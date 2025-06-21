@@ -1,7 +1,7 @@
 import { encode } from "@msgpack/msgpack";
 import { match, type } from "arktype";
 import { Message, Peer } from "crossws";
-import { serve as crosswsServe } from "crossws/server";
+import type { serve as crosswsServe } from "crossws/server";
 import {
   Chunk,
   Context,
@@ -574,12 +574,13 @@ export const serve = <
   SubscriptionHandlers extends Record<string, SubscriptionHandlerContext>,
   MutationHandlers extends Record<string, MutationHandlerContext>,
 >(
+  serveFn: typeof crosswsServe,
   server: Server<SubscriptionHandlers, MutationHandlers>,
 ) => {
   return pipe(
     Effect.succeed(server),
     Effect.map((server) => {
-      return crosswsServe({
+      return serveFn({
         websocket: {
           open: (peer) => {
             return Effect.runPromise(Server.open(peer)(server)).catch(
