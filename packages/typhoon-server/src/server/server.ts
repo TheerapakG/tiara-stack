@@ -6,6 +6,7 @@ import {
   Chunk,
   Context,
   Effect,
+  Exit,
   HashMap,
   Option,
   pipe,
@@ -600,11 +601,23 @@ export const serve = <
         },
         fetch: (request) => {
           return Effect.runPromise(
-            Server.handleWebRequest(request)(server),
-          ).catch((error) => {
-            console.error("[fetch] error", request, error);
-            return new Response("", { status: 500 });
-          });
+            pipe(
+              Server.handleWebRequest(request)(server),
+              Effect.exit,
+              Effect.flatMap(
+                Exit.mapBoth({
+                  onSuccess: (response) => response,
+                  onFailure: (error) => {
+                    console.error("[fetch] error", request, error);
+                    return new Response("", { status: 500 });
+                  },
+                }),
+              ),
+              Effect.withSpan("serve.fetch", {
+                captureStackTrace: true,
+              }),
+            ),
+          );
         },
       });
     }),
