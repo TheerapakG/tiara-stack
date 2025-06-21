@@ -96,6 +96,7 @@ export class AppsScriptClient<
       Effect.let("response", ({ requestBuffer }) =>
         UrlFetchApp.fetch(client.url, {
           method: "post",
+          contentType: "application/octet-stream",
           payload: requestBuffer,
         }),
       ),
