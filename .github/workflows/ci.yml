@@ -31,9 +31,6 @@ jobs:
       - name: Install Dependencies
         run: pnpm install
 
-      - name: Initialize Monorepo
-        run: pnpm -w initialize
-
       - name: Run Checks
         run: pnpm nx run-many -t format,lint,typecheck --output-style=stream
 
@@ -64,9 +61,6 @@ jobs:
 
       - name: Install Dependencies
         run: pnpm install
-
-      - name: Initialize Monorepo
-        run: pnpm -w initialize
 
       - name: Run Build
         run: pnpm nx build ${{ matrix.package }} --output-style=stream
