@@ -1,10 +1,10 @@
-import { signal, Signal } from "@preact/signals-core";
 import { Chunk, Context, Effect, Exit, pipe, Scope, Stream } from "effect";
 import {
   HandlerConfig,
   RequestParamsConfig,
   validateRequestParamsConfig,
 } from "typhoon-core/config";
+import { signal, Signal } from "typhoon-core/signal";
 
 const streamToParsed =
   <RequestParams extends RequestParamsConfig | undefined>(
@@ -24,7 +24,8 @@ export class EventRequestWithConfig<Config extends HandlerConfig> {
   raw() {
     return pipe(
       Event,
-      Effect.map((signal) => signal.value.stream),
+      Effect.flatMap((signal) => signal.value),
+      Effect.map(({ stream }) => stream),
     );
   }
 
@@ -72,8 +73,13 @@ export class Event extends Context.Tag("Event")<
     return pipe(
       Effect.Do,
       Effect.bind("signal", () => Event),
-      Effect.let("oldScope", ({ signal }) => signal.peek().scope),
-      Effect.tap(({ signal }) => (signal.value = ctx)),
+      Effect.bind("oldScope", ({ signal }) =>
+        pipe(
+          signal.peek(),
+          Effect.map(({ scope }) => scope),
+        ),
+      ),
+      Effect.tap(({ signal }) => signal.setValue(ctx)),
       Effect.tap(({ oldScope }) => Scope.close(oldScope, Exit.void)),
       Effect.map(({ signal }) => signal),
     );
@@ -83,7 +89,12 @@ export class Event extends Context.Tag("Event")<
     return pipe(
       Effect.Do,
       Effect.bind("signal", () => Event),
-      Effect.let("oldScope", ({ signal }) => signal.peek().scope),
+      Effect.bind("oldScope", ({ signal }) =>
+        pipe(
+          signal.peek(),
+          Effect.map(({ scope }) => scope),
+        ),
+      ),
       Effect.tap(({ oldScope }) => Scope.close(oldScope, Exit.void)),
     );
   }

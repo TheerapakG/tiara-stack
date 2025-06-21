@@ -5,9 +5,11 @@
       "cache": false
     },
     "lint": {
+      "dependsOn": ["^build"],
       "cache": false
     },
     "typecheck": {
+      "dependsOn": ["^build"],
       "cache": false
     },
     "build": {
@@ -16,5 +18,5 @@
       "cache": true
     }
   },
-  "defaultBase": "main"
+  "defaultBase": "master"
 }

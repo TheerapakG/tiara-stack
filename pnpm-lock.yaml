@@ -441,9 +441,6 @@ importers:
       '@msgpack/msgpack':
         specifier: ^3.1.2
         version: 3.1.2
-      '@preact/signals-core':
-        specifier: ^1.8.0
-        version: 1.8.0
       '@types/pg':
         specifier: ^8.15.2
         version: 8.15.2
