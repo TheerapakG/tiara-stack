@@ -209,7 +209,9 @@ export class Server<
             Effect.map(({ newPeerStateMap }) => newPeerStateMap),
           ),
         ),
-        Effect.withSpan("updatePeerState"),
+        Effect.withSpan("updatePeerState", {
+          captureStackTrace: true,
+        }),
       );
   }
 
@@ -260,7 +262,9 @@ export class Server<
             subscriptionStateMap: newSubscriptionStateMap,
           }),
         ),
-        Effect.withSpan("updatePeerSubscriptionState"),
+        Effect.withSpan("updatePeerSubscriptionState", {
+          captureStackTrace: true,
+        }),
       ),
     );
   }
@@ -342,7 +346,9 @@ export class Server<
             ).value,
         ),
         Effect.map(({ returnValue }) => returnValue),
-        Effect.withSpan("Server.handleOnce"),
+        Effect.withSpan("Server.handleOnce", {
+          captureStackTrace: true,
+        }),
       );
   }
 
@@ -374,7 +380,9 @@ export class Server<
           ),
         ),
         Effect.map(({ returnValue }) => returnValue),
-        Effect.withSpan("Server.handleMutate"),
+        Effect.withSpan("Server.handleMutate", {
+          captureStackTrace: true,
+        }),
       );
   }
 
@@ -562,7 +570,9 @@ export class Server<
               Effect.sync(() => new Response("", { status: 404 })),
             )(header),
         ),
-        Effect.withSpan("Server.handleWebRequest"),
+        Effect.withSpan("Server.handleWebRequest", {
+          captureStackTrace: true,
+        }),
       );
   }
 }
