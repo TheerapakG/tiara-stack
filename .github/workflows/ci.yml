@@ -6,7 +6,7 @@ on:
       - ".github/workflows/ci.yml"
       - "k8s/**"
       - "packages/**"
-    branches: ["main"]
+    branches: ["master"]
   workflow_dispatch:
 
 jobs:
