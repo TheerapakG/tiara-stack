@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+This project utilizes the ArkType library for runtime type validation. The version of the library being used is 2.1.19.

@@ -1,0 +1,12 @@
+{
+  "name": "tiara-stack-monorepo",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "nx": "19.7.4"
+  },
+  "scripts": {
+    "checks": "nx run-many -t format,lint,typecheck --output-style=stream",
+    "build": "nx run-many -t build --output-style=stream"
+  }
+}
