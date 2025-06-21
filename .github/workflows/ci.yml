@@ -55,7 +55,7 @@ jobs:
         run: docker push registry.digitalocean.com/${{ secrets.REGISTRY_NAME }}/${{ matrix.package }}:$(echo $GITHUB_SHA | head -c7)
 
       - name: Update deployment file
-        run: TAG=$(echo $GITHUB_SHA | head -c7) && sed -i 's|<IMAGE>|registry.digitalocean.com/${{ secrets.REGISTRY_NAME }}/sport-reservation-${{ matrix.package }}:'${TAG}'|' $GITHUB_WORKSPACE/k8s/sport-reservation-${{ matrix.package }}/deployment.yaml
+        run: TAG=$(echo $GITHUB_SHA | head -c7) && sed -i 's|<IMAGE>|registry.digitalocean.com/${{ secrets.REGISTRY_NAME }}/${{ matrix.package }}:'${TAG}'|' $GITHUB_WORKSPACE/k8s/${{ matrix.package }}/deployment.yaml
 
       - name: Save DigitalOcean kubeconfig with short-lived credentials
         run: doctl kubernetes cluster kubeconfig save --expiry-seconds 600 ${{ secrets.CLUSTER_NAME }}
