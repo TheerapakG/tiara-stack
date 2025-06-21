@@ -1,0 +1,7 @@
+packages:
+  - packages/**
+
+catalog: null
+
+ignoredBuiltDependencies:
+  - nx

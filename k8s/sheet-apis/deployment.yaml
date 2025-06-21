@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sheet-apis
+  labels:
+    app: sheet-apis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sheet-apis
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  minReadySeconds: 5
+  template:
+    metadata:
+      labels:
+        app: sheet-apis
+    spec:
+      containers:
+        - name: sheet-apis
+          image: <IMAGE>
+          ports:
+            - containerPort: 3000
+              name: sheet-apis-svc
+          env:
+            - name: POSTGRES_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-apis-secret
+                  key: postgresUrl
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sheet-apis-service
+spec:
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: sheet-apis-svc
+  selector:
+    app: sheet-apis
