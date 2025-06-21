@@ -310,6 +310,73 @@ export class Server<
     );
   }
 
+  static handleOnce<A, E = never>(
+    pullDecodedStream: Effect.Effect<Chunk.Chunk<unknown>, unknown, never>,
+    header: HeaderObject,
+    callback: (buffer: Uint8Array) => Effect.Effect<A, E, Event>,
+    scope: Scope.CloseableScope,
+  ) {
+    return (server: Server) =>
+      pipe(
+        Effect.Do,
+        Effect.let("event", () =>
+          Event.fromPullStreamContext({
+            stream: pullDecodedStream,
+            scope,
+          }),
+        ),
+        Effect.bind("handlerContext", () =>
+          HashMap.get(server.subscriptionHandlerMap, header.handler),
+        ),
+        Effect.bind(
+          "returnValue",
+          ({ event, handlerContext }) =>
+            observeOnce(
+              pipe(
+                Server.runBoundedEventHandler(header.id, handlerContext),
+                Effect.flatMap((returnBuffer) => callback(returnBuffer)),
+                Effect.tap(() => Event.close()),
+                Effect.provideService(Event, event),
+              ),
+            ).value,
+        ),
+        Effect.map(({ returnValue }) => returnValue),
+        Effect.withSpan("Server.handleOnce"),
+      );
+  }
+
+  static handleMutate<A, E = never>(
+    pullDecodedStream: Effect.Effect<Chunk.Chunk<unknown>, unknown, never>,
+    header: HeaderObject,
+    callback: Effect.Effect<A, E, Event>,
+    scope: Scope.CloseableScope,
+  ) {
+    return (server: Server) =>
+      pipe(
+        Effect.Do,
+        Effect.let("event", () =>
+          Event.fromPullStreamContext({
+            stream: pullDecodedStream,
+            scope,
+          }),
+        ),
+        Effect.bind("handlerContext", () =>
+          HashMap.get(server.mutationHandlerMap, header.handler),
+        ),
+        Effect.let("handler", ({ handlerContext }) => handlerContext.handler),
+        Effect.bind("returnValue", ({ event, handler }) =>
+          pipe(
+            handler,
+            Effect.flatMap(() => callback),
+            Effect.tap(() => Event.close()),
+            Effect.provideService(Event, event),
+          ),
+        ),
+        Effect.map(({ returnValue }) => returnValue),
+        Effect.withSpan("Server.handleMutate"),
+      );
+  }
+
   static handleWebSocketMessage(peer: Peer, message: Message) {
     return (server: Server) =>
       pipe(
@@ -421,59 +488,25 @@ export class Server<
               )(server),
             )
             .case({ action: "'client:once'" }, () =>
-              pipe(
-                Effect.Do,
-                Effect.let("event", () =>
-                  Event.fromPullStreamContext({
-                    stream: pullDecodedStream,
-                    scope,
+              Server.handleOnce(
+                pullDecodedStream,
+                header,
+                (buffer) =>
+                  Effect.sync(() => {
+                    peer.send(buffer, {
+                      compress: true,
+                    });
                   }),
-                ),
-                Effect.bind("handlerContext", () =>
-                  HashMap.get(server.subscriptionHandlerMap, header.handler),
-                ),
-                Effect.tap(({ event, handlerContext }) =>
-                  observeOnce(
-                    pipe(
-                      Server.runBoundedEventHandler(header.id, handlerContext),
-                      Effect.tap((boundedEventHandler) =>
-                        peer.send(boundedEventHandler, {
-                          compress: true,
-                        }),
-                      ),
-                      Effect.andThen(Event.close()),
-                      Effect.provideService(Event, event),
-                    ),
-                  ),
-                ),
-                Effect.asVoid,
-              ),
+                scope,
+              )(server),
             )
             .case({ action: "'client:mutate'" }, () =>
-              pipe(
-                Effect.Do,
-                Effect.let("event", () =>
-                  Event.fromPullStreamContext({
-                    stream: pullDecodedStream,
-                    scope,
-                  }),
-                ),
-                Effect.bind("handlerContext", () =>
-                  HashMap.get(server.mutationHandlerMap, header.handler),
-                ),
-                Effect.let(
-                  "handler",
-                  ({ handlerContext }) => handlerContext.handler,
-                ),
-                Effect.tap(({ event, handler }) =>
-                  pipe(
-                    handler,
-                    Effect.andThen(Event.close()),
-                    Effect.provideService(Event, event),
-                  ),
-                ),
-                Effect.asVoid,
-              ),
+              Server.handleMutate(
+                pullDecodedStream,
+                header,
+                Effect.void,
+                scope,
+              )(server),
             )
             .default(() => Effect.void)(header),
         ),
@@ -500,72 +533,35 @@ export class Server<
         Effect.flatMap(({ pullDecodedStream, header, scope }) =>
           match({})
             .case({ action: "'client:once'" }, () =>
-              pipe(
-                Effect.Do,
-                Effect.let("event", () =>
-                  Event.fromPullStreamContext({
-                    stream: pullDecodedStream,
-                    scope,
-                  }),
-                ),
-                Effect.bind("handlerContext", () =>
-                  HashMap.get(server.subscriptionHandlerMap, header.handler),
-                ),
-                Effect.bind(
-                  "boundedEventHandler",
-                  ({ event, handlerContext }) =>
-                    observeOnce(
-                      pipe(
-                        Server.runBoundedEventHandler(
-                          header.id,
-                          handlerContext,
-                        ),
-                        Effect.tap(() => Event.close()),
-                        Effect.provideService(Event, event),
-                      ),
-                    ).value,
-                ),
-                Effect.map(
-                  ({ boundedEventHandler }) =>
-                    new Response(boundedEventHandler, {
-                      status: 200,
-                      headers: {
-                        "content-type": "application/octet-stream",
-                      },
-                    }),
-                ),
-              ),
+              Server.handleOnce(
+                pullDecodedStream,
+                header,
+                (buffer) =>
+                  Effect.sync(
+                    () =>
+                      new Response(buffer, {
+                        status: 200,
+                        headers: {
+                          "content-type": "application/octet-stream",
+                        },
+                      }),
+                  ),
+                scope,
+              )(server),
             )
             .case({ action: "'client:mutate'" }, () =>
-              pipe(
-                Effect.Do,
-                Effect.let("event", () =>
-                  Event.fromPullStreamContext({
-                    stream: pullDecodedStream,
-                    scope,
-                  }),
-                ),
-                Effect.bind("handlerContext", () =>
-                  HashMap.get(server.mutationHandlerMap, header.handler),
-                ),
-                Effect.let(
-                  "handler",
-                  ({ handlerContext }) => handlerContext.handler,
-                ),
-                Effect.tap(({ event, handler }) =>
-                  pipe(
-                    handler,
-                    Effect.andThen(Event.close()),
-                    Effect.provideService(Event, event),
-                  ),
-                ),
-                Effect.map(() => new Response("", { status: 200 })),
-              ),
+              Server.handleMutate(
+                pullDecodedStream,
+                header,
+                Effect.sync(() => new Response("", { status: 200 })),
+                scope,
+              )(server),
             )
             .default(() =>
               Effect.sync(() => new Response("", { status: 404 })),
             )(header),
         ),
+        Effect.withSpan("Server.handleWebRequest"),
       );
   }
 }
