@@ -4,7 +4,6 @@ import { Message, Peer } from "crossws";
 import type { serve as crosswsServe } from "crossws/server";
 import {
   Chunk,
-  Console,
   Context,
   Effect,
   Exit,
@@ -21,7 +20,7 @@ import {
 } from "typhoon-core/protocol";
 import { validate } from "typhoon-core/schema";
 import { Server as BaseServer, ServerSymbol } from "typhoon-core/server";
-import { effect, observeOnce, SignalContext } from "typhoon-core/signal";
+import { effect, observeOnce } from "typhoon-core/signal";
 import { Event } from "./event";
 import { MutationHandlerContext, SubscriptionHandlerContext } from "./handler";
 
@@ -276,19 +275,10 @@ export class Server<
   ) {
     return pipe(
       Effect.Do,
-      Effect.bind("event", () => Event),
-      Effect.bind("signalContext", () => SignalContext),
-      Effect.bind("boundedEventHandler", ({ event, signalContext }) =>
+      Effect.bind("boundedEventHandler", () =>
         pipe(
           Effect.Do,
-          Effect.tap(() => Console.log(event, signalContext)),
-          Effect.bind("update", () =>
-            pipe(
-              subscriptionHandlerContext.handler,
-              Effect.provideService(Event, event),
-              Effect.provideService(SignalContext, signalContext),
-            ),
-          ),
+          Effect.bind("update", () => subscriptionHandlerContext.handler),
           Effect.bind("updateHeader", () =>
             Header.encode({
               protocol: "typh",
@@ -298,7 +288,6 @@ export class Server<
               handler: subscriptionHandlerContext.config.name,
             }),
           ),
-          Effect.tap(() => Console.log("3")),
           Effect.let("updateHeaderEncoded", ({ updateHeader }) =>
             encode(updateHeader),
           ),
