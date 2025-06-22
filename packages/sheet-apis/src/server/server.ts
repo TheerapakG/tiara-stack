@@ -86,7 +86,7 @@ const calcTeamsByConfigMap = (
         percent: prevPercent,
         team,
       } of currentTeams) {
-        if (enced && !tiererEnced && bp + ENC_BP_DIFF > highestBp) {
+        if (enced && !tiererEnced && bp + ENC_BP_DIFF >= highestBp) {
           continue;
         }
         newTeams.push({
@@ -104,14 +104,13 @@ const calcTeamsByConfigMap = (
       if ((encable || tierer) && config.considerEnc) {
         for (const {
           enced,
-          tiererEnced,
           healed,
           highestBp,
           bp: prevBp,
           percent: prevPercent,
           team,
         } of currentTeams) {
-          if (enced || (!tiererEnced && bp < highestBp + ENC_BP_DIFF)) {
+          if ((enced || !tierer) && bp <= highestBp + ENC_BP_DIFF) {
             continue;
           }
           newTeams.push({
