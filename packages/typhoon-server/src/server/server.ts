@@ -324,7 +324,7 @@ export class Server<
         Effect.Do,
         Effect.let("event", () =>
           Event.fromPullStreamContext({
-            stream: pullDecodedStream,
+            pullStream: pullDecodedStream,
             scope,
           }),
         ),
@@ -361,7 +361,7 @@ export class Server<
         Effect.Do,
         Effect.let("event", () =>
           Event.fromPullStreamContext({
-            stream: pullDecodedStream,
+            pullStream: pullDecodedStream,
             scope,
           }),
         ),
@@ -415,7 +415,7 @@ export class Server<
                       onSome: ({ event, effectCleanup }) =>
                         pipe(
                           Event.replaceStreamContext({
-                            stream: pullDecodedStream,
+                            pullStream: pullDecodedStream,
                             scope,
                           }),
                           Effect.map((event) => ({
@@ -430,7 +430,7 @@ export class Server<
                           Effect.Do,
                           Effect.let("event", () =>
                             Event.fromPullStreamContext({
-                              stream: pullDecodedStream,
+                              pullStream: pullDecodedStream,
                               scope,
                             }),
                           ),

@@ -1,13 +1,4 @@
-import {
-  Chunk,
-  Console,
-  Context,
-  Effect,
-  Exit,
-  pipe,
-  Scope,
-  Stream,
-} from "effect";
+import { Chunk, Context, Effect, Exit, pipe, Scope } from "effect";
 import {
   HandlerConfig,
   RequestParamsConfig,
@@ -15,16 +6,14 @@ import {
 } from "typhoon-core/config";
 import { signal, Signal } from "typhoon-core/signal";
 
-const streamToParsed =
+const pullStreamToParsed =
   <RequestParams extends RequestParamsConfig | undefined>(
     requestParams: RequestParams,
   ) =>
-  (stream: Stream.Stream<unknown, unknown, never>) =>
+  (pullStream: Effect.Effect<Chunk.Chunk<unknown>, unknown, never>) =>
     pipe(
-      Stream.take(stream, 1),
-      Stream.runCollect,
+      pullStream,
       Effect.flatMap(Chunk.get(0)),
-      Effect.tap(Console.log),
       Effect.flatMap(validateRequestParamsConfig(requestParams)),
     );
 
@@ -35,7 +24,7 @@ export class EventRequestWithConfig<Config extends HandlerConfig> {
     return pipe(
       Event,
       Effect.flatMap((signal) => signal.value),
-      Effect.map(({ stream }) => stream),
+      Effect.map(({ pullStream }) => pullStream),
     );
   }
 
@@ -47,7 +36,7 @@ export class EventRequestWithConfig<Config extends HandlerConfig> {
     return pipe(
       this.raw(),
       Effect.flatMap(
-        streamToParsed(this.config.requestParams as RequestParams),
+        pullStreamToParsed(this.config.requestParams as RequestParams),
       ),
     );
   }
@@ -62,21 +51,21 @@ export class EventWithConfig<Config extends HandlerConfig> {
 }
 
 type PullStreamContext = {
-  stream: Effect.Effect<Chunk.Chunk<unknown>, unknown, never>;
+  pullStream: Effect.Effect<Chunk.Chunk<unknown>, unknown, never>;
   scope: Scope.CloseableScope;
 };
 
 export class Event extends Context.Tag("Event")<
   Event,
   Signal<{
-    readonly stream: Effect.Effect<Chunk.Chunk<unknown>, unknown, never>;
+    readonly pullStream: Effect.Effect<Chunk.Chunk<unknown>, unknown, never>;
     readonly scope: Scope.CloseableScope;
   }>
 >() {
   static fromPullStreamContext(
     ctx: PullStreamContext,
   ): Context.Tag.Service<Event> {
-    return signal({ stream: ctx.stream, scope: ctx.scope });
+    return signal({ pullStream: ctx.pullStream, scope: ctx.scope });
   }
 
   static replaceStreamContext(ctx: PullStreamContext) {
