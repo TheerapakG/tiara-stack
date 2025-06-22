@@ -21,7 +21,7 @@ import {
 } from "typhoon-core/protocol";
 import { validate } from "typhoon-core/schema";
 import { Server as BaseServer, ServerSymbol } from "typhoon-core/server";
-import { effect, observeOnce } from "typhoon-core/signal";
+import { effect, observeOnce, SignalContext } from "typhoon-core/signal";
 import { Event } from "./event";
 import { MutationHandlerContext, SubscriptionHandlerContext } from "./handler";
 
@@ -277,12 +277,18 @@ export class Server<
     return pipe(
       Effect.Do,
       Effect.bind("event", () => Event),
-      Effect.bind("boundedEventHandler", ({ event }) =>
+      Effect.bind("signalContext", () => SignalContext),
+      Effect.bind("boundedEventHandler", ({ event, signalContext }) =>
         pipe(
           Effect.Do,
-          Effect.tap(() => Console.log("1")),
-          Effect.bind("update", () => subscriptionHandlerContext.handler),
-          Effect.tap(() => Console.log("2")),
+          Effect.tap(() => Console.log(event, signalContext)),
+          Effect.bind("update", () =>
+            pipe(
+              subscriptionHandlerContext.handler,
+              Effect.provideService(Event, event),
+              Effect.provideService(SignalContext, signalContext),
+            ),
+          ),
           Effect.bind("updateHeader", () =>
             Header.encode({
               protocol: "typh",
@@ -296,9 +302,7 @@ export class Server<
           Effect.let("updateHeaderEncoded", ({ updateHeader }) =>
             encode(updateHeader),
           ),
-          Effect.tap(() => Console.log("4")),
           Effect.let("updateMessageEncoded", ({ update }) => encode(update)),
-          Effect.tap(() => Console.log("5")),
           Effect.let(
             "updateBuffer",
             ({ updateHeaderEncoded, updateMessageEncoded }) => {
@@ -313,9 +317,7 @@ export class Server<
               return updateBuffer;
             },
           ),
-          Effect.tap(() => Console.log("6")),
           Effect.map(({ updateBuffer }) => updateBuffer),
-          Effect.provideService(Event, event),
         ),
       ),
       Effect.map(({ boundedEventHandler }) => boundedEventHandler),
