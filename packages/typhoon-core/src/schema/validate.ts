@@ -8,7 +8,16 @@ export type Validated<Schema extends StandardSchemaV1 | undefined> =
 
 export class ValidationError extends Data.TaggedError("ValidationError")<{
   issues: readonly StandardSchemaV1.Issue[];
-}> {}
+  message: string;
+}> {
+  constructor({
+    issues,
+  }: {
+    readonly issues: readonly StandardSchemaV1.Issue[];
+  }) {
+    super({ issues, message: issues.map((issue) => issue.message).join("\n") });
+  }
+}
 
 const parseStandardSchemaV1Result = <Output = unknown>(
   result: StandardSchemaV1.Result<Output>,
