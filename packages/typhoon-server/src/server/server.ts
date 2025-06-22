@@ -280,6 +280,7 @@ export class Server<
       Effect.bind("boundedEventHandler", ({ event }) =>
         pipe(
           Effect.Do,
+          Effect.tap(() => Console.log(event)),
           Effect.bind("update", () => subscriptionHandlerContext.handler),
           Effect.bind("updateHeader", () =>
             Header.encode({
