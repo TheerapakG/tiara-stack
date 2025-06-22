@@ -433,13 +433,13 @@ class OnceObserver<A = unknown, E = unknown> implements DependentSignal {
   readonly [DependentSymbol]: DependentSignal = this;
 
   private _effect: E.Effect<A, E, SignalContext>;
-  private _fiber: Fiber.Fiber<A, E>;
   private _dependencies: HashSet.HashSet<DependencySignal>;
+  private _fiber: Fiber.Fiber<A, E>;
 
   constructor(effect: E.Effect<A, E, SignalContext>) {
     this._effect = effect;
-    this._fiber = pipe(runAndTrackEffect(effect, this), E.runFork);
     this._dependencies = HashSet.empty();
+    this._fiber = pipe(runAndTrackEffect(effect, this), E.runFork);
   }
 
   addDependency(dependency: DependencySignal) {
