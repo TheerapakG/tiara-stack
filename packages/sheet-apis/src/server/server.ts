@@ -225,10 +225,8 @@ const calcHandler = defineHandlerBuilder()
   .config(calcHandlerConfig)
   .handler(
     Effect.gen(function* () {
-      console.log("before");
       const { config, players } =
         yield* Event.withConfig(calcHandlerConfig).request.parsed();
-      console.log("after");
       return calc(config, players);
     }),
   );
