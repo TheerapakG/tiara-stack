@@ -577,6 +577,32 @@ export class Server<
   }
 }
 
+const handleServeAction = <A, E = never>(
+  action: (server: Server) => Effect.Effect<A, E, never>,
+  onError: (error: E) => Effect.Effect<A, never, never>,
+) => {
+  return (server: Server) =>
+    pipe(
+      server,
+      action,
+      Effect.exit,
+      Effect.flatMap(
+        Exit.mapBoth({
+          onSuccess: (response) => Effect.succeed(response),
+          onFailure: (error) => {
+            console.error("[serve] error", error);
+            return onError(error);
+          },
+        }),
+      ),
+      Effect.merge,
+      Effect.flatMap((result) => result),
+      Effect.withSpan("serve.action", {
+        captureStackTrace: true,
+      }),
+    );
+};
+
 export const serve = <
   SubscriptionHandlers extends Record<string, SubscriptionHandlerContext>,
   MutationHandlers extends Record<string, MutationHandlerContext>,
@@ -590,19 +616,42 @@ export const serve = <
       return serveFn({
         websocket: {
           open: (peer) => {
-            return Effect.runPromise(Server.open(peer)(server)).catch(
-              console.error,
+            return Effect.runPromise(
+              pipe(
+                server,
+                handleServeAction(Server.open(peer), () => Effect.void),
+                Effect.withSpan("serve.websocket.open", {
+                  captureStackTrace: true,
+                }),
+              ),
             );
           },
 
           message: (peer, message) => {
             return Effect.runPromise(
-              Server.handleWebSocketMessage(peer, message)(server),
-            ).catch(console.error);
+              pipe(
+                server,
+                handleServeAction(
+                  Server.handleWebSocketMessage(peer, message),
+                  () => Effect.void,
+                ),
+                Effect.withSpan("serve.websocket.message", {
+                  captureStackTrace: true,
+                }),
+              ),
+            );
           },
 
           close: (peer, _event) => {
-            return Effect.runPromise(Server.close(peer)(server));
+            return Effect.runPromise(
+              pipe(
+                server,
+                handleServeAction(Server.close(peer), () => Effect.void),
+                Effect.withSpan("serve.websocket.close", {
+                  captureStackTrace: true,
+                }),
+              ),
+            );
           },
 
           error: (peer, error) => {
@@ -612,16 +661,9 @@ export const serve = <
         fetch: (request) => {
           return Effect.runPromise(
             pipe(
-              Server.handleWebRequest(request)(server),
-              Effect.exit,
-              Effect.flatMap(
-                Exit.mapBoth({
-                  onSuccess: (response) => response,
-                  onFailure: (error) => {
-                    console.error("[fetch] error", request, error);
-                    return new Response("", { status: 500 });
-                  },
-                }),
+              server,
+              handleServeAction(Server.handleWebRequest(request), () =>
+                Effect.succeed(new Response("", { status: 500 })),
               ),
               Effect.withSpan("serve.fetch", {
                 captureStackTrace: true,

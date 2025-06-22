@@ -1,5 +1,5 @@
 import { type } from "arktype";
-import { Array, Cause, Chunk, Effect, pipe, Stream } from "effect";
+import { Array, Chunk, Data, Effect, pipe, Stream } from "effect";
 import { validate, ValidationError } from "../schema/validate";
 
 const headerFields = [
@@ -18,13 +18,25 @@ const headerActionFields = [
   "server:update",
 ] as const;
 
+export class InvalidHeaderFieldError extends Data.TaggedError(
+  "InvalidHeaderFieldError",
+)<{
+  field: string | number;
+}> {}
+
 class HeaderActionField {
   static encode(input: (typeof headerActionFields)[number]) {
-    return Effect.succeed(headerActionFields.indexOf(input));
+    return pipe(
+      Array.findFirstIndex(headerActionFields, (field) => field === input),
+      Effect.mapError(() => new InvalidHeaderFieldError({ field: input })),
+    );
   }
 
   static decode(input: number) {
-    return Array.get(headerActionFields, input);
+    return pipe(
+      Array.get(headerActionFields, input),
+      Effect.mapError(() => new InvalidHeaderFieldError({ field: input })),
+    );
   }
 }
 
@@ -52,11 +64,7 @@ const headerFieldDecoderMap = {
   (typeof headerFields)[number],
   (
     value: unknown,
-  ) => Effect.Effect<
-    unknown,
-    ValidationError | Cause.NoSuchElementException,
-    never
-  >
+  ) => Effect.Effect<unknown, ValidationError | InvalidHeaderFieldError, never>
 >;
 
 export type HeaderObject = {
@@ -94,11 +102,7 @@ const headerFieldEncoderMap = {
   (typeof headerFields)[number],
   (
     value: unknown,
-  ) => Effect.Effect<
-    unknown,
-    ValidationError | Cause.NoSuchElementException,
-    never
-  >
+  ) => Effect.Effect<unknown, ValidationError | InvalidHeaderFieldError, never>
 >;
 
 export class Header {
@@ -117,7 +121,7 @@ export class Header {
             ({ headerFieldEncoder }) =>
               headerFieldEncoder(headerFieldValue) as Effect.Effect<
                 unknown,
-                ValidationError,
+                ValidationError | InvalidHeaderFieldError,
                 never
               >,
           ),
@@ -137,7 +141,12 @@ export class Header {
         pipe(
           Effect.Do,
           Effect.bind("headerField", () =>
-            Array.get(headerFields, headerFieldIndex),
+            pipe(
+              Array.get(headerFields, headerFieldIndex),
+              Effect.mapError(
+                () => new InvalidHeaderFieldError({ field: headerFieldIndex }),
+              ),
+            ),
           ),
           Effect.let(
             "headerFieldDecoder",
@@ -148,7 +157,7 @@ export class Header {
             ({ headerFieldDecoder }) =>
               headerFieldDecoder(headerFieldValue) as Effect.Effect<
                 unknown,
-                ValidationError,
+                ValidationError | InvalidHeaderFieldError,
                 never
               >,
           ),
