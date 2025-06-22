@@ -20,7 +20,7 @@ const calcTeamsByConfigMap = (
 ) => {
   console.log(config);
 
-  let currentTeams = [
+  let currentRooms = [
     {
       enced: false,
       tiererEnced: false,
@@ -28,9 +28,9 @@ const calcTeamsByConfigMap = (
       highestBp: 0,
       bp: 0,
       percent: 0,
-      team: [] as Array<{
+      room: [] as Array<{
         type: string;
-        player: string;
+        team: string;
         bp: number;
         percent: number;
         tags: string[];
@@ -39,21 +39,21 @@ const calcTeamsByConfigMap = (
   ];
 
   for (const player of players) {
-    const newTeams = [];
+    const newRooms = [];
 
     let playerTeams = player
-      .map(({ type, tagStr, player, bp, percent }) => {
+      .map(({ type, tagStr, team, bp, percent }) => {
         const tags = tagStr.split(/\s*,\s*/).filter(Boolean);
 
         return {
           type,
-          player,
+          team,
           bp,
           percent: percent ?? 1,
           tags,
         };
       })
-      .filter(({ player, bp }) => player !== "" && bp !== "")
+      .filter(({ team, bp }) => team !== "" && bp !== "")
       .map(({ bp, ...data }) => ({
         ...data,
         bp: bp as number,
@@ -71,7 +71,7 @@ const calcTeamsByConfigMap = (
       });
     }
 
-    for (const { type, player, bp, percent, tags } of playerTeams) {
+    for (const { type, team, bp, percent, tags } of playerTeams) {
       const tierer = tags.includes("tierer");
       const healer = tags.includes("heal");
       const encable = tags.includes("encable");
@@ -84,19 +84,19 @@ const calcTeamsByConfigMap = (
         highestBp,
         bp: prevBp,
         percent: prevPercent,
-        team,
-      } of currentTeams) {
+        room,
+      } of currentRooms) {
         if (enced && !tiererEnced && bp + ENC_BP_DIFF >= highestBp) {
           continue;
         }
-        newTeams.push({
+        newRooms.push({
           enced,
           tiererEnced,
           healed: healed + (healer ? 1 : 0),
           highestBp: Math.max(highestBp, bp),
           bp: prevBp + bp,
           percent: prevPercent + percent,
-          team: [...team, { type, player, bp, percent, tags: [...tags] }],
+          room: [...room, { type, team, bp, percent, tags: [...tags] }],
         });
       }
 
@@ -108,23 +108,23 @@ const calcTeamsByConfigMap = (
           highestBp,
           bp: prevBp,
           percent: prevPercent,
-          team,
-        } of currentTeams) {
+          room,
+        } of currentRooms) {
           if ((enced || !tierer) && bp <= highestBp + ENC_BP_DIFF) {
             continue;
           }
-          newTeams.push({
+          newRooms.push({
             enced: true,
             tiererEnced: tierer,
             healed: healed + (healer ? 1 : 0),
             highestBp: Math.max(highestBp, bp),
             bp: prevBp + bp,
             percent: prevPercent + 2 * percent,
-            team: [
-              ...team,
+            room: [
+              ...room,
               {
                 type,
-                player,
+                team,
                 bp,
                 percent,
                 tags: [...tags, tierer ? "tierer_enc_override" : "enc"],
@@ -134,12 +134,12 @@ const calcTeamsByConfigMap = (
         }
       }
     }
-    console.log(newTeams.length);
+    console.log(newRooms.length);
 
-    currentTeams = newTeams;
+    currentRooms = newRooms;
   }
 
-  const result = currentTeams.filter(
+  const result = currentRooms.filter(
     ({ enced, healed }) =>
       (config.considerEnc ? enced : true) && healed >= config.healNeeded,
   );
@@ -176,13 +176,13 @@ const calc = (
 
   const bestResult = [];
   let bestPercent = 0;
-  for (const { bp, percent, team } of result) {
+  for (const { bp, percent, room } of result) {
     if (percent > bestPercent) {
       bestPercent = percent;
       bestResult.push([
         bp / 5,
         percent / 5,
-        ...team.map(({ player, tags }) => [tags.join(", "), player]).flat(),
+        ...room.map(({ team, tags }) => [tags.join(", "), team]).flat(),
       ]);
     }
   }
