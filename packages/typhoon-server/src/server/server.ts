@@ -601,75 +601,76 @@ const handleServeAction = <A, E = never>(
     );
 };
 
-export const serve = <
-  SubscriptionHandlers extends Record<string, SubscriptionHandlerContext>,
-  MutationHandlers extends Record<string, MutationHandlerContext>,
->(
-  serveFn: typeof crosswsServe,
-  server: Server<SubscriptionHandlers, MutationHandlers>,
-) => {
-  return pipe(
-    Effect.succeed(server),
-    Effect.map((server) => {
-      return serveFn({
-        websocket: {
-          open: (peer) => {
-            return Effect.runPromise(
-              pipe(
-                server,
-                handleServeAction(Server.open(peer), () => Effect.void),
-                Effect.withSpan("serve.websocket.open", {
-                  captureStackTrace: true,
-                }),
-              ),
-            );
-          },
-
-          message: (peer, message) => {
-            return Effect.runPromise(
-              pipe(
-                server,
-                handleServeAction(
-                  Server.handleWebSocketMessage(peer, message),
-                  () => Effect.void,
+export const serve =
+  <
+    SubscriptionHandlers extends Record<string, SubscriptionHandlerContext>,
+    MutationHandlers extends Record<string, MutationHandlerContext>,
+  >(
+    serveFn: typeof crosswsServe,
+  ) =>
+  (server: Server<SubscriptionHandlers, MutationHandlers>) => {
+    return pipe(
+      Effect.succeed(server),
+      Effect.map((server) => {
+        return serveFn({
+          websocket: {
+            open: (peer) => {
+              return Effect.runPromise(
+                pipe(
+                  server,
+                  handleServeAction(Server.open(peer), () => Effect.void),
+                  Effect.withSpan("serve.websocket.open", {
+                    captureStackTrace: true,
+                  }),
                 ),
-                Effect.withSpan("serve.websocket.message", {
-                  captureStackTrace: true,
-                }),
-              ),
-            );
-          },
+              );
+            },
 
-          close: (peer, _event) => {
+            message: (peer, message) => {
+              return Effect.runPromise(
+                pipe(
+                  server,
+                  handleServeAction(
+                    Server.handleWebSocketMessage(peer, message),
+                    () => Effect.void,
+                  ),
+                  Effect.withSpan("serve.websocket.message", {
+                    captureStackTrace: true,
+                  }),
+                ),
+              );
+            },
+
+            close: (peer, _event) => {
+              return Effect.runPromise(
+                pipe(
+                  server,
+                  handleServeAction(Server.close(peer), () => Effect.void),
+                  Effect.withSpan("serve.websocket.close", {
+                    captureStackTrace: true,
+                  }),
+                ),
+              );
+            },
+
+            error: (peer, error) => {
+              console.log("[ws] error", peer, error);
+            },
+          },
+          fetch: (request) => {
             return Effect.runPromise(
               pipe(
                 server,
-                handleServeAction(Server.close(peer), () => Effect.void),
-                Effect.withSpan("serve.websocket.close", {
+                handleServeAction(Server.handleWebRequest(request), () =>
+                  Effect.succeed(new Response("", { status: 500 })),
+                ),
+                Effect.withSpan("serve.fetch", {
                   captureStackTrace: true,
                 }),
               ),
             );
           },
-
-          error: (peer, error) => {
-            console.log("[ws] error", peer, error);
-          },
-        },
-        fetch: (request) => {
-          return Effect.runPromise(
-            pipe(
-              server,
-              handleServeAction(Server.handleWebRequest(request), () =>
-                Effect.succeed(new Response("", { status: 500 })),
-              ),
-              Effect.withSpan("serve.fetch", {
-                captureStackTrace: true,
-              }),
-            ),
-          );
-        },
-      });
-    }),
-  );
-};
+        });
+      }),
+    );
+  };

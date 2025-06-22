@@ -6,7 +6,7 @@ import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
 
 const filePaths = globSync("./src/**/index.ts", { nodir: true }).map((file) =>
-  fileURLToPath(new URL(file, import.meta.url))
+  fileURLToPath(new URL(file, import.meta.url)),
 );
 
 export default defineConfig({
@@ -19,16 +19,16 @@ export default defineConfig({
           const parsed = path.parse(relativePath);
           const module = path.join(
             parsed.dir.replace(/\.+\//g, ""),
-            parsed.name
+            parsed.name,
           );
 
           return [module, filePath];
-        })
+        }),
       ),
       formats: ["es", "cjs"],
     },
     rollupOptions: {
-      external: [...builtinModules, /^node:/],
+      external: [...builtinModules, /^node:/, "effect"],
     },
   },
   plugins: [
