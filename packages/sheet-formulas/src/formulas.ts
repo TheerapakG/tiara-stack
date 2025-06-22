@@ -2,7 +2,7 @@
 import "../polyfill/classPolyfill";
 
 import { Effect, pipe } from "effect";
-import type { server } from "sheet-apis/server";
+import type { server } from "sheet-apis";
 import { AppsScriptClient } from "typhoon-client-apps-script/client";
 
 const ENC_BP_DIFF = 0;
