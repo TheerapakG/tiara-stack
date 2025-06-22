@@ -21,7 +21,7 @@
   "author": "",
   "dependencies": {
     "@msgpack/msgpack": "^3.1.2",
-    "effect": "^3.15.3",
+    "effect": "^3.16.8",
     "typhoon-client-apps-script": "workspace:*",
     "typhoon-core": "workspace:*",
     "sheet-apis": "workspace:*"

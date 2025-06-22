@@ -21,9 +21,11 @@
   "author": "",
   "dependencies": {
     "@msgpack/msgpack": "^3.1.2",
-    "effect": "^3.15.3",
     "typhoon-core": "workspace:*",
     "typhoon-server": "workspace:*"
+  },
+  "peerDependencies": {
+    "effect": "^3.16.8"
   },
   "devDependencies": {
     "@standard-schema/spec": "^1.0.0",

@@ -17,10 +17,12 @@
     "crossws": "^0.4.1",
     "destr": "^2.0.5",
     "drizzle-orm": "^0.44.0",
-    "effect": "^3.15.3",
     "ofetch": "^1.4.1",
     "pg": "^8.16.0",
     "srvx": "^0.7.1"
+  },
+  "peerDependencies": {
+    "effect": "^3.16.8"
   },
   "devDependencies": {
     "@standard-schema/spec": "^1.0.0",
