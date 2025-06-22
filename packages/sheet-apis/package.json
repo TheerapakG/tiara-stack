@@ -21,9 +21,7 @@
   "author": "",
   "dependencies": {
     "typhoon-server": "workspace:*",
-    "arktype": "^2.1.19"
-  },
-  "peerDependencies": {
+    "arktype": "^2.1.19",
     "effect": "^3.16.8"
   },
   "devDependencies": {

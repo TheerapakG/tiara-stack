@@ -28,7 +28,7 @@ export default defineConfig({
       formats: ["es", "cjs"],
     },
     rollupOptions: {
-      external: [...builtinModules, /^node:/],
+      external: [...builtinModules, /^node:/, "effect"],
     },
   },
   plugins: [
