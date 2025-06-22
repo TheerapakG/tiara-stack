@@ -1,6 +1,6 @@
 import { type } from "arktype";
 import { Effect, pipe } from "effect";
-import { defineHandlerConfigBuilder } from "typhoon-core/config";
+import { defineHandlerConfigBuilder } from "typhoon-server/config";
 import { defineHandlerBuilder, Event, Server } from "typhoon-server/server";
 
 const ENC_BP_DIFF = 0;
@@ -225,8 +225,10 @@ const calcHandler = defineHandlerBuilder()
   .config(calcHandlerConfig)
   .handler(
     Effect.gen(function* () {
+      console.log("before");
       const { config, players } =
         yield* Event.withConfig(calcHandlerConfig).request.parsed();
+      console.log("after");
       return calc(config, players);
     }),
   );
