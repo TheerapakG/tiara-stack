@@ -34,8 +34,8 @@ importers:
         specifier: ^2.1.19
         version: 2.1.20
       effect:
-        specifier: ^3.15.3
-        version: 3.15.3
+        specifier: ^3.16.8
+        version: 3.16.8
       typhoon-core:
         specifier: workspace:*
         version: link:../typhoon-core
@@ -89,8 +89,8 @@ importers:
         specifier: ^3.1.2
         version: 3.1.2
       effect:
-        specifier: ^3.15.3
-        version: 3.15.3
+        specifier: ^3.16.8
+        version: 3.16.8
       sheet-apis:
         specifier: workspace:*
         version: link:../sheet-apis
@@ -156,8 +156,8 @@ importers:
         specifier: ^3.1.2
         version: 3.1.2
       effect:
-        specifier: ^3.15.3
-        version: 3.15.3
+        specifier: ^3.16.8
+        version: 3.16.8
       typhoon-core:
         specifier: workspace:*
         version: link:../typhoon-core
@@ -217,8 +217,8 @@ importers:
         specifier: ^3.1.2
         version: 3.1.2
       effect:
-        specifier: ^3.15.3
-        version: 3.15.3
+        specifier: ^3.16.8
+        version: 3.16.8
       ofetch:
         specifier: ^1.4.1
         version: 1.4.1
@@ -293,8 +293,8 @@ importers:
         specifier: ^0.44.0
         version: 0.44.0(@types/pg@8.15.2)(pg@8.16.0)
       effect:
-        specifier: ^3.15.3
-        version: 3.15.3
+        specifier: ^3.16.8
+        version: 3.16.8
       ofetch:
         specifier: ^1.4.1
         version: 1.4.1
@@ -378,8 +378,8 @@ importers:
         specifier: ^0.44.0
         version: 0.44.0(@types/pg@8.15.2)(pg@8.16.0)
       effect:
-        specifier: ^3.15.3
-        version: 3.15.3
+        specifier: ^3.16.8
+        version: 3.16.8
       ofetch:
         specifier: ^1.4.1
         version: 1.4.1
@@ -457,8 +457,8 @@ importers:
         specifier: ^0.44.0
         version: 0.44.0(@types/pg@8.15.2)(pg@8.16.0)
       effect:
-        specifier: ^3.15.3
-        version: 3.15.3
+        specifier: ^3.16.8
+        version: 3.16.8
       ofetch:
         specifier: ^1.4.1
         version: 1.4.1
@@ -1599,8 +1599,8 @@ packages:
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
 
-  effect@3.15.3:
-    resolution: {integrity: sha512-Qo5LpHaeKKeZUZF99FwxiaGA39SiX5H2G5K0YgqFWy1eEiN6CpgwBYGqpNyz+STMdiibuTrO4kGQUpQyYw+bLA==}
+  effect@3.16.8:
+    resolution: {integrity: sha512-E4U0MZFBun99myxOogy9ZZ1c3IYR47L/A5GqCP9Lp+6ORag0YLmGHOrYxQ3agN1FOMTrElgtJmciicwnHdE+Ug==}
 
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
@@ -3638,7 +3638,7 @@ snapshots:
 
   eastasianwidth@0.2.0: {}
 
-  effect@3.15.3:
+  effect@3.16.8:
     dependencies:
       '@standard-schema/spec': 1.0.0
       fast-check: 3.23.2

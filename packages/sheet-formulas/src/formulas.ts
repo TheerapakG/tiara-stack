@@ -77,6 +77,7 @@ function calcTeamsByConfigMap(
       const tierer = tags.includes("tierer");
       const healer = tags.includes("heal");
       const encable = tags.includes("encable");
+      console.log({ tierer, healer, encable });
 
       // Nothing
       for (const {
@@ -88,7 +89,7 @@ function calcTeamsByConfigMap(
         percent: prevPercent,
         team,
       } of currentTeams) {
-        if (enced && !tiererEnced && bp + ENC_BP_DIFF > highestBp) {
+        if (enced && !tiererEnced && bp + ENC_BP_DIFF >= highestBp) {
           continue;
         }
         newTeams.push({
@@ -113,7 +114,7 @@ function calcTeamsByConfigMap(
           percent: prevPercent,
           team,
         } of currentTeams) {
-          if (enced || (!tiererEnced && bp < highestBp + ENC_BP_DIFF)) {
+          if ((enced || !tierer) && bp <= highestBp + ENC_BP_DIFF) {
             continue;
           }
           newTeams.push({
@@ -137,7 +138,14 @@ function calcTeamsByConfigMap(
         }
       }
     }
-    console.log(newTeams.length);
+    console.log(
+      newTeams.length,
+      newTeams.filter(
+        ({ enced, healed }) =>
+          (configMap["consider_enc"] ? enced : true) &&
+          healed >= configMap["heal_needed"],
+      ).length,
+    );
 
     currentTeams = newTeams;
   }
@@ -147,8 +155,6 @@ function calcTeamsByConfigMap(
       (configMap["consider_enc"] ? enced : true) &&
       healed >= configMap["heal_needed"],
   );
-
-  console.log(result.length);
 
   result.sort(
     ({ bp: bpA, percent: percentA }, { bp: bpB, percent: percentB }) =>
