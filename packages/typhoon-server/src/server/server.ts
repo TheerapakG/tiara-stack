@@ -325,6 +325,7 @@ export class Server<
     return (server: Server) =>
       pipe(
         Effect.Do,
+        Effect.tap(() => Console.log(server, server.subscriptionHandlerMap)),
         Effect.let("event", () =>
           Event.fromPullStreamContext({
             stream: pullDecodedStream,
@@ -540,7 +541,6 @@ export class Server<
             Effect.flatMap(Header.decode),
           ),
         ),
-        Effect.tap(({ header }) => Console.log(header)),
         Effect.flatMap(({ pullDecodedStream, header, scope }) =>
           match({})
             .case({ action: "'client:once'" }, () =>
