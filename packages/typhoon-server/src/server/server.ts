@@ -4,6 +4,7 @@ import { Message, Peer } from "crossws";
 import type { serve as crosswsServe } from "crossws/server";
 import {
   Chunk,
+  Console,
   Context,
   Effect,
   Exit,
@@ -539,6 +540,7 @@ export class Server<
             Effect.flatMap(Header.decode),
           ),
         ),
+        Effect.tap(({ header }) => Console.log(header)),
         Effect.flatMap(({ pullDecodedStream, header, scope }) =>
           match({})
             .case({ action: "'client:once'" }, () =>
