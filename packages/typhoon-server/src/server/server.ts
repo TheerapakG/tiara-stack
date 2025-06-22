@@ -280,8 +280,9 @@ export class Server<
       Effect.bind("boundedEventHandler", ({ event }) =>
         pipe(
           Effect.Do,
-          Effect.tap(() => Console.log(event)),
+          Effect.tap(() => Console.log("1")),
           Effect.bind("update", () => subscriptionHandlerContext.handler),
+          Effect.tap(() => Console.log("2")),
           Effect.bind("updateHeader", () =>
             Header.encode({
               protocol: "typh",
@@ -291,10 +292,13 @@ export class Server<
               handler: subscriptionHandlerContext.config.name,
             }),
           ),
+          Effect.tap(() => Console.log("3")),
           Effect.let("updateHeaderEncoded", ({ updateHeader }) =>
             encode(updateHeader),
           ),
+          Effect.tap(() => Console.log("4")),
           Effect.let("updateMessageEncoded", ({ update }) => encode(update)),
+          Effect.tap(() => Console.log("5")),
           Effect.let(
             "updateBuffer",
             ({ updateHeaderEncoded, updateMessageEncoded }) => {
@@ -309,6 +313,7 @@ export class Server<
               return updateBuffer;
             },
           ),
+          Effect.tap(() => Console.log("6")),
           Effect.map(({ updateBuffer }) => updateBuffer),
           Effect.provideService(Event, event),
         ),
@@ -326,7 +331,6 @@ export class Server<
     return (server: Server) =>
       pipe(
         Effect.Do,
-        Effect.tap(() => Console.log(server, server.subscriptionHandlerMap)),
         Effect.let("event", () =>
           Event.fromPullStreamContext({
             stream: pullDecodedStream,
