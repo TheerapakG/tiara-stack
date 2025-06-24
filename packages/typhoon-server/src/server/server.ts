@@ -285,9 +285,7 @@ export class Server<
               version: 1,
               id: subscriptionId,
               action: "server:update",
-              payload: {
-                handler: subscriptionHandlerContext.config.name,
-              },
+              payload: {},
             }),
           ),
           Effect.let("updateHeaderEncoded", ({ updateHeader }) =>
