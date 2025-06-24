@@ -16,7 +16,7 @@ import {
 import {
   blobToPullDecodedStream,
   Header,
-  HeaderObject,
+  HeaderEncoderDecoder,
 } from "typhoon-core/protocol";
 import { validate } from "typhoon-core/schema";
 import { Server as BaseServer, ServerSymbol } from "typhoon-core/server";
@@ -280,12 +280,14 @@ export class Server<
           Effect.Do,
           Effect.bind("update", () => subscriptionHandlerContext.handler),
           Effect.bind("updateHeader", () =>
-            Header.encode({
+            HeaderEncoderDecoder.encode({
               protocol: "typh",
               version: 1,
               id: subscriptionId,
               action: "server:update",
-              handler: subscriptionHandlerContext.config.name,
+              payload: {
+                handler: subscriptionHandlerContext.config.name,
+              },
             }),
           ),
           Effect.let("updateHeaderEncoded", ({ updateHeader }) =>
@@ -313,9 +315,74 @@ export class Server<
     );
   }
 
+  static handleSubscribe(
+    peer: Peer,
+    pullDecodedStream: Effect.Effect<Chunk.Chunk<unknown>, unknown, never>,
+    header: Header<"client:subscribe">,
+    scope: Scope.CloseableScope,
+  ) {
+    return (server: Server) =>
+      Server.updatePeerSubscriptionState(peer, header.id, (subscriptionState) =>
+        pipe(
+          subscriptionState,
+          Option.match({
+            onSome: ({ event, effectCleanup }) =>
+              pipe(
+                Event.replaceStreamContext({
+                  pullStream: pullDecodedStream,
+                  scope,
+                }),
+                Effect.map((event) => ({
+                  event,
+                  effectCleanup,
+                })),
+                Effect.option,
+                Effect.provideService(Event, event),
+              ),
+            onNone: () =>
+              pipe(
+                Effect.Do,
+                Effect.let("event", () =>
+                  Event.fromPullStreamContext({
+                    pullStream: pullDecodedStream,
+                    scope,
+                  }),
+                ),
+                Effect.bind("handlerContext", () =>
+                  HashMap.get(
+                    server.subscriptionHandlerMap,
+                    // TODO: validate header.payload.handler
+                    header.payload.handler,
+                  ),
+                ),
+                Effect.bind("effectCleanup", ({ event, handlerContext }) =>
+                  effect(
+                    pipe(
+                      Server.runBoundedEventHandler(header.id, handlerContext),
+                      Effect.tap((boundedEventHandler) =>
+                        peer.send(boundedEventHandler, {
+                          compress: true,
+                        }),
+                      ),
+                      Effect.provideService(Event, event),
+                    ),
+                  ),
+                ),
+                Effect.map(({ event, effectCleanup }) =>
+                  Option.some({
+                    event,
+                    effectCleanup,
+                  }),
+                ),
+              ),
+          }),
+        ),
+      )(server);
+  }
+
   static handleOnce<A, E = never>(
     pullDecodedStream: Effect.Effect<Chunk.Chunk<unknown>, unknown, never>,
-    header: HeaderObject,
+    header: Header<"client:once">,
     callback: (buffer: Uint8Array) => Effect.Effect<A, E, Event>,
     scope: Scope.CloseableScope,
   ) {
@@ -329,7 +396,7 @@ export class Server<
           }),
         ),
         Effect.bind("handlerContext", () =>
-          HashMap.get(server.subscriptionHandlerMap, header.handler),
+          HashMap.get(server.subscriptionHandlerMap, header.payload.handler),
         ),
         Effect.bind(
           "returnValue",
@@ -352,7 +419,7 @@ export class Server<
 
   static handleMutate<A, E = never>(
     pullDecodedStream: Effect.Effect<Chunk.Chunk<unknown>, unknown, never>,
-    header: HeaderObject,
+    header: Header<"client:mutate">,
     callback: Effect.Effect<A, E, Event>,
     scope: Scope.CloseableScope,
   ) {
@@ -366,7 +433,7 @@ export class Server<
           }),
         ),
         Effect.bind("handlerContext", () =>
-          HashMap.get(server.mutationHandlerMap, header.handler),
+          HashMap.get(server.mutationHandlerMap, header.payload.handler),
         ),
         Effect.let("handler", ({ handlerContext }) => handlerContext.handler),
         Effect.bind("returnValue", ({ event, handler }) =>
@@ -398,75 +465,18 @@ export class Server<
             pullDecodedStream,
             Effect.flatMap(Chunk.get(0)),
             Effect.flatMap(validate(type([["number", "unknown"], "[]"]))),
-            Effect.flatMap(Header.decode),
+            Effect.flatMap(HeaderEncoderDecoder.decode),
           ),
         ),
         Effect.flatMap(({ pullDecodedStream, header, scope }) =>
           match
-            .in<HeaderObject>()
+            .in<Header>()
             .case({ action: "'client:subscribe'" }, () =>
-              Server.updatePeerSubscriptionState(
+              Server.handleSubscribe(
                 peer,
-                header.id,
-                (subscriptionState) =>
-                  pipe(
-                    subscriptionState,
-                    Option.match({
-                      onSome: ({ event, effectCleanup }) =>
-                        pipe(
-                          Event.replaceStreamContext({
-                            pullStream: pullDecodedStream,
-                            scope,
-                          }),
-                          Effect.map((event) => ({
-                            event,
-                            effectCleanup,
-                          })),
-                          Effect.option,
-                          Effect.provideService(Event, event),
-                        ),
-                      onNone: () =>
-                        pipe(
-                          Effect.Do,
-                          Effect.let("event", () =>
-                            Event.fromPullStreamContext({
-                              pullStream: pullDecodedStream,
-                              scope,
-                            }),
-                          ),
-                          Effect.bind("handlerContext", () =>
-                            HashMap.get(
-                              server.subscriptionHandlerMap,
-                              header.handler,
-                            ),
-                          ),
-                          Effect.bind(
-                            "effectCleanup",
-                            ({ event, handlerContext }) =>
-                              effect(
-                                pipe(
-                                  Server.runBoundedEventHandler(
-                                    header.id,
-                                    handlerContext,
-                                  ),
-                                  Effect.tap((boundedEventHandler) =>
-                                    peer.send(boundedEventHandler, {
-                                      compress: true,
-                                    }),
-                                  ),
-                                  Effect.provideService(Event, event),
-                                ),
-                              ),
-                          ),
-                          Effect.map(({ event, effectCleanup }) =>
-                            Option.some({
-                              event,
-                              effectCleanup,
-                            }),
-                          ),
-                        ),
-                    }),
-                  ),
+                pullDecodedStream,
+                header as Header<"client:subscribe">,
+                scope,
               )(server),
             )
             .case({ action: "'client:unsubscribe'" }, () =>
@@ -497,7 +507,7 @@ export class Server<
             .case({ action: "'client:once'" }, () =>
               Server.handleOnce(
                 pullDecodedStream,
-                header,
+                header as Header<"client:once">,
                 (buffer) =>
                   Effect.sync(() => {
                     peer.send(buffer, {
@@ -510,7 +520,7 @@ export class Server<
             .case({ action: "'client:mutate'" }, () =>
               Server.handleMutate(
                 pullDecodedStream,
-                header,
+                header as Header<"client:mutate">,
                 Effect.void,
                 scope,
               )(server),
@@ -534,7 +544,7 @@ export class Server<
             pullDecodedStream,
             Effect.flatMap(Chunk.get(0)),
             Effect.flatMap(validate(type([["number", "unknown"], "[]"]))),
-            Effect.flatMap(Header.decode),
+            Effect.flatMap(HeaderEncoderDecoder.decode),
           ),
         ),
         Effect.flatMap(({ pullDecodedStream, header, scope }) =>
@@ -542,7 +552,7 @@ export class Server<
             .case({ action: "'client:once'" }, () =>
               Server.handleOnce(
                 pullDecodedStream,
-                header,
+                header as Header<"client:once">,
                 (buffer) =>
                   Effect.sync(
                     () =>
@@ -559,7 +569,7 @@ export class Server<
             .case({ action: "'client:mutate'" }, () =>
               Server.handleMutate(
                 pullDecodedStream,
-                header,
+                header as Header<"client:mutate">,
                 Effect.sync(() => new Response("", { status: 200 })),
                 scope,
               )(server),

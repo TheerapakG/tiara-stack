@@ -2,7 +2,10 @@ import { encode } from "@msgpack/msgpack";
 import { StandardSchemaV1 } from "@standard-schema/spec";
 import { Chunk, Effect, pipe } from "effect";
 import { ofetch } from "ofetch";
-import { blobToPullDecodedStream, Header } from "typhoon-core/protocol";
+import {
+  blobToPullDecodedStream,
+  HeaderEncoderDecoder,
+} from "typhoon-core/protocol";
 import {
   MutationHandlerContext,
   Server,
@@ -67,12 +70,14 @@ export class AppsScriptClient<
       Effect.Do,
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("requestHeader", ({ id }) =>
-        Header.encode({
+        HeaderEncoderDecoder.encode({
           protocol: "typh",
           version: 1,
           id,
           action: "client:once",
-          handler: handler,
+          payload: {
+            handler: handler,
+          },
         }),
       ),
       Effect.let("requestHeaderEncoded", ({ requestHeader }) =>

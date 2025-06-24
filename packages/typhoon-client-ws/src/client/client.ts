@@ -13,7 +13,7 @@ import {
 import {
   blobToPullDecodedStream,
   Header,
-  HeaderObject,
+  HeaderEncoderDecoder,
 } from "typhoon-core/protocol";
 import { validate } from "typhoon-core/schema";
 import {
@@ -122,7 +122,7 @@ export class WebSocketClient<
                       Effect.flatMap(
                         validate(type([["number", "unknown"], "[]"])),
                       ),
-                      Effect.flatMap(Header.decode),
+                      Effect.flatMap(HeaderEncoderDecoder.decode),
                     ),
                   ),
                   Effect.bind("message", ({ pullDecodedStream }) =>
@@ -130,7 +130,7 @@ export class WebSocketClient<
                   ),
                   Effect.tap(({ header, message }) =>
                     match
-                      .in<HeaderObject>()
+                      .in<Header>()
                       .case({ action: "'server:update'" }, () =>
                         pipe(
                           client.updaterStateMapRef,
@@ -214,12 +214,14 @@ export class WebSocketClient<
         ),
       ),
       Effect.bind("header", ({ id }) =>
-        Header.encode({
+        HeaderEncoderDecoder.encode({
           protocol: "typh",
           version: 1,
           id,
           action: "client:subscribe",
-          handler: handler,
+          payload: {
+            handler: handler,
+          },
         }),
       ),
       Effect.let("headerEncoded", ({ header }) => encode(header)),
@@ -269,12 +271,14 @@ export class WebSocketClient<
         ),
       ),
       Effect.bind("header", () =>
-        Header.encode({
+        HeaderEncoderDecoder.encode({
           protocol: "typh",
           version: 1,
           id,
           action: "client:unsubscribe",
-          handler: handler,
+          payload: {
+            handler: handler,
+          },
         }),
       ),
       Effect.let("headerEncoded", ({ header }) => encode(header)),
@@ -321,12 +325,14 @@ export class WebSocketClient<
             ),
       ),
       Effect.bind("requestHeader", ({ id }) =>
-        Header.encode({
+        HeaderEncoderDecoder.encode({
           protocol: "typh",
           version: 1,
           id,
           action: "client:once",
-          handler: handler,
+          payload: {
+            handler: handler,
+          },
         }),
       ),
       Effect.let("requestHeaderEncoded", ({ requestHeader }) =>
