@@ -91,7 +91,6 @@ class LookupEncoderDecoder<
         Effect.forEach(inputEntries, ([field, value]) =>
           pipe(
             Effect.Do,
-            Effect.tap(() => Effect.log(this.encodingTable, field)),
             Effect.let("fieldEncoder", () => this.encodingTable[field](input)),
             Effect.bind(
               "fieldEncodedValue",
@@ -314,7 +313,7 @@ const payloadEncoder = <
     ),
   );
 
-export type Header<
+type InternalHeader<
   Action extends
     (typeof headerActionFields)[number] = (typeof headerActionFields)[number],
 > = Omit<
@@ -324,6 +323,15 @@ export type Header<
   action: Action;
   payload: Effect.Effect.Success<ReturnType<typeof payloadDecoder<Action>>>;
 };
+
+export type Header<
+  Action extends
+    (typeof headerActionFields)[number] = (typeof headerActionFields)[number],
+> = Action extends infer A
+  ? A extends (typeof headerActionFields)[number]
+    ? InternalHeader<A>
+    : never
+  : never;
 
 export class HeaderEncoderDecoder {
   static encode(input: Header) {
@@ -353,10 +361,13 @@ export class HeaderEncoderDecoder {
             payload,
           }),
       ),
-      Effect.map(({ decodedBaseHeader, decodedPayload }) => ({
-        ...decodedBaseHeader,
-        payload: decodedPayload,
-      })),
+      Effect.map(
+        ({ decodedBaseHeader, decodedPayload }) =>
+          ({
+            ...decodedBaseHeader,
+            payload: decodedPayload,
+          }) as Header,
+      ),
     );
   }
 }
