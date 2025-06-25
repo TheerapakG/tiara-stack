@@ -3,9 +3,12 @@ import {
   HandlerConfig,
   RequestParamsConfig,
   validateRequestParamsConfig,
-} from "../config";
-import { MsgpackDecodeError, StreamExhaustedError } from "../protocol";
-import { signal, Signal } from "../signal";
+} from "typhoon-core/config";
+import {
+  MsgpackDecodeError,
+  StreamExhaustedError,
+} from "typhoon-core/protocol";
+import { signal, Signal } from "typhoon-core/signal";
 
 const pullStreamToParsed =
   <RequestParams extends RequestParamsConfig | undefined>(
