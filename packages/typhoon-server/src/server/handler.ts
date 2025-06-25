@@ -2,15 +2,15 @@ import { StandardSchemaV1 } from "@standard-schema/spec";
 import { match } from "arktype";
 import { Effect } from "effect";
 import {
-  HandlerConfig,
-  MutationHandlerConfig,
-  SubscriptionHandlerConfig,
-} from "typhoon-core/config";
-import {
   MutationHandlerContext as BaseMutationHandlerContext,
   SubscriptionHandlerContext as BaseSubscriptionHandlerContext,
 } from "typhoon-core/server";
-import { SignalContext } from "typhoon-core/signal";
+import {
+  HandlerConfig,
+  MutationHandlerConfig,
+  SubscriptionHandlerConfig,
+} from "../config";
+import { SignalContext } from "../signal";
 import { Event } from "./event";
 
 export type SubscriptionEventHandler<Config extends SubscriptionHandlerConfig> =

@@ -171,6 +171,17 @@ const handlerPayloadEncoderDecoder = new LookupEncoderDecoder(
   },
 );
 
+const successPayloadEncoderDecoder = new LookupEncoderDecoder(
+  ["success"],
+  ["success"],
+  {
+    success: () => validate(type("boolean")),
+  },
+  {
+    success: () => validate(type("boolean")),
+  },
+);
+
 const baseHeaderEncoderDecoder = new LookupEncoderDecoder(
   ["protocol", "version", "id", "action", "payload"],
   ["protocol", "version", "id", "action", "payload"],
@@ -235,11 +246,15 @@ const payloadDecoder = <Action extends (typeof headerActionFields)[number]>({
     ? Effect.Effect.Success<
         ReturnType<(typeof handlerPayloadEncoderDecoder)["decode"]>
       >
-    : Action extends "client:unsubscribe" | "server:update"
+    : Action extends "server:update"
       ? Effect.Effect.Success<
-          ReturnType<(typeof emptyPayloadEncoderDecoder)["decode"]>
+          ReturnType<(typeof successPayloadEncoderDecoder)["decode"]>
         >
-      : never,
+      : Action extends "client:unsubscribe"
+        ? Effect.Effect.Success<
+            ReturnType<(typeof emptyPayloadEncoderDecoder)["decode"]>
+          >
+        : never,
   ValidationError | InvalidHeaderFieldError,
   never
 > =>
@@ -254,7 +269,10 @@ const payloadDecoder = <Action extends (typeof headerActionFields)[number]>({
         .case("'client:subscribe' | 'client:once' | 'client:mutate'", () =>
           handlerPayloadEncoderDecoder.decode(payload),
         )
-        .case("'client:unsubscribe' | 'server:update' | undefined", () =>
+        .case("'server:update'", () =>
+          successPayloadEncoderDecoder.decode(payload),
+        )
+        .case("'client:unsubscribe'", () =>
           emptyPayloadEncoderDecoder.decode(payload),
         )
         .default("never")(action),
@@ -264,11 +282,15 @@ const payloadDecoder = <Action extends (typeof headerActionFields)[number]>({
       ? Effect.Effect.Success<
           ReturnType<(typeof handlerPayloadEncoderDecoder)["decode"]>
         >
-      : Action extends "client:unsubscribe" | "server:update"
+      : Action extends "server:update"
         ? Effect.Effect.Success<
-            ReturnType<(typeof emptyPayloadEncoderDecoder)["decode"]>
+            ReturnType<(typeof successPayloadEncoderDecoder)["decode"]>
           >
-        : never,
+        : Action extends "client:unsubscribe"
+          ? Effect.Effect.Success<
+              ReturnType<(typeof emptyPayloadEncoderDecoder)["decode"]>
+            >
+          : never,
     ValidationError | InvalidHeaderFieldError,
     never
   >;

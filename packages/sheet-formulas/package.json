@@ -24,6 +24,7 @@
     "effect": "^3.16.8",
     "typhoon-client-apps-script": "workspace:*",
     "typhoon-core": "workspace:*",
+    "typhoon-server": "workspace:*",
     "sheet-apis": "workspace:*"
   },
   "devDependencies": {
