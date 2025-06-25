@@ -91,7 +91,6 @@ class LookupEncoderDecoder<
         Effect.forEach(inputEntries, ([field, value]) =>
           pipe(
             Effect.Do,
-            Effect.tap(() => Effect.log(this.encodingTable, field)),
             Effect.let("fieldEncoder", () => this.encodingTable[field](input)),
             Effect.bind(
               "fieldEncodedValue",
@@ -323,12 +322,17 @@ const payloadEncoder = <
             >,
           ),
         )
-        .case("'client:unsubscribe' | 'server:update'", () =>
+        .case("'server:update'", () =>
+          successPayloadEncoderDecoder.encode(
+            payload as Effect.Effect.Success<
+              ReturnType<typeof payloadDecoder<"server:update">>
+            >,
+          ),
+        )
+        .case("'client:unsubscribe'", () =>
           emptyPayloadEncoderDecoder.encode(
             payload as Effect.Effect.Success<
-              ReturnType<
-                typeof payloadDecoder<"client:unsubscribe" | "server:update">
-              >
+              ReturnType<typeof payloadDecoder<"client:unsubscribe">>
             >,
           ),
         )
