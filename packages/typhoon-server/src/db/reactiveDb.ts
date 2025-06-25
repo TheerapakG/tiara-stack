@@ -15,7 +15,7 @@ import {
   Computed,
   computed,
   SignalContext,
-} from "../signal";
+} from "typhoon-core/signal";
 
 type TransactionSubscription = { mode: "subscription" };
 type TransactionMutation = {

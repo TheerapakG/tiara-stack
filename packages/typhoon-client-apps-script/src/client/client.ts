@@ -2,16 +2,19 @@ import { encode } from "@msgpack/msgpack";
 import { StandardSchemaV1 } from "@standard-schema/spec";
 import { type } from "arktype";
 import { Chunk, Data, Effect, pipe } from "effect";
-import { RequestParamsConfig } from "../config";
-import { bytesToPullDecodedStream, HeaderEncoderDecoder } from "../protocol";
-import { validate } from "../schema";
+import { RequestParamsConfig } from "typhoon-core/config";
+import {
+  bytesToPullDecodedStream,
+  HeaderEncoderDecoder,
+} from "typhoon-core/protocol";
+import { validate } from "typhoon-core/schema";
 import {
   MutationHandlerContext,
   Server,
   ServerMutationHandlers,
   ServerSubscriptionHandlers,
   SubscriptionHandlerContext,
-} from "../server";
+} from "typhoon-core/server";
 
 export class HandlerError extends Data.TaggedError("HandlerError")<{
   error: unknown;
