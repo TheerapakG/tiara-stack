@@ -1,7 +1,6 @@
 import { builtinModules } from "module";
 import path from "pathe";
 import { defineConfig } from "vite";
-import dts from "vite-plugin-dts";
 
 export default defineConfig({
   build: {
@@ -16,9 +15,4 @@ export default defineConfig({
       external: [...builtinModules, /^node:/],
     },
   },
-  plugins: [
-    dts({
-      include: ["./src/**/*.ts"],
-    }),
-  ],
 });

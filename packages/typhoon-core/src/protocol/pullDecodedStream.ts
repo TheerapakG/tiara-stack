@@ -1,34 +1,66 @@
-import { decodeMulti, decodeMultiStream } from "@msgpack/msgpack";
-import { Effect, Function, pipe, Scope, Stream } from "effect";
+import { DecodeError, decodeMulti, decodeMultiStream } from "@msgpack/msgpack";
+import { Data, Effect, Option, pipe, Scope, Stream } from "effect";
 
-export const blobToPullDecodedStream = (blob: Blob) =>
+export class MsgpackDecodeError extends Data.TaggedError("MsgpackDecodeError")<{
+  error: RangeError | DecodeError;
+}> {}
+
+export class StreamExhaustedError extends Data.TaggedError(
+  "StreamExhaustedError",
+) {}
+
+const blobToDecodedStream = (blob: Blob) =>
   pipe(
-    Effect.Do,
-    Effect.bind("scope", () => Effect.scope),
-    Effect.let("stream", () => blob.stream()),
-    Effect.let("decodedStream", ({ stream }) =>
+    Stream.fromAsyncIterable(
+      decodeMultiStream(blob.stream()),
+      (error) =>
+        new MsgpackDecodeError({ error: error as RangeError | DecodeError }),
+    ),
+    Stream.rechunk(1),
+  );
+
+const bytesToDecodedStream = (bytes: Uint8Array) =>
+  pipe(
+    Stream.fromIterableEffect(
       pipe(
-        Stream.fromAsyncIterable(decodeMultiStream(stream), Function.identity),
-        Stream.rechunk(1),
+        Effect.try(() => decodeMulti(bytes)),
+        Effect.catchAll((error) =>
+          Effect.fail(
+            new MsgpackDecodeError({
+              error: error.error as RangeError | DecodeError,
+            }),
+          ),
+        ),
       ),
     ),
-    Effect.bind("pullDecodedStream", ({ decodedStream, scope }) =>
-      pipe(Stream.toPull(decodedStream), Scope.extend(scope)),
-    ),
-    Effect.map(({ pullDecodedStream }) => pullDecodedStream),
-    Effect.withSpan("blobToPullDecodedStream"),
+    Stream.rechunk(1),
   );
 
-export const bytesToPullDecodedStream = (bytes: Uint8Array) =>
+const decodedStreamToPullDecodedStream = (
+  stream: Stream.Stream<unknown, MsgpackDecodeError, never>,
+) =>
   pipe(
     Effect.Do,
     Effect.bind("scope", () => Effect.scope),
-    Effect.let("decodedStream", () =>
-      pipe(Stream.fromIterable(decodeMulti(bytes)), Stream.rechunk(1)),
+    Effect.bind("pullDecodedStream", ({ scope }) =>
+      pipe(Stream.toPull(stream), Scope.extend(scope)),
     ),
-    Effect.bind("pullDecodedStream", ({ decodedStream, scope }) =>
-      pipe(Stream.toPull(decodedStream), Scope.extend(scope)),
+    Effect.map(({ pullDecodedStream }) =>
+      pipe(
+        pullDecodedStream,
+        Effect.mapError(
+          Option.match({
+            onSome: (error) => error,
+            onNone: () => new StreamExhaustedError(),
+          }),
+        ),
+      ),
     ),
-    Effect.map(({ pullDecodedStream }) => pullDecodedStream),
-    Effect.withSpan("blobToPullDecodedStream"),
+    Effect.withSpan("decodedStreamToPullDecodedStream"),
   );
+
+export const blobToPullDecodedStream = (blob: Blob) =>
+  pipe(blobToDecodedStream(blob), decodedStreamToPullDecodedStream);
+
+export const bytesToPullDecodedStream = (bytes: Uint8Array) =>
+  pipe(bytesToDecodedStream(bytes), decodedStreamToPullDecodedStream);

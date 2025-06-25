@@ -6,6 +6,7 @@ import {
   Chunk,
   Context,
   Effect,
+  Either,
   Exit,
   HashMap,
   Option,
@@ -13,14 +14,16 @@ import {
   Scope,
   SynchronizedRef,
 } from "effect";
+import { Server as BaseServer, ServerSymbol } from "typhoon-core/server";
 import {
   blobToPullDecodedStream,
   Header,
   HeaderEncoderDecoder,
-} from "typhoon-core/protocol";
-import { validate } from "typhoon-core/schema";
-import { Server as BaseServer, ServerSymbol } from "typhoon-core/server";
-import { effect, observeOnce } from "typhoon-core/signal";
+  MsgpackDecodeError,
+  StreamExhaustedError,
+} from "../protocol";
+import { validate } from "../schema";
+import { effect, observeOnce } from "../signal";
 import { Event } from "./event";
 import { MutationHandlerContext, SubscriptionHandlerContext } from "./handler";
 
@@ -278,20 +281,35 @@ export class Server<
       Effect.bind("boundedEventHandler", () =>
         pipe(
           Effect.Do,
-          Effect.bind("update", () => subscriptionHandlerContext.handler),
-          Effect.bind("updateHeader", () =>
+          Effect.bind("update", () =>
+            Effect.either(subscriptionHandlerContext.handler),
+          ),
+          Effect.bind("updateHeader", ({ update }) =>
             HeaderEncoderDecoder.encode({
               protocol: "typh",
               version: 1,
               id: subscriptionId,
               action: "server:update",
-              payload: {},
+              payload: {
+                success: Either.isRight(update),
+              },
             }),
+          ),
+          Effect.let("updateMessage", ({ update }) =>
+            pipe(
+              update,
+              Either.match({
+                onLeft: (error) => error,
+                onRight: (value) => value,
+              }),
+            ),
           ),
           Effect.let("updateHeaderEncoded", ({ updateHeader }) =>
             encode(updateHeader),
           ),
-          Effect.let("updateMessageEncoded", ({ update }) => encode(update)),
+          Effect.let("updateMessageEncoded", ({ updateMessage }) =>
+            encode(updateMessage),
+          ),
           Effect.let(
             "updateBuffer",
             ({ updateHeaderEncoded, updateMessageEncoded }) => {
@@ -315,7 +333,11 @@ export class Server<
 
   static handleSubscribe(
     peer: Peer,
-    pullDecodedStream: Effect.Effect<Chunk.Chunk<unknown>, unknown, never>,
+    pullDecodedStream: Effect.Effect<
+      Chunk.Chunk<unknown>,
+      MsgpackDecodeError | StreamExhaustedError,
+      never
+    >,
     header: Header<"client:subscribe">,
     scope: Scope.CloseableScope,
   ) {
@@ -379,7 +401,11 @@ export class Server<
   }
 
   static handleOnce<A, E = never>(
-    pullDecodedStream: Effect.Effect<Chunk.Chunk<unknown>, unknown, never>,
+    pullDecodedStream: Effect.Effect<
+      Chunk.Chunk<unknown>,
+      MsgpackDecodeError | StreamExhaustedError,
+      never
+    >,
     header: Header<"client:once">,
     callback: (buffer: Uint8Array) => Effect.Effect<A, E, Event>,
     scope: Scope.CloseableScope,
@@ -416,7 +442,11 @@ export class Server<
   }
 
   static handleMutate<A, E = never>(
-    pullDecodedStream: Effect.Effect<Chunk.Chunk<unknown>, unknown, never>,
+    pullDecodedStream: Effect.Effect<
+      Chunk.Chunk<unknown>,
+      MsgpackDecodeError | StreamExhaustedError,
+      never
+    >,
     header: Header<"client:mutate">,
     callback: Effect.Effect<A, E, Event>,
     scope: Scope.CloseableScope,
@@ -682,3 +712,10 @@ export const serve =
       }),
     );
   };
+
+export type InferServerType<E extends Effect.Effect<unknown, unknown, never>> =
+  E extends Effect.Effect<infer S, unknown, never>
+    ? S extends Server<infer SubscriptionHandlers, infer MutationHandlers>
+      ? BaseServer<SubscriptionHandlers, MutationHandlers>
+      : never
+    : never;

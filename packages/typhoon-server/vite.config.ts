@@ -3,7 +3,6 @@ import { builtinModules } from "module";
 import path from "pathe";
 import { fileURLToPath } from "url";
 import { defineConfig } from "vite";
-import dts from "vite-plugin-dts";
 
 const filePaths = globSync("./src/**/index.ts", { nodir: true }).map((file) =>
   fileURLToPath(new URL(file, import.meta.url)),
@@ -28,12 +27,13 @@ export default defineConfig({
       formats: ["es", "cjs"],
     },
     rollupOptions: {
-      external: [...builtinModules, /^node:/, "effect"],
+      external: [
+        ...builtinModules,
+        /^node:/,
+        "effect",
+        "arktype",
+        "typhoon-core",
+      ],
     },
   },
-  plugins: [
-    dts({
-      include: ["./src/**/*.ts"],
-    }),
-  ],
 });

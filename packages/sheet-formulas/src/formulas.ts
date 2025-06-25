@@ -2,11 +2,11 @@
 import "../polyfill/classPolyfill";
 
 import { Effect, pipe } from "effect";
-import type { server } from "sheet-apis";
+import type { Server } from "sheet-apis";
 import { AppsScriptClient } from "typhoon-client-apps-script/client";
 
 function getClient(url: string) {
-  return AppsScriptClient.create<Effect.Effect.Success<typeof server>>(url);
+  return AppsScriptClient.create<Server>(url);
 }
 
 function parsePlayer(
@@ -65,13 +65,7 @@ function THEECALC(
             healNeeded: configMap["heal_needed"],
             considerEnc: configMap["consider_enc"],
           },
-          players: [
-            parsePlayer(p1),
-            parsePlayer(p2),
-            parsePlayer(p3),
-            parsePlayer(p4),
-            parsePlayer(p5),
-          ],
+          players: [p1, p2, p3, p4, p5].map(parsePlayer),
         }),
       ),
     ),

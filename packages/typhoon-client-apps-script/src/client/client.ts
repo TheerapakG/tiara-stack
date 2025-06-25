@@ -1,18 +1,21 @@
 import { encode } from "@msgpack/msgpack";
 import { StandardSchemaV1 } from "@standard-schema/spec";
-import { Chunk, Effect, pipe } from "effect";
-import { RequestParamsConfig } from "typhoon-core/config";
-import {
-  bytesToPullDecodedStream,
-  HeaderEncoderDecoder,
-} from "typhoon-core/protocol";
+import { type } from "arktype";
+import { Chunk, Data, Effect, pipe } from "effect";
+import { RequestParamsConfig } from "../config";
+import { bytesToPullDecodedStream, HeaderEncoderDecoder } from "../protocol";
+import { validate } from "../schema";
 import {
   MutationHandlerContext,
   Server,
   ServerMutationHandlers,
   ServerSubscriptionHandlers,
   SubscriptionHandlerContext,
-} from "typhoon-core/server";
+} from "../server";
+
+export class HandlerError extends Data.TaggedError("HandlerError")<{
+  error: unknown;
+}> {}
 
 export class AppsScriptClient<
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -112,18 +115,26 @@ export class AppsScriptClient<
       Effect.bind("pullDecodedStream", ({ bytes }) =>
         bytesToPullDecodedStream(bytes),
       ),
-      Effect.tap(({ pullDecodedStream }) => pullDecodedStream),
+      Effect.bind("header", ({ pullDecodedStream }) =>
+        pipe(
+          pullDecodedStream,
+          Effect.flatMap(Chunk.get(0)),
+          Effect.flatMap(validate(type([["number", "unknown"], "[]"]))),
+          Effect.flatMap(HeaderEncoderDecoder.decode),
+        ),
+      ),
       // TODO: check if the response is a valid header
-      Effect.flatMap(
-        ({ pullDecodedStream }) =>
-          pipe(
-            pullDecodedStream,
-            Effect.flatMap(Chunk.get(0)),
-          ) as Effect.Effect<
-            StandardSchemaV1.InferOutput<
-              ServerSubscriptionHandlers[Handler]["config"]["response"]["validator"]
-            >
-          >,
+      Effect.bind("decodedResponse", ({ pullDecodedStream }) =>
+        pipe(pullDecodedStream, Effect.flatMap(Chunk.get(0))),
+      ),
+      Effect.flatMap(({ header, decodedResponse }) =>
+        header.action === "server:update" && header.payload.success
+          ? Effect.succeed(
+              decodedResponse as StandardSchemaV1.InferOutput<
+                ServerSubscriptionHandlers[Handler]["config"]["response"]["validator"]
+              >,
+            )
+          : Effect.fail(new HandlerError({ error: decodedResponse })),
       ),
       Effect.scoped,
       Effect.withSpan("AppsScriptClient.once"),

@@ -3,8 +3,9 @@ import {
   HandlerConfig,
   RequestParamsConfig,
   validateRequestParamsConfig,
-} from "typhoon-core/config";
-import { signal, Signal } from "typhoon-core/signal";
+} from "../config";
+import { MsgpackDecodeError, StreamExhaustedError } from "../protocol";
+import { signal, Signal } from "../signal";
 
 const pullStreamToParsed =
   <RequestParams extends RequestParamsConfig | undefined>(
@@ -51,14 +52,22 @@ export class EventWithConfig<Config extends HandlerConfig> {
 }
 
 type PullStreamContext = {
-  pullStream: Effect.Effect<Chunk.Chunk<unknown>, unknown, never>;
+  pullStream: Effect.Effect<
+    Chunk.Chunk<unknown>,
+    MsgpackDecodeError | StreamExhaustedError,
+    never
+  >;
   scope: Scope.CloseableScope;
 };
 
 export class Event extends Context.Tag("Event")<
   Event,
   Signal<{
-    readonly pullStream: Effect.Effect<Chunk.Chunk<unknown>, unknown, never>;
+    readonly pullStream: Effect.Effect<
+      Chunk.Chunk<unknown>,
+      MsgpackDecodeError | StreamExhaustedError,
+      never
+    >;
     readonly scope: Scope.CloseableScope;
   }>
 >() {
