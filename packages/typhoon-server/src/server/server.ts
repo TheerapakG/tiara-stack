@@ -14,16 +14,16 @@ import {
   Scope,
   SynchronizedRef,
 } from "effect";
-import { Server as BaseServer, ServerSymbol } from "typhoon-core/server";
 import {
   blobToPullDecodedStream,
   Header,
   HeaderEncoderDecoder,
   MsgpackDecodeError,
   StreamExhaustedError,
-} from "../protocol";
-import { validate } from "../schema";
-import { effect, observeOnce } from "../signal";
+} from "typhoon-core/protocol";
+import { validate } from "typhoon-core/schema";
+import { Server as BaseServer, ServerSymbol } from "typhoon-core/server";
+import { effect, observeOnce } from "typhoon-core/signal";
 import { Event } from "./event";
 import { MutationHandlerContext, SubscriptionHandlerContext } from "./handler";
 

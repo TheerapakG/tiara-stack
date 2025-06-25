@@ -91,6 +91,7 @@ class LookupEncoderDecoder<
         Effect.forEach(inputEntries, ([field, value]) =>
           pipe(
             Effect.Do,
+            Effect.tap(() => Effect.log(this.encodingTable, field)),
             Effect.let("fieldEncoder", () => this.encodingTable[field](input)),
             Effect.bind(
               "fieldEncodedValue",
