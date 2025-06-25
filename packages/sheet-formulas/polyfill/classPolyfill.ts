@@ -73,36 +73,46 @@ class Response {
   }
 }
 
-// @ts-expect-error polyfill
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
 globalThis.setTimeout = setTimeout;
 
 globalThis.clearTimeout = clearTimeout;
 
-// @ts-expect-error polyfill
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
 globalThis.TextEncoder = TextEncoder;
 
-// @ts-expect-error polyfill
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
 globalThis.TextDecoder = TextDecoder;
 
-// @ts-expect-error polyfill
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
 globalThis.URL = URL;
 
-// @ts-expect-error polyfill
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
 globalThis.URLSearchParams = URLSearchParams;
 
-// @ts-expect-error polyfill
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
 globalThis.Blob = Blob;
 
-// @ts-expect-error polyfill
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
 globalThis.FormData = FormData;
 
-// @ts-expect-error polyfill
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
 globalThis.Headers = Headers;
 
-// @ts-expect-error polyfill
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
 globalThis.Request = Request;
 
-// @ts-expect-error polyfill
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
 globalThis.Response = Response;
 
 export {};
