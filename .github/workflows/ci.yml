@@ -37,8 +37,11 @@ jobs:
       - name: Install Dependencies
         run: pnpm install
 
-      - name: Run Checks and Build
-        run: pnpm nx run-many -t format,lint,typecheck,build --output-style=stream
+      - name: Run Build
+        run: pnpm nx run-many -t build --output-style=stream
+
+      - name: Run Checks
+        run: pnpm nx run-many -t format,lint,typecheck --output-style=stream
 
       - name: Build container image
         run: docker build -t registry.digitalocean.com/${{ secrets.REGISTRY_NAME }}/${{ matrix.package }}:$(echo $GITHUB_SHA | head -c7) .
