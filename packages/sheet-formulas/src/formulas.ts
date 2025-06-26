@@ -54,20 +54,31 @@ function THEECALC(
     [string, string, string, string, number, number, number | "", number]
   >,
 ) {
-  const configMap = Object.fromEntries(config);
-
   return Effect.runSync(
     pipe(
-      getClient(url),
-      Effect.flatMap((client) =>
+      Effect.Do,
+      Effect.let("config", () => Object.fromEntries(config)),
+      Effect.bind("client", () => getClient(url)),
+      Effect.bind("result", ({ client, config }) =>
         AppsScriptClient.once(client, "calc", {
           config: {
-            healNeeded: configMap["heal_needed"],
-            considerEnc: configMap["consider_enc"],
+            healNeeded: config["heal_needed"],
+            considerEnc: config["consider_enc"],
           },
           players: [p1, p2, p3, p4, p5].map(parsePlayer),
         }),
       ),
+      Effect.map(({ result }) => {
+        return result.map((r) => [
+          "",
+          r.averageBp,
+          r.averagePercent,
+          ...r.room.map((r) => [r.tags.join(", "), r.team]).flat(),
+        ]);
+      }),
+      Effect.catchAll((e) => {
+        return Effect.succeed([[e.message]]);
+      }),
     ),
   );
 }
