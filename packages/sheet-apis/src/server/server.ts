@@ -179,17 +179,17 @@ const calc = (
   for (const { bp, percent, room } of result) {
     if (percent > bestPercent) {
       bestPercent = percent;
-      bestResult.push([
-        bp / 5,
-        percent / 5,
-        ...room.map(({ team, tags }) => [tags.join(", "), team]).flat(),
-      ]);
+      bestResult.push({
+        averageBp: bp / 5,
+        averagePercent: percent / 5,
+        room,
+      });
     }
   }
 
   bestResult.reverse();
 
-  return bestResult.map((r) => ["", ...r]);
+  return bestResult;
 };
 
 const calcHandlerConfig = defineHandlerConfigBuilder()
@@ -217,7 +217,19 @@ const calcHandlerConfig = defineHandlerConfigBuilder()
     }),
     validate: true,
   })
-  .response({ validator: type("(string | number)[][]") })
+  .response({
+    validator: type({
+      averageBp: "number",
+      averagePercent: "number",
+      room: type({
+        type: "string",
+        team: "string",
+        bp: "number",
+        percent: "number",
+        tags: "string[]",
+      }).array(),
+    }).array(),
+  })
   .build();
 
 const calcHandler = defineHandlerBuilder()
