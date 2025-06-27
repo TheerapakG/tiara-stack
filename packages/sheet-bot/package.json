@@ -1,0 +1,44 @@
+{
+  "name": "sheet-apis",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "format": "prettier -c .",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "build": "rolldown -c rolldown.config.ts && tar -acf dist.tar.zst ./dist"
+  },
+  "keywords": [],
+  "author": "",
+  "dependencies": {
+    "arktype": "^2.1.20",
+    "discord.js": "^14.21.0",
+    "effect": "^3.16.8",
+    "typhoon-client-ws": "workspace:*",
+    "typhoon-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@eslint/compat": "^1.3.0",
+    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/js": "^9.29.0",
+    "@typescript-eslint/eslint-plugin": "^8.34.1",
+    "@typescript-eslint/parser": "^8.34.1",
+    "crossws": "^0.4.1",
+    "eslint": "^9.29.0",
+    "globals": "^16.2.0",
+    "jiti": "^2.4.2",
+    "pathe": "^2.0.3",
+    "prettier": "^3.5.3",
+    "rolldown": "^1.0.0-beta.20",
+    "rolldown-plugin-dts": "^0.13.12",
+    "vite": "npm:rolldown-vite@latest"
+  }
+}

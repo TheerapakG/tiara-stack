@@ -1,4 +1,4 @@
-import { Chunk, Context, Effect, Exit, pipe, Scope } from "effect";
+import { Chunk, Console, Context, Effect, Exit, pipe, Scope } from "effect";
 import {
   HandlerConfig,
   RequestParamsConfig,
@@ -28,7 +28,12 @@ export class EventRequestWithConfig<Config extends HandlerConfig> {
     return pipe(
       Event,
       Effect.flatMap((signal) => signal.value),
-      Effect.map(({ pullStream }) => pullStream),
+      Effect.map(({ pullStream }) =>
+        pipe(
+          pullStream,
+          Effect.tap((value) => Console.log(value)),
+        ),
+      ),
     );
   }
 
