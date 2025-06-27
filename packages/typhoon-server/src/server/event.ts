@@ -1,4 +1,4 @@
-import { Chunk, Console, Context, Effect, Exit, pipe, Scope } from "effect";
+import { Chunk, Context, Effect, Exit, pipe, Scope } from "effect";
 import {
   HandlerConfig,
   RequestParamsConfig,
@@ -18,7 +18,6 @@ const pullStreamToParsed =
     pipe(
       pullStream,
       Effect.flatMap(Chunk.get(0)),
-      Effect.tap((value) => Console.log(value)),
       Effect.flatMap(validateRequestParamsConfig(requestParams)),
     );
 

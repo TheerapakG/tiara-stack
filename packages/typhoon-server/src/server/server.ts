@@ -299,7 +299,7 @@ export class Server<
             pipe(
               update,
               Either.match({
-                onLeft: (error) => error,
+                onLeft: (error) => JSON.stringify(error),
                 onRight: (value) => value,
               }),
             ),
