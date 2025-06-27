@@ -21,6 +21,7 @@
   "dependencies": {
     "typhoon-core": "workspace:*",
     "typhoon-server": "workspace:*",
+    "sheet-apis": "workspace:*",
     "arktype": "^2.1.20",
     "effect": "^3.16.8"
   },
