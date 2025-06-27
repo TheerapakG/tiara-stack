@@ -18,6 +18,7 @@ const pullStreamToParsed =
     pipe(
       pullStream,
       Effect.flatMap(Chunk.get(0)),
+      Effect.tap((value) => Console.log(value)),
       Effect.flatMap(validateRequestParamsConfig(requestParams)),
     );
 
@@ -28,12 +29,7 @@ export class EventRequestWithConfig<Config extends HandlerConfig> {
     return pipe(
       Event,
       Effect.flatMap((signal) => signal.value),
-      Effect.map(({ pullStream }) =>
-        pipe(
-          pullStream,
-          Effect.tap((value) => Console.log(value)),
-        ),
-      ),
+      Effect.map(({ pullStream }) => pullStream),
     );
   }
 
