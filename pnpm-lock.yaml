@@ -36,6 +36,9 @@ importers:
       effect:
         specifier: ^3.16.8
         version: 3.16.8
+      sheet-apis:
+        specifier: workspace:*
+        version: 'link:'
       typhoon-core:
         specifier: workspace:*
         version: link:../typhoon-core
@@ -157,7 +160,7 @@ importers:
         version: 3.16.8
       sheet-apis:
         specifier: workspace:*
-        version: link:../sheet-bot
+        version: link:../sheet-apis
       typhoon-client-apps-script:
         specifier: workspace:*
         version: link:../typhoon-client-apps-script
