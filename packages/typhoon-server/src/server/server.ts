@@ -3,10 +3,11 @@ import { match, type } from "arktype";
 import { Message, Peer } from "crossws";
 import type { serve as crosswsServe } from "crossws/server";
 import {
+  Cause,
   Chunk,
+  Console,
   Context,
   Effect,
-  Either,
   Exit,
   HashMap,
   Option,
@@ -282,7 +283,7 @@ export class Server<
         pipe(
           Effect.Do,
           Effect.bind("update", () =>
-            Effect.either(subscriptionHandlerContext.handler),
+            Effect.exit(subscriptionHandlerContext.handler),
           ),
           Effect.bind("updateHeader", ({ update }) =>
             HeaderEncoderDecoder.encode({
@@ -291,16 +292,16 @@ export class Server<
               id: subscriptionId,
               action: "server:update",
               payload: {
-                success: Either.isRight(update),
+                success: Exit.isSuccess(update),
               },
             }),
           ),
           Effect.let("updateMessage", ({ update }) =>
             pipe(
               update,
-              Either.match({
-                onLeft: (error) => JSON.stringify(error),
-                onRight: (value) => value,
+              Exit.match({
+                onSuccess: (value) => value,
+                onFailure: (cause) => pipe(cause, Cause.pretty),
               }),
             ),
           ),
@@ -615,7 +616,7 @@ export class Server<
 
 const handleServeAction = <A, E = never>(
   action: (server: Server) => Effect.Effect<A, E, never>,
-  onError: (error: E) => Effect.Effect<A, never, never>,
+  onError: (error: Cause.Cause<E>) => Effect.Effect<A, never, never>,
 ) => {
   return (server: Server) =>
     pipe(
@@ -623,16 +624,17 @@ const handleServeAction = <A, E = never>(
       action,
       Effect.exit,
       Effect.flatMap(
-        Exit.mapBoth({
+        Exit.match({
           onSuccess: (response) => Effect.succeed(response),
-          onFailure: (error) => {
-            console.error("[serve] error", error);
-            return onError(error);
-          },
+          onFailure: (cause) =>
+            pipe(
+              Effect.Do,
+              Effect.let("pretty", () => Cause.pretty(cause)),
+              Effect.tap(({ pretty }) => Console.log(pretty)),
+              Effect.flatMap(() => onError(cause)),
+            ),
         }),
       ),
-      Effect.merge,
-      Effect.flatMap((result) => result),
       Effect.withSpan("serve.action", {
         captureStackTrace: true,
       }),
