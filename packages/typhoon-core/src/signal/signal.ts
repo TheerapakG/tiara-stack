@@ -432,14 +432,27 @@ export const effect = (effect: E.Effect<unknown, unknown, SignalContext>) =>
 class OnceObserver<A = unknown, E = unknown> implements DependentSignal {
   readonly [DependentSymbol]: DependentSignal = this;
 
-  private _effect: E.Effect<A, E, SignalContext>;
   private _dependencies: HashSet.HashSet<DependencySignal>;
-  private _fiber: Fiber.Fiber<A, E>;
+  private _fiber: Deferred.Deferred<Fiber.Fiber<A, E>, never>;
 
-  constructor(effect: E.Effect<A, E, SignalContext>) {
-    this._effect = effect;
+  constructor(fiber: Deferred.Deferred<Fiber.Fiber<A, E>, never>) {
     this._dependencies = HashSet.empty();
-    this._fiber = pipe(runAndTrackEffect(effect, this), E.runFork);
+    this._fiber = fiber;
+  }
+
+  static make<A = unknown, E = unknown>(effect: E.Effect<A, E, SignalContext>) {
+    return pipe(
+      E.Do,
+      E.bind("deferred", () => Deferred.make<Fiber.Fiber<A, E>, never>()),
+      E.let("observer", ({ deferred }) => new OnceObserver(deferred)),
+      E.tap(({ deferred, observer }) =>
+        Deferred.complete(
+          deferred,
+          E.forkDaemon(runAndTrackEffect(effect, observer)),
+        ),
+      ),
+      E.map(({ observer }) => observer),
+    );
   }
 
   addDependency(dependency: DependencySignal) {
@@ -464,7 +477,11 @@ class OnceObserver<A = unknown, E = unknown> implements DependentSignal {
   }
 
   get value(): E.Effect<A, E, never> {
-    return Fiber.join(this._fiber);
+    return pipe(
+      E.Do,
+      E.bind("fiber", () => Deferred.await(this._fiber)),
+      E.flatMap(({ fiber }) => Fiber.join(fiber)),
+    );
   }
 
   notify(): E.Effect<unknown, never, never> {
@@ -474,7 +491,7 @@ class OnceObserver<A = unknown, E = unknown> implements DependentSignal {
 
 export const observeOnce = <A = unknown, E = unknown>(
   effect: E.Effect<A, E, SignalContext>,
-) => new OnceObserver(effect);
+) => OnceObserver.make(effect);
 
 export class SignalContext extends Context.Tag("SignalContext")<
   SignalContext,
