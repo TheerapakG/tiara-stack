@@ -4,7 +4,11 @@ import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { serve as crosswsServe } from "crossws/server/node";
 import { Effect, pipe } from "effect";
-import { InferServerType, serve } from "typhoon-server/server";
+import {
+  InferServerType,
+  serve,
+  Server as TyphoonServer,
+} from "typhoon-server/server";
 import { server } from "./server";
 
 export type Server = InferServerType<typeof server>;
@@ -17,8 +21,8 @@ const NodeSdkLive = NodeSdk.layer(() => ({
 
 const serveEffect = pipe(
   server,
+  Effect.map(TyphoonServer.withTraceProvider(NodeSdkLive)),
   Effect.flatMap(serve(crosswsServe)),
-  Effect.provide(NodeSdkLive),
 );
 
 Effect.runPromise(serveEffect);

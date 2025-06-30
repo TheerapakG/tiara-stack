@@ -11,6 +11,7 @@ import {
   Effect,
   Exit,
   HashMap,
+  Layer,
   Metric,
   Option,
   pipe,
@@ -77,16 +78,19 @@ export class Server<
   readonly [ServerSymbol]: BaseServer<SubscriptionHandlers, MutationHandlers> =
     this;
 
+  public traceProvider: Layer.Layer<never>;
   public subscriptionHandlerMap: SubscriptionHandlerMap;
   public mutationHandlerMap: MutationHandlerMap;
   public readonly peerStateMapRef: SynchronizedRef.SynchronizedRef<PeerStateMap>;
   public readonly peerCount: Metric.Metric.Gauge<bigint>;
 
   constructor(
+    traceProvider: Layer.Layer<never>,
     subscriptionHandlerMap: SubscriptionHandlerMap,
     mutationHandlerMap: MutationHandlerMap,
     peerStateMapRef: SynchronizedRef.SynchronizedRef<PeerStateMap>,
   ) {
+    this.traceProvider = traceProvider;
     this.subscriptionHandlerMap = subscriptionHandlerMap;
     this.mutationHandlerMap = mutationHandlerMap;
     this.peerStateMapRef = peerStateMapRef;
@@ -109,9 +113,35 @@ export class Server<
       ),
       Effect.map(
         (peerStateMapRef) =>
-          new Server(HashMap.empty(), HashMap.empty(), peerStateMapRef),
+          new Server(
+            Layer.empty,
+            HashMap.empty(),
+            HashMap.empty(),
+            peerStateMapRef,
+          ),
       ),
     );
+  }
+
+  static withTraceProvider(traceProvider: Layer.Layer<never>) {
+    return <
+      SubscriptionHandlers extends Record<
+        string,
+        SubscriptionHandlerContext
+        // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+      > = {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+      MutationHandlers extends Record<string, MutationHandlerContext> = {},
+    >(
+      server: Server<SubscriptionHandlers, MutationHandlers>,
+    ): Server<SubscriptionHandlers, MutationHandlers> => {
+      return new Server(
+        traceProvider,
+        server.subscriptionHandlerMap,
+        server.mutationHandlerMap,
+        server.peerStateMapRef,
+      );
+    };
   }
 
   static add<
@@ -707,6 +737,7 @@ export const serve =
                   Effect.withSpan("serve.websocket.open", {
                     captureStackTrace: true,
                   }),
+                  Effect.provide(server.traceProvider),
                 ),
               );
             },
@@ -722,6 +753,7 @@ export const serve =
                   Effect.withSpan("serve.websocket.message", {
                     captureStackTrace: true,
                   }),
+                  Effect.provide(server.traceProvider),
                 ),
               );
             },
@@ -734,6 +766,7 @@ export const serve =
                   Effect.withSpan("serve.websocket.close", {
                     captureStackTrace: true,
                   }),
+                  Effect.provide(server.traceProvider),
                 ),
               );
             },
@@ -752,6 +785,7 @@ export const serve =
                 Effect.withSpan("serve.fetch", {
                   captureStackTrace: true,
                 }),
+                Effect.provide(server.traceProvider),
               ),
             );
           },
