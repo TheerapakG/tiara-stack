@@ -171,14 +171,16 @@ const handlerPayloadEncoderDecoder = new LookupEncoderDecoder(
   },
 );
 
-const successPayloadEncoderDecoder = new LookupEncoderDecoder(
-  ["success"],
-  ["success"],
+const successNoncePayloadEncoderDecoder = new LookupEncoderDecoder(
+  ["success", "nonce"],
+  ["success", "nonce"],
   {
     success: () => validate(type("boolean")),
+    nonce: () => validate(type("number")),
   },
   {
     success: () => validate(type("boolean")),
+    nonce: () => validate(type("number")),
   },
 );
 
@@ -248,7 +250,7 @@ const payloadDecoder = <Action extends (typeof headerActionFields)[number]>({
       >
     : Action extends "server:update"
       ? Effect.Effect.Success<
-          ReturnType<(typeof successPayloadEncoderDecoder)["decode"]>
+          ReturnType<(typeof successNoncePayloadEncoderDecoder)["decode"]>
         >
       : Action extends "client:unsubscribe"
         ? Effect.Effect.Success<
@@ -270,7 +272,7 @@ const payloadDecoder = <Action extends (typeof headerActionFields)[number]>({
           handlerPayloadEncoderDecoder.decode(payload),
         )
         .case("'server:update'", () =>
-          successPayloadEncoderDecoder.decode(payload),
+          successNoncePayloadEncoderDecoder.decode(payload),
         )
         .case("'client:unsubscribe'", () =>
           emptyPayloadEncoderDecoder.decode(payload),
@@ -284,7 +286,7 @@ const payloadDecoder = <Action extends (typeof headerActionFields)[number]>({
         >
       : Action extends "server:update"
         ? Effect.Effect.Success<
-            ReturnType<(typeof successPayloadEncoderDecoder)["decode"]>
+            ReturnType<(typeof successNoncePayloadEncoderDecoder)["decode"]>
           >
         : Action extends "client:unsubscribe"
           ? Effect.Effect.Success<
@@ -323,7 +325,7 @@ const payloadEncoder = <
           ),
         )
         .case("'server:update'", () =>
-          successPayloadEncoderDecoder.encode(
+          successNoncePayloadEncoderDecoder.encode(
             payload as Effect.Effect.Success<
               ReturnType<typeof payloadDecoder<"server:update">>
             >,

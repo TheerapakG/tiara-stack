@@ -7,9 +7,11 @@ import {
   Chunk,
   Console,
   Context,
+  Data,
   Effect,
   Exit,
   HashMap,
+  Metric,
   Option,
   pipe,
   Scope,
@@ -34,9 +36,28 @@ type SubscriptionHandlerMap = HashMap.HashMap<
 >;
 type MutationHandlerMap = HashMap.HashMap<string, MutationHandlerContext>;
 
+class Nonce extends Data.TaggedClass("Nonce")<{
+  value: SynchronizedRef.SynchronizedRef<number>;
+}> {
+  static make() {
+    return pipe(
+      SynchronizedRef.make(0),
+      Effect.map((value) => new Nonce({ value })),
+    );
+  }
+
+  static getAndIncrement(nonce: Nonce) {
+    return pipe(
+      nonce.value,
+      SynchronizedRef.updateAndGet((value) => value + 1),
+    );
+  }
+}
+
 type SubscriptionState = {
   event: Context.Tag.Service<Event>;
   effectCleanup: Effect.Effect<void, never, never>;
+  nonce: Nonce;
 };
 type SubscriptionStateMap = HashMap.HashMap<string, SubscriptionState>;
 
@@ -59,6 +80,7 @@ export class Server<
   public subscriptionHandlerMap: SubscriptionHandlerMap;
   public mutationHandlerMap: MutationHandlerMap;
   public readonly peerStateMapRef: SynchronizedRef.SynchronizedRef<PeerStateMap>;
+  public readonly peerCount: Metric.Metric.Gauge<bigint>;
 
   constructor(
     subscriptionHandlerMap: SubscriptionHandlerMap,
@@ -68,6 +90,10 @@ export class Server<
     this.subscriptionHandlerMap = subscriptionHandlerMap;
     this.mutationHandlerMap = mutationHandlerMap;
     this.peerStateMapRef = peerStateMapRef;
+    this.peerCount = Metric.gauge("peer_count", {
+      description: "The number of peers connected to the server",
+      bigint: true,
+    });
   }
 
   static create() {
@@ -151,11 +177,14 @@ export class Server<
     return (server: Server) => {
       return pipe(
         server.peerStateMapRef,
-        SynchronizedRef.update((peerStateMap) =>
+        SynchronizedRef.updateAndGet((peerStateMap) =>
           HashMap.set(peerStateMap, peer.id, {
             peer,
             subscriptionStateMap: HashMap.empty(),
           }),
+        ),
+        Effect.tap((peerStateMap) =>
+          server.peerCount(Effect.succeed(BigInt(HashMap.size(peerStateMap)))),
         ),
         Effect.asVoid,
       );
@@ -166,7 +195,7 @@ export class Server<
     return (server: Server) =>
       pipe(
         server.peerStateMapRef,
-        SynchronizedRef.update((peerStateMap) =>
+        SynchronizedRef.updateAndGet((peerStateMap) =>
           HashMap.modifyAt(peerStateMap, peer.id, (peerState) => {
             Effect.runFork(
               pipe(
@@ -188,6 +217,9 @@ export class Server<
 
             return Option.none();
           }),
+        ),
+        Effect.tap((peerStateMap) =>
+          server.peerCount(Effect.succeed(BigInt(HashMap.size(peerStateMap)))),
         ),
         Effect.asVoid,
       );
@@ -213,7 +245,7 @@ export class Server<
             Effect.map(({ newPeerStateMap }) => newPeerStateMap),
           ),
         ),
-        Effect.withSpan("updatePeerState", {
+        Effect.withSpan("Server.updatePeerState", {
           captureStackTrace: true,
         }),
       );
@@ -266,7 +298,7 @@ export class Server<
             subscriptionStateMap: newSubscriptionStateMap,
           }),
         ),
-        Effect.withSpan("updatePeerSubscriptionState", {
+        Effect.withSpan("Server.updatePeerSubscriptionState", {
           captureStackTrace: true,
         }),
       ),
@@ -276,6 +308,7 @@ export class Server<
   private static runBoundedEventHandler(
     subscriptionId: string,
     subscriptionHandlerContext: SubscriptionHandlerContext,
+    nonce: Nonce,
   ) {
     return pipe(
       Effect.Do,
@@ -285,7 +318,8 @@ export class Server<
           Effect.bind("update", () =>
             Effect.exit(subscriptionHandlerContext.handler),
           ),
-          Effect.bind("updateHeader", ({ update }) =>
+          Effect.bind("nonce", () => Nonce.getAndIncrement(nonce)),
+          Effect.bind("updateHeader", ({ update, nonce }) =>
             HeaderEncoderDecoder.encode({
               protocol: "typh",
               version: 1,
@@ -293,6 +327,7 @@ export class Server<
               action: "server:update",
               payload: {
                 success: Exit.isSuccess(update),
+                nonce,
               },
             }),
           ),
@@ -347,7 +382,7 @@ export class Server<
         pipe(
           subscriptionState,
           Option.match({
-            onSome: ({ event, effectCleanup }) =>
+            onSome: ({ event, effectCleanup, nonce }) =>
               pipe(
                 Event.replaceStreamContext({
                   pullStream: pullDecodedStream,
@@ -356,6 +391,7 @@ export class Server<
                 Effect.map((event) => ({
                   event,
                   effectCleanup,
+                  nonce,
                 })),
                 Effect.option,
                 Effect.provideService(Event, event),
@@ -376,23 +412,31 @@ export class Server<
                     header.payload.handler,
                   ),
                 ),
-                Effect.bind("effectCleanup", ({ event, handlerContext }) =>
-                  effect(
-                    pipe(
-                      Server.runBoundedEventHandler(header.id, handlerContext),
-                      Effect.tap((boundedEventHandler) =>
-                        peer.send(boundedEventHandler, {
-                          compress: true,
-                        }),
+                Effect.bind("nonce", () => Nonce.make()),
+                Effect.bind(
+                  "effectCleanup",
+                  ({ event, handlerContext, nonce }) =>
+                    effect(
+                      pipe(
+                        Server.runBoundedEventHandler(
+                          header.id,
+                          handlerContext,
+                          nonce,
+                        ),
+                        Effect.tap((boundedEventHandler) =>
+                          peer.send(boundedEventHandler, {
+                            compress: true,
+                          }),
+                        ),
+                        Effect.provideService(Event, event),
                       ),
-                      Effect.provideService(Event, event),
                     ),
-                  ),
                 ),
-                Effect.map(({ event, effectCleanup }) =>
+                Effect.map(({ event, effectCleanup, nonce }) =>
                   Option.some({
                     event,
                     effectCleanup,
+                    nonce,
                   }),
                 ),
               ),
@@ -423,12 +467,13 @@ export class Server<
         Effect.bind("handlerContext", () =>
           HashMap.get(server.subscriptionHandlerMap, header.payload.handler),
         ),
+        Effect.bind("nonce", () => Nonce.make()),
         Effect.bind(
           "returnValue",
-          ({ event, handlerContext }) =>
+          ({ event, handlerContext, nonce }) =>
             observeOnce(
               pipe(
-                Server.runBoundedEventHandler(header.id, handlerContext),
+                Server.runBoundedEventHandler(header.id, handlerContext, nonce),
                 Effect.flatMap((returnBuffer) => callback(returnBuffer)),
                 Effect.tap(() => Event.close()),
                 Effect.provideService(Event, event),

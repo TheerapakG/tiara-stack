@@ -31,15 +31,20 @@ type LoadingState = {
   isLoading: true;
 };
 
+type SuccessData<T = unknown> = {
+  nonce: number;
+  value: T;
+};
+
 type SuccessState<T = unknown> = {
   isLoading: false;
-  data: T;
+  data: SuccessData<T>;
 };
 
 type SignalState<T = unknown> = LoadingState | SuccessState<T>;
 
 type UpdaterState<T = unknown> = {
-  updater: (data: T) => Effect.Effect<void, never, never>;
+  updater: (data: SuccessData<T>) => Effect.Effect<void, never, never>;
 };
 type UpdaterStateMap = HashMap.HashMap<string, UpdaterState>;
 
@@ -92,6 +97,34 @@ export class WebSocketClient<
     );
   }
 
+  static handleUpdate(header: Header<"server:update">, message: unknown) {
+    return (
+      client: WebSocketClient<
+        Record<string, SubscriptionHandlerContext>,
+        Record<string, MutationHandlerContext>
+      >,
+    ) =>
+      pipe(
+        client.updaterStateMapRef,
+        SynchronizedRef.get,
+        Effect.map(HashMap.get(header.id)),
+        // TODO: validate message
+        Effect.tap((updaterState) =>
+          pipe(
+            updaterState,
+            Option.match({
+              onSome: ({ updater }) =>
+                updater({
+                  nonce: header.payload.nonce,
+                  value: message,
+                }),
+              onNone: () => Effect.void,
+            }),
+          ),
+        ),
+      );
+  }
+
   static connect(
     client: WebSocketClient<
       Record<string, SubscriptionHandlerContext>,
@@ -132,21 +165,10 @@ export class WebSocketClient<
                     match
                       .in<Header>()
                       .case({ action: "'server:update'" }, () =>
-                        pipe(
-                          client.updaterStateMapRef,
-                          SynchronizedRef.get,
-                          Effect.map(HashMap.get(header.id)),
-                          // TODO: validate message
-                          Effect.tap((updaterState) =>
-                            pipe(
-                              updaterState,
-                              Option.match({
-                                onSome: ({ updater }) => updater(message),
-                                onNone: () => Effect.void,
-                              }),
-                            ),
-                          ),
-                        ),
+                        WebSocketClient.handleUpdate(
+                          header as Header<"server:update">,
+                          message,
+                        )(client),
                       )
                       .default(() => Effect.void)(header),
                   ),
@@ -201,11 +223,17 @@ export class WebSocketClient<
       Effect.let(
         "updater",
         ({ signal }) =>
-          (data: unknown) =>
-            signal.setValue({
-              isLoading: false,
-              data,
-            }),
+          (data: SuccessData) =>
+            signal.updateValue((prev) =>
+              Effect.succeed(
+                prev.isLoading || prev.data.nonce < data.nonce
+                  ? {
+                      isLoading: false,
+                      data: data,
+                    }
+                  : prev,
+              ),
+            ),
       ),
       Effect.tap(({ id, updater }) =>
         pipe(
@@ -310,9 +338,9 @@ export class WebSocketClient<
       Effect.let(
         "updater",
         ({ id, deferred }) =>
-          (data: unknown) =>
+          (data: SuccessData) =>
             pipe(
-              Deferred.succeed(deferred, data),
+              Deferred.succeed(deferred, data.value),
               Effect.andThen(() =>
                 pipe(
                   client.updaterStateMapRef,
