@@ -27,6 +27,7 @@
     "@opentelemetry/sdk-trace-node": "^2.0.1",
     "@opentelemetry/sdk-trace-web": "^2.0.1",
     "arktype": "^2.1.20",
+    "async_hooks": "^1.0.0",
     "effect": "^3.16.8",
     "typhoon-core": "workspace:*",
     "typhoon-server": "workspace:*"
