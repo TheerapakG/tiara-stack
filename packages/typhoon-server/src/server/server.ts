@@ -217,6 +217,9 @@ export class Server<
           server.peerCount(Effect.succeed(BigInt(HashMap.size(peerStateMap)))),
         ),
         Effect.asVoid,
+        Effect.withSpan("Server.open", {
+          captureStackTrace: true,
+        }),
       );
     };
   }
@@ -252,6 +255,9 @@ export class Server<
           server.peerCount(Effect.succeed(BigInt(HashMap.size(peerStateMap)))),
         ),
         Effect.asVoid,
+        Effect.withSpan("Server.close", {
+          captureStackTrace: true,
+        }),
       );
   }
 
@@ -346,7 +352,17 @@ export class Server<
         pipe(
           Effect.Do,
           Effect.bind("update", () =>
-            Effect.exit(subscriptionHandlerContext.handler),
+            Effect.exit(
+              pipe(
+                subscriptionHandlerContext.handler,
+                Effect.withSpan(
+                  `subscriptionHandler:${subscriptionHandlerContext.config.name}`,
+                  {
+                    captureStackTrace: true,
+                  },
+                ),
+              ),
+            ),
           ),
           Effect.bind("nonce", () => Nonce.getAndIncrement(nonce)),
           Effect.bind("updateHeader", ({ update, nonce }) =>
@@ -394,6 +410,9 @@ export class Server<
         ),
       ),
       Effect.map(({ boundedEventHandler }) => boundedEventHandler),
+      Effect.withSpan("Server.runBoundedEventHandler", {
+        captureStackTrace: true,
+      }),
     );
   }
 
@@ -471,6 +490,9 @@ export class Server<
                 ),
               ),
           }),
+          Effect.withSpan("Server.handleSubscribe", {
+            captureStackTrace: true,
+          }),
         ),
       )(server);
   }
@@ -539,10 +561,12 @@ export class Server<
         Effect.bind("handlerContext", () =>
           HashMap.get(server.mutationHandlerMap, header.payload.handler),
         ),
-        Effect.let("handler", ({ handlerContext }) => handlerContext.handler),
-        Effect.bind("returnValue", ({ event, handler }) =>
+        Effect.bind("returnValue", ({ event, handlerContext }) =>
           pipe(
-            handler,
+            handlerContext.handler,
+            Effect.withSpan(`mutationHandler:${handlerContext.config.name}`, {
+              captureStackTrace: true,
+            }),
             Effect.flatMap(() => callback),
             Effect.tap(() => Event.close()),
             Effect.provideService(Event, event),
@@ -631,6 +655,9 @@ export class Server<
             )
             .default(() => Effect.void)(header),
         ),
+        Effect.withSpan("Server.handleWebSocketMessage", {
+          captureStackTrace: true,
+        }),
       );
   }
 
