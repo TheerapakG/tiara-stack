@@ -45,18 +45,9 @@ importers:
       '@opentelemetry/sdk-trace-base':
         specifier: ^2.0.1
         version: 2.0.1(@opentelemetry/api@1.9.0)
-      '@opentelemetry/sdk-trace-node':
-        specifier: ^2.0.1
-        version: 2.0.1(@opentelemetry/api@1.9.0)
-      '@opentelemetry/sdk-trace-web':
-        specifier: ^2.0.1
-        version: 2.0.1(@opentelemetry/api@1.9.0)
       arktype:
         specifier: ^2.1.20
         version: 2.1.20
-      async_hooks:
-        specifier: ^1.0.0
-        version: 1.0.0
       effect:
         specifier: ^3.16.8
         version: 3.16.8
@@ -1768,9 +1759,6 @@ packages:
   ast-kit@2.1.0:
     resolution: {integrity: sha512-ROM2LlXbZBZVk97crfw8PGDOBzzsJvN2uJCmwswvPUNyfH14eg90mSN3xNqsri1JS1G9cz0VzeDUhxJkTrr4Ew==}
     engines: {node: '>=20.18.0'}
-
-  async_hooks@1.0.0:
-    resolution: {integrity: sha512-t4BSJgx48V3e7U6Ll3/WOUNmxIRPzmPdxVfgbyzcnRItEnn4iKp4F//b0sV3L9hzbdr5qxWdNWzOF7t+rjYSfA==}
 
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
@@ -4288,8 +4276,6 @@ snapshots:
     dependencies:
       '@babel/parser': 7.27.5
       pathe: 2.0.3
-
-  async_hooks@1.0.0: {}
 
   asynckit@0.4.0: {}
 
