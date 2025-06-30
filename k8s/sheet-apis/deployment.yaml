@@ -31,6 +31,11 @@ spec:
                 secretKeyRef:
                   name: sheet-apis-secret
                   key: postgresUrl
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-apis-secret
+                  key: otelExporterOtlpEndpoint
 ---
 apiVersion: v1
 kind: Service
