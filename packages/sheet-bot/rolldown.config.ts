@@ -13,6 +13,7 @@ export default defineConfig({
       format: "es",
     },
   ],
+  platform: "node",
   plugins: [dts()],
   external: [...builtinModules, /^node:/],
 });
