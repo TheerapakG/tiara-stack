@@ -70,6 +70,7 @@ class LookupEncoderDecoder<
     Field = keyof InferDecoded<RequiredField, DT> & Field,
 > {
   constructor(
+    private readonly name: string,
     private readonly fields: Field[],
     private readonly requiredFields: RequiredField[],
     private readonly decodingTable: DT,
@@ -112,6 +113,9 @@ class LookupEncoderDecoder<
         ),
       ),
       Effect.map(({ encodedEntries }) => encodedEntries),
+      Effect.withSpan(`${this.name}.encode`, {
+        captureStackTrace: true,
+      }),
     );
   }
 
@@ -154,13 +158,23 @@ class LookupEncoderDecoder<
           ),
       ),
       Effect.map((acc) => acc as InferDecoded<RequiredField, DT>),
+      Effect.withSpan(`${this.name}.decode`, {
+        captureStackTrace: true,
+      }),
     );
   }
 }
 
-const emptyPayloadEncoderDecoder = new LookupEncoderDecoder([], [], {}, {});
+const emptyPayloadEncoderDecoder = new LookupEncoderDecoder(
+  "emptyPayloadEncoderDecoder",
+  [],
+  [],
+  {},
+  {},
+);
 
 const handlerPayloadEncoderDecoder = new LookupEncoderDecoder(
+  "handlerPayloadEncoderDecoder",
   ["handler"],
   ["handler"],
   {
@@ -172,6 +186,7 @@ const handlerPayloadEncoderDecoder = new LookupEncoderDecoder(
 );
 
 const successNoncePayloadEncoderDecoder = new LookupEncoderDecoder(
+  "successNoncePayloadEncoderDecoder",
   ["success", "nonce"],
   ["success", "nonce"],
   {
@@ -185,6 +200,7 @@ const successNoncePayloadEncoderDecoder = new LookupEncoderDecoder(
 );
 
 const baseHeaderEncoderDecoder = new LookupEncoderDecoder(
+  "baseHeaderEncoderDecoder",
   ["protocol", "version", "id", "action", "payload"],
   ["protocol", "version", "id", "action", "payload"],
   {
@@ -373,6 +389,9 @@ export class HeaderEncoderDecoder {
           payload: encodedPayload,
         }),
       ),
+      Effect.withSpan("HeaderEncoderDecoder.encode", {
+        captureStackTrace: true,
+      }),
     );
   }
 
@@ -397,6 +416,9 @@ export class HeaderEncoderDecoder {
             payload: decodedPayload,
           }) as Header,
       ),
+      Effect.withSpan("HeaderEncoderDecoder.decode", {
+        captureStackTrace: true,
+      }),
     );
   }
 }
