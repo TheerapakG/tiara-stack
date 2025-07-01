@@ -19,7 +19,6 @@
   "keywords": [],
   "author": "",
   "dependencies": {
-    "@msgpack/msgpack": "^3.1.2",
     "ofetch": "^1.4.1",
     "typhoon-core": "workspace:*",
     "typhoon-server": "workspace:*"

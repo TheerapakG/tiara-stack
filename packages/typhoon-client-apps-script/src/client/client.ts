@@ -1,11 +1,10 @@
-import { encode } from "@msgpack/msgpack";
 import { StandardSchemaV1 } from "@standard-schema/spec";
 import { type } from "arktype";
 import { Chunk, Data, Effect, pipe } from "effect";
 import { RequestParamsConfig } from "typhoon-core/config";
 import {
-  bytesToPullDecodedStream,
   HeaderEncoderDecoder,
+  MsgpackEncoderDecoder,
 } from "typhoon-core/protocol";
 import { validate } from "typhoon-core/schema";
 import {
@@ -92,10 +91,10 @@ export class AppsScriptClient<
           },
         }),
       ),
-      Effect.let("requestHeaderEncoded", ({ requestHeader }) =>
-        encode(requestHeader),
+      Effect.bind("requestHeaderEncoded", ({ requestHeader }) =>
+        MsgpackEncoderDecoder.encode(requestHeader),
       ),
-      Effect.let("dataEncoded", () => encode(data)),
+      Effect.bind("dataEncoded", () => MsgpackEncoderDecoder.encode(data)),
       Effect.let("requestBuffer", ({ requestHeaderEncoded, dataEncoded }) => {
         const requestBuffer = new Uint8Array(
           requestHeaderEncoded.length + dataEncoded.length,
@@ -116,7 +115,7 @@ export class AppsScriptClient<
         ({ response }) => new Uint8Array(response.getBlob().getBytes()),
       ),
       Effect.bind("pullDecodedStream", ({ bytes }) =>
-        bytesToPullDecodedStream(bytes),
+        MsgpackEncoderDecoder.bytesToPullDecodedStream(bytes),
       ),
       Effect.bind("header", ({ pullDecodedStream }) =>
         pipe(
