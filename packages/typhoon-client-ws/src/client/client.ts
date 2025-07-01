@@ -1,4 +1,3 @@
-import { encode } from "@msgpack/msgpack";
 import { StandardSchemaV1 } from "@standard-schema/spec";
 import { match, type } from "arktype";
 import {
@@ -11,9 +10,9 @@ import {
   SynchronizedRef,
 } from "effect";
 import {
-  blobToPullDecodedStream,
   Header,
   HeaderEncoderDecoder,
+  MsgpackEncoderDecoder,
 } from "typhoon-core/protocol";
 import { validate } from "typhoon-core/schema";
 import {
@@ -146,7 +145,7 @@ export class WebSocketClient<
                   Effect.Do,
                   Effect.let("data", () => event.data as Blob),
                   Effect.bind("pullDecodedStream", ({ data }) =>
-                    blobToPullDecodedStream(data),
+                    MsgpackEncoderDecoder.blobToPullDecodedStream(data),
                   ),
                   Effect.bind("header", ({ pullDecodedStream }) =>
                     pipe(
@@ -252,7 +251,9 @@ export class WebSocketClient<
           },
         }),
       ),
-      Effect.let("headerEncoded", ({ header }) => encode(header)),
+      Effect.bind("headerEncoded", ({ header }) =>
+        MsgpackEncoderDecoder.encode(header),
+      ),
       Effect.bind("ws", () => client.ws),
       Effect.tap(({ ws, headerEncoded }) =>
         Option.map(ws, (ws) => ws.send(headerEncoded)),
@@ -309,7 +310,9 @@ export class WebSocketClient<
           },
         }),
       ),
-      Effect.let("headerEncoded", ({ header }) => encode(header)),
+      Effect.bind("headerEncoded", ({ header }) =>
+        MsgpackEncoderDecoder.encode(header),
+      ),
       Effect.bind("ws", () => client.ws),
       Effect.tap(({ ws, headerEncoded }) =>
         Option.map(ws, (ws) => ws.send(headerEncoded)),
@@ -363,8 +366,8 @@ export class WebSocketClient<
           },
         }),
       ),
-      Effect.let("requestHeaderEncoded", ({ requestHeader }) =>
-        encode(requestHeader),
+      Effect.bind("requestHeaderEncoded", ({ requestHeader }) =>
+        MsgpackEncoderDecoder.encode(requestHeader),
       ),
       Effect.bind("ws", () => client.ws),
       Effect.tap(({ ws, requestHeaderEncoded }) =>

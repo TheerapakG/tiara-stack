@@ -20,7 +20,6 @@
   "author": "",
   "dependencies": {
     "typhoon-server": "workspace:*",
-    "@msgpack/msgpack": "^3.1.2",
     "@preact/signals-core": "^1.8.0",
     "@types/pg": "^8.15.2",
     "crossws": "^0.4.1",

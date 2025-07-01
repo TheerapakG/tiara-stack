@@ -1,4 +1,3 @@
-import { encode } from "@msgpack/msgpack";
 import { match, type } from "arktype";
 import { Message, Peer } from "crossws";
 import type { serve as crosswsServe } from "crossws/server";
@@ -19,10 +18,10 @@ import {
   SynchronizedRef,
 } from "effect";
 import {
-  blobToPullDecodedStream,
   Header,
   HeaderEncoderDecoder,
   MsgpackDecodeError,
+  MsgpackEncoderDecoder,
   StreamExhaustedError,
 } from "typhoon-core/protocol";
 import { validate } from "typhoon-core/schema";
@@ -386,11 +385,11 @@ export class Server<
               }),
             ),
           ),
-          Effect.let("updateHeaderEncoded", ({ updateHeader }) =>
-            encode(updateHeader),
+          Effect.bind("updateHeaderEncoded", ({ updateHeader }) =>
+            MsgpackEncoderDecoder.encode(updateHeader),
           ),
-          Effect.let("updateMessageEncoded", ({ updateMessage }) =>
-            encode(updateMessage),
+          Effect.bind("updateMessageEncoded", ({ updateMessage }) =>
+            MsgpackEncoderDecoder.encode(updateMessage),
           ),
           Effect.let(
             "updateBuffer",
@@ -585,7 +584,10 @@ export class Server<
         Effect.bind("scope", () => Scope.make()),
         Effect.let("blob", () => message.blob()),
         Effect.bind("pullDecodedStream", ({ scope, blob }) =>
-          pipe(blobToPullDecodedStream(blob), Scope.extend(scope)),
+          pipe(
+            MsgpackEncoderDecoder.blobToPullDecodedStream(blob),
+            Scope.extend(scope),
+          ),
         ),
         Effect.bind("header", ({ pullDecodedStream }) =>
           pipe(
@@ -667,7 +669,10 @@ export class Server<
         Effect.bind("scope", () => Scope.make()),
         Effect.bind("blob", () => Effect.promise(() => request.blob())),
         Effect.bind("pullDecodedStream", ({ blob, scope }) =>
-          pipe(blobToPullDecodedStream(blob), Scope.extend(scope)),
+          pipe(
+            MsgpackEncoderDecoder.blobToPullDecodedStream(blob),
+            Scope.extend(scope),
+          ),
         ),
         Effect.bind("header", ({ pullDecodedStream }) =>
           pipe(
