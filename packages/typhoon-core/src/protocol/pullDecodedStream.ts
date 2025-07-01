@@ -60,7 +60,19 @@ const decodedStreamToPullDecodedStream = (
   );
 
 export const blobToPullDecodedStream = (blob: Blob) =>
-  pipe(blobToDecodedStream(blob), decodedStreamToPullDecodedStream);
+  pipe(
+    blobToDecodedStream(blob),
+    decodedStreamToPullDecodedStream,
+    Effect.withSpan("blobToPullDecodedStream", {
+      captureStackTrace: true,
+    }),
+  );
 
 export const bytesToPullDecodedStream = (bytes: Uint8Array) =>
-  pipe(bytesToDecodedStream(bytes), decodedStreamToPullDecodedStream);
+  pipe(
+    bytesToDecodedStream(bytes),
+    decodedStreamToPullDecodedStream,
+    Effect.withSpan("bytesToPullDecodedStream", {
+      captureStackTrace: true,
+    }),
+  );

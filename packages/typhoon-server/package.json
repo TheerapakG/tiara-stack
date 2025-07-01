@@ -26,14 +26,9 @@
     "drizzle-orm": "^0.44.0",
     "ofetch": "^1.4.1",
     "pg": "^8.16.0",
-    "srvx": "^0.7.1",
-    "@opentelemetry/sdk-trace-base": "^2.0.1",
-    "@opentelemetry/sdk-trace-node": "^2.0.1",
-    "@opentelemetry/sdk-trace-web": "^2.0.1",
-    "@opentelemetry/exporter-prometheus": "^0.202.0"
+    "srvx": "^0.7.1"
   },
   "peerDependencies": {
-    "@effect/opentelemetry": "^0.53.1",
     "effect": "^3.16.8",
     "arktype": "^2.1.20",
     "typhoon-core": "workspace:*"

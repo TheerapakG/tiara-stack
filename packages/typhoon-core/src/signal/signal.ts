@@ -48,6 +48,9 @@ export abstract class DependencySignal<A = unknown, E = unknown> {
       E.flatMap(({ dependents }) =>
         E.all(dependents.map((dependent) => dependent.notify())),
       ),
+      E.withSpan("DependencySignal.notifyAllDependents", {
+        captureStackTrace: true,
+      }),
       E.ignore,
     );
   }
@@ -82,6 +85,9 @@ export const bindScopeDependency = (dependency: DependencySignal) =>
     E.flatMap((scope) =>
       E.all([dependency.addDependent(scope), scope.addDependency(dependency)]),
     ),
+    E.withSpan("bindScopeDependency", {
+      captureStackTrace: true,
+    }),
     E.ignore,
   );
 
@@ -118,6 +124,9 @@ const getDependentsUpdateOrder = (
         })
         .reverse();
     }),
+    E.withSpan("getDependentsUpdateOrder", {
+      captureStackTrace: true,
+    }),
   );
 };
 
@@ -128,6 +137,9 @@ const runAndTrackEffect = <A = unknown, E = unknown>(
   return pipe(
     effect,
     E.provideService(SignalContext, SignalContext.fromDependent(scope)),
+    E.withSpan("runAndTrackEffect", {
+      captureStackTrace: true,
+    }),
   );
 };
 
@@ -171,39 +183,57 @@ export class Signal<T = unknown> implements DependencySignal<T, never> {
     return pipe(
       bindScopeDependency(this),
       E.flatMap(() => this.peek()),
+      E.withSpan("Signal.value", {
+        captureStackTrace: true,
+      }),
     );
   }
 
   peek(): E.Effect<T, never, never> {
-    return E.suspend(() => E.succeed(this._value));
+    return pipe(
+      E.suspend(() => E.succeed(this._value)),
+      E.withSpan("Signal.peek", {
+        captureStackTrace: true,
+      }),
+    );
   }
 
   setValue(value: T): E.Effect<void, never, never> {
-    return DependencySignal.notifyAllDependents(
-      this,
-      E.suspend(() =>
-        E.sync(() => {
-          this._value = value;
-        }),
+    return pipe(
+      DependencySignal.notifyAllDependents(
+        this,
+        E.suspend(() =>
+          E.sync(() => {
+            this._value = value;
+          }),
+        ),
       ),
+      E.withSpan("Signal.setValue", {
+        captureStackTrace: true,
+      }),
     );
   }
 
   updateValue(
     updater: (value: T) => E.Effect<T>,
   ): E.Effect<void, never, never> {
-    return DependencySignal.notifyAllDependents(
-      this,
-      E.suspend(() =>
-        pipe(
-          updater(this._value),
-          E.tap((value) =>
-            E.sync(() => {
-              this._value = value;
-            }),
+    return pipe(
+      DependencySignal.notifyAllDependents(
+        this,
+        E.suspend(() =>
+          pipe(
+            updater(this._value),
+            E.tap((value) =>
+              E.sync(() => {
+                this._value = value;
+              }),
+            ),
           ),
         ),
       ),
+      E.withSpan("Signal.updateValue", {
+        captureStackTrace: true,
+      }),
     );
   }
 }
@@ -283,6 +313,9 @@ export class Computed<A = unknown, E = unknown>
     return pipe(
       bindScopeDependency(this),
       E.flatMap(() => this.peek()),
+      E.withSpan("Computed.value", {
+        captureStackTrace: true,
+      }),
     );
   }
 
@@ -307,41 +340,60 @@ export class Computed<A = unknown, E = unknown>
         this._fiber = Option.some(fiber);
       }),
       E.flatMap(() => Deferred.await(this._value)),
+      E.withSpan("Computed.peek", {
+        captureStackTrace: true,
+      }),
     );
   }
 
   reset(): E.Effect<void, never, never> {
-    return E.all([
-      pipe(
-        Deferred.make<A, E>(),
-        E.map((value) => {
-          this._value = value;
-        }),
-      ),
-      pipe(
-        E.succeed(this._fiber),
-        E.tap(() => {
-          this._fiber = Option.none();
-        }),
-        E.flatMap((fiber) =>
-          pipe(
-            fiber,
-            Option.match({
-              onSome: (fiber) => Fiber.interrupt(fiber),
-              onNone: () => E.void,
-            }),
+    return pipe(
+      E.all([
+        pipe(
+          Deferred.make<A, E>(),
+          E.map((value) => {
+            this._value = value;
+          }),
+        ),
+        pipe(
+          E.succeed(this._fiber),
+          E.tap(() => {
+            this._fiber = Option.none();
+          }),
+          E.flatMap((fiber) =>
+            pipe(
+              fiber,
+              Option.match({
+                onSome: (fiber) => Fiber.interrupt(fiber),
+                onNone: () => E.void,
+              }),
+            ),
           ),
         ),
-      ),
-    ]);
+      ]),
+      E.withSpan("Computed.reset", {
+        captureStackTrace: true,
+      }),
+    );
   }
 
   notify(): E.Effect<unknown, never, never> {
-    return pipe(this.clearDependencies(), E.andThen(this.reset()));
+    return pipe(
+      this.clearDependencies(),
+      E.andThen(this.reset()),
+      E.withSpan("Computed.notify", {
+        captureStackTrace: true,
+      }),
+    );
   }
 
   recompute(): E.Effect<void, never, never> {
-    return DependencySignal.notifyAllDependents(this, this.reset());
+    return pipe(
+      DependencySignal.notifyAllDependents(this, this.reset()),
+      E.withSpan("Computed.recompute", {
+        captureStackTrace: true,
+      }),
+    );
   }
 }
 
@@ -351,6 +403,9 @@ export const computed = <A = unknown, E = unknown>(
   pipe(
     Deferred.make<A, E>(),
     E.map((value) => new Computed(effect, value)),
+    E.withSpan("computed", {
+      captureStackTrace: true,
+    }),
   );
 
 class Effect implements DependentSignal {
@@ -388,28 +443,33 @@ class Effect implements DependentSignal {
   }
 
   notify(): E.Effect<unknown, never, never> {
-    return E.all([
-      this.clearDependencies(),
-      pipe(
-        E.Do,
-        E.let("fiber", () => this._fiber),
-        E.bind("newFiber", () =>
-          pipe(runAndTrackEffect(this._effect, this), E.forkDaemon),
-        ),
-        E.tap(({ newFiber }) => {
-          this._fiber = Option.some(newFiber);
-        }),
-        E.flatMap(({ fiber }) =>
-          pipe(
-            fiber,
-            Option.match({
-              onSome: (fiber) => Fiber.interrupt(fiber),
-              onNone: () => E.void,
-            }),
+    return pipe(
+      E.all([
+        this.clearDependencies(),
+        pipe(
+          E.Do,
+          E.let("fiber", () => this._fiber),
+          E.bind("newFiber", () =>
+            pipe(runAndTrackEffect(this._effect, this), E.forkDaemon),
+          ),
+          E.tap(({ newFiber }) => {
+            this._fiber = Option.some(newFiber);
+          }),
+          E.flatMap(({ fiber }) =>
+            pipe(
+              fiber,
+              Option.match({
+                onSome: (fiber) => Fiber.interrupt(fiber),
+                onNone: () => E.void,
+              }),
+            ),
           ),
         ),
-      ),
-    ]);
+      ]),
+      E.withSpan("Effect.notify", {
+        captureStackTrace: true,
+      }),
+    );
   }
 
   cleanup() {
@@ -418,6 +478,9 @@ class Effect implements DependentSignal {
         this._effect = E.void;
       }),
       E.andThen(this.clearDependencies()),
+      E.withSpan("Effect.cleanup", {
+        captureStackTrace: true,
+      }),
     );
   }
 }
@@ -427,6 +490,9 @@ export const effect = (effect: E.Effect<unknown, unknown, SignalContext>) =>
     E.succeed(new Effect(effect)),
     E.tap((effect) => effect.notify()),
     E.map((effect) => effect.cleanup()),
+    E.withSpan("effect", {
+      captureStackTrace: true,
+    }),
   );
 
 class OnceObserver<A = unknown, E = unknown> implements DependentSignal {
@@ -481,11 +547,19 @@ class OnceObserver<A = unknown, E = unknown> implements DependentSignal {
       E.Do,
       E.bind("fiber", () => Deferred.await(this._fiber)),
       E.flatMap(({ fiber }) => Fiber.join(fiber)),
+      E.withSpan("OnceObserver.value", {
+        captureStackTrace: true,
+      }),
     );
   }
 
   notify(): E.Effect<unknown, never, never> {
-    return this.clearDependencies();
+    return pipe(
+      this.clearDependencies(),
+      E.withSpan("OnceObserver.notify", {
+        captureStackTrace: true,
+      }),
+    );
   }
 }
 
@@ -511,6 +585,9 @@ export class SignalContext extends Context.Tag("SignalContext")<
     return pipe(
       SignalContext,
       E.map(({ scope }) => scope),
+      E.withSpan("SignalContext.getScope", {
+        captureStackTrace: true,
+      }),
     );
   }
 }
