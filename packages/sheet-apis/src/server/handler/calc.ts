@@ -110,7 +110,7 @@ const calcTeamsByConfigMap = (
           percent: prevPercent,
           room,
         } of currentRooms) {
-          if ((enced || !tierer) && bp <= highestBp + ENC_BP_DIFF) {
+          if (enced || (!tierer && bp <= highestBp + ENC_BP_DIFF)) {
             continue;
           }
           newRooms.push({
