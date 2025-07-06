@@ -2,6 +2,7 @@ import { match, type } from "arktype";
 import {
   ActionRowBuilder,
   ApplicationIntegrationType,
+  bold,
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
@@ -11,6 +12,8 @@ import {
   MessageFlagsBitField,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  time,
+  TimestampStyles,
 } from "discord.js";
 import { eq } from "drizzle-orm";
 import { Array, Chunk, Effect, Option, pipe, Ref } from "effect";
@@ -100,7 +103,7 @@ const getSlotMessage = (day: number, serverId: string) =>
       Effect.let("slotMessages", ({ daySchedule: { start, schedules } }) =>
         schedules.map(({ hour, empty, breakHour }) =>
           empty > 0 && !breakHour
-            ? `**+${empty} Hour ${hour}** <t:${start + (hour - 1) * 3600}:t> to <t:${start + hour * 3600}:t>`
+            ? `${bold(`+${empty} Hour ${hour}`)} ${time(start + (hour - 1) * 3600, TimestampStyles.ShortTime)} to ${time(start + hour * 3600, TimestampStyles.ShortTime)}`
             : "",
         ),
       ),
@@ -265,7 +268,12 @@ export const command = defineCommand(
                                 ? "All Filled :3"
                                 : slotMessage,
                             )
-                            .setTimestamp(),
+                            .setTimestamp()
+                            .setAuthor({
+                              name: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
+                              iconURL:
+                                interaction.client.user.displayAvatarURL(),
+                            }),
                         ],
                         flags: flags.bitfield,
                         components: [row],
