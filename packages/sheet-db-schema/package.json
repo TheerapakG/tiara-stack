@@ -1,5 +1,5 @@
 {
-  "name": "sheet-bot",
+  "name": "sheet-db-schema",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -14,22 +14,14 @@
     "format": "prettier -c .",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "build": "rolldown -c rolldown.config.ts && tar -acf dist.tar.zst ./dist"
+    "build": "rolldown -c rolldown.config.ts"
   },
   "keywords": [],
   "author": "",
   "dependencies": {
-    "@googleapis/sheets": "^10.0.1",
     "arktype": "^2.1.20",
-    "c12": "^3.0.4",
-    "discord.js": "^14.21.0",
     "drizzle-orm": "^0.44.0",
-    "effect": "^3.16.8",
-    "google-auth-library": "^10.1.0",
-    "postgres": "^3.4.7",
-    "typhoon-server": "workspace:*",
-    "typhoon-core": "workspace:*",
-    "sheet-db-schema": "workspace:*"
+    "postgres": "^3.4.7"
   },
   "devDependencies": {
     "@eslint/compat": "^1.3.0",

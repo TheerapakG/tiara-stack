@@ -240,21 +240,21 @@ export class Signal<T = unknown> implements DependencySignal<T, never> {
 
 export const signal = <T>(value: T) => new Signal(value);
 
-export class Computed<A = unknown, E = unknown>
-  implements DependentSignal, DependencySignal<A, E>
+export class Computed<A = unknown, Err = unknown>
+  implements DependentSignal, DependencySignal<A, Err>
 {
-  readonly [DependencySymbol]: DependencySignal<A, E> = this;
+  readonly [DependencySymbol]: DependencySignal<A, Err> = this;
   readonly [DependentSymbol]: DependentSignal = this;
 
-  private _effect: E.Effect<A, E, SignalContext>;
-  private _value: Deferred.Deferred<A, E>;
+  private _effect: E.Effect<A, Err, SignalContext>;
+  private _value: Deferred.Deferred<A, Err>;
   private _fiber: Option.Option<Fiber.Fiber<boolean, never>>;
   private _dependents: HashSet.HashSet<DependentSignal>;
   private _dependencies: HashSet.HashSet<DependencySignal>;
 
   constructor(
-    effect: E.Effect<A, E, SignalContext>,
-    value: Deferred.Deferred<A, E>,
+    effect: E.Effect<A, Err, SignalContext>,
+    value: Deferred.Deferred<A, Err>,
   ) {
     this._effect = effect;
     this._value = value;
@@ -309,7 +309,7 @@ export class Computed<A = unknown, E = unknown>
     return E.sync(() => HashSet.toValues(this._dependents));
   }
 
-  get value(): E.Effect<A, E, SignalContext> {
+  get value(): E.Effect<A, Err, SignalContext> {
     return pipe(
       bindScopeDependency(this),
       E.flatMap(() => this.peek()),
@@ -319,7 +319,7 @@ export class Computed<A = unknown, E = unknown>
     );
   }
 
-  peek(): E.Effect<A, E, never> {
+  peek(): E.Effect<A, Err, never> {
     return pipe(
       E.Do,
       E.bind("fiber", () =>
@@ -350,7 +350,7 @@ export class Computed<A = unknown, E = unknown>
     return pipe(
       E.all([
         pipe(
-          Deferred.make<A, E>(),
+          Deferred.make<A, Err>(),
           E.map((value) => {
             this._value = value;
           }),
@@ -397,11 +397,11 @@ export class Computed<A = unknown, E = unknown>
   }
 }
 
-export const computed = <A = unknown, E = unknown>(
-  effect: E.Effect<A, E, SignalContext>,
+export const computed = <A = unknown, Err = unknown>(
+  effect: E.Effect<A, Err, SignalContext>,
 ) =>
   pipe(
-    Deferred.make<A, E>(),
+    Deferred.make<A, Err>(),
     E.map((value) => new Computed(effect, value)),
     E.withSpan("computed", {
       captureStackTrace: true,

@@ -246,6 +246,10 @@ export const subscribe = <A, E>(
     Effect.map(({ computedQuery }) => computedQuery),
   );
 
+export const subscribeQuery = <T, TDialect extends Dialect>(
+  q: RunnableQuery<T, TDialect>,
+) => pipe(q, query, run, subscribe);
+
 export const mutate = <A, E>(
   query: Effect.Effect<
     A,
@@ -293,6 +297,10 @@ export const mutate = <A, E>(
       TransactionContext.ofMode("mutation"),
     ),
   );
+
+export const mutateQuery = <T, TDialect extends Dialect>(
+  q: RunnableQuery<T, TDialect>,
+) => pipe(q, query, run, mutate);
 
 export const wrapTransaction =
   <Transaction, Config>(
