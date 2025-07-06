@@ -1,3 +1,4 @@
+import { lightFormat } from "date-fns";
 import { builtinModules } from "module";
 import path from "pathe";
 import { defineConfig } from "rolldown";
@@ -5,7 +6,7 @@ import { dts } from "rolldown-plugin-dts";
 import simpleGit from "simple-git";
 
 const git = simpleGit();
-const date = `${new Date().getUTCFullYear().toString().padStart(4, "0")}${new Date().getUTCMonth().toString().padStart(2, "0")}${new Date().getUTCDate().toString().padStart(2, "0")}`;
+const date = lightFormat(new Date(), "yyyyMMdd");
 const hash = (await git.revparse("HEAD")).substring(0, 7);
 
 export default defineConfig({
