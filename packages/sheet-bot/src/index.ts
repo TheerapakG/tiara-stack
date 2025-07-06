@@ -17,6 +17,7 @@ await Effect.runPromise(
   pipe(
     Effect.Do,
     Effect.bind("bot", () => Bot.create(layer)),
+    Effect.tap(({ bot }) => Bot.registerProcessHandlers(bot)),
     Effect.tap(({ bot }) =>
       Effect.all(
         Object.values(commands).map((command) => Bot.addCommand(command)(bot)),

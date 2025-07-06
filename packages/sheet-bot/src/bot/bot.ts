@@ -173,7 +173,7 @@ export class Bot<E = unknown, R = unknown> {
     );
   }
 
-  static destroy(bot: Bot) {
+  static destroy<E = unknown, R = unknown>(bot: Bot<E, R>) {
     return pipe(
       Effect.promise(() => bot.client.destroy()),
       Effect.andThen(() =>
@@ -188,7 +188,7 @@ export class Bot<E = unknown, R = unknown> {
           ),
         ),
       ),
-
+      Effect.tap(() => Effect.log("Bot is destroyed")),
       Effect.andThen(() => bot.loginLatch.release),
       Effect.as(bot),
     );
@@ -202,5 +202,29 @@ export class Bot<E = unknown, R = unknown> {
         ),
         Effect.as(bot),
       );
+  }
+
+  static registerProcessHandlers<E = unknown, R = unknown>(bot: Bot<E, R>) {
+    return pipe(
+      Effect.sync(() => {
+        process.on("SIGINT", () =>
+          Effect.runPromise(
+            pipe(
+              Effect.log("SIGINT received, shutting down..."),
+              Effect.andThen(() => Bot.destroy(bot)),
+            ),
+          ),
+        );
+        process.on("SIGTERM", () =>
+          Effect.runPromise(
+            pipe(
+              Effect.log("SIGTERM received, shutting down..."),
+              Effect.andThen(() => Bot.destroy(bot)),
+            ),
+          ),
+        );
+      }),
+      Effect.as(bot),
+    );
   }
 }
