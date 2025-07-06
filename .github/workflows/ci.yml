@@ -13,7 +13,7 @@ jobs:
   ci:
     strategy:
       matrix:
-        package: [sheet-apis]
+        package: [sheet-apis, sheet-bot]
     runs-on: ubuntu-latest
     defaults:
       run:
