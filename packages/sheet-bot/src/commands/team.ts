@@ -128,17 +128,22 @@ export const command = defineCommand(
             Effect.let("userTeams", ({ user, teams }) =>
               teams.filter((team) => team.userId === user.id && team.teamName),
             ),
-            Effect.tap(({ userTeams }) =>
+            Effect.tap(({ user, userTeams }) =>
               interaction.reply({
                 embeds: [
                   new EmbedBuilder()
+                    .setTitle(`${user.username}'s Teams`)
                     .addFields(
                       ...userTeams.map((team) => ({
                         name: team.teamName,
                         value: `ISV: ${team.lead}/${team.backline}${team.talent ? `/${team.talent}` : ""} (+${team.lead + (team.backline - team.lead) / 5}%)`,
                       })),
                     )
-                    .setTimestamp(),
+                    .setTimestamp()
+                    .setAuthor({
+                      name: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
+                      iconURL: interaction.client.user.displayAvatarURL(),
+                    }),
                 ],
               }),
             ),
