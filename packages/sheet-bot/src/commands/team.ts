@@ -140,9 +140,8 @@ export const command = defineCommand(
                       })),
                     )
                     .setTimestamp()
-                    .setAuthor({
-                      name: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
-                      iconURL: interaction.client.user.displayAvatarURL(),
+                    .setFooter({
+                      text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
                     }),
                 ],
               }),

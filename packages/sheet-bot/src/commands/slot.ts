@@ -269,10 +269,8 @@ export const command = defineCommand(
                                 : slotMessage,
                             )
                             .setTimestamp()
-                            .setAuthor({
-                              name: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
-                              iconURL:
-                                interaction.client.user.displayAvatarURL(),
+                            .setFooter({
+                              text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
                             }),
                         ],
                         flags: flags.bitfield,
