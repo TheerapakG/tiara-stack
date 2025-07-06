@@ -16,11 +16,15 @@ const layer = Layer.mergeAll(
 await Effect.runPromise(
   pipe(
     Effect.Do,
-    Effect.bind("bot", () => Bot.create(layer)),
-    Effect.tap(({ bot }) => Bot.registerProcessHandlers(bot)),
-    Effect.tap(({ bot }) =>
-      Effect.all(
-        Object.values(commands).map((command) => Bot.addCommand(command)(bot)),
+    Effect.bind("bot", () =>
+      pipe(
+        Bot.create(layer),
+        Effect.flatMap(Bot.registerProcessHandlers),
+        Effect.flatMap((bot) =>
+          Effect.reduce(Object.values(commands), bot, (bot, command) =>
+            Bot.addCommand(command)(bot),
+          ),
+        ),
       ),
     ),
     Effect.flatMap(({ bot }) => Bot.login(bot)),
