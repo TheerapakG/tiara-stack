@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sheet-bot
+  labels:
+    app: sheet-bot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sheet-bot
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  minReadySeconds: 5
+  template:
+    metadata:
+      labels:
+        app: sheet-bot
+    spec:
+      containers:
+        - name: sheet-bot
+          image: <IMAGE>
+          ports:
+            - containerPort: 3000
+              name: sheet-bot-svc
+          env:
+            - name: POSTGRES_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-bot-secret
+                  key: postgresUrl
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-bot-secret
+                  key: otelExporterOtlpEndpoint
+            - name: DISCORD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-bot-secret
+                  key: discordToken
+            - name: DISCORD_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-bot-secret
+                  key: discordClientId
+          volumeMounts:
+            - name: sheet-bot-secret-path
+              readOnly: true
+              mountPath: "/.secret"
+      volumes:
+        - name: sheet-bot-secret-path
+          secret:
+            secretName: sheet-bot-secret-path
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sheet-bot-service
+spec:
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: sheet-bot-svc
+  selector:
+    app: sheet-bot

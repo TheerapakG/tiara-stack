@@ -30,7 +30,9 @@ dist-ssr
 *.sln
 *.sw?
 
+.env
 .env.secret
+google-service-account.json
 auth.key
 auth.key.pub
 volume.yaml

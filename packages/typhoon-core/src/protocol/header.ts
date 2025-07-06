@@ -37,22 +37,18 @@ type EncodingTable<
   DT extends DecodingTable<string>,
 > = {
   [key in keyof InferDecoded<RequiredField, DT>]: (
-    obj: InferDecoded<RequiredField, DT>,
-  ) => (
     value: InferDecoded<RequiredField, DT>[key],
   ) => Effect.Effect<unknown, ValidationError | InvalidHeaderFieldError, never>;
 };
 
 type DecodingTable<Field extends string> = {
   [key in Field]: (
-    parsed: Record<string, unknown>,
-  ) => (
     value: unknown,
   ) => Effect.Effect<unknown, ValidationError | InvalidHeaderFieldError, never>;
 };
 
 type InferAllDecoded<DT extends DecodingTable<string>> = {
-  [key in keyof DT]: Effect.Effect.Success<ReturnType<ReturnType<DT[key]>>>;
+  [key in keyof DT]: Effect.Effect.Success<ReturnType<DT[key]>>;
 };
 
 type InferDecoded<
@@ -79,40 +75,44 @@ class LookupEncoderDecoder<
 
   encode(input: InferDecoded<RequiredField, DT>) {
     return pipe(
-      Effect.Do,
-      Effect.let(
-        "inputEntries",
+      Stream.Do,
+      Stream.bind(
+        "entries",
         () =>
-          Object.entries(input) as [
-            InferredField,
-            InferDecoded<RequiredField, DT>[InferredField],
-          ][],
-      ),
-      Effect.bind("encodedEntries", ({ inputEntries }) =>
-        Effect.forEach(inputEntries, ([field, value]) =>
-          pipe(
-            Effect.Do,
-            Effect.let("fieldEncoder", () => this.encodingTable[field](input)),
-            Effect.bind(
-              "fieldEncodedValue",
-              ({ fieldEncoder }) =>
-                fieldEncoder(value) as Effect.Effect<
-                  unknown,
-                  ValidationError | InvalidHeaderFieldError,
-                  never
-                >,
-            ),
-            Effect.map(
-              ({ fieldEncodedValue }) =>
-                [this.fields.indexOf(field), fieldEncodedValue] as [
-                  number,
-                  unknown,
-                ],
-            ),
+          Stream.fromIterable(
+            Object.entries(input) as [
+              InferredField,
+              InferDecoded<RequiredField, DT>[InferredField],
+            ][],
           ),
-        ),
+        { concurrency: "unbounded" },
       ),
-      Effect.map(({ encodedEntries }) => encodedEntries),
+      Stream.let("fieldIndex", ({ entries: [field, _value] }) =>
+        this.fields.indexOf(field),
+      ),
+      Stream.let(
+        "fieldEncoder",
+        ({ entries: [field, _value] }) => this.encodingTable[field],
+      ),
+      Stream.bind(
+        "fieldEncodedValue",
+        ({ fieldEncoder, entries: [_field, value] }) =>
+          pipe(
+            fieldEncoder(value) as Effect.Effect<
+              unknown,
+              ValidationError | InvalidHeaderFieldError,
+              never
+            >,
+            Stream.fromEffect,
+          ),
+        { concurrency: "unbounded" },
+      ),
+      Stream.map(
+        ({ fieldIndex, fieldEncodedValue }) =>
+          [fieldIndex, fieldEncodedValue] as [number, unknown],
+      ),
+      Stream.runCollect,
+      Effect.map(Chunk.toArray),
       Effect.withSpan(`${this.name}.encode`, {
         captureStackTrace: true,
       }),
@@ -122,41 +122,40 @@ class LookupEncoderDecoder<
   decode(input: [number, unknown][]) {
     // TODO: check if required fields are present
     return pipe(
-      input,
-      Effect.reduce(
-        {},
-        (
-          acc: Partial<InferDecoded<RequiredField, DT>>,
-          [fieldIndex, fieldValue],
-        ) =>
+      Stream.Do,
+      Stream.bind("entries", () => Stream.fromIterable(input), {
+        concurrency: "unbounded",
+      }),
+      Stream.bind(
+        "field",
+        ({ entries: [fieldIndex, _fieldValue] }) =>
           pipe(
-            Effect.Do,
-            Effect.bind("field", () =>
-              pipe(
-                Array.get(this.fields, fieldIndex),
-                Effect.mapError(
-                  () => new InvalidHeaderFieldError({ field: fieldIndex }),
-                ),
-              ),
+            Array.get(this.fields, fieldIndex),
+            Effect.mapError(
+              () => new InvalidHeaderFieldError({ field: fieldIndex }),
             ),
-            Effect.let("fieldDecoder", ({ field }) =>
-              this.decodingTable[field](acc),
-            ),
-            Effect.bind(
-              "fieldValue",
-              ({ fieldDecoder }) =>
-                fieldDecoder(fieldValue) as Effect.Effect<
-                  unknown,
-                  ValidationError | InvalidHeaderFieldError,
-                  never
-                >,
-            ),
-            Effect.map(({ field, fieldValue }) => ({
-              ...acc,
-              [field]: fieldValue,
-            })),
+            Stream.fromEffect,
           ),
+        { concurrency: "unbounded" },
       ),
+      Stream.let("fieldDecoder", ({ field }) => this.decodingTable[field]),
+      Stream.bind(
+        "fieldValue",
+        ({ fieldDecoder, entries: [_fieldIndex, fieldValue] }) =>
+          pipe(
+            fieldDecoder(fieldValue) as Effect.Effect<
+              unknown,
+              ValidationError | InvalidHeaderFieldError,
+              never
+            >,
+            Stream.fromEffect,
+          ),
+        { concurrency: "unbounded" },
+      ),
+      Stream.runFold({}, (acc, { field, fieldValue }) => ({
+        ...acc,
+        [field]: fieldValue,
+      })),
       Effect.map((acc) => acc as InferDecoded<RequiredField, DT>),
       Effect.withSpan(`${this.name}.decode`, {
         captureStackTrace: true,
@@ -178,10 +177,10 @@ const handlerPayloadEncoderDecoder = new LookupEncoderDecoder(
   ["handler"],
   ["handler"],
   {
-    handler: () => validate(type("string")),
+    handler: validate(type("string")),
   },
   {
-    handler: () => validate(type("string")),
+    handler: validate(type("string")),
   },
 );
 
@@ -190,12 +189,12 @@ const successNoncePayloadEncoderDecoder = new LookupEncoderDecoder(
   ["success", "nonce"],
   ["success", "nonce"],
   {
-    success: () => validate(type("boolean")),
-    nonce: () => validate(type("number")),
+    success: validate(type("boolean")),
+    nonce: validate(type("number")),
   },
   {
-    success: () => validate(type("boolean")),
-    nonce: () => validate(type("number")),
+    success: validate(type("boolean")),
+    nonce: validate(type("number")),
   },
 );
 
@@ -204,31 +203,30 @@ const baseHeaderEncoderDecoder = new LookupEncoderDecoder(
   ["protocol", "version", "id", "action", "payload"],
   ["protocol", "version", "id", "action", "payload"],
   {
-    protocol: () => validate(type("string")),
-    version: () => validate(type("number")),
-    id: () =>
-      validate(
-        type("TypedArray.Uint8")
-          .pipe((value) => Array.fromIterable(value))
-          .to("16 <= number[] <= 16")
-          .pipe((value) => value.map((v) => v.toString(16).padStart(2, "0")))
-          .pipe(
-            (value) =>
-              `${value.slice(0, 4).join("")}-${value.slice(4, 6).join("")}-${value.slice(6, 8).join("")}-${value.slice(8, 10).join("")}-${value.slice(10).join("")}`,
-          ),
-      ),
-    action: () => (value) =>
+    protocol: validate(type("string")),
+    version: validate(type("number")),
+    id: validate(
+      type("TypedArray.Uint8")
+        .pipe((value) => Array.fromIterable(value))
+        .to("16 <= number[] <= 16")
+        .pipe((value) => value.map((v) => v.toString(16).padStart(2, "0")))
+        .pipe(
+          (value) =>
+            `${value.slice(0, 4).join("")}-${value.slice(4, 6).join("")}-${value.slice(6, 8).join("")}-${value.slice(8, 10).join("")}-${value.slice(10).join("")}`,
+        ),
+    ),
+    action: (value) =>
       pipe(
         value,
         validate(type("number")),
         Effect.flatMap((value) => HeaderActionField.decode(value)),
       ),
-    payload: () => validate(type([["number", "unknown"], "[]"])),
+    payload: validate(type([["number", "unknown"], "[]"])),
   },
   {
-    protocol: () => validate(type("string")),
-    version: () => validate(type("number")),
-    id: () => (value) =>
+    protocol: validate(type("string")),
+    version: validate(type("number")),
+    id: (value) =>
       pipe(
         value,
         validate(
@@ -243,13 +241,13 @@ const baseHeaderEncoderDecoder = new LookupEncoderDecoder(
         Stream.runCollect,
         Effect.map((chunk) => new Uint8Array(chunk)),
       ),
-    action: () => (value) =>
+    action: (value) =>
       pipe(
         value,
         validate(type.enumerated(...headerActionFields)),
         Effect.flatMap((value) => HeaderActionField.encode(value)),
       ),
-    payload: () => validate(type([["number", "unknown"], "[]"])),
+    payload: validate(type([["number", "unknown"], "[]"])),
   },
 );
 

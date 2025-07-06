@@ -1,19 +1,28 @@
-import { type } from "arktype";
-import { Effect, pipe } from "effect";
-import { validate } from "typhoon-core/schema";
+import { Effect, Layer, pipe } from "effect";
+import { DBSubscriptionContext } from "typhoon-server/db";
 import { Bot } from "./bot";
+import { commands } from "./commands";
+import { Config } from "./config";
+import { DB } from "./db";
+import { GoogleSheets } from "./google";
 
-const envValidator = validate(
-  type({
-    DISCORD_TOKEN: "string",
-  }).pipe(({ DISCORD_TOKEN }) => ({ discordToken: DISCORD_TOKEN })),
+const layer = Layer.mergeAll(
+  Config.Default(),
+  DB.Default(),
+  GoogleSheets.Default(),
+  Layer.effect(DBSubscriptionContext, DBSubscriptionContext.empty()),
 );
 
 await Effect.runPromise(
   pipe(
     Effect.Do,
-    Effect.bind("env", () => envValidator(process.env)),
-    Effect.bind("bot", () => Bot.create()),
-    Effect.flatMap(({ bot, env }) => Bot.login(env.discordToken)(bot)),
+    Effect.bind("bot", () => Bot.create(layer)),
+    Effect.tap(({ bot }) =>
+      Effect.all(
+        Object.values(commands).map((command) => Bot.addCommand(command)(bot)),
+      ),
+    ),
+    Effect.flatMap(({ bot }) => Bot.login(bot)),
+    Effect.provide(layer),
   ),
 );
