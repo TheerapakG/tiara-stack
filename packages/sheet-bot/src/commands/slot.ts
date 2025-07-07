@@ -230,7 +230,10 @@ export const command = defineCommand(
                     .setDescription(
                       slotMessage === "" ? "All Filled :3" : slotMessage,
                     )
-                    .setTimestamp(),
+                    .setTimestamp()
+                    .setFooter({
+                      text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
+                    }),
                 ],
                 flags: flags.bitfield,
                 components: [row],
