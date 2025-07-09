@@ -1,9 +1,10 @@
 import { type } from "arktype";
 import { loadConfig } from "c12";
 import { REST, Routes } from "discord.js";
-import { Effect, pipe } from "effect";
+import { Chunk, Effect, pipe, Stream } from "effect";
 import { validate } from "typhoon-core/schema";
-import { commands } from "./commands";
+import { commands } from "./commands/chatInputCommands";
+import { ChatInputCommandHandlerMap } from "./types/handler";
 
 await loadConfig({ dotenv: true });
 
@@ -24,7 +25,15 @@ await Effect.runPromise(
     Effect.Do,
     Effect.bind("env", () => envValidator(process.env)),
     Effect.let("rest", ({ env }) => new REST().setToken(env.discordToken)),
-    Effect.tap(({ env, rest }) =>
+    Effect.bind("commands", () =>
+      pipe(
+        Stream.fromIterable(ChatInputCommandHandlerMap.values(commands)),
+        Stream.map((command) => command.data.toJSON()),
+        Stream.runCollect,
+        Effect.map(Chunk.toArray),
+      ),
+    ),
+    Effect.tap(({ env, rest, commands }) =>
       Effect.try(() =>
         rest.put(
           env.discordGuildId
@@ -34,9 +43,7 @@ await Effect.runPromise(
               )
             : Routes.applicationCommands(env.discordClientId),
           {
-            body: Object.values(commands).map((command) =>
-              command.data.toJSON(),
-            ),
+            body: commands,
           },
         ),
       ),
