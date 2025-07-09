@@ -5,21 +5,13 @@ import {
   InteractionContextType,
   SlashCommandBuilder,
 } from "discord.js";
-import { eq } from "drizzle-orm";
 import { Array, Effect, Option, pipe } from "effect";
-import { configGuild } from "sheet-db-schema";
-import {
-  DBSubscriptionContext,
-  query,
-  run,
-  subscribe,
-} from "typhoon-server/db";
 import { observeOnce } from "typhoon-server/signal";
-import { DB } from "../db";
-import { GoogleSheets } from "../google";
-import { defineCommand } from "../types";
+import { GoogleSheets } from "../../google";
+import { GuildConfigService } from "../../services/guildConfigService";
+import { defineChatInputCommandHandler } from "../../types";
 
-export const command = defineCommand(
+export const command = defineChatInputCommandHandler(
   new SlashCommandBuilder()
     .setName("team")
     .setDescription("Team commands")
@@ -48,7 +40,7 @@ export const command = defineCommand(
       InteractionContextType.PrivateChannel,
     ),
   (interaction) =>
-    DB.use((db) =>
+    GuildConfigService.use((guildConfigService) =>
       match({})
         .case("'list'", () =>
           pipe(
@@ -76,24 +68,7 @@ export const command = defineCommand(
               user: Effect.succeed(userOption ?? interaction.user),
             })),
             Effect.bind("guildConfigsSubscription", ({ serverId }) =>
-              pipe(
-                DBSubscriptionContext,
-                Effect.flatMap((ctx) =>
-                  pipe(
-                    subscribe(
-                      run(
-                        query(
-                          db
-                            .select()
-                            .from(configGuild)
-                            .where(eq(configGuild.guildId, serverId)),
-                        ),
-                      ),
-                    ),
-                    Effect.provideService(DBSubscriptionContext, ctx),
-                  ),
-                ),
-              ),
+              guildConfigService.getConfig(serverId),
             ),
             Effect.bind("guildConfigObserver", ({ guildConfigsSubscription }) =>
               observeOnce(guildConfigsSubscription.value),
@@ -102,9 +77,12 @@ export const command = defineCommand(
               "guildConfig",
               ({ guildConfigObserver }) => guildConfigObserver.value,
             ),
-            Effect.bind("sheet", ({ guildConfig }) =>
+            Effect.bind("sheetId", ({ guildConfig }) =>
+              Option.fromNullable(guildConfig[0].sheetId),
+            ),
+            Effect.bind("sheet", ({ sheetId }) =>
               GoogleSheets.get({
-                spreadsheetId: guildConfig[0].sheetId,
+                spreadsheetId: sheetId,
                 ranges: ["Teams!C3:C", "Teams!H3:Y"],
               }),
             ),
