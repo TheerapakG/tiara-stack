@@ -7,6 +7,8 @@ import {
   MessageFlagsBitField,
 } from "discord.js";
 import { Chunk, Effect, Option, pipe, Ref } from "effect";
+import { observeOnce } from "typhoon-core/signal";
+import { ChannelConfigService } from "../services/channelConfigService";
 import { ScheduleService } from "../services/scheduleService";
 import { defineButtonInteractionHandler } from "../types";
 
@@ -43,11 +45,22 @@ export const button = defineButtonInteractionHandler(
         messageFlags: Ref.make(
           new MessageFlagsBitField().add(MessageFlags.Ephemeral),
         ),
-        // TODO: get day from interaction
-        day: Effect.try(() => 1),
         serverId: Option.fromNullable(interaction.guildId),
-        channel: Effect.succeed(interaction.channel),
+        channel: Option.fromNullable(interaction.channel),
       })),
+      Effect.bind("channelConfigSubscription", ({ channel }) =>
+        ChannelConfigService.getConfig(channel.id),
+      ),
+      Effect.bind("channelConfigObserver", ({ channelConfigSubscription }) =>
+        observeOnce(channelConfigSubscription.value),
+      ),
+      Effect.bind(
+        "channelConfig",
+        ({ channelConfigObserver }) => channelConfigObserver.value,
+      ),
+      Effect.bind("day", ({ channelConfig }) =>
+        Option.fromNullable(channelConfig[0].day),
+      ),
       Effect.bind("slotMessage", ({ day, serverId }) =>
         getSlotMessage(day, serverId),
       ),

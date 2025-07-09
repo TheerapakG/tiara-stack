@@ -1,9 +1,9 @@
 import {
-  index,
   integer,
   pgTable,
   serial,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -22,7 +22,7 @@ export const configGuild = pgTable(
       .$onUpdate(() => new Date()),
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
   },
-  (table) => [index("config_guild_guild_id_idx").on(table.guildId)],
+  (table) => [uniqueIndex("config_guild_guild_id_idx").on(table.guildId)],
 );
 
 export const configChannel = pgTable(
@@ -40,5 +40,5 @@ export const configChannel = pgTable(
       .$onUpdate(() => new Date()),
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
   },
-  (table) => [index("config_channel_channel_id_idx").on(table.channelId)],
+  (table) => [uniqueIndex("config_channel_channel_id_idx").on(table.channelId)],
 );
