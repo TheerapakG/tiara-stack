@@ -4,6 +4,7 @@ import {
   EmbedBuilder,
   InteractionContextType,
   SlashCommandBuilder,
+  escapeMarkdown,
 } from "discord.js";
 import { Array, Effect, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
@@ -110,10 +111,10 @@ export const command = defineChatInputCommandHandler(
               interaction.reply({
                 embeds: [
                   new EmbedBuilder()
-                    .setTitle(`${user.username}'s Teams`)
+                    .setTitle(`${escapeMarkdown(user.username)}'s Teams`)
                     .addFields(
                       ...userTeams.map((team) => ({
-                        name: team.teamName,
+                        name: escapeMarkdown(team.teamName),
                         value: `ISV: ${team.lead}/${team.backline}${team.talent ? `/${team.talent}` : ""} (+${team.lead + (team.backline - team.lead) / 5}%)`,
                       })),
                     )
