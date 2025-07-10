@@ -4,6 +4,8 @@ import {
   Interaction,
   InteractionButtonComponentData,
   SharedSlashCommand,
+  SlashCommandSubcommandBuilder,
+  SlashCommandSubcommandGroupBuilder,
 } from "discord.js";
 import { Effect, HashMap } from "effect";
 
@@ -23,6 +25,23 @@ export type ChatInputCommandHandler<out E = unknown, out R = unknown> = {
   handler: InteractionHandler<ChatInputCommandInteraction, E, R>;
 };
 
+export type ChatInputSubcommandGroupHandler<
+  out E = unknown,
+  out R = unknown,
+> = {
+  data: (
+    group: SlashCommandSubcommandGroupBuilder,
+  ) => SlashCommandSubcommandGroupBuilder;
+  handler: InteractionHandler<ChatInputCommandInteraction, E, R>;
+};
+
+export type ChatInputSubcommandHandler<out E = unknown, out R = unknown> = {
+  data: (
+    subcommand: SlashCommandSubcommandBuilder,
+  ) => SlashCommandSubcommandBuilder;
+  handler: InteractionHandler<ChatInputCommandInteraction, E, R>;
+};
+
 export const defineButtonInteractionHandler = <E = unknown, R = unknown>(
   data: InteractionButtonComponentData,
   handler: InteractionHandler<ButtonInteraction, E, R>,
@@ -35,6 +54,24 @@ export const defineChatInputCommandHandler = <E = unknown, R = unknown>(
   data: SharedSlashCommand,
   handler: InteractionHandler<ChatInputCommandInteraction, E, R>,
 ): ChatInputCommandHandler<E, R> => ({
+  data,
+  handler,
+});
+
+export const defineChatInputSubcommandGroupHandler = <E = unknown, R = unknown>(
+  data: (
+    group: SlashCommandSubcommandGroupBuilder,
+  ) => SlashCommandSubcommandGroupBuilder,
+  handler: InteractionHandler<ChatInputCommandInteraction, E, R>,
+): ChatInputSubcommandGroupHandler<E, R> => ({
+  data,
+  handler,
+});
+
+export const defineChatInputSubcommandHandler = <E = unknown, R = unknown>(
+  data: (group: SlashCommandSubcommandBuilder) => SlashCommandSubcommandBuilder,
+  handler: InteractionHandler<ChatInputCommandInteraction, E, R>,
+): ChatInputSubcommandHandler<E, R> => ({
   data,
   handler,
 });
