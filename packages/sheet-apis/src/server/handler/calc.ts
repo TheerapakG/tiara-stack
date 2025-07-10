@@ -223,6 +223,15 @@ const deriveRoomWithPlayerTeams = (
     Effect.map((streams) =>
       Stream.mergeAll(streams, { concurrency: "unbounded" }),
     ),
+    Effect.flatMap(Stream.broadcast(2, { capacity: "unbounded" })),
+    Effect.flatMap(([streamOutput, streamCount]) =>
+      pipe(
+        streamCount,
+        Stream.runCount,
+        Effect.tap((count) => Effect.log(`Derived ${count} rooms`)),
+        Effect.as(streamOutput),
+      ),
+    ),
   );
 
 const sortTeams = (teams: Chunk.Chunk<RoomTeam>) =>
@@ -289,8 +298,11 @@ const calc = (
               room: [],
             }),
           ),
-          (roomTeams, playerTeams) =>
-            deriveRoomWithPlayerTeams(config, roomTeams, playerTeams),
+          (roomTeams, playerTeams, i) =>
+            pipe(
+              deriveRoomWithPlayerTeams(config, roomTeams, playerTeams),
+              Effect.annotateLogs("playerIndex", i + 1),
+            ),
         ),
         Effect.flatMap(Stream.runCollect),
       ),
@@ -358,9 +370,7 @@ export const calcHandler = defineHandlerBuilder()
     Effect.gen(function* () {
       const { config, players } =
         yield* Event.withConfig(calcHandlerConfig).request.parsed();
-      yield* Effect.log(config, players);
       const result = Chunk.toArray(yield* calc(config, players));
-      yield* Effect.log(result);
       return result;
     }),
   );
