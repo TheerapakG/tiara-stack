@@ -141,7 +141,14 @@ export const command = defineChatInputCommandHandler(
     ),
   (interaction) =>
     match({})
-      .case("'list_config'", () => handleListConfig.handler(interaction))
-      .case("'set_config'", () => handleSetConfig.handler(interaction))
-      .default(() => Effect.void)(interaction.options.getSubcommandGroup()),
+      .case({ subcommand: "'list_config'" }, () =>
+        handleListConfig.handler(interaction),
+      )
+      .case({ subcommandGroup: "'set_config'" }, () =>
+        handleSetConfig.handler(interaction),
+      )
+      .default(() => Effect.void)({
+      subcommand: interaction.options.getSubcommand(),
+      subcommandGroup: interaction.options.getSubcommandGroup(),
+    }),
 );
