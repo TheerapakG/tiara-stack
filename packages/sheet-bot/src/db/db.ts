@@ -1,12 +1,12 @@
 import { drizzle } from "drizzle-orm/postgres-js";
-import { Console, Effect, pipe } from "effect";
+import { Effect, pipe } from "effect";
 import postgres from "postgres";
 import { Config } from "../config";
 
 export class DB extends Effect.Service<DB>()("DB", {
   scoped: pipe(
     Effect.Do,
-    Effect.tap(() => Console.log("creating db client")),
+    Effect.tap(() => Effect.log("creating db client")),
     Effect.bind("client", () =>
       Config.use(({ postgresUrl }) => Effect.try(() => postgres(postgresUrl))),
     ),
@@ -15,7 +15,7 @@ export class DB extends Effect.Service<DB>()("DB", {
       Effect.addFinalizer(() =>
         pipe(
           Effect.promise(() => client.end()),
-          Effect.andThen(() => Console.log("DB client closed")),
+          Effect.andThen(() => Effect.log("DB client closed")),
         ),
       ),
     ),

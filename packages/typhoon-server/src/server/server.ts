@@ -4,7 +4,6 @@ import type { serve as crosswsServe } from "crossws/server";
 import {
   Cause,
   Chunk,
-  Console,
   Context,
   Data,
   Effect,
@@ -354,6 +353,7 @@ export class Server<
             Effect.exit(
               pipe(
                 subscriptionHandlerContext.handler,
+                Effect.scoped,
                 Effect.withSpan(
                   `subscriptionHandler:${subscriptionHandlerContext.config.name}`,
                   {
@@ -562,6 +562,7 @@ export class Server<
         Effect.bind("returnValue", ({ event, handlerContext }) =>
           pipe(
             handlerContext.handler,
+            Effect.scoped,
             Effect.withSpan(`mutationHandler:${handlerContext.config.name}`, {
               captureStackTrace: true,
             }),
@@ -736,7 +737,7 @@ const handleServeAction = <A, E = never>(
             pipe(
               Effect.Do,
               Effect.let("pretty", () => Cause.pretty(cause)),
-              Effect.tap(({ pretty }) => Console.log(pretty)),
+              Effect.tap(({ pretty }) => Effect.log(pretty)),
               Effect.flatMap(() => onError(cause)),
             ),
         }),
@@ -803,7 +804,15 @@ export const serve =
             },
 
             error: (peer, error) => {
-              console.log("[ws] error", peer, error);
+              return Effect.runPromise(
+                pipe(
+                  Effect.log("[ws] error", peer, error),
+                  Effect.withSpan("serve.websocket.error", {
+                    captureStackTrace: true,
+                  }),
+                  Effect.provide(server.traceProvider),
+                ),
+              );
             },
           },
           fetch: (request) => {

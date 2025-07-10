@@ -1,6 +1,6 @@
 import { StandardSchemaV1 } from "@standard-schema/spec";
 import { match } from "arktype";
-import { Effect } from "effect";
+import { Effect, Scope } from "effect";
 import {
   HandlerConfig,
   MutationHandlerConfig,
@@ -17,14 +17,14 @@ export type SubscriptionEventHandler<Config extends SubscriptionHandlerConfig> =
   Effect.Effect<
     StandardSchemaV1.InferInput<Config["response"]["validator"]>,
     unknown,
-    Event | SignalContext
+    Event | SignalContext | Scope.Scope
   >;
 
 export type MutationEventHandler<Config extends MutationHandlerConfig> =
   Effect.Effect<
     StandardSchemaV1.InferInput<Config["response"]["validator"]>,
     unknown,
-    Event
+    Event | Scope.Scope
   >;
 
 export type SubscriptionHandlerContextContext<
