@@ -46,13 +46,13 @@ const handleListConfig = defineChatInputSubcommandHandler(
       Effect.bind("sheetId", ({ guildConfig }) =>
         Option.fromNullable(guildConfig[0].sheetId),
       ),
-      Effect.bind("response", ({ guild }) =>
+      Effect.bind("response", ({ guild, sheetId }) =>
         Effect.tryPromise(() =>
           interaction.reply({
             embeds: [
               new EmbedBuilder()
                 .setTitle(`Config for ${escapeMarkdown(guild.name)}`)
-                .setDescription(`Sheet id: ${escapeMarkdown(guild.id)}`),
+                .setDescription(`Sheet id: ${escapeMarkdown(sheetId)}`),
             ],
           }),
         ),
