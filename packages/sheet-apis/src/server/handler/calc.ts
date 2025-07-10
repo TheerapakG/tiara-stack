@@ -94,7 +94,7 @@ const deriveRoomWithNormalPlayerTeam = (
         Stream.fromIterable(roomTeams),
         Stream.filter(
           ({ enced, tiererEnced, highestBp }) =>
-            enced && !tiererEnced && playerTeam.bp + ENC_BP_DIFF >= highestBp,
+            !enced || tiererEnced || playerTeam.bp + ENC_BP_DIFF < highestBp,
         ),
       ),
     ),
@@ -141,7 +141,7 @@ const deriveRoomWithEncPlayerTeam = (
         Stream.fromIterable(roomTeams),
         Stream.filter(
           ({ enced, highestBp }) =>
-            enced || (!tierer && playerTeam.bp <= highestBp + ENC_BP_DIFF),
+            !enced && (tierer || playerTeam.bp > highestBp + ENC_BP_DIFF),
         ),
       ),
     ),
@@ -213,8 +213,11 @@ const deriveRoomWithPlayerTeams = (
   playerTeams: PlayerTeam[],
 ) =>
   pipe(
-    Effect.forEach(playerTeams, (playerTeam) =>
-      deriveRoomWithPlayerTeam(config, roomTeams, playerTeam),
+    Effect.forEach(playerTeams, (playerTeam, i) =>
+      pipe(
+        deriveRoomWithPlayerTeam(config, roomTeams, playerTeam),
+        Effect.annotateLogs("teamIndex", i + 1),
+      ),
     ),
     Effect.map((chunks) => Chunk.flatten(Chunk.fromIterable(chunks))),
     Effect.tap((derivedRooms) =>
