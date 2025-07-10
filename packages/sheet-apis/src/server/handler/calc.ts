@@ -1,14 +1,5 @@
 import { type } from "arktype";
-import {
-  Array,
-  Chunk,
-  Data,
-  Effect,
-  Option,
-  Order,
-  pipe,
-  Stream,
-} from "effect";
+import { Chunk, Data, Effect, Option, Order, pipe, Stream } from "effect";
 import { defineHandlerConfigBuilder } from "typhoon-server/config";
 import { defineHandlerBuilder, Event } from "typhoon-server/server";
 
@@ -88,7 +79,7 @@ class RoomTeam extends Data.TaggedClass("RoomTeam")<{
 }
 
 const deriveRoomWithNormalPlayerTeam = (
-  roomTeams: Stream.Stream<RoomTeam>,
+  roomTeams: Chunk.Chunk<RoomTeam>,
   playerTeam: PlayerTeam,
 ) =>
   pipe(
@@ -100,14 +91,14 @@ const deriveRoomWithNormalPlayerTeam = (
     })),
     Effect.let("filteredRooms", () =>
       pipe(
-        roomTeams,
+        Stream.fromIterable(roomTeams),
         Stream.filter(
           ({ enced, tiererEnced, highestBp }) =>
             enced && !tiererEnced && playerTeam.bp + ENC_BP_DIFF >= highestBp,
         ),
       ),
     ),
-    Effect.map(({ healer, filteredRooms }) =>
+    Effect.flatMap(({ healer, filteredRooms }) =>
       pipe(
         filteredRooms,
         Stream.map(
@@ -122,6 +113,12 @@ const deriveRoomWithNormalPlayerTeam = (
               room: [...room, playerTeam],
             }),
         ),
+        Stream.runCollect,
+      ),
+    ),
+    Effect.tap((derivedRooms) =>
+      Effect.log(
+        `Derived ${Chunk.size(derivedRooms)} rooms with normal player team`,
       ),
     ),
     Effect.withSpan("deriveRoomWithNormalPlayerTeam", {
@@ -130,7 +127,7 @@ const deriveRoomWithNormalPlayerTeam = (
   );
 
 const deriveRoomWithEncPlayerTeam = (
-  roomTeams: Stream.Stream<RoomTeam>,
+  roomTeams: Chunk.Chunk<RoomTeam>,
   playerTeam: PlayerTeam,
 ) =>
   pipe(
@@ -141,14 +138,14 @@ const deriveRoomWithEncPlayerTeam = (
     })),
     Effect.let("filteredRooms", ({ tierer }) =>
       pipe(
-        roomTeams,
+        Stream.fromIterable(roomTeams),
         Stream.filter(
           ({ enced, highestBp }) =>
             enced || (!tierer && playerTeam.bp <= highestBp + ENC_BP_DIFF),
         ),
       ),
     ),
-    Effect.map(({ tierer, healer, filteredRooms }) =>
+    Effect.flatMap(({ tierer, healer, filteredRooms }) =>
       pipe(
         filteredRooms,
         Stream.map(
@@ -169,6 +166,12 @@ const deriveRoomWithEncPlayerTeam = (
               ],
             }),
         ),
+        Stream.runCollect,
+      ),
+    ),
+    Effect.tap((derivedRooms) =>
+      Effect.log(
+        `Derived ${Chunk.size(derivedRooms)} rooms with enc player team`,
       ),
     ),
     Effect.withSpan("deriveRoomWithEncPlayerTeam", { captureStackTrace: true }),
@@ -176,7 +179,7 @@ const deriveRoomWithEncPlayerTeam = (
 
 const deriveRoomWithPlayerTeam = (
   config: { healNeeded: number; considerEnc: boolean },
-  roomTeams: Stream.Stream<RoomTeam>,
+  roomTeams: Chunk.Chunk<RoomTeam>,
   playerTeam: PlayerTeam,
 ) =>
   pipe(
@@ -187,23 +190,17 @@ const deriveRoomWithPlayerTeam = (
     })),
     Effect.flatMap(({ tierer, encable }) =>
       pipe(
-        roomTeams,
-        Stream.broadcast(2, { capacity: "unbounded" }),
-        Effect.flatMap(([roomTeamsForNormal, roomTeamsForEnc]) =>
-          pipe(
-            Effect.Do,
-            Effect.bind("normalStream", () =>
-              deriveRoomWithNormalPlayerTeam(roomTeamsForNormal, playerTeam),
-            ),
-            Effect.bind("encStream", () =>
-              (encable || tierer) && config.considerEnc
-                ? deriveRoomWithEncPlayerTeam(roomTeamsForEnc, playerTeam)
-                : Effect.succeed(Stream.empty),
-            ),
-            Effect.map(({ normalStream, encStream }) =>
-              Stream.merge(normalStream, encStream),
-            ),
-          ),
+        Effect.Do,
+        Effect.bind("normalChunk", () =>
+          deriveRoomWithNormalPlayerTeam(roomTeams, playerTeam),
+        ),
+        Effect.bind("encChunk", () =>
+          (encable || tierer) && config.considerEnc
+            ? deriveRoomWithEncPlayerTeam(roomTeams, playerTeam)
+            : Effect.succeed(Chunk.empty()),
+        ),
+        Effect.map(({ normalChunk, encChunk }) =>
+          Chunk.appendAll(normalChunk, encChunk),
         ),
       ),
     ),
@@ -212,30 +209,16 @@ const deriveRoomWithPlayerTeam = (
 
 const deriveRoomWithPlayerTeams = (
   config: { healNeeded: number; considerEnc: boolean },
-  roomTeams: Stream.Stream<RoomTeam>,
+  roomTeams: Chunk.Chunk<RoomTeam>,
   playerTeams: PlayerTeam[],
 ) =>
   pipe(
-    roomTeams,
-    Stream.broadcast(playerTeams.length, { capacity: "unbounded" }),
-    Effect.flatMap((roomTeamsArr) =>
-      Effect.forEach(
-        Array.zip(roomTeamsArr, playerTeams),
-        ([roomTeams, playerTeam]) =>
-          deriveRoomWithPlayerTeam(config, roomTeams, playerTeam),
-      ),
+    Effect.forEach(playerTeams, (playerTeam) =>
+      deriveRoomWithPlayerTeam(config, roomTeams, playerTeam),
     ),
-    Effect.map((streams) =>
-      Stream.mergeAll(streams, { concurrency: "unbounded" }),
-    ),
-    Effect.flatMap(Stream.broadcast(2, { capacity: "unbounded" })),
-    Effect.flatMap(([streamOutput, streamCount]) =>
-      pipe(
-        streamCount,
-        Stream.runCount,
-        Effect.tap((count) => Effect.log(`Derived ${count} rooms`)),
-        Effect.as(streamOutput),
-      ),
+    Effect.map((chunks) => Chunk.flatten(Chunk.fromIterable(chunks))),
+    Effect.tap((derivedRooms) =>
+      Effect.log(`Derived ${Chunk.size(derivedRooms)} rooms`),
     ),
     Effect.withSpan("deriveRoomWithPlayerTeams", { captureStackTrace: true }),
   );
@@ -298,7 +281,7 @@ const calc = (
       pipe(
         Effect.reduce(
           filteredPlayerTeams,
-          Stream.make(
+          Chunk.of(
             new RoomTeam({
               enced: false,
               tiererEnced: false,
@@ -308,14 +291,13 @@ const calc = (
               percent: 0,
               room: [],
             }),
-          ),
+          ) as Chunk.Chunk<RoomTeam>,
           (roomTeams, playerTeams, i) =>
             pipe(
               deriveRoomWithPlayerTeams(config, roomTeams, playerTeams),
               Effect.annotateLogs("playerIndex", i + 1),
             ),
         ),
-        Effect.flatMap(Stream.runCollect),
       ),
     ),
     Effect.bind("sortedResult", ({ result }) => sortTeams(result)),
