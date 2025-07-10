@@ -124,6 +124,9 @@ const deriveRoomWithNormalPlayerTeam = (
         ),
       ),
     ),
+    Effect.withSpan("deriveRoomWithNormalPlayerTeam", {
+      captureStackTrace: true,
+    }),
   );
 
 const deriveRoomWithEncPlayerTeam = (
@@ -168,6 +171,7 @@ const deriveRoomWithEncPlayerTeam = (
         ),
       ),
     ),
+    Effect.withSpan("deriveRoomWithEncPlayerTeam", { captureStackTrace: true }),
   );
 
 const deriveRoomWithPlayerTeam = (
@@ -203,6 +207,7 @@ const deriveRoomWithPlayerTeam = (
         ),
       ),
     ),
+    Effect.withSpan("deriveRoomWithPlayerTeam", { captureStackTrace: true }),
   );
 
 const deriveRoomWithPlayerTeams = (
@@ -232,10 +237,15 @@ const deriveRoomWithPlayerTeams = (
         Effect.as(streamOutput),
       ),
     ),
+    Effect.withSpan("deriveRoomWithPlayerTeams", { captureStackTrace: true }),
   );
 
 const sortTeams = (teams: Chunk.Chunk<RoomTeam>) =>
-  pipe(teams, Chunk.sort(RoomTeam.order));
+  pipe(
+    Effect.succeed(teams),
+    Effect.map(Chunk.sort(RoomTeam.order)),
+    Effect.withSpan("sortTeams", { captureStackTrace: true }),
+  );
 
 const filterBestTeams = (teams: Chunk.Chunk<RoomTeam>) =>
   pipe(
@@ -253,6 +263,7 @@ const filterBestTeams = (teams: Chunk.Chunk<RoomTeam>) =>
     Stream.filter(Option.isSome),
     Stream.map(({ value }) => value),
     Stream.runCollect,
+    Effect.withSpan("filterBestTeams", { captureStackTrace: true }),
   );
 
 const calc = (
@@ -307,7 +318,7 @@ const calc = (
         Effect.flatMap(Stream.runCollect),
       ),
     ),
-    Effect.let("sortedResult", ({ result }) => sortTeams(result)),
+    Effect.bind("sortedResult", ({ result }) => sortTeams(result)),
     Effect.bind("bestResult", ({ sortedResult }) =>
       filterBestTeams(sortedResult),
     ),
@@ -322,6 +333,7 @@ const calc = (
         Chunk.reverse,
       ),
     ),
+    Effect.withSpan("calc", { captureStackTrace: true }),
   );
 
 const calcHandlerConfig = defineHandlerConfigBuilder()
@@ -367,10 +379,10 @@ const calcHandlerConfig = defineHandlerConfigBuilder()
 export const calcHandler = defineHandlerBuilder()
   .config(calcHandlerConfig)
   .handler(
-    Effect.gen(function* () {
-      const { config, players } =
-        yield* Event.withConfig(calcHandlerConfig).request.parsed();
-      const result = Chunk.toArray(yield* calc(config, players));
-      return result;
-    }),
+    pipe(
+      Event.withConfig(calcHandlerConfig).request.parsed(),
+      Effect.flatMap(({ config, players }) => calc(config, players)),
+      Effect.map(Chunk.toArray),
+      Effect.withSpan("calcHandler", { captureStackTrace: true }),
+    ),
   );
