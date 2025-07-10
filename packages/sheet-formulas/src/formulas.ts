@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import "../polyfill/classPolyfill";
 
-import { Console, Effect, pipe } from "effect";
+import { Effect, pipe } from "effect";
 import type { Server } from "sheet-apis";
 import { AppsScriptClient } from "typhoon-client-apps-script/client";
 
@@ -68,7 +68,7 @@ function THEECALC(
           players: [p1, p2, p3, p4, p5].map(parsePlayer),
         }),
       ),
-      Effect.tap(({ result }) => Console.log(result)),
+      Effect.tap(({ result }) => Effect.log(result)),
       Effect.map(({ result }) =>
         result.map((r) => [
           "",
@@ -78,7 +78,7 @@ function THEECALC(
         ]),
       ),
       Effect.catchAll((e) => Effect.succeed([[e.message]])),
-      Effect.tap((result) => Console.log(result)),
+      Effect.tap((result) => Effect.log(result)),
     ),
   );
 }
