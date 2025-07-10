@@ -266,7 +266,9 @@ const calc = (
     Effect.Do,
     Effect.bind("playerTeams", () =>
       Effect.forEach(players, (player) =>
-        Effect.forEach(player, (player) => PlayerTeam.fromApiObject(player)),
+        Effect.allSuccesses(
+          player.map((team) => PlayerTeam.fromApiObject(team)),
+        ),
       ),
     ),
     Effect.bind("filteredPlayerTeams", ({ playerTeams }) =>
