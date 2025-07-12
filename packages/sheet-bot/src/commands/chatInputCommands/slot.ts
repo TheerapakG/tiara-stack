@@ -18,9 +18,8 @@ import { button as slotButton } from "../../buttons/slot";
 import { ChannelConfigService } from "../../services/channelConfigService";
 import { ScheduleService } from "../../services/scheduleService";
 import {
-  chatInputCommandHandlerContextBuilder,
+  chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
-  SubcommandHandler,
 } from "../../types";
 
 const getSlotMessage = (day: number, serverId: string) =>
@@ -196,29 +195,22 @@ const handleButton = chatInputSubcommandHandlerContextBuilder()
   )
   .build();
 
-export const command = chatInputCommandHandlerContextBuilder()
-  .data(
-    new SlashCommandBuilder()
-      .setName("slot")
-      .setDescription("Day slots commands")
-      .setIntegrationTypes(
-        ApplicationIntegrationType.GuildInstall,
-        ApplicationIntegrationType.UserInstall,
-      )
-      .setContexts(
-        InteractionContextType.BotDM,
-        InteractionContextType.Guild,
-        InteractionContextType.PrivateChannel,
-      )
-      .addSubcommand(handleList.data)
-      .addSubcommand(handleButton.data),
-  )
-  .handler(
-    pipe(
-      SubcommandHandler.empty(),
-      SubcommandHandler.addSubcommandHandler(handleList),
-      SubcommandHandler.addSubcommandHandler(handleButton),
-      SubcommandHandler.handler,
-    ),
-  )
-  .build();
+export const command =
+  chatInputCommandHandlerContextWithSubcommandHandlerBuilder()
+    .data(
+      new SlashCommandBuilder()
+        .setName("slot")
+        .setDescription("Day slots commands")
+        .setIntegrationTypes(
+          ApplicationIntegrationType.GuildInstall,
+          ApplicationIntegrationType.UserInstall,
+        )
+        .setContexts(
+          InteractionContextType.BotDM,
+          InteractionContextType.Guild,
+          InteractionContextType.PrivateChannel,
+        ),
+    )
+    .addSubcommandHandler(handleList)
+    .addSubcommandHandler(handleButton)
+    .build();

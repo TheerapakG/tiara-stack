@@ -12,9 +12,8 @@ import { Effect, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-core/signal";
 import { GuildConfigService } from "../../services/guildConfigService";
 import {
-  SubcommandHandler,
-  chatInputCommandHandlerContextBuilder,
-  chatInputSubcommandGroupHandlerContextBuilder,
+  chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
+  chatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
 } from "../../types";
 
@@ -118,45 +117,32 @@ const handleSetSheet = chatInputSubcommandHandlerContextBuilder()
   )
   .build();
 
-const handleSetConfig = chatInputSubcommandGroupHandlerContextBuilder()
-  .data(
-    new SlashCommandSubcommandGroupBuilder()
-      .setName("set_config")
-      .setDescription("Set config for the server")
-      .addSubcommand(handleSetSheet.data),
-  )
-  .handler(
-    pipe(
-      SubcommandHandler.empty(),
-      SubcommandHandler.addSubcommandHandler(handleSetSheet),
-      SubcommandHandler.handler,
-    ),
-  )
-  .build();
+const handleSetConfig =
+  chatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder()
+    .data(
+      new SlashCommandSubcommandGroupBuilder()
+        .setName("set_config")
+        .setDescription("Set config for the server"),
+    )
+    .addSubcommandHandler(handleSetSheet)
+    .build();
 
-export const command = chatInputCommandHandlerContextBuilder()
-  .data(
-    new SlashCommandBuilder()
-      .setName("server")
-      .setDescription("Server commands")
-      .addSubcommand(handleListConfig.data)
-      .addSubcommandGroup(handleSetConfig.data)
-      .setIntegrationTypes(
-        ApplicationIntegrationType.GuildInstall,
-        ApplicationIntegrationType.UserInstall,
-      )
-      .setContexts(
-        InteractionContextType.BotDM,
-        InteractionContextType.Guild,
-        InteractionContextType.PrivateChannel,
-      ),
-  )
-  .handler(
-    pipe(
-      SubcommandHandler.empty(),
-      SubcommandHandler.addSubcommandGroupHandler(handleSetConfig),
-      SubcommandHandler.addSubcommandHandler(handleListConfig),
-      SubcommandHandler.handler,
-    ),
-  )
-  .build();
+export const command =
+  chatInputCommandHandlerContextWithSubcommandHandlerBuilder()
+    .data(
+      new SlashCommandBuilder()
+        .setName("server")
+        .setDescription("Server commands")
+        .setIntegrationTypes(
+          ApplicationIntegrationType.GuildInstall,
+          ApplicationIntegrationType.UserInstall,
+        )
+        .setContexts(
+          InteractionContextType.BotDM,
+          InteractionContextType.Guild,
+          InteractionContextType.PrivateChannel,
+        ),
+    )
+    .addSubcommandGroupHandler(handleSetConfig)
+    .addSubcommandHandler(handleListConfig)
+    .build();

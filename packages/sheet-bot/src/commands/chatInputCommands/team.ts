@@ -11,9 +11,8 @@ import { observeOnce } from "typhoon-server/signal";
 import { GoogleSheets } from "../../google";
 import { GuildConfigService } from "../../services/guildConfigService";
 import {
-  chatInputCommandHandlerContextBuilder,
+  chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
-  SubcommandHandler,
 } from "../../types";
 
 const handleList = chatInputSubcommandHandlerContextBuilder()
@@ -113,27 +112,21 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
   )
   .build();
 
-export const command = chatInputCommandHandlerContextBuilder()
-  .data(
-    new SlashCommandBuilder()
-      .setName("team")
-      .setDescription("Team commands")
-      .addSubcommand(handleList.data)
-      .setIntegrationTypes(
-        ApplicationIntegrationType.GuildInstall,
-        ApplicationIntegrationType.UserInstall,
-      )
-      .setContexts(
-        InteractionContextType.BotDM,
-        InteractionContextType.Guild,
-        InteractionContextType.PrivateChannel,
-      ),
-  )
-  .handler(
-    pipe(
-      SubcommandHandler.empty(),
-      SubcommandHandler.addSubcommandHandler(handleList),
-      SubcommandHandler.handler,
-    ),
-  )
-  .build();
+export const command =
+  chatInputCommandHandlerContextWithSubcommandHandlerBuilder()
+    .data(
+      new SlashCommandBuilder()
+        .setName("team")
+        .setDescription("Team commands")
+        .setIntegrationTypes(
+          ApplicationIntegrationType.GuildInstall,
+          ApplicationIntegrationType.UserInstall,
+        )
+        .setContexts(
+          InteractionContextType.BotDM,
+          InteractionContextType.Guild,
+          InteractionContextType.PrivateChannel,
+        ),
+    )
+    .addSubcommandHandler(handleList)
+    .build();
