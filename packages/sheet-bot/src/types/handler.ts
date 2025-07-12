@@ -4,8 +4,11 @@ import {
   Interaction,
   InteractionButtonComponentData,
   SharedSlashCommand,
+  SharedSlashCommandSubcommands,
+  SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
   SlashCommandSubcommandGroupBuilder,
+  SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 import { Data, Effect, HashMap, Option, pipe } from "effect";
 
@@ -346,6 +349,13 @@ export class ChatInputSubcommandGroupHandlerContext<
   }
 }
 
+export type AnyChatInputSubcommandGroupHandlerContext<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  E = any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  R = any,
+> = ChatInputSubcommandGroupHandlerContext<E, R>;
+
 export class ChatInputSubcommandGroupHandlerContextBuilder<
   Data extends
     Option.Option<SlashCommandSubcommandGroupBuilder> = Option.None<SlashCommandSubcommandGroupBuilder>,
@@ -446,6 +456,13 @@ export class ChatInputSubcommandHandlerContext<
     );
   }
 }
+
+export type AnyChatInputSubcommandHandlerContext<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  E = any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  R = any,
+> = ChatInputSubcommandHandlerContext<E, R>;
 
 export class ChatInputSubcommandHandlerContextBuilder<
   Data extends
@@ -938,3 +955,347 @@ export class SubcommandHandler<out E = never, out R = never> {
       );
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AnySubcommandHandler<E = any, R = any> = SubcommandHandler<E, R>;
+
+type InteractionHandlerContextWithSubcommandHandlerBuilderData<
+  Data extends Option.Option<
+    | (SharedSlashCommandSubcommands<SlashCommandSubcommandsOnlyBuilder> &
+        SharedSlashCommand)
+    | SlashCommandSubcommandGroupBuilder
+  > = Option.None<
+    | (SharedSlashCommandSubcommands<SlashCommandSubcommandsOnlyBuilder> &
+        SharedSlashCommand)
+    | SlashCommandSubcommandGroupBuilder
+  >,
+  Handler extends AnySubcommandHandler = AnySubcommandHandler,
+> = {
+  _data: Data;
+  _handler: Handler;
+};
+
+export class InteractionHandlerContextWithSubcommandHandlerBuilder<
+  Data extends Option.Option<
+    | SlashCommandBuilder
+    | SlashCommandSubcommandsOnlyBuilder
+    | SlashCommandSubcommandGroupBuilder
+  > = Option.None<
+    | SlashCommandBuilder
+    | SlashCommandSubcommandsOnlyBuilder
+    | SlashCommandSubcommandGroupBuilder
+  >,
+  Handler extends AnySubcommandHandler = AnySubcommandHandler,
+> extends Data.TaggedClass(
+  "InteractionHandlerContextWithSubcommandHandlerBuilder",
+)<InteractionHandlerContextWithSubcommandHandlerBuilderData<Data, Handler>> {
+  static empty<
+    BuilderData extends
+      | SlashCommandBuilder
+      | SlashCommandSubcommandsOnlyBuilder
+      | SlashCommandSubcommandGroupBuilder,
+  >() {
+    return new InteractionHandlerContextWithSubcommandHandlerBuilder({
+      _data: Option.none() as Option.None<BuilderData>,
+      _handler: SubcommandHandler.empty(),
+    });
+  }
+
+  data<
+    BuilderData extends
+      | SlashCommandBuilder
+      | SlashCommandSubcommandsOnlyBuilder
+      | SlashCommandSubcommandGroupBuilder,
+    BuilderHandler extends AnySubcommandHandler,
+  >(
+    this: InteractionHandlerContextWithSubcommandHandlerBuilder<
+      Option.None<
+        | SlashCommandBuilder
+        | SlashCommandSubcommandsOnlyBuilder
+        | SlashCommandSubcommandGroupBuilder
+      >,
+      BuilderHandler
+    >,
+    data: BuilderData,
+  ) {
+    return new InteractionHandlerContextWithSubcommandHandlerBuilder({
+      _data: Option.some(data) as Option.Some<BuilderData>,
+      _handler: this._handler,
+    });
+  }
+
+  addSubcommandHandler<
+    BuilderData extends
+      | SlashCommandBuilder
+      | SlashCommandSubcommandsOnlyBuilder
+      | SlashCommandSubcommandGroupBuilder,
+    BuilderHandler extends AnySubcommandHandler,
+    AddBuilderHandler extends AnyChatInputSubcommandHandlerContext,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ME = BuilderHandler extends SubcommandHandler<infer ME, any> ? ME : never,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    MR = BuilderHandler extends SubcommandHandler<any, infer MR> ? MR : never,
+    E = AddBuilderHandler extends ChatInputSubcommandHandlerContext<
+      infer E,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      any
+    >
+      ? E
+      : never,
+    R = AddBuilderHandler extends ChatInputSubcommandHandlerContext<
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      any,
+      infer R
+    >
+      ? R
+      : never,
+  >(
+    this: InteractionHandlerContextWithSubcommandHandlerBuilder<
+      Option.Some<BuilderData>,
+      BuilderHandler
+    >,
+    handler: AddBuilderHandler,
+  ) {
+    return new InteractionHandlerContextWithSubcommandHandlerBuilder({
+      _data: Option.some(
+        this._data.value.addSubcommand(handler.data),
+      ) as Option.Some<
+        BuilderData extends SlashCommandSubcommandGroupBuilder
+          ? SlashCommandSubcommandGroupBuilder
+          : SlashCommandSubcommandsOnlyBuilder
+      >,
+      _handler: SubcommandHandler.addSubcommandHandler<E, R>(handler)<ME, MR>(
+        this._handler,
+      ),
+    });
+  }
+
+  addSubcommandGroupHandler<
+    BuilderData extends
+      | SlashCommandBuilder
+      | SlashCommandSubcommandsOnlyBuilder,
+    BuilderHandler extends AnySubcommandHandler,
+    AddBuilderHandler extends AnyChatInputSubcommandGroupHandlerContext,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ME = BuilderHandler extends SubcommandHandler<infer ME, any> ? ME : never,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    MR = BuilderHandler extends SubcommandHandler<any, infer MR> ? MR : never,
+    E = AddBuilderHandler extends ChatInputSubcommandGroupHandlerContext<
+      infer E,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      any
+    >
+      ? E
+      : never,
+    R = AddBuilderHandler extends ChatInputSubcommandGroupHandlerContext<
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      any,
+      infer R
+    >
+      ? R
+      : never,
+  >(
+    this: InteractionHandlerContextWithSubcommandHandlerBuilder<
+      Option.Some<BuilderData>,
+      BuilderHandler
+    >,
+    handler: AddBuilderHandler,
+  ) {
+    return new InteractionHandlerContextWithSubcommandHandlerBuilder({
+      _data: Option.some(
+        this._data.value.addSubcommandGroup(handler.data),
+      ) as Option.Some<SlashCommandSubcommandsOnlyBuilder>,
+      _handler: SubcommandHandler.addSubcommandGroupHandler<E, R>(handler)<
+        ME,
+        MR
+      >(this._handler),
+    });
+  }
+
+  toBuilderContext<
+    BuilderData extends
+      | SlashCommandBuilder
+      | SlashCommandSubcommandsOnlyBuilder
+      | SlashCommandSubcommandGroupBuilder,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    E = Handler extends SubcommandHandler<infer E, any> ? E : never,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    R = Handler extends SubcommandHandler<any, infer R> ? R : never,
+  >(
+    this: InteractionHandlerContextWithSubcommandHandlerBuilder<
+      Option.Some<BuilderData>,
+      Handler
+    >,
+  ) {
+    return {
+      _data: this._data,
+      _handler: Option.some(SubcommandHandler.handler(this._handler)),
+    } as InteractionHandlerContextBuilderData<
+      Option.Some<BuilderData>,
+      Option.Some<InteractionHandler<ChatInputCommandInteraction, E, R>>
+    >;
+  }
+}
+
+export class ChatInputCommandHandlerContextWithSubcommandHandlerBuilder<
+  Data extends Option.Option<
+    SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder
+  > = Option.None<SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder>,
+  Handler extends AnySubcommandHandler = AnySubcommandHandler,
+> extends Data.TaggedClass(
+  "ChatInputCommandHandlerContextWithSubcommandHandlerBuilder",
+)<{
+  builder: InteractionHandlerContextWithSubcommandHandlerBuilder<Data, Handler>;
+}> {
+  static empty() {
+    return new ChatInputCommandHandlerContextWithSubcommandHandlerBuilder({
+      builder: InteractionHandlerContextWithSubcommandHandlerBuilder.empty<
+        SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder
+      >(),
+    });
+  }
+
+  data<
+    BuilderData extends
+      | SlashCommandBuilder
+      | SlashCommandSubcommandsOnlyBuilder,
+    BuilderHandler extends AnySubcommandHandler,
+  >(
+    this: ChatInputCommandHandlerContextWithSubcommandHandlerBuilder<
+      Option.None<SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder>,
+      BuilderHandler
+    >,
+    data: BuilderData,
+  ) {
+    return new ChatInputCommandHandlerContextWithSubcommandHandlerBuilder({
+      builder: this.builder.data(data),
+    });
+  }
+
+  addSubcommandHandler<
+    BuilderData extends
+      | SlashCommandBuilder
+      | SlashCommandSubcommandsOnlyBuilder,
+    BuilderHandler extends AnySubcommandHandler,
+    AddBuilderHandler extends AnyChatInputSubcommandHandlerContext,
+  >(
+    this: ChatInputCommandHandlerContextWithSubcommandHandlerBuilder<
+      Option.Some<BuilderData>,
+      BuilderHandler
+    >,
+    handler: AddBuilderHandler,
+  ) {
+    return new ChatInputCommandHandlerContextWithSubcommandHandlerBuilder({
+      builder: this.builder.addSubcommandHandler(handler),
+    });
+  }
+
+  addSubcommandGroupHandler<
+    BuilderData extends
+      | SlashCommandBuilder
+      | SlashCommandSubcommandsOnlyBuilder,
+    BuilderHandler extends AnySubcommandHandler,
+    AddBuilderHandler extends AnyChatInputSubcommandGroupHandlerContext,
+  >(
+    this: ChatInputCommandHandlerContextWithSubcommandHandlerBuilder<
+      Option.Some<BuilderData>,
+      BuilderHandler
+    >,
+    handler: AddBuilderHandler,
+  ) {
+    return new ChatInputCommandHandlerContextWithSubcommandHandlerBuilder({
+      builder: this.builder.addSubcommandGroupHandler(handler),
+    });
+  }
+
+  build<
+    BuilderData extends
+      | SlashCommandBuilder
+      | SlashCommandSubcommandsOnlyBuilder,
+    BuilderHandler extends AnySubcommandHandler,
+  >(
+    this: ChatInputCommandHandlerContextWithSubcommandHandlerBuilder<
+      Option.Some<BuilderData>,
+      BuilderHandler
+    >,
+  ) {
+    return ChatInputCommandHandlerContext.fromBuilderContext(
+      this.builder.toBuilderContext(),
+    );
+  }
+}
+
+export class ChatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder<
+  Data extends
+    Option.Option<SlashCommandSubcommandGroupBuilder> = Option.None<SlashCommandSubcommandGroupBuilder>,
+  Handler extends AnySubcommandHandler = AnySubcommandHandler,
+> extends Data.TaggedClass(
+  "ChatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder",
+)<{
+  builder: InteractionHandlerContextWithSubcommandHandlerBuilder<Data, Handler>;
+}> {
+  static empty() {
+    return new ChatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder(
+      {
+        builder:
+          InteractionHandlerContextWithSubcommandHandlerBuilder.empty<SlashCommandSubcommandGroupBuilder>(),
+      },
+    );
+  }
+
+  data<
+    BuilderData extends SlashCommandSubcommandGroupBuilder,
+    BuilderHandler extends AnySubcommandHandler,
+  >(
+    this: ChatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder<
+      Option.None<SlashCommandSubcommandGroupBuilder>,
+      BuilderHandler
+    >,
+    data: BuilderData,
+  ) {
+    return new ChatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder(
+      {
+        builder: this.builder.data(data),
+      },
+    );
+  }
+
+  addSubcommandHandler<
+    BuilderData extends SlashCommandSubcommandGroupBuilder,
+    BuilderHandler extends AnySubcommandHandler,
+    AddBuilderHandler extends AnyChatInputSubcommandHandlerContext,
+  >(
+    this: ChatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder<
+      Option.Some<BuilderData>,
+      BuilderHandler
+    >,
+    handler: AddBuilderHandler,
+  ) {
+    return new ChatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder(
+      {
+        builder: this.builder.addSubcommandHandler(handler),
+      },
+    );
+  }
+
+  build<
+    BuilderData extends SlashCommandSubcommandGroupBuilder,
+    BuilderHandler extends AnySubcommandHandler,
+  >(
+    this: ChatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder<
+      Option.Some<BuilderData>,
+      BuilderHandler
+    >,
+  ) {
+    return ChatInputSubcommandGroupHandlerContext.fromBuilderContext(
+      this.builder.toBuilderContext(),
+    );
+  }
+}
+
+export const chatInputCommandHandlerContextWithSubcommandHandlerBuilder = () =>
+  ChatInputCommandHandlerContextWithSubcommandHandlerBuilder.empty();
+
+export const chatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder =
+  () =>
+    ChatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder.empty();
