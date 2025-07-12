@@ -10,7 +10,7 @@ import { Chunk, Effect, Option, pipe, Ref } from "effect";
 import { observeOnce } from "typhoon-core/signal";
 import { ChannelConfigService } from "../services/channelConfigService";
 import { ScheduleService } from "../services/scheduleService";
-import { defineButtonInteractionHandler } from "../types";
+import { buttonInteractionHandlerContextBuilder } from "../types";
 
 const getSlotMessage = (day: number, serverId: string) =>
   pipe(
@@ -31,14 +31,14 @@ const getSlotMessage = (day: number, serverId: string) =>
     Effect.map(({ slotMessage }) => slotMessage),
   );
 
-export const button = defineButtonInteractionHandler(
-  {
+export const button = buttonInteractionHandlerContextBuilder()
+  .data({
     type: ComponentType.Button,
     customId: "interaction:slot",
     label: "Open slots",
     style: ButtonStyle.Primary,
-  },
-  (interaction) =>
+  })
+  .handler((interaction) =>
     pipe(
       Effect.Do,
       Effect.bindAll(() => ({
@@ -90,4 +90,5 @@ export const button = defineButtonInteractionHandler(
         ),
       ),
     ),
-);
+  )
+  .build();

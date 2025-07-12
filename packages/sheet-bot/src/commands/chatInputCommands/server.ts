@@ -1,27 +1,30 @@
-import { match } from "arktype";
 import {
   ApplicationIntegrationType,
   EmbedBuilder,
   InteractionContextType,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  SlashCommandSubcommandBuilder,
+  SlashCommandSubcommandGroupBuilder,
   escapeMarkdown,
 } from "discord.js";
 import { Effect, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-core/signal";
 import { GuildConfigService } from "../../services/guildConfigService";
 import {
-  defineChatInputCommandHandler,
-  defineChatInputSubcommandGroupHandler,
-  defineChatInputSubcommandHandler,
+  SubcommandHandler,
+  chatInputCommandHandlerContextBuilder,
+  chatInputSubcommandGroupHandlerContextBuilder,
+  chatInputSubcommandHandlerContextBuilder,
 } from "../../types";
 
-const handleListConfig = defineChatInputSubcommandHandler(
-  (subcommand) =>
-    subcommand
+const handleListConfig = chatInputSubcommandHandlerContextBuilder()
+  .data(
+    new SlashCommandSubcommandBuilder()
       .setName("list_config")
       .setDescription("List the config for the server"),
-  (interaction) =>
+  )
+  .handler((interaction) =>
     pipe(
       Effect.Do,
       Effect.bindAll(() => ({
@@ -58,11 +61,12 @@ const handleListConfig = defineChatInputSubcommandHandler(
         ),
       ),
     ),
-);
+  )
+  .build();
 
-const handleSetSheet = defineChatInputSubcommandHandler(
-  (subcommand) =>
-    subcommand
+const handleSetSheet = chatInputSubcommandHandlerContextBuilder()
+  .data(
+    new SlashCommandSubcommandBuilder()
       .setName("sheet")
       .setDescription("Set the sheet id for the server")
       .addStringOption((option) =>
@@ -71,7 +75,8 @@ const handleSetSheet = defineChatInputSubcommandHandler(
           .setDescription("The sheet id to set")
           .setRequired(true),
       ),
-  (interaction) =>
+  )
+  .handler((interaction) =>
     pipe(
       Effect.Do,
       Effect.bindAll(() => ({
@@ -110,45 +115,48 @@ const handleSetSheet = defineChatInputSubcommandHandler(
       ),
       Effect.asVoid,
     ),
-);
+  )
+  .build();
 
-const handleSetConfig = defineChatInputSubcommandGroupHandler(
-  (group) =>
-    group
+const handleSetConfig = chatInputSubcommandGroupHandlerContextBuilder()
+  .data(
+    new SlashCommandSubcommandGroupBuilder()
       .setName("set_config")
       .setDescription("Set config for the server")
       .addSubcommand(handleSetSheet.data),
-  (interaction) =>
-    match({})
-      .case("'sheet'", () => handleSetSheet.handler(interaction))
-      .default(() => Effect.void)(interaction.options.getSubcommand()),
-);
-
-export const command = defineChatInputCommandHandler(
-  new SlashCommandBuilder()
-    .setName("server")
-    .setDescription("Server commands")
-    .addSubcommand(handleListConfig.data)
-    .addSubcommandGroup(handleSetConfig.data)
-    .setIntegrationTypes(
-      ApplicationIntegrationType.GuildInstall,
-      ApplicationIntegrationType.UserInstall,
-    )
-    .setContexts(
-      InteractionContextType.BotDM,
-      InteractionContextType.Guild,
-      InteractionContextType.PrivateChannel,
+  )
+  .handler(
+    pipe(
+      SubcommandHandler.empty(),
+      SubcommandHandler.addSubcommandHandler(handleSetSheet),
+      SubcommandHandler.handler,
     ),
-  (interaction) =>
-    match({})
-      .case({ subcommand: "'list_config'" }, () =>
-        handleListConfig.handler(interaction),
+  )
+  .build();
+
+export const command = chatInputCommandHandlerContextBuilder()
+  .data(
+    new SlashCommandBuilder()
+      .setName("server")
+      .setDescription("Server commands")
+      .addSubcommand(handleListConfig.data)
+      .addSubcommandGroup(handleSetConfig.data)
+      .setIntegrationTypes(
+        ApplicationIntegrationType.GuildInstall,
+        ApplicationIntegrationType.UserInstall,
       )
-      .case({ subcommandGroup: "'set_config'" }, () =>
-        handleSetConfig.handler(interaction),
-      )
-      .default(() => Effect.void)({
-      subcommand: interaction.options.getSubcommand(),
-      subcommandGroup: interaction.options.getSubcommandGroup(),
-    }),
-);
+      .setContexts(
+        InteractionContextType.BotDM,
+        InteractionContextType.Guild,
+        InteractionContextType.PrivateChannel,
+      ),
+  )
+  .handler(
+    pipe(
+      SubcommandHandler.empty(),
+      SubcommandHandler.addSubcommandGroupHandler(handleSetConfig),
+      SubcommandHandler.addSubcommandHandler(handleListConfig),
+      SubcommandHandler.handler,
+    ),
+  )
+  .build();
