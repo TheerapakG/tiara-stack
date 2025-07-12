@@ -2,7 +2,9 @@ import { match } from "arktype";
 import { Dialect } from "drizzle-orm";
 import { RunnableQuery } from "drizzle-orm/runnable-query";
 import {
+  Cause,
   Context,
+  Data,
   Effect,
   HashMap,
   HashSet,
@@ -147,14 +149,18 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
   },
 ) {}
 
+export class QueryError extends Data.TaggedError("QueryError")<{
+  cause: Cause.UnknownException;
+}> {}
+
 type QueryAnalysis<T> = {
-  query: Effect.Effect<T, unknown>;
+  query: Effect.Effect<T, QueryError>;
   tables: HashSet.HashSet<string>;
 };
 
 export const query = <T, TDialect extends Dialect>(
   query: RunnableQuery<T, TDialect>,
-): Effect.Effect<QueryAnalysis<T>, unknown, TransactionContext> =>
+): Effect.Effect<QueryAnalysis<T>, never, TransactionContext> =>
   pipe(
     Effect.Do,
     // @ts-expect-error drizzle internal
@@ -163,13 +169,16 @@ export const query = <T, TDialect extends Dialect>(
       HashSet.make(...(preparedQuery.queryMetadata.tables as string[])),
     ),
     Effect.let("query", ({ preparedQuery }) =>
-      Effect.tryPromise(() => preparedQuery.execute() as Promise<T>),
+      pipe(
+        Effect.tryPromise(() => preparedQuery.execute() as Promise<T>),
+        Effect.mapError((error) => new QueryError({ cause: error })),
+      ),
     ),
     Effect.map(({ query, tables }) => ({ query, tables })),
   );
 
-export const run = <T>(
-  query: Effect.Effect<QueryAnalysis<T>, unknown, TransactionContext>,
+export const run = <T, E>(
+  query: Effect.Effect<QueryAnalysis<T>, E, TransactionContext>,
 ) =>
   pipe(
     Effect.Do,

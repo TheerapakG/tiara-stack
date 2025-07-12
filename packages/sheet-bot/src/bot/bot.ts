@@ -17,7 +17,6 @@ import {
   Cause,
   Effect,
   Exit,
-  HashMap,
   Layer,
   Option,
   pipe,
@@ -25,15 +24,20 @@ import {
   SynchronizedRef,
 } from "effect";
 import { Config } from "../config";
-import { ButtonInteractionHandler, ChatInputCommandHandler } from "../types";
+import {
+  ButtonInteractionHandlerContext,
+  ButtonInteractionHandlerMap,
+  ChatInputCommandHandlerContext,
+  ChatInputCommandHandlerMap,
+} from "../types";
 
-class ScopeLayer<E = unknown, R = unknown> {
+class ScopeLayer<E = never, R = never> {
   constructor(
     private readonly scope: Scope.CloseableScope,
     private readonly layer: Layer.Layer<R, E>,
   ) {}
 
-  static make<E = unknown, R = unknown>(layer: Layer.Layer<R, E>) {
+  static make<E = never, R = never>(layer: Layer.Layer<R, E>) {
     return pipe(
       Effect.Do,
       Effect.bind("scope", () => Scope.make()),
@@ -44,25 +48,25 @@ class ScopeLayer<E = unknown, R = unknown> {
     );
   }
 
-  static provide<E = unknown, R = unknown>(scopeLayer: ScopeLayer<E, R>) {
+  static provide<E = never, R = never>(scopeLayer: ScopeLayer<E, R>) {
     return Effect.provide(scopeLayer.layer);
   }
 
-  static close<E = unknown, R = unknown>(scopeLayer: ScopeLayer<E, R>) {
+  static close<E = never, R = never>(scopeLayer: ScopeLayer<E, R>) {
     return Scope.close(scopeLayer.scope, Exit.void);
   }
 }
 
-export class Bot<E = unknown, R = unknown> {
+export class Bot<E = never, R = never> {
   constructor(
     private readonly client: Client,
     private readonly loginLatch: Effect.Latch,
     private readonly loginSemaphore: Effect.Semaphore,
     private readonly chatInputCommandsMap: SynchronizedRef.SynchronizedRef<
-      HashMap.HashMap<string, ChatInputCommandHandler<unknown, R>>
+      ChatInputCommandHandlerMap<E, R>
     >,
     private readonly buttonsMap: SynchronizedRef.SynchronizedRef<
-      HashMap.HashMap<string, ButtonInteractionHandler<unknown, R>>
+      ButtonInteractionHandlerMap<E, R>
     >,
     private readonly layer: Layer.Layer<R, E>,
     private readonly scopeLayer: SynchronizedRef.SynchronizedRef<
@@ -73,11 +77,11 @@ export class Bot<E = unknown, R = unknown> {
   static onChatInputCommandInteraction(
     interaction: ChatInputCommandInteraction,
   ) {
-    return <E = unknown, R = unknown>(bot: Bot<E, R>) =>
+    return <E = never, R = never>(bot: Bot<E, R>) =>
       pipe(
         SynchronizedRef.get(bot.chatInputCommandsMap),
         Effect.map((commandsMap) =>
-          HashMap.get(commandsMap, interaction.commandName),
+          ChatInputCommandHandlerMap.get(interaction.commandName)(commandsMap),
         ),
         Effect.flatMap(
           Option.match({
@@ -131,7 +135,7 @@ export class Bot<E = unknown, R = unknown> {
   }
 
   static onCommandInteraction(interaction: CommandInteraction) {
-    return <E = unknown, R = unknown>(bot: Bot<E, R>) =>
+    return <E = never, R = never>(bot: Bot<E, R>) =>
       match({})
         .case(`${ApplicationCommandType.ChatInput}`, () =>
           Bot.onChatInputCommandInteraction(
@@ -142,11 +146,11 @@ export class Bot<E = unknown, R = unknown> {
   }
 
   static onButtonInteraction(interaction: ButtonInteraction) {
-    return <E = unknown, R = unknown>(bot: Bot<E, R>) =>
+    return <E = never, R = never>(bot: Bot<E, R>) =>
       pipe(
         SynchronizedRef.get(bot.buttonsMap),
         Effect.map((buttonsMap) =>
-          HashMap.get(buttonsMap, interaction.customId),
+          ButtonInteractionHandlerMap.get(interaction.customId)(buttonsMap),
         ),
         Effect.flatMap(
           Option.match({
@@ -202,7 +206,7 @@ export class Bot<E = unknown, R = unknown> {
   static onMessageComponentInteraction(
     interaction: MessageComponentInteraction,
   ) {
-    return <E = unknown, R = unknown>(bot: Bot<E, R>) =>
+    return <E = never, R = never>(bot: Bot<E, R>) =>
       match({})
         .case(`${ComponentType.Button}`, () =>
           Bot.onButtonInteraction(interaction as ButtonInteraction)(bot),
@@ -211,7 +215,7 @@ export class Bot<E = unknown, R = unknown> {
   }
 
   static onInteraction(interaction: Interaction) {
-    return <E = unknown, R = unknown>(bot: Bot<E, R>) =>
+    return <E = never, R = never>(bot: Bot<E, R>) =>
       match({})
         .case(`${InteractionType.ApplicationCommand}`, () =>
           Bot.onCommandInteraction(interaction as CommandInteraction)(bot),
@@ -224,7 +228,7 @@ export class Bot<E = unknown, R = unknown> {
         .default(() => Effect.void)(interaction.type);
   }
 
-  static create<E = unknown, R = unknown>(layer: Layer.Layer<R, E>) {
+  static create<E = never, R = never>(layer: Layer.Layer<R, E>) {
     return pipe(
       Effect.Do,
       Effect.let(
@@ -234,14 +238,10 @@ export class Bot<E = unknown, R = unknown> {
       Effect.bind("loginLatch", () => Effect.makeLatch(false)),
       Effect.bind("loginSemaphore", () => Effect.makeSemaphore(1)),
       Effect.bind("chatInputCommandsMap", () =>
-        SynchronizedRef.make(
-          HashMap.empty<string, ChatInputCommandHandler<unknown, R>>(),
-        ),
+        SynchronizedRef.make(ChatInputCommandHandlerMap.empty<E, R>()),
       ),
       Effect.bind("buttonsMap", () =>
-        SynchronizedRef.make(
-          HashMap.empty<string, ButtonInteractionHandler<unknown, R>>(),
-        ),
+        SynchronizedRef.make(ButtonInteractionHandlerMap.empty<E, R>()),
       ),
       Effect.bind("scopeLayer", () =>
         SynchronizedRef.make(Option.none<ScopeLayer<E, R>>()),
@@ -285,7 +285,7 @@ export class Bot<E = unknown, R = unknown> {
     );
   }
 
-  static login<E = unknown, R = unknown>(bot: Bot<E, R>) {
+  static login<E = never, R = never>(bot: Bot<E, R>) {
     return Config.use(({ discordToken }) =>
       pipe(
         ScopeLayer.make(bot.layer),
@@ -302,7 +302,7 @@ export class Bot<E = unknown, R = unknown> {
     );
   }
 
-  static destroy<E = unknown, R = unknown>(bot: Bot<E, R>) {
+  static destroy<E = never, R = never>(bot: Bot<E, R>) {
     return pipe(
       Effect.promise(() => bot.client.destroy()),
       Effect.andThen(() =>
@@ -323,29 +323,72 @@ export class Bot<E = unknown, R = unknown> {
     );
   }
 
-  static addChatInputCommand<R = unknown>(
-    command: ChatInputCommandHandler<unknown, R>,
+  static addChatInputCommand<E = never, R = never>(
+    command: ChatInputCommandHandlerContext<E, R>,
   ) {
-    return <BE = unknown, BR = unknown>(bot: Bot<BE, R | BR>) =>
+    return <BE = never, BR = never>(bot: Bot<BE, BR>) =>
       pipe(
-        SynchronizedRef.update(bot.chatInputCommandsMap, (commandsMap) =>
-          HashMap.set(commandsMap, command.data.name, command),
+        Effect.Do,
+        Effect.let("bot", () => bot as Bot<E | BE, R | BR>),
+        Effect.tap(({ bot }) =>
+          SynchronizedRef.update(bot.chatInputCommandsMap, (commandsMap) =>
+            ChatInputCommandHandlerMap.add(command)(commandsMap),
+          ),
         ),
-        Effect.as(bot),
+        Effect.map(({ bot }) => bot),
       );
   }
 
-  static addButton<R = unknown>(button: ButtonInteractionHandler<unknown, R>) {
-    return <BE = unknown, BR = unknown>(bot: Bot<BE, R | BR>) =>
+  static addChatInputCommandHandlerMap<E = never, R = never>(
+    commands: ChatInputCommandHandlerMap<E, R>,
+  ) {
+    return <BE = never, BR = never>(bot: Bot<BE, BR>) =>
       pipe(
-        SynchronizedRef.update(bot.buttonsMap, (buttonsMap) =>
-          HashMap.set(buttonsMap, button.data.customId, button),
+        Effect.Do,
+        Effect.let("bot", () => bot as Bot<E | BE, R | BR>),
+        Effect.tap(({ bot }) =>
+          SynchronizedRef.update(
+            bot.chatInputCommandsMap,
+            ChatInputCommandHandlerMap.union(commands),
+          ),
         ),
-        Effect.as(bot),
+        Effect.map(({ bot }) => bot),
       );
   }
 
-  static registerProcessHandlers<E = unknown, R = unknown>(bot: Bot<E, R>) {
+  static addButton<E = never, R = never>(
+    button: ButtonInteractionHandlerContext<E, R>,
+  ) {
+    return <BE = never, BR = never>(bot: Bot<BE, BR>) =>
+      pipe(
+        Effect.Do,
+        Effect.let("bot", () => bot as Bot<E | BE, R | BR>),
+        Effect.tap(({ bot }) =>
+          SynchronizedRef.update(bot.buttonsMap, (buttonsMap) =>
+            ButtonInteractionHandlerMap.add(button)(buttonsMap),
+          ),
+        ),
+        Effect.map(({ bot }) => bot),
+      );
+  }
+
+  static addButtonInteractionHandlerMap<E = never, R = never>(
+    buttons: ButtonInteractionHandlerMap<E, R>,
+  ) {
+    return <BE = never, BR = never>(bot: Bot<BE, BR>) =>
+      pipe(
+        Effect.Do,
+        Effect.let("bot", () => bot as Bot<E | BE, R | BR>),
+        Effect.tap(({ bot }) =>
+          SynchronizedRef.update(bot.buttonsMap, (buttonsMap) =>
+            ButtonInteractionHandlerMap.union(buttons)(buttonsMap),
+          ),
+        ),
+        Effect.map(({ bot }) => bot),
+      );
+  }
+
+  static registerProcessHandlers<E = never, R = never>(bot: Bot<E, R>) {
     return pipe(
       Effect.sync(() => {
         process.on("SIGINT", () =>

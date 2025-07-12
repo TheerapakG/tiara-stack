@@ -9,10 +9,6 @@ import { GoogleLive } from "./google";
 import { ChannelConfigService } from "./services/channelConfigService";
 import { GuildConfigService } from "./services/guildConfigService";
 import { ScheduleService } from "./services/scheduleService";
-import {
-  ButtonInteractionHandlerMap,
-  ChatInputCommandHandlerMap,
-} from "./types/handler";
 
 const layer = pipe(
   ScheduleService.DefaultWithoutDependencies,
@@ -35,21 +31,8 @@ await Effect.runPromise(
       pipe(
         Bot.create(layer),
         Effect.flatMap(Bot.registerProcessHandlers),
-        Effect.flatMap((bot) =>
-          ChatInputCommandHandlerMap.reduce(
-            commands,
-            Effect.succeed(bot),
-            (bot, command) =>
-              pipe(bot, Effect.flatMap(Bot.addChatInputCommand(command))),
-          ),
-        ),
-        Effect.flatMap((bot) =>
-          ButtonInteractionHandlerMap.reduce(
-            buttons,
-            Effect.succeed(bot),
-            (bot, button) => pipe(bot, Effect.flatMap(Bot.addButton(button))),
-          ),
-        ),
+        Effect.flatMap(Bot.addChatInputCommandHandlerMap(commands)),
+        Effect.flatMap(Bot.addButtonInteractionHandlerMap(buttons)),
       ),
     ),
     Effect.flatMap(({ bot }) => Bot.login(bot)),
