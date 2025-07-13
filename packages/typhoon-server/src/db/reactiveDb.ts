@@ -1,4 +1,3 @@
-import { match } from "arktype";
 import { Dialect } from "drizzle-orm";
 import { RunnableQuery } from "drizzle-orm/runnable-query";
 import {
@@ -8,6 +7,7 @@ import {
   Effect,
   HashMap,
   HashSet,
+  Match,
   Option,
   pipe,
   SynchronizedRef,
@@ -66,11 +66,12 @@ export class TransactionContext extends Context.Tag("TransactionContext")<
     : T extends "mutation"
       ? Effect.Effect<SynchronizedRef.SynchronizedRef<TransactionMutation>>
       : never {
-    return match({
-      "'subscription'": () => TransactionContext.subscription(),
-      "'mutation'": () => TransactionContext.mutation(),
-      default: "never",
-    })(mode) as unknown as T extends "subscription"
+    return pipe(
+      Match.value(mode as "subscription" | "mutation"),
+      Match.when("subscription", () => TransactionContext.subscription()),
+      Match.when("mutation", () => TransactionContext.mutation()),
+      Match.exhaustive,
+    ) as unknown as T extends "subscription"
       ? Effect.Effect<SynchronizedRef.SynchronizedRef<TransactionSubscription>>
       : T extends "mutation"
         ? Effect.Effect<SynchronizedRef.SynchronizedRef<TransactionMutation>>
@@ -195,23 +196,24 @@ export const run = <T, E>(
           TransactionSubscription | TransactionMutation
         >,
         (context) =>
-          match
-            .in<TransactionSubscription | TransactionMutation>()
-            .case({ mode: "'subscription'" }, (context) =>
+          pipe(
+            Match.value(context),
+            Match.when({ mode: "subscription" }, (context) =>
               pipe(
                 BaseDBSubscriptionContext.subscribeTables(
                   HashSet.toValues(queryAnalysis.tables),
                 ),
                 Effect.as(context),
               ),
-            )
-            .case({ mode: "'mutation'" }, (context) =>
+            ),
+            Match.when({ mode: "mutation" }, (context) =>
               Effect.succeed({
                 ...context,
                 tables: HashSet.union(context.tables, queryAnalysis.tables),
               }),
-            )
-            .default("never")(context),
+            ),
+            Match.exhaustive,
+          ),
       ),
     ),
     Effect.bind("result", ({ queryAnalysis }) =>
@@ -283,11 +285,12 @@ export const mutate = <A, E>(
           >,
         ),
         Effect.map((context) =>
-          match
-            .in<TransactionSubscription | TransactionMutation>()
-            .case({ mode: "'subscription'" }, () => HashSet.empty<string>())
-            .case({ mode: "'mutation'" }, (context) => context.tables)
-            .default("never")(context),
+          pipe(
+            Match.value(context),
+            Match.when({ mode: "subscription" }, () => HashSet.empty<string>()),
+            Match.when({ mode: "mutation" }, (context) => context.tables),
+            Match.exhaustive,
+          ),
         ),
         Effect.map(HashSet.toValues),
         Effect.flatMap(BaseDBSubscriptionContext.notifyTables),

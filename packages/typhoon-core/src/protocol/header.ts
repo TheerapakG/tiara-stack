@@ -1,5 +1,5 @@
-import { match, type } from "arktype";
-import { Array, Chunk, Data, Effect, pipe, Stream } from "effect";
+import { Array, Chunk, Data, Effect, Match, pipe, Stream } from "effect";
+import * as v from "valibot";
 import { validate, ValidationError } from "../schema/validate";
 
 const headerActionFields = [
@@ -177,10 +177,10 @@ const handlerPayloadEncoderDecoder = new LookupEncoderDecoder(
   ["handler"],
   ["handler"],
   {
-    handler: validate(type("string")),
+    handler: validate(v.string()),
   },
   {
-    handler: validate(type("string")),
+    handler: validate(v.string()),
   },
 );
 
@@ -189,12 +189,12 @@ const successNoncePayloadEncoderDecoder = new LookupEncoderDecoder(
   ["success", "nonce"],
   ["success", "nonce"],
   {
-    success: validate(type("boolean")),
-    nonce: validate(type("number")),
+    success: validate(v.boolean()),
+    nonce: validate(v.number()),
   },
   {
-    success: validate(type("boolean")),
-    nonce: validate(type("number")),
+    success: validate(v.boolean()),
+    nonce: validate(v.number()),
   },
 );
 
@@ -203,36 +203,42 @@ const baseHeaderEncoderDecoder = new LookupEncoderDecoder(
   ["protocol", "version", "id", "action", "payload"],
   ["protocol", "version", "id", "action", "payload"],
   {
-    protocol: validate(type("string")),
-    version: validate(type("number")),
+    protocol: validate(v.string()),
+    version: validate(v.number()),
     id: validate(
-      type("TypedArray.Uint8")
-        .pipe((value) => Array.fromIterable(value))
-        .to("16 <= number[] <= 16")
-        .pipe((value) => value.map((v) => v.toString(16).padStart(2, "0")))
-        .pipe(
+      v.pipe(
+        v.instance(Uint8Array),
+        v.transform((value) => Array.fromIterable(value)),
+        v.length(16),
+        v.transform((value) =>
+          value.map((v) => v.toString(16).padStart(2, "0")),
+        ),
+        v.transform(
           (value) =>
             `${value.slice(0, 4).join("")}-${value.slice(4, 6).join("")}-${value.slice(6, 8).join("")}-${value.slice(8, 10).join("")}-${value.slice(10).join("")}`,
         ),
+      ),
     ),
     action: (value) =>
       pipe(
         value,
-        validate(type("number")),
+        validate(v.number()),
         Effect.flatMap((value) => HeaderActionField.decode(value)),
       ),
-    payload: validate(type([["number", "unknown"], "[]"])),
+    payload: validate(v.array(v.tuple([v.number(), v.unknown()]))),
   },
   {
-    protocol: validate(type("string")),
-    version: validate(type("number")),
+    protocol: validate(v.string()),
+    version: validate(v.number()),
     id: (value) =>
       pipe(
         value,
         validate(
-          type("string")
-            .pipe((value) => value.replace(/-/g, ""))
-            .to("32 <= string <= 32"),
+          v.pipe(
+            v.string(),
+            v.transform((value) => value.replace(/-/g, "")),
+            v.length(32),
+          ),
         ),
         Stream.fromIterableEffect,
         Stream.grouped(2),
@@ -244,10 +250,10 @@ const baseHeaderEncoderDecoder = new LookupEncoderDecoder(
     action: (value) =>
       pipe(
         value,
-        validate(type.enumerated(...headerActionFields)),
+        validate(v.union(headerActionFields.map((field) => v.literal(field)))),
         Effect.flatMap((value) => HeaderActionField.encode(value)),
       ),
-    payload: validate(type([["number", "unknown"], "[]"])),
+    payload: validate(v.array(v.tuple([v.number(), v.unknown()]))),
   },
 );
 
@@ -278,20 +284,22 @@ const payloadDecoder = <Action extends (typeof headerActionFields)[number]>({
     Effect.Do,
     Effect.let("action", () => action),
     Effect.bind("payload", () =>
-      validate(type([["number", "unknown"], "[]"]))(payload),
+      validate(v.array(v.tuple([v.number(), v.unknown()])))(payload),
     ),
     Effect.flatMap(({ action, payload }) =>
-      match({})
-        .case("'client:subscribe' | 'client:once' | 'client:mutate'", () =>
+      pipe(
+        Match.value(action as (typeof headerActionFields)[number]),
+        Match.whenOr("client:subscribe", "client:once", "client:mutate", () =>
           handlerPayloadEncoderDecoder.decode(payload),
-        )
-        .case("'server:update'", () =>
+        ),
+        Match.when("server:update", () =>
           successNoncePayloadEncoderDecoder.decode(payload),
-        )
-        .case("'client:unsubscribe'", () =>
+        ),
+        Match.when("client:unsubscribe", () =>
           emptyPayloadEncoderDecoder.decode(payload),
-        )
-        .default("never")(action),
+        ),
+        Match.exhaustive,
+      ),
     ),
   ) as Effect.Effect<
     Action extends "client:subscribe" | "client:once" | "client:mutate"
@@ -326,8 +334,9 @@ const payloadEncoder = <
     Effect.let("action", () => action),
     Effect.let("payload", () => payload),
     Effect.flatMap(({ action, payload }) =>
-      match({})
-        .case("'client:subscribe' | 'client:once' | 'client:mutate'", () =>
+      pipe(
+        Match.value(action as (typeof headerActionFields)[number]),
+        Match.whenOr("client:subscribe", "client:once", "client:mutate", () =>
           handlerPayloadEncoderDecoder.encode(
             payload as Effect.Effect.Success<
               ReturnType<
@@ -337,22 +346,23 @@ const payloadEncoder = <
               >
             >,
           ),
-        )
-        .case("'server:update'", () =>
+        ),
+        Match.when("server:update", () =>
           successNoncePayloadEncoderDecoder.encode(
             payload as Effect.Effect.Success<
               ReturnType<typeof payloadDecoder<"server:update">>
             >,
           ),
-        )
-        .case("'client:unsubscribe'", () =>
+        ),
+        Match.when("client:unsubscribe", () =>
           emptyPayloadEncoderDecoder.encode(
             payload as Effect.Effect.Success<
               ReturnType<typeof payloadDecoder<"client:unsubscribe">>
             >,
           ),
-        )
-        .default("never")(action),
+        ),
+        Match.exhaustive,
+      ),
     ),
   );
 

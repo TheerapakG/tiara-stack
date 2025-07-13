@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import "../polyfill/classPolyfill";
 
 import { Effect, pipe } from "effect";
@@ -34,6 +33,7 @@ function parsePlayer(
  *
  * @customfunction
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function THEECALC(
   url: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

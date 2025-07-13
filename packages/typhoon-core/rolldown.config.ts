@@ -26,5 +26,5 @@ export default defineConfig({
     },
   ],
   plugins: [dts()],
-  external: [...builtinModules, /^node:/, "effect", "arktype"],
+  external: [...builtinModules, /^node:/, "effect", "valibot"],
 });

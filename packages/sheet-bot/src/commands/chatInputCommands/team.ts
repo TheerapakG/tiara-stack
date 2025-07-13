@@ -9,7 +9,7 @@ import {
 import { Array, Effect, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import { GoogleSheets } from "../../google";
-import { GuildConfigService } from "../../services/guildConfigService";
+import { GuildConfigService, SheetConfigService } from "../../services";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
@@ -64,10 +64,13 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
       Effect.bind("sheetId", ({ guildConfig }) =>
         Option.fromNullable(guildConfig[0].sheetId),
       ),
-      Effect.bind("sheet", ({ sheetId }) =>
+      Effect.bind("sheetConfig", ({ sheetId }) =>
+        SheetConfigService.getRangesConfig(sheetId),
+      ),
+      Effect.bind("sheet", ({ sheetId, sheetConfig }) =>
         GoogleSheets.get({
           spreadsheetId: sheetId,
-          ranges: ["Teams!C3:C", "Teams!H3:Y"],
+          ranges: [sheetConfig.userIds, sheetConfig.userTeams],
         }),
       ),
       Effect.let("teams", ({ sheet }) => {

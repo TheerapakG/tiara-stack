@@ -28,7 +28,9 @@ export default defineConfig({
       formats: ["es"],
     },
     rollupOptions: {
-      treeshake: false,
+      treeshake: {
+        moduleSideEffects: "no-external",
+      },
       external: [...builtinModules, /^node:/],
     },
     minify: "terser",

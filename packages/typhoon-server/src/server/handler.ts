@@ -1,6 +1,5 @@
 import { StandardSchemaV1 } from "@standard-schema/spec";
-import { match } from "arktype";
-import { Effect, Scope } from "effect";
+import { Effect, Match, pipe, Scope } from "effect";
 import {
   HandlerConfig,
   MutationHandlerConfig,
@@ -73,26 +72,25 @@ class HandlerContextBuilder {
     : Config extends MutationHandlerConfig
       ? MutationHandlerContextBuilder<Config, undefined>
       : never {
-    return match
-      .in<HandlerConfig>()
-      .case(
-        { type: "'subscription'" },
+    return pipe(
+      Match.value(config as HandlerConfig),
+      Match.when(
+        { type: "subscription" },
         (config) =>
           new SubscriptionHandlerContextBuilder({
-            config: config as SubscriptionHandlerConfig,
+            config,
             handler: undefined,
           }),
-      )
-      .case(
-        { type: "'mutation'" },
+      ),
+      Match.when(
+        { type: "mutation" },
         (config) =>
           new MutationHandlerContextBuilder({
-            config: config as MutationHandlerConfig,
+            config,
             handler: undefined,
           }),
-      )
-      .default("never")(
-      config,
+      ),
+      Match.exhaustive,
     ) as unknown as Config extends SubscriptionHandlerConfig
       ? SubscriptionHandlerContextBuilder<Config, undefined>
       : Config extends MutationHandlerConfig

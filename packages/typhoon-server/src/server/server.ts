@@ -1,4 +1,3 @@
-import { match, type } from "arktype";
 import { Message, Peer } from "crossws";
 import type { serve as crosswsServe } from "crossws/server";
 import {
@@ -10,6 +9,7 @@ import {
   Exit,
   HashMap,
   Layer,
+  Match,
   Metric,
   Option,
   pipe,
@@ -26,6 +26,7 @@ import {
 import { validate } from "typhoon-core/schema";
 import { Server as BaseServer, ServerSymbol } from "typhoon-core/server";
 import { effect, observeOnce } from "typhoon-core/signal";
+import * as v from "valibot";
 import { Event } from "./event";
 import { MutationHandlerContext, SubscriptionHandlerContext } from "./handler";
 
@@ -168,23 +169,25 @@ export class Server<
             MutationHandlers & { [K in Handler["config"]["name"]]: Handler }
           >
         : never => {
-      match
-        .in<SubscriptionHandlerContext | MutationHandlerContext>()
-        .case({ config: { type: "'subscription'" } }, (handler) => {
+      pipe(
+        Match.value(handler.config),
+        Match.when({ type: "subscription" }, () => {
           server.subscriptionHandlerMap = HashMap.set(
             server.subscriptionHandlerMap,
             handler.config.name,
-            handler,
+            handler as SubscriptionHandlerContext,
           );
-        })
-        .case({ config: { type: "'mutation'" } }, (handler) => {
+        }),
+        Match.when({ type: "mutation" }, () => {
           server.mutationHandlerMap = HashMap.set(
             server.mutationHandlerMap,
             handler.config.name,
-            handler,
+            handler as MutationHandlerContext,
           );
-        })
-        .default("never")(handler);
+        }),
+        Match.exhaustive,
+      );
+
       return server as unknown as Handler extends SubscriptionHandlerContext
         ? Server<
             SubscriptionHandlers & {
@@ -346,70 +349,87 @@ export class Server<
   ) {
     return pipe(
       Effect.Do,
-      Effect.bind("boundedEventHandler", () =>
-        pipe(
-          Effect.Do,
-          Effect.bind("update", () =>
-            Effect.exit(
-              pipe(
-                subscriptionHandlerContext.handler,
-                Effect.scoped,
-                Effect.withSpan(
-                  `subscriptionHandler:${subscriptionHandlerContext.config.name}`,
-                  {
-                    captureStackTrace: true,
-                  },
-                ),
-              ),
-            ),
-          ),
-          Effect.bind("nonce", () => Nonce.getAndIncrement(nonce)),
-          Effect.bind("updateHeader", ({ update, nonce }) =>
-            HeaderEncoderDecoder.encode({
-              protocol: "typh",
-              version: 1,
-              id: subscriptionId,
-              action: "server:update",
-              payload: {
-                success: Exit.isSuccess(update),
-                nonce,
+      Effect.bind("update", () =>
+        Effect.exit(
+          pipe(
+            subscriptionHandlerContext.handler,
+            Effect.scoped,
+            Effect.withSpan(
+              `subscriptionHandler:${subscriptionHandlerContext.config.name}`,
+              {
+                captureStackTrace: true,
               },
-            }),
-          ),
-          Effect.let("updateMessage", ({ update }) =>
-            pipe(
-              update,
-              Exit.match({
-                onSuccess: (value) => value,
-                onFailure: (cause) => pipe(cause, Cause.pretty),
-              }),
             ),
           ),
-          Effect.bind("updateHeaderEncoded", ({ updateHeader }) =>
-            MsgpackEncoderDecoder.encode(updateHeader),
-          ),
-          Effect.bind("updateMessageEncoded", ({ updateMessage }) =>
-            MsgpackEncoderDecoder.encode(updateMessage),
-          ),
-          Effect.let(
-            "updateBuffer",
-            ({ updateHeaderEncoded, updateMessageEncoded }) => {
-              const updateBuffer = new Uint8Array(
-                updateHeaderEncoded.length + updateMessageEncoded.length,
-              );
-              updateBuffer.set(updateHeaderEncoded, 0);
-              updateBuffer.set(
-                updateMessageEncoded,
-                updateHeaderEncoded.length,
-              );
-              return updateBuffer;
-            },
-          ),
-          Effect.map(({ updateBuffer }) => updateBuffer),
         ),
       ),
-      Effect.map(({ boundedEventHandler }) => boundedEventHandler),
+      Effect.bind("nonce", () => Nonce.getAndIncrement(nonce)),
+      Effect.let(
+        "header",
+        ({ update, nonce }) =>
+          ({
+            protocol: "typh",
+            version: 1,
+            id: subscriptionId,
+            action: "server:update",
+            payload: {
+              success: Exit.isSuccess(update),
+              nonce,
+            },
+          }) as const,
+      ),
+      Effect.let("message", ({ update }) =>
+        pipe(
+          update,
+          Exit.match({
+            onSuccess: (value) => value,
+            onFailure: (cause) => pipe(cause, Cause.pretty),
+          }),
+        ),
+      ),
+      Effect.map(({ header, message }) => ({
+        header,
+        message,
+      })),
       Effect.withSpan("Server.runBoundedEventHandler", {
+        captureStackTrace: true,
+      }),
+    );
+  }
+
+  private static runBoundedEncodedEventHandler(
+    subscriptionId: string,
+    subscriptionHandlerContext: SubscriptionHandlerContext,
+    nonce: Nonce,
+  ) {
+    return pipe(
+      Server.runBoundedEventHandler(
+        subscriptionId,
+        subscriptionHandlerContext,
+        nonce,
+      ),
+      Effect.bind("updateHeader", ({ header }) =>
+        HeaderEncoderDecoder.encode(header),
+      ),
+      Effect.bind("updateHeaderEncoded", ({ updateHeader }) =>
+        MsgpackEncoderDecoder.encode(updateHeader),
+      ),
+      Effect.bind("updateMessageEncoded", ({ message }) =>
+        MsgpackEncoderDecoder.encode(message),
+      ),
+      Effect.let(
+        "updateBuffer",
+        ({ updateHeaderEncoded, updateMessageEncoded }) => {
+          const updateBuffer = new Uint8Array(
+            updateHeaderEncoded.length + updateMessageEncoded.length,
+          );
+          updateBuffer.set(updateHeaderEncoded, 0);
+          updateBuffer.set(updateMessageEncoded, updateHeaderEncoded.length);
+          return updateBuffer;
+        },
+      ),
+      Effect.map(({ updateBuffer }) => updateBuffer),
+      Effect.withSpan("Server.runBoundedEncodedEventHandler", {
         captureStackTrace: true,
       }),
     );
@@ -466,7 +486,7 @@ export class Server<
                   ({ event, handlerContext, nonce }) =>
                     effect(
                       pipe(
-                        Server.runBoundedEventHandler(
+                        Server.runBoundedEncodedEventHandler(
                           header.id,
                           handlerContext,
                           nonce,
@@ -496,6 +516,32 @@ export class Server<
       )(server);
   }
 
+  static handleUnsubscribe(peer: Peer, header: Header<"client:unsubscribe">) {
+    return Server.updatePeerSubscriptionState(
+      peer,
+      header.id,
+      (subscriptionState) =>
+        pipe(
+          Effect.succeed(subscriptionState),
+          Effect.flatMap((subscriptionState) =>
+            pipe(
+              subscriptionState,
+              Option.match({
+                onSome: ({ event, effectCleanup }) =>
+                  pipe(
+                    effectCleanup,
+                    Effect.andThen(Event.close()),
+                    Effect.provideService(Event, event),
+                    Effect.as(Option.none()),
+                  ),
+                onNone: () => Effect.succeed(Option.none()),
+              }),
+            ),
+          ),
+        ),
+    );
+  }
+
   static handleOnce<A, E = never>(
     pullDecodedStream: Effect.Effect<
       Chunk.Chunk<unknown>,
@@ -522,7 +568,11 @@ export class Server<
         Effect.bind("observer", ({ event, handlerContext, nonce }) =>
           observeOnce(
             pipe(
-              Server.runBoundedEventHandler(header.id, handlerContext, nonce),
+              Server.runBoundedEncodedEventHandler(
+                header.id,
+                handlerContext,
+                nonce,
+              ),
               Effect.flatMap((returnBuffer) => callback(returnBuffer)),
               Effect.tap(() => Event.close()),
               Effect.provideService(Event, event),
@@ -594,50 +644,30 @@ export class Server<
           pipe(
             pullDecodedStream,
             Effect.flatMap(Chunk.get(0)),
-            Effect.flatMap(validate(type([["number", "unknown"], "[]"]))),
+            Effect.flatMap(
+              validate(v.array(v.tuple([v.number(), v.unknown()]))),
+            ),
             Effect.flatMap(HeaderEncoderDecoder.decode),
           ),
         ),
         Effect.flatMap(({ pullDecodedStream, header, scope }) =>
-          match
-            .in<Header>()
-            .case({ action: "'client:subscribe'" }, () =>
+          pipe(
+            Match.value(header),
+            Match.when({ action: "client:subscribe" }, (header) =>
               Server.handleSubscribe(
                 peer,
                 pullDecodedStream,
-                header as Header<"client:subscribe">,
+                header,
                 scope,
               )(server),
-            )
-            .case({ action: "'client:unsubscribe'" }, () =>
-              Server.updatePeerSubscriptionState(
-                peer,
-                header.id,
-                (subscriptionState) =>
-                  pipe(
-                    Effect.succeed(subscriptionState),
-                    Effect.flatMap((subscriptionState) =>
-                      pipe(
-                        subscriptionState,
-                        Option.match({
-                          onSome: ({ event, effectCleanup }) =>
-                            pipe(
-                              effectCleanup,
-                              Effect.andThen(Event.close()),
-                              Effect.provideService(Event, event),
-                              Effect.as(Option.none()),
-                            ),
-                          onNone: () => Effect.succeed(Option.none()),
-                        }),
-                      ),
-                    ),
-                  ),
-              )(server),
-            )
-            .case({ action: "'client:once'" }, () =>
+            ),
+            Match.when({ action: "client:unsubscribe" }, (header) =>
+              Server.handleUnsubscribe(peer, header)(server),
+            ),
+            Match.when({ action: "client:once" }, (header) =>
               Server.handleOnce(
                 pullDecodedStream,
-                header as Header<"client:once">,
+                header,
                 (buffer) =>
                   Effect.sync(() => {
                     peer.send(buffer, {
@@ -646,16 +676,17 @@ export class Server<
                   }),
                 scope,
               )(server),
-            )
-            .case({ action: "'client:mutate'" }, () =>
+            ),
+            Match.when({ action: "client:mutate" }, (header) =>
               Server.handleMutate(
                 pullDecodedStream,
-                header as Header<"client:mutate">,
+                header,
                 Effect.void,
                 scope,
               )(server),
-            )
-            .default(() => Effect.void)(header),
+            ),
+            Match.orElse(() => Effect.void),
+          ),
         ),
         Effect.withSpan("Server.handleWebSocketMessage", {
           captureStackTrace: true,
@@ -679,16 +710,19 @@ export class Server<
           pipe(
             pullDecodedStream,
             Effect.flatMap(Chunk.get(0)),
-            Effect.flatMap(validate(type([["number", "unknown"], "[]"]))),
+            Effect.flatMap(
+              validate(v.array(v.tuple([v.number(), v.unknown()]))),
+            ),
             Effect.flatMap(HeaderEncoderDecoder.decode),
           ),
         ),
         Effect.flatMap(({ pullDecodedStream, header, scope }) =>
-          match({})
-            .case({ action: "'client:once'" }, () =>
+          pipe(
+            Match.value(header),
+            Match.when({ action: "client:once" }, (header) =>
               Server.handleOnce(
                 pullDecodedStream,
-                header as Header<"client:once">,
+                header,
                 (buffer) =>
                   Effect.sync(
                     () =>
@@ -701,18 +735,19 @@ export class Server<
                   ),
                 scope,
               )(server),
-            )
-            .case({ action: "'client:mutate'" }, () =>
+            ),
+            Match.when({ action: "client:mutate" }, (header) =>
               Server.handleMutate(
                 pullDecodedStream,
-                header as Header<"client:mutate">,
+                header,
                 Effect.sync(() => new Response("", { status: 200 })),
                 scope,
               )(server),
-            )
-            .default(() =>
+            ),
+            Match.orElse(() =>
               Effect.sync(() => new Response("", { status: 404 })),
-            )(header),
+            ),
+          ),
         ),
         Effect.withSpan("Server.handleWebRequest", {
           captureStackTrace: true,
