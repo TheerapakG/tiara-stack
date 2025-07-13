@@ -6,9 +6,12 @@ import { commands } from "./commands";
 import { Config } from "./config";
 import { DB } from "./db";
 import { GoogleLive } from "./google";
-import { ChannelConfigService } from "./services/channelConfigService";
-import { GuildConfigService } from "./services/guildConfigService";
-import { ScheduleService } from "./services/scheduleService";
+import {
+  ChannelConfigService,
+  GuildConfigService,
+  ScheduleService,
+  SheetConfigService,
+} from "./services";
 
 const layer = pipe(
   ScheduleService.DefaultWithoutDependencies,
@@ -16,6 +19,7 @@ const layer = pipe(
     Layer.mergeAll(
       GuildConfigService.DefaultWithoutDependencies,
       ChannelConfigService.DefaultWithoutDependencies,
+      SheetConfigService.DefaultWithoutDependencies,
     ),
   ),
   Layer.provideMerge(DBSubscriptionContext.Default),

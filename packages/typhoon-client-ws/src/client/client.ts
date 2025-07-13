@@ -1,10 +1,10 @@
 import { StandardSchemaV1 } from "@standard-schema/spec";
-import { match, type } from "arktype";
 import {
   Chunk,
   Deferred,
   Effect,
   HashMap,
+  Match,
   Option,
   pipe,
   SynchronizedRef,
@@ -23,6 +23,7 @@ import {
   SubscriptionHandlerContext,
 } from "typhoon-core/server";
 import { signal, SignalContext } from "typhoon-core/signal";
+import * as v from "valibot";
 
 const WebSocketCtor = globalThis.WebSocket;
 
@@ -152,7 +153,7 @@ export class WebSocketClient<
                       pullDecodedStream,
                       Effect.flatMap(Chunk.get(0)),
                       Effect.flatMap(
-                        validate(type([["number", "unknown"], "[]"])),
+                        validate(v.array(v.tuple([v.number(), v.unknown()]))),
                       ),
                       Effect.flatMap(HeaderEncoderDecoder.decode),
                     ),
@@ -161,15 +162,13 @@ export class WebSocketClient<
                     pipe(pullDecodedStream, Effect.flatMap(Chunk.get(0))),
                   ),
                   Effect.tap(({ header, message }) =>
-                    match
-                      .in<Header>()
-                      .case({ action: "'server:update'" }, () =>
-                        WebSocketClient.handleUpdate(
-                          header as Header<"server:update">,
-                          message,
-                        )(client),
-                      )
-                      .default(() => Effect.void)(header),
+                    pipe(
+                      Match.value(header),
+                      Match.when({ action: "server:update" }, (header) =>
+                        WebSocketClient.handleUpdate(header, message)(client),
+                      ),
+                      Match.orElse(() => Effect.void),
+                    ),
                   ),
                   Effect.asVoid,
                   Effect.scoped,

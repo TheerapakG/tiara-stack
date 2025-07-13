@@ -25,7 +25,7 @@
   },
   "peerDependencies": {
     "effect": "^3.16.8",
-    "arktype": "^2.1.20"
+    "valibot": "^1.1.0"
   },
   "devDependencies": {
     "@standard-schema/spec": "^1.0.0",

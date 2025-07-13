@@ -31,7 +31,7 @@ export default defineConfig({
         ...builtinModules,
         /^node:/,
         "effect",
-        "arktype",
+        "valibot",
         "typhoon-core",
       ],
     },

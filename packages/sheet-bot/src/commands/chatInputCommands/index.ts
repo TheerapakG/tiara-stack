@@ -1,5 +1,5 @@
 import { pipe } from "effect";
-import { ChatInputCommandHandlerMap } from "../../types/handler";
+import { ChatInputCommandHandlerMap } from "../../types";
 import { command as server } from "./server";
 import { command as slot } from "./slot";
 import { command as team } from "./team";

@@ -1,5 +1,4 @@
 import { StandardSchemaV1 } from "@standard-schema/spec";
-import { type } from "arktype";
 import { Chunk, Data, Effect, pipe } from "effect";
 import { RequestParamsConfig } from "typhoon-core/config";
 import {
@@ -14,6 +13,7 @@ import {
   ServerSubscriptionHandlers,
   SubscriptionHandlerContext,
 } from "typhoon-core/server";
+import * as v from "valibot";
 
 export class HandlerError extends Data.TaggedError("HandlerError")<{
   error: unknown;
@@ -121,7 +121,7 @@ export class AppsScriptClient<
         pipe(
           pullDecodedStream,
           Effect.flatMap(Chunk.get(0)),
-          Effect.flatMap(validate(type([["number", "unknown"], "[]"]))),
+          Effect.flatMap(validate(v.array(v.tuple([v.number(), v.unknown()])))),
           Effect.flatMap(HeaderEncoderDecoder.decode),
         ),
       ),

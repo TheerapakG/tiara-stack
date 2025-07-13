@@ -26,5 +26,5 @@ export default defineConfig({
     },
   ],
   plugins: [dts()],
-  external: [...builtinModules, /^node:/, "effect", "arktype", "typhoon-core"],
+  external: [...builtinModules, /^node:/, "effect", "valibot", "typhoon-core"],
 });
