@@ -104,8 +104,7 @@ function syncColors() {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit) {
+export function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit) {
   const sheet = e.range.getSheet();
   const cell = e.range.getA1Notation();
   const watchedCells = [

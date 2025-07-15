@@ -1,5 +1,3 @@
-import "../polyfill/classPolyfill";
-
 import { Effect, pipe } from "effect";
 import type { Server } from "sheet-apis";
 import { AppsScriptClient } from "typhoon-client-apps-script/client";
@@ -27,14 +25,7 @@ function parsePlayer(
   );
 }
 
-/**
- * @preserve
- * Calculate Some Top Teams
- *
- * @customfunction
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function THEECALC(
+export function THEECALC(
   url: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   config: Array<[string, any]>,

@@ -1,12 +1,12 @@
 import {
   ApplicationIntegrationType,
   EmbedBuilder,
+  escapeMarkdown,
   InteractionContextType,
   PermissionFlagsBits,
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
   SlashCommandSubcommandGroupBuilder,
-  escapeMarkdown,
 } from "discord.js";
 import { Effect, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-core/signal";

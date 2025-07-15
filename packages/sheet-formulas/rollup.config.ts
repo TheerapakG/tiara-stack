@@ -1,29 +1,20 @@
 import { getBabelOutputPlugin } from "@rollup/plugin-babel";
+import commonjs from "@rollup/plugin-commonjs";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
 import terser from "@rollup/plugin-terser";
 import typescript from "@rollup/plugin-typescript";
-import { globSync } from "glob";
 import { builtinModules } from "module";
-import path from "pathe";
 import { defineConfig } from "rollup";
 // @ts-expect-error wrong typing
 import dts from "unplugin-dts/rollup";
 import { fileURLToPath } from "url";
 
-const filePaths = globSync("./src/**/*.ts", { nodir: true }).map((file) =>
-  fileURLToPath(new URL(file, import.meta.url)),
-);
+const indexPath = fileURLToPath(new URL("src/index.ts", import.meta.url));
 
 export default defineConfig({
-  input: Object.fromEntries(
-    filePaths.map((filePath) => {
-      const relativePath = path.relative("./src", filePath);
-      const parsed = path.parse(relativePath);
-      const module = path.join(parsed.dir.replace(/\.+\//g, ""), parsed.name);
-
-      return [module, filePath];
-    }),
-  ),
+  input: {
+    index: indexPath,
+  },
   output: [
     {
       dir: "dist",
@@ -36,11 +27,12 @@ export default defineConfig({
   external: [...builtinModules, /^node:/],
   plugins: [
     nodeResolve(),
+    commonjs(),
     typescript(),
     {
       name: "disable-treeshake",
       transform(code, id) {
-        if (filePaths.includes(id)) {
+        if (id === indexPath) {
           return {
             code,
             moduleSideEffects: "no-treeshake",
@@ -57,9 +49,23 @@ export default defineConfig({
       },
     }),
     getBabelOutputPlugin({
-      configFile: fileURLToPath(
-        new URL("./babel.config.json", import.meta.url),
-      ),
+      presets: [["@babel/preset-env"]],
+      plugins: [
+        ["@babel/plugin-transform-class-properties"],
+        ["@babel/plugin-transform-logical-assignment-operators"],
+        ["@babel/plugin-transform-numeric-separator"],
+        ["@babel/plugin-transform-destructuring"],
+        ["@babel/plugin-transform-for-of"],
+        [
+          "@babel/plugin-transform-regenerator",
+          {
+            asyncGenerators: true,
+            generators: true,
+            async: false,
+          },
+        ],
+      ],
+      targets: "node 22",
     }),
     dts({
       include: ["./src/**/*.ts"],
