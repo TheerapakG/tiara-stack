@@ -1,17 +1,14 @@
+import "core-js/modules/web.immediate";
+import "core-js/modules/web.timers";
+import "core-js/modules/web.url";
+import "core-js/modules/web.url-search-params";
+
 class GASPolyfillError extends Error {
   constructor(feature: string) {
     super(`${feature} is not supported in Google Apps Script`);
     this.name = "GASPolyfillError";
   }
 }
-
-const setTimeout = () => {
-  throw new GASPolyfillError("setTimeout");
-};
-
-const clearTimeout = () => {
-  throw new GASPolyfillError("clearTimeout");
-};
 
 class TextEncoder {
   readonly encoding = "utf-8";
@@ -28,18 +25,6 @@ class TextEncoder {
 class TextDecoder {
   decode(buffer: Uint8Array) {
     return Utilities.newBlob(Array.from(buffer)).getDataAsString();
-  }
-}
-
-class URL {
-  constructor() {
-    throw new GASPolyfillError("URL");
-  }
-}
-
-class URLSearchParams {
-  constructor() {
-    throw new GASPolyfillError("URLSearchParams");
   }
 }
 
@@ -72,12 +57,6 @@ class Response {
     throw new GASPolyfillError("Response");
   }
 }
-
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-globalThis.setTimeout = setTimeout;
-
-globalThis.clearTimeout = clearTimeout;
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore

@@ -25,9 +25,9 @@ import {
 } from "effect";
 import { Config } from "../config";
 import {
-  ButtonInteractionHandlerContext,
+  AnyButtonInteractionHandlerContext,
+  AnyChatInputCommandHandlerContext,
   ButtonInteractionHandlerMap,
-  ChatInputCommandHandlerContext,
   ChatInputCommandHandlerMap,
 } from "../types";
 
@@ -256,7 +256,7 @@ export class Bot<E = never, R = never> {
           buttonsMap,
           scopeLayer,
         }) =>
-          new Bot(
+          new Bot<E, R>(
             client,
             loginLatch,
             loginSemaphore,
@@ -324,7 +324,7 @@ export class Bot<E = never, R = never> {
   }
 
   static addChatInputCommand<E = never, R = never>(
-    command: ChatInputCommandHandlerContext<E, R>,
+    command: AnyChatInputCommandHandlerContext<E, R>,
   ) {
     return <BE = never, BR = never>(bot: Bot<BE, BR>) =>
       pipe(
@@ -347,9 +347,8 @@ export class Bot<E = never, R = never> {
         Effect.Do,
         Effect.let("bot", () => bot as Bot<E | BE, R | BR>),
         Effect.tap(({ bot }) =>
-          SynchronizedRef.update(
-            bot.chatInputCommandsMap,
-            ChatInputCommandHandlerMap.union(commands),
+          SynchronizedRef.update(bot.chatInputCommandsMap, (commandsMap) =>
+            ChatInputCommandHandlerMap.union(commands)(commandsMap),
           ),
         ),
         Effect.map(({ bot }) => bot),
@@ -357,7 +356,7 @@ export class Bot<E = never, R = never> {
   }
 
   static addButton<E = never, R = never>(
-    button: ButtonInteractionHandlerContext<E, R>,
+    button: AnyButtonInteractionHandlerContext<E, R>,
   ) {
     return <BE = never, BR = never>(bot: Bot<BE, BR>) =>
       pipe(

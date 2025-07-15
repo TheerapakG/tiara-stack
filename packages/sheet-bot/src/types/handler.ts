@@ -11,11 +11,12 @@ import {
   SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 import { Data, Effect, HashMap, Option, pipe } from "effect";
+type Constrain<T, C> = T extends infer U extends C ? U : never;
 
 export type InteractionHandler<
-  in I extends Interaction = Interaction,
-  out E = never,
-  out R = never,
+  I extends Interaction = Interaction,
+  E = never,
+  R = never,
 > = (interaction: I) => Effect.Effect<unknown, E, R>;
 
 export type AnyInteractionHandler<
@@ -27,7 +28,28 @@ export type AnyInteractionHandler<
   R = any,
 > = InteractionHandler<I, E, R>;
 
-export type InteractionHandlerContextData<
+type InteractionHandlerInteraction<H extends AnyInteractionHandler> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  H extends InteractionHandler<infer I extends Interaction, any, any>
+    ? I
+    : never;
+
+type InteractionHandlerError<H extends AnyInteractionHandler> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  H extends InteractionHandler<any, infer E, any> ? E : never;
+
+type InteractionHandlerRequirement<H extends AnyInteractionHandler> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  H extends InteractionHandler<any, any, infer R> ? R : never;
+
+type InferInteractionHandler<Handler extends AnyInteractionHandler> =
+  InteractionHandler<
+    InteractionHandlerInteraction<Handler>,
+    InteractionHandlerError<Handler>,
+    InteractionHandlerRequirement<Handler>
+  >;
+
+export type InteractionHandlerContextObject<
   Data = unknown,
   Handler extends AnyInteractionHandler = AnyInteractionHandler,
 > = {
@@ -35,38 +57,73 @@ export type InteractionHandlerContextData<
   handler: Handler;
 };
 
+export type AnyInteractionHandlerContextObject<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Data = any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Handler extends AnyInteractionHandler = any,
+> = InteractionHandlerContextObject<Data, Handler>;
+
 export class InteractionHandlerContext<
   Data = unknown,
   Handler extends AnyInteractionHandler = AnyInteractionHandler,
 > extends Data.TaggedClass("InteractionHandlerContext")<
-  InteractionHandlerContextData<Data, Handler>
-> {
-  static fromBuilderContext<
-    Context extends InteractionHandlerContextBuilderData<
-      Option.Some<unknown>,
-      Option.Some<AnyInteractionHandler>
-    >,
-    Data extends Context extends InteractionHandlerContextBuilderData<
-      Option.Some<infer D>,
-      Option.Some<AnyInteractionHandler>
-    >
-      ? D
-      : never,
-    Handler extends Context extends InteractionHandlerContextBuilderData<
-      Option.Some<unknown>,
-      Option.Some<infer H extends AnyInteractionHandler>
-    >
-      ? H
-      : never,
-  >(context: Context) {
-    return new InteractionHandlerContext({
-      data: context._data.value as Data,
-      handler: context._handler.value as Handler,
-    });
-  }
-}
+  InteractionHandlerContextObject<Data, Handler>
+> {}
 
-type InteractionHandlerContextBuilderData<
+type AnyInteractionHandlerContext<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Data = any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Handler extends AnyInteractionHandler = any,
+> = InteractionHandlerContext<Data, Handler>;
+
+type InteractionHandlerContextData<
+  Context extends AnyInteractionHandlerContext,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+> = Context extends AnyInteractionHandlerContext<infer D, any> ? D : never;
+
+export type AnyButtonInteractionHandlerContext<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  E = any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  R = any,
+> = InteractionHandlerContext<
+  InteractionButtonComponentData,
+  AnyInteractionHandler<ButtonInteraction, E, R>
+>;
+
+export type AnyChatInputCommandHandlerContext<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  E = any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  R = any,
+> = InteractionHandlerContext<
+  SharedSlashCommand,
+  AnyInteractionHandler<ChatInputCommandInteraction, E, R>
+>;
+
+export type AnyChatInputSubcommandGroupHandlerContext<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  E = any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  R = any,
+> = InteractionHandlerContext<
+  SlashCommandSubcommandGroupBuilder,
+  AnyInteractionHandler<ChatInputCommandInteraction, E, R>
+>;
+
+export type AnyChatInputSubcommandHandlerContext<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  E = any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  R = any,
+> = InteractionHandlerContext<
+  SlashCommandSubcommandBuilder,
+  AnyInteractionHandler<ChatInputCommandInteraction, E, R>
+>;
+
+export type InteractionHandlerContextBuilderObject<
   Data extends Option.Option<unknown> = Option.None<unknown>,
   Handler extends
     Option.Option<AnyInteractionHandler> = Option.None<AnyInteractionHandler>,
@@ -80,7 +137,7 @@ export class InteractionHandlerContextBuilder<
   Handler extends
     Option.Option<AnyInteractionHandler> = Option.None<AnyInteractionHandler>,
 > extends Data.TaggedClass("InteractionHandlerContextBuilder")<
-  InteractionHandlerContextBuilderData<Data, Handler>
+  InteractionHandlerContextBuilderObject<Data, Handler>
 > {
   static empty<
     Data = unknown,
@@ -92,8 +149,11 @@ export class InteractionHandlerContextBuilder<
     });
   }
 
-  data<BuilderData>(
-    this: InteractionHandlerContextBuilder<Option.None<unknown>, Handler>,
+  data<BuilderData extends Option.Option.Value<Data>>(
+    this: InteractionHandlerContextBuilder<
+      Option.None<Option.Option.Value<Data>>,
+      Handler
+    >,
     data: BuilderData,
   ) {
     return new InteractionHandlerContextBuilder({
@@ -102,467 +162,89 @@ export class InteractionHandlerContextBuilder<
     });
   }
 
-  handler<BuilderHandler extends AnyInteractionHandler>(
+  handler<
+    BuilderHandler extends Constrain<
+      Option.Option.Value<Handler>,
+      AnyInteractionHandler
+    >,
+  >(
     this: InteractionHandlerContextBuilder<
       Data,
-      Option.None<AnyInteractionHandler>
+      Option.None<
+        Constrain<Option.Option.Value<Handler>, AnyInteractionHandler>
+      >
     >,
     handler: BuilderHandler,
   ) {
     return new InteractionHandlerContextBuilder({
       _data: this._data,
-      _handler: Option.some(
-        handler as unknown as BuilderHandler,
-      ) as Option.Some<BuilderHandler>,
-    });
-  }
-}
-
-export class ButtonInteractionHandlerContext<
-  E = unknown,
-  R = unknown,
-> extends Data.TaggedClass("ButtonInteractionHandlerContext")<
-  InteractionHandlerContextData<
-    InteractionButtonComponentData,
-    AnyInteractionHandler<ButtonInteraction, E, R>
-  >
-> {
-  static make<
-    Data extends
-      InteractionButtonComponentData = InteractionButtonComponentData,
-    Handler extends
-      AnyInteractionHandler<ButtonInteraction> = AnyInteractionHandler<ButtonInteraction>,
-    E = Effect.Effect.Error<ReturnType<Handler>>,
-    R = Effect.Effect.Context<ReturnType<Handler>>,
-  >(context: InteractionHandlerContextData<Data, Handler>) {
-    return new ButtonInteractionHandlerContext<E, R>(context);
-  }
-
-  static fromBuilderContext<
-    Context extends InteractionHandlerContextBuilderData<
-      Option.Some<InteractionButtonComponentData>,
-      Option.Some<AnyInteractionHandler<ButtonInteraction>>
-    >,
-  >(context: Context) {
-    return ButtonInteractionHandlerContext.make(
-      InteractionHandlerContext.fromBuilderContext(context),
-    );
-  }
-}
-
-export class ButtonInteractionHandlerContextBuilder<
-  Data extends
-    Option.Option<InteractionButtonComponentData> = Option.None<InteractionButtonComponentData>,
-  Handler extends Option.Option<
-    AnyInteractionHandler<ButtonInteraction>
-  > = Option.None<AnyInteractionHandler<ButtonInteraction>>,
-  InnerData extends Option.Option.Value<Data> extends infer D
-    ? D extends InteractionButtonComponentData
-      ? D
-      : never
-    : never = Option.Option.Value<Data> extends infer D
-    ? D extends InteractionButtonComponentData
-      ? D
-      : never
-    : never,
-  InnerHandler extends Option.Option.Value<Handler> extends infer H
-    ? H extends AnyInteractionHandler<ButtonInteraction>
-      ? H
-      : never
-    : never = Option.Option.Value<Handler> extends infer H
-    ? H extends AnyInteractionHandler<ButtonInteraction>
-      ? H
-      : never
-    : never,
-> extends Data.TaggedClass("ButtonInteractionHandlerContextBuilder")<{
-  builder: InteractionHandlerContextBuilder<Data, Handler>;
-}> {
-  static empty() {
-    return new ButtonInteractionHandlerContextBuilder({
-      builder: InteractionHandlerContextBuilder.empty<
-        InteractionButtonComponentData,
-        AnyInteractionHandler<ButtonInteraction>
-      >(),
+      _handler: Option.some(handler) as Option.Some<BuilderHandler>,
     });
   }
 
-  data<BuilderData extends InteractionButtonComponentData>(
-    this: ButtonInteractionHandlerContextBuilder<
-      Option.None<InteractionButtonComponentData>,
-      Handler
-    >,
-    data: BuilderData,
-  ) {
-    return new ButtonInteractionHandlerContextBuilder({
-      builder: this.builder.data(data),
-    });
-  }
-
-  handler<BuilderHandler extends AnyInteractionHandler<ButtonInteraction>>(
-    this: ButtonInteractionHandlerContextBuilder<
-      Data,
-      Option.None<AnyInteractionHandler<ButtonInteraction>>
-    >,
-    handler: BuilderHandler,
-  ) {
-    return new ButtonInteractionHandlerContextBuilder({
-      builder: this.builder.handler(handler),
-    });
-  }
-
-  build(
-    this: ButtonInteractionHandlerContextBuilder<
-      Option.Some<InnerData>,
-      Option.Some<InnerHandler>
-    >,
-  ) {
-    return ButtonInteractionHandlerContext.fromBuilderContext(this.builder);
-  }
-}
-
-export class ChatInputCommandHandlerContext<
-  E = unknown,
-  R = unknown,
-> extends Data.TaggedClass("ChatInputCommandHandlerContext")<
-  InteractionHandlerContextData<
-    SharedSlashCommand,
-    AnyInteractionHandler<ChatInputCommandInteraction, E, R>
-  >
-> {
-  static make<
-    Data extends SharedSlashCommand,
-    Handler extends AnyInteractionHandler<ChatInputCommandInteraction>,
-    E = Effect.Effect.Error<ReturnType<Handler>>,
-    R = Effect.Effect.Context<ReturnType<Handler>>,
-  >(context: InteractionHandlerContextData<Data, Handler>) {
-    return new ChatInputCommandHandlerContext<E, R>(context);
-  }
-
-  static fromBuilderContext<
-    Context extends InteractionHandlerContextBuilderData<
-      Option.Some<SharedSlashCommand>,
-      Option.Some<AnyInteractionHandler<ChatInputCommandInteraction>>
-    >,
-  >(context: Context) {
-    return ChatInputCommandHandlerContext.make(
-      InteractionHandlerContext.fromBuilderContext(context),
-    );
-  }
-}
-
-export class ChatInputCommandHandlerContextBuilder<
-  Data extends
-    Option.Option<SharedSlashCommand> = Option.None<SharedSlashCommand>,
-  Handler extends Option.Option<
-    AnyInteractionHandler<ChatInputCommandInteraction>
-  > = Option.None<AnyInteractionHandler<ChatInputCommandInteraction>>,
-  InnerData extends Option.Option.Value<Data> extends infer D
-    ? D extends SharedSlashCommand
-      ? D
-      : never
-    : never = Option.Option.Value<Data> extends infer D
-    ? D extends SharedSlashCommand
-      ? D
-      : never
-    : never,
-  InnerHandler extends Option.Option.Value<Handler> extends infer H
-    ? H extends AnyInteractionHandler<ChatInputCommandInteraction>
-      ? H
-      : never
-    : never = Option.Option.Value<Handler> extends infer H
-    ? H extends AnyInteractionHandler<ChatInputCommandInteraction>
-      ? H
-      : never
-    : never,
-> extends Data.TaggedClass("ChatInputCommandHandlerContextBuilder")<{
-  builder: InteractionHandlerContextBuilder<Data, Handler>;
-}> {
-  static empty() {
-    return new ChatInputCommandHandlerContextBuilder({
-      builder: InteractionHandlerContextBuilder.empty<
-        SharedSlashCommand,
-        AnyInteractionHandler<ChatInputCommandInteraction>
-      >(),
-    });
-  }
-
-  data<BuilderData extends SharedSlashCommand>(
-    this: ChatInputCommandHandlerContextBuilder<
-      Option.None<SharedSlashCommand>,
-      Handler
-    >,
-    data: BuilderData,
-  ) {
-    return new ChatInputCommandHandlerContextBuilder({
-      builder: this.builder.data(data),
-    });
-  }
-
-  handler<
-    BuilderHandler extends AnyInteractionHandler<ChatInputCommandInteraction>,
+  build<
+    InnerData extends Option.Option.Value<Data> = Option.Option.Value<Data>,
+    InnerHandler extends Constrain<
+      Option.Option.Value<Handler>,
+      AnyInteractionHandler
+    > = Constrain<Option.Option.Value<Handler>, AnyInteractionHandler>,
   >(
-    this: ChatInputCommandHandlerContextBuilder<Data>,
-    handler: BuilderHandler,
-  ) {
-    return new ChatInputCommandHandlerContextBuilder({
-      builder: this.builder.handler(handler),
-    });
-  }
-
-  build(
-    this: ChatInputCommandHandlerContextBuilder<
+    this: InteractionHandlerContextBuilder<
       Option.Some<InnerData>,
       Option.Some<InnerHandler>
     >,
   ) {
-    return ChatInputCommandHandlerContext.fromBuilderContext(this.builder);
-  }
-}
-
-export class ChatInputSubcommandGroupHandlerContext<
-  E = unknown,
-  R = unknown,
-> extends Data.TaggedClass("ChatInputSubcommandGroupHandlerContext")<
-  InteractionHandlerContextData<
-    SlashCommandSubcommandGroupBuilder,
-    AnyInteractionHandler<ChatInputCommandInteraction, E, R>
-  >
-> {
-  static make<
-    Data extends SlashCommandSubcommandGroupBuilder,
-    Handler extends AnyInteractionHandler<ChatInputCommandInteraction>,
-    E = Effect.Effect.Error<ReturnType<Handler>>,
-    R = Effect.Effect.Context<ReturnType<Handler>>,
-  >(context: InteractionHandlerContextData<Data, Handler>) {
-    return new ChatInputSubcommandGroupHandlerContext<E, R>(context);
-  }
-
-  static fromBuilderContext<
-    Context extends InteractionHandlerContextBuilderData<
-      Option.Some<SlashCommandSubcommandGroupBuilder>,
-      Option.Some<AnyInteractionHandler<ChatInputCommandInteraction>>
-    >,
-  >(context: Context) {
-    return ChatInputSubcommandGroupHandlerContext.make(
-      InteractionHandlerContext.fromBuilderContext(context),
-    );
-  }
-}
-
-export type AnyChatInputSubcommandGroupHandlerContext<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  E = any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  R = any,
-> = ChatInputSubcommandGroupHandlerContext<E, R>;
-
-export class ChatInputSubcommandGroupHandlerContextBuilder<
-  Data extends
-    Option.Option<SlashCommandSubcommandGroupBuilder> = Option.None<SlashCommandSubcommandGroupBuilder>,
-  Handler extends Option.Option<
-    AnyInteractionHandler<ChatInputCommandInteraction>
-  > = Option.None<AnyInteractionHandler<ChatInputCommandInteraction>>,
-  InnerData extends Option.Option.Value<Data> extends infer D
-    ? D extends SlashCommandSubcommandGroupBuilder
-      ? D
-      : never
-    : never = Option.Option.Value<Data> extends infer D
-    ? D extends SlashCommandSubcommandGroupBuilder
-      ? D
-      : never
-    : never,
-  InnerHandler extends Option.Option.Value<Handler> extends infer H
-    ? H extends AnyInteractionHandler<ChatInputCommandInteraction>
-      ? H
-      : never
-    : never = Option.Option.Value<Handler> extends infer H
-    ? H extends AnyInteractionHandler<ChatInputCommandInteraction>
-      ? H
-      : never
-    : never,
-> extends Data.TaggedClass("ChatInputSubcommandGroupHandlerContextBuilder")<{
-  builder: InteractionHandlerContextBuilder<Data, Handler>;
-}> {
-  static empty() {
-    return new ChatInputSubcommandGroupHandlerContextBuilder({
-      builder: InteractionHandlerContextBuilder.empty<
-        SlashCommandSubcommandGroupBuilder,
-        AnyInteractionHandler<ChatInputCommandInteraction>
-      >(),
+    return new InteractionHandlerContext({
+      data: this._data.value,
+      handler: this._handler.value as InferInteractionHandler<InnerHandler>,
     });
-  }
-
-  data<BuilderData extends SlashCommandSubcommandGroupBuilder>(
-    this: ChatInputSubcommandGroupHandlerContextBuilder<
-      Option.None<SlashCommandSubcommandGroupBuilder>,
-      Handler
-    >,
-    data: BuilderData,
-  ) {
-    return new ChatInputSubcommandGroupHandlerContextBuilder({
-      builder: this.builder.data(data),
-    });
-  }
-
-  handler<
-    BuilderHandler extends AnyInteractionHandler<ChatInputCommandInteraction>,
-  >(
-    this: ChatInputSubcommandGroupHandlerContextBuilder<Data>,
-    handler: BuilderHandler,
-  ) {
-    return new ChatInputSubcommandGroupHandlerContextBuilder({
-      builder: this.builder.handler(handler),
-    });
-  }
-
-  build(
-    this: ChatInputSubcommandGroupHandlerContextBuilder<
-      Option.Some<InnerData>,
-      Option.Some<InnerHandler>
-    >,
-  ) {
-    return ChatInputSubcommandGroupHandlerContext.fromBuilderContext(
-      this.builder,
-    );
-  }
-}
-
-export class ChatInputSubcommandHandlerContext<
-  E = unknown,
-  R = unknown,
-> extends Data.TaggedClass("ChatInputSubcommandHandlerContext")<
-  InteractionHandlerContextData<
-    SlashCommandSubcommandBuilder,
-    AnyInteractionHandler<ChatInputCommandInteraction, E, R>
-  >
-> {
-  static make<
-    Data extends SlashCommandSubcommandBuilder,
-    Handler extends AnyInteractionHandler<ChatInputCommandInteraction>,
-    E = Effect.Effect.Error<ReturnType<Handler>>,
-    R = Effect.Effect.Context<ReturnType<Handler>>,
-  >(context: InteractionHandlerContextData<Data, Handler>) {
-    return new ChatInputSubcommandHandlerContext<E, R>(context);
-  }
-
-  static fromBuilderContext<
-    Context extends InteractionHandlerContextBuilderData<
-      Option.Some<SlashCommandSubcommandBuilder>,
-      Option.Some<AnyInteractionHandler<ChatInputCommandInteraction>>
-    >,
-  >(context: Context) {
-    return ChatInputSubcommandHandlerContext.make(
-      InteractionHandlerContext.fromBuilderContext(context),
-    );
-  }
-}
-
-export type AnyChatInputSubcommandHandlerContext<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  E = any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  R = any,
-> = ChatInputSubcommandHandlerContext<E, R>;
-
-export class ChatInputSubcommandHandlerContextBuilder<
-  Data extends
-    Option.Option<SlashCommandSubcommandBuilder> = Option.None<SlashCommandSubcommandBuilder>,
-  Handler extends Option.Option<
-    AnyInteractionHandler<ChatInputCommandInteraction>
-  > = Option.None<AnyInteractionHandler<ChatInputCommandInteraction>>,
-  InnerData extends Option.Option.Value<Data> extends infer D
-    ? D extends SlashCommandSubcommandBuilder
-      ? D
-      : never
-    : never = Option.Option.Value<Data> extends infer D
-    ? D extends SlashCommandSubcommandBuilder
-      ? D
-      : never
-    : never,
-  InnerHandler extends Option.Option.Value<Handler> extends infer H
-    ? H extends AnyInteractionHandler<ChatInputCommandInteraction>
-      ? H
-      : never
-    : never = Option.Option.Value<Handler> extends infer H
-    ? H extends AnyInteractionHandler<ChatInputCommandInteraction>
-      ? H
-      : never
-    : never,
-> extends Data.TaggedClass("ChatInputSubcommandHandlerContextBuilder")<{
-  builder: InteractionHandlerContextBuilder<Data, Handler>;
-}> {
-  static empty() {
-    return new ChatInputSubcommandHandlerContextBuilder({
-      builder: InteractionHandlerContextBuilder.empty<
-        SlashCommandSubcommandBuilder,
-        AnyInteractionHandler<ChatInputCommandInteraction>
-      >(),
-    });
-  }
-
-  data<BuilderData extends SlashCommandSubcommandBuilder>(
-    this: ChatInputSubcommandHandlerContextBuilder<
-      Option.None<SlashCommandSubcommandBuilder>,
-      Handler
-    >,
-    data: BuilderData,
-  ) {
-    return new ChatInputSubcommandHandlerContextBuilder({
-      builder: this.builder.data(data),
-    });
-  }
-
-  handler<
-    BuilderHandler extends AnyInteractionHandler<ChatInputCommandInteraction>,
-  >(
-    this: ChatInputSubcommandHandlerContextBuilder<Data>,
-    handler: BuilderHandler,
-  ) {
-    return new ChatInputSubcommandHandlerContextBuilder({
-      builder: this.builder.handler(handler),
-    });
-  }
-
-  build(
-    this: ChatInputSubcommandHandlerContextBuilder<
-      Option.Some<InnerData>,
-      Option.Some<InnerHandler>
-    >,
-  ) {
-    return ChatInputSubcommandHandlerContext.fromBuilderContext(this.builder);
   }
 }
 
 export const buttonInteractionHandlerContextBuilder = () =>
-  ButtonInteractionHandlerContextBuilder.empty();
+  InteractionHandlerContextBuilder.empty<
+    InteractionButtonComponentData,
+    AnyInteractionHandler<ButtonInteraction>
+  >();
 
 export const chatInputCommandHandlerContextBuilder = () =>
-  ChatInputCommandHandlerContextBuilder.empty();
+  InteractionHandlerContextBuilder.empty<
+    SharedSlashCommand,
+    AnyInteractionHandler<ChatInputCommandInteraction>
+  >();
 
 export const chatInputSubcommandGroupHandlerContextBuilder = () =>
-  ChatInputSubcommandGroupHandlerContextBuilder.empty();
+  InteractionHandlerContextBuilder.empty<
+    SlashCommandSubcommandGroupBuilder,
+    AnyInteractionHandler<ChatInputCommandInteraction>
+  >();
 
 export const chatInputSubcommandHandlerContextBuilder = () =>
-  ChatInputSubcommandHandlerContextBuilder.empty();
+  InteractionHandlerContextBuilder.empty<
+    SlashCommandSubcommandBuilder,
+    AnyInteractionHandler<ChatInputCommandInteraction>
+  >();
 
-export class InteractionHandlerMap<
-  Context extends InteractionHandlerContextData,
-  Data extends Context extends InteractionHandlerContextData<infer D>
-    ? D
-    : never = Context extends InteractionHandlerContextData<infer D>
-    ? D
-    : never,
-> extends Data.TaggedClass("InteractionHandlerMap")<{
+export type InteractionHandlerMapObject<
+  Context extends AnyInteractionHandlerContext,
+  Data extends
+    InteractionHandlerContextData<Context> = InteractionHandlerContextData<Context>,
+> = {
   map: HashMap.HashMap<string, Context>;
   keyGetter: (data: Data) => string;
-}> {
+};
+
+export class InteractionHandlerMap<
+  Context extends AnyInteractionHandlerContext,
+  Data extends
+    InteractionHandlerContextData<Context> = InteractionHandlerContextData<Context>,
+> extends Data.TaggedClass("InteractionHandlerMap")<
+  InteractionHandlerMapObject<Context, Data>
+> {
   static empty<
-    Context extends InteractionHandlerContextData,
-    Data extends Context extends InteractionHandlerContextData<infer D>
-      ? D
-      : never = Context extends InteractionHandlerContextData<infer D>
-      ? D
-      : never,
+    Context extends AnyInteractionHandlerContext,
+    Data extends
+      InteractionHandlerContextData<Context> = InteractionHandlerContextData<Context>,
   >(keyGetter: (data: Data) => string) {
     return new InteractionHandlerMap<Context, Data>({
       map: HashMap.empty(),
@@ -570,12 +252,11 @@ export class InteractionHandlerMap<
     });
   }
 
-  static add<Context extends InteractionHandlerContextData>(context: Context) {
+  static add<Context extends AnyInteractionHandlerContext>(context: Context) {
     return <
       Map extends AnyInteractionHandlerMap,
-      MapContext extends Map extends InteractionHandlerMap<infer C>
-        ? C
-        : never = Map extends InteractionHandlerMap<infer C> ? C : never,
+      MapContext extends
+        InteractionHandlerMapContext<Map> = InteractionHandlerMapContext<Map>,
     >(
       map: Map,
     ) =>
@@ -590,22 +271,20 @@ export class InteractionHandlerMap<
   }
 
   static get(key: string) {
-    return <Context extends InteractionHandlerContextData>(
+    return <Context extends AnyInteractionHandlerContext>(
       map: InteractionHandlerMap<Context>,
     ) => HashMap.get(map.map, key);
   }
 
   static union<
     Map extends AnyInteractionHandlerMap,
-    MapContext extends Map extends InteractionHandlerMap<infer C>
-      ? C
-      : never = Map extends InteractionHandlerMap<infer C> ? C : never,
+    MapContext extends
+      InteractionHandlerMapContext<Map> = InteractionHandlerMapContext<Map>,
   >(map: Map) {
     return <
       OtherMap extends AnyInteractionHandlerMap,
-      OtherMapContext extends OtherMap extends InteractionHandlerMap<infer C>
-        ? C
-        : never = OtherMap extends InteractionHandlerMap<infer C> ? C : never,
+      OtherMapContext extends
+        InteractionHandlerMapContext<OtherMap> = InteractionHandlerMapContext<OtherMap>,
     >(
       other: OtherMap,
     ) =>
@@ -624,21 +303,21 @@ export class InteractionHandlerMap<
 }
 
 type AnyInteractionHandlerMap<
-  Context extends InteractionHandlerContextData = InteractionHandlerContextData,
-  Data extends Context extends InteractionHandlerContextData<infer D>
-    ? D
-    : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      never = any,
-> = InteractionHandlerMap<Context, Data>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Context extends AnyInteractionHandlerContext = any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+> = InteractionHandlerMap<Context, any>;
+
+type InteractionHandlerMapContext<
+  Map extends AnyInteractionHandlerMap,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+> = Map extends InteractionHandlerMap<infer C, any> ? C : never;
 
 export class ButtonInteractionHandlerMap<
   out E = never,
   out R = never,
 > extends Data.TaggedClass("ButtonInteractionHandlerMap")<{
-  map: InteractionHandlerMap<
-    ButtonInteractionHandlerContext<E, R>,
-    InteractionButtonComponentData
-  >;
+  map: InteractionHandlerMap<AnyButtonInteractionHandlerContext<E, R>>;
 }> {
   static empty<E = never, R = never>() {
     return new ButtonInteractionHandlerMap<E, R>({
@@ -647,15 +326,14 @@ export class ButtonInteractionHandlerMap<
   }
 
   static add<E = never, R = never>(
-    handler: ButtonInteractionHandlerContext<E, R>,
+    handler: AnyButtonInteractionHandlerContext<E, R>,
   ) {
     return <ME = never, MR = never>(map: ButtonInteractionHandlerMap<ME, MR>) =>
       new ButtonInteractionHandlerMap({
         map: InteractionHandlerMap.add(handler)(
           map.map,
         ) as InteractionHandlerMap<
-          ButtonInteractionHandlerContext<ME | E, MR | R>,
-          InteractionButtonComponentData
+          AnyButtonInteractionHandlerContext<ME | E, MR | R>
         >,
       });
   }
@@ -673,15 +351,14 @@ export class ButtonInteractionHandlerMap<
         map: InteractionHandlerMap.union(map.map)(
           other.map,
         ) as InteractionHandlerMap<
-          ButtonInteractionHandlerContext<E | ME, R | MR>,
-          InteractionButtonComponentData
+          AnyButtonInteractionHandlerContext<E | ME, R | MR>
         >,
       });
   }
 
   static values<E = never, R = never>(map: ButtonInteractionHandlerMap<E, R>) {
     return InteractionHandlerMap.values(map.map) as IterableIterator<
-      ButtonInteractionHandlerContext<E, R>
+      AnyButtonInteractionHandlerContext<E, R>
     >;
   }
 }
@@ -690,10 +367,7 @@ export class ChatInputCommandHandlerMap<
   out E = never,
   out R = never,
 > extends Data.TaggedClass("ChatInputCommandHandlerMap")<{
-  map: InteractionHandlerMap<
-    ChatInputCommandHandlerContext<E, R>,
-    SharedSlashCommand
-  >;
+  map: InteractionHandlerMap<AnyChatInputCommandHandlerContext<E, R>>;
 }> {
   static empty<E = never, R = never>() {
     return new ChatInputCommandHandlerMap<E, R>({
@@ -702,15 +376,14 @@ export class ChatInputCommandHandlerMap<
   }
 
   static add<E = never, R = never>(
-    handler: ChatInputCommandHandlerContext<E, R>,
+    handler: AnyChatInputCommandHandlerContext<E, R>,
   ) {
     return <ME = never, MR = never>(map: ChatInputCommandHandlerMap<ME, MR>) =>
       new ChatInputCommandHandlerMap({
         map: InteractionHandlerMap.add(handler)(
           map.map,
         ) as InteractionHandlerMap<
-          ChatInputCommandHandlerContext<ME | E, MR | R>,
-          SharedSlashCommand
+          AnyChatInputCommandHandlerContext<ME | E, MR | R>
         >,
       });
   }
@@ -728,15 +401,14 @@ export class ChatInputCommandHandlerMap<
         map: InteractionHandlerMap.union(map.map)(
           other.map,
         ) as InteractionHandlerMap<
-          ChatInputCommandHandlerContext<E | ME, R | MR>,
-          SharedSlashCommand
+          AnyChatInputCommandHandlerContext<E | ME, R | MR>
         >,
       });
   }
 
   static values<E = never, R = never>(map: ChatInputCommandHandlerMap<E, R>) {
     return InteractionHandlerMap.values(map.map) as IterableIterator<
-      ChatInputCommandHandlerContext<E, R>
+      AnyChatInputCommandHandlerContext<E, R>
     >;
   }
 }
@@ -745,10 +417,7 @@ export class ChatInputSubcommandGroupHandlerMap<
   out E = never,
   out R = never,
 > extends Data.TaggedClass("ChatInputSubcommandGroupHandlerMap")<{
-  map: InteractionHandlerMap<
-    ChatInputSubcommandGroupHandlerContext<E, R>,
-    SlashCommandSubcommandGroupBuilder
-  >;
+  map: InteractionHandlerMap<AnyChatInputSubcommandGroupHandlerContext<E, R>>;
 }> {
   static empty<E = never, R = never>() {
     return new ChatInputSubcommandGroupHandlerMap<E, R>({
@@ -757,7 +426,7 @@ export class ChatInputSubcommandGroupHandlerMap<
   }
 
   static add<E = never, R = never>(
-    handler: ChatInputSubcommandGroupHandlerContext<E, R>,
+    handler: AnyChatInputSubcommandGroupHandlerContext<E, R>,
   ) {
     return <ME = never, MR = never>(
       map: ChatInputSubcommandGroupHandlerMap<ME, MR>,
@@ -766,8 +435,7 @@ export class ChatInputSubcommandGroupHandlerMap<
         map: InteractionHandlerMap.add(handler)(
           map.map,
         ) as InteractionHandlerMap<
-          ChatInputSubcommandGroupHandlerContext<ME | E, MR | R>,
-          SlashCommandSubcommandGroupBuilder
+          AnyChatInputSubcommandGroupHandlerContext<ME | E, MR | R>
         >,
       });
   }
@@ -788,8 +456,7 @@ export class ChatInputSubcommandGroupHandlerMap<
         map: InteractionHandlerMap.union(map.map)(
           other.map,
         ) as InteractionHandlerMap<
-          ChatInputSubcommandGroupHandlerContext<E | ME, R | MR>,
-          SlashCommandSubcommandGroupBuilder
+          AnyChatInputSubcommandGroupHandlerContext<E | ME, R | MR>
         >,
       });
   }
@@ -798,7 +465,7 @@ export class ChatInputSubcommandGroupHandlerMap<
     map: ChatInputSubcommandGroupHandlerMap<E, R>,
   ) {
     return InteractionHandlerMap.values(map.map) as IterableIterator<
-      ChatInputSubcommandGroupHandlerContext<E, R>
+      AnyChatInputSubcommandGroupHandlerContext<E, R>
     >;
   }
 }
@@ -807,10 +474,7 @@ export class ChatInputSubcommandHandlerMap<
   out E = never,
   out R = never,
 > extends Data.TaggedClass("ChatInputSubcommandHandlerMap")<{
-  map: InteractionHandlerMap<
-    ChatInputSubcommandHandlerContext<E, R>,
-    SlashCommandSubcommandBuilder
-  >;
+  map: InteractionHandlerMap<AnyChatInputSubcommandHandlerContext<E, R>>;
 }> {
   static empty<E = never, R = never>() {
     return new ChatInputSubcommandHandlerMap<E, R>({
@@ -819,7 +483,7 @@ export class ChatInputSubcommandHandlerMap<
   }
 
   static add<E = never, R = never>(
-    handler: ChatInputSubcommandHandlerContext<E, R>,
+    handler: AnyChatInputSubcommandHandlerContext<E, R>,
   ) {
     return <ME = never, MR = never>(
       map: ChatInputSubcommandHandlerMap<ME, MR>,
@@ -828,8 +492,7 @@ export class ChatInputSubcommandHandlerMap<
         map: InteractionHandlerMap.add(handler)(
           map.map,
         ) as InteractionHandlerMap<
-          ChatInputSubcommandHandlerContext<ME | E, MR | R>,
-          SlashCommandSubcommandBuilder
+          AnyChatInputSubcommandHandlerContext<ME | E, MR | R>
         >,
       });
   }
@@ -847,8 +510,7 @@ export class ChatInputSubcommandHandlerMap<
         map: InteractionHandlerMap.union(map.map)(
           other.map,
         ) as InteractionHandlerMap<
-          ChatInputSubcommandHandlerContext<E | ME, R | MR>,
-          SlashCommandSubcommandBuilder
+          AnyChatInputSubcommandHandlerContext<E | ME, R | MR>
         >,
       });
   }
@@ -857,7 +519,7 @@ export class ChatInputSubcommandHandlerMap<
     map: ChatInputSubcommandHandlerMap<E, R>,
   ) {
     return InteractionHandlerMap.values(map.map) as IterableIterator<
-      ChatInputSubcommandHandlerContext<E, R>
+      AnyChatInputSubcommandHandlerContext<E, R>
     >;
   }
 }
@@ -882,7 +544,7 @@ export class SubcommandHandler<out E = never, out R = never> {
   }
 
   static addSubcommandGroupHandler<E = never, R = never>(
-    handler: ChatInputSubcommandGroupHandlerContext<E, R>,
+    handler: AnyChatInputSubcommandGroupHandlerContext<E, R>,
   ) {
     return <ME = never, MR = never>(map: SubcommandHandler<ME, MR>) =>
       new SubcommandHandler<E | ME, R | MR>(
@@ -906,7 +568,7 @@ export class SubcommandHandler<out E = never, out R = never> {
   }
 
   static addSubcommandHandler<E = never, R = never>(
-    handler: ChatInputSubcommandHandlerContext<E, R>,
+    handler: AnyChatInputSubcommandHandlerContext<E, R>,
   ) {
     return <ME = never, MR = never>(map: SubcommandHandler<ME, MR>) =>
       new SubcommandHandler<E | ME, R | MR>(
@@ -1035,14 +697,14 @@ export class InteractionHandlerContextWithSubcommandHandlerBuilder<
     ME = BuilderHandler extends SubcommandHandler<infer ME, any> ? ME : never,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     MR = BuilderHandler extends SubcommandHandler<any, infer MR> ? MR : never,
-    E = AddBuilderHandler extends ChatInputSubcommandHandlerContext<
+    E = AddBuilderHandler extends AnyChatInputSubcommandHandlerContext<
       infer E,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       any
     >
       ? E
       : never,
-    R = AddBuilderHandler extends ChatInputSubcommandHandlerContext<
+    R = AddBuilderHandler extends AnyChatInputSubcommandHandlerContext<
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       any,
       infer R
@@ -1080,14 +742,14 @@ export class InteractionHandlerContextWithSubcommandHandlerBuilder<
     ME = BuilderHandler extends SubcommandHandler<infer ME, any> ? ME : never,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     MR = BuilderHandler extends SubcommandHandler<any, infer MR> ? MR : never,
-    E = AddBuilderHandler extends ChatInputSubcommandGroupHandlerContext<
+    E = AddBuilderHandler extends AnyChatInputSubcommandGroupHandlerContext<
       infer E,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       any
     >
       ? E
       : never,
-    R = AddBuilderHandler extends ChatInputSubcommandGroupHandlerContext<
+    R = AddBuilderHandler extends AnyChatInputSubcommandGroupHandlerContext<
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       any,
       infer R
@@ -1112,7 +774,7 @@ export class InteractionHandlerContextWithSubcommandHandlerBuilder<
     });
   }
 
-  toBuilderContext<
+  toContext<
     BuilderData extends
       | SlashCommandBuilder
       | SlashCommandSubcommandsOnlyBuilder
@@ -1128,11 +790,11 @@ export class InteractionHandlerContextWithSubcommandHandlerBuilder<
     >,
   ) {
     return {
-      _data: this._data,
-      _handler: Option.some(SubcommandHandler.handler(this._handler)),
-    } as InteractionHandlerContextBuilderData<
-      Option.Some<BuilderData>,
-      Option.Some<InteractionHandler<ChatInputCommandInteraction, E, R>>
+      data: this._data.value,
+      handler: SubcommandHandler.handler(this._handler),
+    } as InteractionHandlerContext<
+      BuilderData,
+      InteractionHandler<ChatInputCommandInteraction, E, R>
     >;
   }
 }
@@ -1219,9 +881,7 @@ export class ChatInputCommandHandlerContextWithSubcommandHandlerBuilder<
       BuilderHandler
     >,
   ) {
-    return ChatInputCommandHandlerContext.fromBuilderContext(
-      this.builder.toBuilderContext(),
-    );
+    return this.builder.toContext();
   }
 }
 
@@ -1287,9 +947,7 @@ export class ChatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder<
       BuilderHandler
     >,
   ) {
-    return ChatInputSubcommandGroupHandlerContext.fromBuilderContext(
-      this.builder.toBuilderContext(),
-    );
+    return this.builder.toContext();
   }
 }
 

@@ -4,10 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "exports": {
-    "./*": {
-      "types": "./dist/*.d.ts",
-      "import": "./dist/*.js",
-      "require": "./dist/*.cjs"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
     "./package.json": "./package.json"
   },
@@ -21,6 +20,7 @@
   "author": "",
   "dependencies": {
     "@babel/core": "^7.28.0",
+    "core-js": "^3.44.0",
     "effect": "^3.16.8",
     "sheet-apis": "workspace:*",
     "typhoon-client-apps-script": "workspace:*",
@@ -33,6 +33,7 @@
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.29.0",
     "@rollup/plugin-babel": "^6.0.4",
+    "@rollup/plugin-commonjs": "^28.0.6",
     "@rollup/plugin-node-resolve": "^16.0.1",
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^12.1.4",
@@ -41,7 +42,6 @@
     "@typescript-eslint/eslint-plugin": "^8.34.1",
     "@typescript-eslint/parser": "^8.34.1",
     "eslint": "^9.29.0",
-    "glob": "^11.0.1",
     "globals": "^16.2.0",
     "jiti": "^2.4.2",
     "pathe": "^2.0.3",
