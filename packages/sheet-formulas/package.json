@@ -25,7 +25,8 @@
     "sheet-apis": "workspace:*",
     "typhoon-client-apps-script": "workspace:*",
     "typhoon-core": "workspace:*",
-    "typhoon-server": "workspace:*"
+    "typhoon-server": "workspace:*",
+    "valibot": "^1.1.0"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.28.0",

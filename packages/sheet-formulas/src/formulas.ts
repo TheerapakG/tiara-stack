@@ -1,62 +1,99 @@
-import { Effect, pipe } from "effect";
+import { Effect, HashMap, Option, pipe } from "effect";
 import type { Server } from "sheet-apis";
 import { AppsScriptClient } from "typhoon-client-apps-script/client";
+import { validate } from "typhoon-core/schema";
+import * as v from "valibot";
 
 function getClient(url: string) {
   return AppsScriptClient.create<Server>(url);
 }
 
-function parsePlayer(
-  player: Array<
-    [string, string, string, string, number, number, number | "", number]
-  >,
-) {
-  return player.map(
-    ([type, tagStr, player, team, lead, backline, bp, percent]) => ({
-      type,
-      tagStr,
-      player,
-      team,
-      lead,
-      backline,
-      bp,
-      percent,
-    }),
-  );
+const cellValueValidator = v.union([
+  v.string(),
+  v.number(),
+  v.boolean(),
+  v.date(),
+]);
+type CellValue = v.InferOutput<typeof cellValueValidator>;
+
+const configValidator = v.object({
+  healNeeded: v.number(),
+  considerEnc: v.boolean(),
+});
+
+const playerTeamValidator = v.object({
+  type: v.string(),
+  tagStr: v.string(),
+  player: v.string(),
+  team: v.string(),
+  lead: v.number(),
+  backline: v.number(),
+  bp: v.union([v.number(), v.literal("")]),
+  percent: v.number(),
+});
+
+function parsePlayerTeam([
+  type,
+  tagStr,
+  player,
+  team,
+  lead,
+  backline,
+  bp,
+  percent,
+]: CellValue[]) {
+  return validate(playerTeamValidator)({
+    type,
+    tagStr,
+    player,
+    team,
+    lead,
+    backline,
+    bp,
+    percent,
+  });
+}
+
+function parsePlayer(player: CellValue[][]) {
+  return pipe(player, Effect.forEach(parsePlayerTeam));
 }
 
 export function THEECALC(
   url: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  config: Array<[string, any]>,
-  p1: Array<
-    [string, string, string, string, number, number, number | "", number]
-  >,
-  p2: Array<
-    [string, string, string, string, number, number, number | "", number]
-  >,
-  p3: Array<
-    [string, string, string, string, number, number, number | "", number]
-  >,
-  p4: Array<
-    [string, string, string, string, number, number, number | "", number]
-  >,
-  p5: Array<
-    [string, string, string, string, number, number, number | "", number]
-  >,
+  config: CellValue[][],
+  p1: CellValue[][],
+  p2: CellValue[][],
+  p3: CellValue[][],
+  p4: CellValue[][],
+  p5: CellValue[][],
 ) {
   return Effect.runSync(
     pipe(
       Effect.Do,
-      Effect.let("config", () => Object.fromEntries(config)),
+      Effect.bind("config", () =>
+        pipe(
+          config,
+          validate(v.array(v.tuple([cellValueValidator, cellValueValidator]))),
+          Effect.map(HashMap.fromIterable),
+          Effect.map((config) => ({
+            healNeeded: Option.getOrUndefined(
+              HashMap.get(config, "heal_needed"),
+            ),
+            considerEnc: Option.getOrUndefined(
+              HashMap.get(config, "consider_enc"),
+            ),
+          })),
+          Effect.flatMap(validate(configValidator)),
+        ),
+      ),
+      Effect.bind("players", () =>
+        pipe([p1, p2, p3, p4, p5], Effect.forEach(parsePlayer)),
+      ),
       Effect.bind("client", () => getClient(url)),
-      Effect.bind("result", ({ client, config }) =>
+      Effect.bind("result", ({ client, config, players }) =>
         AppsScriptClient.once(client, "calc", {
-          config: {
-            healNeeded: config["heal_needed"],
-            considerEnc: config["consider_enc"],
-          },
-          players: [p1, p2, p3, p4, p5].map(parsePlayer),
+          config,
+          players,
         }),
       ),
       Effect.tap(({ result }) => Effect.log(result)),
