@@ -99,8 +99,9 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           embeds: [
             new EmbedBuilder()
               .setTitle(`${escapeMarkdown(user.username)}'s Teams`)
+              .setDescription(userTeams.length === 0 ? "No teams found" : null)
               .addFields(
-                ...userTeams.map((team) => ({
+                userTeams.map((team) => ({
                   name: escapeMarkdown(team.teamName),
                   value: `ISV: ${team.lead}/${team.backline}${team.talent ? `/${team.talent}` : ""} (+${team.lead + (team.backline - team.lead) / 5}%)`,
                 })),

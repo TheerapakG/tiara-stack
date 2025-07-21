@@ -25,6 +25,29 @@ export const configGuild = pgTable(
   (table) => [uniqueIndex("config_guild_guild_id_idx").on(table.guildId)],
 );
 
+export const configGuildManagerRole = pgTable(
+  "config_guild_manager_role",
+  {
+    id: serial("id").primaryKey(),
+    guildId: varchar("guild_id").notNull(),
+    roleId: varchar("role_id").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+    deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("config_guild_manager_role_guild_id_role_id_idx").on(
+      table.guildId,
+      table.roleId,
+    ),
+  ],
+);
+
 export const configChannel = pgTable(
   "config_channel",
   {

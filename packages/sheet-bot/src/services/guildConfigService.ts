@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { Effect, pipe } from "effect";
-import { configGuild } from "sheet-db-schema";
+import { configGuild, configGuildManagerRole } from "sheet-db-schema";
 import { DBSubscriptionContext } from "typhoon-server/db";
 import { DB } from "../db";
 
@@ -17,7 +17,12 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             db
               .select()
               .from(configGuild)
-              .where(eq(configGuild.guildId, guildId)),
+              .where(
+                and(
+                  eq(configGuild.guildId, guildId),
+                  isNull(configGuild.deletedAt),
+                ),
+              ),
           ),
         updateConfig: (
           guildId: string,
@@ -36,6 +41,43 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                   ...config,
                 },
               }),
+          ),
+        getManagerRoles: (guildId: string) =>
+          dbSubscriptionContext.subscribeQuery(
+            db
+              .select()
+              .from(configGuildManagerRole)
+              .where(
+                and(
+                  eq(configGuildManagerRole.guildId, guildId),
+                  isNull(configGuildManagerRole.deletedAt),
+                ),
+              ),
+          ),
+        addManagerRole: (guildId: string, roleId: string) =>
+          dbSubscriptionContext.mutateQuery(
+            db
+              .insert(configGuildManagerRole)
+              .values({ guildId, roleId })
+              .onConflictDoUpdate({
+                target: [
+                  configGuildManagerRole.guildId,
+                  configGuildManagerRole.roleId,
+                ],
+                set: { deletedAt: null },
+              }),
+          ),
+        removeManagerRole: (guildId: string, roleId: string) =>
+          dbSubscriptionContext.mutateQuery(
+            db
+              .update(configGuildManagerRole)
+              .set({ deletedAt: new Date() })
+              .where(
+                and(
+                  eq(configGuildManagerRole.guildId, guildId),
+                  eq(configGuildManagerRole.roleId, roleId),
+                ),
+              ),
           ),
       })),
     ),
