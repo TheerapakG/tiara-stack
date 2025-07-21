@@ -40,7 +40,8 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
       })),
       Effect.tap(({ serverIdOption, userOption }) =>
         interaction.user.id !== interaction.client.application.owner?.id &&
-        (serverIdOption !== undefined || userOption !== undefined)
+        ((serverIdOption !== null && serverIdOption !== interaction.guildId) ||
+          (userOption !== null && userOption?.id !== interaction.user.id))
           ? Effect.fail("You can only get your own teams in the current server")
           : Effect.void,
       ),
