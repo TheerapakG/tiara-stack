@@ -45,7 +45,7 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
               googleSheets.get({
                 spreadsheetId: sheetId,
                 ranges: [
-                  "'Time + event stuff'!X32",
+                  "'TOYA REBORN'!B9",
                   `'Day ${day}'!C3:C`,
                   `'Day ${day}'!J3:O`,
                 ],

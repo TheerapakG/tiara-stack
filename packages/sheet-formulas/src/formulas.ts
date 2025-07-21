@@ -1,4 +1,4 @@
-import { Effect, HashMap, Option, pipe } from "effect";
+import { Effect, HashMap, pipe } from "effect";
 import type { Server } from "sheet-apis";
 import { AppsScriptClient } from "typhoon-client-apps-script/client";
 import { validate } from "typhoon-core/schema";
@@ -75,14 +75,17 @@ export function THEECALC(
           config,
           validate(v.array(v.tuple([cellValueValidator, cellValueValidator]))),
           Effect.map(HashMap.fromIterable),
-          Effect.map((config) => ({
-            healNeeded: Option.getOrUndefined(
-              HashMap.get(config, "heal_needed"),
+          Effect.flatMap((config) =>
+            pipe(
+              Effect.Do,
+              Effect.bind("healNeeded", () =>
+                HashMap.get(config, "heal_needed"),
+              ),
+              Effect.bind("considerEnc", () =>
+                HashMap.get(config, "consider_enc"),
+              ),
             ),
-            considerEnc: Option.getOrUndefined(
-              HashMap.get(config, "consider_enc"),
-            ),
-          })),
+          ),
           Effect.flatMap(validate(configValidator)),
         ),
       ),
