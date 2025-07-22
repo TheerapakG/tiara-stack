@@ -8,6 +8,7 @@ import {
 } from "discord.js";
 import { Array, Effect, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
+import { PermissionService } from "~~/src/services/permissionService";
 import { GoogleSheets } from "../../google";
 import { GuildConfigService, SheetConfigService } from "../../services";
 import {
@@ -33,24 +34,40 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
     pipe(
       Effect.Do,
       Effect.bindAll(() => ({
+        userOption: Effect.try(() => interaction.options.getUser("user")),
         serverIdOption: Effect.try(() =>
           interaction.options.getString("server_id"),
         ),
-        userOption: Effect.try(() => interaction.options.getUser("user")),
       })),
-      Effect.tap(({ serverIdOption, userOption }) =>
-        interaction.user.id !== interaction.client.application.owner?.id &&
-        ((serverIdOption !== null && serverIdOption !== interaction.guildId) ||
-          (userOption !== null && userOption?.id !== interaction.user.id))
-          ? Effect.fail("You can only get your own teams in the current server")
+      Effect.tap(({ serverIdOption }) =>
+        serverIdOption !== null && serverIdOption !== interaction.guildId
+          ? PermissionService.checkOwner(interaction)
+          : Effect.void,
+      ),
+      Effect.bind("managerRoles", () =>
+        interaction.guild
+          ? pipe(
+              GuildConfigService.getManagerRoles(interaction.guild.id),
+              Effect.flatMap((subscription) => observeOnce(subscription.value)),
+              Effect.flatMap((observer) => observer.value),
+            )
+          : Effect.succeed([]),
+      ),
+      Effect.tap(({ userOption, managerRoles }) =>
+        userOption !== null && userOption?.id !== interaction.user.id
+          ? PermissionService.checkRoles(
+              interaction,
+              managerRoles.map((role) => role.roleId),
+              "You can only get your own teams in the current server",
+            )
           : Effect.void,
       ),
       Effect.bindAll(({ serverIdOption, userOption }) => ({
+        user: Effect.succeed(userOption ?? interaction.user),
         serverId: pipe(
           serverIdOption ?? interaction.guildId,
           Option.fromNullable,
         ),
-        user: Effect.succeed(userOption ?? interaction.user),
       })),
       Effect.bind("guildConfigsSubscription", ({ serverId }) =>
         GuildConfigService.getConfig(serverId),

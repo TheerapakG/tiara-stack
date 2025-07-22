@@ -9,6 +9,7 @@ import { GoogleLive } from "./google";
 import {
   ChannelConfigService,
   GuildConfigService,
+  PermissionService,
   ScheduleService,
   SheetConfigService,
 } from "./services";
@@ -26,6 +27,7 @@ const layer = pipe(
   Layer.provideMerge(DB.DefaultWithoutDependencies),
   Layer.provideMerge(GoogleLive),
   Layer.provideMerge(Config.Default),
+  Layer.provideMerge(PermissionService.Default),
 );
 
 await Effect.runPromise(
