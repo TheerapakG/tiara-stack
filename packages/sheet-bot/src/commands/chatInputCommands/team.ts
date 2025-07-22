@@ -8,9 +8,12 @@ import {
 } from "discord.js";
 import { Array, Effect, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
-import { PermissionService } from "~~/src/services/permissionService";
 import { GoogleSheets } from "../../google";
-import { GuildConfigService, SheetConfigService } from "../../services";
+import {
+  GuildConfigService,
+  PermissionService,
+  SheetConfigService,
+} from "../../services";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
