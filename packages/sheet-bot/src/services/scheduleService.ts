@@ -1,6 +1,6 @@
 import { bold, time, TimestampStyles } from "discord.js";
 import { Array, Effect, Option, pipe } from "effect";
-import { observeOnce } from "typhoon-server/signal";
+import { observeEffectSignalOnce } from "typhoon-server/signal";
 import { GoogleSheets } from "../google";
 import { GuildConfigService } from "./guildConfigService";
 
@@ -28,15 +28,8 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
         list: (day: number, serverId: string) =>
           pipe(
             Effect.Do,
-            Effect.bind("guildConfigsSubscription", () =>
-              guildConfigService.getConfig(serverId),
-            ),
-            Effect.bind("guildConfigObserver", ({ guildConfigsSubscription }) =>
-              observeOnce(guildConfigsSubscription.value),
-            ),
-            Effect.bind(
-              "guildConfig",
-              ({ guildConfigObserver }) => guildConfigObserver.value,
+            Effect.bind("guildConfig", () =>
+              observeEffectSignalOnce(guildConfigService.getConfig(serverId)),
             ),
             Effect.bind("sheetId", ({ guildConfig }) =>
               Option.fromNullable(guildConfig[0].sheetId),

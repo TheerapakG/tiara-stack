@@ -10,7 +10,7 @@ import {
   SlashCommandSubcommandGroupBuilder,
 } from "discord.js";
 import { Effect, Option, pipe } from "effect";
-import { observeOnce } from "typhoon-core/signal";
+import { observeEffectSignalOnce } from "typhoon-server/signal";
 import { GuildConfigService } from "../../services/guildConfigService";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
@@ -36,25 +36,11 @@ const handleListConfig = chatInputSubcommandHandlerContextBuilder()
           ? Effect.fail("You do not have permission to manage the server")
           : Effect.void,
       ),
-      Effect.bind("guildConfigsSubscription", ({ guild }) =>
-        GuildConfigService.getConfig(guild.id),
+      Effect.bind("guildConfig", ({ guild }) =>
+        observeEffectSignalOnce(GuildConfigService.getConfig(guild.id)),
       ),
-      Effect.bind("managerRolesSubscription", ({ guild }) =>
-        GuildConfigService.getManagerRoles(guild.id),
-      ),
-      Effect.bind("guildConfigObserver", ({ guildConfigsSubscription }) =>
-        observeOnce(guildConfigsSubscription.value),
-      ),
-      Effect.bind("managerRolesObserver", ({ managerRolesSubscription }) =>
-        observeOnce(managerRolesSubscription.value),
-      ),
-      Effect.bind(
-        "guildConfig",
-        ({ guildConfigObserver }) => guildConfigObserver.value,
-      ),
-      Effect.bind(
-        "managerRoles",
-        ({ managerRolesObserver }) => managerRolesObserver.value,
+      Effect.bind("managerRoles", ({ guild }) =>
+        observeEffectSignalOnce(GuildConfigService.getManagerRoles(guild.id)),
       ),
       Effect.bind("sheetId", ({ guildConfig }) =>
         Option.fromNullable(guildConfig[0].sheetId),
