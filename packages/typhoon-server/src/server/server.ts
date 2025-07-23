@@ -565,7 +565,7 @@ export class Server<
           HashMap.get(server.subscriptionHandlerMap, header.payload.handler),
         ),
         Effect.bind("nonce", () => Nonce.make()),
-        Effect.bind("observer", ({ event, handlerContext, nonce }) =>
+        Effect.bind("returnValue", ({ event, handlerContext, nonce }) =>
           observeOnce(
             pipe(
               Server.runBoundedEncodedEventHandler(
@@ -579,7 +579,6 @@ export class Server<
             ),
           ),
         ),
-        Effect.bind("returnValue", ({ observer }) => observer.value),
         Effect.map(({ returnValue }) => returnValue),
         Effect.withSpan("Server.handleOnce", {
           captureStackTrace: true,

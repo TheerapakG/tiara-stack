@@ -567,7 +567,24 @@ class OnceObserver<A = unknown, Err = unknown> implements DependentSignal {
 
 export const observeOnce = <A = unknown, Err = unknown>(
   effect: E.Effect<A, Err, SignalContext>,
-) => OnceObserver.make(effect);
+) =>
+  pipe(
+    OnceObserver.make(effect),
+    E.flatMap((observer) => observer.value),
+  );
+
+export const observeSignalOnce = <A = unknown, Err = unknown>(
+  signal: DependencySignal<A, Err>,
+) => observeOnce(signal.value);
+
+export const observeEffectSignalOnce = <
+  A = unknown,
+  Err1 = unknown,
+  Err2 = unknown,
+  R = unknown,
+>(
+  effect: E.Effect<DependencySignal<A, Err1>, Err2, R>,
+) => pipe(effect, E.flatMap(observeSignalOnce));
 
 export class SignalContext extends Context.Tag("SignalContext")<
   SignalContext,

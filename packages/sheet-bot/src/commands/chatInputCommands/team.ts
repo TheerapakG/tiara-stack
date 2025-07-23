@@ -7,7 +7,7 @@ import {
   SlashCommandSubcommandBuilder,
 } from "discord.js";
 import { Array, Effect, Option, pipe } from "effect";
-import { observeOnce } from "typhoon-server/signal";
+import { observeEffectSignalOnce } from "typhoon-server/signal";
 import { GoogleSheets } from "../../google";
 import {
   GuildConfigService,
@@ -51,8 +51,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
         interaction.guild
           ? pipe(
               GuildConfigService.getManagerRoles(interaction.guild.id),
-              Effect.flatMap((subscription) => observeOnce(subscription.value)),
-              Effect.flatMap((observer) => observer.value),
+              observeEffectSignalOnce,
             )
           : Effect.succeed([]),
       ),
@@ -72,15 +71,8 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           Option.fromNullable,
         ),
       })),
-      Effect.bind("guildConfigsSubscription", ({ serverId }) =>
-        GuildConfigService.getConfig(serverId),
-      ),
-      Effect.bind("guildConfigObserver", ({ guildConfigsSubscription }) =>
-        observeOnce(guildConfigsSubscription.value),
-      ),
-      Effect.bind(
-        "guildConfig",
-        ({ guildConfigObserver }) => guildConfigObserver.value,
+      Effect.bind("guildConfig", ({ serverId }) =>
+        observeEffectSignalOnce(GuildConfigService.getConfig(serverId)),
       ),
       Effect.bind("sheetId", ({ guildConfig }) =>
         Option.fromNullable(guildConfig[0].sheetId),
