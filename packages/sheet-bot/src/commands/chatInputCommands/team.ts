@@ -37,26 +37,32 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
     pipe(
       Effect.Do,
       Effect.bindAll(() => ({
-        userOption: Effect.try(() => interaction.options.getUser("user")),
-        serverIdOption: Effect.try(() =>
-          interaction.options.getString("server_id"),
+        user: Effect.try(
+          () => interaction.options.getUser("user") ?? interaction.user,
+        ),
+        serverId: pipe(
+          Effect.try(
+            () =>
+              interaction.options.getString("server_id") ?? interaction.guildId,
+          ),
+          Effect.flatMap(Option.fromNullable),
         ),
       })),
-      Effect.tap(({ serverIdOption }) =>
-        serverIdOption !== null && serverIdOption !== interaction.guildId
+      Effect.tap(({ serverId }) =>
+        serverId !== interaction.guildId
           ? PermissionService.checkOwner(interaction)
           : Effect.void,
       ),
-      Effect.bind("managerRoles", () =>
-        interaction.guild
+      Effect.bind("managerRoles", ({ serverId }) =>
+        serverId
           ? pipe(
-              GuildConfigService.getManagerRoles(interaction.guild.id),
+              GuildConfigService.getManagerRoles(serverId),
               observeEffectSignalOnce,
             )
           : Effect.succeed([]),
       ),
-      Effect.tap(({ userOption, managerRoles }) =>
-        userOption !== null && userOption?.id !== interaction.user.id
+      Effect.tap(({ user, managerRoles }) =>
+        user.id !== interaction.user.id
           ? PermissionService.checkRoles(
               interaction,
               managerRoles.map((role) => role.roleId),
@@ -64,13 +70,6 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
             )
           : Effect.void,
       ),
-      Effect.bindAll(({ serverIdOption, userOption }) => ({
-        user: Effect.succeed(userOption ?? interaction.user),
-        serverId: pipe(
-          serverIdOption ?? interaction.guildId,
-          Option.fromNullable,
-        ),
-      })),
       Effect.bind("guildConfig", ({ serverId }) =>
         observeEffectSignalOnce(GuildConfigService.getConfig(serverId)),
       ),

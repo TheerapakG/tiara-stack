@@ -8,15 +8,19 @@ import {
   MessageActionRowComponentBuilder,
   MessageFlags,
   MessageFlagsBitField,
-  PermissionFlagsBits,
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
 import { Chunk, Effect, Option, pipe, Ref } from "effect";
 import { validate } from "typhoon-core/schema";
+import { observeEffectSignalOnce } from "typhoon-server/signal";
 import { button as slotButton } from "../../buttons/slot";
-import { ChannelConfigService } from "../../services/channelConfigService";
-import { ScheduleService } from "../../services/scheduleService";
+import {
+  ChannelConfigService,
+  GuildConfigService,
+  PermissionService,
+  ScheduleService,
+} from "../../services";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
@@ -73,41 +77,43 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
       Effect.bindAll(() => ({
         messageFlags: Ref.make(new MessageFlagsBitField()),
         day: Effect.try(() => interaction.options.getNumber("day", true)),
-        serverIdOption: Effect.try(() =>
-          interaction.options.getString("server_id"),
+        serverId: pipe(
+          Effect.try(
+            () =>
+              interaction.options.getString("server_id") ?? interaction.guildId,
+          ),
+          Effect.flatMap(Option.fromNullable),
         ),
-        messageTypeOption: Effect.try(() =>
-          interaction.options.getString("message_type"),
+        messageType: pipe(
+          Effect.try(
+            () => interaction.options.getString("message_type") ?? "ephemeral",
+          ),
+          Effect.flatMap(validate(type.enumerated("persistent", "ephemeral"))),
         ),
-        channel: Effect.succeed(interaction.channel),
-        user: Option.fromNullable(interaction.user),
+        user: Effect.succeed(interaction.user),
       })),
-      Effect.tap(({ messageTypeOption, channel, user }) =>
-        channel &&
-        !channel.isDMBased() &&
-        !channel
-          .permissionsFor(user)
-          ?.has(PermissionFlagsBits.ManageMessages) &&
-        messageTypeOption !== undefined
-          ? Effect.fail(
-              "You can only request non-ephemeral messages in a channel with the Manage Messages permission",
+      Effect.tap(({ serverId }) =>
+        serverId !== interaction.guildId
+          ? PermissionService.checkOwner(interaction)
+          : Effect.void,
+      ),
+      Effect.bind("managerRoles", ({ serverId }) =>
+        serverId
+          ? pipe(
+              GuildConfigService.getManagerRoles(serverId),
+              observeEffectSignalOnce,
+            )
+          : Effect.succeed([]),
+      ),
+      Effect.tap(({ messageType, managerRoles }) =>
+        messageType !== "ephemeral"
+          ? PermissionService.checkRoles(
+              interaction,
+              managerRoles.map((role) => role.roleId),
+              "You can only make persistent messages as a manager",
             )
           : Effect.void,
       ),
-      Effect.bindAll(({ serverIdOption, messageTypeOption }) => ({
-        serverId: pipe(
-          serverIdOption ?? interaction.guildId,
-          Option.fromNullable,
-        ),
-        messageType: pipe(
-          validate(type.enumerated("persistent", "ephemeral"))(
-            messageTypeOption,
-          ),
-          Effect.catchTag("ValidationError", () =>
-            Effect.succeed("ephemeral" as const),
-          ),
-        ),
-      })),
       Effect.tap(({ messageType, messageFlags }) =>
         messageType === "ephemeral"
           ? Ref.update(messageFlags, (flags) =>
@@ -159,19 +165,35 @@ const handleButton = chatInputSubcommandHandlerContextBuilder()
       Effect.Do,
       Effect.bindAll(() => ({
         day: Effect.try(() => interaction.options.getNumber("day", true)),
-        serverIdOption: Effect.try(() =>
-          interaction.options.getString("server_id"),
+        serverId: pipe(
+          Effect.try(
+            () =>
+              interaction.options.getString("server_id") ?? interaction.guildId,
+          ),
+          Effect.flatMap(Option.fromNullable),
         ),
         channel: Option.fromNullable(interaction.channel),
-        user: Option.fromNullable(interaction.user),
+        user: Effect.succeed(interaction.user),
       })),
-      Effect.tap(({ channel, user }) =>
-        !channel.isDMBased() &&
-        !channel.permissionsFor(user)?.has(PermissionFlagsBits.ManageMessages)
-          ? Effect.fail(
-              "You do not have permission to manage messages in this channel",
-            )
+      Effect.tap(({ serverId }) =>
+        serverId !== interaction.guildId
+          ? PermissionService.checkOwner(interaction)
           : Effect.void,
+      ),
+      Effect.bind("managerRoles", ({ serverId }) =>
+        serverId
+          ? pipe(
+              GuildConfigService.getManagerRoles(serverId),
+              observeEffectSignalOnce,
+            )
+          : Effect.succeed([]),
+      ),
+      Effect.tap(({ managerRoles }) =>
+        PermissionService.checkRoles(
+          interaction,
+          managerRoles.map((role) => role.roleId),
+          "You can only make buttons as a manager",
+        ),
       ),
       Effect.tap(({ channel, day }) =>
         ChannelConfigService.updateConfig(channel.id, {
