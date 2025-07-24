@@ -1,4 +1,13 @@
-import { Chunk, Data, Effect, Option, Order, pipe, Stream } from "effect";
+import {
+  Chunk,
+  Data,
+  Effect,
+  HashSet,
+  Option,
+  Order,
+  pipe,
+  Stream,
+} from "effect";
 import { defineHandlerConfigBuilder } from "typhoon-server/config";
 import { defineHandlerBuilder, Event } from "typhoon-server/server";
 import * as v from "valibot";
@@ -10,16 +19,16 @@ class PlayerTeam extends Data.TaggedClass("PlayerTeam")<{
   team: string;
   bp: number;
   percent: number;
-  tags: string[];
+  tags: HashSet.HashSet<string>;
 }> {
-  static addTags(tags: string[]) {
+  static addTags(tags: HashSet.HashSet<string>) {
     return (playerTeam: PlayerTeam) =>
       new PlayerTeam({
         type: playerTeam.type,
         team: playerTeam.team,
         bp: playerTeam.bp,
         percent: playerTeam.percent,
-        tags: [...playerTeam.tags, ...tags],
+        tags: HashSet.union(playerTeam.tags, tags),
       });
   }
 
@@ -41,7 +50,9 @@ class PlayerTeam extends Data.TaggedClass("PlayerTeam")<{
         team: apiObject.team,
         bp: apiObject.bp,
         percent: apiObject.percent ?? 1,
-        tags: apiObject.tagStr.split(/\s*,\s*/).filter(Boolean),
+        tags: HashSet.fromIterable(
+          apiObject.tagStr.split(/\s*,\s*/).filter(Boolean),
+        ),
       }),
     );
   }
@@ -52,10 +63,10 @@ const filterFixedTeams = (playerTeams: PlayerTeam[]) =>
     Effect.Do,
     Effect.let("fixedTeams", () =>
       playerTeams
-        .filter(({ tags }) => tags.includes("fixed"))
+        .filter(({ tags }) => HashSet.has(tags, "fixed"))
         .map((playerTeam) =>
-          playerTeam.tags.includes("tierer_hint")
-            ? PlayerTeam.addTags(["tierer"])(playerTeam)
+          HashSet.has(playerTeam.tags, "tierer_hint")
+            ? PlayerTeam.addTags(HashSet.make("tierer"))(playerTeam)
             : playerTeam,
         ),
     ),
@@ -88,9 +99,9 @@ const deriveRoomWithNormalPlayerTeam = (
   pipe(
     Effect.Do,
     Effect.bindAll(() => ({
-      tierer: Effect.succeed(playerTeam.tags.includes("tierer")),
-      healer: Effect.succeed(playerTeam.tags.includes("heal")),
-      encable: Effect.succeed(playerTeam.tags.includes("encable")),
+      tierer: Effect.succeed(HashSet.has(playerTeam.tags, "tierer")),
+      healer: Effect.succeed(HashSet.has(playerTeam.tags, "heal")),
+      encable: Effect.succeed(HashSet.has(playerTeam.tags, "encable")),
     })),
     Effect.tap(() =>
       Effect.log("Deriving room with normal player team", roomTeams),
@@ -133,8 +144,8 @@ const deriveRoomWithEncPlayerTeam = (
   pipe(
     Effect.Do,
     Effect.bindAll(() => ({
-      tierer: Effect.succeed(playerTeam.tags.includes("tierer")),
-      healer: Effect.succeed(playerTeam.tags.includes("heal")),
+      tierer: Effect.succeed(HashSet.has(playerTeam.tags, "tierer")),
+      healer: Effect.succeed(HashSet.has(playerTeam.tags, "heal")),
     })),
     Effect.tap(() =>
       Effect.log("Deriving room with enc player team", roomTeams),
@@ -157,9 +168,9 @@ const deriveRoomWithEncPlayerTeam = (
               percent: roomTeam.percent + 2 * playerTeam.percent,
               room: Chunk.append(
                 roomTeam.room,
-                PlayerTeam.addTags([tierer ? "tierer_enc_override" : "enc"])(
-                  playerTeam,
-                ),
+                PlayerTeam.addTags(
+                  HashSet.make(tierer ? "tierer_enc_override" : "enc"),
+                )(playerTeam),
               ),
             }),
         ),
@@ -181,8 +192,8 @@ const deriveRoomWithPlayerTeam = (
   pipe(
     Effect.Do,
     Effect.bindAll(() => ({
-      tierer: Effect.succeed(playerTeam.tags.includes("tierer")),
-      encable: Effect.succeed(playerTeam.tags.includes("encable")),
+      tierer: Effect.succeed(HashSet.has(playerTeam.tags, "tierer")),
+      encable: Effect.succeed(HashSet.has(playerTeam.tags, "encable")),
     })),
     Effect.flatMap(({ tierer, encable }) =>
       pipe(
@@ -310,7 +321,17 @@ const calc = (
         Chunk.map(({ bp, percent, room }) => ({
           averageBp: bp / 5,
           averagePercent: percent / 5,
-          room: Chunk.toArray(room),
+          room: pipe(
+            room,
+            Chunk.map(({ type, team, bp, percent, tags }) => ({
+              type,
+              team,
+              bp,
+              percent,
+              tags: HashSet.toValues(tags),
+            })),
+            Chunk.toArray,
+          ),
         })),
         Chunk.reverse,
       ),
