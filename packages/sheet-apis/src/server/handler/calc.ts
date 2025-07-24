@@ -56,6 +56,16 @@ class PlayerTeam extends Data.TaggedClass("PlayerTeam")<{
       }),
     );
   }
+
+  static clone(playerTeam: PlayerTeam) {
+    return new PlayerTeam({
+      type: playerTeam.type,
+      team: playerTeam.team,
+      bp: playerTeam.bp,
+      percent: playerTeam.percent,
+      tags: HashSet.union(playerTeam.tags, HashSet.empty()),
+    });
+  }
 }
 
 const filterFixedTeams = (playerTeams: PlayerTeam[]) =>
@@ -108,14 +118,12 @@ class RoomTeam extends Data.TaggedClass("RoomTeam")<{
               bp: roomTeam.bp + playerTeam.bp,
               percent: roomTeam.percent + (enc ? 2 : 1) * playerTeam.percent,
               room: Chunk.append(
-                roomTeam.room,
-                structuredClone(
-                  enc
-                    ? PlayerTeam.addTags(
-                        HashSet.make(tierer ? "tierer_enc_override" : "enc"),
-                      )(playerTeam)
-                    : playerTeam,
-                ),
+                Chunk.fromIterable(roomTeam.room),
+                enc
+                  ? PlayerTeam.addTags(
+                      HashSet.make(tierer ? "tierer_enc_override" : "enc"),
+                    )(playerTeam)
+                  : PlayerTeam.clone(playerTeam),
               ),
             }),
         ),
