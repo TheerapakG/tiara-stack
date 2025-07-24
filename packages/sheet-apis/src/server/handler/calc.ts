@@ -93,7 +93,10 @@ class RoomTeam extends Data.TaggedClass("RoomTeam")<{
     Order.number,
     ({ percent }: RoomTeam) => percent,
   );
-  static order = Order.combine(RoomTeam.byBp, RoomTeam.byPercent);
+  static order = Order.combine(
+    RoomTeam.byBp,
+    Order.reverse(RoomTeam.byPercent),
+  );
 
   static addPlayer(playerTeam: PlayerTeam, enc: boolean) {
     return (roomTeam: RoomTeam) =>
