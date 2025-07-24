@@ -104,6 +104,7 @@ const deriveRoomWithNormalPlayerTeam = (
     Effect.flatMap(({ healer, filteredRooms }) =>
       pipe(
         filteredRooms,
+        Stream.tap((room) => Effect.log("Room", room)),
         Stream.map(
           ({ enced, tiererEnced, healed, highestBp, bp, percent, room }) =>
             new RoomTeam({
@@ -151,6 +152,7 @@ const deriveRoomWithEncPlayerTeam = (
     Effect.flatMap(({ tierer, healer, filteredRooms }) =>
       pipe(
         filteredRooms,
+        Stream.tap((room) => Effect.log("Room", room)),
         Stream.map(
           ({ healed, highestBp, bp, percent, room }) =>
             new RoomTeam({
