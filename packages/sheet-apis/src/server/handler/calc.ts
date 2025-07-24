@@ -32,6 +32,10 @@ class PlayerTeam extends Data.TaggedClass("PlayerTeam")<{
       });
   }
 
+  static clone(playerTeam: PlayerTeam) {
+    return PlayerTeam.addTags(HashSet.empty())(playerTeam);
+  }
+
   static fromApiObject(apiObject: {
     type: string;
     tagStr: string;
@@ -55,16 +59,6 @@ class PlayerTeam extends Data.TaggedClass("PlayerTeam")<{
         ),
       }),
     );
-  }
-
-  static clone(playerTeam: PlayerTeam) {
-    return new PlayerTeam({
-      type: playerTeam.type,
-      team: playerTeam.team,
-      bp: playerTeam.bp,
-      percent: playerTeam.percent,
-      tags: HashSet.union(playerTeam.tags, HashSet.empty()),
-    });
   }
 }
 
@@ -107,7 +101,6 @@ class RoomTeam extends Data.TaggedClass("RoomTeam")<{
         Effect.Do,
         Effect.let("tierer", () => HashSet.has(playerTeam.tags, "tierer")),
         Effect.let("heal", () => HashSet.has(playerTeam.tags, "heal")),
-        Effect.tap(() => Effect.log("Adding player to room", playerTeam)),
         Effect.map(
           ({ tierer, heal }) =>
             new RoomTeam({
@@ -137,9 +130,6 @@ const deriveRoomWithNormalPlayerTeam = (
 ) =>
   pipe(
     Effect.Do,
-    Effect.tap(() =>
-      Effect.log("Deriving room with normal player team", roomTeams),
-    ),
     Effect.flatMap(() =>
       pipe(
         roomTeams,
@@ -150,9 +140,6 @@ const deriveRoomWithNormalPlayerTeam = (
         Effect.forEach(RoomTeam.addPlayer(playerTeam, false)),
         Effect.map(Chunk.fromIterable),
       ),
-    ),
-    Effect.tap((derivedRooms) =>
-      Effect.log("Derived room with normal player team", derivedRooms),
     ),
     Effect.tap((derivedRooms) =>
       Effect.log(
@@ -171,9 +158,6 @@ const deriveRoomWithEncPlayerTeam = (
   pipe(
     Effect.Do,
     Effect.let("tierer", () => HashSet.has(playerTeam.tags, "tierer")),
-    Effect.tap(() =>
-      Effect.log("Deriving room with enc player team", roomTeams),
-    ),
     Effect.flatMap(({ tierer }) =>
       pipe(
         roomTeams,
@@ -184,9 +168,6 @@ const deriveRoomWithEncPlayerTeam = (
         Effect.forEach(RoomTeam.addPlayer(playerTeam, true)),
         Effect.map(Chunk.fromIterable),
       ),
-    ),
-    Effect.tap((derivedRooms) =>
-      Effect.log("Derived room with enc player team", derivedRooms),
     ),
     Effect.tap((derivedRooms) =>
       Effect.log(
@@ -250,6 +231,7 @@ const sortTeams = (teams: Chunk.Chunk<RoomTeam>) =>
   pipe(
     Effect.succeed(teams),
     Effect.map(Chunk.sort(RoomTeam.order)),
+    Effect.tap((sortedTeams) => Effect.log("Sorted", sortedTeams)),
     Effect.withSpan("sortTeams", { captureStackTrace: true }),
   );
 
