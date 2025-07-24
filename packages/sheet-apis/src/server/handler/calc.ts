@@ -109,11 +109,13 @@ class RoomTeam extends Data.TaggedClass("RoomTeam")<{
               percent: roomTeam.percent + (enc ? 2 : 1) * playerTeam.percent,
               room: Chunk.append(
                 roomTeam.room,
-                enc
-                  ? PlayerTeam.addTags(
-                      HashSet.make(tierer ? "tierer_enc_override" : "enc"),
-                    )(playerTeam)
-                  : playerTeam,
+                structuredClone(
+                  enc
+                    ? PlayerTeam.addTags(
+                        HashSet.make(tierer ? "tierer_enc_override" : "enc"),
+                      )(playerTeam)
+                    : playerTeam,
+                ),
               ),
             }),
         ),
