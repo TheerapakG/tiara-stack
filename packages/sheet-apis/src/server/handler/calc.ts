@@ -154,7 +154,7 @@ const deriveRoomWithEncPlayerTeam = (
               enced: true,
               tiererEnced: tierer,
               healed: healed + (healer ? 1 : 0),
-              highestBp: Math.max(highestBp, bp),
+              highestBp: Math.max(highestBp, playerTeam.bp),
               bp: bp + playerTeam.bp,
               percent: percent + 2 * playerTeam.percent,
               room: [
