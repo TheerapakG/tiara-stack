@@ -90,6 +90,34 @@ class RoomTeam extends Data.TaggedClass("RoomTeam")<{
     ({ percent }: RoomTeam) => percent,
   );
   static order = Order.combine(RoomTeam.byBp, RoomTeam.byPercent);
+
+  static addPlayer(playerTeam: PlayerTeam, enc: boolean) {
+    return (roomTeam: RoomTeam) =>
+      pipe(
+        Effect.Do,
+        Effect.let("tierer", () => HashSet.has(playerTeam.tags, "tierer")),
+        Effect.let("heal", () => HashSet.has(playerTeam.tags, "heal")),
+        Effect.map(
+          ({ tierer, heal }) =>
+            new RoomTeam({
+              enced: enc ? true : roomTeam.enced,
+              tiererEnced: enc ? tierer : roomTeam.tiererEnced,
+              healed: roomTeam.healed + (heal ? 1 : 0),
+              highestBp: Math.max(roomTeam.highestBp, playerTeam.bp),
+              bp: roomTeam.bp + playerTeam.bp,
+              percent: roomTeam.percent + (enc ? 2 : 1) * playerTeam.percent,
+              room: Chunk.append(
+                roomTeam.room,
+                enc
+                  ? PlayerTeam.addTags(
+                      HashSet.make(tierer ? "tierer_enc_override" : "enc"),
+                    )(playerTeam)
+                  : playerTeam,
+              ),
+            }),
+        ),
+      );
+  }
 }
 
 const deriveRoomWithNormalPlayerTeam = (
@@ -98,34 +126,22 @@ const deriveRoomWithNormalPlayerTeam = (
 ) =>
   pipe(
     Effect.Do,
-    Effect.bindAll(() => ({
-      tierer: Effect.succeed(HashSet.has(playerTeam.tags, "tierer")),
-      healer: Effect.succeed(HashSet.has(playerTeam.tags, "heal")),
-      encable: Effect.succeed(HashSet.has(playerTeam.tags, "encable")),
-    })),
     Effect.tap(() =>
       Effect.log("Deriving room with normal player team", roomTeams),
     ),
-    Effect.map(({ healer }) =>
+    Effect.flatMap(() =>
       pipe(
         roomTeams,
         Chunk.filter(
           ({ enced, tiererEnced, highestBp }) =>
             !enced || tiererEnced || playerTeam.bp + ENC_BP_DIFF < highestBp,
         ),
-        Chunk.map(
-          (roomTeam) =>
-            new RoomTeam({
-              enced: roomTeam.enced,
-              tiererEnced: roomTeam.tiererEnced,
-              healed: roomTeam.healed + (healer ? 1 : 0),
-              highestBp: Math.max(roomTeam.highestBp, playerTeam.bp),
-              bp: roomTeam.bp + playerTeam.bp,
-              percent: roomTeam.percent + playerTeam.percent,
-              room: Chunk.append(roomTeam.room, playerTeam),
-            }),
-        ),
+        Effect.forEach(RoomTeam.addPlayer(playerTeam, false)),
+        Effect.map(Chunk.fromIterable),
       ),
+    ),
+    Effect.tap((derivedRooms) =>
+      Effect.log("Derived room with normal player team", derivedRooms),
     ),
     Effect.tap((derivedRooms) =>
       Effect.log(
@@ -143,38 +159,23 @@ const deriveRoomWithEncPlayerTeam = (
 ) =>
   pipe(
     Effect.Do,
-    Effect.bindAll(() => ({
-      tierer: Effect.succeed(HashSet.has(playerTeam.tags, "tierer")),
-      healer: Effect.succeed(HashSet.has(playerTeam.tags, "heal")),
-    })),
+    Effect.let("tierer", () => HashSet.has(playerTeam.tags, "tierer")),
     Effect.tap(() =>
       Effect.log("Deriving room with enc player team", roomTeams),
     ),
-    Effect.map(({ tierer, healer }) =>
+    Effect.flatMap(({ tierer }) =>
       pipe(
         roomTeams,
         Chunk.filter(
           ({ enced, highestBp }) =>
             !enced && (tierer || playerTeam.bp > highestBp + ENC_BP_DIFF),
         ),
-        Chunk.map(
-          (roomTeam) =>
-            new RoomTeam({
-              enced: true,
-              tiererEnced: tierer,
-              healed: roomTeam.healed + (healer ? 1 : 0),
-              highestBp: Math.max(roomTeam.highestBp, playerTeam.bp),
-              bp: roomTeam.bp + playerTeam.bp,
-              percent: roomTeam.percent + 2 * playerTeam.percent,
-              room: Chunk.append(
-                roomTeam.room,
-                PlayerTeam.addTags(
-                  HashSet.make(tierer ? "tierer_enc_override" : "enc"),
-                )(playerTeam),
-              ),
-            }),
-        ),
+        Effect.forEach(RoomTeam.addPlayer(playerTeam, true)),
+        Effect.map(Chunk.fromIterable),
       ),
+    ),
+    Effect.tap((derivedRooms) =>
+      Effect.log("Derived room with enc player team", derivedRooms),
     ),
     Effect.tap((derivedRooms) =>
       Effect.log(
