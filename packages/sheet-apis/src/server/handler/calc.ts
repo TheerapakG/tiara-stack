@@ -184,6 +184,7 @@ const deriveRoomWithPlayerTeam = (
 ) =>
   pipe(
     Effect.Do,
+    Effect.tap(() => Effect.log("Deriving room with player team", playerTeam)),
     Effect.bindAll(() => ({
       tierer: Effect.succeed(playerTeam.tags.includes("tierer")),
       encable: Effect.succeed(playerTeam.tags.includes("encable")),
