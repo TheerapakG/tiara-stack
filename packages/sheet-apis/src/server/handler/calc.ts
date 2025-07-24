@@ -97,6 +97,7 @@ class RoomTeam extends Data.TaggedClass("RoomTeam")<{
         Effect.Do,
         Effect.let("tierer", () => HashSet.has(playerTeam.tags, "tierer")),
         Effect.let("heal", () => HashSet.has(playerTeam.tags, "heal")),
+        Effect.tap(() => Effect.log("Adding player to room", playerTeam)),
         Effect.map(
           ({ tierer, heal }) =>
             new RoomTeam({
