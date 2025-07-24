@@ -159,10 +159,9 @@ const deriveRoomWithEncPlayerTeam = (
               percent: percent + 2 * playerTeam.percent,
               room: [
                 ...room,
-                PlayerTeam.addTags([
-                  ...playerTeam.tags,
-                  tierer ? "tierer_enc_override" : "enc",
-                ])(playerTeam),
+                PlayerTeam.addTags([tierer ? "tierer_enc_override" : "enc"])(
+                  playerTeam,
+                ),
               ],
             }),
         ),
@@ -305,6 +304,7 @@ const calc = (
       ),
     ),
     Effect.bind("sortedResult", ({ result }) => sortTeams(result)),
+    Effect.tap(({ sortedResult }) => Effect.log("Sorted", sortedResult)),
     Effect.bind("bestResult", ({ sortedResult }) =>
       filterBestTeams(sortedResult),
     ),
