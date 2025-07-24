@@ -234,7 +234,6 @@ const sortTeams = (teams: Chunk.Chunk<RoomTeam>) =>
   pipe(
     Effect.succeed(teams),
     Effect.map(Chunk.sort(RoomTeam.order)),
-    Effect.tap((sortedTeams) => Effect.log("Sorted", sortedTeams)),
     Effect.withSpan("sortTeams", { captureStackTrace: true }),
   );
 
