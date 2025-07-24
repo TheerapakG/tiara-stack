@@ -92,28 +92,26 @@ const deriveRoomWithNormalPlayerTeam = (
       healer: Effect.succeed(playerTeam.tags.includes("heal")),
       encable: Effect.succeed(playerTeam.tags.includes("encable")),
     })),
-    Effect.let("filteredRooms", () =>
+    Effect.tap(() =>
+      Effect.log("Deriving room with normal player team", roomTeams),
+    ),
+    Effect.flatMap(({ healer }) =>
       pipe(
         Stream.fromIterable(roomTeams),
         Stream.filter(
           ({ enced, tiererEnced, highestBp }) =>
             !enced || tiererEnced || playerTeam.bp + ENC_BP_DIFF < highestBp,
         ),
-      ),
-    ),
-    Effect.flatMap(({ healer, filteredRooms }) =>
-      pipe(
-        filteredRooms,
         Stream.map(
-          ({ enced, tiererEnced, healed, highestBp, bp, percent, room }) =>
+          (roomTeam) =>
             new RoomTeam({
-              enced,
-              tiererEnced,
-              healed: healed + (healer ? 1 : 0),
-              highestBp: Math.max(highestBp, playerTeam.bp),
-              bp: bp + playerTeam.bp,
-              percent: percent + playerTeam.percent,
-              room: [...room, playerTeam],
+              enced: roomTeam.enced,
+              tiererEnced: roomTeam.tiererEnced,
+              healed: roomTeam.healed + (healer ? 1 : 0),
+              highestBp: Math.max(roomTeam.highestBp, playerTeam.bp),
+              bp: roomTeam.bp + playerTeam.bp,
+              percent: roomTeam.percent + playerTeam.percent,
+              room: [...roomTeam.room, playerTeam],
             }),
         ),
         Stream.runCollect,
@@ -139,29 +137,27 @@ const deriveRoomWithEncPlayerTeam = (
       tierer: Effect.succeed(playerTeam.tags.includes("tierer")),
       healer: Effect.succeed(playerTeam.tags.includes("heal")),
     })),
-    Effect.let("filteredRooms", ({ tierer }) =>
+    Effect.tap(() =>
+      Effect.log("Deriving room with enc player team", roomTeams),
+    ),
+    Effect.flatMap(({ tierer, healer }) =>
       pipe(
         Stream.fromIterable(roomTeams),
         Stream.filter(
           ({ enced, highestBp }) =>
             !enced && (tierer || playerTeam.bp > highestBp + ENC_BP_DIFF),
         ),
-      ),
-    ),
-    Effect.flatMap(({ tierer, healer, filteredRooms }) =>
-      pipe(
-        filteredRooms,
         Stream.map(
-          ({ healed, highestBp, bp, percent, room }) =>
+          (roomTeam) =>
             new RoomTeam({
               enced: true,
               tiererEnced: tierer,
-              healed: healed + (healer ? 1 : 0),
-              highestBp: Math.max(highestBp, playerTeam.bp),
-              bp: bp + playerTeam.bp,
-              percent: percent + 2 * playerTeam.percent,
+              healed: roomTeam.healed + (healer ? 1 : 0),
+              highestBp: Math.max(roomTeam.highestBp, playerTeam.bp),
+              bp: roomTeam.bp + playerTeam.bp,
+              percent: roomTeam.percent + 2 * playerTeam.percent,
               room: [
-                ...room,
+                ...roomTeam.room,
                 PlayerTeam.addTags([tierer ? "tierer_enc_override" : "enc"])(
                   playerTeam,
                 ),
@@ -306,7 +302,6 @@ const calc = (
         ),
       ),
     ),
-    Effect.tap(({ result }) => Effect.log("Result", result)),
     Effect.bind("sortedResult", ({ result }) => sortTeams(result)),
     Effect.bind("bestResult", ({ sortedResult }) =>
       filterBestTeams(sortedResult),
