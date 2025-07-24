@@ -27,6 +27,7 @@
     "drizzle-orm": "^0.44.0",
     "effect": "^3.16.8",
     "google-auth-library": "^10.1.0",
+    "handlebars": "^4.7.8",
     "postgres": "^3.4.7",
     "sheet-db-schema": "workspace:*",
     "typhoon-core": "workspace:*",
@@ -46,7 +47,7 @@
     "jiti": "^2.4.2",
     "pathe": "^2.0.3",
     "prettier": "^3.5.3",
-    "rolldown": "^1.0.0-beta.20",
+    "rolldown": "^1.0.0-beta.29",
     "rolldown-plugin-dts": "^0.13.12",
     "simple-git": "^3.28.0",
     "vite": "npm:rolldown-vite@latest"
