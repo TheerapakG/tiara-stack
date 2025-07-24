@@ -15,7 +15,10 @@ class PlayerTeam extends Data.TaggedClass("PlayerTeam")<{
   static addTags(tags: string[]) {
     return (playerTeam: PlayerTeam) =>
       new PlayerTeam({
-        ...playerTeam,
+        type: playerTeam.type,
+        team: playerTeam.team,
+        bp: playerTeam.bp,
+        percent: playerTeam.percent,
         tags: [...playerTeam.tags, ...tags],
       });
   }
@@ -183,7 +186,6 @@ const deriveRoomWithPlayerTeam = (
 ) =>
   pipe(
     Effect.Do,
-    Effect.tap(() => Effect.log("Deriving room with player team", playerTeam)),
     Effect.bindAll(() => ({
       tierer: Effect.succeed(playerTeam.tags.includes("tierer")),
       encable: Effect.succeed(playerTeam.tags.includes("encable")),
@@ -216,6 +218,7 @@ const deriveRoomWithPlayerTeams = (
     Effect.forEach(playerTeams, (playerTeam, i) =>
       pipe(
         deriveRoomWithPlayerTeam(config, roomTeams, playerTeam),
+        Effect.annotateLogs("playerTeam", playerTeam),
         Effect.annotateLogs("teamIndex", i + 1),
       ),
     ),
