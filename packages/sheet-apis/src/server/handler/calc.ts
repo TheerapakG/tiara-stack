@@ -71,7 +71,7 @@ class RoomTeam extends Data.TaggedClass("RoomTeam")<{
   highestBp: number;
   bp: number;
   percent: number;
-  room: PlayerTeam[];
+  room: Chunk.Chunk<PlayerTeam>;
 }> {
   static byBp = Order.mapInput(Order.number, ({ bp }: RoomTeam) => bp);
   static byPercent = Order.mapInput(
@@ -95,14 +95,14 @@ const deriveRoomWithNormalPlayerTeam = (
     Effect.tap(() =>
       Effect.log("Deriving room with normal player team", roomTeams),
     ),
-    Effect.flatMap(({ healer }) =>
+    Effect.map(({ healer }) =>
       pipe(
-        Stream.fromIterable(roomTeams),
-        Stream.filter(
+        roomTeams,
+        Chunk.filter(
           ({ enced, tiererEnced, highestBp }) =>
             !enced || tiererEnced || playerTeam.bp + ENC_BP_DIFF < highestBp,
         ),
-        Stream.map(
+        Chunk.map(
           (roomTeam) =>
             new RoomTeam({
               enced: roomTeam.enced,
@@ -111,10 +111,9 @@ const deriveRoomWithNormalPlayerTeam = (
               highestBp: Math.max(roomTeam.highestBp, playerTeam.bp),
               bp: roomTeam.bp + playerTeam.bp,
               percent: roomTeam.percent + playerTeam.percent,
-              room: [...roomTeam.room, playerTeam],
+              room: Chunk.append(roomTeam.room, playerTeam),
             }),
         ),
-        Stream.runCollect,
       ),
     ),
     Effect.tap((derivedRooms) =>
@@ -140,14 +139,14 @@ const deriveRoomWithEncPlayerTeam = (
     Effect.tap(() =>
       Effect.log("Deriving room with enc player team", roomTeams),
     ),
-    Effect.flatMap(({ tierer, healer }) =>
+    Effect.map(({ tierer, healer }) =>
       pipe(
-        Stream.fromIterable(roomTeams),
-        Stream.filter(
+        roomTeams,
+        Chunk.filter(
           ({ enced, highestBp }) =>
             !enced && (tierer || playerTeam.bp > highestBp + ENC_BP_DIFF),
         ),
-        Stream.map(
+        Chunk.map(
           (roomTeam) =>
             new RoomTeam({
               enced: true,
@@ -156,15 +155,14 @@ const deriveRoomWithEncPlayerTeam = (
               highestBp: Math.max(roomTeam.highestBp, playerTeam.bp),
               bp: roomTeam.bp + playerTeam.bp,
               percent: roomTeam.percent + 2 * playerTeam.percent,
-              room: [
-                ...roomTeam.room,
+              room: Chunk.append(
+                roomTeam.room,
                 PlayerTeam.addTags([tierer ? "tierer_enc_override" : "enc"])(
                   playerTeam,
                 ),
-              ],
+              ),
             }),
         ),
-        Stream.runCollect,
       ),
     ),
     Effect.tap((derivedRooms) =>
@@ -291,7 +289,7 @@ const calc = (
               highestBp: 0,
               bp: 0,
               percent: 0,
-              room: [],
+              room: Chunk.empty(),
             }),
           ) as Chunk.Chunk<RoomTeam>,
           (roomTeams, playerTeams, i) =>
@@ -312,7 +310,7 @@ const calc = (
         Chunk.map(({ bp, percent, room }) => ({
           averageBp: bp / 5,
           averagePercent: percent / 5,
-          room,
+          room: Chunk.toArray(room),
         })),
         Chunk.reverse,
       ),
