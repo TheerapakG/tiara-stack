@@ -24,9 +24,34 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 type({
                   "User IDs": "string",
                   "User Teams": "string",
+                  Hours: "string",
+                  Breaks: "string",
+                  "Hour Players": "string",
                 }).pipe((config) => ({
                   userIds: config["User IDs"],
                   userTeams: config["User Teams"],
+                  hours: config["Hours"],
+                  breaks: config["Breaks"],
+                  hourPlayers: config["Hour Players"],
+                })),
+              ),
+            ),
+          ),
+        getEventConfig: (sheetId: string) =>
+          pipe(
+            sheet.get({
+              spreadsheetId: sheetId,
+              ranges: ["'Thee's Sheet Settings'!E8:F"],
+            }),
+            Effect.map((response) =>
+              Object.fromEntries(response.data.valueRanges?.[0]?.values ?? []),
+            ),
+            Effect.flatMap(
+              validate(
+                type({
+                  "Start Time": "number",
+                }).pipe((config) => ({
+                  startTime: config["Start Time"],
                 })),
               ),
             ),

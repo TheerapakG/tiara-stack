@@ -1,4 +1,4 @@
-import { Effect, Layer, pipe } from "effect";
+import { Effect, Layer, Logger, pipe } from "effect";
 import { DBSubscriptionContext } from "typhoon-server/db";
 import { Bot } from "./bot";
 import { buttons } from "./buttons";
@@ -43,5 +43,6 @@ await Effect.runPromise(
     ),
     Effect.flatMap(({ bot }) => Bot.login(bot)),
     Effect.provide(layer),
+    Effect.provide(Logger.logFmt),
   ),
 );

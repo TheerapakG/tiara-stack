@@ -3,7 +3,7 @@ import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { serve as crosswsServe } from "crossws/server/node";
-import { Effect, pipe } from "effect";
+import { Effect, Logger, pipe } from "effect";
 import {
   InferServerType,
   serve,
@@ -23,6 +23,7 @@ const serveEffect = pipe(
   server,
   Effect.map(TyphoonServer.withTraceProvider(NodeSdkLive)),
   Effect.flatMap(serve(crosswsServe)),
+  Effect.provide(Logger.logFmt),
 );
 
 Effect.runPromise(serveEffect);
