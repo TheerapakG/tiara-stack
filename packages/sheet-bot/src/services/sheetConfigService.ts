@@ -23,12 +23,14 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
               validate(
                 type({
                   "User IDs": "string",
+                  "User Sheet Names": "string",
                   "User Teams": "string",
                   Hours: "string",
                   Breaks: "string",
                   "Hour Players": "string",
                 }).pipe((config) => ({
                   userIds: config["User IDs"],
+                  userSheetNames: config["User Sheet Names"],
                   userTeams: config["User Teams"],
                   hours: config["Hours"],
                   breaks: config["Breaks"],
@@ -49,9 +51,12 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
             Effect.flatMap(
               validate(
                 type({
-                  "Start Time": "number",
+                  "Start Time": "string | number",
                 }).pipe((config) => ({
-                  startTime: config["Start Time"],
+                  startTime:
+                    typeof config["Start Time"] === "number"
+                      ? config["Start Time"]
+                      : parseInt(config["Start Time"]),
                 })),
               ),
             ),
