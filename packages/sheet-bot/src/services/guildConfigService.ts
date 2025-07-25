@@ -1,6 +1,10 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { Effect, pipe } from "effect";
-import { configGuild, configGuildManagerRole } from "sheet-db-schema";
+import {
+  configGuild,
+  configGuildManagerRole,
+  configGuildRunningChannel,
+} from "sheet-db-schema";
 import { DBSubscriptionContext } from "typhoon-server/db";
 import { DB } from "../db";
 
@@ -77,7 +81,35 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                   eq(configGuildManagerRole.guildId, guildId),
                   eq(configGuildManagerRole.roleId, roleId),
                 ),
-              ),
+              )
+              .returning(),
+          ),
+        addRunningChannel: (guildId: string, channelId: string, name: string) =>
+          dbSubscriptionContext.mutateQuery(
+            db
+              .insert(configGuildRunningChannel)
+              .values({ guildId, channelId, name })
+              .onConflictDoUpdate({
+                target: [
+                  configGuildRunningChannel.guildId,
+                  configGuildRunningChannel.name,
+                ],
+                set: { channelId, deletedAt: null },
+              }),
+            // TODO: handle channel conflict
+          ),
+        removeRunningChannel: (guildId: string, name: string) =>
+          dbSubscriptionContext.mutateQuery(
+            db
+              .update(configGuildRunningChannel)
+              .set({ deletedAt: new Date() })
+              .where(
+                and(
+                  eq(configGuildRunningChannel.guildId, guildId),
+                  eq(configGuildRunningChannel.name, name),
+                ),
+              )
+              .returning(),
           ),
       })),
     ),

@@ -15,7 +15,7 @@ import { buttonInteractionHandlerContextBuilder } from "../types";
 const getSlotMessage = (day: number, serverId: string) =>
   pipe(
     Effect.Do,
-    Effect.bind("daySchedule", () => ScheduleService.list(day, serverId)),
+    Effect.bind("daySchedule", () => ScheduleService.listDay(day, serverId)),
     Effect.bind("slotMessages", ({ daySchedule: { start, schedules } }) =>
       Effect.forEach(schedules, (schedule) =>
         ScheduleService.formatEmptySlots(start, schedule),

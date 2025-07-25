@@ -1,5 +1,6 @@
 import {
   ApplicationIntegrationType,
+  channelMention,
   EmbedBuilder,
   escapeMarkdown,
   InteractionContextType,
@@ -9,7 +10,7 @@ import {
   SlashCommandSubcommandBuilder,
   SlashCommandSubcommandGroupBuilder,
 } from "discord.js";
-import { Effect, Option, pipe } from "effect";
+import { Array, Effect, Option, pipe } from "effect";
 import { observeEffectSignalOnce } from "typhoon-server/signal";
 import { GuildConfigService } from "../../services/guildConfigService";
 import {
@@ -115,6 +116,65 @@ const handleAddManagerRole = chatInputSubcommandHandlerContextBuilder()
   )
   .build();
 
+const handleAddRunningChannel = chatInputSubcommandHandlerContextBuilder()
+  .data(
+    new SlashCommandSubcommandBuilder()
+      .setName("running_channel")
+      .setDescription("Add a running channel for the server")
+      .addChannelOption((option) =>
+        option
+          .setName("channel")
+          .setDescription("The channel to add")
+          .setRequired(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("name")
+          .setDescription("The name of the running channel")
+          .setRequired(true),
+      ),
+  )
+  .handler((interaction) =>
+    pipe(
+      Effect.Do,
+      Effect.bindAll(() => ({
+        name: Effect.try(() => interaction.options.getString("name", true)),
+        channel: Effect.try(() =>
+          interaction.options.getChannel("channel", true),
+        ),
+        guild: Option.fromNullable(interaction.guild),
+        memberPermissions: Option.fromNullable(interaction.memberPermissions),
+      })),
+      Effect.tap(({ memberPermissions }) =>
+        !memberPermissions.has(PermissionFlagsBits.ManageGuild)
+          ? Effect.fail("You do not have permission to manage the server")
+          : Effect.void,
+      ),
+      Effect.tap(({ guild, name, channel }) =>
+        GuildConfigService.addRunningChannel(guild.id, channel.id, name),
+      ),
+      Effect.bind("response", ({ guild, name, channel }) =>
+        Effect.tryPromise(() =>
+          interaction.reply({
+            embeds: [
+              new EmbedBuilder()
+                .setTitle(`Success!`)
+                .setDescription(
+                  `${escapeMarkdown(name)} (${channelMention(channel.id)}) is now a running channel for ${escapeMarkdown(guild.name)}`,
+                )
+                .setTimestamp()
+                .setFooter({
+                  text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
+                }),
+            ],
+          }),
+        ),
+      ),
+      Effect.asVoid,
+    ),
+  )
+  .build();
+
 const handleAdd =
   chatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder()
     .data(
@@ -123,6 +183,7 @@ const handleAdd =
         .setDescription("Add a config to the server"),
     )
     .addSubcommandHandler(handleAddManagerRole)
+    .addSubcommandHandler(handleAddRunningChannel)
     .build();
 
 const handleRemoveManagerRole = chatInputSubcommandHandlerContextBuilder()
@@ -175,6 +236,59 @@ const handleRemoveManagerRole = chatInputSubcommandHandlerContextBuilder()
   )
   .build();
 
+const handleRemoveRunningChannel = chatInputSubcommandHandlerContextBuilder()
+  .data(
+    new SlashCommandSubcommandBuilder()
+      .setName("running_channel")
+      .setDescription("Remove a running channel from the server")
+      .addStringOption((option) =>
+        option
+          .setName("name")
+          .setDescription("The name of the running channel")
+          .setRequired(true),
+      ),
+  )
+  .handler((interaction) =>
+    pipe(
+      Effect.Do,
+      Effect.bindAll(() => ({
+        name: Effect.try(() => interaction.options.getString("name", true)),
+        guild: Option.fromNullable(interaction.guild),
+        memberPermissions: Option.fromNullable(interaction.memberPermissions),
+      })),
+      Effect.tap(({ memberPermissions }) =>
+        !memberPermissions.has(PermissionFlagsBits.ManageGuild)
+          ? Effect.fail("You do not have permission to manage the server")
+          : Effect.void,
+      ),
+      Effect.bind("runningChannel", ({ guild, name }) =>
+        pipe(
+          GuildConfigService.removeRunningChannel(guild.id, name),
+          Effect.flatMap(Array.head),
+        ),
+      ),
+      Effect.bind("response", ({ guild, name, runningChannel }) =>
+        Effect.tryPromise(() =>
+          interaction.reply({
+            embeds: [
+              new EmbedBuilder()
+                .setTitle(`Success!`)
+                .setDescription(
+                  `${escapeMarkdown(name)} (${channelMention(runningChannel.channelId)}) is no longer a running channel for ${escapeMarkdown(guild.name)}`,
+                )
+                .setTimestamp()
+                .setFooter({
+                  text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
+                }),
+            ],
+          }),
+        ),
+      ),
+      Effect.asVoid,
+    ),
+  )
+  .build();
+
 const handleRemove =
   chatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder()
     .data(
@@ -183,6 +297,7 @@ const handleRemove =
         .setDescription("Remove a config from the server"),
     )
     .addSubcommandHandler(handleRemoveManagerRole)
+    .addSubcommandHandler(handleRemoveRunningChannel)
     .build();
 
 const handleSetSheet = chatInputSubcommandHandlerContextBuilder()
