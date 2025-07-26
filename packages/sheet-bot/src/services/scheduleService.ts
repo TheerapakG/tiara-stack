@@ -183,12 +183,6 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
                   Array.filter(players, (player) => player !== undefined),
               ),
             ),
-            Effect.let("newPlayers", ({ prevPlayers, players }) =>
-              HashSet.difference(
-                HashSet.fromIterable(players),
-                HashSet.fromIterable(prevPlayers),
-              ),
-            ),
             Effect.bind("playerMap", () =>
               pipe(
                 SheetService.getPlayers(),
@@ -204,9 +198,9 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
                 Effect.map(HashMap.fromIterable),
               ),
             ),
-            Effect.map(({ newPlayers, playerMap }) => {
+            Effect.map(({ players, prevPlayers, playerMap }) => {
               const newPlayerMentions = pipe(
-                newPlayers,
+                HashSet.fromIterable(players),
                 HashSet.map((player) =>
                   pipe(
                     HashMap.get(playerMap, player),
@@ -214,6 +208,20 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
                       onSome: (id) => userMention(id),
                       onNone: () => player,
                     }),
+                  ),
+                ),
+                HashSet.difference(
+                  pipe(
+                    HashSet.fromIterable(prevPlayers),
+                    HashSet.map((player) =>
+                      pipe(
+                        HashMap.get(playerMap, player),
+                        Option.match({
+                          onSome: (id) => userMention(id),
+                          onNone: () => player,
+                        }),
+                      ),
+                    ),
                   ),
                 ),
               );
