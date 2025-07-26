@@ -115,12 +115,13 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
       Effect.let("hour", ({ hourOption, eventConfig }) =>
         pipe(
           hourOption,
-          Option.getOrElse(
-            () =>
+          Option.getOrElse(() =>
+            Math.floor(
               (pipe(new Date(), addMinutes(20), getUnixTime) -
                 eventConfig.startTime) /
                 3600 +
-              1,
+                1,
+            ),
           ),
         ),
       ),
