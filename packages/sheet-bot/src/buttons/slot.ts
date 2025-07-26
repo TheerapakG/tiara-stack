@@ -6,16 +6,17 @@ import {
   MessageFlags,
   MessageFlagsBitField,
 } from "discord.js";
-import { Chunk, Effect, Option, pipe, Ref } from "effect";
+import { Array, Chunk, Effect, Option, pipe, Ref } from "effect";
 import { observeEffectSignalOnce } from "typhoon-core/signal";
+import { SheetService } from "../services";
 import { ChannelConfigService } from "../services/channelConfigService";
 import { ScheduleService } from "../services/scheduleService";
 import { buttonInteractionHandlerContextBuilder } from "../types";
 
-const getSlotMessage = (day: number, serverId: string) =>
+const getSlotMessage = (day: number) =>
   pipe(
     Effect.Do,
-    Effect.bind("daySchedule", () => ScheduleService.listDay(day, serverId)),
+    Effect.bind("daySchedule", () => ScheduleService.listDay(day)),
     Effect.bind("slotMessages", ({ daySchedule: { start, schedules } }) =>
       Effect.forEach(schedules, (schedule) =>
         ScheduleService.formatEmptySlots(start, schedule),
@@ -48,14 +49,21 @@ export const button = buttonInteractionHandlerContextBuilder()
         serverId: Option.fromNullable(interaction.guildId),
         channel: Option.fromNullable(interaction.channel),
       })),
+      Effect.bind("sheetService", ({ serverId }) =>
+        SheetService.ofGuild(serverId),
+      ),
       Effect.bind("channelConfig", ({ channel }) =>
         observeEffectSignalOnce(ChannelConfigService.getConfig(channel.id)),
       ),
       Effect.bind("day", ({ channelConfig }) =>
-        Option.fromNullable(channelConfig[0].day),
+        pipe(
+          channelConfig,
+          Array.head,
+          Option.flatMap(({ day }) => Option.fromNullable(day)),
+        ),
       ),
-      Effect.bind("slotMessage", ({ day, serverId }) =>
-        getSlotMessage(day, serverId),
+      Effect.bind("slotMessage", ({ day, sheetService }) =>
+        pipe(getSlotMessage(day), Effect.provide(sheetService)),
       ),
       Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
       Effect.let("updateButton", () =>
