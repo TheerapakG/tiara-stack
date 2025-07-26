@@ -119,7 +119,8 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             () =>
               (pipe(new Date(), addMinutes(20), getUnixTime) -
                 eventConfig.startTime) /
-              3600,
+                3600 +
+              1,
           ),
         ),
       ),
