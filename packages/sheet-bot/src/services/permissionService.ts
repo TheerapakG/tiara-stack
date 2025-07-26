@@ -1,5 +1,5 @@
 import { ChatInputCommandInteraction } from "discord.js";
-import { Data, Effect } from "effect";
+import { Data, Effect, pipe } from "effect";
 
 export class OwnerError extends Data.TaggedError("OwnerError")<{
   readonly message: string;
@@ -49,12 +49,15 @@ export class PermissionService extends Effect.Service<PermissionService>()(
     sync: () => ({
       checkOwner: (
         interaction: ChatInputCommandInteraction,
-      ): Effect.Effect<void, OwnerError> => {
-        if (interaction.user.id === interaction.client.application.owner?.id)
-          return Effect.void;
-
-        return Effect.fail(new OwnerError());
-      },
+      ): Effect.Effect<void, OwnerError> =>
+        pipe(
+          interaction.user.id === interaction.client.application.owner?.id
+            ? Effect.void
+            : Effect.fail(new OwnerError()),
+          Effect.withSpan("PermissionService.checkOwner", {
+            captureStackTrace: true,
+          }),
+        ),
       checkRoles: (
         interaction: ChatInputCommandInteraction,
         roleIds: string[],
@@ -62,29 +65,25 @@ export class PermissionService extends Effect.Service<PermissionService>()(
       ): Effect.Effect<
         void,
         NotInGuildError | UncachedGuildError | PermissionError
-      > => {
-        if (interaction.user.id === interaction.client.application.owner?.id)
-          return Effect.void;
-
-        if (!interaction.inGuild()) {
-          return Effect.fail(new NotInGuildError());
-        }
-
-        if (!interaction.inCachedGuild()) {
-          return Effect.fail(new UncachedGuildError());
-        }
-
-        if (
-          interaction.inCachedGuild() &&
-          interaction.member?.roles.cache.some((role) =>
-            roleIds.includes(role.id),
-          )
-        ) {
-          return Effect.void;
-        }
-
-        return Effect.fail(new PermissionError(reason));
-      },
+      > =>
+        pipe(
+          interaction.user.id === interaction.client.application.owner?.id
+            ? Effect.void
+            : !interaction.inGuild()
+              ? Effect.fail<
+                  NotInGuildError | UncachedGuildError | PermissionError
+                >(new NotInGuildError())
+              : !interaction.inCachedGuild()
+                ? Effect.fail(new UncachedGuildError())
+                : interaction.member?.roles.cache.some((role) =>
+                      roleIds.includes(role.id),
+                    )
+                  ? Effect.void
+                  : Effect.fail(new PermissionError(reason)),
+          Effect.withSpan("PermissionService.checkRoles", {
+            captureStackTrace: true,
+          }),
+        ),
     }),
     accessors: true,
   },

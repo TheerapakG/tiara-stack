@@ -38,6 +38,9 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 })),
               ),
             ),
+            Effect.withSpan("SheetConfigService.getRangesConfig", {
+              captureStackTrace: true,
+            }),
           ),
         getEventConfig: (sheetId: string) =>
           pipe(
@@ -60,6 +63,9 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 })),
               ),
             ),
+            Effect.withSpan("SheetConfigService.getEventConfig", {
+              captureStackTrace: true,
+            }),
           ),
       })),
     ),

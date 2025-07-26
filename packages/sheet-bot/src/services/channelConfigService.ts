@@ -13,29 +13,39 @@ export class ChannelConfigService extends Effect.Service<ChannelConfigService>()
       Effect.bind("dbSubscriptionContext", () => DBSubscriptionContext),
       Effect.map(({ db, dbSubscriptionContext }) => ({
         getConfig: (channelId: string) =>
-          dbSubscriptionContext.subscribeQuery(
-            db
-              .select()
-              .from(configChannel)
-              .where(eq(configChannel.channelId, channelId)),
+          pipe(
+            dbSubscriptionContext.subscribeQuery(
+              db
+                .select()
+                .from(configChannel)
+                .where(eq(configChannel.channelId, channelId)),
+            ),
+            Effect.withSpan("ChannelConfigService.getConfig", {
+              captureStackTrace: true,
+            }),
           ),
         updateConfig: (
           channelId: string,
           config: Partial<typeof configChannel.$inferInsert>,
         ) =>
-          dbSubscriptionContext.mutateQuery(
-            db
-              .insert(configChannel)
-              .values({
-                channelId,
-                ...config,
-              })
-              .onConflictDoUpdate({
-                target: [configChannel.channelId],
-                set: {
+          pipe(
+            dbSubscriptionContext.mutateQuery(
+              db
+                .insert(configChannel)
+                .values({
+                  channelId,
                   ...config,
-                },
-              }),
+                })
+                .onConflictDoUpdate({
+                  target: [configChannel.channelId],
+                  set: {
+                    ...config,
+                  },
+                }),
+            ),
+            Effect.withSpan("ChannelConfigService.updateConfig", {
+              captureStackTrace: true,
+            }),
           ),
       })),
     ),

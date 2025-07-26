@@ -1,3 +1,7 @@
+import { NodeSdk } from "@effect/opentelemetry";
+import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { Effect, Layer, Logger, pipe } from "effect";
 import { DBSubscriptionContext } from "typhoon-server/db";
 import { Bot } from "./bot";
@@ -13,6 +17,12 @@ import {
   ScheduleService,
   SheetConfigService,
 } from "./services";
+
+const NodeSdkLive = NodeSdk.layer(() => ({
+  resource: { serviceName: "sheet-apis" },
+  spanProcessor: new BatchSpanProcessor(new OTLPTraceExporter()),
+  metricReader: new PrometheusExporter(),
+}));
 
 const layer = pipe(
   ScheduleService.DefaultWithoutDependencies,
@@ -36,6 +46,7 @@ await Effect.runPromise(
     Effect.bind("bot", () =>
       pipe(
         Bot.create(layer),
+        Effect.map(Bot.withTraceProvider(NodeSdkLive)),
         Effect.flatMap(Bot.registerProcessHandlers),
         Effect.flatMap(Bot.addChatInputCommandHandlerMap(commands)),
         Effect.flatMap(Bot.addButtonInteractionHandlerMap(buttons)),
