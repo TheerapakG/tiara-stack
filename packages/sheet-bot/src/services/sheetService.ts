@@ -65,13 +65,19 @@ export class SheetService extends Effect.Service<SheetService>()(
                 const userIdObjects = pipe(
                   userIds.values ?? [],
                   Array.map(([userId]) => ({
-                    id: String(userId),
+                    id:
+                      userId === undefined
+                        ? Option.none()
+                        : Option.some(String(userId)),
                   })),
                 );
                 const userSheetNameObjects = pipe(
                   userSheetNames.values ?? [],
                   Array.map(([userSheetName]) => ({
-                    name: String(userSheetName),
+                    name:
+                      userSheetName === undefined
+                        ? Option.none()
+                        : Option.some(String(userSheetName)),
                   })),
                 );
                 return pipe(

@@ -192,6 +192,14 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
             Effect.bind("playerMap", () =>
               pipe(
                 SheetService.getPlayers(),
+                Effect.map(
+                  Array.map(({ id, name }) =>
+                    Option.isSome(id) && Option.isSome(name)
+                      ? Option.some({ id: id.value, name: name.value })
+                      : Option.none(),
+                  ),
+                ),
+                Effect.map(Array.getSomes),
                 Effect.map(Array.map(({ id, name }) => [name, id] as const)),
                 Effect.map(HashMap.fromIterable),
               ),
