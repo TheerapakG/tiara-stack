@@ -5,25 +5,43 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Effect, Option, pipe } from "effect";
+import { Array, Effect, Option, pipe } from "effect";
 import { observeEffectSignalOnce } from "typhoon-server/signal";
 import {
   GuildConfigService,
   PermissionService,
   ScheduleService,
-  SheetConfigService,
+  SheetService,
 } from "../../services";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
 } from "../../types";
 
-const getCheckinMessage = (hour: number, serverId: string) =>
+const getCheckinMessage = (
+  hour: number,
+  channelName: string,
+  serverId: string,
+) =>
   pipe(
     Effect.Do,
-    Effect.bind("daySchedule", () => ScheduleService.list(serverId)),
-    Effect.bind("checkinMessage", ({ daySchedule: { start, schedules } }) =>
-      ScheduleService.formatCheckIn(hour, start, schedules),
+    Effect.bind("daySchedule", () => ScheduleService.list()),
+    Effect.bind("runningChannel", () =>
+      pipe(
+        GuildConfigService.getRunningChannel(serverId, channelName),
+        observeEffectSignalOnce,
+        Effect.flatMap(Array.head),
+      ),
+    ),
+    Effect.bind(
+      "checkinMessage",
+      ({ daySchedule: { start, schedules }, runningChannel }) =>
+        ScheduleService.formatCheckIn(
+          hour,
+          runningChannel.channelId,
+          start,
+          schedules,
+        ),
     ),
     Effect.map(({ checkinMessage }) => checkinMessage),
   );
@@ -38,6 +56,12 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
       )
       .addStringOption((option) =>
         option
+          .setName("channel_name")
+          .setDescription("The name of the running channel")
+          .setRequired(true),
+      )
+      .addStringOption((option) =>
+        option
           .setName("server_id")
           .setDescription("The server to check in users for"),
       ),
@@ -49,6 +73,9 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         hourOption: pipe(
           Effect.try(() => interaction.options.getNumber("hour")),
           Effect.map(Option.fromNullable),
+        ),
+        channelName: pipe(
+          Effect.try(() => interaction.options.getString("channel_name", true)),
         ),
         serverId: pipe(
           Effect.try(
@@ -79,8 +106,11 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
           "You can only check in users as a manager",
         ),
       ),
-      Effect.bind("eventConfig", ({ serverId }) =>
-        SheetConfigService.getEventConfig(serverId),
+      Effect.bind("sheetService", ({ serverId }) =>
+        SheetService.ofGuild(serverId),
+      ),
+      Effect.bind("eventConfig", ({ sheetService }) =>
+        pipe(SheetService.getEventConfig(), Effect.provide(sheetService)),
       ),
       Effect.let("hour", ({ hourOption, eventConfig }) =>
         pipe(
@@ -93,8 +123,13 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
           ),
         ),
       ),
-      Effect.bind("checkinMessage", ({ hour, serverId }) =>
-        getCheckinMessage(hour, serverId),
+      Effect.bind(
+        "checkinMessage",
+        ({ hour, channelName, serverId, sheetService }) =>
+          pipe(
+            getCheckinMessage(hour, channelName, serverId),
+            Effect.provide(sheetService),
+          ),
       ),
       Effect.bind("response", ({ checkinMessage }) =>
         Effect.tryPromise(() =>
