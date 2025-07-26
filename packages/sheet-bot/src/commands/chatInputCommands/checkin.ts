@@ -51,14 +51,14 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
     new SlashCommandSubcommandBuilder()
       .setName("manual")
       .setDescription("Manually check in users")
-      .addNumberOption((option) =>
-        option.setName("hour").setDescription("The hour to check in users for"),
-      )
       .addStringOption((option) =>
         option
           .setName("channel_name")
           .setDescription("The name of the running channel")
           .setRequired(true),
+      )
+      .addNumberOption((option) =>
+        option.setName("hour").setDescription("The hour to check in users for"),
       )
       .addStringOption((option) =>
         option
