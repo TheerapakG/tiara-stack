@@ -44,6 +44,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               Effect.bind("rangesConfig", () => rangesConfig),
               Effect.bind("sheet", ({ rangesConfig }) =>
                 sheet.get({
+                  spreadsheetId: sheetId,
                   ranges: [rangesConfig.userIds, rangesConfig.userSheetNames],
                 }),
               ),
