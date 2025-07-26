@@ -103,6 +103,9 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
               };
             }),
             Effect.map(({ daySchedule }) => daySchedule),
+            Effect.withSpan("ScheduleService.list", {
+              captureStackTrace: true,
+            }),
           ),
         listDay: (day: number) =>
           pipe(
@@ -144,6 +147,9 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
               };
             }),
             Effect.map(({ daySchedule }) => daySchedule),
+            Effect.withSpan("ScheduleService.listDay", {
+              captureStackTrace: true,
+            }),
           ),
         formatEmptySlots: (
           start: number,
@@ -204,6 +210,9 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
                 ),
               );
               return `${HashSet.toValues(newPlayerMentions).join(" ")} React to this message to check in, and head to ${channelMention(channelId)} for ${bold(`hour ${hour}`)} ${time(start + (hour - 1) * 3600, TimestampStyles.RelativeTime)}`;
+            }),
+            Effect.withSpan("ScheduleService.formatCheckIn", {
+              captureStackTrace: true,
             }),
           );
         },

@@ -28,16 +28,28 @@ export class SheetService extends Effect.Service<SheetService>()(
               "spreadsheetId"
             >,
             options?: MethodOptions,
-          ) => sheet.get({ spreadsheetId: sheetId, ...params }, options),
+          ) =>
+            pipe(
+              sheet.get({ spreadsheetId: sheetId, ...params }, options),
+              Effect.withSpan("SheetService.get", { captureStackTrace: true }),
+            ),
           update: (
             params?: Omit<
               sheets_v4.Params$Resource$Spreadsheets$Values$Batchupdate,
               "spreadsheetId"
             >,
             options?: MethodOptions,
-          ) => sheet.update({ spreadsheetId: sheetId, ...params }, options),
-          getRangesConfig: () => rangesConfig,
-          getEventConfig: () => eventConfig,
+          ) =>
+            pipe(
+              sheet.update({ spreadsheetId: sheetId, ...params }, options),
+              Effect.withSpan("SheetService.update", {
+                captureStackTrace: true,
+              }),
+            ),
+          getRangesConfig: () =>
+            pipe(rangesConfig, Effect.withSpan("SheetService.getRangesConfig")),
+          getEventConfig: () =>
+            pipe(eventConfig, Effect.withSpan("SheetService.getEventConfig")),
           getPlayers: () =>
             pipe(
               Effect.Do,
@@ -72,6 +84,9 @@ export class SheetService extends Effect.Service<SheetService>()(
                 );
               }),
               Effect.map(({ players }) => players),
+              Effect.withSpan("SheetService.getPlayers", {
+                captureStackTrace: true,
+              }),
             ),
         })),
       ),
@@ -96,6 +111,7 @@ export class SheetService extends Effect.Service<SheetService>()(
       Effect.map(({ sheetId }) =>
         SheetService.DefaultWithoutDependencies(sheetId),
       ),
+      Effect.withSpan("SheetService.ofGuild", { captureStackTrace: true }),
     );
   }
 }

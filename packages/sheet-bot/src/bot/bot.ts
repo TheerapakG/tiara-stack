@@ -68,6 +68,7 @@ export class Bot<E = never, R = never> {
     private readonly buttonsMap: SynchronizedRef.SynchronizedRef<
       ButtonInteractionHandlerMap<E, R>
     >,
+    private readonly traceProvider: Layer.Layer<never>,
     private readonly layer: Layer.Layer<R, E>,
     private readonly scopeLayer: SynchronizedRef.SynchronizedRef<
       Option.Option<ScopeLayer<E, R>>
@@ -262,6 +263,7 @@ export class Bot<E = never, R = never> {
             loginSemaphore,
             chatInputCommandsMap,
             buttonsMap,
+            Layer.empty,
             layer,
             scopeLayer,
           ),
@@ -278,11 +280,30 @@ export class Bot<E = never, R = never> {
       ),
       Effect.tap(({ bot, client }) =>
         client.on(Events.InteractionCreate, (interaction) =>
-          Effect.runPromise(Bot.onInteraction(interaction)(bot)),
+          Effect.runPromise(
+            pipe(
+              Bot.onInteraction(interaction)(bot),
+              Effect.provide(bot.traceProvider),
+            ),
+          ),
         ),
       ),
       Effect.map(({ bot }) => bot),
     );
+  }
+
+  static withTraceProvider(traceProvider: Layer.Layer<never>) {
+    return <E = never, R = never>(bot: Bot<E, R>) =>
+      new Bot<E, R>(
+        bot.client,
+        bot.loginLatch,
+        bot.loginSemaphore,
+        bot.chatInputCommandsMap,
+        bot.buttonsMap,
+        traceProvider,
+        bot.layer,
+        bot.scopeLayer,
+      );
   }
 
   static login<E = never, R = never>(bot: Bot<E, R>) {
