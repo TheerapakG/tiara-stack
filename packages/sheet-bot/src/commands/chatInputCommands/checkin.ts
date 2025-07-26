@@ -148,7 +148,7 @@ export const command =
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder()
     .data(
       new SlashCommandBuilder()
-        .setName("slot")
+        .setName("checkin")
         .setDescription("Checkin commands")
         .setIntegrationTypes(
           ApplicationIntegrationType.GuildInstall,
