@@ -1,9 +1,14 @@
-import { bold, time, TimestampStyles } from "discord.js";
+import {
+  bold,
+  channelMention,
+  time,
+  TimestampStyles,
+  userMention,
+} from "discord.js";
 import { Array, Effect, HashMap, HashSet, Option, pipe } from "effect";
-import { observeEffectSignalOnce } from "typhoon-server/signal";
 import { GoogleSheets } from "../google";
 import { GuildConfigService } from "./guildConfigService";
-import { SheetConfigService } from "./sheetConfigService";
+import { SheetService } from "./sheetService";
 
 type Schedule = {
   hour: number;
@@ -32,25 +37,14 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
       Effect.Do,
       Effect.bind("guildConfigService", () => GuildConfigService),
       Effect.bind("googleSheets", () => GoogleSheets),
-      Effect.map(({ guildConfigService, googleSheets }) => ({
-        list: (serverId: string) =>
+      Effect.map(() => ({
+        list: () =>
           pipe(
             Effect.Do,
-            Effect.bind("guildConfig", () =>
-              observeEffectSignalOnce(guildConfigService.getConfig(serverId)),
-            ),
-            Effect.bind("sheetId", ({ guildConfig }) =>
-              Option.fromNullable(guildConfig[0].sheetId),
-            ),
-            Effect.bind("eventConfig", ({ sheetId }) =>
-              SheetConfigService.getEventConfig(sheetId),
-            ),
-            Effect.bind("rangesConfig", ({ sheetId }) =>
-              SheetConfigService.getRangesConfig(sheetId),
-            ),
-            Effect.bind("sheet", ({ sheetId, rangesConfig }) =>
-              googleSheets.get({
-                spreadsheetId: sheetId,
+            Effect.bind("eventConfig", () => SheetService.getEventConfig()),
+            Effect.bind("rangesConfig", () => SheetService.getRangesConfig()),
+            Effect.bind("sheet", ({ rangesConfig }) =>
+              SheetService.get({
                 ranges: [
                   rangesConfig.hours,
                   rangesConfig.breaks,
@@ -110,21 +104,12 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
             }),
             Effect.map(({ daySchedule }) => daySchedule),
           ),
-        listDay: (day: number, serverId: string) =>
+        listDay: (day: number) =>
           pipe(
             Effect.Do,
-            Effect.bind("guildConfig", () =>
-              observeEffectSignalOnce(guildConfigService.getConfig(serverId)),
-            ),
-            Effect.bind("sheetId", ({ guildConfig }) =>
-              Option.fromNullable(guildConfig[0].sheetId),
-            ),
-            Effect.bind("eventConfig", ({ sheetId }) =>
-              SheetConfigService.getEventConfig(sheetId),
-            ),
-            Effect.bind("sheet", ({ sheetId }) =>
-              googleSheets.get({
-                spreadsheetId: sheetId,
+            Effect.bind("eventConfig", () => SheetService.getEventConfig()),
+            Effect.bind("sheet", () =>
+              SheetService.get({
                 ranges: [`'Day ${day}'!C3:C`, `'Day ${day}'!J3:O`],
               }),
             ),
@@ -170,6 +155,7 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
         },
         formatCheckIn: (
           hour: number,
+          channelId: string,
           start: number,
           schedules: HashMap.HashMap<number, Schedule>,
         ) => {
@@ -179,22 +165,45 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
               pipe(
                 HashMap.get(schedules, hour - 1),
                 Option.getOrElse(() => emptySchedule(hour - 1)),
-                ({ players }) => players,
+                ({ players }) =>
+                  Array.filter(players, (player) => player !== undefined),
               ),
             ),
             Effect.let("players", () =>
               pipe(
                 HashMap.get(schedules, hour),
                 Option.getOrElse(() => emptySchedule(hour)),
-                ({ players }) => players,
+                ({ players }) =>
+                  Array.filter(players, (player) => player !== undefined),
               ),
             ),
-            Effect.map(({ prevPlayers, players }) => {
+            Effect.let("newPlayers", ({ prevPlayers, players }) =>
               HashSet.difference(
                 HashSet.fromIterable(players),
                 HashSet.fromIterable(prevPlayers),
+              ),
+            ),
+            Effect.bind("playerMap", () =>
+              pipe(
+                SheetService.getPlayers(),
+                Effect.map(Array.map(({ id, name }) => [name, id] as const)),
+                Effect.map(HashMap.fromIterable),
+              ),
+            ),
+            Effect.map(({ newPlayers, playerMap }) => {
+              const newPlayerMentions = pipe(
+                newPlayers,
+                HashSet.map((player) =>
+                  pipe(
+                    HashMap.get(playerMap, player),
+                    Option.match({
+                      onSome: (id) => userMention(id),
+                      onNone: () => player,
+                    }),
+                  ),
+                ),
               );
-              return `React to this message to check in, and head to <#",'TOYA REBORN'!B$13,"> for ${bold(`hour ${hour}`)} ${time(start + (hour - 1) * 3600, TimestampStyles.RelativeTime)}`;
+              return `${HashSet.toValues(newPlayerMentions).join(" ")} React to this message to check in, and head to ${channelMention(channelId)} for ${bold(`hour ${hour}`)} ${time(start + (hour - 1) * 3600, TimestampStyles.RelativeTime)}`;
             }),
           );
         },

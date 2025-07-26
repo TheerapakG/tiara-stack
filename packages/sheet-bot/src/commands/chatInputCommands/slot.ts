@@ -21,15 +21,16 @@ import {
   PermissionService,
   ScheduleService,
 } from "../../services";
+import { SheetService } from "../../services/sheetService";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
 } from "../../types";
 
-const getSlotMessage = (day: number, serverId: string) =>
+const getSlotMessage = (day: number) =>
   pipe(
     Effect.Do,
-    Effect.bind("daySchedule", () => ScheduleService.listDay(day, serverId)),
+    Effect.bind("daySchedule", () => ScheduleService.listDay(day)),
     Effect.bind("slotMessages", ({ daySchedule: { start, schedules } }) =>
       Effect.forEach(schedules, (schedule) =>
         ScheduleService.formatEmptySlots(start, schedule),
@@ -121,8 +122,11 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
             )
           : Effect.void,
       ),
-      Effect.bind("slotMessage", ({ day, serverId }) =>
-        getSlotMessage(day, serverId),
+      Effect.bind("sheetService", ({ serverId }) =>
+        SheetService.ofGuild(serverId),
+      ),
+      Effect.bind("slotMessage", ({ day, sheetService }) =>
+        pipe(getSlotMessage(day), Effect.provide(sheetService)),
       ),
       Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
       Effect.bind("response", ({ day, slotMessage, flags }) =>

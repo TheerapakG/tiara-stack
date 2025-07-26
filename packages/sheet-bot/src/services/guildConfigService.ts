@@ -111,6 +111,19 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               )
               .returning(),
           ),
+        getRunningChannel: (guildId: string, name: string) =>
+          dbSubscriptionContext.subscribeQuery(
+            db
+              .select()
+              .from(configGuildRunningChannel)
+              .where(
+                and(
+                  eq(configGuildRunningChannel.guildId, guildId),
+                  eq(configGuildRunningChannel.name, name),
+                  isNull(configGuildRunningChannel.deletedAt),
+                ),
+              ),
+          ),
       })),
     ),
     dependencies: [DB.Default, DBSubscriptionContext.Default],
