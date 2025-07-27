@@ -133,10 +133,20 @@ export class SheetService extends Effect.Service<SheetService>()(
         Effect.bind("sheetConfigService", () => SheetConfigService),
         Effect.bindAll(({ sheetConfigService }) => ({
           rangesConfig: Effect.cached(
-            sheetConfigService.getRangesConfig(sheetId),
+            pipe(
+              sheetConfigService.getRangesConfig(sheetId),
+              Effect.withSpan("SheetService.rangesConfig", {
+                captureStackTrace: true,
+              }),
+            ),
           ),
           eventConfig: Effect.cached(
-            sheetConfigService.getEventConfig(sheetId),
+            pipe(
+              sheetConfigService.getEventConfig(sheetId),
+              Effect.withSpan("SheetService.eventConfig", {
+                captureStackTrace: true,
+              }),
+            ),
           ),
         })),
         Effect.let(
@@ -199,8 +209,13 @@ export class SheetService extends Effect.Service<SheetService>()(
           getAllSchedules: () =>
             pipe(
               Effect.Do,
-              Effect.bind("eventConfig", () => eventConfig),
-              Effect.bind("rangesConfig", () => rangesConfig),
+              Effect.bindAll(
+                () => ({
+                  eventConfig,
+                  rangesConfig,
+                }),
+                { concurrency: "unbounded" },
+              ),
               Effect.bind("sheet", ({ rangesConfig }) =>
                 sheetGet({
                   ranges: [
@@ -224,8 +239,13 @@ export class SheetService extends Effect.Service<SheetService>()(
           getDaySchedules: (day: number) =>
             pipe(
               Effect.Do,
-              Effect.bind("eventConfig", () => eventConfig),
-              Effect.bind("rangesConfig", () => rangesConfig),
+              Effect.bindAll(
+                () => ({
+                  eventConfig,
+                  rangesConfig,
+                }),
+                { concurrency: "unbounded" },
+              ),
               Effect.bind("sheet", () =>
                 sheetGet({
                   ranges: [
