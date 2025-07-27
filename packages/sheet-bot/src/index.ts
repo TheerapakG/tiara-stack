@@ -19,7 +19,7 @@ import {
 } from "./services";
 
 const NodeSdkLive = NodeSdk.layer(() => ({
-  resource: { serviceName: "sheet-apis" },
+  resource: { serviceName: "sheet-bot" },
   spanProcessor: new BatchSpanProcessor(new OTLPTraceExporter()),
   metricReader: new PrometheusExporter(),
 }));
