@@ -25,7 +25,7 @@ const getCheckinMessage = (
 ) =>
   pipe(
     Effect.Do,
-    Effect.bind("daySchedule", () => ScheduleService.list()),
+    Effect.bind("schedule", () => SheetService.getAllSchedules()),
     Effect.bind("runningChannel", () =>
       pipe(
         GuildConfigService.getRunningChannel(serverId, channelName),
@@ -35,7 +35,7 @@ const getCheckinMessage = (
     ),
     Effect.bind(
       "checkinMessage",
-      ({ daySchedule: { start, schedules }, runningChannel }) =>
+      ({ schedule: { start, schedules }, runningChannel }) =>
         ScheduleService.formatCheckIn(
           hour,
           runningChannel.channelId,

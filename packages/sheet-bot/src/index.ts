@@ -25,7 +25,7 @@ const NodeSdkLive = NodeSdk.layer(() => ({
 }));
 
 const layer = pipe(
-  ScheduleService.DefaultWithoutDependencies,
+  ScheduleService.Default,
   Layer.provideMerge(
     Layer.mergeAll(
       GuildConfigService.DefaultWithoutDependencies,
