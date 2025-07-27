@@ -6,7 +6,16 @@ import {
   MessageFlags,
   MessageFlagsBitField,
 } from "discord.js";
-import { Array, Chunk, Effect, Option, pipe, Ref } from "effect";
+import {
+  Array,
+  Chunk,
+  Effect,
+  HashMap,
+  Option,
+  Order,
+  pipe,
+  Ref,
+} from "effect";
 import { observeEffectSignalOnce } from "typhoon-core/signal";
 import { SheetService } from "../services";
 import { ChannelConfigService } from "../services/channelConfigService";
@@ -16,10 +25,15 @@ import { buttonInteractionHandlerContextBuilder } from "../types";
 const getSlotMessage = (day: number) =>
   pipe(
     Effect.Do,
-    Effect.bind("daySchedule", () => ScheduleService.listDay(day)),
+    Effect.bind("daySchedule", () => SheetService.getDaySchedules(day)),
     Effect.bind("slotMessages", ({ daySchedule: { start, schedules } }) =>
-      Effect.forEach(schedules, (schedule) =>
-        ScheduleService.formatEmptySlots(start, schedule),
+      pipe(
+        schedules,
+        HashMap.values,
+        Array.sortBy(Order.mapInput(Order.number, ({ hour }) => hour)),
+        Effect.forEach((schedule) =>
+          ScheduleService.formatEmptySlots(start, schedule),
+        ),
       ),
     ),
     Effect.let("slotMessage", ({ slotMessages }) =>

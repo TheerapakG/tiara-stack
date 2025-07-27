@@ -11,7 +11,16 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Chunk, Effect, Option, pipe, Ref } from "effect";
+import {
+  Array,
+  Chunk,
+  Effect,
+  HashMap,
+  Option,
+  Order,
+  pipe,
+  Ref,
+} from "effect";
 import { validate } from "typhoon-core/schema";
 import { observeEffectSignalOnce } from "typhoon-server/signal";
 import { button as slotButton } from "../../buttons/slot";
@@ -30,10 +39,15 @@ import {
 const getSlotMessage = (day: number) =>
   pipe(
     Effect.Do,
-    Effect.bind("daySchedule", () => ScheduleService.listDay(day)),
+    Effect.bind("daySchedule", () => SheetService.getDaySchedules(day)),
     Effect.bind("slotMessages", ({ daySchedule: { start, schedules } }) =>
-      Effect.forEach(schedules, (schedule) =>
-        ScheduleService.formatEmptySlots(start, schedule),
+      pipe(
+        schedules,
+        HashMap.values,
+        Array.sortBy(Order.mapInput(Order.number, ({ hour }) => hour)),
+        Effect.forEach((schedule) =>
+          ScheduleService.formatEmptySlots(start, schedule),
+        ),
       ),
     ),
     Effect.let("slotMessage", ({ slotMessages }) =>
