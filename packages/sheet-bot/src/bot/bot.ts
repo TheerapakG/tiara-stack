@@ -132,6 +132,9 @@ export class Bot<E = never, R = never> {
               ),
           }),
         ),
+        Effect.withSpan("Bot.onChatInputCommandInteraction", {
+          captureStackTrace: true,
+        }),
       );
   }
 
@@ -201,6 +204,9 @@ export class Bot<E = never, R = never> {
               ),
           }),
         ),
+        Effect.withSpan("Bot.onButtonInteraction", {
+          captureStackTrace: true,
+        }),
       );
   }
 
