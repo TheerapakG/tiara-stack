@@ -268,26 +268,6 @@ export class Bot<E = never, R = never> {
             scopeLayer,
           ),
       ),
-      Effect.tap(({ client }) =>
-        client.once(Events.ClientReady, (client) =>
-          Effect.runPromise(
-            pipe(
-              Effect.tryPromise(() => client.application.fetch()),
-              Effect.tap(() => Effect.log("Bot is ready")),
-            ),
-          ),
-        ),
-      ),
-      Effect.tap(({ bot, client }) =>
-        client.on(Events.InteractionCreate, (interaction) =>
-          Effect.runPromise(
-            pipe(
-              Bot.onInteraction(interaction)(bot),
-              Effect.provide(bot.traceProvider),
-            ),
-          ),
-        ),
-      ),
       Effect.map(({ bot }) => bot),
     );
   }
@@ -312,6 +292,25 @@ export class Bot<E = never, R = never> {
         ScopeLayer.make(bot.layer),
         Effect.andThen((scopeLayer) =>
           SynchronizedRef.update(bot.scopeLayer, () => Option.some(scopeLayer)),
+        ),
+        Effect.andThen(() =>
+          bot.client
+            .once(Events.ClientReady, (client) =>
+              Effect.runPromise(
+                pipe(
+                  Effect.tryPromise(() => client.application.fetch()),
+                  Effect.tap(() => Effect.log("Bot is ready")),
+                ),
+              ),
+            )
+            .on(Events.InteractionCreate, (interaction) =>
+              Effect.runPromise(
+                pipe(
+                  Bot.onInteraction(interaction)(bot),
+                  Effect.provide(bot.traceProvider),
+                ),
+              ),
+            ),
         ),
         Effect.andThen(() =>
           Effect.promise(() => bot.client.login(discordToken)),
