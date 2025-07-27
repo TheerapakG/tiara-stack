@@ -139,31 +139,43 @@ export class SheetService extends Effect.Service<SheetService>()(
             sheetConfigService.getEventConfig(sheetId),
           ),
         })),
-        Effect.map(({ sheet, rangesConfig, eventConfig }) => ({
-          get: (
-            params?: Omit<
-              sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
-              "spreadsheetId"
-            >,
-            options?: MethodOptions,
-          ) =>
-            pipe(
-              sheet.get({ spreadsheetId: sheetId, ...params }, options),
-              Effect.withSpan("SheetService.get", { captureStackTrace: true }),
-            ),
-          update: (
-            params?: Omit<
-              sheets_v4.Params$Resource$Spreadsheets$Values$Batchupdate,
-              "spreadsheetId"
-            >,
-            options?: MethodOptions,
-          ) =>
-            pipe(
-              sheet.update({ spreadsheetId: sheetId, ...params }, options),
-              Effect.withSpan("SheetService.update", {
-                captureStackTrace: true,
-              }),
-            ),
+        Effect.let(
+          "sheetGet",
+          ({ sheet }) =>
+            (
+              params?: Omit<
+                sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
+                "spreadsheetId"
+              >,
+              options?: MethodOptions,
+            ) =>
+              pipe(
+                sheet.get({ spreadsheetId: sheetId, ...params }, options),
+                Effect.withSpan("SheetService.get", {
+                  captureStackTrace: true,
+                }),
+              ),
+        ),
+        Effect.let(
+          "sheetUpdate",
+          ({ sheet }) =>
+            (
+              params?: Omit<
+                sheets_v4.Params$Resource$Spreadsheets$Values$Batchupdate,
+                "spreadsheetId"
+              >,
+              options?: MethodOptions,
+            ) =>
+              pipe(
+                sheet.update({ spreadsheetId: sheetId, ...params }, options),
+                Effect.withSpan("SheetService.update", {
+                  captureStackTrace: true,
+                }),
+              ),
+        ),
+        Effect.map(({ sheetGet, sheetUpdate, rangesConfig, eventConfig }) => ({
+          get: sheetGet,
+          update: sheetUpdate,
           getRangesConfig: () =>
             pipe(rangesConfig, Effect.withSpan("SheetService.getRangesConfig")),
           getEventConfig: () =>
@@ -173,8 +185,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               Effect.Do,
               Effect.bind("rangesConfig", () => rangesConfig),
               Effect.bind("sheet", ({ rangesConfig }) =>
-                sheet.get({
-                  spreadsheetId: sheetId,
+                sheetGet({
                   ranges: [rangesConfig.userIds, rangesConfig.userSheetNames],
                 }),
               ),
@@ -191,7 +202,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               Effect.bind("eventConfig", () => eventConfig),
               Effect.bind("rangesConfig", () => rangesConfig),
               Effect.bind("sheet", ({ rangesConfig }) =>
-                sheet.get({
+                sheetGet({
                   ranges: [
                     rangesConfig.hours,
                     rangesConfig.breaks,
@@ -216,7 +227,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               Effect.bind("eventConfig", () => eventConfig),
               Effect.bind("rangesConfig", () => rangesConfig),
               Effect.bind("sheet", () =>
-                sheet.get({
+                sheetGet({
                   ranges: [
                     `'Day ${day}'!J3:J`,
                     `'Day ${day}'!C3:C`,
