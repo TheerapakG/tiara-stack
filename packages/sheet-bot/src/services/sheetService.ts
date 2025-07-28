@@ -56,6 +56,77 @@ const playerParser = (
     Effect.withSpan("playerParser", { captureStackTrace: true }),
   );
 
+export type Team = {
+  teamName: Option.Option<string>;
+  lead: Option.Option<number>;
+  backline: Option.Option<number>;
+  talent: Option.Option<number>;
+};
+
+const teamParser = (
+  valueRange: sheets_v4.Schema$ValueRange[] | undefined,
+): Effect.Effect<
+  HashMap.HashMap<string, { id: string; teams: Team[] }>,
+  never,
+  never
+> =>
+  pipe(
+    Effect.Do,
+    Effect.bindAll(() => {
+      const [userIds, userTeams] = valueRange ?? [];
+      return {
+        userIds: parseValueRange(userIds, ([userId]) =>
+          Effect.succeed({
+            id: pipe(Option.fromNullable(userId), Option.map(String)),
+          }),
+        ),
+        userTeams: parseValueRange(userTeams, (teams) =>
+          Effect.succeed({
+            teams: pipe(
+              teams,
+              Array.chunksOf(6),
+              Array.map(
+                ([teamName, _isv, lead, backline, talent, _isvPercent]) => ({
+                  teamName: pipe(
+                    Option.fromNullable(teamName),
+                    Option.map(String),
+                  ),
+                  lead: pipe(
+                    Option.fromNullable(lead),
+                    Option.map((lead) => parseInt(lead, 10)),
+                  ),
+                  backline: pipe(
+                    Option.fromNullable(backline),
+                    Option.map((backline) => parseInt(backline, 10)),
+                  ),
+                  talent: pipe(
+                    Option.fromNullable(talent),
+                    Option.map((talent) => parseInt(talent, 10)),
+                  ),
+                }),
+              ),
+            ),
+          }),
+        ),
+      };
+    }),
+    Effect.map(({ userIds, userTeams }) =>
+      pipe(
+        userIds,
+        zipRows(userTeams),
+        Array.map(({ id, teams }) =>
+          pipe(
+            id,
+            Option.map((id) => [id, { id, teams }] as const),
+          ),
+        ),
+        Array.getSomes,
+        HashMap.fromIterable,
+      ),
+    ),
+    Effect.withSpan("playerParser", { captureStackTrace: true }),
+  );
+
 export type Schedule = {
   hour: number;
   breakHour: boolean;
@@ -203,6 +274,20 @@ export class SheetService extends Effect.Service<SheetService>()(
                 playerParser(sheet.data.valueRanges),
               ),
               Effect.withSpan("SheetService.getPlayers", {
+                captureStackTrace: true,
+              }),
+            ),
+          getTeams: () =>
+            pipe(
+              Effect.Do,
+              Effect.bind("rangesConfig", () => rangesConfig),
+              Effect.bind("sheet", ({ rangesConfig }) =>
+                sheetGet({
+                  ranges: [rangesConfig.userIds, rangesConfig.userTeams],
+                }),
+              ),
+              Effect.flatMap(({ sheet }) => teamParser(sheet.data.valueRanges)),
+              Effect.withSpan("SheetService.getTeams", {
                 captureStackTrace: true,
               }),
             ),

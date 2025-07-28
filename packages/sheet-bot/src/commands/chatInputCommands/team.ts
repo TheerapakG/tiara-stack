@@ -6,14 +6,14 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, Effect, Option, pipe } from "effect";
+import { Array, Effect, HashMap, Option, pipe } from "effect";
 import { observeEffectSignalOnce } from "typhoon-server/signal";
-import { GoogleSheets } from "../../google";
 import {
   GuildConfigService,
   PermissionService,
-  SheetConfigService,
+  SheetService,
 } from "../../services";
+import { Team } from "../../services/sheetService";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
@@ -70,40 +70,37 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
             )
           : Effect.void,
       ),
-      Effect.bind("guildConfig", ({ serverId }) =>
-        observeEffectSignalOnce(GuildConfigService.getConfig(serverId)),
+      Effect.bind("sheetService", ({ serverId }) =>
+        SheetService.ofGuild(serverId),
       ),
-      Effect.bind("sheetId", ({ guildConfig }) =>
-        Option.fromNullable(guildConfig[0].sheetId),
+      Effect.bind("teams", ({ sheetService }) =>
+        pipe(SheetService.getTeams(), Effect.provide(sheetService)),
       ),
-      Effect.bind("sheetConfig", ({ sheetId }) =>
-        SheetConfigService.getRangesConfig(sheetId),
-      ),
-      Effect.bind("sheet", ({ sheetId, sheetConfig }) =>
-        GoogleSheets.get({
-          spreadsheetId: sheetId,
-          ranges: [sheetConfig.userIds, sheetConfig.userTeams],
-        }),
-      ),
-      Effect.let("teams", ({ sheet }) => {
-        const [userIds, userTeams] = sheet.data.valueRanges ?? [];
-        return Array.zip(
-          userIds.values?.map((value) => value[0]) ?? [],
-          userTeams.values ?? [],
-        ).flatMap(([userId, userTeams]) =>
-          Array.chunksOf(userTeams ?? [], 6).map(
-            ([teamName, _isv, lead, backline, talent, _isvPercent]) => ({
-              userId,
-              teamName,
-              lead: Number(lead),
-              backline: Number(backline),
-              talent,
-            }),
-          ),
-        );
-      }),
       Effect.let("userTeams", ({ user, teams }) =>
-        teams.filter((team) => team.userId === user.id && team.teamName),
+        pipe(
+          HashMap.get(teams, user.id),
+          Option.map(({ teams }) => teams),
+          Option.getOrElse(() => [] as Team[]),
+          Array.map((team) =>
+            Option.map(team.teamName, (teamName) => ({
+              teamName,
+              lead: Option.getOrUndefined(team.lead),
+              backline: Option.getOrUndefined(team.backline),
+              talent: Option.getOrUndefined(team.talent),
+            })),
+          ),
+          Array.getSomes,
+          Array.map((team) => ({
+            ...team,
+            leadFormatted: team.lead ?? "?",
+            backlineFormatted: team.backline ?? "?",
+            talentFormatted: team.talent ? `/${team.talent}k` : "",
+            effectValueFormatted:
+              team.lead && team.backline
+                ? ` (+${team.lead + (team.backline - team.lead) / 5}%)`
+                : "",
+          })),
+        ),
       ),
       Effect.tap(({ user, userTeams }) =>
         interaction.reply({
@@ -114,7 +111,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
               .addFields(
                 userTeams.map((team) => ({
                   name: escapeMarkdown(team.teamName),
-                  value: `ISV: ${team.lead}/${team.backline}${team.talent ? `/${team.talent}` : ""} (+${team.lead + (team.backline - team.lead) / 5}%)`,
+                  value: `ISV: ${team.leadFormatted}/${team.backlineFormatted}${team.talentFormatted}${team.effectValueFormatted}`,
                 })),
               )
               .setTimestamp()
