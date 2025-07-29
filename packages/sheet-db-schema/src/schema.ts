@@ -13,6 +13,7 @@ export const configGuild = pgTable(
     id: serial("id").primaryKey(),
     guildId: varchar("guild_id").notNull(),
     sheetId: varchar("sheet_id"),
+    scriptId: varchar("script_id"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),

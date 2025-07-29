@@ -354,6 +354,60 @@ const handleSetSheet = chatInputSubcommandHandlerContextBuilder()
   )
   .build();
 
+const handleSetScript = chatInputSubcommandHandlerContextBuilder()
+  .data(
+    new SlashCommandSubcommandBuilder()
+      .setName("script")
+      .setDescription("Set the script id for the server")
+      .addStringOption((option) =>
+        option
+          .setName("script_id")
+          .setDescription("The script id to set")
+          .setRequired(true),
+      ),
+  )
+  .handler((interaction) =>
+    pipe(
+      Effect.Do,
+      Effect.bindAll(() => ({
+        scriptId: Effect.try(() =>
+          interaction.options.getString("script_id", true),
+        ),
+        guild: Option.fromNullable(interaction.guild),
+        memberPermissions: Option.fromNullable(interaction.memberPermissions),
+      })),
+      Effect.tap(({ memberPermissions }) =>
+        !memberPermissions.has(PermissionFlagsBits.ManageGuild)
+          ? Effect.fail("You do not have permission to manage the server")
+          : Effect.void,
+      ),
+      Effect.tap(({ guild, scriptId }) =>
+        GuildConfigService.updateConfig(guild.id, {
+          scriptId,
+        }),
+      ),
+      Effect.bind("response", ({ guild, scriptId }) =>
+        Effect.tryPromise(() =>
+          interaction.reply({
+            embeds: [
+              new EmbedBuilder()
+                .setTitle(`Success!`)
+                .setDescription(
+                  `Script id for ${escapeMarkdown(guild.name)} is now set to ${escapeMarkdown(scriptId)}`,
+                )
+                .setTimestamp()
+                .setFooter({
+                  text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
+                }),
+            ],
+          }),
+        ),
+      ),
+      Effect.asVoid,
+    ),
+  )
+  .build();
+
 const handleSet =
   chatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder()
     .data(
@@ -362,6 +416,7 @@ const handleSet =
         .setDescription("Set the config of the server"),
     )
     .addSubcommandHandler(handleSetSheet)
+    .addSubcommandHandler(handleSetScript)
     .build();
 
 export const command =
