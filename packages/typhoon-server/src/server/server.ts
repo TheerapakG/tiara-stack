@@ -460,7 +460,7 @@ export class Server<
           update,
           Exit.match({
             onSuccess: (value) => value,
-            onFailure: (cause) => pipe(cause, Cause.pretty),
+            onFailure: (cause) => pipe(cause, Cause.squash),
           }),
         ),
       ),

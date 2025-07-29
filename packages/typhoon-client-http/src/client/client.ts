@@ -16,9 +16,7 @@ import {
 } from "typhoon-core/server";
 import * as v from "valibot";
 
-export class HandlerError extends Data.TaggedError("HandlerError")<{
-  error: unknown;
-}> {}
+export class HandlerError extends Data.TaggedError("HandlerError") {}
 
 export class AppsScriptClient<
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -135,7 +133,7 @@ export class AppsScriptClient<
                 ServerSubscriptionHandlers[Handler]["config"]["response"]["validator"]
               >,
             )
-          : Effect.fail(new HandlerError({ error: decodedResponse })),
+          : Effect.fail(new HandlerError(decodedResponse as void)),
       ),
       Effect.scoped,
       Effect.withSpan("AppsScriptClient.once"),
