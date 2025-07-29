@@ -24,7 +24,11 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.202.0",
     "@opentelemetry/sdk-metrics": "^2.0.1",
     "@opentelemetry/sdk-trace-base": "^2.0.1",
+    "arktype": "^2.1.20",
+    "c12": "^3.0.4",
+    "drizzle-orm": "^0.44.0",
     "effect": "^3.16.8",
+    "postgres": "^3.4.7",
     "typhoon-core": "workspace:*",
     "typhoon-server": "workspace:*",
     "valibot": "^1.1.0"
