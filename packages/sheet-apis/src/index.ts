@@ -23,6 +23,8 @@ const serveEffect = pipe(
   server,
   Effect.map(TyphoonServer.withTraceProvider(NodeSdkLive)),
   Effect.flatMap(serve(crosswsServe)),
+  Effect.sandbox,
+  Effect.catchAll((error) => Effect.logError(error)),
   Effect.provide(Logger.logFmt),
 );
 

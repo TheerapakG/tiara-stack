@@ -126,7 +126,6 @@ export class Server<
   private readonly scopeLayer: SynchronizedRef.SynchronizedRef<
     Option.Option<ScopeLayer<unknown, R>>
   >;
-  private readonly startLatch: Effect.Latch;
   private readonly startSemaphore: Effect.Semaphore;
 
   constructor(
@@ -138,7 +137,6 @@ export class Server<
     scopeLayer: SynchronizedRef.SynchronizedRef<
       Option.Option<ScopeLayer<unknown, R>>
     >,
-    startLatch: Effect.Latch,
     startSemaphore: Effect.Semaphore,
   ) {
     this.traceProvider = traceProvider;
@@ -151,7 +149,6 @@ export class Server<
     });
     this.layer = layer;
     this.scopeLayer = scopeLayer;
-    this.startLatch = startLatch;
     this.startSemaphore = startSemaphore;
   }
 
@@ -172,10 +169,9 @@ export class Server<
       Effect.bind("scopeLayer", () =>
         SynchronizedRef.make(Option.none<ScopeLayer<unknown, R>>()),
       ),
-      Effect.bind("startLatch", () => Effect.makeLatch(false)),
       Effect.bind("startSemaphore", () => Effect.makeSemaphore(1)),
       Effect.map(
-        ({ peerStateMapRef, scopeLayer, startLatch, startSemaphore }) =>
+        ({ peerStateMapRef, scopeLayer, startSemaphore }) =>
           // eslint-disable-next-line @typescript-eslint/no-empty-object-type
           new Server<R, {}, {}>(
             Layer.empty,
@@ -184,7 +180,6 @@ export class Server<
             peerStateMapRef,
             layer,
             scopeLayer,
-            startLatch,
             startSemaphore,
           ),
       ),
@@ -211,7 +206,6 @@ export class Server<
         server.peerStateMapRef,
         server.layer,
         server.scopeLayer,
-        server.startLatch,
         server.startSemaphore,
       );
     };
@@ -893,7 +887,6 @@ export class Server<
           Option.some(scopeLayer),
         ),
       ),
-      Effect.andThen(() => server.startLatch.await),
       Effect.as(server),
       server.startSemaphore.withPermits(1),
     );
@@ -912,7 +905,6 @@ export class Server<
         ),
       ),
       Effect.tap(() => Effect.log("Server is stopped")),
-      Effect.andThen(() => server.startLatch.release),
       Effect.as(server),
     );
   }
