@@ -12,7 +12,7 @@ import {
 } from "discord.js";
 import { Array, Effect, Option, pipe } from "effect";
 import { observeEffectSignalOnce } from "typhoon-server/signal";
-import { GuildConfigService } from "../../services/guildConfigService";
+import { GuildConfigService, PermissionService } from "../../services";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder,
@@ -374,13 +374,8 @@ const handleSetScript = chatInputSubcommandHandlerContextBuilder()
           interaction.options.getString("script_id", true),
         ),
         guild: Option.fromNullable(interaction.guild),
-        memberPermissions: Option.fromNullable(interaction.memberPermissions),
       })),
-      Effect.tap(({ memberPermissions }) =>
-        !memberPermissions.has(PermissionFlagsBits.ManageGuild)
-          ? Effect.fail("You do not have permission to manage the server")
-          : Effect.void,
-      ),
+      Effect.tap(() => PermissionService.checkOwner(interaction)),
       Effect.tap(({ guild, scriptId }) =>
         GuildConfigService.updateConfig(guild.id, {
           scriptId,
