@@ -1,4 +1,5 @@
 import {
+  Array,
   Chunk,
   Data,
   Effect,
@@ -8,9 +9,11 @@ import {
   pipe,
   Stream,
 } from "effect";
+import { observeEffectSignalOnce } from "typhoon-core/signal";
 import { defineHandlerConfigBuilder } from "typhoon-server/config";
 import { defineHandlerBuilder, Event } from "typhoon-server/server";
 import * as v from "valibot";
+import { GuildConfigService } from "../../services";
 
 const ENC_BP_DIFF = 0;
 
@@ -383,12 +386,67 @@ const calcHandlerConfig = defineHandlerConfigBuilder()
   })
   .build();
 
+const extractGoogleAppsScriptId = (userAgent: string) =>
+  pipe(
+    Effect.Do,
+    Effect.let("match", () =>
+      userAgent.match(/Google-Apps-Script.*?id:\s*([^\s)]+)/i),
+    ),
+    Effect.map(({ match }) =>
+      pipe(
+        Option.fromNullable(match),
+        Option.map((match) => match[1]),
+      ),
+    ),
+    Effect.withSpan("extractGoogleAppsScriptId", { captureStackTrace: true }),
+  );
+
 export const calcHandler = defineHandlerBuilder()
   .config(calcHandlerConfig)
   .handler(
     pipe(
-      Event.withConfig(calcHandlerConfig).request.parsed(),
-      Effect.flatMap(({ config, players }) => calc(config, players)),
+      Effect.Do,
+      Effect.bind("request", () => Event.webRequest()),
+      Effect.bind("userAgent", ({ request }) =>
+        Effect.succeed(request.headers.get("user-agent") ?? ""),
+      ),
+      Effect.bind("googleAppsScriptId", ({ userAgent }) =>
+        pipe(
+          extractGoogleAppsScriptId(userAgent),
+          Effect.flatMap(
+            Option.match({
+              onNone: () =>
+                Effect.fail({
+                  message:
+                    "unregistered sheet... contact me before yoinking the sheet could you?",
+                }),
+              onSome: (scriptId) => Effect.succeed(scriptId),
+            }),
+          ),
+        ),
+      ),
+      Effect.bind("guildConfig", ({ googleAppsScriptId }) =>
+        pipe(
+          GuildConfigService.getGuildConfigWithBoundScript(googleAppsScriptId),
+          observeEffectSignalOnce,
+          Effect.map(Array.head),
+          Effect.flatMap(
+            Option.match({
+              onNone: () =>
+                Effect.fail({
+                  message: "",
+                }),
+              onSome: (guildConfig) => Effect.succeed(guildConfig),
+            }),
+          ),
+        ),
+      ),
+      Effect.bind("parsed", () =>
+        Event.withConfig(calcHandlerConfig).request.parsed(),
+      ),
+      Effect.flatMap(({ parsed: { config, players } }) =>
+        calc(config, players),
+      ),
       Effect.map(Chunk.toArray),
       Effect.withSpan("calcHandler", { captureStackTrace: true }),
     ),

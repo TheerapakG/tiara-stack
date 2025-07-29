@@ -213,7 +213,7 @@ export class Server<
 
   // TODO: check handler requirement extends server requirement
   static add<
-    Handler extends SubscriptionHandlerContext | MutationHandlerContext,
+    Handler extends AnySubscriptionHandlerContext | AnyMutationHandlerContext,
   >(handler: Handler) {
     return <
       R = never,
@@ -226,7 +226,7 @@ export class Server<
       MutationHandlers extends Record<string, MutationHandlerContext> = {},
     >(
       server: Server<R, SubscriptionHandlers, MutationHandlers>,
-    ): Handler extends SubscriptionHandlerContext
+    ): [Handler] extends [AnySubscriptionHandlerContext]
       ? Server<
           R,
           SubscriptionHandlers & {
@@ -234,7 +234,7 @@ export class Server<
           },
           MutationHandlers
         >
-      : Handler extends MutationHandlerContext
+      : [Handler] extends [AnyMutationHandlerContext]
         ? Server<
             R,
             SubscriptionHandlers,
@@ -257,10 +257,12 @@ export class Server<
             handler as MutationHandlerContext,
           );
         }),
-        Match.exhaustive,
+        Match.orElseAbsurd,
       );
 
-      return server as unknown as Handler extends SubscriptionHandlerContext
+      return server as unknown as [Handler] extends [
+        AnySubscriptionHandlerContext,
+      ]
         ? Server<
             R,
             SubscriptionHandlers & {
@@ -268,7 +270,7 @@ export class Server<
             },
             MutationHandlers
           >
-        : Handler extends MutationHandlerContext
+        : [Handler] extends [AnyMutationHandlerContext]
           ? Server<
               R,
               SubscriptionHandlers,
@@ -530,6 +532,7 @@ export class Server<
               pipe(
                 Event.replaceStreamContext({
                   pullStream: pullDecodedStream,
+                  request: peer.request,
                   scope,
                 }),
                 Effect.map((event) => ({
@@ -546,6 +549,7 @@ export class Server<
                 Effect.let("event", () =>
                   Event.fromPullStreamContext({
                     pullStream: pullDecodedStream,
+                    request: peer.request,
                     scope,
                   }),
                 ),
@@ -641,6 +645,7 @@ export class Server<
       MsgpackDecodeError | StreamExhaustedError,
       never
     >,
+    request: Request,
     header: Header<"client:once">,
     callback: (buffer: Uint8Array) => Effect.Effect<A, E, Event>,
     scope: Scope.CloseableScope,
@@ -651,6 +656,7 @@ export class Server<
         Effect.let("event", () =>
           Event.fromPullStreamContext({
             pullStream: pullDecodedStream,
+            request,
             scope,
           }),
         ),
@@ -701,6 +707,7 @@ export class Server<
       MsgpackDecodeError | StreamExhaustedError,
       never
     >,
+    request: Request,
     header: Header<"client:mutate">,
     callback: Effect.Effect<A, E, Event>,
     scope: Scope.CloseableScope,
@@ -711,6 +718,7 @@ export class Server<
         Effect.let("event", () =>
           Event.fromPullStreamContext({
             pullStream: pullDecodedStream,
+            request,
             scope,
           }),
         ),
@@ -791,6 +799,7 @@ export class Server<
             Match.when({ action: "client:once" }, (header) =>
               Server.handleOnce(
                 pullDecodedStream,
+                peer.request,
                 header,
                 (buffer) =>
                   Effect.sync(() => {
@@ -804,6 +813,7 @@ export class Server<
             Match.when({ action: "client:mutate" }, (header) =>
               Server.handleMutate(
                 pullDecodedStream,
+                peer.request,
                 header,
                 Effect.void,
                 scope,
@@ -846,6 +856,7 @@ export class Server<
             Match.when({ action: "client:once" }, (header) =>
               Server.handleOnce(
                 pullDecodedStream,
+                request,
                 header,
                 (buffer) =>
                   Effect.sync(
@@ -863,6 +874,7 @@ export class Server<
             Match.when({ action: "client:mutate" }, (header) =>
               Server.handleMutate(
                 pullDecodedStream,
+                request,
                 header,
                 Effect.sync(() => new Response("", { status: 200 })),
                 scope,

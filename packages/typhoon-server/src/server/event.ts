@@ -60,24 +60,22 @@ type PullStreamContext = {
     MsgpackDecodeError | StreamExhaustedError,
     never
   >;
+  request: Request;
   scope: Scope.CloseableScope;
 };
 
 export class Event extends Context.Tag("Event")<
   Event,
-  Signal<{
-    readonly pullStream: Effect.Effect<
-      Chunk.Chunk<unknown>,
-      MsgpackDecodeError | StreamExhaustedError,
-      never
-    >;
-    readonly scope: Scope.CloseableScope;
-  }>
+  Signal<Readonly<PullStreamContext>>
 >() {
   static fromPullStreamContext(
     ctx: PullStreamContext,
   ): Context.Tag.Service<Event> {
-    return signal({ pullStream: ctx.pullStream, scope: ctx.scope });
+    return signal({
+      pullStream: ctx.pullStream,
+      request: ctx.request,
+      scope: ctx.scope,
+    });
   }
 
   static replaceStreamContext(ctx: PullStreamContext) {
@@ -107,6 +105,14 @@ export class Event extends Context.Tag("Event")<
         ),
       ),
       Effect.tap(({ oldScope }) => Scope.close(oldScope, Exit.void)),
+    );
+  }
+
+  static webRequest() {
+    return pipe(
+      Event,
+      Effect.flatMap((signal) => signal.value),
+      Effect.map(({ request }) => request),
     );
   }
 

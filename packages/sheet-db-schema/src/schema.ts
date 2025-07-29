@@ -1,4 +1,5 @@
 import {
+  index,
   integer,
   pgTable,
   serial,
@@ -12,8 +13,8 @@ export const configGuild = pgTable(
   {
     id: serial("id").primaryKey(),
     guildId: varchar("guild_id").notNull(),
-    sheetId: varchar("sheet_id"),
     scriptId: varchar("script_id"),
+    sheetId: varchar("sheet_id"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -23,7 +24,11 @@ export const configGuild = pgTable(
       .$onUpdate(() => new Date()),
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
   },
-  (table) => [uniqueIndex("config_guild_guild_id_idx").on(table.guildId)],
+  (table) => [
+    uniqueIndex("config_guild_guild_id_idx").on(table.guildId),
+    index("config_guild_script_id_idx").on(table.scriptId),
+    index("config_guild_sheet_id_idx").on(table.sheetId),
+  ],
 );
 
 export const configGuildManagerRole = pgTable(
