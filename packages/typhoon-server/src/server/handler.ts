@@ -80,8 +80,11 @@ export type AnySubscriptionHandlerContext<
   Config extends SubscriptionHandlerConfig = any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   R = any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Handler extends AnySubscriptionEventHandler<Config, R> = any,
+  Handler extends AnySubscriptionEventHandler<
+    Config,
+    R
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  > = any,
 > = SubscriptionHandlerContext<Config, R, Handler>;
 
 export type MutationHandlerContext<

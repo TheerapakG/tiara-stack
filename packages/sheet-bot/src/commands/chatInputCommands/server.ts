@@ -43,10 +43,21 @@ const handleListConfig = chatInputSubcommandHandlerContextBuilder()
       Effect.bind("managerRoles", ({ guild }) =>
         observeEffectSignalOnce(GuildConfigService.getManagerRoles(guild.id)),
       ),
-      Effect.bind("sheetId", ({ guildConfig }) =>
-        Option.fromNullable(guildConfig[0].sheetId),
+      Effect.bindAll(({ guildConfig }) =>
+        pipe(
+          guildConfig,
+          Array.head,
+          Option.map(({ sheetId, scriptId }) => ({
+            sheetId: Effect.succeed(sheetId),
+            scriptId: Effect.succeed(scriptId),
+          })),
+          Option.getOrElse(() => ({
+            sheetId: Effect.succeed(undefined),
+            scriptId: Effect.succeed(undefined),
+          })),
+        ),
       ),
-      Effect.bind("response", ({ guild, sheetId, managerRoles }) =>
+      Effect.bind("response", ({ guild, sheetId, scriptId, managerRoles }) =>
         Effect.tryPromise(() =>
           interaction.reply({
             embeds: [
@@ -54,7 +65,8 @@ const handleListConfig = chatInputSubcommandHandlerContextBuilder()
                 .setTitle(`Config for ${escapeMarkdown(guild.name)}`)
                 .setDescription(
                   [
-                    `Sheet id: ${escapeMarkdown(sheetId)}`,
+                    `Sheet id: ${escapeMarkdown(sheetId ?? "None")}`,
+                    `Script id: ${escapeMarkdown(scriptId ?? "None")}`,
                     `Manager roles: ${managerRoles.length > 0 ? managerRoles.map((role) => roleMention(role.roleId)).join(", ") : "None"}`,
                   ].join("\n"),
                 ),
