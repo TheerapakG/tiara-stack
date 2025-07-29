@@ -433,10 +433,16 @@ export const calcHandler = defineHandlerBuilder()
           Effect.flatMap(
             Option.match({
               onNone: () =>
-                Effect.fail({
-                  message:
-                    "unregistered sheet... contact me before yoinking the sheet could you?",
-                }),
+                pipe(
+                  Effect.log("unregistered script id"),
+                  Effect.andThen(() =>
+                    Effect.fail({
+                      message:
+                        "unregistered sheet... contact me before yoinking the sheet could you?",
+                    }),
+                  ),
+                  Effect.annotateLogs("scriptId", googleAppsScriptId),
+                ),
               onSome: (guildConfig) => Effect.succeed(guildConfig),
             }),
           ),
