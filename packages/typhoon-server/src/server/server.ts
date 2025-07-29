@@ -27,14 +27,23 @@ import { validate } from "typhoon-core/schema";
 import { Server as BaseServer, ServerSymbol } from "typhoon-core/server";
 import { effect, observeOnce } from "typhoon-core/signal";
 import * as v from "valibot";
+import { MutationHandlerConfig, SubscriptionHandlerConfig } from "../config";
 import { Event } from "./event";
-import { MutationHandlerContext, SubscriptionHandlerContext } from "./handler";
+import {
+  AnyMutationHandlerContext,
+  AnySubscriptionHandlerContext,
+  MutationHandlerContext,
+  SubscriptionHandlerContext,
+} from "./handler";
 
-type SubscriptionHandlerMap = HashMap.HashMap<
+type SubscriptionHandlerMap<R> = HashMap.HashMap<
   string,
-  SubscriptionHandlerContext
+  SubscriptionHandlerContext<SubscriptionHandlerConfig, R>
 >;
-type MutationHandlerMap = HashMap.HashMap<string, MutationHandlerContext>;
+type MutationHandlerMap<R> = HashMap.HashMap<
+  string,
+  MutationHandlerContext<MutationHandlerConfig, R>
+>;
 
 class Nonce extends Data.TaggedClass("Nonce")<{
   value: SynchronizedRef.SynchronizedRef<number>;
@@ -67,27 +76,70 @@ type PeerState = {
 };
 type PeerStateMap = HashMap.HashMap<string, PeerState>;
 
+class ScopeLayer<E = never, R = never> {
+  constructor(
+    private readonly scope: Scope.CloseableScope,
+    private readonly layer: Layer.Layer<R, E>,
+  ) {}
+
+  static make<E = never, R = never>(layer: Layer.Layer<R, E>) {
+    return pipe(
+      Effect.Do,
+      Effect.bind("scope", () => Scope.make()),
+      Effect.bind("layer", ({ scope }) =>
+        pipe(Layer.memoize(layer), Scope.extend(scope)),
+      ),
+      Effect.map(({ scope, layer }) => new ScopeLayer(scope, layer)),
+    );
+  }
+
+  static provide<E = never, R = never>(scopeLayer: ScopeLayer<E, R>) {
+    return Effect.provide(scopeLayer.layer);
+  }
+
+  static close<E = never, R = never>(scopeLayer: ScopeLayer<E, R>) {
+    return Scope.close(scopeLayer.scope, Exit.void);
+  }
+}
+
 export class Server<
+  R = never,
+  SubscriptionHandlers extends Record<
+    string,
+    AnySubscriptionHandlerContext
+    // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  > = {},
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  SubscriptionHandlers extends Record<string, SubscriptionHandlerContext> = {},
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  MutationHandlers extends Record<string, MutationHandlerContext> = {},
+  MutationHandlers extends Record<string, AnyMutationHandlerContext> = {},
 > implements BaseServer<SubscriptionHandlers, MutationHandlers>
 {
   readonly [ServerSymbol]: BaseServer<SubscriptionHandlers, MutationHandlers> =
     this;
 
   public traceProvider: Layer.Layer<never>;
-  public subscriptionHandlerMap: SubscriptionHandlerMap;
-  public mutationHandlerMap: MutationHandlerMap;
+  public subscriptionHandlerMap: SubscriptionHandlerMap<R>;
+  public mutationHandlerMap: MutationHandlerMap<R>;
   public readonly peerStateMapRef: SynchronizedRef.SynchronizedRef<PeerStateMap>;
   public readonly peerCount: Metric.Metric.Gauge<bigint>;
 
+  private readonly layer: Layer.Layer<R, unknown>;
+  private readonly scopeLayer: SynchronizedRef.SynchronizedRef<
+    Option.Option<ScopeLayer<unknown, R>>
+  >;
+  private readonly startLatch: Effect.Latch;
+  private readonly startSemaphore: Effect.Semaphore;
+
   constructor(
     traceProvider: Layer.Layer<never>,
-    subscriptionHandlerMap: SubscriptionHandlerMap,
-    mutationHandlerMap: MutationHandlerMap,
+    subscriptionHandlerMap: SubscriptionHandlerMap<R>,
+    mutationHandlerMap: MutationHandlerMap<R>,
     peerStateMapRef: SynchronizedRef.SynchronizedRef<PeerStateMap>,
+    layer: Layer.Layer<R, unknown>,
+    scopeLayer: SynchronizedRef.SynchronizedRef<
+      Option.Option<ScopeLayer<unknown, R>>
+    >,
+    startLatch: Effect.Latch,
+    startSemaphore: Effect.Semaphore,
   ) {
     this.traceProvider = traceProvider;
     this.subscriptionHandlerMap = subscriptionHandlerMap;
@@ -97,26 +149,43 @@ export class Server<
       description: "The number of peers connected to the server",
       bigint: true,
     });
+    this.layer = layer;
+    this.scopeLayer = scopeLayer;
+    this.startLatch = startLatch;
+    this.startSemaphore = startSemaphore;
   }
 
-  static create() {
+  static create<R = never>(layer: Layer.Layer<R, unknown>) {
     return pipe(
-      SynchronizedRef.make(
-        HashMap.empty<
-          string,
-          {
-            peer: Peer;
-            subscriptionStateMap: SubscriptionStateMap;
-          }
-        >(),
+      Effect.Do,
+      Effect.bind("peerStateMapRef", () =>
+        SynchronizedRef.make(
+          HashMap.empty<
+            string,
+            {
+              peer: Peer;
+              subscriptionStateMap: SubscriptionStateMap;
+            }
+          >(),
+        ),
       ),
+      Effect.bind("scopeLayer", () =>
+        SynchronizedRef.make(Option.none<ScopeLayer<unknown, R>>()),
+      ),
+      Effect.bind("startLatch", () => Effect.makeLatch(false)),
+      Effect.bind("startSemaphore", () => Effect.makeSemaphore(1)),
       Effect.map(
-        (peerStateMapRef) =>
-          new Server(
+        ({ peerStateMapRef, scopeLayer, startLatch, startSemaphore }) =>
+          // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+          new Server<R, {}, {}>(
             Layer.empty,
             HashMap.empty(),
             HashMap.empty(),
             peerStateMapRef,
+            layer,
+            scopeLayer,
+            startLatch,
+            startSemaphore,
           ),
       ),
     );
@@ -124,6 +193,7 @@ export class Server<
 
   static withTraceProvider(traceProvider: Layer.Layer<never>) {
     return <
+      R = never,
       SubscriptionHandlers extends Record<
         string,
         SubscriptionHandlerContext
@@ -132,21 +202,27 @@ export class Server<
       // eslint-disable-next-line @typescript-eslint/no-empty-object-type
       MutationHandlers extends Record<string, MutationHandlerContext> = {},
     >(
-      server: Server<SubscriptionHandlers, MutationHandlers>,
-    ): Server<SubscriptionHandlers, MutationHandlers> => {
+      server: Server<R, SubscriptionHandlers, MutationHandlers>,
+    ): Server<R, SubscriptionHandlers, MutationHandlers> => {
       return new Server(
         traceProvider,
         server.subscriptionHandlerMap,
         server.mutationHandlerMap,
         server.peerStateMapRef,
+        server.layer,
+        server.scopeLayer,
+        server.startLatch,
+        server.startSemaphore,
       );
     };
   }
 
+  // TODO: check handler requirement extends server requirement
   static add<
     Handler extends SubscriptionHandlerContext | MutationHandlerContext,
   >(handler: Handler) {
     return <
+      R = never,
       SubscriptionHandlers extends Record<
         string,
         SubscriptionHandlerContext
@@ -155,9 +231,10 @@ export class Server<
       // eslint-disable-next-line @typescript-eslint/no-empty-object-type
       MutationHandlers extends Record<string, MutationHandlerContext> = {},
     >(
-      server: Server<SubscriptionHandlers, MutationHandlers>,
+      server: Server<R, SubscriptionHandlers, MutationHandlers>,
     ): Handler extends SubscriptionHandlerContext
       ? Server<
+          R,
           SubscriptionHandlers & {
             [K in Handler["config"]["name"]]: Handler;
           },
@@ -165,6 +242,7 @@ export class Server<
         >
       : Handler extends MutationHandlerContext
         ? Server<
+            R,
             SubscriptionHandlers,
             MutationHandlers & { [K in Handler["config"]["name"]]: Handler }
           >
@@ -190,6 +268,7 @@ export class Server<
 
       return server as unknown as Handler extends SubscriptionHandlerContext
         ? Server<
+            R,
             SubscriptionHandlers & {
               [K in Handler["config"]["name"]]: Handler;
             },
@@ -197,6 +276,7 @@ export class Server<
           >
         : Handler extends MutationHandlerContext
           ? Server<
+              R,
               SubscriptionHandlers,
               MutationHandlers & { [K in Handler["config"]["name"]]: Handler }
             >
@@ -205,7 +285,7 @@ export class Server<
   }
 
   static open(peer: Peer) {
-    return (server: Server) => {
+    return <R = never>(server: Server<R>) => {
       return pipe(
         server.peerStateMapRef,
         SynchronizedRef.updateAndGet((peerStateMap) =>
@@ -226,7 +306,7 @@ export class Server<
   }
 
   static close(peer: Peer) {
-    return (server: Server) =>
+    return <R = never>(server: Server<R>) =>
       pipe(
         server.peerStateMapRef,
         SynchronizedRef.updateAndGet((peerStateMap) =>
@@ -268,7 +348,7 @@ export class Server<
       state: Option.Option<PeerState>,
     ) => Effect.Effect<Option.Option<PeerState>, unknown, never>,
   ) {
-    return (server: Server) =>
+    return <R = never>(server: Server<R>) =>
       pipe(
         server.peerStateMapRef,
         SynchronizedRef.updateEffect((peerStateMap) =>
@@ -342,9 +422,10 @@ export class Server<
     );
   }
 
-  private static runBoundedEventHandler(
+  private static runBoundedEventHandler<R = never>(
     subscriptionId: string,
-    subscriptionHandlerContext: SubscriptionHandlerContext,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    subscriptionHandlerContext: SubscriptionHandlerContext<any, R>,
     nonce: Nonce,
   ) {
     return pipe(
@@ -397,9 +478,10 @@ export class Server<
     );
   }
 
-  private static runBoundedEncodedEventHandler(
+  private static runBoundedEncodedEventHandler<R = never>(
     subscriptionId: string,
-    subscriptionHandlerContext: SubscriptionHandlerContext,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    subscriptionHandlerContext: SubscriptionHandlerContext<any, R>,
     nonce: Nonce,
   ) {
     return pipe(
@@ -445,7 +527,7 @@ export class Server<
     header: Header<"client:subscribe">,
     scope: Scope.CloseableScope,
   ) {
-    return (server: Server) =>
+    return <R = never>(server: Server<R>) =>
       Server.updatePeerSubscriptionState(peer, header.id, (subscriptionState) =>
         pipe(
           subscriptionState,
@@ -486,13 +568,30 @@ export class Server<
                   ({ event, handlerContext, nonce }) =>
                     effect(
                       pipe(
-                        Server.runBoundedEncodedEventHandler(
-                          header.id,
-                          handlerContext,
-                          nonce,
+                        Effect.Do,
+                        Effect.bind("scopeLayer", () =>
+                          SynchronizedRef.get(server.scopeLayer),
                         ),
-                        Effect.tap((boundedEventHandler) =>
-                          peer.send(boundedEventHandler, {
+                        Effect.bind("returnBuffer", ({ scopeLayer }) =>
+                          pipe(
+                            scopeLayer,
+                            Option.match({
+                              onSome: (scopeLayer) =>
+                                pipe(
+                                  Server.runBoundedEncodedEventHandler(
+                                    header.id,
+                                    handlerContext,
+                                    nonce,
+                                  ),
+                                  ScopeLayer.provide(scopeLayer),
+                                ),
+                              onNone: () =>
+                                Effect.fail("scope layer not initialized"),
+                            }),
+                          ),
+                        ),
+                        Effect.tap(({ returnBuffer }) =>
+                          peer.send(returnBuffer, {
                             compress: true,
                           }),
                         ),
@@ -552,7 +651,7 @@ export class Server<
     callback: (buffer: Uint8Array) => Effect.Effect<A, E, Event>,
     scope: Scope.CloseableScope,
   ) {
-    return (server: Server) =>
+    return <R = never>(server: Server<R>) =>
       pipe(
         Effect.Do,
         Effect.let("event", () =>
@@ -568,12 +667,28 @@ export class Server<
         Effect.bind("returnValue", ({ event, handlerContext, nonce }) =>
           observeOnce(
             pipe(
-              Server.runBoundedEncodedEventHandler(
-                header.id,
-                handlerContext,
-                nonce,
+              Effect.Do,
+              Effect.bind("scopeLayer", () =>
+                SynchronizedRef.get(server.scopeLayer),
               ),
-              Effect.flatMap((returnBuffer) => callback(returnBuffer)),
+              Effect.bind("returnBuffer", ({ scopeLayer }) =>
+                pipe(
+                  scopeLayer,
+                  Option.match({
+                    onSome: (scopeLayer) =>
+                      pipe(
+                        Server.runBoundedEncodedEventHandler(
+                          header.id,
+                          handlerContext,
+                          nonce,
+                        ),
+                        ScopeLayer.provide(scopeLayer),
+                      ),
+                    onNone: () => Effect.fail("scope layer not initialized"),
+                  }),
+                ),
+              ),
+              Effect.flatMap(({ returnBuffer }) => callback(returnBuffer)),
               Effect.tap(() => Event.close()),
               Effect.provideService(Event, event),
             ),
@@ -596,7 +711,7 @@ export class Server<
     callback: Effect.Effect<A, E, Event>,
     scope: Scope.CloseableScope,
   ) {
-    return (server: Server) =>
+    return <R = never>(server: Server<R>) =>
       pipe(
         Effect.Do,
         Effect.let("event", () =>
@@ -610,7 +725,23 @@ export class Server<
         ),
         Effect.bind("returnValue", ({ event, handlerContext }) =>
           pipe(
-            handlerContext.handler,
+            Effect.Do,
+            Effect.bind("scopeLayer", () =>
+              SynchronizedRef.get(server.scopeLayer),
+            ),
+            Effect.flatMap(({ scopeLayer }) =>
+              pipe(
+                scopeLayer,
+                Option.match({
+                  onSome: (scopeLayer) =>
+                    pipe(
+                      handlerContext.handler,
+                      ScopeLayer.provide(scopeLayer),
+                    ),
+                  onNone: () => Effect.fail("scope layer not initialized"),
+                }),
+              ),
+            ),
             Effect.scoped,
             Effect.withSpan(`mutationHandler:${handlerContext.config.name}`, {
               captureStackTrace: true,
@@ -628,7 +759,7 @@ export class Server<
   }
 
   static handleWebSocketMessage(peer: Peer, message: Message) {
-    return (server: Server) =>
+    return <R = never>(server: Server<R>) =>
       pipe(
         Effect.Do,
         Effect.bind("scope", () => Scope.make()),
@@ -694,7 +825,7 @@ export class Server<
   }
 
   static handleWebRequest(request: Request) {
-    return (server: Server) =>
+    return <R = never>(server: Server<R>) =>
       pipe(
         Effect.Do,
         Effect.bind("scope", () => Scope.make()),
@@ -753,13 +884,45 @@ export class Server<
         }),
       );
   }
+
+  static start<R = never>(server: Server<R>) {
+    return pipe(
+      ScopeLayer.make(server.layer),
+      Effect.andThen((scopeLayer) =>
+        SynchronizedRef.update(server.scopeLayer, () =>
+          Option.some(scopeLayer),
+        ),
+      ),
+      Effect.andThen(() => server.startLatch.await),
+      Effect.as(server),
+      server.startSemaphore.withPermits(1),
+    );
+  }
+
+  static stop<R = never>(server: Server<R>) {
+    return pipe(
+      SynchronizedRef.updateEffect(server.scopeLayer, (scopeLayer) =>
+        pipe(
+          scopeLayer,
+          Option.match({
+            onSome: (scopeLayer) => ScopeLayer.close(scopeLayer),
+            onNone: () => Effect.void,
+          }),
+          Effect.as(Option.none()),
+        ),
+      ),
+      Effect.tap(() => Effect.log("Server is stopped")),
+      Effect.andThen(() => server.startLatch.release),
+      Effect.as(server),
+    );
+  }
 }
 
-const handleServeAction = <A, E = never>(
-  action: (server: Server) => Effect.Effect<A, E, never>,
+const handleServeAction = <R = never, A = never, E = never>(
+  action: (server: Server<R>) => Effect.Effect<A, E, never>,
   onError: (error: Cause.Cause<E>) => Effect.Effect<A, never, never>,
 ) => {
-  return (server: Server) =>
+  return (server: Server<R>) =>
     pipe(
       server,
       action,
@@ -784,14 +947,22 @@ const handleServeAction = <A, E = never>(
 
 export const serve =
   <
-    SubscriptionHandlers extends Record<string, SubscriptionHandlerContext>,
-    MutationHandlers extends Record<string, MutationHandlerContext>,
+    R,
+    SubscriptionHandlers extends Record<
+      string,
+      AnySubscriptionHandlerContext<SubscriptionHandlerConfig, R>
+    >,
+    MutationHandlers extends Record<
+      string,
+      AnyMutationHandlerContext<MutationHandlerConfig, R>
+    >,
   >(
     serveFn: typeof crosswsServe,
   ) =>
-  (server: Server<SubscriptionHandlers, MutationHandlers>) => {
+  (server: Server<R, SubscriptionHandlers, MutationHandlers>) => {
     return pipe(
       Effect.succeed(server),
+      Effect.andThen(Server.start),
       Effect.map((server) => {
         return serveFn({
           websocket: {
@@ -870,7 +1041,8 @@ export const serve =
 
 export type InferServerType<E extends Effect.Effect<unknown, unknown, never>> =
   E extends Effect.Effect<infer S, unknown, never>
-    ? S extends Server<infer SubscriptionHandlers, infer MutationHandlers>
+    ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      S extends Server<any, infer SubscriptionHandlers, infer MutationHandlers>
       ? BaseServer<SubscriptionHandlers, MutationHandlers>
       : never
     : never;

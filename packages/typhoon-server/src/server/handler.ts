@@ -12,24 +12,43 @@ import {
 import { SignalContext } from "typhoon-core/signal";
 import { Event } from "./event";
 
-export type SubscriptionEventHandler<Config extends SubscriptionHandlerConfig> =
-  Effect.Effect<
-    StandardSchemaV1.InferInput<Config["response"]["validator"]>,
-    unknown,
-    Event | SignalContext | Scope.Scope
-  >;
+export type SubscriptionEventHandler<
+  Config extends SubscriptionHandlerConfig,
+  R = never,
+> = Effect.Effect<
+  StandardSchemaV1.InferInput<Config["response"]["validator"]>,
+  unknown,
+  Event | SignalContext | Scope.Scope | R
+>;
 
-export type MutationEventHandler<Config extends MutationHandlerConfig> =
-  Effect.Effect<
-    StandardSchemaV1.InferInput<Config["response"]["validator"]>,
-    unknown,
-    Event | Scope.Scope
-  >;
+export type AnySubscriptionEventHandler<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Config extends SubscriptionHandlerConfig = any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  R = any,
+> = SubscriptionEventHandler<Config, R>;
+
+export type MutationEventHandler<
+  Config extends MutationHandlerConfig,
+  R = never,
+> = Effect.Effect<
+  StandardSchemaV1.InferInput<Config["response"]["validator"]>,
+  unknown,
+  Event | Scope.Scope | R
+>;
+
+export type AnyMutationEventHandler<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Config extends MutationHandlerConfig = any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  R = any,
+> = MutationEventHandler<Config, R>;
 
 export type SubscriptionHandlerContextContext<
   Config extends SubscriptionHandlerConfig,
-  Handler extends SubscriptionEventHandler<Config> | undefined =
-    | SubscriptionEventHandler<Config>
+  R = never,
+  Handler extends AnySubscriptionEventHandler<Config, R> | undefined =
+    | AnySubscriptionEventHandler<Config, R>
     | undefined,
 > = {
   config: Config;
@@ -38,8 +57,9 @@ export type SubscriptionHandlerContextContext<
 
 export type MutationHandlerContextContext<
   Config extends MutationHandlerConfig,
-  Handler extends MutationEventHandler<Config> | undefined =
-    | MutationEventHandler<Config>
+  R = never,
+  Handler extends AnyMutationEventHandler<Config, R> | undefined =
+    | AnyMutationEventHandler<Config, R>
     | undefined,
 > = {
   config: Config;
@@ -48,14 +68,39 @@ export type MutationHandlerContextContext<
 
 export type SubscriptionHandlerContext<
   Config extends SubscriptionHandlerConfig = SubscriptionHandlerConfig,
-  Handler extends
-    SubscriptionEventHandler<Config> = SubscriptionEventHandler<Config>,
+  R = never,
+  Handler extends AnySubscriptionEventHandler<
+    Config,
+    R
+  > = AnySubscriptionEventHandler<Config, R>,
 > = BaseSubscriptionHandlerContext<Config> & { handler: Handler };
+
+export type AnySubscriptionHandlerContext<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Config extends SubscriptionHandlerConfig = any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  R = any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Handler extends AnySubscriptionEventHandler<Config, R> = any,
+> = SubscriptionHandlerContext<Config, R, Handler>;
 
 export type MutationHandlerContext<
   Config extends MutationHandlerConfig = MutationHandlerConfig,
-  Handler extends MutationEventHandler<Config> = MutationEventHandler<Config>,
+  R = never,
+  Handler extends AnyMutationEventHandler<Config, R> = AnyMutationEventHandler<
+    Config,
+    R
+  >,
 > = BaseMutationHandlerContext<Config> & { handler: Handler };
+
+export type AnyMutationHandlerContext<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Config extends MutationHandlerConfig = any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  R = any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Handler extends AnyMutationEventHandler<Config, R> = any,
+> = MutationHandlerContext<Config, R, Handler>;
 
 class HandlerContextBuilder {
   constructor() {}
@@ -68,9 +113,9 @@ class HandlerContextBuilder {
     this: HandlerContextBuilder,
     config: Config,
   ): Config extends SubscriptionHandlerConfig
-    ? SubscriptionHandlerContextBuilder<Config, undefined>
+    ? SubscriptionHandlerContextBuilder<Config>
     : Config extends MutationHandlerConfig
-      ? MutationHandlerContextBuilder<Config, undefined>
+      ? MutationHandlerContextBuilder<Config>
       : never {
     return pipe(
       Match.value(config as HandlerConfig),
@@ -92,9 +137,9 @@ class HandlerContextBuilder {
       ),
       Match.exhaustive,
     ) as unknown as Config extends SubscriptionHandlerConfig
-      ? SubscriptionHandlerContextBuilder<Config, undefined>
+      ? SubscriptionHandlerContextBuilder<Config>
       : Config extends MutationHandlerConfig
-        ? MutationHandlerContextBuilder<Config, undefined>
+        ? MutationHandlerContextBuilder<Config>
         : never;
   }
 
@@ -102,18 +147,18 @@ class HandlerContextBuilder {
     config: Config,
   ): this extends HandlerContextBuilder
     ? Config extends SubscriptionHandlerConfig
-      ? SubscriptionHandlerContextBuilder<Config, undefined>
+      ? SubscriptionHandlerContextBuilder<Config>
       : Config extends MutationHandlerConfig
-        ? MutationHandlerContextBuilder<Config, undefined>
+        ? MutationHandlerContextBuilder<Config>
         : never
     : "'config' is already defined" {
     return (this as unknown as HandlerContextBuilder).internalConfig(
       config,
     ) as unknown as this extends HandlerContextBuilder
       ? Config extends SubscriptionHandlerConfig
-        ? SubscriptionHandlerContextBuilder<Config, undefined>
+        ? SubscriptionHandlerContextBuilder<Config>
         : Config extends MutationHandlerConfig
-          ? MutationHandlerContextBuilder<Config, undefined>
+          ? MutationHandlerContextBuilder<Config>
           : never
       : "'config' is already defined";
   }
@@ -121,71 +166,37 @@ class HandlerContextBuilder {
 
 class SubscriptionHandlerContextBuilder<
   Config extends SubscriptionHandlerConfig,
-  Handler extends SubscriptionEventHandler<Config> | undefined =
-    | SubscriptionEventHandler<Config>
-    | undefined,
 > {
   constructor(
-    private readonly ctx: SubscriptionHandlerContextContext<Config, Handler>,
+    private readonly ctx: SubscriptionHandlerContextContext<
+      Config,
+      never,
+      undefined
+    >,
   ) {}
 
-  private internalHandler<Handler extends SubscriptionEventHandler<Config>>(
-    this: SubscriptionHandlerContextBuilder<Config, undefined>,
+  handler<R, Handler extends AnySubscriptionEventHandler<Config, R>>(
+    this: SubscriptionHandlerContextBuilder<Config>,
     handler: Handler,
-  ): SubscriptionHandlerContext<Config> {
+  ): SubscriptionHandlerContext<Config, R, Handler> {
     return { ...this.ctx, handler };
-  }
-
-  handler<Handler extends SubscriptionEventHandler<Config>>(
-    handler: Handler,
-  ): this extends SubscriptionHandlerContextBuilder<infer Config, undefined>
-    ? SubscriptionHandlerContext<Config>
-    : "'handler' is already defined" {
-    return (
-      this as unknown as SubscriptionHandlerContextBuilder<Config, undefined>
-    ).internalHandler(
-      handler,
-    ) as unknown as this extends SubscriptionHandlerContextBuilder<
-      infer Config,
-      undefined
-    >
-      ? SubscriptionHandlerContext<Config>
-      : "'handler' is already defined";
   }
 }
 
-class MutationHandlerContextBuilder<
-  Config extends MutationHandlerConfig,
-  Handler extends MutationEventHandler<Config> | undefined =
-    | MutationEventHandler<Config>
-    | undefined,
-> {
+class MutationHandlerContextBuilder<Config extends MutationHandlerConfig> {
   constructor(
-    private readonly ctx: MutationHandlerContextContext<Config, Handler>,
+    private readonly ctx: MutationHandlerContextContext<
+      Config,
+      never,
+      undefined
+    >,
   ) {}
 
-  private internalHandler<Handler extends MutationEventHandler<Config>>(
-    this: MutationHandlerContextBuilder<Config, undefined>,
+  handler<R, Handler extends AnyMutationEventHandler<Config, R>>(
+    this: MutationHandlerContextBuilder<Config>,
     handler: Handler,
-  ): MutationHandlerContext<Config> {
+  ): MutationHandlerContext<Config, R, Handler> {
     return { ...this.ctx, handler };
-  }
-
-  handler<Handler extends MutationEventHandler<Config>>(
-    handler: Handler,
-  ): this extends MutationHandlerContextBuilder<infer Config, undefined>
-    ? MutationHandlerContext<Config>
-    : "'handler' is already defined" {
-    return (
-      this as unknown as MutationHandlerContextBuilder<Config, undefined>
-    ).internalHandler(
-      handler,
-    ) as unknown as this extends MutationHandlerContextBuilder<
-      infer Config,
-      undefined
-    >
-      ? MutationHandlerContext<Config>
-      : "'handler' is already defined";
   }
 }
 
