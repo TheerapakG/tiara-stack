@@ -418,7 +418,7 @@ export const calcHandler = defineHandlerBuilder()
               onNone: () =>
                 Effect.fail({
                   message:
-                    "unregistered sheet... contact me before yoinking the sheet could you?",
+                    "this does not seems like a request from an apps script... what are you doing here?",
                 }),
               onSome: (scriptId) => Effect.succeed(scriptId),
             }),
@@ -434,7 +434,8 @@ export const calcHandler = defineHandlerBuilder()
             Option.match({
               onNone: () =>
                 Effect.fail({
-                  message: "",
+                  message:
+                    "unregistered sheet... contact me before yoinking the sheet could you?",
                 }),
               onSome: (guildConfig) => Effect.succeed(guildConfig),
             }),
