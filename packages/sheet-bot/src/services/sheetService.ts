@@ -114,6 +114,7 @@ const teamParser = (
                     backline,
                     talent,
                   })),
+                  Option.filter(({ teamName }) => teamName !== ""),
                 ),
               ),
               Array.getSomes,
