@@ -233,10 +233,22 @@ const deriveRoomWithPlayerTeams = (
     Effect.withSpan("deriveRoomWithPlayerTeams", { captureStackTrace: true }),
   );
 
+const filterConfigTeams = (
+  config: { healNeeded: number; considerEnc: boolean },
+  teams: Chunk.Chunk<RoomTeam>,
+) =>
+  pipe(
+    teams,
+    Chunk.filter(({ healed }) => healed >= config.healNeeded),
+    Effect.succeed,
+    Effect.withSpan("filterHealTeams", { captureStackTrace: true }),
+  );
+
 const sortTeams = (teams: Chunk.Chunk<RoomTeam>) =>
   pipe(
-    Effect.succeed(teams),
-    Effect.map(Chunk.sort(RoomTeam.order)),
+    teams,
+    Chunk.sort(RoomTeam.order),
+    Effect.succeed,
     Effect.withSpan("sortTeams", { captureStackTrace: true }),
   );
 
@@ -310,7 +322,10 @@ const calc = (
         ),
       ),
     ),
-    Effect.bind("sortedResult", ({ result }) => sortTeams(result)),
+    Effect.bind("configResult", ({ result }) =>
+      filterConfigTeams(config, result),
+    ),
+    Effect.bind("sortedResult", ({ configResult }) => sortTeams(configResult)),
     Effect.bind("bestResult", ({ sortedResult }) =>
       filterBestTeams(sortedResult),
     ),
@@ -388,16 +403,10 @@ const calcHandlerConfig = defineHandlerConfigBuilder()
 
 const extractGoogleAppsScriptId = (userAgent: string) =>
   pipe(
-    Effect.Do,
-    Effect.let("match", () =>
-      userAgent.match(/Google-Apps-Script.*?id:\s*([^\s)]+)/i),
-    ),
-    Effect.map(({ match }) =>
-      pipe(
-        Option.fromNullable(match),
-        Option.map((match) => match[1]),
-      ),
-    ),
+    userAgent.match(/Google-Apps-Script.*?id:\s*([^\s)]+)/i),
+    Option.fromNullable,
+    Option.flatMap(Array.get(1)),
+    Effect.succeed,
     Effect.withSpan("extractGoogleAppsScriptId", { captureStackTrace: true }),
   );
 
@@ -413,16 +422,11 @@ export const calcHandler = defineHandlerBuilder()
       Effect.bind("googleAppsScriptId", ({ userAgent }) =>
         pipe(
           extractGoogleAppsScriptId(userAgent),
-          Effect.flatMap(
-            Option.match({
-              onNone: () =>
-                Effect.fail({
-                  message:
-                    "this does not seems like a request from an apps script... what are you doing here?",
-                }),
-              onSome: (scriptId) => Effect.succeed(scriptId),
-            }),
-          ),
+          Effect.flatten,
+          Effect.orElseFail(() => ({
+            message:
+              "this does not seems like a request from an apps script... what are you doing here?",
+          })),
         ),
       ),
       Effect.bind("guildConfig", ({ googleAppsScriptId }) =>
@@ -430,21 +434,17 @@ export const calcHandler = defineHandlerBuilder()
           GuildConfigService.getGuildConfigWithBoundScript(googleAppsScriptId),
           observeEffectSignalOnce,
           Effect.map(Array.head),
-          Effect.flatMap(
-            Option.match({
-              onNone: () =>
-                pipe(
-                  Effect.log("unregistered script id"),
-                  Effect.andThen(() =>
-                    Effect.fail({
-                      message:
-                        "unregistered sheet... contact me before yoinking the sheet could you?",
-                    }),
-                  ),
-                  Effect.annotateLogs("scriptId", googleAppsScriptId),
-                ),
-              onSome: (guildConfig) => Effect.succeed(guildConfig),
-            }),
+          Effect.flatten,
+          Effect.flipWith((effect) =>
+            pipe(
+              effect,
+              Effect.tap(() => Effect.log("unregistered script id")),
+              Effect.orElseFail(() => ({
+                message:
+                  "unregistered sheet... contact me before yoinking the sheet could you?",
+              })),
+              Effect.annotateLogs("scriptId", googleAppsScriptId),
+            ),
           ),
         ),
       ),

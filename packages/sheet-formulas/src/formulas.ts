@@ -92,6 +92,12 @@ export function THEECALC(
       Effect.bind("players", () =>
         pipe([p1, p2, p3, p4, p5], Effect.forEach(parsePlayer)),
       ),
+      Effect.catchAll((e) =>
+        pipe(
+          Effect.logError(e),
+          Effect.andThen(() => Effect.fail({ message: "sheet value error" })),
+        ),
+      ),
       Effect.bind("client", () => getClient(url)),
       Effect.bind("result", ({ client, config, players }) =>
         AppsScriptClient.once(client, "calc", {
@@ -108,7 +114,12 @@ export function THEECALC(
           ...r.room.map((r) => [r.tags.join(", "), r.team]).flat(),
         ]),
       ),
-      Effect.catchAll((e) => Effect.succeed([[e.message]])),
+      Effect.catchAll((e) =>
+        pipe(
+          Effect.logError(e),
+          Effect.andThen(() => Effect.succeed([[e.message]])),
+        ),
+      ),
       Effect.tap((result) => Effect.log(result)),
     ),
   );
