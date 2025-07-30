@@ -81,15 +81,12 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           HashMap.get(teams, user.id),
           Option.map(({ teams }) => teams),
           Option.getOrElse(() => [] as Team[]),
-          Array.map((team) =>
-            Option.map(team.teamName, (teamName) => ({
-              teamName,
-              lead: Option.getOrUndefined(team.lead),
-              backline: Option.getOrUndefined(team.backline),
-              talent: Option.getOrUndefined(team.talent),
-            })),
-          ),
-          Array.getSomes,
+          Array.map((team) => ({
+            teamName: team.teamName,
+            lead: Option.getOrUndefined(team.lead),
+            backline: Option.getOrUndefined(team.backline),
+            talent: Option.getOrUndefined(team.talent),
+          })),
           Array.map((team) => ({
             ...team,
             leadFormatted: team.lead ?? "?",
