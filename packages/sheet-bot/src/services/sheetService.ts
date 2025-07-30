@@ -57,7 +57,7 @@ const playerParser = (
   );
 
 export type Team = {
-  teamName: Option.Option<string>;
+  teamName: string;
   lead: Option.Option<number>;
   backline: Option.Option<number>;
   talent: Option.Option<number>;
@@ -105,6 +105,18 @@ const teamParser = (
                   ),
                 }),
               ),
+              Array.map(({ teamName, lead, backline, talent }) =>
+                pipe(
+                  teamName,
+                  Option.map((teamName) => ({
+                    teamName,
+                    lead,
+                    backline,
+                    talent,
+                  })),
+                ),
+              ),
+              Array.getSomes,
             ),
           }),
         ),
@@ -117,11 +129,26 @@ const teamParser = (
         Array.map(({ id, teams }) =>
           pipe(
             id,
-            Option.map((id) => [id, { id, teams }] as const),
+            Option.map((id) => ({ id, teams })),
           ),
         ),
         Array.getSomes,
-        HashMap.fromIterable,
+        Array.reduce(
+          HashMap.empty<string, { id: string; teams: Team[] }>(),
+          (acc, { id, teams }) =>
+            HashMap.modifyAt(
+              acc,
+              id,
+              Option.match({
+                onSome: ({ teams: mapTeams }) =>
+                  Option.some({
+                    id,
+                    teams: Array.appendAll(mapTeams, teams),
+                  }),
+                onNone: () => Option.some({ id, teams }),
+              }),
+            ),
+        ),
       ),
     ),
     Effect.withSpan("playerParser", { captureStackTrace: true }),
