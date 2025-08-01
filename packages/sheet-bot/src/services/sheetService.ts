@@ -1,6 +1,6 @@
 import { type MethodOptions, type sheets_v4 } from "@googleapis/sheets";
 import { Array, Effect, HashMap, Option, pipe } from "effect";
-import { observeEffectSignalOnce } from "typhoon-server/signal";
+import { observeOnce } from "typhoon-server/signal";
 import { GoogleSheets } from "../google/sheets";
 import { GuildConfigService } from "./guildConfigService";
 import { SheetConfigService } from "./sheetConfigService";
@@ -389,7 +389,10 @@ export class SheetService extends Effect.Service<SheetService>()(
     return pipe(
       Effect.Do,
       Effect.bind("guildConfig", () =>
-        observeEffectSignalOnce(GuildConfigService.getConfig(guildId)),
+        pipe(
+          GuildConfigService.getConfig(guildId),
+          Effect.flatMap((computed) => observeOnce(computed.value)),
+        ),
       ),
       Effect.bind("sheetId", ({ guildConfig }) =>
         pipe(

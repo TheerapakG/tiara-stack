@@ -11,7 +11,7 @@ import {
   SlashCommandSubcommandGroupBuilder,
 } from "discord.js";
 import { Array, Effect, Option, pipe } from "effect";
-import { observeEffectSignalOnce } from "typhoon-server/signal";
+import { observeOnce } from "typhoon-server/signal";
 import { GuildConfigService, PermissionService } from "../../services";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
@@ -38,10 +38,16 @@ const handleListConfig = chatInputSubcommandHandlerContextBuilder()
           : Effect.void,
       ),
       Effect.bind("guildConfig", ({ guild }) =>
-        observeEffectSignalOnce(GuildConfigService.getConfig(guild.id)),
+        pipe(
+          GuildConfigService.getConfig(guild.id),
+          Effect.flatMap((computed) => observeOnce(computed.value)),
+        ),
       ),
       Effect.bind("managerRoles", ({ guild }) =>
-        observeEffectSignalOnce(GuildConfigService.getManagerRoles(guild.id)),
+        pipe(
+          GuildConfigService.getManagerRoles(guild.id),
+          Effect.flatMap((computed) => observeOnce(computed.value)),
+        ),
       ),
       Effect.bindAll(({ guildConfig }) =>
         pipe(

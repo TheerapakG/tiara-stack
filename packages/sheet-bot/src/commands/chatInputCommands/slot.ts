@@ -22,7 +22,7 @@ import {
   Ref,
 } from "effect";
 import { validate } from "typhoon-core/schema";
-import { observeEffectSignalOnce } from "typhoon-server/signal";
+import { observeOnce } from "typhoon-server/signal";
 import { button as slotButton } from "../../buttons/slot";
 import {
   ChannelConfigService,
@@ -116,7 +116,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
         serverId
           ? pipe(
               GuildConfigService.getManagerRoles(serverId),
-              observeEffectSignalOnce,
+              Effect.flatMap((computed) => observeOnce(computed.value)),
             )
           : Effect.succeed([]),
       ),
@@ -202,7 +202,7 @@ const handleButton = chatInputSubcommandHandlerContextBuilder()
         serverId
           ? pipe(
               GuildConfigService.getManagerRoles(serverId),
-              observeEffectSignalOnce,
+              Effect.flatMap((computed) => observeOnce(computed.value)),
             )
           : Effect.succeed([]),
       ),

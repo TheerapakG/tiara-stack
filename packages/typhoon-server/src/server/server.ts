@@ -7,6 +7,7 @@ import {
   Data,
   Effect,
   Exit,
+  Function,
   HashMap,
   Layer,
   Match,
@@ -25,7 +26,7 @@ import {
 } from "typhoon-core/protocol";
 import { validate } from "typhoon-core/schema";
 import { Server as BaseServer, ServerSymbol } from "typhoon-core/server";
-import { effect, observeOnce } from "typhoon-core/signal";
+import { Computed, computed, effect, observeOnce } from "typhoon-core/signal";
 import * as v from "valibot";
 import { MutationHandlerConfig, SubscriptionHandlerConfig } from "../config";
 import { Event } from "./event";
@@ -418,6 +419,121 @@ export class Server<
     );
   }
 
+  private static getComputedSubscriptionResult<R = never>(
+    subscriptionId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    subscriptionHandlerContext: SubscriptionHandlerContext<any, R>,
+    nonce: Nonce,
+  ): Effect.Effect<
+    Computed<
+      {
+        header: Header<"server:update">;
+        message: Uint8Array;
+      },
+      never,
+      Event | R
+    >,
+    unknown,
+    never
+  > {
+    return pipe(
+      subscriptionHandlerContext.handler,
+      Effect.flatMap((handler) =>
+        computed(
+          pipe(
+            Effect.Do,
+            Effect.bind("value", () => Effect.exit(handler.value)),
+            Effect.bind("nonce", () => Nonce.getAndIncrement(nonce)),
+            Effect.let(
+              "header",
+              ({ value, nonce }) =>
+                ({
+                  protocol: "typh",
+                  version: 1,
+                  id: subscriptionId,
+                  action: "server:update",
+                  payload: {
+                    success: Exit.isSuccess(value),
+                    nonce,
+                  },
+                }) as const,
+            ),
+            Effect.let("message", ({ value }) =>
+              pipe(
+                value,
+                Exit.match({
+                  onSuccess: Function.identity,
+                  onFailure: Cause.squash,
+                }),
+              ),
+            ),
+            Effect.map(({ header, message }) => ({
+              header,
+              message,
+            })),
+            Effect.scoped,
+            Effect.withSpan("subscriptionHandler", {
+              captureStackTrace: true,
+            }),
+            Effect.annotateLogs({
+              handler: subscriptionHandlerContext.config.name,
+            }),
+          ),
+        ),
+      ),
+      Effect.withSpan("Server.getComputedSubscriptionResult", {
+        captureStackTrace: true,
+      }),
+      Effect.annotateLogs({
+        handler: subscriptionHandlerContext.config.name,
+      }),
+    );
+  }
+
+  private static getComputedSubscriptionResultEncoded<R = never>(
+    subscriptionId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    subscriptionHandlerContext: SubscriptionHandlerContext<any, R>,
+    nonce: Nonce,
+  ) {
+    return pipe(
+      Server.getComputedSubscriptionResult(
+        subscriptionId,
+        subscriptionHandlerContext,
+        nonce,
+      ),
+      Effect.flatMap((computedResult) =>
+        computed(
+          pipe(
+            Effect.Do,
+            Effect.bind("result", () => computedResult.value),
+            Effect.bind("header", ({ result }) =>
+              HeaderEncoderDecoder.encode(result.header),
+            ),
+            Effect.bind("headerEncoded", ({ header }) =>
+              MsgpackEncoderDecoder.encode(header),
+            ),
+            Effect.bind("messageEncoded", ({ result }) =>
+              MsgpackEncoderDecoder.encode(result.message),
+            ),
+            Effect.let("updateBuffer", ({ headerEncoded, messageEncoded }) => {
+              const updateBuffer = new Uint8Array(
+                headerEncoded.length + messageEncoded.length,
+              );
+              updateBuffer.set(headerEncoded, 0);
+              updateBuffer.set(messageEncoded, headerEncoded.length);
+              return updateBuffer;
+            }),
+            Effect.map(({ updateBuffer }) => updateBuffer),
+          ),
+        ),
+      ),
+      Effect.withSpan("Server.getComputedSubscriptionResultEncoded", {
+        captureStackTrace: true,
+      }),
+    );
+  }
+
   private static runBoundedEventHandler<R = never>(
     subscriptionId: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -556,40 +672,43 @@ export class Server<
                 Effect.bind("handlerContext", () =>
                   HashMap.get(
                     server.subscriptionHandlerMap,
-                    // TODO: validate header.payload.handler
                     header.payload.handler,
                   ),
                 ),
                 Effect.bind("nonce", () => Nonce.make()),
+                Effect.bind("computedBuffer", ({ handlerContext, nonce }) =>
+                  Server.getComputedSubscriptionResultEncoded(
+                    header.id,
+                    handlerContext,
+                    nonce,
+                  ),
+                ),
+                Effect.bind("providedComputedBuffer", ({ computedBuffer }) =>
+                  computed(
+                    pipe(
+                      SynchronizedRef.get(server.scopeLayer),
+                      Effect.flatMap(
+                        Option.match({
+                          onSome: (scopeLayer) =>
+                            pipe(
+                              computedBuffer.value,
+                              ScopeLayer.provide(scopeLayer),
+                            ),
+                          onNone: () =>
+                            Effect.fail("scope layer not initialized"),
+                        }),
+                      ),
+                    ),
+                  ),
+                ),
                 Effect.bind(
                   "effectCleanup",
-                  ({ event, handlerContext, nonce }) =>
+                  ({ event, providedComputedBuffer }) =>
                     effect(
                       pipe(
-                        Effect.Do,
-                        Effect.bind("scopeLayer", () =>
-                          SynchronizedRef.get(server.scopeLayer),
-                        ),
-                        Effect.bind("returnBuffer", ({ scopeLayer }) =>
-                          pipe(
-                            scopeLayer,
-                            Option.match({
-                              onSome: (scopeLayer) =>
-                                pipe(
-                                  Server.runBoundedEncodedEventHandler(
-                                    header.id,
-                                    handlerContext,
-                                    nonce,
-                                  ),
-                                  ScopeLayer.provide(scopeLayer),
-                                ),
-                              onNone: () =>
-                                Effect.fail("scope layer not initialized"),
-                            }),
-                          ),
-                        ),
-                        Effect.tap(({ returnBuffer }) =>
-                          peer.send(returnBuffer, {
+                        providedComputedBuffer.value,
+                        Effect.tap((buffer) =>
+                          peer.send(buffer, {
                             compress: true,
                           }),
                         ),
@@ -664,31 +783,32 @@ export class Server<
           HashMap.get(server.subscriptionHandlerMap, header.payload.handler),
         ),
         Effect.bind("nonce", () => Nonce.make()),
-        Effect.bind("returnValue", ({ event, handlerContext, nonce }) =>
+        Effect.bind("computedBuffer", ({ handlerContext, nonce }) =>
+          Server.getComputedSubscriptionResultEncoded(
+            header.id,
+            handlerContext,
+            nonce,
+          ),
+        ),
+        Effect.bind("providedComputedBuffer", ({ computedBuffer }) =>
+          computed(
+            pipe(
+              SynchronizedRef.get(server.scopeLayer),
+              Effect.flatMap(
+                Option.match({
+                  onSome: (scopeLayer) =>
+                    pipe(computedBuffer.value, ScopeLayer.provide(scopeLayer)),
+                  onNone: () => Effect.fail("scope layer not initialized"),
+                }),
+              ),
+            ),
+          ),
+        ),
+        Effect.bind("returnValue", ({ event, providedComputedBuffer }) =>
           observeOnce(
             pipe(
-              Effect.Do,
-              Effect.bind("scopeLayer", () =>
-                SynchronizedRef.get(server.scopeLayer),
-              ),
-              Effect.bind("returnBuffer", ({ scopeLayer }) =>
-                pipe(
-                  scopeLayer,
-                  Option.match({
-                    onSome: (scopeLayer) =>
-                      pipe(
-                        Server.runBoundedEncodedEventHandler(
-                          header.id,
-                          handlerContext,
-                          nonce,
-                        ),
-                        ScopeLayer.provide(scopeLayer),
-                      ),
-                    onNone: () => Effect.fail("scope layer not initialized"),
-                  }),
-                ),
-              ),
-              Effect.flatMap(({ returnBuffer }) => callback(returnBuffer)),
+              providedComputedBuffer.value,
+              Effect.flatMap((buffer) => callback(buffer)),
               Effect.tap(() => Event.close()),
               Effect.provideService(Event, event),
             ),
