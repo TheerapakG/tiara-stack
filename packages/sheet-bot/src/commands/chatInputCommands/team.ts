@@ -7,7 +7,7 @@ import {
   SlashCommandSubcommandBuilder,
 } from "discord.js";
 import { Array, Effect, HashMap, Option, pipe } from "effect";
-import { observeEffectSignalOnce } from "typhoon-server/signal";
+import { observeOnce } from "typhoon-server/signal";
 import {
   GuildConfigService,
   PermissionService,
@@ -57,7 +57,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
         serverId
           ? pipe(
               GuildConfigService.getManagerRoles(serverId),
-              observeEffectSignalOnce,
+              Effect.flatMap((computed) => observeOnce(computed.value)),
             )
           : Effect.succeed([]),
       ),

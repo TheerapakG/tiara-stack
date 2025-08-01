@@ -1,31 +1,39 @@
 import {
   Context,
   Deferred,
-  Effect as E,
+  Effect as Effect_,
   Fiber,
   HashSet,
   Option,
   pipe,
 } from "effect";
+import {
+  Observable,
+  ObservableOptions,
+  ObservableSymbol,
+} from "../obsevability/observable";
 
 const DependencySymbol = Symbol("Typhoon/Signal/Dependency");
 const DependentSymbol = Symbol("Typhoon/Signal/Dependent");
 
-export abstract class DependencySignal<A = unknown, Err = unknown> {
-  abstract readonly [DependencySymbol]: DependencySignal<A, Err>;
+export abstract class DependencySignal<A = never, E = never, R = never>
+  implements Observable
+{
+  abstract readonly [DependencySymbol]: DependencySignal<A, E, R>;
+  abstract readonly [ObservableSymbol]: ObservableOptions;
 
   abstract addDependent(
     dependent: DependentSignal,
-  ): E.Effect<void, never, never>;
+  ): Effect_.Effect<void, never, never>;
   abstract removeDependent(
     dependent: DependentSignal,
-  ): E.Effect<void, never, never>;
-  abstract clearDependents(): E.Effect<void, never, never>;
+  ): Effect_.Effect<void, never, never>;
+  abstract clearDependents(): Effect_.Effect<void, never, never>;
 
-  abstract getDependents(): E.Effect<DependentSignal[], never, never>;
+  abstract getDependents(): Effect_.Effect<DependentSignal[], never, never>;
 
-  abstract get value(): E.Effect<A, Err, SignalContext>;
-  abstract peek(): E.Effect<A, Err, never>;
+  abstract get value(): Effect_.Effect<A, E, R | SignalContext>;
+  abstract peek(): Effect_.Effect<A, E, R>;
 
   static isDependencySignal(signal: unknown): signal is DependencySignal {
     return Boolean(
@@ -37,37 +45,38 @@ export abstract class DependencySignal<A = unknown, Err = unknown> {
   }
 
   static notifyAllDependents(
-    signal: DependencySignal,
-    beforeNotify: E.Effect<void, never, never>,
+    signal: DependencySignal<unknown, unknown, unknown>,
+    beforeNotify: Effect_.Effect<void, never, never>,
   ) {
     return pipe(
-      E.Do,
-      E.bind("dependents", () => getDependentsUpdateOrder(signal)),
-      E.tap(signal.clearDependents()),
-      E.tap(beforeNotify),
-      E.flatMap(({ dependents }) =>
-        E.all(dependents.map((dependent) => dependent.notify())),
+      Effect_.Do,
+      Effect_.bind("dependents", () => getDependentsUpdateOrder(signal)),
+      Effect_.tap(signal.clearDependents()),
+      Effect_.tap(beforeNotify),
+      Effect_.flatMap(({ dependents }) =>
+        Effect_.all(dependents.map((dependent) => dependent.notify())),
       ),
-      E.withSpan("DependencySignal.notifyAllDependents", {
+      Observable.withSpan(signal, "DependencySignal.notifyAllDependents", {
         captureStackTrace: true,
       }),
-      E.ignore,
+      Effect_.ignore,
     );
   }
 }
 
-export abstract class DependentSignal {
+export abstract class DependentSignal implements Observable {
   abstract readonly [DependentSymbol]: DependentSignal;
+  abstract readonly [ObservableSymbol]: ObservableOptions;
 
   abstract addDependency(
-    dependency: DependencySignal,
-  ): E.Effect<void, never, never>;
+    dependency: DependencySignal<unknown, unknown, unknown>,
+  ): Effect_.Effect<void, never, never>;
   abstract removeDependency(
-    dependency: DependencySignal,
-  ): E.Effect<void, never, never>;
-  abstract clearDependencies(): E.Effect<void, never, never>;
+    dependency: DependencySignal<unknown, unknown, unknown>,
+  ): Effect_.Effect<void, never, never>;
+  abstract clearDependencies(): Effect_.Effect<void, never, never>;
 
-  abstract notify(): E.Effect<unknown, never, never>;
+  abstract notify(): Effect_.Effect<unknown, never, never>;
 
   static isDependentSignal(signal: unknown): signal is DependentSignal {
     return Boolean(
@@ -79,41 +88,46 @@ export abstract class DependentSignal {
   }
 }
 
-export const bindScopeDependency = (dependency: DependencySignal) =>
+export const bindScopeDependency = (
+  dependency: DependencySignal<unknown, unknown, unknown>,
+) =>
   pipe(
-    SignalContext.getScope(),
-    E.flatMap((scope) =>
-      E.all([dependency.addDependent(scope), scope.addDependency(dependency)]),
+    SignalContext.getScope(dependency),
+    Effect_.flatMap((scope) =>
+      Effect_.all([
+        dependency.addDependent(scope),
+        scope.addDependency(dependency),
+      ]),
     ),
-    E.withSpan("bindScopeDependency", {
+    Observable.withSpan(dependency, "bindScopeDependency", {
       captureStackTrace: true,
     }),
-    E.ignore,
+    Effect_.ignore,
   );
 
 const getDependentsUpdateOrder = (
-  dependency: DependencySignal,
-): E.Effect<DependentSignal[], never, never> => {
+  dependency: DependencySignal<unknown, unknown, unknown>,
+): Effect_.Effect<DependentSignal[], never, never> => {
   return pipe(
-    E.Do,
-    E.bind("thisDependents", () => dependency.getDependents()),
-    E.bind("nestedDependents", ({ thisDependents }) =>
+    Effect_.Do,
+    Effect_.bind("thisDependents", () => dependency.getDependents()),
+    Effect_.bind("nestedDependents", ({ thisDependents }) =>
       pipe(
-        E.all(
+        Effect_.all(
           thisDependents
             .filter((dependent) =>
               DependencySignal.isDependencySignal(dependent),
             )
             .map((dependent) => getDependentsUpdateOrder(dependent)),
         ),
-        E.map((nestedDependents) => nestedDependents.flat()),
+        Effect_.map((nestedDependents) => nestedDependents.flat()),
       ),
     ),
-    E.let("dependents", ({ thisDependents, nestedDependents }) => [
+    Effect_.let("dependents", ({ thisDependents, nestedDependents }) => [
       ...thisDependents,
       ...nestedDependents,
     ]),
-    E.map(({ dependents }) => {
+    Effect_.map(({ dependents }) => {
       const seen = new Set();
       return dependents
         .reverse()
@@ -124,50 +138,52 @@ const getDependentsUpdateOrder = (
         })
         .reverse();
     }),
-    E.withSpan("getDependentsUpdateOrder", {
+    Observable.withSpan(dependency, "getDependentsUpdateOrder", {
       captureStackTrace: true,
     }),
   );
 };
 
-const runAndTrackEffect = <A = unknown, Err = unknown>(
-  effect: E.Effect<A, Err, SignalContext>,
+const runAndTrackEffect = <A = never, E = never, R = never>(
+  effect: Effect_.Effect<A, E, R | SignalContext>,
   scope: DependentSignal,
 ) => {
   return pipe(
     effect,
-    E.provideService(SignalContext, SignalContext.fromDependent(scope)),
-    E.withSpan("runAndTrackEffect", {
+    Effect_.provideService(SignalContext, SignalContext.fromDependent(scope)),
+    Observable.withSpan(scope, "runAndTrackEffect", {
       captureStackTrace: true,
     }),
   );
 };
 
-export class Signal<T = unknown> implements DependencySignal<T, never> {
-  readonly [DependencySymbol]: DependencySignal<T, never> = this;
+export class Signal<T = unknown> implements DependencySignal<T, never, never> {
+  readonly [DependencySymbol]: DependencySignal<T, never, never> = this;
+  readonly [ObservableSymbol]: ObservableOptions;
 
   private _value: T;
   private _dependents: HashSet.HashSet<DependentSignal>;
 
-  constructor(value: T) {
+  constructor(value: T, options: ObservableOptions) {
     this._value = value;
     this._dependents = HashSet.empty();
+    this[ObservableSymbol] = options;
   }
 
   addDependent(dependent: DependentSignal) {
-    return E.sync(() => {
+    return Effect_.sync(() => {
       this._dependents = HashSet.add(this._dependents, dependent);
     });
   }
 
   removeDependent(dependent: DependentSignal) {
-    return E.sync(() => {
+    return Effect_.sync(() => {
       this._dependents = HashSet.remove(this._dependents, dependent);
     });
   }
 
   clearDependents() {
-    return E.sync(() => {
+    return Effect_.sync(() => {
       HashSet.forEach(this._dependents, (dependent) =>
         dependent.removeDependency(this),
       );
@@ -175,108 +191,112 @@ export class Signal<T = unknown> implements DependencySignal<T, never> {
     });
   }
 
-  getDependents(): E.Effect<DependentSignal[], never, never> {
-    return E.sync(() => HashSet.toValues(this._dependents));
+  getDependents(): Effect_.Effect<DependentSignal[], never, never> {
+    return Effect_.sync(() => HashSet.toValues(this._dependents));
   }
 
-  get value(): E.Effect<T, never, SignalContext> {
+  get value(): Effect_.Effect<T, never, SignalContext> {
     return pipe(
       bindScopeDependency(this),
-      E.flatMap(() => this.peek()),
-      E.withSpan("Signal.value", {
+      Effect_.flatMap(() => this.peek()),
+      Observable.withSpan(this, "Signal.value", {
         captureStackTrace: true,
       }),
     );
   }
 
-  peek(): E.Effect<T, never, never> {
+  peek(): Effect_.Effect<T, never, never> {
     return pipe(
-      E.suspend(() => E.succeed(this._value)),
-      E.withSpan("Signal.peek", {
+      Effect_.suspend(() => Effect_.succeed(this._value)),
+      Observable.withSpan(this, "Signal.peek", {
         captureStackTrace: true,
       }),
     );
   }
 
-  setValue(value: T): E.Effect<void, never, never> {
+  setValue(value: T): Effect_.Effect<void, never, never> {
     return pipe(
       DependencySignal.notifyAllDependents(
         this,
-        E.suspend(() =>
-          E.sync(() => {
+        Effect_.suspend(() =>
+          Effect_.sync(() => {
             this._value = value;
           }),
         ),
       ),
-      E.withSpan("Signal.setValue", {
+      Observable.withSpan(this, "Signal.setValue", {
         captureStackTrace: true,
       }),
     );
   }
 
   updateValue(
-    updater: (value: T) => E.Effect<T>,
-  ): E.Effect<void, never, never> {
+    updater: (value: T) => Effect_.Effect<T>,
+  ): Effect_.Effect<void, never, never> {
     return pipe(
       DependencySignal.notifyAllDependents(
         this,
-        E.suspend(() =>
+        Effect_.suspend(() =>
           pipe(
             updater(this._value),
-            E.tap((value) =>
-              E.sync(() => {
+            Effect_.tap((value) =>
+              Effect_.sync(() => {
                 this._value = value;
               }),
             ),
           ),
         ),
       ),
-      E.withSpan("Signal.updateValue", {
+      Observable.withSpan(this, "Signal.updateValue", {
         captureStackTrace: true,
       }),
     );
   }
 }
 
-export const signal = <T>(value: T) => new Signal(value);
+export const signal = <T>(value: T, options?: ObservableOptions) =>
+  new Signal(value, options ?? {});
 
-export class Computed<A = unknown, Err = unknown>
-  implements DependentSignal, DependencySignal<A, Err>
+export class Computed<A = never, E = never, R = never>
+  implements DependentSignal, DependencySignal<A, E, R>
 {
-  readonly [DependencySymbol]: DependencySignal<A, Err> = this;
+  readonly [DependencySymbol]: DependencySignal<A, E, R> = this;
   readonly [DependentSymbol]: DependentSignal = this;
+  readonly [ObservableSymbol]: ObservableOptions;
 
-  private _effect: E.Effect<A, Err, SignalContext>;
-  private _value: Deferred.Deferred<A, Err>;
+  private _effect: Effect_.Effect<A, E, R | SignalContext>;
+  private _value: Deferred.Deferred<A, E>;
   private _fiber: Option.Option<Fiber.Fiber<boolean, never>>;
   private _dependents: HashSet.HashSet<DependentSignal>;
   private _dependencies: HashSet.HashSet<DependencySignal>;
 
   constructor(
-    effect: E.Effect<A, Err, SignalContext>,
-    value: Deferred.Deferred<A, Err>,
+    effect: Effect_.Effect<A, E, R | SignalContext>,
+    value: Deferred.Deferred<A, E>,
+    options: ObservableOptions,
   ) {
     this._effect = effect;
     this._value = value;
     this._fiber = Option.none();
     this._dependents = HashSet.empty();
     this._dependencies = HashSet.empty();
+    this[ObservableSymbol] = options;
   }
 
   addDependent(dependent: DependentSignal) {
-    return E.sync(() => {
+    return Effect_.sync(() => {
       this._dependents = HashSet.add(this._dependents, dependent);
     });
   }
 
   removeDependent(dependent: DependentSignal) {
-    return E.sync(() => {
+    return Effect_.sync(() => {
       this._dependents = HashSet.remove(this._dependents, dependent);
     });
   }
 
   clearDependents() {
-    return E.sync(() => {
+    return Effect_.sync(() => {
       HashSet.forEach(this._dependents, (dependent) =>
         dependent.removeDependency(this),
       );
@@ -285,19 +305,19 @@ export class Computed<A = unknown, Err = unknown>
   }
 
   addDependency(dependency: DependencySignal) {
-    return E.sync(() => {
+    return Effect_.sync(() => {
       this._dependencies = HashSet.add(this._dependencies, dependency);
     });
   }
 
   removeDependency(dependency: DependencySignal) {
-    return E.sync(() => {
+    return Effect_.sync(() => {
       this._dependencies = HashSet.remove(this._dependencies, dependency);
     });
   }
 
   clearDependencies() {
-    return E.sync(() => {
+    return Effect_.sync(() => {
       HashSet.forEach(this._dependencies, (dependency) =>
         dependency.removeDependent(this),
       );
@@ -305,136 +325,145 @@ export class Computed<A = unknown, Err = unknown>
     });
   }
 
-  getDependents(): E.Effect<DependentSignal[], never, never> {
-    return E.sync(() => HashSet.toValues(this._dependents));
+  getDependents(): Effect_.Effect<DependentSignal[], never, never> {
+    return Effect_.sync(() => HashSet.toValues(this._dependents));
   }
 
-  get value(): E.Effect<A, Err, SignalContext> {
+  get value(): Effect_.Effect<A, E, R | SignalContext> {
     return pipe(
       bindScopeDependency(this),
-      E.flatMap(() => this.peek()),
-      E.withSpan("Computed.value", {
+      Effect_.flatMap(() => this.peek()),
+      Observable.withSpan(this, "Computed.value", {
         captureStackTrace: true,
       }),
     );
   }
 
-  peek(): E.Effect<A, Err, never> {
+  peek(): Effect_.Effect<A, E, R> {
     return pipe(
-      E.Do,
-      E.bind("fiber", () =>
+      Effect_.Do,
+      Effect_.bind("fiber", () =>
         pipe(
           this._fiber,
           Option.match({
-            onSome: (fiber) => E.succeed(fiber),
+            onSome: (fiber) => Effect_.succeed(fiber),
             onNone: () =>
               pipe(
-                this._value,
-                Deferred.complete(runAndTrackEffect(this._effect, this)),
-                E.forkDaemon,
+                runAndTrackEffect(this._effect, this),
+                Effect_.exit,
+                Effect_.flatMap((value) =>
+                  Deferred.complete(this._value, value),
+                ),
+                Effect_.forkDaemon,
               ),
           }),
         ),
       ),
-      E.tap(({ fiber }) => {
+      Effect_.tap(({ fiber }) => {
         this._fiber = Option.some(fiber);
       }),
-      E.flatMap(() => Deferred.await(this._value)),
-      E.withSpan("Computed.peek", {
+      Effect_.flatMap(() => Deferred.await(this._value)),
+      Observable.withSpan(this, "Computed.peek", {
         captureStackTrace: true,
       }),
     );
   }
 
-  reset(): E.Effect<void, never, never> {
+  reset(): Effect_.Effect<void, never, never> {
     return pipe(
-      E.all([
+      Effect_.all([
         pipe(
-          Deferred.make<A, Err>(),
-          E.map((value) => {
+          Deferred.make<A, E>(),
+          Effect_.map((value) => {
             this._value = value;
           }),
         ),
         pipe(
-          E.succeed(this._fiber),
-          E.tap(() => {
+          Effect_.succeed(this._fiber),
+          Effect_.tap(() => {
             this._fiber = Option.none();
           }),
-          E.flatMap((fiber) =>
+          Effect_.flatMap((fiber) =>
             pipe(
               fiber,
               Option.match({
                 onSome: (fiber) => Fiber.interrupt(fiber),
-                onNone: () => E.void,
+                onNone: () => Effect_.void,
               }),
             ),
           ),
         ),
       ]),
-      E.withSpan("Computed.reset", {
+      Observable.withSpan(this, "Computed.reset", {
         captureStackTrace: true,
       }),
     );
   }
 
-  notify(): E.Effect<unknown, never, never> {
+  notify(): Effect_.Effect<unknown, never, never> {
     return pipe(
       this.clearDependencies(),
-      E.andThen(this.reset()),
-      E.withSpan("Computed.notify", {
+      Effect_.andThen(this.reset()),
+      Observable.withSpan(this, "Computed.notify", {
         captureStackTrace: true,
       }),
     );
   }
 
-  recompute(): E.Effect<void, never, never> {
+  recompute(): Effect_.Effect<void, never, never> {
     return pipe(
       DependencySignal.notifyAllDependents(this, this.reset()),
-      E.withSpan("Computed.recompute", {
+      Observable.withSpan(this, "Computed.recompute", {
         captureStackTrace: true,
       }),
     );
   }
 }
 
-export const computed = <A = unknown, Err = unknown>(
-  effect: E.Effect<A, Err, SignalContext>,
+export const computed = <A = never, E = never, R = never>(
+  effect: Effect_.Effect<A, E, R | SignalContext>,
+  options?: ObservableOptions,
 ) =>
   pipe(
-    Deferred.make<A, Err>(),
-    E.map((value) => new Computed(effect, value)),
-    E.withSpan("computed", {
+    Deferred.make<A, E>(),
+    Effect_.map((value) => new Computed<A, E, R>(effect, value, options ?? {})),
+    Observable.withSpan({ [ObservableSymbol]: options ?? {} }, "computed", {
       captureStackTrace: true,
     }),
   );
 
 class Effect implements DependentSignal {
   readonly [DependentSymbol]: DependentSignal = this;
+  readonly [ObservableSymbol]: ObservableOptions;
 
-  private _effect: E.Effect<unknown, unknown, SignalContext>;
+  private _effect: Effect_.Effect<unknown, unknown, SignalContext>;
   private _fiber: Option.Option<Fiber.Fiber<unknown, unknown>>;
   private _dependencies: HashSet.HashSet<DependencySignal>;
 
-  constructor(effect: E.Effect<unknown, unknown, SignalContext>) {
+  constructor(
+    effect: Effect_.Effect<unknown, unknown, SignalContext>,
+    options: ObservableOptions,
+  ) {
     this._effect = effect;
     this._fiber = Option.none();
     this._dependencies = HashSet.empty();
+    this[ObservableSymbol] = options;
   }
 
   addDependency(dependency: DependencySignal) {
-    return E.sync(() => {
+    return Effect_.sync(() => {
       this._dependencies = HashSet.add(this._dependencies, dependency);
     });
   }
 
   removeDependency(dependency: DependencySignal) {
-    return E.sync(() => {
+    return Effect_.sync(() => {
       this._dependencies = HashSet.remove(this._dependencies, dependency);
     });
   }
 
   clearDependencies() {
-    return E.sync(() => {
+    return Effect_.sync(() => {
       HashSet.forEach(this._dependencies, (dependency) =>
         dependency.removeDependent(this),
       );
@@ -442,31 +471,31 @@ class Effect implements DependentSignal {
     });
   }
 
-  notify(): E.Effect<unknown, never, never> {
+  notify(): Effect_.Effect<unknown, never, never> {
     return pipe(
-      E.all([
+      Effect_.all([
         this.clearDependencies(),
         pipe(
-          E.Do,
-          E.let("fiber", () => this._fiber),
-          E.bind("newFiber", () =>
-            pipe(runAndTrackEffect(this._effect, this), E.forkDaemon),
+          Effect_.Do,
+          Effect_.let("fiber", () => this._fiber),
+          Effect_.bind("newFiber", () =>
+            pipe(runAndTrackEffect(this._effect, this), Effect_.forkDaemon),
           ),
-          E.tap(({ newFiber }) => {
+          Effect_.tap(({ newFiber }) => {
             this._fiber = Option.some(newFiber);
           }),
-          E.flatMap(({ fiber }) =>
+          Effect_.flatMap(({ fiber }) =>
             pipe(
               fiber,
               Option.match({
                 onSome: (fiber) => Fiber.interrupt(fiber),
-                onNone: () => E.void,
+                onNone: () => Effect_.void,
               }),
             ),
           ),
         ),
       ]),
-      E.withSpan("Effect.notify", {
+      Observable.withSpan(this, "Effect.notify", {
         captureStackTrace: true,
       }),
     );
@@ -474,69 +503,82 @@ class Effect implements DependentSignal {
 
   cleanup() {
     return pipe(
-      E.sync(() => {
-        this._effect = E.void;
+      Effect_.sync(() => {
+        this._effect = Effect_.void;
       }),
-      E.andThen(this.clearDependencies()),
-      E.withSpan("Effect.cleanup", {
+      Effect_.andThen(this.clearDependencies()),
+      Observable.withSpan(this, "Effect.cleanup", {
         captureStackTrace: true,
       }),
     );
   }
 }
 
-export const effect = (effect: E.Effect<unknown, unknown, SignalContext>) =>
+export const effect = (
+  effect: Effect_.Effect<unknown, unknown, SignalContext>,
+  options?: ObservableOptions,
+) =>
   pipe(
-    E.succeed(new Effect(effect)),
-    E.tap((effect) => effect.notify()),
-    E.map((effect) => effect.cleanup()),
-    E.withSpan("effect", {
+    Effect_.succeed(new Effect(effect, options ?? {})),
+    Effect_.tap((effect) => effect.notify()),
+    Effect_.map((effect) => effect.cleanup()),
+    Observable.withSpan({ [ObservableSymbol]: options ?? {} }, "effect", {
       captureStackTrace: true,
     }),
   );
 
-class OnceObserver<A = unknown, Err = unknown> implements DependentSignal {
+class OnceObserver<A = never, E = never> implements DependentSignal {
   readonly [DependentSymbol]: DependentSignal = this;
+  readonly [ObservableSymbol]: ObservableOptions;
 
   private _dependencies: HashSet.HashSet<DependencySignal>;
-  private _fiber: Deferred.Deferred<Fiber.Fiber<A, Err>, never>;
+  private _fiber: Deferred.Deferred<Fiber.Fiber<A, E>, never>;
 
-  constructor(fiber: Deferred.Deferred<Fiber.Fiber<A, Err>, never>) {
+  constructor(
+    fiber: Deferred.Deferred<Fiber.Fiber<A, E>, never>,
+    options: ObservableOptions,
+  ) {
     this._dependencies = HashSet.empty();
     this._fiber = fiber;
+    this[ObservableSymbol] = options;
   }
 
-  static make<A = unknown, Err = unknown>(
-    effect: E.Effect<A, Err, SignalContext>,
+  static make<A = never, E = never, R = never>(
+    effect: Effect_.Effect<A, E, R | SignalContext>,
+    options: ObservableOptions,
   ) {
     return pipe(
-      E.Do,
-      E.bind("deferred", () => Deferred.make<Fiber.Fiber<A, Err>, never>()),
-      E.let("observer", ({ deferred }) => new OnceObserver(deferred)),
-      E.tap(({ deferred, observer }) =>
-        Deferred.complete(
-          deferred,
-          E.forkDaemon(runAndTrackEffect(effect, observer)),
+      Effect_.Do,
+      Effect_.bind("deferred", () => Deferred.make<Fiber.Fiber<A, E>, never>()),
+      Effect_.let(
+        "observer",
+        ({ deferred }) => new OnceObserver(deferred, options),
+      ),
+      Effect_.tap(({ deferred, observer }) =>
+        pipe(
+          runAndTrackEffect(effect, observer),
+          Effect_.forkDaemon,
+          Effect_.flatMap((fiber) => Deferred.succeed(deferred, fiber)),
         ),
       ),
-      E.map(({ observer }) => observer),
+      Effect_.map(({ observer }) => observer),
     );
   }
 
   addDependency(dependency: DependencySignal) {
-    return E.sync(() => {
+    return Effect_.sync(() => {
       this._dependencies = HashSet.add(this._dependencies, dependency);
     });
   }
 
   removeDependency(dependency: DependencySignal) {
-    return E.sync(() => {
+    return Effect_.sync(() => {
       this._dependencies = HashSet.remove(this._dependencies, dependency);
     });
   }
 
   clearDependencies() {
-    return E.sync(() => {
+    return Effect_.sync(() => {
       HashSet.forEach(this._dependencies, (dependency) =>
         dependency.removeDependent(this),
       );
@@ -544,47 +586,38 @@ class OnceObserver<A = unknown, Err = unknown> implements DependentSignal {
     });
   }
 
-  get value(): E.Effect<A, Err, never> {
+  get value(): Effect_.Effect<A, E, never> {
     return pipe(
-      E.Do,
-      E.bind("fiber", () => Deferred.await(this._fiber)),
-      E.flatMap(({ fiber }) => Fiber.join(fiber)),
-      E.withSpan("OnceObserver.value", {
+      Effect_.Do,
+      Effect_.bind("fiber", () => Deferred.await(this._fiber)),
+      Effect_.flatMap(({ fiber }) => Fiber.join(fiber)),
+      Observable.withSpan(this, "OnceObserver.value", {
         captureStackTrace: true,
       }),
     );
   }
 
-  notify(): E.Effect<unknown, never, never> {
+  notify(): Effect_.Effect<unknown, never, never> {
     return pipe(
       this.clearDependencies(),
-      E.withSpan("OnceObserver.notify", {
+      Observable.withSpan(this, "OnceObserver.notify", {
         captureStackTrace: true,
       }),
     );
   }
 }
 
-export const observeOnce = <A = unknown, Err = unknown>(
-  effect: E.Effect<A, Err, SignalContext>,
+export const observeOnce = <A = never, E = never, R = never>(
+  effect: Effect_.Effect<A, E, R | SignalContext>,
+  options?: ObservableOptions,
 ) =>
   pipe(
-    OnceObserver.make(effect),
-    E.flatMap((observer) => observer.value),
+    OnceObserver.make(effect, options ?? {}),
+    Effect_.flatMap((observer) => observer.value),
+    Observable.withSpan({ [ObservableSymbol]: options ?? {} }, "observeOnce", {
+      captureStackTrace: true,
+    }),
   );
-
-export const observeSignalOnce = <A = unknown, Err = unknown>(
-  signal: DependencySignal<A, Err>,
-) => observeOnce(signal.value);
-
-export const observeEffectSignalOnce = <
-  A = unknown,
-  Err1 = unknown,
-  Err2 = unknown,
-  R = unknown,
->(
-  effect: E.Effect<DependencySignal<A, Err1>, Err2, R>,
-) => pipe(effect, E.flatMap(observeSignalOnce));
 
 export class SignalContext extends Context.Tag("SignalContext")<
   SignalContext,
@@ -600,11 +633,11 @@ export class SignalContext extends Context.Tag("SignalContext")<
     };
   }
 
-  static getScope() {
+  static getScope(dependency: DependencySignal<unknown, unknown, unknown>) {
     return pipe(
       SignalContext,
-      E.map(({ scope }) => scope),
-      E.withSpan("SignalContext.getScope", {
+      Effect_.map(({ scope }) => scope),
+      Observable.withSpan(dependency, "SignalContext.getScope", {
         captureStackTrace: true,
       }),
     );

@@ -16,7 +16,7 @@ import {
   pipe,
   Ref,
 } from "effect";
-import { observeEffectSignalOnce } from "typhoon-core/signal";
+import { observeOnce } from "typhoon-server/signal";
 import { SheetService } from "../services";
 import { ChannelConfigService } from "../services/channelConfigService";
 import { ScheduleService } from "../services/scheduleService";
@@ -67,7 +67,10 @@ export const button = buttonInteractionHandlerContextBuilder()
         SheetService.ofGuild(serverId),
       ),
       Effect.bind("channelConfig", ({ channel }) =>
-        observeEffectSignalOnce(ChannelConfigService.getConfig(channel.id)),
+        pipe(
+          ChannelConfigService.getConfig(channel.id),
+          Effect.flatMap((computed) => observeOnce(computed.value)),
+        ),
       ),
       Effect.bind("day", ({ channelConfig }) =>
         pipe(

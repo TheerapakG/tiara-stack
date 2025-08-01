@@ -6,7 +6,7 @@ import {
   SlashCommandSubcommandBuilder,
 } from "discord.js";
 import { Array, Effect, Option, pipe } from "effect";
-import { observeEffectSignalOnce } from "typhoon-server/signal";
+import { observeOnce } from "typhoon-server/signal";
 import {
   GuildConfigService,
   PermissionService,
@@ -29,7 +29,7 @@ const getCheckinMessage = (
     Effect.bind("runningChannel", () =>
       pipe(
         GuildConfigService.getRunningChannel(serverId, channelName),
-        observeEffectSignalOnce,
+        Effect.flatMap((computed) => observeOnce(computed.value)),
         Effect.flatMap(Array.head),
       ),
     ),
@@ -95,7 +95,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         serverId
           ? pipe(
               GuildConfigService.getManagerRoles(serverId),
-              observeEffectSignalOnce,
+              Effect.flatMap((computed) => observeOnce(computed.value)),
             )
           : Effect.succeed([]),
       ),

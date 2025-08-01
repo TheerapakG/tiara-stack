@@ -9,7 +9,7 @@ import {
   pipe,
   Stream,
 } from "effect";
-import { observeEffectSignalOnce } from "typhoon-core/signal";
+import { computed } from "typhoon-core/signal";
 import { defineHandlerConfigBuilder } from "typhoon-server/config";
 import { defineHandlerBuilder, Event } from "typhoon-server/server";
 import * as v from "valibot";
@@ -417,33 +417,43 @@ export const calcHandler = defineHandlerBuilder()
       Effect.Do,
       Effect.bind("request", () => Event.webRequest()),
       Effect.bind("userAgent", ({ request }) =>
-        Effect.succeed(request.headers.get("user-agent") ?? ""),
+        computed(
+          pipe(
+            request.value,
+            Effect.map(({ headers }) => headers.get("user-agent") ?? ""),
+          ),
+        ),
       ),
       Effect.bind("googleAppsScriptId", ({ userAgent }) =>
-        pipe(
-          extractGoogleAppsScriptId(userAgent),
-          Effect.flatten,
-          Effect.orElseFail(() => ({
-            message:
-              "this does not seems like a request from an apps script... what are you doing here?",
-          })),
+        computed(
+          pipe(
+            userAgent.value,
+            Effect.flatMap(extractGoogleAppsScriptId),
+            Effect.flatten,
+            Effect.orElseFail(() => ({
+              message:
+                "this does not seems like a request from an apps script... what are you doing here?",
+            })),
+          ),
         ),
       ),
       Effect.bind("guildConfig", ({ googleAppsScriptId }) =>
-        pipe(
-          GuildConfigService.getGuildConfigWithBoundScript(googleAppsScriptId),
-          observeEffectSignalOnce,
-          Effect.map(Array.head),
-          Effect.flatten,
-          Effect.flipWith((effect) =>
-            pipe(
-              effect,
-              Effect.tap(() => Effect.log("unregistered script id")),
-              Effect.orElseFail(() => ({
-                message:
-                  "unregistered sheet... contact me before yoinking the sheet could you?",
-              })),
-              Effect.annotateLogs("scriptId", googleAppsScriptId),
+        computed(
+          pipe(
+            googleAppsScriptId.value,
+            Effect.flatMap(GuildConfigService.getGuildConfigWithBoundScript),
+            Effect.flatMap((computed) => computed.value),
+            Effect.map(Array.head),
+            Effect.flipWith((effect) =>
+              pipe(
+                effect,
+                Effect.tap(() => Effect.log("unregistered script id")),
+                Effect.orElseFail(() => ({
+                  message:
+                    "unregistered sheet... contact me before yoinking the sheet could you?",
+                })),
+                Effect.annotateLogs("scriptId", googleAppsScriptId),
+              ),
             ),
           ),
         ),
@@ -451,10 +461,19 @@ export const calcHandler = defineHandlerBuilder()
       Effect.bind("parsed", () =>
         Event.withConfig(calcHandlerConfig).request.parsed(),
       ),
-      Effect.flatMap(({ parsed: { config, players } }) =>
-        calc(config, players),
+      Effect.flatMap(({ guildConfig, parsed }) =>
+        computed(
+          pipe(
+            Effect.Do,
+            Effect.bind("guildConfig", () => guildConfig.value),
+            Effect.bind("parsed", () => parsed.value),
+            Effect.flatMap(({ parsed: { config, players } }) =>
+              calc(config, players),
+            ),
+            Effect.map(Chunk.toArray),
+          ),
+        ),
       ),
-      Effect.map(Chunk.toArray),
       Effect.withSpan("calcHandler", { captureStackTrace: true }),
     ),
   );

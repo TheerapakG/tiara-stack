@@ -9,16 +9,20 @@ import {
   MutationHandlerContext as BaseMutationHandlerContext,
   SubscriptionHandlerContext as BaseSubscriptionHandlerContext,
 } from "typhoon-core/server";
-import { SignalContext } from "typhoon-core/signal";
+import { DependencySignal } from "typhoon-core/signal";
 import { Event } from "./event";
 
 export type SubscriptionEventHandler<
   Config extends SubscriptionHandlerConfig,
   R = never,
 > = Effect.Effect<
-  StandardSchemaV1.InferInput<Config["response"]["validator"]>,
+  DependencySignal<
+    StandardSchemaV1.InferInput<Config["response"]["validator"]>,
+    unknown,
+    Event | Scope.Scope | R
+  >,
   unknown,
-  Event | SignalContext | Scope.Scope | R
+  never
 >;
 
 export type AnySubscriptionEventHandler<
