@@ -444,12 +444,12 @@ export const calcHandler = defineHandlerBuilder()
               googleAppsScriptId.value,
               Effect.flatMap(GuildConfigService.getGuildConfigWithBoundScript),
               Effect.flatMap((computed) => computed.value),
-              Effect.map(Array.head),
+              Effect.flatMap(Array.head),
               Effect.flipWith((effect) =>
                 pipe(
                   effect,
                   Effect.tap(() => Effect.log("unregistered script id")),
-                  Effect.orElseFail(() => ({
+                  Effect.map(() => ({
                     message:
                       "unregistered sheet... contact me before yoinking the sheet could you?",
                   })),
