@@ -418,6 +418,48 @@ export class Computed<A = never, E = never, R = never>
       }),
     );
   }
+
+  static annotateLogs<E1 = never, R1 = never>(
+    key: string,
+    value: DependencySignal<unknown, E1, R1>,
+  ) {
+    return <A = never, E2 = never, R2 = never, E3 = never, R3 = never>(
+      signal: Effect_.Effect<Computed<A, E2, R2>, E3, R3>,
+    ) =>
+      computed(
+        pipe(
+          value.value,
+          Effect_.flatMap((value) =>
+            pipe(
+              signal,
+              Effect_.flatMap((signal) => signal.value),
+              Effect_.annotateLogs(key, value),
+            ),
+          ),
+        ),
+      );
+  }
+
+  static annotateSpans<E1 = never, R1 = never>(
+    key: string,
+    value: DependencySignal<unknown, E1, R1>,
+  ) {
+    return <A = never, E2 = never, R2 = never, E3 = never, R3 = never>(
+      signal: Effect_.Effect<Computed<A, E2, R2>, E3, R3>,
+    ) =>
+      computed(
+        pipe(
+          value.value,
+          Effect_.flatMap((value) =>
+            pipe(
+              signal,
+              Effect_.flatMap((signal) => signal.value),
+              Effect_.annotateSpans(key, value),
+            ),
+          ),
+        ),
+      );
+  }
 }
 
 export const computed = <A = never, E = never, R = never>(

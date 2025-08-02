@@ -9,7 +9,7 @@ import {
   pipe,
   Stream,
 } from "effect";
-import { computed } from "typhoon-core/signal";
+import { Computed, computed } from "typhoon-core/signal";
 import { defineHandlerConfigBuilder } from "typhoon-server/config";
 import { defineHandlerBuilder, Event } from "typhoon-server/server";
 import * as v from "valibot";
@@ -438,50 +438,56 @@ export const calcHandler = defineHandlerBuilder()
         ),
       ),
       Effect.bind("guildConfig", ({ googleAppsScriptId }) =>
-        computed(
-          pipe(
-            googleAppsScriptId.value,
-            Effect.flatMap(GuildConfigService.getGuildConfigWithBoundScript),
-            Effect.flatMap((computed) => computed.value),
-            Effect.map(Array.head),
-            Effect.flipWith((effect) =>
-              pipe(
-                effect,
-                Effect.tap(() => Effect.log("unregistered script id")),
-                Effect.orElseFail(() => ({
-                  message:
-                    "unregistered sheet... contact me before yoinking the sheet could you?",
-                })),
-                Effect.annotateLogs("scriptId", googleAppsScriptId.value),
-                Effect.annotateSpans("scriptId", googleAppsScriptId.value),
+        pipe(
+          computed(
+            pipe(
+              googleAppsScriptId.value,
+              Effect.flatMap(GuildConfigService.getGuildConfigWithBoundScript),
+              Effect.flatMap((computed) => computed.value),
+              Effect.map(Array.head),
+              Effect.flipWith((effect) =>
+                pipe(
+                  effect,
+                  Effect.tap(() => Effect.log("unregistered script id")),
+                  Effect.orElseFail(() => ({
+                    message:
+                      "unregistered sheet... contact me before yoinking the sheet could you?",
+                  })),
+                ),
               ),
             ),
           ),
+          Computed.annotateLogs("scriptId", googleAppsScriptId),
+          Computed.annotateSpans("scriptId", googleAppsScriptId),
         ),
       ),
       Effect.bind("parsed", ({ googleAppsScriptId }) =>
-        computed(
-          pipe(
-            Event.withConfig(calcHandlerConfig).request.parsed(),
-            Effect.flatMap((parsed) => parsed.value),
-            Effect.annotateLogs("scriptId", googleAppsScriptId.value),
-            Effect.annotateSpans("scriptId", googleAppsScriptId.value),
+        pipe(
+          computed(
+            pipe(
+              Event.withConfig(calcHandlerConfig).request.parsed(),
+              Effect.flatMap((parsed) => parsed.value),
+            ),
           ),
+          Computed.annotateLogs("scriptId", googleAppsScriptId),
+          Computed.annotateSpans("scriptId", googleAppsScriptId),
         ),
       ),
       Effect.flatMap(({ guildConfig, parsed, googleAppsScriptId }) =>
-        computed(
-          pipe(
-            Effect.Do,
-            Effect.bind("guildConfig", () => guildConfig.value),
-            Effect.bind("parsed", () => parsed.value),
-            Effect.flatMap(({ parsed: { config, players } }) =>
-              calc(config, players),
+        pipe(
+          computed(
+            pipe(
+              Effect.Do,
+              Effect.bind("guildConfig", () => guildConfig.value),
+              Effect.bind("parsed", () => parsed.value),
+              Effect.flatMap(({ parsed: { config, players } }) =>
+                calc(config, players),
+              ),
+              Effect.map(Chunk.toArray),
             ),
-            Effect.map(Chunk.toArray),
-            Effect.annotateLogs("scriptId", googleAppsScriptId.value),
-            Effect.annotateSpans("scriptId", googleAppsScriptId.value),
           ),
+          Computed.annotateLogs("scriptId", googleAppsScriptId),
+          Computed.annotateSpans("scriptId", googleAppsScriptId),
         ),
       ),
       Effect.withSpan("calcHandler", { captureStackTrace: true }),
