@@ -452,16 +452,24 @@ export const calcHandler = defineHandlerBuilder()
                   message:
                     "unregistered sheet... contact me before yoinking the sheet could you?",
                 })),
-                Effect.annotateLogs("scriptId", googleAppsScriptId),
+                Effect.annotateLogs("scriptId", googleAppsScriptId.value),
+                Effect.annotateSpans("scriptId", googleAppsScriptId.value),
               ),
             ),
           ),
         ),
       ),
-      Effect.bind("parsed", () =>
-        Event.withConfig(calcHandlerConfig).request.parsed(),
+      Effect.bind("parsed", ({ googleAppsScriptId }) =>
+        computed(
+          pipe(
+            Event.withConfig(calcHandlerConfig).request.parsed(),
+            Effect.flatMap((parsed) => parsed.value),
+            Effect.annotateLogs("scriptId", googleAppsScriptId.value),
+            Effect.annotateSpans("scriptId", googleAppsScriptId.value),
+          ),
+        ),
       ),
-      Effect.flatMap(({ guildConfig, parsed }) =>
+      Effect.flatMap(({ guildConfig, parsed, googleAppsScriptId }) =>
         computed(
           pipe(
             Effect.Do,
@@ -471,6 +479,8 @@ export const calcHandler = defineHandlerBuilder()
               calc(config, players),
             ),
             Effect.map(Chunk.toArray),
+            Effect.annotateLogs("scriptId", googleAppsScriptId.value),
+            Effect.annotateSpans("scriptId", googleAppsScriptId.value),
           ),
         ),
       ),
