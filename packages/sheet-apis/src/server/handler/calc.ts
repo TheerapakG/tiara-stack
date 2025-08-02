@@ -401,13 +401,57 @@ const calcHandlerConfig = defineHandlerConfigBuilder()
   })
   .build();
 
-const extractGoogleAppsScriptId = (userAgent: string) =>
-  pipe(
-    userAgent.match(/Google-Apps-Script.*?id:\s*([^\s)]+)/i),
-    Option.fromNullable,
-    Option.flatMap(Array.get(1)),
-    Effect.succeed,
-    Effect.withSpan("extractGoogleAppsScriptId", { captureStackTrace: true }),
+const getUserAgent = <E, R>(request: Computed<Request, E, R>) =>
+  computed(
+    pipe(
+      request.value,
+      Effect.map(({ headers }) => headers.get("user-agent") ?? ""),
+      Effect.withSpan("getUserAgent", { captureStackTrace: true }),
+    ),
+  );
+
+const extractGoogleAppsScriptId = <E, R>(userAgent: Computed<string, E, R>) =>
+  computed(
+    pipe(
+      userAgent.value,
+      Effect.map((userAgent) =>
+        userAgent.match(/Google-Apps-Script.*?id:\s*([^\s)]+)/i),
+      ),
+      Effect.map(Option.fromNullable),
+      Effect.map(Option.flatMap(Array.get(1))),
+      Effect.flatMap(
+        Option.match({
+          onSome: (id) => Effect.succeed(id),
+          onNone: () =>
+            Effect.fail({
+              message:
+                "this does not seems like a request from an apps script... what are you doing here?",
+            }),
+        }),
+      ),
+      Effect.withSpan("extractGoogleAppsScriptId", { captureStackTrace: true }),
+    ),
+  );
+
+const getGuildConfigByScriptId = <E, R>(scriptId: Computed<string, E, R>) =>
+  computed(
+    pipe(
+      scriptId.value,
+      Effect.flatMap(GuildConfigService.getGuildConfigWithBoundScript),
+      Effect.flatMap((computed) => computed.value),
+      Effect.flatMap(Array.head),
+      Effect.flipWith((effect) =>
+        pipe(
+          effect,
+          Effect.tap(() => Effect.log("unregistered script id")),
+          Effect.map(() => ({
+            message:
+              "unregistered sheet... contact me before yoinking the sheet could you?",
+          })),
+        ),
+      ),
+      Effect.withSpan("guildConfig", { captureStackTrace: true }),
+    ),
   );
 
 export const calcHandler = defineHandlerBuilder()
@@ -416,59 +460,20 @@ export const calcHandler = defineHandlerBuilder()
     pipe(
       Effect.Do,
       Effect.bind("request", () => Event.webRequest()),
-      Effect.bind("userAgent", ({ request }) =>
-        computed(
-          pipe(
-            request.value,
-            Effect.map(({ headers }) => headers.get("user-agent") ?? ""),
-          ),
-        ),
-      ),
+      Effect.bind("userAgent", ({ request }) => getUserAgent(request)),
       Effect.bind("googleAppsScriptId", ({ userAgent }) =>
-        computed(
-          pipe(
-            userAgent.value,
-            Effect.flatMap(extractGoogleAppsScriptId),
-            Effect.flatten,
-            Effect.orElseFail(() => ({
-              message:
-                "this does not seems like a request from an apps script... what are you doing here?",
-            })),
-          ),
-        ),
+        extractGoogleAppsScriptId(userAgent),
       ),
       Effect.bind("guildConfig", ({ googleAppsScriptId }) =>
         pipe(
-          computed(
-            pipe(
-              googleAppsScriptId.value,
-              Effect.flatMap(GuildConfigService.getGuildConfigWithBoundScript),
-              Effect.flatMap((computed) => computed.value),
-              Effect.flatMap(Array.head),
-              Effect.flipWith((effect) =>
-                pipe(
-                  effect,
-                  Effect.tap(() => Effect.log("unregistered script id")),
-                  Effect.map(() => ({
-                    message:
-                      "unregistered sheet... contact me before yoinking the sheet could you?",
-                  })),
-                ),
-              ),
-            ),
-          ),
+          getGuildConfigByScriptId(googleAppsScriptId),
           Computed.annotateLogs("scriptId", googleAppsScriptId),
           Computed.annotateSpans("scriptId", googleAppsScriptId),
         ),
       ),
       Effect.bind("parsed", ({ googleAppsScriptId }) =>
         pipe(
-          computed(
-            pipe(
-              Event.withConfig(calcHandlerConfig).request.parsed(),
-              Effect.flatMap((parsed) => parsed.value),
-            ),
-          ),
+          Event.withConfig(calcHandlerConfig).request.parsed(),
           Computed.annotateLogs("scriptId", googleAppsScriptId),
           Computed.annotateSpans("scriptId", googleAppsScriptId),
         ),
