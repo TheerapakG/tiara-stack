@@ -425,7 +425,7 @@ const extractGoogleAppsScriptId = <E, R>(userAgent: Computed<string, E, R>) =>
           onNone: () =>
             Effect.fail({
               message:
-                "this does not seems like a request from an apps script... what are you doing here?",
+                "this does not seem like a request from an apps script... what are you doing here?",
             }),
         }),
       ),
@@ -446,7 +446,7 @@ const getGuildConfigByScriptId = <E, R>(scriptId: Computed<string, E, R>) =>
           Effect.tap(() => Effect.log("unregistered script id")),
           Effect.map(() => ({
             message:
-              "unregistered sheet... contact me before yoinking the sheet could you?",
+              "unregistered sheet... contact me before yoinking the sheet, could you?",
           })),
         ),
       ),

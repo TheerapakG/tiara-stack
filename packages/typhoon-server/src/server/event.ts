@@ -1,4 +1,4 @@
-import { Chunk, Context, Effect, Exit, pipe, Scope } from "effect";
+import { Context, Effect, Exit, pipe, Scope } from "effect";
 import {
   HandlerConfig,
   RequestParamsConfig,
@@ -14,10 +14,15 @@ const pullStreamToParsed =
   <RequestParams extends RequestParamsConfig | undefined>(
     requestParams: RequestParams,
   ) =>
-  (pullStream: Effect.Effect<Chunk.Chunk<unknown>, unknown, never>) =>
+  (
+    pullStream: Effect.Effect<
+      unknown,
+      MsgpackDecodeError | StreamExhaustedError,
+      never
+    >,
+  ) =>
     pipe(
       pullStream,
-      Effect.flatMap(Chunk.get(0)),
       Effect.flatMap(validateRequestParamsConfig(requestParams)),
     );
 
@@ -61,7 +66,7 @@ export class EventWithConfig<Config extends HandlerConfig> {
 
 type PullStreamContext = {
   pullStream: Effect.Effect<
-    Chunk.Chunk<unknown>,
+    unknown,
     MsgpackDecodeError | StreamExhaustedError,
     never
   >;
