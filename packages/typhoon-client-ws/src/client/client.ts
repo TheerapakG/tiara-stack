@@ -1,6 +1,5 @@
 import { StandardSchemaV1 } from "@standard-schema/spec";
 import {
-  Chunk,
   Deferred,
   Effect,
   HashMap,
@@ -151,15 +150,15 @@ export class WebSocketClient<
                   Effect.bind("header", ({ pullDecodedStream }) =>
                     pipe(
                       pullDecodedStream,
-                      Effect.flatMap(Chunk.get(0)),
                       Effect.flatMap(
                         validate(v.array(v.tuple([v.number(), v.unknown()]))),
                       ),
                       Effect.flatMap(HeaderEncoderDecoder.decode),
                     ),
                   ),
-                  Effect.bind("message", ({ pullDecodedStream }) =>
-                    pipe(pullDecodedStream, Effect.flatMap(Chunk.get(0))),
+                  Effect.bind(
+                    "message",
+                    ({ pullDecodedStream }) => pullDecodedStream,
                   ),
                   Effect.tap(({ header, message }) =>
                     pipe(
