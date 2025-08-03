@@ -475,6 +475,11 @@ const handleSetScript = chatInputSubcommandHandlerContextBuilder()
           .setName("script_id")
           .setDescription("The script id to set")
           .setRequired(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("server_id")
+          .setDescription("The server id to set the script id for"),
       ),
   )
   .handler((interaction) =>
