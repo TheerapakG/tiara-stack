@@ -94,6 +94,13 @@ export class Bot<E = never, R = never> {
                     onSome: (scopeLayer) =>
                       pipe(
                         command.handler(interaction),
+                        Effect.annotateSpans({
+                          commandName: interaction.commandName,
+                          subcommandGroup:
+                            interaction.options.getSubcommandGroup(false),
+                          subcommand: interaction.options.getSubcommand(false),
+                          commandId: interaction.commandId,
+                        }),
                         ScopeLayer.provide(scopeLayer),
                       ),
                     onNone: () => Effect.void,

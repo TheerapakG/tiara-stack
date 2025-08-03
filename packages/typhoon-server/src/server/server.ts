@@ -2,7 +2,6 @@ import { Message, Peer } from "crossws";
 import type { serve as crosswsServe } from "crossws/server";
 import {
   Cause,
-  Chunk,
   Context,
   Data,
   Effect,
@@ -632,7 +631,7 @@ export class Server<
   static handleSubscribe(
     peer: Peer,
     pullDecodedStream: Effect.Effect<
-      Chunk.Chunk<unknown>,
+      unknown,
       MsgpackDecodeError | StreamExhaustedError,
       never
     >,
@@ -760,7 +759,7 @@ export class Server<
 
   static handleOnce<A, E = never>(
     pullDecodedStream: Effect.Effect<
-      Chunk.Chunk<unknown>,
+      unknown,
       MsgpackDecodeError | StreamExhaustedError,
       never
     >,
@@ -823,7 +822,7 @@ export class Server<
 
   static handleMutate<A, E = never>(
     pullDecodedStream: Effect.Effect<
-      Chunk.Chunk<unknown>,
+      unknown,
       MsgpackDecodeError | StreamExhaustedError,
       never
     >,
@@ -895,7 +894,6 @@ export class Server<
         Effect.bind("header", ({ pullDecodedStream }) =>
           pipe(
             pullDecodedStream,
-            Effect.flatMap(Chunk.get(0)),
             Effect.flatMap(
               validate(v.array(v.tuple([v.number(), v.unknown()]))),
             ),
@@ -963,7 +961,6 @@ export class Server<
         Effect.bind("header", ({ pullDecodedStream }) =>
           pipe(
             pullDecodedStream,
-            Effect.flatMap(Chunk.get(0)),
             Effect.flatMap(
               validate(v.array(v.tuple([v.number(), v.unknown()]))),
             ),

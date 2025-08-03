@@ -1,5 +1,5 @@
 import { StandardSchemaV1 } from "@standard-schema/spec";
-import { Chunk, Data, Effect, pipe } from "effect";
+import { Data, Effect, pipe } from "effect";
 import { RequestParamsConfig } from "typhoon-core/config";
 import {
   HeaderEncoderDecoder,
@@ -118,14 +118,14 @@ export class AppsScriptClient<
       Effect.bind("header", ({ pullDecodedStream }) =>
         pipe(
           pullDecodedStream,
-          Effect.flatMap(Chunk.get(0)),
           Effect.flatMap(validate(v.array(v.tuple([v.number(), v.unknown()])))),
           Effect.flatMap(HeaderEncoderDecoder.decode),
         ),
       ),
       // TODO: check if the response is a valid header
-      Effect.bind("decodedResponse", ({ pullDecodedStream }) =>
-        pipe(pullDecodedStream, Effect.flatMap(Chunk.get(0))),
+      Effect.bind(
+        "decodedResponse",
+        ({ pullDecodedStream }) => pullDecodedStream,
       ),
       Effect.flatMap(({ header, decodedResponse }) =>
         header.action === "server:update" && header.payload.success
