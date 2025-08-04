@@ -411,6 +411,11 @@ const handleSetSheet = chatInputSubcommandHandlerContextBuilder()
           .setName("sheet_id")
           .setDescription("The sheet id to set")
           .setRequired(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("server_id")
+          .setDescription("The server id to set the sheet id for"),
       ),
   )
   .handler((interaction) =>
