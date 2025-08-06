@@ -424,6 +424,7 @@ export class SheetService extends Effect.Service<SheetService>()(
                           `'${config.sheet}'!C3:C`,
                           `'${config.sheet}'!K3:O`,
                           `'${config.sheet}'!P3:P`,
+                          `'${config.sheet}'!Q3:Q`,
                         ],
                       }),
                     ),
