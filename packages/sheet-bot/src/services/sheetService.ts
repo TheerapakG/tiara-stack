@@ -419,6 +419,7 @@ export class SheetService extends Effect.Service<SheetService>()(
                 Effect.bind("sheet", ({ dayConfig }) =>
                   pipe(
                     HashMap.get(dayConfig, day),
+                    Effect.tap(Effect.log),
                     Effect.flatMap((config) =>
                       sheetGet({
                         ranges: [

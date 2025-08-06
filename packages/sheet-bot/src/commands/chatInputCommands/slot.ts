@@ -47,12 +47,8 @@ const getSlotMessage = (day: number) =>
         schedules,
         HashMap.values,
         Array.sortBy(Order.mapInput(Order.number, ({ hour }) => hour)),
-        Effect.succeed,
-        Effect.tap(console.log),
-        Effect.flatMap(
-          Effect.forEach((schedule) =>
-            ScheduleService.formatEmptySlots(start, schedule),
-          ),
+        Effect.forEach((schedule) =>
+          ScheduleService.formatEmptySlots(start, schedule),
         ),
       ),
     ),
