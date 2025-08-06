@@ -1,6 +1,7 @@
 import { addMinutes, getUnixTime } from "date-fns/fp";
 import {
   ApplicationIntegrationType,
+  ChatInputCommandInteraction,
   InteractionContextType,
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
@@ -16,6 +17,7 @@ import {
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
+  InteractionContext,
 } from "../../types";
 
 const getCheckinMessage = (
@@ -66,10 +68,13 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
           .setDescription("The server to check in users for"),
       ),
   )
-  .handler((interaction) =>
+  .handler(
     pipe(
       Effect.Do,
-      Effect.bindAll(() => ({
+      Effect.bind("interaction", () =>
+        InteractionContext.interaction<ChatInputCommandInteraction>(),
+      ),
+      Effect.bindAll(({ interaction }) => ({
         hourOption: pipe(
           Effect.try(() => interaction.options.getNumber("hour")),
           Effect.map(Option.fromNullable),
@@ -86,7 +91,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         ),
         user: Effect.succeed(interaction.user),
       })),
-      Effect.tap(({ serverId }) =>
+      Effect.tap(({ serverId, interaction }) =>
         serverId !== interaction.guildId
           ? PermissionService.checkOwner(interaction)
           : Effect.void,
@@ -99,7 +104,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             )
           : Effect.succeed([]),
       ),
-      Effect.tap(({ managerRoles }) =>
+      Effect.tap(({ managerRoles, interaction }) =>
         PermissionService.checkRoles(
           interaction,
           managerRoles.map((role) => role.roleId),
@@ -133,7 +138,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             Effect.provide(sheetService),
           ),
       ),
-      Effect.bind("response", ({ checkinMessage }) =>
+      Effect.bind("response", ({ checkinMessage, interaction }) =>
         Effect.tryPromise(() =>
           interaction.reply({
             content: checkinMessage,

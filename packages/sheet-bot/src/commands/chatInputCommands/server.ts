@@ -1,6 +1,7 @@
 import {
   ApplicationIntegrationType,
   channelMention,
+  ChatInputCommandInteraction,
   EmbedBuilder,
   escapeMarkdown,
   InteractionContextType,
@@ -17,6 +18,7 @@ import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
+  InteractionContext,
 } from "../../types";
 
 const handleListConfig = chatInputSubcommandHandlerContextBuilder()
@@ -30,10 +32,13 @@ const handleListConfig = chatInputSubcommandHandlerContextBuilder()
           .setDescription("The server id to list the config for"),
       ),
   )
-  .handler((interaction) =>
+  .handler(
     pipe(
       Effect.Do,
-      Effect.bindAll(() => ({
+      Effect.bind("interaction", () =>
+        InteractionContext.interaction<ChatInputCommandInteraction>(),
+      ),
+      Effect.bindAll(({ interaction }) => ({
         serverId: pipe(
           Effect.try(
             () =>
@@ -48,7 +53,7 @@ const handleListConfig = chatInputSubcommandHandlerContextBuilder()
           ? Effect.fail("You do not have permission to manage the server")
           : Effect.void,
       ),
-      Effect.bind("guild", ({ serverId }) =>
+      Effect.bind("guild", ({ serverId, interaction }) =>
         Effect.tryPromise(() => interaction.client.guilds.fetch(serverId)),
       ),
       Effect.bind("guildConfig", ({ guild }) =>
@@ -77,22 +82,24 @@ const handleListConfig = chatInputSubcommandHandlerContextBuilder()
           })),
         ),
       ),
-      Effect.bind("response", ({ guild, sheetId, scriptId, managerRoles }) =>
-        Effect.tryPromise(() =>
-          interaction.reply({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle(`Config for ${escapeMarkdown(guild.name)}`)
-                .setDescription(
-                  [
-                    `Sheet id: ${escapeMarkdown(sheetId ?? "None")}`,
-                    `Script id: ${escapeMarkdown(scriptId ?? "None")}`,
-                    `Manager roles: ${managerRoles.length > 0 ? managerRoles.map((role) => roleMention(role.roleId)).join(", ") : "None"}`,
-                  ].join("\n"),
-                ),
-            ],
-          }),
-        ),
+      Effect.bind(
+        "response",
+        ({ guild, sheetId, scriptId, managerRoles, interaction }) =>
+          Effect.tryPromise(() =>
+            interaction.reply({
+              embeds: [
+                new EmbedBuilder()
+                  .setTitle(`Config for ${escapeMarkdown(guild.name)}`)
+                  .setDescription(
+                    [
+                      `Sheet id: ${escapeMarkdown(sheetId ?? "None")}`,
+                      `Script id: ${escapeMarkdown(scriptId ?? "None")}`,
+                      `Manager roles: ${managerRoles.length > 0 ? managerRoles.map((role) => roleMention(role.roleId)).join(", ") : "None"}`,
+                    ].join("\n"),
+                  ),
+              ],
+            }),
+          ),
       ),
       Effect.withSpan("handleListConfig", { captureStackTrace: true }),
     ),
@@ -116,10 +123,13 @@ const handleAddManagerRole = chatInputSubcommandHandlerContextBuilder()
           .setDescription("The server id to add the manager role to"),
       ),
   )
-  .handler((interaction) =>
+  .handler(
     pipe(
       Effect.Do,
-      Effect.bindAll(() => ({
+      Effect.bind("interaction", () =>
+        InteractionContext.interaction<ChatInputCommandInteraction>(),
+      ),
+      Effect.bindAll(({ interaction }) => ({
         role: Effect.try(() => interaction.options.getRole("role", true)),
         serverId: pipe(
           Effect.try(
@@ -130,7 +140,7 @@ const handleAddManagerRole = chatInputSubcommandHandlerContextBuilder()
         ),
         memberPermissions: Option.fromNullable(interaction.memberPermissions),
       })),
-      Effect.bind("guild", ({ serverId }) =>
+      Effect.bind("guild", ({ serverId, interaction }) =>
         Effect.tryPromise(() => interaction.client.guilds.fetch(serverId)),
       ),
       Effect.tap(({ memberPermissions }) =>
@@ -141,7 +151,7 @@ const handleAddManagerRole = chatInputSubcommandHandlerContextBuilder()
       Effect.tap(({ guild, role }) =>
         GuildConfigService.addManagerRole(guild.id, role.id),
       ),
-      Effect.bind("response", ({ guild, role }) =>
+      Effect.bind("response", ({ guild, role, interaction }) =>
         Effect.tryPromise(() =>
           interaction.reply({
             embeds: [
@@ -189,10 +199,13 @@ const handleAddRunningChannel = chatInputSubcommandHandlerContextBuilder()
           .setDescription("The server id to add the running channel to"),
       ),
   )
-  .handler((interaction) =>
+  .handler(
     pipe(
       Effect.Do,
-      Effect.bindAll(() => ({
+      Effect.bind("interaction", () =>
+        InteractionContext.interaction<ChatInputCommandInteraction>(),
+      ),
+      Effect.bindAll(({ interaction }) => ({
         name: Effect.try(() => interaction.options.getString("name", true)),
         channel: Effect.try(() =>
           interaction.options.getChannel("channel", true),
@@ -206,7 +219,7 @@ const handleAddRunningChannel = chatInputSubcommandHandlerContextBuilder()
         ),
         memberPermissions: Option.fromNullable(interaction.memberPermissions),
       })),
-      Effect.bind("guild", ({ serverId }) =>
+      Effect.bind("guild", ({ serverId, interaction }) =>
         Effect.tryPromise(() => interaction.client.guilds.fetch(serverId)),
       ),
       Effect.tap(({ memberPermissions }) =>
@@ -217,7 +230,7 @@ const handleAddRunningChannel = chatInputSubcommandHandlerContextBuilder()
       Effect.tap(({ guild, name, channel }) =>
         GuildConfigService.addRunningChannel(guild.id, channel.id, name),
       ),
-      Effect.bind("response", ({ guild, name, channel }) =>
+      Effect.bind("response", ({ guild, name, channel, interaction }) =>
         Effect.tryPromise(() =>
           interaction.reply({
             embeds: [
@@ -270,10 +283,13 @@ const handleRemoveManagerRole = chatInputSubcommandHandlerContextBuilder()
           .setDescription("The server id to remove the manager role from"),
       ),
   )
-  .handler((interaction) =>
+  .handler(
     pipe(
       Effect.Do,
-      Effect.bindAll(() => ({
+      Effect.bind("interaction", () =>
+        InteractionContext.interaction<ChatInputCommandInteraction>(),
+      ),
+      Effect.bindAll(({ interaction }) => ({
         role: Effect.try(() => interaction.options.getRole("role", true)),
         serverId: pipe(
           Effect.try(
@@ -284,7 +300,7 @@ const handleRemoveManagerRole = chatInputSubcommandHandlerContextBuilder()
         ),
         memberPermissions: Option.fromNullable(interaction.memberPermissions),
       })),
-      Effect.bind("guild", ({ serverId }) =>
+      Effect.bind("guild", ({ serverId, interaction }) =>
         Effect.tryPromise(() => interaction.client.guilds.fetch(serverId)),
       ),
       Effect.tap(({ memberPermissions }) =>
@@ -295,7 +311,7 @@ const handleRemoveManagerRole = chatInputSubcommandHandlerContextBuilder()
       Effect.tap(({ guild, role }) =>
         GuildConfigService.removeManagerRole(guild.id, role.id),
       ),
-      Effect.bind("response", ({ guild, role }) =>
+      Effect.bind("response", ({ guild, role, interaction }) =>
         Effect.tryPromise(() =>
           interaction.reply({
             embeds: [
@@ -337,10 +353,13 @@ const handleRemoveRunningChannel = chatInputSubcommandHandlerContextBuilder()
           .setDescription("The server id to remove the running channel from"),
       ),
   )
-  .handler((interaction) =>
+  .handler(
     pipe(
       Effect.Do,
-      Effect.bindAll(() => ({
+      Effect.bind("interaction", () =>
+        InteractionContext.interaction<ChatInputCommandInteraction>(),
+      ),
+      Effect.bindAll(({ interaction }) => ({
         name: Effect.try(() => interaction.options.getString("name", true)),
         serverId: pipe(
           Effect.try(
@@ -351,7 +370,7 @@ const handleRemoveRunningChannel = chatInputSubcommandHandlerContextBuilder()
         ),
         memberPermissions: Option.fromNullable(interaction.memberPermissions),
       })),
-      Effect.bind("guild", ({ serverId }) =>
+      Effect.bind("guild", ({ serverId, interaction }) =>
         Effect.tryPromise(() => interaction.client.guilds.fetch(serverId)),
       ),
       Effect.tap(({ memberPermissions }) =>
@@ -365,7 +384,7 @@ const handleRemoveRunningChannel = chatInputSubcommandHandlerContextBuilder()
           Effect.flatMap(Array.head),
         ),
       ),
-      Effect.bind("response", ({ guild, name, runningChannel }) =>
+      Effect.bind("response", ({ guild, name, runningChannel, interaction }) =>
         Effect.tryPromise(() =>
           interaction.reply({
             embeds: [
@@ -418,10 +437,13 @@ const handleSetSheet = chatInputSubcommandHandlerContextBuilder()
           .setDescription("The server id to set the sheet id for"),
       ),
   )
-  .handler((interaction) =>
+  .handler(
     pipe(
       Effect.Do,
-      Effect.bindAll(() => ({
+      Effect.bind("interaction", () =>
+        InteractionContext.interaction<ChatInputCommandInteraction>(),
+      ),
+      Effect.bindAll(({ interaction }) => ({
         sheetId: Effect.try(() =>
           interaction.options.getString("sheet_id", true),
         ),
@@ -434,7 +456,7 @@ const handleSetSheet = chatInputSubcommandHandlerContextBuilder()
         ),
         memberPermissions: Option.fromNullable(interaction.memberPermissions),
       })),
-      Effect.bind("guild", ({ serverId }) =>
+      Effect.bind("guild", ({ serverId, interaction }) =>
         Effect.tryPromise(() => interaction.client.guilds.fetch(serverId)),
       ),
       Effect.tap(({ memberPermissions }) =>
@@ -447,7 +469,7 @@ const handleSetSheet = chatInputSubcommandHandlerContextBuilder()
           sheetId,
         }),
       ),
-      Effect.bind("response", ({ guild, sheetId }) =>
+      Effect.bind("response", ({ guild, sheetId, interaction }) =>
         Effect.tryPromise(() =>
           interaction.reply({
             embeds: [
@@ -487,10 +509,13 @@ const handleSetScript = chatInputSubcommandHandlerContextBuilder()
           .setDescription("The server id to set the script id for"),
       ),
   )
-  .handler((interaction) =>
+  .handler(
     pipe(
       Effect.Do,
-      Effect.bindAll(() => ({
+      Effect.bind("interaction", () =>
+        InteractionContext.interaction<ChatInputCommandInteraction>(),
+      ),
+      Effect.bindAll(({ interaction }) => ({
         scriptId: Effect.try(() =>
           interaction.options.getString("script_id", true),
         ),
@@ -502,16 +527,18 @@ const handleSetScript = chatInputSubcommandHandlerContextBuilder()
           Effect.flatMap(Option.fromNullable),
         ),
       })),
-      Effect.bind("guild", ({ serverId }) =>
+      Effect.bind("guild", ({ serverId, interaction }) =>
         Effect.tryPromise(() => interaction.client.guilds.fetch(serverId)),
       ),
-      Effect.tap(() => PermissionService.checkOwner(interaction)),
+      Effect.tap(({ interaction }) =>
+        PermissionService.checkOwner(interaction),
+      ),
       Effect.tap(({ guild, scriptId }) =>
         GuildConfigService.updateConfig(guild.id, {
           scriptId,
         }),
       ),
-      Effect.bind("response", ({ guild, scriptId }) =>
+      Effect.bind("response", ({ guild, scriptId, interaction }) =>
         Effect.tryPromise(() =>
           interaction.reply({
             embeds: [

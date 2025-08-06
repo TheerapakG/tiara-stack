@@ -11,13 +11,14 @@ import {
   SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 import { Data, Effect, HashMap, Option, pipe } from "effect";
+import { InteractionContext } from "./interactionContext";
 type Constrain<T, C> = T extends infer U extends C ? U : never;
 
 export type InteractionHandler<
   I extends Interaction = Interaction,
   E = never,
   R = never,
-> = (interaction: I) => Effect.Effect<unknown, E, R>;
+> = Effect.Effect<unknown, E, R | InteractionContext<I>>;
 
 export type AnyInteractionHandler<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -590,31 +591,34 @@ export class SubcommandHandler<out E = never, out R = never> {
   }
 
   static handler<E = never, R = never>(handler: SubcommandHandler<E, R>) {
-    return (interaction: ChatInputCommandInteraction) =>
-      pipe(
-        Option.fromNullable(interaction.options.getSubcommandGroup()),
-        Option.flatMap((group) =>
-          ChatInputSubcommandGroupHandlerMap.get(group)(
-            handler.subcommandGroupHandlerMap,
-          ),
-        ),
-        Option.map((ctx) => ctx.handler),
-        Option.orElse(() =>
-          pipe(
-            Option.fromNullable(interaction.options.getSubcommand()),
-            Option.flatMap((subcommand) =>
-              ChatInputSubcommandHandlerMap.get(subcommand)(
-                handler.subcommandHandlerMap,
-              ),
+    return pipe(
+      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      Effect.flatMap((interaction) =>
+        pipe(
+          Option.fromNullable(interaction.options.getSubcommandGroup()),
+          Option.flatMap((group) =>
+            ChatInputSubcommandGroupHandlerMap.get(group)(
+              handler.subcommandGroupHandlerMap,
             ),
-            Option.map((ctx) => ctx.handler),
           ),
+          Option.map((ctx) => ctx.handler),
+          Option.orElse(() =>
+            pipe(
+              Option.fromNullable(interaction.options.getSubcommand()),
+              Option.flatMap((subcommand) =>
+                ChatInputSubcommandHandlerMap.get(subcommand)(
+                  handler.subcommandHandlerMap,
+                ),
+              ),
+              Option.map((ctx) => ctx.handler),
+            ),
+          ),
+          Option.getOrElse<
+            InteractionHandler<ChatInputCommandInteraction, never, never>
+          >(() => Effect.succeed(undefined)),
         ),
-        Option.getOrElse<
-          InteractionHandler<ChatInputCommandInteraction, never, never>
-        >(() => () => Effect.succeed(undefined)),
-        (handler) => handler(interaction),
-      );
+      ),
+    );
   }
 }
 

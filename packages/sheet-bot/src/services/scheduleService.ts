@@ -11,7 +11,9 @@ import { Schedule, ScheduleMap, SheetService } from "./sheetService";
 const emptySchedule = (hour: number): Schedule => ({
   hour,
   breakHour: false,
-  players: [undefined, undefined, undefined, undefined, undefined],
+  fills: [undefined, undefined, undefined, undefined, undefined],
+  overFills: [],
+  standbys: [],
   empty: 5,
 });
 
@@ -37,20 +39,20 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
         ) => {
           return pipe(
             Effect.Do,
-            Effect.let("prevPlayers", () =>
+            Effect.let("prevFills", () =>
               pipe(
                 HashMap.get(schedules, hour - 1),
                 Option.getOrElse(() => emptySchedule(hour - 1)),
-                ({ players }) =>
-                  Array.filter(players, (player) => player !== undefined),
+                ({ fills }) =>
+                  Array.filter(fills, (fill) => fill !== undefined),
               ),
             ),
-            Effect.let("players", () =>
+            Effect.let("fills", () =>
               pipe(
                 HashMap.get(schedules, hour),
                 Option.getOrElse(() => emptySchedule(hour)),
-                ({ players }) =>
-                  Array.filter(players, (player) => player !== undefined),
+                ({ fills }) =>
+                  Array.filter(fills, (fill) => fill !== undefined),
               ),
             ),
             Effect.bind("playerMap", () =>
@@ -68,9 +70,9 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
                 Effect.map(HashMap.fromIterable),
               ),
             ),
-            Effect.map(({ players, prevPlayers, playerMap }) => {
+            Effect.map(({ fills, prevFills, playerMap }) => {
               const newPlayerMentions = pipe(
-                HashSet.fromIterable(players),
+                HashSet.fromIterable(fills),
                 HashSet.map((player) =>
                   pipe(
                     HashMap.get(playerMap, player),
@@ -82,7 +84,7 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
                 ),
                 HashSet.difference(
                   pipe(
-                    HashSet.fromIterable(prevPlayers),
+                    HashSet.fromIterable(prevFills),
                     HashSet.map((player) =>
                       pipe(
                         HashMap.get(playerMap, player),
