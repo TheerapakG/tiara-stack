@@ -1,5 +1,6 @@
 import {
   ButtonBuilder,
+  ButtonInteraction,
   ButtonStyle,
   ComponentType,
   EmbedBuilder,
@@ -20,7 +21,10 @@ import { observeOnce } from "typhoon-server/signal";
 import { SheetService } from "../services";
 import { ChannelConfigService } from "../services/channelConfigService";
 import { ScheduleService } from "../services/scheduleService";
-import { buttonInteractionHandlerContextBuilder } from "../types";
+import {
+  buttonInteractionHandlerContextBuilder,
+  InteractionContext,
+} from "../types";
 
 const getSlotMessage = (day: number) =>
   pipe(
@@ -53,10 +57,13 @@ export const button = buttonInteractionHandlerContextBuilder()
     label: "Open slots",
     style: ButtonStyle.Primary,
   })
-  .handler((interaction) =>
+  .handler(
     pipe(
       Effect.Do,
-      Effect.bindAll(() => ({
+      Effect.bind("interaction", () =>
+        InteractionContext.interaction<ButtonInteraction>(),
+      ),
+      Effect.bindAll(({ interaction }) => ({
         messageFlags: Ref.make(
           new MessageFlagsBitField().add(MessageFlags.Ephemeral),
         ),
@@ -89,7 +96,7 @@ export const button = buttonInteractionHandlerContextBuilder()
           .setLabel("Update")
           .setStyle(ButtonStyle.Primary),
       ),
-      Effect.bind("response", ({ day, slotMessage, flags }) =>
+      Effect.bind("response", ({ day, slotMessage, flags, interaction }) =>
         Effect.tryPromise(() =>
           interaction.reply({
             embeds: [

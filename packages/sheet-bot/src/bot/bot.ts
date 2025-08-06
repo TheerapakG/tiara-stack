@@ -9,7 +9,9 @@ import {
   Events,
   GatewayIntentBits,
   Interaction,
+  InteractionResponse,
   InteractionType,
+  Message,
   MessageComponentInteraction,
   MessageFlags,
 } from "discord.js";
@@ -29,6 +31,7 @@ import {
   AnyChatInputCommandHandlerContext,
   ButtonInteractionHandlerMap,
   ChatInputCommandHandlerMap,
+  InteractionContext,
 } from "../types";
 
 class ScopeLayer<E = never, R = never> {
@@ -63,10 +66,13 @@ export class Bot<E = never, R = never> {
     private readonly loginLatch: Effect.Latch,
     private readonly loginSemaphore: Effect.Semaphore,
     private readonly chatInputCommandsMap: SynchronizedRef.SynchronizedRef<
-      ChatInputCommandHandlerMap<E, R>
+      ChatInputCommandHandlerMap<
+        E,
+        R | InteractionContext<ChatInputCommandInteraction>
+      >
     >,
     private readonly buttonsMap: SynchronizedRef.SynchronizedRef<
-      ButtonInteractionHandlerMap<E, R>
+      ButtonInteractionHandlerMap<E, R | InteractionContext<ButtonInteraction>>
     >,
     private readonly traceProvider: Layer.Layer<never>,
     private readonly layer: Layer.Layer<R, E>,
@@ -80,59 +86,46 @@ export class Bot<E = never, R = never> {
   ) {
     return <E = never, R = never>(bot: Bot<E, R>) =>
       pipe(
-        SynchronizedRef.get(bot.chatInputCommandsMap),
-        Effect.map((commandsMap) =>
-          ChatInputCommandHandlerMap.get(interaction.commandName)(commandsMap),
+        Effect.Do,
+        Effect.bind("scopeLayer", () => SynchronizedRef.get(bot.scopeLayer)),
+        Effect.bind("chatInputCommandsMap", () =>
+          SynchronizedRef.get(bot.chatInputCommandsMap),
         ),
-        Effect.flatMap(
-          Option.match({
-            onSome: (command) =>
+        Effect.flatMap(({ scopeLayer, chatInputCommandsMap }) =>
+          pipe(
+            scopeLayer,
+            Option.map((scopeLayer) =>
               pipe(
-                SynchronizedRef.get(bot.scopeLayer),
-                Effect.flatMap(
-                  Option.match({
-                    onSome: (scopeLayer) =>
-                      pipe(
-                        command.handler(interaction),
-                        Effect.annotateSpans({
-                          commandName: interaction.commandName,
-                          subcommandGroup:
-                            interaction.options.getSubcommandGroup(false),
-                          subcommand: interaction.options.getSubcommand(false),
-                          commandId: interaction.commandId,
-                        }),
-                        ScopeLayer.provide(scopeLayer),
-                      ),
-                    onNone: () => Effect.void,
-                  }),
+                ChatInputCommandHandlerMap.get(interaction.commandName)(
+                  chatInputCommandsMap,
                 ),
+                Option.map((command) => command.handler),
+                Option.getOrElse(() => Effect.void),
+                ScopeLayer.provide(scopeLayer),
+                Effect.provide(InteractionContext.make(interaction)),
               ),
-            onNone: () => Effect.void,
-          }),
+            ),
+            Option.getOrElse(() => Effect.void),
+          ),
         ),
         Effect.exit,
         Effect.flatMap(
           Exit.match({
-            onSuccess: (value) => Effect.succeed(value),
+            onSuccess: Effect.succeed,
             onFailure: (cause) =>
               pipe(
-                Effect.Do,
-                Effect.tap(() => Effect.log(cause)),
-                Effect.let("pretty", () => Cause.pretty(cause)),
-                Effect.tap(({ pretty }) =>
-                  interaction.replied || interaction.deferred
-                    ? Effect.promise(() =>
-                        interaction.followUp({
-                          content: pretty,
-                          flags: MessageFlags.Ephemeral,
-                        }),
-                      )
-                    : Effect.promise(() =>
-                        interaction.reply({
-                          content: pretty,
-                          flags: MessageFlags.Ephemeral,
-                        }),
-                      ),
+                Effect.succeed(cause),
+                Effect.tap((cause) => Effect.log(cause)),
+                Effect.map(Cause.pretty),
+                Effect.tap((pretty) =>
+                  Effect.promise<Message | InteractionResponse>(() =>
+                    (interaction.replied || interaction.deferred
+                      ? interaction.followUp.bind(interaction)
+                      : interaction.reply.bind(interaction))({
+                      content: pretty,
+                      flags: MessageFlags.Ephemeral,
+                    }),
+                  ),
                 ),
                 // TODO: handle errors
                 Effect.exit,
@@ -141,6 +134,12 @@ export class Bot<E = never, R = never> {
         ),
         Effect.withSpan("Bot.onChatInputCommandInteraction", {
           captureStackTrace: true,
+        }),
+        Effect.annotateSpans({
+          commandName: interaction.commandName,
+          subcommandGroup: interaction.options.getSubcommandGroup(false),
+          subcommand: interaction.options.getSubcommand(false),
+          commandId: interaction.commandId,
         }),
       );
   }
@@ -159,52 +158,44 @@ export class Bot<E = never, R = never> {
   static onButtonInteraction(interaction: ButtonInteraction) {
     return <E = never, R = never>(bot: Bot<E, R>) =>
       pipe(
-        SynchronizedRef.get(bot.buttonsMap),
-        Effect.map((buttonsMap) =>
-          ButtonInteractionHandlerMap.get(interaction.customId)(buttonsMap),
-        ),
-        Effect.flatMap(
-          Option.match({
-            onSome: (command) =>
+        Effect.Do,
+        Effect.bind("scopeLayer", () => SynchronizedRef.get(bot.scopeLayer)),
+        Effect.bind("buttonsMap", () => SynchronizedRef.get(bot.buttonsMap)),
+        Effect.flatMap(({ scopeLayer, buttonsMap }) =>
+          pipe(
+            scopeLayer,
+            Option.map((scopeLayer) =>
               pipe(
-                SynchronizedRef.get(bot.scopeLayer),
-                Effect.flatMap(
-                  Option.match({
-                    onSome: (scopeLayer) =>
-                      pipe(
-                        command.handler(interaction),
-                        ScopeLayer.provide(scopeLayer),
-                      ),
-                    onNone: () => Effect.void,
-                  }),
+                ButtonInteractionHandlerMap.get(interaction.customId)(
+                  buttonsMap,
                 ),
+                Option.map((command) => command.handler),
+                Option.getOrElse(() => Effect.void),
+                ScopeLayer.provide(scopeLayer),
+                Effect.provide(InteractionContext.make(interaction)),
               ),
-            onNone: () => Effect.void,
-          }),
+            ),
+            Option.getOrElse(() => Effect.void),
+          ),
         ),
         Effect.exit,
         Effect.flatMap(
           Exit.match({
-            onSuccess: (value) => Effect.succeed(value),
+            onSuccess: Effect.succeed,
             onFailure: (cause) =>
               pipe(
-                Effect.Do,
-                Effect.tap(() => Effect.log(cause)),
-                Effect.let("pretty", () => Cause.pretty(cause)),
-                Effect.tap(({ pretty }) =>
-                  interaction.replied || interaction.deferred
-                    ? Effect.promise(() =>
-                        interaction.followUp({
-                          content: pretty,
-                          flags: MessageFlags.Ephemeral,
-                        }),
-                      )
-                    : Effect.promise(() =>
-                        interaction.reply({
-                          content: pretty,
-                          flags: MessageFlags.Ephemeral,
-                        }),
-                      ),
+                Effect.succeed(cause),
+                Effect.tap((cause) => Effect.log(cause)),
+                Effect.map(Cause.pretty),
+                Effect.tap((pretty) =>
+                  Effect.promise<Message | InteractionResponse>(() =>
+                    (interaction.replied || interaction.deferred
+                      ? interaction.followUp.bind(interaction)
+                      : interaction.reply.bind(interaction))({
+                      content: pretty,
+                      flags: MessageFlags.Ephemeral,
+                    }),
+                  ),
                 ),
                 // TODO: handle errors
                 Effect.exit,
@@ -213,6 +204,9 @@ export class Bot<E = never, R = never> {
         ),
         Effect.withSpan("Bot.onButtonInteraction", {
           captureStackTrace: true,
+        }),
+        Effect.annotateSpans({
+          customId: interaction.customId,
         }),
       );
   }
@@ -252,10 +246,20 @@ export class Bot<E = never, R = never> {
       Effect.bind("loginLatch", () => Effect.makeLatch(false)),
       Effect.bind("loginSemaphore", () => Effect.makeSemaphore(1)),
       Effect.bind("chatInputCommandsMap", () =>
-        SynchronizedRef.make(ChatInputCommandHandlerMap.empty<E, R>()),
+        SynchronizedRef.make(
+          ChatInputCommandHandlerMap.empty<
+            E,
+            R | InteractionContext<ChatInputCommandInteraction>
+          >(),
+        ),
       ),
       Effect.bind("buttonsMap", () =>
-        SynchronizedRef.make(ButtonInteractionHandlerMap.empty<E, R>()),
+        SynchronizedRef.make(
+          ButtonInteractionHandlerMap.empty<
+            E,
+            R | InteractionContext<ButtonInteraction>
+          >(),
+        ),
       ),
       Effect.bind("scopeLayer", () =>
         SynchronizedRef.make(Option.none<ScopeLayer<E, R>>()),
@@ -357,7 +361,10 @@ export class Bot<E = never, R = never> {
   }
 
   static addChatInputCommand<E = never, R = never>(
-    command: AnyChatInputCommandHandlerContext<E, R>,
+    command: AnyChatInputCommandHandlerContext<
+      E,
+      R | InteractionContext<ChatInputCommandInteraction>
+    >,
   ) {
     return <BE = never, BR = never>(bot: Bot<BE, BR>) =>
       pipe(
@@ -373,7 +380,10 @@ export class Bot<E = never, R = never> {
   }
 
   static addChatInputCommandHandlerMap<E = never, R = never>(
-    commands: ChatInputCommandHandlerMap<E, R>,
+    commands: ChatInputCommandHandlerMap<
+      E,
+      R | InteractionContext<ChatInputCommandInteraction>
+    >,
   ) {
     return <BE = never, BR = never>(bot: Bot<BE, BR>) =>
       pipe(
@@ -389,7 +399,10 @@ export class Bot<E = never, R = never> {
   }
 
   static addButton<E = never, R = never>(
-    button: AnyButtonInteractionHandlerContext<E, R>,
+    button: AnyButtonInteractionHandlerContext<
+      E,
+      R | InteractionContext<ButtonInteraction>
+    >,
   ) {
     return <BE = never, BR = never>(bot: Bot<BE, BR>) =>
       pipe(
@@ -405,7 +418,10 @@ export class Bot<E = never, R = never> {
   }
 
   static addButtonInteractionHandlerMap<E = never, R = never>(
-    buttons: ButtonInteractionHandlerMap<E, R>,
+    buttons: ButtonInteractionHandlerMap<
+      E,
+      R | InteractionContext<ButtonInteraction>
+    >,
   ) {
     return <BE = never, BR = never>(bot: Bot<BE, BR>) =>
       pipe(

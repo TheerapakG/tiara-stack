@@ -1,5 +1,6 @@
 import {
   ApplicationIntegrationType,
+  ChatInputCommandInteraction,
   EmbedBuilder,
   escapeMarkdown,
   InteractionContextType,
@@ -17,6 +18,7 @@ import { Team } from "../../services/sheetService";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
+  InteractionContext,
 } from "../../types";
 
 const handleList = chatInputSubcommandHandlerContextBuilder()
@@ -33,10 +35,13 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           .setDescription("The server to get the teams for"),
       ),
   )
-  .handler((interaction) =>
+  .handler(
     pipe(
       Effect.Do,
-      Effect.bindAll(() => ({
+      Effect.bind("interaction", () =>
+        InteractionContext.interaction<ChatInputCommandInteraction>(),
+      ),
+      Effect.bindAll(({ interaction }) => ({
         user: Effect.try(
           () => interaction.options.getUser("user") ?? interaction.user,
         ),
@@ -48,7 +53,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           Effect.flatMap(Option.fromNullable),
         ),
       })),
-      Effect.tap(({ serverId }) =>
+      Effect.tap(({ serverId, interaction }) =>
         serverId !== interaction.guildId
           ? PermissionService.checkOwner(interaction)
           : Effect.void,
@@ -61,7 +66,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
             )
           : Effect.succeed([]),
       ),
-      Effect.tap(({ user, managerRoles }) =>
+      Effect.tap(({ user, managerRoles, interaction }) =>
         user.id !== interaction.user.id
           ? PermissionService.checkRoles(
               interaction,
@@ -99,7 +104,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           })),
         ),
       ),
-      Effect.tap(({ user, userTeams }) =>
+      Effect.tap(({ user, userTeams, interaction }) =>
         interaction.reply({
           embeds: [
             new EmbedBuilder()

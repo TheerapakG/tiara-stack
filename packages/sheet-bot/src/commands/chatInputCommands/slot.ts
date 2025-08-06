@@ -3,6 +3,7 @@ import {
   ActionRowBuilder,
   ApplicationIntegrationType,
   ButtonBuilder,
+  ChatInputCommandInteraction,
   EmbedBuilder,
   InteractionContextType,
   MessageActionRowComponentBuilder,
@@ -34,6 +35,7 @@ import { SheetService } from "../../services/sheetService";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
+  InteractionContext,
 } from "../../types";
 
 const getSlotMessage = (day: number) =>
@@ -86,10 +88,13 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           ),
       ),
   )
-  .handler((interaction) =>
+  .handler(
     pipe(
       Effect.Do,
-      Effect.bindAll(() => ({
+      Effect.bind("interaction", () =>
+        InteractionContext.interaction<ChatInputCommandInteraction>(),
+      ),
+      Effect.bindAll(({ interaction }) => ({
         messageFlags: Ref.make(new MessageFlagsBitField()),
         day: Effect.try(() => interaction.options.getNumber("day", true)),
         serverId: pipe(
@@ -107,7 +112,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
         ),
         user: Effect.succeed(interaction.user),
       })),
-      Effect.tap(({ serverId }) =>
+      Effect.tap(({ serverId, interaction }) =>
         serverId !== interaction.guildId
           ? PermissionService.checkOwner(interaction)
           : Effect.void,
@@ -120,7 +125,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
             )
           : Effect.succeed([]),
       ),
-      Effect.tap(({ messageType, managerRoles }) =>
+      Effect.tap(({ messageType, managerRoles, interaction }) =>
         messageType !== "ephemeral"
           ? PermissionService.checkRoles(
               interaction,
@@ -143,7 +148,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
         pipe(getSlotMessage(day), Effect.provide(sheetService)),
       ),
       Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
-      Effect.bind("response", ({ day, slotMessage, flags }) =>
+      Effect.bind("response", ({ day, slotMessage, flags, interaction }) =>
         Effect.tryPromise(() =>
           interaction.reply({
             embeds: [
@@ -178,10 +183,13 @@ const handleButton = chatInputSubcommandHandlerContextBuilder()
           .setRequired(true),
       ),
   )
-  .handler((interaction) =>
+  .handler(
     pipe(
       Effect.Do,
-      Effect.bindAll(() => ({
+      Effect.bind("interaction", () =>
+        InteractionContext.interaction<ChatInputCommandInteraction>(),
+      ),
+      Effect.bindAll(({ interaction }) => ({
         day: Effect.try(() => interaction.options.getNumber("day", true)),
         serverId: pipe(
           Effect.try(
@@ -193,7 +201,7 @@ const handleButton = chatInputSubcommandHandlerContextBuilder()
         channel: Option.fromNullable(interaction.channel),
         user: Effect.succeed(interaction.user),
       })),
-      Effect.tap(({ serverId }) =>
+      Effect.tap(({ serverId, interaction }) =>
         serverId !== interaction.guildId
           ? PermissionService.checkOwner(interaction)
           : Effect.void,
@@ -206,7 +214,7 @@ const handleButton = chatInputSubcommandHandlerContextBuilder()
             )
           : Effect.succeed([]),
       ),
-      Effect.tap(({ managerRoles }) =>
+      Effect.tap(({ managerRoles, interaction }) =>
         PermissionService.checkRoles(
           interaction,
           managerRoles.map((role) => role.roleId),
@@ -218,7 +226,7 @@ const handleButton = chatInputSubcommandHandlerContextBuilder()
           day,
         }),
       ),
-      Effect.bind("response", ({ day }) =>
+      Effect.bind("response", ({ day, interaction }) =>
         Effect.tryPromise(() =>
           interaction.reply({
             content: `Press the button below to get the current open slots for day ${day}`,

@@ -158,13 +158,15 @@ const teamParser = (
 export type Schedule = {
   hour: number;
   breakHour: boolean;
-  players: readonly [
+  fills: readonly [
     string | undefined,
     string | undefined,
     string | undefined,
     string | undefined,
     string | undefined,
   ];
+  overFills: string[];
+  standbys: string[];
   empty: number;
 };
 export type ScheduleMap = HashMap.HashMap<number, Schedule>;
@@ -175,7 +177,7 @@ const scheduleParser = (
   pipe(
     Effect.Do,
     Effect.bindAll(() => {
-      const [hours, breaks, schedules] = valueRange ?? [];
+      const [hours, breaks, fills, overFills, standbys] = valueRange ?? [];
       return {
         hours: parseValueRange(hours, ([hour]) =>
           Effect.succeed({
@@ -187,9 +189,9 @@ const scheduleParser = (
             breakHour: breakHour === "TRUE",
           }),
         ),
-        schedules: parseValueRange(schedules, ([p1, p2, p3, p4, p5]) =>
+        fills: parseValueRange(fills, ([p1, p2, p3, p4, p5]) =>
           Effect.succeed({
-            players: [
+            fills: [
               p1 !== undefined ? String(p1) : undefined,
               p2 !== undefined ? String(p2) : undefined,
               p3 !== undefined ? String(p3) : undefined,
@@ -198,23 +200,53 @@ const scheduleParser = (
             ] as const,
           }),
         ),
+        overFills: parseValueRange(overFills, ([overFill]) =>
+          Effect.succeed({
+            overFills:
+              overFill !== undefined
+                ? String(overFill)
+                    .split(",")
+                    .map((player) => player.trim())
+                : [],
+          }),
+        ),
+        standbys: parseValueRange(standbys, ([standby]) =>
+          Effect.succeed({
+            standbys:
+              standby !== undefined
+                ? String(standby)
+                    .split(",")
+                    .map((player) => player.trim())
+                : [],
+          }),
+        ),
       };
     }),
-    Effect.map(({ hours, breaks, schedules }) =>
+    Effect.map(({ hours, breaks, fills, overFills, standbys }) =>
       pipe(
         hours,
         zipRows(breaks),
-        zipRows(schedules),
-        Array.map(({ hour, breakHour, players }) => ({
+        zipRows(fills),
+        zipRows(overFills),
+        zipRows(standbys),
+        Array.map(({ hour, breakHour, fills, overFills, standbys }) => ({
           hour,
           breakHour,
-          players,
-          empty: 5 - players.filter(Boolean).length,
+          fills,
+          overFills,
+          standbys,
+          empty: Math.max(
+            5 - fills.filter(Boolean).length - overFills.length,
+            0,
+          ),
         })),
         Array.filter(({ hour }) => !isNaN(hour)),
         Array.map(
-          ({ hour, breakHour, players, empty }) =>
-            [hour, { hour, breakHour, players, empty }] as const,
+          ({ hour, breakHour, fills, overFills, standbys, empty }) =>
+            [
+              hour,
+              { hour, breakHour, fills, overFills, standbys, empty },
+            ] as const,
         ),
         HashMap.fromIterable,
       ),
@@ -243,6 +275,14 @@ export class SheetService extends Effect.Service<SheetService>()(
             pipe(
               sheetConfigService.getEventConfig(sheetId),
               Effect.withSpan("SheetService.eventConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          ),
+          dayConfig: Effect.cached(
+            pipe(
+              sheetConfigService.getDayConfig(sheetId),
+              Effect.withSpan("SheetService.dayConfig", {
                 captureStackTrace: true,
               }),
             ),
@@ -282,104 +322,126 @@ export class SheetService extends Effect.Service<SheetService>()(
                 }),
               ),
         ),
-        Effect.map(({ sheetGet, sheetUpdate, rangesConfig, eventConfig }) => ({
-          get: sheetGet,
-          update: sheetUpdate,
-          getRangesConfig: () =>
-            pipe(rangesConfig, Effect.withSpan("SheetService.getRangesConfig")),
-          getEventConfig: () =>
-            pipe(eventConfig, Effect.withSpan("SheetService.getEventConfig")),
-          getPlayers: () =>
-            pipe(
-              Effect.Do,
-              Effect.bind("rangesConfig", () => rangesConfig),
-              Effect.bind("sheet", ({ rangesConfig }) =>
-                sheetGet({
-                  ranges: [rangesConfig.userIds, rangesConfig.userSheetNames],
+        Effect.map(
+          ({
+            sheetGet,
+            sheetUpdate,
+            rangesConfig,
+            eventConfig,
+            dayConfig,
+          }) => ({
+            get: sheetGet,
+            update: sheetUpdate,
+            getRangesConfig: () =>
+              pipe(
+                rangesConfig,
+                Effect.withSpan("SheetService.getRangesConfig"),
+              ),
+            getEventConfig: () =>
+              pipe(eventConfig, Effect.withSpan("SheetService.getEventConfig")),
+            getDayConfig: () =>
+              pipe(dayConfig, Effect.withSpan("SheetService.getDayConfig")),
+            getPlayers: () =>
+              pipe(
+                Effect.Do,
+                Effect.bind("rangesConfig", () => rangesConfig),
+                Effect.bind("sheet", ({ rangesConfig }) =>
+                  sheetGet({
+                    ranges: [rangesConfig.userIds, rangesConfig.userSheetNames],
+                  }),
+                ),
+                Effect.flatMap(({ sheet }) =>
+                  playerParser(sheet.data.valueRanges),
+                ),
+                Effect.withSpan("SheetService.getPlayers", {
+                  captureStackTrace: true,
                 }),
               ),
-              Effect.flatMap(({ sheet }) =>
-                playerParser(sheet.data.valueRanges),
-              ),
-              Effect.withSpan("SheetService.getPlayers", {
-                captureStackTrace: true,
-              }),
-            ),
-          getTeams: () =>
-            pipe(
-              Effect.Do,
-              Effect.bind("rangesConfig", () => rangesConfig),
-              Effect.bind("sheet", ({ rangesConfig }) =>
-                sheetGet({
-                  ranges: [rangesConfig.userIds, rangesConfig.userTeams],
+            getTeams: () =>
+              pipe(
+                Effect.Do,
+                Effect.bind("rangesConfig", () => rangesConfig),
+                Effect.bind("sheet", ({ rangesConfig }) =>
+                  sheetGet({
+                    ranges: [rangesConfig.userIds, rangesConfig.userTeams],
+                  }),
+                ),
+                Effect.flatMap(({ sheet }) =>
+                  teamParser(sheet.data.valueRanges),
+                ),
+                Effect.withSpan("SheetService.getTeams", {
+                  captureStackTrace: true,
                 }),
               ),
-              Effect.flatMap(({ sheet }) => teamParser(sheet.data.valueRanges)),
-              Effect.withSpan("SheetService.getTeams", {
-                captureStackTrace: true,
-              }),
-            ),
-          getAllSchedules: () =>
-            pipe(
-              Effect.Do,
-              Effect.bindAll(
-                () => ({
-                  eventConfig,
-                  rangesConfig,
-                }),
-                { concurrency: "unbounded" },
-              ),
-              Effect.bind("sheet", ({ rangesConfig }) =>
-                sheetGet({
-                  ranges: [
-                    rangesConfig.hours,
-                    rangesConfig.breaks,
-                    rangesConfig.hourPlayers,
-                  ],
-                }),
-              ),
-              Effect.bind("schedules", ({ sheet }) =>
-                scheduleParser(sheet.data.valueRanges),
-              ),
-              Effect.map(({ eventConfig, schedules }) => ({
-                start: eventConfig.startTime,
-                schedules,
-              })),
-              Effect.withSpan("SheetService.getAllSchedules", {
-                captureStackTrace: true,
-              }),
-            ),
-          getDaySchedules: (day: number) =>
-            pipe(
-              Effect.Do,
-              Effect.bindAll(
-                () => ({
-                  eventConfig,
-                  rangesConfig,
-                }),
-                { concurrency: "unbounded" },
-              ),
-              Effect.bind("sheet", () =>
-                sheetGet({
-                  ranges: [
-                    `'Day ${day}'!J3:J`,
-                    `'Day ${day}'!C3:C`,
-                    `'Day ${day}'!K3:O`,
-                  ],
+            getAllSchedules: () =>
+              pipe(
+                Effect.Do,
+                Effect.bindAll(
+                  () => ({
+                    eventConfig,
+                    rangesConfig,
+                  }),
+                  { concurrency: "unbounded" },
+                ),
+                Effect.bind("sheet", ({ rangesConfig }) =>
+                  sheetGet({
+                    ranges: [
+                      rangesConfig.hours,
+                      rangesConfig.breaks,
+                      rangesConfig.hourPlayers,
+                    ],
+                  }),
+                ),
+                Effect.bind("schedules", ({ sheet }) =>
+                  scheduleParser(sheet.data.valueRanges),
+                ),
+                Effect.map(({ eventConfig, schedules }) => ({
+                  start: eventConfig.startTime,
+                  schedules,
+                })),
+                Effect.withSpan("SheetService.getAllSchedules", {
+                  captureStackTrace: true,
                 }),
               ),
-              Effect.bind("schedules", ({ sheet }) =>
-                scheduleParser(sheet.data.valueRanges),
+            getDaySchedules: (day: number) =>
+              pipe(
+                Effect.Do,
+                Effect.bindAll(
+                  () => ({
+                    eventConfig,
+                    rangesConfig,
+                    dayConfig,
+                  }),
+                  { concurrency: "unbounded" },
+                ),
+                Effect.bind("sheet", ({ dayConfig }) =>
+                  pipe(
+                    HashMap.get(dayConfig, day),
+                    Effect.flatMap((config) =>
+                      sheetGet({
+                        ranges: [
+                          `'${config.sheet}'!J3:J`,
+                          `'${config.sheet}'!C3:C`,
+                          `'${config.sheet}'!K3:O`,
+                          `'${config.sheet}'!P3:P`,
+                        ],
+                      }),
+                    ),
+                  ),
+                ),
+                Effect.bind("schedules", ({ sheet }) =>
+                  scheduleParser(sheet.data.valueRanges),
+                ),
+                Effect.map(({ eventConfig, schedules }) => ({
+                  start: eventConfig.startTime,
+                  schedules,
+                })),
+                Effect.withSpan("SheetService.getDaySchedules", {
+                  captureStackTrace: true,
+                }),
               ),
-              Effect.map(({ eventConfig, schedules }) => ({
-                start: eventConfig.startTime,
-                schedules,
-              })),
-              Effect.withSpan("SheetService.getDaySchedules", {
-                captureStackTrace: true,
-              }),
-            ),
-        })),
+          }),
+        ),
       ),
     dependencies: [GoogleSheets.Default, SheetConfigService.Default],
     accessors: true,
