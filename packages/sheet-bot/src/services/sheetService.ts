@@ -431,6 +431,7 @@ export class SheetService extends Effect.Service<SheetService>()(
                         ],
                       }),
                     ),
+                    Effect.tap(Effect.log),
                   ),
                 ),
                 Effect.bind("schedules", ({ sheet }) =>
