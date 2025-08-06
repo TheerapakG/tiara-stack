@@ -200,11 +200,11 @@ const scheduleParser = (
             ] as const,
           }),
         ),
-        overfills: parseValueRange(overfills, ([overFill]) =>
+        overfills: parseValueRange(overfills, ([overfill]) =>
           Effect.succeed({
             overfills:
-              overFill !== undefined
-                ? String(overFill)
+              overfill !== undefined
+                ? String(overfill)
                     .split(",")
                     .map((player) => player.trim())
                 : [],
@@ -419,7 +419,6 @@ export class SheetService extends Effect.Service<SheetService>()(
                 Effect.bind("sheet", ({ dayConfig }) =>
                   pipe(
                     HashMap.get(dayConfig, day),
-                    Effect.tap(Effect.log),
                     Effect.flatMap((config) =>
                       sheetGet({
                         ranges: [
@@ -431,7 +430,6 @@ export class SheetService extends Effect.Service<SheetService>()(
                         ],
                       }),
                     ),
-                    Effect.tap(Effect.log),
                   ),
                 ),
                 Effect.bind("schedules", ({ sheet }) =>
@@ -441,6 +439,7 @@ export class SheetService extends Effect.Service<SheetService>()(
                   start: eventConfig.startTime,
                   schedules,
                 })),
+                Effect.tap(Effect.log),
                 Effect.withSpan("SheetService.getDaySchedules", {
                   captureStackTrace: true,
                 }),
