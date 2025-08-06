@@ -12,7 +12,7 @@ const emptySchedule = (hour: number): Schedule => ({
   hour,
   breakHour: false,
   fills: [undefined, undefined, undefined, undefined, undefined],
-  overFills: [],
+  overfills: [],
   standbys: [],
   empty: 5,
 });

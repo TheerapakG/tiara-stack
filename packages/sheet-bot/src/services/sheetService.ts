@@ -165,7 +165,7 @@ export type Schedule = {
     string | undefined,
     string | undefined,
   ];
-  overFills: string[];
+  overfills: string[];
   standbys: string[];
   empty: number;
 };
@@ -177,7 +177,7 @@ const scheduleParser = (
   pipe(
     Effect.Do,
     Effect.bindAll(() => {
-      const [hours, breaks, fills, overFills, standbys] = valueRange ?? [];
+      const [hours, breaks, fills, overfills, standbys] = valueRange ?? [];
       return {
         hours: parseValueRange(hours, ([hour]) =>
           Effect.succeed({
@@ -200,9 +200,9 @@ const scheduleParser = (
             ] as const,
           }),
         ),
-        overFills: parseValueRange(overFills, ([overFill]) =>
+        overfills: parseValueRange(overfills, ([overFill]) =>
           Effect.succeed({
-            overFills:
+            overfills:
               overFill !== undefined
                 ? String(overFill)
                     .split(",")
@@ -222,30 +222,30 @@ const scheduleParser = (
         ),
       };
     }),
-    Effect.map(({ hours, breaks, fills, overFills, standbys }) =>
+    Effect.map(({ hours, breaks, fills, overfills, standbys }) =>
       pipe(
         hours,
         zipRows(breaks),
         zipRows(fills),
-        zipRows(overFills),
+        zipRows(overfills),
         zipRows(standbys),
-        Array.map(({ hour, breakHour, fills, overFills, standbys }) => ({
+        Array.map(({ hour, breakHour, fills, overfills, standbys }) => ({
           hour,
           breakHour,
           fills,
-          overFills,
+          overfills,
           standbys,
           empty: Math.max(
-            5 - fills.filter(Boolean).length - overFills.length,
+            5 - fills.filter(Boolean).length - overfills.length,
             0,
           ),
         })),
         Array.filter(({ hour }) => !isNaN(hour)),
         Array.map(
-          ({ hour, breakHour, fills, overFills, standbys, empty }) =>
+          ({ hour, breakHour, fills, overfills, standbys, empty }) =>
             [
               hour,
-              { hour, breakHour, fills, overFills, standbys, empty },
+              { hour, breakHour, fills, overfills, standbys, empty },
             ] as const,
         ),
         HashMap.fromIterable,
@@ -388,7 +388,9 @@ export class SheetService extends Effect.Service<SheetService>()(
                     ranges: [
                       rangesConfig.hours,
                       rangesConfig.breaks,
-                      rangesConfig.hourPlayers,
+                      rangesConfig.fills,
+                      rangesConfig.overfills,
+                      rangesConfig.standbys,
                     ],
                   }),
                 ),
