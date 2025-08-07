@@ -1,6 +1,7 @@
 import { type MethodOptions, type sheets_v4 } from "@googleapis/sheets";
 import { Array, Effect, HashMap, Option, Order, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
+import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
 import { GoogleSheets } from "../google/sheets";
 import { GuildConfigService } from "./guildConfigService";
 import { SheetConfigService } from "./sheetConfigService";
@@ -15,36 +16,6 @@ const parseValueRange = <A = never, E = never, R = never>(
     Option.map(Effect.forEach(rowParser)),
     Option.getOrElse(() => Effect.succeed([])),
   );
-
-const zipRows =
-  <B>(b: Effect.Effect<{ array: B[]; default: B }>) =>
-  <A>(a: Effect.Effect<{ array: A[]; default: A }>) =>
-    pipe(
-      Effect.Do,
-      Effect.bind("a", () => a),
-      Effect.bind("b", () => b),
-      Effect.let("lengthA", ({ a }) => Array.length(a.array)),
-      Effect.let("lengthB", ({ b }) => Array.length(b.array)),
-      Effect.let("maxLength", ({ lengthA, lengthB }) =>
-        Order.max(Order.number)(lengthA, lengthB),
-      ),
-      Effect.let("paddedA", ({ maxLength, a }) =>
-        Array.pad(a.array, maxLength, a.default),
-      ),
-      Effect.let("paddedB", ({ maxLength, b }) =>
-        Array.pad(b.array, maxLength, b.default),
-      ),
-      Effect.let("zipped", ({ paddedA, paddedB }) =>
-        Array.zip(paddedA, paddedB),
-      ),
-      Effect.let("mapped", ({ zipped }) =>
-        Array.map(zipped, ([a, b]) => ({ ...a, ...b })),
-      ),
-      Effect.map(({ mapped, a, b }) => ({
-        array: mapped,
-        default: { ...a.default, ...b.default },
-      })),
-    );
 
 export type Player = {
   id: Option.Option<string>;
@@ -71,18 +42,21 @@ const playerParser = (
         ),
       };
     }),
-    Effect.flatMap(({ userIds, userSheetNames }) =>
+    Effect.map(({ userIds, userSheetNames }) =>
       pipe(
-        Effect.succeed({ array: userIds, default: { id: Option.none() } }),
-        zipRows(
-          Effect.succeed({
+        new ArrayWithDefault({
+          array: userIds,
+          default: { id: Option.none() },
+        }),
+        ArrayWithDefault.zip(
+          new ArrayWithDefault({
             array: userSheetNames,
             default: { name: Option.none() },
           }),
         ),
-        Effect.map(({ array }) => array),
       ),
     ),
+    Effect.map(({ array }) => array),
     Effect.withSpan("playerParser", { captureStackTrace: true }),
   );
 
@@ -153,38 +127,34 @@ const teamParser = (
         ),
       };
     }),
-    Effect.flatMap(({ userIds, userTeams }) =>
+    Effect.map(({ userIds, userTeams }) =>
       pipe(
-        Effect.succeed({ array: userIds, default: { id: Option.none() } }),
-        zipRows(Effect.succeed({ array: userTeams, default: { teams: [] } })),
-        Effect.map(({ array }) => array),
-        Effect.map(
-          Array.map(({ id, teams }) =>
-            pipe(
-              id,
-              Option.map((id) => ({ id, teams })),
-            ),
+        new ArrayWithDefault({
+          array: userIds,
+          default: { id: Option.none() },
+        }),
+        ArrayWithDefault.zip(
+          new ArrayWithDefault({ array: userTeams, default: { teams: [] } }),
+        ),
+        ArrayWithDefault.map(({ id, teams }) =>
+          pipe(
+            id,
+            Option.map((id) => ({ id, teams })),
           ),
         ),
-        Effect.map(Array.getSomes),
-        Effect.map(
-          Array.reduce(
-            HashMap.empty<string, { id: string; teams: Team[] }>(),
-            (acc, { id, teams }) =>
-              HashMap.modifyAt(
-                acc,
-                id,
-                Option.match({
-                  onSome: ({ teams: mapTeams }) =>
-                    Option.some({
-                      id,
-                      teams: Array.appendAll(mapTeams, teams),
-                    }),
-                  onNone: () => Option.some({ id, teams }),
-                }),
-              ),
-          ),
-        ),
+      ),
+    ),
+    Effect.map(({ array }) =>
+      pipe(
+        array,
+        Array.getSomes,
+        collectArrayToHashMap({
+          keyGetter: ({ id }) => id,
+          keyValueReducer: (a, b) => ({
+            id: a.id,
+            teams: Array.appendAll(a.teams, b.teams),
+          }),
+        }),
       ),
     ),
     Effect.withSpan("playerParser", { captureStackTrace: true }),
@@ -257,55 +227,51 @@ const scheduleParser = (
         ),
       };
     }),
-    Effect.flatMap(({ hours, breaks, fills, overfills, standbys }) =>
+    Effect.map(({ hours, breaks, fills, overfills, standbys }) =>
       pipe(
-        Effect.succeed({ array: hours, default: { hour: Number.NaN } }),
-        zipRows(
-          Effect.succeed({ array: breaks, default: { breakHour: false } }),
+        new ArrayWithDefault({ array: hours, default: { hour: Number.NaN } }),
+        ArrayWithDefault.zip(
+          new ArrayWithDefault({
+            array: breaks,
+            default: { breakHour: false },
+          }),
         ),
-        zipRows(
-          Effect.succeed({
+        ArrayWithDefault.zip(
+          new ArrayWithDefault({
             array: fills,
             default: {
-              fills: [
-                undefined,
-                undefined,
-                undefined,
-                undefined,
-                undefined,
-              ] as const,
+              fills: [undefined, undefined, undefined, undefined, undefined],
             },
           }),
         ),
-        zipRows(
-          Effect.succeed({ array: overfills, default: { overfills: [] } }),
+        ArrayWithDefault.zip(
+          new ArrayWithDefault({
+            array: overfills,
+            default: { overfills: [] },
+          }),
         ),
-        zipRows(Effect.succeed({ array: standbys, default: { standbys: [] } })),
-        Effect.map(({ array }) => array),
-        Effect.map(
-          Array.map(({ hour, breakHour, fills, overfills, standbys }) => ({
-            hour,
-            breakHour,
-            fills,
-            overfills,
-            standbys,
-            empty: Math.max(
-              5 - fills.filter(Boolean).length - overfills.length,
-              0,
-            ),
-          })),
+        ArrayWithDefault.zip(
+          new ArrayWithDefault({
+            array: standbys,
+            default: { standbys: [] },
+          }),
         ),
-        Effect.map(Array.filter(({ hour }) => !isNaN(hour))),
-        Effect.map(
-          Array.map(
-            ({ hour, breakHour, fills, overfills, standbys, empty }) =>
-              [
-                hour,
-                { hour, breakHour, fills, overfills, standbys, empty },
-              ] as const,
+        ArrayWithDefault.zipMap(({ fills, overfills }) => ({
+          empty: Order.max(Order.number)(
+            5 - fills.filter(Boolean).length - overfills.length,
+            0,
           ),
-        ),
-        Effect.map(HashMap.fromIterable),
+        })),
+      ),
+    ),
+    Effect.map(({ array }) =>
+      pipe(
+        array,
+        Array.filter(({ hour }) => !isNaN(hour)),
+        collectArrayToHashMap({
+          keyGetter: ({ hour }) => hour,
+          keyValueReducer: (_, b) => b,
+        }),
       ),
     ),
     Effect.withSpan("scheduleParser", { captureStackTrace: true }),

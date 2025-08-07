@@ -1,6 +1,5 @@
 import {
   ApplicationIntegrationType,
-  channelMention,
   ChatInputCommandInteraction,
   EmbedBuilder,
   escapeMarkdown,
@@ -176,85 +175,6 @@ const handleAddManagerRole = chatInputSubcommandHandlerContextBuilder()
   )
   .build();
 
-const handleAddRunningChannel = chatInputSubcommandHandlerContextBuilder()
-  .data(
-    new SlashCommandSubcommandBuilder()
-      .setName("running_channel")
-      .setDescription("Add a running channel for the server")
-      .addChannelOption((option) =>
-        option
-          .setName("channel")
-          .setDescription("The channel to add")
-          .setRequired(true),
-      )
-      .addStringOption((option) =>
-        option
-          .setName("name")
-          .setDescription("The name of the running channel")
-          .setRequired(true),
-      )
-      .addStringOption((option) =>
-        option
-          .setName("server_id")
-          .setDescription("The server id to add the running channel to"),
-      ),
-  )
-  .handler(
-    pipe(
-      Effect.Do,
-      Effect.bind("interaction", () =>
-        InteractionContext.interaction<ChatInputCommandInteraction>(),
-      ),
-      Effect.bindAll(({ interaction }) => ({
-        name: Effect.try(() => interaction.options.getString("name", true)),
-        channel: Effect.try(() =>
-          interaction.options.getChannel("channel", true),
-        ),
-        serverId: pipe(
-          Effect.try(
-            () =>
-              interaction.options.getString("server_id") ?? interaction.guildId,
-          ),
-          Effect.flatMap(Option.fromNullable),
-        ),
-        memberPermissions: Option.fromNullable(interaction.memberPermissions),
-      })),
-      Effect.bind("guild", ({ serverId, interaction }) =>
-        Effect.tryPromise(() => interaction.client.guilds.fetch(serverId)),
-      ),
-      Effect.tap(({ memberPermissions }) =>
-        !memberPermissions.has(PermissionFlagsBits.ManageGuild)
-          ? Effect.fail("You do not have permission to manage the server")
-          : Effect.void,
-      ),
-      Effect.tap(({ guild, name, channel }) =>
-        GuildConfigService.addRunningChannel(guild.id, channel.id, name),
-      ),
-      Effect.bind("response", ({ guild, name, channel, interaction }) =>
-        Effect.tryPromise(() =>
-          interaction.reply({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle(`Success!`)
-                .setDescription(
-                  `${escapeMarkdown(name)} (${channelMention(channel.id)}) is now a running channel for ${escapeMarkdown(guild.name)}`,
-                )
-                .setTimestamp()
-                .setFooter({
-                  text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
-                }),
-            ],
-          }),
-        ),
-      ),
-      Effect.asVoid,
-      Effect.withSpan("handleAddRunningChannel", {
-        captureStackTrace: true,
-      }),
-    ),
-  )
-  .build();
-
 const handleAdd =
   chatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder()
     .data(
@@ -263,7 +183,6 @@ const handleAdd =
         .setDescription("Add a config to the server"),
     )
     .addSubcommandHandler(handleAddManagerRole)
-    .addSubcommandHandler(handleAddRunningChannel)
     .build();
 
 const handleRemoveManagerRole = chatInputSubcommandHandlerContextBuilder()
@@ -336,79 +255,6 @@ const handleRemoveManagerRole = chatInputSubcommandHandlerContextBuilder()
   )
   .build();
 
-const handleRemoveRunningChannel = chatInputSubcommandHandlerContextBuilder()
-  .data(
-    new SlashCommandSubcommandBuilder()
-      .setName("running_channel")
-      .setDescription("Remove a running channel from the server")
-      .addStringOption((option) =>
-        option
-          .setName("name")
-          .setDescription("The name of the running channel")
-          .setRequired(true),
-      )
-      .addStringOption((option) =>
-        option
-          .setName("server_id")
-          .setDescription("The server id to remove the running channel from"),
-      ),
-  )
-  .handler(
-    pipe(
-      Effect.Do,
-      Effect.bind("interaction", () =>
-        InteractionContext.interaction<ChatInputCommandInteraction>(),
-      ),
-      Effect.bindAll(({ interaction }) => ({
-        name: Effect.try(() => interaction.options.getString("name", true)),
-        serverId: pipe(
-          Effect.try(
-            () =>
-              interaction.options.getString("server_id") ?? interaction.guildId,
-          ),
-          Effect.flatMap(Option.fromNullable),
-        ),
-        memberPermissions: Option.fromNullable(interaction.memberPermissions),
-      })),
-      Effect.bind("guild", ({ serverId, interaction }) =>
-        Effect.tryPromise(() => interaction.client.guilds.fetch(serverId)),
-      ),
-      Effect.tap(({ memberPermissions }) =>
-        !memberPermissions.has(PermissionFlagsBits.ManageGuild)
-          ? Effect.fail("You do not have permission to manage the server")
-          : Effect.void,
-      ),
-      Effect.bind("runningChannel", ({ guild, name }) =>
-        pipe(
-          GuildConfigService.removeRunningChannel(guild.id, name),
-          Effect.flatMap(Array.head),
-        ),
-      ),
-      Effect.bind("response", ({ guild, name, runningChannel, interaction }) =>
-        Effect.tryPromise(() =>
-          interaction.reply({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle(`Success!`)
-                .setDescription(
-                  `${escapeMarkdown(name)} (${channelMention(runningChannel.channelId)}) is no longer a running channel for ${escapeMarkdown(guild.name)}`,
-                )
-                .setTimestamp()
-                .setFooter({
-                  text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
-                }),
-            ],
-          }),
-        ),
-      ),
-      Effect.asVoid,
-      Effect.withSpan("handleRemoveRunningChannel", {
-        captureStackTrace: true,
-      }),
-    ),
-  )
-  .build();
-
 const handleRemove =
   chatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder()
     .data(
@@ -417,7 +263,6 @@ const handleRemove =
         .setDescription("Remove a config from the server"),
     )
     .addSubcommandHandler(handleRemoveManagerRole)
-    .addSubcommandHandler(handleRemoveRunningChannel)
     .build();
 
 const handleSetSheet = chatInputSubcommandHandlerContextBuilder()

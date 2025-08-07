@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   pgTable,
@@ -54,13 +55,14 @@ export const configGuildManagerRole = pgTable(
   ],
 );
 
-export const configGuildRunningChannel = pgTable(
-  "config_guild_running_channel",
+export const configGuildChannel = pgTable(
+  "config_guild_channel",
   {
     id: serial("id").primaryKey(),
     guildId: varchar("guild_id").notNull(),
     channelId: varchar("channel_id").notNull(),
-    name: varchar("name").notNull(),
+    name: varchar("name"),
+    running: boolean("running").notNull().default(false),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -71,11 +73,11 @@ export const configGuildRunningChannel = pgTable(
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
   },
   (table) => [
-    uniqueIndex("config_guild_running_channel_guild_id_channel_id_idx").on(
+    uniqueIndex("config_guild_channel_guild_id_channel_id_idx").on(
       table.guildId,
       table.channelId,
     ),
-    uniqueIndex("config_guild_running_channel_guild_id_name_idx").on(
+    uniqueIndex("config_guild_channel_guild_id_name_idx").on(
       table.guildId,
       table.name,
     ),
