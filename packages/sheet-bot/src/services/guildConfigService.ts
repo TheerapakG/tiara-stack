@@ -1,9 +1,9 @@
 import { and, eq, isNull } from "drizzle-orm";
-import { Effect, pipe } from "effect";
+import { Array, Effect, pipe } from "effect";
 import {
   configGuild,
+  configGuildChannel,
   configGuildManagerRole,
-  configGuildRunningChannel,
 } from "sheet-db-schema";
 import { DBSubscriptionContext } from "typhoon-server/db";
 import { DB } from "../db";
@@ -109,40 +109,28 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               captureStackTrace: true,
             }),
           ),
-        addRunningChannel: (guildId: string, channelId: string, name: string) =>
+        setChannelConfig: (
+          guildId: string,
+          channelId: string,
+          { running, name }: { running?: boolean; name?: string },
+        ) =>
           pipe(
             dbSubscriptionContext.mutateQuery(
               db
-                .insert(configGuildRunningChannel)
-                .values({ guildId, channelId, name })
+                .insert(configGuildChannel)
+                .values({ guildId, channelId, running, name })
                 .onConflictDoUpdate({
                   target: [
-                    configGuildRunningChannel.guildId,
-                    configGuildRunningChannel.name,
+                    configGuildChannel.guildId,
+                    configGuildChannel.channelId,
                   ],
-                  set: { channelId, deletedAt: null },
-                }),
+                  set: { running, name, deletedAt: null },
+                })
+                .returning(),
               // TODO: handle channel conflict
             ),
-            Effect.withSpan("GuildConfigService.addRunningChannel", {
-              captureStackTrace: true,
-            }),
-          ),
-        removeRunningChannel: (guildId: string, name: string) =>
-          pipe(
-            dbSubscriptionContext.mutateQuery(
-              db
-                .update(configGuildRunningChannel)
-                .set({ deletedAt: new Date() })
-                .where(
-                  and(
-                    eq(configGuildRunningChannel.guildId, guildId),
-                    eq(configGuildRunningChannel.name, name),
-                  ),
-                )
-                .returning(),
-            ),
-            Effect.withSpan("GuildConfigService.removeRunningChannel", {
+            Effect.flatMap(Array.head),
+            Effect.withSpan("GuildConfigService.setChannelConfig", {
               captureStackTrace: true,
             }),
           ),
@@ -151,12 +139,12 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             dbSubscriptionContext.subscribeQuery(
               db
                 .select()
-                .from(configGuildRunningChannel)
+                .from(configGuildChannel)
                 .where(
                   and(
-                    eq(configGuildRunningChannel.guildId, guildId),
-                    eq(configGuildRunningChannel.name, name),
-                    isNull(configGuildRunningChannel.deletedAt),
+                    eq(configGuildChannel.guildId, guildId),
+                    eq(configGuildChannel.name, name),
+                    isNull(configGuildChannel.deletedAt),
                   ),
                 ),
             ),

@@ -1,28 +1,19 @@
 import { type sheets_v4 } from "@googleapis/sheets";
 import { type } from "arktype";
 import { Array, Effect, HashMap, Option, pipe } from "effect";
-import { validate } from "typhoon-core/schema";
+import { validate, validateWithDefault } from "typhoon-core/schema";
+import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
 import { GoogleSheets } from "../google/sheets";
 
 const parseValueRange = <A = never, E = never, R = never>(
   valueRange: sheets_v4.Schema$ValueRange,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  rowParser: (row: readonly any[], index: number) => Effect.Effect<A, E, R>,
+  rowParser: (row: readonly unknown[], index: number) => Effect.Effect<A, E, R>,
 ): Effect.Effect<A[], E, R> =>
   pipe(
     Option.fromNullable(valueRange.values),
     Option.map(Effect.forEach(rowParser)),
     Option.getOrElse(() => Effect.succeed([])),
   );
-
-const zipRows =
-  <B>(b: B[]) =>
-  <A>(a: A[]) =>
-    pipe(
-      a,
-      Array.zip(b),
-      Array.map(([a, b]) => ({ ...a, ...b })),
-    );
 
 export type DayConfig = {
   day: number;
@@ -40,37 +31,53 @@ const dayConfigParser = (
       const [day, sheet, draft] = valueRange ?? [];
       return {
         day: parseValueRange(day, ([day]) =>
-          Effect.succeed({
-            day: parseInt(day, 10),
-          }),
+          pipe(
+            day,
+            validateWithDefault(
+              type("string.integer.parse").pipe((day) => ({ day })),
+              { day: Number.NaN },
+            ),
+          ),
         ),
         sheet: parseValueRange(sheet, ([sheet]) =>
-          Effect.succeed({
-            sheet: sheet,
-          }),
+          pipe(
+            sheet,
+            validateWithDefault(
+              type("string").pipe((sheet) => ({ sheet })),
+              { sheet: "" },
+            ),
+          ),
         ),
         draft: parseValueRange(draft, ([draft]) =>
-          Effect.succeed({
-            draft: draft,
-          }),
+          pipe(
+            draft,
+            validateWithDefault(
+              type("string").pipe((draft) => ({ draft })),
+              { draft: "" },
+            ),
+          ),
         ),
       };
     }),
     Effect.map(({ day, sheet, draft }) =>
       pipe(
-        day,
-        zipRows(sheet),
-        zipRows(draft),
-        Array.map(({ day, sheet, draft }) => ({
-          day,
-          sheet,
-          draft,
-        })),
-        Array.filter(({ day }) => !isNaN(day)),
-        Array.map(
-          ({ day, sheet, draft }) => [day, { day, sheet, draft }] as const,
+        new ArrayWithDefault({ array: day, default: { day: Number.NaN } }),
+        ArrayWithDefault.zip(
+          new ArrayWithDefault({ array: sheet, default: { sheet: "" } }),
         ),
-        HashMap.fromIterable,
+        ArrayWithDefault.zip(
+          new ArrayWithDefault({ array: draft, default: { draft: "" } }),
+        ),
+      ),
+    ),
+    Effect.map(({ array }) =>
+      pipe(
+        array,
+        Array.filter(({ day }) => !isNaN(day)),
+        collectArrayToHashMap({
+          keyGetter: ({ day }) => day,
+          keyValueReducer: (_, b) => b,
+        }),
       ),
     ),
     Effect.withSpan("scheduleParser", { captureStackTrace: true }),
