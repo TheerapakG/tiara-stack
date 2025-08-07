@@ -74,6 +74,9 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
       Effect.bind("interaction", () =>
         InteractionContext.interaction<ChatInputCommandInteraction>(),
       ),
+      Effect.tap(({ interaction }) =>
+        Effect.tryPromise(() => interaction.deferReply()),
+      ),
       Effect.bindAll(({ interaction }) => ({
         hourOption: pipe(
           Effect.try(() => interaction.options.getNumber("hour")),
