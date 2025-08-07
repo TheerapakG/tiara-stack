@@ -31,6 +31,15 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
             ? `${bold(`+${empty} Hour ${hour}`)} ${time(start + (hour - 1) * 3600, TimestampStyles.ShortTime)} to ${time(start + hour * 3600, TimestampStyles.ShortTime)}`
             : "";
         },
+        formatCheckinEmptySlots: (hour: number, schedules: ScheduleMap) => {
+          return pipe(
+            HashMap.get(schedules, hour),
+            Option.getOrElse(() => emptySchedule(hour)),
+            ({ empty }) => {
+              return `Checkin message sent! (${empty > 0 ? `+${empty}` : "No"} empty slot${empty > 1 ? "s" : ""})`;
+            },
+          );
+        },
         formatCheckIn: (
           hour: number,
           channelId: string,

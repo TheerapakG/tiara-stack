@@ -3,6 +3,7 @@ import {
   ApplicationIntegrationType,
   ChatInputCommandInteraction,
   InteractionContextType,
+  MessageFlags,
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
@@ -20,7 +21,7 @@ import {
   InteractionContext,
 } from "../../types";
 
-const getCheckinMessage = (
+const getCheckinMessages = (
   hour: number,
   channelName: string,
   serverId: string,
@@ -35,6 +36,9 @@ const getCheckinMessage = (
         Effect.flatMap(Array.head),
       ),
     ),
+    Effect.bind("emptySlotsMessage", ({ schedule: { schedules } }) =>
+      ScheduleService.formatCheckinEmptySlots(hour, schedules),
+    ),
     Effect.bind(
       "checkinMessage",
       ({ schedule: { start, schedules }, runningChannel }) =>
@@ -45,7 +49,10 @@ const getCheckinMessage = (
           schedules,
         ),
     ),
-    Effect.map(({ checkinMessage }) => checkinMessage),
+    Effect.map(({ emptySlotsMessage, checkinMessage }) => ({
+      emptySlotsMessage,
+      checkinMessage,
+    })),
   );
 
 const handleManual = chatInputSubcommandHandlerContextBuilder()
@@ -75,7 +82,9 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         InteractionContext.interaction<ChatInputCommandInteraction>(),
       ),
       Effect.tap(({ interaction }) =>
-        Effect.tryPromise(() => interaction.deferReply()),
+        Effect.tryPromise(() =>
+          interaction.deferReply({ flags: MessageFlags.Ephemeral }),
+        ),
       ),
       Effect.bindAll(({ interaction }) => ({
         hourOption: pipe(
@@ -134,19 +143,26 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         ),
       ),
       Effect.bind(
-        "checkinMessage",
+        "checkinMessages",
         ({ hour, channelName, serverId, sheetService }) =>
           pipe(
-            getCheckinMessage(hour, channelName, serverId),
+            getCheckinMessages(hour, channelName, serverId),
             Effect.provide(sheetService),
           ),
       ),
-      Effect.bind("response", ({ checkinMessage, interaction }) =>
-        Effect.tryPromise(() =>
-          interaction.reply({
-            content: checkinMessage,
-          }),
-        ),
+      Effect.bind("response", ({ checkinMessages, interaction }) =>
+        Effect.all([
+          Effect.tryPromise(() =>
+            interaction.editReply({
+              content: checkinMessages.emptySlotsMessage,
+            }),
+          ),
+          Effect.tryPromise(() =>
+            interaction.followUp({
+              content: checkinMessages.checkinMessage,
+            }),
+          ),
+        ]),
       ),
       Effect.asVoid,
     ),
