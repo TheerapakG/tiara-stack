@@ -98,7 +98,12 @@ export class PermissionService extends Effect.Service<PermissionService>()(
                 >(new NotInGuildError())
               : !interaction.inCachedGuild()
                 ? Effect.fail(new UncachedGuildError())
-                : Effect.tryPromise(() => interaction.member.roles.add(roleId)),
+                : pipe(
+                    Effect.tryPromise(() =>
+                      interaction.member.roles.add(roleId),
+                    ),
+                    Effect.tap((member) => Effect.log(member.roles.cache)),
+                  ),
           Effect.withSpan("PermissionService.addRole", {
             captureStackTrace: true,
           }),
