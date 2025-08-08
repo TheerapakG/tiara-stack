@@ -15,6 +15,7 @@ import {
   GuildConfigService,
   MessageCheckinService,
   PermissionService,
+  PlayerService,
   ScheduleService,
   SheetConfigService,
 } from "./services";
@@ -26,7 +27,7 @@ const NodeSdkLive = NodeSdk.layer(() => ({
 }));
 
 const layer = pipe(
-  ScheduleService.Default,
+  Layer.mergeAll(ScheduleService.Default, PlayerService.Default),
   Layer.provideMerge(
     Layer.mergeAll(
       GuildConfigService.DefaultWithoutDependencies,
