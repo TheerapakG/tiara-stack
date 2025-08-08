@@ -41,7 +41,9 @@ export const button = buttonInteractionHandlerContextBuilder()
         InteractionContext.interaction<ButtonInteraction>(),
       ),
       Effect.tap(({ interaction }) =>
-        Effect.tryPromise(() => interaction.deferReply({ ephemeral: true })),
+        Effect.tryPromise(() =>
+          interaction.deferReply({ flags: MessageFlags.Ephemeral }),
+        ),
       ),
       Effect.bindAll(({ interaction }) => ({
         messageFlags: Ref.make(
