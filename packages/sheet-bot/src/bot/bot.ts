@@ -20,9 +20,9 @@ import {
   Effect,
   Exit,
   Layer,
+  ManagedRuntime,
   Option,
   pipe,
-  Scope,
   SynchronizedRef,
 } from "effect";
 import { Config } from "../config";
@@ -33,32 +33,6 @@ import {
   ChatInputCommandHandlerMap,
   InteractionContext,
 } from "../types";
-
-class ScopeLayer<E = never, R = never> {
-  constructor(
-    private readonly scope: Scope.CloseableScope,
-    private readonly layer: Layer.Layer<R, E>,
-  ) {}
-
-  static make<E = never, R = never>(layer: Layer.Layer<R, E>) {
-    return pipe(
-      Effect.Do,
-      Effect.bind("scope", () => Scope.make()),
-      Effect.bind("layer", ({ scope }) =>
-        pipe(Layer.memoize(layer), Scope.extend(scope)),
-      ),
-      Effect.map(({ scope, layer }) => new ScopeLayer(scope, layer)),
-    );
-  }
-
-  static provide<E = never, R = never>(scopeLayer: ScopeLayer<E, R>) {
-    return Effect.provide(scopeLayer.layer);
-  }
-
-  static close<E = never, R = never>(scopeLayer: ScopeLayer<E, R>) {
-    return Scope.close(scopeLayer.scope, Exit.void);
-  }
-}
 
 export class Bot<E = never, R = never> {
   constructor(
@@ -76,8 +50,8 @@ export class Bot<E = never, R = never> {
     >,
     private readonly traceProvider: Layer.Layer<never>,
     private readonly layer: Layer.Layer<R, E>,
-    private readonly scopeLayer: SynchronizedRef.SynchronizedRef<
-      Option.Option<ScopeLayer<E, R>>
+    private readonly runtime: SynchronizedRef.SynchronizedRef<
+      Option.Option<ManagedRuntime.ManagedRuntime<R, E>>
     >,
   ) {}
 
@@ -87,21 +61,21 @@ export class Bot<E = never, R = never> {
     return <E = never, R = never>(bot: Bot<E, R>) =>
       pipe(
         Effect.Do,
-        Effect.bind("scopeLayer", () => SynchronizedRef.get(bot.scopeLayer)),
+        Effect.bind("runtime", () => SynchronizedRef.get(bot.runtime)),
         Effect.bind("chatInputCommandsMap", () =>
           SynchronizedRef.get(bot.chatInputCommandsMap),
         ),
-        Effect.flatMap(({ scopeLayer, chatInputCommandsMap }) =>
+        Effect.flatMap(({ runtime, chatInputCommandsMap }) =>
           pipe(
-            scopeLayer,
-            Option.map((scopeLayer) =>
+            runtime,
+            Option.map((runtime) =>
               pipe(
                 ChatInputCommandHandlerMap.get(interaction.commandName)(
                   chatInputCommandsMap,
                 ),
                 Option.map((command) => command.handler),
                 Option.getOrElse(() => Effect.void),
-                ScopeLayer.provide(scopeLayer),
+                Effect.provide(runtime),
                 Effect.provide(InteractionContext.make(interaction)),
               ),
             ),
@@ -159,19 +133,19 @@ export class Bot<E = never, R = never> {
     return <E = never, R = never>(bot: Bot<E, R>) =>
       pipe(
         Effect.Do,
-        Effect.bind("scopeLayer", () => SynchronizedRef.get(bot.scopeLayer)),
+        Effect.bind("runtime", () => SynchronizedRef.get(bot.runtime)),
         Effect.bind("buttonsMap", () => SynchronizedRef.get(bot.buttonsMap)),
-        Effect.flatMap(({ scopeLayer, buttonsMap }) =>
+        Effect.flatMap(({ runtime, buttonsMap }) =>
           pipe(
-            scopeLayer,
-            Option.map((scopeLayer) =>
+            runtime,
+            Option.map((runtime) =>
               pipe(
                 ButtonInteractionHandlerMap.get(interaction.customId)(
                   buttonsMap,
                 ),
                 Option.map((command) => command.handler),
                 Option.getOrElse(() => Effect.void),
-                ScopeLayer.provide(scopeLayer),
+                Effect.provide(runtime),
                 Effect.provide(InteractionContext.make(interaction)),
               ),
             ),
@@ -261,8 +235,10 @@ export class Bot<E = never, R = never> {
           >(),
         ),
       ),
-      Effect.bind("scopeLayer", () =>
-        SynchronizedRef.make(Option.none<ScopeLayer<E, R>>()),
+      Effect.bind("runtime", () =>
+        SynchronizedRef.make(
+          Option.none<ManagedRuntime.ManagedRuntime<R, E>>(),
+        ),
       ),
       Effect.let(
         "bot",
@@ -272,7 +248,7 @@ export class Bot<E = never, R = never> {
           loginSemaphore,
           chatInputCommandsMap,
           buttonsMap,
-          scopeLayer,
+          runtime,
         }) =>
           new Bot<E, R>(
             client,
@@ -282,7 +258,7 @@ export class Bot<E = never, R = never> {
             buttonsMap,
             Layer.empty,
             layer,
-            scopeLayer,
+            runtime,
           ),
       ),
       Effect.map(({ bot }) => bot),
@@ -299,16 +275,15 @@ export class Bot<E = never, R = never> {
         bot.buttonsMap,
         traceProvider,
         bot.layer,
-        bot.scopeLayer,
+        bot.runtime,
       );
   }
 
   static login<E = never, R = never>(bot: Bot<E, R>) {
     return Config.use(({ discordToken }) =>
       pipe(
-        ScopeLayer.make(bot.layer),
-        Effect.andThen((scopeLayer) =>
-          SynchronizedRef.update(bot.scopeLayer, () => Option.some(scopeLayer)),
+        SynchronizedRef.update(bot.runtime, () =>
+          Option.some(ManagedRuntime.make(bot.layer)),
         ),
         Effect.andThen(() =>
           bot.client
@@ -343,11 +318,11 @@ export class Bot<E = never, R = never> {
     return pipe(
       Effect.promise(() => bot.client.destroy()),
       Effect.andThen(() =>
-        SynchronizedRef.updateEffect(bot.scopeLayer, (scopeLayer) =>
+        SynchronizedRef.updateEffect(bot.runtime, (runtime) =>
           pipe(
-            scopeLayer,
+            runtime,
             Option.match({
-              onSome: (scopeLayer) => ScopeLayer.close(scopeLayer),
+              onSome: (runtime) => Effect.tryPromise(() => runtime.dispose()),
               onNone: () => Effect.void,
             }),
             Effect.as(Option.none()),
