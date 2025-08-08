@@ -1,4 +1,5 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { subHours } from "date-fns/fp";
+import { and, eq, gte, isNull } from "drizzle-orm";
 import { Array, Effect, pipe } from "effect";
 import { messageCheckin, messageCheckinMember } from "sheet-db-schema";
 import { DBSubscriptionContext } from "typhoon-server/db";
@@ -117,6 +118,10 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
                     eq(messageCheckinMember.messageId, messageId),
                     eq(messageCheckinMember.memberId, memberId),
                     isNull(messageCheckinMember.deletedAt),
+                    gte(
+                      messageCheckinMember.createdAt,
+                      pipe(new Date(), subHours(1)),
+                    ),
                   ),
                 )
                 .returning(),
