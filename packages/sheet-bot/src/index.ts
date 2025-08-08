@@ -13,6 +13,7 @@ import { GoogleLive } from "./google";
 import {
   ChannelConfigService,
   GuildConfigService,
+  MessageCheckinService,
   PermissionService,
   ScheduleService,
   SheetConfigService,
@@ -31,6 +32,7 @@ const layer = pipe(
       GuildConfigService.DefaultWithoutDependencies,
       ChannelConfigService.DefaultWithoutDependencies,
       SheetConfigService.DefaultWithoutDependencies,
+      MessageCheckinService.DefaultWithoutDependencies,
     ),
   ),
   Layer.provideMerge(DBSubscriptionContext.Default),

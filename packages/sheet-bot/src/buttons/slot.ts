@@ -29,14 +29,20 @@ import {
 const getSlotMessage = (day: number) =>
   pipe(
     Effect.Do,
-    Effect.bind("daySchedule", () => SheetService.getDaySchedules(day)),
-    Effect.bind("slotMessages", ({ daySchedule: { start, schedules } }) =>
+    Effect.bindAll(
+      () => ({
+        eventConfig: SheetService.getEventConfig(),
+        daySchedule: SheetService.getDaySchedules(day),
+      }),
+      { concurrency: "unbounded" },
+    ),
+    Effect.bind("slotMessages", ({ eventConfig, daySchedule }) =>
       pipe(
-        schedules,
+        daySchedule,
         HashMap.values,
         Array.sortBy(Order.mapInput(Order.number, ({ hour }) => hour)),
         Effect.forEach((schedule) =>
-          ScheduleService.formatEmptySlots(start, schedule),
+          ScheduleService.formatEmptySlots(eventConfig.startTime, schedule),
         ),
       ),
     ),

@@ -1,5 +1,5 @@
-import { ChatInputCommandInteraction } from "discord.js";
-import { Data, Effect, pipe } from "effect";
+import { Interaction } from "discord.js";
+import { Cause, Data, Effect, pipe } from "effect";
 
 export class OwnerError extends Data.TaggedError("OwnerError")<{
   readonly message: string;
@@ -47,9 +47,7 @@ export class PermissionService extends Effect.Service<PermissionService>()(
   "PermissionService",
   {
     sync: () => ({
-      checkOwner: (
-        interaction: ChatInputCommandInteraction,
-      ): Effect.Effect<void, OwnerError> =>
+      checkOwner: (interaction: Interaction): Effect.Effect<void, OwnerError> =>
         pipe(
           interaction.user.id === interaction.client.application.owner?.id
             ? Effect.void
@@ -59,7 +57,7 @@ export class PermissionService extends Effect.Service<PermissionService>()(
           }),
         ),
       checkRoles: (
-        interaction: ChatInputCommandInteraction,
+        interaction: Interaction,
         roleIds: string[],
         reason: string,
       ): Effect.Effect<
@@ -75,12 +73,33 @@ export class PermissionService extends Effect.Service<PermissionService>()(
                 >(new NotInGuildError())
               : !interaction.inCachedGuild()
                 ? Effect.fail(new UncachedGuildError())
-                : interaction.member?.roles.cache.some((role) =>
+                : interaction.member.roles.cache.some((role) =>
                       roleIds.includes(role.id),
                     )
                   ? Effect.void
                   : Effect.fail(new PermissionError(reason)),
           Effect.withSpan("PermissionService.checkRoles", {
+            captureStackTrace: true,
+          }),
+        ),
+      addRole: (
+        interaction: Interaction,
+        roleId: string,
+      ): Effect.Effect<
+        void,
+        NotInGuildError | UncachedGuildError | Cause.UnknownException
+      > =>
+        pipe(
+          interaction.user.id === interaction.client.application.owner?.id
+            ? Effect.void
+            : !interaction.inGuild()
+              ? Effect.fail<
+                  NotInGuildError | UncachedGuildError | Cause.UnknownException
+                >(new NotInGuildError())
+              : !interaction.inCachedGuild()
+                ? Effect.fail(new UncachedGuildError())
+                : Effect.tryPromise(() => interaction.member.roles.add(roleId)),
+          Effect.withSpan("PermissionService.addRole", {
             captureStackTrace: true,
           }),
         ),

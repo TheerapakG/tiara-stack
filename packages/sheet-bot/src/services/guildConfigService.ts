@@ -112,19 +112,22 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
         setChannelConfig: (
           guildId: string,
           channelId: string,
-          { running, name }: { running?: boolean; name?: string },
+          config: Pick<
+            typeof configGuildChannel.$inferInsert,
+            "running" | "name" | "roleId"
+          >,
         ) =>
           pipe(
             dbSubscriptionContext.mutateQuery(
               db
                 .insert(configGuildChannel)
-                .values({ guildId, channelId, running, name })
+                .values({ guildId, channelId, ...config })
                 .onConflictDoUpdate({
                   target: [
                     configGuildChannel.guildId,
                     configGuildChannel.channelId,
                   ],
-                  set: { running, name, deletedAt: null },
+                  set: { ...config, deletedAt: null },
                 })
                 .returning(),
               // TODO: handle channel conflict
@@ -134,7 +137,25 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               captureStackTrace: true,
             }),
           ),
-        getRunningChannel: (guildId: string, name: string) =>
+        getRunningChannelById: (guildId: string, id: string) =>
+          pipe(
+            dbSubscriptionContext.subscribeQuery(
+              db
+                .select()
+                .from(configGuildChannel)
+                .where(
+                  and(
+                    eq(configGuildChannel.guildId, guildId),
+                    eq(configGuildChannel.channelId, id),
+                    isNull(configGuildChannel.deletedAt),
+                  ),
+                ),
+            ),
+            Effect.withSpan("GuildConfigService.getRunningChannelById", {
+              captureStackTrace: true,
+            }),
+          ),
+        getRunningChannelByName: (guildId: string, name: string) =>
           pipe(
             dbSubscriptionContext.subscribeQuery(
               db
@@ -148,7 +169,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                   ),
                 ),
             ),
-            Effect.withSpan("GuildConfigService.getRunningChannel", {
+            Effect.withSpan("GuildConfigService.getRunningChannelByName", {
               captureStackTrace: true,
             }),
           ),
