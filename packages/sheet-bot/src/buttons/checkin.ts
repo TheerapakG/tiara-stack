@@ -4,6 +4,7 @@ import {
   ButtonInteraction,
   ButtonStyle,
   ComponentType,
+  InteractionButtonComponentData,
   MessageActionRowComponentBuilder,
   MessageFlags,
   MessageFlagsBitField,
@@ -22,7 +23,8 @@ const buttonData = {
   customId: "interaction:checkin",
   label: "Check in",
   style: ButtonStyle.Primary,
-} as const;
+  emoji: "907705464215711834",
+} as const satisfies InteractionButtonComponentData;
 
 class CheckinError extends Data.TaggedError("CheckinError")<{
   readonly message: string;
