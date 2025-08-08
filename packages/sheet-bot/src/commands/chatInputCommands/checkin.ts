@@ -234,16 +234,23 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         ({ hour, checkinData, fillIds, checkinMessages, interaction }) =>
           pipe(
             Effect.tryPromise(() =>
-              interaction.followUp({
-                content: checkinMessages.checkinMessage,
-                components: checkinData.runningChannel.roleId
-                  ? [
-                      new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                        new ButtonBuilder(checkinButton.data),
-                      ),
-                    ]
-                  : [],
+              interaction.editReply({
+                content: checkinMessages.emptySlotsMessage,
               }),
+            ),
+            Effect.andThen(() =>
+              Effect.tryPromise(() =>
+                interaction.followUp({
+                  content: checkinMessages.checkinMessage,
+                  components: checkinData.runningChannel.roleId
+                    ? [
+                        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                          new ButtonBuilder(checkinButton.data),
+                        ),
+                      ]
+                    : [],
+                }),
+              ),
             ),
             Effect.tap((message) =>
               checkinData.runningChannel.roleId
@@ -270,13 +277,6 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
                     Effect.asVoid,
                   )
                 : Effect.void,
-            ),
-            Effect.andThen(() =>
-              Effect.tryPromise(() =>
-                interaction.editReply({
-                  content: checkinMessages.emptySlotsMessage,
-                }),
-              ),
             ),
           ),
       ),
