@@ -78,87 +78,77 @@ type PeerState = {
 type PeerStateMap = HashMap.HashMap<string, PeerState>;
 
 export class Server<
-  R = never,
-  SubscriptionHandlers extends Record<
-    string,
-    AnySubscriptionHandlerContext
+    R = never,
+    SubscriptionHandlers extends Record<
+      string,
+      AnySubscriptionHandlerContext
+      // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+    > = {},
     // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  > = {},
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  MutationHandlers extends Record<string, AnyMutationHandlerContext> = {},
-> implements BaseServer<SubscriptionHandlers, MutationHandlers>
+    MutationHandlers extends Record<string, AnyMutationHandlerContext> = {},
+  >
+  extends Data.TaggedClass("Server")<{
+    traceProvider: Layer.Layer<never>;
+    subscriptionHandlerMap: SubscriptionHandlerMap<R>;
+    mutationHandlerMap: MutationHandlerMap<R>;
+    peerStateMapRef: SynchronizedRef.SynchronizedRef<PeerStateMap>;
+    peerCount: Metric.Metric.Gauge<bigint>;
+    layer: Layer.Layer<R, unknown>;
+    runtime: SynchronizedRef.SynchronizedRef<
+      Option.Option<ManagedRuntime.ManagedRuntime<R, unknown>>
+    >;
+    startSemaphore: Effect.Semaphore;
+  }>
+  implements BaseServer<SubscriptionHandlers, MutationHandlers>
 {
   readonly [ServerSymbol]: BaseServer<SubscriptionHandlers, MutationHandlers> =
     this;
 
-  public traceProvider: Layer.Layer<never>;
-  public subscriptionHandlerMap: SubscriptionHandlerMap<R>;
-  public mutationHandlerMap: MutationHandlerMap<R>;
-  public readonly peerStateMapRef: SynchronizedRef.SynchronizedRef<PeerStateMap>;
-  public readonly peerCount: Metric.Metric.Gauge<bigint>;
-
-  private readonly layer: Layer.Layer<R, unknown>;
-  private readonly runtime: SynchronizedRef.SynchronizedRef<
-    Option.Option<ManagedRuntime.ManagedRuntime<R, unknown>>
-  >;
-  private readonly startSemaphore: Effect.Semaphore;
-
-  constructor(
-    traceProvider: Layer.Layer<never>,
-    subscriptionHandlerMap: SubscriptionHandlerMap<R>,
-    mutationHandlerMap: MutationHandlerMap<R>,
-    peerStateMapRef: SynchronizedRef.SynchronizedRef<PeerStateMap>,
-    layer: Layer.Layer<R, unknown>,
-    runtime: SynchronizedRef.SynchronizedRef<
-      Option.Option<ManagedRuntime.ManagedRuntime<R, unknown>>
-    >,
-    startSemaphore: Effect.Semaphore,
-  ) {
-    this.traceProvider = traceProvider;
-    this.subscriptionHandlerMap = subscriptionHandlerMap;
-    this.mutationHandlerMap = mutationHandlerMap;
-    this.peerStateMapRef = peerStateMapRef;
-    this.peerCount = Metric.gauge("peer_count", {
-      description: "The number of peers connected to the server",
-      bigint: true,
-    });
-    this.layer = layer;
-    this.runtime = runtime;
-    this.startSemaphore = startSemaphore;
-  }
-
   static create<R = never>(layer: Layer.Layer<R, unknown>) {
     return pipe(
       Effect.Do,
-      Effect.bind("peerStateMapRef", () =>
-        SynchronizedRef.make(
-          HashMap.empty<
-            string,
-            {
-              peer: Peer;
-              subscriptionStateMap: SubscriptionStateMap;
-            }
-          >(),
-        ),
-      ),
-      Effect.bind("runtime", () =>
-        SynchronizedRef.make(
-          Option.none<ManagedRuntime.ManagedRuntime<R, unknown>>(),
-        ),
-      ),
-      Effect.bind("startSemaphore", () => Effect.makeSemaphore(1)),
-      Effect.map(
-        ({ peerStateMapRef, runtime, startSemaphore }) =>
-          // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-          new Server<R, {}, {}>(
-            Layer.empty,
-            HashMap.empty(),
-            HashMap.empty(),
-            peerStateMapRef,
-            layer,
-            runtime,
-            startSemaphore,
+      Effect.bindAll(
+        () => ({
+          traceProvider: Effect.succeed(Layer.empty),
+          subscriptionHandlerMap: Effect.succeed(
+            HashMap.empty<
+              string,
+              SubscriptionHandlerContext<SubscriptionHandlerConfig, R>
+            >(),
           ),
+          mutationHandlerMap: Effect.succeed(
+            HashMap.empty<
+              string,
+              MutationHandlerContext<MutationHandlerConfig, R>
+            >(),
+          ),
+          peerStateMapRef: SynchronizedRef.make(
+            HashMap.empty<
+              string,
+              {
+                peer: Peer;
+                subscriptionStateMap: SubscriptionStateMap;
+              }
+            >(),
+          ),
+          peerCount: Effect.succeed(
+            Metric.gauge("peer_count", {
+              description: "The number of peers connected to the server",
+              bigint: true,
+            }),
+          ),
+          layer: Effect.succeed(layer),
+          runtime: SynchronizedRef.make(
+            Option.none<ManagedRuntime.ManagedRuntime<R, unknown>>(),
+          ),
+          startSemaphore: Effect.makeSemaphore(1),
+        }),
+        { concurrency: "unbounded" },
+      ),
+      Effect.map(
+        (params) =>
+          // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+          new Server<R, {}, {}>(params),
       ),
     );
   }
@@ -176,15 +166,10 @@ export class Server<
     >(
       server: Server<R, SubscriptionHandlers, MutationHandlers>,
     ): Server<R, SubscriptionHandlers, MutationHandlers> => {
-      return new Server(
+      return new Server({
+        ...server,
         traceProvider,
-        server.subscriptionHandlerMap,
-        server.mutationHandlerMap,
-        server.peerStateMapRef,
-        server.layer,
-        server.runtime,
-        server.startSemaphore,
-      );
+      });
     };
   }
 
@@ -218,28 +203,31 @@ export class Server<
             MutationHandlers & { [K in Handler["config"]["name"]]: Handler }
           >
         : never => {
-      pipe(
+      const newHandlerMaps = pipe(
         Match.value(handler.config),
-        Match.when({ type: "subscription" }, () => {
-          server.subscriptionHandlerMap = HashMap.set(
+        Match.when({ type: "subscription" }, () => ({
+          subscriptionHandlerMap: HashMap.set(
             server.subscriptionHandlerMap,
             handler.config.name,
             handler as SubscriptionHandlerContext,
-          );
-        }),
-        Match.when({ type: "mutation" }, () => {
-          server.mutationHandlerMap = HashMap.set(
+          ),
+          mutationHandlerMap: server.mutationHandlerMap,
+        })),
+        Match.when({ type: "mutation" }, () => ({
+          subscriptionHandlerMap: server.subscriptionHandlerMap,
+          mutationHandlerMap: HashMap.set(
             server.mutationHandlerMap,
             handler.config.name,
             handler as MutationHandlerContext,
-          );
-        }),
+          ),
+        })),
         Match.orElseAbsurd,
       );
 
-      return server as unknown as [Handler] extends [
-        AnySubscriptionHandlerContext,
-      ]
+      return new Server({
+        ...server,
+        ...newHandlerMaps,
+      }) as unknown as [Handler] extends [AnySubscriptionHandlerContext]
         ? Server<
             R,
             SubscriptionHandlers & {
