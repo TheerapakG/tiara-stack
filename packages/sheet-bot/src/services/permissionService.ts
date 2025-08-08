@@ -90,20 +90,13 @@ export class PermissionService extends Effect.Service<PermissionService>()(
         NotInGuildError | UncachedGuildError | Cause.UnknownException
       > =>
         pipe(
-          interaction.user.id === interaction.client.application.owner?.id
-            ? Effect.void
-            : !interaction.inGuild()
-              ? Effect.fail<
-                  NotInGuildError | UncachedGuildError | Cause.UnknownException
-                >(new NotInGuildError())
-              : !interaction.inCachedGuild()
-                ? Effect.fail(new UncachedGuildError())
-                : pipe(
-                    Effect.tryPromise(() =>
-                      interaction.member.roles.add(roleId),
-                    ),
-                    Effect.tap((member) => Effect.log(member.roles.cache)),
-                  ),
+          !interaction.inGuild()
+            ? Effect.fail<
+                NotInGuildError | UncachedGuildError | Cause.UnknownException
+              >(new NotInGuildError())
+            : !interaction.inCachedGuild()
+              ? Effect.fail(new UncachedGuildError())
+              : Effect.tryPromise(() => interaction.member.roles.add(roleId)),
           Effect.withSpan("PermissionService.addRole", {
             captureStackTrace: true,
           }),
