@@ -285,32 +285,35 @@ export class SheetService extends Effect.Service<SheetService>()(
         Effect.Do,
         Effect.bind("sheet", () => GoogleSheets),
         Effect.bind("sheetConfigService", () => SheetConfigService),
-        Effect.bindAll(({ sheetConfigService }) => ({
-          rangesConfig: Effect.cached(
-            pipe(
-              sheetConfigService.getRangesConfig(sheetId),
-              Effect.withSpan("SheetService.rangesConfig", {
-                captureStackTrace: true,
-              }),
+        Effect.bindAll(
+          ({ sheetConfigService }) => ({
+            rangesConfig: Effect.cached(
+              pipe(
+                sheetConfigService.getRangesConfig(sheetId),
+                Effect.withSpan("SheetService.rangesConfig", {
+                  captureStackTrace: true,
+                }),
+              ),
             ),
-          ),
-          eventConfig: Effect.cached(
-            pipe(
-              sheetConfigService.getEventConfig(sheetId),
-              Effect.withSpan("SheetService.eventConfig", {
-                captureStackTrace: true,
-              }),
+            eventConfig: Effect.cached(
+              pipe(
+                sheetConfigService.getEventConfig(sheetId),
+                Effect.withSpan("SheetService.eventConfig", {
+                  captureStackTrace: true,
+                }),
+              ),
             ),
-          ),
-          dayConfig: Effect.cached(
-            pipe(
-              sheetConfigService.getDayConfig(sheetId),
-              Effect.withSpan("SheetService.dayConfig", {
-                captureStackTrace: true,
-              }),
+            dayConfig: Effect.cached(
+              pipe(
+                sheetConfigService.getDayConfig(sheetId),
+                Effect.withSpan("SheetService.dayConfig", {
+                  captureStackTrace: true,
+                }),
+              ),
             ),
-          ),
-        })),
+          }),
+          { concurrency: "unbounded" },
+        ),
         Effect.let(
           "sheetGet",
           ({ sheet }) =>
@@ -345,26 +348,9 @@ export class SheetService extends Effect.Service<SheetService>()(
                 }),
               ),
         ),
-        Effect.map(
-          ({
-            sheetGet,
-            sheetUpdate,
-            rangesConfig,
-            eventConfig,
-            dayConfig,
-          }) => ({
-            get: sheetGet,
-            update: sheetUpdate,
-            getRangesConfig: () =>
-              pipe(
-                rangesConfig,
-                Effect.withSpan("SheetService.getRangesConfig"),
-              ),
-            getEventConfig: () =>
-              pipe(eventConfig, Effect.withSpan("SheetService.getEventConfig")),
-            getDayConfig: () =>
-              pipe(dayConfig, Effect.withSpan("SheetService.getDayConfig")),
-            getPlayers: () =>
+        Effect.bindAll(
+          ({ sheetGet, rangesConfig }) => ({
+            players: Effect.cached(
               pipe(
                 Effect.Do,
                 Effect.bind("rangesConfig", () => rangesConfig),
@@ -376,11 +362,12 @@ export class SheetService extends Effect.Service<SheetService>()(
                 Effect.flatMap(({ sheet }) =>
                   playerParser(sheet.data.valueRanges),
                 ),
-                Effect.withSpan("SheetService.getPlayers", {
+                Effect.withSpan("SheetService.players", {
                   captureStackTrace: true,
                 }),
               ),
-            getTeams: () =>
+            ),
+            teams: Effect.cached(
               pipe(
                 Effect.Do,
                 Effect.bind("rangesConfig", () => rangesConfig),
@@ -392,16 +379,16 @@ export class SheetService extends Effect.Service<SheetService>()(
                 Effect.flatMap(({ sheet }) =>
                   teamParser(sheet.data.valueRanges),
                 ),
-                Effect.withSpan("SheetService.getTeams", {
+                Effect.withSpan("SheetService.teams", {
                   captureStackTrace: true,
                 }),
               ),
-            getAllSchedules: () =>
+            ),
+            allSchedules: Effect.cached(
               pipe(
                 Effect.Do,
                 Effect.bindAll(
                   () => ({
-                    eventConfig,
                     rangesConfig,
                   }),
                   { concurrency: "unbounded" },
@@ -420,10 +407,54 @@ export class SheetService extends Effect.Service<SheetService>()(
                 Effect.bind("schedules", ({ sheet }) =>
                   scheduleParser(sheet.data.valueRanges),
                 ),
-                Effect.map(({ eventConfig, schedules }) => ({
-                  start: eventConfig.startTime,
-                  schedules,
-                })),
+                Effect.map(({ schedules }) => schedules),
+                Effect.withSpan("SheetService.allSchedules", {
+                  captureStackTrace: true,
+                }),
+              ),
+            ),
+          }),
+          { concurrency: "unbounded" },
+        ),
+        Effect.map(
+          ({
+            sheetGet,
+            sheetUpdate,
+            rangesConfig,
+            eventConfig,
+            dayConfig,
+            players,
+            teams,
+            allSchedules,
+          }) => ({
+            get: sheetGet,
+            update: sheetUpdate,
+            getRangesConfig: () =>
+              pipe(
+                rangesConfig,
+                Effect.withSpan("SheetService.getRangesConfig"),
+              ),
+            getEventConfig: () =>
+              pipe(eventConfig, Effect.withSpan("SheetService.getEventConfig")),
+            getDayConfig: () =>
+              pipe(dayConfig, Effect.withSpan("SheetService.getDayConfig")),
+            getPlayers: () =>
+              pipe(
+                players,
+                Effect.withSpan("SheetService.getPlayers", {
+                  captureStackTrace: true,
+                }),
+              ),
+            getTeams: () =>
+              pipe(
+                teams,
+                Effect.withSpan("SheetService.getTeams", {
+                  captureStackTrace: true,
+                }),
+              ),
+            getAllSchedules: () =>
+              pipe(
+                allSchedules,
                 Effect.withSpan("SheetService.getAllSchedules", {
                   captureStackTrace: true,
                 }),
@@ -433,7 +464,6 @@ export class SheetService extends Effect.Service<SheetService>()(
                 Effect.Do,
                 Effect.bindAll(
                   () => ({
-                    eventConfig,
                     rangesConfig,
                     dayConfig,
                   }),
@@ -458,10 +488,7 @@ export class SheetService extends Effect.Service<SheetService>()(
                 Effect.bind("schedules", ({ sheet }) =>
                   scheduleParser(sheet.data.valueRanges),
                 ),
-                Effect.map(({ eventConfig, schedules }) => ({
-                  start: eventConfig.startTime,
-                  schedules,
-                })),
+                Effect.map(({ schedules }) => schedules),
                 Effect.withSpan("SheetService.getDaySchedules", {
                   captureStackTrace: true,
                 }),

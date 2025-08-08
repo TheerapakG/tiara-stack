@@ -63,6 +63,7 @@ export const configGuildChannel = pgTable(
     channelId: varchar("channel_id").notNull(),
     name: varchar("name"),
     running: boolean("running").notNull().default(false),
+    roleId: varchar("role_id"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -100,4 +101,50 @@ export const configChannel = pgTable(
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
   },
   (table) => [uniqueIndex("config_channel_channel_id_idx").on(table.channelId)],
+);
+
+export const messageCheckin = pgTable(
+  "message_checkin",
+  {
+    id: serial("id").primaryKey(),
+    messageId: varchar("message_id").notNull(),
+    initialMessage: varchar("initial_message").notNull(),
+    hour: integer("hour").notNull(),
+    roleId: varchar("role_id").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+    deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("message_checkin_message_id_idx").on(table.messageId),
+  ],
+);
+
+export const messageCheckinMember = pgTable(
+  "message_checkin_member",
+  {
+    id: serial("id").primaryKey(),
+    messageId: varchar("message_id").notNull(),
+    memberId: varchar("member_id").notNull(),
+    checkinAt: timestamp("checkin_at", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+    deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("message_checkin_member_message_id_member_id_idx").on(
+      table.messageId,
+      table.memberId,
+    ),
+  ],
 );

@@ -6,6 +6,7 @@ import {
   escapeMarkdown,
   InteractionContextType,
   PermissionFlagsBits,
+  roleMention,
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
@@ -29,6 +30,11 @@ const handleSet = chatInputSubcommandHandlerContextBuilder()
       )
       .addStringOption((option) =>
         option.setName("name").setDescription("The name of the channel"),
+      )
+      .addRoleOption((option) =>
+        option
+          .setName("role")
+          .setDescription("The role to assign to the channel"),
       ),
   )
   .handler(
@@ -46,6 +52,10 @@ const handleSet = chatInputSubcommandHandlerContextBuilder()
           Effect.try(() => interaction.options.getString("name")),
           Effect.map(Option.fromNullable),
         ),
+        role: pipe(
+          Effect.try(() => interaction.options.getRole("role")),
+          Effect.map(Option.fromNullable),
+        ),
         channel: Option.fromNullable(interaction.channel),
         guild: Option.fromNullable(interaction.guild),
         memberPermissions: Option.fromNullable(interaction.memberPermissions),
@@ -55,10 +65,17 @@ const handleSet = chatInputSubcommandHandlerContextBuilder()
           ? Effect.fail("You do not have permission to manage the server")
           : Effect.void,
       ),
-      Effect.bind("config", ({ guild, name, channel, running }) =>
+      Effect.let("roleId", ({ role }) =>
+        pipe(
+          role,
+          Option.map((r) => r.id),
+        ),
+      ),
+      Effect.bind("config", ({ guild, name, channel, running, roleId }) =>
         GuildConfigService.setChannelConfig(guild.id, channel.id, {
           running: Option.getOrElse(running, () => false),
           name: Option.getOrElse(name, () => undefined),
+          roleId: Option.getOrElse(roleId, () => undefined),
         }),
       ),
       Effect.bind("response", ({ channel, interaction, config }) =>
@@ -72,12 +89,16 @@ const handleSet = chatInputSubcommandHandlerContextBuilder()
                 )
                 .addFields(
                   {
+                    name: "Name",
+                    value: escapeMarkdown(config.name ?? "None!"),
+                  },
+                  {
                     name: "Running channel",
                     value: config.running ? "Yes" : "No",
                   },
                   {
-                    name: "Name",
-                    value: escapeMarkdown(config.name ?? "None!"),
+                    name: "Role",
+                    value: config.roleId ? roleMention(config.roleId) : "None!",
                   },
                 )
                 .setTimestamp()

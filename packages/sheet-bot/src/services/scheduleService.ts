@@ -6,9 +6,9 @@ import {
   userMention,
 } from "discord.js";
 import { Array, Effect, HashMap, HashSet, Option, pipe } from "effect";
-import { Schedule, ScheduleMap, SheetService } from "./sheetService";
+import { Schedule, SheetService } from "./sheetService";
 
-const emptySchedule = (hour: number): Schedule => ({
+export const emptySchedule = (hour: number): Schedule => ({
   hour,
   breakHour: false,
   fills: [undefined, undefined, undefined, undefined, undefined],
@@ -31,38 +31,28 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
             ? `${bold(`+${empty} Hour ${hour}`)} ${time(start + (hour - 1) * 3600, TimestampStyles.ShortTime)} to ${time(start + hour * 3600, TimestampStyles.ShortTime)}`
             : "";
         },
-        formatCheckinEmptySlots: (hour: number, schedules: ScheduleMap) => {
-          return pipe(
-            HashMap.get(schedules, hour),
-            Option.getOrElse(() => emptySchedule(hour)),
-            ({ empty }) => {
-              return `Checkin message sent! (${empty > 0 ? `+${empty}` : "No"} empty slot${empty > 1 ? "s" : ""})`;
-            },
-          );
-        },
-        formatCheckIn: (
-          hour: number,
-          channelId: string,
-          start: number,
-          schedules: ScheduleMap,
-        ) => {
+        formatCheckinEmptySlots: ({ empty }: Schedule) =>
+          `Checkin message sent! (${empty > 0 ? `+${empty}` : "No"} empty slot${
+            empty > 1 ? "s" : ""
+          })`,
+        formatCheckIn: ({
+          channelId,
+          startTime,
+          prevSchedule,
+          schedule,
+        }: {
+          startTime: number;
+          prevSchedule: Schedule;
+          schedule: Schedule;
+          channelId: string;
+        }) => {
           return pipe(
             Effect.Do,
             Effect.let("prevFills", () =>
-              pipe(
-                HashMap.get(schedules, hour - 1),
-                Option.getOrElse(() => emptySchedule(hour - 1)),
-                ({ fills }) =>
-                  Array.filter(fills, (fill) => fill !== undefined),
-              ),
+              Array.filter(prevSchedule.fills, (fill) => fill !== undefined),
             ),
             Effect.let("fills", () =>
-              pipe(
-                HashMap.get(schedules, hour),
-                Option.getOrElse(() => emptySchedule(hour)),
-                ({ fills }) =>
-                  Array.filter(fills, (fill) => fill !== undefined),
-              ),
+              Array.filter(schedule.fills, (fill) => fill !== undefined),
             ),
             Effect.bind("playerMap", () =>
               pipe(
@@ -106,7 +96,7 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
                   ),
                 ),
               );
-              return `${HashSet.toValues(newPlayerMentions).join(" ")} React to this message to check in, and head to ${channelMention(channelId)} for ${bold(`hour ${hour}`)} ${time(start + (hour - 1) * 3600, TimestampStyles.RelativeTime)}`;
+              return `${HashSet.toValues(newPlayerMentions).join(" ")} React to this message to check in, and head to ${channelMention(channelId)} for ${bold(`hour ${schedule.hour}`)} ${time(startTime + (schedule.hour - 1) * 3600, TimestampStyles.RelativeTime)}`;
             }),
             Effect.withSpan("ScheduleService.formatCheckIn", {
               captureStackTrace: true,

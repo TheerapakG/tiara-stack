@@ -1,17 +1,24 @@
 import { addMinutes, getUnixTime } from "date-fns/fp";
 import {
+  ActionRowBuilder,
   ApplicationIntegrationType,
+  ButtonBuilder,
   ChatInputCommandInteraction,
   InteractionContextType,
+  MessageActionRowComponentBuilder,
   MessageFlags,
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, Effect, Option, pipe } from "effect";
+import { Array, Effect, HashMap, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
+import { checkinButton } from "../../buttons";
 import {
+  emptySchedule,
   GuildConfigService,
+  MessageCheckinService,
   PermissionService,
+  Schedule,
   ScheduleService,
   SheetService,
 } from "../../services";
@@ -21,33 +28,74 @@ import {
   InteractionContext,
 } from "../../types";
 
-const getCheckinMessages = (
-  hour: number,
-  channelName: string,
-  serverId: string,
-) =>
+const getCheckinData = ({
+  hour,
+  channelName,
+  serverId,
+}: {
+  hour: number;
+  channelName: string;
+  serverId: string;
+}) =>
   pipe(
     Effect.Do,
-    Effect.bind("schedule", () => SheetService.getAllSchedules()),
+    Effect.bindAll(
+      () => ({
+        eventConfig: SheetService.getEventConfig(),
+        schedules: SheetService.getAllSchedules(),
+      }),
+      { concurrency: "unbounded" },
+    ),
+    Effect.let("prevSchedule", ({ schedules }) =>
+      pipe(
+        HashMap.get(schedules, hour - 1),
+        Option.getOrElse(() => emptySchedule(hour - 1)),
+      ),
+    ),
+    Effect.let("schedule", ({ schedules }) =>
+      pipe(
+        HashMap.get(schedules, hour),
+        Option.getOrElse(() => emptySchedule(hour)),
+      ),
+    ),
     Effect.bind("runningChannel", () =>
       pipe(
-        GuildConfigService.getRunningChannel(serverId, channelName),
+        GuildConfigService.getRunningChannelByName(serverId, channelName),
         Effect.flatMap((computed) => observeOnce(computed.value)),
         Effect.flatMap(Array.head),
       ),
     ),
-    Effect.bind("emptySlotsMessage", ({ schedule: { schedules } }) =>
-      ScheduleService.formatCheckinEmptySlots(hour, schedules),
+    Effect.map(({ eventConfig, prevSchedule, schedule, runningChannel }) => ({
+      startTime: eventConfig.startTime,
+      prevSchedule,
+      schedule,
+      runningChannel: {
+        channelId: runningChannel.channelId,
+        roleId: runningChannel.roleId,
+      },
+    })),
+  );
+
+const getCheckinMessages = (data: {
+  startTime: number;
+  prevSchedule: Schedule;
+  schedule: Schedule;
+  runningChannel: {
+    channelId: string;
+  };
+}) =>
+  pipe(
+    Effect.Do,
+    Effect.bind("emptySlotsMessage", () =>
+      ScheduleService.formatCheckinEmptySlots(data.schedule),
     ),
-    Effect.bind(
-      "checkinMessage",
-      ({ schedule: { start, schedules }, runningChannel }) =>
-        ScheduleService.formatCheckIn(
-          hour,
-          runningChannel.channelId,
-          start,
-          schedules,
-        ),
+    Effect.bind("checkinMessage", () =>
+      ScheduleService.formatCheckIn({
+        startTime: data.startTime,
+        prevSchedule: data.prevSchedule,
+        schedule: data.schedule,
+        channelId: data.runningChannel.channelId,
+      }),
     ),
     Effect.map(({ emptySlotsMessage, checkinMessage }) => ({
       emptySlotsMessage,
@@ -126,8 +174,28 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
       Effect.bind("sheetService", ({ serverId }) =>
         SheetService.ofGuild(serverId),
       ),
-      Effect.bind("eventConfig", ({ sheetService }) =>
-        pipe(SheetService.getEventConfig(), Effect.provide(sheetService)),
+      Effect.bindAll(
+        ({ sheetService }) => ({
+          eventConfig: pipe(
+            SheetService.getEventConfig(),
+            Effect.provide(sheetService),
+          ),
+          playerMap: pipe(
+            SheetService.getPlayers(),
+            Effect.map(
+              Array.map(({ id, name }) =>
+                Option.isSome(id) && Option.isSome(name)
+                  ? Option.some({ id: id.value, name: name.value })
+                  : Option.none(),
+              ),
+            ),
+            Effect.map(Array.getSomes),
+            Effect.map(Array.map(({ id, name }) => [name, id] as const)),
+            Effect.map(HashMap.fromIterable),
+            Effect.provide(sheetService),
+          ),
+        }),
+        { concurrency: "unbounded" },
       ),
       Effect.let("hour", ({ hourOption, eventConfig }) =>
         pipe(
@@ -143,26 +211,71 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         ),
       ),
       Effect.bind(
-        "checkinMessages",
+        "checkinData",
         ({ hour, channelName, serverId, sheetService }) =>
           pipe(
-            getCheckinMessages(hour, channelName, serverId),
+            getCheckinData({ hour, channelName, serverId }),
             Effect.provide(sheetService),
           ),
       ),
-      Effect.bind("response", ({ checkinMessages, interaction }) =>
-        Effect.all([
-          Effect.tryPromise(() =>
-            interaction.editReply({
-              content: checkinMessages.emptySlotsMessage,
-            }),
-          ),
-          Effect.tryPromise(() =>
-            interaction.followUp({
-              content: checkinMessages.checkinMessage,
-            }),
-          ),
-        ]),
+      Effect.bind("checkinMessages", ({ checkinData, sheetService }) =>
+        pipe(getCheckinMessages(checkinData), Effect.provide(sheetService)),
+      ),
+      Effect.tap(
+        ({ hour, checkinData, playerMap, checkinMessages, interaction }) =>
+          Effect.all([
+            Effect.tryPromise(() =>
+              interaction.editReply({
+                content: checkinMessages.emptySlotsMessage,
+              }),
+            ),
+            pipe(
+              Effect.tryPromise(() =>
+                interaction.followUp({
+                  content: checkinMessages.checkinMessage,
+                  components: checkinData.runningChannel.roleId
+                    ? [
+                        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                          new ButtonBuilder(checkinButton.data),
+                        ),
+                      ]
+                    : [],
+                }),
+              ),
+              Effect.tap((message) =>
+                checkinData.runningChannel.roleId
+                  ? pipe(
+                      Effect.all(
+                        [
+                          MessageCheckinService.upsertMessageCheckinData(
+                            message.id,
+                            {
+                              initialMessage: checkinMessages.checkinMessage,
+                              hour,
+                              roleId: checkinData.runningChannel.roleId,
+                            },
+                          ),
+                          MessageCheckinService.addMessageCheckinMembers(
+                            message.id,
+                            pipe(
+                              checkinData.schedule.fills,
+                              Array.map(Option.fromNullable),
+                              Array.getSomes,
+                              Array.map((player) =>
+                                pipe(HashMap.get(playerMap, player)),
+                              ),
+                              Array.getSomes,
+                            ),
+                          ),
+                        ],
+                        { concurrency: "unbounded" },
+                      ),
+                      Effect.asVoid,
+                    )
+                  : Effect.void,
+              ),
+            ),
+          ]),
       ),
       Effect.asVoid,
     ),
