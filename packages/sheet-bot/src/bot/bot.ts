@@ -17,6 +17,7 @@ import {
 } from "discord.js";
 import {
   Cause,
+  Data,
   Effect,
   Exit,
   Layer,
@@ -34,27 +35,25 @@ import {
   InteractionContext,
 } from "../types";
 
-export class Bot<E = never, R = never> {
-  constructor(
-    private readonly client: Client,
-    private readonly loginLatch: Effect.Latch,
-    private readonly loginSemaphore: Effect.Semaphore,
-    private readonly chatInputCommandsMap: SynchronizedRef.SynchronizedRef<
-      ChatInputCommandHandlerMap<
-        E,
-        R | InteractionContext<ChatInputCommandInteraction>
-      >
-    >,
-    private readonly buttonsMap: SynchronizedRef.SynchronizedRef<
-      ButtonInteractionHandlerMap<E, R | InteractionContext<ButtonInteraction>>
-    >,
-    private readonly traceProvider: Layer.Layer<never>,
-    private readonly layer: Layer.Layer<R, E>,
-    private readonly runtime: SynchronizedRef.SynchronizedRef<
-      Option.Option<ManagedRuntime.ManagedRuntime<R, E>>
-    >,
-  ) {}
-
+export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
+  readonly client: Client;
+  readonly loginLatch: Effect.Latch;
+  readonly loginSemaphore: Effect.Semaphore;
+  readonly chatInputCommandsMap: SynchronizedRef.SynchronizedRef<
+    ChatInputCommandHandlerMap<
+      E,
+      R | InteractionContext<ChatInputCommandInteraction>
+    >
+  >;
+  readonly buttonsMap: SynchronizedRef.SynchronizedRef<
+    ButtonInteractionHandlerMap<E, R | InteractionContext<ButtonInteraction>>
+  >;
+  readonly traceProvider: Layer.Layer<never>;
+  readonly layer: Layer.Layer<R, E>;
+  readonly runtime: SynchronizedRef.SynchronizedRef<
+    Option.Option<ManagedRuntime.ManagedRuntime<R, E>>
+  >;
+}> {
   static onChatInputCommandInteraction(
     interaction: ChatInputCommandInteraction,
   ) {
@@ -213,70 +212,44 @@ export class Bot<E = never, R = never> {
   static create<E = never, R = never>(layer: Layer.Layer<R, E>) {
     return pipe(
       Effect.Do,
-      Effect.let(
-        "client",
-        () => new Client({ intents: [GatewayIntentBits.Guilds] }),
-      ),
-      Effect.bind("loginLatch", () => Effect.makeLatch(false)),
-      Effect.bind("loginSemaphore", () => Effect.makeSemaphore(1)),
-      Effect.bind("chatInputCommandsMap", () =>
-        SynchronizedRef.make(
-          ChatInputCommandHandlerMap.empty<
-            E,
-            R | InteractionContext<ChatInputCommandInteraction>
-          >(),
-        ),
-      ),
-      Effect.bind("buttonsMap", () =>
-        SynchronizedRef.make(
-          ButtonInteractionHandlerMap.empty<
-            E,
-            R | InteractionContext<ButtonInteraction>
-          >(),
-        ),
-      ),
-      Effect.bind("runtime", () =>
-        SynchronizedRef.make(
-          Option.none<ManagedRuntime.ManagedRuntime<R, E>>(),
-        ),
-      ),
-      Effect.let(
-        "bot",
-        ({
-          client,
-          loginLatch,
-          loginSemaphore,
-          chatInputCommandsMap,
-          buttonsMap,
-          runtime,
-        }) =>
-          new Bot<E, R>(
-            client,
-            loginLatch,
-            loginSemaphore,
-            chatInputCommandsMap,
-            buttonsMap,
-            Layer.empty,
-            layer,
-            runtime,
+      Effect.bindAll(
+        () => ({
+          client: Effect.succeed(
+            new Client({ intents: [GatewayIntentBits.Guilds] }),
           ),
+          loginLatch: Effect.makeLatch(false),
+          loginSemaphore: Effect.makeSemaphore(1),
+          chatInputCommandsMap: SynchronizedRef.make(
+            ChatInputCommandHandlerMap.empty<
+              E,
+              R | InteractionContext<ChatInputCommandInteraction>
+            >(),
+          ),
+          buttonsMap: SynchronizedRef.make(
+            ButtonInteractionHandlerMap.empty<
+              E,
+              R | InteractionContext<ButtonInteraction>
+            >(),
+          ),
+          traceProvider: Effect.succeed(Layer.empty),
+          layer: Effect.succeed(layer),
+          runtime: SynchronizedRef.make(
+            Option.none<ManagedRuntime.ManagedRuntime<R, E>>(),
+          ),
+        }),
+        { concurrency: "unbounded" },
       ),
+      Effect.let("bot", (params) => new Bot<E, R>(params)),
       Effect.map(({ bot }) => bot),
     );
   }
 
   static withTraceProvider(traceProvider: Layer.Layer<never>) {
     return <E = never, R = never>(bot: Bot<E, R>) =>
-      new Bot<E, R>(
-        bot.client,
-        bot.loginLatch,
-        bot.loginSemaphore,
-        bot.chatInputCommandsMap,
-        bot.buttonsMap,
+      new Bot<E, R>({
+        ...bot,
         traceProvider,
-        bot.layer,
-        bot.runtime,
-      );
+      });
   }
 
   static login<E = never, R = never>(bot: Bot<E, R>) {
