@@ -1,5 +1,5 @@
 import { type MethodOptions, type sheets_v4 } from "@googleapis/sheets";
-import { Array, Effect, HashMap, Option, Order, pipe } from "effect";
+import { Array, Data, Effect, HashMap, Option, Order, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
 import { GoogleSheets } from "../google/sheets";
@@ -17,14 +17,14 @@ const parseValueRange = <A = never, E = never, R = never>(
     Option.getOrElse(() => Effect.succeed([])),
   );
 
-export type Player = {
+export class RawPlayer extends Data.TaggedClass("RawPlayer")<{
   id: Option.Option<string>;
   name: Option.Option<string>;
-};
+}> {}
 
 const playerParser = (
   valueRange: sheets_v4.Schema$ValueRange[] | undefined,
-): Effect.Effect<Player[], never, never> =>
+): Effect.Effect<RawPlayer[], never, never> =>
   pipe(
     Effect.Do,
     Effect.bindAll(() => {
@@ -56,21 +56,26 @@ const playerParser = (
         ),
       ),
     ),
-    Effect.map(({ array }) => array),
+    Effect.map(({ array }) =>
+      pipe(
+        array,
+        Array.map(({ id, name }) => new RawPlayer({ id, name })),
+      ),
+    ),
     Effect.withSpan("playerParser", { captureStackTrace: true }),
   );
 
-export type Team = {
+export class RawTeam extends Data.TaggedClass("RawTeam")<{
   teamName: string;
   lead: Option.Option<number>;
   backline: Option.Option<number>;
   talent: Option.Option<number>;
-};
+}> {}
 
 const teamParser = (
   valueRange: sheets_v4.Schema$ValueRange[] | undefined,
 ): Effect.Effect<
-  HashMap.HashMap<string, { id: string; teams: Team[] }>,
+  HashMap.HashMap<string, { id: string; teams: RawTeam[] }>,
   never,
   never
 > =>
@@ -112,12 +117,10 @@ const teamParser = (
               Array.map(({ teamName, lead, backline, talent }) =>
                 pipe(
                   teamName,
-                  Option.map((teamName) => ({
-                    teamName,
-                    lead,
-                    backline,
-                    talent,
-                  })),
+                  Option.map(
+                    (teamName) =>
+                      new RawTeam({ teamName, lead, backline, talent }),
+                  ),
                   Option.filter(({ teamName }) => teamName !== ""),
                 ),
               ),
@@ -139,7 +142,16 @@ const teamParser = (
         ArrayWithDefault.map(({ id, teams }) =>
           pipe(
             id,
-            Option.map((id) => ({ id, teams })),
+            Option.map((id) => ({
+              id,
+              teams: pipe(
+                teams,
+                Array.map(
+                  ({ teamName, lead, backline, talent }) =>
+                    new RawTeam({ teamName, lead, backline, talent }),
+                ),
+              ),
+            })),
           ),
         ),
       ),
