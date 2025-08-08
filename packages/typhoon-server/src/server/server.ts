@@ -9,6 +9,7 @@ import {
   Function,
   HashMap,
   Layer,
+  ManagedRuntime,
   Match,
   Metric,
   Option,
@@ -76,32 +77,6 @@ type PeerState = {
 };
 type PeerStateMap = HashMap.HashMap<string, PeerState>;
 
-class ScopeLayer<E = never, R = never> {
-  constructor(
-    private readonly scope: Scope.CloseableScope,
-    private readonly layer: Layer.Layer<R, E>,
-  ) {}
-
-  static make<E = never, R = never>(layer: Layer.Layer<R, E>) {
-    return pipe(
-      Effect.Do,
-      Effect.bind("scope", () => Scope.make()),
-      Effect.bind("layer", ({ scope }) =>
-        pipe(Layer.memoize(layer), Scope.extend(scope)),
-      ),
-      Effect.map(({ scope, layer }) => new ScopeLayer(scope, layer)),
-    );
-  }
-
-  static provide<E = never, R = never>(scopeLayer: ScopeLayer<E, R>) {
-    return Effect.provide(scopeLayer.layer);
-  }
-
-  static close<E = never, R = never>(scopeLayer: ScopeLayer<E, R>) {
-    return Scope.close(scopeLayer.scope, Exit.void);
-  }
-}
-
 export class Server<
   R = never,
   SubscriptionHandlers extends Record<
@@ -123,8 +98,8 @@ export class Server<
   public readonly peerCount: Metric.Metric.Gauge<bigint>;
 
   private readonly layer: Layer.Layer<R, unknown>;
-  private readonly scopeLayer: SynchronizedRef.SynchronizedRef<
-    Option.Option<ScopeLayer<unknown, R>>
+  private readonly runtime: SynchronizedRef.SynchronizedRef<
+    Option.Option<ManagedRuntime.ManagedRuntime<R, unknown>>
   >;
   private readonly startSemaphore: Effect.Semaphore;
 
@@ -134,8 +109,8 @@ export class Server<
     mutationHandlerMap: MutationHandlerMap<R>,
     peerStateMapRef: SynchronizedRef.SynchronizedRef<PeerStateMap>,
     layer: Layer.Layer<R, unknown>,
-    scopeLayer: SynchronizedRef.SynchronizedRef<
-      Option.Option<ScopeLayer<unknown, R>>
+    runtime: SynchronizedRef.SynchronizedRef<
+      Option.Option<ManagedRuntime.ManagedRuntime<R, unknown>>
     >,
     startSemaphore: Effect.Semaphore,
   ) {
@@ -148,7 +123,7 @@ export class Server<
       bigint: true,
     });
     this.layer = layer;
-    this.scopeLayer = scopeLayer;
+    this.runtime = runtime;
     this.startSemaphore = startSemaphore;
   }
 
@@ -166,12 +141,14 @@ export class Server<
           >(),
         ),
       ),
-      Effect.bind("scopeLayer", () =>
-        SynchronizedRef.make(Option.none<ScopeLayer<unknown, R>>()),
+      Effect.bind("runtime", () =>
+        SynchronizedRef.make(
+          Option.none<ManagedRuntime.ManagedRuntime<R, unknown>>(),
+        ),
       ),
       Effect.bind("startSemaphore", () => Effect.makeSemaphore(1)),
       Effect.map(
-        ({ peerStateMapRef, scopeLayer, startSemaphore }) =>
+        ({ peerStateMapRef, runtime, startSemaphore }) =>
           // eslint-disable-next-line @typescript-eslint/no-empty-object-type
           new Server<R, {}, {}>(
             Layer.empty,
@@ -179,7 +156,7 @@ export class Server<
             HashMap.empty(),
             peerStateMapRef,
             layer,
-            scopeLayer,
+            runtime,
             startSemaphore,
           ),
       ),
@@ -205,7 +182,7 @@ export class Server<
         server.mutationHandlerMap,
         server.peerStateMapRef,
         server.layer,
-        server.scopeLayer,
+        server.runtime,
         server.startSemaphore,
       );
     };
@@ -685,14 +662,11 @@ export class Server<
                 Effect.bind("providedComputedBuffer", ({ computedBuffer }) =>
                   computed(
                     pipe(
-                      SynchronizedRef.get(server.scopeLayer),
+                      SynchronizedRef.get(server.runtime),
                       Effect.flatMap(
                         Option.match({
-                          onSome: (scopeLayer) =>
-                            pipe(
-                              computedBuffer.value,
-                              ScopeLayer.provide(scopeLayer),
-                            ),
+                          onSome: (runtime) =>
+                            pipe(computedBuffer.value, Effect.provide(runtime)),
                           onNone: () =>
                             Effect.fail("scope layer not initialized"),
                         }),
@@ -792,11 +766,11 @@ export class Server<
         Effect.bind("providedComputedBuffer", ({ computedBuffer }) =>
           computed(
             pipe(
-              SynchronizedRef.get(server.scopeLayer),
+              SynchronizedRef.get(server.runtime),
               Effect.flatMap(
                 Option.match({
-                  onSome: (scopeLayer) =>
-                    pipe(computedBuffer.value, ScopeLayer.provide(scopeLayer)),
+                  onSome: (runtime) =>
+                    pipe(computedBuffer.value, Effect.provide(runtime)),
                   onNone: () => Effect.fail("scope layer not initialized"),
                 }),
               ),
@@ -847,18 +821,13 @@ export class Server<
         Effect.bind("returnValue", ({ event, handlerContext }) =>
           pipe(
             Effect.Do,
-            Effect.bind("scopeLayer", () =>
-              SynchronizedRef.get(server.scopeLayer),
-            ),
-            Effect.flatMap(({ scopeLayer }) =>
+            Effect.bind("runtime", () => SynchronizedRef.get(server.runtime)),
+            Effect.flatMap(({ runtime }) =>
               pipe(
-                scopeLayer,
+                runtime,
                 Option.match({
-                  onSome: (scopeLayer) =>
-                    pipe(
-                      handlerContext.handler,
-                      ScopeLayer.provide(scopeLayer),
-                    ),
+                  onSome: (runtime) =>
+                    pipe(handlerContext.handler, Effect.provide(runtime)),
                   onNone: () => Effect.fail("scope layer not initialized"),
                 }),
               ),
@@ -1010,11 +979,8 @@ export class Server<
 
   static start<R = never>(server: Server<R>) {
     return pipe(
-      ScopeLayer.make(server.layer),
-      Effect.andThen((scopeLayer) =>
-        SynchronizedRef.update(server.scopeLayer, () =>
-          Option.some(scopeLayer),
-        ),
+      SynchronizedRef.update(server.runtime, () =>
+        Option.some(ManagedRuntime.make(server.layer)),
       ),
       Effect.as(server),
       server.startSemaphore.withPermits(1),
@@ -1023,11 +989,11 @@ export class Server<
 
   static stop<R = never>(server: Server<R>) {
     return pipe(
-      SynchronizedRef.updateEffect(server.scopeLayer, (scopeLayer) =>
+      SynchronizedRef.updateEffect(server.runtime, (runtime) =>
         pipe(
-          scopeLayer,
+          runtime,
           Option.match({
-            onSome: (scopeLayer) => ScopeLayer.close(scopeLayer),
+            onSome: (runtime) => Effect.tryPromise(() => runtime.dispose()),
             onNone: () => Effect.void,
           }),
           Effect.as(Option.none()),
