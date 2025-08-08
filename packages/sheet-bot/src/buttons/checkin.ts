@@ -9,7 +9,7 @@ import {
   MessageFlagsBitField,
   userMention,
 } from "discord.js";
-import { Data, Effect, Function, Option, pipe, Ref } from "effect";
+import { Array, Data, Effect, Function, Option, pipe, Ref } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import { MessageCheckinService, PermissionService } from "../services";
 import {
@@ -63,12 +63,18 @@ export const button = buttonInteractionHandlerContextBuilder()
             message.id,
             interaction.user.id,
           ),
-          Effect.catchAll(() =>
-            Effect.fail(
-              new CheckinError(
-                "I encountered an error while checking you in...",
-              ),
-            ),
+          Effect.tap((values) =>
+            Array.length(values) > 0
+              ? Effect.tryPromise(() =>
+                  interaction.editReply({
+                    content: "You have been checked in!",
+                  }),
+                )
+              : Effect.fail(
+                  new CheckinError(
+                    "I don't think you are in the list of players to check in...",
+                  ),
+                ),
           ),
         ),
       ),
@@ -88,28 +94,21 @@ export const button = buttonInteractionHandlerContextBuilder()
         PermissionService.addRole(interaction, messageCheckinData.roleId),
       ),
       Effect.tap(({ interaction, messageCheckinData, checkedInMentions }) =>
-        Effect.all([
-          Effect.tryPromise(() =>
-            interaction.message.edit({
-              content:
-                checkedInMentions.length > 0
-                  ? `${messageCheckinData.initialMessage}\n\nChecked in: ${checkedInMentions}`
-                  : messageCheckinData.initialMessage,
-              components: messageCheckinData.roleId
-                ? [
-                    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                      new ButtonBuilder(buttonData),
-                    ),
-                  ]
-                : [],
-            }),
-          ),
-          Effect.tryPromise(() =>
-            interaction.editReply({
-              content: "You have been checked in!",
-            }),
-          ),
-        ]),
+        Effect.tryPromise(() =>
+          interaction.message.edit({
+            content:
+              checkedInMentions.length > 0
+                ? `${messageCheckinData.initialMessage}\n\nChecked in: ${checkedInMentions}`
+                : messageCheckinData.initialMessage,
+            components: messageCheckinData.roleId
+              ? [
+                  new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                    new ButtonBuilder(buttonData),
+                  ),
+                ]
+              : [],
+          }),
+        ),
       ),
     ),
   )

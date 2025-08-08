@@ -118,7 +118,8 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
                     eq(messageCheckinMember.memberId, memberId),
                     isNull(messageCheckinMember.deletedAt),
                   ),
-                ),
+                )
+                .returning(),
             ),
             Effect.withSpan(
               "MessageCheckinService.setMessageCheckinMemberCheckinAt",
