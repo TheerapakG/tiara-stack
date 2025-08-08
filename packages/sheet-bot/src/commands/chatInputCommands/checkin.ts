@@ -5,12 +5,13 @@ import {
   ButtonBuilder,
   ChatInputCommandInteraction,
   InteractionContextType,
+  Message,
   MessageActionRowComponentBuilder,
   MessageFlags,
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, Effect, HashMap, Option, pipe } from "effect";
+import { Array, Cause, Effect, HashMap, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import { checkinButton } from "../../buttons";
 import {
@@ -142,6 +143,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         channelName: pipe(
           Effect.try(() => interaction.options.getString("channel_name", true)),
         ),
+        channel: pipe(interaction.channel, Option.fromNullable),
         serverId: pipe(
           Effect.try(
             () =>
@@ -231,27 +233,35 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         pipe(getCheckinMessages(checkinData), Effect.provide(sheetService)),
       ),
       Effect.tap(
-        ({ hour, checkinData, fillIds, checkinMessages, interaction }) =>
+        ({
+          hour,
+          checkinData,
+          fillIds,
+          checkinMessages,
+          channel,
+          interaction,
+        }) =>
           pipe(
-            Effect.tryPromise(() =>
-              interaction.editReply({
-                content: checkinMessages.emptySlotsMessage,
-              }),
-            ),
-            Effect.andThen(() =>
-              Effect.tryPromise(() =>
-                interaction.followUp({
-                  content: checkinMessages.checkinMessage,
-                  components: checkinData.runningChannel.roleId
-                    ? [
-                        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                          new ButtonBuilder(checkinButton.data),
-                        ),
-                      ]
-                    : [],
-                }),
-              ),
-            ),
+            channel.isSendable()
+              ? Effect.tryPromise<Message<boolean>>(() =>
+                  channel.send({
+                    content: checkinMessages.checkinMessage,
+                    components: checkinData.runningChannel.roleId
+                      ? [
+                          new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                            new ButtonBuilder(checkinButton.data),
+                          ),
+                        ]
+                      : [],
+                  }),
+                )
+              : (Effect.fail(
+                  "Cannot send message to this channel",
+                ) as Effect.Effect<
+                  Message<boolean>,
+                  string | Cause.UnknownException,
+                  never
+                >),
             Effect.tap((message) =>
               checkinData.runningChannel.roleId
                 ? pipe(
@@ -277,6 +287,13 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
                     Effect.asVoid,
                   )
                 : Effect.void,
+            ),
+            Effect.andThen(() =>
+              Effect.tryPromise(() =>
+                interaction.editReply({
+                  content: checkinMessages.emptySlotsMessage,
+                }),
+              ),
             ),
           ),
       ),
