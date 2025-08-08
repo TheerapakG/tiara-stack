@@ -40,6 +40,9 @@ export const button = buttonInteractionHandlerContextBuilder()
       Effect.bind("interaction", () =>
         InteractionContext.interaction<ButtonInteraction>(),
       ),
+      Effect.tap(({ interaction }) =>
+        Effect.tryPromise(() => interaction.deferReply({ ephemeral: true })),
+      ),
       Effect.bindAll(({ interaction }) => ({
         messageFlags: Ref.make(
           new MessageFlagsBitField().add(MessageFlags.Ephemeral),
@@ -85,18 +88,28 @@ export const button = buttonInteractionHandlerContextBuilder()
         PermissionService.addRole(interaction, messageCheckinData.roleId),
       ),
       Effect.tap(({ interaction, messageCheckinData, checkedInMentions }) =>
-        Effect.tryPromise(() =>
-          interaction.message.edit({
-            content: `${messageCheckinData.initialMessage}\n\nChecked in: ${checkedInMentions}`,
-            components: messageCheckinData.roleId
-              ? [
-                  new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                    new ButtonBuilder(buttonData),
-                  ),
-                ]
-              : [],
-          }),
-        ),
+        Effect.all([
+          Effect.tryPromise(() =>
+            interaction.message.edit({
+              content:
+                checkedInMentions.length > 0
+                  ? `${messageCheckinData.initialMessage}\n\nChecked in: ${checkedInMentions}`
+                  : messageCheckinData.initialMessage,
+              components: messageCheckinData.roleId
+                ? [
+                    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                      new ButtonBuilder(buttonData),
+                    ),
+                  ]
+                : [],
+            }),
+          ),
+          Effect.tryPromise(() =>
+            interaction.editReply({
+              content: "You have been checked in!",
+            }),
+          ),
+        ]),
       ),
     ),
   )
