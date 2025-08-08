@@ -19,6 +19,7 @@ import {
   GuildConfigService,
   MessageCheckinService,
   PermissionService,
+  PlayerService,
   Schedule,
   ScheduleService,
   SheetService,
@@ -176,28 +177,8 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
       Effect.bind("sheetService", ({ serverId }) =>
         SheetService.ofGuild(serverId),
       ),
-      Effect.bindAll(
-        ({ sheetService }) => ({
-          eventConfig: pipe(
-            SheetService.getEventConfig(),
-            Effect.provide(sheetService),
-          ),
-          playerMap: pipe(
-            SheetService.getPlayers(),
-            Effect.map(
-              Array.map(({ id, name }) =>
-                Option.isSome(id) && Option.isSome(name)
-                  ? Option.some({ id: id.value, name: name.value })
-                  : Option.none(),
-              ),
-            ),
-            Effect.map(Array.getSomes),
-            Effect.map(Array.map(({ id, name }) => [name, id] as const)),
-            Effect.map(HashMap.fromIterable),
-            Effect.provide(sheetService),
-          ),
-        }),
-        { concurrency: "unbounded" },
+      Effect.bind("eventConfig", ({ sheetService }) =>
+        pipe(SheetService.getEventConfig(), Effect.provide(sheetService)),
       ),
       Effect.let("hour", ({ hourOption, eventConfig }) =>
         pipe(
@@ -220,13 +201,19 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             Effect.provide(sheetService),
           ),
       ),
-      Effect.let("fillIds", ({ checkinData, playerMap }) =>
+      Effect.bind("fillIds", ({ checkinData, sheetService }) =>
         pipe(
           checkinData.schedule.fills,
           Array.map(Option.fromNullable),
           Array.getSomes,
-          Array.map((player) => pipe(HashMap.get(playerMap, player))),
-          Array.getSomes,
+          Effect.forEach((playerName) =>
+            pipe(
+              PlayerService.getByName(playerName),
+              Effect.provide(sheetService),
+            ),
+          ),
+          Effect.map(Array.getSomes),
+          Effect.map(Array.map((p) => p.id)),
         ),
       ),
       Effect.bind("checkinMessages", ({ checkinData, sheetService }) =>

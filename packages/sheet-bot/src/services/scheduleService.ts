@@ -1,12 +1,14 @@
 import {
   bold,
   channelMention,
+  escapeMarkdown,
   time,
   TimestampStyles,
   userMention,
 } from "discord.js";
-import { Array, Effect, HashMap, HashSet, Option, pipe } from "effect";
-import { Schedule, SheetService } from "./sheetService";
+import { Array, Effect, HashSet, Option, pipe } from "effect";
+import { PlayerService } from "./playerService";
+import { Schedule } from "./sheetService";
 
 export const emptySchedule = (hour: number): Schedule => ({
   hour,
@@ -54,46 +56,37 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
             Effect.let("fills", () =>
               Array.filter(schedule.fills, (fill) => fill !== undefined),
             ),
-            Effect.bind("playerMap", () =>
-              pipe(
-                SheetService.getPlayers(),
-                Effect.map(
-                  Array.map(({ id, name }) =>
-                    Option.isSome(id) && Option.isSome(name)
-                      ? Option.some({ id: id.value, name: name.value })
-                      : Option.none(),
-                  ),
-                ),
-                Effect.map(Array.getSomes),
-                Effect.map(Array.map(({ id, name }) => [name, id] as const)),
-                Effect.map(HashMap.fromIterable),
-              ),
-            ),
-            Effect.map(({ fills, prevFills, playerMap }) => {
-              const newPlayerMentions = pipe(
-                HashSet.fromIterable(fills),
-                HashSet.map((player) =>
-                  pipe(
-                    HashMap.get(playerMap, player),
+            Effect.bind("fillsPlayers", ({ fills }) =>
+              Effect.forEach(fills, (player) =>
+                pipe(
+                  PlayerService.getByName(player),
+                  Effect.map(
                     Option.match({
-                      onSome: (id) => userMention(id),
-                      onNone: () => player,
+                      onSome: (p) => userMention(p.id),
+                      onNone: () => escapeMarkdown(player),
                     }),
                   ),
                 ),
-                HashSet.difference(
-                  pipe(
-                    HashSet.fromIterable(prevFills),
-                    HashSet.map((player) =>
-                      pipe(
-                        HashMap.get(playerMap, player),
-                        Option.match({
-                          onSome: (id) => userMention(id),
-                          onNone: () => player,
-                        }),
-                      ),
-                    ),
+              ),
+            ),
+            Effect.bind("prevFillsPlayers", ({ prevFills }) =>
+              Effect.forEach(prevFills, (player) =>
+                pipe(
+                  PlayerService.getByName(player),
+                  Effect.map(
+                    Option.match({
+                      onSome: (p) => userMention(p.id),
+                      onNone: () => escapeMarkdown(player),
+                    }),
                   ),
+                ),
+              ),
+            ),
+            Effect.map(({ fillsPlayers, prevFillsPlayers }) => {
+              const newPlayerMentions = pipe(
+                HashSet.fromIterable(fillsPlayers),
+                HashSet.difference(
+                  pipe(HashSet.fromIterable(prevFillsPlayers)),
                 ),
               );
               return `${HashSet.toValues(newPlayerMentions).join(" ")} React to this message to check in, and head to ${channelMention(channelId)} for ${bold(`hour ${schedule.hour}`)} ${time(startTime + (schedule.hour - 1) * 3600, TimestampStyles.RelativeTime)}`;

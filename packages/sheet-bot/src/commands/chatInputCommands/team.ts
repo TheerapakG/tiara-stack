@@ -14,7 +14,7 @@ import {
   PermissionService,
   SheetService,
 } from "../../services";
-import { Team } from "../../services/sheetService";
+import { RawTeam } from "../../services/sheetService";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
@@ -85,7 +85,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
         pipe(
           HashMap.get(teams, user.id),
           Option.map(({ teams }) => teams),
-          Option.getOrElse(() => [] as Team[]),
+          Option.getOrElse(() => [] as RawTeam[]),
           Array.map((team) => ({
             teamName: team.teamName,
             lead: Option.getOrUndefined(team.lead),
