@@ -218,64 +218,67 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             Effect.provide(sheetService),
           ),
       ),
+      Effect.let("fillIds", ({ checkinData, playerMap }) =>
+        pipe(
+          checkinData.schedule.fills,
+          Array.map(Option.fromNullable),
+          Array.getSomes,
+          Array.map((player) => pipe(HashMap.get(playerMap, player))),
+          Array.getSomes,
+        ),
+      ),
       Effect.bind("checkinMessages", ({ checkinData, sheetService }) =>
         pipe(getCheckinMessages(checkinData), Effect.provide(sheetService)),
       ),
       Effect.tap(
-        ({ hour, checkinData, playerMap, checkinMessages, interaction }) =>
-          Effect.all([
+        ({ hour, checkinData, fillIds, checkinMessages, interaction }) =>
+          pipe(
             Effect.tryPromise(() =>
-              interaction.editReply({
-                content: checkinMessages.emptySlotsMessage,
+              interaction.followUp({
+                content: checkinMessages.checkinMessage,
+                components: checkinData.runningChannel.roleId
+                  ? [
+                      new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                        new ButtonBuilder(checkinButton.data),
+                      ),
+                    ]
+                  : [],
               }),
             ),
-            pipe(
-              Effect.tryPromise(() =>
-                interaction.followUp({
-                  content: checkinMessages.checkinMessage,
-                  components: checkinData.runningChannel.roleId
-                    ? [
-                        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                          new ButtonBuilder(checkinButton.data),
+            Effect.tap((message) =>
+              checkinData.runningChannel.roleId
+                ? pipe(
+                    Effect.all(
+                      [
+                        MessageCheckinService.upsertMessageCheckinData(
+                          message.id,
+                          {
+                            initialMessage: checkinMessages.checkinMessage,
+                            hour,
+                            roleId: checkinData.runningChannel.roleId,
+                          },
                         ),
-                      ]
-                    : [],
+                        Array.isEmptyArray(fillIds)
+                          ? Effect.void
+                          : MessageCheckinService.addMessageCheckinMembers(
+                              message.id,
+                              fillIds,
+                            ),
+                      ],
+                      { concurrency: "unbounded" },
+                    ),
+                    Effect.asVoid,
+                  )
+                : Effect.void,
+            ),
+            Effect.andThen(() =>
+              Effect.tryPromise(() =>
+                interaction.editReply({
+                  content: checkinMessages.emptySlotsMessage,
                 }),
               ),
-              Effect.tap((message) =>
-                checkinData.runningChannel.roleId
-                  ? pipe(
-                      Effect.all(
-                        [
-                          MessageCheckinService.upsertMessageCheckinData(
-                            message.id,
-                            {
-                              initialMessage: checkinMessages.checkinMessage,
-                              hour,
-                              roleId: checkinData.runningChannel.roleId,
-                            },
-                          ),
-                          MessageCheckinService.addMessageCheckinMembers(
-                            message.id,
-                            pipe(
-                              checkinData.schedule.fills,
-                              Array.map(Option.fromNullable),
-                              Array.getSomes,
-                              Array.map((player) =>
-                                pipe(HashMap.get(playerMap, player)),
-                              ),
-                              Array.getSomes,
-                            ),
-                          ),
-                        ],
-                        { concurrency: "unbounded" },
-                      ),
-                      Effect.asVoid,
-                    )
-                  : Effect.void,
-              ),
             ),
-          ]),
+          ),
       ),
       Effect.asVoid,
     ),
