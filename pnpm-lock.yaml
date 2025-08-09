@@ -723,9 +723,6 @@ importers:
       '@standard-schema/spec':
         specifier: ^1.0.0
         version: 1.0.0
-      '@types/node':
-        specifier: ^24.2.1
-        version: 24.2.1
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.39.0
         version: 8.39.0(@typescript-eslint/parser@8.39.0(eslint@9.29.0(jiti@2.4.2))(typescript@5.9.2))(eslint@9.29.0(jiti@2.4.2))(typescript@5.9.2)

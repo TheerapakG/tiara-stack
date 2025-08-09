@@ -935,7 +935,7 @@ export class Server<
                 (buffer) =>
                   Effect.sync(
                     () =>
-                      new Response(buffer, {
+                      new Response(buffer as unknown as BodyInit, {
                         status: 200,
                         headers: {
                           "content-type": "application/octet-stream",
