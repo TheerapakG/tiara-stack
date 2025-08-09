@@ -25,6 +25,8 @@ spec:
           ports:
             - containerPort: 3000
               name: sheet-apis-svc
+            - containerPort: 9464
+              name: sheet-apis-metrics
           env:
             - name: POSTGRES_URL
               valueFrom:
@@ -46,5 +48,22 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: sheet-apis-svc
+    - protocol: TCP
+      port: 9464
+      targetPort: sheet-apis-metrics
   selector:
     app: sheet-apis
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: sheet-apis
+  labels:
+    app: sheet-apis
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: sheet-apis
+  endpoints:
+    - port: sheet-apis-metrics

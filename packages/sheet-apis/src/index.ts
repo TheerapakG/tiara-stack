@@ -13,18 +13,24 @@ import { server } from "./server";
 
 export type Server = InferServerType<typeof server>;
 
-const NodeSdkLive = NodeSdk.layer(() => ({
+const TracesLive = NodeSdk.layer(() => ({
   resource: { serviceName: "sheet-apis" },
   spanProcessor: new BatchSpanProcessor(new OTLPTraceExporter()),
+}));
+
+const MetricsLive = NodeSdk.layer(() => ({
+  resource: { serviceName: "sheet-apis" },
   metricReader: new PrometheusExporter(),
 }));
 
 const serveEffect = pipe(
   server,
-  Effect.map(TyphoonServer.withTraceProvider(NodeSdkLive)),
+  Effect.map(TyphoonServer.withTraceProvider(TracesLive)),
   Effect.flatMap(serve(crosswsServe)),
+  Effect.flatMap((latch) => latch.await),
   Effect.sandbox,
   Effect.catchAll((error) => Effect.logError(error)),
+  Effect.provide(MetricsLive),
   Effect.provide(Logger.logFmt),
 );
 
