@@ -19,7 +19,9 @@ const parseValueRange = <A = never, E = never, R = never>(
 
 export class RawPlayer extends Data.TaggedClass("RawPlayer")<{
   id: Option.Option<string>;
+  idIndex: number;
   name: Option.Option<string>;
+  nameIndex: number;
 }> {}
 
 const playerParser = (
@@ -30,15 +32,22 @@ const playerParser = (
     Effect.bindAll(() => {
       const [userIds, userSheetNames] = valueRange ?? [];
       return {
-        userIds: parseValueRange(userIds, ([userId]) =>
+        userIds: parseValueRange(userIds, ([userId], index) =>
           Effect.succeed({
             id: pipe(Option.fromNullable(userId), Option.map(String)),
+            idIndex: index,
           }),
         ),
-        userSheetNames: parseValueRange(userSheetNames, ([userSheetName]) =>
-          Effect.succeed({
-            name: pipe(Option.fromNullable(userSheetName), Option.map(String)),
-          }),
+        userSheetNames: parseValueRange(
+          userSheetNames,
+          ([userSheetName], index) =>
+            Effect.succeed({
+              name: pipe(
+                Option.fromNullable(userSheetName),
+                Option.map(String),
+              ),
+              nameIndex: index,
+            }),
         ),
       };
     }),
@@ -46,12 +55,12 @@ const playerParser = (
       pipe(
         new ArrayWithDefault({
           array: userIds,
-          default: { id: Option.none() },
+          default: { id: Option.none(), idIndex: Number.NaN },
         }),
         ArrayWithDefault.zip(
           new ArrayWithDefault({
             array: userSheetNames,
-            default: { name: Option.none() },
+            default: { name: Option.none(), nameIndex: Number.NaN },
           }),
         ),
       ),
@@ -59,7 +68,7 @@ const playerParser = (
     Effect.map(({ array }) =>
       pipe(
         array,
-        Array.map(({ id, name }) => new RawPlayer({ id, name })),
+        Array.map((value) => new RawPlayer(value)),
       ),
     ),
     Effect.withSpan("playerParser", { captureStackTrace: true }),
@@ -439,6 +448,7 @@ export class SheetService extends Effect.Service<SheetService>()(
             teams,
             allSchedules,
           }) => ({
+            boundGuildId: () => Effect.succeed(sheetId),
             get: sheetGet,
             update: sheetUpdate,
             getRangesConfig: () =>

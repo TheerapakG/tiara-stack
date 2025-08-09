@@ -3,7 +3,9 @@ import { SheetService } from "./sheetService";
 
 export class Player extends Data.TaggedClass("Player")<{
   id: string;
+  idIndex: number;
   name: string;
+  nameIndex: number;
 }> {}
 
 export class PlayerService extends Effect.Service<PlayerService>()(
@@ -11,14 +13,22 @@ export class PlayerService extends Effect.Service<PlayerService>()(
   {
     effect: pipe(
       Effect.Do,
-      Effect.bindAll(() => ({
+      Effect.bind("sheetService", () => SheetService),
+      Effect.bindAll(({ sheetService }) => ({
         playerMaps: Effect.cached(
           pipe(
-            SheetService.getPlayers(),
+            sheetService.getPlayers(),
             Effect.map(
-              Array.map(({ id, name }) =>
+              Array.map(({ id, name, idIndex, nameIndex }) =>
                 Option.isSome(id) && Option.isSome(name)
-                  ? Option.some(new Player({ id: id.value, name: name.value }))
+                  ? Option.some(
+                      new Player({
+                        id: id.value,
+                        idIndex,
+                        name: name.value,
+                        nameIndex,
+                      }),
+                    )
                   : Option.none(),
               ),
             ),

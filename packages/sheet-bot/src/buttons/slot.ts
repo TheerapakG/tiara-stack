@@ -12,15 +12,19 @@ import {
   Chunk,
   Effect,
   HashMap,
+  Layer,
   Option,
   Order,
   pipe,
   Ref,
 } from "effect";
 import { observeOnce } from "typhoon-server/signal";
-import { SheetService } from "../services";
-import { ChannelConfigService } from "../services/channelConfigService";
-import { ScheduleService } from "../services/scheduleService";
+import {
+  ChannelConfigService,
+  guildServices,
+  ScheduleService,
+  SheetService,
+} from "../services";
 import {
   buttonInteractionHandlerContextBuilder,
   InteractionContext,
@@ -69,55 +73,61 @@ export const button = buttonInteractionHandlerContextBuilder()
       Effect.bind("interaction", () =>
         InteractionContext.interaction<ButtonInteraction>(),
       ),
-      Effect.bindAll(({ interaction }) => ({
-        messageFlags: Ref.make(
-          new MessageFlagsBitField().add(MessageFlags.Ephemeral),
-        ),
-        serverId: Option.fromNullable(interaction.guildId),
-        channel: Option.fromNullable(interaction.channel),
-      })),
-      Effect.bind("sheetService", ({ serverId }) =>
-        SheetService.ofGuild(serverId),
-      ),
-      Effect.bind("channelConfig", ({ channel }) =>
+      Effect.flatMap(({ interaction }) =>
         pipe(
-          ChannelConfigService.getConfig(channel.id),
-          Effect.flatMap((computed) => observeOnce(computed.value)),
-        ),
-      ),
-      Effect.bind("day", ({ channelConfig }) =>
-        pipe(
-          channelConfig,
-          Array.head,
-          Option.flatMap(({ day }) => Option.fromNullable(day)),
-        ),
-      ),
-      Effect.bind("slotMessage", ({ day, sheetService }) =>
-        pipe(getSlotMessage(day), Effect.provide(sheetService)),
-      ),
-      Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
-      Effect.let("updateButton", () =>
-        new ButtonBuilder()
-          .setCustomId("update")
-          .setLabel("Update")
-          .setStyle(ButtonStyle.Primary),
-      ),
-      Effect.bind("response", ({ day, slotMessage, flags, interaction }) =>
-        Effect.tryPromise(() =>
-          interaction.reply({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle(`Day ${day} Slots~`)
-                .setDescription(
-                  slotMessage === "" ? "All Filled :3" : slotMessage,
-                )
-                .setTimestamp()
-                .setFooter({
-                  text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
-                }),
-            ],
-            flags: flags.bitfield,
-          }),
+          Effect.Do,
+          Effect.bindAll(() => ({
+            messageFlags: Ref.make(
+              new MessageFlagsBitField().add(MessageFlags.Ephemeral),
+            ),
+            channel: Option.fromNullable(interaction.channel),
+          })),
+          Effect.bind("channelConfig", ({ channel }) =>
+            pipe(
+              ChannelConfigService.getConfig(channel.id),
+              Effect.flatMap((computed) => observeOnce(computed.value)),
+            ),
+          ),
+          Effect.bind("day", ({ channelConfig }) =>
+            pipe(
+              channelConfig,
+              Array.head,
+              Option.flatMap(({ day }) => Option.fromNullable(day)),
+            ),
+          ),
+          Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
+          Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
+          Effect.let("updateButton", () =>
+            new ButtonBuilder()
+              .setCustomId("update")
+              .setLabel("Update")
+              .setStyle(ButtonStyle.Primary),
+          ),
+          Effect.bind("response", ({ day, slotMessage, flags }) =>
+            Effect.tryPromise(() =>
+              interaction.reply({
+                embeds: [
+                  new EmbedBuilder()
+                    .setTitle(`Day ${day} Slots~`)
+                    .setDescription(
+                      slotMessage === "" ? "All Filled :3" : slotMessage,
+                    )
+                    .setTimestamp()
+                    .setFooter({
+                      text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
+                    }),
+                ],
+                flags: flags.bitfield,
+              }),
+            ),
+          ),
+          Effect.provide(
+            pipe(
+              Option.fromNullable(interaction.guildId),
+              Effect.map(guildServices),
+              Layer.unwrapEffect,
+            ),
+          ),
         ),
       ),
     ),
