@@ -26,7 +26,7 @@ spec:
             - containerPort: 3000
               name: sheet-apis-svc
             - containerPort: 9464
-              name: sheet-apis-metrics
+              name: sheet-apis-met
           env:
             - name: POSTGRES_URL
               valueFrom:
@@ -50,7 +50,7 @@ spec:
       targetPort: sheet-apis-svc
     - protocol: TCP
       port: 9464
-      targetPort: sheet-apis-metrics
+      targetPort: sheet-apis-met
   selector:
     app: sheet-apis
 ---
@@ -66,4 +66,4 @@ spec:
     matchLabels:
       app: sheet-apis
   endpoints:
-    - port: sheet-apis-metrics
+    - port: sheet-apis-met

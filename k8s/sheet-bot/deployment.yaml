@@ -26,7 +26,7 @@ spec:
             - containerPort: 3000
               name: sheet-bot-svc
             - containerPort: 9464
-              name: sheet-bot-metrics
+              name: sheet-bot-met
           env:
             - name: POSTGRES_URL
               valueFrom:
@@ -68,7 +68,7 @@ spec:
       targetPort: sheet-bot-svc
     - protocol: TCP
       port: 9464
-      targetPort: sheet-bot-metrics
+      targetPort: sheet-bot-met
   selector:
     app: sheet-bot
 ---
@@ -84,4 +84,4 @@ spec:
     matchLabels:
       app: sheet-bot
   endpoints:
-    - port: sheet-bot-metrics
+    - port: sheet-bot-met
