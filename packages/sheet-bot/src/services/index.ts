@@ -1,4 +1,5 @@
 export * from "./channelConfigService";
+export * from "./collection";
 export * from "./guildConfigService";
 export * from "./messageCheckinService";
 export * from "./permissionService";

@@ -17,6 +17,7 @@ import {
   Chunk,
   Effect,
   HashMap,
+  Layer,
   Option,
   Order,
   pipe,
@@ -28,6 +29,7 @@ import { slotButton } from "../../buttons";
 import {
   ChannelConfigService,
   GuildConfigService,
+  guildServices,
   PermissionService,
   ScheduleService,
 } from "../../services";
@@ -100,79 +102,87 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
       Effect.bind("interaction", () =>
         InteractionContext.interaction<ChatInputCommandInteraction>(),
       ),
-      Effect.bindAll(({ interaction }) => ({
-        messageFlags: Ref.make(new MessageFlagsBitField()),
-        day: Effect.try(() => interaction.options.getNumber("day", true)),
-        serverId: pipe(
-          Effect.try(
-            () =>
-              interaction.options.getString("server_id") ?? interaction.guildId,
+      Effect.flatMap(({ interaction }) =>
+        pipe(
+          Effect.Do,
+          Effect.bindAll(() => ({
+            messageFlags: Ref.make(new MessageFlagsBitField()),
+            day: Effect.try(() => interaction.options.getNumber("day", true)),
+            serverId: SheetService.boundGuildId(),
+            messageType: pipe(
+              Effect.try(
+                () =>
+                  interaction.options.getString("message_type") ?? "ephemeral",
+              ),
+              Effect.flatMap(
+                validate(type.enumerated("persistent", "ephemeral")),
+              ),
+            ),
+            user: Effect.succeed(interaction.user),
+          })),
+          Effect.tap(({ serverId }) =>
+            serverId !== interaction.guildId
+              ? PermissionService.checkOwner(interaction)
+              : Effect.void,
           ),
-          Effect.flatMap(Option.fromNullable),
-        ),
-        messageType: pipe(
-          Effect.try(
-            () => interaction.options.getString("message_type") ?? "ephemeral",
-          ),
-          Effect.flatMap(validate(type.enumerated("persistent", "ephemeral"))),
-        ),
-        user: Effect.succeed(interaction.user),
-      })),
-      Effect.tap(({ serverId, interaction }) =>
-        serverId !== interaction.guildId
-          ? PermissionService.checkOwner(interaction)
-          : Effect.void,
-      ),
-      Effect.bind("managerRoles", ({ serverId }) =>
-        serverId
-          ? pipe(
-              GuildConfigService.getManagerRoles(serverId),
-              Effect.flatMap((computed) => observeOnce(computed.value)),
-            )
-          : Effect.succeed([]),
-      ),
-      Effect.tap(({ messageType, managerRoles, interaction }) =>
-        messageType !== "ephemeral"
-          ? PermissionService.checkRoles(
-              interaction,
-              managerRoles.map((role) => role.roleId),
-              "You can only make persistent messages as a manager",
-            )
-          : Effect.void,
-      ),
-      Effect.tap(({ messageType, messageFlags }) =>
-        messageType === "ephemeral"
-          ? Ref.update(messageFlags, (flags) =>
-              flags.add(MessageFlags.Ephemeral),
-            )
-          : Effect.void,
-      ),
-      Effect.bind("sheetService", ({ serverId }) =>
-        SheetService.ofGuild(serverId),
-      ),
-      Effect.bind("slotMessage", ({ day, sheetService }) =>
-        pipe(getSlotMessage(day), Effect.provide(sheetService)),
-      ),
-      Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
-      Effect.bind("response", ({ day, slotMessage, flags, interaction }) =>
-        Effect.tryPromise(() =>
-          interaction.reply({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle(`Day ${day} Slots~`)
-                .setDescription(
-                  slotMessage === "" ? "All Filled :3" : slotMessage,
+          Effect.bind("managerRoles", ({ serverId }) =>
+            serverId
+              ? pipe(
+                  GuildConfigService.getManagerRoles(serverId),
+                  Effect.flatMap((computed) => observeOnce(computed.value)),
                 )
-                .setTimestamp()
-                .setFooter({
-                  text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
-                }),
-            ],
-            flags: flags.bitfield,
-          }),
+              : Effect.succeed([]),
+          ),
+          Effect.tap(({ messageType, managerRoles }) =>
+            messageType !== "ephemeral"
+              ? PermissionService.checkRoles(
+                  interaction,
+                  managerRoles.map((role) => role.roleId),
+                  "You can only make persistent messages as a manager",
+                )
+              : Effect.void,
+          ),
+          Effect.tap(({ messageType, messageFlags }) =>
+            messageType === "ephemeral"
+              ? Ref.update(messageFlags, (flags) =>
+                  flags.add(MessageFlags.Ephemeral),
+                )
+              : Effect.void,
+          ),
+          Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
+          Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
+          Effect.bind("response", ({ day, slotMessage, flags }) =>
+            Effect.tryPromise(() =>
+              interaction.reply({
+                embeds: [
+                  new EmbedBuilder()
+                    .setTitle(`Day ${day} Slots~`)
+                    .setDescription(
+                      slotMessage === "" ? "All Filled :3" : slotMessage,
+                    )
+                    .setTimestamp()
+                    .setFooter({
+                      text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
+                    }),
+                ],
+                flags: flags.bitfield,
+              }),
+            ),
+          ),
+          Effect.provide(
+            pipe(
+              Effect.try(
+                () =>
+                  interaction.options.getString("server_id") ??
+                  interaction.guildId,
+              ),
+              Effect.flatMap(Option.fromNullable),
+              Effect.map(guildServices),
+              Layer.unwrapEffect,
+            ),
+          ),
         ),
       ),
-      Effect.asVoid,
     ),
   )
   .build();

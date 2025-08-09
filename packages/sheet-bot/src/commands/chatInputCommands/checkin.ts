@@ -11,12 +11,13 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, Cause, Effect, HashMap, Option, pipe } from "effect";
+import { Array, Cause, Effect, HashMap, Layer, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import { checkinButton } from "../../buttons";
 import {
   emptySchedule,
   GuildConfigService,
+  guildServices,
   MessageCheckinService,
   PermissionService,
   PlayerService,
@@ -136,155 +137,147 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
           interaction.deferReply({ flags: MessageFlags.Ephemeral }),
         ),
       ),
-      Effect.bindAll(({ interaction }) => ({
-        hourOption: pipe(
-          Effect.try(() => interaction.options.getNumber("hour")),
-          Effect.map(Option.fromNullable),
-        ),
-        channelName: pipe(
-          Effect.try(() => interaction.options.getString("channel_name", true)),
-        ),
-        channel: pipe(interaction.channel, Option.fromNullable),
-        serverId: pipe(
-          Effect.try(
-            () =>
-              interaction.options.getString("server_id") ?? interaction.guildId,
-          ),
-          Effect.flatMap(Option.fromNullable),
-        ),
-        user: Effect.succeed(interaction.user),
-      })),
-      Effect.tap(({ serverId, interaction }) =>
-        serverId !== interaction.guildId
-          ? PermissionService.checkOwner(interaction)
-          : Effect.void,
-      ),
-      Effect.bind("managerRoles", ({ serverId }) =>
-        serverId
-          ? pipe(
-              GuildConfigService.getManagerRoles(serverId),
-              Effect.flatMap((computed) => observeOnce(computed.value)),
-            )
-          : Effect.succeed([]),
-      ),
-      Effect.tap(({ managerRoles, interaction }) =>
-        PermissionService.checkRoles(
-          interaction,
-          managerRoles.map((role) => role.roleId),
-          "You can only check in users as a manager",
-        ),
-      ),
-      Effect.bind("sheetService", ({ serverId }) =>
-        SheetService.ofGuild(serverId),
-      ),
-      Effect.bind("eventConfig", ({ sheetService }) =>
-        pipe(SheetService.getEventConfig(), Effect.provide(sheetService)),
-      ),
-      Effect.let("hour", ({ hourOption, eventConfig }) =>
+      Effect.flatMap(({ interaction }) =>
         pipe(
-          hourOption,
-          Option.getOrElse(() =>
-            Math.floor(
-              (pipe(new Date(), addMinutes(20), getUnixTime) -
-                eventConfig.startTime) /
-                3600 +
-                1,
+          Effect.Do,
+          Effect.bindAll(() => ({
+            hourOption: pipe(
+              Effect.try(() => interaction.options.getNumber("hour")),
+              Effect.map(Option.fromNullable),
             ),
-          ),
-        ),
-      ),
-      Effect.bind(
-        "checkinData",
-        ({ hour, channelName, serverId, sheetService }) =>
-          pipe(
-            getCheckinData({ hour, channelName, serverId }),
-            Effect.provide(sheetService),
-          ),
-      ),
-      Effect.bind("fillIds", ({ checkinData, sheetService }) =>
-        pipe(
-          checkinData.schedule.fills,
-          Array.map(Option.fromNullable),
-          Array.getSomes,
-          Effect.forEach((playerName) =>
-            pipe(
-              PlayerService.getByName(playerName),
-              Effect.provide(sheetService),
+            channelName: pipe(
+              Effect.try(() =>
+                interaction.options.getString("channel_name", true),
+              ),
             ),
+            channel: pipe(interaction.channel, Option.fromNullable),
+            serverId: SheetService.boundGuildId(),
+            user: Effect.succeed(interaction.user),
+          })),
+          Effect.tap(({ serverId }) =>
+            serverId !== interaction.guildId
+              ? PermissionService.checkOwner(interaction)
+              : Effect.void,
           ),
-          Effect.map(Array.getSomes),
-          Effect.map(Array.map((p) => p.id)),
-        ),
-      ),
-      Effect.bind("checkinMessages", ({ checkinData, sheetService }) =>
-        pipe(getCheckinMessages(checkinData), Effect.provide(sheetService)),
-      ),
-      Effect.tap(
-        ({
-          hour,
-          checkinData,
-          fillIds,
-          checkinMessages,
-          channel,
-          interaction,
-        }) =>
-          pipe(
-            channel.isSendable()
-              ? Effect.tryPromise<Message<boolean>>(() =>
-                  channel.send({
-                    content: checkinMessages.checkinMessage,
-                    components: checkinData.runningChannel.roleId
-                      ? [
-                          new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                            new ButtonBuilder(checkinButton.data),
-                          ),
-                        ]
-                      : [],
-                  }),
+          Effect.bind("managerRoles", ({ serverId }) =>
+            serverId
+              ? pipe(
+                  GuildConfigService.getManagerRoles(serverId),
+                  Effect.flatMap((computed) => observeOnce(computed.value)),
                 )
-              : (Effect.fail(
-                  "Cannot send message to this channel",
-                ) as Effect.Effect<
-                  Message<boolean>,
-                  string | Cause.UnknownException,
-                  never
-                >),
-            Effect.tap((message) =>
-              checkinData.runningChannel.roleId
-                ? pipe(
-                    Effect.all(
-                      [
-                        MessageCheckinService.upsertMessageCheckinData(
-                          message.id,
-                          {
-                            initialMessage: checkinMessages.checkinMessage,
-                            hour,
-                            roleId: checkinData.runningChannel.roleId,
-                          },
-                        ),
-                        Array.isEmptyArray(fillIds)
-                          ? Effect.void
-                          : MessageCheckinService.addMessageCheckinMembers(
-                              message.id,
-                              fillIds,
-                            ),
-                      ],
-                      { concurrency: "unbounded" },
-                    ),
-                    Effect.asVoid,
-                  )
-                : Effect.void,
+              : Effect.succeed([]),
+          ),
+          Effect.tap(({ managerRoles }) =>
+            PermissionService.checkRoles(
+              interaction,
+              managerRoles.map((role) => role.roleId),
+              "You can only check in users as a manager",
             ),
-            Effect.andThen(() =>
-              Effect.tryPromise(() =>
-                interaction.editReply({
-                  content: checkinMessages.emptySlotsMessage,
-                }),
+          ),
+          Effect.bind("eventConfig", () => SheetService.getEventConfig()),
+          Effect.let("hour", ({ hourOption, eventConfig }) =>
+            pipe(
+              hourOption,
+              Option.getOrElse(() =>
+                Math.floor(
+                  (pipe(new Date(), addMinutes(20), getUnixTime) -
+                    eventConfig.startTime) /
+                    3600 +
+                    1,
+                ),
               ),
             ),
           ),
+          Effect.bind("checkinData", ({ hour, channelName, serverId }) =>
+            getCheckinData({ hour, channelName, serverId }),
+          ),
+          Effect.bind("fillIds", ({ checkinData }) =>
+            pipe(
+              checkinData.schedule.fills,
+              Array.map(Option.fromNullable),
+              Array.getSomes,
+              Effect.forEach((playerName) =>
+                PlayerService.getByName(playerName),
+              ),
+              Effect.map(Array.getSomes),
+              Effect.map(Array.map((p) => p.id)),
+            ),
+          ),
+          Effect.bind("checkinMessages", ({ checkinData }) =>
+            getCheckinMessages(checkinData),
+          ),
+          Effect.tap(
+            ({ hour, checkinData, fillIds, checkinMessages, channel }) =>
+              pipe(
+                channel.isSendable()
+                  ? Effect.tryPromise<Message<boolean>>(() =>
+                      channel.send({
+                        content: checkinMessages.checkinMessage,
+                        components: checkinData.runningChannel.roleId
+                          ? [
+                              new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                                new ButtonBuilder(checkinButton.data),
+                              ),
+                            ]
+                          : [],
+                      }),
+                    )
+                  : (Effect.fail(
+                      "Cannot send message to this channel",
+                    ) as Effect.Effect<
+                      Message<boolean>,
+                      string | Cause.UnknownException,
+                      never
+                    >),
+                Effect.tap((message) =>
+                  checkinData.runningChannel.roleId
+                    ? pipe(
+                        Effect.all(
+                          [
+                            MessageCheckinService.upsertMessageCheckinData(
+                              message.id,
+                              {
+                                initialMessage: checkinMessages.checkinMessage,
+                                hour,
+                                roleId: checkinData.runningChannel.roleId,
+                              },
+                            ),
+                            Array.isEmptyArray(fillIds)
+                              ? Effect.void
+                              : MessageCheckinService.addMessageCheckinMembers(
+                                  message.id,
+                                  fillIds,
+                                ),
+                          ],
+                          { concurrency: "unbounded" },
+                        ),
+                        Effect.asVoid,
+                      )
+                    : Effect.void,
+                ),
+                Effect.andThen(() =>
+                  Effect.tryPromise(() =>
+                    interaction.editReply({
+                      content: checkinMessages.emptySlotsMessage,
+                    }),
+                  ),
+                ),
+              ),
+          ),
+          Effect.provide(
+            pipe(
+              Effect.try(
+                () =>
+                  interaction.options.getString("server_id") ??
+                  interaction.guildId,
+              ),
+              Effect.flatMap(Option.fromNullable),
+              Effect.map(guildServices),
+              Layer.unwrapEffect,
+            ),
+          ),
+        ),
       ),
-      Effect.asVoid,
     ),
   )
   .build();

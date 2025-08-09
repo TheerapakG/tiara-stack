@@ -10,15 +10,7 @@ import { commands } from "./commands";
 import { Config } from "./config";
 import { DB } from "./db";
 import { GoogleLive } from "./google";
-import {
-  ChannelConfigService,
-  GuildConfigService,
-  MessageCheckinService,
-  PermissionService,
-  PlayerService,
-  ScheduleService,
-  SheetConfigService,
-} from "./services";
+import { botServices } from "./services";
 
 const NodeSdkLive = NodeSdk.layer(() => ({
   resource: { serviceName: "sheet-bot" },
@@ -27,20 +19,11 @@ const NodeSdkLive = NodeSdk.layer(() => ({
 }));
 
 const layer = pipe(
-  Layer.mergeAll(ScheduleService.Default, PlayerService.Default),
-  Layer.provideMerge(
-    Layer.mergeAll(
-      GuildConfigService.DefaultWithoutDependencies,
-      ChannelConfigService.DefaultWithoutDependencies,
-      SheetConfigService.DefaultWithoutDependencies,
-      MessageCheckinService.DefaultWithoutDependencies,
-    ),
-  ),
+  botServices,
   Layer.provideMerge(DBSubscriptionContext.Default),
   Layer.provideMerge(DB.DefaultWithoutDependencies),
   Layer.provideMerge(GoogleLive),
   Layer.provideMerge(Config.Default),
-  Layer.provideMerge(PermissionService.Default),
 );
 
 await Effect.runPromise(

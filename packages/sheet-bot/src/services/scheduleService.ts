@@ -24,7 +24,8 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
   {
     effect: pipe(
       Effect.Do,
-      Effect.map(() => ({
+      Effect.bind("playerService", () => PlayerService),
+      Effect.map(({ playerService }) => ({
         formatEmptySlots: (
           start: number,
           { hour, breakHour, empty }: Schedule,
@@ -59,7 +60,7 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
             Effect.bind("fillsPlayers", ({ fills }) =>
               Effect.forEach(fills, (player) =>
                 pipe(
-                  PlayerService.getByName(player),
+                  playerService.getByName(player),
                   Effect.map(
                     Option.match({
                       onSome: (p) => userMention(p.id),
@@ -72,7 +73,7 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
             Effect.bind("prevFillsPlayers", ({ prevFills }) =>
               Effect.forEach(prevFills, (player) =>
                 pipe(
-                  PlayerService.getByName(player),
+                  playerService.getByName(player),
                   Effect.map(
                     Option.match({
                       onSome: (p) => userMention(p.id),
