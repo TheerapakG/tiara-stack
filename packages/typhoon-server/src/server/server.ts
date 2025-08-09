@@ -935,7 +935,7 @@ export class Server<
                 (buffer) =>
                   Effect.sync(
                     () =>
-                      new Response(buffer, {
+                      new Response(new Blob([buffer]).stream(), {
                         status: 200,
                         headers: {
                           "content-type": "application/octet-stream",
