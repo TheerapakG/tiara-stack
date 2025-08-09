@@ -12,9 +12,13 @@ import { DB } from "./db";
 import { GoogleLive } from "./google";
 import { botServices } from "./services";
 
-const NodeSdkLive = NodeSdk.layer(() => ({
+const TracesLive = NodeSdk.layer(() => ({
   resource: { serviceName: "sheet-bot" },
   spanProcessor: new BatchSpanProcessor(new OTLPTraceExporter()),
+}));
+
+const MetricsLive = NodeSdk.layer(() => ({
+  resource: { serviceName: "sheet-bot" },
   metricReader: new PrometheusExporter(),
 }));
 
@@ -32,7 +36,7 @@ await Effect.runPromise(
     Effect.bind("bot", () =>
       pipe(
         Bot.create(layer),
-        Effect.map(Bot.withTraceProvider(NodeSdkLive)),
+        Effect.map(Bot.withTraceProvider(TracesLive)),
         Effect.flatMap(Bot.registerProcessHandlers),
         Effect.flatMap(Bot.addChatInputCommandHandlerMap(commands)),
         Effect.flatMap(Bot.addButtonInteractionHandlerMap(buttons)),
@@ -40,6 +44,7 @@ await Effect.runPromise(
     ),
     Effect.flatMap(({ bot }) => Bot.login(bot)),
     Effect.provide(layer),
+    Effect.provide(MetricsLive),
     Effect.provide(Logger.logFmt),
   ),
 );

@@ -1111,6 +1111,8 @@ export const serve =
           },
         });
       }),
+      // TODO: actual server closing method
+      Effect.flatMap(() => Effect.makeLatch(false)),
     );
   };
 
