@@ -92,7 +92,12 @@ export class Server<
     subscriptionHandlerMap: SubscriptionHandlerMap<R>;
     mutationHandlerMap: MutationHandlerMap<R>;
     peerStateMapRef: SynchronizedRef.SynchronizedRef<PeerStateMap>;
-    peerCount: Metric.Metric.Gauge<bigint>;
+    peerActive: Metric.Metric.Gauge<bigint>;
+    peerTotal: Metric.Metric.Counter<bigint>;
+    subscribeTotal: Metric.Metric.Counter<bigint>;
+    unsubscribeTotal: Metric.Metric.Counter<bigint>;
+    onceTotal: Metric.Metric.Counter<bigint>;
+    mutationTotal: Metric.Metric.Counter<bigint>;
     layer: Layer.Layer<R, unknown>;
     runtime: SynchronizedRef.SynchronizedRef<
       Option.Option<ManagedRuntime.ManagedRuntime<R, unknown>>
@@ -131,10 +136,46 @@ export class Server<
               }
             >(),
           ),
-          peerCount: Effect.succeed(
-            Metric.gauge("peer_count", {
-              description: "The number of peers connected to the server",
+          peerActive: Effect.succeed(
+            Metric.gauge("typhoon_server_peer_active", {
+              description:
+                "The number of peers currently connected to the server",
               bigint: true,
+            }),
+          ),
+          peerTotal: Effect.succeed(
+            Metric.counter("typhoon_server_peer_total", {
+              description: "The total number of peers connected to the server",
+              bigint: true,
+              incremental: true,
+            }),
+          ),
+          subscribeTotal: Effect.succeed(
+            Metric.counter("typhoon_server_subscribe_total", {
+              description: "The total number of subscribe events",
+              bigint: true,
+              incremental: true,
+            }),
+          ),
+          unsubscribeTotal: Effect.succeed(
+            Metric.counter("typhoon_server_unsubscribe_total", {
+              description: "The total number of unsubscribe events",
+              bigint: true,
+              incremental: true,
+            }),
+          ),
+          onceTotal: Effect.succeed(
+            Metric.counter("typhoon_server_once_total", {
+              description: "The total number of once events",
+              bigint: true,
+              incremental: true,
+            }),
+          ),
+          mutationTotal: Effect.succeed(
+            Metric.counter("typhoon_server_mutation_total", {
+              description: "The total number of mutation events",
+              bigint: true,
+              incremental: true,
             }),
           ),
           layer: Effect.succeed(layer),
@@ -256,8 +297,9 @@ export class Server<
           }),
         ),
         Effect.tap((peerStateMap) =>
-          server.peerCount(Effect.succeed(BigInt(HashMap.size(peerStateMap)))),
+          server.peerActive(Effect.succeed(BigInt(HashMap.size(peerStateMap)))),
         ),
+        Effect.tap(() => server.peerTotal(Effect.succeed(BigInt(1)))),
         Effect.asVoid,
         Effect.withSpan("Server.open", {
           captureStackTrace: true,
@@ -294,7 +336,7 @@ export class Server<
           }),
         ),
         Effect.tap((peerStateMap) =>
-          server.peerCount(Effect.succeed(BigInt(HashMap.size(peerStateMap)))),
+          server.peerActive(Effect.succeed(BigInt(HashMap.size(peerStateMap)))),
         ),
         Effect.asVoid,
         Effect.withSpan("Server.close", {
@@ -498,101 +540,6 @@ export class Server<
     );
   }
 
-  private static runBoundedEventHandler<R = never>(
-    subscriptionId: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    subscriptionHandlerContext: SubscriptionHandlerContext<any, R>,
-    nonce: Nonce,
-  ) {
-    return pipe(
-      Effect.Do,
-      Effect.bind("update", () =>
-        Effect.exit(
-          pipe(
-            subscriptionHandlerContext.handler,
-            Effect.scoped,
-            Effect.withSpan(
-              `subscriptionHandler:${subscriptionHandlerContext.config.name}`,
-              {
-                captureStackTrace: true,
-              },
-            ),
-          ),
-        ),
-      ),
-      Effect.bind("nonce", () => Nonce.getAndIncrement(nonce)),
-      Effect.let(
-        "header",
-        ({ update, nonce }) =>
-          ({
-            protocol: "typh",
-            version: 1,
-            id: subscriptionId,
-            action: "server:update",
-            payload: {
-              success: Exit.isSuccess(update),
-              nonce,
-            },
-          }) as const,
-      ),
-      Effect.let("message", ({ update }) =>
-        pipe(
-          update,
-          Exit.match({
-            onSuccess: (value) => value,
-            onFailure: (cause) => pipe(cause, Cause.squash),
-          }),
-        ),
-      ),
-      Effect.map(({ header, message }) => ({
-        header,
-        message,
-      })),
-      Effect.withSpan("Server.runBoundedEventHandler", {
-        captureStackTrace: true,
-      }),
-    );
-  }
-
-  private static runBoundedEncodedEventHandler<R = never>(
-    subscriptionId: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    subscriptionHandlerContext: SubscriptionHandlerContext<any, R>,
-    nonce: Nonce,
-  ) {
-    return pipe(
-      Server.runBoundedEventHandler(
-        subscriptionId,
-        subscriptionHandlerContext,
-        nonce,
-      ),
-      Effect.bind("updateHeader", ({ header }) =>
-        HeaderEncoderDecoder.encode(header),
-      ),
-      Effect.bind("updateHeaderEncoded", ({ updateHeader }) =>
-        MsgpackEncoderDecoder.encode(updateHeader),
-      ),
-      Effect.bind("updateMessageEncoded", ({ message }) =>
-        MsgpackEncoderDecoder.encode(message),
-      ),
-      Effect.let(
-        "updateBuffer",
-        ({ updateHeaderEncoded, updateMessageEncoded }) => {
-          const updateBuffer = new Uint8Array(
-            updateHeaderEncoded.length + updateMessageEncoded.length,
-          );
-          updateBuffer.set(updateHeaderEncoded, 0);
-          updateBuffer.set(updateMessageEncoded, updateHeaderEncoded.length);
-          return updateBuffer;
-        },
-      ),
-      Effect.map(({ updateBuffer }) => updateBuffer),
-      Effect.withSpan("Server.runBoundedEncodedEventHandler", {
-        captureStackTrace: true,
-      }),
-    );
-  }
-
   static handleSubscribe(
     peer: Peer,
     pullDecodedStream: Effect.Effect<
@@ -604,119 +551,140 @@ export class Server<
     scope: Scope.CloseableScope,
   ) {
     return <R = never>(server: Server<R>) =>
-      Server.updatePeerSubscriptionState(peer, header.id, (subscriptionState) =>
-        pipe(
-          subscriptionState,
-          Option.match({
-            onSome: ({ event, effectCleanup, nonce }) =>
+      pipe(
+        server.subscribeTotal(Effect.succeed(BigInt(1))),
+        Effect.andThen(() =>
+          Server.updatePeerSubscriptionState(
+            peer,
+            header.id,
+            (subscriptionState) =>
               pipe(
-                Event.replaceStreamContext({
-                  pullStream: pullDecodedStream,
-                  request: peer.request,
-                  scope,
-                }),
-                Effect.map((event) => ({
-                  event,
-                  effectCleanup,
-                  nonce,
-                })),
-                Effect.option,
-                Effect.provideService(Event, event),
-              ),
-            onNone: () =>
-              pipe(
-                Effect.Do,
-                Effect.let("event", () =>
-                  Event.fromPullStreamContext({
-                    pullStream: pullDecodedStream,
-                    request: peer.request,
-                    scope,
-                  }),
-                ),
-                Effect.bind("handlerContext", () =>
-                  HashMap.get(
-                    server.subscriptionHandlerMap,
-                    header.payload.handler,
-                  ),
-                ),
-                Effect.bind("nonce", () => Nonce.make()),
-                Effect.bind("computedBuffer", ({ handlerContext, nonce }) =>
-                  Server.getComputedSubscriptionResultEncoded(
-                    header.id,
-                    handlerContext,
-                    nonce,
-                  ),
-                ),
-                Effect.bind("providedComputedBuffer", ({ computedBuffer }) =>
-                  computed(
+                subscriptionState,
+                Option.match({
+                  onSome: ({ event, effectCleanup, nonce }) =>
                     pipe(
-                      SynchronizedRef.get(server.runtime),
-                      Effect.flatMap(
-                        Option.match({
-                          onSome: (runtime) =>
-                            pipe(computedBuffer.value, Effect.provide(runtime)),
-                          onNone: () =>
-                            Effect.fail("scope layer not initialized"),
+                      Event.replaceStreamContext({
+                        pullStream: pullDecodedStream,
+                        request: peer.request,
+                        scope,
+                      }),
+                      Effect.map((event) => ({
+                        event,
+                        effectCleanup,
+                        nonce,
+                      })),
+                      Effect.option,
+                      Effect.provideService(Event, event),
+                    ),
+                  onNone: () =>
+                    pipe(
+                      Effect.Do,
+                      Effect.let("event", () =>
+                        Event.fromPullStreamContext({
+                          pullStream: pullDecodedStream,
+                          request: peer.request,
+                          scope,
+                        }),
+                      ),
+                      Effect.bind("handlerContext", () =>
+                        HashMap.get(
+                          server.subscriptionHandlerMap,
+                          header.payload.handler,
+                        ),
+                      ),
+                      Effect.bind("nonce", () => Nonce.make()),
+                      Effect.bind(
+                        "computedBuffer",
+                        ({ handlerContext, nonce }) =>
+                          Server.getComputedSubscriptionResultEncoded(
+                            header.id,
+                            handlerContext,
+                            nonce,
+                          ),
+                      ),
+                      Effect.bind(
+                        "providedComputedBuffer",
+                        ({ computedBuffer }) =>
+                          computed(
+                            pipe(
+                              SynchronizedRef.get(server.runtime),
+                              Effect.flatMap(
+                                Option.match({
+                                  onSome: (runtime) =>
+                                    pipe(
+                                      computedBuffer.value,
+                                      Effect.provide(runtime),
+                                    ),
+                                  onNone: () =>
+                                    Effect.fail("scope layer not initialized"),
+                                }),
+                              ),
+                            ),
+                          ),
+                      ),
+                      Effect.bind(
+                        "effectCleanup",
+                        ({ event, providedComputedBuffer }) =>
+                          effect(
+                            pipe(
+                              providedComputedBuffer.value,
+                              Effect.tap((buffer) =>
+                                peer.send(buffer, {
+                                  compress: true,
+                                }),
+                              ),
+                              Effect.provideService(Event, event),
+                            ),
+                          ),
+                      ),
+                      Effect.map(({ event, effectCleanup, nonce }) =>
+                        Option.some({
+                          event,
+                          effectCleanup,
+                          nonce,
                         }),
                       ),
                     ),
-                  ),
-                ),
-                Effect.bind(
-                  "effectCleanup",
-                  ({ event, providedComputedBuffer }) =>
-                    effect(
-                      pipe(
-                        providedComputedBuffer.value,
-                        Effect.tap((buffer) =>
-                          peer.send(buffer, {
-                            compress: true,
-                          }),
-                        ),
-                        Effect.provideService(Event, event),
-                      ),
-                    ),
-                ),
-                Effect.map(({ event, effectCleanup, nonce }) =>
-                  Option.some({
-                    event,
-                    effectCleanup,
-                    nonce,
-                  }),
-                ),
+                }),
+                Effect.withSpan("Server.handleSubscribe", {
+                  captureStackTrace: true,
+                }),
               ),
-          }),
-          Effect.withSpan("Server.handleSubscribe", {
-            captureStackTrace: true,
-          }),
+          )(server),
         ),
-      )(server);
+      );
   }
 
   static handleUnsubscribe(peer: Peer, header: Header<"client:unsubscribe">) {
-    return Server.updatePeerSubscriptionState(
-      peer,
-      header.id,
-      (subscriptionState) =>
-        pipe(
-          Effect.succeed(subscriptionState),
-          Effect.flatMap((subscriptionState) =>
-            pipe(
-              subscriptionState,
-              Option.match({
-                onSome: ({ event, effectCleanup }) =>
+    return <R = never>(server: Server<R>) =>
+      pipe(
+        server.unsubscribeTotal(Effect.succeed(BigInt(1))),
+        Effect.andThen(() =>
+          Server.updatePeerSubscriptionState(
+            peer,
+            header.id,
+            (subscriptionState) =>
+              pipe(
+                Effect.succeed(subscriptionState),
+                Effect.flatMap((subscriptionState) =>
                   pipe(
-                    effectCleanup,
-                    Effect.andThen(Event.close()),
-                    Effect.provideService(Event, event),
-                    Effect.as(Option.none()),
+                    subscriptionState,
+                    Option.match({
+                      onSome: ({ event, effectCleanup }) =>
+                        pipe(
+                          effectCleanup,
+                          Effect.andThen(Event.close()),
+                          Effect.provideService(Event, event),
+                          Effect.as(Option.none()),
+                        ),
+                      onNone: () => Effect.succeed(Option.none()),
+                    }),
                   ),
-                onNone: () => Effect.succeed(Option.none()),
-              }),
-            ),
-          ),
+                ),
+              ),
+          )(server),
         ),
-    );
+      );
   }
 
   static handleOnce<A, E = never>(
@@ -733,6 +701,7 @@ export class Server<
     return <R = never>(server: Server<R>) =>
       pipe(
         Effect.Do,
+        Effect.tap(() => server.onceTotal(Effect.succeed(BigInt(1)))),
         Effect.let("event", () =>
           Event.fromPullStreamContext({
             pullStream: pullDecodedStream,
@@ -796,6 +765,7 @@ export class Server<
     return <R = never>(server: Server<R>) =>
       pipe(
         Effect.Do,
+        Effect.tap(() => server.mutationTotal(Effect.succeed(BigInt(1)))),
         Effect.let("event", () =>
           Event.fromPullStreamContext({
             pullStream: pullDecodedStream,
