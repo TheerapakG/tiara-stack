@@ -45,10 +45,12 @@ metadata:
   name: sheet-apis-service
 spec:
   ports:
-    - protocol: TCP
+    - name: sheet-apis-svc
+      protocol: TCP
       port: 80
       targetPort: sheet-apis-svc
-    - protocol: TCP
+    - name: sheet-apis-met
+      protocol: TCP
       port: 9464
       targetPort: sheet-apis-met
   selector:

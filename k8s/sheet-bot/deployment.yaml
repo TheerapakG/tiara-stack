@@ -63,10 +63,12 @@ metadata:
   name: sheet-bot-service
 spec:
   ports:
-    - protocol: TCP
+    - name: sheet-bot-svc
+      protocol: TCP
       port: 80
       targetPort: sheet-bot-svc
-    - protocol: TCP
+    - name: sheet-bot-met
+      protocol: TCP
       port: 9464
       targetPort: sheet-bot-met
   selector:
