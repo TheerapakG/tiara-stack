@@ -9,11 +9,14 @@ import {
   Events,
   GatewayIntentBits,
   Interaction,
+  InteractionButtonComponentData,
   InteractionResponse,
   InteractionType,
   Message,
   MessageComponentInteraction,
   MessageFlags,
+  SharedSlashCommand,
+  SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 import {
   Cause,
@@ -35,7 +38,7 @@ import {
   chatInputCommandHandlerMap,
   ChatInputCommandHandlerMap,
   InteractionContext,
-  InteractionHandlerMap,
+  InteractionHandlerMapWithMetrics,
 } from "../types";
 
 export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
@@ -43,10 +46,18 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
   readonly loginLatch: Effect.Latch;
   readonly loginSemaphore: Effect.Semaphore;
   readonly chatInputCommandsMap: SynchronizedRef.SynchronizedRef<
-    ChatInputCommandHandlerMap<E, R>
+    InteractionHandlerMapWithMetrics<
+      SharedSlashCommand | SlashCommandSubcommandsOnlyBuilder,
+      E,
+      R | InteractionContext<ChatInputCommandInteraction>
+    >
   >;
   readonly buttonsMap: SynchronizedRef.SynchronizedRef<
-    ButtonInteractionHandlerMap<E, R>
+    InteractionHandlerMapWithMetrics<
+      InteractionButtonComponentData,
+      E,
+      R | InteractionContext<ButtonInteraction>
+    >
   >;
   readonly traceProvider: Layer.Layer<never>;
   readonly layer: Layer.Layer<R, E>;
@@ -70,9 +81,9 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
             Option.map((runtime) =>
               pipe(
                 chatInputCommandsMap,
-                InteractionHandlerMap.get(interaction.commandName),
-                Option.map((command) => command.handler),
-                Option.getOrElse(() => Effect.void),
+                InteractionHandlerMapWithMetrics.execute(
+                  interaction.commandName,
+                ),
                 Effect.provide(runtime),
                 Effect.provide(InteractionContext.make(interaction)),
               ),
@@ -139,9 +150,7 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
             Option.map((runtime) =>
               pipe(
                 buttonsMap,
-                InteractionHandlerMap.get(interaction.customId),
-                Option.map((command) => command.handler),
-                Option.getOrElse(() => Effect.void),
+                InteractionHandlerMapWithMetrics.execute(interaction.customId),
                 Effect.provide(runtime),
                 Effect.provide(InteractionContext.make(interaction)),
               ),
@@ -218,16 +227,22 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
           loginLatch: Effect.makeLatch(false),
           loginSemaphore: Effect.makeSemaphore(1),
           chatInputCommandsMap: SynchronizedRef.make(
-            chatInputCommandHandlerMap<
-              E,
-              R | InteractionContext<ChatInputCommandInteraction>
-            >(),
+            InteractionHandlerMapWithMetrics.make(
+              "chat_input_command",
+              chatInputCommandHandlerMap<
+                E,
+                R | InteractionContext<ChatInputCommandInteraction>
+              >(),
+            ),
           ),
           buttonsMap: SynchronizedRef.make(
-            buttonInteractionHandlerMap<
-              E,
-              R | InteractionContext<ButtonInteraction>
-            >(),
+            InteractionHandlerMapWithMetrics.make(
+              "button",
+              buttonInteractionHandlerMap<
+                E,
+                R | InteractionContext<ButtonInteraction>
+              >(),
+            ),
           ),
           traceProvider: Effect.succeed(Layer.empty),
           layer: Effect.succeed(layer),
@@ -316,7 +331,7 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(
             bot.chatInputCommandsMap,
-            InteractionHandlerMap.add(command),
+            InteractionHandlerMapWithMetrics.add(command),
           ),
         ),
         Effect.map(({ bot }) => bot),
@@ -333,7 +348,7 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(
             bot.chatInputCommandsMap,
-            InteractionHandlerMap.union(commands),
+            InteractionHandlerMapWithMetrics.union(commands),
           ),
         ),
         Effect.map(({ bot }) => bot),
@@ -350,7 +365,7 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(
             bot.buttonsMap,
-            InteractionHandlerMap.add(button),
+            InteractionHandlerMapWithMetrics.add(button),
           ),
         ),
         Effect.map(({ bot }) => bot),
@@ -367,7 +382,7 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(
             bot.buttonsMap,
-            InteractionHandlerMap.union(buttons),
+            InteractionHandlerMapWithMetrics.union(buttons),
           ),
         ),
         Effect.map(({ bot }) => bot),
