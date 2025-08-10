@@ -4,7 +4,7 @@ import { REST, Routes } from "discord.js";
 import { Chunk, Effect, pipe, Stream } from "effect";
 import { validate } from "typhoon-core/schema";
 import { commands } from "./commands/chatInputCommands";
-import { ChatInputCommandHandlerMap } from "./types/handler";
+import { InteractionHandlerMap } from "./types/handler";
 
 await loadConfig({ dotenv: true });
 
@@ -27,7 +27,7 @@ await Effect.runPromise(
     Effect.let("rest", ({ env }) => new REST().setToken(env.discordToken)),
     Effect.bind("commands", () =>
       pipe(
-        Stream.fromIterable(ChatInputCommandHandlerMap.values(commands)),
+        Stream.fromIterable(InteractionHandlerMap.values(commands)),
         Stream.map((command) => command.data.toJSON()),
         Stream.runCollect,
         Effect.map(Chunk.toArray),
