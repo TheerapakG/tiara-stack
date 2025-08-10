@@ -1,6 +1,5 @@
 import {
   bold,
-  channelMention,
   escapeMarkdown,
   time,
   TimestampStyles,
@@ -39,7 +38,7 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
             empty > 1 ? "s" : ""
           })`,
         formatCheckIn: ({
-          channelId,
+          channelName,
           startTime,
           prevSchedule,
           schedule,
@@ -47,7 +46,7 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
           startTime: number;
           prevSchedule: Schedule;
           schedule: Schedule;
-          channelId: string;
+          channelName: string;
         }) => {
           return pipe(
             Effect.Do,
@@ -90,7 +89,7 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
                   pipe(HashSet.fromIterable(prevFillsPlayers)),
                 ),
               );
-              return `${HashSet.toValues(newPlayerMentions).join(" ")} React to this message to check in, and head to ${channelMention(channelId)} for ${bold(`hour ${schedule.hour}`)} ${time(startTime + (schedule.hour - 1) * 3600, TimestampStyles.RelativeTime)}`;
+              return `${HashSet.toValues(newPlayerMentions).join(" ")} React to this message to check in, and head to ${channelName} for ${bold(`hour ${schedule.hour}`)} ${time(startTime + (schedule.hour - 1) * 3600, TimestampStyles.RelativeTime)}`;
             }),
             Effect.withSpan("ScheduleService.formatCheckIn", {
               captureStackTrace: true,

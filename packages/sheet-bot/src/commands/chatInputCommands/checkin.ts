@@ -74,6 +74,7 @@ const getCheckinData = ({
       schedule,
       runningChannel: {
         channelId: runningChannel.channelId,
+        channelName,
         roleId: runningChannel.roleId,
       },
     })),
@@ -85,6 +86,7 @@ const getCheckinMessages = (data: {
   schedule: Schedule;
   runningChannel: {
     channelId: string;
+    channelName: string;
   };
 }) =>
   pipe(
@@ -97,7 +99,7 @@ const getCheckinMessages = (data: {
         startTime: data.startTime,
         prevSchedule: data.prevSchedule,
         schedule: data.schedule,
-        channelId: data.runningChannel.channelId,
+        channelName: data.runningChannel.channelName,
       }),
     ),
     Effect.map(({ emptySlotsMessage, checkinMessage }) => ({
