@@ -14,5 +14,11 @@ export const guildServices = (guildId: string) =>
         Layer.provideMerge(sheetService),
       ),
     ),
+    Effect.withSpan("guildServices", {
+      captureStackTrace: true,
+      attributes: {
+        guildId,
+      },
+    }),
     Layer.unwrapEffect,
   );

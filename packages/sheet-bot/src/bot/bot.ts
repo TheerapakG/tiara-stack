@@ -106,12 +106,12 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
         ),
         Effect.withSpan("Bot.onChatInputCommandInteraction", {
           captureStackTrace: true,
-        }),
-        Effect.annotateSpans({
-          commandName: interaction.commandName,
-          subcommandGroup: interaction.options.getSubcommandGroup(false),
-          subcommand: interaction.options.getSubcommand(false),
-          commandId: interaction.commandId,
+          attributes: {
+            commandName: interaction.commandName,
+            subcommandGroup: interaction.options.getSubcommandGroup(false),
+            subcommand: interaction.options.getSubcommand(false),
+            commandId: interaction.commandId,
+          },
         }),
       );
   }
@@ -175,9 +175,9 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
         ),
         Effect.withSpan("Bot.onButtonInteraction", {
           captureStackTrace: true,
-        }),
-        Effect.annotateSpans({
-          customId: interaction.customId,
+          attributes: {
+            guildId: interaction.guildId,
+          },
         }),
       );
   }
