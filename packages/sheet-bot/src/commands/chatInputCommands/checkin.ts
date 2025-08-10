@@ -155,9 +155,6 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             user: Effect.succeed(interaction.user),
           })),
           Effect.tap(({ serverId }) =>
-            Effect.log(serverId, interaction.guildId),
-          ),
-          Effect.tap(({ serverId }) =>
             serverId !== interaction.guildId
               ? PermissionService.checkOwner(interaction)
               : Effect.void,

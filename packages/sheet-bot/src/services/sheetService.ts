@@ -301,7 +301,7 @@ const scheduleParser = (
 export class SheetService extends Effect.Service<SheetService>()(
   "SheetService",
   {
-    effect: (sheetId: string) =>
+    effect: (sheetId: string, guildId: string) =>
       pipe(
         Effect.Do,
         Effect.bind("sheet", () => GoogleSheets),
@@ -448,7 +448,7 @@ export class SheetService extends Effect.Service<SheetService>()(
             teams,
             allSchedules,
           }) => ({
-            boundGuildId: () => Effect.succeed(sheetId),
+            boundGuildId: () => Effect.succeed(guildId),
             get: sheetGet,
             update: sheetUpdate,
             getRangesConfig: () =>
@@ -540,7 +540,7 @@ export class SheetService extends Effect.Service<SheetService>()(
         ),
       ),
       Effect.map(({ sheetId }) =>
-        SheetService.DefaultWithoutDependencies(sheetId),
+        SheetService.DefaultWithoutDependencies(sheetId, guildId),
       ),
       Effect.withSpan("SheetService.ofGuild", { captureStackTrace: true }),
     );
