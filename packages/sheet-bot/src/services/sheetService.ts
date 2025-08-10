@@ -448,18 +448,36 @@ export class SheetService extends Effect.Service<SheetService>()(
             teams,
             allSchedules,
           }) => ({
-            boundGuildId: () => Effect.succeed(guildId),
+            boundGuildId: () =>
+              pipe(
+                Effect.succeed(guildId),
+                Effect.withSpan("SheetService.boundGuildId", {
+                  captureStackTrace: true,
+                }),
+              ),
             get: sheetGet,
             update: sheetUpdate,
             getRangesConfig: () =>
               pipe(
                 rangesConfig,
-                Effect.withSpan("SheetService.getRangesConfig"),
+                Effect.withSpan("SheetService.getRangesConfig", {
+                  captureStackTrace: true,
+                }),
               ),
             getEventConfig: () =>
-              pipe(eventConfig, Effect.withSpan("SheetService.getEventConfig")),
+              pipe(
+                eventConfig,
+                Effect.withSpan("SheetService.getEventConfig", {
+                  captureStackTrace: true,
+                }),
+              ),
             getDayConfig: () =>
-              pipe(dayConfig, Effect.withSpan("SheetService.getDayConfig")),
+              pipe(
+                dayConfig,
+                Effect.withSpan("SheetService.getDayConfig", {
+                  captureStackTrace: true,
+                }),
+              ),
             getPlayers: () =>
               pipe(
                 players,
