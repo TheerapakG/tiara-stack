@@ -26,7 +26,7 @@ export class InteractionHandlerMapWithMetrics<
     return new InteractionHandlerMapWithMetrics({
       map,
       interactionCount: Metric.counter(
-        `typhooon_discord_bot_${interactionName}_interaction_total`,
+        `typhoon_discord_bot_${interactionName}_interaction_total`,
         {
           description: `The number of ${interactionName} interactions with the bot`,
           bigint: true,
@@ -34,7 +34,7 @@ export class InteractionHandlerMapWithMetrics<
         },
       ),
       interactionSuccessCount: Metric.counter(
-        `typhooon_discord_bot_${interactionName}_interaction_success_total`,
+        `typhoon_discord_bot_${interactionName}_interaction_success_total`,
         {
           description: `The number of successful ${interactionName} interactions with the bot`,
           bigint: true,
@@ -42,7 +42,7 @@ export class InteractionHandlerMapWithMetrics<
         },
       ),
       interactionErrorCount: Metric.counter(
-        `typhooon_discord_bot_${interactionName}_interaction_error_total`,
+        `typhoon_discord_bot_${interactionName}_interaction_error_total`,
         {
           description: `The number of error ${interactionName} interactions with the bot`,
           bigint: true,
