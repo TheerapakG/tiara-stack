@@ -7,9 +7,8 @@ type InteractionHandlerMapWithMetricsObject<
   R = never,
 > = {
   map: InteractionHandlerMap<Data, E, R>;
+  interactionType: string;
   interactionCount: Metric.Metric.Counter<bigint>;
-  interactionSuccessCount: Metric.Metric.Counter<bigint>;
-  interactionErrorCount: Metric.Metric.Counter<bigint>;
 };
 
 export class InteractionHandlerMapWithMetrics<
@@ -20,31 +19,16 @@ export class InteractionHandlerMapWithMetrics<
   InteractionHandlerMapWithMetricsObject<Data, E, R>
 > {
   static make<Data = unknown, E = never, R = never>(
-    interactionName: string,
+    interactionType: string,
     map: InteractionHandlerMap<Data, E, R>,
   ) {
     return new InteractionHandlerMapWithMetrics({
       map,
+      interactionType,
       interactionCount: Metric.counter(
-        `typhoon_discord_bot_${interactionName}_interaction_total`,
+        `typhoon_discord_bot_interaction_total`,
         {
-          description: `The number of ${interactionName} interactions with the bot`,
-          bigint: true,
-          incremental: true,
-        },
-      ),
-      interactionSuccessCount: Metric.counter(
-        `typhoon_discord_bot_${interactionName}_interaction_success_total`,
-        {
-          description: `The number of successful ${interactionName} interactions with the bot`,
-          bigint: true,
-          incremental: true,
-        },
-      ),
-      interactionErrorCount: Metric.counter(
-        `typhoon_discord_bot_${interactionName}_interaction_error_total`,
-        {
-          description: `The number of error ${interactionName} interactions with the bot`,
+          description: `The number of interactions with the bot`,
           bigint: true,
           incremental: true,
         },
@@ -60,9 +44,8 @@ export class InteractionHandlerMapWithMetrics<
     ) =>
       new InteractionHandlerMapWithMetrics({
         map: pipe(map.map, InteractionHandlerMap.add(context)),
+        interactionType: map.interactionType,
         interactionCount: map.interactionCount,
-        interactionSuccessCount: map.interactionSuccessCount,
-        interactionErrorCount: map.interactionErrorCount,
       });
   }
 
@@ -74,33 +57,34 @@ export class InteractionHandlerMapWithMetrics<
     ) =>
       new InteractionHandlerMapWithMetrics({
         map: pipe(other.map, InteractionHandlerMap.union(map)),
+        interactionType: other.interactionType,
         interactionCount: other.interactionCount,
-        interactionSuccessCount: other.interactionSuccessCount,
-        interactionErrorCount: other.interactionErrorCount,
       });
   }
 
-  static execute(commandName: string) {
+  static execute(interactionKey: string) {
     return <Data, E, R>(map: InteractionHandlerMapWithMetrics<Data, E, R>) =>
       pipe(
         map.map,
-        InteractionHandlerMap.get(commandName),
+        InteractionHandlerMap.get(interactionKey),
         Option.map((command) => command.handler),
         Option.getOrElse(() => Effect.void as Effect.Effect<unknown, E, R>),
         Effect.tapBoth({
           onSuccess: () =>
             pipe(
-              Effect.succeed(BigInt(1)),
-              map.interactionSuccessCount,
               map.interactionCount,
+              Metric.update(BigInt(1)),
+              Effect.tagMetrics("interaction_status", "success"),
             ),
           onFailure: () =>
             pipe(
-              Effect.succeed(BigInt(1)),
-              map.interactionErrorCount,
               map.interactionCount,
+              Metric.update(BigInt(1)),
+              Effect.tagMetrics("interaction_status", "failure"),
             ),
         }),
+        Effect.tagMetrics("interaction_type", map.interactionType),
+        Effect.tagMetrics("interaction_key", interactionKey),
       );
   }
 
