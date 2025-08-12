@@ -1,6 +1,7 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: true
 ---
-This project utilizes the Effect library for composability and type-safety. The version of the library being used is 3.5.13. The project prefers using the "pipe" syntax over the "generator" syntax. Use "do simulation" to combat excessive nesting. Do not use Effect/Schema for runtime validation, prefering ArkType instead.
+
+This project utilizes the Effect library for composability and type-safety. The version of the library being used is 3.17.7. The project prefers using the "pipe" syntax over the "generator" syntax. Use "do simulation" to combat excessive nesting. Do not use Effect/Schema for runtime validation, prefering ArkType or Valibot instead.

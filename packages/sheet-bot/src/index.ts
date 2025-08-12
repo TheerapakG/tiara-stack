@@ -2,14 +2,11 @@ import { NodeSdk } from "@effect/opentelemetry";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { Effect, Layer, Logger, pipe } from "effect";
-import { DBSubscriptionContext } from "typhoon-server/db";
+import { Effect, Logger, pipe } from "effect";
 import { Bot } from "./bot";
 import { buttons } from "./buttons";
 import { commands } from "./commands";
 import { Config } from "./config";
-import { DB } from "./db";
-import { GoogleLive } from "./google";
 import { botServices } from "./services";
 
 const TracesLive = NodeSdk.layer(() => ({
@@ -22,20 +19,12 @@ const MetricsLive = NodeSdk.layer(() => ({
   metricReader: new PrometheusExporter(),
 }));
 
-const layer = pipe(
-  botServices,
-  Layer.provideMerge(DBSubscriptionContext.Default),
-  Layer.provideMerge(DB.DefaultWithoutDependencies),
-  Layer.provideMerge(GoogleLive),
-  Layer.provideMerge(Config.Default),
-);
-
 await Effect.runPromise(
   pipe(
     Effect.Do,
     Effect.bind("bot", () =>
       pipe(
-        Bot.create(layer),
+        Bot.create(botServices),
         Effect.map(Bot.withTraceProvider(TracesLive)),
         Effect.flatMap(Bot.registerProcessHandlers),
         Effect.flatMap(Bot.addChatInputCommandHandlerMap(commands)),
@@ -43,7 +32,7 @@ await Effect.runPromise(
       ),
     ),
     Effect.flatMap(({ bot }) => Bot.login(bot)),
-    Effect.provide(layer),
+    Effect.provide(Config.Default),
     Effect.provide(MetricsLive),
     Effect.provide(Logger.logFmt),
   ),

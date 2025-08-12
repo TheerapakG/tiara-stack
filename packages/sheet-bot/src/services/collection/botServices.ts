@@ -1,16 +1,27 @@
-import { Layer, pipe } from "effect";
-import { ChannelConfigService } from "../channelConfigService";
-import { GuildConfigService } from "../guildConfigService";
-import { MessageCheckinService } from "../messageCheckinService";
-import { PermissionService } from "../permissionService";
-import { SheetConfigService } from "../sheetConfigService";
+import { Effect, Layer, pipe } from "effect";
+import { DBSubscriptionContext } from "typhoon-server/db";
+import { Config } from "../../config";
+import { DB } from "../../db";
+import { GoogleLive } from "../../google";
+import {
+  ChannelConfigService,
+  MessageCheckinService,
+  SheetConfigService,
+} from "../bot";
 
 export const botServices = pipe(
   Layer.mergeAll(
-    GuildConfigService.DefaultWithoutDependencies,
     ChannelConfigService.DefaultWithoutDependencies,
     SheetConfigService.DefaultWithoutDependencies,
     MessageCheckinService.DefaultWithoutDependencies,
   ),
-  Layer.provideMerge(PermissionService.Default),
+  Layer.provideMerge(DB.DefaultWithoutDependencies),
+  Layer.provideMerge(
+    Layer.mergeAll(DBSubscriptionContext.Default, GoogleLive, Config.Default),
+  ),
+  Effect.succeed,
+  Effect.withSpan("botServices", {
+    captureStackTrace: true,
+  }),
+  Layer.unwrapEffect,
 );

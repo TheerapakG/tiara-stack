@@ -3,7 +3,7 @@ import { type } from "arktype";
 import { Array, Effect, HashMap, Option, pipe } from "effect";
 import { validate, validateWithDefault } from "typhoon-core/schema";
 import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
-import { GoogleSheets } from "../google/sheets";
+import { GoogleSheets } from "../../google/sheets";
 
 const parseValueRange = <A = never, E = never, R = never>(
   valueRange: sheets_v4.Schema$ValueRange,

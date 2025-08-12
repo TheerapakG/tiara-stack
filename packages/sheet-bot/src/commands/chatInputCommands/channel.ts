@@ -10,8 +10,12 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Effect, Option, pipe } from "effect";
-import { GuildConfigService } from "../../services";
+import { Effect, Layer, Option, pipe } from "effect";
+import {
+  GuildConfigService,
+  guildServices,
+  PermissionService,
+} from "../../services";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
@@ -39,77 +43,76 @@ const handleSet = chatInputSubcommandHandlerContextBuilder()
   )
   .handler(
     pipe(
-      Effect.Do,
-      Effect.bind("interaction", () =>
-        InteractionContext.interaction<ChatInputCommandInteraction>(),
-      ),
-      Effect.bindAll(({ interaction }) => ({
-        running: pipe(
-          Effect.try(() => interaction.options.getBoolean("running")),
-          Effect.map(Option.fromNullable),
-        ),
-        name: pipe(
-          Effect.try(() => interaction.options.getString("name")),
-          Effect.map(Option.fromNullable),
-        ),
-        role: pipe(
-          Effect.try(() => interaction.options.getRole("role")),
-          Effect.map(Option.fromNullable),
-        ),
-        channel: Option.fromNullable(interaction.channel),
-        guild: Option.fromNullable(interaction.guild),
-        memberPermissions: Option.fromNullable(interaction.memberPermissions),
-      })),
-      Effect.tap(({ memberPermissions }) =>
-        !memberPermissions.has(PermissionFlagsBits.ManageGuild)
-          ? Effect.fail("You do not have permission to manage the server")
-          : Effect.void,
-      ),
-      Effect.let("roleId", ({ role }) =>
+      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      Effect.flatMap((interaction) =>
         pipe(
-          role,
-          Option.map((r) => r.id),
+          Effect.Do,
+          PermissionService.tapCheckPermissions(
+            PermissionFlagsBits.ManageGuild,
+          ),
+          Effect.bindAll(
+            () => ({
+              running: InteractionContext.getBoolean("running"),
+              name: InteractionContext.getString("name"),
+              role: InteractionContext.getRole("role"),
+              channel: Option.fromNullable(interaction.channel),
+            }),
+            { concurrency: "unbounded" },
+          ),
+          Effect.let("roleId", ({ role }) =>
+            pipe(
+              role,
+              Option.map((r) => r.id),
+            ),
+          ),
+          Effect.bind("config", ({ name, channel, running, roleId }) =>
+            GuildConfigService.setChannelConfig(channel.id, {
+              running: Option.getOrElse(running, () => false),
+              name: Option.getOrElse(name, () => undefined),
+              roleId: Option.getOrElse(roleId, () => undefined),
+            }),
+          ),
+          Effect.bind("response", ({ channel, config }) =>
+            InteractionContext.reply({
+              embeds: [
+                new EmbedBuilder()
+                  .setTitle(`Success!`)
+                  .setDescription(
+                    `${channelMention(channel.id)} configuration updated`,
+                  )
+                  .addFields(
+                    {
+                      name: "Name",
+                      value: escapeMarkdown(config.name ?? "None!"),
+                    },
+                    {
+                      name: "Running channel",
+                      value: config.running ? "Yes" : "No",
+                    },
+                    {
+                      name: "Role",
+                      value: config.roleId
+                        ? roleMention(config.roleId)
+                        : "None!",
+                    },
+                  )
+                  .setTimestamp()
+                  .setFooter({
+                    text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
+                  }),
+              ],
+            }),
+          ),
+          Effect.provide(
+            pipe(
+              interaction.guildId,
+              Option.fromNullable,
+              Effect.map(guildServices),
+              Layer.unwrapEffect,
+            ),
+          ),
         ),
       ),
-      Effect.bind("config", ({ guild, name, channel, running, roleId }) =>
-        GuildConfigService.setChannelConfig(guild.id, channel.id, {
-          running: Option.getOrElse(running, () => false),
-          name: Option.getOrElse(name, () => undefined),
-          roleId: Option.getOrElse(roleId, () => undefined),
-        }),
-      ),
-      Effect.bind("response", ({ channel, interaction, config }) =>
-        Effect.tryPromise(() =>
-          interaction.reply({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle(`Success!`)
-                .setDescription(
-                  `${channelMention(channel.id)} configuration updated`,
-                )
-                .addFields(
-                  {
-                    name: "Name",
-                    value: escapeMarkdown(config.name ?? "None!"),
-                  },
-                  {
-                    name: "Running channel",
-                    value: config.running ? "Yes" : "No",
-                  },
-                  {
-                    name: "Role",
-                    value: config.roleId ? roleMention(config.roleId) : "None!",
-                  },
-                )
-                .setTimestamp()
-                .setFooter({
-                  text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
-                }),
-            ],
-          }),
-        ),
-      ),
-      Effect.asVoid,
       Effect.withSpan("handlesSetRunning", {
         captureStackTrace: true,
       }),

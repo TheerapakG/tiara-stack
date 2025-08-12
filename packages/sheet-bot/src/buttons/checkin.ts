@@ -42,17 +42,12 @@ export const button = buttonInteractionHandlerContextBuilder()
       Effect.bind("interaction", () =>
         InteractionContext.interaction<ButtonInteraction>(),
       ),
-      Effect.tap(({ interaction }) =>
-        Effect.tryPromise(() =>
-          interaction.deferReply({ flags: MessageFlags.Ephemeral }),
-        ),
-      ),
+      InteractionContext.tapDeferReply({ flags: MessageFlags.Ephemeral }),
       Effect.bindAll(({ interaction }) => ({
         messageFlags: Ref.make(
           new MessageFlagsBitField().add(MessageFlags.Ephemeral),
         ),
         message: Option.fromNullable(interaction.message),
-        serverId: Option.fromNullable(interaction.guildId),
       })),
       Effect.bind("messageCheckinData", ({ message }) =>
         pipe(
@@ -69,11 +64,9 @@ export const button = buttonInteractionHandlerContextBuilder()
           ),
           Effect.tap((values) =>
             Array.length(values) > 0
-              ? Effect.tryPromise(() =>
-                  interaction.editReply({
-                    content: "You have been checked in!",
-                  }),
-                )
+              ? InteractionContext.editReply({
+                  content: "You have been checked in!",
+                })
               : Effect.fail(
                   new CheckinError(
                     "I don't think you are in the list of players to check in...",
@@ -94,8 +87,8 @@ export const button = buttonInteractionHandlerContextBuilder()
           .map((m) => userMention(m.memberId))
           .join(" "),
       ),
-      Effect.tap(({ interaction, messageCheckinData }) =>
-        PermissionService.addRole(interaction, messageCheckinData.roleId),
+      Effect.tap(({ messageCheckinData }) =>
+        PermissionService.addRole(messageCheckinData.roleId),
       ),
       Effect.tap(({ interaction, messageCheckinData, checkedInMentions }) =>
         Effect.tryPromise(() =>

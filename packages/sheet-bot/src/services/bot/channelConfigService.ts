@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { Effect, pipe } from "effect";
 import { configChannel } from "sheet-db-schema";
 import { DBSubscriptionContext } from "typhoon-server/db";
-import { DB } from "../db";
+import { DB } from "../../db";
 
 export class ChannelConfigService extends Effect.Service<ChannelConfigService>()(
   "ChannelConfigService",

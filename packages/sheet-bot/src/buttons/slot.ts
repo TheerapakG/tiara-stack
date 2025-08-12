@@ -69,11 +69,8 @@ export const button = buttonInteractionHandlerContextBuilder()
   })
   .handler(
     pipe(
-      Effect.Do,
-      Effect.bind("interaction", () =>
-        InteractionContext.interaction<ButtonInteraction>(),
-      ),
-      Effect.flatMap(({ interaction }) =>
+      InteractionContext.interaction<ButtonInteraction>(),
+      Effect.flatMap((interaction) =>
         pipe(
           Effect.Do,
           Effect.bindAll(() => ({
@@ -104,22 +101,20 @@ export const button = buttonInteractionHandlerContextBuilder()
               .setStyle(ButtonStyle.Primary),
           ),
           Effect.bind("response", ({ day, slotMessage, flags }) =>
-            Effect.tryPromise(() =>
-              interaction.reply({
-                embeds: [
-                  new EmbedBuilder()
-                    .setTitle(`Day ${day} Slots~`)
-                    .setDescription(
-                      slotMessage === "" ? "All Filled :3" : slotMessage,
-                    )
-                    .setTimestamp()
-                    .setFooter({
-                      text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
-                    }),
-                ],
-                flags: flags.bitfield,
-              }),
-            ),
+            InteractionContext.reply({
+              embeds: [
+                new EmbedBuilder()
+                  .setTitle(`Day ${day} Slots~`)
+                  .setDescription(
+                    slotMessage === "" ? "All Filled :3" : slotMessage,
+                  )
+                  .setTimestamp()
+                  .setFooter({
+                    text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
+                  }),
+              ],
+              flags: flags.bitfield,
+            }),
           ),
           Effect.provide(
             pipe(

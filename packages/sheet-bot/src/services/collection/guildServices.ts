@@ -1,17 +1,21 @@
 import { Effect, Layer, pipe } from "effect";
-import { PlayerService } from "../playerService";
-import { ScheduleService } from "../scheduleService";
-import { SheetService } from "../sheetService";
+import {
+  GuildConfigService,
+  GuildService,
+  PlayerService,
+  ScheduleService,
+  SheetService,
+} from "../guild";
 
 export const guildServices = (guildId: string) =>
   pipe(
-    Effect.Do,
-    Effect.bind("sheetService", () => SheetService.ofGuild(guildId)),
-    Effect.map(({ sheetService }) =>
+    Effect.succeed(
       pipe(
         ScheduleService.Default,
         Layer.provideMerge(PlayerService.Default),
-        Layer.provideMerge(sheetService),
+        Layer.provideMerge(SheetService.ofGuild()),
+        Layer.provideMerge(GuildConfigService.DefaultWithoutDependencies),
+        Layer.provideMerge(GuildService.fromGuildId(guildId)),
       ),
     ),
     Effect.withSpan("guildServices", {

@@ -10,19 +10,14 @@ import {
   GatewayIntentBits,
   Interaction,
   InteractionButtonComponentData,
-  InteractionResponse,
   InteractionType,
-  Message,
   MessageComponentInteraction,
-  MessageFlags,
   SharedSlashCommand,
   SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 import {
-  Cause,
   Data,
   Effect,
-  Exit,
   Layer,
   ManagedRuntime,
   Option,
@@ -30,24 +25,26 @@ import {
   SynchronizedRef,
 } from "effect";
 import { Config } from "../config";
+import { interactionServices } from "../services";
 import {
-  ButtonInteractionHandlerContext,
   buttonInteractionHandlerMap,
-  ButtonInteractionHandlerMap,
-  ChatInputCommandHandlerContext,
   chatInputCommandHandlerMap,
-  ChatInputCommandHandlerMap,
   InteractionContext,
   InteractionHandlerMapWithMetrics,
+  VariantInteractionHandlerContext,
+  VariantInteractionHandlerMap,
 } from "../types";
 
-export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
+export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
+  "Bot",
+)<{
   readonly client: Client;
   readonly loginLatch: Effect.Latch;
   readonly loginSemaphore: Effect.Semaphore;
   readonly chatInputCommandsMap: SynchronizedRef.SynchronizedRef<
     InteractionHandlerMapWithMetrics<
       SharedSlashCommand | SlashCommandSubcommandsOnlyBuilder,
+      A,
       E,
       R | InteractionContext<ChatInputCommandInteraction>
     >
@@ -55,6 +52,7 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
   readonly buttonsMap: SynchronizedRef.SynchronizedRef<
     InteractionHandlerMapWithMetrics<
       InteractionButtonComponentData,
+      A,
       E,
       R | InteractionContext<ButtonInteraction>
     >
@@ -68,7 +66,7 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
   static onChatInputCommandInteraction(
     interaction: ChatInputCommandInteraction,
   ) {
-    return <E = never, R = never>(bot: Bot<E, R>) =>
+    return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
       pipe(
         Effect.Do,
         Effect.bind("runtime", () => SynchronizedRef.get(bot.runtime)),
@@ -81,39 +79,15 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
             Option.map((runtime) =>
               pipe(
                 chatInputCommandsMap,
-                InteractionHandlerMapWithMetrics.execute(
+                InteractionHandlerMapWithMetrics.executeAndReplyError(
                   interaction.commandName,
                 ),
                 Effect.provide(runtime),
-                Effect.provide(InteractionContext.make(interaction)),
+                Effect.provide(interactionServices(interaction)),
               ),
             ),
             Option.getOrElse(() => Effect.void),
           ),
-        ),
-        Effect.exit,
-        Effect.flatMap(
-          Exit.match({
-            onSuccess: Effect.succeed,
-            onFailure: (cause) =>
-              pipe(
-                Effect.succeed(cause),
-                Effect.tap((cause) => Effect.log(cause)),
-                Effect.map(Cause.pretty),
-                Effect.tap((pretty) =>
-                  Effect.promise<Message | InteractionResponse>(() =>
-                    (interaction.replied || interaction.deferred
-                      ? interaction.followUp.bind(interaction)
-                      : interaction.reply.bind(interaction))({
-                      content: pretty,
-                      flags: MessageFlags.Ephemeral,
-                    }),
-                  ),
-                ),
-                // TODO: handle errors
-                Effect.exit,
-              ),
-          }),
         ),
         Effect.withSpan("Bot.onChatInputCommandInteraction", {
           captureStackTrace: true,
@@ -128,7 +102,7 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
   }
 
   static onCommandInteraction(interaction: CommandInteraction) {
-    return <E = never, R = never>(bot: Bot<E, R>) =>
+    return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
       match({})
         .case(`${ApplicationCommandType.ChatInput}`, () =>
           Bot.onChatInputCommandInteraction(
@@ -139,7 +113,7 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
   }
 
   static onButtonInteraction(interaction: ButtonInteraction) {
-    return <E = never, R = never>(bot: Bot<E, R>) =>
+    return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
       pipe(
         Effect.Do,
         Effect.bind("runtime", () => SynchronizedRef.get(bot.runtime)),
@@ -150,37 +124,15 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
             Option.map((runtime) =>
               pipe(
                 buttonsMap,
-                InteractionHandlerMapWithMetrics.execute(interaction.customId),
+                InteractionHandlerMapWithMetrics.executeAndReplyError(
+                  interaction.customId,
+                ),
                 Effect.provide(runtime),
-                Effect.provide(InteractionContext.make(interaction)),
+                Effect.provide(interactionServices(interaction)),
               ),
             ),
             Option.getOrElse(() => Effect.void),
           ),
-        ),
-        Effect.exit,
-        Effect.flatMap(
-          Exit.match({
-            onSuccess: Effect.succeed,
-            onFailure: (cause) =>
-              pipe(
-                Effect.succeed(cause),
-                Effect.tap((cause) => Effect.log(cause)),
-                Effect.map(Cause.pretty),
-                Effect.tap((pretty) =>
-                  Effect.promise<Message | InteractionResponse>(() =>
-                    (interaction.replied || interaction.deferred
-                      ? interaction.followUp.bind(interaction)
-                      : interaction.reply.bind(interaction))({
-                      content: pretty,
-                      flags: MessageFlags.Ephemeral,
-                    }),
-                  ),
-                ),
-                // TODO: handle errors
-                Effect.exit,
-              ),
-          }),
         ),
         Effect.withSpan("Bot.onButtonInteraction", {
           captureStackTrace: true,
@@ -194,7 +146,7 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
   static onMessageComponentInteraction(
     interaction: MessageComponentInteraction,
   ) {
-    return <E = never, R = never>(bot: Bot<E, R>) =>
+    return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
       match({})
         .case(`${ComponentType.Button}`, () =>
           Bot.onButtonInteraction(interaction as ButtonInteraction)(bot),
@@ -203,7 +155,7 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
   }
 
   static onInteraction(interaction: Interaction) {
-    return <E = never, R = never>(bot: Bot<E, R>) =>
+    return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
       match({})
         .case(`${InteractionType.ApplicationCommand}`, () =>
           Bot.onCommandInteraction(interaction as CommandInteraction)(bot),
@@ -216,7 +168,7 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
         .default(() => Effect.void)(interaction.type);
   }
 
-  static create<E = never, R = never>(layer: Layer.Layer<R, E>) {
+  static create<A = never, E = never, R = never>(layer: Layer.Layer<R, E>) {
     return pipe(
       Effect.Do,
       Effect.bindAll(
@@ -230,6 +182,7 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
             InteractionHandlerMapWithMetrics.make(
               "chat_input_command",
               chatInputCommandHandlerMap<
+                A,
                 E,
                 R | InteractionContext<ChatInputCommandInteraction>
               >(),
@@ -239,6 +192,7 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
             InteractionHandlerMapWithMetrics.make(
               "button",
               buttonInteractionHandlerMap<
+                A,
                 E,
                 R | InteractionContext<ButtonInteraction>
               >(),
@@ -252,20 +206,20 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
         }),
         { concurrency: "unbounded" },
       ),
-      Effect.let("bot", (params) => new Bot<E, R>(params)),
+      Effect.let("bot", (params) => new Bot<A, E, R>(params)),
       Effect.map(({ bot }) => bot),
     );
   }
 
   static withTraceProvider(traceProvider: Layer.Layer<never>) {
-    return <E = never, R = never>(bot: Bot<E, R>) =>
-      new Bot<E, R>({
+    return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
+      new Bot<A, E, R>({
         ...bot,
         traceProvider,
       });
   }
 
-  static login<E = never, R = never>(bot: Bot<E, R>) {
+  static login<A = never, E = never, R = never>(bot: Bot<A, E, R>) {
     return Config.use(({ discordToken }) =>
       pipe(
         SynchronizedRef.update(bot.runtime, () =>
@@ -284,7 +238,8 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
             .on(Events.InteractionCreate, (interaction) =>
               Effect.runPromise(
                 pipe(
-                  Bot.onInteraction(interaction)(bot),
+                  bot,
+                  Bot.onInteraction(interaction),
                   Effect.provide(bot.traceProvider),
                 ),
               ),
@@ -300,7 +255,7 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
     );
   }
 
-  static destroy<E = never, R = never>(bot: Bot<E, R>) {
+  static destroy<A = never, E = never, R = never>(bot: Bot<A, E, R>) {
     return pipe(
       Effect.promise(() => bot.client.destroy()),
       Effect.andThen(() =>
@@ -321,13 +276,13 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
     );
   }
 
-  static addChatInputCommand<E = never, R = never>(
-    command: ChatInputCommandHandlerContext<E, R>,
+  static addChatInputCommand<A = never, E = never, R = never>(
+    command: VariantInteractionHandlerContext<"chatInput", A, E, R>,
   ) {
-    return <BE = never, BR = never>(bot: Bot<BE, BR>) =>
+    return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
         Effect.Do,
-        Effect.let("bot", () => bot as Bot<E | BE, R | BR>),
+        Effect.let("bot", () => bot as Bot<A | BA, E | BE, R | BR>),
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(
             bot.chatInputCommandsMap,
@@ -338,13 +293,13 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
       );
   }
 
-  static addChatInputCommandHandlerMap<E = never, R = never>(
-    commands: ChatInputCommandHandlerMap<E, R>,
+  static addChatInputCommandHandlerMap<A = never, E = never, R = never>(
+    commands: VariantInteractionHandlerMap<"chatInput", A, E, R>,
   ) {
-    return <BE = never, BR = never>(bot: Bot<BE, BR>) =>
+    return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
         Effect.Do,
-        Effect.let("bot", () => bot as Bot<E | BE, R | BR>),
+        Effect.let("bot", () => bot as Bot<A | BA, E | BE, R | BR>),
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(
             bot.chatInputCommandsMap,
@@ -355,13 +310,13 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
       );
   }
 
-  static addButton<E = never, R = never>(
-    button: ButtonInteractionHandlerContext<E, R>,
+  static addButton<A = never, E = never, R = never>(
+    button: VariantInteractionHandlerContext<"button", A, E, R>,
   ) {
-    return <BE = never, BR = never>(bot: Bot<BE, BR>) =>
+    return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
         Effect.Do,
-        Effect.let("bot", () => bot as Bot<E | BE, R | BR>),
+        Effect.let("bot", () => bot as Bot<A | BA, E | BE, R | BR>),
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(
             bot.buttonsMap,
@@ -372,13 +327,13 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
       );
   }
 
-  static addButtonInteractionHandlerMap<E = never, R = never>(
-    buttons: ButtonInteractionHandlerMap<E, R>,
+  static addButtonInteractionHandlerMap<A = never, E = never, R = never>(
+    buttons: VariantInteractionHandlerMap<"button", A, E, R>,
   ) {
-    return <BE = never, BR = never>(bot: Bot<BE, BR>) =>
+    return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
         Effect.Do,
-        Effect.let("bot", () => bot as Bot<E | BE, R | BR>),
+        Effect.let("bot", () => bot as Bot<A | BA, E | BE, R | BR>),
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(
             bot.buttonsMap,
@@ -389,7 +344,9 @@ export class Bot<E = never, R = never> extends Data.TaggedClass("Bot")<{
       );
   }
 
-  static registerProcessHandlers<E = never, R = never>(bot: Bot<E, R>) {
+  static registerProcessHandlers<A = never, E = never, R = never>(
+    bot: Bot<A, E, R>,
+  ) {
     return pipe(
       Effect.sync(() => {
         process.on("SIGINT", () =>
