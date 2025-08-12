@@ -82,9 +82,8 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 InteractionHandlerMapWithMetrics.executeAndReplyError(
                   interaction.commandName,
                 ),
-                Effect.provide(runtime),
                 Effect.provide(interactionServices(interaction)),
-                Effect.provide(InteractionContext.make(interaction)),
+                Effect.provide(runtime),
               ),
             ),
             Option.getOrElse(() => Effect.void),
@@ -128,9 +127,8 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 InteractionHandlerMapWithMetrics.executeAndReplyError(
                   interaction.customId,
                 ),
-                Effect.provide(runtime),
                 Effect.provide(interactionServices(interaction)),
-                Effect.provide(InteractionContext.make(interaction)),
+                Effect.provide(runtime),
               ),
             ),
             Option.getOrElse(() => Effect.void),
