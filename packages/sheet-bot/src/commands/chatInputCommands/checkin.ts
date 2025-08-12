@@ -218,6 +218,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
                               {
                                 initialMessage: checkinMessages.checkinMessage,
                                 hour,
+                                channelId: checkinData.runningChannel.channelId,
                                 roleId: checkinData.runningChannel.roleId,
                               },
                             ),

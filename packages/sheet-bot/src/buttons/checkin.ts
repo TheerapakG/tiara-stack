@@ -12,7 +12,11 @@ import {
 } from "discord.js";
 import { Array, Data, Effect, Function, Option, pipe, Ref } from "effect";
 import { observeOnce } from "typhoon-server/signal";
-import { MessageCheckinService, PermissionService } from "../services";
+import {
+  ClientService,
+  MessageCheckinService,
+  PermissionService,
+} from "../services";
 import {
   buttonInteractionHandlerContextBuilder,
   InteractionContext,
@@ -39,8 +43,12 @@ export const button = buttonInteractionHandlerContextBuilder()
   .handler(
     pipe(
       Effect.Do,
-      Effect.bind("interaction", () =>
-        InteractionContext.interaction<ButtonInteraction>(),
+      Effect.bindAll(
+        () => ({
+          interaction: InteractionContext.interaction<ButtonInteraction>(),
+          client: ClientService.getClient(),
+        }),
+        { concurrency: "unbounded" },
       ),
       InteractionContext.tapDeferReply({ flags: MessageFlags.Ephemeral }),
       Effect.bindAll(({ interaction }) => ({
@@ -90,22 +98,35 @@ export const button = buttonInteractionHandlerContextBuilder()
       Effect.tap(({ messageCheckinData }) =>
         PermissionService.addRole(messageCheckinData.roleId),
       ),
-      Effect.tap(({ interaction, messageCheckinData, checkedInMentions }) =>
-        Effect.tryPromise(() =>
-          interaction.message.edit({
-            content:
-              checkedInMentions.length > 0
-                ? `${messageCheckinData.initialMessage}\n\nChecked in: ${checkedInMentions}`
-                : messageCheckinData.initialMessage,
-            components: messageCheckinData.roleId
-              ? [
-                  new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                    new ButtonBuilder(buttonData),
-                  ),
-                ]
-              : [],
-          }),
-        ),
+      Effect.tap(
+        ({ interaction, client, messageCheckinData, checkedInMentions }) =>
+          Effect.all([
+            Effect.tryPromise(() =>
+              interaction.message.edit({
+                content:
+                  checkedInMentions.length > 0
+                    ? `${messageCheckinData.initialMessage}\n\nChecked in: ${checkedInMentions}`
+                    : messageCheckinData.initialMessage,
+                components: messageCheckinData.roleId
+                  ? [
+                      new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                        new ButtonBuilder(buttonData),
+                      ),
+                    ]
+                  : [],
+              }),
+            ),
+            Effect.tryPromise(async () => {
+              const channel = await client.channels.fetch(
+                messageCheckinData.channelId,
+              );
+              if (channel?.isSendable()) {
+                await channel.send({
+                  content: `${userMention(interaction.user.id)} has checked in!`,
+                });
+              }
+            }),
+          ]),
       ),
     ),
   )
