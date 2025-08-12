@@ -34,11 +34,9 @@ import {
 const getCheckinData = ({
   hour,
   channelName,
-  serverId,
 }: {
   hour: number;
   channelName: string;
-  serverId: string;
 }) =>
   pipe(
     Effect.Do,
@@ -63,7 +61,7 @@ const getCheckinData = ({
     ),
     Effect.bind("runningChannel", () =>
       pipe(
-        GuildConfigService.getRunningChannelByName(serverId, channelName),
+        GuildConfigService.getRunningChannelByName(channelName),
         Effect.flatMap((computed) => observeOnce(computed.value)),
         Effect.flatMap(Array.head),
       ),
@@ -130,51 +128,30 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
   )
   .handler(
     pipe(
-      Effect.Do,
-      Effect.bind("interaction", () =>
-        InteractionContext.interaction<ChatInputCommandInteraction>(),
-      ),
-      Effect.tap(({ interaction }) =>
-        Effect.tryPromise(() =>
-          interaction.deferReply({ flags: MessageFlags.Ephemeral }),
-        ),
-      ),
-      Effect.flatMap(({ interaction }) =>
+      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      InteractionContext.tapDeferReply({ flags: MessageFlags.Ephemeral }),
+      Effect.flatMap((interaction) =>
         pipe(
           Effect.Do,
-          Effect.bindAll(() => ({
-            hourOption: pipe(
-              Effect.try(() => interaction.options.getNumber("hour")),
-              Effect.map(Option.fromNullable),
-            ),
-            channelName: pipe(
-              Effect.try(() =>
-                interaction.options.getString("channel_name", true),
+          PermissionService.tapCheckOwner({ allowSameGuild: true }),
+          PermissionService.tapCheckRoles(
+            pipe(
+              GuildConfigService.getManagerRoles(),
+              Effect.flatMap((computed) => observeOnce(computed.value)),
+              Effect.map((managerRoles) =>
+                managerRoles.map((role) => role.roleId),
               ),
             ),
-            channel: pipe(interaction.channel, Option.fromNullable),
-            serverId: SheetService.boundGuildId(),
-            user: Effect.succeed(interaction.user),
-          })),
-          Effect.tap(({ serverId }) =>
-            serverId !== interaction.guildId
-              ? PermissionService.checkOwner(interaction)
-              : Effect.void,
+            "You can only check in users as a manager",
           ),
-          Effect.bind("managerRoles", ({ serverId }) =>
-            serverId
-              ? pipe(
-                  GuildConfigService.getManagerRoles(serverId),
-                  Effect.flatMap((computed) => observeOnce(computed.value)),
-                )
-              : Effect.succeed([]),
-          ),
-          Effect.tap(({ managerRoles }) =>
-            PermissionService.checkRoles(
-              interaction,
-              managerRoles.map((role) => role.roleId),
-              "You can only check in users as a manager",
-            ),
+          Effect.bindAll(
+            () => ({
+              hourOption: InteractionContext.getNumber("hour"),
+              channelName: InteractionContext.getString("channel_name", true),
+              channel: pipe(interaction.channel, Option.fromNullable),
+              user: Effect.succeed(interaction.user),
+            }),
+            { concurrency: "unbounded" },
           ),
           Effect.bind("eventConfig", () => SheetService.getEventConfig()),
           Effect.let("hour", ({ hourOption, eventConfig }) =>
@@ -190,8 +167,8 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
               ),
             ),
           ),
-          Effect.bind("checkinData", ({ hour, channelName, serverId }) =>
-            getCheckinData({ hour, channelName, serverId }),
+          Effect.bind("checkinData", ({ hour, channelName }) =>
+            getCheckinData({ hour, channelName }),
           ),
           Effect.bind("fillIds", ({ checkinData }) =>
             pipe(
@@ -257,22 +234,15 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
                       )
                     : Effect.void,
                 ),
-                Effect.andThen(() =>
-                  Effect.tryPromise(() =>
-                    interaction.editReply({
-                      content: checkinMessages.emptySlotsMessage,
-                    }),
-                  ),
-                ),
+                InteractionContext.tapEditReply({
+                  content: checkinMessages.emptySlotsMessage,
+                }),
               ),
           ),
           Effect.provide(
             pipe(
-              Effect.try(
-                () =>
-                  interaction.options.getString("server_id") ??
-                  interaction.guildId,
-              ),
+              InteractionContext.getString("server_id"),
+              Effect.map(Option.getOrElse(() => interaction.guildId)),
               Effect.flatMap(Option.fromNullable),
               Effect.map(guildServices),
               Layer.unwrapEffect,

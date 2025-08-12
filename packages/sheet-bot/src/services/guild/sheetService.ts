@@ -1,10 +1,19 @@
 import { type MethodOptions, type sheets_v4 } from "@googleapis/sheets";
-import { Array, Data, Effect, HashMap, Option, Order, pipe } from "effect";
+import {
+  Array,
+  Data,
+  Effect,
+  HashMap,
+  Layer,
+  Option,
+  Order,
+  pipe,
+} from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
-import { GoogleSheets } from "../google/sheets";
+import { GoogleSheets } from "../../google/sheets";
+import { SheetConfigService } from "../bot/sheetConfigService";
 import { GuildConfigService } from "./guildConfigService";
-import { SheetConfigService } from "./sheetConfigService";
 
 const parseValueRange = <A = never, E = never, R = never>(
   valueRange: sheets_v4.Schema$ValueRange,
@@ -301,11 +310,16 @@ const scheduleParser = (
 export class SheetService extends Effect.Service<SheetService>()(
   "SheetService",
   {
-    effect: (sheetId: string, guildId: string) =>
+    effect: (sheetId: string) =>
       pipe(
         Effect.Do,
-        Effect.bind("sheet", () => GoogleSheets),
-        Effect.bind("sheetConfigService", () => SheetConfigService),
+        Effect.bindAll(
+          () => ({
+            sheet: GoogleSheets,
+            sheetConfigService: SheetConfigService,
+          }),
+          { concurrency: "unbounded" },
+        ),
         Effect.bindAll(
           ({ sheetConfigService }) => ({
             rangesConfig: Effect.cached(
@@ -448,13 +462,6 @@ export class SheetService extends Effect.Service<SheetService>()(
             teams,
             allSchedules,
           }) => ({
-            boundGuildId: () =>
-              pipe(
-                Effect.succeed(guildId),
-                Effect.withSpan("SheetService.boundGuildId", {
-                  captureStackTrace: true,
-                }),
-              ),
             get: sheetGet,
             update: sheetUpdate,
             getRangesConfig: () =>
@@ -540,12 +547,12 @@ export class SheetService extends Effect.Service<SheetService>()(
     accessors: true,
   },
 ) {
-  static ofGuild(guildId: string) {
+  static ofGuild() {
     return pipe(
       Effect.Do,
       Effect.bind("guildConfig", () =>
         pipe(
-          GuildConfigService.getConfig(guildId),
+          GuildConfigService.getConfig(),
           Effect.flatMap((computed) => observeOnce(computed.value)),
         ),
       ),
@@ -558,9 +565,10 @@ export class SheetService extends Effect.Service<SheetService>()(
         ),
       ),
       Effect.map(({ sheetId }) =>
-        SheetService.DefaultWithoutDependencies(sheetId, guildId),
+        SheetService.DefaultWithoutDependencies(sheetId),
       ),
       Effect.withSpan("SheetService.ofGuild", { captureStackTrace: true }),
+      Layer.unwrapEffect,
     );
   }
 }

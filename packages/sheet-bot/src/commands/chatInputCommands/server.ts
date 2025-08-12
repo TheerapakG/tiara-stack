@@ -10,9 +10,14 @@ import {
   SlashCommandSubcommandBuilder,
   SlashCommandSubcommandGroupBuilder,
 } from "discord.js";
-import { Array, Effect, Option, pipe } from "effect";
+import { Array, Effect, Layer, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
-import { GuildConfigService, PermissionService } from "../../services";
+import {
+  GuildConfigService,
+  GuildService,
+  guildServices,
+  PermissionService,
+} from "../../services";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandGroupHandlerContextWithSubcommandHandlerBuilder,
@@ -33,74 +38,72 @@ const handleListConfig = chatInputSubcommandHandlerContextBuilder()
   )
   .handler(
     pipe(
-      Effect.Do,
-      Effect.bind("interaction", () =>
-        InteractionContext.interaction<ChatInputCommandInteraction>(),
-      ),
-      Effect.bindAll(({ interaction }) => ({
-        serverId: pipe(
-          Effect.try(
-            () =>
-              interaction.options.getString("server_id") ?? interaction.guildId,
+      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      Effect.flatMap((interaction) =>
+        pipe(
+          Effect.Do,
+          PermissionService.tapCheckPermissions(
+            PermissionFlagsBits.ManageGuild,
           ),
-          Effect.flatMap(Option.fromNullable),
-        ),
-        memberPermissions: Option.fromNullable(interaction.memberPermissions),
-      })),
-      Effect.tap(({ memberPermissions }) =>
-        !memberPermissions.has(PermissionFlagsBits.ManageGuild)
-          ? Effect.fail("You do not have permission to manage the server")
-          : Effect.void,
-      ),
-      Effect.bind("guild", ({ serverId, interaction }) =>
-        Effect.tryPromise(() => interaction.client.guilds.fetch(serverId)),
-      ),
-      Effect.bind("guildConfig", ({ guild }) =>
-        pipe(
-          GuildConfigService.getConfig(guild.id),
-          Effect.flatMap((computed) => observeOnce(computed.value)),
-        ),
-      ),
-      Effect.bind("managerRoles", ({ guild }) =>
-        pipe(
-          GuildConfigService.getManagerRoles(guild.id),
-          Effect.flatMap((computed) => observeOnce(computed.value)),
-        ),
-      ),
-      Effect.bindAll(({ guildConfig }) =>
-        pipe(
-          guildConfig,
-          Array.head,
-          Option.map(({ sheetId, scriptId }) => ({
-            sheetId: Effect.succeed(sheetId),
-            scriptId: Effect.succeed(scriptId),
-          })),
-          Option.getOrElse(() => ({
-            sheetId: Effect.succeed(undefined),
-            scriptId: Effect.succeed(undefined),
-          })),
-        ),
-      ),
-      Effect.bind(
-        "response",
-        ({ guild, sheetId, scriptId, managerRoles, interaction }) =>
-          Effect.tryPromise(() =>
-            interaction.reply({
-              embeds: [
-                new EmbedBuilder()
-                  .setTitle(`Config for ${escapeMarkdown(guild.name)}`)
-                  .setDescription(
-                    [
-                      `Sheet id: ${escapeMarkdown(sheetId ?? "None")}`,
-                      `Script id: ${escapeMarkdown(scriptId ?? "None")}`,
-                      `Manager roles: ${managerRoles.length > 0 ? managerRoles.map((role) => roleMention(role.roleId)).join(", ") : "None"}`,
-                    ].join("\n"),
-                  ),
-              ],
+          Effect.bindAll(
+            () => ({
+              guild: GuildService.getGuild(),
+              guildConfig: pipe(
+                GuildConfigService.getConfig(),
+                Effect.flatMap((computed) => observeOnce(computed.value)),
+              ),
+              managerRoles: pipe(
+                GuildConfigService.getManagerRoles(),
+                Effect.flatMap((computed) => observeOnce(computed.value)),
+              ),
             }),
+            { concurrency: "unbounded" },
           ),
+          Effect.bindAll(({ guildConfig }) =>
+            pipe(
+              guildConfig,
+              Array.head,
+              Option.map(({ sheetId, scriptId }) => ({
+                sheetId: Effect.succeed(sheetId),
+                scriptId: Effect.succeed(scriptId),
+              })),
+              Option.getOrElse(() => ({
+                sheetId: Effect.succeed(undefined),
+                scriptId: Effect.succeed(undefined),
+              })),
+            ),
+          ),
+          Effect.bind(
+            "response",
+            ({ guild, sheetId, scriptId, managerRoles }) =>
+              InteractionContext.reply({
+                embeds: [
+                  new EmbedBuilder()
+                    .setTitle(`Config for ${escapeMarkdown(guild.name)}`)
+                    .setDescription(
+                      [
+                        `Sheet id: ${escapeMarkdown(sheetId ?? "None")}`,
+                        `Script id: ${escapeMarkdown(scriptId ?? "None")}`,
+                        `Manager roles: ${managerRoles.length > 0 ? managerRoles.map((role) => roleMention(role.roleId)).join(", ") : "None"}`,
+                      ].join("\n"),
+                    ),
+                ],
+              }),
+          ),
+          Effect.provide(
+            pipe(
+              InteractionContext.getString("server_id"),
+              Effect.map(Option.getOrElse(() => interaction.guildId)),
+              Effect.flatMap(Option.fromNullable),
+              Effect.map(guildServices),
+              Layer.unwrapEffect,
+            ),
+          ),
+        ),
       ),
-      Effect.withSpan("handleListConfig", { captureStackTrace: true }),
+      Effect.withSpan("handleServerListConfig", {
+        captureStackTrace: true,
+      }),
     ),
   )
   .build();
@@ -124,51 +127,48 @@ const handleAddManagerRole = chatInputSubcommandHandlerContextBuilder()
   )
   .handler(
     pipe(
-      Effect.Do,
-      Effect.bind("interaction", () =>
-        InteractionContext.interaction<ChatInputCommandInteraction>(),
-      ),
-      Effect.bindAll(({ interaction }) => ({
-        role: Effect.try(() => interaction.options.getRole("role", true)),
-        serverId: pipe(
-          Effect.try(
-            () =>
-              interaction.options.getString("server_id") ?? interaction.guildId,
+      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      Effect.flatMap((interaction) =>
+        pipe(
+          Effect.Do,
+          PermissionService.tapCheckPermissions(
+            PermissionFlagsBits.ManageGuild,
           ),
-          Effect.flatMap(Option.fromNullable),
+          Effect.bindAll(
+            () => ({
+              guild: GuildService.getGuild(),
+              role: InteractionContext.getRole("role", true),
+            }),
+            { concurrency: "unbounded" },
+          ),
+          Effect.tap(({ role }) => GuildConfigService.addManagerRole(role.id)),
+          Effect.bind("response", ({ guild, role }) =>
+            InteractionContext.reply({
+              embeds: [
+                new EmbedBuilder()
+                  .setTitle(`Success!`)
+                  .setDescription(
+                    `${roleMention(role.id)} is now a manager role for ${escapeMarkdown(guild.name)}`,
+                  )
+                  .setTimestamp()
+                  .setFooter({
+                    text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
+                  }),
+              ],
+            }),
+          ),
+          Effect.provide(
+            pipe(
+              InteractionContext.getString("server_id"),
+              Effect.map(Option.getOrElse(() => interaction.guildId)),
+              Effect.flatMap(Option.fromNullable),
+              Effect.map(guildServices),
+              Layer.unwrapEffect,
+            ),
+          ),
         ),
-        memberPermissions: Option.fromNullable(interaction.memberPermissions),
-      })),
-      Effect.bind("guild", ({ serverId, interaction }) =>
-        Effect.tryPromise(() => interaction.client.guilds.fetch(serverId)),
       ),
-      Effect.tap(({ memberPermissions }) =>
-        !memberPermissions.has(PermissionFlagsBits.ManageGuild)
-          ? Effect.fail("You do not have permission to manage the server")
-          : Effect.void,
-      ),
-      Effect.tap(({ guild, role }) =>
-        GuildConfigService.addManagerRole(guild.id, role.id),
-      ),
-      Effect.bind("response", ({ guild, role, interaction }) =>
-        Effect.tryPromise(() =>
-          interaction.reply({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle(`Success!`)
-                .setDescription(
-                  `${roleMention(role.id)} is now a manager role for ${escapeMarkdown(guild.name)}`,
-                )
-                .setTimestamp()
-                .setFooter({
-                  text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
-                }),
-            ],
-          }),
-        ),
-      ),
-      Effect.asVoid,
-      Effect.withSpan("handleAddManagerRole", {
+      Effect.withSpan("handleServerAddManagerRole", {
         captureStackTrace: true,
       }),
     ),
@@ -204,51 +204,50 @@ const handleRemoveManagerRole = chatInputSubcommandHandlerContextBuilder()
   )
   .handler(
     pipe(
-      Effect.Do,
-      Effect.bind("interaction", () =>
-        InteractionContext.interaction<ChatInputCommandInteraction>(),
-      ),
-      Effect.bindAll(({ interaction }) => ({
-        role: Effect.try(() => interaction.options.getRole("role", true)),
-        serverId: pipe(
-          Effect.try(
-            () =>
-              interaction.options.getString("server_id") ?? interaction.guildId,
+      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      Effect.flatMap((interaction) =>
+        pipe(
+          Effect.Do,
+          PermissionService.tapCheckPermissions(
+            PermissionFlagsBits.ManageGuild,
           ),
-          Effect.flatMap(Option.fromNullable),
+          Effect.bindAll(
+            () => ({
+              guild: GuildService.getGuild(),
+              role: InteractionContext.getRole("role", true),
+            }),
+            { concurrency: "unbounded" },
+          ),
+          Effect.tap(({ role }) =>
+            GuildConfigService.removeManagerRole(role.id),
+          ),
+          Effect.bind("response", ({ guild, role }) =>
+            InteractionContext.reply({
+              embeds: [
+                new EmbedBuilder()
+                  .setTitle(`Success!`)
+                  .setDescription(
+                    `${roleMention(role.id)} is no longer a manager role for ${escapeMarkdown(guild.name)}`,
+                  )
+                  .setTimestamp()
+                  .setFooter({
+                    text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
+                  }),
+              ],
+            }),
+          ),
+          Effect.provide(
+            pipe(
+              InteractionContext.getString("server_id"),
+              Effect.map(Option.getOrElse(() => interaction.guildId)),
+              Effect.flatMap(Option.fromNullable),
+              Effect.map(guildServices),
+              Layer.unwrapEffect,
+            ),
+          ),
         ),
-        memberPermissions: Option.fromNullable(interaction.memberPermissions),
-      })),
-      Effect.bind("guild", ({ serverId, interaction }) =>
-        Effect.tryPromise(() => interaction.client.guilds.fetch(serverId)),
       ),
-      Effect.tap(({ memberPermissions }) =>
-        !memberPermissions.has(PermissionFlagsBits.ManageGuild)
-          ? Effect.fail("You do not have permission to manage the server")
-          : Effect.void,
-      ),
-      Effect.tap(({ guild, role }) =>
-        GuildConfigService.removeManagerRole(guild.id, role.id),
-      ),
-      Effect.bind("response", ({ guild, role, interaction }) =>
-        Effect.tryPromise(() =>
-          interaction.reply({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle(`Success!`)
-                .setDescription(
-                  `${roleMention(role.id)} is no longer a manager role for ${escapeMarkdown(guild.name)}`,
-                )
-                .setTimestamp()
-                .setFooter({
-                  text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
-                }),
-            ],
-          }),
-        ),
-      ),
-      Effect.asVoid,
-      Effect.withSpan("handleRemoveManagerRole", {
+      Effect.withSpan("handleServerRemoveManagerRole", {
         captureStackTrace: true,
       }),
     ),
@@ -284,55 +283,52 @@ const handleSetSheet = chatInputSubcommandHandlerContextBuilder()
   )
   .handler(
     pipe(
-      Effect.Do,
-      Effect.bind("interaction", () =>
-        InteractionContext.interaction<ChatInputCommandInteraction>(),
-      ),
-      Effect.bindAll(({ interaction }) => ({
-        sheetId: Effect.try(() =>
-          interaction.options.getString("sheet_id", true),
-        ),
-        serverId: pipe(
-          Effect.try(
-            () =>
-              interaction.options.getString("server_id") ?? interaction.guildId,
+      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      Effect.flatMap((interaction) =>
+        pipe(
+          Effect.Do,
+          PermissionService.tapCheckPermissions(
+            PermissionFlagsBits.ManageGuild,
           ),
-          Effect.flatMap(Option.fromNullable),
+          Effect.bindAll(
+            () => ({
+              sheetId: InteractionContext.getString("sheet_id", true),
+              guild: GuildService.getGuild(),
+            }),
+            { concurrency: "unbounded" },
+          ),
+          Effect.tap(({ sheetId }) =>
+            GuildConfigService.updateConfig({
+              sheetId,
+            }),
+          ),
+          Effect.bind("response", ({ guild, sheetId }) =>
+            InteractionContext.reply({
+              embeds: [
+                new EmbedBuilder()
+                  .setTitle(`Success!`)
+                  .setDescription(
+                    `Sheet id for ${escapeMarkdown(guild.name)} is now set to ${escapeMarkdown(sheetId)}`,
+                  )
+                  .setTimestamp()
+                  .setFooter({
+                    text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
+                  }),
+              ],
+            }),
+          ),
+          Effect.provide(
+            pipe(
+              InteractionContext.getString("server_id"),
+              Effect.map(Option.getOrElse(() => interaction.guildId)),
+              Effect.flatMap(Option.fromNullable),
+              Effect.map(guildServices),
+              Layer.unwrapEffect,
+            ),
+          ),
         ),
-        memberPermissions: Option.fromNullable(interaction.memberPermissions),
-      })),
-      Effect.bind("guild", ({ serverId, interaction }) =>
-        Effect.tryPromise(() => interaction.client.guilds.fetch(serverId)),
       ),
-      Effect.tap(({ memberPermissions }) =>
-        !memberPermissions.has(PermissionFlagsBits.ManageGuild)
-          ? Effect.fail("You do not have permission to manage the server")
-          : Effect.void,
-      ),
-      Effect.tap(({ guild, sheetId }) =>
-        GuildConfigService.updateConfig(guild.id, {
-          sheetId,
-        }),
-      ),
-      Effect.bind("response", ({ guild, sheetId, interaction }) =>
-        Effect.tryPromise(() =>
-          interaction.reply({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle(`Success!`)
-                .setDescription(
-                  `Sheet id for ${escapeMarkdown(guild.name)} is now set to ${escapeMarkdown(sheetId)}`,
-                )
-                .setTimestamp()
-                .setFooter({
-                  text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
-                }),
-            ],
-          }),
-        ),
-      ),
-      Effect.asVoid,
-      Effect.withSpan("handleSetSheet", { captureStackTrace: true }),
+      Effect.withSpan("handleServerSetSheet", { captureStackTrace: true }),
     ),
   )
   .build();
@@ -356,52 +352,50 @@ const handleSetScript = chatInputSubcommandHandlerContextBuilder()
   )
   .handler(
     pipe(
-      Effect.Do,
-      Effect.bind("interaction", () =>
-        InteractionContext.interaction<ChatInputCommandInteraction>(),
-      ),
-      Effect.bindAll(({ interaction }) => ({
-        scriptId: Effect.try(() =>
-          interaction.options.getString("script_id", true),
-        ),
-        serverId: pipe(
-          Effect.try(
-            () =>
-              interaction.options.getString("server_id") ?? interaction.guildId,
+      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      Effect.flatMap((interaction) =>
+        pipe(
+          Effect.Do,
+          PermissionService.tapCheckOwner({ allowSameGuild: false }),
+          Effect.bindAll(
+            () => ({
+              scriptId: InteractionContext.getString("script_id", true),
+              guild: GuildService.getGuild(),
+            }),
+            { concurrency: "unbounded" },
           ),
-          Effect.flatMap(Option.fromNullable),
+          Effect.tap(({ scriptId }) =>
+            GuildConfigService.updateConfig({
+              scriptId,
+            }),
+          ),
+          Effect.bind("response", ({ guild, scriptId }) =>
+            InteractionContext.reply({
+              embeds: [
+                new EmbedBuilder()
+                  .setTitle(`Success!`)
+                  .setDescription(
+                    `Script id for ${escapeMarkdown(guild.name)} is now set to ${escapeMarkdown(scriptId)}`,
+                  )
+                  .setTimestamp()
+                  .setFooter({
+                    text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
+                  }),
+              ],
+            }),
+          ),
+          Effect.provide(
+            pipe(
+              InteractionContext.getString("server_id"),
+              Effect.map(Option.getOrElse(() => interaction.guildId)),
+              Effect.flatMap(Option.fromNullable),
+              Effect.map(guildServices),
+              Layer.unwrapEffect,
+            ),
+          ),
         ),
-      })),
-      Effect.bind("guild", ({ serverId, interaction }) =>
-        Effect.tryPromise(() => interaction.client.guilds.fetch(serverId)),
       ),
-      Effect.tap(({ interaction }) =>
-        PermissionService.checkOwner(interaction),
-      ),
-      Effect.tap(({ guild, scriptId }) =>
-        GuildConfigService.updateConfig(guild.id, {
-          scriptId,
-        }),
-      ),
-      Effect.bind("response", ({ guild, scriptId, interaction }) =>
-        Effect.tryPromise(() =>
-          interaction.reply({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle(`Success!`)
-                .setDescription(
-                  `Script id for ${escapeMarkdown(guild.name)} is now set to ${escapeMarkdown(scriptId)}`,
-                )
-                .setTimestamp()
-                .setFooter({
-                  text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
-                }),
-            ],
-          }),
-        ),
-      ),
-      Effect.asVoid,
-      Effect.withSpan("handleSetScript", { captureStackTrace: true }),
+      Effect.withSpan("handleServerSetScript", { captureStackTrace: true }),
     ),
   )
   .build();

@@ -1,26 +1,39 @@
-import { Data, Effect, Metric, Option, pipe } from "effect";
-import { InteractionHandlerContext, InteractionHandlerMap } from "./handler";
+import {
+  InteractionResponse,
+  Message,
+  MessageFlags,
+  RepliableInteraction,
+} from "discord.js";
+import { Cause, Data, Effect, Metric, Option, pipe } from "effect";
+import {
+  InteractionHandler,
+  InteractionHandlerContext,
+  InteractionHandlerMap,
+} from "./handler";
+import { InteractionContext } from "./interactionContext";
 
 type InteractionHandlerMapWithMetricsObject<
   Data = unknown,
+  A = never,
   E = never,
   R = never,
 > = {
-  map: InteractionHandlerMap<Data, E, R>;
+  map: InteractionHandlerMap<Data, A, E, R>;
   interactionType: string;
   interactionCount: Metric.Metric.Counter<bigint>;
 };
 
 export class InteractionHandlerMapWithMetrics<
   Data = unknown,
+  A = never,
   E = never,
   R = never,
 > extends Data.TaggedClass("InteractionHandlerMapWithMetrics")<
-  InteractionHandlerMapWithMetricsObject<Data, E, R>
+  InteractionHandlerMapWithMetricsObject<Data, A, E, R>
 > {
-  static make<Data = unknown, E = never, R = never>(
+  static make<Data = unknown, A = never, E = never, R = never>(
     interactionType: string,
-    map: InteractionHandlerMap<Data, E, R>,
+    map: InteractionHandlerMap<Data, A, E, R>,
   ) {
     return new InteractionHandlerMapWithMetrics({
       map,
@@ -36,11 +49,11 @@ export class InteractionHandlerMapWithMetrics<
     });
   }
 
-  static add<Data1 extends Data2, Data2, E1 = never, R1 = never>(
-    context: InteractionHandlerContext<Data1, E1, R1>,
+  static add<Data1 extends Data2, Data2, A1 = never, E1 = never, R1 = never>(
+    context: InteractionHandlerContext<Data1, A1, E1, R1>,
   ) {
-    return <E2 = never, R2 = never>(
-      map: InteractionHandlerMapWithMetrics<Data2, E2, R2>,
+    return <A2 = never, E2 = never, R2 = never>(
+      map: InteractionHandlerMapWithMetrics<Data2, A2, E2, R2>,
     ) =>
       new InteractionHandlerMapWithMetrics({
         map: pipe(map.map, InteractionHandlerMap.add(context)),
@@ -49,11 +62,11 @@ export class InteractionHandlerMapWithMetrics<
       });
   }
 
-  static union<Data1 extends Data2, Data2, E1 = never, R1 = never>(
-    map: InteractionHandlerMap<Data1, E1, R1>,
+  static union<Data1 extends Data2, Data2, A1 = never, E1 = never, R1 = never>(
+    map: InteractionHandlerMap<Data1, A1, E1, R1>,
   ) {
-    return <E2 = never, R2 = never>(
-      other: InteractionHandlerMapWithMetrics<Data2, E2, R2>,
+    return <A2 = never, E2 = never, R2 = never>(
+      other: InteractionHandlerMapWithMetrics<Data2, A2, E2, R2>,
     ) =>
       new InteractionHandlerMapWithMetrics({
         map: pipe(other.map, InteractionHandlerMap.union(map)),
@@ -63,12 +76,16 @@ export class InteractionHandlerMapWithMetrics<
   }
 
   static execute(interactionKey: string) {
-    return <Data, E, R>(map: InteractionHandlerMapWithMetrics<Data, E, R>) =>
+    return <Data, A, E, R>(
+      map: InteractionHandlerMapWithMetrics<Data, A, E, R>,
+    ) =>
       pipe(
         map.map,
         InteractionHandlerMap.get(interactionKey),
-        Option.map((command) => command.handler),
-        Option.getOrElse(() => Effect.void as Effect.Effect<unknown, E, R>),
+        Option.map(
+          (command) => command.handler as InteractionHandler<A | void, E, R>,
+        ),
+        Option.getOrElse(() => Effect.void as Effect.Effect<A | void, E, R>),
         Effect.tapBoth({
           onSuccess: () =>
             pipe(
@@ -85,10 +102,63 @@ export class InteractionHandlerMapWithMetrics<
         }),
         Effect.tagMetrics("interaction_type", map.interactionType),
         Effect.tagMetrics("interaction_key", interactionKey),
+        Effect.withSpan("InteractionHandlerMapWithMetrics.execute", {
+          captureStackTrace: true,
+        }),
       );
   }
 
-  static values<Data, E, R>(map: InteractionHandlerMapWithMetrics<Data, E, R>) {
+  static executeAndReplyError(interactionKey: string) {
+    return <Data, A, E, R>(
+      map: InteractionHandlerMapWithMetrics<Data, A, E, R>,
+    ) =>
+      pipe(
+        map,
+        InteractionHandlerMapWithMetrics.execute(interactionKey),
+        Effect.sandbox,
+        Effect.tapBoth({
+          onSuccess: () => Effect.void,
+          onFailure: (cause) =>
+            pipe(
+              Effect.Do,
+              Effect.let("cause", () => cause),
+              Effect.bind("interaction", () =>
+                InteractionContext.interaction<RepliableInteraction>(),
+              ),
+              Effect.tap(({ cause }) => Effect.log(cause)),
+              Effect.tap(({ cause, interaction }) =>
+                pipe(
+                  Effect.suspend<
+                    Message | InteractionResponse,
+                    Cause.UnknownException,
+                    InteractionContext<RepliableInteraction>
+                  >(() =>
+                    (interaction.replied || interaction.deferred
+                      ? InteractionContext.followUp
+                      : InteractionContext.reply)({
+                      content: Cause.pretty(cause),
+                      flags: MessageFlags.Ephemeral,
+                    }),
+                  ),
+                  // TODO: handle errors
+                  Effect.catchAll(() => Effect.void),
+                ),
+              ),
+            ),
+        }),
+        Effect.unsandbox,
+        Effect.withSpan(
+          "InteractionHandlerMapWithMetrics.executeAndReplyError",
+          {
+            captureStackTrace: true,
+          },
+        ),
+      );
+  }
+
+  static values<Data, A, E, R>(
+    map: InteractionHandlerMapWithMetrics<Data, A, E, R>,
+  ) {
     return InteractionHandlerMap.values(map.map);
   }
 }

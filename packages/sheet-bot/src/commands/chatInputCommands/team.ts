@@ -15,7 +15,7 @@ import {
   PermissionService,
   SheetService,
 } from "../../services";
-import { RawTeam } from "../../services/sheetService";
+import { RawTeam } from "../../services/guild/sheetService";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
@@ -38,36 +38,26 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
   )
   .handler(
     pipe(
-      Effect.Do,
-      Effect.bind("interaction", () =>
-        InteractionContext.interaction<ChatInputCommandInteraction>(),
-      ),
-      Effect.flatMap(({ interaction }) =>
+      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      Effect.flatMap((interaction) =>
         pipe(
           Effect.Do,
+          PermissionService.tapCheckOwner({ allowSameGuild: true }),
           Effect.bindAll(() => ({
-            user: Effect.try(
-              () => interaction.options.getUser("user") ?? interaction.user,
+            user: pipe(
+              InteractionContext.getUser("user"),
+              Effect.map(Option.getOrElse(() => interaction.user)),
             ),
-            serverId: SheetService.boundGuildId(),
           })),
-          Effect.tap(({ serverId }) =>
-            serverId !== interaction.guildId
-              ? PermissionService.checkOwner(interaction)
-              : Effect.void,
-          ),
-          Effect.bind("managerRoles", ({ serverId }) =>
-            serverId
-              ? pipe(
-                  GuildConfigService.getManagerRoles(serverId),
-                  Effect.flatMap((computed) => observeOnce(computed.value)),
-                )
-              : Effect.succeed([]),
+          Effect.bind("managerRoles", () =>
+            pipe(
+              GuildConfigService.getManagerRoles(),
+              Effect.flatMap((computed) => observeOnce(computed.value)),
+            ),
           ),
           Effect.tap(({ user, managerRoles }) =>
             user.id !== interaction.user.id
               ? PermissionService.checkRoles(
-                  interaction,
                   managerRoles.map((role) => role.roleId),
                   "You can only get your own teams in the current server",
                 )
@@ -98,7 +88,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
             ),
           ),
           Effect.tap(({ user, userTeams }) =>
-            interaction.reply({
+            InteractionContext.reply({
               embeds: [
                 new EmbedBuilder()
                   .setTitle(`${escapeMarkdown(user.username)}'s Teams`)
@@ -120,11 +110,8 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           ),
           Effect.provide(
             pipe(
-              Effect.try(
-                () =>
-                  interaction.options.getString("server_id") ??
-                  interaction.guildId,
-              ),
+              InteractionContext.getString("server_id"),
+              Effect.map(Option.getOrElse(() => interaction.guildId)),
               Effect.flatMap(Option.fromNullable),
               Effect.map(guildServices),
               Layer.unwrapEffect,
@@ -132,6 +119,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           ),
         ),
       ),
+      Effect.withSpan("handleTeamList", { captureStackTrace: true }),
     ),
   )
   .build();

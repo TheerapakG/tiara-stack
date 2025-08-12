@@ -33,7 +33,7 @@ import {
   PermissionService,
   ScheduleService,
 } from "../../services";
-import { SheetService } from "../../services/sheetService";
+import { SheetService } from "../../services/guild/sheetService";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
@@ -98,45 +98,32 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
   )
   .handler(
     pipe(
-      Effect.Do,
-      Effect.bind("interaction", () =>
-        InteractionContext.interaction<ChatInputCommandInteraction>(),
-      ),
-      Effect.flatMap(({ interaction }) =>
+      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      Effect.flatMap((interaction) =>
         pipe(
           Effect.Do,
+          PermissionService.tapCheckOwner({ allowSameGuild: true }),
           Effect.bindAll(() => ({
             messageFlags: Ref.make(new MessageFlagsBitField()),
-            day: Effect.try(() => interaction.options.getNumber("day", true)),
-            serverId: SheetService.boundGuildId(),
+            day: InteractionContext.getNumber("day", true),
             messageType: pipe(
-              Effect.try(
-                () =>
-                  interaction.options.getString("message_type") ?? "ephemeral",
-              ),
+              InteractionContext.getString("message_type"),
+              Effect.map(Option.getOrElse(() => "ephemeral")),
               Effect.flatMap(
                 validate(type.enumerated("persistent", "ephemeral")),
               ),
             ),
             user: Effect.succeed(interaction.user),
           })),
-          Effect.tap(({ serverId }) =>
-            serverId !== interaction.guildId
-              ? PermissionService.checkOwner(interaction)
-              : Effect.void,
-          ),
-          Effect.bind("managerRoles", ({ serverId }) =>
-            serverId
-              ? pipe(
-                  GuildConfigService.getManagerRoles(serverId),
-                  Effect.flatMap((computed) => observeOnce(computed.value)),
-                )
-              : Effect.succeed([]),
+          Effect.bind("managerRoles", () =>
+            pipe(
+              GuildConfigService.getManagerRoles(),
+              Effect.flatMap((computed) => observeOnce(computed.value)),
+            ),
           ),
           Effect.tap(({ messageType, managerRoles }) =>
             messageType !== "ephemeral"
               ? PermissionService.checkRoles(
-                  interaction,
                   managerRoles.map((role) => role.roleId),
                   "You can only make persistent messages as a manager",
                 )
@@ -152,30 +139,25 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
           Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
           Effect.bind("response", ({ day, slotMessage, flags }) =>
-            Effect.tryPromise(() =>
-              interaction.reply({
-                embeds: [
-                  new EmbedBuilder()
-                    .setTitle(`Day ${day} Slots~`)
-                    .setDescription(
-                      slotMessage === "" ? "All Filled :3" : slotMessage,
-                    )
-                    .setTimestamp()
-                    .setFooter({
-                      text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
-                    }),
-                ],
-                flags: flags.bitfield,
-              }),
-            ),
+            InteractionContext.reply({
+              embeds: [
+                new EmbedBuilder()
+                  .setTitle(`Day ${day} Slots~`)
+                  .setDescription(
+                    slotMessage === "" ? "All Filled :3" : slotMessage,
+                  )
+                  .setTimestamp()
+                  .setFooter({
+                    text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
+                  }),
+              ],
+              flags: flags.bitfield,
+            }),
           ),
           Effect.provide(
             pipe(
-              Effect.try(
-                () =>
-                  interaction.options.getString("server_id") ??
-                  interaction.guildId,
-              ),
+              InteractionContext.getString("server_id"),
+              Effect.map(Option.getOrElse(() => interaction.guildId)),
               Effect.flatMap(Option.fromNullable),
               Effect.map(guildServices),
               Layer.unwrapEffect,
@@ -183,6 +165,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           ),
         ),
       ),
+      Effect.withSpan("handleSlotList", { captureStackTrace: true }),
     ),
   )
   .build();
@@ -201,60 +184,53 @@ const handleButton = chatInputSubcommandHandlerContextBuilder()
   )
   .handler(
     pipe(
-      Effect.Do,
-      Effect.bind("interaction", () =>
-        InteractionContext.interaction<ChatInputCommandInteraction>(),
-      ),
-      Effect.bindAll(({ interaction }) => ({
-        day: Effect.try(() => interaction.options.getNumber("day", true)),
-        serverId: pipe(
-          Effect.try(
-            () =>
-              interaction.options.getString("server_id") ?? interaction.guildId,
-          ),
-          Effect.flatMap(Option.fromNullable),
-        ),
-        channel: Option.fromNullable(interaction.channel),
-        user: Effect.succeed(interaction.user),
-      })),
-      Effect.tap(({ serverId, interaction }) =>
-        serverId !== interaction.guildId
-          ? PermissionService.checkOwner(interaction)
-          : Effect.void,
-      ),
-      Effect.bind("managerRoles", ({ serverId }) =>
-        serverId
-          ? pipe(
-              GuildConfigService.getManagerRoles(serverId),
+      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      Effect.flatMap((interaction) =>
+        pipe(
+          Effect.Do,
+          PermissionService.tapCheckOwner({ allowSameGuild: true }),
+          PermissionService.tapCheckRoles(
+            pipe(
+              GuildConfigService.getManagerRoles(),
               Effect.flatMap((computed) => observeOnce(computed.value)),
-            )
-          : Effect.succeed([]),
-      ),
-      Effect.tap(({ managerRoles, interaction }) =>
-        PermissionService.checkRoles(
-          interaction,
-          managerRoles.map((role) => role.roleId),
-          "You can only make buttons as a manager",
-        ),
-      ),
-      Effect.tap(({ channel, day }) =>
-        ChannelConfigService.updateConfig(channel.id, {
-          day,
-        }),
-      ),
-      Effect.bind("response", ({ day, interaction }) =>
-        Effect.tryPromise(() =>
-          interaction.reply({
-            content: `Press the button below to get the current open slots for day ${day}`,
-            components: [
-              new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                new ButtonBuilder(slotButton.data),
+              Effect.map((managerRoles) =>
+                managerRoles.map((role) => role.roleId),
               ),
-            ],
-          }),
+            ),
+            "You can only make buttons as a manager",
+          ),
+          Effect.bindAll(() => ({
+            day: InteractionContext.getNumber("day", true),
+            channel: Option.fromNullable(interaction.channel),
+            user: Effect.succeed(interaction.user),
+          })),
+          Effect.tap(({ channel, day }) =>
+            ChannelConfigService.updateConfig(channel.id, {
+              day,
+            }),
+          ),
+          Effect.bind("response", ({ day }) =>
+            InteractionContext.reply({
+              content: `Press the button below to get the current open slots for day ${day}`,
+              components: [
+                new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                  new ButtonBuilder(slotButton.data),
+                ),
+              ],
+            }),
+          ),
+          Effect.provide(
+            pipe(
+              InteractionContext.getString("server_id"),
+              Effect.map(Option.getOrElse(() => interaction.guildId)),
+              Effect.flatMap(Option.fromNullable),
+              Effect.map(guildServices),
+              Layer.unwrapEffect,
+            ),
+          ),
         ),
       ),
-      Effect.asVoid,
+      Effect.withSpan("handleSlotButton", { captureStackTrace: true }),
     ),
   )
   .build();

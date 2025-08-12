@@ -4,7 +4,7 @@ import { Array, Effect, pipe } from "effect";
 import { messageCheckin, messageCheckinMember } from "sheet-db-schema";
 import { DBSubscriptionContext } from "typhoon-server/db";
 import { computed } from "typhoon-server/signal";
-import { DB } from "../db";
+import { DB } from "../../db";
 
 export class MessageCheckinService extends Effect.Service<MessageCheckinService>()(
   "MessageCheckinService",
