@@ -11,7 +11,16 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, Cause, Effect, HashMap, Layer, Option, pipe } from "effect";
+import {
+  Array,
+  Cause,
+  Data,
+  Effect,
+  HashMap,
+  Layer,
+  Option,
+  pipe,
+} from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import { checkinButton } from "../../buttons";
 import {
@@ -30,6 +39,14 @@ import {
   chatInputSubcommandHandlerContextBuilder,
   InteractionContext,
 } from "../../types";
+
+class ArgumentError extends Data.TaggedError("ArgumentError")<{
+  readonly message: string;
+}> {
+  constructor(message: string) {
+    super({ message });
+  }
+}
 
 const getCheckinData = ({
   hour,
@@ -63,7 +80,16 @@ const getCheckinData = ({
       pipe(
         GuildConfigService.getRunningChannelByName(channelName),
         Effect.flatMap((computed) => observeOnce(computed.value)),
-        Effect.flatMap(Array.head),
+        Effect.map(Array.head),
+        Effect.flatMap(
+          Option.match({
+            onSome: (channel) => Effect.succeed(channel),
+            onNone: () =>
+              Effect.fail(
+                new ArgumentError(`No such running channel: ${channelName}`),
+              ),
+          }),
+        ),
       ),
     ),
     Effect.map(({ eventConfig, prevSchedule, schedule, runningChannel }) => ({

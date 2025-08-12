@@ -35,10 +35,10 @@ type InteractionHandlerSuccess<H extends AnyInteractionHandler> =
   H extends InteractionHandler<infer A, unknown, unknown> ? A : never;
 
 type InteractionHandlerError<H extends AnyInteractionHandler> =
-  H extends InteractionHandler<infer E, unknown> ? E : never;
+  H extends InteractionHandler<unknown, infer E, unknown> ? E : never;
 
 type InteractionHandlerRequirement<H extends AnyInteractionHandler> =
-  H extends InteractionHandler<unknown, infer R> ? R : never;
+  H extends InteractionHandler<unknown, unknown, infer R> ? R : never;
 
 export type VariantInteractionHandler<
   Variant extends HandlerVariantKey,
