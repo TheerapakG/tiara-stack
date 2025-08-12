@@ -38,7 +38,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
           messageId: string,
           data: Pick<
             typeof messageCheckin.$inferInsert,
-            "initialMessage" | "hour" | "roleId"
+            "initialMessage" | "hour" | "channelId" | "roleId"
           >,
         ) =>
           pipe(

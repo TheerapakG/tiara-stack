@@ -110,6 +110,7 @@ export const messageCheckin = pgTable(
     messageId: varchar("message_id").notNull(),
     initialMessage: varchar("initial_message").notNull(),
     hour: integer("hour").notNull(),
+    channelId: varchar("channel_id").notNull(),
     roleId: varchar("role_id").notNull(),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
