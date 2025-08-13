@@ -2,6 +2,7 @@ import {
   Context,
   Deferred,
   Effect as Effect_,
+  Effectable,
   Fiber,
   HashSet,
   Option,
@@ -17,6 +18,7 @@ const DependencySymbol = Symbol("Typhoon/Signal/Dependency");
 const DependentSymbol = Symbol("Typhoon/Signal/Dependent");
 
 export abstract class DependencySignal<A = never, E = never, R = never>
+  extends Effectable.Class<A, E, R | SignalContext>
   implements Observable
 {
   abstract readonly [DependencySymbol]: DependencySignal<A, E, R>;
@@ -157,7 +159,10 @@ const runAndTrackEffect = <A = never, E = never, R = never>(
   );
 };
 
-export class Signal<T = unknown> implements DependencySignal<T, never, never> {
+export class Signal<T = unknown>
+  extends Effectable.Class<T, never, SignalContext>
+  implements DependencySignal<T, never, never>
+{
   readonly [DependencySymbol]: DependencySignal<T, never, never> = this;
   readonly [ObservableSymbol]: ObservableOptions;
 
@@ -165,6 +170,7 @@ export class Signal<T = unknown> implements DependencySignal<T, never, never> {
   private _dependents: HashSet.HashSet<DependentSignal>;
 
   constructor(value: T, options: ObservableOptions) {
+    super();
     this._value = value;
     this._dependents = HashSet.empty();
     this[ObservableSymbol] = options;
@@ -203,6 +209,10 @@ export class Signal<T = unknown> implements DependencySignal<T, never, never> {
         captureStackTrace: true,
       }),
     );
+  }
+
+  commit(): Effect_.Effect<T, never, SignalContext> {
+    return this.value;
   }
 
   peek(): Effect_.Effect<T, never, never> {
@@ -258,6 +268,7 @@ export const signal = <T>(value: T, options?: ObservableOptions) =>
   new Signal(value, options ?? {});
 
 export class Computed<A = never, E = never, R = never>
+  extends Effectable.Class<A, E, R | SignalContext>
   implements DependentSignal, DependencySignal<A, E, R>
 {
   readonly [DependencySymbol]: DependencySignal<A, E, R> = this;
@@ -275,6 +286,7 @@ export class Computed<A = never, E = never, R = never>
     value: Deferred.Deferred<A, E>,
     options: ObservableOptions,
   ) {
+    super();
     this._effect = effect;
     this._value = value;
     this._fiber = Option.none();
@@ -337,6 +349,10 @@ export class Computed<A = never, E = never, R = never>
         captureStackTrace: true,
       }),
     );
+  }
+
+  commit(): Effect_.Effect<A, E, R | SignalContext> {
+    return this.value;
   }
 
   peek(): Effect_.Effect<A, E, R> {
@@ -419,6 +435,18 @@ export class Computed<A = never, E = never, R = never>
     );
   }
 
+  static map<A, B>(mapper: (value: A) => B) {
+    return <E, R>(signal: DependencySignal<A, E, R>) =>
+      computed(pipe(signal, Effect_.map(mapper)));
+  }
+
+  static flatMap<A, B, E2, R2>(
+    mapper: (value: A) => Effect_.Effect<B, E2, R2>,
+  ) {
+    return <E1, R1>(signal: DependencySignal<A, E1, R1>) =>
+      computed(pipe(signal, Effect_.flatMap(mapper)));
+  }
+
   static annotateLogs<E1 = never, R1 = never>(
     key: string,
     value: DependencySignal<unknown, E1, R1>,
@@ -428,11 +456,11 @@ export class Computed<A = never, E = never, R = never>
     ) =>
       computed(
         pipe(
-          value.value,
+          value,
           Effect_.flatMap((value) =>
             pipe(
               signal,
-              Effect_.flatMap((signal) => signal.value),
+              Effect_.flatMap((signal) => signal),
               Effect_.annotateLogs(key, value),
             ),
           ),
@@ -449,11 +477,11 @@ export class Computed<A = never, E = never, R = never>
     ) =>
       computed(
         pipe(
-          value.value,
+          value,
           Effect_.flatMap((value) =>
             pipe(
               signal,
-              Effect_.flatMap((signal) => signal.value),
+              Effect_.flatMap((signal) => signal),
               Effect_.annotateSpans(key, value),
             ),
           ),
@@ -569,7 +597,10 @@ export const effect = (
     }),
   );
 
-class OnceObserver<A = never, E = never> implements DependentSignal {
+class OnceObserver<A = never, E = never>
+  extends Effectable.Class<A, E, never>
+  implements DependentSignal
+{
   readonly [DependentSymbol]: DependentSignal = this;
   readonly [ObservableSymbol]: ObservableOptions;
 
@@ -580,6 +611,7 @@ class OnceObserver<A = never, E = never> implements DependentSignal {
     fiber: Deferred.Deferred<Fiber.Fiber<A, E>, never>,
     options: ObservableOptions,
   ) {
+    super();
     this._dependencies = HashSet.empty();
     this._fiber = fiber;
     this[ObservableSymbol] = options;
@@ -628,6 +660,10 @@ class OnceObserver<A = never, E = never> implements DependentSignal {
     });
   }
 
+  commit(): Effect_.Effect<A, E, never> {
+    return this.value;
+  }
+
   get value(): Effect_.Effect<A, E, never> {
     return pipe(
       Effect_.Do,
@@ -655,7 +691,7 @@ export const observeOnce = <A = never, E = never, R = never>(
 ) =>
   pipe(
     OnceObserver.make(effect, options ?? {}),
-    Effect_.flatMap((observer) => observer.value),
+    Effect_.flatMap((observer) => observer),
     Observable.withSpan({ [ObservableSymbol]: options ?? {} }, "observeOnce", {
       captureStackTrace: true,
     }),

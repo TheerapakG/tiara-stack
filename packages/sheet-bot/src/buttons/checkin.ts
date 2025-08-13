@@ -53,7 +53,7 @@ export const button = buttonInteractionHandlerContextBuilder()
       Effect.bind("messageCheckinData", ({ message }) =>
         pipe(
           MessageCheckinService.getMessageCheckinData(message.id),
-          Effect.flatMap((computed) => observeOnce(computed.value)),
+          Effect.flatMap(observeOnce),
           Effect.flatMap(Function.identity),
         ),
       ),
@@ -79,7 +79,7 @@ export const button = buttonInteractionHandlerContextBuilder()
       Effect.bind("checkedInMentions", ({ message }) =>
         pipe(
           MessageCheckinService.getMessageCheckinMembers(message.id),
-          Effect.flatMap((computed) => observeOnce(computed.value)),
+          Effect.flatMap(observeOnce),
           Effect.map((members) =>
             members
               .filter((m) => m.checkinAt !== null)

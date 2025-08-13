@@ -53,7 +53,7 @@ const getCheckinData = ({
       schedules: SheetService.getAllSchedules(),
       runningChannel: pipe(
         GuildConfigService.getRunningChannelByName(channelName),
-        Effect.flatMap((computed) => observeOnce(computed.value)),
+        Effect.flatMap(observeOnce),
         Effect.flatMap(
           Option.match({
             onSome: (channel) => Effect.succeed(channel),
@@ -145,7 +145,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
       PermissionService.tapCheckRoles(
         pipe(
           GuildConfigService.getManagerRoles(),
-          Effect.flatMap((computed) => observeOnce(computed.value)),
+          Effect.flatMap(observeOnce),
           Effect.map((managerRoles) => managerRoles.map((role) => role.roleId)),
         ),
         "You can only check in users as a manager",

@@ -259,7 +259,7 @@ export class WebSocketClient<
       Effect.map(
         ({ id, signal }) =>
           [
-            signal.value as Effect.Effect<
+            signal as Effect.Effect<
               SignalState<
                 StandardSchemaV1.InferOutput<
                   ServerSubscriptionHandlers[Handler]["config"]["response"]["validator"]
@@ -341,7 +341,7 @@ export class WebSocketClient<
         ({ id, deferred }) =>
           (data: SuccessData) =>
             pipe(
-              Deferred.succeed(deferred, data.value),
+              Deferred.succeed(deferred, data),
               Effect.andThen(() =>
                 pipe(
                   client.updaterStateMapRef,

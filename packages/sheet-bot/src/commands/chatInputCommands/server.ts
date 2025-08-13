@@ -45,12 +45,12 @@ const handleListConfig = chatInputSubcommandHandlerContextBuilder()
         guild: GuildService.getGuild(),
         guildConfig: pipe(
           GuildConfigService.getConfig(),
-          Effect.flatMap((computed) => observeOnce(computed.value)),
+          Effect.flatMap(observeOnce),
           Effect.map(Option.getOrUndefined),
         ),
         managerRoles: pipe(
           GuildConfigService.getManagerRoles(),
-          Effect.flatMap((computed) => observeOnce(computed.value)),
+          Effect.flatMap(observeOnce),
         ),
       }),
       Effect.tap(({ guild, guildConfig, managerRoles }) =>

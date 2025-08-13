@@ -111,7 +111,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           ? PermissionService.effectCheckRoles(
               pipe(
                 GuildConfigService.getManagerRoles(),
-                Effect.flatMap((computed) => observeOnce(computed.value)),
+                Effect.flatMap(observeOnce),
                 Effect.map((managerRoles) =>
                   managerRoles.map((role) => role.roleId),
                 ),
@@ -169,7 +169,7 @@ const handleButton = chatInputSubcommandHandlerContextBuilder()
       PermissionService.tapCheckRoles(
         pipe(
           GuildConfigService.getManagerRoles(),
-          Effect.flatMap((computed) => observeOnce(computed.value)),
+          Effect.flatMap(observeOnce),
           Effect.map((managerRoles) => managerRoles.map((role) => role.roleId)),
         ),
         "You can only make buttons as a manager",

@@ -43,7 +43,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
       bindObject({
         managerRoles: pipe(
           GuildConfigService.getManagerRoles(),
-          Effect.flatMap((computed) => observeOnce(computed.value)),
+          Effect.flatMap(observeOnce),
         ),
         interactionUser: InteractionContext.user(),
         user: pipe(

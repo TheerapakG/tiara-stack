@@ -27,9 +27,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
                   ),
                 ),
             ),
-            Effect.flatMap((c) =>
-              computed(pipe(c.value, Effect.map(Array.head))),
-            ),
+            Effect.flatMap((c) => computed(pipe(c, Effect.map(Array.head)))),
             Effect.withSpan("MessageCheckinService.getMessageCheckinData", {
               captureStackTrace: true,
             }),

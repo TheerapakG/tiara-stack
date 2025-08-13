@@ -33,7 +33,7 @@ export class EventRequestWithConfig<Config extends HandlerConfig> {
     return computed(
       pipe(
         Event,
-        Effect.flatMap((signal) => signal.value),
+        Effect.flatMap((signal) => signal),
         Effect.map(({ pullStream }) => pullStream),
       ),
     );
@@ -47,7 +47,7 @@ export class EventRequestWithConfig<Config extends HandlerConfig> {
     return computed(
       pipe(
         this.raw(),
-        Effect.flatMap((stream) => stream.value),
+        Effect.flatMap((stream) => stream),
         Effect.flatMap(
           pullStreamToParsed(this.config.requestParams as RequestParams),
         ),
@@ -122,7 +122,7 @@ export class Event extends Context.Tag("Event")<
     return computed(
       pipe(
         Event,
-        Effect.flatMap((signal) => signal.value),
+        Effect.flatMap((signal) => signal),
         Effect.map(({ request }) => request),
       ),
     );
