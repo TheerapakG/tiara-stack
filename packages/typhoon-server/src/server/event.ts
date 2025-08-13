@@ -8,7 +8,7 @@ import {
   MsgpackDecodeError,
   StreamExhaustedError,
 } from "typhoon-core/protocol";
-import { computed, signal, Signal } from "typhoon-core/signal";
+import { Computed, signal, Signal } from "typhoon-core/signal";
 
 const pullStreamToParsed =
   <RequestParams extends RequestParamsConfig | undefined>(
@@ -30,12 +30,9 @@ export class EventRequestWithConfig<Config extends HandlerConfig> {
   constructor(readonly config: Config) {}
 
   raw() {
-    return computed(
-      pipe(
-        Event,
-        Effect.flatMap((signal) => signal),
-        Effect.map(({ pullStream }) => pullStream),
-      ),
+    return pipe(
+      Event,
+      Computed.map(({ pullStream }) => pullStream),
     );
   }
 
@@ -44,13 +41,10 @@ export class EventRequestWithConfig<Config extends HandlerConfig> {
       | RequestParamsConfig
       | undefined = Config["requestParams"],
   >() {
-    return computed(
-      pipe(
-        this.raw(),
-        Effect.flatMap((stream) => stream),
-        Effect.flatMap(
-          pullStreamToParsed(this.config.requestParams as RequestParams),
-        ),
+    return pipe(
+      this.raw(),
+      Computed.flatMap(
+        pullStreamToParsed(this.config.requestParams as RequestParams),
       ),
     );
   }
@@ -119,12 +113,9 @@ export class Event extends Context.Tag("Event")<
   }
 
   static webRequest() {
-    return computed(
-      pipe(
-        Event,
-        Effect.flatMap((signal) => signal),
-        Effect.map(({ request }) => request),
-      ),
+    return pipe(
+      Event,
+      Computed.map(({ request }) => request),
     );
   }
 

@@ -3,7 +3,7 @@ import { and, eq, gte, isNull } from "drizzle-orm";
 import { Array, Effect, pipe } from "effect";
 import { messageCheckin, messageCheckinMember } from "sheet-db-schema";
 import { DBSubscriptionContext } from "typhoon-server/db";
-import { computed } from "typhoon-server/signal";
+import { Computed } from "typhoon-server/signal";
 import { DB } from "../../db";
 
 export class MessageCheckinService extends Effect.Service<MessageCheckinService>()(
@@ -27,7 +27,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
                   ),
                 ),
             ),
-            Effect.flatMap((c) => computed(pipe(c, Effect.map(Array.head)))),
+            Computed.map(Array.head),
             Effect.withSpan("MessageCheckinService.getMessageCheckinData", {
               captureStackTrace: true,
             }),

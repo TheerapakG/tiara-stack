@@ -534,10 +534,7 @@ export class SheetService extends Effect.Service<SheetService>()(
     return pipe(
       Effect.Do,
       Effect.bind("guildConfig", () =>
-        pipe(
-          GuildConfigService.getConfig(),
-          Effect.flatMap((computed) => observeOnce(computed.value)),
-        ),
+        pipe(GuildConfigService.getConfig(), Effect.flatMap(observeOnce)),
       ),
       Effect.bind("sheetId", ({ guildConfig }) =>
         pipe(
