@@ -5,7 +5,7 @@ import {
   configGuildChannel,
   configGuildManagerRole,
 } from "sheet-db-schema";
-import { computed } from "typhoon-core/signal";
+import { Computed } from "typhoon-core/signal";
 import { DBSubscriptionContext } from "typhoon-server/db";
 import { DB } from "../../db";
 import { bindObject } from "../../utils";
@@ -40,7 +40,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                   ),
               ),
             ),
-            Effect.flatMap((c) => computed(pipe(c, Effect.map(Array.head)))),
+            Computed.map(Array.head),
             Effect.withSpan("GuildConfigService.getConfig", {
               captureStackTrace: true,
             }),
@@ -179,7 +179,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                   ),
               ),
             ),
-            Effect.flatMap((c) => computed(pipe(c, Effect.map(Array.head)))),
+            Computed.map(Array.head),
             Effect.withSpan("GuildConfigService.getRunningChannelById", {
               captureStackTrace: true,
             }),
@@ -201,7 +201,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                   ),
               ),
             ),
-            Effect.flatMap((c) => computed(pipe(c, Effect.map(Array.head)))),
+            Computed.map(Array.head),
             Effect.withSpan("GuildConfigService.getRunningChannelByName", {
               captureStackTrace: true,
             }),

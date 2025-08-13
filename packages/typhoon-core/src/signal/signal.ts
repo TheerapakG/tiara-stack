@@ -435,16 +435,35 @@ export class Computed<A = never, E = never, R = never>
     );
   }
 
-  static map<A, B>(mapper: (value: A) => B) {
-    return <E, R>(signal: DependencySignal<A, E, R>) =>
-      computed(pipe(signal, Effect_.map(mapper)));
+  static map<A, B>(mapper: (value: A) => B, options?: ObservableOptions) {
+    return <E1, R1, E2, R2>(
+      signal: Effect_.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    ) =>
+      computed(
+        pipe(
+          signal,
+          Effect_.flatMap((signal) => signal),
+          Effect_.map(mapper),
+        ),
+        options,
+      );
   }
 
-  static flatMap<A, B, E2, R2>(
-    mapper: (value: A) => Effect_.Effect<B, E2, R2>,
+  static flatMap<A, B, E3, R3>(
+    mapper: (value: A) => Effect_.Effect<B, E3, R3>,
+    options?: ObservableOptions,
   ) {
-    return <E1, R1>(signal: DependencySignal<A, E1, R1>) =>
-      computed(pipe(signal, Effect_.flatMap(mapper)));
+    return <E1, R1, E2, R2>(
+      signal: Effect_.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    ) =>
+      computed(
+        pipe(
+          signal,
+          Effect_.flatMap((signal) => signal),
+          Effect_.flatMap(mapper),
+        ),
+        options,
+      );
   }
 
   static annotateLogs<E1 = never, R1 = never>(
@@ -452,7 +471,7 @@ export class Computed<A = never, E = never, R = never>
     value: DependencySignal<unknown, E1, R1>,
   ) {
     return <A = never, E2 = never, R2 = never, E3 = never, R3 = never>(
-      signal: Effect_.Effect<Computed<A, E2, R2>, E3, R3>,
+      signal: Effect_.Effect<DependencySignal<A, E2, R2>, E3, R3>,
     ) =>
       computed(
         pipe(
@@ -473,7 +492,7 @@ export class Computed<A = never, E = never, R = never>
     value: DependencySignal<unknown, E1, R1>,
   ) {
     return <A = never, E2 = never, R2 = never, E3 = never, R3 = never>(
-      signal: Effect_.Effect<Computed<A, E2, R2>, E3, R3>,
+      signal: Effect_.Effect<DependencySignal<A, E2, R2>, E3, R3>,
     ) =>
       computed(
         pipe(

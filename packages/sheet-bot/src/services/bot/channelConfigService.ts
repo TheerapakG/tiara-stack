@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { Array, Effect, pipe } from "effect";
 import { configChannel } from "sheet-db-schema";
 import { DBSubscriptionContext } from "typhoon-server/db";
-import { computed } from "typhoon-server/signal";
+import { Computed } from "typhoon-server/signal";
 import { DB } from "../../db";
 
 export class ChannelConfigService extends Effect.Service<ChannelConfigService>()(
@@ -21,7 +21,7 @@ export class ChannelConfigService extends Effect.Service<ChannelConfigService>()
                 .from(configChannel)
                 .where(eq(configChannel.channelId, channelId)),
             ),
-            Effect.flatMap((c) => computed(pipe(c, Effect.map(Array.head)))),
+            Computed.map(Array.head),
             Effect.withSpan("ChannelConfigService.getConfig", {
               captureStackTrace: true,
             }),
