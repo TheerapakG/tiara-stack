@@ -1,4 +1,4 @@
-import { Client, Interaction } from "discord.js";
+import { Client, EmbedBuilder, Interaction } from "discord.js";
 import { Effect, pipe } from "effect";
 
 export class ClientService extends Effect.Service<ClientService>()(
@@ -13,6 +13,10 @@ export class ClientService extends Effect.Service<ClientService>()(
               captureStackTrace: true,
             }),
           ),
+        makeEmbedBuilder: () =>
+          new EmbedBuilder().setTimestamp().setFooter({
+            text: `${client.user.username} ${process.env.BUILD_VERSION}`,
+          }),
       }),
     accessors: true,
   },

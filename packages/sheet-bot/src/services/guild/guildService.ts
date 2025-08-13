@@ -1,4 +1,4 @@
-import { Guild, Interaction } from "discord.js";
+import { Guild } from "discord.js";
 import { Effect, Layer, pipe } from "effect";
 import { CachedInteractionContext } from "../../types";
 import { ClientService } from "../interaction/clientService";
@@ -35,8 +35,8 @@ export class GuildService extends Effect.Service<GuildService>()(
 
   static fromInteraction() {
     return pipe(
-      CachedInteractionContext.interaction<Interaction>(),
-      Effect.map((interaction) => GuildService.Default(interaction.guild)),
+      CachedInteractionContext.guild(),
+      Effect.map((guild) => GuildService.Default(guild)),
       Effect.withSpan("GuildService.fromInteraction", {
         captureStackTrace: true,
       }),

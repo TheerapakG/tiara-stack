@@ -1,8 +1,6 @@
 import {
   ApplicationIntegrationType,
   channelMention,
-  ChatInputCommandInteraction,
-  EmbedBuilder,
   escapeMarkdown,
   InteractionContextType,
   PermissionFlagsBits,
@@ -10,10 +8,11 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Effect, Layer, Option, pipe } from "effect";
+import { Effect, Option, pipe } from "effect";
 import {
+  ClientService,
   GuildConfigService,
-  guildServices,
+  guildServicesFromInteractionOption,
   PermissionService,
 } from "../../services";
 import {
@@ -43,39 +42,40 @@ const handleSet = chatInputSubcommandHandlerContextBuilder()
   )
   .handler(
     pipe(
-      InteractionContext.interaction<ChatInputCommandInteraction>(),
-      Effect.flatMap((interaction) =>
+      Effect.Do,
+      PermissionService.tapCheckPermissions(PermissionFlagsBits.ManageGuild),
+      Effect.bindAll(
+        () => ({
+          running: InteractionContext.getBoolean("running"),
+          name: InteractionContext.getString("name"),
+          role: InteractionContext.getRole("role"),
+          channel: pipe(
+            InteractionContext.channel(),
+            Effect.flatMap(Option.fromNullable),
+          ),
+        }),
+        { concurrency: "unbounded" },
+      ),
+      Effect.let("roleId", ({ role }) =>
         pipe(
-          Effect.Do,
-          PermissionService.tapCheckPermissions(
-            PermissionFlagsBits.ManageGuild,
-          ),
-          Effect.bindAll(
-            () => ({
-              running: InteractionContext.getBoolean("running"),
-              name: InteractionContext.getString("name"),
-              role: InteractionContext.getRole("role"),
-              channel: Option.fromNullable(interaction.channel),
-            }),
-            { concurrency: "unbounded" },
-          ),
-          Effect.let("roleId", ({ role }) =>
-            pipe(
-              role,
-              Option.map((r) => r.id),
-            ),
-          ),
-          Effect.bind("config", ({ name, channel, running, roleId }) =>
-            GuildConfigService.setChannelConfig(channel.id, {
-              running: Option.getOrElse(running, () => false),
-              name: Option.getOrElse(name, () => undefined),
-              roleId: Option.getOrElse(roleId, () => undefined),
-            }),
-          ),
-          Effect.bind("response", ({ channel, config }) =>
+          role,
+          Option.map((r) => r.id),
+        ),
+      ),
+      Effect.bind("config", ({ name, channel, running, roleId }) =>
+        GuildConfigService.setChannelConfig(channel.id, {
+          running: Option.getOrElse(running, () => false),
+          name: Option.getOrElse(name, () => undefined),
+          roleId: Option.getOrElse(roleId, () => undefined),
+        }),
+      ),
+      Effect.bind("response", ({ channel, config }) =>
+        pipe(
+          ClientService.makeEmbedBuilder(),
+          Effect.tap((embed) =>
             InteractionContext.reply({
               embeds: [
-                new EmbedBuilder()
+                embed
                   .setTitle(`Success!`)
                   .setDescription(
                     `${channelMention(channel.id)} configuration updated`,
@@ -95,24 +95,13 @@ const handleSet = chatInputSubcommandHandlerContextBuilder()
                         ? roleMention(config.roleId)
                         : "None!",
                     },
-                  )
-                  .setTimestamp()
-                  .setFooter({
-                    text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
-                  }),
+                  ),
               ],
             }),
           ),
-          Effect.provide(
-            pipe(
-              interaction.guildId,
-              Option.fromNullable,
-              Effect.map(guildServices),
-              Layer.unwrapEffect,
-            ),
-          ),
         ),
       ),
+      Effect.provide(guildServicesFromInteractionOption("server_id")),
       Effect.withSpan("handlesSetRunning", {
         captureStackTrace: true,
       }),

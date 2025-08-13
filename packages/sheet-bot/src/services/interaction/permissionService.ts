@@ -1,11 +1,14 @@
 import {
-  Interaction,
   PermissionResolvable,
   PermissionsBitField,
   RoleResolvable,
 } from "discord.js";
 import { Data, Effect, Option, pipe } from "effect";
-import { CachedInteractionContext, InteractionContext } from "../../types";
+import {
+  CachedInteractionContext,
+  InteractionContext,
+  InteractionT,
+} from "../../types";
 import { GuildService } from "../guild";
 import { ClientService } from "./clientService";
 
@@ -37,11 +40,11 @@ export class PermissionService extends Effect.Service<PermissionService>()(
       Effect.bindAll(
         () => ({
           interaction: pipe(
-            InteractionContext.interaction<Interaction>(),
+            InteractionContext.interaction<InteractionT>(),
             Effect.either,
           ),
           cachedInteraction: pipe(
-            CachedInteractionContext.interaction<Interaction>(),
+            CachedInteractionContext.interaction<InteractionT>(),
             Effect.either,
           ),
           client: ClientService.getClient(),

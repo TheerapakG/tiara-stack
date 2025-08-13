@@ -1,29 +1,31 @@
 import {
-  ButtonInteraction,
-  ChatInputCommandInteraction,
   InteractionButtonComponentData,
   SharedSlashCommand,
   SlashCommandSubcommandBuilder,
   SlashCommandSubcommandGroupBuilder,
   SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
+import {
+  ButtonInteractionT,
+  ChatInputCommandInteractionT,
+} from "./interactionContext";
 
 export type HandlerVariant = {
   button: {
     data: InteractionButtonComponentData;
-    interaction: ButtonInteraction;
+    interaction: ButtonInteractionT;
   };
   chatInput: {
     data: SharedSlashCommand | SlashCommandSubcommandsOnlyBuilder;
-    interaction: ChatInputCommandInteraction;
+    interaction: ChatInputCommandInteractionT;
   };
   chatInputSubcommandGroup: {
     data: SlashCommandSubcommandGroupBuilder;
-    interaction: ChatInputCommandInteraction;
+    interaction: ChatInputCommandInteractionT;
   };
   chatInputSubcommand: {
     data: SlashCommandSubcommandBuilder;
-    interaction: ChatInputCommandInteraction;
+    interaction: ChatInputCommandInteractionT;
   };
 };
 
