@@ -1,4 +1,5 @@
-import { Effect, Layer, pipe } from "effect";
+import { Effect, Layer, Option, pipe } from "effect";
+import { CachedInteractionContext, InteractionContext } from "../../types";
 import {
   GuildConfigService,
   GuildService,
@@ -23,6 +24,32 @@ export const guildServices = (guildId: string) =>
       attributes: {
         guildId,
       },
+    }),
+    Layer.unwrapEffect,
+  );
+
+export const guildServicesFromInteraction = () =>
+  pipe(
+    CachedInteractionContext.guildId(),
+    Effect.map(guildServices),
+    Effect.withSpan("guildServicesFromInteractionOption", {
+      captureStackTrace: true,
+    }),
+    Layer.unwrapEffect,
+  );
+
+export const guildServicesFromInteractionOption = (name: string) =>
+  pipe(
+    InteractionContext.getString(name),
+    Effect.flatMap(
+      Option.match({
+        onSome: (guildId) => Effect.succeed(guildId),
+        onNone: () => CachedInteractionContext.guildId(),
+      }),
+    ),
+    Effect.map(guildServices),
+    Effect.withSpan("guildServicesFromInteractionOption", {
+      captureStackTrace: true,
     }),
     Layer.unwrapEffect,
   );

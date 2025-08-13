@@ -1,7 +1,12 @@
 import {
+  AnySelectMenuInteraction,
   APIInteractionDataResolvedGuildMember,
   APIRole,
   Attachment,
+  AutocompleteInteraction,
+  BaseInteraction,
+  ButtonInteraction,
+  CacheType,
   ChannelType,
   ChatInputCommandInteraction,
   CommandInteractionOption,
@@ -10,14 +15,19 @@ import {
   InteractionDeferReplyOptions,
   InteractionEditReplyOptions,
   InteractionReplyOptions,
+  MessageComponentInteraction,
+  MessageContextMenuCommandInteraction,
   MessagePayload,
   MessageResolvable,
+  ModalSubmitInteraction,
+  PrimaryEntryPointCommandInteraction,
   RepliableInteraction,
   Role,
   Snowflake,
   User,
+  UserContextMenuCommandInteraction,
 } from "discord.js";
-import { Context, Data, Effect, Option, pipe } from "effect";
+import { Context, Data, Effect, HKT, Option, pipe, Types } from "effect";
 
 export class NotInGuildError extends Data.TaggedError("NotInGuildError")<{
   readonly message: string;
@@ -44,23 +54,121 @@ export class UncachedGuildError extends Data.TaggedError("UncachedGuildError")<{
 type OptionGetterEffect<T, Required extends boolean> = Effect.Effect<
   [Required] extends [true] ? T : Option.Option<T>,
   unknown,
-  InteractionContext<ChatInputCommandInteraction>
+  InteractionContext<ChatInputCommandInteractionT>
 >;
 
-export class InteractionContext<I extends Interaction = Interaction> {
-  $inferInteractionType: I = undefined as unknown as I;
+export interface ChatInputCommandInteractionT extends HKT.TypeLambda {
+  readonly type: this["Target"] extends CacheType
+    ? ChatInputCommandInteraction<this["Target"]>
+    : ChatInputCommandInteraction;
+}
 
-  static interaction<I extends Interaction = Interaction>() {
-    return Context.GenericTag<InteractionContext<I>, I>("InteractionContext");
+export interface MessageContextMenuCommandInteractionT extends HKT.TypeLambda {
+  readonly type: this["Target"] extends CacheType
+    ? MessageContextMenuCommandInteraction<this["Target"]>
+    : MessageContextMenuCommandInteraction;
+}
+
+export interface UserContextMenuCommandInteractionT extends HKT.TypeLambda {
+  readonly type: this["Target"] extends CacheType
+    ? UserContextMenuCommandInteraction<this["Target"]>
+    : UserContextMenuCommandInteraction;
+}
+
+export interface PrimaryEntryPointCommandInteractionT extends HKT.TypeLambda {
+  readonly type: this["Target"] extends CacheType
+    ? PrimaryEntryPointCommandInteraction<this["Target"]>
+    : PrimaryEntryPointCommandInteraction;
+}
+
+export interface AnySelectMenuInteractionT extends HKT.TypeLambda {
+  readonly type: this["Target"] extends CacheType
+    ? AnySelectMenuInteraction<this["Target"]>
+    : AnySelectMenuInteraction;
+}
+
+export interface MessageComponentInteractionT extends HKT.TypeLambda {
+  readonly type: this["Target"] extends CacheType
+    ? MessageComponentInteraction<this["Target"]>
+    : MessageComponentInteraction;
+}
+
+export interface ButtonInteractionT extends HKT.TypeLambda {
+  readonly type: this["Target"] extends CacheType
+    ? ButtonInteraction<this["Target"]>
+    : ButtonInteraction;
+}
+
+export interface AutocompleteInteractionT extends HKT.TypeLambda {
+  readonly type: this["Target"] extends CacheType
+    ? AutocompleteInteraction<this["Target"]>
+    : AutocompleteInteraction;
+}
+
+export interface ModalSubmitInteractionT extends HKT.TypeLambda {
+  readonly type: this["Target"] extends CacheType
+    ? ModalSubmitInteraction<this["Target"]>
+    : ModalSubmitInteraction;
+}
+
+export interface InteractionT extends HKT.TypeLambda {
+  readonly type: this["Target"] extends CacheType
+    ? Interaction<this["Target"]>
+    : Interaction;
+}
+
+export interface RepliableInteractionT extends HKT.TypeLambda {
+  readonly type: this["Target"] extends CacheType
+    ? RepliableInteraction<this["Target"]>
+    : RepliableInteraction;
+}
+
+export interface BaseInteractionT extends HKT.TypeLambda {
+  readonly type: this["Target"] extends CacheType
+    ? BaseInteraction<this["Target"]>
+    : BaseInteraction;
+}
+
+export type InteractionKind<
+  F extends BaseBaseInteractionT,
+  B extends CacheType = CacheType,
+> = HKT.Kind<F, never, never, never, B>;
+
+interface BaseBaseInteractionT extends HKT.TypeLambda {
+  readonly type: BaseInteraction<CacheType>;
+}
+
+export class InteractionContext<I extends BaseInteractionT = InteractionT> {
+  $inferInteractionType: Types.Contravariant<I> =
+    undefined as unknown as Types.Contravariant<I>;
+
+  static interaction<I extends BaseBaseInteractionT = InteractionT>() {
+    return Context.GenericTag<InteractionContext<I>, InteractionKind<I>>(
+      "InteractionContext",
+    );
   }
 
-  static make<I extends Interaction>(interaction: I) {
+  static make<I extends BaseBaseInteractionT>(interaction: InteractionKind<I>) {
     return Context.make(this.interaction<I>(), interaction);
+  }
+
+  static replied() {
+    return pipe(
+      InteractionContext.interaction<RepliableInteractionT>(),
+      Effect.flatMap((interaction) => Effect.succeed(interaction.replied)),
+    );
+  }
+
+  static deferred() {
+    return pipe(
+      InteractionContext.interaction<RepliableInteractionT>(),
+      Effect.flatMap((interaction) => Effect.succeed(interaction.deferred)),
+    );
   }
 
   static deferReply(options?: InteractionDeferReplyOptions) {
     return pipe(
-      InteractionContext.interaction<RepliableInteraction>(),
+      InteractionContext.interaction<RepliableInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.tryPromise(() => interaction.deferReply(options)),
       ),
@@ -80,7 +188,7 @@ export class InteractionContext<I extends Interaction = Interaction> {
 
   static deferReplyWithResponse(options?: InteractionDeferReplyOptions) {
     return pipe(
-      InteractionContext.interaction<RepliableInteraction>(),
+      InteractionContext.interaction<RepliableInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.tryPromise(() =>
           interaction.deferReply({ ...options, withResponse: true }),
@@ -94,7 +202,7 @@ export class InteractionContext<I extends Interaction = Interaction> {
 
   static deleteReply(message?: MessageResolvable | "@original") {
     return pipe(
-      InteractionContext.interaction<RepliableInteraction>(),
+      InteractionContext.interaction<RepliableInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.tryPromise(() => interaction.deleteReply(message)),
       ),
@@ -116,7 +224,7 @@ export class InteractionContext<I extends Interaction = Interaction> {
     options: string | MessagePayload | InteractionEditReplyOptions,
   ) {
     return pipe(
-      InteractionContext.interaction<RepliableInteraction>(),
+      InteractionContext.interaction<RepliableInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.tryPromise(() => interaction.editReply(options)),
       ),
@@ -138,7 +246,7 @@ export class InteractionContext<I extends Interaction = Interaction> {
 
   static fetchReply(message?: Snowflake | "@original") {
     return pipe(
-      InteractionContext.interaction<RepliableInteraction>(),
+      InteractionContext.interaction<RepliableInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.tryPromise(() => interaction.fetchReply(message)),
       ),
@@ -150,7 +258,7 @@ export class InteractionContext<I extends Interaction = Interaction> {
 
   static followUp(options: string | MessagePayload | InteractionReplyOptions) {
     return pipe(
-      InteractionContext.interaction<RepliableInteraction>(),
+      InteractionContext.interaction<RepliableInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.tryPromise(() => interaction.followUp(options)),
       ),
@@ -172,7 +280,7 @@ export class InteractionContext<I extends Interaction = Interaction> {
 
   static reply(options: string | MessagePayload | InteractionReplyOptions) {
     return pipe(
-      InteractionContext.interaction<RepliableInteraction>(),
+      InteractionContext.interaction<RepliableInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.tryPromise(() => interaction.reply(options)),
       ),
@@ -192,7 +300,7 @@ export class InteractionContext<I extends Interaction = Interaction> {
 
   static replyWithResponse(options: InteractionReplyOptions) {
     return pipe(
-      InteractionContext.interaction<RepliableInteraction>(),
+      InteractionContext.interaction<RepliableInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.tryPromise(() =>
           interaction.reply({ ...options, withResponse: true }),
@@ -204,12 +312,65 @@ export class InteractionContext<I extends Interaction = Interaction> {
     );
   }
 
+  static channelId() {
+    return pipe(
+      InteractionContext.interaction<InteractionT>(),
+      Effect.flatMap((interaction) => Effect.succeed(interaction.channelId)),
+    );
+  }
+
+  static channel() {
+    return pipe(
+      InteractionContext.interaction<InteractionT>(),
+      Effect.flatMap((interaction) => Effect.succeed(interaction.channel)),
+    );
+  }
+
+  static user() {
+    return pipe(
+      InteractionContext.interaction<InteractionT>(),
+      Effect.flatMap((interaction) => Effect.succeed(interaction.user)),
+    );
+  }
+
+  static getSubcommandGroup<Required extends boolean>(required?: Required) {
+    return pipe(
+      InteractionContext.interaction<ChatInputCommandInteractionT>(),
+      Effect.flatMap((interaction) =>
+        Effect.try(() => interaction.options.getSubcommandGroup(required)),
+      ),
+      (e) =>
+        (required
+          ? e
+          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
+          string,
+          Required
+        >,
+    );
+  }
+
+  static getSubcommand<Required extends boolean>(required?: Required) {
+    return pipe(
+      InteractionContext.interaction<ChatInputCommandInteractionT>(),
+      Effect.flatMap((interaction) =>
+        Effect.try(() => interaction.options.getSubcommand(required ?? false)),
+      ),
+      (e) =>
+        (required
+          ? e
+          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
+          string,
+          Required
+        >,
+    );
+  }
+
   static getBoolean<Required extends boolean>(
     name: string,
     required?: Required,
   ) {
     return pipe(
-      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      InteractionContext.interaction<ChatInputCommandInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.try(() => interaction.options.getBoolean(name, required)),
       ),
@@ -228,7 +389,7 @@ export class InteractionContext<I extends Interaction = Interaction> {
     const Type extends ChannelType = ChannelType,
   >(name: string, required?: Required, channelTypes?: readonly Type[]) {
     return pipe(
-      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      InteractionContext.interaction<ChatInputCommandInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.try(() =>
           interaction.options.getChannel(name, required, channelTypes),
@@ -258,7 +419,7 @@ export class InteractionContext<I extends Interaction = Interaction> {
     required?: Required,
   ) {
     return pipe(
-      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      InteractionContext.interaction<ChatInputCommandInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.try(() => interaction.options.getString(name, required)),
       ),
@@ -277,7 +438,7 @@ export class InteractionContext<I extends Interaction = Interaction> {
     required?: Required,
   ) {
     return pipe(
-      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      InteractionContext.interaction<ChatInputCommandInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.try(() => interaction.options.getInteger(name, required)),
       ),
@@ -296,7 +457,7 @@ export class InteractionContext<I extends Interaction = Interaction> {
     required?: Required,
   ) {
     return pipe(
-      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      InteractionContext.interaction<ChatInputCommandInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.try(() => interaction.options.getNumber(name, required)),
       ),
@@ -312,7 +473,7 @@ export class InteractionContext<I extends Interaction = Interaction> {
 
   static getUser<Required extends boolean>(name: string, required?: Required) {
     return pipe(
-      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      InteractionContext.interaction<ChatInputCommandInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.try(() => interaction.options.getUser(name, required)),
       ),
@@ -331,7 +492,7 @@ export class InteractionContext<I extends Interaction = Interaction> {
     required?: Required,
   ) {
     return pipe(
-      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      InteractionContext.interaction<ChatInputCommandInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.try(() => interaction.options.getMember(name)),
       ),
@@ -347,7 +508,7 @@ export class InteractionContext<I extends Interaction = Interaction> {
 
   static getRole<Required extends boolean>(name: string, required?: Required) {
     return pipe(
-      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      InteractionContext.interaction<ChatInputCommandInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.try(() => interaction.options.getRole(name, required)),
       ),
@@ -366,7 +527,7 @@ export class InteractionContext<I extends Interaction = Interaction> {
     required?: Required,
   ) {
     return pipe(
-      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      InteractionContext.interaction<ChatInputCommandInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.try(() => interaction.options.getAttachment(name, required)),
       ),
@@ -385,7 +546,7 @@ export class InteractionContext<I extends Interaction = Interaction> {
     required?: Required,
   ) {
     return pipe(
-      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      InteractionContext.interaction<ChatInputCommandInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.try(() => interaction.options.getMentionable(name, required)),
       ),
@@ -404,21 +565,62 @@ export class InteractionContext<I extends Interaction = Interaction> {
   }
 }
 
+interface BaseMessageInteractionT extends HKT.TypeLambda {
+  readonly type:
+    | MessageComponentInteraction<CacheType>
+    | ModalSubmitInteraction<CacheType>;
+}
+
 export class CachedInteractionContext {
-  static interaction<I extends Interaction = Interaction>() {
+  static interaction<
+    I extends BaseBaseInteractionT = InteractionT,
+    Kind extends InteractionKind<I, "cached"> = InteractionKind<I, "cached">,
+  >() {
     return pipe(
       InteractionContext.interaction<I>(),
       Effect.flatMap((interaction) =>
-        pipe(
-          !interaction.inGuild()
-            ? Effect.fail<NotInGuildError | UncachedGuildError>(
-                new NotInGuildError(),
-              )
-            : !interaction.inCachedGuild()
-              ? Effect.fail(new UncachedGuildError())
-              : Effect.succeed(interaction),
-        ),
+        !interaction.inGuild()
+          ? Effect.fail(new NotInGuildError())
+          : Effect.succeed(interaction),
       ),
+      Effect.flatMap((interaction) =>
+        !interaction.inCachedGuild()
+          ? Effect.fail(new UncachedGuildError())
+          : Effect.succeed(interaction as Kind),
+      ),
+    );
+  }
+
+  static message<
+    I extends BaseMessageInteractionT,
+    Kind extends InteractionKind<I, "cached"> = InteractionKind<I, "cached">,
+  >() {
+    return pipe(
+      CachedInteractionContext.interaction<I, Kind>(),
+      Effect.flatMap((interaction) =>
+        Effect.succeed(interaction.message as Kind["message"]),
+      ),
+    );
+  }
+
+  static channel() {
+    return pipe(
+      CachedInteractionContext.interaction<InteractionT>(),
+      Effect.flatMap((interaction) => Effect.succeed(interaction.channel)),
+    );
+  }
+
+  static guildId() {
+    return pipe(
+      CachedInteractionContext.interaction<InteractionT>(),
+      Effect.flatMap((interaction) => Effect.succeed(interaction.guildId)),
+    );
+  }
+
+  static guild() {
+    return pipe(
+      CachedInteractionContext.interaction<InteractionT>(),
+      Effect.flatMap((interaction) => Effect.try(() => interaction.guild)),
     );
   }
 
@@ -427,7 +629,7 @@ export class CachedInteractionContext {
     const Type extends ChannelType = ChannelType,
   >(name: string, required?: Required, channelTypes?: readonly Type[]) {
     return pipe(
-      CachedInteractionContext.interaction<ChatInputCommandInteraction>(),
+      CachedInteractionContext.interaction<ChatInputCommandInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.try(() =>
           interaction.options.getChannel(name, required, channelTypes),
@@ -457,7 +659,7 @@ export class CachedInteractionContext {
     required?: Required,
   ) {
     return pipe(
-      CachedInteractionContext.interaction<ChatInputCommandInteraction>(),
+      CachedInteractionContext.interaction<ChatInputCommandInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.try(() => interaction.options.getMember(name)),
       ),
@@ -473,7 +675,7 @@ export class CachedInteractionContext {
 
   static getRole<Required extends boolean>(name: string, required?: Required) {
     return pipe(
-      InteractionContext.interaction<ChatInputCommandInteraction>(),
+      CachedInteractionContext.interaction<ChatInputCommandInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.try(() => interaction.options.getRole(name, required)),
       ),
@@ -492,7 +694,7 @@ export class CachedInteractionContext {
     required?: Required,
   ) {
     return pipe(
-      CachedInteractionContext.interaction<ChatInputCommandInteraction>(),
+      CachedInteractionContext.interaction<ChatInputCommandInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.try(() => interaction.options.getMentionable(name, required)),
       ),

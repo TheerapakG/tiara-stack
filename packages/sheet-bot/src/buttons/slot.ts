@@ -1,9 +1,7 @@
 import {
   ButtonBuilder,
-  ButtonInteraction,
   ButtonStyle,
   ComponentType,
-  EmbedBuilder,
   MessageFlags,
   MessageFlagsBitField,
 } from "discord.js";
@@ -12,7 +10,6 @@ import {
   Chunk,
   Effect,
   HashMap,
-  Layer,
   Option,
   Order,
   pipe,
@@ -21,7 +18,8 @@ import {
 import { observeOnce } from "typhoon-server/signal";
 import {
   ChannelConfigService,
-  guildServices,
+  ClientService,
+  guildServicesFromInteraction,
   ScheduleService,
   SheetService,
 } from "../services";
@@ -69,62 +67,56 @@ export const button = buttonInteractionHandlerContextBuilder()
   })
   .handler(
     pipe(
-      InteractionContext.interaction<ButtonInteraction>(),
-      Effect.flatMap((interaction) =>
+      Effect.Do,
+      Effect.bindAll(() => ({
+        messageFlags: Ref.make(
+          new MessageFlagsBitField().add(MessageFlags.Ephemeral),
+        ),
+        channel: pipe(
+          InteractionContext.channel(),
+          Effect.flatMap(Option.fromNullable),
+        ),
+      })),
+      Effect.bind("channelConfig", ({ channel }) =>
         pipe(
-          Effect.Do,
-          Effect.bindAll(() => ({
-            messageFlags: Ref.make(
-              new MessageFlagsBitField().add(MessageFlags.Ephemeral),
-            ),
-            channel: Option.fromNullable(interaction.channel),
-          })),
-          Effect.bind("channelConfig", ({ channel }) =>
-            pipe(
-              ChannelConfigService.getConfig(channel.id),
-              Effect.flatMap((computed) => observeOnce(computed.value)),
-            ),
-          ),
-          Effect.bind("day", ({ channelConfig }) =>
-            pipe(
-              channelConfig,
-              Array.head,
-              Option.flatMap(({ day }) => Option.fromNullable(day)),
-            ),
-          ),
-          Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
-          Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
-          Effect.let("updateButton", () =>
-            new ButtonBuilder()
-              .setCustomId("update")
-              .setLabel("Update")
-              .setStyle(ButtonStyle.Primary),
-          ),
-          Effect.bind("response", ({ day, slotMessage, flags }) =>
+          ChannelConfigService.getConfig(channel.id),
+          Effect.flatMap((computed) => observeOnce(computed.value)),
+        ),
+      ),
+      Effect.bind("day", ({ channelConfig }) =>
+        pipe(
+          channelConfig,
+          Array.head,
+          Option.flatMap(({ day }) => Option.fromNullable(day)),
+        ),
+      ),
+      Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
+      Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
+      Effect.let("updateButton", () =>
+        new ButtonBuilder()
+          .setCustomId("update")
+          .setLabel("Update")
+          .setStyle(ButtonStyle.Primary),
+      ),
+      Effect.bind("response", ({ day, slotMessage, flags }) =>
+        pipe(
+          ClientService.makeEmbedBuilder(),
+          Effect.tap((embed) =>
             InteractionContext.reply({
               embeds: [
-                new EmbedBuilder()
+                embed
                   .setTitle(`Day ${day} Slots~`)
                   .setDescription(
                     slotMessage === "" ? "All Filled :3" : slotMessage,
-                  )
-                  .setTimestamp()
-                  .setFooter({
-                    text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
-                  }),
+                  ),
               ],
               flags: flags.bitfield,
             }),
           ),
-          Effect.provide(
-            pipe(
-              Option.fromNullable(interaction.guildId),
-              Effect.map(guildServices),
-              Layer.unwrapEffect,
-            ),
-          ),
         ),
       ),
+      Effect.provide(guildServicesFromInteraction()),
+      Effect.asVoid,
     ),
   )
   .build();

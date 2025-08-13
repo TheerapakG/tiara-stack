@@ -1,17 +1,16 @@
 import {
   ApplicationIntegrationType,
-  ChatInputCommandInteraction,
-  EmbedBuilder,
   escapeMarkdown,
   InteractionContextType,
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, Effect, HashMap, Layer, Option, pipe } from "effect";
+import { Array, Effect, HashMap, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import {
+  ClientService,
   GuildConfigService,
-  guildServices,
+  guildServicesFromInteractionOption,
   PermissionService,
   SheetService,
 } from "../../services";
@@ -38,59 +37,66 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
   )
   .handler(
     pipe(
-      InteractionContext.interaction<ChatInputCommandInteraction>(),
-      Effect.flatMap((interaction) =>
+      Effect.Do,
+      PermissionService.tapCheckOwner({ allowSameGuild: true }),
+      Effect.bindAll(
+        () => ({
+          managerRoles: pipe(
+            GuildConfigService.getManagerRoles(),
+            Effect.flatMap((computed) => observeOnce(computed.value)),
+          ),
+          interactionUser: InteractionContext.user(),
+          user: pipe(
+            InteractionContext.getUser("user"),
+            Effect.flatMap(
+              Option.match({
+                onSome: (user) => Effect.succeed(user),
+                onNone: () => InteractionContext.user(),
+              }),
+            ),
+          ),
+        }),
+        { concurrency: "unbounded" },
+      ),
+      Effect.tap(({ user, interactionUser, managerRoles }) =>
+        user.id !== interactionUser.id
+          ? PermissionService.checkRoles(
+              managerRoles.map((role) => role.roleId),
+              "You can only get your own teams in the current server",
+            )
+          : Effect.void,
+      ),
+      Effect.bind("teams", () => SheetService.getTeams()),
+      Effect.let("userTeams", ({ user, teams }) =>
         pipe(
-          Effect.Do,
-          PermissionService.tapCheckOwner({ allowSameGuild: true }),
-          Effect.bindAll(() => ({
-            user: pipe(
-              InteractionContext.getUser("user"),
-              Effect.map(Option.getOrElse(() => interaction.user)),
-            ),
+          HashMap.get(teams, user.id),
+          Option.map(({ teams }) => teams),
+          Option.getOrElse(() => [] as RawTeam[]),
+          Array.map((team) => ({
+            teamName: team.teamName,
+            lead: Option.getOrUndefined(team.lead),
+            backline: Option.getOrUndefined(team.backline),
+            talent: Option.getOrUndefined(team.talent),
           })),
-          Effect.bind("managerRoles", () =>
-            pipe(
-              GuildConfigService.getManagerRoles(),
-              Effect.flatMap((computed) => observeOnce(computed.value)),
-            ),
-          ),
-          Effect.tap(({ user, managerRoles }) =>
-            user.id !== interaction.user.id
-              ? PermissionService.checkRoles(
-                  managerRoles.map((role) => role.roleId),
-                  "You can only get your own teams in the current server",
-                )
-              : Effect.void,
-          ),
-          Effect.bind("teams", () => SheetService.getTeams()),
-          Effect.let("userTeams", ({ user, teams }) =>
-            pipe(
-              HashMap.get(teams, user.id),
-              Option.map(({ teams }) => teams),
-              Option.getOrElse(() => [] as RawTeam[]),
-              Array.map((team) => ({
-                teamName: team.teamName,
-                lead: Option.getOrUndefined(team.lead),
-                backline: Option.getOrUndefined(team.backline),
-                talent: Option.getOrUndefined(team.talent),
-              })),
-              Array.map((team) => ({
-                ...team,
-                leadFormatted: team.lead ?? "?",
-                backlineFormatted: team.backline ?? "?",
-                talentFormatted: team.talent ? `/${team.talent}k` : "",
-                effectValueFormatted:
-                  team.lead && team.backline
-                    ? ` (+${team.lead + (team.backline - team.lead) / 5}%)`
-                    : "",
-              })),
-            ),
-          ),
-          Effect.tap(({ user, userTeams }) =>
+          Array.map((team) => ({
+            ...team,
+            leadFormatted: team.lead ?? "?",
+            backlineFormatted: team.backline ?? "?",
+            talentFormatted: team.talent ? `/${team.talent}k` : "",
+            effectValueFormatted:
+              team.lead && team.backline
+                ? ` (+${team.lead + (team.backline - team.lead) / 5}%)`
+                : "",
+          })),
+        ),
+      ),
+      Effect.tap(({ user, userTeams }) =>
+        pipe(
+          ClientService.makeEmbedBuilder(),
+          Effect.tap((embed) =>
             InteractionContext.reply({
               embeds: [
-                new EmbedBuilder()
+                embed
                   .setTitle(`${escapeMarkdown(user.username)}'s Teams`)
                   .setDescription(
                     userTeams.length === 0 ? "No teams found" : null,
@@ -100,25 +106,13 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
                       name: escapeMarkdown(team.teamName),
                       value: `ISV: ${team.leadFormatted}/${team.backlineFormatted}${team.talentFormatted}${team.effectValueFormatted}`,
                     })),
-                  )
-                  .setTimestamp()
-                  .setFooter({
-                    text: `${interaction.client.user.username} ${process.env.BUILD_VERSION}`,
-                  }),
+                  ),
               ],
             }),
           ),
-          Effect.provide(
-            pipe(
-              InteractionContext.getString("server_id"),
-              Effect.map(Option.getOrElse(() => interaction.guildId)),
-              Effect.flatMap(Option.fromNullable),
-              Effect.map(guildServices),
-              Layer.unwrapEffect,
-            ),
-          ),
         ),
       ),
+      Effect.provide(guildServicesFromInteractionOption("server_id")),
       Effect.withSpan("handleTeamList", { captureStackTrace: true }),
     ),
   )

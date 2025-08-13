@@ -1,5 +1,4 @@
 import {
-  ChatInputCommandInteraction,
   SharedSlashCommand,
   SharedSlashCommandSubcommands,
   SlashCommandBuilder,
@@ -415,17 +414,24 @@ export class SubcommandHandler<
     handler: SubcommandHandler<A, E, R>,
   ) {
     return pipe(
-      InteractionContext.interaction<ChatInputCommandInteraction>(),
-      Effect.flatMap((interaction) =>
+      Effect.Do,
+      Effect.bindAll(
+        () => ({
+          subcommandGroup: InteractionContext.getSubcommandGroup(),
+          subcommand: InteractionContext.getSubcommand(),
+        }),
+        { concurrency: "unbounded" },
+      ),
+      Effect.flatMap(({ subcommandGroup, subcommand }) =>
         pipe(
-          Option.fromNullable(interaction.options.getSubcommandGroup()),
+          subcommandGroup,
           Option.flatMap((group) =>
             InteractionHandlerMap.get(group)(handler.subcommandGroupHandlerMap),
           ),
           Option.map((ctx) => ctx.handler),
           Option.orElse(() =>
             pipe(
-              Option.fromNullable(interaction.options.getSubcommand()),
+              subcommand,
               Option.flatMap((subcommand) =>
                 InteractionHandlerMap.get(subcommand)(
                   handler.subcommandHandlerMap,

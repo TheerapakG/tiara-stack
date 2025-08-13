@@ -1,16 +1,14 @@
 import {
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonInteraction,
   ButtonStyle,
   ComponentType,
   InteractionButtonComponentData,
   MessageActionRowComponentBuilder,
   MessageFlags,
-  MessageFlagsBitField,
   userMention,
 } from "discord.js";
-import { Array, Data, Effect, Function, Option, pipe, Ref } from "effect";
+import { Array, Data, Effect, Function, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import {
   ClientService,
@@ -19,6 +17,8 @@ import {
 } from "../services";
 import {
   buttonInteractionHandlerContextBuilder,
+  ButtonInteractionT,
+  CachedInteractionContext,
   InteractionContext,
 } from "../types";
 
@@ -43,20 +43,15 @@ export const button = buttonInteractionHandlerContextBuilder()
   .handler(
     pipe(
       Effect.Do,
+      InteractionContext.tapDeferReply({ flags: MessageFlags.Ephemeral }),
       Effect.bindAll(
         () => ({
-          interaction: InteractionContext.interaction<ButtonInteraction>(),
           client: ClientService.getClient(),
+          message: CachedInteractionContext.message<ButtonInteractionT>(),
+          user: InteractionContext.user(),
         }),
         { concurrency: "unbounded" },
       ),
-      InteractionContext.tapDeferReply({ flags: MessageFlags.Ephemeral }),
-      Effect.bindAll(({ interaction }) => ({
-        messageFlags: Ref.make(
-          new MessageFlagsBitField().add(MessageFlags.Ephemeral),
-        ),
-        message: Option.fromNullable(interaction.message),
-      })),
       Effect.bind("messageCheckinData", ({ message }) =>
         pipe(
           MessageCheckinService.getMessageCheckinData(message.id),
@@ -64,11 +59,11 @@ export const button = buttonInteractionHandlerContextBuilder()
           Effect.flatMap(Function.identity),
         ),
       ),
-      Effect.tap(({ interaction, message }) =>
+      Effect.tap(({ message, user }) =>
         pipe(
           MessageCheckinService.setMessageCheckinMemberCheckinAt(
             message.id,
-            interaction.user.id,
+            user.id,
           ),
           Effect.tap((values) =>
             Array.length(values) > 0
@@ -99,10 +94,10 @@ export const button = buttonInteractionHandlerContextBuilder()
         PermissionService.addRole(messageCheckinData.roleId),
       ),
       Effect.tap(
-        ({ interaction, client, messageCheckinData, checkedInMentions }) =>
+        ({ message, user, client, messageCheckinData, checkedInMentions }) =>
           Effect.all([
             Effect.tryPromise(() =>
-              interaction.message.edit({
+              message.edit({
                 content:
                   checkedInMentions.length > 0
                     ? `${messageCheckinData.initialMessage}\n\nChecked in: ${checkedInMentions}`
@@ -122,12 +117,13 @@ export const button = buttonInteractionHandlerContextBuilder()
               );
               if (channel?.isSendable()) {
                 await channel.send({
-                  content: `${userMention(interaction.user.id)} has checked in!`,
+                  content: `${userMention(user.id)} has checked in!`,
                 });
               }
             }),
           ]),
       ),
+      Effect.asVoid,
     ),
   )
   .build();

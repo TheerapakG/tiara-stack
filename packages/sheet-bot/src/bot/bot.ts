@@ -28,7 +28,9 @@ import { Config } from "../config";
 import { interactionServices } from "../services";
 import {
   buttonInteractionHandlerMap,
+  ButtonInteractionT,
   chatInputCommandHandlerMap,
+  ChatInputCommandInteractionT,
   InteractionContext,
   InteractionHandlerMapWithMetrics,
   VariantInteractionHandlerContext,
@@ -46,7 +48,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       SharedSlashCommand | SlashCommandSubcommandsOnlyBuilder,
       A,
       E,
-      R | InteractionContext<ChatInputCommandInteraction>
+      R | InteractionContext<ChatInputCommandInteractionT>
     >
   >;
   readonly buttonsMap: SynchronizedRef.SynchronizedRef<
@@ -54,7 +56,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       InteractionButtonComponentData,
       A,
       E,
-      R | InteractionContext<ButtonInteraction>
+      R | InteractionContext<ButtonInteractionT>
     >
   >;
   readonly traceProvider: Layer.Layer<never>;
@@ -82,7 +84,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 InteractionHandlerMapWithMetrics.executeAndReplyError(
                   interaction.commandName,
                 ),
-                Effect.provide(interactionServices(interaction)),
+                Effect.provide(
+                  interactionServices<ChatInputCommandInteractionT>(
+                    interaction,
+                  ),
+                ),
                 Effect.provide(runtime),
               ),
             ),
@@ -127,7 +133,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 InteractionHandlerMapWithMetrics.executeAndReplyError(
                   interaction.customId,
                 ),
-                Effect.provide(interactionServices(interaction)),
+                Effect.provide(
+                  interactionServices<ButtonInteractionT>(interaction),
+                ),
                 Effect.provide(runtime),
               ),
             ),
@@ -184,7 +192,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
               chatInputCommandHandlerMap<
                 A,
                 E,
-                R | InteractionContext<ChatInputCommandInteraction>
+                R | InteractionContext<ChatInputCommandInteractionT>
               >(),
             ),
           ),
@@ -194,7 +202,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
               buttonInteractionHandlerMap<
                 A,
                 E,
-                R | InteractionContext<ButtonInteraction>
+                R | InteractionContext<ButtonInteractionT>
               >(),
             ),
           ),
