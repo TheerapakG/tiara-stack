@@ -182,7 +182,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       Effect.Do,
       bindObject({
         client: Effect.succeed(
-          new Client({ intents: [GatewayIntentBits.Guilds] }),
+          new Client({
+            intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+          }),
         ),
         loginLatch: Effect.makeLatch(false),
         loginSemaphore: Effect.makeSemaphore(1),
