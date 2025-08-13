@@ -40,7 +40,7 @@ class TimeError extends Data.TaggedError("TimeError")<{
   }
 }
 
-const getForceoutData = ({
+const getKickoutData = ({
   hour,
   channelName,
 }: {
@@ -85,7 +85,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
   .data(
     new SlashCommandSubcommandBuilder()
       .setName("manual")
-      .setDescription("Manually force out users")
+      .setDescription("Manually kick out users")
       .addStringOption((option) =>
         option
           .setName("channel_name")
@@ -95,7 +95,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
       .addStringOption((option) =>
         option
           .setName("server_id")
-          .setDescription("The server to force out users for"),
+          .setDescription("The server to kick out users for"),
       ),
   )
   .handler(
@@ -109,7 +109,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
           Effect.flatMap(observeOnce),
           Effect.map((managerRoles) => managerRoles.map((role) => role.roleId)),
         ),
-        "You can only force out users as a manager",
+        "You can only kick out users as a manager",
       ),
       bindObject({
         hourOption: InteractionContext.getNumber("hour"),
@@ -125,9 +125,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
       Effect.let("date", () => new Date()),
       Effect.tap(({ date }) =>
         pipe(date, getMinutes) >= 40
-          ? Effect.fail(
-              new TimeError("Cannot force out until next hour starts"),
-            )
+          ? Effect.fail(new TimeError("Cannot kick out until next hour starts"))
           : Effect.void,
       ),
       Effect.let("hour", ({ date, hourOption, eventConfig }) =>
@@ -143,22 +141,23 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
           ),
         ),
       ),
-      Effect.bind("forceoutData", ({ hour, channelName }) =>
-        getForceoutData({ hour, channelName }),
+      Effect.bind("kickoutData", ({ hour, channelName }) =>
+        getKickoutData({ hour, channelName }),
       ),
-      Effect.bind("role", ({ guild, forceoutData }) =>
+      Effect.bind("role", ({ guild, kickoutData }) =>
         pipe(
-          forceoutData.runningChannel.roleId,
+          kickoutData.runningChannel.roleId,
           Option.fromNullable,
+          Effect.tap(() => Effect.tryPromise(() => guild.members.fetch())),
           Effect.flatMap((roleId) =>
             Effect.tryPromise(() => guild.roles.fetch(roleId)),
           ),
           Effect.flatMap(Option.fromNullable),
         ),
       ),
-      Effect.bind("fillIds", ({ forceoutData }) =>
+      Effect.bind("fillIds", ({ kickoutData }) =>
         pipe(
-          forceoutData.schedule.fills,
+          kickoutData.schedule.fills,
           Array.map(Option.fromNullable),
           Array.getSomes,
           Effect.forEach((playerName) => PlayerService.getByName(playerName)),
@@ -184,13 +183,13 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         InteractionContext.editReply({
           content:
             removedMembers.length > 0
-              ? `Forced out ${removedMembers.map((m) => userMention(m.user.id)).join(" ")}`
-              : "No players to force out",
+              ? `Kicked out ${removedMembers.map((m) => userMention(m.user.id)).join(" ")}`
+              : "No players to kick out",
           allowedMentions: { parse: [] },
         }),
       ),
       Effect.provide(guildServicesFromInteractionOption("server_id")),
-      Effect.withSpan("handleForceoutManual", { captureStackTrace: true }),
+      Effect.withSpan("handleKickoutManual", { captureStackTrace: true }),
     ),
   )
   .build();
@@ -199,8 +198,8 @@ export const command =
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder()
     .data(
       new SlashCommandBuilder()
-        .setName("forceout")
-        .setDescription("Force out commands")
+        .setName("kickout")
+        .setDescription("Kick out commands")
         .setIntegrationTypes(
           ApplicationIntegrationType.GuildInstall,
           ApplicationIntegrationType.UserInstall,
