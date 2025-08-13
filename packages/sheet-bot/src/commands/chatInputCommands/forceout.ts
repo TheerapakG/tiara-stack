@@ -2,7 +2,6 @@ import { addMinutes, getMinutes, getUnixTime } from "date-fns/fp";
 import {
   ApplicationIntegrationType,
   InteractionContextType,
-  MessageFlags,
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
   userMention,
@@ -102,7 +101,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
   .handler(
     pipe(
       Effect.Do,
-      InteractionContext.tapDeferReply({ flags: MessageFlags.Ephemeral }),
+      InteractionContext.tapDeferReply(),
       PermissionService.tapCheckOwner({ allowSameGuild: true }),
       PermissionService.tapCheckRoles(
         pipe(
