@@ -1,4 +1,5 @@
 import { Array, Data, Effect, HashMap, Option, pipe } from "effect";
+import { bindObject } from "../../utils";
 import { SheetService } from "./sheetService";
 
 export class Player extends Data.TaggedClass("Player")<{
@@ -13,7 +14,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
   {
     effect: pipe(
       Effect.Do,
-      Effect.bind("sheetService", () => SheetService),
+      bindObject({ sheetService: SheetService }),
       Effect.bindAll(({ sheetService }) => ({
         playerMaps: Effect.cached(
           pipe(

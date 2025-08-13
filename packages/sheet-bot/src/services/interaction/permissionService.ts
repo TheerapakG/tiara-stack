@@ -9,6 +9,7 @@ import {
   InteractionContext,
   InteractionT,
 } from "../../types";
+import { bindObject } from "../../utils";
 import { GuildService } from "../guild";
 import { ClientService } from "./clientService";
 
@@ -37,25 +38,22 @@ export class PermissionService extends Effect.Service<PermissionService>()(
   {
     effect: pipe(
       Effect.Do,
-      Effect.bindAll(
-        () => ({
-          interaction: pipe(
-            InteractionContext.interaction<InteractionT>(),
-            Effect.either,
-          ),
-          cachedInteraction: pipe(
-            CachedInteractionContext.interaction<InteractionT>(),
-            Effect.either,
-          ),
-          client: ClientService.getClient(),
-        }),
-        { concurrency: "unbounded" },
-      ),
+      bindObject({
+        interaction: pipe(
+          InteractionContext.interaction<InteractionT>(),
+          Effect.either,
+        ),
+        cachedInteraction: pipe(
+          CachedInteractionContext.interaction<InteractionT>(),
+          Effect.either,
+        ),
+        client: ClientService.getClient(),
+      }),
       Effect.map(({ interaction, cachedInteraction, client }) => ({
         checkOwner: ({ allowSameGuild }: { allowSameGuild?: boolean }) =>
           pipe(
             Effect.Do,
-            Effect.bindAll(() => ({
+            bindObject({
               interaction,
               guild: pipe(
                 Effect.serviceOption(GuildService),
@@ -67,7 +65,7 @@ export class PermissionService extends Effect.Service<PermissionService>()(
                   }),
                 ),
               ),
-            })),
+            }),
             Effect.let("sameGuild", ({ interaction, guild }) =>
               pipe(
                 guild,
@@ -172,6 +170,16 @@ export class PermissionService extends Effect.Service<PermissionService>()(
       );
   }
 
+  static effectCheckRoles<E, R>(
+    roles: Effect.Effect<RoleResolvable[], E, R>,
+    reason?: string,
+  ) {
+    return pipe(
+      roles,
+      Effect.tap((roles) => PermissionService.checkRoles(roles, reason)),
+    );
+  }
+
   static tapCheckRoles<E1, R1>(
     roles: Effect.Effect<RoleResolvable[], E1, R1>,
     reason?: string,
@@ -179,18 +187,10 @@ export class PermissionService extends Effect.Service<PermissionService>()(
     return <A, E2, R2>(self: Effect.Effect<A, E2, R2>) =>
       pipe(
         Effect.Do,
-        Effect.bindAll(
-          () => ({
-            self,
-            roles: pipe(
-              roles,
-              Effect.tap((roles) =>
-                PermissionService.checkRoles(roles, reason),
-              ),
-            ),
-          }),
-          { concurrency: "unbounded" },
-        ),
+        bindObject({
+          self,
+          roles: PermissionService.effectCheckRoles(roles, reason),
+        }),
         Effect.map(({ self }) => self),
       );
   }

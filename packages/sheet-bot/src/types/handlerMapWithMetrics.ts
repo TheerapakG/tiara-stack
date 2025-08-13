@@ -1,5 +1,6 @@
 import { InteractionResponse, Message, MessageFlags } from "discord.js";
 import { Cause, Data, Effect, Metric, Option, pipe } from "effect";
+import { bindObject } from "../utils";
 import {
   InteractionHandler,
   InteractionHandlerContext,
@@ -119,14 +120,11 @@ export class InteractionHandlerMapWithMetrics<
           onFailure: (cause) =>
             pipe(
               Effect.Do,
-              Effect.let("cause", () => cause),
-              Effect.bindAll(
-                () => ({
-                  replied: InteractionContext.replied(),
-                  deferred: InteractionContext.deferred(),
-                }),
-                { concurrency: "unbounded" },
-              ),
+              bindObject({
+                cause: Effect.succeed(cause),
+                replied: InteractionContext.replied(),
+                deferred: InteractionContext.deferred(),
+              }),
               Effect.tap(({ cause }) => Effect.log(cause)),
               Effect.tap(({ cause, replied, deferred }) =>
                 pipe(

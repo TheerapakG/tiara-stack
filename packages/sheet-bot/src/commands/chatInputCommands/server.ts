@@ -9,7 +9,7 @@ import {
   SlashCommandSubcommandBuilder,
   SlashCommandSubcommandGroupBuilder,
 } from "discord.js";
-import { Array, Effect, Option, pipe } from "effect";
+import { Effect, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import {
   ClientService,
@@ -24,6 +24,7 @@ import {
   chatInputSubcommandHandlerContextBuilder,
   InteractionContext,
 } from "../../types";
+import { bindObject } from "../../utils";
 
 const handleListConfig = chatInputSubcommandHandlerContextBuilder()
   .data(
@@ -40,43 +41,27 @@ const handleListConfig = chatInputSubcommandHandlerContextBuilder()
     pipe(
       Effect.Do,
       PermissionService.tapCheckPermissions(PermissionFlagsBits.ManageGuild),
-      Effect.bindAll(
-        () => ({
-          guild: GuildService.getGuild(),
-          guildConfig: pipe(
-            GuildConfigService.getConfig(),
-            Effect.flatMap((computed) => observeOnce(computed.value)),
-          ),
-          managerRoles: pipe(
-            GuildConfigService.getManagerRoles(),
-            Effect.flatMap((computed) => observeOnce(computed.value)),
-          ),
-        }),
-        { concurrency: "unbounded" },
-      ),
-      Effect.bindAll(({ guildConfig }) =>
-        pipe(
-          guildConfig,
-          Array.head,
-          Option.map(({ sheetId, scriptId }) => ({
-            sheetId: Effect.succeed(sheetId),
-            scriptId: Effect.succeed(scriptId),
-          })),
-          Option.getOrElse(() => ({
-            sheetId: Effect.succeed(undefined),
-            scriptId: Effect.succeed(undefined),
-          })),
+      bindObject({
+        guild: GuildService.getGuild(),
+        guildConfig: pipe(
+          GuildConfigService.getConfig(),
+          Effect.flatMap((computed) => observeOnce(computed.value)),
+          Effect.map(Option.getOrUndefined),
         ),
-      ),
-      Effect.bind("response", ({ guild, sheetId, scriptId, managerRoles }) =>
+        managerRoles: pipe(
+          GuildConfigService.getManagerRoles(),
+          Effect.flatMap((computed) => observeOnce(computed.value)),
+        ),
+      }),
+      Effect.tap(({ guild, guildConfig, managerRoles }) =>
         InteractionContext.reply({
           embeds: [
             new EmbedBuilder()
               .setTitle(`Config for ${escapeMarkdown(guild.name)}`)
               .setDescription(
                 [
-                  `Sheet id: ${escapeMarkdown(sheetId ?? "None")}`,
-                  `Script id: ${escapeMarkdown(scriptId ?? "None")}`,
+                  `Sheet id: ${escapeMarkdown(guildConfig?.sheetId ?? "None")}`,
+                  `Script id: ${escapeMarkdown(guildConfig?.scriptId ?? "None")}`,
                   `Manager roles: ${managerRoles.length > 0 ? managerRoles.map((role) => roleMention(role.roleId)).join(", ") : "None"}`,
                 ].join("\n"),
               ),
@@ -112,15 +97,12 @@ const handleAddManagerRole = chatInputSubcommandHandlerContextBuilder()
     pipe(
       Effect.Do,
       PermissionService.tapCheckPermissions(PermissionFlagsBits.ManageGuild),
-      Effect.bindAll(
-        () => ({
-          guild: GuildService.getGuild(),
-          role: InteractionContext.getRole("role", true),
-        }),
-        { concurrency: "unbounded" },
-      ),
+      bindObject({
+        guild: GuildService.getGuild(),
+        role: InteractionContext.getRole("role", true),
+      }),
       Effect.tap(({ role }) => GuildConfigService.addManagerRole(role.id)),
-      Effect.bind("response", ({ guild, role }) =>
+      Effect.tap(({ guild, role }) =>
         pipe(
           ClientService.makeEmbedBuilder(),
           Effect.tap((embed) =>
@@ -175,15 +157,12 @@ const handleRemoveManagerRole = chatInputSubcommandHandlerContextBuilder()
     pipe(
       Effect.Do,
       PermissionService.tapCheckPermissions(PermissionFlagsBits.ManageGuild),
-      Effect.bindAll(
-        () => ({
-          guild: GuildService.getGuild(),
-          role: InteractionContext.getRole("role", true),
-        }),
-        { concurrency: "unbounded" },
-      ),
+      bindObject({
+        guild: GuildService.getGuild(),
+        role: InteractionContext.getRole("role", true),
+      }),
       Effect.tap(({ role }) => GuildConfigService.removeManagerRole(role.id)),
-      Effect.bind("response", ({ guild, role }) =>
+      Effect.tap(({ guild, role }) =>
         pipe(
           ClientService.makeEmbedBuilder(),
           Effect.tap((embed) =>
@@ -238,19 +217,16 @@ const handleSetSheet = chatInputSubcommandHandlerContextBuilder()
     pipe(
       Effect.Do,
       PermissionService.tapCheckPermissions(PermissionFlagsBits.ManageGuild),
-      Effect.bindAll(
-        () => ({
-          sheetId: InteractionContext.getString("sheet_id", true),
-          guild: GuildService.getGuild(),
-        }),
-        { concurrency: "unbounded" },
-      ),
+      bindObject({
+        sheetId: InteractionContext.getString("sheet_id", true),
+        guild: GuildService.getGuild(),
+      }),
       Effect.tap(({ sheetId }) =>
         GuildConfigService.updateConfig({
           sheetId,
         }),
       ),
-      Effect.bind("response", ({ guild, sheetId }) =>
+      Effect.tap(({ guild, sheetId }) =>
         pipe(
           ClientService.makeEmbedBuilder(),
           Effect.tap((embed) =>
@@ -293,19 +269,16 @@ const handleSetScript = chatInputSubcommandHandlerContextBuilder()
     pipe(
       Effect.Do,
       PermissionService.tapCheckOwner({ allowSameGuild: false }),
-      Effect.bindAll(
-        () => ({
-          scriptId: InteractionContext.getString("script_id", true),
-          guild: GuildService.getGuild(),
-        }),
-        { concurrency: "unbounded" },
-      ),
+      bindObject({
+        scriptId: InteractionContext.getString("script_id", true),
+        guild: GuildService.getGuild(),
+      }),
       Effect.tap(({ scriptId }) =>
         GuildConfigService.updateConfig({
           scriptId,
         }),
       ),
-      Effect.bind("response", ({ guild, scriptId }) =>
+      Effect.tap(({ guild, scriptId }) =>
         pipe(
           ClientService.makeEmbedBuilder(),
           Effect.tap((embed) =>

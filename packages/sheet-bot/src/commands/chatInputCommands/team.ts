@@ -20,6 +20,7 @@ import {
   chatInputSubcommandHandlerContextBuilder,
   InteractionContext,
 } from "../../types";
+import { bindObject } from "../../utils";
 
 const handleList = chatInputSubcommandHandlerContextBuilder()
   .data(
@@ -39,25 +40,22 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
     pipe(
       Effect.Do,
       PermissionService.tapCheckOwner({ allowSameGuild: true }),
-      Effect.bindAll(
-        () => ({
-          managerRoles: pipe(
-            GuildConfigService.getManagerRoles(),
-            Effect.flatMap((computed) => observeOnce(computed.value)),
+      bindObject({
+        managerRoles: pipe(
+          GuildConfigService.getManagerRoles(),
+          Effect.flatMap((computed) => observeOnce(computed.value)),
+        ),
+        interactionUser: InteractionContext.user(),
+        user: pipe(
+          InteractionContext.getUser("user"),
+          Effect.flatMap(
+            Option.match({
+              onSome: (user) => Effect.succeed(user),
+              onNone: () => InteractionContext.user(),
+            }),
           ),
-          interactionUser: InteractionContext.user(),
-          user: pipe(
-            InteractionContext.getUser("user"),
-            Effect.flatMap(
-              Option.match({
-                onSome: (user) => Effect.succeed(user),
-                onNone: () => InteractionContext.user(),
-              }),
-            ),
-          ),
-        }),
-        { concurrency: "unbounded" },
-      ),
+        ),
+      }),
       Effect.tap(({ user, interactionUser, managerRoles }) =>
         user.id !== interactionUser.id
           ? PermissionService.checkRoles(

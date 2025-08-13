@@ -29,6 +29,7 @@ import {
   chatInputSubcommandHandlerContextBuilder,
   InteractionContext,
 } from "../../types";
+import { bindObject } from "../../utils";
 
 class ArgumentError extends Data.TaggedError("ArgumentError")<{
   readonly message: string;
@@ -47,13 +48,23 @@ const getCheckinData = ({
 }) =>
   pipe(
     Effect.Do,
-    Effect.bindAll(
-      () => ({
-        eventConfig: SheetService.getEventConfig(),
-        schedules: SheetService.getAllSchedules(),
-      }),
-      { concurrency: "unbounded" },
-    ),
+    bindObject({
+      eventConfig: SheetService.getEventConfig(),
+      schedules: SheetService.getAllSchedules(),
+      runningChannel: pipe(
+        GuildConfigService.getRunningChannelByName(channelName),
+        Effect.flatMap((computed) => observeOnce(computed.value)),
+        Effect.flatMap(
+          Option.match({
+            onSome: (channel) => Effect.succeed(channel),
+            onNone: () =>
+              Effect.fail(
+                new ArgumentError(`No such running channel: ${channelName}`),
+              ),
+          }),
+        ),
+      ),
+    }),
     Effect.let("prevSchedule", ({ schedules }) =>
       pipe(
         HashMap.get(schedules, hour - 1),
@@ -64,22 +75,6 @@ const getCheckinData = ({
       pipe(
         HashMap.get(schedules, hour),
         Option.getOrElse(() => emptySchedule(hour)),
-      ),
-    ),
-    Effect.bind("runningChannel", () =>
-      pipe(
-        GuildConfigService.getRunningChannelByName(channelName),
-        Effect.flatMap((computed) => observeOnce(computed.value)),
-        Effect.map(Array.head),
-        Effect.flatMap(
-          Option.match({
-            onSome: (channel) => Effect.succeed(channel),
-            onNone: () =>
-              Effect.fail(
-                new ArgumentError(`No such running channel: ${channelName}`),
-              ),
-          }),
-        ),
       ),
     ),
     Effect.map(({ eventConfig, prevSchedule, schedule, runningChannel }) => ({
@@ -155,19 +150,16 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         ),
         "You can only check in users as a manager",
       ),
-      Effect.bindAll(
-        () => ({
-          hourOption: InteractionContext.getNumber("hour"),
-          channelName: InteractionContext.getString("channel_name", true),
-          channel: pipe(
-            InteractionContext.channel(),
-            Effect.flatMap(Option.fromNullable),
-          ),
-          user: InteractionContext.user(),
-          eventConfig: SheetService.getEventConfig(),
-        }),
-        { concurrency: "unbounded" },
-      ),
+      bindObject({
+        hourOption: InteractionContext.getNumber("hour"),
+        channelName: InteractionContext.getString("channel_name", true),
+        channel: pipe(
+          InteractionContext.channel(),
+          Effect.flatMap(Option.fromNullable),
+        ),
+        user: InteractionContext.user(),
+        eventConfig: SheetService.getEventConfig(),
+      }),
       Effect.let("hour", ({ hourOption, eventConfig }) =>
         pipe(
           hourOption,

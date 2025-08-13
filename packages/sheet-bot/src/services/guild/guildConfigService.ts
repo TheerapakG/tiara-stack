@@ -5,23 +5,24 @@ import {
   configGuildChannel,
   configGuildManagerRole,
 } from "sheet-db-schema";
+import { computed } from "typhoon-core/signal";
 import { DBSubscriptionContext } from "typhoon-server/db";
 import { DB } from "../../db";
+import { bindObject } from "../../utils";
 import { GuildService } from "./guildService";
+
+export type ChannelConfig = typeof configGuildChannel.$inferSelect;
 
 export class GuildConfigService extends Effect.Service<GuildConfigService>()(
   "GuildConfigService",
   {
     effect: pipe(
       Effect.Do,
-      Effect.bindAll(
-        () => ({
-          db: DB,
-          dbSubscriptionContext: DBSubscriptionContext,
-          guildService: GuildService,
-        }),
-        { concurrency: "unbounded" },
-      ),
+      bindObject({
+        db: DB,
+        dbSubscriptionContext: DBSubscriptionContext,
+        guildService: GuildService,
+      }),
       Effect.map(({ db, dbSubscriptionContext, guildService }) => ({
         getConfig: () =>
           pipe(
@@ -38,6 +39,9 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                     ),
                   ),
               ),
+            ),
+            Effect.flatMap((c) =>
+              computed(pipe(c.value, Effect.map(Array.head))),
             ),
             Effect.withSpan("GuildConfigService.getConfig", {
               captureStackTrace: true,
@@ -177,6 +181,9 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                   ),
               ),
             ),
+            Effect.flatMap((c) =>
+              computed(pipe(c.value, Effect.map(Array.head))),
+            ),
             Effect.withSpan("GuildConfigService.getRunningChannelById", {
               captureStackTrace: true,
             }),
@@ -197,6 +204,9 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                     ),
                   ),
               ),
+            ),
+            Effect.flatMap((c) =>
+              computed(pipe(c.value, Effect.map(Array.head))),
             ),
             Effect.withSpan("GuildConfigService.getRunningChannelByName", {
               captureStackTrace: true,

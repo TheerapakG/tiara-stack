@@ -37,35 +37,33 @@ import {
   chatInputSubcommandHandlerContextBuilder,
   InteractionContext,
 } from "../../types";
+import { bindObject } from "../../utils";
 
 const getSlotMessage = (day: number) =>
   pipe(
     Effect.Do,
-    Effect.bindAll(
-      () => ({
-        eventConfig: SheetService.getEventConfig(),
-        daySchedule: SheetService.getDaySchedules(day),
-      }),
-      { concurrency: "unbounded" },
-    ),
-    Effect.bind("slotMessages", ({ eventConfig, daySchedule }) =>
-      pipe(
+    bindObject({
+      eventConfig: SheetService.getEventConfig(),
+      daySchedule: SheetService.getDaySchedules(day),
+    }),
+    Effect.bindAll(({ eventConfig, daySchedule }) => ({
+      title: Effect.succeed(`Day ${day} Slots~`),
+      description: pipe(
         daySchedule,
         HashMap.values,
         Array.sortBy(Order.mapInput(Order.number, ({ hour }) => hour)),
         Effect.forEach((schedule) =>
           ScheduleService.formatEmptySlots(eventConfig.startTime, schedule),
         ),
+        Effect.map(Chunk.fromIterable),
+        Effect.map(Chunk.dedupeAdjacent),
+        Effect.map(Chunk.join("\n")),
+        Effect.map((description) =>
+          description === "" ? "All Filled :3" : description,
+        ),
       ),
-    ),
-    Effect.let("slotMessage", ({ slotMessages }) =>
-      pipe(
-        Chunk.fromIterable(slotMessages),
-        Chunk.dedupeAdjacent,
-        Chunk.join("\n"),
-      ),
-    ),
-    Effect.map(({ slotMessage }) => slotMessage),
+    })),
+    Effect.map(({ title, description }) => ({ title, description })),
   );
 
 const handleList = chatInputSubcommandHandlerContextBuilder()
@@ -98,7 +96,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
     pipe(
       Effect.Do,
       PermissionService.tapCheckOwner({ allowSameGuild: true }),
-      Effect.bindAll(() => ({
+      bindObject({
         messageFlags: Ref.make(new MessageFlagsBitField()),
         day: InteractionContext.getNumber("day", true),
         messageType: pipe(
@@ -107,17 +105,17 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           Effect.flatMap(validate(type.enumerated("persistent", "ephemeral"))),
         ),
         user: InteractionContext.user(),
-      })),
-      Effect.bind("managerRoles", () =>
-        pipe(
-          GuildConfigService.getManagerRoles(),
-          Effect.flatMap((computed) => observeOnce(computed.value)),
-        ),
-      ),
-      Effect.tap(({ messageType, managerRoles }) =>
+      }),
+      Effect.tap(({ messageType }) =>
         messageType !== "ephemeral"
-          ? PermissionService.checkRoles(
-              managerRoles.map((role) => role.roleId),
+          ? PermissionService.effectCheckRoles(
+              pipe(
+                GuildConfigService.getManagerRoles(),
+                Effect.flatMap((computed) => observeOnce(computed.value)),
+                Effect.map((managerRoles) =>
+                  managerRoles.map((role) => role.roleId),
+                ),
+              ),
               "You can only make persistent messages as a manager",
             )
           : Effect.void,
@@ -131,17 +129,15 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
       ),
       Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
       Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
-      Effect.bind("response", ({ day, slotMessage, flags }) =>
+      Effect.bind("response", ({ slotMessage, flags }) =>
         pipe(
           ClientService.makeEmbedBuilder(),
           Effect.tap((embed) =>
             InteractionContext.reply({
               embeds: [
                 embed
-                  .setTitle(`Day ${day} Slots~`)
-                  .setDescription(
-                    slotMessage === "" ? "All Filled :3" : slotMessage,
-                  ),
+                  .setTitle(slotMessage.title)
+                  .setDescription(slotMessage.description),
               ],
               flags: flags.bitfield,
             }),
@@ -178,23 +174,20 @@ const handleButton = chatInputSubcommandHandlerContextBuilder()
         ),
         "You can only make buttons as a manager",
       ),
-      Effect.bindAll(
-        () => ({
-          day: InteractionContext.getNumber("day", true),
-          channel: pipe(
-            InteractionContext.channel(),
-            Effect.flatMap(Option.fromNullable),
-          ),
-          user: InteractionContext.user(),
-        }),
-        { concurrency: "unbounded" },
-      ),
+      bindObject({
+        day: InteractionContext.getNumber("day", true),
+        channel: pipe(
+          InteractionContext.channel(),
+          Effect.flatMap(Option.fromNullable),
+        ),
+        user: InteractionContext.user(),
+      }),
       Effect.tap(({ channel, day }) =>
         ChannelConfigService.updateConfig(channel.id, {
           day,
         }),
       ),
-      Effect.bind("response", ({ day }) =>
+      Effect.tap(({ day }) =>
         InteractionContext.reply({
           content: `Press the button below to get the current open slots for day ${day}`,
           components: [

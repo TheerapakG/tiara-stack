@@ -10,6 +10,7 @@ import {
 } from "discord.js";
 import { Effect, Option, pipe } from "effect";
 import {
+  ChannelConfig,
   ClientService,
   GuildConfigService,
   guildServicesFromInteractionOption,
@@ -20,6 +21,22 @@ import {
   chatInputSubcommandHandlerContextBuilder,
   InteractionContext,
 } from "../../types";
+import { bindObject } from "../../utils";
+
+const configFields = (config: ChannelConfig) => [
+  {
+    name: "Name",
+    value: escapeMarkdown(config.name ?? "None!"),
+  },
+  {
+    name: "Running channel",
+    value: config.running ? "Yes" : "No",
+  },
+  {
+    name: "Role",
+    value: config.roleId ? roleMention(config.roleId) : "None!",
+  },
+];
 
 const handleSet = chatInputSubcommandHandlerContextBuilder()
   .data(
@@ -44,32 +61,27 @@ const handleSet = chatInputSubcommandHandlerContextBuilder()
     pipe(
       Effect.Do,
       PermissionService.tapCheckPermissions(PermissionFlagsBits.ManageGuild),
-      Effect.bindAll(
-        () => ({
-          running: InteractionContext.getBoolean("running"),
-          name: InteractionContext.getString("name"),
-          role: InteractionContext.getRole("role"),
-          channel: pipe(
-            InteractionContext.channel(),
-            Effect.flatMap(Option.fromNullable),
+      bindObject({
+        channel: pipe(
+          InteractionContext.channel(),
+          Effect.flatMap(Option.fromNullable),
+        ),
+        running: InteractionContext.getBoolean("running"),
+        name: InteractionContext.getString("name"),
+        role: InteractionContext.getRole("role"),
+      }),
+      Effect.bind("config", ({ channel, running, name, role }) =>
+        GuildConfigService.setChannelConfig(channel.id, {
+          running: Option.getOrUndefined(running),
+          name: Option.getOrUndefined(name),
+          roleId: pipe(
+            role,
+            Option.map((r) => r.id),
+            Option.getOrUndefined,
           ),
         }),
-        { concurrency: "unbounded" },
       ),
-      Effect.let("roleId", ({ role }) =>
-        pipe(
-          role,
-          Option.map((r) => r.id),
-        ),
-      ),
-      Effect.bind("config", ({ name, channel, running, roleId }) =>
-        GuildConfigService.setChannelConfig(channel.id, {
-          running: Option.getOrElse(running, () => false),
-          name: Option.getOrElse(name, () => undefined),
-          roleId: Option.getOrElse(roleId, () => undefined),
-        }),
-      ),
-      Effect.bind("response", ({ channel, config }) =>
+      Effect.tap(({ channel, config }) =>
         pipe(
           ClientService.makeEmbedBuilder(),
           Effect.tap((embed) =>
@@ -80,22 +92,62 @@ const handleSet = chatInputSubcommandHandlerContextBuilder()
                   .setDescription(
                     `${channelMention(channel.id)} configuration updated`,
                   )
-                  .addFields(
-                    {
-                      name: "Name",
-                      value: escapeMarkdown(config.name ?? "None!"),
-                    },
-                    {
-                      name: "Running channel",
-                      value: config.running ? "Yes" : "No",
-                    },
-                    {
-                      name: "Role",
-                      value: config.roleId
-                        ? roleMention(config.roleId)
-                        : "None!",
-                    },
-                  ),
+                  .addFields(...configFields(config)),
+              ],
+            }),
+          ),
+        ),
+      ),
+      Effect.provide(guildServicesFromInteractionOption("server_id")),
+      Effect.withSpan("handlesSetRunning", {
+        captureStackTrace: true,
+      }),
+    ),
+  )
+  .build();
+
+const handleUnset = chatInputSubcommandHandlerContextBuilder()
+  .data(
+    new SlashCommandSubcommandBuilder()
+      .setName("unset")
+      .setDescription("Unset the config for the channel")
+      .addBooleanOption((option) =>
+        option.setName("name").setDescription("Unset the name of the channel"),
+      )
+      .addBooleanOption((option) =>
+        option.setName("role").setDescription("Unset the role of the channel"),
+      ),
+  )
+  .handler(
+    pipe(
+      Effect.Do,
+      PermissionService.tapCheckPermissions(PermissionFlagsBits.ManageGuild),
+      bindObject({
+        channel: pipe(
+          InteractionContext.channel(),
+          Effect.flatMap(Option.fromNullable),
+        ),
+        name: InteractionContext.getBoolean("name"),
+        role: InteractionContext.getBoolean("role"),
+      }),
+      Effect.bind("config", ({ channel, name, role }) =>
+        GuildConfigService.setChannelConfig(channel.id, {
+          name: name ? null : undefined,
+          roleId: role ? null : undefined,
+        }),
+      ),
+      Effect.tap(({ channel, config }) =>
+        pipe(
+          ClientService.makeEmbedBuilder(),
+          Effect.tap((embed) =>
+            InteractionContext.reply({
+              embeds: [
+                embed
+                  .setTitle(`Success!`)
+                  .setDescription(
+                    `${channelMention(channel.id)} configuration updated`,
+                  )
+                  .addFields(...configFields(config)),
               ],
             }),
           ),
@@ -126,4 +178,5 @@ export const command =
         ),
     )
     .addSubcommandHandler(handleSet)
+    .addSubcommandHandler(handleUnset)
     .build();
