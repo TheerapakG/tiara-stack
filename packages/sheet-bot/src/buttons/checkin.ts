@@ -21,6 +21,7 @@ import {
   CachedInteractionContext,
   InteractionContext,
 } from "../types";
+import { bindObject } from "../utils";
 
 const buttonData = {
   type: ComponentType.Button,
@@ -44,14 +45,11 @@ export const button = buttonInteractionHandlerContextBuilder()
     pipe(
       Effect.Do,
       InteractionContext.tapDeferReply({ flags: MessageFlags.Ephemeral }),
-      Effect.bindAll(
-        () => ({
-          client: ClientService.getClient(),
-          message: CachedInteractionContext.message<ButtonInteractionT>(),
-          user: InteractionContext.user(),
-        }),
-        { concurrency: "unbounded" },
-      ),
+      bindObject({
+        client: ClientService.getClient(),
+        message: CachedInteractionContext.message<ButtonInteractionT>(),
+        user: InteractionContext.user(),
+      }),
       Effect.bind("messageCheckinData", ({ message }) =>
         pipe(
           MessageCheckinService.getMessageCheckinData(message.id),
@@ -78,17 +76,17 @@ export const button = buttonInteractionHandlerContextBuilder()
           ),
         ),
       ),
-      Effect.bind("messageCheckinMembers", ({ message }) =>
+      Effect.bind("checkedInMentions", ({ message }) =>
         pipe(
           MessageCheckinService.getMessageCheckinMembers(message.id),
           Effect.flatMap((computed) => observeOnce(computed.value)),
+          Effect.map((members) =>
+            members
+              .filter((m) => m.checkinAt !== null)
+              .map((m) => userMention(m.memberId))
+              .join(" "),
+          ),
         ),
-      ),
-      Effect.let("checkedInMentions", ({ messageCheckinMembers }) =>
-        messageCheckinMembers
-          .filter((m) => m.checkinAt !== null)
-          .map((m) => userMention(m.memberId))
-          .join(" "),
       ),
       Effect.tap(({ messageCheckinData }) =>
         PermissionService.addRole(messageCheckinData.roleId),

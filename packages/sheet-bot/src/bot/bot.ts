@@ -36,6 +36,7 @@ import {
   VariantInteractionHandlerContext,
   VariantInteractionHandlerMap,
 } from "../types";
+import { bindObject } from "../utils";
 
 export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   "Bot",
@@ -179,43 +180,39 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   static create<A = never, E = never, R = never>(layer: Layer.Layer<R, E>) {
     return pipe(
       Effect.Do,
-      Effect.bindAll(
-        () => ({
-          client: Effect.succeed(
-            new Client({ intents: [GatewayIntentBits.Guilds] }),
+      bindObject({
+        client: Effect.succeed(
+          new Client({ intents: [GatewayIntentBits.Guilds] }),
+        ),
+        loginLatch: Effect.makeLatch(false),
+        loginSemaphore: Effect.makeSemaphore(1),
+        chatInputCommandsMap: SynchronizedRef.make(
+          InteractionHandlerMapWithMetrics.make(
+            "chat_input_command",
+            chatInputCommandHandlerMap<
+              A,
+              E,
+              R | InteractionContext<ChatInputCommandInteractionT>
+            >(),
           ),
-          loginLatch: Effect.makeLatch(false),
-          loginSemaphore: Effect.makeSemaphore(1),
-          chatInputCommandsMap: SynchronizedRef.make(
-            InteractionHandlerMapWithMetrics.make(
-              "chat_input_command",
-              chatInputCommandHandlerMap<
-                A,
-                E,
-                R | InteractionContext<ChatInputCommandInteractionT>
-              >(),
-            ),
+        ),
+        buttonsMap: SynchronizedRef.make(
+          InteractionHandlerMapWithMetrics.make(
+            "button",
+            buttonInteractionHandlerMap<
+              A,
+              E,
+              R | InteractionContext<ButtonInteractionT>
+            >(),
           ),
-          buttonsMap: SynchronizedRef.make(
-            InteractionHandlerMapWithMetrics.make(
-              "button",
-              buttonInteractionHandlerMap<
-                A,
-                E,
-                R | InteractionContext<ButtonInteractionT>
-              >(),
-            ),
-          ),
-          traceProvider: Effect.succeed(Layer.empty),
-          layer: Effect.succeed(layer),
-          runtime: SynchronizedRef.make(
-            Option.none<ManagedRuntime.ManagedRuntime<R, E>>(),
-          ),
-        }),
-        { concurrency: "unbounded" },
-      ),
-      Effect.let("bot", (params) => new Bot<A, E, R>(params)),
-      Effect.map(({ bot }) => bot),
+        ),
+        traceProvider: Effect.succeed(Layer.empty),
+        layer: Effect.succeed(layer),
+        runtime: SynchronizedRef.make(
+          Option.none<ManagedRuntime.ManagedRuntime<R, E>>(),
+        ),
+      }),
+      Effect.map((params) => new Bot<A, E, R>(params)),
     );
   }
 

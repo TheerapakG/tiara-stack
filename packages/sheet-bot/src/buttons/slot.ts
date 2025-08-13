@@ -1,20 +1,5 @@
-import {
-  ButtonBuilder,
-  ButtonStyle,
-  ComponentType,
-  MessageFlags,
-  MessageFlagsBitField,
-} from "discord.js";
-import {
-  Array,
-  Chunk,
-  Effect,
-  HashMap,
-  Option,
-  Order,
-  pipe,
-  Ref,
-} from "effect";
+import { ButtonStyle, ComponentType, MessageFlags } from "discord.js";
+import { Array, Chunk, Effect, HashMap, Option, Order, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import {
   ChannelConfigService,
@@ -27,35 +12,33 @@ import {
   buttonInteractionHandlerContextBuilder,
   InteractionContext,
 } from "../types";
+import { bindObject } from "../utils";
 
 const getSlotMessage = (day: number) =>
   pipe(
     Effect.Do,
-    Effect.bindAll(
-      () => ({
-        eventConfig: SheetService.getEventConfig(),
-        daySchedule: SheetService.getDaySchedules(day),
-      }),
-      { concurrency: "unbounded" },
-    ),
-    Effect.bind("slotMessages", ({ eventConfig, daySchedule }) =>
-      pipe(
+    bindObject({
+      eventConfig: SheetService.getEventConfig(),
+      daySchedule: SheetService.getDaySchedules(day),
+    }),
+    Effect.bindAll(({ eventConfig, daySchedule }) => ({
+      title: Effect.succeed(`Day ${day} Slots~`),
+      description: pipe(
         daySchedule,
         HashMap.values,
         Array.sortBy(Order.mapInput(Order.number, ({ hour }) => hour)),
         Effect.forEach((schedule) =>
           ScheduleService.formatEmptySlots(eventConfig.startTime, schedule),
         ),
+        Effect.map(Chunk.fromIterable),
+        Effect.map(Chunk.dedupeAdjacent),
+        Effect.map(Chunk.join("\n")),
+        Effect.map((description) =>
+          description === "" ? "All Filled :3" : description,
+        ),
       ),
-    ),
-    Effect.let("slotMessage", ({ slotMessages }) =>
-      pipe(
-        Chunk.fromIterable(slotMessages),
-        Chunk.dedupeAdjacent,
-        Chunk.join("\n"),
-      ),
-    ),
-    Effect.map(({ slotMessage }) => slotMessage),
+    })),
+    Effect.map(({ title, description }) => ({ title, description })),
   );
 
 export const button = buttonInteractionHandlerContextBuilder()
@@ -67,50 +50,20 @@ export const button = buttonInteractionHandlerContextBuilder()
   })
   .handler(
     pipe(
-      Effect.Do,
-      Effect.bindAll(() => ({
-        messageFlags: Ref.make(
-          new MessageFlagsBitField().add(MessageFlags.Ephemeral),
-        ),
-        channel: pipe(
-          InteractionContext.channel(),
-          Effect.flatMap(Option.fromNullable),
-        ),
-      })),
-      Effect.bind("channelConfig", ({ channel }) =>
-        pipe(
-          ChannelConfigService.getConfig(channel.id),
-          Effect.flatMap((computed) => observeOnce(computed.value)),
-        ),
-      ),
-      Effect.bind("day", ({ channelConfig }) =>
-        pipe(
-          channelConfig,
-          Array.head,
-          Option.flatMap(({ day }) => Option.fromNullable(day)),
-        ),
-      ),
-      Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
-      Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
-      Effect.let("updateButton", () =>
-        new ButtonBuilder()
-          .setCustomId("update")
-          .setLabel("Update")
-          .setStyle(ButtonStyle.Primary),
-      ),
-      Effect.bind("response", ({ day, slotMessage, flags }) =>
+      InteractionContext.channel(),
+      Effect.flatMap(Option.fromNullable),
+      Effect.flatMap((channel) => ChannelConfigService.getConfig(channel.id)),
+      Effect.flatMap((computed) => observeOnce(computed.value)),
+      Effect.map(Option.map(({ day }) => day)),
+      Effect.flatMap(Option.flatMap(Option.fromNullable)),
+      Effect.flatMap((day) => getSlotMessage(day)),
+      Effect.tap(({ title, description }) =>
         pipe(
           ClientService.makeEmbedBuilder(),
           Effect.tap((embed) =>
             InteractionContext.reply({
-              embeds: [
-                embed
-                  .setTitle(`Day ${day} Slots~`)
-                  .setDescription(
-                    slotMessage === "" ? "All Filled :3" : slotMessage,
-                  ),
-              ],
-              flags: flags.bitfield,
+              embeds: [embed.setTitle(title).setDescription(description)],
+              flags: MessageFlags.Ephemeral,
             }),
           ),
         ),

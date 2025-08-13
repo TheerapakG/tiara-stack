@@ -7,6 +7,7 @@ import {
   SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 import { Data, Effect, HashMap, Option, pipe } from "effect";
+import { bindObject } from "../utils";
 import {
   HandlerVariantData,
   HandlerVariantInteraction,
@@ -415,13 +416,10 @@ export class SubcommandHandler<
   ) {
     return pipe(
       Effect.Do,
-      Effect.bindAll(
-        () => ({
-          subcommandGroup: InteractionContext.getSubcommandGroup(),
-          subcommand: InteractionContext.getSubcommand(),
-        }),
-        { concurrency: "unbounded" },
-      ),
+      bindObject({
+        subcommandGroup: InteractionContext.getSubcommandGroup(),
+        subcommand: InteractionContext.getSubcommand(),
+      }),
       Effect.flatMap(({ subcommandGroup, subcommand }) =>
         pipe(
           subcommandGroup,

@@ -12,6 +12,7 @@ import {
 import { observeOnce } from "typhoon-server/signal";
 import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
 import { GoogleSheets } from "../../google/sheets";
+import { bindObject } from "../../utils";
 import { SheetConfigService } from "../bot/sheetConfigService";
 import { GuildConfigService } from "./guildConfigService";
 
@@ -33,32 +34,27 @@ export class RawPlayer extends Data.TaggedClass("RawPlayer")<{
   nameIndex: number;
 }> {}
 
-const playerParser = (
-  valueRange: sheets_v4.Schema$ValueRange[] | undefined,
-): Effect.Effect<RawPlayer[], never, never> =>
+const playerParser = ([
+  userIds,
+  userSheetNames,
+]: sheets_v4.Schema$ValueRange[]): Effect.Effect<RawPlayer[], never, never> =>
   pipe(
     Effect.Do,
-    Effect.bindAll(() => {
-      const [userIds, userSheetNames] = valueRange ?? [];
-      return {
-        userIds: parseValueRange(userIds, ([userId], index) =>
+    bindObject({
+      userIds: parseValueRange(userIds, ([userId], index) =>
+        Effect.succeed({
+          id: pipe(Option.fromNullable(userId), Option.map(String)),
+          idIndex: index,
+        }),
+      ),
+      userSheetNames: parseValueRange(
+        userSheetNames,
+        ([userSheetName], index) =>
           Effect.succeed({
-            id: pipe(Option.fromNullable(userId), Option.map(String)),
-            idIndex: index,
+            name: pipe(Option.fromNullable(userSheetName), Option.map(String)),
+            nameIndex: index,
           }),
-        ),
-        userSheetNames: parseValueRange(
-          userSheetNames,
-          ([userSheetName], index) =>
-            Effect.succeed({
-              name: pipe(
-                Option.fromNullable(userSheetName),
-                Option.map(String),
-              ),
-              nameIndex: index,
-            }),
-        ),
-      };
+      ),
     }),
     Effect.map(({ userIds, userSheetNames }) =>
       pipe(
@@ -90,63 +86,61 @@ export class RawTeam extends Data.TaggedClass("RawTeam")<{
   talent: Option.Option<number>;
 }> {}
 
-const teamParser = (
-  valueRange: sheets_v4.Schema$ValueRange[] | undefined,
-): Effect.Effect<
+const teamParser = ([
+  userIds,
+  userTeams,
+]: sheets_v4.Schema$ValueRange[]): Effect.Effect<
   HashMap.HashMap<string, { id: string; teams: RawTeam[] }>,
   never,
   never
 > =>
   pipe(
     Effect.Do,
-    Effect.bindAll(() => {
-      const [userIds, userTeams] = valueRange ?? [];
-      return {
-        userIds: parseValueRange(userIds, ([userId]) =>
-          Effect.succeed({
-            id: pipe(Option.fromNullable(userId), Option.map(String)),
-          }),
-        ),
-        userTeams: parseValueRange(userTeams, (teams) =>
-          Effect.succeed({
-            teams: pipe(
-              teams,
-              Array.chunksOf(6),
-              Array.map(
-                ([teamName, _isv, lead, backline, talent, _isvPercent]) => ({
-                  teamName: pipe(
-                    Option.fromNullable(teamName),
-                    Option.map(String),
-                  ),
-                  lead: pipe(
-                    Option.fromNullable(lead),
-                    Option.map((lead) => parseInt(lead, 10)),
-                  ),
-                  backline: pipe(
-                    Option.fromNullable(backline),
-                    Option.map((backline) => parseInt(backline, 10)),
-                  ),
-                  talent: pipe(
-                    Option.fromNullable(talent),
-                    Option.map((talent) => parseInt(talent, 10)),
-                  ),
-                }),
-              ),
-              Array.map(({ teamName, lead, backline, talent }) =>
-                pipe(
-                  teamName,
-                  Option.map(
-                    (teamName) =>
-                      new RawTeam({ teamName, lead, backline, talent }),
-                  ),
-                  Option.filter(({ teamName }) => teamName !== ""),
+    bindObject({
+      userIds: parseValueRange(userIds, ([userId]) =>
+        Effect.succeed({
+          id: pipe(Option.fromNullable(userId), Option.map(String)),
+        }),
+      ),
+      userTeams: parseValueRange(userTeams, (teams) =>
+        Effect.succeed({
+          teams: pipe(
+            teams,
+            Array.chunksOf(6),
+            Array.map(
+              ([teamName, _isv, lead, backline, talent, _isvPercent]) => ({
+                teamName: pipe(
+                  Option.fromNullable(teamName),
+                  Option.map(String),
                 ),
-              ),
-              Array.getSomes,
+                lead: pipe(
+                  Option.fromNullable(lead),
+                  Option.map((lead) => parseInt(lead, 10)),
+                ),
+                backline: pipe(
+                  Option.fromNullable(backline),
+                  Option.map((backline) => parseInt(backline, 10)),
+                ),
+                talent: pipe(
+                  Option.fromNullable(talent),
+                  Option.map((talent) => parseInt(talent, 10)),
+                ),
+              }),
             ),
-          }),
-        ),
-      };
+            Array.map(({ teamName, lead, backline, talent }) =>
+              pipe(
+                teamName,
+                Option.map(
+                  (teamName) =>
+                    new RawTeam({ teamName, lead, backline, talent }),
+                ),
+                Option.filter(({ teamName }) => teamName !== ""),
+              ),
+            ),
+            Array.getSomes,
+          ),
+        }),
+      ),
     }),
     Effect.map(({ userIds, userTeams }) =>
       pipe(
@@ -206,56 +200,57 @@ export type Schedule = {
 };
 export type ScheduleMap = HashMap.HashMap<number, Schedule>;
 
-const scheduleParser = (
-  valueRange: sheets_v4.Schema$ValueRange[] | undefined,
-): Effect.Effect<ScheduleMap, never, never> =>
+const scheduleParser = ([
+  hours,
+  breaks,
+  fills,
+  overfills,
+  standbys,
+]: sheets_v4.Schema$ValueRange[]): Effect.Effect<ScheduleMap, never, never> =>
   pipe(
     Effect.Do,
-    Effect.bindAll(() => {
-      const [hours, breaks, fills, overfills, standbys] = valueRange ?? [];
-      return {
-        hours: parseValueRange(hours, ([hour]) =>
-          Effect.succeed({
-            hour: parseInt(hour, 10),
-          }),
-        ),
-        breaks: parseValueRange(breaks, ([breakHour]) =>
-          Effect.succeed({
-            breakHour: breakHour === "TRUE",
-          }),
-        ),
-        fills: parseValueRange(fills, ([p1, p2, p3, p4, p5]) =>
-          Effect.succeed({
-            fills: [
-              p1 ? String(p1) : undefined,
-              p2 ? String(p2) : undefined,
-              p3 ? String(p3) : undefined,
-              p4 ? String(p4) : undefined,
-              p5 ? String(p5) : undefined,
-            ] as const,
-          }),
-        ),
-        overfills: parseValueRange(overfills, ([overfill]) =>
-          Effect.succeed({
-            overfills:
-              overfill !== undefined
-                ? String(overfill)
-                    .split(",")
-                    .map((player) => player.trim())
-                : [],
-          }),
-        ),
-        standbys: parseValueRange(standbys, ([standby]) =>
-          Effect.succeed({
-            standbys:
-              standby !== undefined
-                ? String(standby)
-                    .split(",")
-                    .map((player) => player.trim())
-                : [],
-          }),
-        ),
-      };
+    bindObject({
+      hours: parseValueRange(hours, ([hour]) =>
+        Effect.succeed({
+          hour: parseInt(hour, 10),
+        }),
+      ),
+      breaks: parseValueRange(breaks, ([breakHour]) =>
+        Effect.succeed({
+          breakHour: breakHour === "TRUE",
+        }),
+      ),
+      fills: parseValueRange(fills, ([p1, p2, p3, p4, p5]) =>
+        Effect.succeed({
+          fills: [
+            p1 ? String(p1) : undefined,
+            p2 ? String(p2) : undefined,
+            p3 ? String(p3) : undefined,
+            p4 ? String(p4) : undefined,
+            p5 ? String(p5) : undefined,
+          ] as const,
+        }),
+      ),
+      overfills: parseValueRange(overfills, ([overfill]) =>
+        Effect.succeed({
+          overfills:
+            overfill !== undefined
+              ? String(overfill)
+                  .split(",")
+                  .map((player) => player.trim())
+              : [],
+        }),
+      ),
+      standbys: parseValueRange(standbys, ([standby]) =>
+        Effect.succeed({
+          standbys:
+            standby !== undefined
+              ? String(standby)
+                  .split(",")
+                  .map((player) => player.trim())
+              : [],
+        }),
+      ),
     }),
     Effect.map(({ hours, breaks, fills, overfills, standbys }) =>
       pipe(
@@ -313,13 +308,10 @@ export class SheetService extends Effect.Service<SheetService>()(
     effect: (sheetId: string) =>
       pipe(
         Effect.Do,
-        Effect.bindAll(
-          () => ({
-            sheet: GoogleSheets,
-            sheetConfigService: SheetConfigService,
-          }),
-          { concurrency: "unbounded" },
-        ),
+        bindObject({
+          sheet: GoogleSheets,
+          sheetConfigService: SheetConfigService,
+        }),
         Effect.bindAll(
           ({ sheetConfigService }) => ({
             rangesConfig: Effect.cached(
@@ -385,68 +377,62 @@ export class SheetService extends Effect.Service<SheetService>()(
         ),
         Effect.bindAll(
           ({ sheetGet, rangesConfig }) => ({
-            players: Effect.cached(
-              pipe(
-                Effect.Do,
-                Effect.bind("rangesConfig", () => rangesConfig),
-                Effect.bind("sheet", ({ rangesConfig }) =>
-                  sheetGet({
-                    ranges: [rangesConfig.userIds, rangesConfig.userSheetNames],
-                  }),
-                ),
-                Effect.flatMap(({ sheet }) =>
-                  playerParser(sheet.data.valueRanges),
-                ),
-                Effect.withSpan("SheetService.players", {
-                  captureStackTrace: true,
+            players: pipe(
+              Effect.Do,
+              Effect.bind("rangesConfig", () => rangesConfig),
+              Effect.bind("sheet", ({ rangesConfig }) =>
+                sheetGet({
+                  ranges: [rangesConfig.userIds, rangesConfig.userSheetNames],
                 }),
               ),
+              Effect.flatMap(({ sheet }) =>
+                playerParser(sheet.data.valueRanges ?? []),
+              ),
+              Effect.withSpan("SheetService.players", {
+                captureStackTrace: true,
+              }),
+              Effect.cached,
             ),
-            teams: Effect.cached(
-              pipe(
-                Effect.Do,
-                Effect.bind("rangesConfig", () => rangesConfig),
-                Effect.bind("sheet", ({ rangesConfig }) =>
-                  sheetGet({
-                    ranges: [rangesConfig.userIds, rangesConfig.userTeams],
-                  }),
-                ),
-                Effect.flatMap(({ sheet }) =>
-                  teamParser(sheet.data.valueRanges),
-                ),
-                Effect.withSpan("SheetService.teams", {
-                  captureStackTrace: true,
+            teams: pipe(
+              Effect.Do,
+              Effect.bind("rangesConfig", () => rangesConfig),
+              Effect.bind("sheet", ({ rangesConfig }) =>
+                sheetGet({
+                  ranges: [rangesConfig.userIds, rangesConfig.userTeams],
                 }),
               ),
+              Effect.flatMap(({ sheet }) =>
+                teamParser(sheet.data.valueRanges ?? []),
+              ),
+              Effect.withSpan("SheetService.teams", {
+                captureStackTrace: true,
+              }),
+              Effect.cached,
             ),
-            allSchedules: Effect.cached(
-              pipe(
-                Effect.Do,
-                Effect.bindAll(
-                  () => ({
-                    rangesConfig,
-                  }),
-                  { concurrency: "unbounded" },
-                ),
-                Effect.bind("sheet", ({ rangesConfig }) =>
-                  sheetGet({
-                    ranges: [
-                      rangesConfig.hours,
-                      rangesConfig.breaks,
-                      rangesConfig.fills,
-                      rangesConfig.overfills,
-                      rangesConfig.standbys,
-                    ],
-                  }),
-                ),
-                Effect.bind("schedules", ({ sheet }) =>
-                  scheduleParser(sheet.data.valueRanges),
-                ),
-                Effect.map(({ schedules }) => schedules),
-                Effect.withSpan("SheetService.allSchedules", {
-                  captureStackTrace: true,
+            allSchedules: pipe(
+              Effect.Do,
+              bindObject({
+                rangesConfig,
+              }),
+              Effect.bind("sheet", ({ rangesConfig }) =>
+                sheetGet({
+                  ranges: [
+                    rangesConfig.hours,
+                    rangesConfig.breaks,
+                    rangesConfig.fills,
+                    rangesConfig.overfills,
+                    rangesConfig.standbys,
+                  ],
                 }),
               ),
+              Effect.bind("schedules", ({ sheet }) =>
+                scheduleParser(sheet.data.valueRanges ?? []),
+              ),
+              Effect.map(({ schedules }) => schedules),
+              Effect.withSpan("SheetService.allSchedules", {
+                captureStackTrace: true,
+              }),
+              Effect.cached,
             ),
           }),
           { concurrency: "unbounded" },
@@ -509,13 +495,10 @@ export class SheetService extends Effect.Service<SheetService>()(
             getDaySchedules: (day: number) =>
               pipe(
                 Effect.Do,
-                Effect.bindAll(
-                  () => ({
-                    rangesConfig,
-                    dayConfig,
-                  }),
-                  { concurrency: "unbounded" },
-                ),
+                bindObject({
+                  rangesConfig,
+                  dayConfig,
+                }),
                 Effect.bind("sheet", ({ dayConfig }) =>
                   pipe(
                     HashMap.get(dayConfig, day),
@@ -533,7 +516,7 @@ export class SheetService extends Effect.Service<SheetService>()(
                   ),
                 ),
                 Effect.bind("schedules", ({ sheet }) =>
-                  scheduleParser(sheet.data.valueRanges),
+                  scheduleParser(sheet.data.valueRanges ?? []),
                 ),
                 Effect.map(({ schedules }) => schedules),
                 Effect.withSpan("SheetService.getDaySchedules", {
@@ -559,7 +542,6 @@ export class SheetService extends Effect.Service<SheetService>()(
       Effect.bind("sheetId", ({ guildConfig }) =>
         pipe(
           guildConfig,
-          Array.head,
           Option.map((guildConfig) => guildConfig.sheetId),
           Option.flatMap(Option.fromNullable),
         ),

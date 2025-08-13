@@ -4,6 +4,7 @@ import { Array, Effect, HashMap, Option, pipe } from "effect";
 import { validate, validateWithDefault } from "typhoon-core/schema";
 import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
 import { GoogleSheets } from "../../google/sheets";
+import { bindObject } from "../../utils";
 
 const parseValueRange = <A = never, E = never, R = never>(
   valueRange: sheets_v4.Schema$ValueRange,
@@ -22,42 +23,41 @@ export type DayConfig = {
 };
 export type DayConfigMap = HashMap.HashMap<number, DayConfig>;
 
-const dayConfigParser = (
-  valueRange: sheets_v4.Schema$ValueRange[] | undefined,
-): Effect.Effect<DayConfigMap, never, never> =>
+const dayConfigParser = ([
+  day,
+  sheet,
+  draft,
+]: sheets_v4.Schema$ValueRange[]): Effect.Effect<DayConfigMap, never, never> =>
   pipe(
     Effect.Do,
-    Effect.bindAll(() => {
-      const [day, sheet, draft] = valueRange ?? [];
-      return {
-        day: parseValueRange(day, ([day]) =>
-          pipe(
-            day,
-            validateWithDefault(
-              type("string.integer.parse").pipe((day) => ({ day })),
-              { day: Number.NaN },
-            ),
+    bindObject({
+      day: parseValueRange(day, ([day]) =>
+        pipe(
+          day,
+          validateWithDefault(
+            type("string.integer.parse").pipe((day) => ({ day })),
+            { day: Number.NaN },
           ),
         ),
-        sheet: parseValueRange(sheet, ([sheet]) =>
-          pipe(
-            sheet,
-            validateWithDefault(
-              type("string").pipe((sheet) => ({ sheet })),
-              { sheet: "" },
-            ),
+      ),
+      sheet: parseValueRange(sheet, ([sheet]) =>
+        pipe(
+          sheet,
+          validateWithDefault(
+            type("string").pipe((sheet) => ({ sheet })),
+            { sheet: "" },
           ),
         ),
-        draft: parseValueRange(draft, ([draft]) =>
-          pipe(
-            draft,
-            validateWithDefault(
-              type("string").pipe((draft) => ({ draft })),
-              { draft: "" },
-            ),
+      ),
+      draft: parseValueRange(draft, ([draft]) =>
+        pipe(
+          draft,
+          validateWithDefault(
+            type("string").pipe((draft) => ({ draft })),
+            { draft: "" },
           ),
         ),
-      };
+      ),
     }),
     Effect.map(({ day, sheet, draft }) =>
       pipe(
@@ -165,7 +165,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
               }),
             ),
             Effect.flatMap(({ sheet }) =>
-              dayConfigParser(sheet.data.valueRanges),
+              dayConfigParser(sheet.data.valueRanges ?? []),
             ),
             Effect.withSpan("SheetConfigService.getDayConfig", {
               captureStackTrace: true,
