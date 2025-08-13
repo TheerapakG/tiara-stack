@@ -93,11 +93,6 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
           .setDescription("The name of the running channel")
           .setRequired(true),
       )
-      .addNumberOption((option) =>
-        option
-          .setName("hour")
-          .setDescription("The hour to force out users for"),
-      )
       .addStringOption((option) =>
         option
           .setName("server_id")
@@ -192,6 +187,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             removedMembers.length > 0
               ? `Forced out ${removedMembers.map((m) => userMention(m.user.id)).join(" ")}`
               : "No players to force out",
+          allowedMentions: { parse: [] },
         }),
       ),
       Effect.provide(guildServicesFromInteractionOption("server_id")),
