@@ -50,19 +50,38 @@ export const button = buttonInteractionHandlerContextBuilder()
   })
   .handler(
     pipe(
-      InteractionContext.channel(),
-      Effect.flatMap(Option.fromNullable),
-      Effect.flatMap((channel) => ChannelConfigService.getConfig(channel.id)),
-      Effect.flatMap((computed) => observeOnce(computed.value)),
-      Effect.map(Option.map(({ day }) => day)),
-      Effect.flatMap(Option.flatMap(Option.fromNullable)),
-      Effect.flatMap((day) => getSlotMessage(day)),
-      Effect.tap(({ title, description }) =>
+      Effect.Do,
+      InteractionContext.tapDeferReply({ flags: MessageFlags.Ephemeral }),
+      bindObject({
+        channel: pipe(
+          InteractionContext.channel(),
+          Effect.flatMap(Option.fromNullable),
+        ),
+      }),
+      Effect.bind("channelConfig", ({ channel }) =>
+        pipe(
+          ChannelConfigService.getConfig(channel.id),
+          Effect.flatMap((computed) => observeOnce(computed.value)),
+        ),
+      ),
+      Effect.bind("day", ({ channelConfig }) =>
+        pipe(
+          channelConfig,
+          Option.map(({ day }) => day),
+          Option.flatMap(Option.fromNullable),
+        ),
+      ),
+      Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
+      Effect.tap(({ slotMessage }) =>
         pipe(
           ClientService.makeEmbedBuilder(),
           Effect.tap((embed) =>
             InteractionContext.reply({
-              embeds: [embed.setTitle(title).setDescription(description)],
+              embeds: [
+                embed
+                  .setTitle(slotMessage.title)
+                  .setDescription(slotMessage.description),
+              ],
               flags: MessageFlags.Ephemeral,
             }),
           ),
