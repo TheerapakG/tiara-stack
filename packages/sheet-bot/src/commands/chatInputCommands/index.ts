@@ -2,6 +2,7 @@ import { pipe } from "effect";
 import { InteractionHandlerMap, chatInputCommandHandlerMap } from "../../types";
 import { command as channel } from "./channel";
 import { command as checkin } from "./checkin";
+import { command as forceout } from "./forceout";
 import { command as server } from "./server";
 import { command as slot } from "./slot";
 import { command as team } from "./team";
@@ -10,6 +11,7 @@ export const commands = pipe(
   chatInputCommandHandlerMap(),
   InteractionHandlerMap.add(channel),
   InteractionHandlerMap.add(checkin),
+  InteractionHandlerMap.add(forceout),
   InteractionHandlerMap.add(server),
   InteractionHandlerMap.add(slot),
   InteractionHandlerMap.add(team),
