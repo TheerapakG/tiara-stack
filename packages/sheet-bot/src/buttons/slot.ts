@@ -61,7 +61,7 @@ export const button = buttonInteractionHandlerContextBuilder()
       Effect.bind("channelConfig", ({ channel }) =>
         pipe(
           ChannelConfigService.getConfig(channel.id),
-          Effect.flatMap((computed) => observeOnce(computed.value)),
+          Effect.flatMap(observeOnce),
         ),
       ),
       Effect.bind("day", ({ channelConfig }) =>
@@ -76,13 +76,12 @@ export const button = buttonInteractionHandlerContextBuilder()
         pipe(
           ClientService.makeEmbedBuilder(),
           Effect.tap((embed) =>
-            InteractionContext.reply({
+            InteractionContext.editReply({
               embeds: [
                 embed
                   .setTitle(slotMessage.title)
                   .setDescription(slotMessage.description),
               ],
-              flags: MessageFlags.Ephemeral,
             }),
           ),
         ),

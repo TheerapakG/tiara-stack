@@ -448,7 +448,7 @@ export class Server<
         computed(
           pipe(
             Effect.Do,
-            Effect.bind("value", () => Effect.exit(handler.value)),
+            Effect.bind("value", () => Effect.exit(handler)),
             Effect.bind("nonce", () => Nonce.getAndIncrement(nonce)),
             Effect.let(
               "header",
@@ -512,7 +512,7 @@ export class Server<
         computed(
           pipe(
             Effect.Do,
-            Effect.bind("result", () => computedResult.value),
+            Effect.bind("result", () => computedResult),
             Effect.bind("header", ({ result }) =>
               HeaderEncoderDecoder.encode(result.header),
             ),
@@ -612,7 +612,7 @@ export class Server<
                                 Option.match({
                                   onSome: (runtime) =>
                                     pipe(
-                                      computedBuffer.value,
+                                      computedBuffer,
                                       Effect.provide(runtime),
                                     ),
                                   onNone: () =>
@@ -627,7 +627,7 @@ export class Server<
                         ({ event, providedComputedBuffer }) =>
                           effect(
                             pipe(
-                              providedComputedBuffer.value,
+                              providedComputedBuffer,
                               Effect.tap((buffer) =>
                                 peer.send(buffer, {
                                   compress: true,
@@ -727,7 +727,7 @@ export class Server<
               Effect.flatMap(
                 Option.match({
                   onSome: (runtime) =>
-                    pipe(computedBuffer.value, Effect.provide(runtime)),
+                    pipe(computedBuffer, Effect.provide(runtime)),
                   onNone: () => Effect.fail("scope layer not initialized"),
                 }),
               ),
@@ -737,7 +737,7 @@ export class Server<
         Effect.bind("returnValue", ({ event, providedComputedBuffer }) =>
           observeOnce(
             pipe(
-              providedComputedBuffer.value,
+              providedComputedBuffer,
               Effect.flatMap((buffer) => callback(buffer)),
               Effect.tap(() => Event.close()),
               Effect.provideService(Event, event),

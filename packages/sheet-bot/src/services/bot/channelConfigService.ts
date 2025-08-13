@@ -21,9 +21,7 @@ export class ChannelConfigService extends Effect.Service<ChannelConfigService>()
                 .from(configChannel)
                 .where(eq(configChannel.channelId, channelId)),
             ),
-            Effect.flatMap((c) =>
-              computed(pipe(c.value, Effect.map(Array.head))),
-            ),
+            Effect.flatMap((c) => computed(pipe(c, Effect.map(Array.head)))),
             Effect.withSpan("ChannelConfigService.getConfig", {
               captureStackTrace: true,
             }),

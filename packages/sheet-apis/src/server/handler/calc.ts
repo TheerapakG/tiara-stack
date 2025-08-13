@@ -404,7 +404,7 @@ const calcHandlerConfig = defineHandlerConfigBuilder()
 const getUserAgent = <E, R>(request: Computed<Request, E, R>) =>
   computed(
     pipe(
-      request.value,
+      request,
       Effect.map(({ headers }) => headers.get("user-agent") ?? ""),
       Effect.withSpan("getUserAgent", { captureStackTrace: true }),
     ),
@@ -413,7 +413,7 @@ const getUserAgent = <E, R>(request: Computed<Request, E, R>) =>
 const extractGoogleAppsScriptId = <E, R>(userAgent: Computed<string, E, R>) =>
   computed(
     pipe(
-      userAgent.value,
+      userAgent,
       Effect.map((userAgent) =>
         userAgent.match(/Google-Apps-Script.*?id:\s*([^\s)]+)/i),
       ),
@@ -436,9 +436,9 @@ const extractGoogleAppsScriptId = <E, R>(userAgent: Computed<string, E, R>) =>
 const getGuildConfigByScriptId = <E, R>(scriptId: Computed<string, E, R>) =>
   computed(
     pipe(
-      scriptId.value,
+      scriptId,
       Effect.flatMap(GuildConfigService.getGuildConfigWithBoundScript),
-      Effect.flatMap((computed) => computed.value),
+      Effect.flatMap((computed) => computed),
       Effect.flatMap(Array.head),
       Effect.flipWith((effect) =>
         pipe(
@@ -483,8 +483,8 @@ export const calcHandler = defineHandlerBuilder()
           computed(
             pipe(
               Effect.Do,
-              Effect.bind("guildConfig", () => guildConfig.value),
-              Effect.bind("parsed", () => parsed.value),
+              Effect.bind("guildConfig", () => guildConfig),
+              Effect.bind("parsed", () => parsed),
               Effect.flatMap(({ parsed: { config, players } }) =>
                 calc(config, players),
               ),

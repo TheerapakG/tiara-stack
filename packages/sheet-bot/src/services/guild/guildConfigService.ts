@@ -40,9 +40,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                   ),
               ),
             ),
-            Effect.flatMap((c) =>
-              computed(pipe(c.value, Effect.map(Array.head))),
-            ),
+            Effect.flatMap((c) => computed(pipe(c, Effect.map(Array.head)))),
             Effect.withSpan("GuildConfigService.getConfig", {
               captureStackTrace: true,
             }),
@@ -181,9 +179,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                   ),
               ),
             ),
-            Effect.flatMap((c) =>
-              computed(pipe(c.value, Effect.map(Array.head))),
-            ),
+            Effect.flatMap((c) => computed(pipe(c, Effect.map(Array.head)))),
             Effect.withSpan("GuildConfigService.getRunningChannelById", {
               captureStackTrace: true,
             }),
@@ -205,9 +201,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                   ),
               ),
             ),
-            Effect.flatMap((c) =>
-              computed(pipe(c.value, Effect.map(Array.head))),
-            ),
+            Effect.flatMap((c) => computed(pipe(c, Effect.map(Array.head)))),
             Effect.withSpan("GuildConfigService.getRunningChannelByName", {
               captureStackTrace: true,
             }),
