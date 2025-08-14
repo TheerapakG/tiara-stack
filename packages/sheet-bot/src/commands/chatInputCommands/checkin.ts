@@ -4,16 +4,16 @@ import {
   ApplicationIntegrationType,
   ButtonBuilder,
   InteractionContextType,
-  Message,
   MessageActionRowComponentBuilder,
   MessageFlags,
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, Cause, Data, Effect, HashMap, Option, pipe } from "effect";
+import { Array, Data, Effect, HashMap, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import { checkinButton } from "../../buttons";
 import {
+  channelServicesFromInteraction,
   emptySchedule,
   GuildConfigService,
   guildServicesFromInteractionOption,
@@ -23,6 +23,7 @@ import {
   PlayerService,
   Schedule,
   ScheduleService,
+  SendableChannelContext,
   SheetService,
 } from "../../services";
 import {
@@ -158,7 +159,6 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         bindObject({
           hourOption: InteractionContext.getNumber("hour"),
           channelName: InteractionContext.getString("channel_name", true),
-          channel: InteractionContext.channel(true),
           user: InteractionContext.user(),
           eventConfig: SheetService.getEventConfig(),
         }),
@@ -191,27 +191,20 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         Effect.bind("checkinMessages", ({ checkinData }) =>
           getCheckinMessages(checkinData),
         ),
-        Effect.bind("message", ({ checkinData, checkinMessages, channel }) =>
-          channel.isSendable()
-            ? Effect.tryPromise<Message<boolean>>(() =>
-                channel.send({
-                  content: checkinMessages.checkinMessage,
-                  components: checkinData.runningChannel.roleId
-                    ? [
-                        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                          new ButtonBuilder(checkinButton.data),
-                        ),
-                      ]
-                    : [],
-                }),
-              )
-            : (Effect.fail(
-                "Cannot send message to this channel",
-              ) as Effect.Effect<
-                Message<boolean>,
-                string | Cause.UnknownException,
-                never
-              >),
+        Effect.bind("message", ({ checkinData, checkinMessages }) =>
+          pipe(
+            SendableChannelContext.send({
+              content: checkinMessages.checkinMessage,
+              components: checkinData.runningChannel.roleId
+                ? [
+                    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                      new ButtonBuilder(checkinButton.data),
+                    ),
+                  ]
+                : [],
+            }),
+            Effect.provide(channelServicesFromInteraction()),
+          ),
         ),
         Effect.tap(
           ({ checkinData, message, fillIds, checkinMessages, hour }) =>
