@@ -1,6 +1,11 @@
 import { Effect, Layer, pipe } from "effect";
-import { InteractionContext, InteractionKind, InteractionT } from "../../types";
-import { ClientService, PermissionService } from "../interaction";
+import {
+  ClientService,
+  InteractionContext,
+  InteractionKind,
+  InteractionT,
+  PermissionService,
+} from "../interaction";
 
 export const interactionServices = <I extends InteractionT>(
   interaction: InteractionKind<I>,

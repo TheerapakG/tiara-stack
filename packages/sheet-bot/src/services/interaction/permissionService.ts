@@ -4,14 +4,14 @@ import {
   RoleResolvable,
 } from "discord.js";
 import { Data, Effect, Equal, pipe } from "effect";
+import { bindObject } from "../../utils";
+import { GuildService } from "../guild";
+import { ClientService } from "./clientService";
 import {
   CachedInteractionContext,
   InteractionContext,
   InteractionT,
-} from "../../types";
-import { bindObject } from "../../utils";
-import { GuildService } from "../guild";
-import { ClientService } from "./clientService";
+} from "./interactionContext";
 
 export class OwnerError extends Data.TaggedError("OwnerError")<{
   readonly message: string;

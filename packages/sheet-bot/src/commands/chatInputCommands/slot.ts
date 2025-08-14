@@ -28,14 +28,14 @@ import {
   ClientService,
   GuildConfigService,
   guildServicesFromInteractionOption,
+  InteractionContext,
   PermissionService,
   ScheduleService,
+  SheetService,
 } from "../../services";
-import { SheetService } from "../../services/guild/sheetService";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
-  InteractionContext,
 } from "../../types";
 import { bindObject } from "../../utils";
 

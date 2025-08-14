@@ -1,5 +1,4 @@
 import { Effect, Layer, Option, pipe } from "effect";
-import { CachedInteractionContext, InteractionContext } from "../../types";
 import {
   GuildConfigService,
   GuildService,
@@ -7,6 +6,7 @@ import {
   ScheduleService,
   SheetService,
 } from "../guild";
+import { CachedInteractionContext, InteractionContext } from "../interaction";
 
 export const guildServices = (guildId: string) =>
   pipe(

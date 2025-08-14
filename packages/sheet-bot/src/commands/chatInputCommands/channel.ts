@@ -14,12 +14,12 @@ import {
   ClientService,
   GuildConfigService,
   guildServicesFromInteractionOption,
+  InteractionContext,
   PermissionService,
 } from "../../services";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
-  InteractionContext,
 } from "../../types";
 import { bindObject } from "../../utils";
 
