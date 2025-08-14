@@ -138,56 +138,60 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
       ),
   )
   .handler(
-    pipe(
-      Effect.Do,
-      InteractionContext.tapDeferReply({ flags: MessageFlags.Ephemeral }),
-      PermissionService.tapCheckOwner({ allowSameGuild: true }),
-      PermissionService.tapCheckRoles(
-        pipe(
-          GuildConfigService.getManagerRoles(),
-          Effect.flatMap(observeOnce),
-          Effect.map((managerRoles) => managerRoles.map((role) => role.roleId)),
-        ),
-        "You can only check in users as a manager",
-      ),
-      bindObject({
-        hourOption: InteractionContext.getNumber("hour"),
-        channelName: InteractionContext.getString("channel_name", true),
-        channel: InteractionContext.channel(true),
-        user: InteractionContext.user(),
-        eventConfig: SheetService.getEventConfig(),
-      }),
-      Effect.let("hour", ({ hourOption, eventConfig }) =>
-        pipe(
-          hourOption,
-          Option.getOrElse(() =>
-            Math.floor(
-              (pipe(new Date(), addMinutes(20), getUnixTime) -
-                eventConfig.startTime) /
-                3600 +
-                1,
+    Effect.provide(guildServicesFromInteractionOption("server_id"))(
+      pipe(
+        Effect.Do,
+        InteractionContext.tapDeferReply(() => ({
+          flags: MessageFlags.Ephemeral,
+        })),
+        PermissionService.tapCheckOwner(() => ({ allowSameGuild: true })),
+        PermissionService.tapCheckRoles(() => ({
+          roles: pipe(
+            GuildConfigService.getManagerRoles(),
+            Effect.flatMap(observeOnce),
+            Effect.map((managerRoles) =>
+              managerRoles.map((role) => role.roleId),
+            ),
+          ),
+          reason: "You can only check in users as a manager",
+        })),
+        bindObject({
+          hourOption: InteractionContext.getNumber("hour"),
+          channelName: InteractionContext.getString("channel_name", true),
+          channel: InteractionContext.channel(true),
+          user: InteractionContext.user(),
+          eventConfig: SheetService.getEventConfig(),
+        }),
+        Effect.let("hour", ({ hourOption, eventConfig }) =>
+          pipe(
+            hourOption,
+            Option.getOrElse(() =>
+              Math.floor(
+                (pipe(new Date(), addMinutes(20), getUnixTime) -
+                  eventConfig.startTime) /
+                  3600 +
+                  1,
+              ),
             ),
           ),
         ),
-      ),
-      Effect.bind("checkinData", ({ hour, channelName }) =>
-        getCheckinData({ hour, channelName }),
-      ),
-      Effect.bind("fillIds", ({ checkinData }) =>
-        pipe(
-          checkinData.schedule.fills,
-          Array.map(Option.fromNullable),
-          Array.getSomes,
-          Effect.forEach((playerName) => PlayerService.getByName(playerName)),
-          Effect.map(Array.getSomes),
-          Effect.map(Array.map((p) => p.id)),
+        Effect.bind("checkinData", ({ hour, channelName }) =>
+          getCheckinData({ hour, channelName }),
         ),
-      ),
-      Effect.bind("checkinMessages", ({ checkinData }) =>
-        getCheckinMessages(checkinData),
-      ),
-      Effect.tap(({ hour, checkinData, fillIds, checkinMessages, channel }) =>
-        pipe(
+        Effect.bind("fillIds", ({ checkinData }) =>
+          pipe(
+            checkinData.schedule.fills,
+            Array.map(Option.fromNullable),
+            Array.getSomes,
+            Effect.forEach((playerName) => PlayerService.getByName(playerName)),
+            Effect.map(Array.getSomes),
+            Effect.map(Array.map((p) => p.id)),
+          ),
+        ),
+        Effect.bind("checkinMessages", ({ checkinData }) =>
+          getCheckinMessages(checkinData),
+        ),
+        Effect.bind("message", ({ checkinData, checkinMessages, channel }) =>
           channel.isSendable()
             ? Effect.tryPromise<Message<boolean>>(() =>
                 channel.send({
@@ -208,7 +212,9 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
                 string | Cause.UnknownException,
                 never
               >),
-          Effect.tap((message) =>
+        ),
+        Effect.tap(
+          ({ checkinData, message, fillIds, checkinMessages, hour }) =>
             checkinData.runningChannel.roleId
               ? pipe(
                   Effect.all(
@@ -234,14 +240,13 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
                   Effect.asVoid,
                 )
               : Effect.void,
-          ),
-          InteractionContext.tapEditReply({
-            content: checkinMessages.emptySlotsMessage,
-          }),
         ),
+        InteractionContext.tapEditReply(({ checkinMessages }) => ({
+          content: checkinMessages.emptySlotsMessage,
+        })),
+        Effect.asVoid,
+        Effect.withSpan("handleCheckinManual", { captureStackTrace: true }),
       ),
-      Effect.provide(guildServicesFromInteractionOption("server_id")),
-      Effect.withSpan("handleCheckinManual", { captureStackTrace: true }),
     ),
   )
   .build();

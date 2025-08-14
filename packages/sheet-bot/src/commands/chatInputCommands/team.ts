@@ -37,62 +37,62 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
       ),
   )
   .handler(
-    pipe(
-      Effect.Do,
-      PermissionService.tapCheckOwner({ allowSameGuild: true }),
-      bindObject({
-        managerRoles: pipe(
-          GuildConfigService.getManagerRoles(),
-          Effect.flatMap(observeOnce),
+    Effect.provide(guildServicesFromInteractionOption("server_id"))(
+      pipe(
+        Effect.Do,
+        PermissionService.tapCheckOwner(() => ({ allowSameGuild: true })),
+        bindObject({
+          managerRoles: pipe(
+            GuildConfigService.getManagerRoles(),
+            Effect.flatMap(observeOnce),
+          ),
+          interactionUser: InteractionContext.user(),
+          user: pipe(
+            InteractionContext.getUser("user"),
+            Effect.flatMap(
+              Option.match({
+                onSome: (user) => Effect.succeed(user),
+                onNone: () => InteractionContext.user(),
+              }),
+            ),
+          ),
+        }),
+        Effect.tap(({ user, interactionUser, managerRoles }) =>
+          user.id !== interactionUser.id
+            ? PermissionService.checkRoles({
+                roles: managerRoles.map((role) => role.roleId),
+                reason: "You can only get your own teams in the current server",
+              })
+            : Effect.void,
         ),
-        interactionUser: InteractionContext.user(),
-        user: pipe(
-          InteractionContext.getUser("user"),
-          Effect.flatMap(
-            Option.match({
-              onSome: (user) => Effect.succeed(user),
-              onNone: () => InteractionContext.user(),
-            }),
+        Effect.bind("teams", () => SheetService.getTeams()),
+        Effect.let("userTeams", ({ user, teams }) =>
+          pipe(
+            HashMap.get(teams, user.id),
+            Option.map(({ teams }) => teams),
+            Option.getOrElse(() => [] as RawTeam[]),
+            Array.map((team) => ({
+              teamName: team.teamName,
+              lead: Option.getOrUndefined(team.lead),
+              backline: Option.getOrUndefined(team.backline),
+              talent: Option.getOrUndefined(team.talent),
+            })),
+            Array.map((team) => ({
+              ...team,
+              leadFormatted: team.lead ?? "?",
+              backlineFormatted: team.backline ?? "?",
+              talentFormatted: team.talent ? `/${team.talent}k` : "",
+              effectValueFormatted:
+                team.lead && team.backline
+                  ? ` (+${team.lead + (team.backline - team.lead) / 5}%)`
+                  : "",
+            })),
           ),
         ),
-      }),
-      Effect.tap(({ user, interactionUser, managerRoles }) =>
-        user.id !== interactionUser.id
-          ? PermissionService.checkRoles(
-              managerRoles.map((role) => role.roleId),
-              "You can only get your own teams in the current server",
-            )
-          : Effect.void,
-      ),
-      Effect.bind("teams", () => SheetService.getTeams()),
-      Effect.let("userTeams", ({ user, teams }) =>
-        pipe(
-          HashMap.get(teams, user.id),
-          Option.map(({ teams }) => teams),
-          Option.getOrElse(() => [] as RawTeam[]),
-          Array.map((team) => ({
-            teamName: team.teamName,
-            lead: Option.getOrUndefined(team.lead),
-            backline: Option.getOrUndefined(team.backline),
-            talent: Option.getOrUndefined(team.talent),
-          })),
-          Array.map((team) => ({
-            ...team,
-            leadFormatted: team.lead ?? "?",
-            backlineFormatted: team.backline ?? "?",
-            talentFormatted: team.talent ? `/${team.talent}k` : "",
-            effectValueFormatted:
-              team.lead && team.backline
-                ? ` (+${team.lead + (team.backline - team.lead) / 5}%)`
-                : "",
-          })),
-        ),
-      ),
-      Effect.tap(({ user, userTeams }) =>
-        pipe(
-          ClientService.makeEmbedBuilder(),
-          Effect.tap((embed) =>
-            InteractionContext.reply({
+        Effect.tap(({ user, userTeams }) =>
+          pipe(
+            ClientService.makeEmbedBuilder(),
+            InteractionContext.tapReply((embed) => ({
               embeds: [
                 embed
                   .setTitle(`${escapeMarkdown(user.username)}'s Teams`)
@@ -106,12 +106,11 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
                     })),
                   ),
               ],
-            }),
+            })),
           ),
         ),
+        Effect.withSpan("handleTeamList", { captureStackTrace: true }),
       ),
-      Effect.provide(guildServicesFromInteractionOption("server_id")),
-      Effect.withSpan("handleTeamList", { captureStackTrace: true }),
     ),
   )
   .build();

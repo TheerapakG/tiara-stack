@@ -49,42 +49,46 @@ export const button = buttonInteractionHandlerContextBuilder()
     style: ButtonStyle.Primary,
   })
   .handler(
-    pipe(
-      Effect.Do,
-      InteractionContext.tapDeferReply({ flags: MessageFlags.Ephemeral }),
-      bindObject({
-        channel: InteractionContext.channel(true),
-      }),
-      Effect.bind("channelConfig", ({ channel }) =>
-        pipe(
-          ChannelConfigService.getConfig(channel.id),
-          Effect.flatMap(observeOnce),
+    Effect.provide(guildServicesFromInteraction())(
+      pipe(
+        Effect.Do,
+        InteractionContext.tapDeferReply(() => ({
+          flags: MessageFlags.Ephemeral,
+        })),
+        bindObject({
+          channel: InteractionContext.channel(true),
+        }),
+        Effect.bind("channelConfig", ({ channel }) =>
+          pipe(
+            ChannelConfigService.getConfig(channel.id),
+            Effect.flatMap(observeOnce),
+          ),
         ),
-      ),
-      Effect.bind("day", ({ channelConfig }) =>
-        pipe(
-          channelConfig,
-          Option.map(({ day }) => day),
-          Option.flatMap(Option.fromNullable),
+        Effect.bind("day", ({ channelConfig }) =>
+          pipe(
+            channelConfig,
+            Option.map(({ day }) => day),
+            Option.flatMap(Option.fromNullable),
+          ),
         ),
-      ),
-      Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
-      Effect.tap(({ slotMessage }) =>
-        pipe(
-          ClientService.makeEmbedBuilder(),
-          Effect.tap((embed) =>
-            InteractionContext.editReply({
+        Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
+        Effect.tap(({ slotMessage }) =>
+          pipe(
+            ClientService.makeEmbedBuilder(),
+            InteractionContext.tapEditReply((embed) => ({
               embeds: [
                 embed
                   .setTitle(slotMessage.title)
                   .setDescription(slotMessage.description),
               ],
-            }),
+            })),
           ),
         ),
+        Effect.asVoid,
+        Effect.withSpan("handleInteractionSlot", {
+          captureStackTrace: true,
+        }),
       ),
-      Effect.provide(guildServicesFromInteraction()),
-      Effect.asVoid,
     ),
   )
   .build();

@@ -1,5 +1,5 @@
 import { Guild } from "discord.js";
-import { Effect, Layer, pipe } from "effect";
+import { Effect, Layer, Option, pipe } from "effect";
 import { CachedInteractionContext } from "../../types";
 import { ClientService } from "../interaction/clientService";
 
@@ -39,7 +39,16 @@ export class GuildService extends Effect.Service<GuildService>()(
         fetchRole: (roleId: string) =>
           pipe(
             Effect.tryPromise(() => guild.roles.fetch(roleId)),
+            Effect.map(Option.fromNullable),
             Effect.withSpan("GuildService.fetchRole", {
+              captureStackTrace: true,
+            }),
+          ),
+        fetchChannel: (channelId: string) =>
+          pipe(
+            Effect.tryPromise(() => guild.channels.fetch(channelId)),
+            Effect.map(Option.fromNullable),
+            Effect.withSpan("GuildService.fetchChannel", {
               captureStackTrace: true,
             }),
           ),
