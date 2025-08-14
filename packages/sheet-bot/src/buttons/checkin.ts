@@ -14,12 +14,13 @@ import { observeOnce } from "typhoon-server/signal";
 import {
   ButtonInteractionT,
   CachedInteractionContext,
-  GuildService,
+  channelServicesFromGuildChannelId,
   guildServicesFromInteraction,
   InteractionContext,
   MessageCheckinService,
   PermissionService,
   RepliableInteractionT,
+  SendableChannelContext,
 } from "../services";
 import { buttonInteractionHandlerContextBuilder } from "../types";
 import { bindObject } from "../utils";
@@ -124,16 +125,11 @@ export const button = buttonInteractionHandlerContextBuilder()
               }),
             ),
             pipe(
-              GuildService.fetchChannel(messageCheckinData.channelId),
-              Effect.flatMap(Function.identity),
-              Effect.flatMap((channel) =>
-                Effect.tryPromise(async () => {
-                  if (channel.isSendable()) {
-                    await channel.send({
-                      content: `${userMention(user.id)} has checked in!`,
-                    });
-                  }
-                }),
+              SendableChannelContext.send({
+                content: `${userMention(user.id)} has checked in!`,
+              }),
+              Effect.provide(
+                channelServicesFromGuildChannelId(messageCheckinData.channelId),
               ),
             ),
           ]),
