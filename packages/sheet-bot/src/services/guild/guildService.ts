@@ -15,6 +15,34 @@ export class GuildService extends Effect.Service<GuildService>()(
               captureStackTrace: true,
             }),
           ),
+        getId: () =>
+          pipe(
+            Effect.succeed(guild.id),
+            Effect.withSpan("GuildService.getId", {
+              captureStackTrace: true,
+            }),
+          ),
+        getName: () =>
+          pipe(
+            Effect.succeed(guild.name),
+            Effect.withSpan("GuildService.getName", {
+              captureStackTrace: true,
+            }),
+          ),
+        fetchMembers: () =>
+          pipe(
+            Effect.tryPromise(() => guild.members.fetch()),
+            Effect.withSpan("GuildService.fetchMembers", {
+              captureStackTrace: true,
+            }),
+          ),
+        fetchRole: (roleId: string) =>
+          pipe(
+            Effect.tryPromise(() => guild.roles.fetch(roleId)),
+            Effect.withSpan("GuildService.fetchRole", {
+              captureStackTrace: true,
+            }),
+          ),
       }),
     accessors: true,
   },

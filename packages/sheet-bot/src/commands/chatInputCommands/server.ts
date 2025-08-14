@@ -42,7 +42,7 @@ const handleListConfig = chatInputSubcommandHandlerContextBuilder()
       Effect.Do,
       PermissionService.tapCheckPermissions(PermissionFlagsBits.ManageGuild),
       bindObject({
-        guild: GuildService.getGuild(),
+        guildName: GuildService.getName(),
         guildConfig: pipe(
           GuildConfigService.getConfig(),
           Effect.flatMap(observeOnce),
@@ -53,11 +53,11 @@ const handleListConfig = chatInputSubcommandHandlerContextBuilder()
           Effect.flatMap(observeOnce),
         ),
       }),
-      Effect.tap(({ guild, guildConfig, managerRoles }) =>
+      Effect.tap(({ guildName, guildConfig, managerRoles }) =>
         InteractionContext.reply({
           embeds: [
             new EmbedBuilder()
-              .setTitle(`Config for ${escapeMarkdown(guild.name)}`)
+              .setTitle(`Config for ${escapeMarkdown(guildName)}`)
               .setDescription(
                 [
                   `Sheet id: ${escapeMarkdown(guildConfig?.sheetId ?? "None")}`,
@@ -98,11 +98,11 @@ const handleAddManagerRole = chatInputSubcommandHandlerContextBuilder()
       Effect.Do,
       PermissionService.tapCheckPermissions(PermissionFlagsBits.ManageGuild),
       bindObject({
-        guild: GuildService.getGuild(),
+        guildName: GuildService.getName(),
         role: InteractionContext.getRole("role", true),
       }),
       Effect.tap(({ role }) => GuildConfigService.addManagerRole(role.id)),
-      Effect.tap(({ guild, role }) =>
+      Effect.tap(({ guildName, role }) =>
         pipe(
           ClientService.makeEmbedBuilder(),
           Effect.tap((embed) =>
@@ -111,7 +111,7 @@ const handleAddManagerRole = chatInputSubcommandHandlerContextBuilder()
                 embed
                   .setTitle(`Success!`)
                   .setDescription(
-                    `${roleMention(role.id)} is now a manager role for ${escapeMarkdown(guild.name)}`,
+                    `${roleMention(role.id)} is now a manager role for ${escapeMarkdown(guildName)}`,
                   ),
               ],
             }),
@@ -158,11 +158,11 @@ const handleRemoveManagerRole = chatInputSubcommandHandlerContextBuilder()
       Effect.Do,
       PermissionService.tapCheckPermissions(PermissionFlagsBits.ManageGuild),
       bindObject({
-        guild: GuildService.getGuild(),
+        guildName: GuildService.getName(),
         role: InteractionContext.getRole("role", true),
       }),
       Effect.tap(({ role }) => GuildConfigService.removeManagerRole(role.id)),
-      Effect.tap(({ guild, role }) =>
+      Effect.tap(({ guildName, role }) =>
         pipe(
           ClientService.makeEmbedBuilder(),
           Effect.tap((embed) =>
@@ -171,7 +171,7 @@ const handleRemoveManagerRole = chatInputSubcommandHandlerContextBuilder()
                 embed
                   .setTitle(`Success!`)
                   .setDescription(
-                    `${roleMention(role.id)} is no longer a manager role for ${escapeMarkdown(guild.name)}`,
+                    `${roleMention(role.id)} is no longer a manager role for ${escapeMarkdown(guildName)}`,
                   ),
               ],
             }),
@@ -219,14 +219,14 @@ const handleSetSheet = chatInputSubcommandHandlerContextBuilder()
       PermissionService.tapCheckPermissions(PermissionFlagsBits.ManageGuild),
       bindObject({
         sheetId: InteractionContext.getString("sheet_id", true),
-        guild: GuildService.getGuild(),
+        guildName: GuildService.getName(),
       }),
       Effect.tap(({ sheetId }) =>
         GuildConfigService.updateConfig({
           sheetId,
         }),
       ),
-      Effect.tap(({ guild, sheetId }) =>
+      Effect.tap(({ guildName, sheetId }) =>
         pipe(
           ClientService.makeEmbedBuilder(),
           Effect.tap((embed) =>
@@ -235,7 +235,7 @@ const handleSetSheet = chatInputSubcommandHandlerContextBuilder()
                 embed
                   .setTitle(`Success!`)
                   .setDescription(
-                    `Sheet id for ${escapeMarkdown(guild.name)} is now set to ${escapeMarkdown(sheetId)}`,
+                    `Sheet id for ${escapeMarkdown(guildName)} is now set to ${escapeMarkdown(sheetId)}`,
                   ),
               ],
             }),
@@ -271,14 +271,14 @@ const handleSetScript = chatInputSubcommandHandlerContextBuilder()
       PermissionService.tapCheckOwner({ allowSameGuild: false }),
       bindObject({
         scriptId: InteractionContext.getString("script_id", true),
-        guild: GuildService.getGuild(),
+        guildName: GuildService.getName(),
       }),
       Effect.tap(({ scriptId }) =>
         GuildConfigService.updateConfig({
           scriptId,
         }),
       ),
-      Effect.tap(({ guild, scriptId }) =>
+      Effect.tap(({ guildName, scriptId }) =>
         pipe(
           ClientService.makeEmbedBuilder(),
           Effect.tap((embed) =>
@@ -287,7 +287,7 @@ const handleSetScript = chatInputSubcommandHandlerContextBuilder()
                 embed
                   .setTitle(`Success!`)
                   .setDescription(
-                    `Script id for ${escapeMarkdown(guild.name)} is now set to ${escapeMarkdown(scriptId)}`,
+                    `Script id for ${escapeMarkdown(guildName)} is now set to ${escapeMarkdown(scriptId)}`,
                   ),
               ],
             }),

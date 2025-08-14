@@ -26,15 +26,15 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
       Effect.map(({ db, dbSubscriptionContext, guildService }) => ({
         getConfig: () =>
           pipe(
-            guildService.getGuild(),
-            Effect.flatMap((guild) =>
+            guildService.getId(),
+            Effect.flatMap((guildId) =>
               dbSubscriptionContext.subscribeQuery(
                 db
                   .select()
                   .from(configGuild)
                   .where(
                     and(
-                      eq(configGuild.guildId, guild.id),
+                      eq(configGuild.guildId, guildId),
                       isNull(configGuild.deletedAt),
                     ),
                   ),
@@ -49,13 +49,13 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           config: Omit<Partial<typeof configGuild.$inferInsert>, "guildId">,
         ) =>
           pipe(
-            guildService.getGuild(),
-            Effect.flatMap((guild) =>
+            guildService.getId(),
+            Effect.flatMap((guildId) =>
               dbSubscriptionContext.mutateQuery(
                 db
                   .insert(configGuild)
                   .values({
-                    guildId: guild.id,
+                    guildId,
                     ...config,
                   })
                   .onConflictDoUpdate({
@@ -72,15 +72,15 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           ),
         getManagerRoles: () =>
           pipe(
-            guildService.getGuild(),
-            Effect.flatMap((guild) =>
+            guildService.getId(),
+            Effect.flatMap((guildId) =>
               dbSubscriptionContext.subscribeQuery(
                 db
                   .select()
                   .from(configGuildManagerRole)
                   .where(
                     and(
-                      eq(configGuildManagerRole.guildId, guild.id),
+                      eq(configGuildManagerRole.guildId, guildId),
                       isNull(configGuildManagerRole.deletedAt),
                     ),
                   ),
@@ -92,12 +92,12 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           ),
         addManagerRole: (roleId: string) =>
           pipe(
-            guildService.getGuild(),
-            Effect.flatMap((guild) =>
+            guildService.getId(),
+            Effect.flatMap((guildId) =>
               dbSubscriptionContext.mutateQuery(
                 db
                   .insert(configGuildManagerRole)
-                  .values({ guildId: guild.id, roleId })
+                  .values({ guildId, roleId })
                   .onConflictDoUpdate({
                     target: [
                       configGuildManagerRole.guildId,
@@ -113,15 +113,15 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           ),
         removeManagerRole: (roleId: string) =>
           pipe(
-            guildService.getGuild(),
-            Effect.flatMap((guild) =>
+            guildService.getId(),
+            Effect.flatMap((guildId) =>
               dbSubscriptionContext.mutateQuery(
                 db
                   .update(configGuildManagerRole)
                   .set({ deletedAt: new Date() })
                   .where(
                     and(
-                      eq(configGuildManagerRole.guildId, guild.id),
+                      eq(configGuildManagerRole.guildId, guildId),
                       eq(configGuildManagerRole.roleId, roleId),
                     ),
                   )
@@ -140,12 +140,12 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           >,
         ) =>
           pipe(
-            guildService.getGuild(),
-            Effect.flatMap((guild) =>
+            guildService.getId(),
+            Effect.flatMap((guildId) =>
               dbSubscriptionContext.mutateQuery(
                 db
                   .insert(configGuildChannel)
-                  .values({ guildId: guild.id, channelId, ...config })
+                  .values({ guildId, channelId, ...config })
                   .onConflictDoUpdate({
                     target: [
                       configGuildChannel.guildId,
@@ -164,15 +164,15 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           ),
         getRunningChannelById: (id: string) =>
           pipe(
-            guildService.getGuild(),
-            Effect.flatMap((guild) =>
+            guildService.getId(),
+            Effect.flatMap((guildId) =>
               dbSubscriptionContext.subscribeQuery(
                 db
                   .select()
                   .from(configGuildChannel)
                   .where(
                     and(
-                      eq(configGuildChannel.guildId, guild.id),
+                      eq(configGuildChannel.guildId, guildId),
                       eq(configGuildChannel.channelId, id),
                       isNull(configGuildChannel.deletedAt),
                     ),
@@ -186,15 +186,15 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           ),
         getRunningChannelByName: (name: string) =>
           pipe(
-            guildService.getGuild(),
-            Effect.flatMap((guild) =>
+            guildService.getId(),
+            Effect.flatMap((guildId) =>
               dbSubscriptionContext.subscribeQuery(
                 db
                   .select()
                   .from(configGuildChannel)
                   .where(
                     and(
-                      eq(configGuildChannel.guildId, guild.id),
+                      eq(configGuildChannel.guildId, guildId),
                       eq(configGuildChannel.name, name),
                       isNull(configGuildChannel.deletedAt),
                     ),

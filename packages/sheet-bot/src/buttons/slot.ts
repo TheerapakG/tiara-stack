@@ -53,10 +53,7 @@ export const button = buttonInteractionHandlerContextBuilder()
       Effect.Do,
       InteractionContext.tapDeferReply({ flags: MessageFlags.Ephemeral }),
       bindObject({
-        channel: pipe(
-          InteractionContext.channel(),
-          Effect.flatMap(Option.fromNullable),
-        ),
+        channel: InteractionContext.channel(true),
       }),
       Effect.bind("channelConfig", ({ channel }) =>
         pipe(

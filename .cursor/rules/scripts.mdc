@@ -6,3 +6,4 @@ There are two workspace-level scripts defined in package.json.
 The "build" script invokes nx to build all the packages.
 The "checks" script invokes nx to run linter, formatter, and type checkers in all the packages.
 Run these scripts using `pnpm -w <script>`, replacing `<script>` with the script you want to run.
+If the changes you made are only scoped to a package, prefer using the lint tool call rather than these scripts.

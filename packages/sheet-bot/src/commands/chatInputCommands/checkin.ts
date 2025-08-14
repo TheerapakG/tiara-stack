@@ -153,10 +153,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
       bindObject({
         hourOption: InteractionContext.getNumber("hour"),
         channelName: InteractionContext.getString("channel_name", true),
-        channel: pipe(
-          InteractionContext.channel(),
-          Effect.flatMap(Option.fromNullable),
-        ),
+        channel: InteractionContext.channel(true),
         user: InteractionContext.user(),
         eventConfig: SheetService.getEventConfig(),
       }),
