@@ -93,59 +93,60 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
       ),
   )
   .handler(
-    pipe(
-      Effect.Do,
-      PermissionService.tapCheckOwner({ allowSameGuild: true }),
-      bindObject({
-        messageFlags: Ref.make(new MessageFlagsBitField()),
-        day: InteractionContext.getNumber("day", true),
-        messageType: pipe(
-          InteractionContext.getString("message_type"),
-          Effect.map(Option.getOrElse(() => "ephemeral")),
-          Effect.flatMap(validate(type.enumerated("persistent", "ephemeral"))),
-        ),
-        user: InteractionContext.user(),
-      }),
-      Effect.tap(({ messageType }) =>
-        messageType !== "ephemeral"
-          ? PermissionService.effectCheckRoles(
-              pipe(
-                GuildConfigService.getManagerRoles(),
-                Effect.flatMap(observeOnce),
-                Effect.map((managerRoles) =>
-                  managerRoles.map((role) => role.roleId),
+    Effect.provide(guildServicesFromInteractionOption("server_id"))(
+      pipe(
+        Effect.Do,
+        PermissionService.tapCheckOwner(() => ({ allowSameGuild: true })),
+        bindObject({
+          messageFlags: Ref.make(new MessageFlagsBitField()),
+          day: InteractionContext.getNumber("day", true),
+          messageType: pipe(
+            InteractionContext.getString("message_type"),
+            Effect.map(Option.getOrElse(() => "ephemeral")),
+            Effect.flatMap(
+              validate(type.enumerated("persistent", "ephemeral")),
+            ),
+          ),
+          user: InteractionContext.user(),
+        }),
+        Effect.tap(({ messageType }) =>
+          messageType !== "ephemeral"
+            ? PermissionService.effectCheckRoles({
+                roles: pipe(
+                  GuildConfigService.getManagerRoles(),
+                  Effect.flatMap(observeOnce),
+                  Effect.map((managerRoles) =>
+                    managerRoles.map((role) => role.roleId),
+                  ),
                 ),
-              ),
-              "You can only make persistent messages as a manager",
-            )
-          : Effect.void,
-      ),
-      Effect.tap(({ messageType, messageFlags }) =>
-        messageType === "ephemeral"
-          ? Ref.update(messageFlags, (flags) =>
-              flags.add(MessageFlags.Ephemeral),
-            )
-          : Effect.void,
-      ),
-      Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
-      Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
-      Effect.bind("response", ({ slotMessage, flags }) =>
-        pipe(
-          ClientService.makeEmbedBuilder(),
-          Effect.tap((embed) =>
-            InteractionContext.reply({
+                reason: "You can only make persistent messages as a manager",
+              })
+            : Effect.void,
+        ),
+        Effect.tap(({ messageType, messageFlags }) =>
+          messageType === "ephemeral"
+            ? Ref.update(messageFlags, (flags) =>
+                flags.add(MessageFlags.Ephemeral),
+              )
+            : Effect.void,
+        ),
+        Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
+        Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
+        Effect.bind("response", ({ slotMessage, flags }) =>
+          pipe(
+            ClientService.makeEmbedBuilder(),
+            InteractionContext.tapReply((embed) => ({
               embeds: [
                 embed
                   .setTitle(slotMessage.title)
                   .setDescription(slotMessage.description),
               ],
               flags: flags.bitfield,
-            }),
+            })),
           ),
         ),
+        Effect.withSpan("handleSlotList", { captureStackTrace: true }),
       ),
-      Effect.provide(guildServicesFromInteractionOption("server_id")),
-      Effect.withSpan("handleSlotList", { captureStackTrace: true }),
     ),
   )
   .build();
@@ -163,39 +164,40 @@ const handleButton = chatInputSubcommandHandlerContextBuilder()
       ),
   )
   .handler(
-    pipe(
-      Effect.Do,
-      PermissionService.tapCheckOwner({ allowSameGuild: true }),
-      PermissionService.tapCheckRoles(
-        pipe(
-          GuildConfigService.getManagerRoles(),
-          Effect.flatMap(observeOnce),
-          Effect.map((managerRoles) => managerRoles.map((role) => role.roleId)),
-        ),
-        "You can only make buttons as a manager",
-      ),
-      bindObject({
-        day: InteractionContext.getNumber("day", true),
-        channel: InteractionContext.channel(true),
-        user: InteractionContext.user(),
-      }),
-      Effect.tap(({ channel, day }) =>
-        ChannelConfigService.updateConfig(channel.id, {
-          day,
+    Effect.provide(guildServicesFromInteractionOption("server_id"))(
+      pipe(
+        Effect.Do,
+        PermissionService.tapCheckOwner(() => ({ allowSameGuild: true })),
+        PermissionService.tapCheckRoles(() => ({
+          roles: pipe(
+            GuildConfigService.getManagerRoles(),
+            Effect.flatMap(observeOnce),
+            Effect.map((managerRoles) =>
+              managerRoles.map((role) => role.roleId),
+            ),
+          ),
+          reason: "You can only make buttons as a manager",
+        })),
+        bindObject({
+          day: InteractionContext.getNumber("day", true),
+          channel: InteractionContext.channel(true),
+          user: InteractionContext.user(),
         }),
-      ),
-      Effect.tap(({ day }) =>
-        InteractionContext.reply({
+        Effect.tap(({ channel, day }) =>
+          ChannelConfigService.updateConfig(channel.id, {
+            day,
+          }),
+        ),
+        InteractionContext.tapReply(({ day }) => ({
           content: `Press the button below to get the current open slots for day ${day}`,
           components: [
             new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
               new ButtonBuilder(slotButton.data),
             ),
           ],
-        }),
+        })),
+        Effect.withSpan("handleSlotButton", { captureStackTrace: true }),
       ),
-      Effect.provide(guildServicesFromInteractionOption("server_id")),
-      Effect.withSpan("handleSlotButton", { captureStackTrace: true }),
     ),
   )
   .build();

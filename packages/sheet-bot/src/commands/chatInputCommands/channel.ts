@@ -58,31 +58,33 @@ const handleSet = chatInputSubcommandHandlerContextBuilder()
       ),
   )
   .handler(
-    pipe(
-      Effect.Do,
-      PermissionService.tapCheckPermissions(PermissionFlagsBits.ManageGuild),
-      bindObject({
-        channel: InteractionContext.channel(true),
-        running: InteractionContext.getBoolean("running"),
-        name: InteractionContext.getString("name"),
-        role: InteractionContext.getRole("role"),
-      }),
-      Effect.bind("config", ({ channel, running, name, role }) =>
-        GuildConfigService.setChannelConfig(channel.id, {
-          running: Option.getOrUndefined(running),
-          name: Option.getOrUndefined(name),
-          roleId: pipe(
-            role,
-            Option.map((r) => r.id),
-            Option.getOrUndefined,
-          ),
+    Effect.provide(guildServicesFromInteractionOption("server_id"))(
+      pipe(
+        Effect.Do,
+        PermissionService.tapCheckPermissions(() => ({
+          permissions: PermissionFlagsBits.ManageGuild,
+        })),
+        bindObject({
+          channel: InteractionContext.channel(true),
+          running: InteractionContext.getBoolean("running"),
+          name: InteractionContext.getString("name"),
+          role: InteractionContext.getRole("role"),
         }),
-      ),
-      Effect.tap(({ channel, config }) =>
-        pipe(
-          ClientService.makeEmbedBuilder(),
-          Effect.tap((embed) =>
-            InteractionContext.reply({
+        Effect.bind("config", ({ channel, running, name, role }) =>
+          GuildConfigService.setChannelConfig(channel.id, {
+            running: Option.getOrUndefined(running),
+            name: Option.getOrUndefined(name),
+            roleId: pipe(
+              role,
+              Option.map((r) => r.id),
+              Option.getOrUndefined,
+            ),
+          }),
+        ),
+        Effect.tap(({ channel, config }) =>
+          pipe(
+            ClientService.makeEmbedBuilder(),
+            InteractionContext.tapReply((embed) => ({
               embeds: [
                 embed
                   .setTitle(`Success!`)
@@ -91,14 +93,13 @@ const handleSet = chatInputSubcommandHandlerContextBuilder()
                   )
                   .addFields(...configFields(config)),
               ],
-            }),
+            })),
           ),
         ),
+        Effect.withSpan("handlesSetRunning", {
+          captureStackTrace: true,
+        }),
       ),
-      Effect.provide(guildServicesFromInteractionOption("server_id")),
-      Effect.withSpan("handlesSetRunning", {
-        captureStackTrace: true,
-      }),
     ),
   )
   .build();
@@ -116,25 +117,27 @@ const handleUnset = chatInputSubcommandHandlerContextBuilder()
       ),
   )
   .handler(
-    pipe(
-      Effect.Do,
-      PermissionService.tapCheckPermissions(PermissionFlagsBits.ManageGuild),
-      bindObject({
-        channel: InteractionContext.channel(true),
-        name: InteractionContext.getBoolean("name"),
-        role: InteractionContext.getBoolean("role"),
-      }),
-      Effect.bind("config", ({ channel, name, role }) =>
-        GuildConfigService.setChannelConfig(channel.id, {
-          name: Option.getOrUndefined(name) ? null : undefined,
-          roleId: Option.getOrUndefined(role) ? null : undefined,
+    Effect.provide(guildServicesFromInteractionOption("server_id"))(
+      pipe(
+        Effect.Do,
+        PermissionService.tapCheckPermissions(() => ({
+          permissions: PermissionFlagsBits.ManageGuild,
+        })),
+        bindObject({
+          channel: InteractionContext.channel(true),
+          name: InteractionContext.getBoolean("name"),
+          role: InteractionContext.getBoolean("role"),
         }),
-      ),
-      Effect.tap(({ channel, config }) =>
-        pipe(
-          ClientService.makeEmbedBuilder(),
-          Effect.tap((embed) =>
-            InteractionContext.reply({
+        Effect.bind("config", ({ channel, name, role }) =>
+          GuildConfigService.setChannelConfig(channel.id, {
+            name: Option.getOrUndefined(name) ? null : undefined,
+            roleId: Option.getOrUndefined(role) ? null : undefined,
+          }),
+        ),
+        Effect.tap(({ channel, config }) =>
+          pipe(
+            ClientService.makeEmbedBuilder(),
+            InteractionContext.tapReply((embed) => ({
               embeds: [
                 embed
                   .setTitle(`Success!`)
@@ -143,14 +146,13 @@ const handleUnset = chatInputSubcommandHandlerContextBuilder()
                   )
                   .addFields(...configFields(config)),
               ],
-            }),
+            })),
           ),
         ),
+        Effect.withSpan("handlesSetRunning", {
+          captureStackTrace: true,
+        }),
       ),
-      Effect.provide(guildServicesFromInteractionOption("server_id")),
-      Effect.withSpan("handlesSetRunning", {
-        captureStackTrace: true,
-      }),
     ),
   )
   .build();

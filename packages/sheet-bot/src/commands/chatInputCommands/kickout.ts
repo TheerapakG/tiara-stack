@@ -6,7 +6,7 @@ import {
   SlashCommandSubcommandBuilder,
   userMention,
 } from "discord.js";
-import { Array, Data, Effect, HashMap, Option, pipe } from "effect";
+import { Array, Data, Effect, Function, HashMap, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import {
   emptySchedule,
@@ -99,92 +99,96 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
       ),
   )
   .handler(
-    pipe(
-      Effect.Do,
-      InteractionContext.tapDeferReply(),
-      PermissionService.tapCheckOwner({ allowSameGuild: true }),
-      PermissionService.tapCheckRoles(
-        pipe(
-          GuildConfigService.getManagerRoles(),
-          Effect.flatMap(observeOnce),
-          Effect.map((managerRoles) => managerRoles.map((role) => role.roleId)),
+    Effect.provide(guildServicesFromInteractionOption("server_id"))(
+      pipe(
+        Effect.Do,
+        InteractionContext.tapDeferReply(),
+        PermissionService.tapCheckOwner(() => ({ allowSameGuild: true })),
+        PermissionService.tapCheckRoles(() => ({
+          roles: pipe(
+            GuildConfigService.getManagerRoles(),
+            Effect.flatMap(observeOnce),
+            Effect.map((managerRoles) =>
+              managerRoles.map((role) => role.roleId),
+            ),
+          ),
+          reason: "You can only kick out users as a manager",
+        })),
+        bindObject({
+          hourOption: InteractionContext.getNumber("hour"),
+          channelName: InteractionContext.getString("channel_name", true),
+          guildName: GuildService.getName(),
+          channel: InteractionContext.channel(true),
+          user: InteractionContext.user(),
+          eventConfig: SheetService.getEventConfig(),
+        }),
+        Effect.let("date", () => new Date()),
+        Effect.tap(({ date }) =>
+          pipe(date, getMinutes) >= 40
+            ? Effect.fail(
+                new TimeError("Cannot kick out until next hour starts"),
+              )
+            : Effect.void,
         ),
-        "You can only kick out users as a manager",
-      ),
-      bindObject({
-        hourOption: InteractionContext.getNumber("hour"),
-        channelName: InteractionContext.getString("channel_name", true),
-        guildName: GuildService.getName(),
-        channel: InteractionContext.channel(true),
-        user: InteractionContext.user(),
-        eventConfig: SheetService.getEventConfig(),
-      }),
-      Effect.let("date", () => new Date()),
-      Effect.tap(({ date }) =>
-        pipe(date, getMinutes) >= 40
-          ? Effect.fail(new TimeError("Cannot kick out until next hour starts"))
-          : Effect.void,
-      ),
-      Effect.let("hour", ({ date, hourOption, eventConfig }) =>
-        pipe(
-          hourOption,
-          Option.getOrElse(() =>
-            Math.floor(
-              (pipe(date, addMinutes(20), getUnixTime) -
-                eventConfig.startTime) /
-                3600 +
-                1,
+        Effect.let("hour", ({ date, hourOption, eventConfig }) =>
+          pipe(
+            hourOption,
+            Option.getOrElse(() =>
+              Math.floor(
+                (pipe(date, addMinutes(20), getUnixTime) -
+                  eventConfig.startTime) /
+                  3600 +
+                  1,
+              ),
             ),
           ),
         ),
-      ),
-      Effect.bind("kickoutData", ({ hour, channelName }) =>
-        getKickoutData({ hour, channelName }),
-      ),
-      Effect.bind("role", ({ kickoutData }) =>
-        pipe(
-          kickoutData.runningChannel.roleId,
-          Option.fromNullable,
-          Effect.tap(() => GuildService.fetchMembers()),
-          Effect.flatMap((roleId) => GuildService.fetchRole(roleId)),
-          Effect.flatMap(Option.fromNullable),
+        Effect.bind("kickoutData", ({ hour, channelName }) =>
+          getKickoutData({ hour, channelName }),
         ),
-      ),
-      Effect.bind("fillIds", ({ kickoutData }) =>
-        pipe(
-          kickoutData.schedule.fills,
-          Array.map(Option.fromNullable),
-          Array.getSomes,
-          Effect.forEach((playerName) => PlayerService.getByName(playerName)),
-          Effect.map(Array.getSomes),
-          Effect.map(Array.map((p) => p.id)),
-        ),
-      ),
-      Effect.let("removedMembers", ({ fillIds, role }) =>
-        pipe(
-          role.members.values(),
-          Array.filter((member) => !fillIds.includes(member.id)),
-        ),
-      ),
-      Effect.tap(({ removedMembers, role }) =>
-        pipe(
-          removedMembers,
-          Effect.forEach((member) =>
-            Effect.tryPromise(() => member.roles.remove(role)),
+        Effect.bind("role", ({ kickoutData }) =>
+          pipe(
+            kickoutData.runningChannel.roleId,
+            Option.fromNullable,
+            Effect.tap(() => GuildService.fetchMembers()),
+            Effect.flatMap((roleId) => GuildService.fetchRole(roleId)),
+            Effect.flatMap(Function.identity),
           ),
         ),
-      ),
-      Effect.tap(({ removedMembers }) =>
-        InteractionContext.editReply({
+        Effect.bind("fillIds", ({ kickoutData }) =>
+          pipe(
+            kickoutData.schedule.fills,
+            Array.map(Option.fromNullable),
+            Array.getSomes,
+            Effect.forEach((playerName) => PlayerService.getByName(playerName)),
+            Effect.map(Array.getSomes),
+            Effect.map(Array.map((p) => p.id)),
+          ),
+        ),
+        Effect.let("removedMembers", ({ fillIds, role }) =>
+          pipe(
+            role.members.values(),
+            Array.filter((member) => !fillIds.includes(member.id)),
+          ),
+        ),
+        Effect.tap(({ removedMembers, role }) =>
+          pipe(
+            removedMembers,
+            Effect.forEach((member) =>
+              Effect.tryPromise(() => member.roles.remove(role)),
+            ),
+          ),
+        ),
+        InteractionContext.tapEditReply(({ removedMembers }) => ({
           content:
             removedMembers.length > 0
               ? `Kicked out ${removedMembers.map((m) => userMention(m.user.id)).join(" ")}`
               : "No players to kick out",
           allowedMentions: { parse: [] },
-        }),
+        })),
+        Effect.asVoid,
+        Effect.withSpan("handleKickoutManual", { captureStackTrace: true }),
       ),
-      Effect.provide(guildServicesFromInteractionOption("server_id")),
-      Effect.withSpan("handleKickoutManual", { captureStackTrace: true }),
     ),
   )
   .build();

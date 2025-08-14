@@ -4,14 +4,15 @@ import {
   ButtonStyle,
   ComponentType,
   InteractionButtonComponentData,
+  Message,
   MessageActionRowComponentBuilder,
   MessageFlags,
   userMention,
 } from "discord.js";
-import { Array, Data, Effect, Function, pipe } from "effect";
+import { Cause, Data, Effect, Function, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import {
-  ClientService,
+  GuildService,
   MessageCheckinService,
   PermissionService,
 } from "../services";
@@ -20,6 +21,7 @@ import {
   ButtonInteractionT,
   CachedInteractionContext,
   InteractionContext,
+  RepliableInteractionT,
 } from "../types";
 import { bindObject } from "../utils";
 
@@ -44,9 +46,10 @@ export const button = buttonInteractionHandlerContextBuilder()
   .handler(
     pipe(
       Effect.Do,
-      InteractionContext.tapDeferReply({ flags: MessageFlags.Ephemeral }),
+      InteractionContext.tapDeferReply(() => ({
+        flags: MessageFlags.Ephemeral,
+      })),
       bindObject({
-        client: ClientService.getClient(),
         message: CachedInteractionContext.message<ButtonInteractionT>(),
         user: InteractionContext.user(),
       }),
@@ -63,16 +66,28 @@ export const button = buttonInteractionHandlerContextBuilder()
             message.id,
             user.id,
           ),
-          Effect.tap((values) =>
-            Array.length(values) > 0
-              ? InteractionContext.editReply({
-                  content: "You have been checked in!",
-                })
-              : Effect.fail(
-                  new CheckinError(
-                    "I don't think you are in the list of players to check in...",
-                  ),
-                ),
+          Effect.flatMap((checkinData) =>
+            Effect.suspend<
+              Message,
+              CheckinError | Cause.UnknownException,
+              InteractionContext<RepliableInteractionT>
+            >(() =>
+              pipe(
+                checkinData,
+                Option.match({
+                  onSome: () =>
+                    InteractionContext.editReply({
+                      content: "You have been checked in!",
+                    }),
+                  onNone: () =>
+                    Effect.fail(
+                      new CheckinError(
+                        "I don't think you are in the list of players to check in...",
+                      ),
+                    ),
+                }),
+              ),
+            ),
           ),
         ),
       ),
@@ -91,37 +106,42 @@ export const button = buttonInteractionHandlerContextBuilder()
       Effect.tap(({ messageCheckinData }) =>
         PermissionService.addRole(messageCheckinData.roleId),
       ),
-      Effect.tap(
-        ({ message, user, client, messageCheckinData, checkedInMentions }) =>
-          Effect.all([
-            Effect.tryPromise(() =>
-              message.edit({
-                content:
-                  checkedInMentions.length > 0
-                    ? `${messageCheckinData.initialMessage}\n\nChecked in: ${checkedInMentions}`
-                    : messageCheckinData.initialMessage,
-                components: messageCheckinData.roleId
-                  ? [
-                      new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                        new ButtonBuilder(buttonData),
-                      ),
-                    ]
-                  : [],
+      Effect.tap(({ message, user, messageCheckinData, checkedInMentions }) =>
+        Effect.all([
+          Effect.tryPromise(() =>
+            message.edit({
+              content:
+                checkedInMentions.length > 0
+                  ? `${messageCheckinData.initialMessage}\n\nChecked in: ${checkedInMentions}`
+                  : messageCheckinData.initialMessage,
+              components: messageCheckinData.roleId
+                ? [
+                    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                      new ButtonBuilder(buttonData),
+                    ),
+                  ]
+                : [],
+            }),
+          ),
+          pipe(
+            GuildService.fetchChannel(messageCheckinData.channelId),
+            Effect.flatMap(Function.identity),
+            Effect.flatMap((channel) =>
+              Effect.tryPromise(async () => {
+                if (channel.isSendable()) {
+                  await channel.send({
+                    content: `${userMention(user.id)} has checked in!`,
+                  });
+                }
               }),
             ),
-            Effect.tryPromise(async () => {
-              const channel = await client.channels.fetch(
-                messageCheckinData.channelId,
-              );
-              if (channel?.isSendable()) {
-                await channel.send({
-                  content: `${userMention(user.id)} has checked in!`,
-                });
-              }
-            }),
-          ]),
+          ),
+        ]),
       ),
       Effect.asVoid,
+      Effect.withSpan("handleInteractionCheckin", {
+        captureStackTrace: true,
+      }),
     ),
   )
   .build();

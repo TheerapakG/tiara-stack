@@ -77,10 +77,13 @@ export class PermissionService extends Effect.Service<PermissionService>()(
               captureStackTrace: true,
             }),
           ),
-        checkPermissions: (
-          permissions: PermissionResolvable,
-          reason?: string,
-        ) =>
+        checkPermissions: ({
+          permissions,
+          reason,
+        }: {
+          permissions: PermissionResolvable;
+          reason?: string;
+        }) =>
           pipe(
             interaction,
             Effect.flatMap((interaction) =>
@@ -97,7 +100,13 @@ export class PermissionService extends Effect.Service<PermissionService>()(
               captureStackTrace: true,
             }),
           ),
-        checkRoles: (roles: RoleResolvable[], reason?: string) =>
+        checkRoles: ({
+          roles,
+          reason,
+        }: {
+          roles: RoleResolvable[];
+          reason?: string;
+        }) =>
           pipe(
             interaction,
             Effect.flatMap((interaction) =>
@@ -142,57 +151,58 @@ export class PermissionService extends Effect.Service<PermissionService>()(
     accessors: true,
   },
 ) {
-  static tapCheckOwner({ allowSameGuild }: { allowSameGuild?: boolean }) {
-    return <A, E, R>(self: Effect.Effect<A, E, R>) =>
+  static tapCheckOwner<A>(f: (a: A) => { allowSameGuild?: boolean }) {
+    return <E, R>(self: Effect.Effect<A, E, R>) =>
       pipe(
         self,
-        Effect.tap(() => PermissionService.checkOwner({ allowSameGuild })),
+        Effect.tap((a) => PermissionService.checkOwner(f(a))),
       );
   }
 
-  static tapCheckPermissions(
-    permissions: PermissionResolvable,
-    reason?: string,
+  static tapCheckPermissions<A>(
+    f: (a: A) => {
+      permissions: PermissionResolvable;
+      reason?: string;
+    },
   ) {
-    return <A, E, R>(self: Effect.Effect<A, E, R>) =>
+    return <E, R>(self: Effect.Effect<A, E, R>) =>
       pipe(
         self,
-        Effect.tap(() =>
-          PermissionService.checkPermissions(permissions, reason),
-        ),
+        Effect.tap((a) => PermissionService.checkPermissions(f(a))),
       );
   }
 
-  static effectCheckRoles<E, R>(
-    roles: Effect.Effect<RoleResolvable[], E, R>,
-    reason?: string,
-  ) {
+  static effectCheckRoles<E, R>({
+    roles,
+    reason,
+  }: {
+    roles: Effect.Effect<RoleResolvable[], E, R>;
+    reason?: string;
+  }) {
     return pipe(
       roles,
-      Effect.tap((roles) => PermissionService.checkRoles(roles, reason)),
+      Effect.tap((roles) => PermissionService.checkRoles({ roles, reason })),
     );
   }
 
-  static tapCheckRoles<E1, R1>(
-    roles: Effect.Effect<RoleResolvable[], E1, R1>,
-    reason?: string,
+  static tapCheckRoles<A, E1, R1>(
+    f: (a: A) => {
+      roles: Effect.Effect<RoleResolvable[], E1, R1>;
+      reason?: string;
+    },
   ) {
-    return <A, E2, R2>(self: Effect.Effect<A, E2, R2>) =>
+    return <E2, R2>(self: Effect.Effect<A, E2, R2>) =>
       pipe(
-        Effect.Do,
-        bindObject({
-          self,
-          roles: PermissionService.effectCheckRoles(roles, reason),
-        }),
-        Effect.map(({ self }) => self),
+        self,
+        Effect.tap((a) => PermissionService.effectCheckRoles(f(a))),
       );
   }
 
-  static tapAddRole(roleId: string) {
-    return <A, E, R>(self: Effect.Effect<A, E, R>) =>
+  static tapAddRole<A>(f: (a: A) => string) {
+    return <E, R>(self: Effect.Effect<A, E, R>) =>
       pipe(
         self,
-        Effect.tap(() => PermissionService.addRole(roleId)),
+        Effect.tap((a) => PermissionService.addRole(f(a))),
       );
   }
 }

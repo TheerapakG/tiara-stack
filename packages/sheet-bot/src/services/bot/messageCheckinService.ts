@@ -124,6 +124,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
                 )
                 .returning(),
             ),
+            Effect.map(Array.head),
             Effect.withSpan(
               "MessageCheckinService.setMessageCheckinMemberCheckinAt",
               { captureStackTrace: true },

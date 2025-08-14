@@ -277,11 +277,11 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static tapDeferReply(options?: InteractionDeferReplyOptions) {
-    return <A, E, R>(self: Effect.Effect<A, E, R>) =>
+  static tapDeferReply<A>(f?: (a: A) => InteractionDeferReplyOptions) {
+    return <E, R>(self: Effect.Effect<A, E, R>) =>
       pipe(
         self,
-        Effect.tap(() => InteractionContext.deferReply(options)),
+        Effect.tap((a) => InteractionContext.deferReply(f?.(a))),
       );
   }
 
@@ -311,11 +311,11 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static tapDeleteReply(message?: MessageResolvable | "@original") {
-    return <A, E, R>(self: Effect.Effect<A, E, R>) =>
+  static tapDeleteReply<A>(f?: (a: A) => MessageResolvable | "@original") {
+    return <E, R>(self: Effect.Effect<A, E, R>) =>
       pipe(
         self,
-        Effect.tap(() => InteractionContext.deleteReply(message)),
+        Effect.tap((a) => InteractionContext.deleteReply(f?.(a))),
       );
   }
 
@@ -333,13 +333,13 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static tapEditReply(
-    options: string | MessagePayload | InteractionEditReplyOptions,
+  static tapEditReply<A>(
+    f: (a: A) => string | MessagePayload | InteractionEditReplyOptions,
   ) {
-    return <A, E, R>(self: Effect.Effect<A, E, R>) =>
+    return <E, R>(self: Effect.Effect<A, E, R>) =>
       pipe(
         self,
-        Effect.tap(() => InteractionContext.editReply(options)),
+        Effect.tap((a) => InteractionContext.editReply(f(a))),
       );
   }
 
@@ -367,13 +367,13 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static tapFollowUp(
-    options: string | MessagePayload | InteractionReplyOptions,
+  static tapFollowUp<A>(
+    f: (a: A) => string | MessagePayload | InteractionReplyOptions,
   ) {
-    return <A, E, R>(self: Effect.Effect<A, E, R>) =>
+    return <E, R>(self: Effect.Effect<A, E, R>) =>
       pipe(
         self,
-        Effect.tap(() => InteractionContext.followUp(options)),
+        Effect.tap((a) => InteractionContext.followUp(f(a))),
       );
   }
 
@@ -389,11 +389,23 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static tapReply(options: string | MessagePayload | InteractionReplyOptions) {
-    return <A, E, R>(self: Effect.Effect<A, E, R>) =>
+  static tapReply<A>(
+    f: (a: A) => string | MessagePayload | InteractionReplyOptions,
+  ) {
+    return <E, R>(self: Effect.Effect<A, E, R>) =>
       pipe(
         self,
-        Effect.tap(() => InteractionContext.reply(options)),
+        Effect.tap((a) => InteractionContext.reply(f(a))),
+      );
+  }
+
+  static mapReply<A>(
+    f: (a: A) => string | MessagePayload | InteractionReplyOptions,
+  ) {
+    return <E, R>(self: Effect.Effect<A, E, R>) =>
+      pipe(
+        self,
+        Effect.flatMap((a) => InteractionContext.reply(f(a))),
       );
   }
 
@@ -409,6 +421,14 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
         captureStackTrace: true,
       }),
     );
+  }
+
+  static mapReplyWithResponse<A>(f: (a: A) => InteractionReplyOptions) {
+    return <E, R>(self: Effect.Effect<A, E, R>) =>
+      pipe(
+        self,
+        Effect.flatMap((a) => InteractionContext.replyWithResponse(f(a))),
+      );
   }
 
   static channelId<Required extends boolean>(required?: Required) {
