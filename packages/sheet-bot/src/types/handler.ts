@@ -7,13 +7,13 @@ import {
   SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 import { Data, Effect, HashMap, Option, pipe } from "effect";
+import { InteractionContext } from "../services";
 import { bindObject } from "../utils";
 import {
   HandlerVariantData,
   HandlerVariantInteraction,
   HandlerVariantKey,
 } from "./handlerVariant";
-import { InteractionContext } from "./interactionContext";
 
 type Constrain<T, C> = T extends infer U extends C ? U : never;
 

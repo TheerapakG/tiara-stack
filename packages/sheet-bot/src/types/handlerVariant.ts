@@ -8,7 +8,7 @@ import {
 import {
   ButtonInteractionT,
   ChatInputCommandInteractionT,
-} from "./interactionContext";
+} from "../services/interaction/interactionContext";
 
 export type HandlerVariant = {
   button: {

@@ -1,7 +1,6 @@
 import { Guild } from "discord.js";
 import { Effect, Layer, Option, pipe } from "effect";
-import { CachedInteractionContext } from "../../types";
-import { ClientService } from "../interaction/clientService";
+import { CachedInteractionContext, ClientService } from "../interaction";
 
 export class GuildService extends Effect.Service<GuildService>()(
   "GuildService",

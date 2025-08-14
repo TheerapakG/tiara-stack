@@ -13,6 +13,13 @@ export class ClientService extends Effect.Service<ClientService>()(
               captureStackTrace: true,
             }),
           ),
+        fetchApplication: () =>
+          pipe(
+            Effect.tryPromise(() => client.application.fetch()),
+            Effect.withSpan("ClientService.fetchApplication", {
+              captureStackTrace: true,
+            }),
+          ),
         makeEmbedBuilder: () =>
           new EmbedBuilder().setTimestamp().setFooter({
             text: `${client.user.username} ${process.env.BUILD_VERSION}`,

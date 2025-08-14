@@ -25,13 +25,16 @@ import {
   SynchronizedRef,
 } from "effect";
 import { Config } from "../config";
-import { interactionServices } from "../services";
+import {
+  ButtonInteractionT,
+  ChatInputCommandInteractionT,
+  ClientService,
+  InteractionContext,
+  interactionServices,
+} from "../services";
 import {
   buttonInteractionHandlerMap,
-  ButtonInteractionT,
   chatInputCommandHandlerMap,
-  ChatInputCommandInteractionT,
-  InteractionContext,
   InteractionHandlerMapWithMetrics,
   VariantInteractionHandlerContext,
   VariantInteractionHandlerMap,
@@ -237,8 +240,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
             .once(Events.ClientReady, (client) =>
               Effect.runPromise(
                 pipe(
-                  Effect.tryPromise(() => client.application.fetch()),
+                  ClientService.fetchApplication(),
                   Effect.tap(() => Effect.log("Bot is ready")),
+                  Effect.provide(ClientService.Default(client)),
                 ),
               ),
             )

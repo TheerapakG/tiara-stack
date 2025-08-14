@@ -5,13 +5,11 @@ import {
   ChannelConfigService,
   ClientService,
   guildServicesFromInteraction,
+  InteractionContext,
   ScheduleService,
   SheetService,
 } from "../services";
-import {
-  buttonInteractionHandlerContextBuilder,
-  InteractionContext,
-} from "../types";
+import { buttonInteractionHandlerContextBuilder } from "../types";
 import { bindObject } from "../utils";
 
 const getSlotMessage = (day: number) =>

@@ -13,6 +13,7 @@ import {
   GuildConfigService,
   GuildService,
   guildServicesFromInteractionOption,
+  InteractionContext,
   PermissionService,
   PlayerService,
   SheetService,
@@ -20,7 +21,6 @@ import {
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
-  InteractionContext,
 } from "../../types";
 import { bindObject } from "../../utils";
 

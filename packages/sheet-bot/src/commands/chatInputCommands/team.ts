@@ -11,6 +11,7 @@ import {
   ClientService,
   GuildConfigService,
   guildServicesFromInteractionOption,
+  InteractionContext,
   PermissionService,
   SheetService,
 } from "../../services";
@@ -18,7 +19,6 @@ import { RawTeam } from "../../services/guild/sheetService";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
-  InteractionContext,
 } from "../../types";
 import { bindObject } from "../../utils";
 
