@@ -62,10 +62,7 @@ const handleSet = chatInputSubcommandHandlerContextBuilder()
       Effect.Do,
       PermissionService.tapCheckPermissions(PermissionFlagsBits.ManageGuild),
       bindObject({
-        channel: pipe(
-          InteractionContext.channel(),
-          Effect.flatMap(Option.fromNullable),
-        ),
+        channel: InteractionContext.channel(true),
         running: InteractionContext.getBoolean("running"),
         name: InteractionContext.getString("name"),
         role: InteractionContext.getRole("role"),
@@ -123,17 +120,14 @@ const handleUnset = chatInputSubcommandHandlerContextBuilder()
       Effect.Do,
       PermissionService.tapCheckPermissions(PermissionFlagsBits.ManageGuild),
       bindObject({
-        channel: pipe(
-          InteractionContext.channel(),
-          Effect.flatMap(Option.fromNullable),
-        ),
+        channel: InteractionContext.channel(true),
         name: InteractionContext.getBoolean("name"),
         role: InteractionContext.getBoolean("role"),
       }),
       Effect.bind("config", ({ channel, name, role }) =>
         GuildConfigService.setChannelConfig(channel.id, {
-          name: name ? null : undefined,
-          roleId: role ? null : undefined,
+          name: Option.getOrUndefined(name) ? null : undefined,
+          roleId: Option.getOrUndefined(role) ? null : undefined,
         }),
       ),
       Effect.tap(({ channel, config }) =>

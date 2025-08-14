@@ -176,10 +176,7 @@ const handleButton = chatInputSubcommandHandlerContextBuilder()
       ),
       bindObject({
         day: InteractionContext.getNumber("day", true),
-        channel: pipe(
-          InteractionContext.channel(),
-          Effect.flatMap(Option.fromNullable),
-        ),
+        channel: InteractionContext.channel(true),
         user: InteractionContext.user(),
       }),
       Effect.tap(({ channel, day }) =>

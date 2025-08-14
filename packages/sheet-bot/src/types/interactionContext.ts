@@ -1,16 +1,11 @@
 import {
   AnySelectMenuInteraction,
-  APIInteractionDataResolvedGuildMember,
-  APIRole,
-  Attachment,
   AutocompleteInteraction,
   BaseInteraction,
   ButtonInteraction,
   CacheType,
   ChannelType,
   ChatInputCommandInteraction,
-  CommandInteractionOption,
-  GuildMember,
   Interaction,
   InteractionDeferReplyOptions,
   InteractionEditReplyOptions,
@@ -22,9 +17,7 @@ import {
   ModalSubmitInteraction,
   PrimaryEntryPointCommandInteraction,
   RepliableInteraction,
-  Role,
   Snowflake,
-  User,
   UserContextMenuCommandInteraction,
 } from "discord.js";
 import { Context, Data, Effect, HKT, Option, pipe, Types } from "effect";
@@ -51,11 +44,55 @@ export class UncachedGuildError extends Data.TaggedError("UncachedGuildError")<{
   }
 }
 
-type OptionGetterEffect<T, Required extends boolean> = Effect.Effect<
-  [Required] extends [true] ? T : Option.Option<T>,
-  unknown,
-  InteractionContext<ChatInputCommandInteractionT>
+export class MissingChannelError extends Data.TaggedError(
+  "MissingChannelError",
+)<{
+  readonly message: string;
+}> {
+  constructor() {
+    super({ message: "You must use this command within a channel." });
+  }
+}
+
+export class MissingGuildError extends Data.TaggedError("MissingGuildError")<{
+  readonly message: string;
+}> {
+  constructor() {
+    super({ message: "You must use this command within a guild." });
+  }
+}
+
+export class ArgumentError extends Data.TaggedError("ArgumentError")<{
+  readonly name: string;
+  readonly required: boolean;
+  readonly message: string;
+}> {
+  constructor(name: string, required?: boolean) {
+    super({
+      name,
+      required: required ?? false,
+      message: `Invalid argument: ${name}, required: ${required ?? false}`,
+    });
+  }
+}
+
+type RequiredEffect<
+  Required extends boolean,
+  A,
+  EOptional,
+  ERequired,
+  R,
+> = Effect.Effect<
+  [Required] extends [true] ? NonNullable<A> : Option.Option<NonNullable<A>>,
+  EOptional | ([Required] extends [true] ? ERequired : never),
+  R
 >;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type InferEffect<Ef extends Effect.Effect<any, any, any>> =
+  Ef extends Effect.Effect<infer A, infer E, infer R>
+    ? Effect.Effect<A, E, R>
+    : never;
 
 export interface ChatInputCommandInteractionT extends HKT.TypeLambda {
   readonly type: this["Target"] extends CacheType
@@ -138,7 +175,69 @@ interface BaseBaseInteractionT extends HKT.TypeLambda {
   readonly type: BaseInteraction<CacheType>;
 }
 
-export class InteractionContext<I extends BaseInteractionT = InteractionT> {
+const mapNullableInteraction =
+  <I extends BaseInteraction, A, ERequired, Required extends boolean = false>(
+    f: (interaction: I, required: Required) => A,
+    requiredError: () => ERequired,
+    required?: Required,
+  ) =>
+  <E, R>(self: Effect.Effect<I, E, R>) =>
+    pipe(
+      self,
+      Effect.map((interaction) =>
+        f(interaction, required ?? (false as Required)),
+      ),
+      Effect.map(Option.fromNullable),
+      (e) =>
+        (required
+          ? pipe(
+              e,
+              Effect.flatMap(
+                Option.match({
+                  onSome: Effect.succeed,
+                  onNone: () => Effect.fail(requiredError()),
+                }),
+              ),
+            )
+          : e) as InferEffect<RequiredEffect<Required, A, E, ERequired, R>>,
+    );
+
+const mapTryNullableInteraction =
+  <
+    I extends BaseInteraction,
+    A,
+    EOptional,
+    ERequired,
+    Required extends boolean = false,
+  >(
+    f: (interaction: I, required: Required) => A,
+    optionalError: () => EOptional,
+    requiredError: () => ERequired,
+    required?: Required,
+  ) =>
+  <E, R>(self: Effect.Effect<I, E, R>) =>
+    pipe(
+      self,
+      Effect.tryMap({
+        try: (interaction) => f(interaction, required ?? (false as Required)),
+        catch: () => Effect.fail(optionalError()),
+      }),
+      Effect.map(Option.fromNullable),
+      (e) =>
+        (required
+          ? pipe(
+              e,
+              Effect.flatMap(
+                Option.match({
+                  onSome: Effect.succeed,
+                  onNone: () => Effect.fail(requiredError()),
+                }),
+              ),
+            )
+          : e) as InferEffect<RequiredEffect<Required, A, E, ERequired, R>>,
+    );
+
+export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
   $inferInteractionType: Types.Contravariant<I> =
     undefined as unknown as Types.Contravariant<I>;
 
@@ -312,17 +411,47 @@ export class InteractionContext<I extends BaseInteractionT = InteractionT> {
     );
   }
 
-  static channelId() {
+  static channelId<Required extends boolean>(required?: Required) {
     return pipe(
       InteractionContext.interaction<InteractionT>(),
-      Effect.flatMap((interaction) => Effect.succeed(interaction.channelId)),
+      mapNullableInteraction(
+        (interaction) => interaction.channelId,
+        () => new MissingChannelError(),
+        required,
+      ),
     );
   }
 
-  static channel() {
+  static channel<Required extends boolean>(required?: Required) {
     return pipe(
       InteractionContext.interaction<InteractionT>(),
-      Effect.flatMap((interaction) => Effect.succeed(interaction.channel)),
+      mapNullableInteraction(
+        (interaction) => interaction.channel,
+        () => new MissingChannelError(),
+        required,
+      ),
+    );
+  }
+
+  static guildId<Required extends boolean>(required?: Required) {
+    return pipe(
+      InteractionContext.interaction<InteractionT>(),
+      mapNullableInteraction(
+        (interaction) => interaction.guildId,
+        () => new MissingGuildError(),
+        required,
+      ),
+    );
+  }
+
+  static guild<Required extends boolean>(required?: Required) {
+    return pipe(
+      InteractionContext.interaction<InteractionT>(),
+      mapNullableInteraction(
+        (interaction) => interaction.guild,
+        () => new MissingGuildError(),
+        required,
+      ),
     );
   }
 
@@ -336,32 +465,25 @@ export class InteractionContext<I extends BaseInteractionT = InteractionT> {
   static getSubcommandGroup<Required extends boolean>(required?: Required) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.try(() => interaction.options.getSubcommandGroup(required)),
+      mapTryNullableInteraction(
+        (interaction, required) =>
+          interaction.options.getSubcommandGroup(required),
+        () => new ArgumentError("subcommandGroup", required),
+        () => new ArgumentError("subcommandGroup", required),
+        required,
       ),
-      (e) =>
-        (required
-          ? e
-          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
-          string,
-          Required
-        >,
     );
   }
 
   static getSubcommand<Required extends boolean>(required?: Required) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.try(() => interaction.options.getSubcommand(required ?? false)),
+      mapTryNullableInteraction(
+        (interaction, required) => interaction.options.getSubcommand(required),
+        () => new ArgumentError("subcommand", required),
+        () => new ArgumentError("subcommand", required),
+        required,
       ),
-      (e) =>
-        (required
-          ? e
-          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
-          string,
-          Required
-        >,
     );
   }
 
@@ -371,16 +493,13 @@ export class InteractionContext<I extends BaseInteractionT = InteractionT> {
   ) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.try(() => interaction.options.getBoolean(name, required)),
+      mapTryNullableInteraction(
+        (interaction, required) =>
+          interaction.options.getBoolean(name, required),
+        () => new ArgumentError(name, required),
+        () => new ArgumentError(name, required),
+        required,
       ),
-      (e) =>
-        (required
-          ? e
-          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
-          boolean,
-          Required
-        >,
     );
   }
 
@@ -390,27 +509,13 @@ export class InteractionContext<I extends BaseInteractionT = InteractionT> {
   >(name: string, required?: Required, channelTypes?: readonly Type[]) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.try(() =>
+      mapTryNullableInteraction(
+        (interaction, required) =>
           interaction.options.getChannel(name, required, channelTypes),
-        ),
+        () => new ArgumentError(name, required),
+        () => new ArgumentError(name, required),
+        required,
       ),
-      (e) =>
-        (required
-          ? e
-          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
-          Extract<
-            NonNullable<CommandInteractionOption["channel"]>,
-            {
-              type: Type extends
-                | ChannelType.PublicThread
-                | ChannelType.AnnouncementThread
-                ? ChannelType.PublicThread | ChannelType.AnnouncementThread
-                : Type;
-            }
-          >,
-          Required
-        >,
     );
   }
 
@@ -420,16 +525,13 @@ export class InteractionContext<I extends BaseInteractionT = InteractionT> {
   ) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.try(() => interaction.options.getString(name, required)),
+      mapTryNullableInteraction(
+        (interaction, required) =>
+          interaction.options.getString(name, required),
+        () => new ArgumentError(name, required),
+        () => new ArgumentError(name, required),
+        required,
       ),
-      (e) =>
-        (required
-          ? e
-          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
-          string,
-          Required
-        >,
     );
   }
 
@@ -439,16 +541,13 @@ export class InteractionContext<I extends BaseInteractionT = InteractionT> {
   ) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.try(() => interaction.options.getInteger(name, required)),
+      mapTryNullableInteraction(
+        (interaction, required) =>
+          interaction.options.getInteger(name, required),
+        () => new ArgumentError(name, required),
+        () => new ArgumentError(name, required),
+        required,
       ),
-      (e) =>
-        (required
-          ? e
-          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
-          number,
-          Required
-        >,
     );
   }
 
@@ -458,32 +557,25 @@ export class InteractionContext<I extends BaseInteractionT = InteractionT> {
   ) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.try(() => interaction.options.getNumber(name, required)),
+      mapTryNullableInteraction(
+        (interaction, required) =>
+          interaction.options.getNumber(name, required),
+        () => new ArgumentError(name, required),
+        () => new ArgumentError(name, required),
+        required,
       ),
-      (e) =>
-        (required
-          ? e
-          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
-          number,
-          Required
-        >,
     );
   }
 
   static getUser<Required extends boolean>(name: string, required?: Required) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.try(() => interaction.options.getUser(name, required)),
+      mapTryNullableInteraction(
+        (interaction, required) => interaction.options.getUser(name, required),
+        () => new ArgumentError(name, required),
+        () => new ArgumentError(name, required),
+        required,
       ),
-      (e) =>
-        (required
-          ? e
-          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
-          User,
-          Required
-        >,
     );
   }
 
@@ -493,32 +585,24 @@ export class InteractionContext<I extends BaseInteractionT = InteractionT> {
   ) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.try(() => interaction.options.getMember(name)),
+      mapTryNullableInteraction(
+        (interaction) => interaction.options.getMember(name),
+        () => new ArgumentError(name, required),
+        () => new ArgumentError(name, required),
+        required,
       ),
-      (e) =>
-        (required
-          ? e
-          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
-          GuildMember | APIInteractionDataResolvedGuildMember,
-          Required
-        >,
     );
   }
 
   static getRole<Required extends boolean>(name: string, required?: Required) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.try(() => interaction.options.getRole(name, required)),
+      mapTryNullableInteraction(
+        (interaction) => interaction.options.getRole(name, required),
+        () => new ArgumentError(name, required),
+        () => new ArgumentError(name, required),
+        required,
       ),
-      (e) =>
-        (required
-          ? e
-          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
-          Role | APIRole,
-          Required
-        >,
     );
   }
 
@@ -528,16 +612,12 @@ export class InteractionContext<I extends BaseInteractionT = InteractionT> {
   ) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.try(() => interaction.options.getAttachment(name, required)),
+      mapTryNullableInteraction(
+        (interaction) => interaction.options.getAttachment(name, required),
+        () => new ArgumentError(name, required),
+        () => new ArgumentError(name, required),
+        required,
       ),
-      (e) =>
-        (required
-          ? e
-          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
-          Attachment,
-          Required
-        >,
     );
   }
 
@@ -547,20 +627,13 @@ export class InteractionContext<I extends BaseInteractionT = InteractionT> {
   ) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.try(() => interaction.options.getMentionable(name, required)),
+      mapTryNullableInteraction(
+        (interaction, required) =>
+          interaction.options.getMentionable(name, required),
+        () => new ArgumentError(name, required),
+        () => new ArgumentError(name, required),
+        required,
       ),
-      (e) =>
-        (required
-          ? e
-          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
-          | GuildMember
-          | APIInteractionDataResolvedGuildMember
-          | Role
-          | APIRole
-          | User,
-          Required
-        >,
     );
   }
 }
@@ -603,10 +676,14 @@ export class CachedInteractionContext {
     );
   }
 
-  static channel() {
+  static channel<Required extends boolean>(required?: Required) {
     return pipe(
       CachedInteractionContext.interaction<InteractionT>(),
-      Effect.flatMap((interaction) => Effect.succeed(interaction.channel)),
+      mapNullableInteraction(
+        (interaction) => interaction.channel,
+        () => new MissingChannelError(),
+        required,
+      ),
     );
   }
 
@@ -620,7 +697,7 @@ export class CachedInteractionContext {
   static guild() {
     return pipe(
       CachedInteractionContext.interaction<InteractionT>(),
-      Effect.flatMap((interaction) => Effect.try(() => interaction.guild)),
+      Effect.flatMap((interaction) => Effect.succeed(interaction.guild)),
     );
   }
 
@@ -630,27 +707,13 @@ export class CachedInteractionContext {
   >(name: string, required?: Required, channelTypes?: readonly Type[]) {
     return pipe(
       CachedInteractionContext.interaction<ChatInputCommandInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.try(() =>
+      mapTryNullableInteraction(
+        (interaction) =>
           interaction.options.getChannel(name, required, channelTypes),
-        ),
+        () => new ArgumentError(name, required),
+        () => new ArgumentError(name, required),
+        required,
       ),
-      (e) =>
-        (required
-          ? e
-          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
-          Extract<
-            NonNullable<CommandInteractionOption<"cached">["channel"]>,
-            {
-              type: Type extends
-                | ChannelType.PublicThread
-                | ChannelType.AnnouncementThread
-                ? ChannelType.PublicThread | ChannelType.AnnouncementThread
-                : Type;
-            }
-          >,
-          Required
-        >,
     );
   }
 
@@ -660,32 +723,24 @@ export class CachedInteractionContext {
   ) {
     return pipe(
       CachedInteractionContext.interaction<ChatInputCommandInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.try(() => interaction.options.getMember(name)),
+      mapTryNullableInteraction(
+        (interaction) => interaction.options.getMember(name),
+        () => new ArgumentError(name, required),
+        () => new ArgumentError(name, required),
+        required,
       ),
-      (e) =>
-        (required
-          ? e
-          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
-          GuildMember,
-          Required
-        >,
     );
   }
 
   static getRole<Required extends boolean>(name: string, required?: Required) {
     return pipe(
       CachedInteractionContext.interaction<ChatInputCommandInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.try(() => interaction.options.getRole(name, required)),
+      mapTryNullableInteraction(
+        (interaction) => interaction.options.getRole(name, required),
+        () => new ArgumentError(name, required),
+        () => new ArgumentError(name, required),
+        required,
       ),
-      (e) =>
-        (required
-          ? e
-          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
-          Role,
-          Required
-        >,
     );
   }
 
@@ -695,16 +750,12 @@ export class CachedInteractionContext {
   ) {
     return pipe(
       CachedInteractionContext.interaction<ChatInputCommandInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.try(() => interaction.options.getMentionable(name, required)),
+      mapTryNullableInteraction(
+        (interaction) => interaction.options.getMentionable(name, required),
+        () => new ArgumentError(name, required),
+        () => new ArgumentError(name, required),
+        required,
       ),
-      (e) =>
-        (required
-          ? e
-          : pipe(e, Effect.map(Option.fromNullable))) as OptionGetterEffect<
-          GuildMember | Role | User,
-          Required
-        >,
     );
   }
 }

@@ -3,7 +3,7 @@ import {
   PermissionsBitField,
   RoleResolvable,
 } from "discord.js";
-import { Data, Effect, Option, pipe } from "effect";
+import { Data, Effect, Equal, pipe } from "effect";
 import {
   CachedInteractionContext,
   InteractionContext,
@@ -54,31 +54,24 @@ export class PermissionService extends Effect.Service<PermissionService>()(
           pipe(
             Effect.Do,
             bindObject({
-              interaction,
-              guild: pipe(
+              interactionGuildId: InteractionContext.guildId(),
+              guiildGuildId: pipe(
                 Effect.serviceOption(GuildService),
                 Effect.flatMap(
-                  Option.match({
-                    onSome: (guildService) =>
-                      pipe(guildService.getGuild(), Effect.map(Option.some)),
-                    onNone: () => Effect.succeed(Option.none()),
-                  }),
+                  Effect.transposeMapOption((guildService) =>
+                    guildService.getId(),
+                  ),
                 ),
               ),
+              interactionUser: InteractionContext.user(),
             }),
-            Effect.let("sameGuild", ({ interaction, guild }) =>
-              pipe(
-                guild,
-                Option.map((guild) => guild.id),
-                Option.getOrNull,
-                (guildId) => guildId === interaction.guildId,
-              ),
-            ),
-            Effect.flatMap(({ interaction, sameGuild }) =>
-              (allowSameGuild && sameGuild) ||
-              interaction.user.id === client.application.owner?.id
-                ? Effect.void
-                : Effect.fail(new OwnerError()),
+            Effect.flatMap(
+              ({ interactionUser, interactionGuildId, guiildGuildId }) =>
+                (allowSameGuild &&
+                  Equal.equals(interactionGuildId, guiildGuildId)) ||
+                interactionUser.id === client.application.owner?.id
+                  ? Effect.void
+                  : Effect.fail(new OwnerError()),
             ),
             Effect.withSpan("PermissionService.checkOwner", {
               captureStackTrace: true,

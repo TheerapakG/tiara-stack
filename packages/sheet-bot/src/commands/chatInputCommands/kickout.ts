@@ -114,11 +114,8 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
       bindObject({
         hourOption: InteractionContext.getNumber("hour"),
         channelName: InteractionContext.getString("channel_name", true),
-        guild: GuildService.getGuild(),
-        channel: pipe(
-          InteractionContext.channel(),
-          Effect.flatMap(Option.fromNullable),
-        ),
+        guildName: GuildService.getName(),
+        channel: InteractionContext.channel(true),
         user: InteractionContext.user(),
         eventConfig: SheetService.getEventConfig(),
       }),
@@ -144,14 +141,12 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
       Effect.bind("kickoutData", ({ hour, channelName }) =>
         getKickoutData({ hour, channelName }),
       ),
-      Effect.bind("role", ({ guild, kickoutData }) =>
+      Effect.bind("role", ({ kickoutData }) =>
         pipe(
           kickoutData.runningChannel.roleId,
           Option.fromNullable,
-          Effect.tap(() => Effect.tryPromise(() => guild.members.fetch())),
-          Effect.flatMap((roleId) =>
-            Effect.tryPromise(() => guild.roles.fetch(roleId)),
-          ),
+          Effect.tap(() => GuildService.fetchMembers()),
+          Effect.flatMap((roleId) => GuildService.fetchRole(roleId)),
           Effect.flatMap(Option.fromNullable),
         ),
       ),
