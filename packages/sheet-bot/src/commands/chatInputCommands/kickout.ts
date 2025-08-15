@@ -108,9 +108,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
           roles: pipe(
             GuildConfigService.getManagerRoles(),
             Effect.flatMap(observeOnce),
-            Effect.map((managerRoles) =>
-              managerRoles.map((role) => role.roleId),
-            ),
+            Effect.map(Array.map((role) => role.roleId)),
           ),
           reason: "You can only kick out users as a manager",
         })),
