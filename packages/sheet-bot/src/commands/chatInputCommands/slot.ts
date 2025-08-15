@@ -102,7 +102,6 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           day: InteractionContext.getNumber("day", true),
           messageType: pipe(
             InteractionContext.getString("message_type"),
-            Effect.tap(Effect.log),
             Effect.map(Option.getOrElse(() => "ephemeral")),
             Effect.flatMap(
               validate(type.enumerated("persistent", "ephemeral")),
