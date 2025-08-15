@@ -150,9 +150,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
           roles: pipe(
             GuildConfigService.getManagerRoles(),
             Effect.flatMap(observeOnce),
-            Effect.map((managerRoles) =>
-              managerRoles.map((role) => role.roleId),
-            ),
+            Effect.map(Array.map((role) => role.roleId)),
           ),
           reason: "You can only check in users as a manager",
         })),

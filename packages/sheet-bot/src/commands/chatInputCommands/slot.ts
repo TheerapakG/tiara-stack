@@ -102,6 +102,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           day: InteractionContext.getNumber("day", true),
           messageType: pipe(
             InteractionContext.getString("message_type"),
+            Effect.tap(Effect.log),
             Effect.map(Option.getOrElse(() => "ephemeral")),
             Effect.flatMap(
               validate(type.enumerated("persistent", "ephemeral")),
@@ -109,39 +110,37 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           ),
           user: InteractionContext.user(),
         }),
-        Effect.tap(({ messageType }) =>
-          messageType !== "ephemeral"
-            ? PermissionService.effectCheckRoles({
+        Effect.tap(({ messageFlags, messageType }) =>
+          Ref.update(messageFlags, (flags) =>
+            flags.add(messageType === "ephemeral" ? MessageFlags.Ephemeral : 0),
+          ),
+        ),
+        Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
+        Effect.tap(({ flags }) =>
+          flags.has(MessageFlags.Ephemeral)
+            ? Effect.void
+            : PermissionService.effectCheckRoles({
                 roles: pipe(
                   GuildConfigService.getManagerRoles(),
                   Effect.flatMap(observeOnce),
-                  Effect.map((managerRoles) =>
-                    managerRoles.map((role) => role.roleId),
-                  ),
+                  Effect.map(Array.map((role) => role.roleId)),
                 ),
                 reason: "You can only make persistent messages as a manager",
-              })
-            : Effect.void,
+              }),
         ),
-        Effect.tap(({ messageType, messageFlags }) =>
-          messageType === "ephemeral"
-            ? Ref.update(messageFlags, (flags) =>
-                flags.add(MessageFlags.Ephemeral),
-              )
-            : Effect.void,
-        ),
+        InteractionContext.tapDeferReply(({ flags }) => ({
+          flags: flags.bitfield,
+        })),
         Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
-        Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
-        Effect.bind("response", ({ slotMessage, flags }) =>
+        Effect.bind("response", ({ slotMessage }) =>
           pipe(
             ClientService.makeEmbedBuilder(),
-            InteractionContext.tapReply((embed) => ({
+            InteractionContext.tapEditReply((embed) => ({
               embeds: [
                 embed
                   .setTitle(slotMessage.title)
                   .setDescription(slotMessage.description),
               ],
-              flags: flags.bitfield,
             })),
           ),
         ),
@@ -172,9 +171,7 @@ const handleButton = chatInputSubcommandHandlerContextBuilder()
           roles: pipe(
             GuildConfigService.getManagerRoles(),
             Effect.flatMap(observeOnce),
-            Effect.map((managerRoles) =>
-              managerRoles.map((role) => role.roleId),
-            ),
+            Effect.map(Array.map((role) => role.roleId)),
           ),
           reason: "You can only make buttons as a manager",
         })),
