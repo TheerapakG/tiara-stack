@@ -3,6 +3,7 @@ import {
   ActionRowBuilder,
   ApplicationIntegrationType,
   ButtonBuilder,
+  channelMention,
   InteractionContextType,
   MessageActionRowComponentBuilder,
   MessageFlags,
@@ -87,6 +88,7 @@ const getCheckinData = ({
         channelName,
         roleId: runningChannel.roleId,
       },
+      showChannelMention: runningChannel.roleId !== null,
     })),
   );
 
@@ -98,6 +100,7 @@ const getCheckinMessages = (data: {
     channelId: string;
     channelName: string;
   };
+  showChannelMention: boolean;
 }) =>
   pipe(
     Effect.Do,
@@ -109,7 +112,9 @@ const getCheckinMessages = (data: {
         startTime: data.startTime,
         prevSchedule: data.prevSchedule,
         schedule: data.schedule,
-        channelName: data.runningChannel.channelName,
+        channel: data.showChannelMention
+          ? channelMention(data.runningChannel.channelId)
+          : data.runningChannel.channelName,
       }),
     ),
     Effect.map(({ emptySlotsMessage, checkinMessage }) => ({
