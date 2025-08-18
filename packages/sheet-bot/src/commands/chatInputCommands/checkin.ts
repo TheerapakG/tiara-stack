@@ -204,33 +204,24 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             Effect.provide(channelServicesFromInteraction()),
           ),
         ),
-        Effect.tap(
-          ({ checkinData, message, fillIds, checkinMessages, hour }) =>
-            checkinData.runningChannel.roleId
-              ? pipe(
-                  Effect.all(
-                    [
-                      MessageCheckinService.upsertMessageCheckinData(
-                        message.id,
-                        {
-                          initialMessage: checkinMessages.checkinMessage,
-                          hour,
-                          channelId: checkinData.runningChannel.channelId,
-                          roleId: checkinData.runningChannel.roleId,
-                        },
-                      ),
-                      Array.isEmptyArray(fillIds)
-                        ? Effect.void
-                        : MessageCheckinService.addMessageCheckinMembers(
-                            message.id,
-                            fillIds,
-                          ),
-                    ],
-                    { concurrency: "unbounded" },
+        Effect.tap(({ checkinData, message, fillIds, checkinMessages, hour }) =>
+          Effect.all(
+            [
+              MessageCheckinService.upsertMessageCheckinData(message.id, {
+                initialMessage: checkinMessages.checkinMessage,
+                hour,
+                channelId: checkinData.runningChannel.channelId,
+                roleId: checkinData.runningChannel.roleId,
+              }),
+              Array.isEmptyArray(fillIds)
+                ? Effect.void
+                : MessageCheckinService.addMessageCheckinMembers(
+                    message.id,
+                    fillIds,
                   ),
-                  Effect.asVoid,
-                )
-              : Effect.void,
+            ],
+            { concurrency: "unbounded" },
+          ),
         ),
         InteractionContext.tapEditReply(({ checkinMessages }) => ({
           content: checkinMessages.emptySlotsMessage,
