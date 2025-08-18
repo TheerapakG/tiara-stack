@@ -105,7 +105,9 @@ export const button = buttonInteractionHandlerContextBuilder()
           ),
         ),
         Effect.tap(({ messageCheckinData }) =>
-          PermissionService.addRole(messageCheckinData.roleId),
+          messageCheckinData.roleId
+            ? PermissionService.addRole(messageCheckinData.roleId)
+            : Effect.void,
         ),
         Effect.tap(({ message, user, messageCheckinData, checkedInMentions }) =>
           Effect.all([
