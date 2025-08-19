@@ -133,7 +133,7 @@ const teamParser = (
         ),
         Effect.map((teams) =>
           pipe(
-            teams,
+            teams[0].map((_, i) => teams.map((row) => row[i])),
             Array.map((teams) => ({ teams })),
           ),
         ),
