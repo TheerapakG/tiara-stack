@@ -149,3 +149,23 @@ export const messageCheckinMember = pgTable(
     ),
   ],
 );
+
+export const messageRoomOrder = pgTable(
+  "message_room_order",
+  {
+    id: serial("id").primaryKey(),
+    messageId: varchar("message_id").notNull(),
+    rank: integer("rank").notNull(),
+    position: integer("position").notNull(),
+    team: varchar("team").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+    deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
+  },
+  (table) => [index("message_room_order_message_id_idx").on(table.messageId)],
+);
