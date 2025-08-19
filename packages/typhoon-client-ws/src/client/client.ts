@@ -1,5 +1,6 @@
 import { StandardSchemaV1 } from "@standard-schema/spec";
 import {
+  Data,
   Deferred,
   Effect,
   HashMap,
@@ -23,27 +24,29 @@ import {
 } from "typhoon-core/server";
 import { signal, SignalContext } from "typhoon-core/signal";
 import * as v from "valibot";
+import { RequestParamsConfig } from "../../../typhoon-core/dist/index-DA1YRHxN";
 
 const WebSocketCtor = globalThis.WebSocket;
+
+export class HandlerError extends Data.TaggedError("HandlerError") {}
 
 type LoadingState = {
   isLoading: true;
 };
 
-type SuccessData<T = unknown> = {
-  nonce: number;
-  value: T;
-};
-
-type SuccessState<T = unknown> = {
+type ResolvedState<T = unknown> = {
   isLoading: false;
-  data: SuccessData<T>;
+  nonce: number;
+  value: Effect.Effect<T, HandlerError, never>;
 };
 
-type SignalState<T = unknown> = LoadingState | SuccessState<T>;
+type SignalState<T = unknown> = LoadingState | ResolvedState<T>;
 
 type UpdaterState<T = unknown> = {
-  updater: (data: SuccessData<T>) => Effect.Effect<void, never, never>;
+  updater: (
+    value: Effect.Effect<T, HandlerError, never>,
+    nonce: number,
+  ) => Effect.Effect<void, never, never>;
 };
 type UpdaterStateMap = HashMap.HashMap<string, UpdaterState>;
 
@@ -96,7 +99,7 @@ export class WebSocketClient<
     );
   }
 
-  static handleUpdate(header: Header<"server:update">, message: unknown) {
+  static handleUpdate(header: Header, decodedResponse: unknown) {
     return (
       client: WebSocketClient<
         Record<string, SubscriptionHandlerContext>,
@@ -113,10 +116,23 @@ export class WebSocketClient<
             updaterState,
             Option.match({
               onSome: ({ updater }) =>
-                updater({
-                  nonce: header.payload.nonce,
-                  value: message,
-                }),
+                pipe(
+                  Match.value(header),
+                  Match.when({ action: "server:update" }, (header) =>
+                    updater(
+                      header.payload.success
+                        ? Effect.succeed({
+                            nonce: header.payload.nonce,
+                            data: decodedResponse,
+                          })
+                        : Effect.fail(
+                            new HandlerError(decodedResponse as void),
+                          ),
+                      header.payload.nonce,
+                    ),
+                  ),
+                  Match.orElse(() => Effect.void),
+                ),
               onNone: () => Effect.void,
             }),
           ),
@@ -157,14 +173,17 @@ export class WebSocketClient<
                     ),
                   ),
                   Effect.bind(
-                    "message",
+                    "decodedResponse",
                     ({ pullDecodedStream }) => pullDecodedStream,
                   ),
-                  Effect.tap(({ header, message }) =>
+                  Effect.tap(({ header, decodedResponse }) =>
                     pipe(
                       Match.value(header),
                       Match.when({ action: "server:update" }, (header) =>
-                        WebSocketClient.handleUpdate(header, message)(client),
+                        WebSocketClient.handleUpdate(
+                          header,
+                          decodedResponse,
+                        )(client),
                       ),
                       Match.orElse(() => Effect.void),
                     ),
@@ -220,13 +239,14 @@ export class WebSocketClient<
       Effect.let(
         "updater",
         ({ signal }) =>
-          (data: SuccessData) =>
+          (value: Effect.Effect<unknown, HandlerError, never>, nonce: number) =>
             signal.updateValue((prev) =>
               Effect.succeed(
-                prev.isLoading || prev.data.nonce < data.nonce
+                prev.isLoading || prev.nonce < nonce
                   ? {
                       isLoading: false,
-                      data: data,
+                      nonce: nonce,
+                      value: value,
                     }
                   : prev,
               ),
@@ -331,17 +351,23 @@ export class WebSocketClient<
       Record<string, MutationHandlerContext>
     >,
     handler: Handler,
+    // TODO: make this conditionally optional
+    data?: ServerSubscriptionHandlers[Handler]["config"]["requestParams"] extends RequestParamsConfig
+      ? StandardSchemaV1.InferInput<
+          ServerSubscriptionHandlers[Handler]["config"]["requestParams"]["validator"]
+        >
+      : never,
   ) {
     return pipe(
       Effect.Do,
       Effect.let("id", () => crypto.randomUUID() as string),
-      Effect.bind("deferred", () => Deferred.make<unknown>()),
+      Effect.bind("deferred", () => Deferred.make<unknown, HandlerError>()),
       Effect.let(
         "updater",
         ({ id, deferred }) =>
-          (data: SuccessData) =>
+          (value: Effect.Effect<unknown, HandlerError, never>) =>
             pipe(
-              Deferred.succeed(deferred, data),
+              Deferred.succeed(deferred, value),
               Effect.andThen(() =>
                 pipe(
                   client.updaterStateMapRef,
@@ -367,9 +393,18 @@ export class WebSocketClient<
       Effect.bind("requestHeaderEncoded", ({ requestHeader }) =>
         MsgpackEncoderDecoder.encode(requestHeader),
       ),
+      Effect.bind("dataEncoded", () => MsgpackEncoderDecoder.encode(data)),
+      Effect.let("requestBuffer", ({ requestHeaderEncoded, dataEncoded }) => {
+        const requestBuffer = new Uint8Array(
+          requestHeaderEncoded.length + dataEncoded.length,
+        );
+        requestBuffer.set(requestHeaderEncoded, 0);
+        requestBuffer.set(dataEncoded, requestHeaderEncoded.length);
+        return requestBuffer;
+      }),
       Effect.bind("ws", () => client.ws),
-      Effect.tap(({ ws, requestHeaderEncoded }) =>
-        Option.map(ws, (ws) => ws.send(requestHeaderEncoded)),
+      Effect.tap(({ ws, requestBuffer }) =>
+        Option.map(ws, (ws) => ws.send(requestBuffer)),
       ),
       Effect.flatMap(
         ({ deferred }) =>
@@ -377,7 +412,7 @@ export class WebSocketClient<
             StandardSchemaV1.InferOutput<
               ServerSubscriptionHandlers[Handler]["config"]["response"]["validator"]
             >,
-            never,
+            HandlerError,
             never
           >,
       ),
