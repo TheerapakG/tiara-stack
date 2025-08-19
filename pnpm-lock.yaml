@@ -163,9 +163,15 @@ importers:
       postgres:
         specifier: ^3.4.7
         version: 3.4.7
+      sheet-apis:
+        specifier: workspace:*
+        version: link:../sheet-apis
       sheet-db-schema:
         specifier: workspace:*
         version: link:../sheet-db-schema
+      typhoon-client-ws:
+        specifier: workspace:*
+        version: link:../typhoon-client-ws
       typhoon-core:
         specifier: workspace:*
         version: link:../typhoon-core

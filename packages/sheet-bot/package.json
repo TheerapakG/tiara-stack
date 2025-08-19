@@ -36,7 +36,9 @@
     "postgres": "^3.4.7",
     "sheet-db-schema": "workspace:*",
     "typhoon-core": "workspace:*",
-    "typhoon-server": "workspace:*"
+    "typhoon-server": "workspace:*",
+    "typhoon-client-ws": "workspace:*",
+    "sheet-apis": "workspace:*"
   },
   "devDependencies": {
     "@eslint/compat": "^1.3.0",
