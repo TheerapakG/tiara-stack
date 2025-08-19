@@ -202,7 +202,11 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!E8:G"],
+              ranges: [
+                "'Thee's Sheet Settings'!E8:E",
+                "'Thee's Sheet Settings'!F8:F",
+                "'Thee's Sheet Settings'!G8:G",
+              ],
             }),
             Effect.flatMap((response) =>
               teamConfigParser(response.data.valueRanges ?? []),
