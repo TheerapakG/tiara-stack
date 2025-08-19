@@ -49,22 +49,39 @@ const handleListConfig = chatInputSubcommandHandlerContextBuilder()
           guildConfig: pipe(
             GuildConfigService.getConfig(),
             Effect.flatMap(observeOnce),
-            Effect.map(Option.getOrUndefined),
           ),
           managerRoles: pipe(
             GuildConfigService.getManagerRoles(),
             Effect.flatMap(observeOnce),
           ),
         }),
+        Effect.bindAll(({ guildConfig }) => ({
+          sheetId: pipe(
+            guildConfig,
+            Option.flatMap((guildConfig) => guildConfig.sheetId),
+            Option.match({
+              onSome: (sheetId) => Effect.succeed(escapeMarkdown(sheetId)),
+              onNone: () => Effect.succeed("None"),
+            }),
+          ),
+          scriptId: pipe(
+            guildConfig,
+            Option.flatMap((guildConfig) => guildConfig.scriptId),
+            Option.match({
+              onSome: (scriptId) => Effect.succeed(escapeMarkdown(scriptId)),
+              onNone: () => Effect.succeed("None"),
+            }),
+          ),
+        })),
         InteractionContext.tapReply(
-          ({ guildName, guildConfig, managerRoles }) => ({
+          ({ guildName, sheetId, scriptId, managerRoles }) => ({
             embeds: [
               new EmbedBuilder()
                 .setTitle(`Config for ${escapeMarkdown(guildName)}`)
                 .setDescription(
                   [
-                    `Sheet id: ${escapeMarkdown(guildConfig?.sheetId ?? "None")}`,
-                    `Script id: ${escapeMarkdown(guildConfig?.scriptId ?? "None")}`,
+                    `Sheet id: ${sheetId}`,
+                    `Script id: ${scriptId}`,
                     `Manager roles: ${managerRoles.length > 0 ? managerRoles.map((role) => roleMention(role.roleId)).join(", ") : "None"}`,
                   ].join("\n"),
                 ),
@@ -230,7 +247,7 @@ const handleSetSheet = chatInputSubcommandHandlerContextBuilder()
           guildName: GuildService.getName(),
         }),
         Effect.tap(({ sheetId }) =>
-          GuildConfigService.updateConfig({
+          GuildConfigService.upsertConfig({
             sheetId,
           }),
         ),
@@ -281,7 +298,7 @@ const handleSetScript = chatInputSubcommandHandlerContextBuilder()
           guildName: GuildService.getName(),
         }),
         Effect.tap(({ scriptId }) =>
-          GuildConfigService.updateConfig({
+          GuildConfigService.upsertConfig({
             scriptId,
           }),
         ),

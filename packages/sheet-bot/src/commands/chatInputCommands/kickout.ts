@@ -147,7 +147,6 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         Effect.bind("role", ({ kickoutData }) =>
           pipe(
             kickoutData.runningChannel.roleId,
-            Option.fromNullable,
             Effect.tap(() => GuildService.fetchMembers()),
             Effect.flatMap((roleId) => GuildService.fetchRole(roleId)),
             Effect.flatMap(Function.identity),

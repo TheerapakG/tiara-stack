@@ -8,10 +8,10 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Effect, Option, pipe } from "effect";
+import { Effect, Function, Option, pipe } from "effect";
 import {
-  ChannelConfig,
   ClientService,
+  GuildChannelConfig,
   GuildConfigService,
   guildServicesFromInteractionOption,
   InteractionContext,
@@ -23,10 +23,16 @@ import {
 } from "../../types";
 import { bindObject } from "../../utils";
 
-const configFields = (config: ChannelConfig) => [
+const configFields = (config: GuildChannelConfig) => [
   {
     name: "Name",
-    value: escapeMarkdown(config.name ?? "None!"),
+    value: pipe(
+      config.name,
+      Option.match({
+        onSome: (name) => escapeMarkdown(name),
+        onNone: () => "None!",
+      }),
+    ),
   },
   {
     name: "Running channel",
@@ -34,7 +40,13 @@ const configFields = (config: ChannelConfig) => [
   },
   {
     name: "Role",
-    value: config.roleId ? roleMention(config.roleId) : "None!",
+    value: pipe(
+      config.roleId,
+      Option.match({
+        onSome: (roleId) => roleMention(roleId),
+        onNone: () => "None!",
+      }),
+    ),
   },
 ];
 
@@ -71,15 +83,18 @@ const handleSet = chatInputSubcommandHandlerContextBuilder()
           role: InteractionContext.getRole("role"),
         }),
         Effect.bind("config", ({ channel, running, name, role }) =>
-          GuildConfigService.setChannelConfig(channel.id, {
-            running: Option.getOrUndefined(running),
-            name: Option.getOrUndefined(name),
-            roleId: pipe(
-              role,
-              Option.map((r) => r.id),
-              Option.getOrUndefined,
-            ),
-          }),
+          pipe(
+            GuildConfigService.setChannelConfig(channel.id, {
+              running: Option.getOrUndefined(running),
+              name: Option.getOrUndefined(name),
+              roleId: pipe(
+                role,
+                Option.map((r) => r.id),
+                Option.getOrUndefined,
+              ),
+            }),
+            Effect.flatMap(Function.identity),
+          ),
         ),
         Effect.tap(({ channel, config }) =>
           pipe(
@@ -129,10 +144,13 @@ const handleUnset = chatInputSubcommandHandlerContextBuilder()
           role: InteractionContext.getBoolean("role"),
         }),
         Effect.bind("config", ({ channel, name, role }) =>
-          GuildConfigService.setChannelConfig(channel.id, {
-            name: Option.getOrUndefined(name) ? null : undefined,
-            roleId: Option.getOrUndefined(role) ? null : undefined,
-          }),
+          pipe(
+            GuildConfigService.setChannelConfig(channel.id, {
+              name: Option.getOrUndefined(name) ? null : undefined,
+              roleId: Option.getOrUndefined(role) ? null : undefined,
+            }),
+            Effect.flatMap(Function.identity),
+          ),
         ),
         Effect.tap(({ channel, config }) =>
           pipe(
