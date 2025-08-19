@@ -11,9 +11,11 @@ export class Config extends Effect.Service<Config>()("Config", {
         type({
           POSTGRES_URL: "string",
           DISCORD_TOKEN: "string",
-        }).pipe(({ POSTGRES_URL, DISCORD_TOKEN }) => ({
+          SHEET_APIS_BASE_URL: "string",
+        }).pipe(({ POSTGRES_URL, DISCORD_TOKEN, SHEET_APIS_BASE_URL }) => ({
           postgresUrl: POSTGRES_URL,
           discordToken: DISCORD_TOKEN,
+          sheetApisBaseUrl: SHEET_APIS_BASE_URL,
         })),
       )(process.env),
     ),
