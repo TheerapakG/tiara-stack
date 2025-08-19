@@ -65,8 +65,7 @@ export const button = buttonInteractionHandlerContextBuilder()
         Effect.bind("day", ({ channelConfig }) =>
           pipe(
             channelConfig,
-            Option.map(({ day }) => day),
-            Option.flatMap(Option.fromNullable),
+            Option.flatMap(({ day }) => day),
           ),
         ),
         Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),

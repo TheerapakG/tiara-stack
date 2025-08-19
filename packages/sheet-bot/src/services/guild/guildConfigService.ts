@@ -1,5 +1,5 @@
 import { and, eq, isNull } from "drizzle-orm";
-import { Array, Effect, pipe } from "effect";
+import { Array, Data, Effect, Option, pipe } from "effect";
 import {
   configGuild,
   configGuildChannel,
@@ -11,7 +11,81 @@ import { DB } from "../../db";
 import { bindObject } from "../../utils";
 import { GuildService } from "./guildService";
 
-export type ChannelConfig = typeof configGuildChannel.$inferSelect;
+type GuildConfigInsert = typeof configGuild.$inferInsert;
+type GuildConfigSelect = typeof configGuild.$inferSelect;
+type GuildConfigManagerRoleSelect = typeof configGuildManagerRole.$inferSelect;
+type GuildChannelConfigInsert = typeof configGuildChannel.$inferInsert;
+type GuildChannelConfigSelect = typeof configGuildChannel.$inferSelect;
+
+export class GuildConfig extends Data.TaggedClass("GuildConfig")<{
+  id: number;
+  guildId: string;
+  scriptId: Option.Option<string>;
+  sheetId: Option.Option<string>;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Option.Option<Date>;
+}> {
+  static fromDbSelect(select: GuildConfigSelect) {
+    return new GuildConfig({
+      id: select.id,
+      guildId: select.guildId,
+      scriptId: Option.fromNullable(select.scriptId),
+      sheetId: Option.fromNullable(select.sheetId),
+      createdAt: select.createdAt,
+      updatedAt: select.updatedAt,
+      deletedAt: Option.fromNullable(select.deletedAt),
+    });
+  }
+}
+
+export class GuildConfigManagerRole extends Data.TaggedClass(
+  "GuildConfigManagerRole",
+)<{
+  id: number;
+  guildId: string;
+  roleId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Option.Option<Date>;
+}> {
+  static fromDbSelect(select: GuildConfigManagerRoleSelect) {
+    return new GuildConfigManagerRole({
+      id: select.id,
+      guildId: select.guildId,
+      roleId: select.roleId,
+      createdAt: select.createdAt,
+      updatedAt: select.updatedAt,
+      deletedAt: Option.fromNullable(select.deletedAt),
+    });
+  }
+}
+
+export class GuildChannelConfig extends Data.TaggedClass("GuildChannelConfig")<{
+  id: number;
+  guildId: string;
+  channelId: string;
+  name: Option.Option<string>;
+  running: boolean;
+  roleId: Option.Option<string>;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Option.Option<Date>;
+}> {
+  static fromDbSelect(select: GuildChannelConfigSelect) {
+    return new GuildChannelConfig({
+      id: select.id,
+      guildId: select.guildId,
+      channelId: select.channelId,
+      name: Option.fromNullable(select.name),
+      running: select.running,
+      roleId: Option.fromNullable(select.roleId),
+      createdAt: select.createdAt,
+      updatedAt: select.updatedAt,
+      deletedAt: Option.fromNullable(select.deletedAt),
+    });
+  }
+}
 
 export class GuildConfigService extends Effect.Service<GuildConfigService>()(
   "GuildConfigService",
@@ -41,12 +115,16 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
             ),
             Computed.map(Array.head),
+            Computed.map(Option.map(GuildConfig.fromDbSelect)),
             Effect.withSpan("GuildConfigService.getConfig", {
               captureStackTrace: true,
             }),
           ),
-        updateConfig: (
-          config: Omit<Partial<typeof configGuild.$inferInsert>, "guildId">,
+        upsertConfig: (
+          config: Omit<
+            Partial<GuildConfigInsert>,
+            "id" | "createdAt" | "updatedAt" | "deletedAt" | "guildId"
+          >,
         ) =>
           pipe(
             guildService.getId(),
@@ -66,7 +144,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                   }),
               ),
             ),
-            Effect.withSpan("GuildConfigService.updateConfig", {
+            Effect.withSpan("GuildConfigService.upsertConfig", {
               captureStackTrace: true,
             }),
           ),
@@ -86,6 +164,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                   ),
               ),
             ),
+            Computed.map(Array.map(GuildConfigManagerRole.fromDbSelect)),
             Effect.withSpan("GuildConfigService.getManagerRoles", {
               captureStackTrace: true,
             }),
@@ -134,9 +213,14 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           ),
         setChannelConfig: (
           channelId: string,
-          config: Pick<
-            typeof configGuildChannel.$inferInsert,
-            "running" | "name" | "roleId"
+          config: Omit<
+            Partial<GuildChannelConfigInsert>,
+            | "id"
+            | "createdAt"
+            | "updatedAt"
+            | "deletedAt"
+            | "guildId"
+            | "channelId"
           >,
         ) =>
           pipe(
@@ -157,7 +241,8 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 // TODO: handle channel conflict
               ),
             ),
-            Effect.flatMap(Array.head),
+            Effect.map(Array.head),
+            Effect.map(Option.map(GuildChannelConfig.fromDbSelect)),
             Effect.withSpan("GuildConfigService.setChannelConfig", {
               captureStackTrace: true,
             }),
@@ -180,6 +265,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
             ),
             Computed.map(Array.head),
+            Computed.map(Option.map(GuildChannelConfig.fromDbSelect)),
             Effect.withSpan("GuildConfigService.getRunningChannelById", {
               captureStackTrace: true,
             }),
@@ -202,6 +288,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
             ),
             Computed.map(Array.head),
+            Computed.map(Option.map(GuildChannelConfig.fromDbSelect)),
             Effect.withSpan("GuildConfigService.getRunningChannelByName", {
               captureStackTrace: true,
             }),

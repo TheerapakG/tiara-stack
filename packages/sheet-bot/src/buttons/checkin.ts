@@ -9,7 +9,7 @@ import {
   MessageFlags,
   userMention,
 } from "discord.js";
-import { Cause, Data, Effect, Function, Option, pipe } from "effect";
+import { Array, Cause, Data, Effect, Function, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import {
   ButtonInteractionT,
@@ -96,18 +96,19 @@ export const button = buttonInteractionHandlerContextBuilder()
           pipe(
             MessageCheckinService.getMessageCheckinMembers(message.id),
             Effect.flatMap(observeOnce),
-            Effect.map((members) =>
-              members
-                .filter((m) => m.checkinAt !== null)
-                .map((m) => userMention(m.memberId))
-                .join(" "),
-            ),
+            Effect.map(Array.filter((m) => Option.isSome(m.checkinAt))),
+            Effect.map(Array.map((m) => userMention(m.memberId))),
+            Effect.map(Array.join(" ")),
           ),
         ),
         Effect.tap(({ messageCheckinData }) =>
-          messageCheckinData.roleId
-            ? PermissionService.addRole(messageCheckinData.roleId)
-            : Effect.void,
+          pipe(
+            messageCheckinData.roleId,
+            Option.match({
+              onSome: (roleId) => PermissionService.addRole(roleId),
+              onNone: () => Effect.void,
+            }),
+          ),
         ),
         Effect.tap(({ message, user, messageCheckinData, checkedInMentions }) =>
           Effect.all([

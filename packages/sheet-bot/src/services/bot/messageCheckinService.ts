@@ -1,10 +1,64 @@
 import { subHours } from "date-fns/fp";
 import { and, eq, gte, isNull } from "drizzle-orm";
-import { Array, Effect, pipe } from "effect";
+import { Array, Data, Effect, Option, pipe } from "effect";
 import { messageCheckin, messageCheckinMember } from "sheet-db-schema";
 import { DBSubscriptionContext } from "typhoon-server/db";
 import { Computed } from "typhoon-server/signal";
 import { DB } from "../../db";
+
+type MessageCheckinInsert = typeof messageCheckin.$inferInsert;
+type MessageCheckinSelect = typeof messageCheckin.$inferSelect;
+type MessageCheckinMemberSelect = typeof messageCheckinMember.$inferSelect;
+
+export class MessageCheckin extends Data.TaggedClass("MessageCheckin")<{
+  id: number;
+  messageId: string;
+  initialMessage: string;
+  hour: number;
+  channelId: string;
+  roleId: Option.Option<string>;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Option.Option<Date>;
+}> {
+  static fromDbSelect(select: MessageCheckinSelect) {
+    return new MessageCheckin({
+      id: select.id,
+      messageId: select.messageId,
+      initialMessage: select.initialMessage,
+      hour: select.hour,
+      channelId: select.channelId,
+      roleId: Option.fromNullable(select.roleId),
+      createdAt: select.createdAt,
+      updatedAt: select.updatedAt,
+      deletedAt: Option.fromNullable(select.deletedAt),
+    });
+  }
+}
+
+export class MessageCheckinMember extends Data.TaggedClass(
+  "MessageCheckinMember",
+)<{
+  id: number;
+  messageId: string;
+  memberId: string;
+  checkinAt: Option.Option<Date>;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Option.Option<Date>;
+}> {
+  static fromDbSelect(select: MessageCheckinMemberSelect) {
+    return new MessageCheckinMember({
+      id: select.id,
+      messageId: select.messageId,
+      memberId: select.memberId,
+      checkinAt: Option.fromNullable(select.checkinAt),
+      createdAt: select.createdAt,
+      updatedAt: select.updatedAt,
+      deletedAt: Option.fromNullable(select.deletedAt),
+    });
+  }
+}
 
 export class MessageCheckinService extends Effect.Service<MessageCheckinService>()(
   "MessageCheckinService",
@@ -28,15 +82,16 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
                 ),
             ),
             Computed.map(Array.head),
+            Computed.map(Option.map(MessageCheckin.fromDbSelect)),
             Effect.withSpan("MessageCheckinService.getMessageCheckinData", {
               captureStackTrace: true,
             }),
           ),
         upsertMessageCheckinData: (
           messageId: string,
-          data: Pick<
-            typeof messageCheckin.$inferInsert,
-            "initialMessage" | "hour" | "channelId" | "roleId"
+          data: Omit<
+            MessageCheckinInsert,
+            "id" | "createdAt" | "updatedAt" | "deletedAt" | "messageId"
           >,
         ) =>
           pipe(
@@ -71,6 +126,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
                   ),
                 ),
             ),
+            Computed.map(Array.map(MessageCheckinMember.fromDbSelect)),
             Effect.withSpan("MessageCheckinService.getMessageCheckinMembers", {
               captureStackTrace: true,
             }),

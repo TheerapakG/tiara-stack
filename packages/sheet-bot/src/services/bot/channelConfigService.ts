@@ -1,9 +1,32 @@
 import { eq } from "drizzle-orm";
-import { Array, Effect, pipe } from "effect";
+import { Array, Data, Effect, Option, pipe } from "effect";
 import { configChannel } from "sheet-db-schema";
 import { DBSubscriptionContext } from "typhoon-server/db";
 import { Computed } from "typhoon-server/signal";
 import { DB } from "../../db";
+
+type ConfigInsert = typeof configChannel.$inferInsert;
+type ConfigSelect = typeof configChannel.$inferSelect;
+
+export class Config extends Data.TaggedClass("Config")<{
+  id: number;
+  channelId: string;
+  day: Option.Option<number>;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Option.Option<Date>;
+}> {
+  static fromDbSelect(select: ConfigSelect) {
+    return new Config({
+      id: select.id,
+      channelId: select.channelId,
+      day: Option.fromNullable(select.day),
+      createdAt: select.createdAt,
+      updatedAt: select.updatedAt,
+      deletedAt: Option.fromNullable(select.deletedAt),
+    });
+  }
+}
 
 export class ChannelConfigService extends Effect.Service<ChannelConfigService>()(
   "ChannelConfigService",
@@ -22,13 +45,17 @@ export class ChannelConfigService extends Effect.Service<ChannelConfigService>()
                 .where(eq(configChannel.channelId, channelId)),
             ),
             Computed.map(Array.head),
+            Computed.map(Option.map(Config.fromDbSelect)),
             Effect.withSpan("ChannelConfigService.getConfig", {
               captureStackTrace: true,
             }),
           ),
-        updateConfig: (
+        upsertConfig: (
           channelId: string,
-          config: Partial<typeof configChannel.$inferInsert>,
+          config: Omit<
+            ConfigInsert,
+            "id" | "createdAt" | "updatedAt" | "deletedAt" | "channelId"
+          >,
         ) =>
           pipe(
             dbSubscriptionContext.mutateQuery(
@@ -45,7 +72,7 @@ export class ChannelConfigService extends Effect.Service<ChannelConfigService>()
                   },
                 }),
             ),
-            Effect.withSpan("ChannelConfigService.updateConfig", {
+            Effect.withSpan("ChannelConfigService.upsertConfig", {
               captureStackTrace: true,
             }),
           ),
