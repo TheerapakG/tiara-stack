@@ -9,6 +9,7 @@ import {
   pipe,
   SynchronizedRef,
 } from "effect";
+import { RequestParamsConfig } from "typhoon-core/config";
 import {
   Header,
   HeaderEncoderDecoder,
@@ -24,7 +25,6 @@ import {
 } from "typhoon-core/server";
 import { signal, SignalContext } from "typhoon-core/signal";
 import * as v from "valibot";
-import { RequestParamsConfig } from "../../../typhoon-core/dist/index-DA1YRHxN";
 
 const WebSocketCtor = globalThis.WebSocket;
 
@@ -231,6 +231,11 @@ export class WebSocketClient<
       Record<string, MutationHandlerContext>
     >,
     handler: Handler,
+    // TODO: make this conditionally optional
+    data?: ServerSubscriptionHandlers[Handler]["config"]["requestParams"] extends infer HandlerRequestParamsConfig extends
+      RequestParamsConfig
+      ? StandardSchemaV1.InferInput<HandlerRequestParamsConfig["validator"]>
+      : never,
   ) {
     return pipe(
       Effect.Do,
@@ -258,7 +263,8 @@ export class WebSocketClient<
           SynchronizedRef.update(HashMap.set(id, { updater })),
         ),
       ),
-      Effect.bind("header", ({ id }) =>
+
+      Effect.bind("requestHeader", ({ id }) =>
         HeaderEncoderDecoder.encode({
           protocol: "typh",
           version: 1,
@@ -269,12 +275,21 @@ export class WebSocketClient<
           },
         }),
       ),
-      Effect.bind("headerEncoded", ({ header }) =>
-        MsgpackEncoderDecoder.encode(header),
+      Effect.bind("requestHeaderEncoded", ({ requestHeader }) =>
+        MsgpackEncoderDecoder.encode(requestHeader),
       ),
+      Effect.bind("dataEncoded", () => MsgpackEncoderDecoder.encode(data)),
+      Effect.let("requestBuffer", ({ requestHeaderEncoded, dataEncoded }) => {
+        const requestBuffer = new Uint8Array(
+          requestHeaderEncoded.length + dataEncoded.length,
+        );
+        requestBuffer.set(requestHeaderEncoded, 0);
+        requestBuffer.set(dataEncoded, requestHeaderEncoded.length);
+        return requestBuffer;
+      }),
       Effect.bind("ws", () => client.ws),
-      Effect.tap(({ ws, headerEncoded }) =>
-        Option.map(ws, (ws) => ws.send(headerEncoded)),
+      Effect.tap(({ ws, requestBuffer }) =>
+        Option.map(ws, (ws) => ws.send(requestBuffer)),
       ),
       Effect.map(
         ({ id, signal }) =>
@@ -352,10 +367,9 @@ export class WebSocketClient<
     >,
     handler: Handler,
     // TODO: make this conditionally optional
-    data?: ServerSubscriptionHandlers[Handler]["config"]["requestParams"] extends RequestParamsConfig
-      ? StandardSchemaV1.InferInput<
-          ServerSubscriptionHandlers[Handler]["config"]["requestParams"]["validator"]
-        >
+    data?: ServerSubscriptionHandlers[Handler]["config"]["requestParams"] extends infer HandlerRequestParamsConfig extends
+      RequestParamsConfig
+      ? StandardSchemaV1.InferInput<HandlerRequestParamsConfig["validator"]>
       : never,
   ) {
     return pipe(
