@@ -216,7 +216,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
                 initialMessage: checkinMessages.checkinMessage,
                 hour,
                 channelId: checkinData.runningChannel.channelId,
-                roleId: checkinData.runningChannel.roleId,
+                roleId: Option.getOrNull(checkinData.runningChannel.roleId),
               }),
               Array.isEmptyArray(fillIds)
                 ? Effect.void

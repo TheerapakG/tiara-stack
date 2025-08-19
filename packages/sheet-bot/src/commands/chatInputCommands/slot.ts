@@ -180,7 +180,7 @@ const handleButton = chatInputSubcommandHandlerContextBuilder()
           user: InteractionContext.user(),
         }),
         Effect.tap(({ channel, day }) =>
-          ChannelConfigService.updateConfig(channel.id, {
+          ChannelConfigService.upsertConfig(channel.id, {
             day,
           }),
         ),

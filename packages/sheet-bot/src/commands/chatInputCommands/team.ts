@@ -71,8 +71,10 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
             HashMap.get(teams, user.id),
             Option.map(({ teams }) => teams),
             Option.getOrElse(() => [] as RawTeam[]),
+            Array.filter((team) => !team.tags.includes("tierer_hint")),
             Array.map((team) => ({
-              teamName: team.teamName,
+              name: team.name,
+              tags: team.tags,
               lead: Option.getOrUndefined(team.lead),
               backline: Option.getOrUndefined(team.backline),
               talent: Option.getOrUndefined(team.talent),
@@ -101,8 +103,15 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
                   )
                   .addFields(
                     userTeams.map((team) => ({
-                      name: escapeMarkdown(team.teamName),
-                      value: `ISV: ${team.leadFormatted}/${team.backlineFormatted}${team.talentFormatted}${team.effectValueFormatted}`,
+                      name: escapeMarkdown(team.name),
+                      value: [
+                        `Tags: ${
+                          team.tags.length === 0
+                            ? "None"
+                            : escapeMarkdown(team.tags.join(", "))
+                        }`,
+                        `ISV: ${team.leadFormatted}/${team.backlineFormatted}${team.talentFormatted}${team.effectValueFormatted}`,
+                      ].join("\n"),
                     })),
                   ),
               ],
