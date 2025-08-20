@@ -404,19 +404,14 @@ export const botCalcHandler = defineHandlerBuilder()
   .handler(
     pipe(
       Effect.Do,
-      Effect.bind("raw", () =>
-        Event.withConfig(calcHandlerConfig).request.raw(),
-      ),
       Effect.bind("parsed", () =>
         Event.withConfig(calcHandlerConfig).request.parsed(),
       ),
-      Effect.flatMap(({ raw, parsed }) =>
+      Effect.flatMap(({ parsed }) =>
         pipe(
           computed(
             pipe(
               Effect.Do,
-              Effect.bind("raw", () => raw),
-              Effect.tap(({ raw }) => pipe(raw, Effect.tap(Effect.log))),
               Effect.bind("parsed", () => parsed),
               Effect.flatMap(({ parsed: { config, players } }) =>
                 calc(config, players),
