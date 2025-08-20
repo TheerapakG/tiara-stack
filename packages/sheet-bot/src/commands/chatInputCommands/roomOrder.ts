@@ -116,44 +116,6 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             ),
           ),
         ),
-        Effect.tap(({ scheduleTeams }) =>
-          Effect.log(
-            scheduleTeams,
-            pipe(
-              scheduleTeams,
-              Array.map(({ player, teams }) =>
-                pipe(
-                  teams,
-                  Array.map((team) => {
-                    const lead = pipe(
-                      team.lead,
-                      Option.getOrElse(() => 0),
-                    );
-                    const backline = pipe(
-                      team.backline,
-                      Option.getOrElse(() => 0),
-                    );
-                    const bp = pipe(
-                      team.talent,
-                      Option.getOrElse(() => 0),
-                    );
-                    const percent = lead + (backline - lead) / 5;
-                    return {
-                      type: team.type,
-                      tagStr: team.tags.join(", "),
-                      player: player.name,
-                      team: team.name,
-                      lead,
-                      backline,
-                      bp,
-                      percent,
-                    };
-                  }),
-                ),
-              ),
-            ),
-          ),
-        ),
         Effect.bind("roomOrders", ({ heal, scheduleTeams }) =>
           pipe(
             SheetApisClient.get(),
