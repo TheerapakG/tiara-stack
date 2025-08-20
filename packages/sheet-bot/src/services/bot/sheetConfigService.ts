@@ -127,6 +127,7 @@ const teamConfigParser = ([
 ]: sheets_v4.Schema$ValueRange[]): Effect.Effect<TeamConfigMap, never, never> =>
   pipe(
     Effect.Do,
+    Effect.tap(() => Effect.log(name.values, range.values, tags.values)),
     bindObject({
       name: parseValueRange(name, ([name]) =>
         pipe(
