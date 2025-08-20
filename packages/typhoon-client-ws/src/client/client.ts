@@ -23,7 +23,7 @@ import {
   ServerSubscriptionHandlers,
   SubscriptionHandlerContext,
 } from "typhoon-core/server";
-import { signal, SignalContext } from "typhoon-core/signal";
+import { DependencySignal, signal } from "typhoon-core/signal";
 import * as v from "valibot";
 
 const WebSocketCtor = globalThis.WebSocket;
@@ -293,14 +293,14 @@ export class WebSocketClient<
       Effect.map(
         ({ id, signal }) =>
           [
-            signal as Effect.Effect<
+            signal as DependencySignal<
               SignalState<
                 StandardSchemaV1.InferOutput<
                   ServerSubscriptionHandlers[Handler]["config"]["response"]["validator"]
                 >
               >,
               never,
-              SignalContext
+              never
             >,
             WebSocketClient.unsubscribe(client, id, handler),
           ] as const,
@@ -383,7 +383,8 @@ export class WebSocketClient<
             _nonce: number,
           ) =>
             pipe(
-              Deferred.succeed(deferred, value),
+              deferred,
+              Deferred.complete(value),
               Effect.andThen(() =>
                 pipe(
                   client.updaterStateMapRef,
@@ -428,15 +429,15 @@ export class WebSocketClient<
       Effect.tap(({ ws, requestBuffer }) =>
         Option.map(ws, (ws) => ws.send(requestBuffer)),
       ),
-      Effect.flatMap(
-        ({ deferred }) =>
-          Deferred.await(deferred) as Effect.Effect<
+      Effect.flatMap(({ deferred }) =>
+        Deferred.await(
+          deferred as Deferred.Deferred<
             StandardSchemaV1.InferOutput<
               ServerSubscriptionHandlers[Handler]["config"]["response"]["validator"]
             >,
-            HandlerError,
-            never
+            HandlerError
           >,
+        ),
       ),
       Effect.withSpan("WebSocketClient.once"),
     );

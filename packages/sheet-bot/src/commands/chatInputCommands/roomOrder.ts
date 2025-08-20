@@ -160,7 +160,6 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             ),
           ),
         ),
-        Effect.tap(({ roomOrders }) => Effect.log(roomOrders)),
         Effect.bind("message", ({ roomOrders }) =>
           pipe(
             roomOrders,
