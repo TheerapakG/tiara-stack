@@ -404,6 +404,9 @@ export const botCalcHandler = defineHandlerBuilder()
   .handler(
     pipe(
       Effect.Do,
+      Effect.tap(() =>
+        Effect.log(Event.withConfig(calcHandlerConfig).request.raw()),
+      ),
       Effect.bind("parsed", () =>
         Event.withConfig(calcHandlerConfig).request.parsed(),
       ),
