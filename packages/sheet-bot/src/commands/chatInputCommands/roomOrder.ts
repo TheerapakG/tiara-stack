@@ -161,7 +161,6 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             ),
           ),
         ),
-        Effect.tap(({ roomOrders }) => Effect.log(roomOrders)),
         Effect.bind("message", ({ roomOrders }) =>
           pipe(
             roomOrders,
@@ -188,22 +187,27 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
           ),
         ),
         Effect.tap(({ hour, message, roomOrders }) =>
-          MessageRoomOrderService.upsertMessageRoomOrderData(
-            message.id,
-            pipe(
-              roomOrders,
-              Array.map(({ room }, rank) =>
-                room.map(({ team, tags }, position) => ({
-                  hour,
-                  team,
-                  tags,
-                  rank,
-                  position,
-                })),
+          Effect.all([
+            MessageRoomOrderService.upsertMessageRoomOrder(message.id, {
+              rank: 0,
+            }),
+            MessageRoomOrderService.upsertMessageRoomOrderData(
+              message.id,
+              pipe(
+                roomOrders,
+                Array.map(({ room }, rank) =>
+                  room.map(({ team, tags }, position) => ({
+                    hour,
+                    team,
+                    tags,
+                    rank,
+                    position,
+                  })),
+                ),
+                Array.flatten,
               ),
-              Array.flatten,
             ),
-          ),
+          ]),
         ),
         Effect.asVoid,
         Effect.withSpan("handleRoomOrderManual", { captureStackTrace: true }),
