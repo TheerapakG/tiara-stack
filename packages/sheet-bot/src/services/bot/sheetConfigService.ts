@@ -44,9 +44,10 @@ const dayConfigParser = ([
   pipe(
     Effect.Do,
     bindObject({
-      day: parseValueRange(day, ([day]) =>
+      day: parseValueRange(day, (arr) =>
         pipe(
-          day,
+          Array.get(arr, 0),
+          Option.flatten,
           Option.match({
             onSome: validateWithDefault(
               type("string.integer.parse").pipe((day) => ({
@@ -58,9 +59,10 @@ const dayConfigParser = ([
           }),
         ),
       ),
-      sheet: parseValueRange(sheet, ([sheet]) =>
+      sheet: parseValueRange(sheet, (arr) =>
         pipe(
-          sheet,
+          Array.get(arr, 0),
+          Option.flatten,
           Option.match({
             onSome: validateWithDefault(
               type("string").pipe((sheet) => ({ sheet })),
@@ -70,9 +72,10 @@ const dayConfigParser = ([
           }),
         ),
       ),
-      draft: parseValueRange(draft, ([draft]) =>
+      draft: parseValueRange(draft, (arr) =>
         pipe(
-          draft,
+          Array.get(arr, 0),
+          Option.flatten,
           Option.match({
             onSome: validateWithDefault(
               type("string").pipe((draft) => ({ draft })),
@@ -127,11 +130,11 @@ const teamConfigParser = ([
 ]: sheets_v4.Schema$ValueRange[]): Effect.Effect<TeamConfigMap, never, never> =>
   pipe(
     Effect.Do,
-    Effect.tap(() => Effect.log(name.values, range.values, tags.values)),
     bindObject({
-      name: parseValueRange(name, ([name]) =>
+      name: parseValueRange(name, (arr) =>
         pipe(
-          name,
+          Array.get(arr, 0),
+          Option.flatten,
           Option.match({
             onSome: validateWithDefault(
               type("string").pipe((name) => ({ name })),
@@ -141,9 +144,10 @@ const teamConfigParser = ([
           }),
         ),
       ),
-      range: parseValueRange(range, ([range]) =>
+      range: parseValueRange(range, (arr) =>
         pipe(
-          range,
+          Array.get(arr, 0),
+          Option.flatten,
           Option.match({
             onSome: validateWithDefault(
               type("string").pipe((range) => ({ range })),
@@ -153,9 +157,10 @@ const teamConfigParser = ([
           }),
         ),
       ),
-      tags: parseValueRange(tags, ([tags]) =>
+      tags: parseValueRange(tags, (arr) =>
         pipe(
-          tags,
+          Array.get(arr, 0),
+          Option.flatten,
           Option.match({
             onSome: validateWithDefault(
               type("string").pipe((tags) => ({

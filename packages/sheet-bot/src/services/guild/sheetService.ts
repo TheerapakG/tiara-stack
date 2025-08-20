@@ -55,25 +55,17 @@ const playerParser = ([
   pipe(
     Effect.Do,
     bindObject({
-      userIds: parseValueRange(userIds, ([userId], index) =>
+      userIds: parseValueRange(userIds, (arr, index) =>
         Effect.succeed({
-          id: pipe(
-            Option.fromNullable(userId),
-            Option.map((v) => `'${v}'`),
-          ),
+          id: pipe(Array.get(arr, 0), Option.flatten),
           idIndex: index,
         }),
       ),
-      userSheetNames: parseValueRange(
-        userSheetNames,
-        ([userSheetName], index) =>
-          Effect.succeed({
-            name: pipe(
-              Option.fromNullable(userSheetName),
-              Option.map((v) => `'${v}'`),
-            ),
-            nameIndex: index,
-          }),
+      userSheetNames: parseValueRange(userSheetNames, (arr, index) =>
+        Effect.succeed({
+          name: pipe(Array.get(arr, 0), Option.flatten),
+          nameIndex: index,
+        }),
       ),
     }),
     Effect.map(({ userIds, userSheetNames }) =>
@@ -119,37 +111,36 @@ const teamParser = (
   pipe(
     Effect.Do,
     bindObject({
-      userIds: parseValueRange(userIds, ([userId]) =>
+      userIds: parseValueRange(userIds, (arr) =>
         Effect.succeed({
-          id: userId,
+          id: pipe(Array.get(arr, 0), Option.flatten),
         }),
       ),
       userTeams: pipe(
         Array.zip(teamConfigValues, userTeams),
         Effect.forEach(
           ([teamConfig, userTeams]) =>
-            parseValueRange(
-              userTeams,
-              ([name, _isv, lead, backline, talent, _isvPercent]) =>
-                Effect.succeed({
-                  type: teamConfig.name,
-                  name,
-                  tags: teamConfig.tags,
-                  lead: pipe(
-                    lead,
-                    Option.flatMapNullable((lead) => parseInt(lead, 10)),
-                  ),
-                  backline: pipe(
-                    backline,
-                    Option.flatMapNullable((backline) =>
-                      parseInt(backline, 10),
-                    ),
-                  ),
-                  talent: pipe(
-                    talent,
-                    Option.flatMapNullable((talent) => parseInt(talent, 10)),
-                  ),
-                }),
+            parseValueRange(userTeams, (arr) =>
+              Effect.succeed({
+                type: teamConfig.name,
+                name: pipe(Array.get(arr, 0), Option.flatten),
+                tags: teamConfig.tags,
+                lead: pipe(
+                  Array.get(arr, 2),
+                  Option.flatten,
+                  Option.flatMapNullable((lead) => parseInt(lead, 10)),
+                ),
+                backline: pipe(
+                  Array.get(arr, 3),
+                  Option.flatten,
+                  Option.flatMapNullable((backline) => parseInt(backline, 10)),
+                ),
+                talent: pipe(
+                  Array.get(arr, 4),
+                  Option.flatten,
+                  Option.flatMapNullable((talent) => parseInt(talent, 10)),
+                ),
+              }),
             ),
           { concurrency: "unbounded" },
         ),
@@ -221,11 +212,11 @@ export type Schedule = {
   hour: number;
   breakHour: boolean;
   fills: readonly [
-    string | undefined,
-    string | undefined,
-    string | undefined,
-    string | undefined,
-    string | undefined,
+    Option.Option<string>,
+    Option.Option<string>,
+    Option.Option<string>,
+    Option.Option<string>,
+    Option.Option<string>,
   ];
   overfills: string[];
   standbys: string[];
@@ -243,38 +234,41 @@ const scheduleParser = ([
   pipe(
     Effect.Do,
     bindObject({
-      hours: parseValueRange(hours, ([hour]) =>
+      hours: parseValueRange(hours, (arr) =>
         Effect.succeed({
           hour: pipe(
-            hour,
+            Array.get(arr, 0),
+            Option.flatten,
             Option.flatMapNullable((v) => parseInt(v, 10)),
           ),
         }),
       ),
-      breaks: parseValueRange(breaks, ([breakHour]) =>
+      breaks: parseValueRange(breaks, (arr) =>
         Effect.succeed({
           breakHour: pipe(
-            breakHour,
+            Array.get(arr, 0),
+            Option.flatten,
             Option.map((v) => v === "TRUE"),
             Option.getOrElse(() => false),
           ),
         }),
       ),
-      fills: parseValueRange(fills, ([p1, p2, p3, p4, p5]) =>
+      fills: parseValueRange(fills, (arr) =>
         Effect.succeed({
           fills: [
-            Option.getOrUndefined(p1),
-            Option.getOrUndefined(p2),
-            Option.getOrUndefined(p3),
-            Option.getOrUndefined(p4),
-            Option.getOrUndefined(p5),
+            pipe(Array.get(arr, 0), Option.flatten),
+            pipe(Array.get(arr, 1), Option.flatten),
+            pipe(Array.get(arr, 2), Option.flatten),
+            pipe(Array.get(arr, 3), Option.flatten),
+            pipe(Array.get(arr, 4), Option.flatten),
           ] as const,
         }),
       ),
-      overfills: parseValueRange(overfills, ([overfill]) =>
+      overfills: parseValueRange(overfills, (arr) =>
         Effect.succeed({
           overfills: pipe(
-            overfill,
+            Array.get(arr, 0),
+            Option.flatten,
             Option.map((v) =>
               pipe(v, String.split(","), Array.map(String.trim)),
             ),
@@ -282,10 +276,11 @@ const scheduleParser = ([
           ),
         }),
       ),
-      standbys: parseValueRange(standbys, ([standby]) =>
+      standbys: parseValueRange(standbys, (arr) =>
         Effect.succeed({
           standbys: pipe(
-            standby,
+            Array.get(arr, 0),
+            Option.flatten,
             Option.map((v) =>
               pipe(v, String.split(","), Array.map(String.trim)),
             ),
@@ -310,7 +305,13 @@ const scheduleParser = ([
           new ArrayWithDefault({
             array: fills,
             default: {
-              fills: [undefined, undefined, undefined, undefined, undefined],
+              fills: [
+                Option.none(),
+                Option.none(),
+                Option.none(),
+                Option.none(),
+                Option.none(),
+              ] as const,
             },
           }),
         ),
@@ -337,7 +338,7 @@ const scheduleParser = ([
                 overfills,
                 standbys,
                 empty: Order.max(Order.number)(
-                  5 - fills.filter(Boolean).length - overfills.length,
+                  5 - fills.filter(Option.isSome).length - overfills.length,
                   0,
                 ),
               })),

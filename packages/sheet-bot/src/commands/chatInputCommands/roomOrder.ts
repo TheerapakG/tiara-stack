@@ -95,7 +95,6 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         Effect.bind("schedulePlayers", ({ schedule }) =>
           pipe(
             schedule.fills,
-            Array.map(Option.fromNullable),
             Array.getSomes,
             Effect.forEach(
               (playerName) => PlayerService.getByName(playerName),

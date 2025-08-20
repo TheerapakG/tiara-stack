@@ -155,7 +155,6 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         Effect.bind("fillIds", ({ kickoutData }) =>
           pipe(
             kickoutData.schedule.fills,
-            Array.map(Option.fromNullable),
             Array.getSomes,
             Effect.forEach((playerName) => PlayerService.getByName(playerName)),
             Effect.map(Array.getSomes),
