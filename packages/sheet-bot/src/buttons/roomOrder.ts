@@ -237,7 +237,7 @@ export const roomOrderSendButton = buttonInteractionHandlerContextBuilder()
             Effect.provide(channelServicesFromInteraction()),
           ),
         ),
-        InteractionContext.tapUpdate(() => ({
+        InteractionContext.tapEditReply(() => ({
           content: "sent room order!",
         })),
         Effect.asVoid,
