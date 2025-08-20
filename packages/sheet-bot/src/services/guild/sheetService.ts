@@ -3,11 +3,13 @@ import {
   Array,
   Data,
   Effect,
+  Equal,
   HashMap,
   Layer,
   Option,
   Order,
   pipe,
+  String,
 } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
@@ -18,11 +20,22 @@ import { GuildConfigService } from "./guildConfigService";
 
 const parseValueRange = <A = never, E = never, R = never>(
   valueRange: sheets_v4.Schema$ValueRange,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  rowParser: (row: readonly any[], index: number) => Effect.Effect<A, E, R>,
+  rowParser: (
+    row: readonly Option.Option<string>[],
+    index: number,
+  ) => Effect.Effect<A, E, R>,
 ): Effect.Effect<A[], E, R> =>
   pipe(
     Option.fromNullable(valueRange.values),
+    Option.map(
+      Array.map(
+        Array.map((v) =>
+          Equal.equals(v, "")
+            ? Option.none()
+            : Option.fromNullable(v as string | null | undefined),
+        ),
+      ),
+    ),
     Option.map(Effect.forEach(rowParser)),
     Option.getOrElse(() => Effect.succeed([])),
   );
@@ -43,7 +56,10 @@ const playerParser = ([
     bindObject({
       userIds: parseValueRange(userIds, ([userId], index) =>
         Effect.succeed({
-          id: pipe(Option.fromNullable(userId), Option.map(String)),
+          id: pipe(
+            Option.fromNullable(userId),
+            Option.map((v) => `'${v}'`),
+          ),
           idIndex: index,
         }),
       ),
@@ -51,7 +67,10 @@ const playerParser = ([
         userSheetNames,
         ([userSheetName], index) =>
           Effect.succeed({
-            name: pipe(Option.fromNullable(userSheetName), Option.map(String)),
+            name: pipe(
+              Option.fromNullable(userSheetName),
+              Option.map((v) => `'${v}'`),
+            ),
             nameIndex: index,
           }),
       ),
@@ -101,7 +120,7 @@ const teamParser = (
     bindObject({
       userIds: parseValueRange(userIds, ([userId]) =>
         Effect.succeed({
-          id: pipe(Option.fromNullable(userId), Option.map(String)),
+          id: userId,
         }),
       ),
       userTeams: pipe(
@@ -111,28 +130,25 @@ const teamParser = (
             parseValueRange(
               userTeams,
               ([name, _isv, lead, backline, talent, _isvPercent]) =>
-                pipe(
-                  Effect.log(name, lead, backline, talent),
-                  Effect.as({
-                    type: teamConfig.name,
-                    name: pipe(Option.fromNullable(name), Option.map(String)),
-                    tags: teamConfig.tags,
-                    lead: pipe(
-                      Option.fromNullable(lead),
-                      Option.flatMapNullable((lead) => parseInt(lead, 10)),
+                Effect.succeed({
+                  type: teamConfig.name,
+                  name,
+                  tags: teamConfig.tags,
+                  lead: pipe(
+                    lead,
+                    Option.flatMapNullable((lead) => parseInt(lead, 10)),
+                  ),
+                  backline: pipe(
+                    backline,
+                    Option.flatMapNullable((backline) =>
+                      parseInt(backline, 10),
                     ),
-                    backline: pipe(
-                      Option.fromNullable(backline),
-                      Option.flatMapNullable((backline) =>
-                        parseInt(backline, 10),
-                      ),
-                    ),
-                    talent: pipe(
-                      Option.fromNullable(talent),
-                      Option.flatMapNullable((talent) => parseInt(talent, 10)),
-                    ),
-                  }),
-                ),
+                  ),
+                  talent: pipe(
+                    talent,
+                    Option.flatMapNullable((talent) => parseInt(talent, 10)),
+                  ),
+                }),
             ),
           { concurrency: "unbounded" },
         ),
@@ -228,49 +244,61 @@ const scheduleParser = ([
     bindObject({
       hours: parseValueRange(hours, ([hour]) =>
         Effect.succeed({
-          hour: parseInt(hour, 10),
+          hour: pipe(
+            hour,
+            Option.flatMapNullable((v) => parseInt(v, 10)),
+          ),
         }),
       ),
       breaks: parseValueRange(breaks, ([breakHour]) =>
         Effect.succeed({
-          breakHour: breakHour === "TRUE",
+          breakHour: pipe(
+            breakHour,
+            Option.map((v) => v === "TRUE"),
+            Option.getOrElse(() => false),
+          ),
         }),
       ),
       fills: parseValueRange(fills, ([p1, p2, p3, p4, p5]) =>
         Effect.succeed({
           fills: [
-            p1 ? String(p1) : undefined,
-            p2 ? String(p2) : undefined,
-            p3 ? String(p3) : undefined,
-            p4 ? String(p4) : undefined,
-            p5 ? String(p5) : undefined,
+            Option.getOrUndefined(p1),
+            Option.getOrUndefined(p2),
+            Option.getOrUndefined(p3),
+            Option.getOrUndefined(p4),
+            Option.getOrUndefined(p5),
           ] as const,
         }),
       ),
       overfills: parseValueRange(overfills, ([overfill]) =>
         Effect.succeed({
-          overfills:
-            overfill !== undefined
-              ? String(overfill)
-                  .split(",")
-                  .map((player) => player.trim())
-              : [],
+          overfills: pipe(
+            overfill,
+            Option.map((v) =>
+              pipe(v, String.split(","), Array.map(String.trim)),
+            ),
+            Option.getOrElse(() => []),
+          ),
         }),
       ),
       standbys: parseValueRange(standbys, ([standby]) =>
         Effect.succeed({
-          standbys:
-            standby !== undefined
-              ? String(standby)
-                  .split(",")
-                  .map((player) => player.trim())
-              : [],
+          standbys: pipe(
+            standby,
+            Option.map((v) =>
+              pipe(v, String.split(","), Array.map(String.trim)),
+            ),
+            Option.getOrElse(() => []),
+          ),
         }),
       ),
     }),
     Effect.map(({ hours, breaks, fills, overfills, standbys }) =>
       pipe(
-        new ArrayWithDefault({ array: hours, default: { hour: Number.NaN } }),
+        new ArrayWithDefault({
+          array: hours,
+          default: { hour: Option.none() },
+        }),
         ArrayWithDefault.zip(
           new ArrayWithDefault({
             array: breaks,
@@ -297,18 +325,29 @@ const scheduleParser = ([
             default: { standbys: [] },
           }),
         ),
-        ArrayWithDefault.zipMap(({ fills, overfills }) => ({
-          empty: Order.max(Order.number)(
-            5 - fills.filter(Boolean).length - overfills.length,
-            0,
-          ),
-        })),
+        ArrayWithDefault.map(
+          ({ hour, breakHour, fills, overfills, standbys }) =>
+            pipe(
+              hour,
+              Option.map((hour) => ({
+                hour,
+                breakHour,
+                fills,
+                overfills,
+                standbys,
+                empty: Order.max(Order.number)(
+                  5 - fills.filter(Boolean).length - overfills.length,
+                  0,
+                ),
+              })),
+            ),
+        ),
       ),
     ),
     Effect.map(({ array }) =>
       pipe(
         array,
-        Array.filter(({ hour }) => !isNaN(hour)),
+        Array.getSomes,
         collectArrayToHashMap({
           keyGetter: ({ hour }) => hour,
           keyValueReducer: (_, b) => b,
