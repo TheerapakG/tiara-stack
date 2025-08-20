@@ -38,6 +38,7 @@ const parseValueRange = <A = never, E = never, R = never>(
     ),
     Option.map(Effect.forEach(rowParser)),
     Option.getOrElse(() => Effect.succeed([])),
+    Effect.withSpan("parseValueRange", { captureStackTrace: true }),
   );
 
 export class RawPlayer extends Data.TaggedClass("RawPlayer")<{
