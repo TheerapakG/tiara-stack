@@ -70,6 +70,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
           ),
           user: InteractionContext.user(),
           eventConfig: SheetService.getEventConfig(),
+          teams: SheetService.getTeams(),
         }),
         Effect.let("hour", ({ hourOption, eventConfig }) =>
           pipe(
@@ -101,7 +102,6 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             Effect.map(Array.getSomes),
           ),
         ),
-        Effect.bind("teams", () => SheetService.getTeams()),
         Effect.let("scheduleTeams", ({ schedulePlayers, teams }) =>
           pipe(
             schedulePlayers,
@@ -160,6 +160,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             ),
           ),
         ),
+        Effect.tap(({ roomOrders }) => Effect.log(roomOrders)),
         Effect.bind("message", ({ roomOrders }) =>
           pipe(
             roomOrders,
