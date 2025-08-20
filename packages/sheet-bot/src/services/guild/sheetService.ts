@@ -117,15 +117,17 @@ const teamParser = (
                   tags: teamConfig.tags,
                   lead: pipe(
                     Option.fromNullable(lead),
-                    Option.map((lead) => parseInt(lead, 10)),
+                    Option.flatMapNullable((lead) => parseInt(lead, 10)),
                   ),
                   backline: pipe(
                     Option.fromNullable(backline),
-                    Option.map((backline) => parseInt(backline, 10)),
+                    Option.flatMapNullable((backline) =>
+                      parseInt(backline, 10),
+                    ),
                   ),
                   talent: pipe(
                     Option.fromNullable(talent),
-                    Option.map((talent) => parseInt(talent, 10)),
+                    Option.flatMapNullable((talent) => parseInt(talent, 10)),
                   ),
                 }),
             ),
