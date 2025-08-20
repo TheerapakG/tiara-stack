@@ -111,25 +111,28 @@ const teamParser = (
             parseValueRange(
               userTeams,
               ([name, _isv, lead, backline, talent, _isvPercent]) =>
-                Effect.succeed({
-                  type: teamConfig.name,
-                  name: pipe(Option.fromNullable(name), Option.map(String)),
-                  tags: teamConfig.tags,
-                  lead: pipe(
-                    Option.fromNullable(lead),
-                    Option.flatMapNullable((lead) => parseInt(lead, 10)),
-                  ),
-                  backline: pipe(
-                    Option.fromNullable(backline),
-                    Option.flatMapNullable((backline) =>
-                      parseInt(backline, 10),
+                pipe(
+                  Effect.log(name, lead, backline, talent),
+                  Effect.as({
+                    type: teamConfig.name,
+                    name: pipe(Option.fromNullable(name), Option.map(String)),
+                    tags: teamConfig.tags,
+                    lead: pipe(
+                      Option.fromNullable(lead),
+                      Option.flatMapNullable((lead) => parseInt(lead, 10)),
                     ),
-                  ),
-                  talent: pipe(
-                    Option.fromNullable(talent),
-                    Option.flatMapNullable((talent) => parseInt(talent, 10)),
-                  ),
-                }),
+                    backline: pipe(
+                      Option.fromNullable(backline),
+                      Option.flatMapNullable((backline) =>
+                        parseInt(backline, 10),
+                      ),
+                    ),
+                    talent: pipe(
+                      Option.fromNullable(talent),
+                      Option.flatMapNullable((talent) => parseInt(talent, 10)),
+                    ),
+                  }),
+                ),
             ),
           { concurrency: "unbounded" },
         ),
