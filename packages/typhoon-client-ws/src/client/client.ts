@@ -263,7 +263,6 @@ export class WebSocketClient<
           SynchronizedRef.update(HashMap.set(id, { updater })),
         ),
       ),
-
       Effect.bind("requestHeader", ({ id }) =>
         HeaderEncoderDecoder.encode({
           protocol: "typh",
@@ -379,7 +378,10 @@ export class WebSocketClient<
       Effect.let(
         "updater",
         ({ id, deferred }) =>
-          (value: Effect.Effect<unknown, HandlerError, never>) =>
+          (
+            value: Effect.Effect<unknown, HandlerError, never>,
+            _nonce: number,
+          ) =>
             pipe(
               Deferred.succeed(deferred, value),
               Effect.andThen(() =>
@@ -392,6 +394,12 @@ export class WebSocketClient<
               ),
               Effect.asVoid,
             ),
+      ),
+      Effect.tap(({ id, updater }) =>
+        pipe(
+          client.updaterStateMapRef,
+          SynchronizedRef.update(HashMap.set(id, { updater })),
+        ),
       ),
       Effect.bind("requestHeader", ({ id }) =>
         HeaderEncoderDecoder.encode({
