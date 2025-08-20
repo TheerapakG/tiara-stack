@@ -25,14 +25,14 @@ const roomOrderPreviousButtonData = {
   type: ComponentType.Button,
   customId: "interaction:roomOrder:Previous",
   label: "Previous",
-  style: ButtonStyle.Primary,
+  style: ButtonStyle.Secondary,
 } as const satisfies InteractionButtonComponentData;
 
 const roomOrderNextButtonData = {
   type: ComponentType.Button,
   customId: "interaction:roomOrder:Next",
   label: "Next",
-  style: ButtonStyle.Primary,
+  style: ButtonStyle.Secondary,
 } as const satisfies InteractionButtonComponentData;
 
 const roomOrderSendButtonData = {
@@ -243,7 +243,7 @@ export const roomOrderSendButton = buttonInteractionHandlerContextBuilder()
           ]),
         ),
         Effect.asVoid,
-        Effect.withSpan("handleRoomOrderNextButton", {
+        Effect.withSpan("handleRoomOrderSendButton", {
           captureStackTrace: true,
         }),
       ),
