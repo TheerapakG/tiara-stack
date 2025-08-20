@@ -8,7 +8,7 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, Effect, Function, HashMap, Option, pipe, String } from "effect";
+import { Array, Effect, Function, HashMap, Option, pipe } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { observeOnce } from "typhoon-server/signal";
 import { roomOrderActionRow } from "../../buttons";
@@ -116,8 +116,43 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             ),
           ),
         ),
-        Effect.tap(({ schedule, schedulePlayers, scheduleTeams }) =>
-          Effect.log(schedule, schedulePlayers, scheduleTeams),
+        Effect.tap(({ scheduleTeams }) =>
+          Effect.log(
+            scheduleTeams,
+            pipe(
+              scheduleTeams,
+              Array.map(({ player, teams }) =>
+                pipe(
+                  teams,
+                  Array.map((team) => {
+                    const lead = pipe(
+                      team.lead,
+                      Option.getOrElse(() => 0),
+                    );
+                    const backline = pipe(
+                      team.backline,
+                      Option.getOrElse(() => 0),
+                    );
+                    const bp = pipe(
+                      team.talent,
+                      Option.getOrElse(() => 0),
+                    );
+                    const percent = lead + (backline - lead) / 5;
+                    return {
+                      type: team.type,
+                      tagStr: team.tags.join(", "),
+                      player: player.name,
+                      team: team.name,
+                      lead,
+                      backline,
+                      bp,
+                      percent,
+                    };
+                  }),
+                ),
+              ),
+            ),
+          ),
         ),
         Effect.bind("roomOrders", ({ heal, scheduleTeams }) =>
           pipe(
@@ -144,7 +179,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
                         );
                         const bp = pipe(
                           team.talent,
-                          Option.getOrElse(() => String.empty),
+                          Option.getOrElse(() => 0),
                         );
                         const percent = lead + (backline - lead) / 5;
                         return {
