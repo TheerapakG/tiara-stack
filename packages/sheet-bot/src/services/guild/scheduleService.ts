@@ -12,7 +12,13 @@ import { Schedule } from "./sheetService";
 export const emptySchedule = (hour: number): Schedule => ({
   hour,
   breakHour: false,
-  fills: [undefined, undefined, undefined, undefined, undefined],
+  fills: [
+    Option.none(),
+    Option.none(),
+    Option.none(),
+    Option.none(),
+    Option.none(),
+  ],
   overfills: [],
   standbys: [],
   empty: 5,
@@ -50,12 +56,8 @@ export class ScheduleService extends Effect.Service<ScheduleService>()(
         }) => {
           return pipe(
             Effect.Do,
-            Effect.let("prevFills", () =>
-              Array.filter(prevSchedule.fills, (fill) => fill !== undefined),
-            ),
-            Effect.let("fills", () =>
-              Array.filter(schedule.fills, (fill) => fill !== undefined),
-            ),
+            Effect.let("prevFills", () => Array.getSomes(prevSchedule.fills)),
+            Effect.let("fills", () => Array.getSomes(schedule.fills)),
             Effect.bind("fillsPlayers", ({ fills }) =>
               Effect.forEach(fills, (player) =>
                 pipe(
