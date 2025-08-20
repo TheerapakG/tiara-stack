@@ -156,8 +156,6 @@ export const messageRoomOrder = pgTable(
     id: serial("id").primaryKey(),
     messageId: varchar("message_id").notNull(),
     rank: integer("rank").notNull(),
-    position: integer("position").notNull(),
-    team: varchar("team").notNull(),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -167,5 +165,42 @@ export const messageRoomOrder = pgTable(
       .$onUpdate(() => new Date()),
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
   },
-  (table) => [index("message_room_order_message_id_idx").on(table.messageId)],
+  (table) => [
+    uniqueIndex("message_room_order_message_id_rank_idx").on(
+      table.messageId,
+      table.rank,
+    ),
+  ],
+);
+
+export const messageRoomOrderData = pgTable(
+  "message_room_order_data",
+  {
+    id: serial("id").primaryKey(),
+    messageId: varchar("message_id").notNull(),
+    hour: integer("hour").notNull(),
+    rank: integer("rank").notNull(),
+    position: integer("position").notNull(),
+    team: varchar("team").notNull(),
+    tags: varchar("tags").array().notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+    deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("message_room_order_data_message_id_rank_position_idx").on(
+      table.messageId,
+      table.rank,
+      table.position,
+    ),
+    index("message_room_order_data_message_id_rank_idx").on(
+      table.messageId,
+      table.rank,
+    ),
+  ],
 );

@@ -1,20 +1,24 @@
 import { addMinutes, getUnixTime } from "date-fns/fp";
 import {
   ApplicationIntegrationType,
+  bold,
+  inlineCode,
   InteractionContextType,
   MessageFlags,
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, Effect, HashMap, Option, pipe, String } from "effect";
+import { Array, Effect, Function, HashMap, Option, pipe, String } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { observeOnce } from "typhoon-server/signal";
+import { roomOrderActionRow } from "../../buttons";
 import { SheetApisClient } from "../../client";
 import {
   emptySchedule,
   GuildConfigService,
   guildServicesFromInteractionOption,
   InteractionContext,
+  MessageRoomOrderService,
   PermissionService,
   PlayerService,
   SheetService,
@@ -110,7 +114,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             ),
           ),
         ),
-        Effect.bind("roomOrder", ({ heal, scheduleTeams }) =>
+        Effect.bind("roomOrders", ({ heal, scheduleTeams }) =>
           pipe(
             SheetApisClient.get(),
             Effect.flatMap((client) =>
@@ -153,6 +157,49 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
                   ),
                 ),
               }),
+            ),
+          ),
+        ),
+        Effect.bind("message", ({ roomOrders }) =>
+          pipe(
+            roomOrders,
+            Array.head,
+            Option.map((roomOrder) =>
+              InteractionContext.editReply({
+                content: roomOrder.room
+                  .map(
+                    ({ team, tags }, i) =>
+                      `${inlineCode(`P${i + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
+                  )
+                  .join("\n"),
+                components: [
+                  roomOrderActionRow(
+                    { minRank: 0, maxRank: Array.length(roomOrders) - 1 },
+                    0,
+                  ),
+                ],
+              }),
+            ),
+            Effect.transposeOption,
+            // TODO: message on none case
+            Effect.flatMap(Function.identity),
+          ),
+        ),
+        Effect.tap(({ hour, message, roomOrders }) =>
+          MessageRoomOrderService.upsertMessageRoomOrderData(
+            message.id,
+            pipe(
+              roomOrders,
+              Array.map(({ room }, rank) =>
+                room.map(({ team, tags }, position) => ({
+                  hour,
+                  team,
+                  tags,
+                  rank,
+                  position,
+                })),
+              ),
+              Array.flatten,
             ),
           ),
         ),

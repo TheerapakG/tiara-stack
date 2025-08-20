@@ -7,6 +7,7 @@ import { GoogleLive } from "../../google";
 import {
   ChannelConfigService,
   MessageCheckinService,
+  MessageRoomOrderService,
   SheetConfigService,
 } from "../bot";
 
@@ -15,6 +16,7 @@ export const botServices = pipe(
     ChannelConfigService.DefaultWithoutDependencies,
     SheetConfigService.DefaultWithoutDependencies,
     MessageCheckinService.DefaultWithoutDependencies,
+    MessageRoomOrderService.DefaultWithoutDependencies,
   ),
   Layer.provideMerge(
     Layer.mergeAll(
