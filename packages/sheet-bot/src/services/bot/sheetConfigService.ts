@@ -26,6 +26,7 @@ const parseValueRange = <A = never, E = never, R = never>(
     ),
     Option.map(Effect.forEach(rowParser)),
     Option.getOrElse(() => Effect.succeed([])),
+    Effect.withSpan("parseValueRange", { captureStackTrace: true }),
   );
 
 export type DayConfig = {
@@ -45,35 +46,46 @@ const dayConfigParser = ([
     bindObject({
       day: parseValueRange(day, ([day]) =>
         pipe(
-          Option.getOrUndefined(day),
-          validateWithDefault(
-            type("string.integer.parse").pipe((day) => ({ day })),
-            { day: Number.NaN },
-          ),
+          day,
+          Option.match({
+            onSome: validateWithDefault(
+              type("string.integer.parse").pipe((day) => ({
+                day: Option.some(day),
+              })),
+              { day: Option.none<number>() },
+            ),
+            onNone: () => Effect.succeed({ day: Option.none() }),
+          }),
         ),
       ),
       sheet: parseValueRange(sheet, ([sheet]) =>
         pipe(
-          Option.getOrUndefined(sheet),
-          validateWithDefault(
-            type("string").pipe((sheet) => ({ sheet })),
-            { sheet: "" },
-          ),
+          sheet,
+          Option.match({
+            onSome: validateWithDefault(
+              type("string").pipe((sheet) => ({ sheet })),
+              { sheet: "" },
+            ),
+            onNone: () => Effect.succeed({ sheet: "" }),
+          }),
         ),
       ),
       draft: parseValueRange(draft, ([draft]) =>
         pipe(
-          Option.getOrUndefined(draft),
-          validateWithDefault(
-            type("string").pipe((draft) => ({ draft })),
-            { draft: "" },
-          ),
+          draft,
+          Option.match({
+            onSome: validateWithDefault(
+              type("string").pipe((draft) => ({ draft })),
+              { draft: "" },
+            ),
+            onNone: () => Effect.succeed({ draft: "" }),
+          }),
         ),
       ),
     }),
     Effect.map(({ day, sheet, draft }) =>
       pipe(
-        new ArrayWithDefault({ array: day, default: { day: Number.NaN } }),
+        new ArrayWithDefault({ array: day, default: { day: Option.none() } }),
         ArrayWithDefault.zip(
           new ArrayWithDefault({ array: sheet, default: { sheet: "" } }),
         ),
@@ -85,7 +97,13 @@ const dayConfigParser = ([
     Effect.map(({ array }) =>
       pipe(
         array,
-        Array.filter(({ day }) => !isNaN(day)),
+        Array.map(({ day, sheet, draft }) =>
+          pipe(
+            day,
+            Option.map((day) => ({ day, sheet, draft })),
+          ),
+        ),
+        Array.getSomes,
         collectArrayToHashMap({
           keyGetter: ({ day }) => day,
           keyValueReducer: (_, b) => b,
@@ -112,36 +130,45 @@ const teamConfigParser = ([
     bindObject({
       name: parseValueRange(name, ([name]) =>
         pipe(
-          Option.getOrUndefined(name),
-          validateWithDefault(
-            type("string").pipe((name) => ({ name })),
-            { name: "" },
-          ),
+          name,
+          Option.match({
+            onSome: validateWithDefault(
+              type("string").pipe((name) => ({ name })),
+              { name: "" },
+            ),
+            onNone: () => Effect.succeed({ name: "" }),
+          }),
         ),
       ),
       range: parseValueRange(range, ([range]) =>
         pipe(
-          Option.getOrUndefined(range),
-          validateWithDefault(
-            type("string").pipe((range) => ({ range })),
-            { range: "" },
-          ),
+          range,
+          Option.match({
+            onSome: validateWithDefault(
+              type("string").pipe((range) => ({ range })),
+              { range: "" },
+            ),
+            onNone: () => Effect.succeed({ range: "" }),
+          }),
         ),
       ),
       tags: parseValueRange(tags, ([tags]) =>
         pipe(
-          Option.getOrUndefined(tags),
-          validateWithDefault(
-            type("string").pipe((tags) => ({
-              tags: pipe(
-                tags,
-                String.split(","),
-                Array.map(String.trim),
-                Array.filter(String.isNonEmpty),
-              ),
-            })),
-            { tags: [] },
-          ),
+          tags,
+          Option.match({
+            onSome: validateWithDefault(
+              type("string").pipe((tags) => ({
+                tags: pipe(
+                  tags,
+                  String.split(","),
+                  Array.map(String.trim),
+                  Array.filter(String.isNonEmpty),
+                ),
+              })),
+              { tags: [] },
+            ),
+            onNone: () => Effect.succeed({ tags: [] }),
+          }),
         ),
       ),
     }),
