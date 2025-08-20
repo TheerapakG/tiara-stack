@@ -66,6 +66,7 @@ export const roomOrderPreviousButton = buttonInteractionHandlerContextBuilder()
     Effect.provide(guildServicesFromInteraction())(
       pipe(
         Effect.Do,
+        InteractionContext.tapDeferUpdate(),
         bindObject({
           message: CachedInteractionContext.message<ButtonInteractionT>(),
         }),
@@ -92,29 +93,22 @@ export const roomOrderPreviousButton = buttonInteractionHandlerContextBuilder()
             Effect.flatMap(observeOnce),
           ),
         ),
-        Effect.tap(
+        InteractionContext.tapEditReply(
           ({
-            message,
             messageRoomOrderData,
             messageRoomOrderRange,
             messageRoomOrder,
-          }) =>
-            Effect.tryPromise(() =>
-              message.edit({
-                content: messageRoomOrderData
-                  .map(
-                    ({ team, tags, position }) =>
-                      `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
-                  )
-                  .join("\n"),
-                components: [
-                  roomOrderActionRow(
-                    messageRoomOrderRange,
-                    messageRoomOrder.rank,
-                  ),
-                ],
-              }),
-            ),
+          }) => ({
+            content: messageRoomOrderData
+              .map(
+                ({ team, tags, position }) =>
+                  `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
+              )
+              .join("\n"),
+            components: [
+              roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank),
+            ],
+          }),
         ),
         Effect.asVoid,
         Effect.withSpan("handleRoomOrderPreviousButton", {
@@ -131,6 +125,7 @@ export const roomOrderNextButton = buttonInteractionHandlerContextBuilder()
     Effect.provide(guildServicesFromInteraction())(
       pipe(
         Effect.Do,
+        InteractionContext.tapDeferUpdate(),
         bindObject({
           message: CachedInteractionContext.message<ButtonInteractionT>(),
         }),
@@ -157,29 +152,22 @@ export const roomOrderNextButton = buttonInteractionHandlerContextBuilder()
             Effect.flatMap(observeOnce),
           ),
         ),
-        Effect.tap(
+        InteractionContext.tapEditReply(
           ({
-            message,
             messageRoomOrderData,
             messageRoomOrderRange,
             messageRoomOrder,
-          }) =>
-            Effect.tryPromise(() =>
-              message.edit({
-                content: messageRoomOrderData
-                  .map(
-                    ({ team, tags, position }) =>
-                      `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
-                  )
-                  .join("\n"),
-                components: [
-                  roomOrderActionRow(
-                    messageRoomOrderRange,
-                    messageRoomOrder.rank,
-                  ),
-                ],
-              }),
-            ),
+          }) => ({
+            content: messageRoomOrderData
+              .map(
+                ({ team, tags, position }) =>
+                  `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
+              )
+              .join("\n"),
+            components: [
+              roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank),
+            ],
+          }),
         ),
         Effect.asVoid,
         Effect.withSpan("handleRoomOrderNextButton", {
