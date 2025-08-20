@@ -85,19 +85,21 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             ),
           ),
         ),
-        Effect.bind("schedulePlayers", ({ hour }) =>
+        Effect.bind("schedule", ({ hour }) =>
           pipe(
             SheetService.getAllSchedules(),
             Effect.map(HashMap.get(hour)),
             Effect.map(Option.getOrElse(() => emptySchedule(hour))),
-            Effect.map((schedule) => schedule.fills),
-            Effect.map(Array.map(Option.fromNullable)),
-            Effect.map(Array.getSomes),
-            Effect.flatMap(
-              Effect.forEach(
-                (playerName) => PlayerService.getByName(playerName),
-                { concurrency: "unbounded" },
-              ),
+          ),
+        ),
+        Effect.bind("schedulePlayers", ({ schedule }) =>
+          pipe(
+            schedule.fills,
+            Array.map(Option.fromNullable),
+            Array.getSomes,
+            Effect.forEach(
+              (playerName) => PlayerService.getByName(playerName),
+              { concurrency: "unbounded" },
             ),
             Effect.map(Array.getSomes),
           ),
@@ -113,6 +115,9 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
               ),
             ),
           ),
+        ),
+        Effect.tap(({ schedule, schedulePlayers, scheduleTeams }) =>
+          Effect.log(schedule, schedulePlayers, scheduleTeams),
         ),
         Effect.bind("roomOrders", ({ heal, scheduleTeams }) =>
           pipe(
@@ -158,13 +163,6 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
                 ),
               }),
             ),
-          ),
-        ),
-        Effect.catchAll((e) =>
-          pipe(
-            Effect.logError(e),
-            Effect.tap(() => Effect.log([[e.message]])),
-            Effect.andThen(() => Effect.fail(e)),
           ),
         ),
         Effect.bind("message", ({ roomOrders }) =>
