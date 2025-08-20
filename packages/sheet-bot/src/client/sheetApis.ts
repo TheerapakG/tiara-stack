@@ -6,11 +6,17 @@ import { Config } from "../config";
 export class SheetApisClient extends Effect.Service<SheetApisClient>()(
   "SheetApisClient",
   {
-    effect: pipe(
+    scoped: pipe(
       Effect.Do,
       Effect.bind("config", () => Config),
       Effect.bind("client", ({ config }) =>
-        WebSocketClient.create<Server>(config.sheetApisBaseUrl),
+        pipe(
+          WebSocketClient.create<Server>(config.sheetApisBaseUrl),
+          Effect.tap(WebSocketClient.connect),
+        ),
+      ),
+      Effect.tap(({ client }) =>
+        Effect.addFinalizer(() => WebSocketClient.close(client)),
       ),
       Effect.map(({ client }) => ({
         get: () => client,
