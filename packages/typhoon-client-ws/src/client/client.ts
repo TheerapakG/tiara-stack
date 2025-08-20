@@ -43,10 +43,7 @@ type ResolvedState<T = unknown> = {
 type SignalState<T = unknown> = LoadingState | ResolvedState<T>;
 
 type UpdaterState<T = unknown> = {
-  updater: (
-    value: Effect.Effect<T, HandlerError, never>,
-    nonce: number,
-  ) => Effect.Effect<void, never, never>;
+  updater: (value: ResolvedState<T>) => Effect.Effect<void, never, never>;
 };
 type UpdaterStateMap = HashMap.HashMap<string, UpdaterState>;
 
@@ -119,17 +116,15 @@ export class WebSocketClient<
                 pipe(
                   Match.value(header),
                   Match.when({ action: "server:update" }, (header) =>
-                    updater(
-                      header.payload.success
-                        ? Effect.succeed({
-                            nonce: header.payload.nonce,
-                            data: decodedResponse,
-                          })
+                    updater({
+                      isLoading: false,
+                      nonce: header.payload.nonce,
+                      value: header.payload.success
+                        ? Effect.succeed(decodedResponse)
                         : Effect.fail(
                             new HandlerError(decodedResponse as void),
                           ),
-                      header.payload.nonce,
-                    ),
+                    }),
                   ),
                   Match.orElse(() => Effect.void),
                 ),
@@ -244,14 +239,14 @@ export class WebSocketClient<
       Effect.let(
         "updater",
         ({ signal }) =>
-          (value: Effect.Effect<unknown, HandlerError, never>, nonce: number) =>
+          (value: ResolvedState<unknown>) =>
             signal.updateValue((prev) =>
               Effect.succeed(
-                prev.isLoading || prev.nonce < nonce
+                prev.isLoading || prev.nonce < value.nonce
                   ? {
                       isLoading: false,
-                      nonce: nonce,
-                      value: value,
+                      nonce: value.nonce,
+                      value: value.value,
                     }
                   : prev,
               ),
@@ -378,13 +373,10 @@ export class WebSocketClient<
       Effect.let(
         "updater",
         ({ id, deferred }) =>
-          (
-            value: Effect.Effect<unknown, HandlerError, never>,
-            _nonce: number,
-          ) =>
+          (value: ResolvedState<unknown>) =>
             pipe(
               deferred,
-              Deferred.complete(value),
+              Deferred.complete(value.value),
               Effect.andThen(() =>
                 pipe(
                   client.updaterStateMapRef,
