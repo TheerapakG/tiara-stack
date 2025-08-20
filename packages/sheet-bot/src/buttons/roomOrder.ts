@@ -15,6 +15,7 @@ import {
   CachedInteractionContext,
   channelServicesFromInteraction,
   guildServicesFromInteraction,
+  InteractionContext,
   MessageRoomOrderService,
   SendableChannelContext,
 } from "../services";
@@ -195,6 +196,7 @@ export const roomOrderSendButton = buttonInteractionHandlerContextBuilder()
     Effect.provide(guildServicesFromInteraction())(
       pipe(
         Effect.Do,
+        InteractionContext.tapDeferUpdate(),
         bindObject({
           message: CachedInteractionContext.message<ButtonInteractionT>(),
         }),
@@ -222,26 +224,22 @@ export const roomOrderSendButton = buttonInteractionHandlerContextBuilder()
             Effect.flatMap(observeOnce),
           ),
         ),
-        Effect.tap(({ message, messageRoomOrderData }) =>
-          Effect.all([
-            Effect.tryPromise(() =>
-              message.edit({
-                content: "sent room order!",
-              }),
-            ),
-            pipe(
-              SendableChannelContext.send({
-                content: messageRoomOrderData
-                  .map(
-                    ({ team, tags, position }) =>
-                      `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
-                  )
-                  .join("\n"),
-              }),
-              Effect.provide(channelServicesFromInteraction()),
-            ),
-          ]),
+        Effect.tap(({ messageRoomOrderData }) =>
+          pipe(
+            SendableChannelContext.send({
+              content: messageRoomOrderData
+                .map(
+                  ({ team, tags, position }) =>
+                    `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
+                )
+                .join("\n"),
+            }),
+            Effect.provide(channelServicesFromInteraction()),
+          ),
         ),
+        InteractionContext.tapUpdate(() => ({
+          content: "sent room order!",
+        })),
         Effect.asVoid,
         Effect.withSpan("handleRoomOrderSendButton", {
           captureStackTrace: true,

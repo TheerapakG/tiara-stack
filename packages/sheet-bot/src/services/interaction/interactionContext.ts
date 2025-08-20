@@ -8,8 +8,10 @@ import {
   ChatInputCommandInteraction,
   Interaction,
   InteractionDeferReplyOptions,
+  InteractionDeferUpdateOptions,
   InteractionEditReplyOptions,
   InteractionReplyOptions,
+  InteractionUpdateOptions,
   MessageComponentInteraction,
   MessageContextMenuCommandInteraction,
   MessagePayload,
@@ -299,6 +301,32 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
+  static deferUpdate(options?: InteractionDeferUpdateOptions) {
+    return pipe(
+      InteractionContext.interaction<MessageComponentInteractionT>(),
+      Effect.flatMap((interaction) =>
+        Effect.tryPromise(() => interaction.deferUpdate(options)),
+      ),
+    );
+  }
+
+  static tapDeferUpdate<A>(f?: (a: A) => InteractionDeferUpdateOptions) {
+    return <E, R>(self: Effect.Effect<A, E, R>) =>
+      pipe(
+        self,
+        Effect.tap((a) => InteractionContext.deferUpdate(f?.(a))),
+      );
+  }
+
+  static deferUpdateWithResponse(options?: InteractionDeferUpdateOptions) {
+    return pipe(
+      InteractionContext.interaction<MessageComponentInteractionT>(),
+      Effect.flatMap((interaction) =>
+        Effect.tryPromise(() => interaction.deferUpdate(options)),
+      ),
+    );
+  }
+
   static deleteReply(message?: MessageResolvable | "@original") {
     return pipe(
       InteractionContext.interaction<RepliableInteractionT>(),
@@ -428,6 +456,60 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
       pipe(
         self,
         Effect.flatMap((a) => InteractionContext.replyWithResponse(f(a))),
+      );
+  }
+
+  static update(options: string | MessagePayload | InteractionUpdateOptions) {
+    return pipe(
+      InteractionContext.interaction<MessageComponentInteractionT>(),
+      Effect.flatMap((interaction) =>
+        Effect.tryPromise(() => interaction.update(options)),
+      ),
+      Effect.withSpan("InteractionContext.updateWithResponse", {
+        captureStackTrace: true,
+      }),
+    );
+  }
+
+  static tapUpdate<A>(
+    f: (a: A) => string | MessagePayload | InteractionUpdateOptions,
+  ) {
+    return <E, R>(self: Effect.Effect<A, E, R>) =>
+      pipe(
+        self,
+        Effect.tap((a) => InteractionContext.update(f(a))),
+      );
+  }
+
+  static mapUpdate<A>(
+    f: (a: A) => string | MessagePayload | InteractionUpdateOptions,
+  ) {
+    return <E, R>(self: Effect.Effect<A, E, R>) =>
+      pipe(
+        self,
+        Effect.flatMap((a) => InteractionContext.update(f(a))),
+      );
+  }
+
+  static updateWithResponse(options: InteractionUpdateOptions) {
+    return pipe(
+      InteractionContext.interaction<MessageComponentInteractionT>(),
+      Effect.flatMap((interaction) =>
+        Effect.tryPromise(() =>
+          interaction.update({ ...options, withResponse: true }),
+        ),
+      ),
+      Effect.withSpan("InteractionContext.updateWithResponse", {
+        captureStackTrace: true,
+      }),
+    );
+  }
+
+  static mapUpdateWithResponse<A>(f: (a: A) => InteractionUpdateOptions) {
+    return <E, R>(self: Effect.Effect<A, E, R>) =>
+      pipe(
+        self,
+        Effect.flatMap((a) => InteractionContext.updateWithResponse(f(a))),
       );
   }
 

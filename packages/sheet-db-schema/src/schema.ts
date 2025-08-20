@@ -166,10 +166,7 @@ export const messageRoomOrder = pgTable(
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
   },
   (table) => [
-    uniqueIndex("message_room_order_message_id_rank_idx").on(
-      table.messageId,
-      table.rank,
-    ),
+    uniqueIndex("message_room_order_message_id_idx").on(table.messageId),
   ],
 );
 
