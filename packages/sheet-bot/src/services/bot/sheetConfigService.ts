@@ -1,6 +1,6 @@
 import { type sheets_v4 } from "@googleapis/sheets";
 import { type } from "arktype";
-import { Array, Effect, HashMap, Option, pipe, String } from "effect";
+import { Array, Effect, Equal, HashMap, Option, pipe, String } from "effect";
 import { validate, validateWithDefault } from "typhoon-core/schema";
 import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
 import { GoogleSheets } from "../../google/sheets";
@@ -8,10 +8,22 @@ import { bindObject } from "../../utils";
 
 const parseValueRange = <A = never, E = never, R = never>(
   valueRange: sheets_v4.Schema$ValueRange,
-  rowParser: (row: readonly unknown[], index: number) => Effect.Effect<A, E, R>,
+  rowParser: (
+    row: readonly Option.Option<string>[],
+    index: number,
+  ) => Effect.Effect<A, E, R>,
 ): Effect.Effect<A[], E, R> =>
   pipe(
     Option.fromNullable(valueRange.values),
+    Option.map(
+      Array.map(
+        Array.map((v) =>
+          Equal.equals(v, "")
+            ? Option.none()
+            : Option.fromNullable(v as string | null | undefined),
+        ),
+      ),
+    ),
     Option.map(Effect.forEach(rowParser)),
     Option.getOrElse(() => Effect.succeed([])),
   );
@@ -33,7 +45,7 @@ const dayConfigParser = ([
     bindObject({
       day: parseValueRange(day, ([day]) =>
         pipe(
-          day,
+          Option.getOrUndefined(day),
           validateWithDefault(
             type("string.integer.parse").pipe((day) => ({ day })),
             { day: Number.NaN },
@@ -42,7 +54,7 @@ const dayConfigParser = ([
       ),
       sheet: parseValueRange(sheet, ([sheet]) =>
         pipe(
-          sheet,
+          Option.getOrUndefined(sheet),
           validateWithDefault(
             type("string").pipe((sheet) => ({ sheet })),
             { sheet: "" },
@@ -51,7 +63,7 @@ const dayConfigParser = ([
       ),
       draft: parseValueRange(draft, ([draft]) =>
         pipe(
-          draft,
+          Option.getOrUndefined(draft),
           validateWithDefault(
             type("string").pipe((draft) => ({ draft })),
             { draft: "" },
@@ -100,7 +112,7 @@ const teamConfigParser = ([
     bindObject({
       name: parseValueRange(name, ([name]) =>
         pipe(
-          name,
+          Option.getOrUndefined(name),
           validateWithDefault(
             type("string").pipe((name) => ({ name })),
             { name: "" },
@@ -109,7 +121,7 @@ const teamConfigParser = ([
       ),
       range: parseValueRange(range, ([range]) =>
         pipe(
-          range,
+          Option.getOrUndefined(range),
           validateWithDefault(
             type("string").pipe((range) => ({ range })),
             { range: "" },
@@ -118,7 +130,7 @@ const teamConfigParser = ([
       ),
       tags: parseValueRange(tags, ([tags]) =>
         pipe(
-          tags,
+          Option.getOrUndefined(tags),
           validateWithDefault(
             type("string").pipe((tags) => ({
               tags: pipe(
