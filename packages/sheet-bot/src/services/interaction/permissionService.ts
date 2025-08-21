@@ -4,7 +4,7 @@ import {
   RoleResolvable,
 } from "discord.js";
 import { Data, Effect, Equal, pipe } from "effect";
-import { bindObject } from "../../utils";
+import { bindObject, tapify } from "../../utils";
 import { GuildService } from "../guild";
 import { ClientService } from "./clientService";
 import {
@@ -151,26 +151,8 @@ export class PermissionService extends Effect.Service<PermissionService>()(
     accessors: true,
   },
 ) {
-  static tapCheckOwner<A>(f: (a: A) => { allowSameGuild?: boolean }) {
-    return <E, R>(self: Effect.Effect<A, E, R>) =>
-      pipe(
-        self,
-        Effect.tap((a) => PermissionService.checkOwner(f(a))),
-      );
-  }
-
-  static tapCheckPermissions<A>(
-    f: (a: A) => {
-      permissions: PermissionResolvable;
-      reason?: string;
-    },
-  ) {
-    return <E, R>(self: Effect.Effect<A, E, R>) =>
-      pipe(
-        self,
-        Effect.tap((a) => PermissionService.checkPermissions(f(a))),
-      );
-  }
+  static tapCheckOwner = tapify(PermissionService.checkOwner);
+  static tapCheckPermissions = tapify(PermissionService.checkPermissions);
 
   static effectCheckRoles<E, R>({
     roles,
@@ -198,11 +180,5 @@ export class PermissionService extends Effect.Service<PermissionService>()(
       );
   }
 
-  static tapAddRole<A>(f: (a: A) => string) {
-    return <E, R>(self: Effect.Effect<A, E, R>) =>
-      pipe(
-        self,
-        Effect.tap((a) => PermissionService.addRole(f(a))),
-      );
-  }
+  static tapAddRole = tapify(PermissionService.addRole);
 }

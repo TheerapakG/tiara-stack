@@ -7,6 +7,8 @@ import {
   inlineCode,
   InteractionButtonComponentData,
   MessageActionRowComponentBuilder,
+  time,
+  TimestampStyles,
 } from "discord.js";
 import { Effect, Function, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
@@ -18,6 +20,8 @@ import {
   InteractionContext,
   MessageRoomOrderService,
   SendableChannelContext,
+  SheetService,
+  FormatService,
 } from "../../services";
 import { buttonInteractionHandlerContextBuilder } from "../../types";
 import { bindObject } from "../../utils";
@@ -69,6 +73,7 @@ export const roomOrderPreviousButton = buttonInteractionHandlerContextBuilder()
         InteractionContext.tapDeferUpdate(),
         bindObject({
           message: CachedInteractionContext.message<ButtonInteractionT>(),
+          eventConfig: SheetService.getEventConfig(),
         }),
         Effect.bindAll(
           ({ message }) => ({
@@ -93,23 +98,22 @@ export const roomOrderPreviousButton = buttonInteractionHandlerContextBuilder()
             Effect.flatMap(observeOnce),
           ),
         ),
-        InteractionContext.tapEditReply(
-          ({
-            messageRoomOrderData,
-            messageRoomOrderRange,
-            messageRoomOrder,
-          }) => ({
-            content: messageRoomOrderData
-              .map(
-                ({ team, tags, position }) =>
-                  `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
-              )
-              .join("\n"),
-            components: [
-              roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank),
-            ],
-          }),
+        Effect.bind("formattedHour", ({ messageRoomOrder }) =>
+          FormatService.formatHour(messageRoomOrder.hour),
         ),
+        InteractionContext.tapEditReply(({ messageRoomOrderData, messageRoomOrderRange, messageRoomOrder, formattedHour }) => ({
+          content: [
+            `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(formattedHour.start, TimestampStyles.ShortDateTime)} - ${time(formattedHour.end, TimestampStyles.ShortDateTime)}`,
+            "",
+            messageRoomOrderData.map(
+              ({ team, tags, position }) =>
+                `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
+            ),
+          ].join("\n"),
+          components: [
+            roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank),
+          ],
+        })),
         Effect.asVoid,
         Effect.withSpan("handleRoomOrderPreviousButton", {
           captureStackTrace: true,
@@ -128,6 +132,7 @@ export const roomOrderNextButton = buttonInteractionHandlerContextBuilder()
         InteractionContext.tapDeferUpdate(),
         bindObject({
           message: CachedInteractionContext.message<ButtonInteractionT>(),
+          eventConfig: SheetService.getEventConfig(),
         }),
         Effect.bindAll(
           ({ message }) => ({
@@ -152,23 +157,22 @@ export const roomOrderNextButton = buttonInteractionHandlerContextBuilder()
             Effect.flatMap(observeOnce),
           ),
         ),
-        InteractionContext.tapEditReply(
-          ({
-            messageRoomOrderData,
-            messageRoomOrderRange,
-            messageRoomOrder,
-          }) => ({
-            content: messageRoomOrderData
-              .map(
-                ({ team, tags, position }) =>
-                  `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
-              )
-              .join("\n"),
-            components: [
-              roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank),
-            ],
-          }),
+        Effect.bind("formattedHour", ({ messageRoomOrder }) =>
+          FormatService.formatHour(messageRoomOrder.hour),
         ),
+        InteractionContext.tapEditReply(({ messageRoomOrderData, messageRoomOrderRange, messageRoomOrder, formattedHour }) => ({
+          content: [
+            `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(formattedHour.start, TimestampStyles.ShortDateTime)} - ${time(formattedHour.end, TimestampStyles.ShortDateTime)}`,
+            "",
+            messageRoomOrderData.map(
+              ({ team, tags, position }) =>
+                `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
+            ),
+          ].join("\n"),
+          components: [
+            roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank),
+          ],
+        })),
         Effect.asVoid,
         Effect.withSpan("handleRoomOrderNextButton", {
           captureStackTrace: true,
@@ -187,6 +191,7 @@ export const roomOrderSendButton = buttonInteractionHandlerContextBuilder()
         InteractionContext.tapDeferUpdate(),
         bindObject({
           message: CachedInteractionContext.message<ButtonInteractionT>(),
+          eventConfig: SheetService.getEventConfig(),
         }),
         Effect.bindAll(
           ({ message }) => ({
@@ -212,15 +217,17 @@ export const roomOrderSendButton = buttonInteractionHandlerContextBuilder()
             Effect.flatMap(observeOnce),
           ),
         ),
-        Effect.tap(({ messageRoomOrderData }) =>
+        Effect.tap(({ messageRoomOrderData, eventConfig, messageRoomOrder }) =>
           pipe(
             SendableChannelContext.send({
-              content: messageRoomOrderData
-                .map(
+              content: [
+                `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(eventConfig.startTime + (messageRoomOrder.hour - 1) * 3600, TimestampStyles.ShortDateTime)} - ${time(eventConfig.startTime + messageRoomOrder.hour * 3600, TimestampStyles.ShortDateTime)}`,
+                "",
+                ...messageRoomOrderData.map(
                   ({ team, tags, position }) =>
                     `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
-                )
-                .join("\n"),
+                ),
+              ].join("\n"),
             }),
             Effect.provide(channelServicesFromInteraction()),
           ),
