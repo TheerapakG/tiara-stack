@@ -9,13 +9,13 @@ import {
 import { Array, Data, Effect, Function, HashMap, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import {
-  emptySchedule,
   GuildConfigService,
   GuildService,
   guildServicesFromInteractionOption,
   InteractionContext,
   PermissionService,
   PlayerService,
+  Schedule,
   SheetService,
 } from "../../services";
 import {
@@ -68,7 +68,7 @@ const getKickoutData = ({
     Effect.let("schedule", ({ schedules }) =>
       pipe(
         HashMap.get(schedules, hour),
-        Option.getOrElse(() => emptySchedule(hour)),
+        Option.getOrElse(() => Schedule.empty(hour)),
       ),
     ),
     Effect.map(({ schedule, runningChannel }) => ({

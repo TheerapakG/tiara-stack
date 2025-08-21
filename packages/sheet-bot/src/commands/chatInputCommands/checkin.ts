@@ -15,7 +15,7 @@ import { observeOnce } from "typhoon-server/signal";
 import { checkinButton } from "../../messageComponents";
 import {
   channelServicesFromInteraction,
-  emptySchedule,
+  FormatService,
   GuildConfigService,
   guildServicesFromInteractionOption,
   InteractionContext,
@@ -23,7 +23,6 @@ import {
   PermissionService,
   PlayerService,
   Schedule,
-  ScheduleService,
   SendableChannelContext,
   SheetService,
 } from "../../services";
@@ -51,7 +50,6 @@ const getCheckinData = ({
   pipe(
     Effect.Do,
     bindObject({
-      eventConfig: SheetService.getEventConfig(),
       schedules: SheetService.getAllSchedules(),
       runningChannel: pipe(
         GuildConfigService.getRunningChannelByName(channelName),
@@ -70,17 +68,16 @@ const getCheckinData = ({
     Effect.let("prevSchedule", ({ schedules }) =>
       pipe(
         HashMap.get(schedules, hour - 1),
-        Option.getOrElse(() => emptySchedule(hour - 1)),
+        Option.getOrElse(() => Schedule.empty(hour - 1)),
       ),
     ),
     Effect.let("schedule", ({ schedules }) =>
       pipe(
         HashMap.get(schedules, hour),
-        Option.getOrElse(() => emptySchedule(hour)),
+        Option.getOrElse(() => Schedule.empty(hour)),
       ),
     ),
-    Effect.map(({ eventConfig, prevSchedule, schedule, runningChannel }) => ({
-      startTime: eventConfig.startTime,
+    Effect.map(({ prevSchedule, schedule, runningChannel }) => ({
       prevSchedule,
       schedule,
       runningChannel: {
@@ -93,7 +90,6 @@ const getCheckinData = ({
   );
 
 const getCheckinMessages = (data: {
-  startTime: number;
   prevSchedule: Schedule;
   schedule: Schedule;
   runningChannel: {
@@ -105,11 +101,10 @@ const getCheckinMessages = (data: {
   pipe(
     Effect.Do,
     Effect.bind("emptySlotsMessage", () =>
-      ScheduleService.formatCheckinEmptySlots(data.schedule),
+      FormatService.formatCheckinEmptySlots(data.schedule),
     ),
     Effect.bind("checkinMessage", () =>
-      ScheduleService.formatCheckIn({
-        startTime: data.startTime,
+      FormatService.formatCheckIn({
         prevSchedule: data.prevSchedule,
         schedule: data.schedule,
         channel: data.showChannelMention

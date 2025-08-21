@@ -1,9 +1,9 @@
 import { Effect, Layer, Option, pipe } from "effect";
 import {
+  FormatService,
   GuildConfigService,
   GuildService,
   PlayerService,
-  ScheduleService,
   SheetService,
 } from "../guild";
 import { CachedInteractionContext, InteractionContext } from "../interaction";
@@ -12,8 +12,7 @@ export const guildServices = (guildId: string) =>
   pipe(
     Effect.succeed(
       pipe(
-        ScheduleService.Default,
-        Layer.provideMerge(PlayerService.Default),
+        Layer.mergeAll(PlayerService.Default, FormatService.Default),
         Layer.provideMerge(SheetService.ofGuild()),
         Layer.provideMerge(GuildConfigService.DefaultWithoutDependencies),
         Layer.provideMerge(GuildService.fromGuildId(guildId)),
