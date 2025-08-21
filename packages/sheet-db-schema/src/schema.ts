@@ -155,6 +155,7 @@ export const messageRoomOrder = pgTable(
   {
     id: serial("id").primaryKey(),
     messageId: varchar("message_id").notNull(),
+    hour: integer("hour").notNull(),
     rank: integer("rank").notNull(),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()

@@ -13,6 +13,7 @@ type MessageRoomOrderDataSelect = typeof messageRoomOrderData.$inferSelect;
 export class MessageRoomOrder extends Data.TaggedClass("MessageRoomOrder")<{
   id: number;
   messageId: string;
+  hour: number;
   rank: number;
   createdAt: Date;
   updatedAt: Date;
@@ -22,6 +23,7 @@ export class MessageRoomOrder extends Data.TaggedClass("MessageRoomOrder")<{
     return new MessageRoomOrder({
       id: select.id,
       messageId: select.messageId,
+      hour: select.hour,
       rank: select.rank,
       createdAt: select.createdAt,
       updatedAt: select.updatedAt,

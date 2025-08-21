@@ -16,7 +16,7 @@ import { observeOnce } from "typhoon-server/signal";
 import { SheetApisClient } from "../../client";
 import { roomOrderActionRow } from "../../messageComponents";
 import {
-  emptySchedule,
+  FormatService,
   GuildConfigService,
   guildServicesFromInteractionOption,
   HourRange,
@@ -24,9 +24,9 @@ import {
   MessageRoomOrderService,
   PermissionService,
   PlayerService,
-  RawTeam,
+  Schedule,
   SheetService,
-  FormatService,
+  Team,
 } from "../../services";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
@@ -95,7 +95,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
           pipe(
             SheetService.getAllSchedules(),
             Effect.map(HashMap.get(hour)),
-            Effect.map(Option.getOrElse(() => emptySchedule(hour))),
+            Effect.map(Option.getOrElse(() => Schedule.empty(hour))),
           ),
         ),
         Effect.bind("schedulePlayers", ({ schedule }) =>
@@ -137,7 +137,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
                       teams,
                       Array.map(
                         (team) =>
-                          new RawTeam({
+                          new Team({
                             ...team,
                             tags: pipe(
                               team.tags,
