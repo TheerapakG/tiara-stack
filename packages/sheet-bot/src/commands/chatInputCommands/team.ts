@@ -15,7 +15,7 @@ import {
   PermissionService,
   SheetService,
 } from "../../services";
-import { RawTeam } from "../../services/guild/sheetService";
+import { Team } from "../../services/guild/sheetService";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
   chatInputSubcommandHandlerContextBuilder,
@@ -70,7 +70,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
           pipe(
             HashMap.get(teams, user.id),
             Option.map(({ teams }) => teams),
-            Option.getOrElse(() => [] as RawTeam[]),
+            Option.getOrElse(() => [] as Team[]),
             Array.filter((team) => !team.tags.includes("tierer_hint")),
             Array.map((team) => ({
               name: team.name,
