@@ -21,9 +21,9 @@ import {
   PermissionService,
   RepliableInteractionT,
   SendableChannelContext,
-} from "../services";
-import { buttonInteractionHandlerContextBuilder } from "../types";
-import { bindObject } from "../utils";
+} from "../../services";
+import { buttonInteractionHandlerContextBuilder } from "../../types";
+import { bindObject } from "../../utils";
 
 const buttonData = {
   type: ComponentType.Button,

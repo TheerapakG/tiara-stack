@@ -39,21 +39,23 @@ export class ArrayWithDefault<A> extends Data.TaggedClass("ArrayWithDefault")<{
 }
 
 export const collectArrayToHashMap =
-  <A, K>({
+  <A, B, K>({
     keyGetter,
-    keyValueReducer,
+    valueInitializer,
+    valueReducer,
   }: {
     keyGetter: (a: A) => K;
-    keyValueReducer: (a: A, b: A) => A;
+    valueInitializer: (a: A) => B;
+    valueReducer: (b: NoInfer<B>, a: NoInfer<A>) => NoInfer<B>;
   }) =>
   (a: Array<A>) =>
-    Array.reduce(a, HashMap.empty<K, A>(), (acc, v) =>
+    Array.reduce(a, HashMap.empty<K, B>(), (acc, v) =>
       HashMap.modifyAt(
         acc,
         keyGetter(v),
         Option.match({
-          onSome: (mapValue) => Option.some(keyValueReducer(mapValue, v)),
-          onNone: () => Option.some(v),
+          onSome: (mapValue) => Option.some(valueReducer(mapValue, v)),
+          onNone: () => Option.some(valueInitializer(v)),
         }),
       ),
     );

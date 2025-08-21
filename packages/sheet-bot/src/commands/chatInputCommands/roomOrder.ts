@@ -11,16 +11,18 @@ import {
 import { Array, Effect, Function, HashMap, Option, pipe } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { observeOnce } from "typhoon-server/signal";
-import { roomOrderActionRow } from "../../buttons";
 import { SheetApisClient } from "../../client";
+import { roomOrderActionRow } from "../../messageComponents";
 import {
   emptySchedule,
   GuildConfigService,
   guildServicesFromInteractionOption,
+  HourRange,
   InteractionContext,
   MessageRoomOrderService,
   PermissionService,
   PlayerService,
+  RawTeam,
   SheetService,
 } from "../../services";
 import {
@@ -71,6 +73,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
           user: InteractionContext.user(),
           eventConfig: SheetService.getEventConfig(),
           teams: SheetService.getTeams(),
+          runnerConfig: SheetService.getRunnerConfig(),
         }),
         Effect.let("hour", ({ hourOption, eventConfig }) =>
           pipe(
@@ -103,17 +106,53 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             Effect.map(Array.getSomes),
           ),
         ),
-        Effect.let("scheduleTeams", ({ schedulePlayers, teams }) =>
-          pipe(
-            schedulePlayers,
-            Array.map((player) =>
-              pipe(
-                HashMap.get(teams, player.id),
-                Option.map(({ teams }) => ({ player, teams })),
-                Option.getOrElse(() => ({ player, teams: [] })),
+        Effect.bind(
+          "scheduleTeams",
+          ({ schedulePlayers, teams, runnerConfig, hour }) =>
+            pipe(
+              schedulePlayers,
+              Effect.forEach((player) =>
+                pipe(
+                  Effect.Do,
+                  Effect.let("teams", () =>
+                    pipe(
+                      HashMap.get(teams, player.id),
+                      Option.map(({ teams }) => teams),
+                      Option.getOrElse(() => []),
+                    ),
+                  ),
+                  Effect.let("runnerHours", () =>
+                    pipe(
+                      HashMap.get(runnerConfig, player.name),
+                      Option.map(({ hours }) => hours),
+                      Option.getOrElse(() => []),
+                    ),
+                  ),
+                  Effect.map(({ teams, runnerHours }) => ({
+                    player,
+                    teams: pipe(
+                      teams,
+                      Array.map(
+                        (team) =>
+                          new RawTeam({
+                            ...team,
+                            tags: pipe(
+                              team.tags,
+                              team.tags.includes("tierer_hint") &&
+                                Array.some(
+                                  runnerHours,
+                                  HourRange.includes(hour),
+                                )
+                                ? Array.append("fixed")
+                                : Function.identity,
+                            ),
+                          }),
+                      ),
+                    ),
+                  })),
+                ),
               ),
             ),
-          ),
         ),
         Effect.bind("roomOrders", ({ heal, scheduleTeams }) =>
           pipe(
@@ -145,7 +184,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
                         const percent = lead + (backline - lead) / 5;
                         return {
                           type: team.type,
-                          tagStr: team.tags.join(", "),
+                          tagStr: pipe(team.tags, Array.join(", ")),
                           player: player.name,
                           team: team.name,
                           lead,

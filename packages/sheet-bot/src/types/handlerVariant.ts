@@ -4,16 +4,22 @@ import {
   SlashCommandSubcommandBuilder,
   SlashCommandSubcommandGroupBuilder,
   SlashCommandSubcommandsOnlyBuilder,
+  UserSelectMenuComponentData,
 } from "discord.js";
 import {
   ButtonInteractionT,
   ChatInputCommandInteractionT,
+  UserSelectMenuInteractionT,
 } from "../services/interaction/interactionContext";
 
 export type HandlerVariant = {
   button: {
     data: InteractionButtonComponentData;
     interaction: ButtonInteractionT;
+  };
+  userSelectMenu: {
+    data: UserSelectMenuComponentData;
+    interaction: UserSelectMenuInteractionT;
   };
   chatInput: {
     data: SharedSlashCommand | SlashCommandSubcommandsOnlyBuilder;

@@ -4,9 +4,9 @@ import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { Effect, Logger, pipe } from "effect";
 import { Bot } from "./bot";
-import { buttons } from "./buttons";
 import { commands } from "./commands";
 import { Config } from "./config";
+import { buttons } from "./messageComponents";
 import { botServices } from "./services";
 
 const TracesLive = NodeSdk.layer(() => ({

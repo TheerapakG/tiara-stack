@@ -173,6 +173,9 @@ export class InteractionHandlerContextBuilder<
 export const buttonInteractionHandlerContextBuilder = () =>
   InteractionHandlerContextBuilder.emptyVariant<"button">();
 
+export const userSelectMenuInteractionHandlerContextBuilder = () =>
+  InteractionHandlerContextBuilder.emptyVariant<"userSelectMenu">();
+
 export const chatInputCommandHandlerContextBuilder = () =>
   InteractionHandlerContextBuilder.emptyVariant<"chatInput">();
 
@@ -288,6 +291,15 @@ export const buttonInteractionHandlerMap = <
   R = never,
 >() =>
   InteractionHandlerMap.emptyVariant<"button", A, E, R>(
+    (data) => data.customId,
+  );
+
+export const userSelectMenuInteractionHandlerMap = <
+  A = never,
+  E = never,
+  R = never,
+>() =>
+  InteractionHandlerMap.emptyVariant<"userSelectMenu", A, E, R>(
     (data) => data.customId,
   );
 
