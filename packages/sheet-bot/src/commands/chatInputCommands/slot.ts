@@ -26,11 +26,11 @@ import { slotButton } from "../../messageComponents";
 import {
   ChannelConfigService,
   ClientService,
+  FormatService,
   GuildConfigService,
   guildServicesFromInteractionOption,
   InteractionContext,
   PermissionService,
-  ScheduleService,
   SheetService,
 } from "../../services";
 import {
@@ -43,18 +43,15 @@ const getSlotMessage = (day: number) =>
   pipe(
     Effect.Do,
     bindObject({
-      eventConfig: SheetService.getEventConfig(),
       daySchedule: SheetService.getDaySchedules(day),
     }),
-    Effect.bindAll(({ eventConfig, daySchedule }) => ({
+    Effect.bindAll(({ daySchedule }) => ({
       title: Effect.succeed(`Day ${day} Slots~`),
       description: pipe(
         daySchedule,
         HashMap.values,
         Array.sortBy(Order.mapInput(Order.number, ({ hour }) => hour)),
-        Effect.forEach((schedule) =>
-          ScheduleService.formatEmptySlots(eventConfig.startTime, schedule),
-        ),
+        Effect.forEach((schedule) => FormatService.formatEmptySlots(schedule)),
         Effect.map(Chunk.fromIterable),
         Effect.map(Chunk.dedupeAdjacent),
         Effect.map(Chunk.join("\n")),

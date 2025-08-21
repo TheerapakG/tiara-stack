@@ -91,7 +91,7 @@ const playerParser = ([
     Effect.withSpan("playerParser", { captureStackTrace: true }),
   );
 
-export class RawTeam extends Data.TaggedClass("RawTeam")<{
+export class Team extends Data.TaggedClass("Team")<{
   type: string;
   name: string;
   tags: string[];
@@ -104,7 +104,7 @@ const teamParser = (
   teamConfigValues: TeamConfig[],
   [userIds, ...userTeams]: sheets_v4.Schema$ValueRange[],
 ): Effect.Effect<
-  HashMap.HashMap<string, { id: string; teams: RawTeam[] }>,
+  HashMap.HashMap<string, { id: string; teams: Team[] }>,
   never,
   never
 > =>
@@ -173,7 +173,7 @@ const teamParser = (
                     name,
                     Option.map(
                       (name) =>
-                        new RawTeam({
+                        new Team({
                           type,
                           name,
                           tags,
@@ -209,7 +209,7 @@ const teamParser = (
     Effect.withSpan("playerParser", { captureStackTrace: true }),
   );
 
-export type Schedule = {
+export class Schedule extends Data.TaggedClass("Schedule")<{
   hour: number;
   breakHour: boolean;
   fills: readonly [
@@ -222,7 +222,24 @@ export type Schedule = {
   overfills: string[];
   standbys: string[];
   empty: number;
-};
+}> {
+  static empty(hour: number) {
+    return new Schedule({
+      hour,
+      breakHour: false,
+      fills: [
+        Option.none(),
+        Option.none(),
+        Option.none(),
+        Option.none(),
+        Option.none(),
+      ],
+      overfills: [],
+      standbys: [],
+      empty: 5,
+    });
+  }
+}
 export type ScheduleMap = HashMap.HashMap<number, Schedule>;
 
 const scheduleParser = ([
@@ -332,17 +349,20 @@ const scheduleParser = ([
           ({ hour, breakHour, fills, overfills, standbys }) =>
             pipe(
               hour,
-              Option.map((hour) => ({
-                hour,
-                breakHour,
-                fills,
-                overfills,
-                standbys,
-                empty: Order.max(Order.number)(
-                  5 - fills.filter(Option.isSome).length - overfills.length,
-                  0,
-                ),
-              })),
+              Option.map(
+                (hour) =>
+                  new Schedule({
+                    hour,
+                    breakHour,
+                    fills,
+                    overfills,
+                    standbys,
+                    empty: Order.max(Order.number)(
+                      5 - fills.filter(Option.isSome).length - overfills.length,
+                      0,
+                    ),
+                  }),
+              ),
             ),
         ),
       ),
