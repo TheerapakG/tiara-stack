@@ -4,9 +4,9 @@ import { observeOnce } from "typhoon-server/signal";
 import {
   ChannelConfigService,
   ClientService,
+  FormatService,
   guildServicesFromInteraction,
   InteractionContext,
-  ScheduleService,
   SheetService,
 } from "../../services";
 import { buttonInteractionHandlerContextBuilder } from "../../types";
@@ -16,18 +16,15 @@ const getSlotMessage = (day: number) =>
   pipe(
     Effect.Do,
     bindObject({
-      eventConfig: SheetService.getEventConfig(),
       daySchedule: SheetService.getDaySchedules(day),
     }),
-    Effect.bindAll(({ eventConfig, daySchedule }) => ({
+    Effect.bindAll(({ daySchedule }) => ({
       title: Effect.succeed(`Day ${day} Slots~`),
       description: pipe(
         daySchedule,
         HashMap.values,
         Array.sortBy(Order.mapInput(Order.number, ({ hour }) => hour)),
-        Effect.forEach((schedule) =>
-          ScheduleService.formatEmptySlots(eventConfig.startTime, schedule),
-        ),
+        Effect.forEach((schedule) => FormatService.formatEmptySlots(schedule)),
         Effect.map(Chunk.fromIterable),
         Effect.map(Chunk.dedupeAdjacent),
         Effect.map(Chunk.join("\n")),
