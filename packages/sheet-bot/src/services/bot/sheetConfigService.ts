@@ -38,12 +38,12 @@ const parseValueRange = <A = never, E = never, R = never>(
     Effect.withSpan("parseValueRange", { captureStackTrace: true }),
   );
 
-export type DayConfig = {
+export class DayConfig extends Data.TaggedClass("DayConfig")<{
   channel: string;
   day: number;
   sheet: string;
   draft: string;
-};
+}> {}
 
 const dayConfigParser = ([
   channel,
@@ -129,7 +129,7 @@ const dayConfigParser = ([
         Array.map(({ channel, day, sheet, draft }) =>
           pipe(
             day,
-            Option.map((day) => ({ channel, day, sheet, draft })),
+            Option.map((day) => new DayConfig({ channel, day, sheet, draft })),
           ),
         ),
         Array.getSomes,
@@ -138,11 +138,11 @@ const dayConfigParser = ([
     Effect.withSpan("dayConfigParser", { captureStackTrace: true }),
   );
 
-export type TeamConfig = {
+export class TeamConfig extends Data.TaggedClass("TeamConfig")<{
   name: string;
   range: string;
   tags: string[];
-};
+}> {}
 export type TeamConfigMap = HashMap.HashMap<string, TeamConfig>;
 
 const teamConfigParser = ([
@@ -215,6 +215,9 @@ const teamConfigParser = ([
       pipe(
         array,
         Array.filter(({ name }) => name !== ""),
+        Array.map(
+          ({ name, range, tags }) => new TeamConfig({ name, range, tags }),
+        ),
         collectArrayToHashMap({
           keyGetter: ({ name }) => name,
           valueInitializer: (a) => a,
@@ -337,8 +340,13 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
               spreadsheetId: sheetId,
               ranges: ["'Thee's Sheet Settings'!B8:C"],
             }),
-            Effect.map((response) =>
-              Object.fromEntries(response.data.valueRanges?.[0]?.values ?? []),
+            Effect.flatMap((response) =>
+              pipe(
+                Option.fromNullable(response.data.valueRanges),
+                Option.flatMap(Array.get(0)),
+                Option.flatMap((range) => Option.fromNullable(range.values)),
+                Option.map(Object.fromEntries),
+              ),
             ),
             Effect.flatMap(
               validate(
@@ -376,7 +384,12 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
               ],
             }),
             Effect.flatMap((response) =>
-              teamConfigParser(response.data.valueRanges ?? []),
+              pipe(
+                Option.fromNullable(response.data.valueRanges),
+                Option.map(teamConfigParser),
+                Effect.transposeOption,
+                Effect.flatten,
+              ),
             ),
             Effect.withSpan("SheetConfigService.getTeamConfig", {
               captureStackTrace: true,
@@ -388,8 +401,13 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
               spreadsheetId: sheetId,
               ranges: ["'Thee's Sheet Settings'!I8:J"],
             }),
-            Effect.map((response) =>
-              Object.fromEntries(response.data.valueRanges?.[0]?.values ?? []),
+            Effect.flatMap((response) =>
+              pipe(
+                Option.fromNullable(response.data.valueRanges),
+                Option.flatMap(Array.get(0)),
+                Option.flatMap((range) => Option.fromNullable(range.values)),
+                Option.map(Object.fromEntries),
+              ),
             ),
             Effect.flatMap(
               validate(
@@ -419,7 +437,12 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
               ],
             }),
             Effect.flatMap((response) =>
-              dayConfigParser(response.data.valueRanges ?? []),
+              pipe(
+                Option.fromNullable(response.data.valueRanges),
+                Option.map(dayConfigParser),
+                Effect.transposeOption,
+                Effect.flatten,
+              ),
             ),
             Effect.withSpan("SheetConfigService.getDayConfig", {
               captureStackTrace: true,
@@ -435,7 +458,12 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
               ],
             }),
             Effect.flatMap((response) =>
-              runnerConfigParser(response.data.valueRanges ?? []),
+              pipe(
+                Option.fromNullable(response.data.valueRanges),
+                Option.map(runnerConfigParser),
+                Effect.transposeOption,
+                Effect.flatten,
+              ),
             ),
             Effect.withSpan("SheetConfigService.getRunnerConfig", {
               captureStackTrace: true,
