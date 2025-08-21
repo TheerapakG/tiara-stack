@@ -16,12 +16,12 @@ import {
   ButtonInteractionT,
   CachedInteractionContext,
   channelServicesFromInteraction,
+  FormatService,
   guildServicesFromInteraction,
   InteractionContext,
   MessageRoomOrderService,
   SendableChannelContext,
   SheetService,
-  FormatService,
 } from "../../services";
 import { buttonInteractionHandlerContextBuilder } from "../../types";
 import { bindObject } from "../../utils";
@@ -101,19 +101,26 @@ export const roomOrderPreviousButton = buttonInteractionHandlerContextBuilder()
         Effect.bind("formattedHour", ({ messageRoomOrder }) =>
           FormatService.formatHour(messageRoomOrder.hour),
         ),
-        InteractionContext.tapEditReply(({ messageRoomOrderData, messageRoomOrderRange, messageRoomOrder, formattedHour }) => ({
-          content: [
-            `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(formattedHour.start, TimestampStyles.ShortDateTime)} - ${time(formattedHour.end, TimestampStyles.ShortDateTime)}`,
-            "",
-            messageRoomOrderData.map(
-              ({ team, tags, position }) =>
-                `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
-            ),
-          ].join("\n"),
-          components: [
-            roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank),
-          ],
-        })),
+        InteractionContext.tapEditReply(
+          ({
+            messageRoomOrderData,
+            messageRoomOrderRange,
+            messageRoomOrder,
+            formattedHour,
+          }) => ({
+            content: [
+              `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(formattedHour.start, TimestampStyles.ShortDateTime)} - ${time(formattedHour.end, TimestampStyles.ShortDateTime)}`,
+              "",
+              messageRoomOrderData.map(
+                ({ team, tags, position }) =>
+                  `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
+              ),
+            ].join("\n"),
+            components: [
+              roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank),
+            ],
+          }),
+        ),
         Effect.asVoid,
         Effect.withSpan("handleRoomOrderPreviousButton", {
           captureStackTrace: true,
@@ -160,19 +167,26 @@ export const roomOrderNextButton = buttonInteractionHandlerContextBuilder()
         Effect.bind("formattedHour", ({ messageRoomOrder }) =>
           FormatService.formatHour(messageRoomOrder.hour),
         ),
-        InteractionContext.tapEditReply(({ messageRoomOrderData, messageRoomOrderRange, messageRoomOrder, formattedHour }) => ({
-          content: [
-            `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(formattedHour.start, TimestampStyles.ShortDateTime)} - ${time(formattedHour.end, TimestampStyles.ShortDateTime)}`,
-            "",
-            messageRoomOrderData.map(
-              ({ team, tags, position }) =>
-                `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
-            ),
-          ].join("\n"),
-          components: [
-            roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank),
-          ],
-        })),
+        InteractionContext.tapEditReply(
+          ({
+            messageRoomOrderData,
+            messageRoomOrderRange,
+            messageRoomOrder,
+            formattedHour,
+          }) => ({
+            content: [
+              `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(formattedHour.start, TimestampStyles.ShortDateTime)} - ${time(formattedHour.end, TimestampStyles.ShortDateTime)}`,
+              "",
+              messageRoomOrderData.map(
+                ({ team, tags, position }) =>
+                  `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
+              ),
+            ].join("\n"),
+            components: [
+              roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank),
+            ],
+          }),
+        ),
         Effect.asVoid,
         Effect.withSpan("handleRoomOrderNextButton", {
           captureStackTrace: true,
