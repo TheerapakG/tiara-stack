@@ -21,6 +21,7 @@ import {
   RepliableInteraction,
   Snowflake,
   UserContextMenuCommandInteraction,
+  UserSelectMenuInteraction,
 } from "discord.js";
 import { Context, Data, Effect, HKT, Option, pipe, Types } from "effect";
 
@@ -136,6 +137,12 @@ export interface ButtonInteractionT extends HKT.TypeLambda {
   readonly type: this["Target"] extends CacheType
     ? ButtonInteraction<this["Target"]>
     : ButtonInteraction;
+}
+
+export interface UserSelectMenuInteractionT extends HKT.TypeLambda {
+  readonly type: this["Target"] extends CacheType
+    ? UserSelectMenuInteraction<this["Target"]>
+    : UserSelectMenuInteraction;
 }
 
 export interface AutocompleteInteractionT extends HKT.TypeLambda {

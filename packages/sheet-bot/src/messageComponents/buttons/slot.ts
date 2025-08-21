@@ -8,9 +8,9 @@ import {
   InteractionContext,
   ScheduleService,
   SheetService,
-} from "../services";
-import { buttonInteractionHandlerContextBuilder } from "../types";
-import { bindObject } from "../utils";
+} from "../../services";
+import { buttonInteractionHandlerContextBuilder } from "../../types";
+import { bindObject } from "../../utils";
 
 const getSlotMessage = (day: number) =>
   pipe(

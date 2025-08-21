@@ -14,6 +14,8 @@ import {
   MessageComponentInteraction,
   SharedSlashCommand,
   SlashCommandSubcommandsOnlyBuilder,
+  UserSelectMenuComponentData,
+  UserSelectMenuInteraction,
 } from "discord.js";
 import {
   Data,
@@ -31,11 +33,13 @@ import {
   ClientService,
   InteractionContext,
   interactionServices,
+  UserSelectMenuInteractionT,
 } from "../services";
 import {
   buttonInteractionHandlerMap,
   chatInputCommandHandlerMap,
   InteractionHandlerMapWithMetrics,
+  userSelectMenuInteractionHandlerMap,
   VariantInteractionHandlerContext,
   VariantInteractionHandlerMap,
 } from "../types";
@@ -61,6 +65,14 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       A,
       E,
       R | InteractionContext<ButtonInteractionT>
+    >
+  >;
+  readonly userSelectMenuMap: SynchronizedRef.SynchronizedRef<
+    InteractionHandlerMapWithMetrics<
+      UserSelectMenuComponentData,
+      A,
+      E,
+      R | InteractionContext<UserSelectMenuInteractionT>
     >
   >;
   readonly traceProvider: Layer.Layer<never>;
@@ -155,6 +167,41 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       );
   }
 
+  static onUserSelectMenuInteraction(interaction: UserSelectMenuInteraction) {
+    return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
+      pipe(
+        Effect.Do,
+        Effect.bind("runtime", () => SynchronizedRef.get(bot.runtime)),
+        Effect.bind("userSelectMenuMap", () =>
+          SynchronizedRef.get(bot.userSelectMenuMap),
+        ),
+        Effect.flatMap(({ runtime, userSelectMenuMap }) =>
+          pipe(
+            runtime,
+            Option.map((runtime) =>
+              pipe(
+                userSelectMenuMap,
+                InteractionHandlerMapWithMetrics.executeAndReplyError(
+                  interaction.customId,
+                ),
+                Effect.provide(
+                  interactionServices<UserSelectMenuInteractionT>(interaction),
+                ),
+                Effect.provide(runtime),
+              ),
+            ),
+            Option.getOrElse(() => Effect.void),
+          ),
+        ),
+        Effect.withSpan("Bot.onUserSelectMenuInteraction", {
+          captureStackTrace: true,
+          attributes: {
+            guildId: interaction.guildId,
+          },
+        }),
+      );
+  }
+
   static onMessageComponentInteraction(
     interaction: MessageComponentInteraction,
   ) {
@@ -162,6 +209,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       match({})
         .case(`${ComponentType.Button}`, () =>
           Bot.onButtonInteraction(interaction as ButtonInteraction)(bot),
+        )
+        .case(`${ComponentType.UserSelect}`, () =>
+          Bot.onUserSelectMenuInteraction(
+            interaction as UserSelectMenuInteraction,
+          )(bot),
         )
         .default(() => Effect.void)(interaction.componentType);
   }
@@ -208,6 +260,16 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
               A,
               E,
               R | InteractionContext<ButtonInteractionT>
+            >(),
+          ),
+        ),
+        userSelectMenuMap: SynchronizedRef.make(
+          InteractionHandlerMapWithMetrics.make(
+            "user_select_menu",
+            userSelectMenuInteractionHandlerMap<
+              A,
+              E,
+              R | InteractionContext<UserSelectMenuInteractionT>
             >(),
           ),
         ),
@@ -349,6 +411,42 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
           SynchronizedRef.update(
             bot.buttonsMap,
             InteractionHandlerMapWithMetrics.union(buttons),
+          ),
+        ),
+        Effect.map(({ bot }) => bot),
+      );
+  }
+
+  static addUserSelectMenu<A = never, E = never, R = never>(
+    userSelectMenu: VariantInteractionHandlerContext<"userSelectMenu", A, E, R>,
+  ) {
+    return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
+      pipe(
+        Effect.Do,
+        Effect.let("bot", () => bot as Bot<A | BA, E | BE, R | BR>),
+        Effect.tap(({ bot }) =>
+          SynchronizedRef.update(
+            bot.userSelectMenuMap,
+            InteractionHandlerMapWithMetrics.add(userSelectMenu),
+          ),
+        ),
+        Effect.map(({ bot }) => bot),
+      );
+  }
+
+  static addUserSelectMenuInteractionHandlerMap<
+    A = never,
+    E = never,
+    R = never,
+  >(userSelectMenus: VariantInteractionHandlerMap<"userSelectMenu", A, E, R>) {
+    return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
+      pipe(
+        Effect.Do,
+        Effect.let("bot", () => bot as Bot<A | BA, E | BE, R | BR>),
+        Effect.tap(({ bot }) =>
+          SynchronizedRef.update(
+            bot.userSelectMenuMap,
+            InteractionHandlerMapWithMetrics.union(userSelectMenus),
           ),
         ),
         Effect.map(({ bot }) => bot),

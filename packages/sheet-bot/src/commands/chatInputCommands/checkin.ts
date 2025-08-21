@@ -12,7 +12,7 @@ import {
 } from "discord.js";
 import { Array, Data, Effect, HashMap, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
-import { checkinButton } from "../../buttons";
+import { checkinButton } from "../../messageComponents";
 import {
   channelServicesFromInteraction,
   emptySchedule,

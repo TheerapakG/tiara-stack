@@ -18,9 +18,9 @@ import {
   InteractionContext,
   MessageRoomOrderService,
   SendableChannelContext,
-} from "../services";
-import { buttonInteractionHandlerContextBuilder } from "../types";
-import { bindObject } from "../utils";
+} from "../../services";
+import { buttonInteractionHandlerContextBuilder } from "../../types";
+import { bindObject } from "../../utils";
 
 const roomOrderPreviousButtonData = {
   type: ComponentType.Button,

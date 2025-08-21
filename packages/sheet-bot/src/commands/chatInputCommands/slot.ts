@@ -22,7 +22,7 @@ import {
 } from "effect";
 import { validate } from "typhoon-core/schema";
 import { observeOnce } from "typhoon-server/signal";
-import { slotButton } from "../../buttons";
+import { slotButton } from "../../messageComponents";
 import {
   ChannelConfigService,
   ClientService,

@@ -1,6 +1,15 @@
 import { type sheets_v4 } from "@googleapis/sheets";
 import { type } from "arktype";
-import { Array, Effect, Equal, HashMap, Option, pipe, String } from "effect";
+import {
+  Array,
+  Data,
+  Effect,
+  Equal,
+  HashMap,
+  Option,
+  pipe,
+  String,
+} from "effect";
 import { validate, validateWithDefault } from "typhoon-core/schema";
 import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
 import { GoogleSheets } from "../../google/sheets";
@@ -30,20 +39,34 @@ const parseValueRange = <A = never, E = never, R = never>(
   );
 
 export type DayConfig = {
+  channel: string;
   day: number;
   sheet: string;
   draft: string;
 };
-export type DayConfigMap = HashMap.HashMap<number, DayConfig>;
 
 const dayConfigParser = ([
+  channel,
   day,
   sheet,
   draft,
-]: sheets_v4.Schema$ValueRange[]): Effect.Effect<DayConfigMap, never, never> =>
+]: sheets_v4.Schema$ValueRange[]): Effect.Effect<DayConfig[], never, never> =>
   pipe(
     Effect.Do,
     bindObject({
+      channel: parseValueRange(channel, (arr) =>
+        pipe(
+          Array.get(arr, 0),
+          Option.flatten,
+          Option.match({
+            onSome: validateWithDefault(
+              type("string").pipe((channel) => ({ channel })),
+              { channel: "" },
+            ),
+            onNone: () => Effect.succeed({ channel: "" }),
+          }),
+        ),
+      ),
       day: parseValueRange(day, (arr) =>
         pipe(
           Array.get(arr, 0),
@@ -86,9 +109,12 @@ const dayConfigParser = ([
         ),
       ),
     }),
-    Effect.map(({ day, sheet, draft }) =>
+    Effect.map(({ channel, day, sheet, draft }) =>
       pipe(
-        new ArrayWithDefault({ array: day, default: { day: Option.none() } }),
+        new ArrayWithDefault({ array: channel, default: { channel: "" } }),
+        ArrayWithDefault.zip(
+          new ArrayWithDefault({ array: day, default: { day: Option.none() } }),
+        ),
         ArrayWithDefault.zip(
           new ArrayWithDefault({ array: sheet, default: { sheet: "" } }),
         ),
@@ -100,17 +126,13 @@ const dayConfigParser = ([
     Effect.map(({ array }) =>
       pipe(
         array,
-        Array.map(({ day, sheet, draft }) =>
+        Array.map(({ channel, day, sheet, draft }) =>
           pipe(
             day,
-            Option.map((day) => ({ day, sheet, draft })),
+            Option.map((day) => ({ channel, day, sheet, draft })),
           ),
         ),
         Array.getSomes,
-        collectArrayToHashMap({
-          keyGetter: ({ day }) => day,
-          keyValueReducer: (_, b) => b,
-        }),
       ),
     ),
     Effect.withSpan("dayConfigParser", { captureStackTrace: true }),
@@ -195,11 +217,111 @@ const teamConfigParser = ([
         Array.filter(({ name }) => name !== ""),
         collectArrayToHashMap({
           keyGetter: ({ name }) => name,
-          keyValueReducer: (_, b) => b,
+          valueInitializer: (a) => a,
+          valueReducer: (_, a) => a,
         }),
       ),
     ),
     Effect.withSpan("teamConfigParser", { captureStackTrace: true }),
+  );
+
+export class HourRange extends Data.TaggedClass("HourRange")<{
+  start: number;
+  end: number;
+}> {
+  static includes = (hour: number) => (hourRange: HourRange) =>
+    hour >= hourRange.start && hour <= hourRange.end;
+}
+
+const hourRangesParser = (ranges: string): HourRange[] =>
+  pipe(
+    ranges,
+    String.split(","),
+    Array.map(String.trim),
+    Array.map((range) =>
+      pipe(
+        range,
+        String.split("-"),
+        Array.map(String.trim),
+        ([start, end]) =>
+          new HourRange({
+            start: parseInt(start, 10),
+            end: parseInt(end, 10),
+          }),
+      ),
+    ),
+  );
+
+export class RunnerConfig extends Data.TaggedClass("RunnerConfig")<{
+  name: string;
+  hours: HourRange[];
+}> {}
+
+export type RunnerConfigMap = HashMap.HashMap<string, RunnerConfig>;
+
+const runnerConfigParser = ([
+  name,
+  hours,
+]: sheets_v4.Schema$ValueRange[]): Effect.Effect<
+  RunnerConfigMap,
+  never,
+  never
+> =>
+  pipe(
+    Effect.Do,
+    bindObject({
+      name: parseValueRange(name, (arr) =>
+        pipe(
+          Array.get(arr, 0),
+          Option.flatten,
+          Option.match({
+            onSome: validateWithDefault(
+              type("string").pipe((name) => ({ name })),
+              { name: "" },
+            ),
+            onNone: () => Effect.succeed({ name: "" }),
+          }),
+        ),
+      ),
+      hours: parseValueRange(hours, (arr) =>
+        pipe(
+          Array.get(arr, 0),
+          Option.flatten,
+          Option.match({
+            onSome: validateWithDefault(
+              type("string").pipe((hours) => ({
+                hours: hourRangesParser(hours),
+              })),
+              { hours: [] },
+            ),
+            onNone: () => Effect.succeed({ hours: [] }),
+          }),
+        ),
+      ),
+    }),
+    Effect.map(({ name, hours }) =>
+      pipe(
+        new ArrayWithDefault({ array: name, default: { name: "" } }),
+        ArrayWithDefault.zip(
+          new ArrayWithDefault({ array: hours, default: { hours: [] } }),
+        ),
+        ArrayWithDefault.map(
+          ({ name, hours }) => new RunnerConfig({ name, hours }),
+        ),
+      ),
+    ),
+    Effect.map(({ array }) =>
+      pipe(
+        array,
+        Array.filter(({ name }) => name !== ""),
+        collectArrayToHashMap({
+          keyGetter: ({ name }) => name,
+          valueInitializer: (a) => a,
+          valueReducer: (_, a) => a,
+        }),
+      ),
+    ),
+    Effect.withSpan("runnerConfigParser", { captureStackTrace: true }),
   );
 
 export class SheetConfigService extends Effect.Service<SheetConfigService>()(
@@ -290,15 +412,32 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
             sheet.get({
               spreadsheetId: sheetId,
               ranges: [
-                "'Thee's Sheet Settings'!P8:P",
-                "'Thee's Sheet Settings'!Q8:Q",
-                "'Thee's Sheet Settings'!R8:R",
+                "'Thee's Sheet Settings'!L8:L",
+                "'Thee's Sheet Settings'!M8:M",
+                "'Thee's Sheet Settings'!N8:N",
+                "'Thee's Sheet Settings'!O8:O",
               ],
             }),
             Effect.flatMap((response) =>
               dayConfigParser(response.data.valueRanges ?? []),
             ),
             Effect.withSpan("SheetConfigService.getDayConfig", {
+              captureStackTrace: true,
+            }),
+          ),
+        getRunnerConfig: (sheetId: string) =>
+          pipe(
+            sheet.get({
+              spreadsheetId: sheetId,
+              ranges: [
+                "'Thee's Sheet Settings'!Q8:Q",
+                "'Thee's Sheet Settings'!R8:R",
+              ],
+            }),
+            Effect.flatMap((response) =>
+              runnerConfigParser(response.data.valueRanges ?? []),
+            ),
+            Effect.withSpan("SheetConfigService.getRunnerConfig", {
               captureStackTrace: true,
             }),
           ),

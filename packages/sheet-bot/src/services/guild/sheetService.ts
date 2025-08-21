@@ -198,9 +198,10 @@ const teamParser = (
         Array.getSomes,
         collectArrayToHashMap({
           keyGetter: ({ id }) => id,
-          keyValueReducer: (a, b) => ({
-            id: a.id,
-            teams: Array.appendAll(a.teams, b.teams),
+          valueInitializer: (a) => a,
+          valueReducer: (acc, a) => ({
+            id: acc.id,
+            teams: Array.appendAll(acc.teams, a.teams),
           }),
         }),
       ),
@@ -352,7 +353,8 @@ const scheduleParser = ([
         Array.getSomes,
         collectArrayToHashMap({
           keyGetter: ({ hour }) => hour,
-          keyValueReducer: (_, b) => b,
+          valueInitializer: (a) => a,
+          valueReducer: (_, a) => a,
         }),
       ),
     ),
@@ -399,6 +401,14 @@ export class SheetService extends Effect.Service<SheetService>()(
               pipe(
                 sheetConfigService.getDayConfig(sheetId),
                 Effect.withSpan("SheetService.dayConfig", {
+                  captureStackTrace: true,
+                }),
+              ),
+            ),
+            runnerConfig: Effect.cached(
+              pipe(
+                sheetConfigService.getRunnerConfig(sheetId),
+                Effect.withSpan("SheetService.runnerConfig", {
                   captureStackTrace: true,
                 }),
               ),
@@ -523,6 +533,7 @@ export class SheetService extends Effect.Service<SheetService>()(
             players,
             teams,
             allSchedules,
+            runnerConfig,
           }) => ({
             get: sheetGet,
             update: sheetUpdate,
@@ -551,6 +562,13 @@ export class SheetService extends Effect.Service<SheetService>()(
               pipe(
                 dayConfig,
                 Effect.withSpan("SheetService.getDayConfig", {
+                  captureStackTrace: true,
+                }),
+              ),
+            getRunnerConfig: () =>
+              pipe(
+                runnerConfig,
+                Effect.withSpan("SheetService.getRunnerConfig", {
                   captureStackTrace: true,
                 }),
               ),
@@ -584,15 +602,22 @@ export class SheetService extends Effect.Service<SheetService>()(
                 }),
                 Effect.bind("sheet", ({ dayConfig }) =>
                   pipe(
-                    HashMap.get(dayConfig, day),
+                    dayConfig,
+                    collectArrayToHashMap({
+                      keyGetter: ({ day }) => day,
+                      valueInitializer: (a) => [a],
+                      valueReducer: (acc, a) => Array.append(acc, a),
+                    }),
+                    HashMap.get(day),
+                    // TODO: parse multiple sheets
                     Effect.flatMap((config) =>
                       sheetGet({
                         ranges: [
-                          `'${config.sheet}'!J3:J`,
-                          `'${config.sheet}'!C3:C`,
-                          `'${config.sheet}'!K3:O`,
-                          `'${config.sheet}'!P3:P`,
-                          `'${config.sheet}'!Q3:Q`,
+                          `'${config[0].sheet}'!J3:J`,
+                          `'${config[0].sheet}'!C3:C`,
+                          `'${config[0].sheet}'!K3:O`,
+                          `'${config[0].sheet}'!P3:P`,
+                          `'${config[0].sheet}'!Q3:Q`,
                         ],
                       }),
                     ),
