@@ -24,6 +24,7 @@ import {
   UserSelectMenuInteraction,
 } from "discord.js";
 import { Context, Data, Effect, HKT, Option, pipe, Types } from "effect";
+import { mapify, tapify, tapifyOptional } from "../../utils";
 
 export class NotInGuildError extends Data.TaggedError("NotInGuildError")<{
   readonly message: string;
@@ -286,13 +287,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static tapDeferReply<A>(f?: (a: A) => InteractionDeferReplyOptions) {
-    return <E, R>(self: Effect.Effect<A, E, R>) =>
-      pipe(
-        self,
-        Effect.tap((a) => InteractionContext.deferReply(f?.(a))),
-      );
-  }
+  static tapDeferReply = tapifyOptional(InteractionContext.deferReply);
 
   static deferReplyWithResponse(options?: InteractionDeferReplyOptions) {
     return pipe(
@@ -317,20 +312,19 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static tapDeferUpdate<A>(f?: (a: A) => InteractionDeferUpdateOptions) {
-    return <E, R>(self: Effect.Effect<A, E, R>) =>
-      pipe(
-        self,
-        Effect.tap((a) => InteractionContext.deferUpdate(f?.(a))),
-      );
-  }
+  static tapDeferUpdate = tapifyOptional(InteractionContext.deferUpdate);
 
   static deferUpdateWithResponse(options?: InteractionDeferUpdateOptions) {
     return pipe(
       InteractionContext.interaction<MessageComponentInteractionT>(),
       Effect.flatMap((interaction) =>
-        Effect.tryPromise(() => interaction.deferUpdate(options)),
+        Effect.tryPromise(() =>
+          interaction.deferUpdate({ ...options, withResponse: true }),
+        ),
       ),
+      Effect.withSpan("InteractionContext.deferUpdateWithResponse", {
+        captureStackTrace: true,
+      }),
     );
   }
 
@@ -346,13 +340,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static tapDeleteReply<A>(f?: (a: A) => MessageResolvable | "@original") {
-    return <E, R>(self: Effect.Effect<A, E, R>) =>
-      pipe(
-        self,
-        Effect.tap((a) => InteractionContext.deleteReply(f?.(a))),
-      );
-  }
+  static tapDeleteReply = tapifyOptional(InteractionContext.deleteReply);
 
   static editReply(
     options: string | MessagePayload | InteractionEditReplyOptions,
@@ -368,15 +356,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static tapEditReply<A>(
-    f: (a: A) => string | MessagePayload | InteractionEditReplyOptions,
-  ) {
-    return <E, R>(self: Effect.Effect<A, E, R>) =>
-      pipe(
-        self,
-        Effect.tap((a) => InteractionContext.editReply(f(a))),
-      );
-  }
+  static tapEditReply = tapify(InteractionContext.editReply);
 
   static fetchReply(message?: Snowflake | "@original") {
     return pipe(
@@ -402,15 +382,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static tapFollowUp<A>(
-    f: (a: A) => string | MessagePayload | InteractionReplyOptions,
-  ) {
-    return <E, R>(self: Effect.Effect<A, E, R>) =>
-      pipe(
-        self,
-        Effect.tap((a) => InteractionContext.followUp(f(a))),
-      );
-  }
+  static tapFollowUp = tapify(InteractionContext.followUp);
 
   static reply(options: string | MessagePayload | InteractionReplyOptions) {
     return pipe(
@@ -424,25 +396,8 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static tapReply<A>(
-    f: (a: A) => string | MessagePayload | InteractionReplyOptions,
-  ) {
-    return <E, R>(self: Effect.Effect<A, E, R>) =>
-      pipe(
-        self,
-        Effect.tap((a) => InteractionContext.reply(f(a))),
-      );
-  }
-
-  static mapReply<A>(
-    f: (a: A) => string | MessagePayload | InteractionReplyOptions,
-  ) {
-    return <E, R>(self: Effect.Effect<A, E, R>) =>
-      pipe(
-        self,
-        Effect.flatMap((a) => InteractionContext.reply(f(a))),
-      );
-  }
+  static tapReply = tapify(InteractionContext.reply);
+  static mapReply = mapify(InteractionContext.reply);
 
   static replyWithResponse(options: InteractionReplyOptions) {
     return pipe(
@@ -458,13 +413,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static mapReplyWithResponse<A>(f: (a: A) => InteractionReplyOptions) {
-    return <E, R>(self: Effect.Effect<A, E, R>) =>
-      pipe(
-        self,
-        Effect.flatMap((a) => InteractionContext.replyWithResponse(f(a))),
-      );
-  }
+  static mapReplyWithResponse = mapify(InteractionContext.replyWithResponse);
 
   static update(options: string | MessagePayload | InteractionUpdateOptions) {
     return pipe(
@@ -478,25 +427,8 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static tapUpdate<A>(
-    f: (a: A) => string | MessagePayload | InteractionUpdateOptions,
-  ) {
-    return <E, R>(self: Effect.Effect<A, E, R>) =>
-      pipe(
-        self,
-        Effect.tap((a) => InteractionContext.update(f(a))),
-      );
-  }
-
-  static mapUpdate<A>(
-    f: (a: A) => string | MessagePayload | InteractionUpdateOptions,
-  ) {
-    return <E, R>(self: Effect.Effect<A, E, R>) =>
-      pipe(
-        self,
-        Effect.flatMap((a) => InteractionContext.update(f(a))),
-      );
-  }
+  static tapUpdate = tapify(InteractionContext.update);
+  static mapUpdate = mapify(InteractionContext.update);
 
   static updateWithResponse(options: InteractionUpdateOptions) {
     return pipe(
@@ -512,13 +444,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static mapUpdateWithResponse<A>(f: (a: A) => InteractionUpdateOptions) {
-    return <E, R>(self: Effect.Effect<A, E, R>) =>
-      pipe(
-        self,
-        Effect.flatMap((a) => InteractionContext.updateWithResponse(f(a))),
-      );
-  }
+  static mapUpdateWithResponse = mapify(InteractionContext.updateWithResponse);
 
   static channelId<Required extends boolean>(required?: Required) {
     return pipe(

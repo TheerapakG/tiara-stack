@@ -7,6 +7,8 @@ import {
   MessageFlags,
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
+  time,
+  TimestampStyles,
 } from "discord.js";
 import { Array, Effect, Function, HashMap, Option, pipe } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
@@ -24,6 +26,7 @@ import {
   PlayerService,
   RawTeam,
   SheetService,
+  FormatService,
 } from "../../services";
 import {
   chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
@@ -200,18 +203,23 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             ),
           ),
         ),
-        Effect.bind("message", ({ roomOrders }) =>
+        Effect.bind("formattedHour", ({ hour }) =>
+          FormatService.formatHour(hour),
+        ),
+        Effect.bind("message", ({ hour, formattedHour, roomOrders }) =>
           pipe(
             roomOrders,
             Array.head,
             Option.map((roomOrder) =>
               InteractionContext.editReply({
-                content: roomOrder.room
-                  .map(
+                content: [
+                  `${bold(`Hour ${hour}`)} ${time(formattedHour.start, TimestampStyles.ShortDateTime)} - ${time(formattedHour.end, TimestampStyles.ShortDateTime)}`,
+                  "",
+                  ...roomOrder.room.map(
                     ({ team, tags }, i) =>
                       `${inlineCode(`P${i + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
-                  )
-                  .join("\n"),
+                  ),
+                ].join("\n"),
                 components: [
                   roomOrderActionRow(
                     { minRank: 0, maxRank: Array.length(roomOrders) - 1 },
@@ -228,6 +236,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
         Effect.tap(({ hour, message, roomOrders }) =>
           Effect.all([
             MessageRoomOrderService.upsertMessageRoomOrder(message.id, {
+              hour,
               rank: 0,
             }),
             MessageRoomOrderService.upsertMessageRoomOrderData(
