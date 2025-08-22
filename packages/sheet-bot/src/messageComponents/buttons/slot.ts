@@ -47,7 +47,7 @@ export const button = buttonInteractionHandlerContextBuilder()
     Effect.provide(guildServicesFromInteraction())(
       pipe(
         Effect.Do,
-        InteractionContext.tapDeferReply(() => ({
+        InteractionContext.deferReply.tap(() => ({
           flags: MessageFlags.Ephemeral,
         })),
         bindObject({
@@ -69,7 +69,7 @@ export const button = buttonInteractionHandlerContextBuilder()
         Effect.tap(({ slotMessage }) =>
           pipe(
             ClientService.makeEmbedBuilder(),
-            InteractionContext.tapEditReply((embed) => ({
+            InteractionContext.editReply.tap((embed) => ({
               embeds: [
                 embed
                   .setTitle(slotMessage.title)

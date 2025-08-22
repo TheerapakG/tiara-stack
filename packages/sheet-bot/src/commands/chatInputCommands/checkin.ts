@@ -142,11 +142,11 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
     Effect.provide(guildServicesFromInteractionOption("server_id"))(
       pipe(
         Effect.Do,
-        InteractionContext.tapDeferReply(() => ({
+        InteractionContext.deferReply.tap(() => ({
           flags: MessageFlags.Ephemeral,
         })),
-        PermissionService.tapCheckOwner(() => ({ allowSameGuild: true })),
-        PermissionService.tapCheckRoles(() => ({
+        PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
+        PermissionService.tapCheckEffectRoles(() => ({
           roles: pipe(
             GuildConfigService.getManagerRoles(),
             Effect.flatMap(observeOnce),
@@ -222,7 +222,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             { concurrency: "unbounded" },
           ),
         ),
-        InteractionContext.tapEditReply(({ checkinMessages }) => ({
+        InteractionContext.editReply.tap(({ checkinMessages }) => ({
           content: checkinMessages.emptySlotsMessage,
         })),
         Effect.asVoid,

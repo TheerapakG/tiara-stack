@@ -47,7 +47,7 @@ export const button = buttonInteractionHandlerContextBuilder()
     Effect.provide(guildServicesFromInteraction())(
       pipe(
         Effect.Do,
-        InteractionContext.tapDeferReply(() => ({
+        InteractionContext.deferReply.tap(() => ({
           flags: MessageFlags.Ephemeral,
         })),
         bindObject({
@@ -77,7 +77,7 @@ export const button = buttonInteractionHandlerContextBuilder()
                   checkinData,
                   Option.match({
                     onSome: () =>
-                      InteractionContext.editReply({
+                      InteractionContext.editReply.effect({
                         content: "You have been checked in!",
                       }),
                     onNone: () =>
@@ -105,7 +105,7 @@ export const button = buttonInteractionHandlerContextBuilder()
           pipe(
             messageCheckinData.roleId,
             Option.match({
-              onSome: (roleId) => PermissionService.addRole(roleId),
+              onSome: (roleId) => PermissionService.addRole.effect(roleId),
               onNone: () => Effect.void,
             }),
           ),

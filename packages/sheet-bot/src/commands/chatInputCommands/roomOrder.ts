@@ -55,11 +55,11 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
     Effect.provide(guildServicesFromInteractionOption("server_id"))(
       pipe(
         Effect.Do,
-        InteractionContext.tapDeferReply(() => ({
+        InteractionContext.deferReply.tap(() => ({
           flags: MessageFlags.Ephemeral,
         })),
-        PermissionService.tapCheckOwner(() => ({ allowSameGuild: true })),
-        PermissionService.tapCheckRoles(() => ({
+        PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
+        PermissionService.tapCheckEffectRoles(() => ({
           roles: pipe(
             GuildConfigService.getManagerRoles(),
             Effect.flatMap(observeOnce),
@@ -90,6 +90,9 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
               ),
             ),
           ),
+        ),
+        Effect.bind("formattedHour", ({ hour }) =>
+          FormatService.formatHour(hour),
         ),
         Effect.bind("schedule", ({ hour }) =>
           pipe(
@@ -203,35 +206,27 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             ),
           ),
         ),
-        Effect.bind("formattedHour", ({ hour }) =>
-          FormatService.formatHour(hour),
+        Effect.bind("roomOrder", ({ roomOrders }) =>
+          pipe(roomOrders, Array.head),
         ),
-        Effect.bind("message", ({ hour, formattedHour, roomOrders }) =>
-          pipe(
-            roomOrders,
-            Array.head,
-            Option.map((roomOrder) =>
-              InteractionContext.editReply({
-                content: [
-                  `${bold(`Hour ${hour}`)} ${time(formattedHour.start, TimestampStyles.ShortDateTime)} - ${time(formattedHour.end, TimestampStyles.ShortDateTime)}`,
-                  "",
-                  ...roomOrder.room.map(
-                    ({ team, tags }, i) =>
-                      `${inlineCode(`P${i + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
-                  ),
-                ].join("\n"),
-                components: [
-                  roomOrderActionRow(
-                    { minRank: 0, maxRank: Array.length(roomOrders) - 1 },
-                    0,
-                  ),
-                ],
-              }),
-            ),
-            Effect.transposeOption,
-            // TODO: message on none case
-            Effect.flatMap(Function.identity),
-          ),
+        InteractionContext.editReply.bind(
+          "message",
+          ({ hour, formattedHour, roomOrders, roomOrder }) => ({
+            content: [
+              `${bold(`Hour ${hour}`)} ${time(formattedHour.start, TimestampStyles.ShortDateTime)} - ${time(formattedHour.end, TimestampStyles.ShortDateTime)}`,
+              "",
+              ...roomOrder.room.map(
+                ({ team, tags }, i) =>
+                  `${inlineCode(`P${i + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
+              ),
+            ].join("\n"),
+            components: [
+              roomOrderActionRow(
+                { minRank: 0, maxRank: Array.length(roomOrders) - 1 },
+                0,
+              ),
+            ],
+          }),
         ),
         Effect.tap(({ hour, message, roomOrders }) =>
           Effect.all([

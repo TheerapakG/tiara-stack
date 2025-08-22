@@ -4,7 +4,7 @@ import {
   RoleResolvable,
 } from "discord.js";
 import { Data, Effect, Equal, pipe } from "effect";
-import { bindObject, tapify } from "../../utils";
+import { bindObject, wrap } from "../../utils";
 import { GuildService } from "../guild";
 import { ClientService } from "./clientService";
 import {
@@ -50,7 +50,7 @@ export class PermissionService extends Effect.Service<PermissionService>()(
         client: ClientService.getClient(),
       }),
       Effect.map(({ interaction, cachedInteraction, client }) => ({
-        checkOwner: ({ allowSameGuild }: { allowSameGuild?: boolean }) =>
+        privateCheckOwner: ({ allowSameGuild }: { allowSameGuild?: boolean }) =>
           pipe(
             Effect.Do,
             bindObject({
@@ -77,7 +77,7 @@ export class PermissionService extends Effect.Service<PermissionService>()(
               captureStackTrace: true,
             }),
           ),
-        checkPermissions: ({
+        privateCheckPermissions: ({
           permissions,
           reason,
         }: {
@@ -100,7 +100,7 @@ export class PermissionService extends Effect.Service<PermissionService>()(
               captureStackTrace: true,
             }),
           ),
-        checkRoles: ({
+        privateCheckRoles: ({
           roles,
           reason,
         }: {
@@ -136,7 +136,7 @@ export class PermissionService extends Effect.Service<PermissionService>()(
               captureStackTrace: true,
             }),
           ),
-        addRole: (roleId: string) =>
+        privateAddRole: (roleId: string) =>
           pipe(
             cachedInteraction,
             Effect.flatMap((interaction) =>
@@ -151,10 +151,12 @@ export class PermissionService extends Effect.Service<PermissionService>()(
     accessors: true,
   },
 ) {
-  static tapCheckOwner = tapify(PermissionService.checkOwner);
-  static tapCheckPermissions = tapify(PermissionService.checkPermissions);
+  static checkOwner = wrap(PermissionService.privateCheckOwner);
+  static checkPermissions = wrap(PermissionService.privateCheckPermissions);
+  static checkRoles = wrap(PermissionService.privateCheckRoles);
+  static addRole = wrap(PermissionService.privateAddRole);
 
-  static effectCheckRoles<E, R>({
+  static checkEffectRoles<E, R>({
     roles,
     reason,
   }: {
@@ -163,11 +165,13 @@ export class PermissionService extends Effect.Service<PermissionService>()(
   }) {
     return pipe(
       roles,
-      Effect.tap((roles) => PermissionService.checkRoles({ roles, reason })),
+      Effect.tap((roles) =>
+        PermissionService.checkRoles.effect({ roles, reason }),
+      ),
     );
   }
 
-  static tapCheckRoles<A, E1, R1>(
+  static tapCheckEffectRoles<A, E1, R1>(
     f: (a: A) => {
       roles: Effect.Effect<RoleResolvable[], E1, R1>;
       reason?: string;
@@ -176,9 +180,7 @@ export class PermissionService extends Effect.Service<PermissionService>()(
     return <E2, R2>(self: Effect.Effect<A, E2, R2>) =>
       pipe(
         self,
-        Effect.tap((a) => PermissionService.effectCheckRoles(f(a))),
+        Effect.tap((a) => PermissionService.checkEffectRoles(f(a))),
       );
   }
-
-  static tapAddRole = tapify(PermissionService.addRole);
 }

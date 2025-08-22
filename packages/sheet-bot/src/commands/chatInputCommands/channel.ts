@@ -73,7 +73,7 @@ const handleSet = chatInputSubcommandHandlerContextBuilder()
     Effect.provide(guildServicesFromInteractionOption("server_id"))(
       pipe(
         Effect.Do,
-        PermissionService.tapCheckPermissions(() => ({
+        PermissionService.checkPermissions.tap(() => ({
           permissions: PermissionFlagsBits.ManageGuild,
         })),
         bindObject({
@@ -99,7 +99,7 @@ const handleSet = chatInputSubcommandHandlerContextBuilder()
         Effect.tap(({ channel, config }) =>
           pipe(
             ClientService.makeEmbedBuilder(),
-            InteractionContext.tapReply((embed) => ({
+            InteractionContext.reply.tap((embed) => ({
               embeds: [
                 embed
                   .setTitle(`Success!`)
@@ -135,7 +135,7 @@ const handleUnset = chatInputSubcommandHandlerContextBuilder()
     Effect.provide(guildServicesFromInteractionOption("server_id"))(
       pipe(
         Effect.Do,
-        PermissionService.tapCheckPermissions(() => ({
+        PermissionService.checkPermissions.tap(() => ({
           permissions: PermissionFlagsBits.ManageGuild,
         })),
         bindObject({
@@ -155,7 +155,7 @@ const handleUnset = chatInputSubcommandHandlerContextBuilder()
         Effect.tap(({ channel, config }) =>
           pipe(
             ClientService.makeEmbedBuilder(),
-            InteractionContext.tapReply((embed) => ({
+            InteractionContext.reply.tap((embed) => ({
               embeds: [
                 embed
                   .setTitle(`Success!`)

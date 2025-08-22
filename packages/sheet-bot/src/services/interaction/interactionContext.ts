@@ -24,7 +24,7 @@ import {
   UserSelectMenuInteraction,
 } from "discord.js";
 import { Context, Data, Effect, HKT, Option, pipe, Types } from "effect";
-import { mapify, tapify, tapifyOptional } from "../../utils";
+import { wrap, wrapOptional } from "../../utils";
 
 export class NotInGuildError extends Data.TaggedError("NotInGuildError")<{
   readonly message: string;
@@ -275,8 +275,8 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static deferReply(options?: InteractionDeferReplyOptions) {
-    return pipe(
+  static deferReply = wrapOptional((options?: InteractionDeferReplyOptions) =>
+    pipe(
       InteractionContext.interaction<RepliableInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.tryPromise(() => interaction.deferReply(options)),
@@ -284,82 +284,79 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
       Effect.withSpan("InteractionContext.deferReply", {
         captureStackTrace: true,
       }),
-    );
-  }
+    ),
+  );
 
-  static tapDeferReply = tapifyOptional(InteractionContext.deferReply);
-
-  static deferReplyWithResponse(options?: InteractionDeferReplyOptions) {
-    return pipe(
-      InteractionContext.interaction<RepliableInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.tryPromise(() =>
-          interaction.deferReply({ ...options, withResponse: true }),
+  static deferReplyWithResponse = wrapOptional(
+    (options?: InteractionDeferReplyOptions) =>
+      pipe(
+        InteractionContext.interaction<RepliableInteractionT>(),
+        Effect.flatMap((interaction) =>
+          Effect.tryPromise(() =>
+            interaction.deferReply({ ...options, withResponse: true }),
+          ),
         ),
+        Effect.withSpan("InteractionContext.deferReplyWithResponse", {
+          captureStackTrace: true,
+        }),
       ),
-      Effect.withSpan("InteractionContext.deferReplyWithResponse", {
-        captureStackTrace: true,
-      }),
-    );
-  }
+  );
 
-  static deferUpdate(options?: InteractionDeferUpdateOptions) {
-    return pipe(
+  static deferUpdate = wrapOptional((options?: InteractionDeferUpdateOptions) =>
+    pipe(
       InteractionContext.interaction<MessageComponentInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.tryPromise(() => interaction.deferUpdate(options)),
       ),
-    );
-  }
+      Effect.withSpan("InteractionContext.deferUpdate", {
+        captureStackTrace: true,
+      }),
+    ),
+  );
 
-  static tapDeferUpdate = tapifyOptional(InteractionContext.deferUpdate);
-
-  static deferUpdateWithResponse(options?: InteractionDeferUpdateOptions) {
-    return pipe(
-      InteractionContext.interaction<MessageComponentInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.tryPromise(() =>
-          interaction.deferUpdate({ ...options, withResponse: true }),
+  static deferUpdateWithResponse = wrapOptional(
+    (options?: InteractionDeferUpdateOptions) =>
+      pipe(
+        InteractionContext.interaction<MessageComponentInteractionT>(),
+        Effect.flatMap((interaction) =>
+          Effect.tryPromise(() =>
+            interaction.deferUpdate({ ...options, withResponse: true }),
+          ),
         ),
+        Effect.withSpan("InteractionContext.deferUpdateWithResponse", {
+          captureStackTrace: true,
+        }),
       ),
-      Effect.withSpan("InteractionContext.deferUpdateWithResponse", {
-        captureStackTrace: true,
-      }),
-    );
-  }
+  );
 
-  static deleteReply(message?: MessageResolvable | "@original") {
-    return pipe(
-      InteractionContext.interaction<RepliableInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.tryPromise(() => interaction.deleteReply(message)),
+  static deleteReply = wrapOptional(
+    (message?: MessageResolvable | "@original") =>
+      pipe(
+        InteractionContext.interaction<RepliableInteractionT>(),
+        Effect.flatMap((interaction) =>
+          Effect.tryPromise(() => interaction.deleteReply(message)),
+        ),
+        Effect.withSpan("InteractionContext.deleteReply", {
+          captureStackTrace: true,
+        }),
       ),
-      Effect.withSpan("InteractionContext.deleteReply", {
-        captureStackTrace: true,
-      }),
-    );
-  }
+  );
 
-  static tapDeleteReply = tapifyOptional(InteractionContext.deleteReply);
-
-  static editReply(
-    options: string | MessagePayload | InteractionEditReplyOptions,
-  ) {
-    return pipe(
-      InteractionContext.interaction<RepliableInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.tryPromise(() => interaction.editReply(options)),
+  static editReply = wrap(
+    (options: string | MessagePayload | InteractionEditReplyOptions) =>
+      pipe(
+        InteractionContext.interaction<RepliableInteractionT>(),
+        Effect.flatMap((interaction) =>
+          Effect.tryPromise(() => interaction.editReply(options)),
+        ),
+        Effect.withSpan("InteractionContext.editReply", {
+          captureStackTrace: true,
+        }),
       ),
-      Effect.withSpan("InteractionContext.editReply", {
-        captureStackTrace: true,
-      }),
-    );
-  }
+  );
 
-  static tapEditReply = tapify(InteractionContext.editReply);
-
-  static fetchReply(message?: Snowflake | "@original") {
-    return pipe(
+  static fetchReply = wrapOptional((message?: Snowflake | "@original") =>
+    pipe(
       InteractionContext.interaction<RepliableInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.tryPromise(() => interaction.fetchReply(message)),
@@ -367,40 +364,37 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
       Effect.withSpan("InteractionContext.fetchReply", {
         captureStackTrace: true,
       }),
-    );
-  }
+    ),
+  );
 
-  static followUp(options: string | MessagePayload | InteractionReplyOptions) {
-    return pipe(
-      InteractionContext.interaction<RepliableInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.tryPromise(() => interaction.followUp(options)),
+  static followUp = wrap(
+    (options: string | MessagePayload | InteractionReplyOptions) =>
+      pipe(
+        InteractionContext.interaction<RepliableInteractionT>(),
+        Effect.flatMap((interaction) =>
+          Effect.tryPromise(() => interaction.followUp(options)),
+        ),
+        Effect.withSpan("InteractionContext.followUp", {
+          captureStackTrace: true,
+        }),
       ),
-      Effect.withSpan("InteractionContext.followUp", {
-        captureStackTrace: true,
-      }),
-    );
-  }
+  );
 
-  static tapFollowUp = tapify(InteractionContext.followUp);
-
-  static reply(options: string | MessagePayload | InteractionReplyOptions) {
-    return pipe(
-      InteractionContext.interaction<RepliableInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.tryPromise(() => interaction.reply(options)),
+  static reply = wrap(
+    (options: string | MessagePayload | InteractionReplyOptions) =>
+      pipe(
+        InteractionContext.interaction<RepliableInteractionT>(),
+        Effect.flatMap((interaction) =>
+          Effect.tryPromise(() => interaction.reply(options)),
+        ),
+        Effect.withSpan("InteractionContext.reply", {
+          captureStackTrace: true,
+        }),
       ),
-      Effect.withSpan("InteractionContext.reply", {
-        captureStackTrace: true,
-      }),
-    );
-  }
+  );
 
-  static tapReply = tapify(InteractionContext.reply);
-  static mapReply = mapify(InteractionContext.reply);
-
-  static replyWithResponse(options: InteractionReplyOptions) {
-    return pipe(
+  static replyWithResponse = wrap((options: InteractionReplyOptions) =>
+    pipe(
       InteractionContext.interaction<RepliableInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.tryPromise(() =>
@@ -410,28 +404,24 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
       Effect.withSpan("InteractionContext.replyWithResponse", {
         captureStackTrace: true,
       }),
-    );
-  }
+    ),
+  );
 
-  static mapReplyWithResponse = mapify(InteractionContext.replyWithResponse);
-
-  static update(options: string | MessagePayload | InteractionUpdateOptions) {
-    return pipe(
-      InteractionContext.interaction<MessageComponentInteractionT>(),
-      Effect.flatMap((interaction) =>
-        Effect.tryPromise(() => interaction.update(options)),
+  static update = wrap(
+    (options: string | MessagePayload | InteractionUpdateOptions) =>
+      pipe(
+        InteractionContext.interaction<MessageComponentInteractionT>(),
+        Effect.flatMap((interaction) =>
+          Effect.tryPromise(() => interaction.update(options)),
+        ),
+        Effect.withSpan("InteractionContext.updateWithResponse", {
+          captureStackTrace: true,
+        }),
       ),
-      Effect.withSpan("InteractionContext.updateWithResponse", {
-        captureStackTrace: true,
-      }),
-    );
-  }
+  );
 
-  static tapUpdate = tapify(InteractionContext.update);
-  static mapUpdate = mapify(InteractionContext.update);
-
-  static updateWithResponse(options: InteractionUpdateOptions) {
-    return pipe(
+  static updateWithResponse = wrap((options: InteractionUpdateOptions) =>
+    pipe(
       InteractionContext.interaction<MessageComponentInteractionT>(),
       Effect.flatMap((interaction) =>
         Effect.tryPromise(() =>
@@ -441,10 +431,8 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
       Effect.withSpan("InteractionContext.updateWithResponse", {
         captureStackTrace: true,
       }),
-    );
-  }
-
-  static mapUpdateWithResponse = mapify(InteractionContext.updateWithResponse);
+    ),
+  );
 
   static channelId<Required extends boolean>(required?: Required) {
     return pipe(
