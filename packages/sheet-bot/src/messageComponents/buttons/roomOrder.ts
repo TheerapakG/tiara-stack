@@ -70,7 +70,7 @@ export const roomOrderPreviousButton = buttonInteractionHandlerContextBuilder()
     Effect.provide(guildServicesFromInteraction())(
       pipe(
         Effect.Do,
-        InteractionContext.tapDeferUpdate(),
+        InteractionContext.deferUpdate.tap(),
         bindObject({
           message: CachedInteractionContext.message<ButtonInteractionT>(),
           eventConfig: SheetService.getEventConfig(),
@@ -101,7 +101,7 @@ export const roomOrderPreviousButton = buttonInteractionHandlerContextBuilder()
         Effect.bind("formattedHour", ({ messageRoomOrder }) =>
           FormatService.formatHour(messageRoomOrder.hour),
         ),
-        InteractionContext.tapEditReply(
+        InteractionContext.editReply.tap(
           ({
             messageRoomOrderData,
             messageRoomOrderRange,
@@ -136,7 +136,7 @@ export const roomOrderNextButton = buttonInteractionHandlerContextBuilder()
     Effect.provide(guildServicesFromInteraction())(
       pipe(
         Effect.Do,
-        InteractionContext.tapDeferUpdate(),
+        InteractionContext.deferUpdate.tap(),
         bindObject({
           message: CachedInteractionContext.message<ButtonInteractionT>(),
           eventConfig: SheetService.getEventConfig(),
@@ -167,7 +167,7 @@ export const roomOrderNextButton = buttonInteractionHandlerContextBuilder()
         Effect.bind("formattedHour", ({ messageRoomOrder }) =>
           FormatService.formatHour(messageRoomOrder.hour),
         ),
-        InteractionContext.tapEditReply(
+        InteractionContext.editReply.tap(
           ({
             messageRoomOrderData,
             messageRoomOrderRange,
@@ -202,7 +202,7 @@ export const roomOrderSendButton = buttonInteractionHandlerContextBuilder()
     Effect.provide(guildServicesFromInteraction())(
       pipe(
         Effect.Do,
-        InteractionContext.tapDeferUpdate(),
+        InteractionContext.deferUpdate.tap(),
         bindObject({
           message: CachedInteractionContext.message<ButtonInteractionT>(),
           eventConfig: SheetService.getEventConfig(),
@@ -246,8 +246,9 @@ export const roomOrderSendButton = buttonInteractionHandlerContextBuilder()
             Effect.provide(channelServicesFromInteraction()),
           ),
         ),
-        InteractionContext.tapEditReply(() => ({
+        InteractionContext.editReply.tap(() => ({
           content: "sent room order!",
+          components: [],
         })),
         Effect.asVoid,
         Effect.withSpan("handleRoomOrderSendButton", {

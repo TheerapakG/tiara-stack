@@ -93,7 +93,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
     Effect.provide(guildServicesFromInteractionOption("server_id"))(
       pipe(
         Effect.Do,
-        PermissionService.tapCheckOwner(() => ({ allowSameGuild: true })),
+        PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
         bindObject({
           messageFlags: Ref.make(new MessageFlagsBitField()),
           day: InteractionContext.getNumber("day", true),
@@ -115,7 +115,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
         Effect.tap(({ flags }) =>
           flags.has(MessageFlags.Ephemeral)
             ? Effect.void
-            : PermissionService.effectCheckRoles({
+            : PermissionService.checkEffectRoles({
                 roles: pipe(
                   GuildConfigService.getManagerRoles(),
                   Effect.flatMap(observeOnce),
@@ -124,14 +124,14 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
                 reason: "You can only make persistent messages as a manager",
               }),
         ),
-        InteractionContext.tapDeferReply(({ flags }) => ({
+        InteractionContext.deferReply.tap(({ flags }) => ({
           flags: flags.bitfield,
         })),
         Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
         Effect.bind("response", ({ slotMessage }) =>
           pipe(
             ClientService.makeEmbedBuilder(),
-            InteractionContext.tapEditReply((embed) => ({
+            InteractionContext.editReply.tap((embed) => ({
               embeds: [
                 embed
                   .setTitle(slotMessage.title)
@@ -162,8 +162,8 @@ const handleButton = chatInputSubcommandHandlerContextBuilder()
     Effect.provide(guildServicesFromInteractionOption("server_id"))(
       pipe(
         Effect.Do,
-        PermissionService.tapCheckOwner(() => ({ allowSameGuild: true })),
-        PermissionService.tapCheckRoles(() => ({
+        PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
+        PermissionService.tapCheckEffectRoles(() => ({
           roles: pipe(
             GuildConfigService.getManagerRoles(),
             Effect.flatMap(observeOnce),
@@ -181,7 +181,7 @@ const handleButton = chatInputSubcommandHandlerContextBuilder()
             day,
           }),
         ),
-        InteractionContext.tapReply(({ day }) => ({
+        InteractionContext.reply.tap(({ day }) => ({
           content: `Press the button below to get the current open slots for day ${day}`,
           components: [
             new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(

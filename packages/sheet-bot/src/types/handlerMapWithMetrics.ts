@@ -131,8 +131,8 @@ export class InteractionHandlerMapWithMetrics<
                     InteractionContext<RepliableInteractionT>
                   >(() =>
                     (replied || deferred
-                      ? InteractionContext.followUp
-                      : InteractionContext.reply)({
+                      ? InteractionContext.followUp.effect
+                      : InteractionContext.reply.effect)({
                       content: Cause.pretty(cause),
                       flags: MessageFlags.Ephemeral,
                     }),

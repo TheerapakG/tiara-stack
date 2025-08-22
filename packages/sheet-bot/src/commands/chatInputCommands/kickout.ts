@@ -102,9 +102,9 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
     Effect.provide(guildServicesFromInteractionOption("server_id"))(
       pipe(
         Effect.Do,
-        InteractionContext.tapDeferReply(),
-        PermissionService.tapCheckOwner(() => ({ allowSameGuild: true })),
-        PermissionService.tapCheckRoles(() => ({
+        InteractionContext.deferReply.tap(),
+        PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
+        PermissionService.tapCheckEffectRoles(() => ({
           roles: pipe(
             GuildConfigService.getManagerRoles(),
             Effect.flatMap(observeOnce),
@@ -175,7 +175,7 @@ const handleManual = chatInputSubcommandHandlerContextBuilder()
             ),
           ),
         ),
-        InteractionContext.tapEditReply(({ removedMembers }) => ({
+        InteractionContext.editReply.tap(({ removedMembers }) => ({
           content:
             removedMembers.length > 0
               ? `Kicked out ${removedMembers.map((m) => userMention(m.user.id)).join(" ")}`

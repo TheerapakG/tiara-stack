@@ -41,7 +41,7 @@ const handleListConfig = chatInputSubcommandHandlerContextBuilder()
     Effect.provide(guildServicesFromInteractionOption("server_id"))(
       pipe(
         Effect.Do,
-        PermissionService.tapCheckPermissions(() => ({
+        PermissionService.checkPermissions.tap(() => ({
           permissions: PermissionFlagsBits.ManageGuild,
         })),
         bindObject({
@@ -73,7 +73,7 @@ const handleListConfig = chatInputSubcommandHandlerContextBuilder()
             }),
           ),
         })),
-        InteractionContext.tapReply(
+        InteractionContext.reply.tap(
           ({ guildName, sheetId, scriptId, managerRoles }) => ({
             embeds: [
               new EmbedBuilder()
@@ -117,7 +117,7 @@ const handleAddManagerRole = chatInputSubcommandHandlerContextBuilder()
     Effect.provide(guildServicesFromInteractionOption("server_id"))(
       pipe(
         Effect.Do,
-        PermissionService.tapCheckPermissions(() => ({
+        PermissionService.checkPermissions.tap(() => ({
           permissions: PermissionFlagsBits.ManageGuild,
         })),
         bindObject({
@@ -128,7 +128,7 @@ const handleAddManagerRole = chatInputSubcommandHandlerContextBuilder()
         Effect.tap(({ guildName, role }) =>
           pipe(
             ClientService.makeEmbedBuilder(),
-            InteractionContext.tapReply((embed) => ({
+            InteractionContext.reply.tap((embed) => ({
               embeds: [
                 embed
                   .setTitle(`Success!`)
@@ -178,7 +178,7 @@ const handleRemoveManagerRole = chatInputSubcommandHandlerContextBuilder()
     Effect.provide(guildServicesFromInteractionOption("server_id"))(
       pipe(
         Effect.Do,
-        PermissionService.tapCheckPermissions(() => ({
+        PermissionService.checkPermissions.tap(() => ({
           permissions: PermissionFlagsBits.ManageGuild,
         })),
         bindObject({
@@ -189,7 +189,7 @@ const handleRemoveManagerRole = chatInputSubcommandHandlerContextBuilder()
         Effect.tap(({ guildName, role }) =>
           pipe(
             ClientService.makeEmbedBuilder(),
-            InteractionContext.tapReply((embed) => ({
+            InteractionContext.reply.tap((embed) => ({
               embeds: [
                 embed
                   .setTitle(`Success!`)
@@ -239,7 +239,7 @@ const handleSetSheet = chatInputSubcommandHandlerContextBuilder()
     Effect.provide(guildServicesFromInteractionOption("server_id"))(
       pipe(
         Effect.Do,
-        PermissionService.tapCheckPermissions(() => ({
+        PermissionService.checkPermissions.tap(() => ({
           permissions: PermissionFlagsBits.ManageGuild,
         })),
         bindObject({
@@ -254,7 +254,7 @@ const handleSetSheet = chatInputSubcommandHandlerContextBuilder()
         Effect.tap(({ guildName, sheetId }) =>
           pipe(
             ClientService.makeEmbedBuilder(),
-            InteractionContext.tapReply((embed) => ({
+            InteractionContext.reply.tap((embed) => ({
               embeds: [
                 embed
                   .setTitle(`Success!`)
@@ -292,7 +292,7 @@ const handleSetScript = chatInputSubcommandHandlerContextBuilder()
     Effect.provide(guildServicesFromInteractionOption("server_id"))(
       pipe(
         Effect.Do,
-        PermissionService.tapCheckOwner(() => ({ allowSameGuild: false })),
+        PermissionService.checkOwner.tap(() => ({ allowSameGuild: false })),
         bindObject({
           scriptId: InteractionContext.getString("script_id", true),
           guildName: GuildService.getName(),
@@ -305,7 +305,7 @@ const handleSetScript = chatInputSubcommandHandlerContextBuilder()
         Effect.tap(({ guildName, scriptId }) =>
           pipe(
             ClientService.makeEmbedBuilder(),
-            InteractionContext.tapReply((embed) => ({
+            InteractionContext.reply.tap((embed) => ({
               embeds: [
                 embed
                   .setTitle(`Success!`)

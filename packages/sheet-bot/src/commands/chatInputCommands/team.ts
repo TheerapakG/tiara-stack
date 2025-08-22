@@ -40,7 +40,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
     Effect.provide(guildServicesFromInteractionOption("server_id"))(
       pipe(
         Effect.Do,
-        PermissionService.tapCheckOwner(() => ({ allowSameGuild: true })),
+        PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
         bindObject({
           managerRoles: pipe(
             GuildConfigService.getManagerRoles(),
@@ -59,7 +59,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
         }),
         Effect.tap(({ user, interactionUser, managerRoles }) =>
           user.id !== interactionUser.id
-            ? PermissionService.checkRoles({
+            ? PermissionService.checkRoles.effect({
                 roles: managerRoles.map((role) => role.roleId),
                 reason: "You can only get your own teams in the current server",
               })
@@ -94,7 +94,7 @@ const handleList = chatInputSubcommandHandlerContextBuilder()
         Effect.tap(({ user, userTeams }) =>
           pipe(
             ClientService.makeEmbedBuilder(),
-            InteractionContext.tapReply((embed) => ({
+            InteractionContext.reply.tap((embed) => ({
               embeds: [
                 embed
                   .setTitle(`${escapeMarkdown(user.username)}'s Teams`)
