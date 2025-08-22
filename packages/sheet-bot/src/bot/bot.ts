@@ -36,12 +36,15 @@ import {
   UserSelectMenuInteractionT,
 } from "../services";
 import {
+  ButtonHandlerVariantT,
   buttonInteractionHandlerMap,
-  chatInputCommandHandlerMap,
+  ChatInputHandlerVariantT,
+  chatInputInteractionHandlerMap,
+  HandlerVariantHandlerContext,
+  HandlerVariantMap,
   InteractionHandlerMapWithMetrics,
+  UserSelectMenuHandlerVariantT,
   userSelectMenuInteractionHandlerMap,
-  VariantInteractionHandlerContext,
-  VariantInteractionHandlerMap,
 } from "../types";
 import { bindObject } from "../utils";
 
@@ -246,31 +249,19 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         chatInputCommandsMap: SynchronizedRef.make(
           InteractionHandlerMapWithMetrics.make(
             "chat_input_command",
-            chatInputCommandHandlerMap<
-              A,
-              E,
-              R | InteractionContext<ChatInputCommandInteractionT>
-            >(),
+            chatInputInteractionHandlerMap<A, E, R>(),
           ),
         ),
         buttonsMap: SynchronizedRef.make(
           InteractionHandlerMapWithMetrics.make(
             "button",
-            buttonInteractionHandlerMap<
-              A,
-              E,
-              R | InteractionContext<ButtonInteractionT>
-            >(),
+            buttonInteractionHandlerMap<A, E, R>(),
           ),
         ),
         userSelectMenuMap: SynchronizedRef.make(
           InteractionHandlerMapWithMetrics.make(
             "user_select_menu",
-            userSelectMenuInteractionHandlerMap<
-              A,
-              E,
-              R | InteractionContext<UserSelectMenuInteractionT>
-            >(),
+            userSelectMenuInteractionHandlerMap<A, E, R>(),
           ),
         ),
         traceProvider: Effect.succeed(Layer.empty),
@@ -350,7 +341,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   }
 
   static addChatInputCommand<A = never, E = never, R = never>(
-    command: VariantInteractionHandlerContext<"chatInput", A, E, R>,
+    command: HandlerVariantHandlerContext<ChatInputHandlerVariantT, A, E, R>,
   ) {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
@@ -367,7 +358,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   }
 
   static addChatInputCommandHandlerMap<A = never, E = never, R = never>(
-    commands: VariantInteractionHandlerMap<"chatInput", A, E, R>,
+    commands: HandlerVariantMap<ChatInputHandlerVariantT, A, E, R>,
   ) {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
@@ -384,7 +375,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   }
 
   static addButton<A = never, E = never, R = never>(
-    button: VariantInteractionHandlerContext<"button", A, E, R>,
+    button: HandlerVariantHandlerContext<ButtonHandlerVariantT, A, E, R>,
   ) {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
@@ -401,7 +392,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   }
 
   static addButtonInteractionHandlerMap<A = never, E = never, R = never>(
-    buttons: VariantInteractionHandlerMap<"button", A, E, R>,
+    buttons: HandlerVariantMap<ButtonHandlerVariantT, A, E, R>,
   ) {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
@@ -418,7 +409,12 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   }
 
   static addUserSelectMenu<A = never, E = never, R = never>(
-    userSelectMenu: VariantInteractionHandlerContext<"userSelectMenu", A, E, R>,
+    userSelectMenu: HandlerVariantHandlerContext<
+      UserSelectMenuHandlerVariantT,
+      A,
+      E,
+      R
+    >,
   ) {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
@@ -438,7 +434,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
     A = never,
     E = never,
     R = never,
-  >(userSelectMenus: VariantInteractionHandlerMap<"userSelectMenu", A, E, R>) {
+  >(
+    userSelectMenus: HandlerVariantMap<UserSelectMenuHandlerVariantT, A, E, R>,
+  ) {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
         Effect.Do,
