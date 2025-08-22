@@ -181,7 +181,7 @@ export type InteractionKind<
   B extends CacheType = CacheType,
 > = HKT.Kind<F, never, never, never, B>;
 
-interface BaseBaseInteractionT extends HKT.TypeLambda {
+export interface BaseBaseInteractionT extends HKT.TypeLambda {
   readonly type: BaseInteraction<CacheType>;
 }
 
