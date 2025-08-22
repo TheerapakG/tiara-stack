@@ -12,7 +12,7 @@ import {
 } from "discord.js";
 import { Array, Data, Effect, HashMap, Option, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
-import { checkinButton } from "../../messageComponents";
+import { checkinButton } from "@/messageComponents";
 import {
   channelServicesFromInteraction,
   FormatService,
@@ -25,13 +25,13 @@ import {
   Schedule,
   SendableChannelContext,
   SheetService,
-} from "../../services";
+} from "@/services";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
   ChatInputSubcommandHandlerVariantT,
   handlerVariantContextBuilder,
-} from "../../types";
-import { bindObject } from "../../utils";
+} from "@/types";
+import { bindObject } from "@/utils";
 
 class ArgumentError extends Data.TaggedError("ArgumentError")<{
   readonly message: string;

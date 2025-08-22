@@ -1,10 +1,10 @@
 import { SlashCommandSubcommandGroupBuilder } from "discord.js";
-import { ChatInputCommandInteractionT } from "../../../services";
+import { ChatInputCommandInteractionT } from "@/services";
 import {
   HandlerVariant,
   HandlerVariantT,
   handlerVariantMap,
-} from "../handlerVariant";
+} from "@/types/handler/handlerVariant";
 
 export interface ChatInputSubcommandGroupHandlerVariantT
   extends HandlerVariantT {

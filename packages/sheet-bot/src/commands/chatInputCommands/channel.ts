@@ -16,13 +16,13 @@ import {
   guildServicesFromInteractionOption,
   InteractionContext,
   PermissionService,
-} from "../../services";
+} from "@/services";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
   ChatInputSubcommandHandlerVariantT,
   handlerVariantContextBuilder,
-} from "../../types";
-import { bindObject } from "../../utils";
+} from "@/types";
+import { bindObject } from "@/utils";
 
 const configFields = (config: GuildChannelConfig) => [
   {

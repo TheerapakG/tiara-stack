@@ -1,8 +1,5 @@
+import { InteractionHandlerMap, buttonInteractionHandlerMap } from "@/types";
 import { pipe } from "effect";
-import {
-  InteractionHandlerMap,
-  buttonInteractionHandlerMap,
-} from "../../types";
 import { button as checkinButton } from "./checkin";
 import {
   roomOrderActionRow,

@@ -1,6 +1,3 @@
-import { ButtonStyle, ComponentType, MessageFlags } from "discord.js";
-import { Array, Chunk, Effect, HashMap, Option, Order, pipe } from "effect";
-import { observeOnce } from "typhoon-server/signal";
 import {
   ChannelConfigService,
   ClientService,
@@ -8,12 +5,12 @@ import {
   guildServicesFromInteraction,
   InteractionContext,
   SheetService,
-} from "../../services";
-import {
-  ButtonHandlerVariantT,
-  handlerVariantContextBuilder,
-} from "../../types";
-import { bindObject } from "../../utils";
+} from "@/services";
+import { ButtonHandlerVariantT, handlerVariantContextBuilder } from "@/types";
+import { bindObject } from "@/utils";
+import { ButtonStyle, ComponentType, MessageFlags } from "discord.js";
+import { Array, Chunk, Effect, HashMap, Option, Order, pipe } from "effect";
+import { observeOnce } from "typhoon-server/signal";
 
 const getSlotMessage = (day: number) =>
   pipe(

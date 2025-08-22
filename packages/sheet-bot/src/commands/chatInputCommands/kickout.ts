@@ -17,13 +17,13 @@ import {
   PlayerService,
   Schedule,
   SheetService,
-} from "../../services";
+} from "@/services";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
   ChatInputSubcommandHandlerVariantT,
   handlerVariantContextBuilder,
-} from "../../types";
-import { bindObject } from "../../utils";
+} from "@/types";
+import { bindObject } from "@/utils";
 
 class ArgumentError extends Data.TaggedError("ArgumentError")<{
   readonly message: string;

@@ -1,14 +1,17 @@
-import { Client } from "discord.js";
-import { Effect, Function, Layer, pipe } from "effect";
 import {
   ChannelContext,
   ChannelKind,
   ChannelT,
   GuildBasedChannelT,
   GuildTextBasedChannelT,
-} from "../channel";
-import { GuildService } from "../guild";
-import { CachedInteractionContext, ClientService } from "../interaction";
+} from "@/services/channel";
+import { GuildService } from "@/services/guild";
+import {
+  CachedInteractionContext,
+  ClientService,
+} from "@/services/interaction";
+import { Client } from "discord.js";
+import { Effect, Function, Layer, pipe } from "effect";
 
 export const channelServices = <C extends ChannelT>(channel: ChannelKind<C>) =>
   pipe(

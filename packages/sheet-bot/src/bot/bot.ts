@@ -26,7 +26,7 @@ import {
   pipe,
   SynchronizedRef,
 } from "effect";
-import { Config } from "../config";
+import { Config } from "@/config";
 import {
   ButtonInteractionT,
   ChatInputCommandInteractionT,
@@ -34,7 +34,7 @@ import {
   InteractionContext,
   interactionServices,
   UserSelectMenuInteractionT,
-} from "../services";
+} from "@/services";
 import {
   ButtonHandlerVariantT,
   buttonInteractionHandlerMap,
@@ -45,8 +45,8 @@ import {
   InteractionHandlerMapWithMetrics,
   UserSelectMenuHandlerVariantT,
   userSelectMenuInteractionHandlerMap,
-} from "../types";
-import { bindObject } from "../utils";
+} from "@/types";
+import { bindObject } from "@/utils";
 
 export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   "Bot",

@@ -1,17 +1,20 @@
-import { Data, Effect, Option, pipe } from "effect";
-import { InteractionContext } from "../../../services";
-import { bindObject } from "../../../utils";
-import { InteractionHandler, InteractionHandlerMap } from "../handler";
+import { InteractionContext } from "@/services";
+import {
+  InteractionHandler,
+  InteractionHandlerMap,
+} from "@/types/handler/handler";
 import {
   HandlerVariantHandlerContext,
   HandlerVariantMap,
-} from "../handlerVariant";
+} from "@/types/handler/handlerVariant";
 import {
   ChatInputSubcommandGroupHandlerVariantT,
   ChatInputSubcommandHandlerVariantT,
   chatInputSubcommandGroupInteractionHandlerMap,
   chatInputSubcommandInteractionHandlerMap,
-} from "../variants";
+} from "@/types/handler/variants";
+import { bindObject } from "@/utils";
+import { Data, Effect, Option, pipe } from "effect";
 
 export type SubcommandHandlerObject<A = never, E = never, R = never> = {
   subcommandGroupHandlerMap: HandlerVariantMap<

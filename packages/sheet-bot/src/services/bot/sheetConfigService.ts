@@ -12,8 +12,8 @@ import {
 } from "effect";
 import { validate, validateWithDefault } from "typhoon-core/schema";
 import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
-import { GoogleSheets } from "../../google/sheets";
-import { bindObject } from "../../utils";
+import { GoogleSheets } from "@/google/sheets";
+import { bindObject } from "@/utils";
 
 const parseValueRange = <A = never, E = never, R = never>(
   valueRange: sheets_v4.Schema$ValueRange,

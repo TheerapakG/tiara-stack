@@ -1,10 +1,10 @@
 import { UserSelectMenuComponentData } from "discord.js";
-import { UserSelectMenuInteractionT } from "../../../services";
+import { UserSelectMenuInteractionT } from "@/services";
 import {
   HandlerVariant,
   HandlerVariantT,
   handlerVariantMap,
-} from "../handlerVariant";
+} from "@/types/handler/handlerVariant";
 
 export interface UserSelectMenuHandlerVariantT extends HandlerVariantT {
   readonly type: HandlerVariant<

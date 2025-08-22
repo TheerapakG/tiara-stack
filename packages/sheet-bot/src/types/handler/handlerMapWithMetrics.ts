@@ -1,7 +1,7 @@
 import { InteractionResponse, Message, MessageFlags } from "discord.js";
 import { Cause, Data, Effect, Metric, Option, pipe } from "effect";
-import { InteractionContext, RepliableInteractionT } from "../../services";
-import { bindObject } from "../../utils";
+import { InteractionContext, RepliableInteractionT } from "@/services";
+import { bindObject } from "@/utils";
 import {
   InteractionHandler,
   InteractionHandlerContext,

@@ -1,3 +1,9 @@
+import { GoogleSheets } from "@/google/sheets";
+import {
+  SheetConfigService,
+  TeamConfig,
+} from "@/services/bot/sheetConfigService";
+import { bindObject } from "@/utils";
 import { type MethodOptions, type sheets_v4 } from "@googleapis/sheets";
 import {
   Array,
@@ -13,9 +19,6 @@ import {
 } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
-import { GoogleSheets } from "../../google/sheets";
-import { bindObject } from "../../utils";
-import { SheetConfigService, TeamConfig } from "../bot/sheetConfigService";
 import { GuildConfigService } from "./guildConfigService";
 
 const parseValueRange = <A = never, E = never, R = never>(

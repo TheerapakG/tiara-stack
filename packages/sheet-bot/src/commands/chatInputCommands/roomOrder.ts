@@ -13,8 +13,8 @@ import {
 import { Array, Effect, Function, HashMap, Option, pipe } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { observeOnce } from "typhoon-server/signal";
-import { SheetApisClient } from "../../client";
-import { roomOrderActionRow } from "../../messageComponents";
+import { SheetApisClient } from "@/client";
+import { roomOrderActionRow } from "@/messageComponents";
 import {
   FormatService,
   GuildConfigService,
@@ -27,13 +27,13 @@ import {
   Schedule,
   SheetService,
   Team,
-} from "../../services";
+} from "@/services";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
   ChatInputSubcommandHandlerVariantT,
   handlerVariantContextBuilder,
-} from "../../types";
-import { bindObject } from "../../utils";
+} from "@/types";
+import { bindObject } from "@/utils";
 
 const handleManual =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()

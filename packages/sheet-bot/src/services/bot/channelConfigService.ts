@@ -3,7 +3,7 @@ import { Array, Data, Effect, Option, pipe } from "effect";
 import { configChannel } from "sheet-db-schema";
 import { DBSubscriptionContext } from "typhoon-server/db";
 import { Computed } from "typhoon-server/signal";
-import { DB } from "../../db";
+import { DB } from "@/db";
 
 type ConfigInsert = typeof configChannel.$inferInsert;
 type ConfigSelect = typeof configChannel.$inferSelect;

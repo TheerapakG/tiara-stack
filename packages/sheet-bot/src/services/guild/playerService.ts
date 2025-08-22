@@ -1,5 +1,5 @@
 import { Array, Data, Effect, HashMap, Option, pipe } from "effect";
-import { bindObject } from "../../utils";
+import { bindObject } from "@/utils";
 import { SheetService } from "./sheetService";
 
 export class Player extends Data.TaggedClass("Player")<{
