@@ -34,8 +34,9 @@ import {
   SheetService,
 } from "../../services";
 import {
-  chatInputCommandHandlerContextWithSubcommandHandlerBuilder,
-  chatInputSubcommandHandlerContextBuilder,
+  chatInputCommandSubcommandHandlerContextBuilder,
+  ChatInputSubcommandHandlerVariantT,
+  handlerVariantContextBuilder,
 } from "../../types";
 import { bindObject } from "../../utils";
 
@@ -63,154 +64,157 @@ const getSlotMessage = (day: number) =>
     Effect.map(({ title, description }) => ({ title, description })),
   );
 
-const handleList = chatInputSubcommandHandlerContextBuilder()
-  .data(
-    new SlashCommandSubcommandBuilder()
-      .setName("list")
-      .setDescription("Get the open slots for the day")
-      .addNumberOption((option) =>
-        option
-          .setName("day")
-          .setDescription("The day to get the slots for")
-          .setRequired(true),
-      )
-      .addStringOption((option) =>
-        option
-          .setName("server_id")
-          .setDescription("The server to get the teams for"),
-      )
-      .addStringOption((option) =>
-        option
-          .setName("message_type")
-          .setDescription("The type of message to send")
-          .addChoices(
-            { name: "persistent", value: "persistent" },
-            { name: "ephemeral", value: "ephemeral" },
-          ),
-      ),
-  )
-  .handler(
-    Effect.provide(guildServicesFromInteractionOption("server_id"))(
-      pipe(
-        Effect.Do,
-        PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
-        bindObject({
-          messageFlags: Ref.make(new MessageFlagsBitField()),
-          day: InteractionContext.getNumber("day", true),
-          messageType: pipe(
-            InteractionContext.getString("message_type"),
-            Effect.map(Option.getOrElse(() => "ephemeral")),
-            Effect.flatMap(
-              validate(type.enumerated("persistent", "ephemeral")),
-            ),
-          ),
-          user: InteractionContext.user(),
-        }),
-        Effect.tap(({ messageFlags, messageType }) =>
-          Ref.update(messageFlags, (flags) =>
-            flags.add(messageType === "ephemeral" ? MessageFlags.Ephemeral : 0),
-          ),
-        ),
-        Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
-        Effect.tap(({ flags }) =>
-          flags.has(MessageFlags.Ephemeral)
-            ? Effect.void
-            : PermissionService.checkEffectRoles({
-                roles: pipe(
-                  GuildConfigService.getManagerRoles(),
-                  Effect.flatMap(observeOnce),
-                  Effect.map(Array.map((role) => role.roleId)),
-                ),
-                reason: "You can only make persistent messages as a manager",
-              }),
-        ),
-        InteractionContext.deferReply.tap(({ flags }) => ({
-          flags: flags.bitfield,
-        })),
-        Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
-        Effect.bind("response", ({ slotMessage }) =>
-          pipe(
-            ClientService.makeEmbedBuilder(),
-            InteractionContext.editReply.tap((embed) => ({
-              embeds: [
-                embed
-                  .setTitle(slotMessage.title)
-                  .setDescription(slotMessage.description),
-              ],
-            })),
-          ),
-        ),
-        Effect.withSpan("handleSlotList", { captureStackTrace: true }),
-      ),
-    ),
-  )
-  .build();
-
-const handleButton = chatInputSubcommandHandlerContextBuilder()
-  .data(
-    new SlashCommandSubcommandBuilder()
-      .setName("button")
-      .setDescription("show the button to get the open slots")
-      .addNumberOption((option) =>
-        option
-          .setName("day")
-          .setDescription("The day to get the slots for")
-          .setRequired(true),
-      ),
-  )
-  .handler(
-    Effect.provide(guildServicesFromInteractionOption("server_id"))(
-      pipe(
-        Effect.Do,
-        PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
-        PermissionService.tapCheckEffectRoles(() => ({
-          roles: pipe(
-            GuildConfigService.getManagerRoles(),
-            Effect.flatMap(observeOnce),
-            Effect.map(Array.map((role) => role.roleId)),
-          ),
-          reason: "You can only make buttons as a manager",
-        })),
-        bindObject({
-          day: InteractionContext.getNumber("day", true),
-          channel: InteractionContext.channel(true),
-          user: InteractionContext.user(),
-        }),
-        Effect.tap(({ channel, day }) =>
-          ChannelConfigService.upsertConfig(channel.id, {
-            day,
-          }),
-        ),
-        InteractionContext.reply.tap(({ day }) => ({
-          content: `Press the button below to get the current open slots for day ${day}`,
-          components: [
-            new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-              new ButtonBuilder(slotButton.data),
-            ),
-          ],
-        })),
-        Effect.withSpan("handleSlotButton", { captureStackTrace: true }),
-      ),
-    ),
-  )
-  .build();
-
-export const command =
-  chatInputCommandHandlerContextWithSubcommandHandlerBuilder()
+const handleList =
+  handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
     .data(
-      new SlashCommandBuilder()
-        .setName("slot")
-        .setDescription("Day slots commands")
-        .setIntegrationTypes(
-          ApplicationIntegrationType.GuildInstall,
-          ApplicationIntegrationType.UserInstall,
+      new SlashCommandSubcommandBuilder()
+        .setName("list")
+        .setDescription("Get the open slots for the day")
+        .addNumberOption((option) =>
+          option
+            .setName("day")
+            .setDescription("The day to get the slots for")
+            .setRequired(true),
         )
-        .setContexts(
-          InteractionContextType.BotDM,
-          InteractionContextType.Guild,
-          InteractionContextType.PrivateChannel,
+        .addStringOption((option) =>
+          option
+            .setName("server_id")
+            .setDescription("The server to get the teams for"),
+        )
+        .addStringOption((option) =>
+          option
+            .setName("message_type")
+            .setDescription("The type of message to send")
+            .addChoices(
+              { name: "persistent", value: "persistent" },
+              { name: "ephemeral", value: "ephemeral" },
+            ),
         ),
     )
-    .addSubcommandHandler(handleList)
-    .addSubcommandHandler(handleButton)
+    .handler(
+      Effect.provide(guildServicesFromInteractionOption("server_id"))(
+        pipe(
+          Effect.Do,
+          PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
+          bindObject({
+            messageFlags: Ref.make(new MessageFlagsBitField()),
+            day: InteractionContext.getNumber("day", true),
+            messageType: pipe(
+              InteractionContext.getString("message_type"),
+              Effect.map(Option.getOrElse(() => "ephemeral")),
+              Effect.flatMap(
+                validate(type.enumerated("persistent", "ephemeral")),
+              ),
+            ),
+            user: InteractionContext.user(),
+          }),
+          Effect.tap(({ messageFlags, messageType }) =>
+            Ref.update(messageFlags, (flags) =>
+              flags.add(
+                messageType === "ephemeral" ? MessageFlags.Ephemeral : 0,
+              ),
+            ),
+          ),
+          Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
+          Effect.tap(({ flags }) =>
+            flags.has(MessageFlags.Ephemeral)
+              ? Effect.void
+              : PermissionService.checkEffectRoles({
+                  roles: pipe(
+                    GuildConfigService.getManagerRoles(),
+                    Effect.flatMap(observeOnce),
+                    Effect.map(Array.map((role) => role.roleId)),
+                  ),
+                  reason: "You can only make persistent messages as a manager",
+                }),
+          ),
+          InteractionContext.deferReply.tap(({ flags }) => ({
+            flags: flags.bitfield,
+          })),
+          Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
+          Effect.bind("response", ({ slotMessage }) =>
+            pipe(
+              ClientService.makeEmbedBuilder(),
+              InteractionContext.editReply.tap((embed) => ({
+                embeds: [
+                  embed
+                    .setTitle(slotMessage.title)
+                    .setDescription(slotMessage.description),
+                ],
+              })),
+            ),
+          ),
+          Effect.withSpan("handleSlotList", { captureStackTrace: true }),
+        ),
+      ),
+    )
     .build();
+
+const handleButton =
+  handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
+    .data(
+      new SlashCommandSubcommandBuilder()
+        .setName("button")
+        .setDescription("show the button to get the open slots")
+        .addNumberOption((option) =>
+          option
+            .setName("day")
+            .setDescription("The day to get the slots for")
+            .setRequired(true),
+        ),
+    )
+    .handler(
+      Effect.provide(guildServicesFromInteractionOption("server_id"))(
+        pipe(
+          Effect.Do,
+          PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
+          PermissionService.tapCheckEffectRoles(() => ({
+            roles: pipe(
+              GuildConfigService.getManagerRoles(),
+              Effect.flatMap(observeOnce),
+              Effect.map(Array.map((role) => role.roleId)),
+            ),
+            reason: "You can only make buttons as a manager",
+          })),
+          bindObject({
+            day: InteractionContext.getNumber("day", true),
+            channel: InteractionContext.channel(true),
+            user: InteractionContext.user(),
+          }),
+          Effect.tap(({ channel, day }) =>
+            ChannelConfigService.upsertConfig(channel.id, {
+              day,
+            }),
+          ),
+          InteractionContext.reply.tap(({ day }) => ({
+            content: `Press the button below to get the current open slots for day ${day}`,
+            components: [
+              new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                new ButtonBuilder(slotButton.data),
+              ),
+            ],
+          })),
+          Effect.withSpan("handleSlotButton", { captureStackTrace: true }),
+        ),
+      ),
+    )
+    .build();
+
+export const command = chatInputCommandSubcommandHandlerContextBuilder()
+  .data(
+    new SlashCommandBuilder()
+      .setName("slot")
+      .setDescription("Day slots commands")
+      .setIntegrationTypes(
+        ApplicationIntegrationType.GuildInstall,
+        ApplicationIntegrationType.UserInstall,
+      )
+      .setContexts(
+        InteractionContextType.BotDM,
+        InteractionContextType.Guild,
+        InteractionContextType.PrivateChannel,
+      ),
+  )
+  .addSubcommandHandler(handleList)
+  .addSubcommandHandler(handleButton)
+  .build();

@@ -22,7 +22,10 @@ import {
   RepliableInteractionT,
   SendableChannelContext,
 } from "../../services";
-import { buttonInteractionHandlerContextBuilder } from "../../types";
+import {
+  ButtonHandlerVariantT,
+  handlerVariantContextBuilder,
+} from "../../types";
 import { bindObject } from "../../utils";
 
 const buttonData = {
@@ -41,7 +44,7 @@ class CheckinError extends Data.TaggedError("CheckinError")<{
   }
 }
 
-export const button = buttonInteractionHandlerContextBuilder()
+export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
   .data(buttonData)
   .handler(
     Effect.provide(guildServicesFromInteraction())(

@@ -9,7 +9,10 @@ import {
   InteractionContext,
   SheetService,
 } from "../../services";
-import { buttonInteractionHandlerContextBuilder } from "../../types";
+import {
+  ButtonHandlerVariantT,
+  handlerVariantContextBuilder,
+} from "../../types";
 import { bindObject } from "../../utils";
 
 const getSlotMessage = (day: number) =>
@@ -36,7 +39,7 @@ const getSlotMessage = (day: number) =>
     Effect.map(({ title, description }) => ({ title, description })),
   );
 
-export const button = buttonInteractionHandlerContextBuilder()
+export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
   .data({
     type: ComponentType.Button,
     customId: "interaction:slot",
