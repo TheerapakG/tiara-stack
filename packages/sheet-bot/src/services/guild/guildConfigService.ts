@@ -7,8 +7,8 @@ import {
 } from "sheet-db-schema";
 import { Computed } from "typhoon-core/signal";
 import { DBSubscriptionContext } from "typhoon-server/db";
-import { DB } from "../../db";
-import { bindObject } from "../../utils";
+import { DB } from "@/db";
+import { bindObject } from "@/utils";
 import { GuildService } from "./guildService";
 
 type GuildConfigInsert = typeof configGuild.$inferInsert;

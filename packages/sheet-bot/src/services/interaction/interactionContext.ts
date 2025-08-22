@@ -24,7 +24,7 @@ import {
   UserSelectMenuInteraction,
 } from "discord.js";
 import { Context, Data, Effect, HKT, Option, pipe, Types } from "effect";
-import { wrap, wrapOptional } from "../../utils";
+import { wrap, wrapOptional } from "@/utils";
 
 export class NotInGuildError extends Data.TaggedError("NotInGuildError")<{
   readonly message: string;

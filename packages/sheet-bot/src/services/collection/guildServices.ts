@@ -1,12 +1,15 @@
-import { Effect, Layer, Option, pipe } from "effect";
 import {
   FormatService,
   GuildConfigService,
   GuildService,
   PlayerService,
   SheetService,
-} from "../guild";
-import { CachedInteractionContext, InteractionContext } from "../interaction";
+} from "@/services/guild";
+import {
+  CachedInteractionContext,
+  InteractionContext,
+} from "@/services/interaction";
+import { Effect, Layer, Option, pipe } from "effect";
 
 export const guildServices = (guildId: string) =>
   pipe(

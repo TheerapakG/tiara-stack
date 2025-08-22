@@ -14,14 +14,14 @@ import {
   InteractionContext,
   PermissionService,
   SheetService,
-} from "../../services";
-import { Team } from "../../services/guild/sheetService";
+} from "@/services";
+import { Team } from "@/services/guild/sheetService";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
   ChatInputSubcommandHandlerVariantT,
   handlerVariantContextBuilder,
-} from "../../types";
-import { bindObject } from "../../utils";
+} from "@/types";
+import { bindObject } from "@/utils";
 
 const handleList =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()

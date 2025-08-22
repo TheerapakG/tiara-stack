@@ -4,7 +4,7 @@ import { Array, Data, Effect, Option, pipe } from "effect";
 import { messageCheckin, messageCheckinMember } from "sheet-db-schema";
 import { DBSubscriptionContext } from "typhoon-server/db";
 import { Computed } from "typhoon-server/signal";
-import { DB } from "../../db";
+import { DB } from "@/db";
 
 type MessageCheckinInsert = typeof messageCheckin.$inferInsert;
 type MessageCheckinSelect = typeof messageCheckin.$inferSelect;

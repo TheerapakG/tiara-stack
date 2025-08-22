@@ -2,12 +2,12 @@ import {
   SharedSlashCommand,
   SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
-import { ChatInputCommandInteractionT } from "../../../services";
+import { ChatInputCommandInteractionT } from "@/services";
 import {
   HandlerVariant,
   HandlerVariantT,
   handlerVariantMap,
-} from "../handlerVariant";
+} from "@/types/handler/handlerVariant";
 
 export interface ChatInputHandlerVariantT extends HandlerVariantT {
   readonly type: HandlerVariant<

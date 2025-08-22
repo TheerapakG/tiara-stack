@@ -18,14 +18,14 @@ import {
   guildServicesFromInteractionOption,
   InteractionContext,
   PermissionService,
-} from "../../services";
+} from "@/services";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
   chatInputSubcommandGroupSubcommandHandlerContextBuilder,
   ChatInputSubcommandHandlerVariantT,
   handlerVariantContextBuilder,
-} from "../../types";
-import { bindObject } from "../../utils";
+} from "@/types";
+import { bindObject } from "@/utils";
 
 const handleListConfig =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()

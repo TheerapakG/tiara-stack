@@ -5,7 +5,7 @@ import {
   InteractionKind,
   InteractionT,
   PermissionService,
-} from "../interaction";
+} from "@/services/interaction";
 
 export const interactionServices = <I extends InteractionT>(
   interaction: InteractionKind<I>,

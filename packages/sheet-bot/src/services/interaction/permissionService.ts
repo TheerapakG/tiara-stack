@@ -4,8 +4,8 @@ import {
   RoleResolvable,
 } from "discord.js";
 import { Data, Effect, Equal, pipe } from "effect";
-import { bindObject, wrap } from "../../utils";
-import { GuildService } from "../guild";
+import { bindObject, wrap } from "@/utils";
+import { GuildService } from "@/services/guild";
 import { ClientService } from "./clientService";
 import {
   CachedInteractionContext,

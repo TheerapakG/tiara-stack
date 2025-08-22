@@ -1,15 +1,15 @@
 import { Effect, Layer, pipe } from "effect";
 import { DBSubscriptionContext } from "typhoon-server/db";
-import { SheetApisClient } from "../../client";
-import { Config } from "../../config";
-import { DB } from "../../db";
-import { GoogleLive } from "../../google";
+import { SheetApisClient } from "@/client";
+import { Config } from "@/config";
+import { DB } from "@/db";
+import { GoogleLive } from "@/google";
 import {
   ChannelConfigService,
   MessageCheckinService,
   MessageRoomOrderService,
   SheetConfigService,
-} from "../bot";
+} from "@/services/bot";
 
 export const botServices = pipe(
   Layer.mergeAll(

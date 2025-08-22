@@ -22,7 +22,7 @@ import {
 } from "effect";
 import { validate } from "typhoon-core/schema";
 import { observeOnce } from "typhoon-server/signal";
-import { slotButton } from "../../messageComponents";
+import { slotButton } from "@/messageComponents";
 import {
   ChannelConfigService,
   ClientService,
@@ -32,13 +32,13 @@ import {
   InteractionContext,
   PermissionService,
   SheetService,
-} from "../../services";
+} from "@/services";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
   ChatInputSubcommandHandlerVariantT,
   handlerVariantContextBuilder,
-} from "../../types";
-import { bindObject } from "../../utils";
+} from "@/types";
+import { bindObject } from "@/utils";
 
 const getSlotMessage = (day: number) =>
   pipe(

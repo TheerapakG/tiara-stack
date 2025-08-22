@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import { Effect, pipe } from "effect";
 import postgres from "postgres";
-import { Config } from "../config";
+import { Config } from "@/config";
 
 export class DB extends Effect.Service<DB>()("DB", {
   scoped: pipe(

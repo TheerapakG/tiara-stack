@@ -1,5 +1,5 @@
 import { HKT } from "effect";
-import { BaseBaseInteractionT, InteractionContext } from "../../services";
+import { BaseBaseInteractionT, InteractionContext } from "@/services";
 import {
   InteractionHandler,
   InteractionHandlerContext,

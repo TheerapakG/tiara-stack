@@ -1,10 +1,10 @@
 import { InteractionButtonComponentData } from "discord.js";
-import { ButtonInteractionT } from "../../../services";
+import { ButtonInteractionT } from "@/services";
 import {
   HandlerVariant,
   HandlerVariantT,
   handlerVariantMap,
-} from "../handlerVariant";
+} from "@/types/handler/handlerVariant";
 
 export interface ButtonHandlerVariantT extends HandlerVariantT {
   readonly type: HandlerVariant<

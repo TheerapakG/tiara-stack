@@ -3,6 +3,7 @@ import { builtinModules } from "module";
 import path from "pathe";
 import { defineConfig } from "rolldown";
 import { dts } from "rolldown-plugin-dts";
+import { aliasPlugin } from "rolldown/experimental";
 import simpleGit from "simple-git";
 
 const git = simpleGit();
@@ -25,6 +26,16 @@ export default defineConfig({
     "process.env.BUILD_VERSION": `"${date}-${hash}"`,
   },
   platform: "node",
-  plugins: [dts()],
+  plugins: [
+    dts(),
+    aliasPlugin({
+      entries: [
+        { find: "~~", replacement: path.resolve(__dirname, ".") },
+        { find: "@@", replacement: path.resolve(__dirname, ".") },
+        { find: "~", replacement: path.resolve(__dirname, "src") },
+        { find: "@", replacement: path.resolve(__dirname, "src") },
+      ],
+    }),
+  ],
   external: [...builtinModules, /^node:/],
 });

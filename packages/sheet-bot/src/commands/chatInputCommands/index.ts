@@ -1,8 +1,5 @@
+import { InteractionHandlerMap, chatInputInteractionHandlerMap } from "@/types";
 import { pipe } from "effect";
-import {
-  InteractionHandlerMap,
-  chatInputInteractionHandlerMap,
-} from "../../types";
 import { command as channel } from "./channel";
 import { command as checkin } from "./checkin";
 import { command as kickout } from "./kickout";

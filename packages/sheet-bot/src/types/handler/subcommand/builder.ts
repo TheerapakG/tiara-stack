@@ -6,12 +6,12 @@ import {
   SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 import { Data, Option, pipe } from "effect";
-import { InteractionHandlerContext } from "../handler";
-import { HandlerVariantHandlerContext } from "../handlerVariant";
+import { InteractionHandlerContext } from "@/types/handler/handler";
+import { HandlerVariantHandlerContext } from "@/types/handler/handlerVariant";
 import {
   ChatInputSubcommandGroupHandlerVariantT,
   ChatInputSubcommandHandlerVariantT,
-} from "../variants";
+} from "@/types/handler/variants";
 import { SubcommandHandler } from "./handler";
 
 type SubcommandHandlerBuilderData<
