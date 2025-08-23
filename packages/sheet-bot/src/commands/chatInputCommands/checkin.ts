@@ -1,17 +1,3 @@
-import { addMinutes, getUnixTime } from "date-fns/fp";
-import {
-  ActionRowBuilder,
-  ApplicationIntegrationType,
-  ButtonBuilder,
-  channelMention,
-  InteractionContextType,
-  MessageActionRowComponentBuilder,
-  MessageFlags,
-  SlashCommandBuilder,
-  SlashCommandSubcommandBuilder,
-} from "discord.js";
-import { Array, Data, Effect, HashMap, Option, pipe } from "effect";
-import { observeOnce } from "typhoon-server/signal";
 import { checkinButton } from "@/messageComponents";
 import {
   channelServicesFromInteraction,
@@ -32,6 +18,20 @@ import {
   handlerVariantContextBuilder,
 } from "@/types";
 import { bindObject } from "@/utils";
+import { addMinutes, getUnixTime } from "date-fns/fp";
+import {
+  ActionRowBuilder,
+  ApplicationIntegrationType,
+  ButtonBuilder,
+  channelMention,
+  InteractionContextType,
+  MessageActionRowComponentBuilder,
+  MessageFlags,
+  SlashCommandBuilder,
+  SlashCommandSubcommandBuilder,
+} from "discord.js";
+import { Array, Data, Effect, HashMap, Option, pipe } from "effect";
+import { observeOnce } from "typhoon-server/signal";
 
 class ArgumentError extends Data.TaggedError("ArgumentError")<{
   readonly message: string;
@@ -150,18 +150,23 @@ const handleManual =
             flags: MessageFlags.Ephemeral,
           })),
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
-          PermissionService.tapCheckEffectRoles(() => ({
-            roles: pipe(
+          PermissionService.checkRoles.tapEffect(() =>
+            pipe(
               GuildConfigService.getManagerRoles(),
               Effect.flatMap(observeOnce),
-              Effect.map(Array.map((role) => role.roleId)),
+              Effect.map((roles) => ({
+                roles: pipe(
+                  roles,
+                  Array.map((role) => role.roleId),
+                ),
+                reason: "You can only check in users as a manager",
+              })),
             ),
-            reason: "You can only check in users as a manager",
-          })),
+          ),
+          InteractionContext.user.bind("user"),
           bindObject({
             hourOption: InteractionContext.getNumber("hour"),
             channelName: InteractionContext.getString("channel_name", true),
-            user: InteractionContext.user(),
             eventConfig: SheetService.getEventConfig(),
           }),
           Effect.let("hour", ({ hourOption, eventConfig }) =>
@@ -196,7 +201,7 @@ const handleManual =
           ),
           Effect.bind("message", ({ checkinData, checkinMessages }) =>
             pipe(
-              SendableChannelContext.send({
+              SendableChannelContext.send().sync({
                 content: checkinMessages.checkinMessage,
                 components: checkinData.runningChannel.roleId
                   ? [

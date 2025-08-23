@@ -1,13 +1,3 @@
-import { addMinutes, getMinutes, getUnixTime } from "date-fns/fp";
-import {
-  ApplicationIntegrationType,
-  InteractionContextType,
-  SlashCommandBuilder,
-  SlashCommandSubcommandBuilder,
-  userMention,
-} from "discord.js";
-import { Array, Data, Effect, Function, HashMap, Option, pipe } from "effect";
-import { observeOnce } from "typhoon-server/signal";
 import {
   GuildConfigService,
   GuildService,
@@ -24,6 +14,16 @@ import {
   handlerVariantContextBuilder,
 } from "@/types";
 import { bindObject } from "@/utils";
+import { addMinutes, getMinutes, getUnixTime } from "date-fns/fp";
+import {
+  ApplicationIntegrationType,
+  InteractionContextType,
+  SlashCommandBuilder,
+  SlashCommandSubcommandBuilder,
+  userMention,
+} from "discord.js";
+import { Array, Data, Effect, Function, HashMap, Option, pipe } from "effect";
+import { observeOnce } from "typhoon-server/signal";
 
 class ArgumentError extends Data.TaggedError("ArgumentError")<{
   readonly message: string;
@@ -106,20 +106,21 @@ const handleManual =
           Effect.Do,
           InteractionContext.deferReply.tap(),
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
-          PermissionService.tapCheckEffectRoles(() => ({
-            roles: pipe(
+          PermissionService.checkRoles.tapEffect(() =>
+            pipe(
               GuildConfigService.getManagerRoles(),
               Effect.flatMap(observeOnce),
               Effect.map(Array.map((role) => role.roleId)),
+              Effect.map((roles) => ({
+                roles,
+                reason: "You can only kick out users as a manager",
+              })),
             ),
-            reason: "You can only kick out users as a manager",
-          })),
+          ),
           bindObject({
             hourOption: InteractionContext.getNumber("hour"),
             channelName: InteractionContext.getString("channel_name", true),
             guildName: GuildService.getName(),
-            channel: InteractionContext.channel(true),
-            user: InteractionContext.user(),
             eventConfig: SheetService.getEventConfig(),
           }),
           Effect.let("date", () => new Date()),

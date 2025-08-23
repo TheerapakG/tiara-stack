@@ -23,7 +23,7 @@ import {
   time,
   TimestampStyles,
 } from "discord.js";
-import { Effect, Function, pipe } from "effect";
+import { Effect, Function, Layer, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 
 const roomOrderPreviousButtonData = {
@@ -72,8 +72,10 @@ export const roomOrderPreviousButton =
         pipe(
           Effect.Do,
           InteractionContext.deferUpdate.tap(),
+          CachedInteractionContext.message<ButtonInteractionT>().bind(
+            "message",
+          ),
           bindObject({
-            message: CachedInteractionContext.message<ButtonInteractionT>(),
             eventConfig: SheetService.getEventConfig(),
           }),
           Effect.bindAll(
@@ -144,8 +146,10 @@ export const roomOrderNextButton =
         pipe(
           Effect.Do,
           InteractionContext.deferUpdate.tap(),
+          CachedInteractionContext.message<ButtonInteractionT>().bind(
+            "message",
+          ),
           bindObject({
-            message: CachedInteractionContext.message<ButtonInteractionT>(),
             eventConfig: SheetService.getEventConfig(),
           }),
           Effect.bindAll(
@@ -212,12 +216,19 @@ export const roomOrderSendButton =
   handlerVariantContextBuilder<ButtonHandlerVariantT>()
     .data(roomOrderSendButtonData)
     .handler(
-      Effect.provide(guildServicesFromInteraction())(
+      Effect.provide(
+        Layer.mergeAll(
+          guildServicesFromInteraction(),
+          channelServicesFromInteraction(),
+        ),
+      )(
         pipe(
           Effect.Do,
           InteractionContext.deferUpdate.tap(),
+          CachedInteractionContext.message<ButtonInteractionT>().bind(
+            "message",
+          ),
           bindObject({
-            message: CachedInteractionContext.message<ButtonInteractionT>(),
             eventConfig: SheetService.getEventConfig(),
           }),
           Effect.bindAll(
@@ -244,21 +255,17 @@ export const roomOrderSendButton =
               Effect.flatMap(observeOnce),
             ),
           ),
-          Effect.tap(
-            ({ messageRoomOrderData, eventConfig, messageRoomOrder }) =>
-              pipe(
-                SendableChannelContext.send({
-                  content: [
-                    `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(eventConfig.startTime + (messageRoomOrder.hour - 1) * 3600, TimestampStyles.ShortDateTime)} - ${time(eventConfig.startTime + messageRoomOrder.hour * 3600, TimestampStyles.ShortDateTime)}`,
-                    "",
-                    ...messageRoomOrderData.map(
-                      ({ team, tags, position }) =>
-                        `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
-                    ),
-                  ].join("\n"),
-                }),
-                Effect.provide(channelServicesFromInteraction()),
-              ),
+          SendableChannelContext.send().tap(
+            ({ messageRoomOrderData, eventConfig, messageRoomOrder }) => ({
+              content: [
+                `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(eventConfig.startTime + (messageRoomOrder.hour - 1) * 3600, TimestampStyles.ShortDateTime)} - ${time(eventConfig.startTime + messageRoomOrder.hour * 3600, TimestampStyles.ShortDateTime)}`,
+                "",
+                ...messageRoomOrderData.map(
+                  ({ team, tags, position }) =>
+                    `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
+                ),
+              ].join("\n"),
+            }),
           ),
           InteractionContext.editReply.tap(() => ({
             content: "sent room order!",

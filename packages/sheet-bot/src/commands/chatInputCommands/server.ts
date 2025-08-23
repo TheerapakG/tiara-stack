@@ -1,17 +1,4 @@
 import {
-  ApplicationIntegrationType,
-  EmbedBuilder,
-  escapeMarkdown,
-  InteractionContextType,
-  PermissionFlagsBits,
-  roleMention,
-  SlashCommandBuilder,
-  SlashCommandSubcommandBuilder,
-  SlashCommandSubcommandGroupBuilder,
-} from "discord.js";
-import { Effect, Option, pipe } from "effect";
-import { observeOnce } from "typhoon-server/signal";
-import {
   ClientService,
   GuildConfigService,
   GuildService,
@@ -26,6 +13,18 @@ import {
   handlerVariantContextBuilder,
 } from "@/types";
 import { bindObject } from "@/utils";
+import {
+  ApplicationIntegrationType,
+  escapeMarkdown,
+  InteractionContextType,
+  PermissionFlagsBits,
+  roleMention,
+  SlashCommandBuilder,
+  SlashCommandSubcommandBuilder,
+  SlashCommandSubcommandGroupBuilder,
+} from "discord.js";
+import { Effect, Option, pipe } from "effect";
+import { observeOnce } from "typhoon-server/signal";
 
 const handleListConfig =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
@@ -75,20 +74,24 @@ const handleListConfig =
               }),
             ),
           })),
-          InteractionContext.reply.tap(
-            ({ guildName, sheetId, scriptId, managerRoles }) => ({
-              embeds: [
-                new EmbedBuilder()
-                  .setTitle(`Config for ${escapeMarkdown(guildName)}`)
-                  .setDescription(
-                    [
-                      `Sheet id: ${sheetId}`,
-                      `Script id: ${scriptId}`,
-                      `Manager roles: ${managerRoles.length > 0 ? managerRoles.map((role) => roleMention(role.roleId)).join(", ") : "None"}`,
-                    ].join("\n"),
-                  ),
-              ],
-            }),
+          InteractionContext.reply.tapEffect(
+            ({ guildName, sheetId, scriptId, managerRoles }) =>
+              pipe(
+                ClientService.makeEmbedBuilder(),
+                Effect.map((embed) => ({
+                  embeds: [
+                    embed
+                      .setTitle(`Config for ${escapeMarkdown(guildName)}`)
+                      .setDescription(
+                        [
+                          `Sheet id: ${sheetId}`,
+                          `Script id: ${scriptId}`,
+                          `Manager roles: ${managerRoles.length > 0 ? managerRoles.map((role) => roleMention(role.roleId)).join(", ") : "None"}`,
+                        ].join("\n"),
+                      ),
+                  ],
+                })),
+              ),
           ),
           Effect.withSpan("handleServerListConfig", {
             captureStackTrace: true,
@@ -128,10 +131,10 @@ const handleAddManagerRole =
             role: InteractionContext.getRole("role", true),
           }),
           Effect.tap(({ role }) => GuildConfigService.addManagerRole(role.id)),
-          Effect.tap(({ guildName, role }) =>
+          InteractionContext.reply.tapEffect(({ guildName, role }) =>
             pipe(
               ClientService.makeEmbedBuilder(),
-              InteractionContext.reply.tap((embed) => ({
+              Effect.map((embed) => ({
                 embeds: [
                   embed
                     .setTitle(`Success!`)
@@ -191,10 +194,10 @@ const handleRemoveManagerRole =
           Effect.tap(({ role }) =>
             GuildConfigService.removeManagerRole(role.id),
           ),
-          Effect.tap(({ guildName, role }) =>
+          InteractionContext.reply.tapEffect(({ guildName, role }) =>
             pipe(
               ClientService.makeEmbedBuilder(),
-              InteractionContext.reply.tap((embed) => ({
+              Effect.map((embed) => ({
                 embeds: [
                   embed
                     .setTitle(`Success!`)
@@ -256,10 +259,10 @@ const handleSetSheet =
               sheetId,
             }),
           ),
-          Effect.tap(({ guildName, sheetId }) =>
+          InteractionContext.reply.tapEffect(({ guildName, sheetId }) =>
             pipe(
               ClientService.makeEmbedBuilder(),
-              InteractionContext.reply.tap((embed) => ({
+              Effect.map((embed) => ({
                 embeds: [
                   embed
                     .setTitle(`Success!`)
@@ -308,10 +311,10 @@ const handleSetScript =
               scriptId,
             }),
           ),
-          Effect.tap(({ guildName, scriptId }) =>
+          InteractionContext.reply.tapEffect(({ guildName, scriptId }) =>
             pipe(
               ClientService.makeEmbedBuilder(),
-              InteractionContext.reply.tap((embed) => ({
+              Effect.map((embed) => ({
                 embeds: [
                   embed
                     .setTitle(`Success!`)
