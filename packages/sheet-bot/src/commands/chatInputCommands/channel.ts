@@ -1,15 +1,4 @@
 import {
-  ApplicationIntegrationType,
-  channelMention,
-  escapeMarkdown,
-  InteractionContextType,
-  PermissionFlagsBits,
-  roleMention,
-  SlashCommandBuilder,
-  SlashCommandSubcommandBuilder,
-} from "discord.js";
-import { Effect, Function, Option, pipe } from "effect";
-import {
   ClientService,
   GuildChannelConfig,
   GuildConfigService,
@@ -23,6 +12,17 @@ import {
   handlerVariantContextBuilder,
 } from "@/types";
 import { bindObject } from "@/utils";
+import {
+  ApplicationIntegrationType,
+  channelMention,
+  escapeMarkdown,
+  InteractionContextType,
+  PermissionFlagsBits,
+  roleMention,
+  SlashCommandBuilder,
+  SlashCommandSubcommandBuilder,
+} from "discord.js";
+import { Effect, Function, Option, pipe } from "effect";
 
 const configFields = (config: GuildChannelConfig) => [
   {
@@ -78,8 +78,8 @@ const handleSet =
           PermissionService.checkPermissions.tap(() => ({
             permissions: PermissionFlagsBits.ManageGuild,
           })),
+          InteractionContext.channel(true).bind("channel"),
           bindObject({
-            channel: InteractionContext.channel(true),
             running: InteractionContext.getBoolean("running"),
             name: InteractionContext.getString("name"),
             role: InteractionContext.getRole("role"),
@@ -98,10 +98,10 @@ const handleSet =
               Effect.flatMap(Function.identity),
             ),
           ),
-          Effect.tap(({ channel, config }) =>
+          InteractionContext.reply.tapEffect(({ channel, config }) =>
             pipe(
               ClientService.makeEmbedBuilder(),
-              InteractionContext.reply.tap((embed) => ({
+              Effect.map((embed) => ({
                 embeds: [
                   embed
                     .setTitle(`Success!`)
@@ -145,8 +145,8 @@ const handleUnset =
           PermissionService.checkPermissions.tap(() => ({
             permissions: PermissionFlagsBits.ManageGuild,
           })),
+          InteractionContext.channel(true).bind("channel"),
           bindObject({
-            channel: InteractionContext.channel(true),
             name: InteractionContext.getBoolean("name"),
             role: InteractionContext.getBoolean("role"),
           }),
@@ -159,10 +159,10 @@ const handleUnset =
               Effect.flatMap(Function.identity),
             ),
           ),
-          Effect.tap(({ channel, config }) =>
+          InteractionContext.reply.tapEffect(({ channel, config }) =>
             pipe(
               ClientService.makeEmbedBuilder(),
-              InteractionContext.reply.tap((embed) => ({
+              Effect.map((embed) => ({
                 embeds: [
                   embed
                     .setTitle(`Success!`)

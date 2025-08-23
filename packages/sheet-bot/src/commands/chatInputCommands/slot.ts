@@ -1,3 +1,20 @@
+import { slotButton } from "@/messageComponents";
+import {
+  ChannelConfigService,
+  ClientService,
+  FormatService,
+  GuildConfigService,
+  guildServicesFromInteractionOption,
+  InteractionContext,
+  PermissionService,
+  SheetService,
+} from "@/services";
+import {
+  chatInputCommandSubcommandHandlerContextBuilder,
+  ChatInputSubcommandHandlerVariantT,
+  handlerVariantContextBuilder,
+} from "@/types";
+import { bindObject } from "@/utils";
 import { type } from "arktype";
 import {
   ActionRowBuilder,
@@ -22,23 +39,6 @@ import {
 } from "effect";
 import { validate } from "typhoon-core/schema";
 import { observeOnce } from "typhoon-server/signal";
-import { slotButton } from "@/messageComponents";
-import {
-  ChannelConfigService,
-  ClientService,
-  FormatService,
-  GuildConfigService,
-  guildServicesFromInteractionOption,
-  InteractionContext,
-  PermissionService,
-  SheetService,
-} from "@/services";
-import {
-  chatInputCommandSubcommandHandlerContextBuilder,
-  ChatInputSubcommandHandlerVariantT,
-  handlerVariantContextBuilder,
-} from "@/types";
-import { bindObject } from "@/utils";
 
 const getSlotMessage = (day: number) =>
   pipe(
@@ -106,7 +106,6 @@ const handleList =
                 validate(type.enumerated("persistent", "ephemeral")),
               ),
             ),
-            user: InteractionContext.user(),
           }),
           Effect.tap(({ messageFlags, messageType }) =>
             Ref.update(messageFlags, (flags) =>
@@ -117,25 +116,30 @@ const handleList =
           ),
           Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),
           Effect.tap(({ flags }) =>
-            flags.has(MessageFlags.Ephemeral)
-              ? Effect.void
-              : PermissionService.checkEffectRoles({
-                  roles: pipe(
-                    GuildConfigService.getManagerRoles(),
-                    Effect.flatMap(observeOnce),
-                    Effect.map(Array.map((role) => role.roleId)),
-                  ),
-                  reason: "You can only make persistent messages as a manager",
-                }),
+            pipe(
+              PermissionService.checkRoles.effect(
+                pipe(
+                  GuildConfigService.getManagerRoles(),
+                  Effect.flatMap(observeOnce),
+                  Effect.map(Array.map((role) => role.roleId)),
+                  Effect.map((roles) => ({
+                    roles,
+                    reason:
+                      "You can only make persistent messages as a manager",
+                  })),
+                ),
+              ),
+              Effect.when(() => !flags.has(MessageFlags.Ephemeral)),
+            ),
           ),
           InteractionContext.deferReply.tap(({ flags }) => ({
             flags: flags.bitfield,
           })),
           Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
-          Effect.bind("response", ({ slotMessage }) =>
+          InteractionContext.reply.tapEffect(({ slotMessage }) =>
             pipe(
               ClientService.makeEmbedBuilder(),
-              InteractionContext.editReply.tap((embed) => ({
+              Effect.map((embed) => ({
                 embeds: [
                   embed
                     .setTitle(slotMessage.title)
@@ -168,18 +172,20 @@ const handleButton =
         pipe(
           Effect.Do,
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
-          PermissionService.tapCheckEffectRoles(() => ({
-            roles: pipe(
+          PermissionService.checkRoles.tapEffect(() =>
+            pipe(
               GuildConfigService.getManagerRoles(),
               Effect.flatMap(observeOnce),
               Effect.map(Array.map((role) => role.roleId)),
+              Effect.map((roles) => ({
+                roles,
+                reason: "You can only make buttons as a manager",
+              })),
             ),
-            reason: "You can only make buttons as a manager",
-          })),
+          ),
+          InteractionContext.channel(true).bind("channel"),
           bindObject({
             day: InteractionContext.getNumber("day", true),
-            channel: InteractionContext.channel(true),
-            user: InteractionContext.user(),
           }),
           Effect.tap(({ channel, day }) =>
             ChannelConfigService.upsertConfig(channel.id, {

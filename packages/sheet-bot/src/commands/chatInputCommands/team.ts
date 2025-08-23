@@ -1,13 +1,4 @@
 import {
-  ApplicationIntegrationType,
-  escapeMarkdown,
-  InteractionContextType,
-  SlashCommandBuilder,
-  SlashCommandSubcommandBuilder,
-} from "discord.js";
-import { Array, Effect, HashMap, Option, pipe } from "effect";
-import { observeOnce } from "typhoon-server/signal";
-import {
   ClientService,
   GuildConfigService,
   guildServicesFromInteractionOption,
@@ -21,7 +12,15 @@ import {
   ChatInputSubcommandHandlerVariantT,
   handlerVariantContextBuilder,
 } from "@/types";
-import { bindObject } from "@/utils";
+import {
+  ApplicationIntegrationType,
+  escapeMarkdown,
+  InteractionContextType,
+  SlashCommandBuilder,
+  SlashCommandSubcommandBuilder,
+} from "discord.js";
+import { Array, Effect, HashMap, Option, pipe } from "effect";
+import { observeOnce } from "typhoon-server/signal";
 
 const handleList =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
@@ -45,30 +44,25 @@ const handleList =
         pipe(
           Effect.Do,
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
-          bindObject({
+          InteractionContext.user.bind("interactionUser"),
+          Effect.bindAll(({ interactionUser }) => ({
             managerRoles: pipe(
               GuildConfigService.getManagerRoles(),
               Effect.flatMap(observeOnce),
             ),
-            interactionUser: InteractionContext.user(),
             user: pipe(
               InteractionContext.getUser("user"),
-              Effect.flatMap(
-                Option.match({
-                  onSome: (user) => Effect.succeed(user),
-                  onNone: () => InteractionContext.user(),
-                }),
-              ),
+              Effect.map(Option.getOrElse(() => interactionUser)),
             ),
-          }),
+          })),
           Effect.tap(({ user, interactionUser, managerRoles }) =>
-            user.id !== interactionUser.id
-              ? PermissionService.checkRoles.effect({
-                  roles: managerRoles.map((role) => role.roleId),
-                  reason:
-                    "You can only get your own teams in the current server",
-                })
-              : Effect.void,
+            pipe(
+              PermissionService.checkRoles.sync({
+                roles: managerRoles.map((role) => role.roleId),
+                reason: "You can only get your own teams in the current server",
+              }),
+              Effect.when(() => user.id !== interactionUser.id),
+            ),
           ),
           Effect.bind("teams", () => SheetService.getTeams()),
           Effect.let("userTeams", ({ user, teams }) =>
@@ -96,10 +90,10 @@ const handleList =
               })),
             ),
           ),
-          Effect.tap(({ user, userTeams }) =>
+          InteractionContext.reply.tapEffect(({ user, userTeams }) =>
             pipe(
               ClientService.makeEmbedBuilder(),
-              InteractionContext.reply.tap((embed) => ({
+              Effect.map((embed) => ({
                 embeds: [
                   embed
                     .setTitle(`${escapeMarkdown(user.username)}'s Teams`)

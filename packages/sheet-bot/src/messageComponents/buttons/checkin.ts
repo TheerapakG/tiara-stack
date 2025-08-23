@@ -10,7 +10,6 @@ import {
   SendableChannelContext,
 } from "@/services";
 import { ButtonHandlerVariantT, handlerVariantContextBuilder } from "@/types";
-import { bindObject } from "@/utils";
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -50,10 +49,8 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         InteractionContext.deferReply.tap(() => ({
           flags: MessageFlags.Ephemeral,
         })),
-        bindObject({
-          message: CachedInteractionContext.message<ButtonInteractionT>(),
-          user: InteractionContext.user(),
-        }),
+        InteractionContext.user.bind("user"),
+        CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
         Effect.bind("messageCheckinData", ({ message }) =>
           pipe(
             MessageCheckinService.getMessageCheckinData(message.id),
@@ -77,7 +74,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
                   checkinData,
                   Option.match({
                     onSome: () =>
-                      InteractionContext.editReply.effect({
+                      InteractionContext.editReply.sync({
                         content: "You have been checked in!",
                       }),
                     onNone: () =>
@@ -105,7 +102,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
           pipe(
             messageCheckinData.roleId,
             Option.match({
-              onSome: (roleId) => PermissionService.addRole.effect(roleId),
+              onSome: (roleId) => PermissionService.addRole.sync(roleId),
               onNone: () => Effect.void,
             }),
           ),
@@ -128,7 +125,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
               }),
             ),
             pipe(
-              SendableChannelContext.send({
+              SendableChannelContext.send().sync({
                 content: `${userMention(user.id)} has checked in!`,
               }),
               Effect.provide(

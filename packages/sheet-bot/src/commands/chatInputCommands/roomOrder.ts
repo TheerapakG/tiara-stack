@@ -1,18 +1,3 @@
-import { addMinutes, getUnixTime } from "date-fns/fp";
-import {
-  ApplicationIntegrationType,
-  bold,
-  inlineCode,
-  InteractionContextType,
-  MessageFlags,
-  SlashCommandBuilder,
-  SlashCommandSubcommandBuilder,
-  time,
-  TimestampStyles,
-} from "discord.js";
-import { Array, Effect, Function, HashMap, Option, pipe } from "effect";
-import { WebSocketClient } from "typhoon-client-ws/client";
-import { observeOnce } from "typhoon-server/signal";
 import { SheetApisClient } from "@/client";
 import { roomOrderActionRow } from "@/messageComponents";
 import {
@@ -34,6 +19,21 @@ import {
   handlerVariantContextBuilder,
 } from "@/types";
 import { bindObject } from "@/utils";
+import { addMinutes, getUnixTime } from "date-fns/fp";
+import {
+  ApplicationIntegrationType,
+  bold,
+  inlineCode,
+  InteractionContextType,
+  MessageFlags,
+  SlashCommandBuilder,
+  SlashCommandSubcommandBuilder,
+  time,
+  TimestampStyles,
+} from "discord.js";
+import { Array, Effect, Function, HashMap, Option, pipe } from "effect";
+import { WebSocketClient } from "typhoon-client-ws/client";
+import { observeOnce } from "typhoon-server/signal";
 
 const handleManual =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
@@ -61,21 +61,24 @@ const handleManual =
             flags: MessageFlags.Ephemeral,
           })),
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
-          PermissionService.tapCheckEffectRoles(() => ({
-            roles: pipe(
+          PermissionService.checkRoles.tapEffect(() =>
+            pipe(
               GuildConfigService.getManagerRoles(),
               Effect.flatMap(observeOnce),
               Effect.map(Array.map((role) => role.roleId)),
+              Effect.map((roles) => ({
+                roles,
+                reason: "You can only order rooms as a manager",
+              })),
             ),
-            reason: "You can only order rooms as a manager",
-          })),
+          ),
+          InteractionContext.user.bind("user"),
           bindObject({
             hourOption: InteractionContext.getNumber("hour"),
             heal: pipe(
               InteractionContext.getNumber("heal"),
               Effect.map(Option.getOrElse(() => 0)),
             ),
-            user: InteractionContext.user(),
             eventConfig: SheetService.getEventConfig(),
             teams: SheetService.getTeams(),
             runnerConfig: SheetService.getRunnerConfig(),

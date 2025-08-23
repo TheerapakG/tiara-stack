@@ -50,9 +50,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         InteractionContext.deferReply.tap(() => ({
           flags: MessageFlags.Ephemeral,
         })),
-        bindObject({
-          channel: InteractionContext.channel(true),
-        }),
+        InteractionContext.channel(true).bind("channel"),
         Effect.bind("channelConfig", ({ channel }) =>
           pipe(
             ChannelConfigService.getConfig(channel.id),
@@ -66,10 +64,10 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
           ),
         ),
         Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
-        Effect.tap(({ slotMessage }) =>
+        InteractionContext.editReply.tapEffect(({ slotMessage }) =>
           pipe(
             ClientService.makeEmbedBuilder(),
-            InteractionContext.editReply.tap((embed) => ({
+            Effect.map((embed) => ({
               embeds: [
                 embed
                   .setTitle(slotMessage.title)
