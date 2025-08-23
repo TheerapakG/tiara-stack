@@ -74,7 +74,7 @@ export class GuildService extends Effect.Service<GuildService>()(
 
   static fromInteraction() {
     return pipe(
-      CachedInteractionContext.guild(),
+      CachedInteractionContext.guild().sync(),
       Effect.map((guild) => GuildService.Default(guild)),
       Effect.withSpan("GuildService.fromInteraction", {
         captureStackTrace: true,

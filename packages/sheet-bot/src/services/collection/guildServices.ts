@@ -33,7 +33,7 @@ export const guildServices = (guildId: string) =>
 
 export const guildServicesFromInteraction = () =>
   pipe(
-    CachedInteractionContext.guildId(),
+    CachedInteractionContext.guildId().sync(),
     Effect.map(guildServices),
     Effect.withSpan("guildServicesFromInteractionOption", {
       captureStackTrace: true,
@@ -46,8 +46,8 @@ export const guildServicesFromInteractionOption = (name: string) =>
     InteractionContext.getString(name),
     Effect.flatMap(
       Option.match({
-        onSome: (guildId) => Effect.succeed(guildId),
-        onNone: () => CachedInteractionContext.guildId(),
+        onSome: Effect.succeed,
+        onNone: () => CachedInteractionContext.guildId().sync(),
       }),
     ),
     Effect.map(guildServices),

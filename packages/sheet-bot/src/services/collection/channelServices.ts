@@ -31,7 +31,7 @@ export const channelServices = <C extends ChannelT>(channel: ChannelKind<C>) =>
 
 export const channelServicesFromInteraction = () =>
   pipe(
-    CachedInteractionContext.channel(true),
+    CachedInteractionContext.channel(true).sync(),
     Effect.map((channel) => channelServices<GuildTextBasedChannelT>(channel)),
     Effect.withSpan("channelServicesFromInteraction", {
       captureStackTrace: true,
