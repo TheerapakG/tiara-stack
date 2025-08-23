@@ -1,7 +1,6 @@
+import { InteractionContext, RepliableInteractionT } from "@/services";
 import { InteractionResponse, Message, MessageFlags } from "discord.js";
 import { Cause, Data, Effect, Metric, Option, pipe } from "effect";
-import { InteractionContext, RepliableInteractionT } from "@/services";
-import { bindObject } from "@/utils";
 import {
   InteractionHandler,
   InteractionHandlerContext,
@@ -117,13 +116,10 @@ export class InteractionHandlerMapWithMetrics<
           onFailure: (cause) =>
             pipe(
               Effect.Do,
-              bindObject({
-                cause: Effect.succeed(cause),
-                replied: InteractionContext.replied(),
-                deferred: InteractionContext.deferred(),
-              }),
-              Effect.tap(({ cause }) => Effect.log(cause)),
-              Effect.tap(({ cause, replied, deferred }) =>
+              InteractionContext.replied.bind("replied"),
+              InteractionContext.deferred.bind("deferred"),
+              Effect.tap(() => Effect.log(cause)),
+              Effect.tap(({ replied, deferred }) =>
                 pipe(
                   Effect.suspend<
                     Message | InteractionResponse,
@@ -131,8 +127,8 @@ export class InteractionHandlerMapWithMetrics<
                     InteractionContext<RepliableInteractionT>
                   >(() =>
                     (replied || deferred
-                      ? InteractionContext.followUp.effect
-                      : InteractionContext.reply.effect)({
+                      ? InteractionContext.followUp.sync
+                      : InteractionContext.reply.sync)({
                       content: Cause.pretty(cause),
                       flags: MessageFlags.Ephemeral,
                     }),

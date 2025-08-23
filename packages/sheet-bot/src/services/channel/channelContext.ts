@@ -9,6 +9,7 @@ import {
   SendableChannels,
 } from "discord.js";
 import { Context, Data, Effect, HKT, Types, pipe } from "effect";
+import { wrap } from "~~/src/utils";
 
 export interface BaseChannelT extends HKT.TypeLambda {
   readonly type: BaseChannel;
@@ -83,23 +84,26 @@ export class SendableChannelContext {
     );
   }
 
-  static send<
+  static send = <
     C extends BaseChannelT = ChannelT,
     Kind extends ChannelKind<C> &
       ChannelKind<SendableChannelT> = ChannelKind<C> &
       ChannelKind<SendableChannelT>,
-  >(options: string | MessagePayload | MessageCreateOptions) {
-    return pipe(
-      SendableChannelContext.channel<C, Kind>(),
-      Effect.flatMap((channel: Kind) =>
-        Effect.tryPromise(
-          () =>
-            channel.send(options) as Promise<Awaited<ReturnType<Kind["send"]>>>,
+  >() =>
+    wrap((options: string | MessagePayload | MessageCreateOptions) =>
+      pipe(
+        SendableChannelContext.channel<C, Kind>(),
+        Effect.flatMap((channel: Kind) =>
+          Effect.tryPromise(
+            () =>
+              channel.send(options) as Promise<
+                Awaited<ReturnType<Kind["send"]>>
+              >,
+          ),
         ),
+        Effect.withSpan("SendableChannelContext.send", {
+          captureStackTrace: true,
+        }),
       ),
-      Effect.withSpan("SendableChannelContext.send", {
-        captureStackTrace: true,
-      }),
     );
-  }
 }

@@ -1,11 +1,11 @@
+import { GuildService } from "@/services/guild";
+import { bindObject, wrap } from "@/utils";
 import {
   PermissionResolvable,
   PermissionsBitField,
   RoleResolvable,
 } from "discord.js";
 import { Data, Effect, Equal, pipe } from "effect";
-import { bindObject, wrap } from "@/utils";
-import { GuildService } from "@/services/guild";
 import { ClientService } from "./clientService";
 import {
   CachedInteractionContext,
@@ -40,11 +40,11 @@ export class PermissionService extends Effect.Service<PermissionService>()(
       Effect.Do,
       bindObject({
         interaction: pipe(
-          InteractionContext.interaction<InteractionT>(),
+          InteractionContext.interaction<InteractionT>().sync(),
           Effect.either,
         ),
         cachedInteraction: pipe(
-          CachedInteractionContext.interaction<InteractionT>(),
+          CachedInteractionContext.interaction<InteractionT>().sync(),
           Effect.either,
         ),
         client: ClientService.getClient(),
@@ -53,9 +53,10 @@ export class PermissionService extends Effect.Service<PermissionService>()(
         privateCheckOwner: ({ allowSameGuild }: { allowSameGuild?: boolean }) =>
           pipe(
             Effect.Do,
+            InteractionContext.guildId().bind("interactionGuildId"),
+            InteractionContext.user.bind("interactionUser"),
             bindObject({
-              interactionGuildId: InteractionContext.guildId(),
-              guiildGuildId: pipe(
+              guildGuildId: pipe(
                 Effect.serviceOption(GuildService),
                 Effect.flatMap(
                   Effect.transposeMapOption((guildService) =>
@@ -63,12 +64,11 @@ export class PermissionService extends Effect.Service<PermissionService>()(
                   ),
                 ),
               ),
-              interactionUser: InteractionContext.user(),
             }),
             Effect.flatMap(
-              ({ interactionUser, interactionGuildId, guiildGuildId }) =>
+              ({ interactionUser, interactionGuildId, guildGuildId }) =>
                 (allowSameGuild &&
-                  Equal.equals(interactionGuildId, guiildGuildId)) ||
+                  Equal.equals(interactionGuildId, guildGuildId)) ||
                 interactionUser.id === client.application.owner?.id
                   ? Effect.void
                   : Effect.fail(new OwnerError()),
@@ -155,32 +155,4 @@ export class PermissionService extends Effect.Service<PermissionService>()(
   static checkPermissions = wrap(PermissionService.privateCheckPermissions);
   static checkRoles = wrap(PermissionService.privateCheckRoles);
   static addRole = wrap(PermissionService.privateAddRole);
-
-  static checkEffectRoles<E, R>({
-    roles,
-    reason,
-  }: {
-    roles: Effect.Effect<RoleResolvable[], E, R>;
-    reason?: string;
-  }) {
-    return pipe(
-      roles,
-      Effect.tap((roles) =>
-        PermissionService.checkRoles.effect({ roles, reason }),
-      ),
-    );
-  }
-
-  static tapCheckEffectRoles<A, E1, R1>(
-    f: (a: A) => {
-      roles: Effect.Effect<RoleResolvable[], E1, R1>;
-      reason?: string;
-    },
-  ) {
-    return <E2, R2>(self: Effect.Effect<A, E2, R2>) =>
-      pipe(
-        self,
-        Effect.tap((a) => PermissionService.checkEffectRoles(f(a))),
-      );
-  }
 }
