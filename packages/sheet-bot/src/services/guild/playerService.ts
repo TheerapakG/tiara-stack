@@ -1,12 +1,31 @@
-import { Array, Data, Effect, HashMap, Option, pipe } from "effect";
 import { bindObject } from "@/utils";
-import { SheetService } from "./sheetService";
+import { Array, Data, Effect, HashMap, Option, pipe } from "effect";
+import { Schedule, SheetService } from "./sheetService";
 
 export class Player extends Data.TaggedClass("Player")<{
   id: string;
   idIndex: number;
   name: string;
   nameIndex: number;
+}> {}
+
+export class PartialIdPlayer extends Data.TaggedClass("PartialIdPlayer")<{
+  id: string;
+}> {}
+
+export class PartialNamePlayer extends Data.TaggedClass("PartialNamePlayer")<{
+  name: string;
+}> {}
+
+export class ScheduleWithPlayers extends Data.TaggedClass(
+  "ScheduleWithPlayers",
+)<{
+  hour: number;
+  breakHour: boolean;
+  fills: readonly Option.Option<Player | PartialNamePlayer>[];
+  overfills: readonly (Player | PartialNamePlayer)[];
+  standbys: readonly (Player | PartialNamePlayer)[];
+  empty: number;
 }> {}
 
 export class PlayerService extends Effect.Service<PlayerService>()(
@@ -60,6 +79,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
           pipe(
             playerMaps,
             Effect.map(({ nameToPlayer }) => HashMap.get(nameToPlayer, name)),
+            Effect.map(Option.getOrElse(() => new PartialNamePlayer({ name }))),
             Effect.withSpan("PlayerService.getByName", {
               captureStackTrace: true,
             }),
@@ -68,7 +88,48 @@ export class PlayerService extends Effect.Service<PlayerService>()(
           pipe(
             playerMaps,
             Effect.map(({ idToPlayer }) => HashMap.get(idToPlayer, id)),
+            Effect.map(Option.getOrElse(() => new PartialIdPlayer({ id }))),
             Effect.withSpan("PlayerService.getById", {
+              captureStackTrace: true,
+            }),
+          ),
+      })),
+      Effect.map(({ getPlayerMaps, getById, getByName }) => ({
+        getPlayerMaps,
+        getById,
+        getByName,
+        mapScheduleWithPlayers: (schedule: Schedule) =>
+          pipe(
+            Effect.Do,
+            bindObject({
+              fills: pipe(
+                schedule.fills,
+                Effect.forEach(
+                  (fill) => pipe(fill, Effect.transposeMapOption(getByName)),
+                  { concurrency: "unbounded" },
+                ),
+              ),
+              overfills: pipe(
+                schedule.overfills,
+                Effect.forEach(getByName, { concurrency: "unbounded" }),
+              ),
+              standbys: pipe(
+                schedule.standbys,
+                Effect.forEach(getByName, { concurrency: "unbounded" }),
+              ),
+            }),
+            Effect.map(
+              ({ fills, overfills, standbys }) =>
+                new ScheduleWithPlayers({
+                  hour: schedule.hour,
+                  breakHour: schedule.breakHour,
+                  fills,
+                  overfills,
+                  standbys,
+                  empty: schedule.empty,
+                }),
+            ),
+            Effect.withSpan("PlayerService.mapScheduleWithPlayers", {
               captureStackTrace: true,
             }),
           ),
