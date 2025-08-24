@@ -129,7 +129,7 @@ const handleList =
                   })),
                 ),
               ),
-              Effect.when(() => !flags.has(MessageFlags.Ephemeral)),
+              Effect.unless(() => flags.has(MessageFlags.Ephemeral)),
             ),
           ),
           InteractionContext.deferReply.tap(({ flags }) => ({

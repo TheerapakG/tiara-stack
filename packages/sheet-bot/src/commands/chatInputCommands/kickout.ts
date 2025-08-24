@@ -137,11 +137,12 @@ const handleManual =
           }),
           Effect.let("date", () => new Date()),
           Effect.tap(({ date }) =>
-            pipe(date, getMinutes) >= 40
-              ? Effect.fail(
-                  new TimeError("Cannot kick out until next hour starts"),
-                )
-              : Effect.void,
+            pipe(
+              Effect.fail(
+                new TimeError("Cannot kick out until next hour starts"),
+              ),
+              Effect.when(() => pipe(date, getMinutes) >= 40),
+            ),
           ),
           Effect.let("hour", ({ date, hourOption, eventConfig }) =>
             pipe(
