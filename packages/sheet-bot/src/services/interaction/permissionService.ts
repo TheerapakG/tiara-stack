@@ -52,27 +52,31 @@ export class PermissionService extends Effect.Service<PermissionService>()(
       Effect.map(({ interaction, cachedInteraction, client }) => ({
         privateCheckOwner: ({ allowSameGuild }: { allowSameGuild?: boolean }) =>
           pipe(
-            Effect.Do,
-            InteractionContext.guildId().bind("interactionGuildId"),
-            InteractionContext.user.bind("interactionUser"),
-            bindObject({
-              guildGuildId: pipe(
-                Effect.serviceOption(GuildService),
-                Effect.flatMap(
-                  Effect.transposeMapOption((guildService) =>
-                    guildService.getId(),
+            Effect.fail(new OwnerError()),
+            Effect.unlessEffect(
+              pipe(
+                Effect.Do,
+                InteractionContext.guildId().bind("interactionGuildId"),
+                InteractionContext.user.bind("interactionUser"),
+                bindObject({
+                  guildGuildId: pipe(
+                    Effect.serviceOption(GuildService),
+                    Effect.flatMap(
+                      Effect.transposeMapOption((guildService) =>
+                        guildService.getId(),
+                      ),
+                    ),
                   ),
+                }),
+                Effect.map(
+                  ({ interactionUser, interactionGuildId, guildGuildId }) =>
+                    (allowSameGuild &&
+                      Equal.equals(interactionGuildId, guildGuildId)) ||
+                    interactionUser.id === client.application.owner?.id,
                 ),
               ),
-            }),
-            Effect.flatMap(
-              ({ interactionUser, interactionGuildId, guildGuildId }) =>
-                (allowSameGuild &&
-                  Equal.equals(interactionGuildId, guildGuildId)) ||
-                interactionUser.id === client.application.owner?.id
-                  ? Effect.void
-                  : Effect.fail(new OwnerError()),
             ),
+            Effect.asVoid,
             Effect.withSpan("PermissionService.checkOwner", {
               captureStackTrace: true,
             }),
@@ -85,17 +89,22 @@ export class PermissionService extends Effect.Service<PermissionService>()(
           reason?: string;
         }) =>
           pipe(
-            interaction,
-            Effect.flatMap((interaction) =>
-              interaction.memberPermissions?.has(permissions)
-                ? Effect.void
-                : Effect.fail(
-                    new PermissionError(
-                      reason ??
-                        `You do not have permission for ${new PermissionsBitField(permissions).toArray().join(", ")} to use this command`,
-                    ),
-                  ),
+            Effect.fail(
+              new PermissionError(
+                reason ??
+                  `You do not have permission for ${new PermissionsBitField(permissions).toArray().join(", ")} to use this command`,
+              ),
             ),
+            Effect.unlessEffect(
+              pipe(
+                interaction,
+                Effect.map(
+                  (interaction) =>
+                    interaction.memberPermissions?.has(permissions) ?? false,
+                ),
+              ),
+            ),
+            Effect.asVoid,
             Effect.withSpan("PermissionService.checkPermissions", {
               captureStackTrace: true,
             }),
@@ -108,30 +117,33 @@ export class PermissionService extends Effect.Service<PermissionService>()(
           reason?: string;
         }) =>
           pipe(
-            interaction,
-            Effect.flatMap((interaction) =>
-              interaction.user.id === client.application.owner?.id
-                ? Effect.void
-                : pipe(
-                    cachedInteraction,
-                    Effect.flatMap((interaction) =>
-                      interaction.member.roles.cache.some((role) =>
-                        roles
-                          .map((role) =>
-                            interaction.guild.roles.resolveId(role),
-                          )
-                          .includes(role.id),
-                      )
-                        ? Effect.void
-                        : Effect.fail(
-                            new PermissionError(
-                              reason ??
-                                `You do not have necessary role to use this command`,
-                            ),
-                          ),
-                    ),
-                  ),
+            Effect.fail(
+              new PermissionError(
+                reason ?? `You do not have necessary role to use this command`,
+              ),
             ),
+            Effect.unlessEffect(
+              pipe(
+                cachedInteraction,
+                Effect.map((interaction) =>
+                  interaction.member.roles.cache.some((role) =>
+                    roles
+                      .map((role) => interaction.guild.roles.resolveId(role))
+                      .includes(role.id),
+                  ),
+                ),
+              ),
+            ),
+            Effect.unlessEffect(
+              pipe(
+                interaction,
+                Effect.map(
+                  (interaction) =>
+                    interaction.user.id === client.application.owner?.id,
+                ),
+              ),
+            ),
+            Effect.asVoid,
             Effect.withSpan("PermissionService.checkRoles", {
               captureStackTrace: true,
             }),
