@@ -136,7 +136,7 @@ const handleList =
             flags: flags.bitfield,
           })),
           Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
-          InteractionContext.reply.tapEffect(({ slotMessage }) =>
+          InteractionContext.editReply.tapEffect(({ slotMessage }) =>
             pipe(
               ClientService.makeEmbedBuilder(),
               Effect.map((embed) => ({
@@ -171,6 +171,7 @@ const handleButton =
       Effect.provide(guildServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
+          InteractionContext.deferReply.tap(),
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
           PermissionService.checkRoles.tapEffect(() =>
             pipe(
@@ -192,7 +193,7 @@ const handleButton =
               day,
             }),
           ),
-          InteractionContext.reply.tap(({ day }) => ({
+          InteractionContext.editReply.tap(({ day }) => ({
             content: `Press the button below to get the current open slots for day ${day}`,
             components: [
               new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(

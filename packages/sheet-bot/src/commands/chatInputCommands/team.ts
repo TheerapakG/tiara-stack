@@ -43,6 +43,7 @@ const handleList =
       Effect.provide(guildServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
+          InteractionContext.deferReply.tap(),
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
           InteractionContext.user.bind("interactionUser"),
           Effect.bindAll(({ interactionUser }) => ({
@@ -90,7 +91,7 @@ const handleList =
               })),
             ),
           ),
-          InteractionContext.reply.tapEffect(({ user, userTeams }) =>
+          InteractionContext.editReply.tapEffect(({ user, userTeams }) =>
             pipe(
               ClientService.makeEmbedBuilder(),
               Effect.map((embed) => ({
