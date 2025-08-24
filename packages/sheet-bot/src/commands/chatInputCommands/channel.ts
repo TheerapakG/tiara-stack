@@ -75,6 +75,7 @@ const handleSet =
       Effect.provide(guildServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
+          InteractionContext.deferReply.tap(),
           PermissionService.checkPermissions.tap(() => ({
             permissions: PermissionFlagsBits.ManageGuild,
           })),
@@ -98,7 +99,7 @@ const handleSet =
               Effect.flatMap(Function.identity),
             ),
           ),
-          InteractionContext.reply.tapEffect(({ channel, config }) =>
+          InteractionContext.editReply.tapEffect(({ channel, config }) =>
             pipe(
               ClientService.makeEmbedBuilder(),
               Effect.map((embed) => ({
@@ -142,6 +143,7 @@ const handleUnset =
       Effect.provide(guildServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
+          InteractionContext.deferReply.tap(),
           PermissionService.checkPermissions.tap(() => ({
             permissions: PermissionFlagsBits.ManageGuild,
           })),
@@ -159,7 +161,7 @@ const handleUnset =
               Effect.flatMap(Function.identity),
             ),
           ),
-          InteractionContext.reply.tapEffect(({ channel, config }) =>
+          InteractionContext.editReply.tapEffect(({ channel, config }) =>
             pipe(
               ClientService.makeEmbedBuilder(),
               Effect.map((embed) => ({
