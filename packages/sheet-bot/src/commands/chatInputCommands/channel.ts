@@ -49,6 +49,16 @@ const configFields = (config: GuildChannelConfig) => [
       }),
     ),
   },
+  {
+    name: "Checkin channel",
+    value: pipe(
+      config.checkinChannelId,
+      Option.match({
+        onSome: (channelId) => channelMention(channelId),
+        onNone: () => "None!",
+      }),
+    ),
+  },
 ];
 
 const handleSet =
@@ -69,6 +79,11 @@ const handleSet =
           option
             .setName("role")
             .setDescription("The role to assign to the channel"),
+        )
+        .addChannelOption((option) =>
+          option
+            .setName("checkin_channel")
+            .setDescription("The channel to send check in messages to"),
         ),
     )
     .handler(
@@ -84,20 +99,28 @@ const handleSet =
             running: InteractionContext.getBoolean("running"),
             name: InteractionContext.getString("name"),
             role: InteractionContext.getRole("role"),
+            checkinChannel: InteractionContext.getChannel("checkin_channel"),
           }),
-          Effect.bind("config", ({ channel, running, name, role }) =>
-            pipe(
-              GuildConfigService.setChannelConfig(channel.id, {
-                running: Option.getOrUndefined(running),
-                name: Option.getOrUndefined(name),
-                roleId: pipe(
-                  role,
-                  Option.map((r) => r.id),
-                  Option.getOrUndefined,
-                ),
-              }),
-              Effect.flatMap(Function.identity),
-            ),
+          Effect.bind(
+            "config",
+            ({ channel, running, name, role, checkinChannel }) =>
+              pipe(
+                GuildConfigService.setChannelConfig(channel.id, {
+                  running: Option.getOrUndefined(running),
+                  name: Option.getOrUndefined(name),
+                  roleId: pipe(
+                    role,
+                    Option.map((r) => r.id),
+                    Option.getOrUndefined,
+                  ),
+                  checkinChannelId: pipe(
+                    checkinChannel,
+                    Option.map((c) => c.id),
+                    Option.getOrUndefined,
+                  ),
+                }),
+                Effect.flatMap(Function.identity),
+              ),
           ),
           InteractionContext.editReply.tapEffect(({ channel, config }) =>
             pipe(
@@ -114,7 +137,7 @@ const handleSet =
               })),
             ),
           ),
-          Effect.withSpan("handlesSetRunning", {
+          Effect.withSpan("handleSet", {
             captureStackTrace: true,
           }),
         ),
@@ -137,6 +160,11 @@ const handleUnset =
           option
             .setName("role")
             .setDescription("Unset the role of the channel"),
+        )
+        .addBooleanOption((option) =>
+          option
+            .setName("checkin_channel")
+            .setDescription("Unset the checkin channel of the channel"),
         ),
     )
     .handler(
@@ -151,12 +179,16 @@ const handleUnset =
           bindObject({
             name: InteractionContext.getBoolean("name"),
             role: InteractionContext.getBoolean("role"),
+            checkinChannel: InteractionContext.getBoolean("checkin_channel"),
           }),
-          Effect.bind("config", ({ channel, name, role }) =>
+          Effect.bind("config", ({ channel, name, role, checkinChannel }) =>
             pipe(
               GuildConfigService.setChannelConfig(channel.id, {
                 name: Option.getOrUndefined(name) ? null : undefined,
                 roleId: Option.getOrUndefined(role) ? null : undefined,
+                checkinChannelId: Option.getOrUndefined(checkinChannel)
+                  ? null
+                  : undefined,
               }),
               Effect.flatMap(Function.identity),
             ),
@@ -176,7 +208,7 @@ const handleUnset =
               })),
             ),
           ),
-          Effect.withSpan("handlesSetRunning", {
+          Effect.withSpan("handleUnset", {
             captureStackTrace: true,
           }),
         ),

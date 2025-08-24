@@ -73,11 +73,11 @@ export class FormatService extends Effect.Service<FormatService>()(
         formatCheckIn: ({
           prevSchedule,
           schedule,
-          channel,
+          channelString,
         }: {
           prevSchedule: Schedule;
           schedule: Schedule;
-          channel: string;
+          channelString: string;
         }) =>
           pipe(
             Effect.Do,
@@ -117,7 +117,7 @@ export class FormatService extends Effect.Service<FormatService>()(
                   pipe(HashSet.fromIterable(prevFillsPlayers)),
                 ),
               );
-              return `${HashSet.toValues(newPlayerMentions).join(" ")} React to this message to check in, and head to ${channel} for ${bold(`hour ${schedule.hour}`)} ${time(range.start, TimestampStyles.RelativeTime)}`;
+              return `${HashSet.toValues(newPlayerMentions).join(" ")} React to this message to check in, and ${channelString} for ${bold(`hour ${schedule.hour}`)} ${time(range.start, TimestampStyles.RelativeTime)}`;
             }),
             Effect.withSpan("FormatService.formatCheckIn", {
               captureStackTrace: true,
