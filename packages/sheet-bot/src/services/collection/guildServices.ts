@@ -15,8 +15,7 @@ export const guildServices = (guildId: string) =>
   pipe(
     Effect.succeed(
       pipe(
-        FormatService.Default,
-        Layer.provideMerge(PlayerService.Default),
+        Layer.mergeAll(FormatService.Default, PlayerService.Default),
         Layer.provideMerge(SheetService.ofGuild()),
         Layer.provideMerge(GuildConfigService.DefaultWithoutDependencies),
         Layer.provideMerge(GuildService.fromGuildId(guildId)),
