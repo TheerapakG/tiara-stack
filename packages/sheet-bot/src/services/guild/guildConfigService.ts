@@ -1,3 +1,5 @@
+import { DB } from "@/db";
+import { bindObject } from "@/utils";
 import { and, eq, isNull } from "drizzle-orm";
 import { Array, Data, Effect, Option, pipe } from "effect";
 import {
@@ -7,8 +9,6 @@ import {
 } from "sheet-db-schema";
 import { Computed } from "typhoon-core/signal";
 import { DBSubscriptionContext } from "typhoon-server/db";
-import { DB } from "@/db";
-import { bindObject } from "@/utils";
 import { GuildService } from "./guildService";
 
 type GuildConfigInsert = typeof configGuild.$inferInsert;
@@ -68,6 +68,7 @@ export class GuildChannelConfig extends Data.TaggedClass("GuildChannelConfig")<{
   name: Option.Option<string>;
   running: boolean;
   roleId: Option.Option<string>;
+  checkinChannelId: Option.Option<string>;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Option.Option<Date>;
@@ -80,6 +81,7 @@ export class GuildChannelConfig extends Data.TaggedClass("GuildChannelConfig")<{
       name: Option.fromNullable(select.name),
       running: select.running,
       roleId: Option.fromNullable(select.roleId),
+      checkinChannelId: Option.fromNullable(select.checkinChannelId),
       createdAt: select.createdAt,
       updatedAt: select.updatedAt,
       deletedAt: Option.fromNullable(select.deletedAt),

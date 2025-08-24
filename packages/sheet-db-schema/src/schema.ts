@@ -64,6 +64,7 @@ export const configGuildChannel = pgTable(
     name: varchar("name"),
     running: boolean("running").notNull().default(false),
     roleId: varchar("role_id"),
+    checkinChannelId: varchar("checkin_channel_id"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
