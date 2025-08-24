@@ -7,7 +7,9 @@ import {
   HourRange,
   InteractionContext,
   MessageRoomOrderService,
+  PartialNamePlayer,
   PermissionService,
+  Player,
   PlayerService,
   Schedule,
   SheetService,
@@ -31,7 +33,7 @@ import {
   time,
   TimestampStyles,
 } from "discord.js";
-import { Array, Effect, Function, HashMap, Option, pipe } from "effect";
+import { Array, Effect, Function, HashMap, Match, Option, pipe } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { observeOnce } from "typhoon-server/signal";
 
@@ -104,24 +106,25 @@ const handleManual =
               SheetService.getAllSchedules(),
               Effect.map(HashMap.get(hour)),
               Effect.map(Option.getOrElse(() => Schedule.empty(hour))),
-            ),
-          ),
-          Effect.bind("schedulePlayers", ({ schedule }) =>
-            pipe(
-              schedule.fills,
-              Array.getSomes,
-              Effect.forEach(
-                (playerName) => PlayerService.getByName(playerName),
-                { concurrency: "unbounded" },
-              ),
-              Effect.map(Array.getSomes),
+              Effect.flatMap(PlayerService.mapScheduleWithPlayers),
             ),
           ),
           Effect.bind(
             "scheduleTeams",
-            ({ schedulePlayers, teams, runnerConfig, hour }) =>
+            ({ schedule, teams, runnerConfig, hour }) =>
               pipe(
-                schedulePlayers,
+                schedule.fills,
+                Array.getSomes,
+                Array.map((player) =>
+                  pipe(
+                    Match.type<Player | PartialNamePlayer>(),
+                    Match.tag("Player", (player) => Option.some(player)),
+                    Match.tag("PartialNamePlayer", () => Option.none()),
+                    Match.exhaustive,
+                    Function.apply(player),
+                  ),
+                ),
+                Array.getSomes,
                 Effect.forEach((player) =>
                   pipe(
                     Effect.Do,

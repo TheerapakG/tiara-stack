@@ -3,7 +3,9 @@ import {
   GuildService,
   guildServicesFromInteractionOption,
   InteractionContext,
+  PartialNamePlayer,
   PermissionService,
+  Player,
   PlayerService,
   Schedule,
   SheetService,
@@ -22,7 +24,16 @@ import {
   SlashCommandSubcommandBuilder,
   userMention,
 } from "discord.js";
-import { Array, Data, Effect, Function, HashMap, Option, pipe } from "effect";
+import {
+  Array,
+  Data,
+  Effect,
+  Function,
+  HashMap,
+  Match,
+  Option,
+  pipe,
+} from "effect";
 import { observeOnce } from "typhoon-server/signal";
 
 class ArgumentError extends Data.TaggedError("ArgumentError")<{
@@ -66,10 +77,11 @@ const getKickoutData = ({
         ),
       ),
     }),
-    Effect.let("schedule", ({ schedules }) =>
+    Effect.bind("schedule", ({ schedules }) =>
       pipe(
         HashMap.get(schedules, hour),
         Option.getOrElse(() => Schedule.empty(hour)),
+        PlayerService.mapScheduleWithPlayers,
       ),
     ),
     Effect.map(({ schedule, runningChannel }) => ({
@@ -155,15 +167,20 @@ const handleManual =
               Effect.flatMap(Function.identity),
             ),
           ),
-          Effect.bind("fillIds", ({ kickoutData }) =>
+          Effect.let("fillIds", ({ kickoutData }) =>
             pipe(
               kickoutData.schedule.fills,
               Array.getSomes,
-              Effect.forEach((playerName) =>
-                PlayerService.getByName(playerName),
+              Array.map((player) =>
+                pipe(
+                  Match.type<Player | PartialNamePlayer>(),
+                  Match.tag("Player", (player) => Option.some(player.id)),
+                  Match.tag("PartialNamePlayer", () => Option.none()),
+                  Match.exhaustive,
+                  Function.apply(player),
+                ),
               ),
-              Effect.map(Array.getSomes),
-              Effect.map(Array.map((p) => p.id)),
+              Array.getSomes,
             ),
           ),
           Effect.let("removedMembers", ({ fillIds, role }) =>
