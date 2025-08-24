@@ -7,9 +7,12 @@ import {
   guildServicesFromInteractionOption,
   InteractionContext,
   MessageCheckinService,
+  PartialNamePlayer,
   PermissionService,
+  Player,
   PlayerService,
   Schedule,
+  ScheduleWithPlayers,
   SendableChannelContext,
   SheetService,
 } from "@/services";
@@ -31,7 +34,16 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, Data, Effect, HashMap, Option, pipe } from "effect";
+import {
+  Array,
+  Data,
+  Effect,
+  Function,
+  HashMap,
+  Match,
+  Option,
+  pipe,
+} from "effect";
 import { observeOnce } from "typhoon-server/signal";
 
 class ArgumentError extends Data.TaggedError("ArgumentError")<{
@@ -54,16 +66,18 @@ const getCheckinData = ({
     bindObject({
       schedules: SheetService.getAllSchedules(),
     }),
-    Effect.let("prevSchedule", ({ schedules }) =>
+    Effect.bind("prevSchedule", ({ schedules }) =>
       pipe(
         HashMap.get(schedules, hour - 1),
         Option.getOrElse(() => Schedule.empty(hour - 1)),
+        PlayerService.mapScheduleWithPlayers,
       ),
     ),
-    Effect.let("schedule", ({ schedules }) =>
+    Effect.bind("schedule", ({ schedules }) =>
       pipe(
         HashMap.get(schedules, hour),
         Option.getOrElse(() => Schedule.empty(hour)),
+        PlayerService.mapScheduleWithPlayers,
       ),
     ),
     Effect.map(({ prevSchedule, schedule }) => ({
@@ -75,8 +89,8 @@ const getCheckinData = ({
   );
 
 const getCheckinMessages = (data: {
-  prevSchedule: Schedule;
-  schedule: Schedule;
+  prevSchedule: ScheduleWithPlayers;
+  schedule: ScheduleWithPlayers;
   runningChannel: {
     channelId: string;
     name: Option.Option<string>;
@@ -85,8 +99,8 @@ const getCheckinMessages = (data: {
 }) =>
   pipe(
     Effect.Do,
-    Effect.bind("emptySlotsMessage", () =>
-      FormatService.formatCheckinEmptySlots(data.schedule),
+    Effect.bind("managerCheckinMessage", () =>
+      FormatService.formatManagerCheckinMessage(data.schedule),
     ),
     Effect.bind("checkinMessage", () =>
       FormatService.formatCheckIn({
@@ -104,8 +118,8 @@ const getCheckinMessages = (data: {
             ),
       }),
     ),
-    Effect.map(({ emptySlotsMessage, checkinMessage }) => ({
-      emptySlotsMessage,
+    Effect.map(({ managerCheckinMessage, checkinMessage }) => ({
+      managerCheckinMessage,
       checkinMessage,
     })),
   );
@@ -208,15 +222,20 @@ const handleManual =
           Effect.bind("checkinData", ({ hour, runningChannel }) =>
             getCheckinData({ hour, runningChannel }),
           ),
-          Effect.bind("fillIds", ({ checkinData }) =>
+          Effect.let("fillIds", ({ checkinData }) =>
             pipe(
               checkinData.schedule.fills,
               Array.getSomes,
-              Effect.forEach((playerName) =>
-                PlayerService.getByName(playerName),
+              Array.map((player) =>
+                pipe(
+                  Match.type<Player | PartialNamePlayer>(),
+                  Match.tag("Player", (player) => Option.some(player.id)),
+                  Match.tag("PartialNamePlayer", () => Option.none()),
+                  Match.exhaustive,
+                  Function.apply(player),
+                ),
               ),
-              Effect.map(Array.getSomes),
-              Effect.map(Array.map((p) => p.id)),
+              Array.getSomes,
             ),
           ),
           Effect.bind("checkinMessages", ({ checkinData }) =>
@@ -262,7 +281,7 @@ const handleManual =
               ),
           ),
           InteractionContext.editReply.tap(({ checkinMessages }) => ({
-            content: checkinMessages.emptySlotsMessage,
+            content: checkinMessages.managerCheckinMessage,
           })),
           Effect.asVoid,
           Effect.withSpan("handleCheckinManual", { captureStackTrace: true }),
