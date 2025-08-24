@@ -1,12 +1,19 @@
+import { bold, time, TimestampStyles, userMention } from "discord.js";
 import {
-  bold,
-  escapeMarkdown,
-  time,
-  TimestampStyles,
-  userMention,
-} from "discord.js";
-import { Array, Data, Effect, HashSet, Option, pipe } from "effect";
-import { PlayerService } from "./playerService";
+  Array,
+  Data,
+  Effect,
+  Function,
+  HashSet,
+  Match,
+  Option,
+  pipe,
+} from "effect";
+import {
+  PartialNamePlayer,
+  Player,
+  ScheduleWithPlayers,
+} from "./playerService";
 import { Schedule, SheetService } from "./sheetService";
 
 class HourWindow extends Data.TaggedClass("HourWindow")<{
@@ -20,7 +27,6 @@ export class FormatService extends Effect.Service<FormatService>()(
     effect: pipe(
       Effect.Do,
       Effect.bind("sheetService", () => SheetService),
-      Effect.bind("playerService", () => PlayerService),
       Effect.let(
         "formatHour",
         ({ sheetService }) =>
@@ -39,7 +45,7 @@ export class FormatService extends Effect.Service<FormatService>()(
               }),
             ),
       ),
-      Effect.map(({ playerService, formatHour }) => ({
+      Effect.map(({ formatHour }) => ({
         formatHour,
         formatEmptySlots: ({ hour, breakHour, empty }: Schedule) =>
           pipe(
@@ -59,12 +65,44 @@ export class FormatService extends Effect.Service<FormatService>()(
               captureStackTrace: true,
             }),
           ),
-        formatCheckinEmptySlots: ({ empty }: Schedule) =>
+        formatManagerCheckinMessage: ({ fills, empty }: ScheduleWithPlayers) =>
           pipe(
             Effect.succeed(
-              `Checkin message sent! (${empty > 0 ? `+${empty}` : "No"} empty slot${
-                empty > 1 ? "s" : ""
-              })`,
+              pipe(
+                [
+                  Option.some(
+                    `Checkin message sent! (${empty > 0 ? `+${empty}` : "No"} empty slot${
+                      empty > 1 ? "s" : ""
+                    })`,
+                  ),
+                  pipe(
+                    fills,
+                    Array.getSomes,
+                    Array.map((player) =>
+                      pipe(
+                        Match.type<Player | PartialNamePlayer>(),
+                        Match.tag("Player", () => Option.none()),
+                        Match.tag("PartialNamePlayer", (player) =>
+                          Option.some(player),
+                        ),
+                        Match.exhaustive,
+                        Function.apply(player),
+                      ),
+                    ),
+                    Array.getSomes,
+                    (partialPlayers) =>
+                      partialPlayers.length > 0
+                        ? Option.some(
+                            `Cannot look up Discord ID for ${partialPlayers.join(
+                              ", ",
+                            )}. They would need to check in manually.`,
+                          )
+                        : Option.none(),
+                  ),
+                ],
+                Array.getSomes,
+                Array.join("\n"),
+              ),
             ),
             Effect.withSpan("FormatService.formatCheckinEmptySlots", {
               captureStackTrace: true,
@@ -75,47 +113,47 @@ export class FormatService extends Effect.Service<FormatService>()(
           schedule,
           channelString,
         }: {
-          prevSchedule: Schedule;
-          schedule: Schedule;
+          prevSchedule: ScheduleWithPlayers;
+          schedule: ScheduleWithPlayers;
           channelString: string;
         }) =>
           pipe(
             Effect.Do,
-            Effect.let("prevFills", () => Array.getSomes(prevSchedule.fills)),
-            Effect.let("fills", () => Array.getSomes(schedule.fills)),
-            Effect.bind("fillsPlayers", ({ fills }) =>
-              Effect.forEach(fills, (player) =>
-                pipe(
-                  playerService.getByName(player),
-                  Effect.map(
-                    Option.match({
-                      onSome: (p) => userMention(p.id),
-                      onNone: () => escapeMarkdown(player),
-                    }),
+            Effect.let("prevFills", () =>
+              pipe(
+                prevSchedule.fills,
+                Array.getSomes,
+                Array.map((player) =>
+                  pipe(
+                    Match.type<Player | PartialNamePlayer>(),
+                    Match.tag("Player", (player) => userMention(player.id)),
+                    Match.tag("PartialNamePlayer", (player) => player.name),
+                    Match.exhaustive,
+                    Function.apply(player),
                   ),
                 ),
               ),
             ),
-            Effect.bind("prevFillsPlayers", ({ prevFills }) =>
-              Effect.forEach(prevFills, (player) =>
-                pipe(
-                  playerService.getByName(player),
-                  Effect.map(
-                    Option.match({
-                      onSome: (p) => userMention(p.id),
-                      onNone: () => escapeMarkdown(player),
-                    }),
+            Effect.let("fills", () =>
+              pipe(
+                schedule.fills,
+                Array.getSomes,
+                Array.map((player) =>
+                  pipe(
+                    Match.type<Player | PartialNamePlayer>(),
+                    Match.tag("Player", (player) => userMention(player.id)),
+                    Match.tag("PartialNamePlayer", (player) => player.name),
+                    Match.exhaustive,
+                    Function.apply(player),
                   ),
                 ),
               ),
             ),
             Effect.bind("range", () => formatHour(schedule.hour)),
-            Effect.map(({ fillsPlayers, prevFillsPlayers, range }) => {
+            Effect.map(({ fills, prevFills, range }) => {
               const newPlayerMentions = pipe(
-                HashSet.fromIterable(fillsPlayers),
-                HashSet.difference(
-                  pipe(HashSet.fromIterable(prevFillsPlayers)),
-                ),
+                HashSet.fromIterable(fills),
+                HashSet.difference(pipe(HashSet.fromIterable(prevFills))),
               );
               return `${HashSet.toValues(newPlayerMentions).join(" ")} React to this message to check in, and ${channelString} for ${bold(`hour ${schedule.hour}`)} ${time(range.start, TimestampStyles.RelativeTime)}`;
             }),
