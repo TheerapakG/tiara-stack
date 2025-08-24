@@ -1,7 +1,8 @@
 import { checkinButton } from "@/messageComponents";
 import {
-  channelServicesFromInteraction,
+  channelServicesFromGuildChannelId,
   FormatService,
+  GuildChannelConfig,
   GuildConfigService,
   guildServicesFromInteractionOption,
   InteractionContext,
@@ -43,28 +44,15 @@ class ArgumentError extends Data.TaggedError("ArgumentError")<{
 
 const getCheckinData = ({
   hour,
-  channelName,
+  runningChannel,
 }: {
   hour: number;
-  channelName: string;
+  runningChannel: GuildChannelConfig;
 }) =>
   pipe(
     Effect.Do,
     bindObject({
       schedules: SheetService.getAllSchedules(),
-      runningChannel: pipe(
-        GuildConfigService.getRunningChannelByName(channelName),
-        Effect.flatMap(observeOnce),
-        Effect.flatMap(
-          Option.match({
-            onSome: (channel) => Effect.succeed(channel),
-            onNone: () =>
-              Effect.fail(
-                new ArgumentError(`No such running channel: ${channelName}`),
-              ),
-          }),
-        ),
-      ),
     }),
     Effect.let("prevSchedule", ({ schedules }) =>
       pipe(
@@ -78,15 +66,11 @@ const getCheckinData = ({
         Option.getOrElse(() => Schedule.empty(hour)),
       ),
     ),
-    Effect.map(({ prevSchedule, schedule, runningChannel }) => ({
+    Effect.map(({ prevSchedule, schedule }) => ({
       prevSchedule,
       schedule,
-      runningChannel: {
-        channelId: runningChannel.channelId,
-        channelName,
-        roleId: runningChannel.roleId,
-      },
-      showChannelMention: runningChannel.roleId !== null,
+      runningChannel,
+      showChannelMention: Option.isNone(runningChannel.roleId),
     })),
   );
 
@@ -95,7 +79,7 @@ const getCheckinMessages = (data: {
   schedule: Schedule;
   runningChannel: {
     channelId: string;
-    channelName: string;
+    name: Option.Option<string>;
   };
   showChannelMention: boolean;
 }) =>
@@ -108,9 +92,16 @@ const getCheckinMessages = (data: {
       FormatService.formatCheckIn({
         prevSchedule: data.prevSchedule,
         schedule: data.schedule,
-        channel: data.showChannelMention
-          ? channelMention(data.runningChannel.channelId)
-          : data.runningChannel.channelName,
+        channelString: data.showChannelMention
+          ? `head to ${channelMention(data.runningChannel.channelId)}`
+          : pipe(
+              data.runningChannel.name,
+              Option.match({
+                onSome: (name) => `head to ${name}`,
+                onNone: () =>
+                  "await further instructions from the manager on where the running channel is",
+              }),
+            ),
       }),
     ),
     Effect.map(({ emptySlotsMessage, checkinMessage }) => ({
@@ -128,8 +119,7 @@ const handleManual =
         .addStringOption((option) =>
           option
             .setName("channel_name")
-            .setDescription("The name of the running channel")
-            .setRequired(true),
+            .setDescription("The name of the running channel"),
         )
         .addNumberOption((option) =>
           option
@@ -166,7 +156,7 @@ const handleManual =
           InteractionContext.user.bind("user"),
           bindObject({
             hourOption: InteractionContext.getNumber("hour"),
-            channelName: InteractionContext.getString("channel_name", true),
+            channelNameOption: InteractionContext.getString("channel_name"),
             eventConfig: SheetService.getEventConfig(),
           }),
           Effect.let("hour", ({ hourOption, eventConfig }) =>
@@ -182,8 +172,41 @@ const handleManual =
               ),
             ),
           ),
-          Effect.bind("checkinData", ({ hour, channelName }) =>
-            getCheckinData({ hour, channelName }),
+          Effect.bind("runningChannel", ({ channelNameOption }) =>
+            pipe(
+              channelNameOption,
+              Option.match({
+                onSome: (channelName) =>
+                  GuildConfigService.getRunningChannelByName(channelName),
+                onNone: () =>
+                  pipe(
+                    InteractionContext.channel(true).sync(),
+                    Effect.flatMap((channel) =>
+                      GuildConfigService.getRunningChannelById(channel.id),
+                    ),
+                  ),
+              }),
+              Effect.flatMap(observeOnce),
+              Effect.flatMap(
+                Option.match({
+                  onSome: (channel) => Effect.succeed(channel),
+                  onNone: () =>
+                    Effect.fail(new ArgumentError("No such running channel")),
+                }),
+              ),
+            ),
+          ),
+          Effect.bind("checkinChannelId", ({ runningChannel }) =>
+            pipe(
+              runningChannel.checkinChannelId,
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () => InteractionContext.channelId(true).sync(),
+              }),
+            ),
+          ),
+          Effect.bind("checkinData", ({ hour, runningChannel }) =>
+            getCheckinData({ hour, runningChannel }),
           ),
           Effect.bind("fillIds", ({ checkinData }) =>
             pipe(
@@ -199,20 +222,24 @@ const handleManual =
           Effect.bind("checkinMessages", ({ checkinData }) =>
             getCheckinMessages(checkinData),
           ),
-          Effect.bind("message", ({ checkinData, checkinMessages }) =>
-            pipe(
-              SendableChannelContext.send().sync({
-                content: checkinMessages.checkinMessage,
-                components: checkinData.runningChannel.roleId
-                  ? [
-                      new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                        new ButtonBuilder(checkinButton.data),
-                      ),
-                    ]
-                  : [],
-              }),
-              Effect.provide(channelServicesFromInteraction()),
-            ),
+          Effect.bind(
+            "message",
+            ({ checkinData, checkinMessages, checkinChannelId }) =>
+              pipe(
+                SendableChannelContext.send().sync({
+                  content: checkinMessages.checkinMessage,
+                  components: checkinData.runningChannel.roleId
+                    ? [
+                        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                          new ButtonBuilder(checkinButton.data),
+                        ),
+                      ]
+                    : [],
+                }),
+                Effect.provide(
+                  channelServicesFromGuildChannelId(checkinChannelId),
+                ),
+              ),
           ),
           Effect.tap(
             ({ checkinData, message, fillIds, checkinMessages, hour }) =>
