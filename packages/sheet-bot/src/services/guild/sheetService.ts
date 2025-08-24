@@ -215,15 +215,9 @@ const teamParser = (
 export class Schedule extends Data.TaggedClass("Schedule")<{
   hour: number;
   breakHour: boolean;
-  fills: readonly [
-    Option.Option<string>,
-    Option.Option<string>,
-    Option.Option<string>,
-    Option.Option<string>,
-    Option.Option<string>,
-  ];
-  overfills: string[];
-  standbys: string[];
+  fills: readonly Option.Option<string>[];
+  overfills: readonly string[];
+  standbys: readonly string[];
   empty: number;
 }> {
   static empty(hour: number) {
