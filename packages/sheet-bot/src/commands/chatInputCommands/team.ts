@@ -62,7 +62,7 @@ const handleList =
                 roles: managerRoles.map((role) => role.roleId),
                 reason: "You can only get your own teams in the current server",
               }),
-              Effect.when(() => user.id !== interactionUser.id),
+              Effect.unless(() => user.id === interactionUser.id),
             ),
           ),
           Effect.bind("teams", () => SheetService.getTeams()),

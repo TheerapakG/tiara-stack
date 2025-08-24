@@ -270,12 +270,13 @@ const handleManual =
                     channelId: checkinData.runningChannel.channelId,
                     roleId: Option.getOrNull(checkinData.runningChannel.roleId),
                   }),
-                  Array.isEmptyArray(fillIds)
-                    ? Effect.void
-                    : MessageCheckinService.addMessageCheckinMembers(
-                        message.id,
-                        fillIds,
-                      ),
+                  pipe(
+                    MessageCheckinService.addMessageCheckinMembers(
+                      message.id,
+                      fillIds,
+                    ),
+                    Effect.unless(() => Array.isEmptyArray(fillIds)),
+                  ),
                 ],
                 { concurrency: "unbounded" },
               ),
