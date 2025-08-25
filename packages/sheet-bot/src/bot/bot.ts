@@ -1,3 +1,24 @@
+import { Config } from "@/config";
+import {
+  ButtonInteractionT,
+  ChatInputCommandInteractionT,
+  ClientService,
+  InteractionContext,
+  interactionServices,
+  UserSelectMenuInteractionT,
+} from "@/services";
+import {
+  ButtonHandlerVariantT,
+  buttonInteractionHandlerMap,
+  ChatInputHandlerVariantT,
+  chatInputInteractionHandlerMap,
+  HandlerVariantHandlerContext,
+  HandlerVariantMap,
+  InteractionHandlerMapWithMetrics,
+  UserSelectMenuHandlerVariantT,
+  userSelectMenuInteractionHandlerMap,
+} from "@/types";
+import { bindObject } from "@/utils";
 import { match } from "arktype";
 import {
   ApplicationCommandType,
@@ -26,27 +47,6 @@ import {
   pipe,
   SynchronizedRef,
 } from "effect";
-import { Config } from "@/config";
-import {
-  ButtonInteractionT,
-  ChatInputCommandInteractionT,
-  ClientService,
-  InteractionContext,
-  interactionServices,
-  UserSelectMenuInteractionT,
-} from "@/services";
-import {
-  ButtonHandlerVariantT,
-  buttonInteractionHandlerMap,
-  ChatInputHandlerVariantT,
-  chatInputInteractionHandlerMap,
-  HandlerVariantHandlerContext,
-  HandlerVariantMap,
-  InteractionHandlerMapWithMetrics,
-  UserSelectMenuHandlerVariantT,
-  userSelectMenuInteractionHandlerMap,
-} from "@/types";
-import { bindObject } from "@/utils";
 
 export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   "Bot",
@@ -305,6 +305,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                   bot,
                   Bot.onInteraction(interaction),
                   Effect.provide(bot.traceProvider),
+                  Effect.catchAll(() => Effect.void),
                 ),
               ),
             ),
