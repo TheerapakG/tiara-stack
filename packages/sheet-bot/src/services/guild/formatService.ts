@@ -120,34 +120,38 @@ export class FormatService extends Effect.Service<FormatService>()(
           pipe(
             Effect.Do,
             Effect.let("prevFills", () =>
-              pipe(
-                prevSchedule.fills,
-                Array.getSomes,
-                Array.map((player) =>
-                  pipe(
-                    Match.type<Player | PartialNamePlayer>(),
-                    Match.tag("Player", (player) => userMention(player.id)),
-                    Match.tag("PartialNamePlayer", (player) => player.name),
-                    Match.exhaustive,
-                    Function.apply(player),
+              prevSchedule.breakHour
+                ? []
+                : pipe(
+                    prevSchedule.fills,
+                    Array.getSomes,
+                    Array.map((player) =>
+                      pipe(
+                        Match.type<Player | PartialNamePlayer>(),
+                        Match.tag("Player", (player) => userMention(player.id)),
+                        Match.tag("PartialNamePlayer", (player) => player.name),
+                        Match.exhaustive,
+                        Function.apply(player),
+                      ),
+                    ),
                   ),
-                ),
-              ),
             ),
             Effect.let("fills", () =>
-              pipe(
-                schedule.fills,
-                Array.getSomes,
-                Array.map((player) =>
-                  pipe(
-                    Match.type<Player | PartialNamePlayer>(),
-                    Match.tag("Player", (player) => userMention(player.id)),
-                    Match.tag("PartialNamePlayer", (player) => player.name),
-                    Match.exhaustive,
-                    Function.apply(player),
+              schedule.breakHour
+                ? []
+                : pipe(
+                    schedule.fills,
+                    Array.getSomes,
+                    Array.map((player) =>
+                      pipe(
+                        Match.type<Player | PartialNamePlayer>(),
+                        Match.tag("Player", (player) => userMention(player.id)),
+                        Match.tag("PartialNamePlayer", (player) => player.name),
+                        Match.exhaustive,
+                        Function.apply(player),
+                      ),
+                    ),
                   ),
-                ),
-              ),
             ),
             Effect.bind("range", () => formatHour(schedule.hour)),
             Effect.map(({ fills, prevFills, range }) => {
