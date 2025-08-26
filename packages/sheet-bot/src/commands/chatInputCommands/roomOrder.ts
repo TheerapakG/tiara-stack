@@ -1,6 +1,7 @@
 import { SheetApisClient } from "@/client";
 import { roomOrderActionRow } from "@/messageComponents";
 import {
+  ConverterService,
   FormatService,
   GuildConfigService,
   guildServicesFromInteractionOption,
@@ -21,7 +22,6 @@ import {
   handlerVariantContextBuilder,
 } from "@/types";
 import { bindObject } from "@/utils";
-import { addMinutes, getUnixTime } from "date-fns/fp";
 import {
   ApplicationIntegrationType,
   bold,
@@ -33,7 +33,16 @@ import {
   time,
   TimestampStyles,
 } from "discord.js";
-import { Array, Effect, Function, HashMap, Match, Option, pipe } from "effect";
+import {
+  Array,
+  DateTime,
+  Effect,
+  Function,
+  HashMap,
+  Match,
+  Option,
+  pipe,
+} from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { observeOnce } from "typhoon-server/signal";
 
@@ -81,25 +90,28 @@ const handleManual =
               InteractionContext.getNumber("heal"),
               Effect.map(Option.getOrElse(() => 0)),
             ),
-            eventConfig: SheetService.getEventConfig(),
             teams: SheetService.getTeams(),
             runnerConfig: SheetService.getRunnerConfig(),
           }),
-          Effect.let("hour", ({ hourOption, eventConfig }) =>
+          Effect.bind("hour", ({ hourOption }) =>
             pipe(
               hourOption,
-              Option.getOrElse(() =>
-                Math.floor(
-                  (pipe(new Date(), addMinutes(20), getUnixTime) -
-                    eventConfig.startTime) /
-                    3600 +
-                    1,
-                ),
-              ),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  pipe(
+                    DateTime.now,
+                    Effect.map(DateTime.addDuration("20 minutes")),
+                    Effect.flatMap(ConverterService.convertDateTimeToHour),
+                  ),
+              }),
             ),
           ),
-          Effect.bind("formattedHour", ({ hour }) =>
-            FormatService.formatHour(hour),
+          Effect.bind("formattedHourWindow", ({ hour }) =>
+            pipe(
+              ConverterService.convertHourToHourWindow(hour),
+              Effect.flatMap(FormatService.formatHourWindow),
+            ),
           ),
           Effect.bind("schedule", ({ hour }) =>
             pipe(
@@ -219,9 +231,14 @@ const handleManual =
           ),
           InteractionContext.editReply.bind(
             "message",
-            ({ hour, formattedHour, roomOrders, roomOrder }) => ({
+            ({
+              hour,
+              formattedHourWindow: { start, end },
+              roomOrders,
+              roomOrder,
+            }) => ({
               content: [
-                `${bold(`Hour ${hour}`)} ${time(formattedHour.start, TimestampStyles.ShortDateTime)} - ${time(formattedHour.end, TimestampStyles.ShortDateTime)}`,
+                `${bold(`Hour ${hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
                 "",
                 ...roomOrder.room.map(
                   ({ team, tags }, i) =>

@@ -1,6 +1,7 @@
 import { checkinButton } from "@/messageComponents";
 import {
   channelServicesFromGuildChannelId,
+  ConverterService,
   FormatService,
   GuildChannelConfig,
   GuildConfigService,
@@ -22,7 +23,6 @@ import {
   handlerVariantContextBuilder,
 } from "@/types";
 import { bindObject } from "@/utils";
-import { addMinutes, getUnixTime } from "date-fns/fp";
 import {
   ActionRowBuilder,
   ApplicationIntegrationType,
@@ -37,6 +37,7 @@ import {
 import {
   Array,
   Data,
+  DateTime,
   Effect,
   Function,
   HashMap,
@@ -171,19 +172,19 @@ const handleManual =
           bindObject({
             hourOption: InteractionContext.getNumber("hour"),
             channelNameOption: InteractionContext.getString("channel_name"),
-            eventConfig: SheetService.getEventConfig(),
           }),
-          Effect.let("hour", ({ hourOption, eventConfig }) =>
+          Effect.bind("hour", ({ hourOption }) =>
             pipe(
               hourOption,
-              Option.getOrElse(() =>
-                Math.floor(
-                  (pipe(new Date(), addMinutes(20), getUnixTime) -
-                    eventConfig.startTime) /
-                    3600 +
-                    1,
-                ),
-              ),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  pipe(
+                    DateTime.now,
+                    Effect.map(DateTime.addDuration("20 minutes")),
+                    Effect.flatMap(ConverterService.convertDateTimeToHour),
+                  ),
+              }),
             ),
           ),
           Effect.bind("runningChannel", ({ channelNameOption }) =>

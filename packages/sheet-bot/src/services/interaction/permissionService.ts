@@ -5,7 +5,7 @@ import {
   PermissionsBitField,
   RoleResolvable,
 } from "discord.js";
-import { Data, Effect, Equal, pipe } from "effect";
+import { Data, Effect, Option, String, pipe } from "effect";
 import { ClientService } from "./clientService";
 import {
   CachedInteractionContext,
@@ -47,9 +47,9 @@ export class PermissionService extends Effect.Service<PermissionService>()(
           CachedInteractionContext.interaction<InteractionT>().sync(),
           Effect.either,
         ),
-        client: ClientService.getClient(),
+        applicationOwner: ClientService.getApplicationOwner(),
       }),
-      Effect.map(({ interaction, cachedInteraction, client }) => ({
+      Effect.map(({ interaction, cachedInteraction, applicationOwner }) => ({
         privateCheckOwner: ({ allowSameGuild }: { allowSameGuild?: boolean }) =>
           pipe(
             Effect.fail(new OwnerError()),
@@ -71,8 +71,17 @@ export class PermissionService extends Effect.Service<PermissionService>()(
                 Effect.map(
                   ({ interactionUser, interactionGuildId, guildGuildId }) =>
                     (allowSameGuild &&
-                      Equal.equals(interactionGuildId, guildGuildId)) ||
-                    interactionUser.id === client.application.owner?.id,
+                      Option.getEquivalence(String.Equivalence)(
+                        interactionGuildId,
+                        guildGuildId,
+                      )) ||
+                    Option.getEquivalence(String.Equivalence)(
+                      Option.some(interactionUser.id),
+                      pipe(
+                        applicationOwner,
+                        Option.map((owner) => owner.id),
+                      ),
+                    ),
                 ),
               ),
             ),
@@ -137,9 +146,14 @@ export class PermissionService extends Effect.Service<PermissionService>()(
             Effect.unlessEffect(
               pipe(
                 interaction,
-                Effect.map(
-                  (interaction) =>
-                    interaction.user.id === client.application.owner?.id,
+                Effect.map((interaction) =>
+                  Option.getEquivalence(String.Equivalence)(
+                    Option.some(interaction.user.id),
+                    pipe(
+                      applicationOwner,
+                      Option.map((owner) => owner.id),
+                    ),
+                  ),
                 ),
               ),
             ),

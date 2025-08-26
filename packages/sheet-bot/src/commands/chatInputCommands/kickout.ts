@@ -1,4 +1,5 @@
 import {
+  ConverterService,
   GuildConfigService,
   GuildService,
   guildServicesFromInteractionOption,
@@ -16,7 +17,6 @@ import {
   handlerVariantContextBuilder,
 } from "@/types";
 import { bindObject } from "@/utils";
-import { addMinutes, getMinutes, getUnixTime } from "date-fns/fp";
 import {
   ApplicationIntegrationType,
   InteractionContextType,
@@ -27,11 +27,13 @@ import {
 import {
   Array,
   Data,
+  DateTime,
   Effect,
   Function,
   HashMap,
   Match,
   Option,
+  Order,
   pipe,
 } from "effect";
 import { observeOnce } from "typhoon-server/signal";
@@ -133,28 +135,28 @@ const handleManual =
             hourOption: InteractionContext.getNumber("hour"),
             channelName: InteractionContext.getString("channel_name", true),
             guildName: GuildService.getName(),
-            eventConfig: SheetService.getEventConfig(),
           }),
-          Effect.let("date", () => new Date()),
+          Effect.bind("date", () => DateTime.now),
           Effect.tap(({ date }) =>
             pipe(
               Effect.fail(
                 new TimeError("Cannot kick out until next hour starts"),
               ),
-              Effect.when(() => pipe(date, getMinutes) >= 40),
+              Effect.when(() => pipe(date, DateTime.getPart("minutes")) >= 40),
             ),
           ),
-          Effect.let("hour", ({ date, hourOption, eventConfig }) =>
+          Effect.bind("hour", ({ date, hourOption }) =>
             pipe(
               hourOption,
-              Option.getOrElse(() =>
-                Math.floor(
-                  (pipe(date, addMinutes(20), getUnixTime) -
-                    eventConfig.startTime) /
-                    3600 +
-                    1,
-                ),
-              ),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  pipe(
+                    date,
+                    DateTime.addDuration("20 minutes"),
+                    ConverterService.convertDateTimeToHour,
+                  ),
+              }),
             ),
           ),
           Effect.bind("kickoutData", ({ hour, channelName }) =>
@@ -199,10 +201,13 @@ const handleManual =
             ),
           ),
           InteractionContext.editReply.tap(({ removedMembers }) => ({
-            content:
-              removedMembers.length > 0
-                ? `Kicked out ${removedMembers.map((m) => userMention(m.user.id)).join(" ")}`
-                : "No players to kick out",
+            content: pipe(
+              removedMembers,
+              Array.length,
+              Order.greaterThan(Order.number)(0),
+            )
+              ? `Kicked out ${removedMembers.map((m) => userMention(m.user.id)).join(" ")}`
+              : "No players to kick out",
             allowedMentions: { parse: [] },
           })),
           Effect.asVoid,
