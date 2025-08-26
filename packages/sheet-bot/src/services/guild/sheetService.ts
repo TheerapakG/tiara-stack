@@ -220,21 +220,43 @@ export class Schedule extends Data.TaggedClass("Schedule")<{
   standbys: readonly string[];
   empty: number;
 }> {
-  static empty(hour: number) {
+  static empty(hour: number, breakHour?: boolean) {
     return new Schedule({
       hour,
-      breakHour: false,
-      fills: [
-        Option.none(),
-        Option.none(),
-        Option.none(),
-        Option.none(),
-        Option.none(),
-      ],
+      breakHour: breakHour ?? false,
+      fills: Array.makeBy(5, () => Option.none()),
       overfills: [],
       standbys: [],
       empty: 5,
     });
+  }
+
+  static make({
+    hour,
+    breakHour,
+    fills,
+    overfills,
+    standbys,
+  }: {
+    hour: number;
+    breakHour: boolean;
+    fills: readonly Option.Option<string>[];
+    overfills: readonly string[];
+    standbys: readonly string[];
+  }) {
+    return breakHour
+      ? Schedule.empty(hour, breakHour)
+      : new Schedule({
+          hour,
+          breakHour,
+          fills,
+          overfills,
+          standbys,
+          empty: Order.max(Order.number)(
+            5 - fills.filter(Option.isSome).length - overfills.length,
+            0,
+          ),
+        });
   }
 }
 export type ScheduleMap = HashMap.HashMap<number, Schedule>;
@@ -263,20 +285,16 @@ const scheduleParser = ([
           breakHour: pipe(
             Array.get(arr, 0),
             Option.flatten,
-            Option.map((v) => v === "TRUE"),
+            Option.map((v) => String.Equivalence(v, "TRUE")),
             Option.getOrElse(() => false),
           ),
         }),
       ),
       fills: parseValueRange(fills, (arr) =>
         Effect.succeed({
-          fills: [
-            pipe(Array.get(arr, 0), Option.flatten),
-            pipe(Array.get(arr, 1), Option.flatten),
-            pipe(Array.get(arr, 2), Option.flatten),
-            pipe(Array.get(arr, 3), Option.flatten),
-            pipe(Array.get(arr, 4), Option.flatten),
-          ] as const,
+          fills: Array.makeBy(5, (i) =>
+            pipe(Array.get(arr, i), Option.flatten),
+          ),
         }),
       ),
       overfills: parseValueRange(overfills, (arr) =>
@@ -320,13 +338,7 @@ const scheduleParser = ([
           new ArrayWithDefault({
             array: fills,
             default: {
-              fills: [
-                Option.none(),
-                Option.none(),
-                Option.none(),
-                Option.none(),
-                Option.none(),
-              ] as const,
+              fills: Array.makeBy(5, () => Option.none()),
             },
           }),
         ),
@@ -346,19 +358,14 @@ const scheduleParser = ([
           ({ hour, breakHour, fills, overfills, standbys }) =>
             pipe(
               hour,
-              Option.map(
-                (hour) =>
-                  new Schedule({
-                    hour,
-                    breakHour,
-                    fills,
-                    overfills,
-                    standbys,
-                    empty: Order.max(Order.number)(
-                      5 - fills.filter(Option.isSome).length - overfills.length,
-                      0,
-                    ),
-                  }),
+              Option.map((hour) =>
+                Schedule.make({
+                  hour,
+                  breakHour,
+                  fills,
+                  overfills,
+                  standbys,
+                }),
               ),
             ),
         ),
