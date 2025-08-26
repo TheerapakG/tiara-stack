@@ -1,5 +1,5 @@
 import { Client, EmbedBuilder, Interaction } from "discord.js";
-import { Effect, pipe } from "effect";
+import { Effect, Option, pipe } from "effect";
 
 export class ClientService extends Effect.Service<ClientService>()(
   "ClientService",
@@ -10,6 +10,13 @@ export class ClientService extends Effect.Service<ClientService>()(
           pipe(
             Effect.succeed(client),
             Effect.withSpan("ClientService.getClient", {
+              captureStackTrace: true,
+            }),
+          ),
+        getApplicationOwner: () =>
+          pipe(
+            Effect.succeed(Option.fromNullable(client.application.owner)),
+            Effect.withSpan("ClientService.getApplicationOwner", {
               captureStackTrace: true,
             }),
           ),

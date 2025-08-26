@@ -1,4 +1,5 @@
 import {
+  ConverterService,
   FormatService,
   GuildConfigService,
   GuildService,
@@ -15,7 +16,10 @@ export const guildServices = (guildId: string) =>
   pipe(
     Effect.succeed(
       pipe(
-        Layer.mergeAll(FormatService.Default, PlayerService.Default),
+        FormatService.Default,
+        Layer.provideMerge(
+          Layer.mergeAll(ConverterService.Default, PlayerService.Default),
+        ),
         Layer.provideMerge(SheetService.ofGuild()),
         Layer.provideMerge(GuildConfigService.DefaultWithoutDependencies),
         Layer.provideMerge(GuildService.fromGuildId(guildId)),

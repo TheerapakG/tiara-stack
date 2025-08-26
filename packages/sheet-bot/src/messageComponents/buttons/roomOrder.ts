@@ -2,6 +2,7 @@ import {
   ButtonInteractionT,
   CachedInteractionContext,
   channelServicesFromInteraction,
+  ConverterService,
   FormatService,
   guildServicesFromInteraction,
   InteractionContext,
@@ -23,7 +24,7 @@ import {
   time,
   TimestampStyles,
 } from "discord.js";
-import { Effect, Function, Layer, pipe } from "effect";
+import { Effect, Function, Layer, Number, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 
 const roomOrderPreviousButtonData = {
@@ -54,12 +55,12 @@ export const roomOrderActionRow = (
   new ActionRowBuilder<MessageActionRowComponentBuilder>()
     .addComponents(
       new ButtonBuilder(roomOrderPreviousButtonData).setDisabled(
-        range.minRank === rank,
+        Number.Equivalence(range.minRank, rank),
       ),
     )
     .addComponents(
       new ButtonBuilder(roomOrderNextButtonData).setDisabled(
-        range.maxRank === rank,
+        Number.Equivalence(range.maxRank, rank),
       ),
     )
     .addComponents(new ButtonBuilder(roomOrderSendButtonData));
@@ -103,18 +104,21 @@ export const roomOrderPreviousButton =
               Effect.flatMap(observeOnce),
             ),
           ),
-          Effect.bind("formattedHour", ({ messageRoomOrder }) =>
-            FormatService.formatHour(messageRoomOrder.hour),
+          Effect.bind("formattedHourWindow", ({ messageRoomOrder }) =>
+            pipe(
+              ConverterService.convertHourToHourWindow(messageRoomOrder.hour),
+              Effect.flatMap(FormatService.formatHourWindow),
+            ),
           ),
           InteractionContext.editReply.tap(
             ({
               messageRoomOrderData,
               messageRoomOrderRange,
               messageRoomOrder,
-              formattedHour,
+              formattedHourWindow: { start, end },
             }) => ({
               content: [
-                `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(formattedHour.start, TimestampStyles.ShortDateTime)} - ${time(formattedHour.end, TimestampStyles.ShortDateTime)}`,
+                `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
                 "",
                 messageRoomOrderData.map(
                   ({ team, tags, position }) =>
@@ -177,18 +181,21 @@ export const roomOrderNextButton =
               Effect.flatMap(observeOnce),
             ),
           ),
-          Effect.bind("formattedHour", ({ messageRoomOrder }) =>
-            FormatService.formatHour(messageRoomOrder.hour),
+          Effect.bind("formattedHourWindow", ({ messageRoomOrder }) =>
+            pipe(
+              ConverterService.convertHourToHourWindow(messageRoomOrder.hour),
+              Effect.flatMap(FormatService.formatHourWindow),
+            ),
           ),
           InteractionContext.editReply.tap(
             ({
               messageRoomOrderData,
               messageRoomOrderRange,
               messageRoomOrder,
-              formattedHour,
+              formattedHourWindow: { start, end },
             }) => ({
               content: [
-                `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(formattedHour.start, TimestampStyles.ShortDateTime)} - ${time(formattedHour.end, TimestampStyles.ShortDateTime)}`,
+                `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
                 "",
                 messageRoomOrderData.map(
                   ({ team, tags, position }) =>
@@ -255,10 +262,20 @@ export const roomOrderSendButton =
               Effect.flatMap(observeOnce),
             ),
           ),
+          Effect.bind("formattedHourWindow", ({ messageRoomOrder }) =>
+            pipe(
+              ConverterService.convertHourToHourWindow(messageRoomOrder.hour),
+              Effect.flatMap(FormatService.formatHourWindow),
+            ),
+          ),
           SendableChannelContext.send().tap(
-            ({ messageRoomOrderData, eventConfig, messageRoomOrder }) => ({
+            ({
+              messageRoomOrder,
+              messageRoomOrderData,
+              formattedHourWindow: { start, end },
+            }) => ({
               content: [
-                `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(eventConfig.startTime + (messageRoomOrder.hour - 1) * 3600, TimestampStyles.ShortDateTime)} - ${time(eventConfig.startTime + messageRoomOrder.hour * 3600, TimestampStyles.ShortDateTime)}`,
+                `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
                 "",
                 ...messageRoomOrderData.map(
                   ({ team, tags, position }) =>

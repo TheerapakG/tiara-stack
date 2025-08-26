@@ -2,21 +2,27 @@ import { bold, time, TimestampStyles, userMention } from "discord.js";
 import {
   Array,
   Data,
+  DateTime,
   Effect,
   Function,
   HashSet,
   Match,
+  Number,
   Option,
+  Order,
   pipe,
 } from "effect";
+import { ConverterService, HourWindow } from "./converterService";
 import {
   PartialNamePlayer,
   Player,
   ScheduleWithPlayers,
 } from "./playerService";
-import { Schedule, SheetService } from "./sheetService";
+import { Schedule } from "./sheetService";
 
-class HourWindow extends Data.TaggedClass("HourWindow")<{
+export class FormattedHourWindow extends Data.TaggedClass(
+  "FormattedHourWindow",
+)<{
   start: number;
   end: number;
 }> {}
@@ -26,37 +32,35 @@ export class FormatService extends Effect.Service<FormatService>()(
   {
     effect: pipe(
       Effect.Do,
-      Effect.bind("sheetService", () => SheetService),
+      Effect.bind("converterService", () => ConverterService),
       Effect.let(
-        "formatHour",
-        ({ sheetService }) =>
-          (hour: number) =>
-            pipe(
-              sheetService.getEventConfig(),
-              Effect.map(
-                (eventConfig) =>
-                  new HourWindow({
-                    start: eventConfig.startTime + (hour - 1) * 3600,
-                    end: eventConfig.startTime + hour * 3600,
-                  }),
-              ),
-              Effect.withSpan("FormatService.formatHour", {
-                captureStackTrace: true,
-              }),
-            ),
+        "formatDateTime",
+        () => (dateTime: DateTime.DateTime) =>
+          pipe(dateTime, DateTime.toEpochMillis, Number.unsafeDivide(1000)),
       ),
-      Effect.map(({ formatHour }) => ({
-        formatHour,
+      Effect.let(
+        "formatHourWindow",
+        ({ formatDateTime }) =>
+          (hourWindow: HourWindow) =>
+            new FormattedHourWindow({
+              start: formatDateTime(hourWindow.start),
+              end: formatDateTime(hourWindow.end),
+            }),
+      ),
+      Effect.map(({ converterService, formatDateTime, formatHourWindow }) => ({
+        formatDateTime,
+        formatHourWindow,
         formatEmptySlots: ({ hour, breakHour, empty }: Schedule) =>
           pipe(
             Effect.succeed({ hour, breakHour, empty }),
             Effect.flatMap(({ hour, breakHour, empty }) =>
-              empty > 0 && !breakHour
+              Order.greaterThan(Order.number)(empty, 0) && !breakHour
                 ? pipe(
-                    formatHour(hour),
+                    converterService.convertHourToHourWindow(hour),
+                    Effect.map(formatHourWindow),
                     Effect.map(
-                      (range) =>
-                        `${bold(`+${empty} Hour ${hour}`)} ${time(range.start, TimestampStyles.ShortTime)} to ${time(range.end, TimestampStyles.ShortTime)}`,
+                      ({ start, end }) =>
+                        `${bold(`+${empty} Hour ${hour}`)} ${time(start, TimestampStyles.ShortTime)} to ${time(end, TimestampStyles.ShortTime)}`,
                     ),
                   )
                 : Effect.succeed(""),
@@ -71,9 +75,11 @@ export class FormatService extends Effect.Service<FormatService>()(
               pipe(
                 [
                   Option.some(
-                    `Checkin message sent! (${empty > 0 ? `+${empty}` : "No"} empty slot${
-                      empty > 1 ? "s" : ""
-                    })`,
+                    `Checkin message sent! (${
+                      Order.greaterThan(Order.number)(empty, 0)
+                        ? `+${empty}`
+                        : "No"
+                    } empty slot${Order.greaterThan(Order.number)(empty, 1) ? "s" : ""})`,
                   ),
                   pipe(
                     fills,
@@ -91,10 +97,15 @@ export class FormatService extends Effect.Service<FormatService>()(
                     ),
                     Array.getSomes,
                     (partialPlayers) =>
-                      partialPlayers.length > 0
+                      Order.greaterThan(Order.number)(
+                        pipe(partialPlayers, Array.length),
+                        0,
+                      )
                         ? Option.some(
-                            `Cannot look up Discord ID for ${partialPlayers.join(
-                              ", ",
+                            `Cannot look up Discord ID for ${pipe(
+                              partialPlayers,
+                              Array.map((player) => player.name),
+                              Array.join(", "),
                             )}. They would need to check in manually.`,
                           )
                         : Option.none(),
@@ -153,7 +164,12 @@ export class FormatService extends Effect.Service<FormatService>()(
                     ),
                   ),
             ),
-            Effect.bind("range", () => formatHour(schedule.hour)),
+            Effect.bind("range", () =>
+              pipe(
+                converterService.convertHourToHourWindow(schedule.hour),
+                Effect.map(formatHourWindow),
+              ),
+            ),
             Effect.map(({ fills, prevFills, range }) => {
               const newPlayerMentions = pipe(
                 HashSet.fromIterable(fills),
