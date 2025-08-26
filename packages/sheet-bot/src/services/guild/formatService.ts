@@ -69,56 +69,6 @@ export class FormatService extends Effect.Service<FormatService>()(
               captureStackTrace: true,
             }),
           ),
-        formatManagerCheckinMessage: ({ fills, empty }: ScheduleWithPlayers) =>
-          pipe(
-            Effect.succeed(
-              pipe(
-                [
-                  Option.some(
-                    `Checkin message sent! (${
-                      Order.greaterThan(Order.number)(empty, 0)
-                        ? `+${empty}`
-                        : "No"
-                    } empty slot${Order.greaterThan(Order.number)(empty, 1) ? "s" : ""})`,
-                  ),
-                  pipe(
-                    fills,
-                    Array.getSomes,
-                    Array.map((player) =>
-                      pipe(
-                        Match.type<Player | PartialNamePlayer>(),
-                        Match.tag("Player", () => Option.none()),
-                        Match.tag("PartialNamePlayer", (player) =>
-                          Option.some(player),
-                        ),
-                        Match.exhaustive,
-                        Function.apply(player),
-                      ),
-                    ),
-                    Array.getSomes,
-                    (partialPlayers) =>
-                      Order.greaterThan(Order.number)(
-                        pipe(partialPlayers, Array.length),
-                        0,
-                      )
-                        ? Option.some(
-                            `Cannot look up Discord ID for ${pipe(
-                              partialPlayers,
-                              Array.map((player) => player.name),
-                              Array.join(", "),
-                            )}. They would need to check in manually.`,
-                          )
-                        : Option.none(),
-                  ),
-                ],
-                Array.getSomes,
-                Array.join("\n"),
-              ),
-            ),
-            Effect.withSpan("FormatService.formatCheckinEmptySlots", {
-              captureStackTrace: true,
-            }),
-          ),
         formatCheckIn: ({
           prevSchedule,
           schedule,
@@ -170,13 +120,91 @@ export class FormatService extends Effect.Service<FormatService>()(
                 Effect.map(formatHourWindow),
               ),
             ),
-            Effect.map(({ fills, prevFills, range }) => {
-              const newPlayerMentions = pipe(
+            Effect.let("checkinMessage", ({ fills, prevFills, range }) =>
+              pipe(
                 HashSet.fromIterable(fills),
                 HashSet.difference(pipe(HashSet.fromIterable(prevFills))),
-              );
-              return `${HashSet.toValues(newPlayerMentions).join(" ")} React to this message to check in, and ${channelString} for ${bold(`hour ${schedule.hour}`)} ${time(range.start, TimestampStyles.RelativeTime)}`;
-            }),
+                HashSet.toValues,
+                Option.some,
+                Option.filter(Array.isNonEmptyArray),
+                Option.map(Array.join(" ")),
+                Option.map(
+                  (mentions) =>
+                    `${mentions} React to this message to check in, and ${channelString} for ${bold(`hour ${schedule.hour}`)} ${time(range.start, TimestampStyles.RelativeTime)}`,
+                ),
+              ),
+            ),
+            Effect.let(
+              "emptySlotMessage",
+              () =>
+                `${
+                  Order.greaterThan(Order.number)(schedule.empty, 0)
+                    ? `+${schedule.empty}`
+                    : "No"
+                } empty slot${Order.greaterThan(Order.number)(schedule.empty, 1) ? "s" : ""}`,
+            ),
+            Effect.let(
+              "playersMessage",
+              ({ fills }) => `Players: ${pipe(fills, Array.join(" "))}`,
+            ),
+            Effect.let("lookupFailedMessage", () =>
+              pipe(
+                schedule.fills,
+                Array.getSomes,
+                Array.map((player) =>
+                  pipe(
+                    Match.type<Player | PartialNamePlayer>(),
+                    Match.tag("Player", () => Option.none()),
+                    Match.tag("PartialNamePlayer", (player) =>
+                      Option.some(player),
+                    ),
+                    Match.exhaustive,
+                    Function.apply(player),
+                  ),
+                ),
+                Array.getSomes,
+                (partialPlayers) =>
+                  Order.greaterThan(Order.number)(
+                    pipe(partialPlayers, Array.length),
+                    0,
+                  )
+                    ? Option.some(
+                        `Cannot look up Discord ID for ${pipe(
+                          partialPlayers,
+                          Array.map((player) => player.name),
+                          Array.join(", "),
+                        )}. They would need to check in manually.`,
+                      )
+                    : Option.none(),
+              ),
+            ),
+            Effect.map(
+              ({
+                checkinMessage,
+                emptySlotMessage,
+                playersMessage,
+                lookupFailedMessage,
+              }) => ({
+                checkinMessage,
+                managerCheckinMessage: pipe(
+                  checkinMessage,
+                  Option.match({
+                    onSome: () =>
+                      pipe(
+                        [
+                          Option.some("Checkin message sent!"),
+                          Option.some(emptySlotMessage),
+                          Option.some(playersMessage),
+                          lookupFailedMessage,
+                        ],
+                        Array.getSomes,
+                        Array.join("\n"),
+                      ),
+                    onNone: () => "No checkin message sent, no players changed",
+                  }),
+                ),
+              }),
+            ),
             Effect.withSpan("FormatService.formatCheckIn", {
               captureStackTrace: true,
             }),

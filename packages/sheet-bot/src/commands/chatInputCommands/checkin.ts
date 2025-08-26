@@ -98,32 +98,20 @@ const getCheckinMessages = (data: {
   };
   showChannelMention: boolean;
 }) =>
-  pipe(
-    Effect.Do,
-    Effect.bind("managerCheckinMessage", () =>
-      FormatService.formatManagerCheckinMessage(data.schedule),
-    ),
-    Effect.bind("checkinMessage", () =>
-      FormatService.formatCheckIn({
-        prevSchedule: data.prevSchedule,
-        schedule: data.schedule,
-        channelString: data.showChannelMention
-          ? `head to ${channelMention(data.runningChannel.channelId)}`
-          : pipe(
-              data.runningChannel.name,
-              Option.match({
-                onSome: (name) => `head to ${name}`,
-                onNone: () =>
-                  "await further instructions from the manager on where the running channel is",
-              }),
-            ),
-      }),
-    ),
-    Effect.map(({ managerCheckinMessage, checkinMessage }) => ({
-      managerCheckinMessage,
-      checkinMessage,
-    })),
-  );
+  FormatService.formatCheckIn({
+    prevSchedule: data.prevSchedule,
+    schedule: data.schedule,
+    channelString: data.showChannelMention
+      ? `head to ${channelMention(data.runningChannel.channelId)}`
+      : pipe(
+          data.runningChannel.name,
+          Option.match({
+            onSome: (name) => `head to ${name}`,
+            onNone: () =>
+              "await further instructions from the manager on where the running channel is",
+          }),
+        ),
+  });
 
 const handleManual =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
@@ -246,41 +234,54 @@ const handleManual =
             "message",
             ({ checkinData, checkinMessages, checkinChannelId }) =>
               pipe(
-                SendableChannelContext.send().sync({
-                  content: checkinMessages.checkinMessage,
-                  components: checkinData.runningChannel.roleId
-                    ? [
-                        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                          new ButtonBuilder(checkinButton.data),
-                        ),
-                      ]
-                    : [],
-                }),
+                checkinMessages.checkinMessage,
+                Effect.transposeMapOption((checkinMessage) =>
+                  pipe(
+                    Effect.Do,
+                    Effect.let("initialMessage", () => checkinMessage),
+                    SendableChannelContext.send().bind("message", () => ({
+                      content: checkinMessage,
+                      components: checkinData.runningChannel.roleId
+                        ? [
+                            new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                              new ButtonBuilder(checkinButton.data),
+                            ),
+                          ]
+                        : [],
+                    })),
+                  ),
+                ),
                 Effect.provide(
                   channelServicesFromGuildChannelId(checkinChannelId),
                 ),
               ),
           ),
-          Effect.tap(
-            ({ checkinData, message, fillIds, checkinMessages, hour }) =>
-              Effect.all(
-                [
-                  MessageCheckinService.upsertMessageCheckinData(message.id, {
-                    initialMessage: checkinMessages.checkinMessage,
-                    hour,
-                    channelId: checkinData.runningChannel.channelId,
-                    roleId: Option.getOrNull(checkinData.runningChannel.roleId),
-                  }),
-                  pipe(
-                    MessageCheckinService.addMessageCheckinMembers(
-                      message.id,
-                      fillIds,
+          Effect.tap(({ checkinData, message, fillIds, hour }) =>
+            pipe(
+              message,
+              Effect.transposeMapOption(({ initialMessage, message }) =>
+                Effect.all(
+                  [
+                    MessageCheckinService.upsertMessageCheckinData(message.id, {
+                      initialMessage,
+                      hour,
+                      channelId: checkinData.runningChannel.channelId,
+                      roleId: Option.getOrNull(
+                        checkinData.runningChannel.roleId,
+                      ),
+                    }),
+                    pipe(
+                      MessageCheckinService.addMessageCheckinMembers(
+                        message.id,
+                        fillIds,
+                      ),
+                      Effect.unless(() => Array.isEmptyArray(fillIds)),
                     ),
-                    Effect.unless(() => Array.isEmptyArray(fillIds)),
-                  ),
-                ],
-                { concurrency: "unbounded" },
+                  ],
+                  { concurrency: "unbounded" },
+                ),
               ),
+            ),
           ),
           InteractionContext.editReply.tap(({ checkinMessages }) => ({
             content: checkinMessages.managerCheckinMessage,
