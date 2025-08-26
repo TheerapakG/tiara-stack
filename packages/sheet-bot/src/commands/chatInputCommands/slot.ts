@@ -36,6 +36,7 @@ import {
   Order,
   pipe,
   Ref,
+  String,
 } from "effect";
 import { validate } from "typhoon-core/schema";
 import { observeOnce } from "typhoon-server/signal";
@@ -57,7 +58,9 @@ const getSlotMessage = (day: number) =>
         Effect.map(Chunk.dedupeAdjacent),
         Effect.map(Chunk.join("\n")),
         Effect.map((description) =>
-          description === "" ? "All Filled :3" : description,
+          String.Equivalence(description, String.empty)
+            ? "All Filled :3"
+            : description,
         ),
       ),
     })),
@@ -108,10 +111,11 @@ const handleList =
             ),
           }),
           Effect.tap(({ messageFlags, messageType }) =>
-            Ref.update(messageFlags, (flags) =>
-              flags.add(
-                messageType === "ephemeral" ? MessageFlags.Ephemeral : 0,
+            pipe(
+              Ref.update(messageFlags, (flags) =>
+                flags.add(MessageFlags.Ephemeral),
               ),
+              Effect.when(() => String.Equivalence(messageType, "ephemeral")),
             ),
           ),
           Effect.bind("flags", ({ messageFlags }) => Ref.get(messageFlags)),

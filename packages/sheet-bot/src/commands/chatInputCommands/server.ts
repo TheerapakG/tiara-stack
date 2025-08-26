@@ -23,7 +23,7 @@ import {
   SlashCommandSubcommandBuilder,
   SlashCommandSubcommandGroupBuilder,
 } from "discord.js";
-import { Effect, Option, pipe } from "effect";
+import { Array, Effect, Option, Order, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 
 const handleListConfig =
@@ -87,7 +87,19 @@ const handleListConfig =
                         [
                           `Sheet id: ${sheetId}`,
                           `Script id: ${scriptId}`,
-                          `Manager roles: ${managerRoles.length > 0 ? managerRoles.map((role) => roleMention(role.roleId)).join(", ") : "None"}`,
+                          `Manager roles: ${
+                            pipe(
+                              managerRoles,
+                              Array.length,
+                              Order.greaterThan(Order.number)(0),
+                            )
+                              ? pipe(
+                                  managerRoles,
+                                  Array.map((role) => roleMention(role.roleId)),
+                                  Array.join(", "),
+                                )
+                              : "None"
+                          }`,
                         ].join("\n"),
                       ),
                   ],
