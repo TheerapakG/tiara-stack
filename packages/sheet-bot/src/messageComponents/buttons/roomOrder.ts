@@ -120,9 +120,9 @@ export const roomOrderPreviousButton =
               content: [
                 `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
                 "",
-                messageRoomOrderData.map(
+                ...messageRoomOrderData.map(
                   ({ team, tags, position }) =>
-                    `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
+                    `${inlineCode(`P${position + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : ""}`,
                 ),
               ].join("\n"),
               components: [
@@ -197,9 +197,9 @@ export const roomOrderNextButton =
               content: [
                 `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
                 "",
-                messageRoomOrderData.map(
+                ...messageRoomOrderData.map(
                   ({ team, tags, position }) =>
-                    `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
+                    `${inlineCode(`P${position + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : ""}`,
                 ),
               ].join("\n"),
               components: [
@@ -279,7 +279,7 @@ export const roomOrderSendButton =
                 "",
                 ...messageRoomOrderData.map(
                   ({ team, tags, position }) =>
-                    `${inlineCode(`P${position + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
+                    `${inlineCode(`P${position + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : ""}`,
                 ),
               ].join("\n"),
             }),
