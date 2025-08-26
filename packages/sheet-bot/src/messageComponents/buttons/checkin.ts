@@ -21,7 +21,16 @@ import {
   MessageFlags,
   userMention,
 } from "discord.js";
-import { Array, Cause, Data, Effect, Function, Option, pipe } from "effect";
+import {
+  Array,
+  Cause,
+  Data,
+  Effect,
+  Function,
+  Option,
+  Order,
+  pipe,
+} from "effect";
 import { observeOnce } from "typhoon-server/signal";
 
 const buttonData = {
@@ -94,8 +103,21 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
             MessageCheckinService.getMessageCheckinMembers(message.id),
             Effect.flatMap(observeOnce),
             Effect.map(Array.filter((m) => Option.isSome(m.checkinAt))),
-            Effect.map(Array.map((m) => userMention(m.memberId))),
-            Effect.map(Array.join(" ")),
+            Effect.flatMap((members) =>
+              pipe(
+                members,
+                Array.map((m) => userMention(m.memberId)),
+                Array.join(" "),
+                Effect.succeed,
+                Effect.when(() =>
+                  pipe(
+                    members,
+                    Array.length,
+                    Order.greaterThan(Order.number)(0),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
         Effect.tap(({ messageCheckinData }) =>
@@ -111,10 +133,14 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
           Effect.all([
             Effect.tryPromise(() =>
               message.edit({
-                content:
-                  checkedInMentions.length > 0
-                    ? `${messageCheckinData.initialMessage}\n\nChecked in: ${checkedInMentions}`
-                    : messageCheckinData.initialMessage,
+                content: pipe(
+                  checkedInMentions,
+                  Option.match({
+                    onSome: (checkedInMentions) =>
+                      `${messageCheckinData.initialMessage}\n\nChecked in: ${checkedInMentions}`,
+                    onNone: () => messageCheckinData.initialMessage,
+                  }),
+                ),
                 components: messageCheckinData.roleId
                   ? [
                       new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(

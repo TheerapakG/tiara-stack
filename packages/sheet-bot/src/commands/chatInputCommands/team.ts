@@ -19,7 +19,7 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, Effect, HashMap, Option, pipe } from "effect";
+import { Array, Effect, HashMap, Number, Option, pipe, String } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 
 const handleList =
@@ -62,7 +62,9 @@ const handleList =
                 roles: managerRoles.map((role) => role.roleId),
                 reason: "You can only get your own teams in the current server",
               }),
-              Effect.unless(() => user.id === interactionUser.id),
+              Effect.unless(() =>
+                String.Equivalence(user.id, interactionUser.id),
+              ),
             ),
           ),
           Effect.bind("teams", () => SheetService.getTeams()),
@@ -99,14 +101,16 @@ const handleList =
                   embed
                     .setTitle(`${escapeMarkdown(user.username)}'s Teams`)
                     .setDescription(
-                      userTeams.length === 0 ? "No teams found" : null,
+                      Number.Equivalence(userTeams.length, 0)
+                        ? "No teams found"
+                        : null,
                     )
                     .addFields(
                       userTeams.map((team) => ({
                         name: escapeMarkdown(team.name),
                         value: [
                           `Tags: ${
-                            team.tags.length === 0
+                            Number.Equivalence(team.tags.length, 0)
                               ? "None"
                               : escapeMarkdown(team.tags.join(", "))
                           }`,

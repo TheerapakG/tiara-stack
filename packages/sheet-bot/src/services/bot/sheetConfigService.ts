@@ -1,8 +1,11 @@
+import { GoogleSheets } from "@/google/sheets";
+import { bindObject } from "@/utils";
 import { type sheets_v4 } from "@googleapis/sheets";
 import { type } from "arktype";
 import {
   Array,
   Data,
+  DateTime,
   Effect,
   Equal,
   HashMap,
@@ -12,8 +15,6 @@ import {
 } from "effect";
 import { validate, validateWithDefault } from "typhoon-core/schema";
 import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
-import { GoogleSheets } from "@/google/sheets";
-import { bindObject } from "@/utils";
 
 const parseValueRange = <A = never, E = never, R = never>(
   valueRange: sheets_v4.Schema$ValueRange,
@@ -412,13 +413,16 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
             Effect.flatMap(
               validate(
                 type({
-                  "Start Time": "string | number",
+                  "Start Time": "string.integer.parse",
                 }).pipe((config) => ({
-                  startTime:
-                    typeof config["Start Time"] === "number"
-                      ? config["Start Time"]
-                      : parseInt(config["Start Time"]),
+                  startTime: DateTime.make(config["Start Time"] * 1000),
                 })),
+              ),
+            ),
+            Effect.flatMap(({ startTime }) =>
+              pipe(
+                startTime,
+                Option.map((startTime) => ({ startTime })),
               ),
             ),
             Effect.withSpan("SheetConfigService.getEventConfig", {

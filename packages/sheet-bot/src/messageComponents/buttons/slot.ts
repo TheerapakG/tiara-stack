@@ -9,7 +9,16 @@ import {
 import { ButtonHandlerVariantT, handlerVariantContextBuilder } from "@/types";
 import { bindObject } from "@/utils";
 import { ButtonStyle, ComponentType, MessageFlags } from "discord.js";
-import { Array, Chunk, Effect, HashMap, Option, Order, pipe } from "effect";
+import {
+  Array,
+  Chunk,
+  Effect,
+  HashMap,
+  Option,
+  Order,
+  pipe,
+  String,
+} from "effect";
 import { observeOnce } from "typhoon-server/signal";
 
 const getSlotMessage = (day: number) =>
@@ -29,7 +38,9 @@ const getSlotMessage = (day: number) =>
         Effect.map(Chunk.dedupeAdjacent),
         Effect.map(Chunk.join("\n")),
         Effect.map((description) =>
-          description === "" ? "All Filled :3" : description,
+          String.Equivalence(description, String.empty)
+            ? "All Filled :3"
+            : description,
         ),
       ),
     })),
