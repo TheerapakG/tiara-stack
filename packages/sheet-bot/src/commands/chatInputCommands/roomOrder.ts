@@ -242,7 +242,7 @@ const handleManual =
                 "",
                 ...roomOrder.room.map(
                   ({ team, tags }, i) =>
-                    `${inlineCode(`P${i + 1}:`)}  ${bold(team)}${tags.includes("enc") ? " (enc)" : ""}`,
+                    `${inlineCode(`P${i + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : ""}`,
                 ),
               ].join("\n"),
               components: [
