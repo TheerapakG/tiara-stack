@@ -1,9 +1,9 @@
+import { DB } from "@/db";
 import { and, asc, eq, isNull, max, min, sql } from "drizzle-orm";
 import { Array, Data, Effect, Option, pipe } from "effect";
 import { messageRoomOrder, messageRoomOrderData } from "sheet-db-schema";
 import { DBSubscriptionContext } from "typhoon-server/db";
 import { Computed } from "typhoon-server/signal";
-import { DB } from "@/db";
 
 type MessageRoomOrderInsert = typeof messageRoomOrder.$inferInsert;
 type MessageRoomOrderSelect = typeof messageRoomOrder.$inferSelect;
@@ -119,6 +119,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                 .returning(),
             ),
             Effect.map(Array.head),
+            Effect.map(Option.map(MessageRoomOrder.fromDbSelect)),
             Effect.withSpan(
               "MessageRoomOrderService.decrementMessageRoomOrderRank",
               {
@@ -141,6 +142,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                 .returning(),
             ),
             Effect.map(Array.head),
+            Effect.map(Option.map(MessageRoomOrder.fromDbSelect)),
             Effect.withSpan(
               "MessageRoomOrderService.incrementMessageRoomOrderRank",
               {
