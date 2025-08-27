@@ -6,6 +6,7 @@ import {
   FormatService,
   guildServicesFromInteraction,
   InteractionContext,
+  MessageRoomOrder,
   MessageRoomOrderService,
   SendableChannelContext,
   SheetService,
@@ -65,6 +66,57 @@ export const roomOrderActionRow = (
     )
     .addComponents(new ButtonBuilder(roomOrderSendButtonData));
 
+export const roomOrderInteractionGetReply = (
+  messageRoomOrder: MessageRoomOrder,
+) =>
+  pipe(
+    Effect.Do,
+    CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
+    Effect.bindAll(
+      ({ message }) => ({
+        messageRoomOrderRange: pipe(
+          MessageRoomOrderService.getMessageRoomOrderRange(message.id),
+          Effect.flatMap(observeOnce),
+          Effect.flatMap(Function.identity),
+        ),
+        messageRoomOrderData: pipe(
+          MessageRoomOrderService.getMessageRoomOrderData(
+            message.id,
+            messageRoomOrder.rank,
+          ),
+          Effect.flatMap(observeOnce),
+        ),
+        formattedHourWindow: pipe(
+          ConverterService.convertHourToHourWindow(messageRoomOrder.hour),
+          Effect.flatMap(FormatService.formatHourWindow),
+        ),
+      }),
+      { concurrency: "unbounded" },
+    ),
+    Effect.map(
+      ({
+        messageRoomOrderData,
+        messageRoomOrderRange,
+        formattedHourWindow: { start, end },
+      }) => ({
+        content: [
+          `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
+          "",
+          ...messageRoomOrderData.map(
+            ({ team, tags, position }) =>
+              `${inlineCode(`P${position + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : ""}`,
+          ),
+        ].join("\n"),
+        components: [
+          roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank),
+        ],
+      }),
+    ),
+    Effect.withSpan("roomOrderInteractionGetReply", {
+      captureStackTrace: true,
+    }),
+  );
+
 export const roomOrderPreviousButton =
   handlerVariantContextBuilder<ButtonHandlerVariantT>()
     .data(roomOrderPreviousButtonData)
@@ -79,59 +131,17 @@ export const roomOrderPreviousButton =
           bindObject({
             eventConfig: SheetService.getEventConfig(),
           }),
-          Effect.bindAll(
-            ({ message }) => ({
-              messageRoomOrder: pipe(
-                MessageRoomOrderService.decrementMessageRoomOrderRank(
-                  message.id,
-                ),
-                Effect.flatMap(Function.identity),
-              ),
-              messageRoomOrderRange: pipe(
-                MessageRoomOrderService.getMessageRoomOrderRange(message.id),
-                Effect.flatMap(observeOnce),
-                Effect.flatMap(Function.identity),
-              ),
-            }),
-            { concurrency: "unbounded" },
-          ),
-          Effect.bind("messageRoomOrderData", ({ message, messageRoomOrder }) =>
+          Effect.bind("messageRoomOrder", ({ message }) =>
             pipe(
-              MessageRoomOrderService.getMessageRoomOrderData(
-                message.id,
-                messageRoomOrder.rank,
-              ),
-              Effect.flatMap(observeOnce),
+              MessageRoomOrderService.decrementMessageRoomOrderRank(message.id),
+              Effect.flatMap(Function.identity),
             ),
           ),
-          Effect.bind("formattedHourWindow", ({ messageRoomOrder }) =>
-            pipe(
-              ConverterService.convertHourToHourWindow(messageRoomOrder.hour),
-              Effect.flatMap(FormatService.formatHourWindow),
-            ),
+          Effect.bind("messageRoomOrderReply", ({ messageRoomOrder }) =>
+            roomOrderInteractionGetReply(messageRoomOrder),
           ),
           InteractionContext.editReply.tap(
-            ({
-              messageRoomOrderData,
-              messageRoomOrderRange,
-              messageRoomOrder,
-              formattedHourWindow: { start, end },
-            }) => ({
-              content: [
-                `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
-                "",
-                ...messageRoomOrderData.map(
-                  ({ team, tags, position }) =>
-                    `${inlineCode(`P${position + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : ""}`,
-                ),
-              ].join("\n"),
-              components: [
-                roomOrderActionRow(
-                  messageRoomOrderRange,
-                  messageRoomOrder.rank,
-                ),
-              ],
-            }),
+            ({ messageRoomOrderReply }) => messageRoomOrderReply,
           ),
           Effect.asVoid,
           Effect.withSpan("handleRoomOrderPreviousButton", {
@@ -156,59 +166,17 @@ export const roomOrderNextButton =
           bindObject({
             eventConfig: SheetService.getEventConfig(),
           }),
-          Effect.bindAll(
-            ({ message }) => ({
-              messageRoomOrder: pipe(
-                MessageRoomOrderService.incrementMessageRoomOrderRank(
-                  message.id,
-                ),
-                Effect.flatMap(Function.identity),
-              ),
-              messageRoomOrderRange: pipe(
-                MessageRoomOrderService.getMessageRoomOrderRange(message.id),
-                Effect.flatMap(observeOnce),
-                Effect.flatMap(Function.identity),
-              ),
-            }),
-            { concurrency: "unbounded" },
-          ),
-          Effect.bind("messageRoomOrderData", ({ message, messageRoomOrder }) =>
+          Effect.bind("messageRoomOrder", ({ message }) =>
             pipe(
-              MessageRoomOrderService.getMessageRoomOrderData(
-                message.id,
-                messageRoomOrder.rank,
-              ),
-              Effect.flatMap(observeOnce),
+              MessageRoomOrderService.incrementMessageRoomOrderRank(message.id),
+              Effect.flatMap(Function.identity),
             ),
           ),
-          Effect.bind("formattedHourWindow", ({ messageRoomOrder }) =>
-            pipe(
-              ConverterService.convertHourToHourWindow(messageRoomOrder.hour),
-              Effect.flatMap(FormatService.formatHourWindow),
-            ),
+          Effect.bind("messageRoomOrderReply", ({ messageRoomOrder }) =>
+            roomOrderInteractionGetReply(messageRoomOrder),
           ),
           InteractionContext.editReply.tap(
-            ({
-              messageRoomOrderData,
-              messageRoomOrderRange,
-              messageRoomOrder,
-              formattedHourWindow: { start, end },
-            }) => ({
-              content: [
-                `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
-                "",
-                ...messageRoomOrderData.map(
-                  ({ team, tags, position }) =>
-                    `${inlineCode(`P${position + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : ""}`,
-                ),
-              ].join("\n"),
-              components: [
-                roomOrderActionRow(
-                  messageRoomOrderRange,
-                  messageRoomOrder.rank,
-                ),
-              ],
-            }),
+            ({ messageRoomOrderReply }) => messageRoomOrderReply,
           ),
           Effect.asVoid,
           Effect.withSpan("handleRoomOrderNextButton", {
@@ -238,52 +206,19 @@ export const roomOrderSendButton =
           bindObject({
             eventConfig: SheetService.getEventConfig(),
           }),
-          Effect.bindAll(
-            ({ message }) => ({
-              messageRoomOrder: pipe(
-                MessageRoomOrderService.getMessageRoomOrder(message.id),
-                Effect.flatMap(observeOnce),
-                Effect.flatMap(Function.identity),
-              ),
-              messageRoomOrderRange: pipe(
-                MessageRoomOrderService.getMessageRoomOrderRange(message.id),
-                Effect.flatMap(observeOnce),
-                Effect.flatMap(Function.identity),
-              ),
-            }),
-            { concurrency: "unbounded" },
-          ),
-          Effect.bind("messageRoomOrderData", ({ message, messageRoomOrder }) =>
+          Effect.bind("messageRoomOrder", ({ message }) =>
             pipe(
-              MessageRoomOrderService.getMessageRoomOrderData(
-                message.id,
-                messageRoomOrder.rank,
-              ),
+              MessageRoomOrderService.getMessageRoomOrder(message.id),
               Effect.flatMap(observeOnce),
+              Effect.flatMap(Function.identity),
             ),
           ),
-          Effect.bind("formattedHourWindow", ({ messageRoomOrder }) =>
-            pipe(
-              ConverterService.convertHourToHourWindow(messageRoomOrder.hour),
-              Effect.flatMap(FormatService.formatHourWindow),
-            ),
+          Effect.bind("messageRoomOrderReply", ({ messageRoomOrder }) =>
+            roomOrderInteractionGetReply(messageRoomOrder),
           ),
-          SendableChannelContext.send().tap(
-            ({
-              messageRoomOrder,
-              messageRoomOrderData,
-              formattedHourWindow: { start, end },
-            }) => ({
-              content: [
-                `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
-                "",
-                ...messageRoomOrderData.map(
-                  ({ team, tags, position }) =>
-                    `${inlineCode(`P${position + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : ""}`,
-                ),
-              ].join("\n"),
-            }),
-          ),
+          SendableChannelContext.send().tap(({ messageRoomOrderReply }) => ({
+            content: messageRoomOrderReply.content,
+          })),
           InteractionContext.editReply.tap(() => ({
             content: "sent room order!",
             components: [],
