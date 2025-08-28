@@ -294,6 +294,19 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
               Effect.runPromise(
                 pipe(
                   ClientService.fetchApplication(),
+                  Effect.tap(() =>
+                    Effect.tryPromise(() => client.guilds.fetch()),
+                  ),
+                  Effect.tap(() =>
+                    Effect.log(
+                      [...client.guilds.cache.entries()]
+                        .map(([id, guild]) => ({
+                          id,
+                          name: guild.name,
+                        }))
+                        .join("\n"),
+                    ),
+                  ),
                   Effect.tap(() => Effect.log("Bot is ready")),
                   Effect.provide(ClientService.Default(client)),
                 ),
