@@ -300,10 +300,12 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                   Effect.tap(() =>
                     Effect.log(
                       [...client.guilds.cache.entries()]
-                        .map(([id, guild]) => ({
-                          id,
-                          name: guild.name,
-                        }))
+                        .map(([id, guild]) =>
+                          JSON.stringify({
+                            id,
+                            name: guild.name,
+                          }),
+                        )
                         .join("\n"),
                     ),
                   ),
