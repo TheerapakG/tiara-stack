@@ -41,6 +41,7 @@ import {
 import {
   Data,
   Effect,
+  HashMap,
   Layer,
   ManagedRuntime,
   Option,
@@ -294,19 +295,13 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
               Effect.runPromise(
                 pipe(
                   ClientService.fetchApplication(),
-                  Effect.tap(() =>
-                    Effect.tryPromise(() => client.guilds.fetch()),
-                  ),
-                  Effect.tap(() =>
-                    Effect.log(
-                      [...client.guilds.cache.entries()]
-                        .map(([id, guild]) =>
-                          JSON.stringify({
-                            id,
-                            name: guild.name,
-                          }),
-                        )
-                        .join("\n"),
+                  Effect.tap(() => ClientService.fetchGuilds()),
+                  Effect.andThen(() => ClientService.getGuilds()),
+                  Effect.tap((guilds) =>
+                    Effect.forEach(HashMap.values(guilds), (guild) =>
+                      Effect.log(
+                        `guildId: ${guild.id} guildName: ${guild.name}`,
+                      ),
                     ),
                   ),
                   Effect.tap(() => Effect.log("Bot is ready")),
