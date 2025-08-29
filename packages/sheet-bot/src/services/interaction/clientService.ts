@@ -1,5 +1,5 @@
 import { Client, EmbedBuilder, Interaction } from "discord.js";
-import { Effect, Option, pipe } from "effect";
+import { Effect, HashMap, Option, pipe } from "effect";
 
 export class ClientService extends Effect.Service<ClientService>()(
   "ClientService",
@@ -24,6 +24,22 @@ export class ClientService extends Effect.Service<ClientService>()(
           pipe(
             Effect.tryPromise(() => client.application.fetch()),
             Effect.withSpan("ClientService.fetchApplication", {
+              captureStackTrace: true,
+            }),
+          ),
+        getGuilds: () =>
+          pipe(
+            client.guilds.cache,
+            HashMap.fromIterable,
+            Effect.succeed,
+            Effect.withSpan("ClientService.getGuilds", {
+              captureStackTrace: true,
+            }),
+          ),
+        fetchGuilds: () =>
+          pipe(
+            Effect.tryPromise(() => client.guilds.fetch()),
+            Effect.withSpan("ClientService.fetchGuilds", {
               captureStackTrace: true,
             }),
           ),
