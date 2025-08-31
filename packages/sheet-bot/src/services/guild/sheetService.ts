@@ -1,5 +1,7 @@
 import { GoogleSheets } from "@/google/sheets";
 import {
+  HourRange,
+  RunnerConfigMap,
   SheetConfigService,
   TeamConfig,
 } from "@/services/bot/sheetConfigService";
@@ -261,13 +263,10 @@ export class Schedule extends Data.TaggedClass("Schedule")<{
 }
 export type ScheduleMap = HashMap.HashMap<number, Schedule>;
 
-const scheduleParser = ([
-  hours,
-  breaks,
-  fills,
-  overfills,
-  standbys,
-]: sheets_v4.Schema$ValueRange[]): Effect.Effect<ScheduleMap, never, never> =>
+const scheduleParser = (
+  [hours, fills, overfills, standbys, breaks]: sheets_v4.Schema$ValueRange[],
+  { detectBreak }: { detectBreak?: RunnerConfigMap },
+): Effect.Effect<ScheduleMap, never, never> =>
   pipe(
     Effect.Do,
     bindObject({
@@ -277,16 +276,6 @@ const scheduleParser = ([
             Array.get(arr, 0),
             Option.flatten,
             Option.flatMapNullable((v) => parseInt(v, 10)),
-          ),
-        }),
-      ),
-      breaks: parseValueRange(breaks, (arr) =>
-        Effect.succeed({
-          breakHour: pipe(
-            Array.get(arr, 0),
-            Option.flatten,
-            Option.map((v) => String.Equivalence(v, "TRUE")),
-            Option.getOrElse(() => false),
           ),
         }),
       ),
@@ -321,19 +310,25 @@ const scheduleParser = ([
           ),
         }),
       ),
+      breaks: detectBreak
+        ? Effect.succeed([])
+        : parseValueRange(breaks, (arr) =>
+            Effect.succeed({
+              breakHour: pipe(
+                Array.get(arr, 0),
+                Option.flatten,
+                Option.map((v) => String.Equivalence(v, "TRUE")),
+                Option.getOrElse(() => false),
+              ),
+            }),
+          ),
     }),
-    Effect.map(({ hours, breaks, fills, overfills, standbys }) =>
+    Effect.map(({ hours, fills, overfills, standbys, breaks }) =>
       pipe(
         new ArrayWithDefault({
           array: hours,
           default: { hour: Option.none() },
         }),
-        ArrayWithDefault.zip(
-          new ArrayWithDefault({
-            array: breaks,
-            default: { breakHour: false },
-          }),
-        ),
         ArrayWithDefault.zip(
           new ArrayWithDefault({
             array: fills,
@@ -354,6 +349,12 @@ const scheduleParser = ([
             default: { standbys: [] },
           }),
         ),
+        ArrayWithDefault.zip(
+          new ArrayWithDefault({
+            array: breaks,
+            default: { breakHour: false },
+          }),
+        ),
         ArrayWithDefault.map(
           ({ hour, breakHour, fills, overfills, standbys }) =>
             pipe(
@@ -361,7 +362,23 @@ const scheduleParser = ([
               Option.map((hour) =>
                 Schedule.make({
                   hour,
-                  breakHour,
+                  breakHour: detectBreak
+                    ? pipe(
+                        fills,
+                        Array.getSomes,
+                        Array.map((fill) =>
+                          pipe(detectBreak, HashMap.get(fill)),
+                        ),
+                        Array.getSomes,
+                        Array.filter((config) =>
+                          pipe(
+                            config.hours,
+                            Array.some(HourRange.includes(hour)),
+                          ),
+                        ),
+                        Array.isNonEmptyArray,
+                      )
+                    : breakHour,
                   fills,
                   overfills,
                   standbys,
@@ -475,7 +492,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               ),
         ),
         Effect.bindAll(
-          ({ sheetGet, rangesConfig, teamConfig }) => ({
+          ({ sheetGet, rangesConfig, teamConfig, runnerConfig }) => ({
             players: pipe(
               Effect.Do,
               Effect.bind("rangesConfig", () => rangesConfig),
@@ -522,20 +539,35 @@ export class SheetService extends Effect.Service<SheetService>()(
               Effect.Do,
               bindObject({
                 rangesConfig,
+                runnerConfig,
               }),
               Effect.bind("sheet", ({ rangesConfig }) =>
                 sheetGet({
-                  ranges: [
-                    rangesConfig.hours,
-                    rangesConfig.breaks,
-                    rangesConfig.fills,
-                    rangesConfig.overfills,
-                    rangesConfig.standbys,
-                  ],
+                  ranges: pipe(
+                    [
+                      Option.some(rangesConfig.hours),
+                      Option.some(rangesConfig.fills),
+                      Option.some(rangesConfig.overfills),
+                      Option.some(rangesConfig.standbys),
+                      String.Equivalence(rangesConfig.breaks, "detect")
+                        ? Option.none()
+                        : Option.some(rangesConfig.breaks),
+                    ],
+                    Array.getSomes,
+                  ),
                 }),
               ),
-              Effect.bind("schedules", ({ sheet }) =>
-                scheduleParser(sheet.data.valueRanges ?? []),
+              Effect.bind(
+                "schedules",
+                ({ sheet, rangesConfig, runnerConfig }) =>
+                  scheduleParser(sheet.data.valueRanges ?? [], {
+                    detectBreak: String.Equivalence(
+                      rangesConfig.breaks,
+                      "detect",
+                    )
+                      ? runnerConfig
+                      : undefined,
+                  }),
               ),
               Effect.map(({ schedules }) => schedules),
               Effect.withSpan("SheetService.allSchedules", {
@@ -623,8 +655,9 @@ export class SheetService extends Effect.Service<SheetService>()(
                 bindObject({
                   rangesConfig,
                   dayConfig,
+                  runnerConfig,
                 }),
-                Effect.bind("sheet", ({ dayConfig }) =>
+                Effect.bind("specificDayConfig", ({ dayConfig }) =>
                   pipe(
                     dayConfig,
                     collectArrayToHashMap({
@@ -633,22 +666,48 @@ export class SheetService extends Effect.Service<SheetService>()(
                       valueReducer: (acc, a) => Array.append(acc, a),
                     }),
                     HashMap.get(day),
-                    // TODO: parse multiple sheets
-                    Effect.flatMap((config) =>
-                      sheetGet({
-                        ranges: [
-                          `'${config[0].sheet}'!${config[0].hourRange}`,
-                          `'${config[0].sheet}'!${config[0].breakRange}`,
-                          `'${config[0].sheet}'!${config[0].fillRange}`,
-                          `'${config[0].sheet}'!${config[0].overfillRange}`,
-                          `'${config[0].sheet}'!${config[0].standbyRange}`,
-                        ],
-                      }),
-                    ),
                   ),
                 ),
-                Effect.bind("schedules", ({ sheet }) =>
-                  scheduleParser(sheet.data.valueRanges ?? []),
+                Effect.bind("sheet", ({ specificDayConfig }) =>
+                  sheetGet({
+                    ranges: pipe(
+                      [
+                        Option.some(
+                          `'${specificDayConfig[0].sheet}'!${specificDayConfig[0].hourRange}`,
+                        ),
+                        Option.some(
+                          `'${specificDayConfig[0].sheet}'!${specificDayConfig[0].fillRange}`,
+                        ),
+                        Option.some(
+                          `'${specificDayConfig[0].sheet}'!${specificDayConfig[0].overfillRange}`,
+                        ),
+                        Option.some(
+                          `'${specificDayConfig[0].sheet}'!${specificDayConfig[0].standbyRange}`,
+                        ),
+                        String.Equivalence(
+                          specificDayConfig[0].breakRange,
+                          "detect",
+                        )
+                          ? Option.none()
+                          : Option.some(
+                              `'${specificDayConfig[0].sheet}'!${specificDayConfig[0].breakRange}`,
+                            ),
+                      ],
+                      Array.getSomes,
+                    ),
+                  }),
+                ),
+                Effect.bind(
+                  "schedules",
+                  ({ specificDayConfig, sheet, runnerConfig }) =>
+                    scheduleParser(sheet.data.valueRanges ?? [], {
+                      detectBreak: String.Equivalence(
+                        specificDayConfig[0].breakRange,
+                        "detect",
+                      )
+                        ? runnerConfig
+                        : undefined,
+                    }),
                 ),
                 Effect.map(({ schedules }) => schedules),
                 Effect.withSpan("SheetService.getDaySchedules", {
