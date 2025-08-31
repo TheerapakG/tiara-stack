@@ -637,11 +637,11 @@ export class SheetService extends Effect.Service<SheetService>()(
                     Effect.flatMap((config) =>
                       sheetGet({
                         ranges: [
-                          `'${config[0].sheet}'!J3:J`,
-                          `'${config[0].sheet}'!C3:C`,
-                          `'${config[0].sheet}'!K3:O`,
-                          `'${config[0].sheet}'!P3:P`,
-                          `'${config[0].sheet}'!Q3:Q`,
+                          `'${config[0].sheet}'!${config[0].hourRange}`,
+                          `'${config[0].sheet}'!${config[0].breakRange}`,
+                          `'${config[0].sheet}'!${config[0].fillRange}`,
+                          `'${config[0].sheet}'!${config[0].overfillRange}`,
+                          `'${config[0].sheet}'!${config[0].standbyRange}`,
                         ],
                       }),
                     ),
