@@ -43,6 +43,11 @@ export class DayConfig extends Data.TaggedClass("DayConfig")<{
   channel: string;
   day: number;
   sheet: string;
+  hourRange: string;
+  breakRange: string;
+  fillRange: string;
+  overfillRange: string;
+  standbyRange: string;
   draft: string;
 }> {}
 
@@ -50,6 +55,11 @@ const dayConfigParser = ([
   channel,
   day,
   sheet,
+  hourRange,
+  breakRange,
+  fillRange,
+  overfillRange,
+  standbyRange,
   draft,
 ]: sheets_v4.Schema$ValueRange[]): Effect.Effect<DayConfig[], never, never> =>
   pipe(
@@ -96,6 +106,71 @@ const dayConfigParser = ([
           }),
         ),
       ),
+      hourRange: parseValueRange(hourRange, (arr) =>
+        pipe(
+          Array.get(arr, 0),
+          Option.flatten,
+          Option.match({
+            onSome: validateWithDefault(
+              type("string").pipe((hourRange) => ({ hourRange })),
+              { hourRange: "" },
+            ),
+            onNone: () => Effect.succeed({ hourRange: "" }),
+          }),
+        ),
+      ),
+      breakRange: parseValueRange(breakRange, (arr) =>
+        pipe(
+          Array.get(arr, 0),
+          Option.flatten,
+          Option.match({
+            onSome: validateWithDefault(
+              type("string").pipe((breakRange) => ({ breakRange })),
+              { breakRange: "" },
+            ),
+            onNone: () => Effect.succeed({ breakRange: "" }),
+          }),
+        ),
+      ),
+      fillRange: parseValueRange(fillRange, (arr) =>
+        pipe(
+          Array.get(arr, 0),
+          Option.flatten,
+          Option.match({
+            onSome: validateWithDefault(
+              type("string").pipe((fillRange) => ({ fillRange })),
+              { fillRange: "" },
+            ),
+            onNone: () => Effect.succeed({ fillRange: "" }),
+          }),
+        ),
+      ),
+      overfillRange: parseValueRange(overfillRange, (arr) =>
+        pipe(
+          Array.get(arr, 0),
+          Option.flatten,
+          Option.match({
+            onSome: validateWithDefault(
+              type("string").pipe((overfillRange) => ({ overfillRange })),
+              { overfillRange: "" },
+            ),
+            onNone: () => Effect.succeed({ overfillRange: "" }),
+          }),
+        ),
+      ),
+      standbyRange: parseValueRange(standbyRange, (arr) =>
+        pipe(
+          Array.get(arr, 0),
+          Option.flatten,
+          Option.match({
+            onSome: validateWithDefault(
+              type("string").pipe((standbyRange) => ({ standbyRange })),
+              { standbyRange: "" },
+            ),
+            onNone: () => Effect.succeed({ standbyRange: "" }),
+          }),
+        ),
+      ),
       draft: parseValueRange(draft, (arr) =>
         pipe(
           Array.get(arr, 0),
@@ -110,28 +185,96 @@ const dayConfigParser = ([
         ),
       ),
     }),
-    Effect.map(({ channel, day, sheet, draft }) =>
-      pipe(
-        new ArrayWithDefault({ array: channel, default: { channel: "" } }),
-        ArrayWithDefault.zip(
-          new ArrayWithDefault({ array: day, default: { day: Option.none() } }),
+    Effect.map(
+      ({
+        channel,
+        day,
+        sheet,
+        hourRange,
+        breakRange,
+        fillRange,
+        overfillRange,
+        standbyRange,
+        draft,
+      }) =>
+        pipe(
+          new ArrayWithDefault({ array: channel, default: { channel: "" } }),
+          ArrayWithDefault.zip(
+            new ArrayWithDefault({
+              array: day,
+              default: { day: Option.none() },
+            }),
+          ),
+          ArrayWithDefault.zip(
+            new ArrayWithDefault({ array: sheet, default: { sheet: "" } }),
+          ),
+          ArrayWithDefault.zip(
+            new ArrayWithDefault({
+              array: hourRange,
+              default: { hourRange: "" },
+            }),
+          ),
+          ArrayWithDefault.zip(
+            new ArrayWithDefault({
+              array: breakRange,
+              default: { breakRange: "" },
+            }),
+          ),
+          ArrayWithDefault.zip(
+            new ArrayWithDefault({
+              array: fillRange,
+              default: { fillRange: "" },
+            }),
+          ),
+          ArrayWithDefault.zip(
+            new ArrayWithDefault({
+              array: overfillRange,
+              default: { overfillRange: "" },
+            }),
+          ),
+          ArrayWithDefault.zip(
+            new ArrayWithDefault({
+              array: standbyRange,
+              default: { standbyRange: "" },
+            }),
+          ),
+          ArrayWithDefault.zip(
+            new ArrayWithDefault({ array: draft, default: { draft: "" } }),
+          ),
         ),
-        ArrayWithDefault.zip(
-          new ArrayWithDefault({ array: sheet, default: { sheet: "" } }),
-        ),
-        ArrayWithDefault.zip(
-          new ArrayWithDefault({ array: draft, default: { draft: "" } }),
-        ),
-      ),
     ),
     Effect.map(({ array }) =>
       pipe(
         array,
-        Array.map(({ channel, day, sheet, draft }) =>
-          pipe(
+        Array.map(
+          ({
+            channel,
             day,
-            Option.map((day) => new DayConfig({ channel, day, sheet, draft })),
-          ),
+            sheet,
+            hourRange,
+            breakRange,
+            fillRange,
+            overfillRange,
+            standbyRange,
+            draft,
+          }) =>
+            pipe(
+              day,
+              Option.map(
+                (day) =>
+                  new DayConfig({
+                    channel,
+                    day,
+                    sheet,
+                    hourRange,
+                    breakRange,
+                    fillRange,
+                    overfillRange,
+                    standbyRange,
+                    draft,
+                  }),
+              ),
+            ),
         ),
         Array.getSomes,
       ),
@@ -438,6 +581,11 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 "'Thee's Sheet Settings'!M8:M",
                 "'Thee's Sheet Settings'!N8:N",
                 "'Thee's Sheet Settings'!O8:O",
+                "'Thee's Sheet Settings'!P8:P",
+                "'Thee's Sheet Settings'!Q8:Q",
+                "'Thee's Sheet Settings'!R8:R",
+                "'Thee's Sheet Settings'!S8:S",
+                "'Thee's Sheet Settings'!T8:T",
               ],
             }),
             Effect.flatMap((response) =>
@@ -457,8 +605,8 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
             sheet.get({
               spreadsheetId: sheetId,
               ranges: [
-                "'Thee's Sheet Settings'!Q8:Q",
-                "'Thee's Sheet Settings'!R8:R",
+                "'Thee's Sheet Settings'!V8:V",
+                "'Thee's Sheet Settings'!W8:W",
               ],
             }),
             Effect.flatMap((response) =>
