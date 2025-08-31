@@ -173,17 +173,14 @@ const handleList =
                         {
                           name: "Fill",
                           value: formatHourRanges(fillHours),
-                          inline: true,
                         },
                         {
                           name: "Overfill",
                           value: formatHourRanges(overfillHours),
-                          inline: true,
                         },
                         {
                           name: "Standby",
                           value: formatHourRanges(standbyHours),
-                          inline: true,
                         },
                       ),
                   ],
