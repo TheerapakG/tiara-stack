@@ -376,7 +376,7 @@ const scheduleParser = (
                             Array.some(HourRange.includes(hour)),
                           ),
                         ),
-                        Array.isNonEmptyArray,
+                        Array.isEmptyArray,
                       )
                     : breakHour,
                   fills,
