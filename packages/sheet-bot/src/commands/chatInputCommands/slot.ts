@@ -4,7 +4,7 @@ import {
   ClientService,
   FormatService,
   GuildConfigService,
-  guildServicesFromInteractionOption,
+  guildSheetServicesFromInteractionOption,
   InteractionContext,
   PermissionService,
   SheetService,
@@ -95,7 +95,7 @@ const handleList =
         ),
     )
     .handler(
-      Effect.provide(guildServicesFromInteractionOption("server_id"))(
+      Effect.provide(guildSheetServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
@@ -172,7 +172,7 @@ const handleButton =
         ),
     )
     .handler(
-      Effect.provide(guildServicesFromInteractionOption("server_id"))(
+      Effect.provide(guildSheetServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
           InteractionContext.deferReply.tap(),
