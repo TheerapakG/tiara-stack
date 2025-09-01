@@ -4,7 +4,7 @@ import {
   ConverterService,
   FormatService,
   GuildConfigService,
-  guildServicesFromInteractionOption,
+  guildSheetServicesFromInteractionOption,
   HourRange,
   InteractionContext,
   MessageRoomOrderService,
@@ -65,7 +65,7 @@ const handleManual =
         ),
     )
     .handler(
-      Effect.provide(guildServicesFromInteractionOption("server_id"))(
+      Effect.provide(guildSheetServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
           InteractionContext.deferReply.tap(() => ({

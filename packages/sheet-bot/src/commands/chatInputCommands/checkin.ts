@@ -5,7 +5,7 @@ import {
   FormatService,
   GuildChannelConfig,
   GuildConfigService,
-  guildServicesFromInteractionOption,
+  guildSheetServicesFromInteractionOption,
   InteractionContext,
   MessageCheckinService,
   PartialNamePlayer,
@@ -136,7 +136,7 @@ const handleManual =
         ),
     )
     .handler(
-      Effect.provide(guildServicesFromInteractionOption("server_id"))(
+      Effect.provide(guildSheetServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
           InteractionContext.deferReply.tap(() => ({

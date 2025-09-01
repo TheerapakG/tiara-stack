@@ -2,7 +2,7 @@ import {
   ClientService,
   GuildChannelConfig,
   GuildConfigService,
-  guildServicesFromInteractionOption,
+  guildSheetServicesFromInteractionOption,
   InteractionContext,
   PermissionService,
 } from "@/services";
@@ -87,7 +87,7 @@ const handleSet =
         ),
     )
     .handler(
-      Effect.provide(guildServicesFromInteractionOption("server_id"))(
+      Effect.provide(guildSheetServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
           InteractionContext.deferReply.tap(),
@@ -168,7 +168,7 @@ const handleUnset =
         ),
     )
     .handler(
-      Effect.provide(guildServicesFromInteractionOption("server_id"))(
+      Effect.provide(guildSheetServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
           InteractionContext.deferReply.tap(),

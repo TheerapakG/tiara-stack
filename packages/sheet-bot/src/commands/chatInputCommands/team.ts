@@ -1,7 +1,7 @@
 import {
   ClientService,
   GuildConfigService,
-  guildServicesFromInteractionOption,
+  guildSheetServicesFromInteractionOption,
   InteractionContext,
   PermissionService,
   SheetService,
@@ -40,7 +40,7 @@ const handleList =
         ),
     )
     .handler(
-      Effect.provide(guildServicesFromInteractionOption("server_id"))(
+      Effect.provide(guildSheetServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
           InteractionContext.deferReply.tap(),

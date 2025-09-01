@@ -2,7 +2,7 @@ import {
   ChannelConfigService,
   ClientService,
   FormatService,
-  guildServicesFromInteraction,
+  guildSheetServicesFromInteraction,
   InteractionContext,
   SheetService,
 } from "@/services";
@@ -55,7 +55,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
     style: ButtonStyle.Primary,
   })
   .handler(
-    Effect.provide(guildServicesFromInteraction())(
+    Effect.provide(guildSheetServicesFromInteraction())(
       pipe(
         Effect.Do,
         InteractionContext.deferReply.tap(() => ({
