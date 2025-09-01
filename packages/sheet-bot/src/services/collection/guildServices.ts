@@ -16,13 +16,29 @@ export const guildServices = (guildId: string) =>
   pipe(
     Effect.succeed(
       pipe(
+        GuildConfigService.DefaultWithoutDependencies,
+        Layer.provideMerge(GuildService.fromGuildId(guildId)),
+      ),
+    ),
+    Effect.withSpan("guildServices", {
+      captureStackTrace: true,
+      attributes: {
+        guildId,
+      },
+    }),
+    Layer.unwrapEffect,
+  );
+
+export const guildSheetServices = (guildId: string) =>
+  pipe(
+    Effect.succeed(
+      pipe(
         FormatService.Default,
         Layer.provideMerge(
           Layer.mergeAll(ConverterService.Default, PlayerService.Default),
         ),
         Layer.provideMerge(SheetService.ofGuild()),
-        Layer.provideMerge(GuildConfigService.DefaultWithoutDependencies),
-        Layer.provideMerge(GuildService.fromGuildId(guildId)),
+        Layer.provideMerge(guildServices(guildId)),
       ),
     ),
     Effect.withSpan("guildServices", {
@@ -38,7 +54,17 @@ export const guildServicesFromInteraction = () =>
   pipe(
     CachedInteractionContext.guildId().sync(),
     Effect.map(guildServices),
-    Effect.withSpan("guildServicesFromInteractionOption", {
+    Effect.withSpan("guildServicesFromInteraction", {
+      captureStackTrace: true,
+    }),
+    Layer.unwrapEffect,
+  );
+
+export const guildSheetServicesFromInteraction = () =>
+  pipe(
+    CachedInteractionContext.guildId().sync(),
+    Effect.map(guildSheetServices),
+    Effect.withSpan("guildSheetServicesFromInteraction", {
       captureStackTrace: true,
     }),
     Layer.unwrapEffect,
@@ -55,6 +81,22 @@ export const guildServicesFromInteractionOption = (name: string) =>
     ),
     Effect.map(guildServices),
     Effect.withSpan("guildServicesFromInteractionOption", {
+      captureStackTrace: true,
+    }),
+    Layer.unwrapEffect,
+  );
+
+export const guildSheetServicesFromInteractionOption = (name: string) =>
+  pipe(
+    InteractionContext.getString(name),
+    Effect.flatMap(
+      Option.match({
+        onSome: Effect.succeed,
+        onNone: () => CachedInteractionContext.guildId().sync(),
+      }),
+    ),
+    Effect.map(guildSheetServices),
+    Effect.withSpan("guildSheetServicesFromInteractionOption", {
       captureStackTrace: true,
     }),
     Layer.unwrapEffect,
