@@ -819,46 +819,56 @@ export class Server<
           ),
         ),
         Effect.bind("header", ({ pullDecodedStream }) =>
-          HeaderEncoderDecoder.decodeUnknownEffect(pullDecodedStream),
+          pipe(
+            HeaderEncoderDecoder.decodeUnknownEffect(pullDecodedStream),
+            Effect.either,
+          ),
         ),
         Effect.flatMap(({ pullDecodedStream, header, scope }) =>
           pipe(
-            Match.value(header),
-            Match.when({ action: "client:subscribe" }, (header) =>
-              Server.handleSubscribe(
-                peer,
-                pullDecodedStream,
-                header,
-                scope,
-              )(server),
-            ),
-            Match.when({ action: "client:unsubscribe" }, (header) =>
-              Server.handleUnsubscribe(peer, header)(server),
-            ),
-            Match.when({ action: "client:once" }, (header) =>
-              Server.handleOnce(
-                pullDecodedStream,
-                peer.request,
-                header,
-                (buffer) =>
-                  Effect.sync(() => {
-                    peer.send(buffer, {
-                      compress: true,
-                    });
-                  }),
-                scope,
-              )(server),
-            ),
-            Match.when({ action: "client:mutate" }, (header) =>
-              Server.handleMutate(
-                pullDecodedStream,
-                peer.request,
-                header,
-                Effect.void,
-                scope,
-              )(server),
-            ),
-            Match.orElse(() => Effect.void),
+            header,
+            Either.match({
+              onLeft: () => Effect.void,
+              onRight: (header) =>
+                pipe(
+                  Match.value(header),
+                  Match.when({ action: "client:subscribe" }, (header) =>
+                    Server.handleSubscribe(
+                      peer,
+                      pullDecodedStream,
+                      header,
+                      scope,
+                    )(server),
+                  ),
+                  Match.when({ action: "client:unsubscribe" }, (header) =>
+                    Server.handleUnsubscribe(peer, header)(server),
+                  ),
+                  Match.when({ action: "client:once" }, (header) =>
+                    Server.handleOnce(
+                      pullDecodedStream,
+                      peer.request,
+                      header,
+                      (buffer) =>
+                        Effect.sync(() => {
+                          peer.send(buffer, {
+                            compress: true,
+                          });
+                        }),
+                      scope,
+                    )(server),
+                  ),
+                  Match.when({ action: "client:mutate" }, (header) =>
+                    Server.handleMutate(
+                      pullDecodedStream,
+                      peer.request,
+                      header,
+                      Effect.void,
+                      scope,
+                    )(server),
+                  ),
+                  Match.orElse(() => Effect.void),
+                ),
+            }),
           ),
         ),
         Effect.withSpan("Server.handleWebSocketMessage", {
@@ -891,7 +901,13 @@ export class Server<
             Either.match({
               onLeft: () =>
                 Effect.sync(
-                  () => new Response(invalidHeaderErrorHtml, { status: 400 }),
+                  () =>
+                    new Response(invalidHeaderErrorHtml, {
+                      status: 400,
+                      headers: {
+                        "content-type": "text/html",
+                      },
+                    }),
                 ),
               onRight: (header) =>
                 pipe(
