@@ -25,6 +25,7 @@ import {
   UserSelectMenuInteraction,
 } from "discord.js";
 import { Context, Data, Effect, HKT, Option, pipe, Types } from "effect";
+import { DiscordError } from "~~/src/types/error/discordError";
 
 export class NotInGuildError extends Data.TaggedError("NotInGuildError")<{
   readonly message: string;
@@ -281,7 +282,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     pipe(
       InteractionContext.interaction<RepliableInteractionT>().sync(),
       Effect.flatMap((interaction) =>
-        Effect.tryPromise(() => interaction.deferReply(options)),
+        DiscordError.wrapTryPromise(() => interaction.deferReply(options)),
       ),
       Effect.withSpan("InteractionContext.deferReply", {
         captureStackTrace: true,
@@ -294,7 +295,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
       pipe(
         InteractionContext.interaction<RepliableInteractionT>().sync(),
         Effect.flatMap((interaction) =>
-          Effect.tryPromise(() =>
+          DiscordError.wrapTryPromise(() =>
             interaction.deferReply({ ...options, withResponse: true }),
           ),
         ),
@@ -308,7 +309,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     pipe(
       InteractionContext.interaction<MessageComponentInteractionT>().sync(),
       Effect.flatMap((interaction) =>
-        Effect.tryPromise(() => interaction.deferUpdate(options)),
+        DiscordError.wrapTryPromise(() => interaction.deferUpdate(options)),
       ),
       Effect.withSpan("InteractionContext.deferUpdate", {
         captureStackTrace: true,
@@ -321,7 +322,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
       pipe(
         InteractionContext.interaction<MessageComponentInteractionT>().sync(),
         Effect.flatMap((interaction) =>
-          Effect.tryPromise(() =>
+          DiscordError.wrapTryPromise(() =>
             interaction.deferUpdate({ ...options, withResponse: true }),
           ),
         ),
@@ -336,7 +337,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
       pipe(
         InteractionContext.interaction<RepliableInteractionT>().sync(),
         Effect.flatMap((interaction) =>
-          Effect.tryPromise(() => interaction.deleteReply(message)),
+          DiscordError.wrapTryPromise(() => interaction.deleteReply(message)),
         ),
         Effect.withSpan("InteractionContext.deleteReply", {
           captureStackTrace: true,
@@ -349,7 +350,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
       pipe(
         InteractionContext.interaction<RepliableInteractionT>().sync(),
         Effect.flatMap((interaction) =>
-          Effect.tryPromise(() => interaction.editReply(options)),
+          DiscordError.wrapTryPromise(() => interaction.editReply(options)),
         ),
         Effect.withSpan("InteractionContext.editReply", {
           captureStackTrace: true,
@@ -361,7 +362,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     pipe(
       InteractionContext.interaction<RepliableInteractionT>().sync(),
       Effect.flatMap((interaction) =>
-        Effect.tryPromise(() => interaction.fetchReply(message)),
+        DiscordError.wrapTryPromise(() => interaction.fetchReply(message)),
       ),
       Effect.withSpan("InteractionContext.fetchReply", {
         captureStackTrace: true,
@@ -374,7 +375,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
       pipe(
         InteractionContext.interaction<RepliableInteractionT>().sync(),
         Effect.flatMap((interaction) =>
-          Effect.tryPromise(() => interaction.followUp(options)),
+          DiscordError.wrapTryPromise(() => interaction.followUp(options)),
         ),
         Effect.withSpan("InteractionContext.followUp", {
           captureStackTrace: true,
@@ -387,7 +388,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
       pipe(
         InteractionContext.interaction<RepliableInteractionT>().sync(),
         Effect.flatMap((interaction) =>
-          Effect.tryPromise(() => interaction.reply(options)),
+          DiscordError.wrapTryPromise(() => interaction.reply(options)),
         ),
         Effect.withSpan("InteractionContext.reply", {
           captureStackTrace: true,
@@ -399,7 +400,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     pipe(
       InteractionContext.interaction<RepliableInteractionT>().sync(),
       Effect.flatMap((interaction) =>
-        Effect.tryPromise(() =>
+        DiscordError.wrapTryPromise(() =>
           interaction.reply({ ...options, withResponse: true }),
         ),
       ),
@@ -414,7 +415,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
       pipe(
         InteractionContext.interaction<MessageComponentInteractionT>().sync(),
         Effect.flatMap((interaction) =>
-          Effect.tryPromise(() => interaction.update(options)),
+          DiscordError.wrapTryPromise(() => interaction.update(options)),
         ),
         Effect.withSpan("InteractionContext.updateWithResponse", {
           captureStackTrace: true,
@@ -426,7 +427,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     pipe(
       InteractionContext.interaction<MessageComponentInteractionT>().sync(),
       Effect.flatMap((interaction) =>
-        Effect.tryPromise(() =>
+        DiscordError.wrapTryPromise(() =>
           interaction.update({ ...options, withResponse: true }),
         ),
       ),

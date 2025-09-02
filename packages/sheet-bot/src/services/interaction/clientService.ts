@@ -1,5 +1,6 @@
 import { Client, EmbedBuilder, Interaction } from "discord.js";
 import { Effect, HashMap, Option, pipe } from "effect";
+import { DiscordError } from "~~/src/types/error/discordError";
 
 export class ClientService extends Effect.Service<ClientService>()(
   "ClientService",
@@ -22,7 +23,7 @@ export class ClientService extends Effect.Service<ClientService>()(
           ),
         fetchApplication: () =>
           pipe(
-            Effect.tryPromise(() => client.application.fetch()),
+            DiscordError.wrapTryPromise(() => client.application.fetch()),
             Effect.withSpan("ClientService.fetchApplication", {
               captureStackTrace: true,
             }),
@@ -38,8 +39,15 @@ export class ClientService extends Effect.Service<ClientService>()(
           ),
         fetchGuilds: () =>
           pipe(
-            Effect.tryPromise(() => client.guilds.fetch()),
+            DiscordError.wrapTryPromise(() => client.guilds.fetch()),
             Effect.withSpan("ClientService.fetchGuilds", {
+              captureStackTrace: true,
+            }),
+          ),
+        fetchGuild: (guildId: string) =>
+          pipe(
+            DiscordError.wrapTryPromise(() => client.guilds.fetch(guildId)),
+            Effect.withSpan("ClientService.fetchGuild", {
               captureStackTrace: true,
             }),
           ),

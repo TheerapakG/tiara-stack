@@ -9,6 +9,7 @@ import {
   SendableChannels,
 } from "discord.js";
 import { Context, Data, Effect, HKT, Types, pipe } from "effect";
+import { DiscordError } from "~~/src/types/error/discordError";
 import { wrap } from "~~/src/utils";
 
 export interface BaseChannelT extends HKT.TypeLambda {
@@ -94,7 +95,7 @@ export class SendableChannelContext {
       pipe(
         SendableChannelContext.channel<C, Kind>(),
         Effect.flatMap((channel: Kind) =>
-          Effect.tryPromise(
+          DiscordError.wrapTryPromise(
             () =>
               channel.send(options) as Promise<
                 Awaited<ReturnType<Kind["send"]>>
