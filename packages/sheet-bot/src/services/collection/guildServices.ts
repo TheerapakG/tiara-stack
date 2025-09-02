@@ -14,12 +14,9 @@ import { Effect, Layer, Option, pipe } from "effect";
 
 export const guildServices = (guildId: string) =>
   pipe(
-    Effect.succeed(
-      pipe(
-        GuildConfigService.DefaultWithoutDependencies,
-        Layer.provideMerge(GuildService.fromGuildId(guildId)),
-      ),
-    ),
+    GuildConfigService.DefaultWithoutDependencies,
+    Layer.provideMerge(GuildService.fromGuildId(guildId)),
+    Effect.succeed,
     Effect.withSpan("guildServices", {
       captureStackTrace: true,
       attributes: {
@@ -31,16 +28,13 @@ export const guildServices = (guildId: string) =>
 
 export const guildSheetServices = (guildId: string) =>
   pipe(
-    Effect.succeed(
-      pipe(
-        FormatService.Default,
-        Layer.provideMerge(
-          Layer.mergeAll(ConverterService.Default, PlayerService.Default),
-        ),
-        Layer.provideMerge(SheetService.ofGuild()),
-        Layer.provideMerge(guildServices(guildId)),
-      ),
+    FormatService.Default,
+    Layer.provideMerge(
+      Layer.mergeAll(ConverterService.Default, PlayerService.Default),
     ),
+    Layer.provideMerge(SheetService.ofGuild()),
+    Layer.provideMerge(guildServices(guildId)),
+    Effect.succeed,
     Effect.withSpan("guildServices", {
       captureStackTrace: true,
       attributes: {
