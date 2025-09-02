@@ -25,6 +25,9 @@ export default defineConfig({
       format: "es",
     },
   ],
+  moduleTypes: {
+    ".html": "text",
+  },
   plugins: [dts()],
   external: [...builtinModules, /^node:/, "effect", "valibot", "typhoon-core"],
 });
