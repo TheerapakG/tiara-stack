@@ -10,6 +10,10 @@ const headerActionFields = [
   "server:update",
 ] as const;
 
+export class InvalidHeaderError extends Data.TaggedError(
+  "InvalidHeaderError",
+) {}
+
 export class InvalidHeaderFieldError extends Data.TaggedError(
   "InvalidHeaderFieldError",
 )<{
@@ -158,6 +162,31 @@ class LookupEncoderDecoder<
       })),
       Effect.map((acc) => acc as InferDecoded<RequiredField, DT>),
       Effect.withSpan(`${this.name}.decode`, {
+        captureStackTrace: true,
+      }),
+    );
+  }
+
+  decodeUnknown(input: unknown) {
+    return pipe(
+      input,
+      validate(v.array(v.tuple([v.number(), v.unknown()]))),
+      Effect.flatMap((input) => this.decode(input)),
+      Effect.catchAll(() => Effect.fail(new InvalidHeaderError())),
+      Effect.withSpan(`${this.name}.decodeUnknown`, {
+        captureStackTrace: true,
+      }),
+    );
+  }
+
+  decodeUnknownEffect<E = never, R = never>(
+    input: Effect.Effect<unknown, E, R>,
+  ) {
+    return pipe(
+      input,
+      Effect.flatMap(this.decodeUnknown),
+      Effect.catchAll(() => Effect.fail(new InvalidHeaderError())),
+      Effect.withSpan(`${this.name}.decodeUnknownEffect`, {
         captureStackTrace: true,
       }),
     );
@@ -425,6 +454,31 @@ export class HeaderEncoderDecoder {
           }) as Header,
       ),
       Effect.withSpan("HeaderEncoderDecoder.decode", {
+        captureStackTrace: true,
+      }),
+    );
+  }
+
+  static decodeUnknown(input: unknown) {
+    return pipe(
+      input,
+      validate(v.array(v.tuple([v.number(), v.unknown()]))),
+      Effect.flatMap(HeaderEncoderDecoder.decode),
+      Effect.catchAll(() => Effect.fail(new InvalidHeaderError())),
+      Effect.withSpan("HeaderEncoderDecoder.decodeUnknown", {
+        captureStackTrace: true,
+      }),
+    );
+  }
+
+  static decodeUnknownEffect<E = never, R = never>(
+    input: Effect.Effect<unknown, E, R>,
+  ) {
+    return pipe(
+      input,
+      Effect.flatMap(HeaderEncoderDecoder.decodeUnknown),
+      Effect.catchAll(() => Effect.fail(new InvalidHeaderError())),
+      Effect.withSpan("HeaderEncoderDecoder.decodeUnknownEffect", {
         captureStackTrace: true,
       }),
     );
