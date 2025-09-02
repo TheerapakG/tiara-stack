@@ -45,7 +45,7 @@ export class ClientService extends Effect.Service<ClientService>()(
           ),
         makeEmbedBuilder: () =>
           new EmbedBuilder().setTimestamp().setFooter({
-            text: `${client.user.username} ${process.env.BUILD_VERSION}`,
+            text: `${client.user.username} ${process.env.BUILD_VERSION} by Theerie (@theerapakg)`,
           }),
       }),
     accessors: true,
