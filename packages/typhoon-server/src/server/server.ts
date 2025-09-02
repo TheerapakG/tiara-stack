@@ -5,6 +5,7 @@ import {
   Context,
   Data,
   Effect,
+  Either,
   Exit,
   Function,
   HashMap,
@@ -24,10 +25,8 @@ import {
   MsgpackEncoderDecoder,
   StreamExhaustedError,
 } from "typhoon-core/protocol";
-import { validate } from "typhoon-core/schema";
 import { Server as BaseServer, ServerSymbol } from "typhoon-core/server";
 import { Computed, computed, effect, observeOnce } from "typhoon-core/signal";
-import * as v from "valibot";
 import { MutationHandlerConfig, SubscriptionHandlerConfig } from "../config";
 import { Event } from "./event";
 import {
@@ -36,6 +35,7 @@ import {
   MutationHandlerContext,
   SubscriptionHandlerContext,
 } from "./handler";
+import invalidHeaderErrorHtml from "./invalidHeaderError.html";
 
 type SubscriptionHandlerMap<R> = HashMap.HashMap<
   string,
@@ -819,13 +819,7 @@ export class Server<
           ),
         ),
         Effect.bind("header", ({ pullDecodedStream }) =>
-          pipe(
-            pullDecodedStream,
-            Effect.flatMap(
-              validate(v.array(v.tuple([v.number(), v.unknown()]))),
-            ),
-            Effect.flatMap(HeaderEncoderDecoder.decode),
-          ),
+          HeaderEncoderDecoder.decodeUnknownEffect(pullDecodedStream),
         ),
         Effect.flatMap(({ pullDecodedStream, header, scope }) =>
           pipe(
@@ -887,46 +881,53 @@ export class Server<
         ),
         Effect.bind("header", ({ pullDecodedStream }) =>
           pipe(
-            pullDecodedStream,
-            Effect.flatMap(
-              validate(v.array(v.tuple([v.number(), v.unknown()]))),
-            ),
-            Effect.flatMap(HeaderEncoderDecoder.decode),
+            HeaderEncoderDecoder.decodeUnknownEffect(pullDecodedStream),
+            Effect.either,
           ),
         ),
         Effect.flatMap(({ pullDecodedStream, header, scope }) =>
           pipe(
-            Match.value(header),
-            Match.when({ action: "client:once" }, (header) =>
-              Server.handleOnce(
-                pullDecodedStream,
-                request,
-                header,
-                (buffer) =>
-                  Effect.sync(
-                    () =>
-                      new Response(buffer as unknown as BodyInit, {
-                        status: 200,
-                        headers: {
-                          "content-type": "application/octet-stream",
-                        },
-                      }),
+            header,
+            Either.match({
+              onLeft: () =>
+                Effect.sync(
+                  () => new Response(invalidHeaderErrorHtml, { status: 400 }),
+                ),
+              onRight: (header) =>
+                pipe(
+                  Match.value(header),
+                  Match.when({ action: "client:once" }, (header) =>
+                    Server.handleOnce(
+                      pullDecodedStream,
+                      request,
+                      header,
+                      (buffer) =>
+                        Effect.sync(
+                          () =>
+                            new Response(buffer as unknown as BodyInit, {
+                              status: 200,
+                              headers: {
+                                "content-type": "application/octet-stream",
+                              },
+                            }),
+                        ),
+                      scope,
+                    )(server),
                   ),
-                scope,
-              )(server),
-            ),
-            Match.when({ action: "client:mutate" }, (header) =>
-              Server.handleMutate(
-                pullDecodedStream,
-                request,
-                header,
-                Effect.sync(() => new Response("", { status: 200 })),
-                scope,
-              )(server),
-            ),
-            Match.orElse(() =>
-              Effect.sync(() => new Response("", { status: 404 })),
-            ),
+                  Match.when({ action: "client:mutate" }, (header) =>
+                    Server.handleMutate(
+                      pullDecodedStream,
+                      request,
+                      header,
+                      Effect.sync(() => new Response("", { status: 200 })),
+                      scope,
+                    )(server),
+                  ),
+                  Match.orElse(() =>
+                    Effect.sync(() => new Response("", { status: 404 })),
+                  ),
+                ),
+            }),
           ),
         ),
         Effect.withSpan("Server.handleWebRequest", {
