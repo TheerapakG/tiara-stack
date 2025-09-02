@@ -32,6 +32,7 @@ import {
   pipe,
 } from "effect";
 import { observeOnce } from "typhoon-server/signal";
+import { DiscordError } from "~~/src/types/error/discordError";
 
 const buttonData = {
   type: ComponentType.Button,
@@ -76,7 +77,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
             Effect.flatMap((checkinData) =>
               Effect.suspend<
                 Message,
-                CheckinError | Cause.UnknownException,
+                CheckinError | DiscordError | Cause.UnknownException,
                 InteractionContext<RepliableInteractionT>
               >(() =>
                 pipe(

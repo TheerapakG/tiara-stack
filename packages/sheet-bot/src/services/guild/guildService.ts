@@ -4,6 +4,7 @@ import {
 } from "@/services/interaction";
 import { Guild } from "discord.js";
 import { Effect, Layer, Option, pipe } from "effect";
+import { DiscordError } from "~~/src/types/error/discordError";
 
 export class GuildService extends Effect.Service<GuildService>()(
   "GuildService",
@@ -33,14 +34,14 @@ export class GuildService extends Effect.Service<GuildService>()(
           ),
         fetchMembers: () =>
           pipe(
-            Effect.tryPromise(() => guild.members.fetch()),
+            DiscordError.wrapTryPromise(() => guild.members.fetch()),
             Effect.withSpan("GuildService.fetchMembers", {
               captureStackTrace: true,
             }),
           ),
         fetchRole: (roleId: string) =>
           pipe(
-            Effect.tryPromise(() => guild.roles.fetch(roleId)),
+            DiscordError.wrapTryPromise(() => guild.roles.fetch(roleId)),
             Effect.map(Option.fromNullable),
             Effect.withSpan("GuildService.fetchRole", {
               captureStackTrace: true,
@@ -48,7 +49,7 @@ export class GuildService extends Effect.Service<GuildService>()(
           ),
         fetchChannel: (channelId: string) =>
           pipe(
-            Effect.tryPromise(() => guild.channels.fetch(channelId)),
+            DiscordError.wrapTryPromise(() => guild.channels.fetch(channelId)),
             Effect.map(Option.fromNullable),
             Effect.withSpan("GuildService.fetchChannel", {
               captureStackTrace: true,
@@ -60,10 +61,7 @@ export class GuildService extends Effect.Service<GuildService>()(
 ) {
   static fromGuildId(guildId: string) {
     return pipe(
-      ClientService.getClient(),
-      Effect.flatMap((client) =>
-        Effect.tryPromise(() => client.guilds.fetch(guildId)),
-      ),
+      ClientService.fetchGuild(guildId),
       Effect.map((guild) => GuildService.Default(guild)),
       Effect.withSpan("GuildService.fromGuildId", {
         captureStackTrace: true,
