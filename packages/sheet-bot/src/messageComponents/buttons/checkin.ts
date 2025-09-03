@@ -3,8 +3,10 @@ import {
   CachedInteractionContext,
   channelServicesFromGuildChannelId,
   guildSheetServicesFromInteraction,
+  InGuildMessageContext,
   InteractionContext,
   MessageCheckinService,
+  messageServices,
   PermissionService,
   RepliableInteractionT,
   SendableChannelContext,
@@ -33,7 +35,7 @@ import {
   pipe,
 } from "effect";
 import { observeOnce } from "typhoon-server/signal";
-import { DiscordError } from "~~/src/types/error/discordError";
+import { DiscordError } from "~~/src/types";
 
 const buttonData = {
   type: ComponentType.Button,
@@ -133,8 +135,8 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         ),
         Effect.tap(({ message, user, messageCheckinData, checkedInMentions }) =>
           Effect.all([
-            Effect.tryPromise(() =>
-              message.edit({
+            Effect.provide(messageServices(message))(
+              InGuildMessageContext.edit.sync({
                 content: pipe(
                   checkedInMentions,
                   Option.match({
