@@ -54,7 +54,7 @@ export class FormatService extends Effect.Service<FormatService>()(
           pipe(
             Effect.succeed({ hour, breakHour, empty }),
             Effect.flatMap(({ hour, breakHour, empty }) =>
-              Order.greaterThan(Order.number)(empty, 0) && !breakHour
+              Order.greaterThan(Number.Order)(empty, 0) && !breakHour
                 ? pipe(
                     converterService.convertHourToHourWindow(hour),
                     Effect.map(formatHourWindow),
@@ -138,10 +138,10 @@ export class FormatService extends Effect.Service<FormatService>()(
               "emptySlotMessage",
               () =>
                 `${
-                  Order.greaterThan(Order.number)(schedule.empty, 0)
+                  Order.greaterThan(Number.Order)(schedule.empty, 0)
                     ? `+${schedule.empty}`
                     : "No"
-                } empty slot${Order.greaterThan(Order.number)(schedule.empty, 1) ? "s" : ""}`,
+                } empty slot${Order.greaterThan(Number.Order)(schedule.empty, 1) ? "s" : ""}`,
             ),
             Effect.let(
               "playersMessage",
@@ -164,7 +164,7 @@ export class FormatService extends Effect.Service<FormatService>()(
                 ),
                 Array.getSomes,
                 (partialPlayers) =>
-                  Order.greaterThan(Order.number)(
+                  Order.greaterThan(Number.Order)(
                     pipe(partialPlayers, Array.length),
                     0,
                   )

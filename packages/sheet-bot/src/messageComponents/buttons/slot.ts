@@ -14,6 +14,7 @@ import {
   Chunk,
   Effect,
   HashMap,
+  Number,
   Option,
   Order,
   pipe,
@@ -32,7 +33,7 @@ const getSlotMessage = (day: number) =>
       description: pipe(
         daySchedule,
         HashMap.values,
-        Array.sortBy(Order.mapInput(Order.number, ({ hour }) => hour)),
+        Array.sortBy(Order.mapInput(Number.Order, ({ hour }) => hour)),
         Effect.forEach((schedule) => FormatService.formatEmptySlots(schedule)),
         Effect.map(Chunk.fromIterable),
         Effect.map(Chunk.dedupeAdjacent),

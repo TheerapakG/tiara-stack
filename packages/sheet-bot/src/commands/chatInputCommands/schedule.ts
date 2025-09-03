@@ -26,6 +26,7 @@ import {
   Function,
   HashMap,
   Match,
+  Number,
   Order,
   pipe,
   String,
@@ -85,7 +86,7 @@ const handleList =
             pipe(
               daySchedules,
               HashMap.values,
-              Array.sortBy(Order.mapInput(Order.number, ({ hour }) => hour)),
+              Array.sortBy(Order.mapInput(Number.Order, ({ hour }) => hour)),
               Effect.forEach((schedule) =>
                 PlayerService.mapScheduleWithPlayers(schedule),
               ),

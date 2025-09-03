@@ -23,7 +23,7 @@ import {
   SlashCommandSubcommandBuilder,
   SlashCommandSubcommandGroupBuilder,
 } from "discord.js";
-import { Array, Effect, Option, Order, pipe } from "effect";
+import { Array, Effect, Number, Option, Order, pipe } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 
 const handleListConfig =
@@ -91,7 +91,7 @@ const handleListConfig =
                             pipe(
                               managerRoles,
                               Array.length,
-                              Order.greaterThan(Order.number)(0),
+                              Order.greaterThan(Number.Order)(0),
                             )
                               ? pipe(
                                   managerRoles,
