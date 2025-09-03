@@ -14,6 +14,7 @@ import {
   Equal,
   HashMap,
   Layer,
+  Number,
   Option,
   Order,
   pipe,
@@ -77,12 +78,12 @@ const playerParser = ([
       pipe(
         new ArrayWithDefault({
           array: userIds,
-          default: { id: Option.none(), idIndex: Number.NaN },
+          default: { id: Option.none(), idIndex: globalThis.Number.NaN },
         }),
         ArrayWithDefault.zip(
           new ArrayWithDefault({
             array: userSheetNames,
-            default: { name: Option.none(), nameIndex: Number.NaN },
+            default: { name: Option.none(), nameIndex: globalThis.Number.NaN },
           }),
         ),
       ),
@@ -103,7 +104,15 @@ export class Team extends Data.TaggedClass("Team")<{
   lead: Option.Option<number>;
   backline: Option.Option<number>;
   talent: Option.Option<number>;
-}> {}
+}> {
+  static getEffectValue = (team: Team) =>
+    pipe(
+      Option.Do,
+      Option.bind("lead", () => team.lead),
+      Option.bind("backline", () => team.backline),
+      Option.map(({ lead, backline }) => lead + (backline - lead) / 5),
+    );
+}
 
 const teamParser = (
   teamConfigValues: TeamConfig[],
@@ -123,29 +132,31 @@ const teamParser = (
       ),
       userTeams: pipe(
         Array.zip(teamConfigValues, userTeams),
-        Effect.forEach(([teamConfig, userTeams]) =>
-          parseValueRange(userTeams, (arr) =>
-            Effect.succeed({
-              type: teamConfig.name,
-              name: pipe(Array.get(arr, 0), Option.flatten),
-              tags: teamConfig.tags,
-              lead: pipe(
-                Array.get(arr, 2),
-                Option.flatten,
-                Option.flatMapNullable((lead) => parseInt(lead, 10)),
-              ),
-              backline: pipe(
-                Array.get(arr, 3),
-                Option.flatten,
-                Option.flatMapNullable((backline) => parseInt(backline, 10)),
-              ),
-              talent: pipe(
-                Array.get(arr, 4),
-                Option.flatten,
-                Option.flatMapNullable((talent) => parseInt(talent, 10)),
-              ),
-            }),
-          ),
+        Effect.forEach(
+          ([teamConfig, userTeams]) =>
+            parseValueRange(userTeams, (arr) =>
+              Effect.succeed({
+                type: teamConfig.name,
+                name: pipe(Array.get(arr, 0), Option.flatten),
+                tags: teamConfig.tags,
+                lead: pipe(
+                  Array.get(arr, 2),
+                  Option.flatten,
+                  Option.flatMapNullable((lead) => parseInt(lead, 10)),
+                ),
+                backline: pipe(
+                  Array.get(arr, 3),
+                  Option.flatten,
+                  Option.flatMapNullable((backline) => parseInt(backline, 10)),
+                ),
+                talent: pipe(
+                  Array.get(arr, 4),
+                  Option.flatten,
+                  Option.flatMapNullable((talent) => parseInt(talent, 10)),
+                ),
+              }),
+            ),
+          { concurrency: "unbounded" },
         ),
         Effect.map((teams) =>
           pipe(
@@ -189,6 +200,10 @@ const teamParser = (
                   ),
                 ),
                 Array.getSomes,
+                Array.sortWith(
+                  Team.getEffectValue,
+                  Option.getOrder(Number.Order),
+                ),
               ),
             })),
           ),
@@ -252,7 +267,7 @@ export class Schedule extends Data.TaggedClass("Schedule")<{
           fills,
           overfills,
           standbys,
-          empty: Order.max(Order.number)(
+          empty: Order.max(Number.Order)(
             5 - fills.filter(Option.isSome).length - overfills.length,
             0,
           ),
