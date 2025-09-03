@@ -32,6 +32,7 @@ import {
   Function,
   HashMap,
   Match,
+  Number,
   Option,
   Order,
   pipe,
@@ -204,7 +205,7 @@ const handleManual =
             content: pipe(
               removedMembers,
               Array.length,
-              Order.greaterThan(Order.number)(0),
+              Order.greaterThan(Number.Order)(0),
             )
               ? `Kicked out ${removedMembers.map((m) => userMention(m.user.id)).join(" ")}`
               : "No players to kick out",

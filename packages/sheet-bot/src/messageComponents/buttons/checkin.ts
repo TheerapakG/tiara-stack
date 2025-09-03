@@ -27,6 +27,7 @@ import {
   Data,
   Effect,
   Function,
+  Number,
   Option,
   Order,
   pipe,
@@ -114,7 +115,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
                   pipe(
                     members,
                     Array.length,
-                    Order.greaterThan(Order.number)(0),
+                    Order.greaterThan(Number.Order)(0),
                   ),
                 ),
               ),
