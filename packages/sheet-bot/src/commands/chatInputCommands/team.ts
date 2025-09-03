@@ -94,12 +94,12 @@ const handleList =
                 ),
                 talentFormatted: pipe(
                   team.talent,
-                  Option.map(() => `/${team.talent}k`),
+                  Option.map((talent) => `/${talent}k`),
                   Option.getOrElse(() => ""),
                 ),
                 effectValueFormatted: pipe(
                   team.effectValue,
-                  Option.map(() => ` (+${team.effectValue}%)`),
+                  Option.map((effectValue) => ` (+${effectValue}%)`),
                   Option.getOrElse(() => ""),
                 ),
               })),
