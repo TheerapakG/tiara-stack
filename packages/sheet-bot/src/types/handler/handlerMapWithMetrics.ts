@@ -1,4 +1,5 @@
 import { InteractionContext, RepliableInteractionT } from "@/services";
+import { DiscordError } from "@/types/error/discordError";
 import { InteractionResponse, Message, MessageFlags } from "discord.js";
 import { Cause, Data, Effect, Metric, Option, pipe } from "effect";
 import {
@@ -123,7 +124,7 @@ export class InteractionHandlerMapWithMetrics<
                 pipe(
                   Effect.suspend<
                     Message | InteractionResponse,
-                    Cause.UnknownException,
+                    Cause.UnknownException | DiscordError,
                     InteractionContext<RepliableInteractionT>
                   >(() =>
                     (replied || deferred
