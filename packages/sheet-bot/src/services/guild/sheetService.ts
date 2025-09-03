@@ -123,31 +123,29 @@ const teamParser = (
       ),
       userTeams: pipe(
         Array.zip(teamConfigValues, userTeams),
-        Effect.forEach(
-          ([teamConfig, userTeams]) =>
-            parseValueRange(userTeams, (arr) =>
-              Effect.succeed({
-                type: teamConfig.name,
-                name: pipe(Array.get(arr, 0), Option.flatten),
-                tags: teamConfig.tags,
-                lead: pipe(
-                  Array.get(arr, 2),
-                  Option.flatten,
-                  Option.flatMapNullable((lead) => parseInt(lead, 10)),
-                ),
-                backline: pipe(
-                  Array.get(arr, 3),
-                  Option.flatten,
-                  Option.flatMapNullable((backline) => parseInt(backline, 10)),
-                ),
-                talent: pipe(
-                  Array.get(arr, 4),
-                  Option.flatten,
-                  Option.flatMapNullable((talent) => parseInt(talent, 10)),
-                ),
-              }),
-            ),
-          { concurrency: "unbounded" },
+        Effect.forEach(([teamConfig, userTeams]) =>
+          parseValueRange(userTeams, (arr) =>
+            Effect.succeed({
+              type: teamConfig.name,
+              name: pipe(Array.get(arr, 0), Option.flatten),
+              tags: teamConfig.tags,
+              lead: pipe(
+                Array.get(arr, 2),
+                Option.flatten,
+                Option.flatMapNullable((lead) => parseInt(lead, 10)),
+              ),
+              backline: pipe(
+                Array.get(arr, 3),
+                Option.flatten,
+                Option.flatMapNullable((backline) => parseInt(backline, 10)),
+              ),
+              talent: pipe(
+                Array.get(arr, 4),
+                Option.flatten,
+                Option.flatMapNullable((talent) => parseInt(talent, 10)),
+              ),
+            }),
+          ),
         ),
         Effect.map((teams) =>
           pipe(
