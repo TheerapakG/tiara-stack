@@ -25,18 +25,7 @@ import {
   UserSelectMenuInteraction,
 } from "discord.js";
 import { Context, Data, Effect, HKT, Option, pipe, Types } from "effect";
-import { DiscordError } from "~~/src/types/error/discordError";
-
-export class NotInGuildError extends Data.TaggedError("NotInGuildError")<{
-  readonly message: string;
-}> {
-  constructor() {
-    super({
-      message:
-        "You are not using this command in a guild. Please use this command in a guild.",
-    });
-  }
-}
+import { DiscordError, NotInGuildError } from "~~/src/types";
 
 export class UncachedGuildError extends Data.TaggedError("UncachedGuildError")<{
   readonly message: string;

@@ -1,6 +1,6 @@
 import { Client, EmbedBuilder, Interaction } from "discord.js";
 import { Effect, HashMap, Option, pipe } from "effect";
-import { DiscordError } from "~~/src/types/error/discordError";
+import { DiscordError } from "~~/src/types";
 
 export class ClientService extends Effect.Service<ClientService>()(
   "ClientService",

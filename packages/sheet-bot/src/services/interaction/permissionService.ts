@@ -6,7 +6,7 @@ import {
   RoleResolvable,
 } from "discord.js";
 import { Data, Effect, Option, String, pipe } from "effect";
-import { DiscordError } from "~~/src/types/error/discordError";
+import { DiscordError } from "~~/src/types";
 import { ClientService } from "./clientService";
 import {
   CachedInteractionContext,
