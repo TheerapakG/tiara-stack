@@ -77,19 +77,31 @@ const handleList =
               Array.map((team) => ({
                 name: team.name,
                 tags: team.tags,
-                lead: Option.getOrUndefined(team.lead),
-                backline: Option.getOrUndefined(team.backline),
-                talent: Option.getOrUndefined(team.talent),
+                lead: team.lead,
+                backline: team.backline,
+                talent: team.talent,
+                effectValue: Team.getEffectValue(team),
               })),
               Array.map((team) => ({
                 ...team,
-                leadFormatted: team.lead ?? "?",
-                backlineFormatted: team.backline ?? "?",
-                talentFormatted: team.talent ? `/${team.talent}k` : "",
-                effectValueFormatted:
-                  team.lead && team.backline
-                    ? ` (+${team.lead + (team.backline - team.lead) / 5}%)`
-                    : "",
+                leadFormatted: pipe(
+                  team.lead,
+                  Option.getOrElse(() => "?"),
+                ),
+                backlineFormatted: pipe(
+                  team.backline,
+                  Option.getOrElse(() => "?"),
+                ),
+                talentFormatted: pipe(
+                  team.talent,
+                  Option.map(() => `/${team.talent}k`),
+                  Option.getOrElse(() => ""),
+                ),
+                effectValueFormatted: pipe(
+                  team.effectValue,
+                  Option.map(() => ` (+${team.effectValue}%)`),
+                  Option.getOrElse(() => ""),
+                ),
               })),
             ),
           ),
