@@ -202,7 +202,7 @@ const teamParser = (
                 Array.getSomes,
                 Array.sortWith(
                   Team.getEffectValue,
-                  Option.getOrder(Number.Order),
+                  Order.reverse(Option.getOrder(Number.Order)),
                 ),
               ),
             })),
