@@ -1,7 +1,7 @@
 import { DB } from "@/db";
 import { bindObject } from "@/utils";
 import { and, eq, isNull } from "drizzle-orm";
-import { Array, Data, Effect, Option, pipe } from "effect";
+import { Array, Data, DateTime, Effect, Option, pipe } from "effect";
 import {
   configGuild,
   configGuildChannel,
@@ -194,12 +194,16 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           ),
         removeManagerRole: (roleId: string) =>
           pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
+            Effect.Do,
+            bindObject({
+              guildId: guildService.getId(),
+              now: DateTime.now,
+            }),
+            Effect.flatMap(({ guildId, now }) =>
               dbSubscriptionContext.mutateQuery(
                 db
                   .update(configGuildManagerRole)
-                  .set({ deletedAt: new Date() })
+                  .set({ deletedAt: DateTime.toDate(now) })
                   .where(
                     and(
                       eq(configGuildManagerRole.guildId, guildId),

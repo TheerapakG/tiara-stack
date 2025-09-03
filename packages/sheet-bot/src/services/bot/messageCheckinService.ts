@@ -1,7 +1,7 @@
 import { DB } from "@/db";
 import { subHours } from "date-fns/fp";
 import { and, eq, gte, isNull } from "drizzle-orm";
-import { Array, Data, Effect, Option, pipe } from "effect";
+import { Array, Data, DateTime, Effect, Option, pipe } from "effect";
 import { messageCheckin, messageCheckinMember } from "sheet-db-schema";
 import { DBSubscriptionContext } from "typhoon-server/db";
 import { Computed } from "typhoon-server/signal";
@@ -163,22 +163,25 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
           memberId: string,
         ) =>
           pipe(
-            dbSubscriptionContext.mutateQuery(
-              db
-                .update(messageCheckinMember)
-                .set({ checkinAt: new Date() })
-                .where(
-                  and(
-                    eq(messageCheckinMember.messageId, messageId),
-                    eq(messageCheckinMember.memberId, memberId),
-                    isNull(messageCheckinMember.deletedAt),
-                    gte(
-                      messageCheckinMember.createdAt,
-                      pipe(new Date(), subHours(1)),
+            DateTime.now,
+            Effect.flatMap((now) =>
+              dbSubscriptionContext.mutateQuery(
+                db
+                  .update(messageCheckinMember)
+                  .set({ checkinAt: DateTime.toDate(now) })
+                  .where(
+                    and(
+                      eq(messageCheckinMember.messageId, messageId),
+                      eq(messageCheckinMember.memberId, memberId),
+                      isNull(messageCheckinMember.deletedAt),
+                      gte(
+                        messageCheckinMember.createdAt,
+                        pipe(DateTime.toDate(now), subHours(1)),
+                      ),
                     ),
-                  ),
-                )
-                .returning(),
+                  )
+                  .returning(),
+              ),
             ),
             Effect.map(Array.head),
             Effect.withSpan(
@@ -188,17 +191,20 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
           ),
         removeMessageCheckinMember: (messageId: string, memberId: string) =>
           pipe(
-            dbSubscriptionContext.mutateQuery(
-              db
-                .update(messageCheckinMember)
-                .set({ deletedAt: new Date() })
-                .where(
-                  and(
-                    eq(messageCheckinMember.messageId, messageId),
-                    eq(messageCheckinMember.memberId, memberId),
-                    isNull(messageCheckinMember.deletedAt),
+            DateTime.now,
+            Effect.flatMap((now) =>
+              dbSubscriptionContext.mutateQuery(
+                db
+                  .update(messageCheckinMember)
+                  .set({ deletedAt: DateTime.toDate(now) })
+                  .where(
+                    and(
+                      eq(messageCheckinMember.messageId, messageId),
+                      eq(messageCheckinMember.memberId, memberId),
+                      isNull(messageCheckinMember.deletedAt),
+                    ),
                   ),
-                ),
+              ),
             ),
             Effect.withSpan(
               "MessageCheckinService.removeMessageCheckinMember",

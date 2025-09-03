@@ -1,6 +1,6 @@
 import { DB } from "@/db";
 import { and, asc, eq, isNull, max, min, sql } from "drizzle-orm";
-import { Array, Data, Effect, Option, pipe } from "effect";
+import { Array, Data, DateTime, Effect, Option, pipe } from "effect";
 import { messageRoomOrder, messageRoomOrderData } from "sheet-db-schema";
 import { DBSubscriptionContext } from "typhoon-server/db";
 import { Computed } from "typhoon-server/signal";
@@ -254,16 +254,19 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
           ),
         removeMessageRoomOrderData: (messageId: string) =>
           pipe(
-            dbSubscriptionContext.mutateQuery(
-              db
-                .update(messageRoomOrderData)
-                .set({ deletedAt: new Date() })
-                .where(
-                  and(
-                    eq(messageRoomOrderData.messageId, messageId),
-                    isNull(messageRoomOrderData.deletedAt),
+            DateTime.now,
+            Effect.flatMap((now) =>
+              dbSubscriptionContext.mutateQuery(
+                db
+                  .update(messageRoomOrderData)
+                  .set({ deletedAt: DateTime.toDate(now) })
+                  .where(
+                    and(
+                      eq(messageRoomOrderData.messageId, messageId),
+                      isNull(messageRoomOrderData.deletedAt),
+                    ),
                   ),
-                ),
+              ),
             ),
             Effect.withSpan(
               "MessageRoomOrderService.removeMessageRoomOrderData",
