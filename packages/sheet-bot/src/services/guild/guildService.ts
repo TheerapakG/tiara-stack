@@ -4,7 +4,7 @@ import {
 } from "@/services/interaction";
 import { Guild } from "discord.js";
 import { Effect, Layer, Option, pipe } from "effect";
-import { DiscordError } from "~~/src/types/error/discordError";
+import { DiscordError } from "~~/src/types";
 
 export class GuildService extends Effect.Service<GuildService>()(
   "GuildService",

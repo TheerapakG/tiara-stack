@@ -9,7 +9,7 @@ import {
   SendableChannels,
 } from "discord.js";
 import { Context, Data, Effect, HKT, Types, pipe } from "effect";
-import { DiscordError } from "~~/src/types/error/discordError";
+import { DiscordError } from "~~/src/types";
 import { wrap } from "~~/src/utils";
 
 export interface BaseChannelT extends HKT.TypeLambda {
