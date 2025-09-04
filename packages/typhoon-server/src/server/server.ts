@@ -4,6 +4,7 @@ import {
   Cause,
   Context,
   Data,
+  DateTime,
   Effect,
   Either,
   Exit,
@@ -46,28 +47,9 @@ type MutationHandlerMap<R> = HashMap.HashMap<
   MutationHandlerContext<MutationHandlerConfig, R>
 >;
 
-class Nonce extends Data.TaggedClass("Nonce")<{
-  value: SynchronizedRef.SynchronizedRef<number>;
-}> {
-  static make() {
-    return pipe(
-      SynchronizedRef.make(0),
-      Effect.map((value) => new Nonce({ value })),
-    );
-  }
-
-  static getAndIncrement(nonce: Nonce) {
-    return pipe(
-      nonce.value,
-      SynchronizedRef.updateAndGet((value) => value + 1),
-    );
-  }
-}
-
 type SubscriptionState = {
   event: Context.Tag.Service<Event>;
   effectCleanup: Effect.Effect<void, never, never>;
-  nonce: Nonce;
 };
 type SubscriptionStateMap = HashMap.HashMap<string, SubscriptionState>;
 
@@ -429,7 +411,6 @@ export class Server<
     subscriptionId: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     subscriptionHandlerContext: SubscriptionHandlerContext<any, R>,
-    nonce: Nonce,
   ): Effect.Effect<
     Computed<
       {
@@ -449,10 +430,10 @@ export class Server<
           pipe(
             Effect.Do,
             Effect.bind("value", () => Effect.exit(handler)),
-            Effect.bind("nonce", () => Nonce.getAndIncrement(nonce)),
+            Effect.bind("timestamp", () => DateTime.now),
             Effect.let(
               "header",
-              ({ value, nonce }) =>
+              ({ value, timestamp }) =>
                 ({
                   protocol: "typh",
                   version: 1,
@@ -460,7 +441,7 @@ export class Server<
                   action: "server:update",
                   payload: {
                     success: Exit.isSuccess(value),
-                    nonce,
+                    timestamp: DateTime.toDate(timestamp),
                   },
                 }) as const,
             ),
@@ -500,13 +481,11 @@ export class Server<
     subscriptionId: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     subscriptionHandlerContext: SubscriptionHandlerContext<any, R>,
-    nonce: Nonce,
   ) {
     return pipe(
       Server.getComputedSubscriptionResult(
         subscriptionId,
         subscriptionHandlerContext,
-        nonce,
       ),
       Effect.flatMap((computedResult) =>
         computed(
@@ -561,7 +540,7 @@ export class Server<
               pipe(
                 subscriptionState,
                 Option.match({
-                  onSome: ({ event, effectCleanup, nonce }) =>
+                  onSome: ({ event, effectCleanup }) =>
                     pipe(
                       Event.replaceStreamContext({
                         pullStream: pullDecodedStream,
@@ -571,7 +550,6 @@ export class Server<
                       Effect.map((event) => ({
                         event,
                         effectCleanup,
-                        nonce,
                       })),
                       Effect.option,
                       Effect.provideService(Event, event),
@@ -592,15 +570,11 @@ export class Server<
                           header.payload.handler,
                         ),
                       ),
-                      Effect.bind("nonce", () => Nonce.make()),
-                      Effect.bind(
-                        "computedBuffer",
-                        ({ handlerContext, nonce }) =>
-                          Server.getComputedSubscriptionResultEncoded(
-                            header.id,
-                            handlerContext,
-                            nonce,
-                          ),
+                      Effect.bind("computedBuffer", ({ handlerContext }) =>
+                        Server.getComputedSubscriptionResultEncoded(
+                          header.id,
+                          handlerContext,
+                        ),
                       ),
                       Effect.bind(
                         "providedComputedBuffer",
@@ -637,11 +611,10 @@ export class Server<
                             ),
                           ),
                       ),
-                      Effect.map(({ event, effectCleanup, nonce }) =>
+                      Effect.map(({ event, effectCleanup }) =>
                         Option.some({
                           event,
                           effectCleanup,
-                          nonce,
                         }),
                       ),
                     ),
@@ -712,12 +685,10 @@ export class Server<
         Effect.bind("handlerContext", () =>
           HashMap.get(server.subscriptionHandlerMap, header.payload.handler),
         ),
-        Effect.bind("nonce", () => Nonce.make()),
-        Effect.bind("computedBuffer", ({ handlerContext, nonce }) =>
+        Effect.bind("computedBuffer", ({ handlerContext }) =>
           Server.getComputedSubscriptionResultEncoded(
             header.id,
             handlerContext,
-            nonce,
           ),
         ),
         Effect.bind("providedComputedBuffer", ({ computedBuffer }) =>
