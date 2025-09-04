@@ -85,9 +85,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
     Option.Option<ManagedRuntime.ManagedRuntime<R, E>>
   >;
 }> {
-  static onChatInputCommandInteraction(
+  static onChatInputCommandInteraction = (
     interaction: ChatInputCommandInteraction,
-  ) {
+  ) => {
     return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
       pipe(
         Effect.Do,
@@ -125,9 +125,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
           },
         }),
       );
-  }
+  };
 
-  static onCommandInteraction(interaction: CommandInteraction) {
+  static onCommandInteraction = (interaction: CommandInteraction) => {
     return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
       match({})
         .case(`${ApplicationCommandType.ChatInput}`, () =>
@@ -136,9 +136,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
           )(bot),
         )
         .default(() => Effect.void)(interaction.commandType);
-  }
+  };
 
-  static onButtonInteraction(interaction: ButtonInteraction) {
+  static onButtonInteraction = (interaction: ButtonInteraction) => {
     return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
       pipe(
         Effect.Do,
@@ -169,9 +169,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
           },
         }),
       );
-  }
+  };
 
-  static onUserSelectMenuInteraction(interaction: UserSelectMenuInteraction) {
+  static onUserSelectMenuInteraction = (
+    interaction: UserSelectMenuInteraction,
+  ) => {
     return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
       pipe(
         Effect.Do,
@@ -204,11 +206,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
           },
         }),
       );
-  }
+  };
 
-  static onMessageComponentInteraction(
+  static onMessageComponentInteraction = (
     interaction: MessageComponentInteraction,
-  ) {
+  ) => {
     return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
       match({})
         .case(`${ComponentType.Button}`, () =>
@@ -220,9 +222,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
           )(bot),
         )
         .default(() => Effect.void)(interaction.componentType);
-  }
+  };
 
-  static onInteraction(interaction: Interaction) {
+  static onInteraction = (interaction: Interaction) => {
     return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
       match({})
         .case(`${InteractionType.ApplicationCommand}`, () =>
@@ -234,9 +236,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
           )(bot),
         )
         .default(() => Effect.void)(interaction.type);
-  }
+  };
 
-  static create<A = never, E = never, R = never>(layer: Layer.Layer<R, E>) {
+  static create = <A = never, E = never, R = never>(
+    layer: Layer.Layer<R, E>,
+  ) => {
     return pipe(
       Effect.Do,
       bindObject({
@@ -273,17 +277,17 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       }),
       Effect.map((params) => new Bot<A, E, R>(params)),
     );
-  }
+  };
 
-  static withTraceProvider(traceProvider: Layer.Layer<never>) {
+  static withTraceProvider = (traceProvider: Layer.Layer<never>) => {
     return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
       new Bot<A, E, R>({
         ...bot,
         traceProvider,
       });
-  }
+  };
 
-  static login<A = never, E = never, R = never>(bot: Bot<A, E, R>) {
+  static login = <A = never, E = never, R = never>(bot: Bot<A, E, R>) => {
     return Config.use(({ discordToken }) =>
       pipe(
         SynchronizedRef.update(bot.runtime, () =>
@@ -328,9 +332,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         bot.loginSemaphore.withPermits(1),
       ),
     );
-  }
+  };
 
-  static destroy<A = never, E = never, R = never>(bot: Bot<A, E, R>) {
+  static destroy = <A = never, E = never, R = never>(bot: Bot<A, E, R>) => {
     return pipe(
       Effect.promise(() => bot.client.destroy()),
       Effect.andThen(() =>
@@ -349,11 +353,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       Effect.andThen(() => bot.loginLatch.release),
       Effect.as(bot),
     );
-  }
+  };
 
-  static addChatInputCommand<A = never, E = never, R = never>(
+  static addChatInputCommand = <A = never, E = never, R = never>(
     command: HandlerVariantHandlerContext<ChatInputHandlerVariantT, A, E, R>,
-  ) {
+  ) => {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
         Effect.Do,
@@ -366,11 +370,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         ),
         Effect.map(({ bot }) => bot),
       );
-  }
+  };
 
-  static addChatInputCommandHandlerMap<A = never, E = never, R = never>(
+  static addChatInputCommandHandlerMap = <A = never, E = never, R = never>(
     commands: HandlerVariantMap<ChatInputHandlerVariantT, A, E, R>,
-  ) {
+  ) => {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
         Effect.Do,
@@ -383,11 +387,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         ),
         Effect.map(({ bot }) => bot),
       );
-  }
+  };
 
-  static addButton<A = never, E = never, R = never>(
+  static addButton = <A = never, E = never, R = never>(
     button: HandlerVariantHandlerContext<ButtonHandlerVariantT, A, E, R>,
-  ) {
+  ) => {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
         Effect.Do,
@@ -400,11 +404,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         ),
         Effect.map(({ bot }) => bot),
       );
-  }
+  };
 
-  static addButtonInteractionHandlerMap<A = never, E = never, R = never>(
+  static addButtonInteractionHandlerMap = <A = never, E = never, R = never>(
     buttons: HandlerVariantMap<ButtonHandlerVariantT, A, E, R>,
-  ) {
+  ) => {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
         Effect.Do,
@@ -417,16 +421,16 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         ),
         Effect.map(({ bot }) => bot),
       );
-  }
+  };
 
-  static addUserSelectMenu<A = never, E = never, R = never>(
+  static addUserSelectMenu = <A = never, E = never, R = never>(
     userSelectMenu: HandlerVariantHandlerContext<
       UserSelectMenuHandlerVariantT,
       A,
       E,
       R
     >,
-  ) {
+  ) => {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
         Effect.Do,
@@ -439,15 +443,15 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         ),
         Effect.map(({ bot }) => bot),
       );
-  }
+  };
 
-  static addUserSelectMenuInteractionHandlerMap<
+  static addUserSelectMenuInteractionHandlerMap = <
     A = never,
     E = never,
     R = never,
   >(
     userSelectMenus: HandlerVariantMap<UserSelectMenuHandlerVariantT, A, E, R>,
-  ) {
+  ) => {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
         Effect.Do,
@@ -460,11 +464,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         ),
         Effect.map(({ bot }) => bot),
       );
-  }
+  };
 
-  static registerProcessHandlers<A = never, E = never, R = never>(
+  static registerProcessHandlers = <A = never, E = never, R = never>(
     bot: Bot<A, E, R>,
-  ) {
+  ) => {
     return pipe(
       Effect.sync(() => {
         process.on("SIGINT", () =>
@@ -486,5 +490,5 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       }),
       Effect.as(bot),
     );
-  }
+  };
 }
