@@ -19,8 +19,8 @@ export class MessageRoomOrder extends Data.TaggedClass("MessageRoomOrder")<{
   updatedAt: Date;
   deletedAt: Option.Option<Date>;
 }> {
-  static fromDbSelect(select: MessageRoomOrderSelect) {
-    return new MessageRoomOrder({
+  static fromDbSelect = (select: MessageRoomOrderSelect) =>
+    new MessageRoomOrder({
       id: select.id,
       messageId: select.messageId,
       hour: select.hour,
@@ -29,7 +29,6 @@ export class MessageRoomOrder extends Data.TaggedClass("MessageRoomOrder")<{
       updatedAt: select.updatedAt,
       deletedAt: Option.fromNullable(select.deletedAt),
     });
-  }
 }
 
 export class MessageRoomOrderRange extends Data.TaggedClass(
@@ -38,15 +37,14 @@ export class MessageRoomOrderRange extends Data.TaggedClass(
   minRank: number;
   maxRank: number;
 }> {
-  static fromDbSelect(select: {
+  static fromDbSelect = (select: {
     minRank: number | null;
     maxRank: number | null;
-  }) {
-    return new MessageRoomOrderRange({
+  }) =>
+    new MessageRoomOrderRange({
       minRank: select.minRank ?? NaN,
       maxRank: select.maxRank ?? NaN,
     });
-  }
 }
 
 export class MessageRoomOrderData extends Data.TaggedClass(
@@ -62,8 +60,8 @@ export class MessageRoomOrderData extends Data.TaggedClass(
   updatedAt: Date;
   deletedAt: Option.Option<Date>;
 }> {
-  static fromDbSelect(select: MessageRoomOrderDataSelect) {
-    return new MessageRoomOrderData({
+  static fromDbSelect = (select: MessageRoomOrderDataSelect) =>
+    new MessageRoomOrderData({
       id: select.id,
       messageId: select.messageId,
       rank: select.rank,
@@ -74,7 +72,6 @@ export class MessageRoomOrderData extends Data.TaggedClass(
       updatedAt: select.updatedAt,
       deletedAt: Option.fromNullable(select.deletedAt),
     });
-  }
 }
 
 export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderService>()(
