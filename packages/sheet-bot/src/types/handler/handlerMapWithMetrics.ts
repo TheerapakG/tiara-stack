@@ -27,11 +27,11 @@ export class InteractionHandlerMapWithMetrics<
 > extends Data.TaggedClass("InteractionHandlerMapWithMetrics")<
   InteractionHandlerMapWithMetricsObject<Data, A, E, R>
 > {
-  static make<Data = unknown, A = never, E = never, R = never>(
+  static make = <Data = unknown, A = never, E = never, R = never>(
     interactionType: string,
     map: InteractionHandlerMap<Data, A, E, R>,
-  ) {
-    return new InteractionHandlerMapWithMetrics({
+  ) =>
+    new InteractionHandlerMapWithMetrics({
       map,
       interactionType,
       interactionCount: Metric.counter(
@@ -43,12 +43,12 @@ export class InteractionHandlerMapWithMetrics<
         },
       ),
     });
-  }
 
-  static add<Data1 extends Data2, Data2, A1 = never, E1 = never, R1 = never>(
-    context: InteractionHandlerContext<Data1, A1, E1, R1>,
-  ) {
-    return <A2 = never, E2 = never, R2 = never>(
+  static add =
+    <Data1 extends Data2, Data2, A1 = never, E1 = never, R1 = never>(
+      context: InteractionHandlerContext<Data1, A1, E1, R1>,
+    ) =>
+    <A2 = never, E2 = never, R2 = never>(
       map: InteractionHandlerMapWithMetrics<Data2, A2, E2, R2>,
     ) =>
       new InteractionHandlerMapWithMetrics({
@@ -56,12 +56,12 @@ export class InteractionHandlerMapWithMetrics<
         interactionType: map.interactionType,
         interactionCount: map.interactionCount,
       });
-  }
 
-  static union<Data1 extends Data2, Data2, A1 = never, E1 = never, R1 = never>(
-    map: InteractionHandlerMap<Data1, A1, E1, R1>,
-  ) {
-    return <A2 = never, E2 = never, R2 = never>(
+  static union =
+    <Data1 extends Data2, Data2, A1 = never, E1 = never, R1 = never>(
+      map: InteractionHandlerMap<Data1, A1, E1, R1>,
+    ) =>
+    <A2 = never, E2 = never, R2 = never>(
       other: InteractionHandlerMapWithMetrics<Data2, A2, E2, R2>,
     ) =>
       new InteractionHandlerMapWithMetrics({
@@ -69,12 +69,10 @@ export class InteractionHandlerMapWithMetrics<
         interactionType: other.interactionType,
         interactionCount: other.interactionCount,
       });
-  }
 
-  static execute(interactionKey: string) {
-    return <Data, A, E, R>(
-      map: InteractionHandlerMapWithMetrics<Data, A, E, R>,
-    ) =>
+  static execute =
+    (interactionKey: string) =>
+    <Data, A, E, R>(map: InteractionHandlerMapWithMetrics<Data, A, E, R>) =>
       pipe(
         map.map,
         InteractionHandlerMap.get(interactionKey),
@@ -102,12 +100,10 @@ export class InteractionHandlerMapWithMetrics<
           captureStackTrace: true,
         }),
       );
-  }
 
-  static executeAndReplyError(interactionKey: string) {
-    return <Data, A, E, R>(
-      map: InteractionHandlerMapWithMetrics<Data, A, E, R>,
-    ) =>
+  static executeAndReplyError =
+    (interactionKey: string) =>
+    <Data, A, E, R>(map: InteractionHandlerMapWithMetrics<Data, A, E, R>) =>
       pipe(
         map,
         InteractionHandlerMapWithMetrics.execute(interactionKey),
@@ -148,11 +144,8 @@ export class InteractionHandlerMapWithMetrics<
           },
         ),
       );
-  }
 
-  static values<Data, A, E, R>(
+  static values = <Data, A, E, R>(
     map: InteractionHandlerMapWithMetrics<Data, A, E, R>,
-  ) {
-    return InteractionHandlerMap.values(map.map);
-  }
+  ) => InteractionHandlerMap.values(map.map);
 }

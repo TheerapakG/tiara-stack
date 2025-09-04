@@ -60,12 +60,12 @@ export class InteractionHandlerContextBuilder<
 > extends Data.TaggedClass("InteractionHandlerContextBuilder")<
   InteractionHandlerContextBuilderObject<Data, Handler>
 > {
-  static empty<Data, Handler extends AnyInteractionHandler>() {
+  static empty = <Data, Handler extends AnyInteractionHandler>() => {
     return new InteractionHandlerContextBuilder({
       _data: Option.none() as Option.None<Data>,
       _handler: Option.none() as Option.None<Handler>,
     });
-  }
+  };
 
   data<BuilderData extends Option.Option.Value<Data>>(
     this: InteractionHandlerContextBuilder<
@@ -142,18 +142,18 @@ export class InteractionHandlerMap<
 > extends Data.TaggedClass("InteractionHandlerMap")<
   InteractionHandlerMapObject<Data, A, E, R>
 > {
-  static empty<Data = unknown, A = never, E = never, R = never>(
+  static empty = <Data = unknown, A = never, E = never, R = never>(
     keyGetter: (data: Data) => string,
-  ) {
+  ) => {
     return new InteractionHandlerMap<Data, A, E, R>({
       map: HashMap.empty(),
       keyGetter,
     });
-  }
+  };
 
-  static add<Data1 extends Data2, Data2, A1 = never, E1 = never, R1 = never>(
+  static add = <Data1 extends Data2, Data2, A1 = never, E1 = never, R1 = never>(
     context: InteractionHandlerContext<Data1, A1, E1, R1>,
-  ) {
+  ) => {
     return <A2 = never, E2 = never, R2 = never>(
       map: InteractionHandlerMap<Data2, A2, E2, R2>,
     ) =>
@@ -168,16 +168,22 @@ export class InteractionHandlerMap<
         ),
         keyGetter: map.keyGetter,
       });
-  }
+  };
 
-  static get(key: string) {
+  static get = (key: string) => {
     return <Data, A, E, R>(map: InteractionHandlerMap<Data, A, E, R>) =>
       HashMap.get(map.map, key);
-  }
+  };
 
-  static union<Data1 extends Data2, Data2, A1 = never, E1 = never, R1 = never>(
+  static union = <
+    Data1 extends Data2,
+    Data2,
+    A1 = never,
+    E1 = never,
+    R1 = never,
+  >(
     map: InteractionHandlerMap<Data1, A1, E1, R1>,
-  ) {
+  ) => {
     return <A2 = never, E2 = never, R2 = never>(
       other: InteractionHandlerMap<Data2, A2, E2, R2>,
     ) =>
@@ -194,9 +200,11 @@ export class InteractionHandlerMap<
         ),
         keyGetter: other.keyGetter,
       });
-  }
+  };
 
-  static values<Data, A, E, R>(map: InteractionHandlerMap<Data, A, E, R>) {
+  static values = <Data, A, E, R>(
+    map: InteractionHandlerMap<Data, A, E, R>,
+  ) => {
     return HashMap.values(map.map);
-  }
+  };
 }
