@@ -26,8 +26,8 @@ export class GuildConfig extends Data.TaggedClass("GuildConfig")<{
   updatedAt: Date;
   deletedAt: Option.Option<Date>;
 }> {
-  static fromDbSelect(select: GuildConfigSelect) {
-    return new GuildConfig({
+  static fromDbSelect = (select: GuildConfigSelect) =>
+    new GuildConfig({
       id: select.id,
       guildId: select.guildId,
       scriptId: Option.fromNullable(select.scriptId),
@@ -36,7 +36,6 @@ export class GuildConfig extends Data.TaggedClass("GuildConfig")<{
       updatedAt: select.updatedAt,
       deletedAt: Option.fromNullable(select.deletedAt),
     });
-  }
 }
 
 export class GuildConfigManagerRole extends Data.TaggedClass(
@@ -49,8 +48,8 @@ export class GuildConfigManagerRole extends Data.TaggedClass(
   updatedAt: Date;
   deletedAt: Option.Option<Date>;
 }> {
-  static fromDbSelect(select: GuildConfigManagerRoleSelect) {
-    return new GuildConfigManagerRole({
+  static fromDbSelect = (select: GuildConfigManagerRoleSelect) =>
+    new GuildConfigManagerRole({
       id: select.id,
       guildId: select.guildId,
       roleId: select.roleId,
@@ -58,7 +57,6 @@ export class GuildConfigManagerRole extends Data.TaggedClass(
       updatedAt: select.updatedAt,
       deletedAt: Option.fromNullable(select.deletedAt),
     });
-  }
 }
 
 export class GuildChannelConfig extends Data.TaggedClass("GuildChannelConfig")<{
@@ -73,8 +71,8 @@ export class GuildChannelConfig extends Data.TaggedClass("GuildChannelConfig")<{
   updatedAt: Date;
   deletedAt: Option.Option<Date>;
 }> {
-  static fromDbSelect(select: GuildChannelConfigSelect) {
-    return new GuildChannelConfig({
+  static fromDbSelect = (select: GuildChannelConfigSelect) =>
+    new GuildChannelConfig({
       id: select.id,
       guildId: select.guildId,
       channelId: select.channelId,
@@ -86,7 +84,6 @@ export class GuildChannelConfig extends Data.TaggedClass("GuildChannelConfig")<{
       updatedAt: select.updatedAt,
       deletedAt: Option.fromNullable(select.deletedAt),
     });
-  }
 }
 
 export class GuildConfigService extends Effect.Service<GuildConfigService>()(

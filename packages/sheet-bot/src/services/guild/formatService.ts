@@ -163,19 +163,21 @@ export class FormatService extends Effect.Service<FormatService>()(
                   ),
                 ),
                 Array.getSomes,
-                (partialPlayers) =>
-                  Order.greaterThan(Number.Order)(
-                    pipe(partialPlayers, Array.length),
-                    0,
-                  )
-                    ? Option.some(
-                        `Cannot look up Discord ID for ${pipe(
-                          partialPlayers,
-                          Array.map((player) => player.name),
-                          Array.join(", "),
-                        )}. They would need to check in manually.`,
-                      )
-                    : Option.none(),
+                Option.liftPredicate((partialPlayers) =>
+                  pipe(
+                    partialPlayers,
+                    Array.length,
+                    Order.greaterThan(Number.Order)(0),
+                  ),
+                ),
+                Option.map(
+                  (partialPlayers) =>
+                    `Cannot look up Discord ID for ${pipe(
+                      partialPlayers,
+                      Array.map((player) => player.name),
+                      Array.join(", "),
+                    )}. They would need to check in manually.`,
+                ),
               ),
             ),
             Effect.map(
