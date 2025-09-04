@@ -36,9 +36,11 @@ const parseValueRange = <A = never, E = never, R = never>(
     Option.map(
       Array.map(
         Array.map((v) =>
-          Equal.equals(v, "")
-            ? Option.none()
-            : Option.fromNullable(v as string | null | undefined),
+          pipe(
+            v,
+            Option.liftPredicate(() => !Equal.equals(v, "")),
+            Option.flatMapNullable((v) => v as string | null | undefined),
+          ),
         ),
       ),
     ),
@@ -235,8 +237,8 @@ export class Schedule extends Data.TaggedClass("Schedule")<{
   standbys: readonly string[];
   empty: number;
 }> {
-  static empty(hour: number, breakHour?: boolean) {
-    return new Schedule({
+  static empty = (hour: number, breakHour?: boolean) =>
+    new Schedule({
       hour,
       breakHour: breakHour ?? false,
       fills: Array.makeBy(5, () => Option.none()),
@@ -244,9 +246,8 @@ export class Schedule extends Data.TaggedClass("Schedule")<{
       standbys: [],
       empty: 5,
     });
-  }
 
-  static make({
+  static make = ({
     hour,
     breakHour,
     fills,
@@ -258,8 +259,8 @@ export class Schedule extends Data.TaggedClass("Schedule")<{
     fills: readonly Option.Option<string>[];
     overfills: readonly string[];
     standbys: readonly string[];
-  }) {
-    return breakHour
+  }) =>
+    breakHour
       ? Schedule.empty(hour, breakHour)
       : new Schedule({
           hour,
@@ -272,7 +273,6 @@ export class Schedule extends Data.TaggedClass("Schedule")<{
             0,
           ),
         });
-  }
 }
 export type ScheduleMap = HashMap.HashMap<number, Schedule>;
 
@@ -562,9 +562,13 @@ export class SheetService extends Effect.Service<SheetService>()(
                       Option.some(rangesConfig.fills),
                       Option.some(rangesConfig.overfills),
                       Option.some(rangesConfig.standbys),
-                      String.Equivalence(rangesConfig.breaks, "detect")
-                        ? Option.none()
-                        : Option.some(rangesConfig.breaks),
+                      pipe(
+                        rangesConfig.breaks,
+                        Option.liftPredicate(
+                          () =>
+                            !String.Equivalence(rangesConfig.breaks, "detect"),
+                        ),
+                      ),
                     ],
                     Array.getSomes,
                   ),
@@ -697,14 +701,16 @@ export class SheetService extends Effect.Service<SheetService>()(
                         Option.some(
                           `'${specificDayConfig[0].sheet}'!${specificDayConfig[0].standbyRange}`,
                         ),
-                        String.Equivalence(
-                          specificDayConfig[0].breakRange,
-                          "detect",
-                        )
-                          ? Option.none()
-                          : Option.some(
-                              `'${specificDayConfig[0].sheet}'!${specificDayConfig[0].breakRange}`,
-                            ),
+                        pipe(
+                          `'${specificDayConfig[0].sheet}'!${specificDayConfig[0].breakRange}`,
+                          Option.liftPredicate(
+                            () =>
+                              !String.Equivalence(
+                                specificDayConfig[0].breakRange,
+                                "detect",
+                              ),
+                          ),
+                        ),
                       ],
                       Array.getSomes,
                     ),
@@ -734,8 +740,8 @@ export class SheetService extends Effect.Service<SheetService>()(
     accessors: true,
   },
 ) {
-  static ofGuild() {
-    return pipe(
+  static ofGuild = () =>
+    pipe(
       Effect.Do,
       Effect.bind("guildConfig", () =>
         pipe(GuildConfigService.getConfig(), Effect.flatMap(observeOnce)),
@@ -752,5 +758,4 @@ export class SheetService extends Effect.Service<SheetService>()(
       Effect.withSpan("SheetService.ofGuild", { captureStackTrace: true }),
       Layer.unwrapEffect,
     );
-  }
 }

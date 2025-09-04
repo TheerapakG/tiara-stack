@@ -59,8 +59,8 @@ export class GuildService extends Effect.Service<GuildService>()(
     accessors: true,
   },
 ) {
-  static fromGuildId(guildId: string) {
-    return pipe(
+  static fromGuildId = (guildId: string) =>
+    pipe(
       ClientService.fetchGuild(guildId),
       Effect.map((guild) => GuildService.Default(guild)),
       Effect.withSpan("GuildService.fromGuildId", {
@@ -68,10 +68,9 @@ export class GuildService extends Effect.Service<GuildService>()(
       }),
       Layer.unwrapEffect,
     );
-  }
 
-  static fromInteraction() {
-    return pipe(
+  static fromInteraction = () =>
+    pipe(
       CachedInteractionContext.guild().sync(),
       Effect.map((guild) => GuildService.Default(guild)),
       Effect.withSpan("GuildService.fromInteraction", {
@@ -79,5 +78,4 @@ export class GuildService extends Effect.Service<GuildService>()(
       }),
       Layer.unwrapEffect,
     );
-  }
 }
