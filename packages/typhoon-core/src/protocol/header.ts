@@ -213,17 +213,17 @@ const handlerPayloadEncoderDecoder = new LookupEncoderDecoder(
   },
 );
 
-const successNoncePayloadEncoderDecoder = new LookupEncoderDecoder(
-  "successNoncePayloadEncoderDecoder",
-  ["success", "nonce"],
-  ["success", "nonce"],
+const successTimestampPayloadEncoderDecoder = new LookupEncoderDecoder(
+  "successTimestampPayloadEncoderDecoder",
+  ["success", "timestamp"],
+  ["success", "timestamp"],
   {
     success: validate(v.boolean()),
-    nonce: validate(v.number()),
+    timestamp: validate(v.date()),
   },
   {
     success: validate(v.boolean()),
-    nonce: validate(v.number()),
+    timestamp: validate(v.date()),
   },
 );
 
@@ -299,7 +299,7 @@ const payloadDecoder = <Action extends (typeof headerActionFields)[number]>({
       >
     : Action extends "server:update"
       ? Effect.Effect.Success<
-          ReturnType<(typeof successNoncePayloadEncoderDecoder)["decode"]>
+          ReturnType<(typeof successTimestampPayloadEncoderDecoder)["decode"]>
         >
       : Action extends "client:unsubscribe"
         ? Effect.Effect.Success<
@@ -322,7 +322,7 @@ const payloadDecoder = <Action extends (typeof headerActionFields)[number]>({
           handlerPayloadEncoderDecoder.decode(payload),
         ),
         Match.when("server:update", () =>
-          successNoncePayloadEncoderDecoder.decode(payload),
+          successTimestampPayloadEncoderDecoder.decode(payload),
         ),
         Match.when("client:unsubscribe", () =>
           emptyPayloadEncoderDecoder.decode(payload),
@@ -337,7 +337,7 @@ const payloadDecoder = <Action extends (typeof headerActionFields)[number]>({
         >
       : Action extends "server:update"
         ? Effect.Effect.Success<
-            ReturnType<(typeof successNoncePayloadEncoderDecoder)["decode"]>
+            ReturnType<(typeof successTimestampPayloadEncoderDecoder)["decode"]>
           >
         : Action extends "client:unsubscribe"
           ? Effect.Effect.Success<
@@ -377,7 +377,7 @@ const payloadEncoder = <
           ),
         ),
         Match.when("server:update", () =>
-          successNoncePayloadEncoderDecoder.encode(
+          successTimestampPayloadEncoderDecoder.encode(
             payload as Effect.Effect.Success<
               ReturnType<typeof payloadDecoder<"server:update">>
             >,
