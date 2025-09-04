@@ -21,8 +21,8 @@ export class MessageCheckin extends Data.TaggedClass("MessageCheckin")<{
   updatedAt: Date;
   deletedAt: Option.Option<Date>;
 }> {
-  static fromDbSelect(select: MessageCheckinSelect) {
-    return new MessageCheckin({
+  static fromDbSelect = (select: MessageCheckinSelect) =>
+    new MessageCheckin({
       id: select.id,
       messageId: select.messageId,
       initialMessage: select.initialMessage,
@@ -33,7 +33,6 @@ export class MessageCheckin extends Data.TaggedClass("MessageCheckin")<{
       updatedAt: select.updatedAt,
       deletedAt: Option.fromNullable(select.deletedAt),
     });
-  }
 }
 
 export class MessageCheckinMember extends Data.TaggedClass(
@@ -47,8 +46,8 @@ export class MessageCheckinMember extends Data.TaggedClass(
   updatedAt: Date;
   deletedAt: Option.Option<Date>;
 }> {
-  static fromDbSelect(select: MessageCheckinMemberSelect) {
-    return new MessageCheckinMember({
+  static fromDbSelect = (select: MessageCheckinMemberSelect) =>
+    new MessageCheckinMember({
       id: select.id,
       messageId: select.messageId,
       memberId: select.memberId,
@@ -57,7 +56,6 @@ export class MessageCheckinMember extends Data.TaggedClass(
       updatedAt: select.updatedAt,
       deletedAt: Option.fromNullable(select.deletedAt),
     });
-  }
 }
 
 export class MessageCheckinService extends Effect.Service<MessageCheckinService>()(

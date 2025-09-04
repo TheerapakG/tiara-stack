@@ -28,9 +28,11 @@ const parseValueRange = <A = never, E = never, R = never>(
     Option.map(
       Array.map(
         Array.map((v) =>
-          Equal.equals(v, "")
-            ? Option.none()
-            : Option.fromNullable(v as string | null | undefined),
+          pipe(
+            v,
+            Option.liftPredicate(() => !Equal.equals(v, "")),
+            Option.flatMapNullable((v) => v as string | null | undefined),
+          ),
         ),
       ),
     ),

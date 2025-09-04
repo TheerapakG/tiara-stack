@@ -1,9 +1,9 @@
+import { DB } from "@/db";
 import { eq } from "drizzle-orm";
 import { Array, Data, Effect, Option, pipe } from "effect";
 import { configChannel } from "sheet-db-schema";
 import { DBSubscriptionContext } from "typhoon-server/db";
 import { Computed } from "typhoon-server/signal";
-import { DB } from "@/db";
 
 type ConfigInsert = typeof configChannel.$inferInsert;
 type ConfigSelect = typeof configChannel.$inferSelect;
@@ -16,8 +16,8 @@ export class Config extends Data.TaggedClass("Config")<{
   updatedAt: Date;
   deletedAt: Option.Option<Date>;
 }> {
-  static fromDbSelect(select: ConfigSelect) {
-    return new Config({
+  static fromDbSelect = (select: ConfigSelect) =>
+    new Config({
       id: select.id,
       channelId: select.channelId,
       day: Option.fromNullable(select.day),
@@ -25,7 +25,6 @@ export class Config extends Data.TaggedClass("Config")<{
       updatedAt: select.updatedAt,
       deletedAt: Option.fromNullable(select.deletedAt),
     });
-  }
 }
 
 export class ChannelConfigService extends Effect.Service<ChannelConfigService>()(
