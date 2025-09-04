@@ -184,11 +184,13 @@ const handleUnset =
           Effect.bind("config", ({ channel, name, role, checkinChannel }) =>
             pipe(
               GuildConfigService.setChannelConfig(channel.id, {
-                name: Option.getOrUndefined(name) ? null : undefined,
-                roleId: Option.getOrUndefined(role) ? null : undefined,
-                checkinChannelId: Option.getOrUndefined(checkinChannel)
-                  ? null
-                  : undefined,
+                name: pipe(name, Option.as(null), Option.getOrUndefined),
+                roleId: pipe(role, Option.as(null), Option.getOrUndefined),
+                checkinChannelId: pipe(
+                  checkinChannel,
+                  Option.as(null),
+                  Option.getOrUndefined,
+                ),
               }),
               Effect.flatMap(Function.identity),
             ),

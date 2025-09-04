@@ -59,7 +59,6 @@ export class ClientService extends Effect.Service<ClientService>()(
     accessors: true,
   },
 ) {
-  static fromInteraction(interaction: Interaction) {
-    return ClientService.Default(interaction.client);
-  }
+  static fromInteraction = (interaction: Interaction) =>
+    ClientService.Default(interaction.client);
 }
