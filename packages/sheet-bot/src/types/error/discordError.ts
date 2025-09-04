@@ -19,7 +19,7 @@ export class DiscordError extends Data.TaggedError("DiscordError")<{
     super({ message: cause.message, cause });
   }
 
-  static fromUnknownException(cause: Cause.UnknownException) {
+  static fromUnknownException = (cause: Cause.UnknownException) => {
     return pipe(
       cause.error,
       validate(
@@ -38,23 +38,23 @@ export class DiscordError extends Data.TaggedError("DiscordError")<{
       Effect.map((error) => new DiscordError(error)),
       Effect.catchTag("ValidationError", () => Effect.succeed(cause)),
     );
-  }
+  };
 
-  static wrapTry<A>(thunk: Function.LazyArg<A>) {
-    return pipe(
+  static wrapTry = <A>(thunk: Function.LazyArg<A>) =>
+    pipe(
       Effect.try(thunk),
       Effect.catchTag("UnknownException", (cause) =>
         pipe(DiscordError.fromUnknownException(cause), Effect.flip),
       ),
     );
-  }
 
-  static wrapTryPromise<A>(evaluate: (signal: AbortSignal) => PromiseLike<A>) {
-    return pipe(
+  static wrapTryPromise = <A>(
+    evaluate: (signal: AbortSignal) => PromiseLike<A>,
+  ) =>
+    pipe(
       Effect.tryPromise(evaluate),
       Effect.catchTag("UnknownException", (cause) =>
         pipe(DiscordError.fromUnknownException(cause), Effect.flip),
       ),
     );
-  }
 }

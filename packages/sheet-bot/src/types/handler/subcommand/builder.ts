@@ -1,3 +1,9 @@
+import { InteractionHandlerContext } from "@/types/handler/handler";
+import { HandlerVariantHandlerContext } from "@/types/handler/handlerVariant";
+import {
+  ChatInputSubcommandGroupHandlerVariantT,
+  ChatInputSubcommandHandlerVariantT,
+} from "@/types/handler/variants";
 import {
   SharedSlashCommand,
   SharedSlashCommandSubcommands,
@@ -6,12 +12,6 @@ import {
   SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 import { Data, Option, pipe } from "effect";
-import { InteractionHandlerContext } from "@/types/handler/handler";
-import { HandlerVariantHandlerContext } from "@/types/handler/handlerVariant";
-import {
-  ChatInputSubcommandGroupHandlerVariantT,
-  ChatInputSubcommandHandlerVariantT,
-} from "@/types/handler/variants";
 import { SubcommandHandler } from "./handler";
 
 type SubcommandHandlerBuilderData<
@@ -48,7 +48,7 @@ export class SubcommandHandlerBuilder<
 > extends Data.TaggedClass("SubcommandHandlerBuilder")<
   SubcommandHandlerBuilderData<Data, A, E, R>
 > {
-  static empty<
+  static empty = <
     BuilderData extends
       | SlashCommandBuilder
       | SlashCommandSubcommandsOnlyBuilder
@@ -56,12 +56,12 @@ export class SubcommandHandlerBuilder<
     A = never,
     E = never,
     R = never,
-  >() {
+  >() => {
     return new SubcommandHandlerBuilder({
       _data: Option.none() as Option.None<BuilderData>,
       _handler: SubcommandHandler.empty<A, E, R>(),
     });
-  }
+  };
 
   data<
     BuilderData extends
@@ -178,13 +178,13 @@ export class ChatInputCommandSubcommandHandlerContextBuilder<
 > extends Data.TaggedClass("SubcommandHandlerContextBuilder")<{
   builder: SubcommandHandlerBuilder<Data, A, E, R>;
 }> {
-  static empty() {
+  static empty = () => {
     return new ChatInputCommandSubcommandHandlerContextBuilder({
       builder: SubcommandHandlerBuilder.empty<
         SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder
       >(),
     });
-  }
+  };
 
   data<
     BuilderData extends
@@ -295,12 +295,12 @@ export class ChatInputSubcommandGroupSubcommandHandlerContextBuilder<
 )<{
   builder: SubcommandHandlerBuilder<Data, A, E, R>;
 }> {
-  static empty() {
+  static empty = () => {
     return new ChatInputSubcommandGroupSubcommandHandlerContextBuilder({
       builder:
         SubcommandHandlerBuilder.empty<SlashCommandSubcommandGroupBuilder>(),
     });
-  }
+  };
 
   data<BuilderData extends SlashCommandSubcommandGroupBuilder, A, E, R>(
     this: ChatInputSubcommandGroupSubcommandHandlerContextBuilder<
