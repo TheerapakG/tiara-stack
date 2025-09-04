@@ -1,11 +1,13 @@
 import { StandardSchemaV1 } from "@standard-schema/spec";
 import {
   Data,
+  DateTime,
   Deferred,
   Effect,
   HashMap,
   Match,
   Option,
+  Order,
   pipe,
   SynchronizedRef,
 } from "effect";
@@ -31,12 +33,12 @@ const WebSocketCtor = globalThis.WebSocket;
 export class HandlerError extends Data.TaggedError("HandlerError") {}
 
 type LoadingState = {
-  isLoading: true;
+  state: "loading";
 };
 
 type ResolvedState<T = unknown> = {
-  isLoading: false;
-  nonce: number;
+  state: "resolved";
+  timestamp: DateTime.DateTime;
   value: Effect.Effect<T, HandlerError, never>;
 };
 
@@ -96,6 +98,37 @@ export class WebSocketClient<
     );
   }
 
+  static addUpdater(
+    id: string,
+    updater: (
+      value: ResolvedState<unknown>,
+    ) => Effect.Effect<void, never, never>,
+  ) {
+    return (
+      client: WebSocketClient<
+        Record<string, SubscriptionHandlerContext>,
+        Record<string, MutationHandlerContext>
+      >,
+    ) =>
+      pipe(
+        client.updaterStateMapRef,
+        SynchronizedRef.update(HashMap.set(id, { updater })),
+      );
+  }
+
+  static removeUpdater(id: string) {
+    return (
+      client: WebSocketClient<
+        Record<string, SubscriptionHandlerContext>,
+        Record<string, MutationHandlerContext>
+      >,
+    ) =>
+      pipe(
+        client.updaterStateMapRef,
+        SynchronizedRef.update(HashMap.remove(id)),
+      );
+  }
+
   static handleUpdate(header: Header, decodedResponse: unknown) {
     return (
       client: WebSocketClient<
@@ -116,15 +149,20 @@ export class WebSocketClient<
                 pipe(
                   Match.value(header),
                   Match.when({ action: "server:update" }, (header) =>
-                    updater({
-                      isLoading: false,
-                      nonce: header.payload.nonce,
-                      value: header.payload.success
-                        ? Effect.succeed(decodedResponse)
-                        : Effect.fail(
-                            new HandlerError(decodedResponse as void),
-                          ),
-                    }),
+                    pipe(
+                      DateTime.make(header.payload.timestamp),
+                      Effect.transposeMapOption((timestamp) =>
+                        updater({
+                          state: "resolved",
+                          timestamp,
+                          value: header.payload.success
+                            ? Effect.succeed(decodedResponse)
+                            : Effect.fail(
+                                new HandlerError(decodedResponse as void),
+                              ),
+                        }),
+                      ),
+                    ),
                   ),
                   Match.orElse(() => Effect.void),
                 ),
@@ -235,27 +273,27 @@ export class WebSocketClient<
     return pipe(
       Effect.Do,
       Effect.let("id", () => crypto.randomUUID() as string),
-      Effect.let("signal", () => signal<SignalState>({ isLoading: true })),
-      Effect.let(
-        "updater",
-        ({ signal }) =>
-          (value: ResolvedState<unknown>) =>
+      Effect.let("signal", () => signal<SignalState>({ state: "loading" })),
+      Effect.tap(({ id, signal }) =>
+        pipe(
+          client,
+          WebSocketClient.addUpdater(id, (value) =>
             signal.updateValue((prev) =>
               Effect.succeed(
-                prev.isLoading || prev.nonce < value.nonce
+                prev.state === "loading" ||
+                  Order.lessThan(DateTime.Order)(
+                    prev.timestamp,
+                    value.timestamp,
+                  )
                   ? {
-                      isLoading: false,
-                      nonce: value.nonce,
+                      state: "resolved",
+                      timestamp: value.timestamp,
                       value: value.value,
                     }
                   : prev,
               ),
             ),
-      ),
-      Effect.tap(({ id, updater }) =>
-        pipe(
-          client.updaterStateMapRef,
-          SynchronizedRef.update(HashMap.set(id, { updater })),
+          ),
         ),
       ),
       Effect.bind("requestHeader", ({ id }) =>
@@ -320,12 +358,7 @@ export class WebSocketClient<
   ) {
     return pipe(
       Effect.Do,
-      Effect.tap(() =>
-        pipe(
-          client.updaterStateMapRef,
-          SynchronizedRef.update(HashMap.modifyAt(id, () => Option.none())),
-        ),
-      ),
+      Effect.tap(() => pipe(client, WebSocketClient.removeUpdater(id))),
       Effect.bind("header", () =>
         HeaderEncoderDecoder.encode({
           protocol: "typh",
@@ -370,28 +403,19 @@ export class WebSocketClient<
       Effect.Do,
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("deferred", () => Deferred.make<unknown, HandlerError>()),
-      Effect.let(
-        "updater",
-        ({ id, deferred }) =>
-          (value: ResolvedState<unknown>) =>
+      Effect.tap(({ id, deferred }) =>
+        pipe(
+          client,
+          WebSocketClient.addUpdater(id, (value) =>
             pipe(
               deferred,
               Deferred.complete(value.value),
               Effect.andThen(() =>
-                pipe(
-                  client.updaterStateMapRef,
-                  SynchronizedRef.update(
-                    HashMap.modifyAt(id, () => Option.none()),
-                  ),
-                ),
+                pipe(client, WebSocketClient.removeUpdater(id)),
               ),
               Effect.asVoid,
             ),
-      ),
-      Effect.tap(({ id, updater }) =>
-        pipe(
-          client.updaterStateMapRef,
-          SynchronizedRef.update(HashMap.set(id, { updater })),
+          ),
         ),
       ),
       Effect.bind("requestHeader", ({ id }) =>
