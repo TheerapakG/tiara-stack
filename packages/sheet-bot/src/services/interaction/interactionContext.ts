@@ -671,16 +671,19 @@ export class CachedInteractionContext {
     wrapOptional(() =>
       pipe(
         InteractionContext.interaction<I>().sync(),
-        Effect.flatMap((interaction) =>
-          !interaction.inGuild()
-            ? Effect.fail(new NotInGuildError())
-            : Effect.succeed(interaction),
+        Effect.tap((interaction) =>
+          pipe(
+            Effect.fail(new NotInGuildError()),
+            Effect.unless(() => interaction.inGuild()),
+          ),
         ),
-        Effect.flatMap((interaction) =>
-          !interaction.inCachedGuild()
-            ? Effect.fail(new UncachedGuildError())
-            : Effect.succeed(interaction as Kind),
+        Effect.tap((interaction) =>
+          pipe(
+            Effect.fail(new UncachedGuildError()),
+            Effect.unless(() => interaction.inCachedGuild()),
+          ),
         ),
+        Effect.map((interaction) => interaction as Kind),
       ),
     );
 
