@@ -74,11 +74,13 @@ export class SendableChannelContext {
   >() {
     return pipe(
       ChannelContext.channel<C>(),
-      Effect.flatMap((channel) =>
-        channel.isSendable()
-          ? Effect.succeed(channel as Kind)
-          : Effect.fail(new UnsendableChannelError()),
+      Effect.tap((channel) =>
+        pipe(
+          Effect.fail(new UnsendableChannelError()),
+          Effect.unless(() => channel.isSendable()),
+        ),
       ),
+      Effect.map((channel) => channel as Kind),
       Effect.withSpan("SendableChannelContext.channel", {
         captureStackTrace: true,
       }),
