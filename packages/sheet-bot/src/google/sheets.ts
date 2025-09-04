@@ -21,19 +21,17 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
         get: (
           params?: sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
           options?: MethodOptions,
-        ) => {
-          return Effect.tryPromise(() =>
+        ) =>
+          Effect.tryPromise(() =>
             sheets.spreadsheets.values.batchGet(params, options),
-          );
-        },
+          ),
         update: (
           params?: sheets_v4.Params$Resource$Spreadsheets$Values$Batchupdate,
           options?: MethodOptions,
-        ) => {
-          return Effect.tryPromise(() =>
+        ) =>
+          Effect.tryPromise(() =>
             sheets.spreadsheets.values.batchUpdate(params, options),
-          );
-        },
+          ),
       })),
     ),
     dependencies: [GoogleAuth.Default],
