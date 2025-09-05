@@ -2,12 +2,13 @@ import {
   ButtonInteractionT,
   CachedInteractionContext,
   channelServicesFromGuildChannelId,
+  GuildMemberContext,
+  guildMemberServicesFromInteraction,
   guildSheetServicesFromInteraction,
   InGuildMessageContext,
   InteractionContext,
   MessageCheckinService,
   messageServices,
-  PermissionService,
   RepliableInteractionT,
   SendableChannelContext,
 } from "@/services";
@@ -127,10 +128,11 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         Effect.tap(({ messageCheckinData }) =>
           pipe(
             messageCheckinData.roleId,
-            Option.match({
-              onSome: (roleId) => PermissionService.addRole.sync(roleId),
-              onNone: () => Effect.void,
-            }),
+            Effect.transposeMapOption((roleId) =>
+              Effect.provide(guildMemberServicesFromInteraction())(
+                GuildMemberContext.addRoles.sync(roleId),
+              ),
+            ),
           ),
         ),
         Effect.tap(({ message, user, messageCheckinData, checkedInMentions }) =>

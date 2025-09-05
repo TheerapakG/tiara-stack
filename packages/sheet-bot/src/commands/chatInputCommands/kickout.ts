@@ -1,6 +1,8 @@
 import {
   ConverterService,
   GuildConfigService,
+  GuildMemberContext,
+  guildMemberServices,
   GuildService,
   guildSheetServicesFromInteractionOption,
   InteractionContext,
@@ -197,7 +199,9 @@ const handleManual =
             pipe(
               removedMembers,
               Effect.forEach((member) =>
-                Effect.tryPromise(() => member.roles.remove(role)),
+                Effect.provide(guildMemberServices(member))(
+                  GuildMemberContext.removeRoles.sync(role),
+                ),
               ),
             ),
           ),

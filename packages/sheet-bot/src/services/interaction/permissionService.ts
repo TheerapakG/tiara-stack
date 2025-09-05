@@ -6,7 +6,6 @@ import {
   RoleResolvable,
 } from "discord.js";
 import { Data, Effect, Option, String, pipe } from "effect";
-import { DiscordError } from "~~/src/types";
 import { ClientService } from "./clientService";
 import {
   CachedInteractionContext,
@@ -163,18 +162,6 @@ export class PermissionService extends Effect.Service<PermissionService>()(
               captureStackTrace: true,
             }),
           ),
-        privateAddRole: (roleId: string) =>
-          pipe(
-            cachedInteraction,
-            Effect.flatMap((interaction) =>
-              DiscordError.wrapTryPromise(() =>
-                interaction.member.roles.add(roleId),
-              ),
-            ),
-            Effect.withSpan("PermissionService.addRole", {
-              captureStackTrace: true,
-            }),
-          ),
       })),
     ),
     accessors: true,
@@ -183,5 +170,4 @@ export class PermissionService extends Effect.Service<PermissionService>()(
   static checkOwner = wrap(PermissionService.privateCheckOwner);
   static checkPermissions = wrap(PermissionService.privateCheckPermissions);
   static checkRoles = wrap(PermissionService.privateCheckRoles);
-  static addRole = wrap(PermissionService.privateAddRole);
 }
