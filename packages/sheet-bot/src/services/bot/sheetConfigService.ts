@@ -71,119 +71,119 @@ const dayConfigParser = ([
         pipe(
           Array.get(arr, 0),
           Option.flatten,
-          Option.match({
-            onSome: validateWithDefault(
+          Effect.transposeMapOption(
+            validateWithDefault(
               type("string").pipe((channel) => ({ channel })),
               { channel: "" },
             ),
-            onNone: () => Effect.succeed({ channel: "" }),
-          }),
+          ),
+          Effect.map(Option.getOrElse(() => ({ channel: "" }))),
         ),
       ),
       day: parseValueRange(day, (arr) =>
         pipe(
           Array.get(arr, 0),
           Option.flatten,
-          Option.match({
-            onSome: validateWithDefault(
+          Effect.transposeMapOption(
+            validateWithDefault(
               type("string.integer.parse").pipe((day) => ({
                 day: Option.some(day),
               })),
               { day: Option.none<number>() },
             ),
-            onNone: () => Effect.succeed({ day: Option.none() }),
-          }),
+          ),
+          Effect.map(Option.getOrElse(() => ({ day: Option.none() }))),
         ),
       ),
       sheet: parseValueRange(sheet, (arr) =>
         pipe(
           Array.get(arr, 0),
           Option.flatten,
-          Option.match({
-            onSome: validateWithDefault(
+          Effect.transposeMapOption(
+            validateWithDefault(
               type("string").pipe((sheet) => ({ sheet })),
               { sheet: "" },
             ),
-            onNone: () => Effect.succeed({ sheet: "" }),
-          }),
+          ),
+          Effect.map(Option.getOrElse(() => ({ sheet: "" }))),
         ),
       ),
       hourRange: parseValueRange(hourRange, (arr) =>
         pipe(
           Array.get(arr, 0),
           Option.flatten,
-          Option.match({
-            onSome: validateWithDefault(
+          Effect.transposeMapOption(
+            validateWithDefault(
               type("string").pipe((hourRange) => ({ hourRange })),
               { hourRange: "" },
             ),
-            onNone: () => Effect.succeed({ hourRange: "" }),
-          }),
+          ),
+          Effect.map(Option.getOrElse(() => ({ hourRange: "" }))),
         ),
       ),
       breakRange: parseValueRange(breakRange, (arr) =>
         pipe(
           Array.get(arr, 0),
           Option.flatten,
-          Option.match({
-            onSome: validateWithDefault(
+          Effect.transposeMapOption(
+            validateWithDefault(
               type("string").pipe((breakRange) => ({ breakRange })),
               { breakRange: "" },
             ),
-            onNone: () => Effect.succeed({ breakRange: "" }),
-          }),
+          ),
+          Effect.map(Option.getOrElse(() => ({ breakRange: "" }))),
         ),
       ),
       fillRange: parseValueRange(fillRange, (arr) =>
         pipe(
           Array.get(arr, 0),
           Option.flatten,
-          Option.match({
-            onSome: validateWithDefault(
+          Effect.transposeMapOption(
+            validateWithDefault(
               type("string").pipe((fillRange) => ({ fillRange })),
               { fillRange: "" },
             ),
-            onNone: () => Effect.succeed({ fillRange: "" }),
-          }),
+          ),
+          Effect.map(Option.getOrElse(() => ({ fillRange: "" }))),
         ),
       ),
       overfillRange: parseValueRange(overfillRange, (arr) =>
         pipe(
           Array.get(arr, 0),
           Option.flatten,
-          Option.match({
-            onSome: validateWithDefault(
+          Effect.transposeMapOption(
+            validateWithDefault(
               type("string").pipe((overfillRange) => ({ overfillRange })),
               { overfillRange: "" },
             ),
-            onNone: () => Effect.succeed({ overfillRange: "" }),
-          }),
+          ),
+          Effect.map(Option.getOrElse(() => ({ overfillRange: "" }))),
         ),
       ),
       standbyRange: parseValueRange(standbyRange, (arr) =>
         pipe(
           Array.get(arr, 0),
           Option.flatten,
-          Option.match({
-            onSome: validateWithDefault(
+          Effect.transposeMapOption(
+            validateWithDefault(
               type("string").pipe((standbyRange) => ({ standbyRange })),
               { standbyRange: "" },
             ),
-            onNone: () => Effect.succeed({ standbyRange: "" }),
-          }),
+          ),
+          Effect.map(Option.getOrElse(() => ({ standbyRange: "" }))),
         ),
       ),
       draft: parseValueRange(draft, (arr) =>
         pipe(
           Array.get(arr, 0),
           Option.flatten,
-          Option.match({
-            onSome: validateWithDefault(
+          Effect.transposeMapOption(
+            validateWithDefault(
               type("string").pipe((draft) => ({ draft })),
               { draft: "" },
             ),
-            onNone: () => Effect.succeed({ draft: "" }),
-          }),
+          ),
+          Effect.map(Option.getOrElse(() => ({ draft: "" }))),
         ),
       ),
     }),
@@ -204,7 +204,7 @@ const dayConfigParser = ([
           ArrayWithDefault.zip(
             new ArrayWithDefault({
               array: day,
-              default: { day: Option.none() },
+              default: { day: Option.none<number>() },
             }),
           ),
           ArrayWithDefault.zip(
@@ -303,34 +303,34 @@ const teamConfigParser = ([
         pipe(
           Array.get(arr, 0),
           Option.flatten,
-          Option.match({
-            onSome: validateWithDefault(
+          Effect.transposeMapOption(
+            validateWithDefault(
               type("string").pipe((name) => ({ name })),
               { name: "" },
             ),
-            onNone: () => Effect.succeed({ name: "" }),
-          }),
+          ),
+          Effect.map(Option.getOrElse(() => ({ name: "" }))),
         ),
       ),
       range: parseValueRange(range, (arr) =>
         pipe(
           Array.get(arr, 0),
           Option.flatten,
-          Option.match({
-            onSome: validateWithDefault(
+          Effect.transposeMapOption(
+            validateWithDefault(
               type("string").pipe((range) => ({ range })),
               { range: "" },
             ),
-            onNone: () => Effect.succeed({ range: "" }),
-          }),
+          ),
+          Effect.map(Option.getOrElse(() => ({ range: "" }))),
         ),
       ),
       tags: parseValueRange(tags, (arr) =>
         pipe(
           Array.get(arr, 0),
           Option.flatten,
-          Option.match({
-            onSome: validateWithDefault(
+          Effect.transposeMapOption(
+            validateWithDefault(
               type("string").pipe((tags) => ({
                 tags: pipe(
                   tags,
@@ -341,8 +341,8 @@ const teamConfigParser = ([
               })),
               { tags: [] },
             ),
-            onNone: () => Effect.succeed({ tags: [] }),
-          }),
+          ),
+          Effect.map(Option.getOrElse(() => ({ tags: [] }))),
         ),
       ),
     }),
@@ -423,28 +423,28 @@ const runnerConfigParser = ([
         pipe(
           Array.get(arr, 0),
           Option.flatten,
-          Option.match({
-            onSome: validateWithDefault(
+          Effect.transposeMapOption(
+            validateWithDefault(
               type("string").pipe((name) => ({ name })),
               { name: "" },
             ),
-            onNone: () => Effect.succeed({ name: "" }),
-          }),
+          ),
+          Effect.map(Option.getOrElse(() => ({ name: "" }))),
         ),
       ),
       hours: parseValueRange(hours, (arr) =>
         pipe(
           Array.get(arr, 0),
           Option.flatten,
-          Option.match({
-            onSome: validateWithDefault(
+          Effect.transposeMapOption(
+            validateWithDefault(
               type("string").pipe((hours) => ({
                 hours: hourRangesParser(hours),
               })),
               { hours: [] },
             ),
-            onNone: () => Effect.succeed({ hours: [] }),
-          }),
+          ),
+          Effect.map(Option.getOrElse(() => ({ hours: [] }))),
         ),
       ),
     }),

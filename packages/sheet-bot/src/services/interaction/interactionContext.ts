@@ -481,6 +481,13 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     ),
   );
 
+  static member = wrapOptional(() =>
+    pipe(
+      InteractionContext.interaction<InteractionT>().sync(),
+      Effect.flatMap((interaction) => Effect.succeed(interaction.member)),
+    ),
+  );
+
   static getSubcommandGroup<Required extends boolean>(required?: Required) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>().sync(),
@@ -725,6 +732,14 @@ export class CachedInteractionContext {
       pipe(
         CachedInteractionContext.interaction<InteractionT>().sync(),
         Effect.flatMap((interaction) => Effect.succeed(interaction.guild)),
+      ),
+    );
+
+  static member = () =>
+    wrapOptional(() =>
+      pipe(
+        CachedInteractionContext.interaction<InteractionT>().sync(),
+        Effect.flatMap((interaction) => Effect.succeed(interaction.member)),
       ),
     );
 
