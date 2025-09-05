@@ -341,10 +341,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         SynchronizedRef.updateEffect(bot.runtime, (runtime) =>
           pipe(
             runtime,
-            Option.match({
-              onSome: (runtime) => Effect.tryPromise(() => runtime.dispose()),
-              onNone: () => Effect.void,
-            }),
+            Effect.transposeMapOption((runtime) =>
+              Effect.tryPromise(() => runtime.dispose()),
+            ),
             Effect.as(Option.none()),
           ),
         ),

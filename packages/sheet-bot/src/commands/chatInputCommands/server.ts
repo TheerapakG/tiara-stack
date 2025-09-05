@@ -61,18 +61,16 @@ const handleListConfig =
             sheetId: pipe(
               guildConfig,
               Option.flatMap((guildConfig) => guildConfig.sheetId),
-              Option.match({
-                onSome: (sheetId) => Effect.succeed(escapeMarkdown(sheetId)),
-                onNone: () => Effect.succeed("None"),
-              }),
+              Option.map(escapeMarkdown),
+              Option.getOrElse(() => "None"),
+              Effect.succeed,
             ),
             scriptId: pipe(
               guildConfig,
               Option.flatMap((guildConfig) => guildConfig.scriptId),
-              Option.match({
-                onSome: (scriptId) => Effect.succeed(escapeMarkdown(scriptId)),
-                onNone: () => Effect.succeed("None"),
-              }),
+              Option.map(escapeMarkdown),
+              Option.getOrElse(() => "None"),
+              Effect.succeed,
             ),
           })),
           InteractionContext.editReply.tapEffect(

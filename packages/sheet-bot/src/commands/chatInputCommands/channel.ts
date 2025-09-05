@@ -29,10 +29,8 @@ const configFields = (config: GuildChannelConfig) => [
     name: "Name",
     value: pipe(
       config.name,
-      Option.match({
-        onSome: (name) => escapeMarkdown(name),
-        onNone: () => "None!",
-      }),
+      Option.map(escapeMarkdown),
+      Option.getOrElse(() => "None!"),
     ),
   },
   {
@@ -43,20 +41,16 @@ const configFields = (config: GuildChannelConfig) => [
     name: "Role",
     value: pipe(
       config.roleId,
-      Option.match({
-        onSome: (roleId) => roleMention(roleId),
-        onNone: () => "None!",
-      }),
+      Option.map(roleMention),
+      Option.getOrElse(() => "None!"),
     ),
   },
   {
     name: "Checkin channel",
     value: pipe(
       config.checkinChannelId,
-      Option.match({
-        onSome: (channelId) => channelMention(channelId),
-        onNone: () => "None!",
-      }),
+      Option.map(channelMention),
+      Option.getOrElse(() => "None!"),
     ),
   },
 ];

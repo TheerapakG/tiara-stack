@@ -105,11 +105,11 @@ const getCheckinMessages = (data: {
       ? `head to ${channelMention(data.runningChannel.channelId)}`
       : pipe(
           data.runningChannel.name,
-          Option.match({
-            onSome: (name) => `head to ${name}`,
-            onNone: () =>
+          Option.map((name) => `head to ${name}`),
+          Option.getOrElse(
+            () =>
               "await further instructions from the manager on where the running channel is",
-          }),
+          ),
         ),
   });
 
@@ -192,7 +192,7 @@ const handleManual =
               Effect.flatMap(observeOnce),
               Effect.flatMap(
                 Option.match({
-                  onSome: (channel) => Effect.succeed(channel),
+                  onSome: Effect.succeed,
                   onNone: () =>
                     Effect.fail(new ArgumentError("No such running channel")),
                 }),
