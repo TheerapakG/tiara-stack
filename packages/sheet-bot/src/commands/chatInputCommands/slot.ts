@@ -184,7 +184,9 @@ const handleButton =
       )(
         pipe(
           Effect.Do,
-          InteractionContext.deferReply.tap(),
+          InteractionContext.deferReply.tap(() => ({
+            flags: MessageFlags.Ephemeral,
+          })),
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
           PermissionService.checkRoles.tapEffect(() =>
             pipe(
