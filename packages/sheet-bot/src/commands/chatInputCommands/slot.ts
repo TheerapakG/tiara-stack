@@ -1,12 +1,14 @@
 import { slotButton } from "@/messageComponents";
 import {
-  ChannelConfigService,
+  channelServicesFromInteraction,
   ClientService,
   FormatService,
   GuildConfigService,
   guildSheetServicesFromInteractionOption,
   InteractionContext,
+  MessageSlotService,
   PermissionService,
+  SendableChannelContext,
   SheetService,
 } from "@/services";
 import {
@@ -32,6 +34,7 @@ import {
   Chunk,
   Effect,
   HashMap,
+  Layer,
   Number,
   Option,
   Order,
@@ -173,7 +176,12 @@ const handleButton =
         ),
     )
     .handler(
-      Effect.provide(guildSheetServicesFromInteractionOption("server_id"))(
+      Effect.provide(
+        Layer.mergeAll(
+          guildSheetServicesFromInteractionOption("server_id"),
+          channelServicesFromInteraction(),
+        ),
+      )(
         pipe(
           Effect.Do,
           InteractionContext.deferReply.tap(),
@@ -189,22 +197,24 @@ const handleButton =
               })),
             ),
           ),
-          InteractionContext.channel(true).bind("channel"),
           bindObject({
             day: InteractionContext.getNumber("day", true),
           }),
-          Effect.tap(({ channel, day }) =>
-            ChannelConfigService.upsertConfig(channel.id, {
-              day,
-            }),
-          ),
-          InteractionContext.editReply.tap(({ day }) => ({
+          SendableChannelContext.send().bind("message", ({ day }) => ({
             content: `Press the button below to get the current open slots for day ${day}`,
             components: [
               new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
                 new ButtonBuilder(slotButton.data),
               ),
             ],
+          })),
+          Effect.tap(({ message, day }) =>
+            MessageSlotService.upsertMessageSlotData(message.id, {
+              day,
+            }),
+          ),
+          InteractionContext.editReply.tap(() => ({
+            content: "Slot button sent!",
           })),
           Effect.withSpan("handleSlotButton", { captureStackTrace: true }),
         ),

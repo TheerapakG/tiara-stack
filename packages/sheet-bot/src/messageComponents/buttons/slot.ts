@@ -1,9 +1,11 @@
 import {
-  ChannelConfigService,
+  ButtonInteractionT,
+  CachedInteractionContext,
   ClientService,
   FormatService,
   guildSheetServicesFromInteraction,
   InteractionContext,
+  MessageSlotService,
   SheetService,
 } from "@/services";
 import { ButtonHandlerVariantT, handlerVariantContextBuilder } from "@/types";
@@ -13,9 +15,9 @@ import {
   Array,
   Chunk,
   Effect,
+  Function,
   HashMap,
   Number,
-  Option,
   Order,
   pipe,
   String,
@@ -62,20 +64,17 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         InteractionContext.deferReply.tap(() => ({
           flags: MessageFlags.Ephemeral,
         })),
-        InteractionContext.channel(true).bind("channel"),
-        Effect.bind("channelConfig", ({ channel }) =>
+        CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
+        Effect.bind("messageSlotData", ({ message }) =>
           pipe(
-            ChannelConfigService.getConfig(channel.id),
+            MessageSlotService.getMessageSlotData(message.id),
             Effect.flatMap(observeOnce),
+            Effect.flatMap(Function.identity),
           ),
         ),
-        Effect.bind("day", ({ channelConfig }) =>
-          pipe(
-            channelConfig,
-            Option.flatMap(({ day }) => day),
-          ),
+        Effect.bind("slotMessage", ({ messageSlotData }) =>
+          getSlotMessage(messageSlotData.day),
         ),
-        Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
         InteractionContext.editReply.tapEffect(({ slotMessage }) =>
           pipe(
             ClientService.makeEmbedBuilder(),
