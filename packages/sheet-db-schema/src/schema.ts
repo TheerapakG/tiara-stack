@@ -86,12 +86,12 @@ export const configGuildChannel = pgTable(
   ],
 );
 
-export const configChannel = pgTable(
-  "config_channel",
+export const messageSlot = pgTable(
+  "message_slot",
   {
     id: serial("id").primaryKey(),
-    channelId: varchar("channel_id").notNull(),
-    day: integer("day"),
+    messageId: varchar("message_id").notNull(),
+    day: integer("day").notNull(),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -101,7 +101,7 @@ export const configChannel = pgTable(
       .$onUpdate(() => new Date()),
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
   },
-  (table) => [uniqueIndex("config_channel_channel_id_idx").on(table.channelId)],
+  (table) => [uniqueIndex("message_slot_message_id_idx").on(table.messageId)],
 );
 
 export const messageCheckin = pgTable(
