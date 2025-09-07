@@ -3,6 +3,7 @@ import {
   Chunk,
   Data,
   Effect,
+  Function,
   HashSet,
   Option,
   Order,
@@ -14,8 +15,6 @@ import { defineHandlerConfigBuilder } from "typhoon-server/config";
 import { defineHandlerBuilder, Event } from "typhoon-server/server";
 import * as v from "valibot";
 import { GuildConfigService } from "../../services";
-
-const ENC_BP_DIFF = 0;
 
 class PlayerTeam extends Data.TaggedClass("PlayerTeam")<{
   type: string;
@@ -101,137 +100,126 @@ class RoomTeam extends Data.TaggedClass("RoomTeam")<{
     Order.reverse(RoomTeam.byPercent),
   );
 
-  static addPlayer(playerTeam: PlayerTeam, enc: boolean) {
-    return (roomTeam: RoomTeam) =>
-      pipe(
-        Effect.Do,
-        Effect.let("tierer", () => HashSet.has(playerTeam.tags, "tierer")),
-        Effect.let("heal", () => HashSet.has(playerTeam.tags, "heal")),
-        Effect.map(
-          ({ tierer, heal }) =>
-            new RoomTeam({
-              enced: enc ? true : roomTeam.enced,
-              tiererEnced: enc ? tierer : roomTeam.tiererEnced,
-              healed: roomTeam.healed + (heal ? 1 : 0),
-              highestBp: Math.max(roomTeam.highestBp, playerTeam.bp),
-              bp: roomTeam.bp + playerTeam.bp,
-              percent: roomTeam.percent + (enc ? 2 : 1) * playerTeam.percent,
-              room: Chunk.append(
-                Chunk.fromIterable(roomTeam.room),
-                enc
-                  ? PlayerTeam.addTags(
-                      HashSet.make(tierer ? "tierer_enc_override" : "enc"),
-                    )(playerTeam)
-                  : PlayerTeam.clone(playerTeam),
-              ),
-            }),
-        ),
-      );
+  static base(teams: ReadonlyArray<PlayerTeam>) {
+    return new RoomTeam({
+      enced: false,
+      tiererEnced: false,
+      healed: teams.reduce(
+        (acc, t) => acc + (HashSet.has(t.tags, "heal") ? 1 : 0),
+        0,
+      ),
+      highestBp: teams.reduce((acc, t) => Math.max(acc, t.bp), 0),
+      bp: teams.reduce((acc, t) => acc + t.bp, 0),
+      percent: teams.reduce((acc, t) => acc + t.percent, 0),
+      room: Chunk.fromIterable(teams.map((t) => PlayerTeam.clone(t))),
+    });
   }
+
+  static applyEncAndDoormat = (roomTeam: RoomTeam) => {
+    const teams = Chunk.toArray(roomTeam.room);
+
+    let encIndex = -1;
+    let bestPercent = -Infinity;
+    for (let i = 0; i < teams.length; i++) {
+      const t = teams[i];
+      if (HashSet.has(t.tags, "encable")) {
+        if (t.percent > bestPercent) {
+          bestPercent = t.percent;
+          encIndex = i;
+        }
+      }
+    }
+
+    let tiererOverride = false;
+    if (encIndex === -1) {
+      let bestBp = -Infinity;
+      for (let i = 0; i < teams.length; i++) {
+        const t = teams[i];
+        if (HashSet.has(t.tags, "tierer")) {
+          if (t.bp > bestBp) {
+            bestBp = t.bp;
+            encIndex = i;
+            tiererOverride = true;
+          }
+        }
+      }
+    }
+
+    if (encIndex === -1) {
+      return roomTeam;
+    }
+
+    const encTeam = teams[encIndex];
+    const updatedTeams = teams.map((t, i) => {
+      if (i === encIndex) {
+        return PlayerTeam.addTags(
+          HashSet.make(tiererOverride ? "tierer_enc_override" : "enc"),
+        )(t);
+      }
+      return t.bp > encTeam.bp
+        ? PlayerTeam.addTags(HashSet.make("doormat"))(t)
+        : t;
+    });
+
+    return new RoomTeam({
+      enced: true,
+      tiererEnced: tiererOverride,
+      healed: roomTeam.healed,
+      highestBp: roomTeam.highestBp,
+      bp: roomTeam.bp,
+      percent: roomTeam.percent + encTeam.percent,
+      room: Chunk.fromIterable(updatedTeams),
+    });
+  };
 }
 
-const deriveRoomWithNormalPlayerTeam = (
-  roomTeams: Chunk.Chunk<RoomTeam>,
-  playerTeam: PlayerTeam,
-) =>
+const cartesian = <T>(
+  arrays: Array.NonEmptyReadonlyArray<ReadonlyArray<T>>,
+): T[][] =>
   pipe(
-    Effect.Do,
-    Effect.flatMap(() =>
-      pipe(
-        roomTeams,
-        Chunk.filter(
-          ({ enced, tiererEnced, highestBp }) =>
-            !enced || tiererEnced || playerTeam.bp + ENC_BP_DIFF < highestBp,
+    arrays,
+    Array.tailNonEmpty,
+    Array.match({
+      onEmpty: () =>
+        pipe(
+          Array.headNonEmpty(arrays),
+          Array.map((head) => Array.make(head)),
         ),
-        Effect.forEach(RoomTeam.addPlayer(playerTeam, false)),
-        Effect.map(Chunk.fromIterable),
-      ),
-    ),
-    Effect.tap((derivedRooms) =>
-      Effect.log(
-        `Derived ${Chunk.size(derivedRooms)} rooms with normal player team`,
-      ),
-    ),
-    Effect.withSpan("deriveRoomWithNormalPlayerTeam", {
-      captureStackTrace: true,
+      onNonEmpty: (self) =>
+        pipe(
+          cartesian(self),
+          Array.flatMap((product) =>
+            pipe(
+              Array.headNonEmpty(arrays),
+              Array.map((head) => [head, ...product]),
+            ),
+          ),
+        ),
     }),
   );
 
-const deriveRoomWithEncPlayerTeam = (
-  roomTeams: Chunk.Chunk<RoomTeam>,
-  playerTeam: PlayerTeam,
-) =>
-  pipe(
-    Effect.Do,
-    Effect.let("tierer", () => HashSet.has(playerTeam.tags, "tierer")),
-    Effect.flatMap(({ tierer }) =>
-      pipe(
-        roomTeams,
-        Chunk.filter(
-          ({ enced, highestBp }) =>
-            !enced && (tierer || playerTeam.bp > highestBp + ENC_BP_DIFF),
-        ),
-        Effect.forEach(RoomTeam.addPlayer(playerTeam, true)),
-        Effect.map(Chunk.fromIterable),
-      ),
-    ),
-    Effect.tap((derivedRooms) =>
-      Effect.log(
-        `Derived ${Chunk.size(derivedRooms)} rooms with enc player team`,
-      ),
-    ),
-    Effect.withSpan("deriveRoomWithEncPlayerTeam", { captureStackTrace: true }),
-  );
-
-const deriveRoomWithPlayerTeam = (
-  config: { healNeeded: number; considerEnc: boolean },
-  roomTeams: Chunk.Chunk<RoomTeam>,
-  playerTeam: PlayerTeam,
-) =>
-  pipe(
-    Effect.Do,
-    Effect.bindAll(() => ({
-      tierer: Effect.succeed(HashSet.has(playerTeam.tags, "tierer")),
-      encable: Effect.succeed(HashSet.has(playerTeam.tags, "encable")),
-    })),
-    Effect.flatMap(({ tierer, encable }) =>
-      pipe(
-        Effect.Do,
-        Effect.bind("normalChunk", () =>
-          deriveRoomWithNormalPlayerTeam(roomTeams, playerTeam),
-        ),
-        Effect.bind("encChunk", () =>
-          (encable || tierer) && config.considerEnc
-            ? deriveRoomWithEncPlayerTeam(roomTeams, playerTeam)
-            : Effect.succeed(Chunk.empty()),
-        ),
-        Effect.map(({ normalChunk, encChunk }) =>
-          Chunk.appendAll(normalChunk, encChunk),
+const deriveRoomsFromCartesian =
+  (config: { healNeeded: number; considerEnc: boolean }) =>
+  (perPlayerTeams: Array.NonEmptyReadonlyArray<ReadonlyArray<PlayerTeam>>) =>
+    pipe(
+      Effect.succeed(
+        cartesian(perPlayerTeams).map((teams) =>
+          pipe(
+            RoomTeam.base(teams),
+            config.considerEnc
+              ? RoomTeam.applyEncAndDoormat
+              : Function.identity,
+          ),
         ),
       ),
-    ),
-    Effect.withSpan("deriveRoomWithPlayerTeam", { captureStackTrace: true }),
-  );
-
-const deriveRoomWithPlayerTeams = (
-  config: { healNeeded: number; considerEnc: boolean },
-  roomTeams: Chunk.Chunk<RoomTeam>,
-  playerTeams: PlayerTeam[],
-) =>
-  pipe(
-    Effect.forEach(playerTeams, (playerTeam, i) =>
-      pipe(
-        deriveRoomWithPlayerTeam(config, roomTeams, playerTeam),
-        Effect.annotateLogs("playerTeam", playerTeam),
-        Effect.annotateLogs("teamIndex", i + 1),
+      Effect.map(Chunk.fromIterable),
+      Effect.tap((derived) =>
+        Effect.log(
+          `Derived ${Chunk.size(derived)} rooms from cartesian product`,
+        ),
       ),
-    ),
-    Effect.map((chunks) => Chunk.flatten(Chunk.fromIterable(chunks))),
-    Effect.tap((derivedRooms) =>
-      Effect.log(`Derived ${Chunk.size(derivedRooms)} rooms`),
-    ),
-    Effect.withSpan("deriveRoomWithPlayerTeams", { captureStackTrace: true }),
-  );
+      Effect.withSpan("deriveRoomsFromCartesian", { captureStackTrace: true }),
+    );
 
 const filterConfigTeams = (
   config: { healNeeded: number; considerEnc: boolean },
@@ -301,25 +289,11 @@ const calc = (
     ),
     Effect.bind("result", ({ filteredPlayerTeams }) =>
       pipe(
-        Effect.reduce(
-          filteredPlayerTeams,
-          Chunk.of(
-            new RoomTeam({
-              enced: false,
-              tiererEnced: false,
-              healed: 0,
-              highestBp: 0,
-              bp: 0,
-              percent: 0,
-              room: Chunk.empty(),
-            }),
-          ) as Chunk.Chunk<RoomTeam>,
-          (roomTeams, playerTeams, i) =>
-            pipe(
-              deriveRoomWithPlayerTeams(config, roomTeams, playerTeams),
-              Effect.annotateLogs("playerIndex", i + 1),
-            ),
-        ),
+        filteredPlayerTeams,
+        Array.match({
+          onEmpty: () => Effect.succeed(Chunk.empty()),
+          onNonEmpty: deriveRoomsFromCartesian(config),
+        }),
       ),
     ),
     Effect.bind("configResult", ({ result }) =>
