@@ -297,10 +297,6 @@ const teamParser = (
                 ),
             ),
             Array.getSomes,
-            Array.sortWith(
-              ({ team }) => Team.getEffectValue(team),
-              Order.reverse(Option.getOrder(Number.Order)),
-            ),
           ),
         ),
       ),
@@ -318,6 +314,18 @@ const teamParser = (
           }),
         }),
       ),
+    ),
+    Effect.map(
+      HashMap.map(({ name, teams }) => ({
+        name,
+        teams: pipe(
+          teams,
+          Array.sortWith(
+            Team.getEffectValue,
+            Order.reverse(Option.getOrder(Number.Order)),
+          ),
+        ),
+      })),
     ),
     Effect.withSpan("teamParser", { captureStackTrace: true }),
   );
