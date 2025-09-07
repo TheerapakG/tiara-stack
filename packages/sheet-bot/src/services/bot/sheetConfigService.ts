@@ -701,7 +701,6 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 "'Thee's Sheet Settings'!F8:F",
                 "'Thee's Sheet Settings'!G8:G",
                 "'Thee's Sheet Settings'!H8:H",
-                "'Thee's Sheet Settings'!G8:G",
                 "'Thee's Sheet Settings'!I8:I",
                 "'Thee's Sheet Settings'!J8:J",
                 "'Thee's Sheet Settings'!K8:K",
