@@ -4,7 +4,7 @@ import {
   guildSheetServicesFromInteractionOption,
   InteractionContext,
   PermissionService,
-  SheetService,
+  PlayerService,
 } from "@/services";
 import { Team } from "@/services/guild/sheetService";
 import {
@@ -19,7 +19,7 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, Effect, HashMap, Number, Option, pipe, String } from "effect";
+import { Array, Effect, Number, Option, pipe, String } from "effect";
 import { observeOnce } from "typhoon-server/signal";
 
 const handleList =
@@ -67,12 +67,12 @@ const handleList =
               ),
             ),
           ),
-          Effect.bind("teams", () => SheetService.getTeams()),
-          Effect.let("userTeams", ({ user, teams }) =>
+          Effect.bind("teams", ({ user }) =>
+            PlayerService.getTeamsById(user.id),
+          ),
+          Effect.let("formattedTeams", ({ teams }) =>
             pipe(
-              HashMap.get(teams, user.id),
-              Option.map(({ teams }) => teams),
-              Option.getOrElse(() => [] as Team[]),
+              teams,
               Array.filter((team) => !team.tags.includes("tierer_hint")),
               Array.map((team) => ({
                 name: team.name,
@@ -105,7 +105,7 @@ const handleList =
               })),
             ),
           ),
-          InteractionContext.editReply.tapEffect(({ user, userTeams }) =>
+          InteractionContext.editReply.tapEffect(({ user, formattedTeams }) =>
             pipe(
               ClientService.makeEmbedBuilder(),
               Effect.map((embed) => ({
@@ -113,12 +113,12 @@ const handleList =
                   embed
                     .setTitle(`${escapeMarkdown(user.username)}'s Teams`)
                     .setDescription(
-                      Number.Equivalence(userTeams.length, 0)
+                      Number.Equivalence(formattedTeams.length, 0)
                         ? "No teams found"
                         : null,
                     )
                     .addFields(
-                      userTeams.map((team) => ({
+                      formattedTeams.map((team) => ({
                         name: escapeMarkdown(team.name),
                         value: [
                           `Tags: ${
