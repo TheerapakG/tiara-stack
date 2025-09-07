@@ -297,6 +297,10 @@ const teamParser = (
                 ),
             ),
             Array.getSomes,
+            Array.sortWith(
+              ({ team }) => Team.getEffectValue(team),
+              Order.reverse(Option.getOrder(Number.Order)),
+            ),
           ),
         ),
       ),
