@@ -1,5 +1,6 @@
 import { MethodOptions, sheets, sheets_v4 } from "@googleapis/sheets";
-import { Effect, pipe } from "effect";
+import { Effect, HashMap, pipe } from "effect";
+import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
 import { GoogleAuth } from "./auth";
 
 export class GoogleSheets extends Effect.Service<GoogleSheets>()(
@@ -24,6 +25,54 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
         ) =>
           Effect.tryPromise(() =>
             sheets.spreadsheets.values.batchGet(params, options),
+          ),
+        getHashMap: <K>(
+          ranges: HashMap.HashMap<K, string>,
+          defaultKey: K,
+          params?: Omit<
+            sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
+            "ranges"
+          >,
+          options?: MethodOptions,
+        ) =>
+          pipe(
+            Effect.Do,
+            Effect.let("entries", () => HashMap.toEntries(ranges)),
+            Effect.bind("sheet", ({ entries }) =>
+              Effect.tryPromise(() =>
+                sheets.spreadsheets.values.batchGet(
+                  { ...params, ranges: entries.map(([_, range]) => range) },
+                  options,
+                ),
+              ),
+            ),
+            Effect.map(({ entries, sheet }) =>
+              pipe(
+                new ArrayWithDefault({
+                  array: entries.map(([key, _]) => ({ key })),
+                  default: { key: defaultKey },
+                }),
+                ArrayWithDefault.zip(
+                  new ArrayWithDefault({
+                    array:
+                      sheet.data.valueRanges?.map((valueRange) => ({
+                        valueRange,
+                      })) ?? [],
+                    default: { valueRange: { values: [] } },
+                  }),
+                ),
+              ),
+            ),
+            Effect.map(({ array }) =>
+              pipe(
+                array,
+                collectArrayToHashMap({
+                  keyGetter: ({ key }) => key,
+                  valueInitializer: ({ valueRange }) => valueRange,
+                  valueReducer: (_, { valueRange }) => valueRange,
+                }),
+              ),
+            ),
           ),
         update: (
           params?: sheets_v4.Params$Resource$Spreadsheets$Values$Batchupdate,
