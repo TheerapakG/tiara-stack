@@ -8,9 +8,7 @@ import {
   HourRange,
   InteractionContext,
   MessageRoomOrderService,
-  PartialNamePlayer,
   PermissionService,
-  Player,
   PlayerService,
   Schedule,
   SheetService,
@@ -39,7 +37,6 @@ import {
   Effect,
   Function,
   HashMap,
-  Match,
   Option,
   pipe,
 } from "effect";
@@ -90,7 +87,6 @@ const handleManual =
               InteractionContext.getNumber("heal"),
               Effect.map(Option.getOrElse(() => 0)),
             ),
-            teams: SheetService.getTeams(),
             runnerConfig: SheetService.getRunnerConfig(),
           }),
           Effect.bind("hour", ({ hourOption }) =>
@@ -121,64 +117,48 @@ const handleManual =
               Effect.flatMap(PlayerService.mapScheduleWithPlayers),
             ),
           ),
-          Effect.bind(
-            "scheduleTeams",
-            ({ schedule, teams, runnerConfig, hour }) =>
-              pipe(
-                schedule.fills,
-                Array.getSomes,
-                Array.map((player) =>
-                  pipe(
-                    Match.type<Player | PartialNamePlayer>(),
-                    Match.tag("Player", (player) => Option.some(player)),
-                    Match.tag("PartialNamePlayer", () => Option.none()),
-                    Match.exhaustive,
-                    Function.apply(player),
+          Effect.bind("scheduleTeams", ({ schedule, runnerConfig, hour }) =>
+            pipe(
+              schedule.fills,
+              Array.getSomes,
+              Effect.forEach((player) =>
+                pipe(
+                  Effect.Do,
+                  Effect.bind("teams", () =>
+                    PlayerService.getTeamsByName(player.name),
                   ),
-                ),
-                Array.getSomes,
-                Effect.forEach((player) =>
-                  pipe(
-                    Effect.Do,
-                    Effect.let("teams", () =>
-                      pipe(
-                        HashMap.get(teams, player.id),
-                        Option.map(({ teams }) => teams),
-                        Option.getOrElse(() => []),
+                  Effect.let("runnerHours", () =>
+                    pipe(
+                      HashMap.get(runnerConfig, player.name),
+                      Option.map(({ hours }) => hours),
+                      Option.getOrElse(() => []),
+                    ),
+                  ),
+                  Effect.map(({ teams, runnerHours }) => ({
+                    player,
+                    teams: pipe(
+                      teams,
+                      Array.map(
+                        (team) =>
+                          new Team({
+                            ...team,
+                            tags: pipe(
+                              team.tags,
+                              team.tags.includes("tierer_hint") &&
+                                Array.some(
+                                  runnerHours,
+                                  HourRange.includes(hour),
+                                )
+                                ? Array.append("fixed")
+                                : Function.identity,
+                            ),
+                          }),
                       ),
                     ),
-                    Effect.let("runnerHours", () =>
-                      pipe(
-                        HashMap.get(runnerConfig, player.name),
-                        Option.map(({ hours }) => hours),
-                        Option.getOrElse(() => []),
-                      ),
-                    ),
-                    Effect.map(({ teams, runnerHours }) => ({
-                      player,
-                      teams: pipe(
-                        teams,
-                        Array.map(
-                          (team) =>
-                            new Team({
-                              ...team,
-                              tags: pipe(
-                                team.tags,
-                                team.tags.includes("tierer_hint") &&
-                                  Array.some(
-                                    runnerHours,
-                                    HourRange.includes(hour),
-                                  )
-                                  ? Array.append("fixed")
-                                  : Function.identity,
-                              ),
-                            }),
-                        ),
-                      ),
-                    })),
-                  ),
+                  })),
                 ),
               ),
+            ),
           ),
           Effect.bind("roomOrders", ({ heal, scheduleTeams }) =>
             pipe(
