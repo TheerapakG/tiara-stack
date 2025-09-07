@@ -284,16 +284,39 @@ const dayConfigParser = ([
     Effect.withSpan("dayConfigParser", { captureStackTrace: true }),
   );
 
+export class TeamTagsConstantsConfig extends Data.TaggedClass(
+  "TeamTagsConstantsConfig",
+)<{
+  tags: string[];
+}> {}
+
+export class TeamTagsRangesConfig extends Data.TaggedClass(
+  "TeamTagsRangesConfig",
+)<{
+  tagsRange: string;
+}> {}
+
 export class TeamConfig extends Data.TaggedClass("TeamConfig")<{
   name: string;
-  range: string;
-  tags: string[];
+  sheet: string;
+  playerNameRange: string;
+  teamNameRange: string;
+  leadRange: string;
+  backlineRange: string;
+  talentRange: string;
+  tagsConfig: TeamTagsConstantsConfig | TeamTagsRangesConfig;
 }> {}
 export type TeamConfigMap = HashMap.HashMap<string, TeamConfig>;
 
 const teamConfigParser = ([
   name,
-  range,
+  sheet,
+  playerNameRange,
+  teamNameRange,
+  leadRange,
+  backlineRange,
+  talentRange,
+  tagsType,
   tags,
 ]: sheets_v4.Schema$ValueRange[]): Effect.Effect<TeamConfigMap, never, never> =>
   pipe(
@@ -312,17 +335,95 @@ const teamConfigParser = ([
           Effect.map(Option.getOrElse(() => ({ name: "" }))),
         ),
       ),
-      range: parseValueRange(range, (arr) =>
+      sheet: parseValueRange(sheet, (arr) =>
         pipe(
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
             validateWithDefault(
-              type("string").pipe((range) => ({ range })),
-              { range: "" },
+              type("string").pipe((sheet) => ({ sheet })),
+              { sheet: "" },
             ),
           ),
-          Effect.map(Option.getOrElse(() => ({ range: "" }))),
+          Effect.map(Option.getOrElse(() => ({ sheet: "" }))),
+        ),
+      ),
+      playerNameRange: parseValueRange(playerNameRange, (arr) =>
+        pipe(
+          Array.get(arr, 0),
+          Option.flatten,
+          Effect.transposeMapOption(
+            validateWithDefault(
+              type("string").pipe((playerNameRange) => ({ playerNameRange })),
+              { playerNameRange: "" },
+            ),
+          ),
+          Effect.map(Option.getOrElse(() => ({ playerNameRange: "" }))),
+        ),
+      ),
+      teamNameRange: parseValueRange(teamNameRange, (arr) =>
+        pipe(
+          Array.get(arr, 0),
+          Option.flatten,
+          Effect.transposeMapOption(
+            validateWithDefault(
+              type("string").pipe((teamNameRange) => ({ teamNameRange })),
+              { teamNameRange: "" },
+            ),
+          ),
+          Effect.map(Option.getOrElse(() => ({ teamNameRange: "" }))),
+        ),
+      ),
+      leadRange: parseValueRange(leadRange, (arr) =>
+        pipe(
+          Array.get(arr, 0),
+          Option.flatten,
+          Effect.transposeMapOption(
+            validateWithDefault(
+              type("string").pipe((leadRange) => ({ leadRange })),
+              { leadRange: "" },
+            ),
+          ),
+          Effect.map(Option.getOrElse(() => ({ leadRange: "" }))),
+        ),
+      ),
+      backlineRange: parseValueRange(backlineRange, (arr) =>
+        pipe(
+          Array.get(arr, 0),
+          Option.flatten,
+          Effect.transposeMapOption(
+            validateWithDefault(
+              type("string").pipe((backlineRange) => ({ backlineRange })),
+              { backlineRange: "" },
+            ),
+          ),
+          Effect.map(Option.getOrElse(() => ({ backlineRange: "" }))),
+        ),
+      ),
+      talentRange: parseValueRange(talentRange, (arr) =>
+        pipe(
+          Array.get(arr, 0),
+          Option.flatten,
+          Effect.transposeMapOption(
+            validateWithDefault(
+              type("string").pipe((talentRange) => ({ talentRange })),
+              { talentRange: "" },
+            ),
+          ),
+          Effect.map(Option.getOrElse(() => ({ talentRange: "" }))),
+        ),
+      ),
+      tagsType: parseValueRange(tagsType, (arr) =>
+        pipe(
+          Array.get(arr, 0),
+          Option.flatten,
+          Effect.transposeMapOption(
+            validateWithDefault(
+              type("'constants' | 'ranges'").pipe((tagsType) => ({ tagsType })),
+              { tagsType: "constants" },
+            ),
+          ),
+          Effect.map(Option.getOrElse(() => ({ tagsType: "constants" }))),
         ),
       ),
       tags: parseValueRange(tags, (arr) =>
@@ -332,37 +433,109 @@ const teamConfigParser = ([
           Effect.transposeMapOption(
             validateWithDefault(
               type("string").pipe((tags) => ({
-                tags: pipe(
-                  tags,
-                  String.split(","),
-                  Array.map(String.trim),
-                  Array.filter(String.isNonEmpty),
-                ),
+                tags,
               })),
-              { tags: [] },
+              { tags: "" },
             ),
           ),
-          Effect.map(Option.getOrElse(() => ({ tags: [] }))),
+          Effect.map(Option.getOrElse(() => ({ tags: "" }))),
         ),
       ),
     }),
-    Effect.map(({ name, range, tags }) =>
-      pipe(
-        new ArrayWithDefault({ array: name, default: { name: "" } }),
-        ArrayWithDefault.zip(
-          new ArrayWithDefault({ array: range, default: { range: "" } }),
+    Effect.map(
+      ({
+        name,
+        sheet,
+        playerNameRange,
+        teamNameRange,
+        leadRange,
+        backlineRange,
+        talentRange,
+        tagsType,
+        tags,
+      }) =>
+        pipe(
+          new ArrayWithDefault({ array: name, default: { name: "" } }),
+          ArrayWithDefault.zip(
+            new ArrayWithDefault({ array: sheet, default: { sheet: "" } }),
+          ),
+          ArrayWithDefault.zip(
+            new ArrayWithDefault({
+              array: playerNameRange,
+              default: { playerNameRange: "" },
+            }),
+          ),
+          ArrayWithDefault.zip(
+            new ArrayWithDefault({
+              array: teamNameRange,
+              default: { teamNameRange: "" },
+            }),
+          ),
+          ArrayWithDefault.zip(
+            new ArrayWithDefault({
+              array: leadRange,
+              default: { leadRange: "" },
+            }),
+          ),
+          ArrayWithDefault.zip(
+            new ArrayWithDefault({
+              array: backlineRange,
+              default: { backlineRange: "" },
+            }),
+          ),
+          ArrayWithDefault.zip(
+            new ArrayWithDefault({
+              array: talentRange,
+              default: { talentRange: "" },
+            }),
+          ),
+          ArrayWithDefault.zip(
+            new ArrayWithDefault({
+              array: tagsType,
+              default: { tagsType: "constants" },
+            }),
+          ),
+          ArrayWithDefault.zip(
+            new ArrayWithDefault({ array: tags, default: { tags: "" } }),
+          ),
         ),
-        ArrayWithDefault.zip(
-          new ArrayWithDefault({ array: tags, default: { tags: [] } }),
-        ),
-      ),
     ),
     Effect.map(({ array }) =>
       pipe(
         array,
         Array.filter(({ name }) => name !== ""),
         Array.map(
-          ({ name, range, tags }) => new TeamConfig({ name, range, tags }),
+          ({
+            name,
+            sheet,
+            playerNameRange,
+            teamNameRange,
+            leadRange,
+            backlineRange,
+            talentRange,
+            tagsType,
+            tags,
+          }) =>
+            new TeamConfig({
+              name,
+              sheet,
+              playerNameRange,
+              teamNameRange,
+              leadRange,
+              backlineRange,
+              talentRange,
+              tagsConfig:
+                tagsType === "constants"
+                  ? new TeamTagsConstantsConfig({
+                      tags: pipe(
+                        tags,
+                        String.split(","),
+                        Array.map(String.trim),
+                        Array.filter(String.isNonEmpty),
+                      ),
+                    })
+                  : new TeamTagsRangesConfig({ tagsRange: tags }),
+            }),
         ),
         collectArrayToHashMap({
           keyGetter: ({ name }) => name,
@@ -527,6 +700,13 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 "'Thee's Sheet Settings'!E8:E",
                 "'Thee's Sheet Settings'!F8:F",
                 "'Thee's Sheet Settings'!G8:G",
+                "'Thee's Sheet Settings'!H8:H",
+                "'Thee's Sheet Settings'!G8:G",
+                "'Thee's Sheet Settings'!I8:I",
+                "'Thee's Sheet Settings'!J8:J",
+                "'Thee's Sheet Settings'!K8:K",
+                "'Thee's Sheet Settings'!L8:L",
+                "'Thee's Sheet Settings'!M8:M",
               ],
             }),
             Effect.flatMap((response) =>
@@ -545,7 +725,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!I8:J"],
+              ranges: ["'Thee's Sheet Settings'!O8:P"],
             }),
             Effect.flatMap((response) =>
               pipe(
@@ -579,15 +759,15 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
             sheet.get({
               spreadsheetId: sheetId,
               ranges: [
-                "'Thee's Sheet Settings'!L8:L",
-                "'Thee's Sheet Settings'!M8:M",
-                "'Thee's Sheet Settings'!N8:N",
-                "'Thee's Sheet Settings'!O8:O",
-                "'Thee's Sheet Settings'!P8:P",
-                "'Thee's Sheet Settings'!Q8:Q",
                 "'Thee's Sheet Settings'!R8:R",
                 "'Thee's Sheet Settings'!S8:S",
                 "'Thee's Sheet Settings'!T8:T",
+                "'Thee's Sheet Settings'!U8:U",
+                "'Thee's Sheet Settings'!V8:V",
+                "'Thee's Sheet Settings'!W8:W",
+                "'Thee's Sheet Settings'!X8:X",
+                "'Thee's Sheet Settings'!Y8:Y",
+                "'Thee's Sheet Settings'!Z8:Z",
               ],
             }),
             Effect.flatMap((response) =>
@@ -607,8 +787,8 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
             sheet.get({
               spreadsheetId: sheetId,
               ranges: [
-                "'Thee's Sheet Settings'!V8:V",
-                "'Thee's Sheet Settings'!W8:W",
+                "'Thee's Sheet Settings'!AB8:AB",
+                "'Thee's Sheet Settings'!AC8:AC",
               ],
             }),
             Effect.flatMap((response) =>

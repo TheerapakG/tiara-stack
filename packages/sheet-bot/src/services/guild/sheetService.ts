@@ -14,6 +14,7 @@ import {
   Equal,
   HashMap,
   Layer,
+  Match,
   Number,
   Option,
   Order,
@@ -24,30 +25,31 @@ import { observeOnce } from "typhoon-server/signal";
 import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
 import { GuildConfigService } from "./guildConfigService";
 
-const parseValueRange = <A = never, E = never, R = never>(
-  valueRange: sheets_v4.Schema$ValueRange,
-  rowParser: (
-    row: readonly Option.Option<string>[],
-    index: number,
-  ) => Effect.Effect<A, E, R>,
-): Effect.Effect<A[], E, R> =>
-  pipe(
-    Option.fromNullable(valueRange.values),
-    Option.map(
-      Array.map(
-        Array.map((v) =>
-          pipe(
-            v,
-            Option.liftPredicate(() => !Equal.equals(v, "")),
-            Option.flatMapNullable((v) => v as string | null | undefined),
+const parseValueRange =
+  <A = never, E = never, R = never>(
+    rowParser: (
+      row: readonly Option.Option<string>[],
+      index: number,
+    ) => Effect.Effect<A, E, R>,
+  ) =>
+  (valueRange: sheets_v4.Schema$ValueRange): Effect.Effect<A[], E, R> =>
+    pipe(
+      Option.fromNullable(valueRange.values),
+      Option.map(
+        Array.map(
+          Array.map((v) =>
+            pipe(
+              v,
+              Option.liftPredicate(() => !Equal.equals(v, "")),
+              Option.flatMapNullable((v) => v as string | null | undefined),
+            ),
           ),
         ),
       ),
-    ),
-    Option.map(Effect.forEach(rowParser)),
-    Option.getOrElse(() => Effect.succeed([])),
-    Effect.withSpan("parseValueRange", { captureStackTrace: true }),
-  );
+      Option.map(Effect.forEach(rowParser)),
+      Option.getOrElse(() => Effect.succeed([])),
+      Effect.withSpan("parseValueRange", { captureStackTrace: true }),
+    );
 
 export class RawPlayer extends Data.TaggedClass("RawPlayer")<{
   id: Option.Option<string>;
@@ -63,17 +65,23 @@ const playerParser = ([
   pipe(
     Effect.Do,
     bindObject({
-      userIds: parseValueRange(userIds, (arr, index) =>
-        Effect.succeed({
-          id: pipe(Array.get(arr, 0), Option.flatten),
-          idIndex: index,
-        }),
+      userIds: pipe(
+        userIds,
+        parseValueRange((arr, index) =>
+          Effect.succeed({
+            id: pipe(Array.get(arr, 0), Option.flatten),
+            idIndex: index,
+          }),
+        ),
       ),
-      userSheetNames: parseValueRange(userSheetNames, (arr, index) =>
-        Effect.succeed({
-          name: pipe(Array.get(arr, 0), Option.flatten),
-          nameIndex: index,
-        }),
+      userSheetNames: pipe(
+        userSheetNames,
+        parseValueRange((arr, index) =>
+          Effect.succeed({
+            name: pipe(Array.get(arr, 0), Option.flatten),
+            nameIndex: index,
+          }),
+        ),
       ),
     }),
     Effect.map(({ userIds, userSheetNames }) =>
@@ -118,115 +126,196 @@ export class Team extends Data.TaggedClass("Team")<{
 
 const teamParser = (
   teamConfigValues: TeamConfig[],
-  [userIds, ...userTeams]: sheets_v4.Schema$ValueRange[],
-): Effect.Effect<
-  HashMap.HashMap<string, { id: string; teams: Team[] }>,
-  never,
-  never
-> =>
+  sheet: HashMap.HashMap<string, sheets_v4.Schema$ValueRange>,
+) =>
   pipe(
-    Effect.Do,
-    bindObject({
-      userIds: parseValueRange(userIds, (arr) =>
-        Effect.succeed({
-          id: pipe(Array.get(arr, 0), Option.flatten),
-        }),
-      ),
-      userTeams: pipe(
-        Array.zip(teamConfigValues, userTeams),
-        Effect.forEach(
-          ([teamConfig, userTeams]) =>
-            parseValueRange(userTeams, (arr) =>
-              Effect.succeed({
-                type: teamConfig.name,
-                name: pipe(Array.get(arr, 0), Option.flatten),
-                tags: teamConfig.tags,
-                lead: pipe(
-                  Array.get(arr, 2),
-                  Option.flatten,
-                  Option.flatMapNullable((lead) => parseInt(lead, 10)),
-                ),
-                backline: pipe(
-                  Array.get(arr, 3),
-                  Option.flatten,
-                  Option.flatMapNullable((backline) => parseInt(backline, 10)),
-                ),
-                talent: pipe(
-                  Array.get(arr, 4),
-                  Option.flatten,
-                  Option.flatMapNullable((talent) => parseInt(talent, 10)),
-                ),
-              }),
-            ),
-          { concurrency: "unbounded" },
-        ),
-        Effect.map((teams) =>
-          pipe(
-            teams[0].map((_, i) => teams.map((row) => row[i])),
-            Array.map((teams) => ({ teams })),
-          ),
-        ),
-      ),
-    }),
-    Effect.map(({ userIds, userTeams }) =>
+    teamConfigValues,
+    Effect.forEach((teamConfig) =>
       pipe(
-        new ArrayWithDefault({
-          array: userIds,
-          default: { id: Option.none() },
-        }),
-        ArrayWithDefault.zip(
-          new ArrayWithDefault({ array: userTeams, default: { teams: [] } }),
-        ),
-        ArrayWithDefault.map(({ id, teams }) =>
-          pipe(
-            id,
-            Option.map((id) => ({
-              id,
-              teams: pipe(
-                teams,
-                Array.map(({ type, name, tags, lead, backline, talent }) =>
-                  pipe(
-                    name,
-                    Option.map(
-                      (name) =>
-                        new Team({
-                          type,
-                          name,
-                          tags,
-                          lead,
-                          backline,
-                          talent,
-                        }),
+        Effect.Do,
+        bindObject({
+          playerName: pipe(
+            sheet,
+            HashMap.get(`${teamConfig.name}!playerName`),
+            Effect.flatMap(
+              parseValueRange((arr) =>
+                Effect.succeed({
+                  playerName: pipe(Array.get(arr, 0), Option.flatten),
+                }),
+              ),
+            ),
+          ),
+          teamName: pipe(
+            sheet,
+            HashMap.get(`${teamConfig.name}!teamName`),
+            Effect.flatMap(
+              parseValueRange((arr) =>
+                Effect.succeed({
+                  teamName: pipe(Array.get(arr, 0), Option.flatten),
+                }),
+              ),
+            ),
+          ),
+          lead: pipe(
+            sheet,
+            HashMap.get(`${teamConfig.name}!lead`),
+            Effect.flatMap(
+              parseValueRange((arr) =>
+                Effect.succeed({
+                  lead: pipe(
+                    Array.get(arr, 0),
+                    Option.flatten,
+                    Option.flatMapNullable((lead) => parseInt(lead, 10)),
+                  ),
+                }),
+              ),
+            ),
+          ),
+          backline: pipe(
+            sheet,
+            HashMap.get(`${teamConfig.name}!backline`),
+            Effect.flatMap(
+              parseValueRange((arr) =>
+                Effect.succeed({
+                  backline: pipe(
+                    Array.get(arr, 0),
+                    Option.flatten,
+                    Option.flatMapNullable((backline) =>
+                      parseInt(backline, 10),
                     ),
-                    Option.filter(({ name }) => name !== ""),
+                  ),
+                }),
+              ),
+            ),
+          ),
+          talent: pipe(
+            sheet,
+            HashMap.get(`${teamConfig.name}!talent`),
+            Effect.flatMap(
+              parseValueRange((arr) =>
+                Effect.succeed({
+                  talent: pipe(
+                    Array.get(arr, 0),
+                    Option.flatten,
+                    Option.flatMapNullable((talent) => parseInt(talent, 10)),
+                  ),
+                }),
+              ),
+            ),
+          ),
+          tags: pipe(
+            Match.value(teamConfig.tagsConfig),
+            Match.tagsExhaustive({
+              TeamTagsConstantsConfig: () => Effect.succeed([]),
+              TeamTagsRangesConfig: () =>
+                pipe(
+                  sheet,
+                  HashMap.get(`${teamConfig.name}!tags`),
+                  Effect.flatMap(
+                    parseValueRange((arr) =>
+                      Effect.succeed({
+                        tags: pipe(
+                          Array.get(arr, 0),
+                          Option.flatten,
+                          Option.map(String.split(",")),
+                          Option.map(Array.map(String.trim)),
+                          Option.getOrElse(() => []),
+                        ),
+                      }),
+                    ),
                   ),
                 ),
-                Array.getSomes,
-                Array.sortWith(
-                  Team.getEffectValue,
-                  Order.reverse(Option.getOrder(Number.Order)),
+            }),
+          ),
+        }),
+        Effect.map(({ playerName, teamName, lead, backline, talent, tags }) =>
+          pipe(
+            new ArrayWithDefault({
+              array: playerName,
+              default: { playerName: Option.none() },
+            }),
+            ArrayWithDefault.zip(
+              new ArrayWithDefault({
+                array: teamName,
+                default: { teamName: Option.none() },
+              }),
+            ),
+            ArrayWithDefault.zip(
+              new ArrayWithDefault({
+                array: lead,
+                default: { lead: Option.none() },
+              }),
+            ),
+            ArrayWithDefault.zip(
+              new ArrayWithDefault({
+                array: backline,
+                default: { backline: Option.none() },
+              }),
+            ),
+            ArrayWithDefault.zip(
+              new ArrayWithDefault({
+                array: talent,
+                default: { talent: Option.none() },
+              }),
+            ),
+            ArrayWithDefault.zip(
+              new ArrayWithDefault({
+                array: tags,
+                default: {
+                  tags: pipe(
+                    Match.value(teamConfig.tagsConfig),
+                    Match.tagsExhaustive({
+                      TeamTagsConstantsConfig: (teamConfig) => teamConfig.tags,
+                      TeamTagsRangesConfig: () => [],
+                    }),
+                  ),
+                },
+              }),
+            ),
+          ),
+        ),
+        Effect.map(({ array }) =>
+          pipe(
+            array,
+            Array.map(
+              ({ playerName, teamName, lead, backline, talent, tags }) =>
+                pipe(
+                  Option.Do,
+                  Option.bind("playerName", () => playerName),
+                  Option.bind("teamName", () => teamName),
+                  Option.map(({ playerName, teamName }) => ({
+                    name: playerName,
+                    team: new Team({
+                      type: teamConfig.name,
+                      name: teamName,
+                      tags,
+                      lead,
+                      backline,
+                      talent,
+                    }),
+                  })),
                 ),
-              ),
-            })),
+            ),
+            Array.getSomes,
           ),
         ),
       ),
     ),
-    Effect.map(({ array }) =>
+    Effect.map(Array.flatten),
+    Effect.map((array) =>
       pipe(
         array,
-        Array.getSomes,
         collectArrayToHashMap({
-          keyGetter: ({ id }) => id,
-          valueInitializer: (a) => a,
-          valueReducer: (acc, a) => ({
-            id: acc.id,
-            teams: Array.appendAll(acc.teams, a.teams),
+          keyGetter: ({ name }) => name,
+          valueInitializer: ({ name, team }) => ({ name, teams: [team] }),
+          valueReducer: ({ name, teams }, { team }) => ({
+            name,
+            teams: Array.append(teams, team),
           }),
         }),
       ),
     ),
-    Effect.withSpan("playerParser", { captureStackTrace: true }),
+    Effect.withSpan("teamParser", { captureStackTrace: true }),
   );
 
 export class Schedule extends Data.TaggedClass("Schedule")<{
@@ -283,57 +372,72 @@ const scheduleParser = (
   pipe(
     Effect.Do,
     bindObject({
-      hours: parseValueRange(hours, (arr) =>
-        Effect.succeed({
-          hour: pipe(
-            Array.get(arr, 0),
-            Option.flatten,
-            Option.flatMapNullable((v) => parseInt(v, 10)),
-          ),
-        }),
-      ),
-      fills: parseValueRange(fills, (arr) =>
-        Effect.succeed({
-          fills: Array.makeBy(5, (i) =>
-            pipe(Array.get(arr, i), Option.flatten),
-          ),
-        }),
-      ),
-      overfills: parseValueRange(overfills, (arr) =>
-        Effect.succeed({
-          overfills: pipe(
-            Array.get(arr, 0),
-            Option.flatten,
-            Option.map((v) =>
-              pipe(v, String.split(","), Array.map(String.trim)),
+      hours: pipe(
+        hours,
+        parseValueRange((arr) =>
+          Effect.succeed({
+            hour: pipe(
+              Array.get(arr, 0),
+              Option.flatten,
+              Option.flatMapNullable((v) => parseInt(v, 10)),
             ),
-            Option.getOrElse(() => []),
-          ),
-        }),
+          }),
+        ),
       ),
-      standbys: parseValueRange(standbys, (arr) =>
-        Effect.succeed({
-          standbys: pipe(
-            Array.get(arr, 0),
-            Option.flatten,
-            Option.map((v) =>
-              pipe(v, String.split(","), Array.map(String.trim)),
+      fills: pipe(
+        fills,
+        parseValueRange((arr) =>
+          Effect.succeed({
+            fills: Array.makeBy(5, (i) =>
+              pipe(Array.get(arr, i), Option.flatten),
             ),
-            Option.getOrElse(() => []),
-          ),
-        }),
+          }),
+        ),
+      ),
+      overfills: pipe(
+        overfills,
+        parseValueRange((arr) =>
+          Effect.succeed({
+            overfills: pipe(
+              Array.get(arr, 0),
+              Option.flatten,
+              Option.map((v) =>
+                pipe(v, String.split(","), Array.map(String.trim)),
+              ),
+              Option.getOrElse(() => []),
+            ),
+          }),
+        ),
+      ),
+      standbys: pipe(
+        standbys,
+        parseValueRange((arr) =>
+          Effect.succeed({
+            standbys: pipe(
+              Array.get(arr, 0),
+              Option.flatten,
+              Option.map((v) =>
+                pipe(v, String.split(","), Array.map(String.trim)),
+              ),
+              Option.getOrElse(() => []),
+            ),
+          }),
+        ),
       ),
       breaks: detectBreak
         ? Effect.succeed([])
-        : parseValueRange(breaks, (arr) =>
-            Effect.succeed({
-              breakHour: pipe(
-                Array.get(arr, 0),
-                Option.flatten,
-                Option.map((v) => String.Equivalence(v, "TRUE")),
-                Option.getOrElse(() => false),
-              ),
-            }),
+        : pipe(
+            breaks,
+            parseValueRange((arr) =>
+              Effect.succeed({
+                breakHour: pipe(
+                  Array.get(arr, 0),
+                  Option.flatten,
+                  Option.map((v) => String.Equivalence(v, "TRUE")),
+                  Option.getOrElse(() => false),
+                ),
+              }),
+            ),
           ),
     }),
     Effect.map(({ hours, fills, overfills, standbys, breaks }) =>
@@ -487,6 +591,31 @@ export class SheetService extends Effect.Service<SheetService>()(
                 }),
               ),
         ),
+
+        Effect.let(
+          "sheetGetHashMap",
+          ({ sheet }) =>
+            <K>(
+              ranges: HashMap.HashMap<K, string>,
+              defaultKey: K,
+              params?: Omit<
+                sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
+                "spreadsheetId"
+              >,
+              options?: MethodOptions,
+            ) =>
+              pipe(
+                sheet.getHashMap(
+                  ranges,
+                  defaultKey,
+                  { spreadsheetId: sheetId, ...params },
+                  options,
+                ),
+                Effect.withSpan("SheetService.getHashMap", {
+                  captureStackTrace: true,
+                }),
+              ),
+        ),
         Effect.let(
           "sheetUpdate",
           ({ sheet }) =>
@@ -505,7 +634,13 @@ export class SheetService extends Effect.Service<SheetService>()(
               ),
         ),
         Effect.bindAll(
-          ({ sheetGet, rangesConfig, teamConfig, runnerConfig }) => ({
+          ({
+            sheetGet,
+            sheetGetHashMap,
+            rangesConfig,
+            teamConfig,
+            runnerConfig,
+          }) => ({
             players: pipe(
               Effect.Do,
               Effect.bind("rangesConfig", () => rangesConfig),
@@ -524,24 +659,58 @@ export class SheetService extends Effect.Service<SheetService>()(
             ),
             teams: pipe(
               Effect.Do,
-              Effect.bind("rangesConfig", () => rangesConfig),
               Effect.bind("teamConfig", () => teamConfig),
               Effect.let("teamConfigValues", ({ teamConfig }) =>
                 HashMap.toValues(teamConfig),
               ),
-              Effect.bind("sheet", ({ rangesConfig, teamConfigValues }) =>
-                sheetGet({
-                  ranges: [
-                    rangesConfig.userIds,
-                    ...pipe(
-                      teamConfigValues,
-                      Array.map(({ range }) => range),
-                    ),
-                  ],
-                }),
+              Effect.let("ranges", ({ teamConfigValues }) =>
+                pipe(
+                  teamConfigValues,
+                  Array.reduce(
+                    HashMap.empty<string, Option.Option<string>>(),
+                    (acc, a) =>
+                      pipe(
+                        acc,
+                        HashMap.set(
+                          `${a.name}!playerName`,
+                          Option.some(`'${a.sheet}'!${a.playerNameRange}`),
+                        ),
+                        HashMap.set(
+                          `${a.name}!teamName`,
+                          Option.some(`'${a.sheet}'!${a.teamNameRange}`),
+                        ),
+                        HashMap.set(
+                          `${a.name}!lead`,
+                          Option.some(`'${a.sheet}'!${a.leadRange}`),
+                        ),
+                        HashMap.set(
+                          `${a.name}!backline`,
+                          Option.some(`'${a.sheet}'!${a.backlineRange}`),
+                        ),
+                        HashMap.set(
+                          `${a.name}!talent`,
+                          Option.some(`'${a.sheet}'!${a.talentRange}`),
+                        ),
+                        HashMap.set(
+                          `${a.name}!tags`,
+                          pipe(
+                            Match.value(a.tagsConfig),
+                            Match.tag("TeamTagsRangesConfig", (tagsConfig) =>
+                              Option.some(
+                                `'${a.sheet}'!${tagsConfig.tagsRange}`,
+                              ),
+                            ),
+                            Match.orElse(() => Option.none()),
+                          ),
+                        ),
+                      ),
+                  ),
+                  HashMap.filterMap((a, _) => a),
+                ),
               ),
+              Effect.bind("sheet", ({ ranges }) => sheetGetHashMap(ranges, "")),
               Effect.flatMap(({ teamConfigValues, sheet }) =>
-                teamParser(teamConfigValues, sheet.data.valueRanges ?? []),
+                teamParser(teamConfigValues, sheet),
               ),
               Effect.withSpan("SheetService.teams", {
                 captureStackTrace: true,
@@ -598,6 +767,7 @@ export class SheetService extends Effect.Service<SheetService>()(
         Effect.map(
           ({
             sheetGet,
+            sheetGetHashMap,
             sheetUpdate,
             rangesConfig,
             teamConfig,
@@ -609,6 +779,7 @@ export class SheetService extends Effect.Service<SheetService>()(
             runnerConfig,
           }) => ({
             get: sheetGet,
+            getHashMap: () => sheetGetHashMap,
             update: sheetUpdate,
             getRangesConfig: () =>
               pipe(
