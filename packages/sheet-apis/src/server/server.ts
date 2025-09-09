@@ -3,14 +3,14 @@ import { DBSubscriptionContext } from "typhoon-server/db";
 import { Server } from "typhoon-server/server";
 import { Config } from "../config";
 import { DB } from "../db";
-import { GuildConfigService } from "../services";
+import { CalcService, GuildConfigService } from "../services";
 import { botCalcHandler, calcHandler } from "./handler";
 
 const layer = pipe(
   GuildConfigService.DefaultWithoutDependencies,
   Layer.provideMerge(DBSubscriptionContext.Default),
   Layer.provideMerge(DB.DefaultWithoutDependencies),
-  Layer.provideMerge(Config.Default),
+  Layer.provideMerge(Layer.mergeAll(Config.Default, CalcService.Default)),
 );
 
 export const server = pipe(
