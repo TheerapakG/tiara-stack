@@ -59,6 +59,36 @@ type PeerState = {
 };
 type PeerStateMap = HashMap.HashMap<string, PeerState>;
 
+type AddServerHandler<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  S extends Server<any, any, any>,
+  Handler extends AnySubscriptionHandlerContext | AnyMutationHandlerContext,
+> = [Handler] extends [AnySubscriptionHandlerContext]
+  ? S extends Server<
+      infer R,
+      infer SubscriptionHandlers,
+      infer MutationHandlers
+    >
+    ? Server<
+        R,
+        SubscriptionHandlers & { [K in Handler["config"]["name"]]: Handler },
+        MutationHandlers
+      >
+    : never
+  : [Handler] extends [AnyMutationHandlerContext]
+    ? S extends Server<
+        infer R,
+        infer SubscriptionHandlers,
+        infer MutationHandlers
+      >
+      ? Server<
+          R,
+          SubscriptionHandlers,
+          MutationHandlers & { [K in Handler["config"]["name"]]: Handler }
+        >
+      : never
+    : never;
+
 export class Server<
     R = never,
     SubscriptionHandlers extends Record<
@@ -201,31 +231,11 @@ export class Server<
     Handler extends AnySubscriptionHandlerContext | AnyMutationHandlerContext,
   >(handler: Handler) {
     return <
-      R = never,
-      SubscriptionHandlers extends Record<
-        string,
-        SubscriptionHandlerContext
-        // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-      > = {},
-      // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-      MutationHandlers extends Record<string, MutationHandlerContext> = {},
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      S extends Server<any, any, any>,
     >(
-      server: Server<R, SubscriptionHandlers, MutationHandlers>,
-    ): [Handler] extends [AnySubscriptionHandlerContext]
-      ? Server<
-          R,
-          SubscriptionHandlers & {
-            [K in Handler["config"]["name"]]: Handler;
-          },
-          MutationHandlers
-        >
-      : [Handler] extends [AnyMutationHandlerContext]
-        ? Server<
-            R,
-            SubscriptionHandlers,
-            MutationHandlers & { [K in Handler["config"]["name"]]: Handler }
-          >
-        : never => {
+      server: S,
+    ): AddServerHandler<S, Handler> => {
       const newHandlerMaps = pipe(
         Match.value(handler.config),
         Match.when({ type: "subscription" }, () => ({
@@ -250,21 +260,7 @@ export class Server<
       return new Server({
         ...server,
         ...newHandlerMaps,
-      }) as unknown as [Handler] extends [AnySubscriptionHandlerContext]
-        ? Server<
-            R,
-            SubscriptionHandlers & {
-              [K in Handler["config"]["name"]]: Handler;
-            },
-            MutationHandlers
-          >
-        : [Handler] extends [AnyMutationHandlerContext]
-          ? Server<
-              R,
-              SubscriptionHandlers,
-              MutationHandlers & { [K in Handler["config"]["name"]]: Handler }
-            >
-          : never;
+      }) as unknown as AddServerHandler<S, Handler>;
     };
   }
 
