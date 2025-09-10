@@ -40,18 +40,21 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
           fs.readFile("/var/run/secrets/tokens/sheet-apis-token", "utf-8"),
         ),
       ),
-      Effect.bind("kubernetesJwt", () =>
+      Effect.bind("kubernetesToken", () =>
         Effect.tryPromise(() =>
-          fs.readFile("/var/run/secrets/tokens/kubernetes-token", "utf-8"),
+          fs.readFile(
+            "/var/run/secrets/kubernetes.io/serviceaccount/token",
+            "utf-8",
+          ),
         ),
       ),
-      Effect.bind("oidc", ({ kubernetesJwt }) =>
+      Effect.bind("oidc", ({ kubernetesToken }) =>
         Effect.tryPromise(() =>
           fetch(
             "https://kubernetes.default.svc.cluster.local/.well-known/openid-configuration",
             {
               headers: {
-                Authorization: `Bearer ${kubernetesJwt}`,
+                Authorization: `Bearer ${kubernetesToken}`,
               },
             },
           ),
@@ -61,7 +64,7 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
         Effect.tryPromise(() => oidc.json()),
       ),
       InteractionContext.editReply.tapEffect(
-        ({ sheetApisJwt, kubernetesJwt, oidcJson }) =>
+        ({ sheetApisJwt, kubernetesToken, oidcJson }) =>
           pipe(
             ClientService.makeEmbedBuilder(),
             Effect.map((embed) => ({
@@ -69,7 +72,7 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
                 embed
                   .setTitle("Success!")
                   .setDescription(
-                    `API JWT: ${sheetApisJwt}\nKubernetes JWT: ${kubernetesJwt}\nOIDC: ${JSON.stringify(oidcJson, null, 2)}`,
+                    `API JWT: ${sheetApisJwt}\nKubernetes Token: ${kubernetesToken}\nOIDC: ${JSON.stringify(oidcJson, null, 2)}`,
                   ),
               ],
             })),
