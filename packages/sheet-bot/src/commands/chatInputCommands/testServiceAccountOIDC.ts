@@ -47,14 +47,17 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
           ),
         ),
       ),
-      InteractionContext.editReply.tapEffect(({ jwt, oidc }) =>
+      Effect.bind("oidcJson", ({ oidc }) =>
+        Effect.tryPromise(() => oidc.json()),
+      ),
+      InteractionContext.editReply.tapEffect(({ jwt, oidcJson }) =>
         pipe(
           ClientService.makeEmbedBuilder(),
           Effect.map((embed) => ({
             embeds: [
               embed
                 .setTitle("Success!")
-                .setDescription(`JWT: ${jwt}\nOIDC: ${oidc}`),
+                .setDescription(`JWT: ${jwt}\nOIDC: ${oidcJson}`),
             ],
           })),
         ),
