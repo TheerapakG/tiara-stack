@@ -50,7 +50,7 @@ export class FormatService extends Effect.Service<FormatService>()(
       Effect.map(({ converterService, formatDateTime, formatHourWindow }) => ({
         formatDateTime,
         formatHourWindow,
-        formatEmptySlots: ({ hour, breakHour, empty }: Schedule) =>
+        formatOpenSlot: ({ hour, breakHour, empty }: Schedule) =>
           pipe(
             Effect.succeed({ hour, breakHour, empty }),
             Effect.flatMap(({ hour, breakHour, empty }) =>
@@ -60,12 +60,31 @@ export class FormatService extends Effect.Service<FormatService>()(
                     Effect.map(formatHourWindow),
                     Effect.map(
                       ({ start, end }) =>
-                        `${bold(`+${empty} Hour ${hour}`)} ${time(start, TimestampStyles.ShortTime)} to ${time(end, TimestampStyles.ShortTime)}`,
+                        `${bold(`+${empty} | ${hour}`)} ${time(start, TimestampStyles.ShortTime)}-${time(end, TimestampStyles.ShortTime)}`,
                     ),
                   )
                 : Effect.succeed(""),
             ),
-            Effect.withSpan("FormatService.formatEmptySlots", {
+            Effect.withSpan("FormatService.formatOpenSlot", {
+              captureStackTrace: true,
+            }),
+          ),
+        formatFilledSlot: ({ hour, breakHour, empty }: Schedule) =>
+          pipe(
+            Effect.succeed({ hour, breakHour, empty }),
+            Effect.flatMap(({ hour, breakHour, empty }) =>
+              Number.Equivalence(empty, 0) && !breakHour
+                ? pipe(
+                    converterService.convertHourToHourWindow(hour),
+                    Effect.map(formatHourWindow),
+                    Effect.map(
+                      ({ start, end }) =>
+                        `${bold(`${hour}`)} ${time(start, TimestampStyles.ShortTime)}-${time(end, TimestampStyles.ShortTime)}`,
+                    ),
+                  )
+                : Effect.succeed(""),
+            ),
+            Effect.withSpan("FormatService.formatFilledSlot", {
               captureStackTrace: true,
             }),
           ),

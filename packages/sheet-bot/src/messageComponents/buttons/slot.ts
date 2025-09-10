@@ -32,11 +32,11 @@ const getSlotMessage = (day: number) =>
     }),
     Effect.bindAll(({ daySchedule }) => ({
       title: Effect.succeed(`Day ${day} Slots~`),
-      description: pipe(
+      openSlots: pipe(
         daySchedule,
         HashMap.values,
         Array.sortBy(Order.mapInput(Number.Order, ({ hour }) => hour)),
-        Effect.forEach((schedule) => FormatService.formatEmptySlots(schedule)),
+        Effect.forEach((schedule) => FormatService.formatOpenSlot(schedule)),
         Effect.map(Chunk.fromIterable),
         Effect.map(Chunk.dedupeAdjacent),
         Effect.map(Chunk.join("\n")),
@@ -46,8 +46,28 @@ const getSlotMessage = (day: number) =>
             : description,
         ),
       ),
+      filledSlots: pipe(
+        daySchedule,
+        HashMap.values,
+        Array.sortBy(Order.mapInput(Number.Order, ({ hour }) => hour)),
+        Effect.forEach((schedule) => FormatService.formatFilledSlot(schedule)),
+        Effect.map(Chunk.fromIterable),
+        Effect.map(Chunk.dedupeAdjacent),
+        Effect.map(Chunk.join("\n")),
+        Effect.map((description) =>
+          String.Equivalence(description, String.empty)
+            ? "All Open :3"
+            : description,
+        ),
+      ),
     })),
-    Effect.map(({ title, description }) => ({ title, description })),
+    Effect.map(({ title, openSlots, filledSlots }) => ({
+      title,
+      fields: [
+        { name: "Open Slots", value: openSlots },
+        { name: "Filled Slots", value: filledSlots },
+      ],
+    })),
   );
 
 export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
@@ -82,7 +102,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
               embeds: [
                 embed
                   .setTitle(slotMessage.title)
-                  .setDescription(slotMessage.description),
+                  .setFields(...slotMessage.fields),
               ],
             })),
           ),
