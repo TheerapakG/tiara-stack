@@ -32,6 +32,11 @@ export type AnySubscriptionEventHandler<
   R = any,
 > = SubscriptionEventHandler<Config, R>;
 
+type SubscriptionEventHandlerContext<
+  Handler extends AnySubscriptionEventHandler,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+> = Handler extends SubscriptionEventHandler<any, infer R> ? R : never;
+
 export type MutationEventHandler<
   Config extends MutationHandlerConfig,
   R = never,
@@ -47,6 +52,11 @@ export type AnyMutationEventHandler<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   R = any,
 > = MutationEventHandler<Config, R>;
+
+type MutationEventHandlerContext<
+  Handler extends AnyMutationEventHandler,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+> = Handler extends MutationEventHandler<any, infer R> ? R : never;
 
 export type SubscriptionHandlerContextContext<
   Config extends SubscriptionHandlerConfig,
@@ -182,10 +192,14 @@ class SubscriptionHandlerContextBuilder<
     >,
   ) {}
 
-  handler<R, Handler extends AnySubscriptionEventHandler<Config, R>>(
+  handler<Handler extends AnySubscriptionEventHandler<Config>>(
     this: SubscriptionHandlerContextBuilder<Config>,
     handler: Handler,
-  ): SubscriptionHandlerContext<Config, R, Handler> {
+  ): SubscriptionHandlerContext<
+    Config,
+    SubscriptionEventHandlerContext<Handler>,
+    Handler
+  > {
     return { ...this.ctx, handler };
   }
 }
@@ -199,10 +213,14 @@ class MutationHandlerContextBuilder<Config extends MutationHandlerConfig> {
     >,
   ) {}
 
-  handler<R, Handler extends AnyMutationEventHandler<Config, R>>(
+  handler<Handler extends AnyMutationEventHandler<Config>>(
     this: MutationHandlerContextBuilder<Config>,
     handler: Handler,
-  ): MutationHandlerContext<Config, R, Handler> {
+  ): MutationHandlerContext<
+    Config,
+    MutationEventHandlerContext<Handler>,
+    Handler
+  > {
     return { ...this.ctx, handler };
   }
 }

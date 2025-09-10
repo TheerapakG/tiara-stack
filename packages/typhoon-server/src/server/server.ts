@@ -36,6 +36,7 @@ import {
   MutationHandlerContext,
   SubscriptionHandlerContext,
 } from "./handler";
+import { HandlerGroup } from "./handlerGroup";
 import invalidHeaderErrorHtml from "./invalidHeaderError.html";
 
 type SubscriptionHandlerMap<R> = HashMap.HashMap<
@@ -63,28 +64,40 @@ type AddServerHandler<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   S extends Server<any, any, any>,
   Handler extends AnySubscriptionHandlerContext | AnyMutationHandlerContext,
-> = [Handler] extends [AnySubscriptionHandlerContext]
-  ? S extends Server<
-      infer R,
-      infer SubscriptionHandlers,
-      infer MutationHandlers
-    >
-    ? Server<
-        R,
-        SubscriptionHandlers & { [K in Handler["config"]["name"]]: Handler },
-        MutationHandlers
-      >
-    : never
-  : [Handler] extends [AnyMutationHandlerContext]
-    ? S extends Server<
-        infer R,
-        infer SubscriptionHandlers,
-        infer MutationHandlers
+> =
+  S extends Server<infer R, infer SubscriptionHandlers, infer MutationHandlers>
+    ? [Handler] extends [AnySubscriptionHandlerContext]
+      ? Server<
+          R,
+          SubscriptionHandlers & { [K in Handler["config"]["name"]]: Handler },
+          MutationHandlers
+        >
+      : [Handler] extends [AnyMutationHandlerContext]
+        ? Server<
+            R,
+            SubscriptionHandlers,
+            MutationHandlers & { [K in Handler["config"]["name"]]: Handler }
+          >
+        : never
+    : never;
+
+type AddServerHandlerGroup<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  S extends Server<any, any, any>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  G extends HandlerGroup<any, any, any>,
+> =
+  S extends Server<infer R, infer SubscriptionHandlers, infer MutationHandlers>
+    ? G extends HandlerGroup<
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        any,
+        infer GroupSubscriptionHandlers,
+        infer GroupMutationHandlers
       >
       ? Server<
           R,
-          SubscriptionHandlers,
-          MutationHandlers & { [K in Handler["config"]["name"]]: Handler }
+          SubscriptionHandlers & GroupSubscriptionHandlers,
+          MutationHandlers & GroupMutationHandlers
         >
       : never
     : never;
@@ -262,6 +275,30 @@ export class Server<
         ...newHandlerMaps,
       }) as unknown as AddServerHandler<S, Handler>;
     };
+  }
+
+  // TODO: check handler requirement extends server requirement
+  static addGroup<
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    G extends HandlerGroup<any, any, any>,
+  >(handlerGroup: G) {
+    return <
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      S extends Server<any, any, any>,
+    >(
+      server: S,
+    ) =>
+      new Server({
+        ...server,
+        subscriptionHandlerMap: HashMap.union(
+          server.subscriptionHandlerMap,
+          handlerGroup.subscriptionHandlerMap,
+        ),
+        mutationHandlerMap: HashMap.union(
+          server.mutationHandlerMap,
+          handlerGroup.mutationHandlerMap,
+        ),
+      }) as unknown as AddServerHandlerGroup<S, G>;
   }
 
   static open(peer: Peer) {
