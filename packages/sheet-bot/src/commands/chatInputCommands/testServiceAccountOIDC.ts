@@ -33,6 +33,7 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
   .handler(
     pipe(
       Effect.Do,
+      InteractionContext.deferReply.tap(),
       PermissionService.checkOwner.tap(() => ({ allowSameGuild: false })),
       Effect.bind("jwt", () =>
         Effect.tryPromise(() =>
