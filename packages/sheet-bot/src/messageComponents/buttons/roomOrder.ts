@@ -104,7 +104,7 @@ export const roomOrderInteractionGetReply = (
           "",
           ...messageRoomOrderData.map(
             ({ team, tags, position }) =>
-              `${inlineCode(`P${position + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : ""}`,
+              `${inlineCode(`P${position + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : tags.includes("doormat") ? " (doormat)" : ""}`,
           ),
         ].join("\n"),
         components: [
