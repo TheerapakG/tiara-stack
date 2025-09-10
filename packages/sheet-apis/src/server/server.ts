@@ -4,7 +4,7 @@ import { Server } from "typhoon-server/server";
 import { Config } from "../config";
 import { DB } from "../db";
 import { CalcService, GuildConfigService } from "../services";
-import { botCalcHandler, calcHandler } from "./handler";
+import { calcHandlerGroup } from "./handler/calc";
 
 const layer = pipe(
   GuildConfigService.DefaultWithoutDependencies,
@@ -15,6 +15,5 @@ const layer = pipe(
 
 export const server = pipe(
   Server.create(layer),
-  Effect.map(Server.add(botCalcHandler)),
-  Effect.map(Server.add(calcHandler)),
+  Effect.map(Server.addGroup(calcHandlerGroup)),
 );

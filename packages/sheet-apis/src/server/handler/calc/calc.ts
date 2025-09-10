@@ -8,7 +8,7 @@ import {
   CalcService,
   GuildConfigService,
   PlayerTeam,
-} from "../../services";
+} from "../../../services";
 
 const calcHandlerConfig = defineHandlerConfigBuilder()
   .name("calc")
@@ -94,9 +94,8 @@ const getGuildConfigByScriptId = <E, R>(scriptId: Computed<string, E, R>) =>
   computed(
     pipe(
       scriptId,
-      Effect.flatMap(GuildConfigService.getGuildConfigWithBoundScript),
+      Effect.flatMap(GuildConfigService.getGuildConfigByScriptId),
       Effect.flatMap((computed) => computed),
-      Effect.flatMap(Array.head),
       Effect.flipWith((effect) =>
         pipe(
           effect,

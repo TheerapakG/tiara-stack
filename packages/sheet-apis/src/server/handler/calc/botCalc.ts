@@ -3,7 +3,7 @@ import { computed } from "typhoon-core/signal";
 import { defineHandlerConfigBuilder } from "typhoon-server/config";
 import { defineHandlerBuilder, Event } from "typhoon-server/server";
 import * as v from "valibot";
-import { CalcConfig, CalcService, PlayerTeam } from "../../services";
+import { CalcConfig, CalcService, PlayerTeam } from "../../../services";
 
 const calcHandlerConfig = defineHandlerConfigBuilder()
   .name("botCalc")
