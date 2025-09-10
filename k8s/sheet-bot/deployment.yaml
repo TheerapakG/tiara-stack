@@ -72,10 +72,6 @@ spec:
                   path: sheet-apis-token
                   expirationSeconds: 3600
                   audience: sheet-apis
-              - serviceAccountToken:
-                  path: kubernetes-token
-                  expirationSeconds: 3600
-                  audience: https://kubernetes.default.svc.cluster.local
 ---
 apiVersion: v1
 kind: Service
