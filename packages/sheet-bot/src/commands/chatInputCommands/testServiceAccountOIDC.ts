@@ -57,7 +57,9 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
             embeds: [
               embed
                 .setTitle("Success!")
-                .setDescription(`JWT: ${jwt}\nOIDC: ${oidcJson}`),
+                .setDescription(
+                  `JWT: ${jwt}\nOIDC: ${JSON.stringify(oidcJson, null, 2)}`,
+                ),
             ],
           })),
         ),
