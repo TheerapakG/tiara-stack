@@ -53,24 +53,34 @@ export const testOIDCHandler = defineHandlerBuilder()
                   ),
                 ),
               ),
-              Effect.let("jwks", ({ kubernetesToken }) =>
-                createRemoteJWKSet(
-                  new URL(
-                    "https://kubernetes.default.svc.cluster.local/.well-known/openid/v1/jwks",
+              Effect.bind("jwks", ({ kubernetesToken }) =>
+                pipe(
+                  Effect.try(() =>
+                    createRemoteJWKSet(
+                      new URL(
+                        "https://kubernetes.default.svc.cluster.local/.well-known/openid/v1/jwks",
+                      ),
+                      {
+                        headers: {
+                          Authorization: `Bearer ${kubernetesToken}`,
+                        },
+                      },
+                    ),
                   ),
-                  {
-                    headers: {
-                      Authorization: `Bearer ${kubernetesToken}`,
-                    },
-                  },
+                  Effect.withSpan("createRemoteJWKSet", {
+                    captureStackTrace: true,
+                  }),
                 ),
               ),
               Effect.bind("result", ({ jwks, token }) =>
-                Effect.tryPromise(() =>
-                  jwtVerify(token, jwks, {
-                    issuer: "https://kubernetes.default.svc.cluster.local",
-                    audience: "sheet-apis",
-                  }),
+                pipe(
+                  Effect.tryPromise(() =>
+                    jwtVerify(token, jwks, {
+                      issuer: "https://kubernetes.default.svc.cluster.local",
+                      audience: "sheet-apis",
+                    }),
+                  ),
+                  Effect.withSpan("jwtVerify", { captureStackTrace: true }),
                 ),
               ),
               Effect.map(({ result }) => ({
