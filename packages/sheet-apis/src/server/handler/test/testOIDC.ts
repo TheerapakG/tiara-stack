@@ -58,7 +58,7 @@ export const testOIDCHandler = defineHandlerBuilder()
                   Effect.try(() =>
                     createRemoteJWKSet(
                       new URL(
-                        "https://kubernetes.default.svc.cluster.local/.well-known/openid/v1/jwks",
+                        "https://kubernetes.default.svc.cluster.local/openid/v1/jwks",
                       ),
                       {
                         headers: {
