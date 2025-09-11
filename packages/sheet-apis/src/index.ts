@@ -1,4 +1,5 @@
 import { NodeSdk } from "@effect/opentelemetry";
+import { NodeRuntime } from "@effect/platform-node";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
@@ -34,4 +35,7 @@ const serveEffect = pipe(
   Effect.provide(Logger.logFmt),
 );
 
-Effect.runPromise(serveEffect);
+NodeRuntime.runMain(serveEffect, {
+  disableErrorReporting: true,
+  disablePrettyLogger: true,
+});
