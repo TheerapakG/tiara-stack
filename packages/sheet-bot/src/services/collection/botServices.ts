@@ -8,6 +8,7 @@ import {
   MessageSlotService,
   SheetConfigService,
 } from "@/services/bot";
+import { NodeContext } from "@effect/platform-node";
 import { Effect, Layer, pipe } from "effect";
 import { DBSubscriptionContext } from "typhoon-server/db";
 
@@ -25,7 +26,12 @@ export const botServices = pipe(
     ),
   ),
   Layer.provideMerge(
-    Layer.mergeAll(DBSubscriptionContext.Default, GoogleLive, Config.Default),
+    Layer.mergeAll(
+      DBSubscriptionContext.Default,
+      GoogleLive,
+      Config.Default,
+      NodeContext.layer,
+    ),
   ),
   Effect.succeed,
   Effect.withSpan("botServices", {
