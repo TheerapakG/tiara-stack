@@ -30,7 +30,7 @@
     "srvx": "^0.7.1"
   },
   "peerDependencies": {
-    "effect": "^3.17.7",
+    "effect": "^3.17.13",
     "valibot": "^1.1.0"
   },
   "devDependencies": {
