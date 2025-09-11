@@ -1,4 +1,5 @@
 import { NodeSdk } from "@effect/opentelemetry";
+import { NodeRuntime } from "@effect/platform-node";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
@@ -19,7 +20,7 @@ const MetricsLive = NodeSdk.layer(() => ({
   metricReader: new PrometheusExporter(),
 }));
 
-await Effect.runPromise(
+NodeRuntime.runMain(
   pipe(
     Effect.Do,
     Effect.bind("bot", () =>
@@ -36,4 +37,8 @@ await Effect.runPromise(
     Effect.provide(MetricsLive),
     Effect.provide(Logger.logFmt),
   ),
+  {
+    disableErrorReporting: true,
+    disablePrettyLogger: true,
+  },
 );

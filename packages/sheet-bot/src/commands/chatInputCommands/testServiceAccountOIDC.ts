@@ -7,13 +7,13 @@ import {
   ChatInputHandlerVariantT,
   handlerVariantContextBuilder,
 } from "@/types";
+import { FileSystem } from "@effect/platform";
 import {
   ApplicationIntegrationType,
   InteractionContextType,
   SlashCommandBuilder,
 } from "discord.js";
 import { Effect, pipe } from "effect";
-import fs from "fs/promises";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { SheetApisClient } from "~~/src/client";
 
@@ -37,10 +37,9 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
       Effect.Do,
       InteractionContext.deferReply.tap(),
       PermissionService.checkOwner.tap(() => ({ allowSameGuild: false })),
-      Effect.bind("sheetApisJwt", () =>
-        Effect.tryPromise(() =>
-          fs.readFile("/var/run/secrets/tokens/sheet-apis-token", "utf-8"),
-        ),
+      Effect.bind("fs", () => FileSystem.FileSystem),
+      Effect.bind("sheetApisJwt", ({ fs }) =>
+        fs.readFileString("/var/run/secrets/tokens/sheet-apis-token", "utf-8"),
       ),
       Effect.bind("response", ({ sheetApisJwt }) =>
         pipe(
@@ -64,6 +63,10 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
           })),
         ),
       ),
+      Effect.asVoid,
+      Effect.withSpan("testServiceAccountOIDC", {
+        captureStackTrace: true,
+      }),
     ),
   )
   .build();
