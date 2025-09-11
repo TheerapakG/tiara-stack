@@ -14,6 +14,8 @@ import {
 } from "discord.js";
 import { Effect, pipe } from "effect";
 import fs from "fs/promises";
+import { WebSocketClient } from "typhoon-client-ws/client";
+import { SheetApisClient } from "~~/src/client";
 
 export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
   .data(
@@ -40,43 +42,27 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
           fs.readFile("/var/run/secrets/tokens/sheet-apis-token", "utf-8"),
         ),
       ),
-      Effect.bind("kubernetesToken", () =>
-        Effect.tryPromise(() =>
-          fs.readFile(
-            "/var/run/secrets/kubernetes.io/serviceaccount/token",
-            "utf-8",
+      Effect.bind("response", ({ sheetApisJwt }) =>
+        pipe(
+          SheetApisClient.get(),
+          Effect.flatMap((client) =>
+            WebSocketClient.once(client, "testOIDC", { token: sheetApisJwt }),
           ),
         ),
       ),
-      Effect.bind("oidc", ({ kubernetesToken }) =>
-        Effect.tryPromise(() =>
-          fetch(
-            "https://kubernetes.default.svc.cluster.local/.well-known/openid-configuration",
-            {
-              headers: {
-                Authorization: `Bearer ${kubernetesToken}`,
-              },
-            },
-          ),
+      InteractionContext.editReply.tapEffect(({ sheetApisJwt, response }) =>
+        pipe(
+          ClientService.makeEmbedBuilder(),
+          Effect.map((embed) => ({
+            embeds: [
+              embed
+                .setTitle("Success!")
+                .setDescription(
+                  `API JWT: ${sheetApisJwt}\nResponse: ${JSON.stringify(response, null, 2)}`,
+                ),
+            ],
+          })),
         ),
-      ),
-      Effect.bind("oidcJson", ({ oidc }) =>
-        Effect.tryPromise(() => oidc.json()),
-      ),
-      InteractionContext.editReply.tapEffect(
-        ({ sheetApisJwt, kubernetesToken, oidcJson }) =>
-          pipe(
-            ClientService.makeEmbedBuilder(),
-            Effect.map((embed) => ({
-              embeds: [
-                embed
-                  .setTitle("Success!")
-                  .setDescription(
-                    `API JWT: ${sheetApisJwt}\nKubernetes Token: ${kubernetesToken}\nOIDC: ${JSON.stringify(oidcJson, null, 2)}`,
-                  ),
-              ],
-            })),
-          ),
       ),
     ),
   )
