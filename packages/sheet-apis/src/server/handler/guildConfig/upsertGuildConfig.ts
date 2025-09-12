@@ -16,8 +16,8 @@ export const upsertGuildConfigHandlerConfig = defineHandlerConfigBuilder()
     validator: pipe(
       Schema.Struct({
         guildId: Schema.String,
-        scriptId: Schema.optional(Schema.String),
-        sheetId: Schema.optional(Schema.String),
+        scriptId: Schema.optional(Schema.NullishOr(Schema.String)),
+        sheetId: Schema.optional(Schema.NullishOr(Schema.String)),
       }),
       Schema.standardSchemaV1,
     ),

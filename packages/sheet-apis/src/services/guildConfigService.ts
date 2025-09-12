@@ -236,7 +236,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               captureStackTrace: true,
             }),
           ),
-        setGuildChannelConfig: (
+        upsertGuildChannelConfig: (
           guildId: string,
           channelId: string,
           config: Omit<
@@ -274,7 +274,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
             ),
             Effect.flatMap(Effect.transposeOption),
-            Effect.withSpan("GuildConfigService.setGuildChannelConfig", {
+            Effect.withSpan("GuildConfigService.upsertGuildChannelConfig", {
               captureStackTrace: true,
             }),
           ),

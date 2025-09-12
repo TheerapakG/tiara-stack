@@ -31,9 +31,9 @@ import {
   removeGuildManagerRoleHandlerConfig,
 } from "./removeGuildManagerRole";
 import {
-  setGuildChannelConfigHandler,
-  setGuildChannelConfigHandlerConfig,
-} from "./setGuildChannelConfig";
+  upsertGuildChannelConfigHandler,
+  upsertGuildChannelConfigHandlerConfig,
+} from "./upsertGuildChannelConfig";
 import {
   upsertGuildConfigHandler,
   upsertGuildConfigHandlerConfig,
@@ -47,7 +47,7 @@ export const guildConfigHandlerConfigGroup = pipe(
   HandlerConfigGroup.add(getGuildManagerRolesHandlerConfig),
   HandlerConfigGroup.add(addGuildManagerRoleHandlerConfig),
   HandlerConfigGroup.add(removeGuildManagerRoleHandlerConfig),
-  HandlerConfigGroup.add(setGuildChannelConfigHandlerConfig),
+  HandlerConfigGroup.add(upsertGuildChannelConfigHandlerConfig),
   HandlerConfigGroup.add(getGuildRunningChannelByIdHandlerConfig),
   HandlerConfigGroup.add(getGuildRunningChannelByNameHandlerConfig),
 );
@@ -60,7 +60,7 @@ export const guildConfigHandlerGroup = pipe(
   HandlerGroup.add(getGuildManagerRolesHandler),
   HandlerGroup.add(addGuildManagerRoleHandler),
   HandlerGroup.add(removeGuildManagerRoleHandler),
-  HandlerGroup.add(setGuildChannelConfigHandler),
+  HandlerGroup.add(upsertGuildChannelConfigHandler),
   HandlerGroup.add(getGuildRunningChannelByIdHandler),
   HandlerGroup.add(getGuildRunningChannelByNameHandler),
 );
