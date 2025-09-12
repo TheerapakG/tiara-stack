@@ -41,7 +41,6 @@ import {
   pipe,
 } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
-import { observeOnce } from "typhoon-server/signal";
 
 const handleManual =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
@@ -71,8 +70,7 @@ const handleManual =
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
           PermissionService.checkRoles.tapEffect(() =>
             pipe(
-              GuildConfigService.getManagerRoles(),
-              Effect.flatMap(observeOnce),
+              GuildConfigService.getGuildManagerRoles(),
               Effect.map(Array.map((role) => role.roleId)),
               Effect.map((roles) => ({
                 roles,

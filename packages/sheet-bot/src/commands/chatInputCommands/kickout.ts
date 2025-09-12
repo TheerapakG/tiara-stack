@@ -39,7 +39,6 @@ import {
   Order,
   pipe,
 } from "effect";
-import { observeOnce } from "typhoon-server/signal";
 
 class ArgumentError extends Data.TaggedError("ArgumentError")<{
   readonly message: string;
@@ -69,8 +68,7 @@ const getKickoutData = ({
     bindObject({
       schedules: SheetService.getAllSchedules(),
       runningChannel: pipe(
-        GuildConfigService.getRunningChannelByName(channelName),
-        Effect.flatMap(observeOnce),
+        GuildConfigService.getGuildRunningChannelByName(channelName),
         Effect.flatMap(
           Option.match({
             onSome: (channel) => Effect.succeed(channel),
@@ -125,8 +123,7 @@ const handleManual =
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
           PermissionService.checkRoles.tapEffect(() =>
             pipe(
-              GuildConfigService.getManagerRoles(),
-              Effect.flatMap(observeOnce),
+              GuildConfigService.getGuildManagerRoles(),
               Effect.map(Array.map((role) => role.roleId)),
               Effect.map((roles) => ({
                 roles,

@@ -20,7 +20,6 @@ import {
   SlashCommandSubcommandBuilder,
 } from "discord.js";
 import { Array, Effect, Number, Option, pipe, String } from "effect";
-import { observeOnce } from "typhoon-server/signal";
 
 const handleList =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
@@ -47,10 +46,7 @@ const handleList =
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
           InteractionContext.user.bind("interactionUser"),
           Effect.bindAll(({ interactionUser }) => ({
-            managerRoles: pipe(
-              GuildConfigService.getManagerRoles(),
-              Effect.flatMap(observeOnce),
-            ),
+            managerRoles: GuildConfigService.getGuildManagerRoles(),
             user: pipe(
               InteractionContext.getUser("user"),
               Effect.map(Option.getOrElse(() => interactionUser)),
