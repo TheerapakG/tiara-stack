@@ -1,5 +1,5 @@
 import { and, eq, isNull } from "drizzle-orm";
-import { Array, Data, DateTime, Effect, Option, pipe } from "effect";
+import { Array, DateTime, Effect, Option, pipe, Schema } from "effect";
 import {
   configGuild,
   configGuildChannel,
@@ -10,79 +10,48 @@ import { DBSubscriptionContext } from "typhoon-server/db";
 import { DB } from "../db";
 
 type GuildConfigInsert = typeof configGuild.$inferInsert;
-type GuildConfigSelect = typeof configGuild.$inferSelect;
-type GuildConfigManagerRoleSelect = typeof configGuildManagerRole.$inferSelect;
 type GuildChannelConfigInsert = typeof configGuildChannel.$inferInsert;
-type GuildChannelConfigSelect = typeof configGuildChannel.$inferSelect;
 
-export class GuildConfig extends Data.TaggedClass("GuildConfig")<{
-  id: number;
-  guildId: string;
-  scriptId: Option.Option<string>;
-  sheetId: Option.Option<string>;
-  createdAt: Date;
-  updatedAt: Date;
-  deletedAt: Option.Option<Date>;
-}> {
-  static fromDbSelect = (select: GuildConfigSelect) =>
-    new GuildConfig({
-      id: select.id,
-      guildId: select.guildId,
-      scriptId: Option.fromNullable(select.scriptId),
-      sheetId: Option.fromNullable(select.sheetId),
-      createdAt: select.createdAt,
-      updatedAt: select.updatedAt,
-      deletedAt: Option.fromNullable(select.deletedAt),
-    });
-}
+export class GuildConfig extends Schema.TaggedClass<GuildConfig>()(
+  "GuildConfig",
+  {
+    id: Schema.Number,
+    guildId: Schema.String,
+    scriptId: Schema.OptionFromNullishOr(Schema.String, undefined),
+    sheetId: Schema.OptionFromNullishOr(Schema.String, undefined),
+    createdAt: Schema.DateFromSelf,
+    updatedAt: Schema.DateFromSelf,
+    deletedAt: Schema.OptionFromNullishOr(Schema.DateFromSelf, undefined),
+  },
+) {}
 
-export class GuildConfigManagerRole extends Data.TaggedClass(
+export class GuildConfigManagerRole extends Schema.TaggedClass<GuildConfigManagerRole>()(
   "GuildConfigManagerRole",
-)<{
-  id: number;
-  guildId: string;
-  roleId: string;
-  createdAt: Date;
-  updatedAt: Date;
-  deletedAt: Option.Option<Date>;
-}> {
-  static fromDbSelect = (select: GuildConfigManagerRoleSelect) =>
-    new GuildConfigManagerRole({
-      id: select.id,
-      guildId: select.guildId,
-      roleId: select.roleId,
-      createdAt: select.createdAt,
-      updatedAt: select.updatedAt,
-      deletedAt: Option.fromNullable(select.deletedAt),
-    });
-}
+  {
+    id: Schema.Number,
+    guildId: Schema.String,
+    roleId: Schema.String,
+    createdAt: Schema.DateFromSelf,
+    updatedAt: Schema.DateFromSelf,
+    deletedAt: Schema.OptionFromNullishOr(Schema.DateFromSelf, undefined),
+  },
+) {}
 
-export class GuildChannelConfig extends Data.TaggedClass("GuildChannelConfig")<{
-  id: number;
-  guildId: string;
-  channelId: string;
-  name: Option.Option<string>;
-  running: boolean;
-  roleId: Option.Option<string>;
-  checkinChannelId: Option.Option<string>;
-  createdAt: Date;
-  updatedAt: Date;
-  deletedAt: Option.Option<Date>;
-}> {
-  static fromDbSelect = (select: GuildChannelConfigSelect) =>
-    new GuildChannelConfig({
-      id: select.id,
-      guildId: select.guildId,
-      channelId: select.channelId,
-      name: Option.fromNullable(select.name),
-      running: select.running,
-      roleId: Option.fromNullable(select.roleId),
-      checkinChannelId: Option.fromNullable(select.checkinChannelId),
-      createdAt: select.createdAt,
-      updatedAt: select.updatedAt,
-      deletedAt: Option.fromNullable(select.deletedAt),
-    });
-}
+export class GuildChannelConfig extends Schema.TaggedClass<GuildChannelConfig>()(
+  "GuildChannelConfig",
+  {
+    id: Schema.Number,
+    guildId: Schema.String,
+    channelId: Schema.String,
+    name: Schema.OptionFromNullishOr(Schema.String, undefined),
+    running: Schema.Boolean,
+    roleId: Schema.OptionFromNullishOr(Schema.String, undefined),
+    checkinChannelId: Schema.OptionFromNullishOr(Schema.String, undefined),
+    createdAt: Schema.DateFromSelf,
+    updatedAt: Schema.DateFromSelf,
+    deletedAt: Schema.OptionFromNullishOr(Schema.DateFromSelf, undefined),
+  },
+) {}
 
 export class GuildConfigService extends Effect.Service<GuildConfigService>()(
   "GuildConfigService",
@@ -106,7 +75,15 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 ),
             ),
             Computed.map(Array.head),
-            Computed.map(Option.map(GuildConfig.fromDbSelect)),
+            Computed.map(
+              Option.map((v) =>
+                Schema.decodeEither(GuildConfig)({
+                  _tag: GuildConfig._tag,
+                  ...v,
+                }),
+              ),
+            ),
+            Computed.flatMap(Effect.transposeOption),
             Effect.withSpan("GuildConfigService.getConfig", {
               captureStackTrace: true,
             }),
@@ -125,7 +102,15 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 ),
             ),
             Computed.map(Array.head),
-            Computed.map(Option.map(GuildConfig.fromDbSelect)),
+            Computed.map(
+              Option.map((v) =>
+                Schema.decodeEither(GuildConfig)({
+                  _tag: GuildConfig._tag,
+                  ...v,
+                }),
+              ),
+            ),
+            Computed.flatMap(Effect.transposeOption),
             Effect.withSpan("GuildConfigService.getGuildConfigByScriptId", {
               captureStackTrace: true,
             }),
@@ -150,8 +135,19 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                   set: {
                     ...config,
                   },
-                }),
+                })
+                .returning(),
             ),
+            Effect.map(Array.head),
+            Effect.map(
+              Option.map((v) =>
+                Schema.decodeEither(GuildConfig)({
+                  _tag: GuildConfig._tag,
+                  ...v,
+                }),
+              ),
+            ),
+            Effect.flatMap(Effect.transposeOption),
             Effect.withSpan("GuildConfigService.upsertGuildConfig", {
               captureStackTrace: true,
             }),
@@ -169,7 +165,14 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                   ),
                 ),
             ),
-            Computed.map(Array.map(GuildConfigManagerRole.fromDbSelect)),
+            Computed.flatMap(
+              Effect.forEach((v) =>
+                Schema.decodeEither(GuildConfigManagerRole)({
+                  _tag: GuildConfigManagerRole._tag,
+                  ...v,
+                }),
+              ),
+            ),
             Effect.withSpan("GuildConfigService.getGuildManagerRoles", {
               captureStackTrace: true,
             }),
@@ -186,8 +189,19 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                     configGuildManagerRole.roleId,
                   ],
                   set: { deletedAt: null },
-                }),
+                })
+                .returning(),
             ),
+            Effect.map(Array.head),
+            Effect.map(
+              Option.map((v) =>
+                Schema.decodeEither(GuildConfigManagerRole)({
+                  _tag: GuildConfigManagerRole._tag,
+                  ...v,
+                }),
+              ),
+            ),
+            Effect.flatMap(Effect.transposeOption),
             Effect.withSpan("GuildConfigService.addGuildManagerRole", {
               captureStackTrace: true,
             }),
@@ -208,6 +222,14 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                     ),
                   )
                   .returning(),
+              ),
+            ),
+            Effect.flatMap(
+              Effect.forEach((v) =>
+                Schema.decodeEither(GuildConfigManagerRole)({
+                  _tag: GuildConfigManagerRole._tag,
+                  ...v,
+                }),
               ),
             ),
             Effect.withSpan("GuildConfigService.removeGuildManagerRole", {
@@ -243,12 +265,20 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               // TODO: handle channel conflict
             ),
             Effect.map(Array.head),
-            Effect.map(Option.map(GuildChannelConfig.fromDbSelect)),
+            Effect.map(
+              Option.map((v) =>
+                Schema.decodeEither(GuildChannelConfig)({
+                  _tag: GuildChannelConfig._tag,
+                  ...v,
+                }),
+              ),
+            ),
+            Effect.flatMap(Effect.transposeOption),
             Effect.withSpan("GuildConfigService.setGuildChannelConfig", {
               captureStackTrace: true,
             }),
           ),
-        getGuildRunningChannelById: (guildId: string, id: string) =>
+        getGuildRunningChannelById: (guildId: string, channelId: string) =>
           pipe(
             dbSubscriptionContext.subscribeQuery(
               db
@@ -257,18 +287,26 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 .where(
                   and(
                     eq(configGuildChannel.guildId, guildId),
-                    eq(configGuildChannel.channelId, id),
+                    eq(configGuildChannel.channelId, channelId),
                     isNull(configGuildChannel.deletedAt),
                   ),
                 ),
             ),
             Computed.map(Array.head),
-            Computed.map(Option.map(GuildChannelConfig.fromDbSelect)),
+            Computed.map(
+              Option.map((v) =>
+                Schema.decodeEither(GuildChannelConfig)({
+                  _tag: GuildChannelConfig._tag,
+                  ...v,
+                }),
+              ),
+            ),
+            Computed.flatMap(Effect.transposeOption),
             Effect.withSpan("GuildConfigService.getGuildRunningChannelById", {
               captureStackTrace: true,
             }),
           ),
-        getGuildRunningChannelByName: (guildId: string, name: string) =>
+        getGuildRunningChannelByName: (guildId: string, channelName: string) =>
           pipe(
             dbSubscriptionContext.subscribeQuery(
               db
@@ -277,13 +315,21 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 .where(
                   and(
                     eq(configGuildChannel.guildId, guildId),
-                    eq(configGuildChannel.name, name),
+                    eq(configGuildChannel.name, channelName),
                     isNull(configGuildChannel.deletedAt),
                   ),
                 ),
             ),
             Computed.map(Array.head),
-            Computed.map(Option.map(GuildChannelConfig.fromDbSelect)),
+            Computed.map(
+              Option.map((v) =>
+                Schema.decodeEither(GuildChannelConfig)({
+                  _tag: GuildChannelConfig._tag,
+                  ...v,
+                }),
+              ),
+            ),
+            Computed.flatMap(Effect.transposeOption),
             Effect.withSpan("GuildConfigService.getGuildRunningChannelByName", {
               captureStackTrace: true,
             }),
