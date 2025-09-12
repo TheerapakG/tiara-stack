@@ -11,20 +11,18 @@ import {
   pipe,
   SynchronizedRef,
 } from "effect";
-import { RequestParamsConfig } from "typhoon-core/config";
+import {
+  HandlerConfigGroup,
+  MutationHandlerConfig,
+  RequestParamsConfig,
+  SubscriptionHandlerConfig,
+} from "typhoon-core/config";
 import {
   Header,
   HeaderEncoderDecoder,
   MsgpackEncoderDecoder,
 } from "typhoon-core/protocol";
 import { validate } from "typhoon-core/schema";
-import {
-  MutationHandlerContext,
-  Server,
-  ServerMutationHandlers,
-  ServerSubscriptionHandlers,
-  SubscriptionHandlerContext,
-} from "typhoon-core/server";
 import { DependencySignal, signal } from "typhoon-core/signal";
 import * as v from "valibot";
 
@@ -50,15 +48,13 @@ type UpdaterState<T = unknown> = {
 type UpdaterStateMap = HashMap.HashMap<string, UpdaterState>;
 
 export class WebSocketClient<
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  SubscriptionHandlers extends Record<
+  SubscriptionHandlerConfigs extends Record<
     string,
-    SubscriptionHandlerContext
-  > = Record<string, SubscriptionHandlerContext>,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  MutationHandlers extends Record<string, MutationHandlerContext> = Record<
+    SubscriptionHandlerConfig
+  > = Record<string, SubscriptionHandlerConfig>,
+  MutationHandlerConfigs extends Record<string, MutationHandlerConfig> = Record<
     string,
-    MutationHandlerContext
+    MutationHandlerConfig
   >,
 > {
   constructor(
@@ -67,17 +63,29 @@ export class WebSocketClient<
       Option.Option<WebSocket>
     >,
     private readonly updaterStateMapRef: SynchronizedRef.SynchronizedRef<UpdaterStateMap>,
+    private readonly configGroup: HandlerConfigGroup<
+      SubscriptionHandlerConfigs,
+      MutationHandlerConfigs
+    >,
+    private readonly token: SynchronizedRef.SynchronizedRef<
+      Option.Option<string>
+    >,
   ) {}
 
   static create<
-    S extends Server<
-      Record<string, SubscriptionHandlerContext>,
-      Record<string, MutationHandlerContext>
+    SubscriptionHandlerConfigs extends Record<
+      string,
+      SubscriptionHandlerConfig
     >,
+    MutationHandlerConfigs extends Record<string, MutationHandlerConfig>,
   >(
+    configGroup: HandlerConfigGroup<
+      SubscriptionHandlerConfigs,
+      MutationHandlerConfigs
+    >,
     url: string,
   ): Effect.Effect<
-    WebSocketClient<ServerSubscriptionHandlers<S>, ServerMutationHandlers<S>>,
+    WebSocketClient<SubscriptionHandlerConfigs, MutationHandlerConfigs>,
     never,
     never
   > {
@@ -87,12 +95,13 @@ export class WebSocketClient<
       Effect.bind("updaterStateMapRef", () =>
         SynchronizedRef.make(HashMap.empty<string, UpdaterState>()),
       ),
+      Effect.bind("token", () => SynchronizedRef.make(Option.none<string>())),
       Effect.map(
-        ({ ws, updaterStateMapRef }) =>
+        ({ ws, updaterStateMapRef, token }) =>
           new WebSocketClient<
-            ServerSubscriptionHandlers<S>,
-            ServerMutationHandlers<S>
-          >(url, ws, updaterStateMapRef),
+            SubscriptionHandlerConfigs,
+            MutationHandlerConfigs
+          >(url, ws, updaterStateMapRef, configGroup, token),
       ),
       Effect.withSpan("WebSocketClient.create"),
     );
@@ -106,8 +115,8 @@ export class WebSocketClient<
   ) {
     return (
       client: WebSocketClient<
-        Record<string, SubscriptionHandlerContext>,
-        Record<string, MutationHandlerContext>
+        Record<string, SubscriptionHandlerConfig>,
+        Record<string, MutationHandlerConfig>
       >,
     ) =>
       pipe(
@@ -119,8 +128,8 @@ export class WebSocketClient<
   static removeUpdater(id: string) {
     return (
       client: WebSocketClient<
-        Record<string, SubscriptionHandlerContext>,
-        Record<string, MutationHandlerContext>
+        Record<string, SubscriptionHandlerConfig>,
+        Record<string, MutationHandlerConfig>
       >,
     ) =>
       pipe(
@@ -132,8 +141,8 @@ export class WebSocketClient<
   static handleUpdate(header: Header, decodedResponse: unknown) {
     return (
       client: WebSocketClient<
-        Record<string, SubscriptionHandlerContext>,
-        Record<string, MutationHandlerContext>
+        Record<string, SubscriptionHandlerConfig>,
+        Record<string, MutationHandlerConfig>
       >,
     ) =>
       pipe(
@@ -173,13 +182,13 @@ export class WebSocketClient<
       );
   }
 
-  static connect(
+  static connect = (
     client: WebSocketClient<
-      Record<string, SubscriptionHandlerContext>,
-      Record<string, MutationHandlerContext>
+      Record<string, SubscriptionHandlerConfig>,
+      Record<string, MutationHandlerConfig>
     >,
-  ) {
-    return pipe(
+  ) =>
+    pipe(
       Effect.Do,
       Effect.bind("latch", () => Effect.makeLatch()),
       Effect.tap(({ latch }) =>
@@ -232,12 +241,11 @@ export class WebSocketClient<
       ),
       Effect.withSpan("WebSocketClient.connect"),
     );
-  }
 
   static close(
     client: WebSocketClient<
-      Record<string, SubscriptionHandlerContext>,
-      Record<string, MutationHandlerContext>
+      Record<string, SubscriptionHandlerConfig>,
+      Record<string, MutationHandlerConfig>
     >,
   ) {
     return pipe(
@@ -252,20 +260,33 @@ export class WebSocketClient<
     );
   }
 
+  static token =
+    (token: Option.Option<string>) =>
+    (
+      client: WebSocketClient<
+        Record<string, SubscriptionHandlerConfig>,
+        Record<string, MutationHandlerConfig>
+      >,
+    ) =>
+      pipe(
+        SynchronizedRef.update(client.token, () => token),
+        Effect.withSpan("WebSocketClient.token"),
+      );
+
   static subscribe<
-    ServerSubscriptionHandlers extends Record<
+    SubscriptionHandlerConfigs extends Record<
       string,
-      SubscriptionHandlerContext
+      SubscriptionHandlerConfig
     >,
-    Handler extends keyof ServerSubscriptionHandlers & string,
+    Handler extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: WebSocketClient<
-      ServerSubscriptionHandlers,
-      Record<string, MutationHandlerContext>
+      SubscriptionHandlerConfigs,
+      Record<string, MutationHandlerConfig>
     >,
     handler: Handler,
     // TODO: make this conditionally optional
-    data?: ServerSubscriptionHandlers[Handler]["config"]["requestParams"] extends infer HandlerRequestParamsConfig extends
+    data?: SubscriptionHandlerConfigs[Handler]["requestParams"] extends infer HandlerRequestParamsConfig extends
       RequestParamsConfig
       ? StandardSchemaV1.InferInput<HandlerRequestParamsConfig["validator"]>
       : never,
@@ -288,7 +309,27 @@ export class WebSocketClient<
                   ? {
                       state: "resolved",
                       timestamp: value.timestamp,
-                      value: value.value,
+                      // TODO: validate the response validator
+                      value: pipe(
+                        Effect.Do,
+                        Effect.bind("value", () => value.value),
+                        Effect.bind("config", () =>
+                          HashMap.get(
+                            client.configGroup.subscriptionHandlerMap,
+                            handler,
+                          ),
+                        ),
+                        Effect.flatMap(({ value, config }) =>
+                          validate(config.response.validator)(value),
+                        ),
+                        Effect.catchAll((error) =>
+                          Effect.fail(
+                            new HandlerError({
+                              cause: error,
+                            } as unknown as void),
+                          ),
+                        ),
+                      ),
                     }
                   : prev,
               ),
@@ -296,7 +337,8 @@ export class WebSocketClient<
           ),
         ),
       ),
-      Effect.bind("requestHeader", ({ id }) =>
+      Effect.bind("token", () => client.token),
+      Effect.bind("requestHeader", ({ id, token }) =>
         HeaderEncoderDecoder.encode({
           protocol: "typh",
           version: 1,
@@ -304,6 +346,7 @@ export class WebSocketClient<
           action: "client:subscribe",
           payload: {
             handler: handler,
+            token: Option.getOrUndefined(token),
           },
         }),
       ),
@@ -329,7 +372,7 @@ export class WebSocketClient<
             signal as DependencySignal<
               SignalState<
                 StandardSchemaV1.InferOutput<
-                  ServerSubscriptionHandlers[Handler]["config"]["response"]["validator"]
+                  SubscriptionHandlerConfigs[Handler]["response"]["validator"]
                 >
               >,
               never,
@@ -343,15 +386,15 @@ export class WebSocketClient<
   }
 
   static unsubscribe<
-    ServerSubscriptionHandlers extends Record<
+    SubscriptionHandlerConfigs extends Record<
       string,
-      SubscriptionHandlerContext
+      SubscriptionHandlerConfig
     >,
-    Handler extends keyof ServerSubscriptionHandlers & string,
+    Handler extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: WebSocketClient<
-      ServerSubscriptionHandlers,
-      Record<string, MutationHandlerContext>
+      SubscriptionHandlerConfigs,
+      Record<string, MutationHandlerConfig>
     >,
     id: string,
     handler: Handler,
@@ -377,24 +420,25 @@ export class WebSocketClient<
       Effect.tap(({ ws, headerEncoded }) =>
         Option.map(ws, (ws) => ws.send(headerEncoded)),
       ),
+      Effect.asVoid,
       Effect.withSpan("WebSocketClient.unsubscribe"),
     );
   }
 
   static once<
-    ServerSubscriptionHandlers extends Record<
+    SubscriptionHandlerConfigs extends Record<
       string,
-      SubscriptionHandlerContext
+      SubscriptionHandlerConfig
     >,
-    Handler extends keyof ServerSubscriptionHandlers & string,
+    Handler extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: WebSocketClient<
-      ServerSubscriptionHandlers,
-      Record<string, MutationHandlerContext>
+      SubscriptionHandlerConfigs,
+      Record<string, MutationHandlerConfig>
     >,
     handler: Handler,
     // TODO: make this conditionally optional
-    data?: ServerSubscriptionHandlers[Handler]["config"]["requestParams"] extends infer HandlerRequestParamsConfig extends
+    data?: SubscriptionHandlerConfigs[Handler]["requestParams"] extends infer HandlerRequestParamsConfig extends
       RequestParamsConfig
       ? StandardSchemaV1.InferInput<HandlerRequestParamsConfig["validator"]>
       : never,
@@ -409,7 +453,26 @@ export class WebSocketClient<
           WebSocketClient.addUpdater(id, (value) =>
             pipe(
               deferred,
-              Deferred.complete(value.value),
+              Deferred.complete(
+                pipe(
+                  Effect.Do,
+                  Effect.bind("value", () => value.value),
+                  Effect.bind("config", () =>
+                    HashMap.get(
+                      client.configGroup.subscriptionHandlerMap,
+                      handler,
+                    ),
+                  ),
+                  Effect.flatMap(({ value, config }) =>
+                    validate(config.response.validator)(value),
+                  ),
+                  Effect.catchAll((error) =>
+                    Effect.fail(
+                      new HandlerError({ cause: error } as unknown as void),
+                    ),
+                  ),
+                ),
+              ),
               Effect.andThen(() =>
                 pipe(client, WebSocketClient.removeUpdater(id)),
               ),
@@ -418,7 +481,8 @@ export class WebSocketClient<
           ),
         ),
       ),
-      Effect.bind("requestHeader", ({ id }) =>
+      Effect.bind("token", () => client.token),
+      Effect.bind("requestHeader", ({ id, token }) =>
         HeaderEncoderDecoder.encode({
           protocol: "typh",
           version: 1,
@@ -426,6 +490,7 @@ export class WebSocketClient<
           action: "client:once",
           payload: {
             handler: handler,
+            token: Option.getOrUndefined(token),
           },
         }),
       ),
@@ -449,7 +514,7 @@ export class WebSocketClient<
         Deferred.await(
           deferred as Deferred.Deferred<
             StandardSchemaV1.InferOutput<
-              ServerSubscriptionHandlers[Handler]["config"]["response"]["validator"]
+              SubscriptionHandlerConfigs[Handler]["response"]["validator"]
             >,
             HandlerError
           >,

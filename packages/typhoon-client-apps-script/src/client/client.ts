@@ -1,5 +1,5 @@
 import { StandardSchemaV1 } from "@standard-schema/spec";
-import { Data, Effect, pipe } from "effect";
+import { Data, Effect, Option, pipe, SynchronizedRef } from "effect";
 import { RequestParamsConfig } from "typhoon-core/config";
 import {
   HeaderEncoderDecoder,
@@ -29,7 +29,12 @@ export class AppsScriptClient<
     MutationHandlerContext
   >,
 > {
-  constructor(private readonly url: string) {}
+  constructor(
+    private readonly url: string,
+    private readonly token: SynchronizedRef.SynchronizedRef<
+      Option.Option<string>
+    >,
+  ) {}
 
   static create<
     S extends Server<
@@ -45,16 +50,30 @@ export class AppsScriptClient<
   > {
     return pipe(
       Effect.Do,
+      Effect.bind("token", () => SynchronizedRef.make(Option.none<string>())),
       Effect.map(
-        () =>
+        ({ token }) =>
           new AppsScriptClient<
             ServerSubscriptionHandlers<S>,
             ServerMutationHandlers<S>
-          >(url),
+          >(url, token),
       ),
       Effect.withSpan("AppsScriptClient.create"),
     );
   }
+
+  static token =
+    (token: Option.Option<string>) =>
+    (
+      client: AppsScriptClient<
+        Record<string, SubscriptionHandlerContext>,
+        Record<string, MutationHandlerContext>
+      >,
+    ) =>
+      pipe(
+        SynchronizedRef.update(client.token, () => token),
+        Effect.withSpan("AppsScriptClient.token"),
+      );
 
   static once<
     ServerSubscriptionHandlers extends Record<
@@ -78,7 +97,8 @@ export class AppsScriptClient<
     return pipe(
       Effect.Do,
       Effect.let("id", () => Utilities.getUuid() as string),
-      Effect.bind("requestHeader", ({ id }) =>
+      Effect.bind("token", () => client.token),
+      Effect.bind("requestHeader", ({ id, token }) =>
         HeaderEncoderDecoder.encode({
           protocol: "typh",
           version: 1,
@@ -86,6 +106,7 @@ export class AppsScriptClient<
           action: "client:once",
           payload: {
             handler: handler,
+            token: Option.getOrUndefined(token),
           },
         }),
       ),
@@ -123,6 +144,7 @@ export class AppsScriptClient<
         ),
       ),
       // TODO: check if the response is a valid header
+      // TODO: validate the response validator
       Effect.bind(
         "decodedResponse",
         ({ pullDecodedStream }) => pullDecodedStream,
@@ -130,7 +152,7 @@ export class AppsScriptClient<
       Effect.flatMap(({ header, decodedResponse }) =>
         header.action === "server:update" && header.payload.success
           ? Effect.succeed(
-              decodedResponse as StandardSchemaV1.InferOutput<
+              decodedResponse as StandardSchemaV1.InferInput<
                 ServerSubscriptionHandlers[Handler]["config"]["response"]["validator"]
               >,
             )
