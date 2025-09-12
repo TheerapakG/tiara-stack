@@ -203,13 +203,15 @@ const emptyPayloadEncoderDecoder = new LookupEncoderDecoder(
 
 const handlerPayloadEncoderDecoder = new LookupEncoderDecoder(
   "handlerPayloadEncoderDecoder",
-  ["handler"],
-  ["handler"],
+  ["handler", "token"],
+  ["handler", "token"],
   {
     handler: validate(v.string()),
+    token: validate(v.optional(v.string())),
   },
   {
     handler: validate(v.string()),
+    token: validate(v.optional(v.string())),
   },
 );
 

@@ -4,6 +4,7 @@ import {
   Effect as Effect_,
   Effectable,
   Fiber,
+  Function,
   HashSet,
   Option,
   pipe,
@@ -440,11 +441,7 @@ export class Computed<A = never, E = never, R = never>
       signal: Effect_.Effect<DependencySignal<A, E1, R1>, E2, R2>,
     ) =>
       computed(
-        pipe(
-          signal,
-          Effect_.flatMap((signal) => signal),
-          Effect_.map(mapper),
-        ),
+        pipe(signal, Effect_.flatMap(Function.identity), Effect_.map(mapper)),
         options,
       );
   }
@@ -459,8 +456,26 @@ export class Computed<A = never, E = never, R = never>
       computed(
         pipe(
           signal,
-          Effect_.flatMap((signal) => signal),
+          Effect_.flatMap(Function.identity),
           Effect_.flatMap(mapper),
+        ),
+        options,
+      );
+  }
+
+  static flatMapComputed<A, B, E3, R3, E4, R4>(
+    mapper: (value: A) => Effect_.Effect<DependencySignal<B, E3, R3>, E4, R4>,
+    options?: ObservableOptions,
+  ) {
+    return <E1, R1, E2, R2>(
+      signal: Effect_.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    ) =>
+      computed(
+        pipe(
+          signal,
+          Effect_.flatMap(Function.identity),
+          Effect_.flatMap(mapper),
+          Effect_.flatMap(Function.identity),
         ),
         options,
       );
@@ -479,7 +494,7 @@ export class Computed<A = never, E = never, R = never>
           Effect_.flatMap((value) =>
             pipe(
               signal,
-              Effect_.flatMap((signal) => signal),
+              Effect_.flatMap(Function.identity),
               Effect_.annotateLogs(key, value),
             ),
           ),
@@ -500,7 +515,7 @@ export class Computed<A = never, E = never, R = never>
           Effect_.flatMap((value) =>
             pipe(
               signal,
-              Effect_.flatMap((signal) => signal),
+              Effect_.flatMap(Function.identity),
               Effect_.annotateSpans(key, value),
             ),
           ),
