@@ -381,7 +381,12 @@ export class WebSocketClient<
             WebSocketClient.unsubscribe(client, id, handler),
           ] as const,
       ),
-      Effect.withSpan("WebSocketClient.subscribe"),
+      Effect.withSpan("WebSocketClient.subscribe", {
+        attributes: {
+          handler,
+        },
+        captureStackTrace: true,
+      }),
     );
   }
 
@@ -421,7 +426,13 @@ export class WebSocketClient<
         Option.map(ws, (ws) => ws.send(headerEncoded)),
       ),
       Effect.asVoid,
-      Effect.withSpan("WebSocketClient.unsubscribe"),
+      Effect.withSpan("WebSocketClient.unsubscribe", {
+        attributes: {
+          id,
+          handler,
+        },
+        captureStackTrace: true,
+      }),
     );
   }
 
@@ -520,7 +531,12 @@ export class WebSocketClient<
           >,
         ),
       ),
-      Effect.withSpan("WebSocketClient.once"),
+      Effect.withSpan("WebSocketClient.once", {
+        attributes: {
+          handler,
+        },
+        captureStackTrace: true,
+      }),
     );
   }
 
@@ -613,7 +629,12 @@ export class WebSocketClient<
           >,
         ),
       ),
-      Effect.withSpan("WebSocketClient.mutate"),
+      Effect.withSpan("WebSocketClient.mutate", {
+        attributes: {
+          handler,
+        },
+        captureStackTrace: true,
+      }),
     );
   }
 }
