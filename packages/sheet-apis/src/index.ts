@@ -11,6 +11,8 @@ import {
   Server as TyphoonServer,
 } from "typhoon-server/server";
 import { server } from "./server";
+export { serverHandlerConfigGroup } from "./server";
+export * from "./services";
 
 export type Server = InferServerType<typeof server>;
 

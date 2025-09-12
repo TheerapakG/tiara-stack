@@ -5,7 +5,7 @@ import { defineHandlerBuilder, Event } from "typhoon-server/server";
 import * as v from "valibot";
 import { CalcConfig, CalcService, PlayerTeam } from "../../../services";
 
-const calcHandlerConfig = defineHandlerConfigBuilder()
+export const botCalcHandlerConfig = defineHandlerConfigBuilder()
   .name("botCalc")
   .type("subscription")
   .request({
@@ -54,12 +54,12 @@ const calcHandlerConfig = defineHandlerConfigBuilder()
   .build();
 
 export const botCalcHandler = defineHandlerBuilder()
-  .config(calcHandlerConfig)
+  .config(botCalcHandlerConfig)
   .handler(
     pipe(
       Effect.Do,
       Effect.bind("parsed", () =>
-        Event.withConfig(calcHandlerConfig).request.parsed(),
+        Event.withConfig(botCalcHandlerConfig).request.parsed(),
       ),
       Effect.flatMap(({ parsed }) =>
         pipe(
