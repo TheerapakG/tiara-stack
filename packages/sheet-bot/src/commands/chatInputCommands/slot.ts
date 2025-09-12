@@ -43,7 +43,6 @@ import {
   String,
 } from "effect";
 import { validate } from "typhoon-core/schema";
-import { observeOnce } from "typhoon-server/signal";
 
 const getSlotMessage = (day: number) =>
   pipe(
@@ -147,8 +146,7 @@ const handleList =
             pipe(
               PermissionService.checkRoles.effect(
                 pipe(
-                  GuildConfigService.getManagerRoles(),
-                  Effect.flatMap(observeOnce),
+                  GuildConfigService.getGuildManagerRoles(),
                   Effect.map(Array.map((role) => role.roleId)),
                   Effect.map((roles) => ({
                     roles,
@@ -210,8 +208,7 @@ const handleButton =
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
           PermissionService.checkRoles.tapEffect(() =>
             pipe(
-              GuildConfigService.getManagerRoles(),
-              Effect.flatMap(observeOnce),
+              GuildConfigService.getGuildManagerRoles(),
               Effect.map(Array.map((role) => role.roleId)),
               Effect.map((roles) => ({
                 roles,

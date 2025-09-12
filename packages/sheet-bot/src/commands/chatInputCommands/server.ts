@@ -24,7 +24,6 @@ import {
   SlashCommandSubcommandGroupBuilder,
 } from "discord.js";
 import { Array, Effect, Number, Option, Order, pipe } from "effect";
-import { observeOnce } from "typhoon-server/signal";
 
 const handleListConfig =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
@@ -49,10 +48,7 @@ const handleListConfig =
           bindObject({
             guildName: GuildService.getName(),
             guildConfig: GuildConfigService.getGuildConfigByGuildId(),
-            managerRoles: pipe(
-              GuildConfigService.getManagerRoles(),
-              Effect.flatMap(observeOnce),
-            ),
+            managerRoles: GuildConfigService.getGuildManagerRoles(),
           }),
           Effect.bindAll(({ guildConfig }) => ({
             sheetId: pipe(
@@ -139,7 +135,9 @@ const handleAddManagerRole =
             guildName: GuildService.getName(),
             role: InteractionContext.getRole("role", true),
           }),
-          Effect.tap(({ role }) => GuildConfigService.addManagerRole(role.id)),
+          Effect.tap(({ role }) =>
+            GuildConfigService.addGuildManagerRole(role.id),
+          ),
           InteractionContext.editReply.tapEffect(({ guildName, role }) =>
             pipe(
               ClientService.makeEmbedBuilder(),
@@ -202,7 +200,7 @@ const handleRemoveManagerRole =
             role: InteractionContext.getRole("role", true),
           }),
           Effect.tap(({ role }) =>
-            GuildConfigService.removeManagerRole(role.id),
+            GuildConfigService.removeGuildManagerRole(role.id),
           ),
           InteractionContext.editReply.tapEffect(({ guildName, role }) =>
             pipe(
@@ -266,7 +264,7 @@ const handleSetSheet =
             guildName: GuildService.getName(),
           }),
           Effect.tap(({ sheetId }) =>
-            GuildConfigService.upsertConfig({
+            GuildConfigService.upsertGuildConfig({
               sheetId,
             }),
           ),
@@ -319,7 +317,7 @@ const handleSetScript =
             guildName: GuildService.getName(),
           }),
           Effect.tap(({ scriptId }) =>
-            GuildConfigService.upsertConfig({
+            GuildConfigService.upsertGuildConfig({
               scriptId,
             }),
           ),

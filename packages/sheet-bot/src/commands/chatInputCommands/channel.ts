@@ -99,7 +99,7 @@ const handleSet =
             "config",
             ({ channel, running, name, role, checkinChannel }) =>
               pipe(
-                GuildConfigService.setChannelConfig(channel.id, {
+                GuildConfigService.upsertGuildChannelConfig(channel.id, {
                   running: Option.getOrUndefined(running),
                   name: Option.getOrUndefined(name),
                   roleId: pipe(
@@ -177,7 +177,7 @@ const handleUnset =
           }),
           Effect.bind("config", ({ channel, name, role, checkinChannel }) =>
             pipe(
-              GuildConfigService.setChannelConfig(channel.id, {
+              GuildConfigService.upsertGuildChannelConfig(channel.id, {
                 name: pipe(name, Option.as(null), Option.getOrUndefined),
                 roleId: pipe(role, Option.as(null), Option.getOrUndefined),
                 checkinChannelId: pipe(
