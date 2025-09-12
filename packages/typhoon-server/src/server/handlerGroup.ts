@@ -46,6 +46,30 @@ type AddHandlerGroupHandler<
         : never
     : never;
 
+type AddHandlerGroupHandlerGroup<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  OtherG extends HandlerGroup<any, any, any>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ThisG extends HandlerGroup<any, any, any>,
+> =
+  OtherG extends HandlerGroup<
+    infer OtherR,
+    infer OtherSubscriptionHandlers,
+    infer OtherMutationHandlers
+  >
+    ? ThisG extends HandlerGroup<
+        infer ThisR,
+        infer ThisSubscriptionHandlers,
+        infer ThisMutationHandlers
+      >
+      ? HandlerGroup<
+          OtherR | ThisR,
+          OtherSubscriptionHandlers & ThisSubscriptionHandlers,
+          OtherMutationHandlers & ThisMutationHandlers
+        >
+      : never
+    : never;
+
 export class HandlerGroup<
   R = never,
   _SubscriptionHandlers extends Record<
@@ -100,4 +124,22 @@ export class HandlerGroup<
         newHandlerMaps,
       ) as unknown as AddHandlerGroupHandler<G, Handler>;
     };
+
+  static addGroup =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    <OtherG extends HandlerGroup<any, any, any>>(otherGroup: OtherG) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      <ThisG extends HandlerGroup<any, any, any>>(
+        thisGroup: ThisG,
+      ): AddHandlerGroupHandlerGroup<ThisG, OtherG> =>
+        new HandlerGroup({
+          subscriptionHandlerMap: HashMap.union(
+            thisGroup.subscriptionHandlerMap,
+            otherGroup.subscriptionHandlerMap,
+          ),
+          mutationHandlerMap: HashMap.union(
+            thisGroup.mutationHandlerMap,
+            otherGroup.mutationHandlerMap,
+          ),
+        }) as unknown as AddHandlerGroupHandlerGroup<ThisG, OtherG>;
 }

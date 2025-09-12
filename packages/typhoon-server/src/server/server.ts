@@ -1,6 +1,7 @@
 import { Message, Peer } from "crossws";
 import type { serve as crosswsServe } from "crossws/server";
 import {
+  Array,
   Cause,
   Context,
   Data,
@@ -17,6 +18,7 @@ import {
   Option,
   pipe,
   Scope,
+  String,
   SynchronizedRef,
 } from "effect";
 import {
@@ -41,7 +43,7 @@ import invalidHeaderErrorHtml from "./invalidHeaderError.html";
 
 type SubscriptionHandlerMap<R> = HashMap.HashMap<
   string,
-  SubscriptionHandlerContext<SubscriptionHandlerConfig, R>
+  SubscriptionHandlerContext<SubscriptionHandlerConfig, R, R>
 >;
 type MutationHandlerMap<R> = HashMap.HashMap<
   string,
@@ -143,7 +145,7 @@ export class Server<
           subscriptionHandlerMap: Effect.succeed(
             HashMap.empty<
               string,
-              SubscriptionHandlerContext<SubscriptionHandlerConfig, R>
+              SubscriptionHandlerContext<SubscriptionHandlerConfig, R, R>
             >(),
           ),
           mutationHandlerMap: Effect.succeed(
@@ -443,7 +445,7 @@ export class Server<
   private static getComputedSubscriptionResult<R = never>(
     subscriptionId: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    subscriptionHandlerContext: SubscriptionHandlerContext<any, R>,
+    subscriptionHandlerContext: SubscriptionHandlerContext<any, R, R>,
   ): Effect.Effect<
     Computed<
       {
@@ -454,7 +456,7 @@ export class Server<
       Event | R
     >,
     unknown,
-    never
+    R
   > {
     return pipe(
       subscriptionHandlerContext.handler,
@@ -513,7 +515,7 @@ export class Server<
   private static getComputedSubscriptionResultEncoded<R = never>(
     subscriptionId: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    subscriptionHandlerContext: SubscriptionHandlerContext<any, R>,
+    subscriptionHandlerContext: SubscriptionHandlerContext<any, R, R>,
   ) {
     return pipe(
       Server.getComputedSubscriptionResult(
@@ -575,9 +577,8 @@ export class Server<
                 Option.match({
                   onSome: ({ event, effectCleanup }) =>
                     pipe(
-                      Event.replaceStreamContext({
-                        pullStream: pullDecodedStream,
-                        request: peer.request,
+                      Event.replacePullStream({
+                        stream: pullDecodedStream,
                         scope,
                       }),
                       Effect.map((event) => ({
@@ -590,11 +591,31 @@ export class Server<
                   onNone: () =>
                     pipe(
                       Effect.Do,
-                      Effect.let("event", () =>
-                        Event.fromPullStreamContext({
-                          pullStream: pullDecodedStream,
+                      Effect.bind("event", () =>
+                        Event.fromEventContext({
                           request: peer.request,
-                          scope,
+                          pullStream: {
+                            stream: pullDecodedStream,
+                            scope,
+                          },
+                          token: pipe(
+                            Option.fromNullable(header.payload.token),
+                            Option.orElse(() =>
+                              pipe(
+                                Option.fromNullable(
+                                  peer.request.headers.get("Authorization"),
+                                ),
+                                Option.map(String.split(" ")),
+                                Option.filter((parts) =>
+                                  Option.getEquivalence(String.Equivalence)(
+                                    Array.get(parts, 0),
+                                    Option.some("Bearer"),
+                                  ),
+                                ),
+                                Option.flatMap(Array.get(1)),
+                              ),
+                            ),
+                          ),
                         }),
                       ),
                       Effect.bind("handlerContext", () =>
@@ -604,9 +625,22 @@ export class Server<
                         ),
                       ),
                       Effect.bind("computedBuffer", ({ handlerContext }) =>
-                        Server.getComputedSubscriptionResultEncoded(
-                          header.id,
-                          handlerContext,
+                        pipe(
+                          SynchronizedRef.get(server.runtime),
+                          Effect.flatMap(
+                            Option.match({
+                              onSome: (runtime) =>
+                                pipe(
+                                  Server.getComputedSubscriptionResultEncoded(
+                                    header.id,
+                                    handlerContext,
+                                  ),
+                                  Effect.provide(runtime),
+                                ),
+                              onNone: () =>
+                                Effect.fail("scope layer not initialized"),
+                            }),
+                          ),
                         ),
                       ),
                       Effect.bind(
@@ -708,20 +742,50 @@ export class Server<
       pipe(
         Effect.Do,
         Effect.tap(() => server.onceTotal(Effect.succeed(BigInt(1)))),
-        Effect.let("event", () =>
-          Event.fromPullStreamContext({
-            pullStream: pullDecodedStream,
+        Effect.bind("event", () =>
+          Event.fromEventContext({
             request,
-            scope,
+            pullStream: {
+              stream: pullDecodedStream,
+              scope,
+            },
+            token: pipe(
+              Option.fromNullable(header.payload.token),
+              Option.orElse(() =>
+                pipe(
+                  Option.fromNullable(request.headers.get("Authorization")),
+                  Option.map(String.split(" ")),
+                  Option.filter((parts) =>
+                    Option.getEquivalence(String.Equivalence)(
+                      Array.get(parts, 0),
+                      Option.some("Bearer"),
+                    ),
+                  ),
+                  Option.flatMap(Array.get(1)),
+                ),
+              ),
+            ),
           }),
         ),
         Effect.bind("handlerContext", () =>
           HashMap.get(server.subscriptionHandlerMap, header.payload.handler),
         ),
         Effect.bind("computedBuffer", ({ handlerContext }) =>
-          Server.getComputedSubscriptionResultEncoded(
-            header.id,
-            handlerContext,
+          pipe(
+            SynchronizedRef.get(server.runtime),
+            Effect.flatMap(
+              Option.match({
+                onSome: (runtime) =>
+                  pipe(
+                    Server.getComputedSubscriptionResultEncoded(
+                      header.id,
+                      handlerContext,
+                    ),
+                    Effect.provide(runtime),
+                  ),
+                onNone: () => Effect.fail("scope layer not initialized"),
+              }),
+            ),
           ),
         ),
         Effect.bind("providedComputedBuffer", ({ computedBuffer }) =>
@@ -770,11 +834,29 @@ export class Server<
       pipe(
         Effect.Do,
         Effect.tap(() => server.mutationTotal(Effect.succeed(BigInt(1)))),
-        Effect.let("event", () =>
-          Event.fromPullStreamContext({
-            pullStream: pullDecodedStream,
+        Effect.bind("event", () =>
+          Event.fromEventContext({
             request,
-            scope,
+            pullStream: {
+              stream: pullDecodedStream,
+              scope,
+            },
+            token: pipe(
+              Option.fromNullable(header.payload.token),
+              Option.orElse(() =>
+                pipe(
+                  Option.fromNullable(request.headers.get("Authorization")),
+                  Option.map(String.split(" ")),
+                  Option.filter((parts) =>
+                    Option.getEquivalence(String.Equivalence)(
+                      Array.get(parts, 0),
+                      Option.some("Bearer"),
+                    ),
+                  ),
+                  Option.flatMap(Array.get(1)),
+                ),
+              ),
+            ),
           }),
         ),
         Effect.bind("handlerContext", () =>
@@ -1016,7 +1098,7 @@ export const serve =
     R,
     SubscriptionHandlers extends Record<
       string,
-      AnySubscriptionHandlerContext<SubscriptionHandlerConfig, R>
+      AnySubscriptionHandlerContext<SubscriptionHandlerConfig, R, R>
     >,
     MutationHandlers extends Record<
       string,

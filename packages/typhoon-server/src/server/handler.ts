@@ -14,28 +14,42 @@ import { Event } from "./event";
 
 export type SubscriptionEventHandler<
   Config extends SubscriptionHandlerConfig,
-  R = never,
+  SignalR = never,
+  EffectR = never,
 > = Effect.Effect<
   DependencySignal<
     StandardSchemaV1.InferInput<Config["response"]["validator"]>,
     unknown,
-    Event | Scope.Scope | R
+    Event | Scope.Scope | SignalR
   >,
   unknown,
-  never
+  EffectR
 >;
 
 export type AnySubscriptionEventHandler<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Config extends SubscriptionHandlerConfig = any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  R = any,
-> = SubscriptionEventHandler<Config, R>;
-
-type SubscriptionEventHandlerContext<
-  Handler extends AnySubscriptionEventHandler,
+  SignalR = any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-> = Handler extends SubscriptionEventHandler<any, infer R> ? R : never;
+  EffectR = any,
+> = SubscriptionEventHandler<Config, SignalR, EffectR>;
+
+type SubscriptionEventHandlerSignalContext<
+  Handler extends AnySubscriptionEventHandler,
+> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Handler extends SubscriptionEventHandler<any, infer SignalR, any>
+    ? SignalR
+    : never;
+
+type SubscriptionEventHandlerEffectContext<
+  Handler extends AnySubscriptionEventHandler,
+> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Handler extends SubscriptionEventHandler<any, any, infer EffectR>
+    ? EffectR
+    : never;
 
 export type MutationEventHandler<
   Config extends MutationHandlerConfig,
@@ -60,9 +74,12 @@ type MutationEventHandlerContext<
 
 export type SubscriptionHandlerContextContext<
   Config extends SubscriptionHandlerConfig,
-  R = never,
-  Handler extends AnySubscriptionEventHandler<Config, R> | undefined =
-    | AnySubscriptionEventHandler<Config, R>
+  SignalR = never,
+  EffectR = never,
+  Handler extends
+    | AnySubscriptionEventHandler<Config, SignalR, EffectR>
+    | undefined =
+    | AnySubscriptionEventHandler<Config, SignalR, EffectR>
     | undefined,
 > = {
   config: Config;
@@ -82,24 +99,29 @@ export type MutationHandlerContextContext<
 
 export type SubscriptionHandlerContext<
   Config extends SubscriptionHandlerConfig = SubscriptionHandlerConfig,
-  R = never,
+  SignalR = never,
+  EffectR = never,
   Handler extends AnySubscriptionEventHandler<
     Config,
-    R
-  > = AnySubscriptionEventHandler<Config, R>,
+    SignalR,
+    EffectR
+  > = AnySubscriptionEventHandler<Config, SignalR, EffectR>,
 > = BaseSubscriptionHandlerContext<Config> & { handler: Handler };
 
 export type AnySubscriptionHandlerContext<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Config extends SubscriptionHandlerConfig = any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  R = any,
+  SignalR = any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  EffectR = any,
   Handler extends AnySubscriptionEventHandler<
     Config,
-    R
+    SignalR,
+    EffectR
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   > = any,
-> = SubscriptionHandlerContext<Config, R, Handler>;
+> = SubscriptionHandlerContext<Config, SignalR, EffectR, Handler>;
 
 export type MutationHandlerContext<
   Config extends MutationHandlerConfig = MutationHandlerConfig,
@@ -188,6 +210,7 @@ class SubscriptionHandlerContextBuilder<
     private readonly ctx: SubscriptionHandlerContextContext<
       Config,
       never,
+      never,
       undefined
     >,
   ) {}
@@ -197,7 +220,8 @@ class SubscriptionHandlerContextBuilder<
     handler: Handler,
   ): SubscriptionHandlerContext<
     Config,
-    SubscriptionEventHandlerContext<Handler>,
+    SubscriptionEventHandlerSignalContext<Handler>,
+    SubscriptionEventHandlerEffectContext<Handler>,
     Handler
   > {
     return { ...this.ctx, handler };
