@@ -512,6 +512,59 @@ export class Server<
     );
   }
 
+  private static getMutationResult<R = never>(
+    mutationId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mutationHandlerContext: MutationHandlerContext<any, R>,
+  ): Effect.Effect<
+    {
+      header: Header<"server:update">;
+      message: Uint8Array;
+    },
+    unknown,
+    Event | R
+  > {
+    return pipe(
+      Effect.Do,
+      Effect.bind("value", () => Effect.exit(mutationHandlerContext.handler)),
+      Effect.bind("timestamp", () => DateTime.now),
+      Effect.let(
+        "header",
+        ({ value, timestamp }) =>
+          ({
+            protocol: "typh",
+            version: 1,
+            id: mutationId,
+            action: "server:update",
+            payload: {
+              success: Exit.isSuccess(value),
+              timestamp: DateTime.toDate(timestamp),
+            },
+          }) as const,
+      ),
+      Effect.let("message", ({ value }) =>
+        pipe(
+          value,
+          Exit.match({
+            onSuccess: Function.identity,
+            onFailure: Cause.squash,
+          }),
+        ),
+      ),
+      Effect.map(({ header, message }) => ({
+        header,
+        message,
+      })),
+      Effect.scoped,
+      Effect.withSpan("Server.getMutationResult", {
+        captureStackTrace: true,
+      }),
+      Effect.annotateLogs({
+        handler: mutationHandlerContext.config.name,
+      }),
+    );
+  }
+
   private static getComputedSubscriptionResultEncoded<R = never>(
     subscriptionId: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -549,6 +602,40 @@ export class Server<
         ),
       ),
       Effect.withSpan("Server.getComputedSubscriptionResultEncoded", {
+        captureStackTrace: true,
+      }),
+    );
+  }
+
+  private static getMutationResultEncoded<R = never>(
+    mutationId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mutationHandlerContext: MutationHandlerContext<any, R>,
+  ) {
+    return pipe(
+      Effect.Do,
+      Effect.bind("result", () =>
+        Server.getMutationResult(mutationId, mutationHandlerContext),
+      ),
+      Effect.bind("header", ({ result }) =>
+        HeaderEncoderDecoder.encode(result.header),
+      ),
+      Effect.bind("headerEncoded", ({ header }) =>
+        MsgpackEncoderDecoder.encode(header),
+      ),
+      Effect.bind("messageEncoded", ({ result }) =>
+        MsgpackEncoderDecoder.encode(result.message),
+      ),
+      Effect.let("updateBuffer", ({ headerEncoded, messageEncoded }) => {
+        const updateBuffer = new Uint8Array(
+          headerEncoded.length + messageEncoded.length,
+        );
+        updateBuffer.set(headerEncoded, 0);
+        updateBuffer.set(messageEncoded, headerEncoded.length);
+        return updateBuffer;
+      }),
+      Effect.map(({ updateBuffer }) => updateBuffer),
+      Effect.withSpan("Server.getMutationResultEncoded", {
         captureStackTrace: true,
       }),
     );
@@ -827,7 +914,7 @@ export class Server<
     >,
     request: Request,
     header: Header<"client:mutate">,
-    callback: Effect.Effect<A, E, Event>,
+    callback: (buffer: Uint8Array) => Effect.Effect<A, E, Event>,
     scope: Scope.CloseableScope,
   ) {
     return <R = never>(server: Server<R>) =>
@@ -862,27 +949,29 @@ export class Server<
         Effect.bind("handlerContext", () =>
           HashMap.get(server.mutationHandlerMap, header.payload.handler),
         ),
-        Effect.bind("returnValue", ({ event, handlerContext }) =>
+        Effect.bind("buffer", ({ event, handlerContext }) =>
           pipe(
-            Effect.Do,
-            Effect.bind("runtime", () => SynchronizedRef.get(server.runtime)),
-            Effect.flatMap(({ runtime }) =>
-              pipe(
-                runtime,
-                Option.match({
-                  onSome: (runtime) =>
-                    pipe(handlerContext.handler, Effect.provide(runtime)),
-                  onNone: () => Effect.fail("scope layer not initialized"),
-                }),
-              ),
+            SynchronizedRef.get(server.runtime),
+            Effect.flatMap(
+              Option.match({
+                onSome: (runtime) =>
+                  pipe(
+                    Server.getMutationResultEncoded(header.id, handlerContext),
+                    Effect.provide(runtime),
+                    Effect.provideService(Event, event),
+                  ),
+                onNone: () => Effect.fail("scope layer not initialized"),
+              }),
             ),
-            Effect.scoped,
-            Effect.withSpan(`mutationHandler:${handlerContext.config.name}`, {
-              captureStackTrace: true,
-            }),
-            Effect.flatMap(() => callback),
-            Effect.tap(() => Event.close()),
-            Effect.provideService(Event, event),
+          ),
+        ),
+        Effect.bind("returnValue", ({ event, buffer }) =>
+          observeOnce(
+            pipe(
+              callback(buffer),
+              Effect.tap(() => Event.close()),
+              Effect.provideService(Event, event),
+            ),
           ),
         ),
         Effect.map(({ returnValue }) => returnValue),
@@ -948,7 +1037,12 @@ export class Server<
                       pullDecodedStream,
                       peer.request,
                       header,
-                      Effect.void,
+                      (buffer) =>
+                        Effect.sync(() => {
+                          peer.send(buffer, {
+                            compress: true,
+                          });
+                        }),
                       scope,
                     )(server),
                   ),
@@ -1021,7 +1115,16 @@ export class Server<
                       pullDecodedStream,
                       request,
                       header,
-                      Effect.sync(() => new Response("", { status: 200 })),
+                      (buffer) =>
+                        Effect.sync(
+                          () =>
+                            new Response(buffer as unknown as BodyInit, {
+                              status: 200,
+                              headers: {
+                                "content-type": "application/octet-stream",
+                              },
+                            }),
+                        ),
                       scope,
                     )(server),
                   ),

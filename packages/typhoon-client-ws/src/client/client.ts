@@ -523,4 +523,97 @@ export class WebSocketClient<
       Effect.withSpan("WebSocketClient.once"),
     );
   }
+
+  static mutate<
+    MutationHandlerConfigs extends Record<string, MutationHandlerConfig>,
+    Handler extends keyof MutationHandlerConfigs & string,
+  >(
+    client: WebSocketClient<
+      Record<string, SubscriptionHandlerConfig>,
+      MutationHandlerConfigs
+    >,
+    handler: Handler,
+    // TODO: make this conditionally optional
+    data?: MutationHandlerConfigs[Handler]["requestParams"] extends infer HandlerRequestParamsConfig extends
+      RequestParamsConfig
+      ? StandardSchemaV1.InferInput<HandlerRequestParamsConfig["validator"]>
+      : never,
+  ) {
+    return pipe(
+      Effect.Do,
+      Effect.let("id", () => crypto.randomUUID() as string),
+      Effect.bind("deferred", () => Deferred.make<unknown, HandlerError>()),
+      Effect.tap(({ id, deferred }) =>
+        pipe(
+          client,
+          WebSocketClient.addUpdater(id, (value) =>
+            pipe(
+              deferred,
+              Deferred.complete(
+                pipe(
+                  Effect.Do,
+                  Effect.bind("value", () => value.value),
+                  Effect.bind("config", () =>
+                    HashMap.get(client.configGroup.mutationHandlerMap, handler),
+                  ),
+                  Effect.flatMap(({ value, config }) =>
+                    validate(config.response.validator)(value),
+                  ),
+                  Effect.catchAll((error) =>
+                    Effect.fail(
+                      new HandlerError({ cause: error } as unknown as void),
+                    ),
+                  ),
+                ),
+              ),
+              Effect.andThen(() =>
+                pipe(client, WebSocketClient.removeUpdater(id)),
+              ),
+              Effect.asVoid,
+            ),
+          ),
+        ),
+      ),
+      Effect.bind("token", () => client.token),
+      Effect.bind("requestHeader", ({ id, token }) =>
+        HeaderEncoderDecoder.encode({
+          protocol: "typh",
+          version: 1,
+          id,
+          action: "client:mutate",
+          payload: {
+            handler: handler,
+            token: Option.getOrUndefined(token),
+          },
+        }),
+      ),
+      Effect.bind("requestHeaderEncoded", ({ requestHeader }) =>
+        MsgpackEncoderDecoder.encode(requestHeader),
+      ),
+      Effect.bind("dataEncoded", () => MsgpackEncoderDecoder.encode(data)),
+      Effect.let("requestBuffer", ({ requestHeaderEncoded, dataEncoded }) => {
+        const requestBuffer = new Uint8Array(
+          requestHeaderEncoded.length + dataEncoded.length,
+        );
+        requestBuffer.set(requestHeaderEncoded, 0);
+        requestBuffer.set(dataEncoded, requestHeaderEncoded.length);
+        return requestBuffer;
+      }),
+      Effect.bind("ws", () => client.ws),
+      Effect.tap(({ ws, requestBuffer }) =>
+        Option.map(ws, (ws) => ws.send(requestBuffer)),
+      ),
+      Effect.flatMap(({ deferred }) =>
+        Deferred.await(
+          deferred as Deferred.Deferred<
+            StandardSchemaV1.InferOutput<
+              MutationHandlerConfigs[Handler]["response"]["validator"]
+            >,
+            HandlerError
+          >,
+        ),
+      ),
+      Effect.withSpan("WebSocketClient.mutate"),
+    );
+  }
 }
