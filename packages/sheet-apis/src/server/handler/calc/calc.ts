@@ -1,5 +1,5 @@
 import { Array, Chunk, Effect, HashSet, Option, pipe } from "effect";
-import { Computed, computed } from "typhoon-core/signal";
+import { Computed, computed, DependencySignal } from "typhoon-core/signal";
 import { defineHandlerConfigBuilder } from "typhoon-server/config";
 import { defineHandlerBuilder, Event } from "typhoon-server/server";
 import * as v from "valibot";
@@ -10,7 +10,7 @@ import {
   PlayerTeam,
 } from "../../../services";
 
-const calcHandlerConfig = defineHandlerConfigBuilder()
+export const calcHandlerConfig = defineHandlerConfigBuilder()
   .name("calc")
   .type("subscription")
   .request({
@@ -58,7 +58,7 @@ const calcHandlerConfig = defineHandlerConfigBuilder()
   })
   .build();
 
-const getUserAgent = <E, R>(request: Computed<Request, E, R>) =>
+const getUserAgent = <E, R>(request: DependencySignal<Request, E, R>) =>
   computed(
     pipe(
       request,
@@ -115,7 +115,7 @@ export const calcHandler = defineHandlerBuilder()
   .handler(
     pipe(
       Effect.Do,
-      Effect.bind("request", () => Event.webRequest()),
+      Effect.bind("request", () => computed(Event.webRequest())),
       Effect.bind("userAgent", ({ request }) => getUserAgent(request)),
       Effect.bind("googleAppsScriptId", ({ userAgent }) =>
         extractGoogleAppsScriptId(userAgent),

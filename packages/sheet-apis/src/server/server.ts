@@ -1,11 +1,19 @@
 import { NodeContext } from "@effect/platform-node";
 import { Effect, Layer, pipe } from "effect";
+import { HandlerConfigGroup } from "typhoon-server/config";
 import { DBSubscriptionContext } from "typhoon-server/db";
-import { Server } from "typhoon-server/server";
+import { HandlerGroup, Server } from "typhoon-server/server";
 import { Config } from "../config";
 import { DB } from "../db";
 import { AuthService, CalcService, GuildConfigService } from "../services";
-import { calcHandlerGroup, testHandlerGroup } from "./handler";
+import {
+  calcHandlerConfigGroup,
+  calcHandlerGroup,
+  guildConfigHandlerConfigGroup,
+  guildConfigHandlerGroup,
+  testHandlerConfigGroup,
+  testHandlerGroup,
+} from "./handler";
 
 const layer = pipe(
   Layer.mergeAll(
@@ -23,8 +31,21 @@ const layer = pipe(
   ),
 );
 
+export const serverHandlerConfigGroup = pipe(
+  HandlerConfigGroup.empty(),
+  HandlerConfigGroup.addGroup(calcHandlerConfigGroup),
+  HandlerConfigGroup.addGroup(guildConfigHandlerConfigGroup),
+  HandlerConfigGroup.addGroup(testHandlerConfigGroup),
+);
+
+export const serverHandlerGroup = pipe(
+  HandlerGroup.empty(),
+  HandlerGroup.addGroup(calcHandlerGroup),
+  HandlerGroup.addGroup(guildConfigHandlerGroup),
+  HandlerGroup.addGroup(testHandlerGroup),
+);
+
 export const server = pipe(
   Server.create(layer),
-  Effect.map(Server.addGroup(calcHandlerGroup)),
-  Effect.map(Server.addGroup(testHandlerGroup)),
+  Effect.map(Server.addGroup(serverHandlerGroup)),
 );

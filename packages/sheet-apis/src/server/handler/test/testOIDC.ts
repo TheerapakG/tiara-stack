@@ -5,7 +5,7 @@ import { defineHandlerBuilder, Event } from "typhoon-server/server";
 import * as v from "valibot";
 import { AuthService } from "../../../services";
 
-const testOIDCHandlerConfig = defineHandlerConfigBuilder()
+export const testOIDCHandlerConfig = defineHandlerConfigBuilder()
   .name("testOIDC")
   .type("subscription")
   .request({
