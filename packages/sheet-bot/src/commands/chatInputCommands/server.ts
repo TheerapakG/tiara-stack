@@ -48,10 +48,7 @@ const handleListConfig =
           })),
           bindObject({
             guildName: GuildService.getName(),
-            guildConfig: pipe(
-              GuildConfigService.getConfig(),
-              Effect.flatMap(observeOnce),
-            ),
+            guildConfig: GuildConfigService.getGuildConfigByGuildId(),
             managerRoles: pipe(
               GuildConfigService.getManagerRoles(),
               Effect.flatMap(observeOnce),

@@ -7,8 +7,10 @@ import {
   configGuildChannel,
   configGuildManagerRole,
 } from "sheet-db-schema";
+import { WebSocketClient } from "typhoon-client-ws/client";
 import { Computed } from "typhoon-core/signal";
 import { DBSubscriptionContext } from "typhoon-server/db";
+import { SheetApisClient } from "~~/src/client/sheetApis";
 import { GuildService } from "./guildService";
 
 type GuildConfigInsert = typeof configGuild.$inferInsert;
@@ -95,208 +97,203 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
         db: DB,
         dbSubscriptionContext: DBSubscriptionContext,
         guildService: GuildService,
+        sheetApisClient: SheetApisClient,
       }),
-      Effect.map(({ db, dbSubscriptionContext, guildService }) => ({
-        getConfig: () =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              dbSubscriptionContext.subscribeQuery(
-                db
-                  .select()
-                  .from(configGuild)
-                  .where(
-                    and(
-                      eq(configGuild.guildId, guildId),
-                      isNull(configGuild.deletedAt),
-                    ),
-                  ),
+      Effect.map(
+        ({ db, dbSubscriptionContext, guildService, sheetApisClient }) => ({
+          getGuildConfigByGuildId: () =>
+            pipe(
+              guildService.getId(),
+              Effect.flatMap((guildId) =>
+                WebSocketClient.once(
+                  sheetApisClient.get(),
+                  "guildConfig.getGuildConfigByGuildId",
+                  guildId,
+                ),
               ),
+              Effect.withSpan("GuildConfigService.getGuildConfigByGuildId", {
+                captureStackTrace: true,
+              }),
             ),
-            Computed.map(Array.head),
-            Computed.map(Option.map(GuildConfig.fromDbSelect)),
-            Effect.withSpan("GuildConfigService.getConfig", {
-              captureStackTrace: true,
-            }),
-          ),
-        upsertConfig: (
-          config: Omit<
-            Partial<GuildConfigInsert>,
-            "id" | "createdAt" | "updatedAt" | "deletedAt" | "guildId"
-          >,
-        ) =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              dbSubscriptionContext.mutateQuery(
-                db
-                  .insert(configGuild)
-                  .values({
-                    guildId,
-                    ...config,
-                  })
-                  .onConflictDoUpdate({
-                    target: [configGuild.guildId],
-                    set: {
+          upsertConfig: (
+            config: Omit<
+              Partial<GuildConfigInsert>,
+              "id" | "createdAt" | "updatedAt" | "deletedAt" | "guildId"
+            >,
+          ) =>
+            pipe(
+              guildService.getId(),
+              Effect.flatMap((guildId) =>
+                dbSubscriptionContext.mutateQuery(
+                  db
+                    .insert(configGuild)
+                    .values({
+                      guildId,
                       ...config,
-                    },
-                  }),
+                    })
+                    .onConflictDoUpdate({
+                      target: [configGuild.guildId],
+                      set: {
+                        ...config,
+                      },
+                    }),
+                ),
               ),
+              Effect.withSpan("GuildConfigService.upsertConfig", {
+                captureStackTrace: true,
+              }),
             ),
-            Effect.withSpan("GuildConfigService.upsertConfig", {
-              captureStackTrace: true,
-            }),
-          ),
-        getManagerRoles: () =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              dbSubscriptionContext.subscribeQuery(
-                db
-                  .select()
-                  .from(configGuildManagerRole)
-                  .where(
-                    and(
-                      eq(configGuildManagerRole.guildId, guildId),
-                      isNull(configGuildManagerRole.deletedAt),
+          getManagerRoles: () =>
+            pipe(
+              guildService.getId(),
+              Effect.flatMap((guildId) =>
+                dbSubscriptionContext.subscribeQuery(
+                  db
+                    .select()
+                    .from(configGuildManagerRole)
+                    .where(
+                      and(
+                        eq(configGuildManagerRole.guildId, guildId),
+                        isNull(configGuildManagerRole.deletedAt),
+                      ),
                     ),
-                  ),
+                ),
               ),
+              Computed.map(Array.map(GuildConfigManagerRole.fromDbSelect)),
+              Effect.withSpan("GuildConfigService.getManagerRoles", {
+                captureStackTrace: true,
+              }),
             ),
-            Computed.map(Array.map(GuildConfigManagerRole.fromDbSelect)),
-            Effect.withSpan("GuildConfigService.getManagerRoles", {
-              captureStackTrace: true,
-            }),
-          ),
-        addManagerRole: (roleId: string) =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              dbSubscriptionContext.mutateQuery(
-                db
-                  .insert(configGuildManagerRole)
-                  .values({ guildId, roleId })
-                  .onConflictDoUpdate({
-                    target: [
-                      configGuildManagerRole.guildId,
-                      configGuildManagerRole.roleId,
-                    ],
-                    set: { deletedAt: null },
-                  }),
+          addManagerRole: (roleId: string) =>
+            pipe(
+              guildService.getId(),
+              Effect.flatMap((guildId) =>
+                dbSubscriptionContext.mutateQuery(
+                  db
+                    .insert(configGuildManagerRole)
+                    .values({ guildId, roleId })
+                    .onConflictDoUpdate({
+                      target: [
+                        configGuildManagerRole.guildId,
+                        configGuildManagerRole.roleId,
+                      ],
+                      set: { deletedAt: null },
+                    }),
+                ),
               ),
+              Effect.withSpan("GuildConfigService.addManagerRole", {
+                captureStackTrace: true,
+              }),
             ),
-            Effect.withSpan("GuildConfigService.addManagerRole", {
-              captureStackTrace: true,
-            }),
-          ),
-        removeManagerRole: (roleId: string) =>
-          pipe(
-            Effect.Do,
-            bindObject({
-              guildId: guildService.getId(),
-              now: DateTime.now,
-            }),
-            Effect.flatMap(({ guildId, now }) =>
-              dbSubscriptionContext.mutateQuery(
-                db
-                  .update(configGuildManagerRole)
-                  .set({ deletedAt: DateTime.toDate(now) })
-                  .where(
-                    and(
-                      eq(configGuildManagerRole.guildId, guildId),
-                      eq(configGuildManagerRole.roleId, roleId),
+          removeManagerRole: (roleId: string) =>
+            pipe(
+              Effect.Do,
+              bindObject({
+                guildId: guildService.getId(),
+                now: DateTime.now,
+              }),
+              Effect.flatMap(({ guildId, now }) =>
+                dbSubscriptionContext.mutateQuery(
+                  db
+                    .update(configGuildManagerRole)
+                    .set({ deletedAt: DateTime.toDate(now) })
+                    .where(
+                      and(
+                        eq(configGuildManagerRole.guildId, guildId),
+                        eq(configGuildManagerRole.roleId, roleId),
+                      ),
+                    )
+                    .returning(),
+                ),
+              ),
+              Effect.withSpan("GuildConfigService.removeManagerRole", {
+                captureStackTrace: true,
+              }),
+            ),
+          setChannelConfig: (
+            channelId: string,
+            config: Omit<
+              Partial<GuildChannelConfigInsert>,
+              | "id"
+              | "createdAt"
+              | "updatedAt"
+              | "deletedAt"
+              | "guildId"
+              | "channelId"
+            >,
+          ) =>
+            pipe(
+              guildService.getId(),
+              Effect.flatMap((guildId) =>
+                dbSubscriptionContext.mutateQuery(
+                  db
+                    .insert(configGuildChannel)
+                    .values({ guildId, channelId, ...config })
+                    .onConflictDoUpdate({
+                      target: [
+                        configGuildChannel.guildId,
+                        configGuildChannel.channelId,
+                      ],
+                      set: { ...config, deletedAt: null },
+                    })
+                    .returning(),
+                  // TODO: handle channel conflict
+                ),
+              ),
+              Effect.map(Array.head),
+              Effect.map(Option.map(GuildChannelConfig.fromDbSelect)),
+              Effect.withSpan("GuildConfigService.setChannelConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          getRunningChannelById: (id: string) =>
+            pipe(
+              guildService.getId(),
+              Effect.flatMap((guildId) =>
+                dbSubscriptionContext.subscribeQuery(
+                  db
+                    .select()
+                    .from(configGuildChannel)
+                    .where(
+                      and(
+                        eq(configGuildChannel.guildId, guildId),
+                        eq(configGuildChannel.channelId, id),
+                        isNull(configGuildChannel.deletedAt),
+                      ),
                     ),
-                  )
-                  .returning(),
+                ),
               ),
+              Computed.map(Array.head),
+              Computed.map(Option.map(GuildChannelConfig.fromDbSelect)),
+              Effect.withSpan("GuildConfigService.getRunningChannelById", {
+                captureStackTrace: true,
+              }),
             ),
-            Effect.withSpan("GuildConfigService.removeManagerRole", {
-              captureStackTrace: true,
-            }),
-          ),
-        setChannelConfig: (
-          channelId: string,
-          config: Omit<
-            Partial<GuildChannelConfigInsert>,
-            | "id"
-            | "createdAt"
-            | "updatedAt"
-            | "deletedAt"
-            | "guildId"
-            | "channelId"
-          >,
-        ) =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              dbSubscriptionContext.mutateQuery(
-                db
-                  .insert(configGuildChannel)
-                  .values({ guildId, channelId, ...config })
-                  .onConflictDoUpdate({
-                    target: [
-                      configGuildChannel.guildId,
-                      configGuildChannel.channelId,
-                    ],
-                    set: { ...config, deletedAt: null },
-                  })
-                  .returning(),
-                // TODO: handle channel conflict
-              ),
-            ),
-            Effect.map(Array.head),
-            Effect.map(Option.map(GuildChannelConfig.fromDbSelect)),
-            Effect.withSpan("GuildConfigService.setChannelConfig", {
-              captureStackTrace: true,
-            }),
-          ),
-        getRunningChannelById: (id: string) =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              dbSubscriptionContext.subscribeQuery(
-                db
-                  .select()
-                  .from(configGuildChannel)
-                  .where(
-                    and(
-                      eq(configGuildChannel.guildId, guildId),
-                      eq(configGuildChannel.channelId, id),
-                      isNull(configGuildChannel.deletedAt),
+          getRunningChannelByName: (name: string) =>
+            pipe(
+              guildService.getId(),
+              Effect.flatMap((guildId) =>
+                dbSubscriptionContext.subscribeQuery(
+                  db
+                    .select()
+                    .from(configGuildChannel)
+                    .where(
+                      and(
+                        eq(configGuildChannel.guildId, guildId),
+                        eq(configGuildChannel.name, name),
+                        isNull(configGuildChannel.deletedAt),
+                      ),
                     ),
-                  ),
+                ),
               ),
+              Computed.map(Array.head),
+              Computed.map(Option.map(GuildChannelConfig.fromDbSelect)),
+              Effect.withSpan("GuildConfigService.getRunningChannelByName", {
+                captureStackTrace: true,
+              }),
             ),
-            Computed.map(Array.head),
-            Computed.map(Option.map(GuildChannelConfig.fromDbSelect)),
-            Effect.withSpan("GuildConfigService.getRunningChannelById", {
-              captureStackTrace: true,
-            }),
-          ),
-        getRunningChannelByName: (name: string) =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              dbSubscriptionContext.subscribeQuery(
-                db
-                  .select()
-                  .from(configGuildChannel)
-                  .where(
-                    and(
-                      eq(configGuildChannel.guildId, guildId),
-                      eq(configGuildChannel.name, name),
-                      isNull(configGuildChannel.deletedAt),
-                    ),
-                  ),
-              ),
-            ),
-            Computed.map(Array.head),
-            Computed.map(Option.map(GuildChannelConfig.fromDbSelect)),
-            Effect.withSpan("GuildConfigService.getRunningChannelByName", {
-              captureStackTrace: true,
-            }),
-          ),
-      })),
+        }),
+      ),
     ),
     dependencies: [DB.Default, DBSubscriptionContext.Default],
     accessors: true,

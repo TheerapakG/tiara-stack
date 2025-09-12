@@ -21,7 +21,6 @@ import {
   pipe,
   String,
 } from "effect";
-import { observeOnce } from "typhoon-server/signal";
 import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
 import { GuildConfigService } from "./guildConfigService";
 
@@ -927,7 +926,7 @@ export class SheetService extends Effect.Service<SheetService>()(
     pipe(
       Effect.Do,
       Effect.bind("guildConfig", () =>
-        pipe(GuildConfigService.getConfig(), Effect.flatMap(observeOnce)),
+        GuildConfigService.getGuildConfigByGuildId(),
       ),
       Effect.bind("sheetId", ({ guildConfig }) =>
         pipe(

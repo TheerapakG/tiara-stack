@@ -1,6 +1,7 @@
 import { Config } from "@/config";
-import { Effect, pipe } from "effect";
-import type { Server } from "sheet-apis";
+import { FileSystem } from "@effect/platform";
+import { Effect, Option, pipe, Schedule } from "effect";
+import { serverHandlerConfigGroup } from "sheet-apis";
 import { WebSocketClient } from "typhoon-client-ws/client";
 
 export class SheetApisClient extends Effect.Service<SheetApisClient>()(
@@ -8,14 +9,36 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()(
   {
     scoped: Config.use((config) =>
       pipe(
-        Effect.acquireRelease(
-          pipe(
-            WebSocketClient.create<Server>(config.sheetApisBaseUrl),
-            Effect.tap(WebSocketClient.connect),
+        Effect.Do,
+        Effect.bind("fs", () => FileSystem.FileSystem),
+        Effect.bind("client", () =>
+          Effect.acquireRelease(
+            pipe(
+              WebSocketClient.create(
+                serverHandlerConfigGroup,
+                config.sheetApisBaseUrl,
+              ),
+              Effect.tap(WebSocketClient.connect),
+            ),
+            (client) => WebSocketClient.close(client),
           ),
-          (client) => WebSocketClient.close(client),
         ),
-        Effect.map((client) => ({
+        Effect.tap(({ fs, client }) =>
+          Effect.forkScoped(
+            pipe(
+              fs.readFileString(
+                "/var/run/secrets/tokens/sheet-apis-token",
+                "utf-8",
+              ),
+              Effect.tap((token) =>
+                WebSocketClient.token(Option.some(token))(client),
+              ),
+              Effect.catchAll(() => Effect.void),
+              Effect.repeat(Schedule.spaced("5 minutes")),
+            ),
+          ),
+        ),
+        Effect.map(({ client }) => ({
           get: () => client,
         })),
       ),
