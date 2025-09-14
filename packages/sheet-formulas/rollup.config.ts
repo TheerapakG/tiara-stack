@@ -26,8 +26,8 @@ export default defineConfig({
   },
   external: [...builtinModules, /^node:/],
   plugins: [
-    nodeResolve(),
     commonjs(),
+    nodeResolve(),
     typescript(),
     {
       name: "disable-treeshake",

@@ -1,11 +1,11 @@
 import { Effect, HashMap, pipe } from "effect";
-import type { Server } from "sheet-apis";
+import { serverHandlerConfigGroup } from "sheet-apis";
 import { AppsScriptClient } from "typhoon-client-apps-script/client";
 import { validate } from "typhoon-core/schema";
 import * as v from "valibot";
 
 function getClient(url: string) {
-  return AppsScriptClient.create<Server>(url);
+  return AppsScriptClient.create(serverHandlerConfigGroup, url);
 }
 
 const cellValueValidator = v.union([
