@@ -649,9 +649,16 @@ export class Server<R = never>
                         }),
                       ),
                       Effect.bind("handlerContext", () =>
-                        HashMap.get(
-                          server.subscriptionHandlerMap,
-                          header.payload.handler,
+                        pipe(
+                          HashMap.get(
+                            server.subscriptionHandlerMap,
+                            header.payload.handler,
+                          ),
+                          Effect.orElse(() =>
+                            Effect.fail(
+                              `handler ${header.payload.handler} not found`,
+                            ),
+                          ),
                         ),
                       ),
                       Effect.bind("computedBuffer", ({ handlerContext }) =>
@@ -798,7 +805,12 @@ export class Server<R = never>
           }),
         ),
         Effect.bind("handlerContext", () =>
-          HashMap.get(server.subscriptionHandlerMap, header.payload.handler),
+          pipe(
+            HashMap.get(server.subscriptionHandlerMap, header.payload.handler),
+            Effect.orElse(() =>
+              Effect.fail(`handler ${header.payload.handler} not found`),
+            ),
+          ),
         ),
         Effect.bind("computedBuffer", ({ handlerContext }) =>
           pipe(
@@ -890,7 +902,12 @@ export class Server<R = never>
           }),
         ),
         Effect.bind("handlerContext", () =>
-          HashMap.get(server.mutationHandlerMap, header.payload.handler),
+          pipe(
+            HashMap.get(server.mutationHandlerMap, header.payload.handler),
+            Effect.orElse(() =>
+              Effect.fail(`handler ${header.payload.handler} not found`),
+            ),
+          ),
         ),
         Effect.bind("buffer", ({ event, handlerContext }) =>
           pipe(
