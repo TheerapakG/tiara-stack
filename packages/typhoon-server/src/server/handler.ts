@@ -123,6 +123,20 @@ export type AnySubscriptionHandlerContext<
   > = any,
 > = SubscriptionHandlerContext<Config, SignalR, EffectR, Handler>;
 
+export type SubscriptionHandlerContextRequirement<
+  H extends AnySubscriptionHandlerContext,
+> =
+  H extends AnySubscriptionHandlerContext<
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    any,
+    infer SignalR,
+    infer EffectR,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    any
+  >
+    ? SignalR | EffectR
+    : never;
+
 export type MutationHandlerContext<
   Config extends MutationHandlerConfig = MutationHandlerConfig,
   R = never,
@@ -140,6 +154,19 @@ export type AnyMutationHandlerContext<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Handler extends AnyMutationEventHandler<Config, R> = any,
 > = MutationHandlerContext<Config, R, Handler>;
+
+export type MutationHandlerContextRequirement<
+  H extends AnyMutationHandlerContext,
+> =
+  H extends AnyMutationHandlerContext<
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    any,
+    infer R,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    any
+  >
+    ? R
+    : never;
 
 class HandlerContextBuilder {
   constructor() {}
