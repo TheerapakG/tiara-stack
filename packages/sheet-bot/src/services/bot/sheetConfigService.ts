@@ -1,7 +1,6 @@
 import { GoogleSheets } from "@/google/sheets";
 import { bindObject } from "@/utils";
 import { type sheets_v4 } from "@googleapis/sheets";
-import { type } from "arktype";
 import {
   Array,
   Data,
@@ -11,9 +10,10 @@ import {
   HashMap,
   Option,
   pipe,
+  Schema,
   String,
 } from "effect";
-import { validate, validateWithDefault } from "typhoon-core/schema";
+import { validate, validateOption } from "typhoon-core/schema";
 import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
 
 const parseValueRange = <A = never, E = never, R = never>(
@@ -72,12 +72,15 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((channel) => ({ channel })),
-              { channel: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ channel: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (channel) => ({ channel }),
+              onNone: () => ({ channel: "" }),
+            }),
+          ),
         ),
       ),
       day: parseValueRange(day, (arr) =>
@@ -85,14 +88,12 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string.integer.parse").pipe((day) => ({
-                day: Option.some(day),
-              })),
-              { day: Option.none<number>() },
+            validateOption(
+              pipe(Schema.NumberFromString, Schema.standardSchemaV1),
             ),
           ),
-          Effect.map(Option.getOrElse(() => ({ day: Option.none() }))),
+          Effect.map(Option.flatten),
+          Effect.map((day) => ({ day })),
         ),
       ),
       sheet: parseValueRange(sheet, (arr) =>
@@ -100,12 +101,15 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((sheet) => ({ sheet })),
-              { sheet: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ sheet: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (sheet) => ({ sheet }),
+              onNone: () => ({ sheet: "" }),
+            }),
+          ),
         ),
       ),
       hourRange: parseValueRange(hourRange, (arr) =>
@@ -113,12 +117,15 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((hourRange) => ({ hourRange })),
-              { hourRange: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ hourRange: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (hourRange) => ({ hourRange }),
+              onNone: () => ({ hourRange: "" }),
+            }),
+          ),
         ),
       ),
       breakRange: parseValueRange(breakRange, (arr) =>
@@ -126,12 +133,15 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((breakRange) => ({ breakRange })),
-              { breakRange: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ breakRange: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (breakRange) => ({ breakRange }),
+              onNone: () => ({ breakRange: "" }),
+            }),
+          ),
         ),
       ),
       fillRange: parseValueRange(fillRange, (arr) =>
@@ -139,12 +149,15 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((fillRange) => ({ fillRange })),
-              { fillRange: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ fillRange: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (fillRange) => ({ fillRange }),
+              onNone: () => ({ fillRange: "" }),
+            }),
+          ),
         ),
       ),
       overfillRange: parseValueRange(overfillRange, (arr) =>
@@ -152,12 +165,15 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((overfillRange) => ({ overfillRange })),
-              { overfillRange: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ overfillRange: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (overfillRange) => ({ overfillRange }),
+              onNone: () => ({ overfillRange: "" }),
+            }),
+          ),
         ),
       ),
       standbyRange: parseValueRange(standbyRange, (arr) =>
@@ -165,12 +181,15 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((standbyRange) => ({ standbyRange })),
-              { standbyRange: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ standbyRange: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (standbyRange) => ({ standbyRange }),
+              onNone: () => ({ standbyRange: "" }),
+            }),
+          ),
         ),
       ),
       draft: parseValueRange(draft, (arr) =>
@@ -178,12 +197,15 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((draft) => ({ draft })),
-              { draft: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ draft: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (draft) => ({ draft }),
+              onNone: () => ({ draft: "" }),
+            }),
+          ),
         ),
       ),
     }),
@@ -327,12 +349,15 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((name) => ({ name })),
-              { name: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ name: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (name) => ({ name }),
+              onNone: () => ({ name: "" }),
+            }),
+          ),
         ),
       ),
       sheet: parseValueRange(sheet, (arr) =>
@@ -340,12 +365,15 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((sheet) => ({ sheet })),
-              { sheet: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ sheet: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (sheet) => ({ sheet }),
+              onNone: () => ({ sheet: "" }),
+            }),
+          ),
         ),
       ),
       playerNameRange: parseValueRange(playerNameRange, (arr) =>
@@ -353,12 +381,15 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((playerNameRange) => ({ playerNameRange })),
-              { playerNameRange: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ playerNameRange: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (playerNameRange) => ({ playerNameRange }),
+              onNone: () => ({ playerNameRange: "" }),
+            }),
+          ),
         ),
       ),
       teamNameRange: parseValueRange(teamNameRange, (arr) =>
@@ -366,12 +397,15 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((teamNameRange) => ({ teamNameRange })),
-              { teamNameRange: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ teamNameRange: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (teamNameRange) => ({ teamNameRange }),
+              onNone: () => ({ teamNameRange: "" }),
+            }),
+          ),
         ),
       ),
       leadRange: parseValueRange(leadRange, (arr) =>
@@ -379,12 +413,15 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((leadRange) => ({ leadRange })),
-              { leadRange: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ leadRange: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (leadRange) => ({ leadRange }),
+              onNone: () => ({ leadRange: "" }),
+            }),
+          ),
         ),
       ),
       backlineRange: parseValueRange(backlineRange, (arr) =>
@@ -392,12 +429,15 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((backlineRange) => ({ backlineRange })),
-              { backlineRange: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ backlineRange: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (backlineRange) => ({ backlineRange }),
+              onNone: () => ({ backlineRange: "" }),
+            }),
+          ),
         ),
       ),
       talentRange: parseValueRange(talentRange, (arr) =>
@@ -405,12 +445,15 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((talentRange) => ({ talentRange })),
-              { talentRange: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ talentRange: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (talentRange) => ({ talentRange }),
+              onNone: () => ({ talentRange: "" }),
+            }),
+          ),
         ),
       ),
       tagsType: parseValueRange(tagsType, (arr) =>
@@ -418,12 +461,20 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("'constants' | 'ranges'").pipe((tagsType) => ({ tagsType })),
-              { tagsType: "constants" },
+            validateOption(
+              pipe(
+                Schema.Literal("constants", "ranges"),
+                Schema.standardSchemaV1,
+              ),
             ),
           ),
-          Effect.map(Option.getOrElse(() => ({ tagsType: "constants" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (tagsType) => ({ tagsType }),
+              onNone: () => ({ tagsType: "constants" }),
+            }),
+          ),
         ),
       ),
       tags: parseValueRange(tags, (arr) =>
@@ -431,14 +482,15 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((tags) => ({
-                tags,
-              })),
-              { tags: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ tags: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (tags) => ({ tags }),
+              onNone: () => ({ tags: "" }),
+            }),
+          ),
         ),
       ),
     }),
@@ -597,12 +649,15 @@ const runnerConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((name) => ({ name })),
-              { name: "" },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ name: "" }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (name) => ({ name }),
+              onNone: () => ({ name: "" }),
+            }),
+          ),
         ),
       ),
       hours: parseValueRange(hours, (arr) =>
@@ -610,14 +665,15 @@ const runnerConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateWithDefault(
-              type("string").pipe((hours) => ({
-                hours: hourRangesParser(hours),
-              })),
-              { hours: [] },
-            ),
+            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
           ),
-          Effect.map(Option.getOrElse(() => ({ hours: [] }))),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (hours) => ({ hours: hourRangesParser(hours) }),
+              onNone: () => ({ hours: [] }),
+            }),
+          ),
         ),
       ),
     }),
@@ -669,23 +725,27 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
             ),
             Effect.flatMap(
               validate(
-                type({
-                  "User IDs": "string",
-                  "User Sheet Names": "string",
-                  Hours: "string",
-                  Breaks: "string",
-                  Fills: "string",
-                  Overfills: "string",
-                  Standbys: "string",
-                }).pipe((config) => ({
-                  userIds: config["User IDs"],
-                  userSheetNames: config["User Sheet Names"],
-                  hours: config["Hours"],
-                  breaks: config["Breaks"],
-                  fills: config["Fills"],
-                  overfills: config["Overfills"],
-                  standbys: config["Standbys"],
-                })),
+                pipe(
+                  Schema.Struct({
+                    "User IDs": Schema.String,
+                    "User Sheet Names": Schema.String,
+                    Hours: Schema.String,
+                    Breaks: Schema.String,
+                    Fills: Schema.String,
+                    Overfills: Schema.String,
+                    Standbys: Schema.String,
+                  }),
+                  Schema.rename({
+                    "User IDs": "userIds",
+                    "User Sheet Names": "userSheetNames",
+                    Hours: "hours",
+                    Breaks: "breaks",
+                    Fills: "fills",
+                    Overfills: "overfills",
+                    Standbys: "standbys",
+                  }),
+                  Schema.standardSchemaV1,
+                ),
               ),
             ),
             Effect.withSpan("SheetConfigService.getRangesConfig", {
@@ -736,16 +796,21 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
             ),
             Effect.flatMap(
               validate(
-                type({
-                  "Start Time": "string.integer.parse",
-                }).pipe((config) => ({
-                  startTime: DateTime.make(config["Start Time"] * 1000),
-                })),
+                pipe(
+                  Schema.Struct({
+                    "Start Time": Schema.NumberFromString,
+                  }),
+                  Schema.rename({
+                    "Start Time": "startTime",
+                  }),
+                  Schema.standardSchemaV1,
+                ),
               ),
             ),
             Effect.flatMap(({ startTime }) =>
               pipe(
-                startTime,
+                startTime * 1000,
+                DateTime.make,
                 Option.map((startTime) => ({ startTime })),
               ),
             ),

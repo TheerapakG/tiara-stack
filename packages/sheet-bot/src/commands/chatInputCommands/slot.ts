@@ -17,7 +17,6 @@ import {
   handlerVariantContextBuilder,
 } from "@/types";
 import { bindObject } from "@/utils";
-import { type } from "arktype";
 import {
   ActionRowBuilder,
   ApplicationIntegrationType,
@@ -40,6 +39,7 @@ import {
   Order,
   pipe,
   Ref,
+  Schema,
   String,
 } from "effect";
 import { validate } from "typhoon-core/schema";
@@ -129,7 +129,12 @@ const handleList =
               InteractionContext.getString("message_type"),
               Effect.map(Option.getOrElse(() => "ephemeral")),
               Effect.flatMap(
-                validate(type.enumerated("persistent", "ephemeral")),
+                validate(
+                  pipe(
+                    Schema.Literal("persistent", "ephemeral"),
+                    Schema.standardSchemaV1,
+                  ),
+                ),
               ),
             ),
           }),
