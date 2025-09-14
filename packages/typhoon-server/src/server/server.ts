@@ -956,6 +956,7 @@ export class Server<R = never>
         Effect.bind("header", ({ pullDecodedStream }) =>
           pipe(
             HeaderEncoderDecoder.decodeUnknownEffect(pullDecodedStream),
+            Effect.tap((header) => Effect.log("header", header)),
             Effect.either,
           ),
         ),
