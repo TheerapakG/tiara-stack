@@ -1,5 +1,5 @@
 import { StandardSchemaV1 } from "@standard-schema/spec";
-import { Data, Effect, pipe } from "effect";
+import { Data, Effect, Option, pipe } from "effect";
 import {
   Observable,
   ObservableOptions,
@@ -72,6 +72,23 @@ export class Validator<Schema extends StandardSchemaV1 | undefined>
       );
   }
 
+  static validateSchemaOption<
+    Schema extends StandardSchemaV1,
+    Output extends
+      StandardSchemaV1.InferOutput<Schema> = StandardSchemaV1.InferOutput<Schema>,
+  >(validator: Validator<Schema>) {
+    return (value: unknown): Effect.Effect<Option.Option<Output>> =>
+      pipe(
+        value,
+        Validator.validateSchema<Schema, Output>(validator),
+        Effect.map(Option.some),
+        Effect.catchTag("ValidationError", () => Effect.succeedNone),
+        Observable.withSpan(validator, "Validator.validateSchemaOption", {
+          captureStackTrace: true,
+        }),
+      );
+  }
+
   static validateSchemaWithDefault<
     Schema extends StandardSchemaV1,
     Output extends
@@ -106,6 +123,22 @@ export class Validator<Schema extends StandardSchemaV1 | undefined>
       );
   }
 
+  static validateOption<
+    Schema extends StandardSchemaV1 | undefined,
+    Output extends Validated<Schema> = Validated<Schema>,
+  >(validator: Validator<Schema>) {
+    return (value: unknown): Effect.Effect<Option.Option<Output>> =>
+      pipe(
+        value,
+        Validator.validate<Schema, Output>(validator),
+        Effect.map(Option.some),
+        Effect.catchTag("ValidationError", () => Effect.succeedNone),
+        Observable.withSpan(validator, "Validator.validateOption", {
+          captureStackTrace: true,
+        }),
+      );
+  }
+
   static validateWithDefault<
     Schema extends StandardSchemaV1 | undefined,
     Output extends Validated<Schema> = Validated<Schema>,
@@ -130,6 +163,14 @@ export const validateSchema = <Schema extends StandardSchemaV1>(
     new Validator({ [ObservableSymbol]: options ?? {}, schema }),
   );
 
+export const validateSchemaOption = <Schema extends StandardSchemaV1>(
+  schema: Schema,
+  options?: ObservableOptions,
+) =>
+  Validator.validateSchemaOption(
+    new Validator({ [ObservableSymbol]: options ?? {}, schema }),
+  );
+
 export const validateSchemaWithDefault = <
   Schema extends StandardSchemaV1,
   Output extends
@@ -149,6 +190,14 @@ export const validate = <Schema extends StandardSchemaV1 | undefined>(
   options?: ObservableOptions,
 ) =>
   Validator.validate(
+    new Validator({ [ObservableSymbol]: options ?? {}, schema }),
+  );
+
+export const validateOption = <Schema extends StandardSchemaV1 | undefined>(
+  schema: Schema,
+  options?: ObservableOptions,
+) =>
+  Validator.validateOption(
     new Validator({ [ObservableSymbol]: options ?? {}, schema }),
   );
 
