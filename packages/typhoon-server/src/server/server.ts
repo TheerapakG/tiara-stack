@@ -36,7 +36,9 @@ import {
   AnyMutationHandlerContext,
   AnySubscriptionHandlerContext,
   MutationHandlerContext,
+  MutationHandlerContextRequirement,
   SubscriptionHandlerContext,
+  SubscriptionHandlerContextRequirement,
 } from "./handler";
 import { HandlerGroup } from "./handlerGroup";
 import invalidHeaderErrorHtml from "./invalidHeaderError.html";
@@ -62,58 +64,11 @@ type PeerState = {
 };
 type PeerStateMap = HashMap.HashMap<string, PeerState>;
 
-type AddServerHandler<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  S extends Server<any, any, any>,
-  Handler extends AnySubscriptionHandlerContext | AnyMutationHandlerContext,
-> =
-  S extends Server<infer R, infer SubscriptionHandlers, infer MutationHandlers>
-    ? [Handler] extends [AnySubscriptionHandlerContext]
-      ? Server<
-          R,
-          SubscriptionHandlers & { [K in Handler["config"]["name"]]: Handler },
-          MutationHandlers
-        >
-      : [Handler] extends [AnyMutationHandlerContext]
-        ? Server<
-            R,
-            SubscriptionHandlers,
-            MutationHandlers & { [K in Handler["config"]["name"]]: Handler }
-          >
-        : never
-    : never;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ServerLayerContext<S extends Server<any>> =
+  S extends Server<infer R> ? R : never;
 
-type AddServerHandlerGroup<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  S extends Server<any, any, any>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  G extends HandlerGroup<any, any, any>,
-> =
-  S extends Server<infer R, infer SubscriptionHandlers, infer MutationHandlers>
-    ? G extends HandlerGroup<
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        any,
-        infer GroupSubscriptionHandlers,
-        infer GroupMutationHandlers
-      >
-      ? Server<
-          R,
-          SubscriptionHandlers & GroupSubscriptionHandlers,
-          MutationHandlers & GroupMutationHandlers
-        >
-      : never
-    : never;
-
-export class Server<
-    R = never,
-    SubscriptionHandlers extends Record<
-      string,
-      AnySubscriptionHandlerContext
-      // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-    > = {},
-    // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-    MutationHandlers extends Record<string, AnyMutationHandlerContext> = {},
-  >
+export class Server<R = never>
   extends Data.TaggedClass("Server")<{
     traceProvider: Layer.Layer<never>;
     subscriptionHandlerMap: SubscriptionHandlerMap<R>;
@@ -131,10 +86,9 @@ export class Server<
     >;
     startSemaphore: Effect.Semaphore;
   }>
-  implements BaseServer<SubscriptionHandlers, MutationHandlers>
+  implements BaseServer
 {
-  readonly [ServerSymbol]: BaseServer<SubscriptionHandlers, MutationHandlers> =
-    this;
+  readonly [ServerSymbol]: BaseServer = this;
 
   static create<R = never>(layer: Layer.Layer<R, unknown>) {
     return pipe(
@@ -213,27 +167,12 @@ export class Server<
         }),
         { concurrency: "unbounded" },
       ),
-      Effect.map(
-        (params) =>
-          // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-          new Server<R, {}, {}>(params),
-      ),
+      Effect.map((params) => new Server<R>(params)),
     );
   }
 
   static withTraceProvider(traceProvider: Layer.Layer<never>) {
-    return <
-      R = never,
-      SubscriptionHandlers extends Record<
-        string,
-        SubscriptionHandlerContext
-        // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-      > = {},
-      // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-      MutationHandlers extends Record<string, MutationHandlerContext> = {},
-    >(
-      server: Server<R, SubscriptionHandlers, MutationHandlers>,
-    ): Server<R, SubscriptionHandlers, MutationHandlers> => {
+    return <R = never>(server: Server<R>): Server<R> => {
       return new Server({
         ...server,
         traceProvider,
@@ -246,11 +185,13 @@ export class Server<
     Handler extends AnySubscriptionHandlerContext | AnyMutationHandlerContext,
   >(handler: Handler) {
     return <
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      S extends Server<any, any, any>,
+      S extends Server<
+        | SubscriptionHandlerContextRequirement<Handler>
+        | MutationHandlerContextRequirement<Handler>
+      >,
     >(
       server: S,
-    ): AddServerHandler<S, Handler> => {
+    ) => {
       const newHandlerMaps = pipe(
         Match.value(handler.config),
         Match.when({ type: "subscription" }, () => ({
@@ -272,24 +213,26 @@ export class Server<
         Match.orElseAbsurd,
       );
 
+      // TODO: add handler map substitution helper
       return new Server({
         ...server,
         ...newHandlerMaps,
-      }) as unknown as AddServerHandler<S, Handler>;
+      }) as Server<ServerLayerContext<S>>;
     };
   }
 
   // TODO: check handler requirement extends server requirement
   static addGroup<
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    G extends HandlerGroup<any, any, any>,
+    G extends HandlerGroup<any>,
   >(handlerGroup: G) {
     return <
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      S extends Server<any, any, any>,
+      S extends Server<any>,
     >(
       server: S,
     ) =>
+      // TODO: add handler map substitution helper
       new Server({
         ...server,
         subscriptionHandlerMap: HashMap.union(
@@ -300,7 +243,7 @@ export class Server<
           server.mutationHandlerMap,
           handlerGroup.mutationHandlerMap,
         ),
-      }) as unknown as AddServerHandlerGroup<S, G>;
+      }) as unknown as Server<ServerLayerContext<S>>;
   }
 
   static open(peer: Peer) {
@@ -1197,20 +1140,8 @@ const handleServeAction = <R = never, A = never, E = never>(
 };
 
 export const serve =
-  <
-    R,
-    SubscriptionHandlers extends Record<
-      string,
-      AnySubscriptionHandlerContext<SubscriptionHandlerConfig, R, R>
-    >,
-    MutationHandlers extends Record<
-      string,
-      AnyMutationHandlerContext<MutationHandlerConfig, R>
-    >,
-  >(
-    serveFn: typeof crosswsServe,
-  ) =>
-  (server: Server<R, SubscriptionHandlers, MutationHandlers>) => {
+  <R>(serveFn: typeof crosswsServe) =>
+  (server: Server<R>) => {
     return pipe(
       Effect.succeed(server),
       Effect.andThen(Server.start),
@@ -1291,11 +1222,3 @@ export const serve =
       Effect.flatMap(() => Effect.makeLatch(false)),
     );
   };
-
-export type InferServerType<E extends Effect.Effect<unknown, unknown, never>> =
-  E extends Effect.Effect<infer S, unknown, never>
-    ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      S extends Server<any, infer SubscriptionHandlers, infer MutationHandlers>
-      ? BaseServer<SubscriptionHandlers, MutationHandlers>
-      : never
-    : never;
