@@ -3,7 +3,6 @@ import path from "pathe";
 import { defineConfig } from "rolldown";
 import { dts } from "rolldown-plugin-dts";
 import { aliasPlugin } from "rolldown/experimental";
-import { PluginPure } from "rollup-plugin-pure";
 
 export default defineConfig({
   input: {
@@ -24,9 +23,6 @@ export default defineConfig({
         { find: "~", replacement: path.resolve(__dirname, "src") },
         { find: "@", replacement: path.resolve(__dirname, "src") },
       ],
-    }),
-    PluginPure({
-      functions: [/^.*$/],
     }),
   ],
   treeshake: true,
