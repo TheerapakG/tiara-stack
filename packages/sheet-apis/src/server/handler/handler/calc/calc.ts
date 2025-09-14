@@ -1,62 +1,13 @@
-import { Array, Chunk, Effect, HashSet, Option, pipe } from "effect";
-import { Computed, computed, DependencySignal } from "typhoon-core/signal";
-import { defineHandlerConfigBuilder } from "typhoon-server/config";
-import { defineHandlerBuilder, Event } from "typhoon-server/server";
-import * as v from "valibot";
+import { calcHandlerConfig } from "@/server/handler/config";
 import {
   CalcConfig,
   CalcService,
   GuildConfigService,
   PlayerTeam,
-} from "../../../services";
-
-export const calcHandlerConfig = defineHandlerConfigBuilder()
-  .name("calc")
-  .type("subscription")
-  .request({
-    validator: v.object({
-      config: v.object({
-        healNeeded: v.number(),
-        considerEnc: v.boolean(),
-      }),
-      players: v.pipe(
-        v.array(
-          v.array(
-            v.object({
-              type: v.string(),
-              tagStr: v.string(),
-              player: v.string(),
-              team: v.string(),
-              lead: v.number(),
-              backline: v.number(),
-              bp: v.union([v.number(), v.literal("")]),
-              percent: v.number(),
-            }),
-          ),
-        ),
-        v.length(5),
-      ),
-    }),
-    validate: true,
-  })
-  .response({
-    validator: v.array(
-      v.object({
-        averageBp: v.number(),
-        averagePercent: v.number(),
-        room: v.array(
-          v.object({
-            type: v.string(),
-            team: v.string(),
-            bp: v.number(),
-            percent: v.number(),
-            tags: v.array(v.string()),
-          }),
-        ),
-      }),
-    ),
-  })
-  .build();
+} from "@/server/services";
+import { Array, Chunk, Effect, HashSet, Option, pipe } from "effect";
+import { Computed, computed, DependencySignal } from "typhoon-core/signal";
+import { defineHandlerBuilder, Event } from "typhoon-server/server";
 
 const getUserAgent = <E, R>(request: DependencySignal<Request, E, R>) =>
   computed(
