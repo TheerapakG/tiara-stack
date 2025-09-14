@@ -1,50 +1,55 @@
 import { StandardSchemaV1 } from "@standard-schema/spec";
-import { Data, Effect, Option, pipe, SynchronizedRef } from "effect";
-import { RequestParamsConfig } from "typhoon-core/config";
+import { Data, Effect, HashMap, Option, pipe, SynchronizedRef } from "effect";
+import {
+  HandlerConfigGroup,
+  MutationHandlerConfig,
+  RequestParamsConfig,
+  SubscriptionHandlerConfig,
+} from "typhoon-core/config";
 import {
   HeaderEncoderDecoder,
   MsgpackEncoderDecoder,
 } from "typhoon-core/protocol";
 import { validate } from "typhoon-core/schema";
-import {
-  MutationHandlerContext,
-  Server,
-  ServerMutationHandlers,
-  ServerSubscriptionHandlers,
-  SubscriptionHandlerContext,
-} from "typhoon-core/server";
 import * as v from "valibot";
 
 export class HandlerError extends Data.TaggedError("HandlerError") {}
 
 export class AppsScriptClient<
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  SubscriptionHandlers extends Record<
+  SubscriptionHandlerConfigs extends Record<
     string,
-    SubscriptionHandlerContext
-  > = Record<string, SubscriptionHandlerContext>,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  MutationHandlers extends Record<string, MutationHandlerContext> = Record<
+    SubscriptionHandlerConfig
+  > = Record<string, SubscriptionHandlerConfig>,
+  MutationHandlerConfigs extends Record<string, MutationHandlerConfig> = Record<
     string,
-    MutationHandlerContext
+    MutationHandlerConfig
   >,
 > {
   constructor(
     private readonly url: string,
+    private readonly configGroup: HandlerConfigGroup<
+      SubscriptionHandlerConfigs,
+      MutationHandlerConfigs
+    >,
     private readonly token: SynchronizedRef.SynchronizedRef<
       Option.Option<string>
     >,
   ) {}
 
   static create<
-    S extends Server<
-      Record<string, SubscriptionHandlerContext>,
-      Record<string, MutationHandlerContext>
+    SubscriptionHandlerConfigs extends Record<
+      string,
+      SubscriptionHandlerConfig
     >,
+    MutationHandlerConfigs extends Record<string, MutationHandlerConfig>,
   >(
+    configGroup: HandlerConfigGroup<
+      SubscriptionHandlerConfigs,
+      MutationHandlerConfigs
+    >,
     url: string,
   ): Effect.Effect<
-    AppsScriptClient<ServerSubscriptionHandlers<S>, ServerMutationHandlers<S>>,
+    AppsScriptClient<SubscriptionHandlerConfigs, MutationHandlerConfigs>,
     never,
     never
   > {
@@ -54,11 +59,13 @@ export class AppsScriptClient<
       Effect.map(
         ({ token }) =>
           new AppsScriptClient<
-            ServerSubscriptionHandlers<S>,
-            ServerMutationHandlers<S>
-          >(url, token),
+            SubscriptionHandlerConfigs,
+            MutationHandlerConfigs
+          >(url, configGroup, token),
       ),
-      Effect.withSpan("AppsScriptClient.create"),
+      Effect.withSpan("AppsScriptClient.create", {
+        captureStackTrace: true,
+      }),
     );
   }
 
@@ -66,31 +73,33 @@ export class AppsScriptClient<
     (token: Option.Option<string>) =>
     (
       client: AppsScriptClient<
-        Record<string, SubscriptionHandlerContext>,
-        Record<string, MutationHandlerContext>
+        Record<string, SubscriptionHandlerConfig>,
+        Record<string, MutationHandlerConfig>
       >,
     ) =>
       pipe(
         SynchronizedRef.update(client.token, () => token),
-        Effect.withSpan("AppsScriptClient.token"),
+        Effect.withSpan("AppsScriptClient.token", {
+          captureStackTrace: true,
+        }),
       );
 
   static once<
-    ServerSubscriptionHandlers extends Record<
+    SubscriptionHandlerConfigs extends Record<
       string,
-      SubscriptionHandlerContext
+      SubscriptionHandlerConfig
     >,
-    Handler extends keyof ServerSubscriptionHandlers & string,
+    Handler extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: AppsScriptClient<
-      ServerSubscriptionHandlers,
-      Record<string, MutationHandlerContext>
+      SubscriptionHandlerConfigs,
+      Record<string, MutationHandlerConfig>
     >,
     handler: Handler,
     // TODO: make this conditionally optional
-    data?: ServerSubscriptionHandlers[Handler]["config"]["requestParams"] extends RequestParamsConfig
+    data?: SubscriptionHandlerConfigs[Handler]["requestParams"] extends RequestParamsConfig
       ? StandardSchemaV1.InferInput<
-          ServerSubscriptionHandlers[Handler]["config"]["requestParams"]["validator"]
+          SubscriptionHandlerConfigs[Handler]["requestParams"]["validator"]
         >
       : never,
   ) {
@@ -144,17 +153,26 @@ export class AppsScriptClient<
         ),
       ),
       // TODO: check if the response is a valid header
-      // TODO: validate the response validator
       Effect.bind(
         "decodedResponse",
         ({ pullDecodedStream }) => pullDecodedStream,
       ),
-      Effect.flatMap(({ header, decodedResponse }) =>
+      Effect.bind("config", () =>
+        HashMap.get(client.configGroup.subscriptionHandlerMap, handler),
+      ),
+      Effect.flatMap(({ header, decodedResponse, config }) =>
         header.action === "server:update" && header.payload.success
-          ? Effect.succeed(
-              decodedResponse as StandardSchemaV1.InferInput<
-                ServerSubscriptionHandlers[Handler]["config"]["response"]["validator"]
-              >,
+          ? pipe(
+              decodedResponse,
+              validate(
+                config.response
+                  .validator as SubscriptionHandlerConfigs[Handler]["response"]["validator"],
+              ),
+              Effect.catchAll((error) =>
+                Effect.fail(
+                  new HandlerError({ cause: error } as unknown as void),
+                ),
+              ),
             )
           : Effect.fail(new HandlerError(decodedResponse as void)),
       ),
