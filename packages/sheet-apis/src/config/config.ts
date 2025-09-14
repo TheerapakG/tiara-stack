@@ -1,6 +1,5 @@
-import { type } from "arktype";
 import { loadConfig } from "c12";
-import { Effect, pipe } from "effect";
+import { Effect, pipe, Schema } from "effect";
 import { validate } from "typhoon-core/schema";
 
 export class Config extends Effect.Service<Config>()("Config", {
@@ -8,11 +7,13 @@ export class Config extends Effect.Service<Config>()("Config", {
     Effect.tryPromise(() => loadConfig({ dotenv: true })),
     Effect.andThen(
       validate(
-        type({
-          POSTGRES_URL: "string",
-        }).pipe(({ POSTGRES_URL }) => ({
-          postgresUrl: POSTGRES_URL,
-        })),
+        pipe(
+          Schema.Struct({
+            POSTGRES_URL: Schema.String,
+          }),
+          Schema.rename({ POSTGRES_URL: "postgresUrl" }),
+          Schema.standardSchemaV1,
+        ),
       )(process.env),
     ),
   ),
