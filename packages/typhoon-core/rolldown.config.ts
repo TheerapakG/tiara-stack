@@ -3,6 +3,7 @@ import { builtinModules } from "module";
 import path from "pathe";
 import { defineConfig } from "rolldown";
 import { dts } from "rolldown-plugin-dts";
+import { PluginPure } from "rollup-plugin-pure";
 import { fileURLToPath } from "url";
 
 const filePaths = globSync("./src/**/index.ts", { nodir: true }).map((file) =>
@@ -25,6 +26,16 @@ export default defineConfig({
       format: "es",
     },
   ],
-  plugins: [dts()],
+  plugins: [
+    dts(),
+    PluginPure({
+      functions: [/^.*$/],
+    }),
+  ],
+  treeshake: {
+    moduleSideEffects: false,
+    annotations: true,
+    unknownGlobalSideEffects: true,
+  },
   external: [...builtinModules, /^node:/, "effect", "valibot"],
 });

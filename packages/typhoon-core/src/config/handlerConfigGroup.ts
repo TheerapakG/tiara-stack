@@ -24,23 +24,65 @@ type HandlerConfigGroupMutationHandlerConfigs<
     ? MutationHandlerConfigs
     : never;
 
+type AddSubscriptionHandlerConfig<
+  A extends Record<string, SubscriptionHandlerConfig>,
+  HandlerConfig extends SubscriptionHandlerConfig,
+> = {
+  [K in keyof A | HandlerConfig["name"]]: K extends keyof A
+    ? A[K]
+    : HandlerConfig;
+};
+
+type AddMutationHandlerConfig<
+  A extends Record<string, MutationHandlerConfig>,
+  HandlerConfig extends MutationHandlerConfig,
+> = {
+  [K in keyof A | HandlerConfig["name"]]: K extends keyof A
+    ? A[K]
+    : HandlerConfig;
+};
+
+type MergeSubscriptionHandlerConfig<
+  A extends Record<string, SubscriptionHandlerConfig>,
+  B extends Record<string, SubscriptionHandlerConfig>,
+> = {
+  [K in keyof A | keyof B]: K extends keyof A
+    ? A[K]
+    : K extends keyof B
+      ? B[K]
+      : never;
+};
+
+type MergeMutationHandlerConfig<
+  A extends Record<string, MutationHandlerConfig>,
+  B extends Record<string, MutationHandlerConfig>,
+> = {
+  [K in keyof A | keyof B]: K extends keyof A
+    ? A[K]
+    : K extends keyof B
+      ? B[K]
+      : never;
+};
+
 type AddHandlerConfigGroupHandlerConfig<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   G extends HandlerConfigGroup<any, any>,
   HandlerConfig extends SubscriptionHandlerConfig | MutationHandlerConfig,
 > = [HandlerConfig] extends [SubscriptionHandlerConfig]
   ? HandlerConfigGroup<
-      HandlerConfigGroupSubscriptionHandlerConfigs<G> & {
-        [K in HandlerConfig["name"]]: HandlerConfig;
-      },
+      AddSubscriptionHandlerConfig<
+        HandlerConfigGroupSubscriptionHandlerConfigs<G>,
+        HandlerConfig
+      >,
       HandlerConfigGroupMutationHandlerConfigs<G>
     >
   : [HandlerConfig] extends [MutationHandlerConfig]
     ? HandlerConfigGroup<
         HandlerConfigGroupSubscriptionHandlerConfigs<G>,
-        HandlerConfigGroupMutationHandlerConfigs<G> & {
-          [K in HandlerConfig["name"]]: HandlerConfig;
-        }
+        AddMutationHandlerConfig<
+          HandlerConfigGroupMutationHandlerConfigs<G>,
+          HandlerConfig
+        >
       >
     : never;
 
@@ -50,10 +92,14 @@ type AddHandlerConfigGroupHandlerConfigGroup<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ThisG extends HandlerConfigGroup<any, any>,
 > = HandlerConfigGroup<
-  HandlerConfigGroupSubscriptionHandlerConfigs<ThisG> &
-    HandlerConfigGroupSubscriptionHandlerConfigs<OtherG>,
-  HandlerConfigGroupMutationHandlerConfigs<ThisG> &
+  MergeSubscriptionHandlerConfig<
+    HandlerConfigGroupSubscriptionHandlerConfigs<ThisG>,
+    HandlerConfigGroupSubscriptionHandlerConfigs<OtherG>
+  >,
+  MergeMutationHandlerConfig<
+    HandlerConfigGroupMutationHandlerConfigs<ThisG>,
     HandlerConfigGroupMutationHandlerConfigs<OtherG>
+  >
 >;
 
 export class HandlerConfigGroup<
