@@ -1,6 +1,5 @@
-import { type } from "arktype";
 import { loadConfig } from "c12";
-import { Effect, pipe } from "effect";
+import { Effect, pipe, Schema } from "effect";
 import { validate } from "typhoon-core/schema";
 
 export class Config extends Effect.Service<Config>()("Config", {
@@ -8,15 +7,19 @@ export class Config extends Effect.Service<Config>()("Config", {
     Effect.tryPromise(() => loadConfig({ dotenv: true })),
     Effect.andThen(
       validate(
-        type({
-          POSTGRES_URL: "string",
-          DISCORD_TOKEN: "string",
-          SHEET_APIS_BASE_URL: "string",
-        }).pipe(({ POSTGRES_URL, DISCORD_TOKEN, SHEET_APIS_BASE_URL }) => ({
-          postgresUrl: POSTGRES_URL,
-          discordToken: DISCORD_TOKEN,
-          sheetApisBaseUrl: SHEET_APIS_BASE_URL,
-        })),
+        pipe(
+          Schema.Struct({
+            POSTGRES_URL: Schema.String,
+            DISCORD_TOKEN: Schema.String,
+            SHEET_APIS_BASE_URL: Schema.String,
+          }),
+          Schema.rename({
+            POSTGRES_URL: "postgresUrl",
+            DISCORD_TOKEN: "discordToken",
+            SHEET_APIS_BASE_URL: "sheetApisBaseUrl",
+          }),
+          Schema.standardSchemaV1,
+        ),
       )(process.env),
     ),
   ),

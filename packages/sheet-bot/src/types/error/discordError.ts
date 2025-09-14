@@ -1,10 +1,9 @@
-import { type } from "arktype";
 import {
   DiscordjsError,
   DiscordjsRangeError,
   DiscordjsTypeError,
 } from "discord.js";
-import { Cause, Data, Effect, Function, pipe } from "effect";
+import { Cause, Data, Effect, Function, pipe, Schema } from "effect";
 import { validate } from "typhoon-core/schema";
 
 export type Constructor<Instance> = abstract new (...args: never[]) => Instance;
@@ -23,16 +22,19 @@ export class DiscordError extends Data.TaggedError("DiscordError")<{
     return pipe(
       cause.error,
       validate(
-        type.or(
-          type.instanceOf(
-            DiscordjsError as unknown as Constructor<DiscordjsError>,
+        pipe(
+          Schema.Union(
+            Schema.instanceOf(
+              DiscordjsError as unknown as Constructor<DiscordjsError>,
+            ),
+            Schema.instanceOf(
+              DiscordjsTypeError as unknown as Constructor<DiscordjsTypeError>,
+            ),
+            Schema.instanceOf(
+              DiscordjsRangeError as unknown as Constructor<DiscordjsRangeError>,
+            ),
           ),
-          type.instanceOf(
-            DiscordjsTypeError as unknown as Constructor<DiscordjsTypeError>,
-          ),
-          type.instanceOf(
-            DiscordjsRangeError as unknown as Constructor<DiscordjsRangeError>,
-          ),
+          Schema.standardSchemaV1,
         ),
       ),
       Effect.map((error) => new DiscordError(error)),

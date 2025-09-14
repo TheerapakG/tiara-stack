@@ -19,7 +19,6 @@ import {
   userSelectMenuInteractionHandlerMap,
 } from "@/types";
 import { bindObject } from "@/utils";
-import { match } from "arktype";
 import {
   ApplicationCommandType,
   ButtonInteraction,
@@ -44,6 +43,7 @@ import {
   HashMap,
   Layer,
   ManagedRuntime,
+  Match,
   Option,
   pipe,
   SynchronizedRef,
@@ -129,13 +129,15 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
 
   static onCommandInteraction = (interaction: CommandInteraction) => {
     return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
-      match({})
-        .case(`${ApplicationCommandType.ChatInput}`, () =>
+      pipe(
+        Match.value(interaction),
+        Match.when({ commandType: ApplicationCommandType.ChatInput }, () =>
           Bot.onChatInputCommandInteraction(
             interaction as ChatInputCommandInteraction,
           )(bot),
-        )
-        .default(() => Effect.void)(interaction.commandType);
+        ),
+        Match.orElse(() => Effect.void),
+      );
   };
 
   static onButtonInteraction = (interaction: ButtonInteraction) => {
@@ -212,30 +214,34 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
     interaction: MessageComponentInteraction,
   ) => {
     return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
-      match({})
-        .case(`${ComponentType.Button}`, () =>
+      pipe(
+        Match.value(interaction),
+        Match.when({ componentType: ComponentType.Button }, () =>
           Bot.onButtonInteraction(interaction as ButtonInteraction)(bot),
-        )
-        .case(`${ComponentType.UserSelect}`, () =>
+        ),
+        Match.when({ componentType: ComponentType.UserSelect }, () =>
           Bot.onUserSelectMenuInteraction(
             interaction as UserSelectMenuInteraction,
           )(bot),
-        )
-        .default(() => Effect.void)(interaction.componentType);
+        ),
+        Match.orElse(() => Effect.void),
+      );
   };
 
   static onInteraction = (interaction: Interaction) => {
     return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
-      match({})
-        .case(`${InteractionType.ApplicationCommand}`, () =>
+      pipe(
+        Match.value(interaction),
+        Match.when({ type: InteractionType.ApplicationCommand }, () =>
           Bot.onCommandInteraction(interaction as CommandInteraction)(bot),
-        )
-        .case(`${InteractionType.MessageComponent}`, () =>
+        ),
+        Match.when({ type: InteractionType.MessageComponent }, () =>
           Bot.onMessageComponentInteraction(
             interaction as MessageComponentInteraction,
           )(bot),
-        )
-        .default(() => Effect.void)(interaction.type);
+        ),
+        Match.orElse(() => Effect.void),
+      );
   };
 
   static create = <A = never, E = never, R = never>(
