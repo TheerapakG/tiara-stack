@@ -689,9 +689,6 @@ importers:
       rolldown-plugin-dts:
         specifier: ^0.13.12
         version: 0.13.12(rolldown@1.0.0-beta.29)(typescript@5.9.2)
-      rollup-plugin-pure:
-        specifier: ^0.4.0
-        version: 0.4.0(rollup@4.45.0)
       terser:
         specifier: ^5.43.0
         version: 5.43.0
