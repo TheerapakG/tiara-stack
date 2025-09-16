@@ -21,6 +21,7 @@ import {
   String,
   SynchronizedRef,
 } from "effect";
+import { HandlerConfig } from "typhoon-core/config";
 import {
   Header,
   HeaderEncoderDecoder,
@@ -30,7 +31,6 @@ import {
 } from "typhoon-core/protocol";
 import { Server as BaseServer, ServerSymbol } from "typhoon-core/server";
 import { Computed, computed, effect, observeOnce } from "typhoon-core/signal";
-import { MutationHandlerConfig, SubscriptionHandlerConfig } from "../config";
 import { Event } from "./event";
 import {
   AnyMutationHandlerContext,
@@ -45,11 +45,11 @@ import invalidHeaderErrorHtml from "./invalidHeaderError.html";
 
 type SubscriptionHandlerMap<R> = HashMap.HashMap<
   string,
-  SubscriptionHandlerContext<SubscriptionHandlerConfig, R, R>
+  SubscriptionHandlerContext<HandlerConfig.SubscriptionHandlerConfig, R, R>
 >;
 type MutationHandlerMap<R> = HashMap.HashMap<
   string,
-  MutationHandlerContext<MutationHandlerConfig, R>
+  MutationHandlerContext<HandlerConfig.MutationHandlerConfig, R>
 >;
 
 type SubscriptionState = {
@@ -99,13 +99,17 @@ export class Server<R = never>
           subscriptionHandlerMap: Effect.succeed(
             HashMap.empty<
               string,
-              SubscriptionHandlerContext<SubscriptionHandlerConfig, R, R>
+              SubscriptionHandlerContext<
+                HandlerConfig.SubscriptionHandlerConfig,
+                R,
+                R
+              >
             >(),
           ),
           mutationHandlerMap: Effect.succeed(
             HashMap.empty<
               string,
-              MutationHandlerContext<MutationHandlerConfig, R>
+              MutationHandlerContext<HandlerConfig.MutationHandlerConfig, R>
             >(),
           ),
           peerStateMapRef: SynchronizedRef.make(
@@ -186,27 +190,32 @@ export class Server<R = never>
   >(handler: Handler) {
     return <
       S extends Server<
-        | SubscriptionHandlerContextRequirement<Handler>
-        | MutationHandlerContextRequirement<Handler>
+        Handler extends AnySubscriptionHandlerContext
+          ? SubscriptionHandlerContextRequirement<Handler>
+          : Handler extends AnyMutationHandlerContext
+            ? MutationHandlerContextRequirement<Handler>
+            : never
       >,
     >(
       server: S,
     ) => {
       const newHandlerMaps = pipe(
-        Match.value(handler.config),
-        Match.when({ type: "subscription" }, () => ({
+        Match.value(HandlerConfig.type(handler.config)),
+        Match.when("subscription", () => ({
           subscriptionHandlerMap: HashMap.set(
             server.subscriptionHandlerMap,
-            handler.config.name,
+            HandlerConfig.name(
+              handler.config as HandlerConfig.SubscriptionHandlerConfig,
+            ),
             handler as SubscriptionHandlerContext,
           ),
           mutationHandlerMap: server.mutationHandlerMap,
         })),
-        Match.when({ type: "mutation" }, () => ({
+        Match.when("mutation", () => ({
           subscriptionHandlerMap: server.subscriptionHandlerMap,
           mutationHandlerMap: HashMap.set(
             server.mutationHandlerMap,
-            handler.config.name,
+            HandlerConfig.name(handler.config),
             handler as MutationHandlerContext,
           ),
         })),
@@ -387,13 +396,16 @@ export class Server<R = never>
 
   private static getComputedSubscriptionResult<R = never>(
     subscriptionId: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    subscriptionHandlerContext: SubscriptionHandlerContext<any, R, R>,
+    subscriptionHandlerContext: SubscriptionHandlerContext<
+      HandlerConfig.SubscriptionHandlerConfig,
+      R,
+      R
+    >,
   ): Effect.Effect<
     Computed<
       {
         header: Header<"server:update">;
-        message: Uint8Array;
+        message: unknown;
       },
       never,
       Event | R
@@ -439,30 +451,38 @@ export class Server<R = never>
             Effect.scoped,
             Effect.withSpan("subscriptionHandler", {
               captureStackTrace: true,
+              attributes: {
+                handler: HandlerConfig.name(subscriptionHandlerContext.config),
+              },
             }),
             Effect.annotateLogs({
-              handler: subscriptionHandlerContext.config.name,
+              handler: HandlerConfig.name(subscriptionHandlerContext.config),
             }),
           ),
         ),
       ),
       Effect.withSpan("Server.getComputedSubscriptionResult", {
         captureStackTrace: true,
+        attributes: {
+          handler: HandlerConfig.name(subscriptionHandlerContext.config),
+        },
       }),
       Effect.annotateLogs({
-        handler: subscriptionHandlerContext.config.name,
+        handler: HandlerConfig.name(subscriptionHandlerContext.config),
       }),
     );
   }
 
   private static getMutationResult<R = never>(
     mutationId: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mutationHandlerContext: MutationHandlerContext<any, R>,
+    mutationHandlerContext: MutationHandlerContext<
+      HandlerConfig.MutationHandlerConfig,
+      R
+    >,
   ): Effect.Effect<
     {
       header: Header<"server:update">;
-      message: Uint8Array;
+      message: unknown;
     },
     unknown,
     Event | R
@@ -501,17 +521,23 @@ export class Server<R = never>
       Effect.scoped,
       Effect.withSpan("Server.getMutationResult", {
         captureStackTrace: true,
+        attributes: {
+          handler: HandlerConfig.name(mutationHandlerContext.config),
+        },
       }),
       Effect.annotateLogs({
-        handler: mutationHandlerContext.config.name,
+        handler: HandlerConfig.name(mutationHandlerContext.config),
       }),
     );
   }
 
   private static getComputedSubscriptionResultEncoded<R = never>(
     subscriptionId: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    subscriptionHandlerContext: SubscriptionHandlerContext<any, R, R>,
+    subscriptionHandlerContext: SubscriptionHandlerContext<
+      HandlerConfig.SubscriptionHandlerConfig,
+      R,
+      R
+    >,
   ) {
     return pipe(
       Server.getComputedSubscriptionResult(
@@ -546,14 +572,19 @@ export class Server<R = never>
       ),
       Effect.withSpan("Server.getComputedSubscriptionResultEncoded", {
         captureStackTrace: true,
+        attributes: {
+          handler: HandlerConfig.name(subscriptionHandlerContext.config),
+        },
       }),
     );
   }
 
   private static getMutationResultEncoded<R = never>(
     mutationId: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mutationHandlerContext: MutationHandlerContext<any, R>,
+    mutationHandlerContext: MutationHandlerContext<
+      HandlerConfig.MutationHandlerConfig,
+      R
+    >,
   ) {
     return pipe(
       Effect.Do,
@@ -580,6 +611,9 @@ export class Server<R = never>
       Effect.map(({ updateBuffer }) => updateBuffer),
       Effect.withSpan("Server.getMutationResultEncoded", {
         captureStackTrace: true,
+        attributes: {
+          handler: HandlerConfig.name(mutationHandlerContext.config),
+        },
       }),
     );
   }
