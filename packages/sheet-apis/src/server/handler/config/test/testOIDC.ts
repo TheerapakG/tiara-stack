@@ -1,16 +1,18 @@
-import { defineHandlerConfigBuilder } from "typhoon-server/config";
+import { pipe } from "effect";
+import { HandlerConfig } from "typhoon-core/config";
 import * as v from "valibot";
 
-export const testOIDCHandlerConfig = defineHandlerConfigBuilder()
-  .name("testOIDC")
-  .type("subscription")
-  .request({
+export const testOIDCHandlerConfig = pipe(
+  HandlerConfig.empty,
+  HandlerConfig.Builder.name("testOIDC"),
+  HandlerConfig.Builder.type("subscription"),
+  HandlerConfig.Builder.requestParams({
     validator: v.object({
       token: v.string(),
     }),
     validate: true,
-  })
-  .response({
+  }),
+  HandlerConfig.Builder.response({
     validator: v.object({
       payload: v.object({
         iss: v.optional(v.string()),
@@ -22,5 +24,5 @@ export const testOIDCHandlerConfig = defineHandlerConfigBuilder()
         iat: v.optional(v.number()),
       }),
     }),
-  })
-  .build();
+  }),
+);

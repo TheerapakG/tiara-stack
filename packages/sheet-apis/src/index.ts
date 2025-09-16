@@ -1,5 +1,5 @@
 import { pipe } from "effect";
-import { HandlerConfigGroup } from "typhoon-server/config";
+import { HandlerConfig } from "typhoon-core/config";
 import {
   calcHandlerConfigGroup,
   guildConfigHandlerConfigGroup,
@@ -7,8 +7,8 @@ import {
 } from "./server/handler/config";
 
 export const serverHandlerConfigGroup = pipe(
-  HandlerConfigGroup.empty(),
-  HandlerConfigGroup.addGroup(calcHandlerConfigGroup),
-  HandlerConfigGroup.addGroup(guildConfigHandlerConfigGroup),
-  HandlerConfigGroup.addGroup(testHandlerConfigGroup),
+  HandlerConfig.Group.empty(),
+  HandlerConfig.Group.addGroup(calcHandlerConfigGroup),
+  HandlerConfig.Group.addGroup(guildConfigHandlerConfigGroup),
+  HandlerConfig.Group.addGroup(testHandlerConfigGroup),
 );
