@@ -1,10 +1,12 @@
-import { defineHandlerConfigBuilder } from "typhoon-server/config";
+import { pipe } from "effect";
+import { HandlerConfig } from "typhoon-core/config";
 import * as v from "valibot";
 
-export const calcHandlerConfig = defineHandlerConfigBuilder()
-  .name("calc")
-  .type("subscription")
-  .request({
+export const calcHandlerConfig = pipe(
+  HandlerConfig.empty,
+  HandlerConfig.Builder.name("calc"),
+  HandlerConfig.Builder.type("subscription"),
+  HandlerConfig.Builder.requestParams({
     validator: v.object({
       config: v.object({
         healNeeded: v.number(),
@@ -28,9 +30,8 @@ export const calcHandlerConfig = defineHandlerConfigBuilder()
         v.length(5),
       ),
     }),
-    validate: true,
-  })
-  .response({
+  }),
+  HandlerConfig.Builder.response({
     validator: v.array(
       v.object({
         averageBp: v.number(),
@@ -46,5 +47,5 @@ export const calcHandlerConfig = defineHandlerConfigBuilder()
         ),
       }),
     ),
-  })
-  .build();
+  }),
+);
