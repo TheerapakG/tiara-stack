@@ -1,2 +1,1 @@
-export * from "./handler";
-export * from "./handlerConfigGroup";
+export * as HandlerConfig from "./handler";
