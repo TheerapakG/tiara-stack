@@ -11,18 +11,13 @@ import {
   pipe,
   SynchronizedRef,
 } from "effect";
-import {
-  HandlerConfigGroup,
-  MutationHandlerConfig,
-  RequestParamsConfig,
-  SubscriptionHandlerConfig,
-} from "typhoon-core/config";
+import { HandlerConfig } from "typhoon-core/config";
 import {
   Header,
   HeaderEncoderDecoder,
   MsgpackEncoderDecoder,
 } from "typhoon-core/protocol";
-import { validate } from "typhoon-core/schema";
+import { validate, Validated } from "typhoon-core/schema";
 import { DependencySignal, signal } from "typhoon-core/signal";
 import * as v from "valibot";
 
@@ -50,12 +45,12 @@ type UpdaterStateMap = HashMap.HashMap<string, UpdaterState>;
 export class WebSocketClient<
   SubscriptionHandlerConfigs extends Record<
     string,
-    SubscriptionHandlerConfig
-  > = Record<string, SubscriptionHandlerConfig>,
-  MutationHandlerConfigs extends Record<string, MutationHandlerConfig> = Record<
+    HandlerConfig.SubscriptionHandlerConfig
+  > = Record<string, HandlerConfig.SubscriptionHandlerConfig>,
+  MutationHandlerConfigs extends Record<
     string,
-    MutationHandlerConfig
-  >,
+    HandlerConfig.MutationHandlerConfig
+  > = Record<string, HandlerConfig.MutationHandlerConfig>,
 > {
   constructor(
     private readonly url: string,
@@ -63,7 +58,7 @@ export class WebSocketClient<
       Option.Option<WebSocket>
     >,
     private readonly updaterStateMapRef: SynchronizedRef.SynchronizedRef<UpdaterStateMap>,
-    private readonly configGroup: HandlerConfigGroup<
+    private readonly configGroup: HandlerConfig.Group.HandlerConfigGroup<
       SubscriptionHandlerConfigs,
       MutationHandlerConfigs
     >,
@@ -75,11 +70,14 @@ export class WebSocketClient<
   static create<
     SubscriptionHandlerConfigs extends Record<
       string,
-      SubscriptionHandlerConfig
+      HandlerConfig.SubscriptionHandlerConfig
     >,
-    MutationHandlerConfigs extends Record<string, MutationHandlerConfig>,
+    MutationHandlerConfigs extends Record<
+      string,
+      HandlerConfig.MutationHandlerConfig
+    >,
   >(
-    configGroup: HandlerConfigGroup<
+    configGroup: HandlerConfig.Group.HandlerConfigGroup<
       SubscriptionHandlerConfigs,
       MutationHandlerConfigs
     >,
@@ -115,8 +113,8 @@ export class WebSocketClient<
   ) {
     return (
       client: WebSocketClient<
-        Record<string, SubscriptionHandlerConfig>,
-        Record<string, MutationHandlerConfig>
+        Record<string, HandlerConfig.SubscriptionHandlerConfig>,
+        Record<string, HandlerConfig.MutationHandlerConfig>
       >,
     ) =>
       pipe(
@@ -128,8 +126,8 @@ export class WebSocketClient<
   static removeUpdater(id: string) {
     return (
       client: WebSocketClient<
-        Record<string, SubscriptionHandlerConfig>,
-        Record<string, MutationHandlerConfig>
+        Record<string, HandlerConfig.SubscriptionHandlerConfig>,
+        Record<string, HandlerConfig.MutationHandlerConfig>
       >,
     ) =>
       pipe(
@@ -141,8 +139,8 @@ export class WebSocketClient<
   static handleUpdate(header: Header, decodedResponse: unknown) {
     return (
       client: WebSocketClient<
-        Record<string, SubscriptionHandlerConfig>,
-        Record<string, MutationHandlerConfig>
+        Record<string, HandlerConfig.SubscriptionHandlerConfig>,
+        Record<string, HandlerConfig.MutationHandlerConfig>
       >,
     ) =>
       pipe(
@@ -184,8 +182,8 @@ export class WebSocketClient<
 
   static connect = (
     client: WebSocketClient<
-      Record<string, SubscriptionHandlerConfig>,
-      Record<string, MutationHandlerConfig>
+      Record<string, HandlerConfig.SubscriptionHandlerConfig>,
+      Record<string, HandlerConfig.MutationHandlerConfig>
     >,
   ) =>
     pipe(
@@ -244,8 +242,8 @@ export class WebSocketClient<
 
   static close(
     client: WebSocketClient<
-      Record<string, SubscriptionHandlerConfig>,
-      Record<string, MutationHandlerConfig>
+      Record<string, HandlerConfig.SubscriptionHandlerConfig>,
+      Record<string, HandlerConfig.MutationHandlerConfig>
     >,
   ) {
     return pipe(
@@ -264,8 +262,8 @@ export class WebSocketClient<
     (token: Option.Option<string>) =>
     (
       client: WebSocketClient<
-        Record<string, SubscriptionHandlerConfig>,
-        Record<string, MutationHandlerConfig>
+        Record<string, HandlerConfig.SubscriptionHandlerConfig>,
+        Record<string, HandlerConfig.MutationHandlerConfig>
       >,
     ) =>
       pipe(
@@ -276,25 +274,40 @@ export class WebSocketClient<
   static subscribe<
     SubscriptionHandlerConfigs extends Record<
       string,
-      SubscriptionHandlerConfig
+      HandlerConfig.SubscriptionHandlerConfig
     >,
     Handler extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: WebSocketClient<
       SubscriptionHandlerConfigs,
-      Record<string, MutationHandlerConfig>
+      Record<string, HandlerConfig.MutationHandlerConfig>
     >,
     handler: Handler,
     // TODO: make this conditionally optional
-    data?: SubscriptionHandlerConfigs[Handler]["requestParams"] extends infer HandlerRequestParamsConfig extends
-      RequestParamsConfig
-      ? StandardSchemaV1.InferInput<HandlerRequestParamsConfig["validator"]>
+    data?: HandlerConfig.ResolvedRequestParamsValidator<
+      HandlerConfig.RequestParamsOrUndefined<
+        SubscriptionHandlerConfigs[Handler]
+      >
+    > extends infer Validator extends StandardSchemaV1
+      ? StandardSchemaV1.InferInput<Validator>
       : never,
   ) {
     return pipe(
       Effect.Do,
       Effect.let("id", () => crypto.randomUUID() as string),
-      Effect.let("signal", () => signal<SignalState>({ state: "loading" })),
+      Effect.let("signal", () =>
+        signal<
+          SignalState<
+            Validated<
+              HandlerConfig.ResolvedResponseValidator<
+                HandlerConfig.ResponseOrUndefined<
+                  SubscriptionHandlerConfigs[Handler]
+                >
+              >
+            >
+          >
+        >({ state: "loading" }),
+      ),
       Effect.tap(({ id, signal }) =>
         pipe(
           client,
@@ -309,7 +322,6 @@ export class WebSocketClient<
                   ? {
                       state: "resolved",
                       timestamp: value.timestamp,
-                      // TODO: validate the response validator
                       value: pipe(
                         Effect.Do,
                         Effect.bind("value", () => value.value),
@@ -320,7 +332,13 @@ export class WebSocketClient<
                           ),
                         ),
                         Effect.flatMap(({ value, config }) =>
-                          validate(config.response.validator)(value),
+                          validate(
+                            HandlerConfig.resolveResponseValidator(
+                              HandlerConfig.response(
+                                config as SubscriptionHandlerConfigs[Handler],
+                              ),
+                            ),
+                          )(value),
                         ),
                         Effect.catchAll((error) =>
                           Effect.fail(
@@ -371,8 +389,12 @@ export class WebSocketClient<
           [
             signal as DependencySignal<
               SignalState<
-                StandardSchemaV1.InferOutput<
-                  SubscriptionHandlerConfigs[Handler]["response"]["validator"]
+                Validated<
+                  HandlerConfig.ResolvedResponseValidator<
+                    HandlerConfig.ResponseOrUndefined<
+                      SubscriptionHandlerConfigs[Handler]
+                    >
+                  >
                 >
               >,
               never,
@@ -393,13 +415,13 @@ export class WebSocketClient<
   static unsubscribe<
     SubscriptionHandlerConfigs extends Record<
       string,
-      SubscriptionHandlerConfig
+      HandlerConfig.SubscriptionHandlerConfig
     >,
     Handler extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: WebSocketClient<
       SubscriptionHandlerConfigs,
-      Record<string, MutationHandlerConfig>
+      Record<string, HandlerConfig.MutationHandlerConfig>
     >,
     id: string,
     handler: Handler,
@@ -439,25 +461,39 @@ export class WebSocketClient<
   static once<
     SubscriptionHandlerConfigs extends Record<
       string,
-      SubscriptionHandlerConfig
+      HandlerConfig.SubscriptionHandlerConfig
     >,
     Handler extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: WebSocketClient<
       SubscriptionHandlerConfigs,
-      Record<string, MutationHandlerConfig>
+      Record<string, HandlerConfig.MutationHandlerConfig>
     >,
     handler: Handler,
     // TODO: make this conditionally optional
-    data?: SubscriptionHandlerConfigs[Handler]["requestParams"] extends infer HandlerRequestParamsConfig extends
-      RequestParamsConfig
-      ? StandardSchemaV1.InferInput<HandlerRequestParamsConfig["validator"]>
+    data?: HandlerConfig.ResolvedRequestParamsValidator<
+      HandlerConfig.RequestParamsOrUndefined<
+        SubscriptionHandlerConfigs[Handler]
+      >
+    > extends infer Validator extends StandardSchemaV1
+      ? StandardSchemaV1.InferInput<Validator>
       : never,
   ) {
     return pipe(
       Effect.Do,
       Effect.let("id", () => crypto.randomUUID() as string),
-      Effect.bind("deferred", () => Deferred.make<unknown, HandlerError>()),
+      Effect.bind("deferred", () =>
+        Deferred.make<
+          Validated<
+            HandlerConfig.ResolvedResponseValidator<
+              HandlerConfig.ResponseOrUndefined<
+                SubscriptionHandlerConfigs[Handler]
+              >
+            >
+          >,
+          HandlerError
+        >(),
+      ),
       Effect.tap(({ id, deferred }) =>
         pipe(
           client,
@@ -475,7 +511,13 @@ export class WebSocketClient<
                     ),
                   ),
                   Effect.flatMap(({ value, config }) =>
-                    validate(config.response.validator)(value),
+                    validate(
+                      HandlerConfig.resolveResponseValidator(
+                        HandlerConfig.response(
+                          config as SubscriptionHandlerConfigs[Handler],
+                        ),
+                      ),
+                    )(value),
                   ),
                   Effect.catchAll((error) =>
                     Effect.fail(
@@ -521,16 +563,7 @@ export class WebSocketClient<
       Effect.tap(({ ws, requestBuffer }) =>
         Option.map(ws, (ws) => ws.send(requestBuffer)),
       ),
-      Effect.flatMap(({ deferred }) =>
-        Deferred.await(
-          deferred as Deferred.Deferred<
-            StandardSchemaV1.InferOutput<
-              SubscriptionHandlerConfigs[Handler]["response"]["validator"]
-            >,
-            HandlerError
-          >,
-        ),
-      ),
+      Effect.flatMap(({ deferred }) => Deferred.await(deferred)),
       Effect.withSpan("WebSocketClient.once", {
         attributes: {
           handler,
@@ -541,24 +574,37 @@ export class WebSocketClient<
   }
 
   static mutate<
-    MutationHandlerConfigs extends Record<string, MutationHandlerConfig>,
+    MutationHandlerConfigs extends Record<
+      string,
+      HandlerConfig.MutationHandlerConfig
+    >,
     Handler extends keyof MutationHandlerConfigs & string,
   >(
     client: WebSocketClient<
-      Record<string, SubscriptionHandlerConfig>,
+      Record<string, HandlerConfig.SubscriptionHandlerConfig>,
       MutationHandlerConfigs
     >,
     handler: Handler,
     // TODO: make this conditionally optional
-    data?: MutationHandlerConfigs[Handler]["requestParams"] extends infer HandlerRequestParamsConfig extends
-      RequestParamsConfig
-      ? StandardSchemaV1.InferInput<HandlerRequestParamsConfig["validator"]>
+    data?: HandlerConfig.ResolvedRequestParamsValidator<
+      HandlerConfig.RequestParamsOrUndefined<MutationHandlerConfigs[Handler]>
+    > extends infer Validator extends StandardSchemaV1
+      ? StandardSchemaV1.InferInput<Validator>
       : never,
   ) {
     return pipe(
       Effect.Do,
       Effect.let("id", () => crypto.randomUUID() as string),
-      Effect.bind("deferred", () => Deferred.make<unknown, HandlerError>()),
+      Effect.bind("deferred", () =>
+        Deferred.make<
+          Validated<
+            HandlerConfig.ResolvedResponseValidator<
+              HandlerConfig.ResponseOrUndefined<MutationHandlerConfigs[Handler]>
+            >
+          >,
+          HandlerError
+        >(),
+      ),
       Effect.tap(({ id, deferred }) =>
         pipe(
           client,
@@ -573,7 +619,13 @@ export class WebSocketClient<
                     HashMap.get(client.configGroup.mutationHandlerMap, handler),
                   ),
                   Effect.flatMap(({ value, config }) =>
-                    validate(config.response.validator)(value),
+                    validate(
+                      HandlerConfig.resolveResponseValidator(
+                        HandlerConfig.response(
+                          config as MutationHandlerConfigs[Handler],
+                        ),
+                      ),
+                    )(value),
                   ),
                   Effect.catchAll((error) =>
                     Effect.fail(
@@ -619,16 +671,7 @@ export class WebSocketClient<
       Effect.tap(({ ws, requestBuffer }) =>
         Option.map(ws, (ws) => ws.send(requestBuffer)),
       ),
-      Effect.flatMap(({ deferred }) =>
-        Deferred.await(
-          deferred as Deferred.Deferred<
-            StandardSchemaV1.InferOutput<
-              MutationHandlerConfigs[Handler]["response"]["validator"]
-            >,
-            HandlerError
-          >,
-        ),
-      ),
+      Effect.flatMap(({ deferred }) => Deferred.await(deferred)),
       Effect.withSpan("WebSocketClient.mutate", {
         attributes: {
           handler,
