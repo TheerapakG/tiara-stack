@@ -1,11 +1,6 @@
 import { StandardSchemaV1 } from "@standard-schema/spec";
 import { Data, Effect, HashMap, Option, pipe, SynchronizedRef } from "effect";
-import {
-  HandlerConfigGroup,
-  MutationHandlerConfig,
-  RequestParamsConfig,
-  SubscriptionHandlerConfig,
-} from "typhoon-core/config";
+import { HandlerConfig } from "typhoon-core/config";
 import {
   HeaderEncoderDecoder,
   MsgpackEncoderDecoder,
@@ -18,16 +13,16 @@ export class HandlerError extends Data.TaggedError("HandlerError") {}
 export class AppsScriptClient<
   SubscriptionHandlerConfigs extends Record<
     string,
-    SubscriptionHandlerConfig
-  > = Record<string, SubscriptionHandlerConfig>,
-  MutationHandlerConfigs extends Record<string, MutationHandlerConfig> = Record<
+    HandlerConfig.SubscriptionHandlerConfig
+  > = Record<string, HandlerConfig.SubscriptionHandlerConfig>,
+  MutationHandlerConfigs extends Record<
     string,
-    MutationHandlerConfig
-  >,
+    HandlerConfig.MutationHandlerConfig
+  > = Record<string, HandlerConfig.MutationHandlerConfig>,
 > {
   constructor(
     private readonly url: string,
-    private readonly configGroup: HandlerConfigGroup<
+    private readonly configGroup: HandlerConfig.Group.HandlerConfigGroup<
       SubscriptionHandlerConfigs,
       MutationHandlerConfigs
     >,
@@ -39,11 +34,14 @@ export class AppsScriptClient<
   static create<
     SubscriptionHandlerConfigs extends Record<
       string,
-      SubscriptionHandlerConfig
+      HandlerConfig.SubscriptionHandlerConfig
     >,
-    MutationHandlerConfigs extends Record<string, MutationHandlerConfig>,
+    MutationHandlerConfigs extends Record<
+      string,
+      HandlerConfig.MutationHandlerConfig
+    >,
   >(
-    configGroup: HandlerConfigGroup<
+    configGroup: HandlerConfig.Group.HandlerConfigGroup<
       SubscriptionHandlerConfigs,
       MutationHandlerConfigs
     >,
@@ -73,8 +71,8 @@ export class AppsScriptClient<
     (token: Option.Option<string>) =>
     (
       client: AppsScriptClient<
-        Record<string, SubscriptionHandlerConfig>,
-        Record<string, MutationHandlerConfig>
+        Record<string, HandlerConfig.SubscriptionHandlerConfig>,
+        Record<string, HandlerConfig.MutationHandlerConfig>
       >,
     ) =>
       pipe(
@@ -87,20 +85,22 @@ export class AppsScriptClient<
   static once<
     SubscriptionHandlerConfigs extends Record<
       string,
-      SubscriptionHandlerConfig
+      HandlerConfig.SubscriptionHandlerConfig
     >,
     Handler extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: AppsScriptClient<
       SubscriptionHandlerConfigs,
-      Record<string, MutationHandlerConfig>
+      Record<string, HandlerConfig.MutationHandlerConfig>
     >,
     handler: Handler,
     // TODO: make this conditionally optional
-    data?: SubscriptionHandlerConfigs[Handler]["requestParams"] extends RequestParamsConfig
-      ? StandardSchemaV1.InferInput<
-          SubscriptionHandlerConfigs[Handler]["requestParams"]["validator"]
-        >
+    data?: HandlerConfig.ResolvedRequestParamsValidator<
+      HandlerConfig.RequestParamsOrUndefined<
+        SubscriptionHandlerConfigs[Handler]
+      >
+    > extends infer Validator extends StandardSchemaV1
+      ? StandardSchemaV1.InferInput<Validator>
       : never,
   ) {
     return pipe(
@@ -165,8 +165,11 @@ export class AppsScriptClient<
           ? pipe(
               decodedResponse,
               validate(
-                config.response
-                  .validator as SubscriptionHandlerConfigs[Handler]["response"]["validator"],
+                HandlerConfig.resolveResponseValidator(
+                  HandlerConfig.response(
+                    config as SubscriptionHandlerConfigs[Handler],
+                  ),
+                ),
               ),
               Effect.catchAll((error) =>
                 Effect.fail(
