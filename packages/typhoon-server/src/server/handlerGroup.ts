@@ -1,8 +1,5 @@
 import { Data, HashMap, Match, pipe } from "effect";
-import {
-  MutationHandlerConfig,
-  SubscriptionHandlerConfig,
-} from "typhoon-core/config";
+import { HandlerConfig } from "typhoon-core/config";
 import {
   AnyMutationHandlerContext,
   AnySubscriptionHandlerContext,
@@ -12,11 +9,11 @@ import {
 
 type SubscriptionHandlerMap<R> = HashMap.HashMap<
   string,
-  SubscriptionHandlerContext<SubscriptionHandlerConfig, R>
+  SubscriptionHandlerContext<HandlerConfig.SubscriptionHandlerConfig, R>
 >;
 type MutationHandlerMap<R> = HashMap.HashMap<
   string,
-  MutationHandlerContext<MutationHandlerConfig, R>
+  MutationHandlerContext<HandlerConfig.MutationHandlerConfig, R>
 >;
 
 export class HandlerGroup<R = never> extends Data.TaggedClass("HandlerGroup")<{
@@ -56,20 +53,20 @@ export const add =
     handlerGroup: G,
   ): AddHandlerGroupHandler<G, Handler> => {
     const newHandlerMaps = pipe(
-      Match.value(handler.config),
-      Match.when({ type: "subscription" }, () => ({
+      Match.value(HandlerConfig.type(handler.config)),
+      Match.when("subscription", () => ({
         subscriptionHandlerMap: HashMap.set(
           handlerGroup.subscriptionHandlerMap,
-          handler.config.name,
+          HandlerConfig.name(handler.config),
           handler as SubscriptionHandlerContext,
         ),
         mutationHandlerMap: handlerGroup.mutationHandlerMap,
       })),
-      Match.when({ type: "mutation" }, () => ({
+      Match.when("mutation", () => ({
         subscriptionHandlerMap: handlerGroup.subscriptionHandlerMap,
         mutationHandlerMap: HashMap.set(
           handlerGroup.mutationHandlerMap,
-          handler.config.name,
+          HandlerConfig.name(handler.config),
           handler as MutationHandlerContext,
         ),
       })),

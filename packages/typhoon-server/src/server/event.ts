@@ -7,19 +7,16 @@ import {
   Scope,
   SynchronizedRef,
 } from "effect";
-import {
-  HandlerConfig,
-  RequestParamsConfig,
-  validateRequestParamsConfig,
-} from "typhoon-core/config";
+import { HandlerConfig } from "typhoon-core/config";
 import {
   MsgpackDecodeError,
   StreamExhaustedError,
 } from "typhoon-core/protocol";
+import { validate } from "typhoon-core/schema";
 import { Computed, signal, Signal } from "typhoon-core/signal";
 
 const pullStreamToParsed =
-  <RequestParams extends RequestParamsConfig | undefined>(
+  <const RequestParams extends HandlerConfig.RequestParamsConfig | undefined>(
     requestParams: RequestParams,
   ) =>
   (
@@ -31,10 +28,16 @@ const pullStreamToParsed =
   ) =>
     pipe(
       pullStream,
-      Effect.flatMap(validateRequestParamsConfig(requestParams)),
+      Effect.flatMap(
+        validate(HandlerConfig.resolveRequestParamsValidator(requestParams)),
+      ),
     );
 
-export class EventRequestWithConfig<Config extends HandlerConfig> {
+export class EventRequestWithConfig<
+  const Config extends
+    | HandlerConfig.SubscriptionHandlerConfig
+    | HandlerConfig.MutationHandlerConfig,
+> {
   constructor(readonly config: Config) {}
 
   raw() {
@@ -46,21 +49,21 @@ export class EventRequestWithConfig<Config extends HandlerConfig> {
     );
   }
 
-  parsed<
-    RequestParams extends
-      | RequestParamsConfig
-      | undefined = Config["requestParams"],
-  >() {
+  parsed() {
     return pipe(
       this.raw(),
       Computed.flatMap(
-        pullStreamToParsed(this.config.requestParams as RequestParams),
+        pullStreamToParsed(HandlerConfig.requestParams(this.config)),
       ),
     );
   }
 }
 
-export class EventWithConfig<Config extends HandlerConfig> {
+export class EventWithConfig<
+  Config extends
+    | HandlerConfig.SubscriptionHandlerConfig
+    | HandlerConfig.MutationHandlerConfig,
+> {
   constructor(readonly config: Config) {}
 
   get request() {
@@ -177,7 +180,11 @@ export class Event extends Context.Tag("Event")<
       Effect.map((ctx) => ctx.token),
     );
 
-  static withConfig<Config extends HandlerConfig>(config: Config) {
+  static withConfig<
+    Config extends
+      | HandlerConfig.SubscriptionHandlerConfig
+      | HandlerConfig.MutationHandlerConfig,
+  >(config: Config) {
     return new EventWithConfig(config);
   }
 }
