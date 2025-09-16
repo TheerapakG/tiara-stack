@@ -33,11 +33,11 @@ const coerceFalse = <T extends boolean | undefined>(
 export const type =
   <const Type extends "subscription" | "mutation">(type: Type) =>
   <const Config extends HandlerConfig>(config: Config) =>
-    new HandlerConfig(
-      Struct.evolve(config, {
+    new HandlerConfig({
+      data: Struct.evolve(config.data, {
         type: () => StrictOption.some(type),
       }),
-    ) as HandlerConfig<
+    }) as HandlerConfig<
       Option.Some<Type>,
       NameOption<Config>,
       RequestParamsOption<Config>,
@@ -47,11 +47,11 @@ export const type =
 export const name =
   <const Name extends string>(name: Name) =>
   <const Config extends HandlerConfig>(config: Config) =>
-    new HandlerConfig(
-      Struct.evolve(config, {
+    new HandlerConfig({
+      data: Struct.evolve(config.data, {
         name: () => StrictOption.some(name),
       }),
-    ) as HandlerConfig<
+    }) as HandlerConfig<
       TypeOption<Config>,
       Option.Some<Name>,
       RequestParamsOption<Config>,
@@ -89,11 +89,11 @@ export const requestParams =
   ) =>
   <const Config extends HandlerConfig>(config: Config) => {
     const transformedRequestParams = transformRequestParamConfig(requestParams);
-    return new HandlerConfig(
-      Struct.evolve(config, {
+    return new HandlerConfig({
+      data: Struct.evolve(config.data, {
         requestParams: () => StrictOption.some(transformedRequestParams),
       }),
-    ) as HandlerConfig<
+    }) as HandlerConfig<
       TypeOption<Config>,
       NameOption<Config>,
       Option.Some<typeof transformedRequestParams>,
@@ -125,11 +125,11 @@ export const response =
   <const Response extends ResponseConfigIn>(response: Response) =>
   <const Config extends HandlerConfig>(config: Config) => {
     const transformedResponse = transformResponseConfig(response);
-    return new HandlerConfig(
-      Struct.evolve(config, {
+    return new HandlerConfig({
+      data: Struct.evolve(config.data, {
         response: () => StrictOption.some(transformedResponse),
       }),
-    ) as HandlerConfig<
+    }) as HandlerConfig<
       TypeOption<Config>,
       NameOption<Config>,
       RequestParamsOption<Config>,
