@@ -1,13 +1,15 @@
-import { MutationHandlerConfig, SubscriptionHandlerConfig } from "../config";
+import { HandlerConfig } from "../config";
 
 export type SubscriptionHandlerContext<
-  Config extends SubscriptionHandlerConfig = SubscriptionHandlerConfig,
+  Config extends
+    HandlerConfig.SubscriptionHandlerConfig = HandlerConfig.SubscriptionHandlerConfig,
 > = {
   config: Config;
 };
 
 export type MutationHandlerContext<
-  Config extends MutationHandlerConfig = MutationHandlerConfig,
+  Config extends
+    HandlerConfig.MutationHandlerConfig = HandlerConfig.MutationHandlerConfig,
 > = {
   config: Config;
 };
