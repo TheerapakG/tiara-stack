@@ -10,7 +10,7 @@ type MutationHandlerConfigMap = HashMap.HashMap<
   HandlerConfig.MutationHandlerConfig
 >;
 
-export type HandlerConfigGroupSubscriptionHandlerConfigs<
+type HandlerConfigGroupSubscriptionHandlerConfigs<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   G extends HandlerConfigGroup<any, any>,
 > =
