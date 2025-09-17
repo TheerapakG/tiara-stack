@@ -12,8 +12,8 @@ import {
   MsgpackDecodeError,
   StreamExhaustedError,
 } from "typhoon-core/protocol";
-import { validate } from "typhoon-core/schema";
-import { Computed, signal, Signal } from "typhoon-core/signal";
+import { Computed, Signal } from "typhoon-core/signal";
+import { validate } from "typhoon-core/validator";
 
 const pullStreamToParsed =
   <const RequestParams extends HandlerConfig.RequestParamsConfig | undefined>(
@@ -88,7 +88,7 @@ export class Event extends Context.Tag("Event")<
   Event,
   SynchronizedRef.SynchronizedRef<{
     request: Request;
-    pullStream: Signal<
+    pullStream: Signal.Signal<
       Readonly<{
         stream: Effect.Effect<
           unknown,
@@ -106,7 +106,7 @@ export class Event extends Context.Tag("Event")<
   ): Effect.Effect<Context.Tag.Service<Event>> =>
     SynchronizedRef.make({
       request: ctx.request,
-      pullStream: signal({
+      pullStream: Signal.make({
         stream: ctx.pullStream.stream,
         scope: ctx.pullStream.scope,
       }),

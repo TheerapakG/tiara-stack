@@ -1,4 +1,4 @@
 export * from "./event";
 export * from "./handler";
 export * as HandlerGroup from "./handlerGroup";
-export * from "./server";
+export * as Server from "./server";
