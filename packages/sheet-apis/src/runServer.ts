@@ -6,12 +6,7 @@ import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { serve as crosswsServe } from "crossws/server/node";
 import { Effect, Layer, Logger, pipe } from "effect";
 import { DBSubscriptionContext } from "typhoon-server/db";
-import {
-  HandlerGroup,
-  serve,
-  Server,
-  Server as TyphoonServer,
-} from "typhoon-server/server";
+import { HandlerGroup, Server } from "typhoon-server/server";
 import { Config } from "./config";
 import { DB } from "./db";
 import {
@@ -65,8 +60,8 @@ const MetricsLive = NodeSdk.layer(() => ({
 
 const serveEffect = pipe(
   server,
-  Effect.map(TyphoonServer.withTraceProvider(TracesLive)),
-  Effect.flatMap(serve(crosswsServe)),
+  Effect.map(Server.withTraceProvider(TracesLive)),
+  Effect.flatMap(Server.serve(crosswsServe)),
   Effect.flatMap((latch) => latch.await),
   Effect.sandbox,
   Effect.catchAll((error) => Effect.logError(error)),
