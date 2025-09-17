@@ -1,10 +1,7 @@
 import { StandardSchemaV1 } from "@standard-schema/spec";
 import { Effect, Match, pipe, Scope } from "effect";
 import { HandlerConfig } from "typhoon-core/config";
-import {
-  MutationHandlerContext as BaseMutationHandlerContext,
-  SubscriptionHandlerContext as BaseSubscriptionHandlerContext,
-} from "typhoon-core/server";
+import { HandlerContext } from "typhoon-core/server";
 import { DependencySignal } from "typhoon-core/signal";
 import { Event } from "./event";
 
@@ -18,7 +15,7 @@ export type SubscriptionEventHandler<
   SignalR = never,
   EffectR = never,
 > = Effect.Effect<
-  DependencySignal<
+  DependencySignal.DependencySignal<
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ResolvedResponseValidator<Config> extends StandardSchemaV1<infer T, any>
       ? T
@@ -114,7 +111,7 @@ export type SubscriptionHandlerContext<
     SignalR,
     EffectR
   > = AnySubscriptionEventHandler<Config, SignalR, EffectR>,
-> = BaseSubscriptionHandlerContext<Config> & { handler: Handler };
+> = HandlerContext.SubscriptionHandlerContext<Config> & { handler: Handler };
 
 export type AnySubscriptionHandlerContext<
   Config extends
@@ -153,7 +150,7 @@ export type MutationHandlerContext<
     Config,
     R
   >,
-> = BaseMutationHandlerContext<Config> & { handler: Handler };
+> = HandlerContext.MutationHandlerContext<Config> & { handler: Handler };
 
 export type AnyMutationHandlerContext<
   Config extends
