@@ -17,8 +17,8 @@ import {
   HeaderEncoderDecoder,
   MsgpackEncoderDecoder,
 } from "typhoon-core/protocol";
-import { validate, Validated } from "typhoon-core/schema";
-import { DependencySignal, signal } from "typhoon-core/signal";
+import { DependencySignal, Signal } from "typhoon-core/signal";
+import { validate, Validator } from "typhoon-core/validator";
 import * as v from "valibot";
 
 const WebSocketCtor = globalThis.WebSocket;
@@ -296,9 +296,9 @@ export class WebSocketClient<
       Effect.Do,
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.let("signal", () =>
-        signal<
+        Signal.make<
           SignalState<
-            Validated<
+            Validator.Validated<
               HandlerConfig.ResolvedResponseValidator<
                 HandlerConfig.ResponseOrUndefined<
                   SubscriptionHandlerConfigs[Handler]
@@ -387,9 +387,9 @@ export class WebSocketClient<
       Effect.map(
         ({ id, signal }) =>
           [
-            signal as DependencySignal<
+            signal as DependencySignal.DependencySignal<
               SignalState<
-                Validated<
+                Validator.Validated<
                   HandlerConfig.ResolvedResponseValidator<
                     HandlerConfig.ResponseOrUndefined<
                       SubscriptionHandlerConfigs[Handler]
@@ -484,7 +484,7 @@ export class WebSocketClient<
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("deferred", () =>
         Deferred.make<
-          Validated<
+          Validator.Validated<
             HandlerConfig.ResolvedResponseValidator<
               HandlerConfig.ResponseOrUndefined<
                 SubscriptionHandlerConfigs[Handler]
@@ -597,7 +597,7 @@ export class WebSocketClient<
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("deferred", () =>
         Deferred.make<
-          Validated<
+          Validator.Validated<
             HandlerConfig.ResolvedResponseValidator<
               HandlerConfig.ResponseOrUndefined<MutationHandlerConfigs[Handler]>
             >
