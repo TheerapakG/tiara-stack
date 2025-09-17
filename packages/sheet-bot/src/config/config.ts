@@ -1,6 +1,6 @@
 import { loadConfig } from "c12";
 import { Effect, pipe, Schema } from "effect";
-import { validate } from "typhoon-core/schema";
+import { validate } from "typhoon-core/validator";
 
 export class Config extends Effect.Service<Config>()("Config", {
   effect: pipe(

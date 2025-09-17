@@ -42,7 +42,7 @@ import {
   Schema,
   String,
 } from "effect";
-import { validate } from "typhoon-core/schema";
+import { validate } from "typhoon-core/validator";
 
 const getSlotMessage = (day: number) =>
   pipe(

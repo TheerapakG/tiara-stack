@@ -4,7 +4,7 @@ import {
   DiscordjsTypeError,
 } from "discord.js";
 import { Cause, Data, Effect, Function, pipe, Schema } from "effect";
-import { validate } from "typhoon-core/schema";
+import { validate } from "typhoon-core/validator";
 
 export type Constructor<Instance> = abstract new (...args: never[]) => Instance;
 

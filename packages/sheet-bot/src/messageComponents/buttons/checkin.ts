@@ -35,7 +35,7 @@ import {
   Order,
   pipe,
 } from "effect";
-import { observeOnce } from "typhoon-server/signal";
+import { OnceObserver } from "typhoon-core/signal";
 import { DiscordError } from "~~/src/types";
 
 const buttonData = {
@@ -68,7 +68,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         Effect.bind("messageCheckinData", ({ message }) =>
           pipe(
             MessageCheckinService.getMessageCheckinData(message.id),
-            Effect.flatMap(observeOnce),
+            Effect.flatMap(OnceObserver.observeOnce),
             Effect.flatMap(Function.identity),
           ),
         ),
@@ -106,7 +106,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         Effect.bind("checkedInMentions", ({ message }) =>
           pipe(
             MessageCheckinService.getMessageCheckinMembers(message.id),
-            Effect.flatMap(observeOnce),
+            Effect.flatMap(OnceObserver.observeOnce),
             Effect.map(Array.filter((m) => Option.isSome(m.checkinAt))),
             Effect.flatMap((members) =>
               pipe(

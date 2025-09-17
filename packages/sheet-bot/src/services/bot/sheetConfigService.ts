@@ -13,8 +13,8 @@ import {
   Schema,
   String,
 } from "effect";
-import { validate, validateOption } from "typhoon-core/schema";
-import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
+import { Array as ArrayUtils } from "typhoon-core/utils";
+import { validate, validateOption } from "typhoon-core/validator";
 
 const parseValueRange = <A = never, E = never, R = never>(
   valueRange: sheets_v4.Schema$ValueRange,
@@ -222,48 +222,57 @@ const dayConfigParser = ([
         draft,
       }) =>
         pipe(
-          new ArrayWithDefault({ array: channel, default: { channel: "" } }),
-          ArrayWithDefault.zip(
-            new ArrayWithDefault({
+          new ArrayUtils.WithDefault.ArrayWithDefault({
+            array: channel,
+            default: { channel: "" },
+          }),
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
               array: day,
               default: { day: Option.none<number>() },
             }),
           ),
-          ArrayWithDefault.zip(
-            new ArrayWithDefault({ array: sheet, default: { sheet: "" } }),
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
+              array: sheet,
+              default: { sheet: "" },
+            }),
           ),
-          ArrayWithDefault.zip(
-            new ArrayWithDefault({
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
               array: hourRange,
               default: { hourRange: "" },
             }),
           ),
-          ArrayWithDefault.zip(
-            new ArrayWithDefault({
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
               array: breakRange,
               default: { breakRange: "" },
             }),
           ),
-          ArrayWithDefault.zip(
-            new ArrayWithDefault({
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
               array: fillRange,
               default: { fillRange: "" },
             }),
           ),
-          ArrayWithDefault.zip(
-            new ArrayWithDefault({
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
               array: overfillRange,
               default: { overfillRange: "" },
             }),
           ),
-          ArrayWithDefault.zip(
-            new ArrayWithDefault({
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
               array: standbyRange,
               default: { standbyRange: "" },
             }),
           ),
-          ArrayWithDefault.zip(
-            new ArrayWithDefault({ array: draft, default: { draft: "" } }),
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
+              array: draft,
+              default: { draft: "" },
+            }),
           ),
         ),
     ),
@@ -507,48 +516,57 @@ const teamConfigParser = ([
         tags,
       }) =>
         pipe(
-          new ArrayWithDefault({ array: name, default: { name: "" } }),
-          ArrayWithDefault.zip(
-            new ArrayWithDefault({ array: sheet, default: { sheet: "" } }),
+          new ArrayUtils.WithDefault.ArrayWithDefault({
+            array: name,
+            default: { name: "" },
+          }),
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
+              array: sheet,
+              default: { sheet: "" },
+            }),
           ),
-          ArrayWithDefault.zip(
-            new ArrayWithDefault({
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
               array: playerNameRange,
               default: { playerNameRange: "" },
             }),
           ),
-          ArrayWithDefault.zip(
-            new ArrayWithDefault({
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
               array: teamNameRange,
               default: { teamNameRange: "" },
             }),
           ),
-          ArrayWithDefault.zip(
-            new ArrayWithDefault({
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
               array: leadRange,
               default: { leadRange: "" },
             }),
           ),
-          ArrayWithDefault.zip(
-            new ArrayWithDefault({
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
               array: backlineRange,
               default: { backlineRange: "" },
             }),
           ),
-          ArrayWithDefault.zip(
-            new ArrayWithDefault({
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
               array: talentRange,
               default: { talentRange: "" },
             }),
           ),
-          ArrayWithDefault.zip(
-            new ArrayWithDefault({
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
               array: tagsType,
               default: { tagsType: "constants" },
             }),
           ),
-          ArrayWithDefault.zip(
-            new ArrayWithDefault({ array: tags, default: { tags: "" } }),
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
+              array: tags,
+              default: { tags: "" },
+            }),
           ),
         ),
     ),
@@ -589,7 +607,7 @@ const teamConfigParser = ([
                   : new TeamTagsRangesConfig({ tagsRange: tags }),
             }),
         ),
-        collectArrayToHashMap({
+        ArrayUtils.Collect.toHashMap({
           keyGetter: ({ name }) => name,
           valueInitializer: (a) => a,
           valueReducer: (_, a) => a,
@@ -679,11 +697,17 @@ const runnerConfigParser = ([
     }),
     Effect.map(({ name, hours }) =>
       pipe(
-        new ArrayWithDefault({ array: name, default: { name: "" } }),
-        ArrayWithDefault.zip(
-          new ArrayWithDefault({ array: hours, default: { hours: [] } }),
+        new ArrayUtils.WithDefault.ArrayWithDefault({
+          array: name,
+          default: { name: "" },
+        }),
+        ArrayUtils.WithDefault.zip(
+          new ArrayUtils.WithDefault.ArrayWithDefault({
+            array: hours,
+            default: { hours: [] },
+          }),
         ),
-        ArrayWithDefault.map(
+        ArrayUtils.WithDefault.map(
           ({ name, hours }) => new RunnerConfig({ name, hours }),
         ),
       ),
@@ -692,7 +716,7 @@ const runnerConfigParser = ([
       pipe(
         array,
         Array.filter(({ name }) => name !== ""),
-        collectArrayToHashMap({
+        ArrayUtils.Collect.toHashMap({
           keyGetter: ({ name }) => name,
           valueInitializer: (a) => a,
           valueReducer: (_, a) => a,
