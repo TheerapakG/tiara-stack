@@ -1,6 +1,9 @@
 import { Array, Chunk, Data, Effect, Match, pipe, Stream } from "effect";
 import * as v from "valibot";
-import { validate, ValidationError } from "../schema/validate";
+import { validate } from "../validator/validate";
+import { ValidationError } from "../validator/validator";
+
+export type * from "../validator/validator";
 
 const headerActionFields = [
   "client:subscribe",

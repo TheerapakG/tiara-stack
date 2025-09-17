@@ -2,7 +2,7 @@ import { StandardSchemaV1 } from "@standard-schema/spec";
 import { Data, Option, pipe } from "effect";
 import { StrictOption } from "../../utils";
 
-export { StrictOption };
+export type { StrictOption };
 
 export class RequestParamsConfig<
   const T extends StandardSchemaV1 = StandardSchemaV1,
