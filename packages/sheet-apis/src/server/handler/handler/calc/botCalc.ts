@@ -1,7 +1,7 @@
 import { botCalcHandlerConfig } from "@/server/handler/config";
 import { CalcConfig, CalcService, PlayerTeam } from "@/server/services";
 import { Chunk, Effect, HashSet, pipe } from "effect";
-import { computed } from "typhoon-core/signal";
+import { Computed } from "typhoon-core/signal";
 import { defineHandlerBuilder, Event } from "typhoon-server/server";
 
 export const botCalcHandler = defineHandlerBuilder()
@@ -14,7 +14,7 @@ export const botCalcHandler = defineHandlerBuilder()
       ),
       Effect.flatMap(({ parsed }) =>
         pipe(
-          computed(
+          Computed.make(
             pipe(
               Effect.Do,
               Effect.bind("parsed", () => parsed),

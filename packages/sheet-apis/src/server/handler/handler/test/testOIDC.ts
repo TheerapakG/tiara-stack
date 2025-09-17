@@ -1,7 +1,7 @@
 import { testOIDCHandlerConfig } from "@/server/handler/config";
 import { AuthService } from "@/server/services";
 import { Effect, pipe } from "effect";
-import { computed } from "typhoon-core/signal";
+import { Computed } from "typhoon-core/signal";
 import { defineHandlerBuilder, Event } from "typhoon-server/server";
 
 export const testOIDCHandler = defineHandlerBuilder()
@@ -14,7 +14,7 @@ export const testOIDCHandler = defineHandlerBuilder()
       ),
       Effect.flatMap(({ parsed }) =>
         pipe(
-          computed(
+          Computed.make(
             pipe(
               Effect.Do,
               Effect.bind("parsed", () => parsed),

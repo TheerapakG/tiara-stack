@@ -2,7 +2,7 @@ import { upsertGuildChannelConfigHandlerConfig } from "@/server/handler/config";
 import { GuildChannelConfig } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
 import { Effect, pipe, Schema } from "effect";
-import { observeOnce } from "typhoon-core/signal";
+import { OnceObserver } from "typhoon-core/signal";
 import { defineHandlerBuilder, Event } from "typhoon-server/server";
 
 const responseSchema = Schema.OptionFromNullishOr(
@@ -21,7 +21,7 @@ export const upsertGuildChannelConfigHandler = defineHandlerBuilder()
           Event.withConfig(
             upsertGuildChannelConfigHandlerConfig,
           ).request.parsed(),
-          Effect.flatMap(observeOnce),
+          Effect.flatMap(OnceObserver.observeOnce),
         ),
       ),
       Effect.flatMap((parsed) =>

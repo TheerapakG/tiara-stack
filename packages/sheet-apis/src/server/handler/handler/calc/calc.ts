@@ -6,11 +6,13 @@ import {
   PlayerTeam,
 } from "@/server/services";
 import { Array, Chunk, Effect, HashSet, Option, pipe } from "effect";
-import { Computed, computed, DependencySignal } from "typhoon-core/signal";
+import { Computed, DependencySignal } from "typhoon-core/signal";
 import { defineHandlerBuilder, Event } from "typhoon-server/server";
 
-const getUserAgent = <E, R>(request: DependencySignal<Request, E, R>) =>
-  computed(
+const getUserAgent = <E, R>(
+  request: DependencySignal.DependencySignal<Request, E, R>,
+) =>
+  Computed.make(
     pipe(
       request,
       Effect.map(({ headers }) => headers.get("user-agent") ?? ""),
@@ -18,8 +20,10 @@ const getUserAgent = <E, R>(request: DependencySignal<Request, E, R>) =>
     ),
   );
 
-const extractGoogleAppsScriptId = <E, R>(userAgent: Computed<string, E, R>) =>
-  computed(
+const extractGoogleAppsScriptId = <E, R>(
+  userAgent: Computed.Computed<string, E, R>,
+) =>
+  Computed.make(
     pipe(
       userAgent,
       Effect.map((userAgent) =>
@@ -41,8 +45,10 @@ const extractGoogleAppsScriptId = <E, R>(userAgent: Computed<string, E, R>) =>
     ),
   );
 
-const getGuildConfigByScriptId = <E, R>(scriptId: Computed<string, E, R>) =>
-  computed(
+const getGuildConfigByScriptId = <E, R>(
+  scriptId: Computed.Computed<string, E, R>,
+) =>
+  Computed.make(
     pipe(
       scriptId,
       Effect.flatMap(GuildConfigService.getGuildConfigByScriptId),
@@ -66,7 +72,7 @@ export const calcHandler = defineHandlerBuilder()
   .handler(
     pipe(
       Effect.Do,
-      Effect.bind("request", () => computed(Event.webRequest())),
+      Effect.bind("request", () => Computed.make(Event.webRequest())),
       Effect.bind("userAgent", ({ request }) => getUserAgent(request)),
       Effect.bind("googleAppsScriptId", ({ userAgent }) =>
         extractGoogleAppsScriptId(userAgent),
@@ -87,7 +93,7 @@ export const calcHandler = defineHandlerBuilder()
       ),
       Effect.flatMap(({ guildConfig, parsed, googleAppsScriptId }) =>
         pipe(
-          computed(
+          Computed.make(
             pipe(
               Effect.Do,
               Effect.bind("guildConfig", () => guildConfig),

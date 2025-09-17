@@ -2,7 +2,7 @@ import { addGuildManagerRoleHandlerConfig } from "@/server/handler/config";
 import { GuildConfigManagerRole } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
 import { Effect, pipe, Schema } from "effect";
-import { observeOnce } from "typhoon-core/signal";
+import { OnceObserver } from "typhoon-core/signal";
 import { defineHandlerBuilder, Event } from "typhoon-server/server";
 
 const responseSchema = Schema.OptionFromNullishOr(
@@ -19,7 +19,7 @@ export const addGuildManagerRoleHandler = defineHandlerBuilder()
       Effect.flatMap(() =>
         pipe(
           Event.withConfig(addGuildManagerRoleHandlerConfig).request.parsed(),
-          Effect.flatMap(observeOnce),
+          Effect.flatMap(OnceObserver.observeOnce),
         ),
       ),
       Effect.flatMap((parsed) =>
