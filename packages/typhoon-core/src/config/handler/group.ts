@@ -1,14 +1,17 @@
 import { Data, HashMap, Match, pipe } from "effect";
-import * as HandlerConfig from "./data";
+import {
+  MutationHandlerConfig,
+  NameOrUndefined,
+  SubscriptionHandlerConfig,
+  name,
+  type,
+} from "./data";
 
 type SubscriptionHandlerConfigMap = HashMap.HashMap<
   string,
-  HandlerConfig.SubscriptionHandlerConfig
+  SubscriptionHandlerConfig
 >;
-type MutationHandlerConfigMap = HashMap.HashMap<
-  string,
-  HandlerConfig.MutationHandlerConfig
->;
+type MutationHandlerConfigMap = HashMap.HashMap<string, MutationHandlerConfig>;
 
 type HandlerConfigGroupSubscriptionHandlerConfigs<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -28,26 +31,22 @@ type HandlerConfigGroupMutationHandlerConfigs<
     : never;
 
 type AddSubscriptionHandlerConfig<
-  A extends Record<string, HandlerConfig.SubscriptionHandlerConfig>,
-  Config extends HandlerConfig.SubscriptionHandlerConfig,
+  A extends Record<string, SubscriptionHandlerConfig>,
+  Config extends SubscriptionHandlerConfig,
 > = {
-  [K in keyof A | HandlerConfig.NameOrUndefined<Config>]: K extends keyof A
-    ? A[K]
-    : Config;
+  [K in keyof A | NameOrUndefined<Config>]: K extends keyof A ? A[K] : Config;
 };
 
 type AddMutationHandlerConfig<
-  A extends Record<string, HandlerConfig.MutationHandlerConfig>,
-  Config extends HandlerConfig.MutationHandlerConfig,
+  A extends Record<string, MutationHandlerConfig>,
+  Config extends MutationHandlerConfig,
 > = {
-  [K in keyof A | HandlerConfig.NameOrUndefined<Config>]: K extends keyof A
-    ? A[K]
-    : Config;
+  [K in keyof A | NameOrUndefined<Config>]: K extends keyof A ? A[K] : Config;
 };
 
 type MergeSubscriptionHandlerConfig<
-  A extends Record<string, HandlerConfig.SubscriptionHandlerConfig>,
-  B extends Record<string, HandlerConfig.SubscriptionHandlerConfig>,
+  A extends Record<string, SubscriptionHandlerConfig>,
+  B extends Record<string, SubscriptionHandlerConfig>,
 > = {
   [K in keyof A | keyof B]: K extends keyof A
     ? A[K]
@@ -57,8 +56,8 @@ type MergeSubscriptionHandlerConfig<
 };
 
 type MergeMutationHandlerConfig<
-  A extends Record<string, HandlerConfig.MutationHandlerConfig>,
-  B extends Record<string, HandlerConfig.MutationHandlerConfig>,
+  A extends Record<string, MutationHandlerConfig>,
+  B extends Record<string, MutationHandlerConfig>,
 > = {
   [K in keyof A | keyof B]: K extends keyof A
     ? A[K]
@@ -70,10 +69,8 @@ type MergeMutationHandlerConfig<
 type AddHandlerConfigGroupHandlerConfig<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   G extends HandlerConfigGroup<any, any>,
-  Config extends
-    | HandlerConfig.SubscriptionHandlerConfig
-    | HandlerConfig.MutationHandlerConfig,
-> = [Config] extends [HandlerConfig.SubscriptionHandlerConfig]
+  Config extends SubscriptionHandlerConfig | MutationHandlerConfig,
+> = [Config] extends [SubscriptionHandlerConfig]
   ? HandlerConfigGroup<
       AddSubscriptionHandlerConfig<
         HandlerConfigGroupSubscriptionHandlerConfigs<G>,
@@ -81,7 +78,7 @@ type AddHandlerConfigGroupHandlerConfig<
       >,
       HandlerConfigGroupMutationHandlerConfigs<G>
     >
-  : [Config] extends [HandlerConfig.MutationHandlerConfig]
+  : [Config] extends [MutationHandlerConfig]
     ? HandlerConfigGroup<
         HandlerConfigGroupSubscriptionHandlerConfigs<G>,
         AddMutationHandlerConfig<
@@ -110,12 +107,12 @@ type AddHandlerConfigGroupHandlerConfigGroup<
 export class HandlerConfigGroup<
   _SubscriptionHandlerConfigs extends Record<
     string,
-    HandlerConfig.SubscriptionHandlerConfig
+    SubscriptionHandlerConfig
     // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   > = {},
   _MutationHandlerConfigs extends Record<
     string,
-    HandlerConfig.MutationHandlerConfig
+    MutationHandlerConfig
     // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   > = {},
 > extends Data.TaggedClass("HandlerGroup")<{
@@ -130,11 +127,7 @@ export const empty = () =>
   });
 
 export const add =
-  <
-    const Config extends
-      | HandlerConfig.SubscriptionHandlerConfig
-      | HandlerConfig.MutationHandlerConfig,
-  >(
+  <const Config extends SubscriptionHandlerConfig | MutationHandlerConfig>(
     handlerConfig: Config,
   ) =>
   <
@@ -145,17 +138,15 @@ export const add =
   ): AddHandlerConfigGroupHandlerConfig<G, Config> => {
     const newHandlerMaps = pipe(
       Match.value(
-        HandlerConfig.type(
-          handlerConfig as
-            | HandlerConfig.SubscriptionHandlerConfig
-            | HandlerConfig.MutationHandlerConfig,
+        type(
+          handlerConfig as SubscriptionHandlerConfig | MutationHandlerConfig,
         ),
       ),
       Match.when("subscription", () => ({
         subscriptionHandlerMap: HashMap.set(
           handlerGroup.subscriptionHandlerMap,
-          HandlerConfig.name(handlerConfig),
-          handlerConfig as HandlerConfig.SubscriptionHandlerConfig,
+          name(handlerConfig),
+          handlerConfig as SubscriptionHandlerConfig,
         ),
         mutationHandlerMap: handlerGroup.mutationHandlerMap,
       })),
@@ -163,8 +154,8 @@ export const add =
         subscriptionHandlerMap: handlerGroup.subscriptionHandlerMap,
         mutationHandlerMap: HashMap.set(
           handlerGroup.mutationHandlerMap,
-          HandlerConfig.name(handlerConfig),
-          handlerConfig as HandlerConfig.MutationHandlerConfig,
+          name(handlerConfig),
+          handlerConfig as MutationHandlerConfig,
         ),
       })),
       Match.orElseAbsurd,
