@@ -1,7 +1,7 @@
 import { Effect, HashMap, pipe } from "effect";
 import { serverHandlerConfigGroup } from "sheet-apis";
 import { AppsScriptClient } from "typhoon-client-apps-script/client";
-import { validate } from "typhoon-core/schema";
+import { validate } from "typhoon-core/validator";
 import * as v from "valibot";
 
 function getClient(url: string) {
