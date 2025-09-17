@@ -6,7 +6,7 @@ import {
   HeaderEncoderDecoder,
   MsgpackEncoderDecoder,
 } from "typhoon-core/protocol";
-import { validate } from "typhoon-core/schema";
+import { validate } from "typhoon-core/validator";
 import * as v from "valibot";
 
 export class HandlerError extends Data.TaggedError("HandlerError") {}
