@@ -1,6 +1,6 @@
 import { bindObject } from "@/utils";
 import { Array, Data, Effect, HashMap, Match, Option, pipe } from "effect";
-import { collectArrayToHashMap } from "typhoon-core/utils";
+import { Array as ArrayUtils } from "typhoon-core/utils";
 import { Schedule, SheetService } from "./sheetService";
 
 export class Player extends Data.TaggedClass("Player")<{
@@ -57,7 +57,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
             Effect.map((players) => ({
               privateNameToPlayer: pipe(
                 players,
-                collectArrayToHashMap({
+                ArrayUtils.Collect.toHashMap({
                   keyGetter: ({ name }) => name,
                   valueInitializer: (player) => player,
                   valueReducer: (_, player) => player,
@@ -65,7 +65,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
               ),
               idToPlayer: pipe(
                 players,
-                collectArrayToHashMap({
+                ArrayUtils.Collect.toHashMap({
                   keyGetter: ({ id }) => id,
                   valueInitializer: (player) => ({
                     id: player.id,

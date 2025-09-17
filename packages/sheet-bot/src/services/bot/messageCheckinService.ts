@@ -3,8 +3,8 @@ import { subHours } from "date-fns/fp";
 import { and, eq, gte, isNull } from "drizzle-orm";
 import { Array, Data, DateTime, Effect, Option, pipe } from "effect";
 import { messageCheckin, messageCheckinMember } from "sheet-db-schema";
+import { Computed } from "typhoon-core/signal";
 import { DBSubscriptionContext } from "typhoon-server/db";
-import { Computed } from "typhoon-server/signal";
 
 type MessageCheckinInsert = typeof messageCheckin.$inferInsert;
 type MessageCheckinSelect = typeof messageCheckin.$inferSelect;

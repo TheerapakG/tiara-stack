@@ -21,7 +21,7 @@ import {
   pipe,
   String,
 } from "effect";
-import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
+import { Array as ArrayUtils } from "typhoon-core/utils";
 import { GuildConfigService } from "./guildConfigService";
 
 const parseValueRange =
@@ -85,12 +85,12 @@ const playerParser = ([
     }),
     Effect.map(({ userIds, userSheetNames }) =>
       pipe(
-        new ArrayWithDefault({
+        new ArrayUtils.WithDefault.ArrayWithDefault({
           array: userIds,
           default: { id: Option.none(), idIndex: globalThis.Number.NaN },
         }),
-        ArrayWithDefault.zip(
-          new ArrayWithDefault({
+        ArrayUtils.WithDefault.zip(
+          new ArrayUtils.WithDefault.ArrayWithDefault({
             array: userSheetNames,
             default: { name: Option.none(), nameIndex: globalThis.Number.NaN },
           }),
@@ -229,36 +229,36 @@ const teamParser = (
         }),
         Effect.map(({ playerName, teamName, lead, backline, talent, tags }) =>
           pipe(
-            new ArrayWithDefault({
+            new ArrayUtils.WithDefault.ArrayWithDefault({
               array: playerName,
               default: { playerName: Option.none() },
             }),
-            ArrayWithDefault.zip(
-              new ArrayWithDefault({
+            ArrayUtils.WithDefault.zip(
+              new ArrayUtils.WithDefault.ArrayWithDefault({
                 array: teamName,
                 default: { teamName: Option.none() },
               }),
             ),
-            ArrayWithDefault.zip(
-              new ArrayWithDefault({
+            ArrayUtils.WithDefault.zip(
+              new ArrayUtils.WithDefault.ArrayWithDefault({
                 array: lead,
                 default: { lead: Option.none() },
               }),
             ),
-            ArrayWithDefault.zip(
-              new ArrayWithDefault({
+            ArrayUtils.WithDefault.zip(
+              new ArrayUtils.WithDefault.ArrayWithDefault({
                 array: backline,
                 default: { backline: Option.none() },
               }),
             ),
-            ArrayWithDefault.zip(
-              new ArrayWithDefault({
+            ArrayUtils.WithDefault.zip(
+              new ArrayUtils.WithDefault.ArrayWithDefault({
                 array: talent,
                 default: { talent: Option.none() },
               }),
             ),
-            ArrayWithDefault.zip(
-              new ArrayWithDefault({
+            ArrayUtils.WithDefault.zip(
+              new ArrayUtils.WithDefault.ArrayWithDefault({
                 array: tags,
                 default: {
                   tags: pipe(
@@ -304,7 +304,7 @@ const teamParser = (
     Effect.map((array) =>
       pipe(
         array,
-        collectArrayToHashMap({
+        ArrayUtils.Collect.toHashMap({
           keyGetter: ({ name }) => name,
           valueInitializer: ({ name, team }) => ({ name, teams: [team] }),
           valueReducer: ({ name, teams }, { team }) => ({
@@ -453,37 +453,37 @@ const scheduleParser = (
     }),
     Effect.map(({ hours, fills, overfills, standbys, breaks }) =>
       pipe(
-        new ArrayWithDefault({
+        new ArrayUtils.WithDefault.ArrayWithDefault({
           array: hours,
           default: { hour: Option.none() },
         }),
-        ArrayWithDefault.zip(
-          new ArrayWithDefault({
+        ArrayUtils.WithDefault.zip(
+          new ArrayUtils.WithDefault.ArrayWithDefault({
             array: fills,
             default: {
               fills: Array.makeBy(5, () => Option.none()),
             },
           }),
         ),
-        ArrayWithDefault.zip(
-          new ArrayWithDefault({
+        ArrayUtils.WithDefault.zip(
+          new ArrayUtils.WithDefault.ArrayWithDefault({
             array: overfills,
             default: { overfills: [] },
           }),
         ),
-        ArrayWithDefault.zip(
-          new ArrayWithDefault({
+        ArrayUtils.WithDefault.zip(
+          new ArrayUtils.WithDefault.ArrayWithDefault({
             array: standbys,
             default: { standbys: [] },
           }),
         ),
-        ArrayWithDefault.zip(
-          new ArrayWithDefault({
+        ArrayUtils.WithDefault.zip(
+          new ArrayUtils.WithDefault.ArrayWithDefault({
             array: breaks,
             default: { breakHour: false },
           }),
         ),
-        ArrayWithDefault.map(
+        ArrayUtils.WithDefault.map(
           ({ hour, breakHour, fills, overfills, standbys }) =>
             pipe(
               hour,
@@ -520,7 +520,7 @@ const scheduleParser = (
       pipe(
         array,
         Array.getSomes,
-        collectArrayToHashMap({
+        ArrayUtils.Collect.toHashMap({
           keyGetter: ({ hour }) => hour,
           valueInitializer: (a) => a,
           valueReducer: (_, a) => a,
@@ -859,7 +859,7 @@ export class SheetService extends Effect.Service<SheetService>()(
                 Effect.bind("specificDayConfig", ({ dayConfig }) =>
                   pipe(
                     dayConfig,
-                    collectArrayToHashMap({
+                    ArrayUtils.Collect.toHashMap({
                       keyGetter: ({ day }) => day,
                       valueInitializer: (a) => [a],
                       valueReducer: (acc, a) => Array.append(acc, a),

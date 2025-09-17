@@ -1,7 +1,7 @@
 import { loadConfig } from "c12";
 import { REST, Routes } from "discord.js";
 import { Chunk, Effect, pipe, Schema, Stream } from "effect";
-import { validate } from "typhoon-core/schema";
+import { validate } from "typhoon-core/validator";
 import { commands } from "./commands/chatInputCommands";
 import { InteractionHandlerMap } from "./types/handler";
 

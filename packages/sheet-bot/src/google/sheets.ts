@@ -1,6 +1,6 @@
 import { MethodOptions, sheets, sheets_v4 } from "@googleapis/sheets";
 import { Effect, HashMap, pipe } from "effect";
-import { ArrayWithDefault, collectArrayToHashMap } from "typhoon-server/utils";
+import { Array as ArrayUtils } from "typhoon-core/utils";
 import { GoogleAuth } from "./auth";
 
 export class GoogleSheets extends Effect.Service<GoogleSheets>()(
@@ -48,12 +48,12 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
             ),
             Effect.map(({ entries, sheet }) =>
               pipe(
-                new ArrayWithDefault({
+                new ArrayUtils.WithDefault.ArrayWithDefault({
                   array: entries.map(([key, _]) => ({ key })),
                   default: { key: defaultKey },
                 }),
-                ArrayWithDefault.zip(
-                  new ArrayWithDefault({
+                ArrayUtils.WithDefault.zip(
+                  new ArrayUtils.WithDefault.ArrayWithDefault({
                     array:
                       sheet.data.valueRanges?.map((valueRange) => ({
                         valueRange,
@@ -66,7 +66,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
             Effect.map(({ array }) =>
               pipe(
                 array,
-                collectArrayToHashMap({
+                ArrayUtils.Collect.toHashMap({
                   keyGetter: ({ key }) => key,
                   valueInitializer: ({ valueRange }) => valueRange,
                   valueReducer: (_, { valueRange }) => valueRange,

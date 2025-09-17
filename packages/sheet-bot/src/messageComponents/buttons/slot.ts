@@ -22,7 +22,7 @@ import {
   pipe,
   String,
 } from "effect";
-import { observeOnce } from "typhoon-server/signal";
+import { OnceObserver } from "typhoon-core/signal";
 
 const getSlotMessage = (day: number) =>
   pipe(
@@ -88,7 +88,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         Effect.bind("messageSlotData", ({ message }) =>
           pipe(
             MessageSlotService.getMessageSlotData(message.id),
-            Effect.flatMap(observeOnce),
+            Effect.flatMap(OnceObserver.observeOnce),
             Effect.flatMap(Function.identity),
           ),
         ),

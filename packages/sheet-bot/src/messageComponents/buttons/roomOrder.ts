@@ -26,7 +26,7 @@ import {
   TimestampStyles,
 } from "discord.js";
 import { Effect, Function, Layer, Number, pipe } from "effect";
-import { observeOnce } from "typhoon-server/signal";
+import { OnceObserver } from "typhoon-core/signal";
 
 const roomOrderPreviousButtonData = {
   type: ComponentType.Button,
@@ -76,7 +76,7 @@ export const roomOrderInteractionGetReply = (
       ({ message }) => ({
         messageRoomOrderRange: pipe(
           MessageRoomOrderService.getMessageRoomOrderRange(message.id),
-          Effect.flatMap(observeOnce),
+          Effect.flatMap(OnceObserver.observeOnce),
           Effect.flatMap(Function.identity),
         ),
         messageRoomOrderData: pipe(
@@ -84,7 +84,7 @@ export const roomOrderInteractionGetReply = (
             message.id,
             messageRoomOrder.rank,
           ),
-          Effect.flatMap(observeOnce),
+          Effect.flatMap(OnceObserver.observeOnce),
         ),
         formattedHourWindow: pipe(
           ConverterService.convertHourToHourWindow(messageRoomOrder.hour),
@@ -209,7 +209,7 @@ export const roomOrderSendButton =
           Effect.bind("messageRoomOrder", ({ message }) =>
             pipe(
               MessageRoomOrderService.getMessageRoomOrder(message.id),
-              Effect.flatMap(observeOnce),
+              Effect.flatMap(OnceObserver.observeOnce),
               Effect.flatMap(Function.identity),
             ),
           ),

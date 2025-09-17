@@ -2,8 +2,8 @@ import { DB } from "@/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { Array, Data, Effect, Option, pipe } from "effect";
 import { messageSlot } from "sheet-db-schema";
+import { Computed } from "typhoon-core/signal";
 import { DBSubscriptionContext } from "typhoon-server/db";
-import { Computed } from "typhoon-server/signal";
 
 type MessageSlotInsert = typeof messageSlot.$inferInsert;
 type MessageSlotSelect = typeof messageSlot.$inferSelect;
