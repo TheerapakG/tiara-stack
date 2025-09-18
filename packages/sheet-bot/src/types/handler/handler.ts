@@ -202,8 +202,16 @@ export class InteractionHandlerMap<
       });
   };
 
-  static values = <Data, A, E, R>(
-    map: InteractionHandlerMap<Data, A, E, R>,
+  static keys = (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    map: InteractionHandlerMap<any, unknown, unknown, unknown>,
+  ) => {
+    return HashMap.keys(map.map);
+  };
+
+  static values = (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    map: InteractionHandlerMap<any, unknown, unknown, unknown>,
   ) => {
     return HashMap.values(map.map);
   };

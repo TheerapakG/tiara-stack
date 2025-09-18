@@ -3,20 +3,16 @@ import {
   ButtonInteractionT,
   ChatInputCommandInteractionT,
   ClientService,
-  InteractionContext,
   interactionServices,
   UserSelectMenuInteractionT,
 } from "@/services";
 import {
   ButtonHandlerVariantT,
-  buttonInteractionHandlerMap,
   ChatInputHandlerVariantT,
-  chatInputInteractionHandlerMap,
   HandlerVariantHandlerContext,
   HandlerVariantMap,
-  InteractionHandlerMapWithMetrics,
+  InteractionHandlerMapWithMetricsGroup,
   UserSelectMenuHandlerVariantT,
-  userSelectMenuInteractionHandlerMap,
 } from "@/types";
 import { bindObject } from "@/utils";
 import {
@@ -29,12 +25,8 @@ import {
   Events,
   GatewayIntentBits,
   Interaction,
-  InteractionButtonComponentData,
   InteractionType,
   MessageComponentInteraction,
-  SharedSlashCommand,
-  SlashCommandSubcommandsOnlyBuilder,
-  UserSelectMenuComponentData,
   UserSelectMenuInteraction,
 } from "discord.js";
 import {
@@ -55,29 +47,8 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   readonly client: Client;
   readonly loginLatch: Effect.Latch;
   readonly loginSemaphore: Effect.Semaphore;
-  readonly chatInputCommandsMap: SynchronizedRef.SynchronizedRef<
-    InteractionHandlerMapWithMetrics<
-      SharedSlashCommand | SlashCommandSubcommandsOnlyBuilder,
-      A,
-      E,
-      R | InteractionContext<ChatInputCommandInteractionT>
-    >
-  >;
-  readonly buttonsMap: SynchronizedRef.SynchronizedRef<
-    InteractionHandlerMapWithMetrics<
-      InteractionButtonComponentData,
-      A,
-      E,
-      R | InteractionContext<ButtonInteractionT>
-    >
-  >;
-  readonly userSelectMenuMap: SynchronizedRef.SynchronizedRef<
-    InteractionHandlerMapWithMetrics<
-      UserSelectMenuComponentData,
-      A,
-      E,
-      R | InteractionContext<UserSelectMenuInteractionT>
-    >
+  readonly interactionHandlerMapWithMetricsGroup: SynchronizedRef.SynchronizedRef<
+    InteractionHandlerMapWithMetricsGroup<A, E, R>
   >;
   readonly traceProvider: Layer.Layer<never>;
   readonly layer: Layer.Layer<R, E>;
@@ -92,16 +63,16 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       pipe(
         Effect.Do,
         Effect.bind("runtime", () => SynchronizedRef.get(bot.runtime)),
-        Effect.bind("chatInputCommandsMap", () =>
-          SynchronizedRef.get(bot.chatInputCommandsMap),
+        Effect.bind("interactionHandlerMapWithMetricsGroup", () =>
+          SynchronizedRef.get(bot.interactionHandlerMapWithMetricsGroup),
         ),
-        Effect.flatMap(({ runtime, chatInputCommandsMap }) =>
+        Effect.flatMap(({ runtime, interactionHandlerMapWithMetricsGroup }) =>
           pipe(
             runtime,
             Option.map((runtime) =>
               pipe(
-                chatInputCommandsMap,
-                InteractionHandlerMapWithMetrics.executeAndReplyError(
+                interactionHandlerMapWithMetricsGroup,
+                InteractionHandlerMapWithMetricsGroup.chatInputCommandsExecuteAndReplyError(
                   interaction.commandName,
                 ),
                 Effect.provide(
@@ -145,14 +116,16 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       pipe(
         Effect.Do,
         Effect.bind("runtime", () => SynchronizedRef.get(bot.runtime)),
-        Effect.bind("buttonsMap", () => SynchronizedRef.get(bot.buttonsMap)),
-        Effect.flatMap(({ runtime, buttonsMap }) =>
+        Effect.bind("interactionHandlerMapWithMetricsGroup", () =>
+          SynchronizedRef.get(bot.interactionHandlerMapWithMetricsGroup),
+        ),
+        Effect.flatMap(({ runtime, interactionHandlerMapWithMetricsGroup }) =>
           pipe(
             runtime,
             Option.map((runtime) =>
               pipe(
-                buttonsMap,
-                InteractionHandlerMapWithMetrics.executeAndReplyError(
+                interactionHandlerMapWithMetricsGroup,
+                InteractionHandlerMapWithMetricsGroup.buttonsExecuteAndReplyError(
                   interaction.customId,
                 ),
                 Effect.provide(
@@ -180,16 +153,16 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       pipe(
         Effect.Do,
         Effect.bind("runtime", () => SynchronizedRef.get(bot.runtime)),
-        Effect.bind("userSelectMenuMap", () =>
-          SynchronizedRef.get(bot.userSelectMenuMap),
+        Effect.bind("interactionHandlerMapWithMetricsGroup", () =>
+          SynchronizedRef.get(bot.interactionHandlerMapWithMetricsGroup),
         ),
-        Effect.flatMap(({ runtime, userSelectMenuMap }) =>
+        Effect.flatMap(({ runtime, interactionHandlerMapWithMetricsGroup }) =>
           pipe(
             runtime,
             Option.map((runtime) =>
               pipe(
-                userSelectMenuMap,
-                InteractionHandlerMapWithMetrics.executeAndReplyError(
+                interactionHandlerMapWithMetricsGroup,
+                InteractionHandlerMapWithMetricsGroup.userSelectMenuExecuteAndReplyError(
                   interaction.customId,
                 ),
                 Effect.provide(
@@ -257,23 +230,8 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         ),
         loginLatch: Effect.makeLatch(false),
         loginSemaphore: Effect.makeSemaphore(1),
-        chatInputCommandsMap: SynchronizedRef.make(
-          InteractionHandlerMapWithMetrics.make(
-            "chat_input_command",
-            chatInputInteractionHandlerMap<A, E, R>(),
-          ),
-        ),
-        buttonsMap: SynchronizedRef.make(
-          InteractionHandlerMapWithMetrics.make(
-            "button",
-            buttonInteractionHandlerMap<A, E, R>(),
-          ),
-        ),
-        userSelectMenuMap: SynchronizedRef.make(
-          InteractionHandlerMapWithMetrics.make(
-            "user_select_menu",
-            userSelectMenuInteractionHandlerMap<A, E, R>(),
-          ),
+        interactionHandlerMapWithMetricsGroup: SynchronizedRef.make(
+          InteractionHandlerMapWithMetricsGroup.empty<A, E, R>(),
         ),
         traceProvider: Effect.succeed(Layer.empty),
         layer: Effect.succeed(layer),
@@ -311,6 +269,15 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                     Effect.forEach(HashMap.values(guilds), (guild) =>
                       Effect.log(
                         `guildId: ${guild.id} guildName: ${guild.name}`,
+                      ),
+                    ),
+                  ),
+                  Effect.tap(() =>
+                    pipe(
+                      bot.interactionHandlerMapWithMetricsGroup,
+                      SynchronizedRef.get,
+                      Effect.flatMap(
+                        InteractionHandlerMapWithMetricsGroup.initialize,
                       ),
                     ),
                   ),
@@ -369,8 +336,8 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         Effect.let("bot", () => bot as Bot<A | BA, E | BE, R | BR>),
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(
-            bot.chatInputCommandsMap,
-            InteractionHandlerMapWithMetrics.add(command),
+            bot.interactionHandlerMapWithMetricsGroup,
+            InteractionHandlerMapWithMetricsGroup.addChatInputCommand(command),
           ),
         ),
         Effect.map(({ bot }) => bot),
@@ -386,8 +353,10 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         Effect.let("bot", () => bot as Bot<A | BA, E | BE, R | BR>),
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(
-            bot.chatInputCommandsMap,
-            InteractionHandlerMapWithMetrics.union(commands),
+            bot.interactionHandlerMapWithMetricsGroup,
+            InteractionHandlerMapWithMetricsGroup.addChatInputCommandHandlerMap(
+              commands,
+            ),
           ),
         ),
         Effect.map(({ bot }) => bot),
@@ -403,8 +372,8 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         Effect.let("bot", () => bot as Bot<A | BA, E | BE, R | BR>),
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(
-            bot.buttonsMap,
-            InteractionHandlerMapWithMetrics.add(button),
+            bot.interactionHandlerMapWithMetricsGroup,
+            InteractionHandlerMapWithMetricsGroup.addButton(button),
           ),
         ),
         Effect.map(({ bot }) => bot),
@@ -420,8 +389,10 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         Effect.let("bot", () => bot as Bot<A | BA, E | BE, R | BR>),
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(
-            bot.buttonsMap,
-            InteractionHandlerMapWithMetrics.union(buttons),
+            bot.interactionHandlerMapWithMetricsGroup,
+            InteractionHandlerMapWithMetricsGroup.addButtonInteractionHandlerMap(
+              buttons,
+            ),
           ),
         ),
         Effect.map(({ bot }) => bot),
@@ -442,8 +413,10 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         Effect.let("bot", () => bot as Bot<A | BA, E | BE, R | BR>),
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(
-            bot.userSelectMenuMap,
-            InteractionHandlerMapWithMetrics.add(userSelectMenu),
+            bot.interactionHandlerMapWithMetricsGroup,
+            InteractionHandlerMapWithMetricsGroup.addUserSelectMenu(
+              userSelectMenu,
+            ),
           ),
         ),
         Effect.map(({ bot }) => bot),
@@ -463,8 +436,10 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         Effect.let("bot", () => bot as Bot<A | BA, E | BE, R | BR>),
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(
-            bot.userSelectMenuMap,
-            InteractionHandlerMapWithMetrics.union(userSelectMenus),
+            bot.interactionHandlerMapWithMetricsGroup,
+            InteractionHandlerMapWithMetricsGroup.addUserSelectMenuInteractionHandlerMap(
+              userSelectMenus,
+            ),
           ),
         ),
         Effect.map(({ bot }) => bot),
