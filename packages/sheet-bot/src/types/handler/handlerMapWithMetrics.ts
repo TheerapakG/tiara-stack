@@ -70,6 +70,31 @@ export class InteractionHandlerMapWithMetrics<
         interactionCount: other.interactionCount,
       });
 
+  private static tagInteractionMetrics =
+    (values: Record<string, string>) =>
+    <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+      pipe(
+        InteractionContext.guildId().sync(),
+        Effect.flatMap((guildId) =>
+          pipe(
+            effect,
+            Effect.tagMetrics({
+              ...values,
+              interaction_guild_id: pipe(
+                guildId,
+                Option.getOrElse(() => "unknown"),
+              ),
+            }),
+          ),
+        ),
+        Effect.withSpan(
+          "InteractionHandlerMapWithMetrics.tagInteractionMetrics",
+          {
+            captureStackTrace: true,
+          },
+        ),
+      );
+
   static execute =
     (interactionKey: string) =>
     <Data, A, E, R>(map: InteractionHandlerMapWithMetrics<Data, A, E, R>) =>
@@ -77,7 +102,7 @@ export class InteractionHandlerMapWithMetrics<
         map.map,
         InteractionHandlerMap.get(interactionKey),
         Option.map(
-          (command) => command.handler as InteractionHandler<A | void, E, R>,
+          (context) => context.handler as InteractionHandler<A | void, E, R>,
         ),
         Option.getOrElse(() => Effect.void as Effect.Effect<A | void, E, R>),
         Effect.tapBoth({
@@ -85,17 +110,23 @@ export class InteractionHandlerMapWithMetrics<
             pipe(
               map.interactionCount,
               Metric.update(BigInt(1)),
-              Effect.tagMetrics("interaction_status", "success"),
+              InteractionHandlerMapWithMetrics.tagInteractionMetrics({
+                interaction_key: interactionKey,
+                interaction_type: map.interactionType,
+                interaction_status: "success",
+              }),
             ),
           onFailure: () =>
             pipe(
               map.interactionCount,
               Metric.update(BigInt(1)),
-              Effect.tagMetrics("interaction_status", "failure"),
+              InteractionHandlerMapWithMetrics.tagInteractionMetrics({
+                interaction_key: interactionKey,
+                interaction_type: map.interactionType,
+                interaction_status: "failure",
+              }),
             ),
         }),
-        Effect.tagMetrics("interaction_type", map.interactionType),
-        Effect.tagMetrics("interaction_key", interactionKey),
         Effect.withSpan("InteractionHandlerMapWithMetrics.execute", {
           captureStackTrace: true,
         }),
