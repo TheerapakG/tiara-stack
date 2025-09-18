@@ -1,12 +1,48 @@
-import { InteractionContext, RepliableInteractionT } from "@/services";
+import {
+  ButtonInteractionT,
+  ChatInputCommandInteractionT,
+  ClientService,
+  InteractionContext,
+  RepliableInteractionT,
+  UserSelectMenuInteractionT,
+} from "@/services";
 import { DiscordError } from "@/types/error/discordError";
-import { InteractionResponse, Message, MessageFlags } from "discord.js";
-import { Cause, Data, Effect, Metric, Option, pipe } from "effect";
+import {
+  InteractionButtonComponentData,
+  InteractionResponse,
+  Message,
+  MessageFlags,
+  SharedSlashCommand,
+  SlashCommandSubcommandsOnlyBuilder,
+  UserSelectMenuComponentData,
+} from "discord.js";
+import {
+  Cause,
+  Data,
+  Effect,
+  HashMap,
+  Metric,
+  Option,
+  pipe,
+  Struct,
+} from "effect";
 import {
   InteractionHandler,
   InteractionHandlerContext,
   InteractionHandlerMap,
 } from "./handler";
+import {
+  HandlerVariantHandlerContext,
+  HandlerVariantMap,
+} from "./handlerVariant";
+import {
+  ButtonHandlerVariantT,
+  buttonInteractionHandlerMap,
+  ChatInputHandlerVariantT,
+  chatInputInteractionHandlerMap,
+  UserSelectMenuHandlerVariantT,
+  userSelectMenuInteractionHandlerMap,
+} from "./variants";
 
 type InteractionHandlerMapWithMetricsObject<
   Data = unknown,
@@ -70,31 +106,6 @@ export class InteractionHandlerMapWithMetrics<
         interactionCount: other.interactionCount,
       });
 
-  private static tagInteractionMetrics =
-    (values: Record<string, string>) =>
-    <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-      pipe(
-        InteractionContext.guildId().sync(),
-        Effect.flatMap((guildId) =>
-          pipe(
-            effect,
-            Effect.tagMetrics({
-              ...values,
-              interaction_guild_id: pipe(
-                guildId,
-                Option.getOrElse(() => "unknown"),
-              ),
-            }),
-          ),
-        ),
-        Effect.withSpan(
-          "InteractionHandlerMapWithMetrics.tagInteractionMetrics",
-          {
-            captureStackTrace: true,
-          },
-        ),
-      );
-
   static execute =
     (interactionKey: string) =>
     <Data, A, E, R>(map: InteractionHandlerMapWithMetrics<Data, A, E, R>) =>
@@ -108,23 +119,41 @@ export class InteractionHandlerMapWithMetrics<
         Effect.tapBoth({
           onSuccess: () =>
             pipe(
-              map.interactionCount,
-              Metric.update(BigInt(1)),
-              InteractionHandlerMapWithMetrics.tagInteractionMetrics({
-                interaction_key: interactionKey,
-                interaction_type: map.interactionType,
-                interaction_status: "success",
-              }),
+              InteractionContext.guildId().sync(),
+              Effect.flatMap((guildId) =>
+                pipe(
+                  map.interactionCount,
+                  Metric.update(BigInt(1)),
+                  Effect.tagMetrics({
+                    interaction_type: map.interactionType,
+                    interaction_key: interactionKey,
+                    interaction_guild_id: pipe(
+                      guildId,
+                      Option.getOrElse(() => "unknown"),
+                    ),
+                    interaction_status: "success",
+                  }),
+                ),
+              ),
             ),
           onFailure: () =>
             pipe(
-              map.interactionCount,
-              Metric.update(BigInt(1)),
-              InteractionHandlerMapWithMetrics.tagInteractionMetrics({
-                interaction_key: interactionKey,
-                interaction_type: map.interactionType,
-                interaction_status: "failure",
-              }),
+              InteractionContext.guildId().sync(),
+              Effect.flatMap((guildId) =>
+                pipe(
+                  map.interactionCount,
+                  Metric.update(BigInt(1)),
+                  Effect.tagMetrics({
+                    interaction_type: map.interactionType,
+                    interaction_key: interactionKey,
+                    interaction_guild_id: pipe(
+                      guildId,
+                      Option.getOrElse(() => "unknown"),
+                    ),
+                    interaction_status: "failure",
+                  }),
+                ),
+              ),
             ),
         }),
         Effect.withSpan("InteractionHandlerMapWithMetrics.execute", {
@@ -179,4 +208,243 @@ export class InteractionHandlerMapWithMetrics<
   static values = <Data, A, E, R>(
     map: InteractionHandlerMapWithMetrics<Data, A, E, R>,
   ) => InteractionHandlerMap.values(map.map);
+}
+
+export class InteractionHandlerMapWithMetricsGroup<
+  A = never,
+  E = never,
+  R = never,
+> extends Data.TaggedClass("InteractionHandlerMapWithMetricsGroup")<{
+  readonly chatInputCommandsMap: InteractionHandlerMapWithMetrics<
+    SharedSlashCommand | SlashCommandSubcommandsOnlyBuilder,
+    A,
+    E,
+    R | InteractionContext<ChatInputCommandInteractionT>
+  >;
+  readonly buttonsMap: InteractionHandlerMapWithMetrics<
+    InteractionButtonComponentData,
+    A,
+    E,
+    R | InteractionContext<ButtonInteractionT>
+  >;
+  readonly userSelectMenuMap: InteractionHandlerMapWithMetrics<
+    UserSelectMenuComponentData,
+    A,
+    E,
+    R | InteractionContext<UserSelectMenuInteractionT>
+  >;
+}> {
+  static empty = <A = never, E = never, R = never>() =>
+    new InteractionHandlerMapWithMetricsGroup({
+      chatInputCommandsMap: InteractionHandlerMapWithMetrics.make(
+        "chat_input_command",
+        chatInputInteractionHandlerMap<A, E, R>(),
+      ),
+      buttonsMap: InteractionHandlerMapWithMetrics.make(
+        "button",
+        buttonInteractionHandlerMap<A, E, R>(),
+      ),
+      userSelectMenuMap: InteractionHandlerMapWithMetrics.make(
+        "user_select_menu",
+        userSelectMenuInteractionHandlerMap<A, E, R>(),
+      ),
+    });
+
+  static addChatInputCommand = <A = never, E = never, R = never>(
+    command: HandlerVariantHandlerContext<ChatInputHandlerVariantT, A, E, R>,
+  ) => {
+    return <BA = never, BE = never, BR = never>(
+      group: InteractionHandlerMapWithMetricsGroup<BA, BE, BR>,
+    ) =>
+      new InteractionHandlerMapWithMetricsGroup(
+        pipe(
+          group,
+          Struct.evolve({
+            chatInputCommandsMap: (map) =>
+              pipe(map, InteractionHandlerMapWithMetrics.add(command)),
+          }),
+        ),
+      );
+  };
+
+  static addChatInputCommandHandlerMap = <A = never, E = never, R = never>(
+    commands: HandlerVariantMap<ChatInputHandlerVariantT, A, E, R>,
+  ) => {
+    return <BA = never, BE = never, BR = never>(
+      group: InteractionHandlerMapWithMetricsGroup<BA, BE, BR>,
+    ) =>
+      new InteractionHandlerMapWithMetricsGroup(
+        pipe(
+          group,
+          Struct.evolve({
+            chatInputCommandsMap: (map) =>
+              pipe(map, InteractionHandlerMapWithMetrics.union(commands)),
+          }),
+        ),
+      );
+  };
+
+  static addButton = <A = never, E = never, R = never>(
+    button: HandlerVariantHandlerContext<ButtonHandlerVariantT, A, E, R>,
+  ) => {
+    return <BA = never, BE = never, BR = never>(
+      group: InteractionHandlerMapWithMetricsGroup<BA, BE, BR>,
+    ) =>
+      new InteractionHandlerMapWithMetricsGroup(
+        pipe(
+          group,
+          Struct.evolve({
+            buttonsMap: (map) =>
+              pipe(map, InteractionHandlerMapWithMetrics.add(button)),
+          }),
+        ),
+      );
+  };
+
+  static addButtonInteractionHandlerMap = <A = never, E = never, R = never>(
+    buttons: HandlerVariantMap<ButtonHandlerVariantT, A, E, R>,
+  ) => {
+    return <BA = never, BE = never, BR = never>(
+      group: InteractionHandlerMapWithMetricsGroup<BA, BE, BR>,
+    ) =>
+      new InteractionHandlerMapWithMetricsGroup(
+        pipe(
+          group,
+          Struct.evolve({
+            buttonsMap: (map) =>
+              pipe(map, InteractionHandlerMapWithMetrics.union(buttons)),
+          }),
+        ),
+      );
+  };
+
+  static addUserSelectMenu = <A = never, E = never, R = never>(
+    userSelectMenu: HandlerVariantHandlerContext<
+      UserSelectMenuHandlerVariantT,
+      A,
+      E,
+      R
+    >,
+  ) => {
+    return <BA = never, BE = never, BR = never>(
+      group: InteractionHandlerMapWithMetricsGroup<BA, BE, BR>,
+    ) =>
+      new InteractionHandlerMapWithMetricsGroup(
+        pipe(
+          group,
+          Struct.evolve({
+            userSelectMenuMap: (map) =>
+              pipe(map, InteractionHandlerMapWithMetrics.add(userSelectMenu)),
+          }),
+        ),
+      );
+  };
+
+  static addUserSelectMenuInteractionHandlerMap = <
+    A = never,
+    E = never,
+    R = never,
+  >(
+    userSelectMenus: HandlerVariantMap<UserSelectMenuHandlerVariantT, A, E, R>,
+  ) => {
+    return <BA = never, BE = never, BR = never>(
+      group: InteractionHandlerMapWithMetricsGroup<BA, BE, BR>,
+    ) =>
+      new InteractionHandlerMapWithMetricsGroup(
+        pipe(
+          group,
+          Struct.evolve({
+            userSelectMenuMap: (map) =>
+              pipe(
+                map,
+                InteractionHandlerMapWithMetrics.union(userSelectMenus),
+              ),
+          }),
+        ),
+      );
+  };
+
+  static initialize = (
+    map: InteractionHandlerMapWithMetricsGroup<unknown, unknown, unknown>,
+  ) =>
+    pipe(
+      ClientService.getGuilds(),
+      Effect.map(HashMap.values),
+      Effect.flatMap(
+        Effect.forEach((guild) =>
+          pipe(
+            [map.chatInputCommandsMap, map.buttonsMap, map.userSelectMenuMap],
+            Effect.forEach((map) =>
+              pipe(
+                map.map,
+                InteractionHandlerMap.keys,
+                Effect.forEach((interactionKey) =>
+                  pipe(
+                    ["success", "failure"],
+                    Effect.forEach((interactionStatus) =>
+                      pipe(
+                        map.interactionCount,
+                        Metric.update(BigInt(0)),
+                        Effect.tagMetrics({
+                          interaction_type: map.interactionType,
+                          interaction_key: interactionKey,
+                          interaction_guild_id: guild.id,
+                          interaction_status: interactionStatus,
+                        }),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      Effect.asVoid,
+      Effect.withSpan("InteractionHandlerMapWithMetricsGroup.initialize", {
+        captureStackTrace: true,
+      }),
+    );
+
+  static chatInputCommandsExecuteAndReplyError =
+    (interactionKey: string) =>
+    <A, E, R>(group: InteractionHandlerMapWithMetricsGroup<A, E, R>) =>
+      pipe(
+        group.chatInputCommandsMap,
+        InteractionHandlerMapWithMetrics.executeAndReplyError(interactionKey),
+        Effect.withSpan(
+          "InteractionHandlerMapWithMetricsGroup.chatInputCommandsExecuteAndReplyError",
+          {
+            captureStackTrace: true,
+          },
+        ),
+      );
+
+  static buttonsExecuteAndReplyError =
+    (interactionKey: string) =>
+    <A, E, R>(group: InteractionHandlerMapWithMetricsGroup<A, E, R>) =>
+      pipe(
+        group.buttonsMap,
+        InteractionHandlerMapWithMetrics.executeAndReplyError(interactionKey),
+        Effect.withSpan(
+          "InteractionHandlerMapWithMetricsGroup.buttonsExecuteAndReplyError",
+          {
+            captureStackTrace: true,
+          },
+        ),
+      );
+
+  static userSelectMenuExecuteAndReplyError =
+    (interactionKey: string) =>
+    <A, E, R>(group: InteractionHandlerMapWithMetricsGroup<A, E, R>) =>
+      pipe(
+        group.userSelectMenuMap,
+        InteractionHandlerMapWithMetrics.executeAndReplyError(interactionKey),
+        Effect.withSpan(
+          "InteractionHandlerMapWithMetricsGroup.userSelectMenuExecuteAndReplyError",
+          {
+            captureStackTrace: true,
+          },
+        ),
+      );
 }
