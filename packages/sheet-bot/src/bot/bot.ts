@@ -254,9 +254,14 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   static login = <A = never, E = never, R = never>(bot: Bot<A, E, R>) => {
     return Config.use(({ discordToken }) =>
       pipe(
-        SynchronizedRef.update(bot.runtime, () =>
-          Option.some(ManagedRuntime.make(bot.layer)),
-        ),
+        SynchronizedRef.updateEffect(bot.runtime, () => {
+          const runtime = ManagedRuntime.make(bot.layer);
+          return pipe(
+            Effect.tryPromise(() => runtime.runPromiseExit(Effect.void)),
+            Effect.flatten,
+            Effect.map(() => Option.some(runtime)),
+          );
+        }),
         Effect.andThen(() =>
           bot.client
             .once(Events.ClientReady, (client) =>
