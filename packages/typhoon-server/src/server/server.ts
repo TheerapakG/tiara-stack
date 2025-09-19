@@ -16,7 +16,6 @@ import {
   ManagedRuntime,
   Match,
   Metric,
-  Number,
   Option,
   pipe,
   Scope,
@@ -77,6 +76,7 @@ export class Server<R = never>
       Option.Option<ManagedRuntime.ManagedRuntime<R, unknown>>
     >;
     startSemaphore: Effect.Semaphore;
+    status: SynchronizedRef.SynchronizedRef<"stopped" | "pending" | "ready">;
   }>
   implements BaseServer.Server
 {
@@ -148,6 +148,9 @@ export const create = <R = never>(layer: Layer.Layer<R, unknown>) =>
           Option.none<ManagedRuntime.ManagedRuntime<R, unknown>>(),
         ),
         startSemaphore: Effect.makeSemaphore(1),
+        status: SynchronizedRef.make<"stopped" | "pending" | "ready">(
+          "stopped",
+        ),
       }),
       { concurrency: "unbounded" },
     ),
@@ -1146,10 +1149,18 @@ const handleWebRequest =
     );
 
 const isStarted = <R = never>(server: Server<R>) =>
-  pipe(server.startSemaphore.take(0), Effect.map(Number.greaterThan(0)));
+  pipe(
+    server.status,
+    SynchronizedRef.get,
+    Effect.map((status) => Array.contains(["pending", "ready"], status)),
+  );
 
 const isReady = <R = never>(server: Server<R>) =>
-  pipe(server.runtime, Effect.map(Option.isSome));
+  pipe(
+    server.status,
+    SynchronizedRef.get,
+    Effect.map((status) => String.Equivalence(status, "ready")),
+  );
 
 const handleLive =
   <A = never, E = never, R1 = never>(
@@ -1177,25 +1188,38 @@ const handleReady =
     );
 
 const start = <R = never>(server: Server<R>) =>
-  pipe(
-    SynchronizedRef.update(server.runtime, () =>
-      Option.some(ManagedRuntime.make(server.layer)),
+  server.startSemaphore.withPermits(1)(
+    pipe(
+      SynchronizedRef.update(server.status, () => "pending" as const),
+      Effect.andThen(
+        SynchronizedRef.update(server.runtime, () =>
+          Option.some(ManagedRuntime.make(server.layer)),
+        ),
+      ),
+      Effect.andThen(
+        SynchronizedRef.update(server.status, () => "ready" as const),
+      ),
+      Effect.as(server),
     ),
-    Effect.as(server),
-    server.startSemaphore.withPermits(1),
   );
 
 export const stop = <R = never>(server: Server<R>) =>
   pipe(
-    SynchronizedRef.updateEffect(server.runtime, (runtime) =>
-      pipe(
-        runtime,
-        Option.match({
-          onSome: (runtime) => Effect.tryPromise(() => runtime.dispose()),
-          onNone: () => Effect.void,
-        }),
-        Effect.as(Option.none()),
+    SynchronizedRef.update(server.status, () => "pending" as const),
+    Effect.andThen(
+      SynchronizedRef.updateEffect(server.runtime, (runtime) =>
+        pipe(
+          runtime,
+          Option.match({
+            onSome: (runtime) => Effect.tryPromise(() => runtime.dispose()),
+            onNone: () => Effect.void,
+          }),
+          Effect.as(Option.none()),
+        ),
       ),
+    ),
+    Effect.andThen(
+      SynchronizedRef.update(server.status, () => "stopped" as const),
     ),
     Effect.tap(() => Effect.log("Server is stopped")),
     Effect.as(server),
