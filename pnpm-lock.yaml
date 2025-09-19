@@ -123,7 +123,7 @@ importers:
         version: 0.13.12(rolldown@1.0.0-beta.29)(typescript@5.9.2)
       vite:
         specifier: npm:rolldown-vite@latest
-        version: rolldown-vite@7.1.10(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0)
+        version: rolldown-vite@7.1.11(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0)
 
   packages/sheet-bot:
     dependencies:
@@ -241,7 +241,7 @@ importers:
         version: 3.28.0
       vite:
         specifier: npm:rolldown-vite@latest
-        version: rolldown-vite@7.1.10(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0)
+        version: rolldown-vite@7.1.11(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0)
 
   packages/sheet-db-schema:
     dependencies:
@@ -299,7 +299,7 @@ importers:
         version: 0.13.12(rolldown@1.0.0-beta.29)(typescript@5.9.2)
       vite:
         specifier: npm:rolldown-vite@latest
-        version: rolldown-vite@7.1.10(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0)
+        version: rolldown-vite@7.1.11(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0)
 
   packages/sheet-formulas:
     dependencies:
@@ -460,7 +460,7 @@ importers:
         version: 0.13.12(rolldown@1.0.0-beta.29)(typescript@5.9.2)
       vite:
         specifier: npm:rolldown-vite@latest
-        version: rolldown-vite@7.1.10(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0)
+        version: rolldown-vite@7.1.11(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0)
 
   packages/typhoon-client-http:
     dependencies:
@@ -524,7 +524,7 @@ importers:
         version: 0.13.12(rolldown@1.0.0-beta.29)(typescript@5.9.2)
       vite:
         specifier: npm:rolldown-vite@latest
-        version: rolldown-vite@7.1.10(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0)
+        version: rolldown-vite@7.1.11(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0)
 
   packages/typhoon-client-ws:
     dependencies:
@@ -609,7 +609,7 @@ importers:
         version: 0.13.12(rolldown@1.0.0-beta.29)(typescript@5.9.2)
       vite:
         specifier: npm:rolldown-vite@latest
-        version: rolldown-vite@7.1.10(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0)
+        version: rolldown-vite@7.1.11(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0)
 
   packages/typhoon-core:
     dependencies:
@@ -697,7 +697,7 @@ importers:
         version: 5.43.0
       vite:
         specifier: npm:rolldown-vite@latest
-        version: rolldown-vite@7.1.10(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0)
+        version: rolldown-vite@7.1.11(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0)
 
   packages/typhoon-server:
     dependencies:
@@ -728,6 +728,9 @@ importers:
       typhoon-core:
         specifier: workspace:*
         version: link:../typhoon-core
+      ufo:
+        specifier: ^1.6.1
+        version: 1.6.1
       valibot:
         specifier: ^1.1.0
         version: 1.1.0(typescript@5.9.2)
@@ -779,7 +782,7 @@ importers:
         version: 3.0.1(rollup@4.45.0)
       vite:
         specifier: npm:rolldown-vite@latest
-        version: rolldown-vite@7.1.10(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0)
+        version: rolldown-vite@7.1.11(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0)
 
 packages:
 
@@ -4233,8 +4236,8 @@ packages:
       vue-tsc:
         optional: true
 
-  rolldown-vite@7.1.10:
-    resolution: {integrity: sha512-FjyH+AXrgMkojvHPAQ6mjo/7hwnsC4lz0hUdb9jUl4sPr5BcH2RFmdz6HQjDLoSe1q6j3B+Zze51VRGpc1Rkpw==}
+  rolldown-vite@7.1.11:
+    resolution: {integrity: sha512-33L3z0NvLLyg2avZsEuLrKR33l8+tALVw9tYpSvW/4Zj7tYeRs5O9bodPL/NsmfUzLSjVIoG+GdADVeil0HNiQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
     peerDependencies:
@@ -8114,7 +8117,7 @@ snapshots:
       - oxc-resolver
       - supports-color
 
-  rolldown-vite@7.1.10(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0):
+  rolldown-vite@7.1.11(@types/node@24.2.1)(esbuild@0.25.5)(jiti@2.4.2)(terser@5.43.0):
     dependencies:
       '@oxc-project/runtime': 0.89.0
       fdir: 6.5.0(picomatch@4.0.3)
