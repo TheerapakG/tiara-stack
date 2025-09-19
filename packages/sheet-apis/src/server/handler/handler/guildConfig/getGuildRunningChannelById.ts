@@ -2,24 +2,24 @@ import { getGuildRunningChannelByIdHandlerConfig } from "@/server/handler/config
 import { GuildChannelConfig } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
 import { Effect, Function, pipe, Schema } from "effect";
+import { HandlerContextConfig } from "typhoon-core/config";
 import { Computed } from "typhoon-core/signal";
-import { defineHandlerBuilder, Event } from "typhoon-server/server";
+import { Event } from "typhoon-server/server";
 
 const responseSchema = Schema.OptionFromNullishOr(
   GuildChannelConfig,
   undefined,
 );
 
-export const getGuildRunningChannelByIdHandler = defineHandlerBuilder()
-  .config(getGuildRunningChannelByIdHandlerConfig)
-  .handler(
+export const getGuildRunningChannelByIdHandler = pipe(
+  HandlerContextConfig.empty,
+  HandlerContextConfig.Builder.config(getGuildRunningChannelByIdHandlerConfig),
+  HandlerContextConfig.Builder.handler(
     pipe(
       Computed.make(Event.token()),
       Computed.flatMap(Effect.flatMap(AuthService.verify)),
       Computed.flatMapComputed(() =>
-        Event.withConfig(
-          getGuildRunningChannelByIdHandlerConfig,
-        ).request.parsed(),
+        Event.request.parsed(getGuildRunningChannelByIdHandlerConfig),
       ),
       Computed.flatMap((parsed) =>
         GuildConfigService.getGuildRunningChannelById(
@@ -33,4 +33,5 @@ export const getGuildRunningChannelByIdHandler = defineHandlerBuilder()
         captureStackTrace: true,
       }),
     ),
-  );
+  ),
+);

@@ -1,9 +1,9 @@
 import { pipe } from "effect";
-import { HandlerGroup } from "typhoon-server/server";
+import { HandlerContextConfig } from "typhoon-core/config";
 
 import { testOIDCHandler } from "./testOIDC";
 
 export const testHandlerGroup = pipe(
-  HandlerGroup.empty(),
-  HandlerGroup.add(testOIDCHandler),
+  HandlerContextConfig.Group.empty(),
+  HandlerContextConfig.Group.add(testOIDCHandler),
 );

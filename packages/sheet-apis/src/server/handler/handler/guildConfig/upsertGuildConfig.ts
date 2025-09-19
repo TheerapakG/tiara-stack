@@ -2,20 +2,22 @@ import { upsertGuildConfigHandlerConfig } from "@/server/handler/config";
 import { GuildConfig } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
 import { Effect, pipe, Schema } from "effect";
+import { HandlerContextConfig } from "typhoon-core/config";
 import { OnceObserver } from "typhoon-core/signal";
-import { defineHandlerBuilder, Event } from "typhoon-server/server";
+import { Event } from "typhoon-server/server";
 
 const responseSchema = Schema.OptionFromNullishOr(GuildConfig, undefined);
 
-export const upsertGuildConfigHandler = defineHandlerBuilder()
-  .config(upsertGuildConfigHandlerConfig)
-  .handler(
+export const upsertGuildConfigHandler = pipe(
+  HandlerContextConfig.empty,
+  HandlerContextConfig.Builder.config(upsertGuildConfigHandlerConfig),
+  HandlerContextConfig.Builder.handler(
     pipe(
       Event.token(),
       Effect.flatMap(Effect.flatMap(AuthService.verify)),
       Effect.flatMap(() =>
         pipe(
-          Event.withConfig(upsertGuildConfigHandlerConfig).request.parsed(),
+          Event.request.parsed(upsertGuildConfigHandlerConfig),
           Effect.flatMap(OnceObserver.observeOnce),
         ),
       ),
@@ -27,4 +29,5 @@ export const upsertGuildConfigHandler = defineHandlerBuilder()
         captureStackTrace: true,
       }),
     ),
-  );
+  ),
+);
