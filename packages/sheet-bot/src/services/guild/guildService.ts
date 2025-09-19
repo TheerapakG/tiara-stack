@@ -39,11 +39,33 @@ export class GuildService extends Effect.Service<GuildService>()(
               captureStackTrace: true,
             }),
           ),
+        fetchMember: (memberId: string) =>
+          pipe(
+            DiscordError.wrapTryPromise(() => guild.members.fetch(memberId)),
+            Effect.map(Option.fromNullable),
+            Effect.withSpan("GuildService.fetchMember", {
+              captureStackTrace: true,
+            }),
+          ),
+        fetchRoles: () =>
+          pipe(
+            DiscordError.wrapTryPromise(() => guild.roles.fetch()),
+            Effect.withSpan("GuildService.fetchRoles", {
+              captureStackTrace: true,
+            }),
+          ),
         fetchRole: (roleId: string) =>
           pipe(
             DiscordError.wrapTryPromise(() => guild.roles.fetch(roleId)),
             Effect.map(Option.fromNullable),
             Effect.withSpan("GuildService.fetchRole", {
+              captureStackTrace: true,
+            }),
+          ),
+        fetchChannels: () =>
+          pipe(
+            DiscordError.wrapTryPromise(() => guild.channels.fetch()),
+            Effect.withSpan("GuildService.fetchChannels", {
               captureStackTrace: true,
             }),
           ),
