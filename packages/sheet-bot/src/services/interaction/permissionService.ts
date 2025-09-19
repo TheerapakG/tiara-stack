@@ -106,10 +106,33 @@ export class PermissionService extends Effect.Service<PermissionService>()(
             ),
             Effect.unlessEffect(
               pipe(
-                interaction,
-                Effect.map(
-                  (interaction) =>
-                    interaction.memberPermissions?.has(permissions) ?? false,
+                Effect.serviceOption(GuildService),
+                Effect.flatMap(
+                  Option.match({
+                    onSome: (guildService) =>
+                      pipe(
+                        interaction,
+                        Effect.flatMap((interaction) =>
+                          guildService.fetchMember(interaction.user.id),
+                        ),
+                        Effect.map(
+                          Option.match({
+                            onSome: (member) =>
+                              member.permissions.has(permissions),
+                            onNone: () => false,
+                          }),
+                        ),
+                      ),
+                    onNone: () =>
+                      pipe(
+                        interaction,
+                        Effect.map(
+                          (interaction) =>
+                            interaction.memberPermissions?.has(permissions) ??
+                            false,
+                        ),
+                      ),
+                  }),
                 ),
               ),
             ),
@@ -133,13 +156,47 @@ export class PermissionService extends Effect.Service<PermissionService>()(
             ),
             Effect.unlessEffect(
               pipe(
-                cachedInteraction,
-                Effect.map((interaction) =>
-                  interaction.member.roles.cache.some((role) =>
-                    roles
-                      .map((role) => interaction.guild.roles.resolveId(role))
-                      .includes(role.id),
-                  ),
+                Effect.serviceOption(GuildService),
+                Effect.flatMap(
+                  Option.match({
+                    onSome: (guildService) =>
+                      pipe(
+                        Effect.Do,
+                        Effect.bind("interaction", () => cachedInteraction),
+                        Effect.bind("member", ({ interaction }) =>
+                          guildService.fetchMember(interaction.user.id),
+                        ),
+                        Effect.map(({ interaction, member }) =>
+                          pipe(
+                            member,
+                            Option.match({
+                              onSome: (member) =>
+                                member.roles.cache.some((role) =>
+                                  roles
+                                    .map((role) =>
+                                      interaction.guild.roles.resolveId(role),
+                                    )
+                                    .includes(role.id),
+                                ),
+                              onNone: () => false,
+                            }),
+                          ),
+                        ),
+                      ),
+                    onNone: () =>
+                      pipe(
+                        cachedInteraction,
+                        Effect.map((interaction) =>
+                          interaction.member.roles.cache.some((role) =>
+                            roles
+                              .map((role) =>
+                                interaction.guild.roles.resolveId(role),
+                              )
+                              .includes(role.id),
+                          ),
+                        ),
+                      ),
+                  }),
                 ),
               ),
             ),
