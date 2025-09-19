@@ -33,46 +33,9 @@ const pullStreamToParsed =
       ),
     );
 
-export class EventRequestWithConfig<
-  const Config extends
-    | HandlerConfig.SubscriptionHandlerConfig
-    | HandlerConfig.MutationHandlerConfig,
-> {
-  constructor(readonly config: Config) {}
-
-  raw() {
-    return pipe(
-      Event,
-      Effect.flatMap((ref) => SynchronizedRef.get(ref)),
-      Effect.map((ctx) => ctx.pullStream),
-      Computed.map((pullStream) => pullStream.stream),
-    );
-  }
-
-  parsed() {
-    return pipe(
-      this.raw(),
-      Computed.flatMap(
-        pullStreamToParsed(HandlerConfig.requestParams(this.config)),
-      ),
-    );
-  }
-}
-
-export class EventWithConfig<
-  Config extends
-    | HandlerConfig.SubscriptionHandlerConfig
-    | HandlerConfig.MutationHandlerConfig,
-> {
-  constructor(readonly config: Config) {}
-
-  get request() {
-    return new EventRequestWithConfig(this.config);
-  }
-}
-
 type EventContext = {
   request: Request;
+  token: Option.Option<string>;
   pullStream: {
     stream: Effect.Effect<
       unknown,
@@ -81,13 +44,13 @@ type EventContext = {
     >;
     scope: Scope.CloseableScope;
   };
-  token: Option.Option<string>;
 };
 
 export class Event extends Context.Tag("Event")<
   Event,
   SynchronizedRef.SynchronizedRef<{
     request: Request;
+    token: Option.Option<string>;
     pullStream: Signal.Signal<
       Readonly<{
         stream: Effect.Effect<
@@ -98,93 +61,105 @@ export class Event extends Context.Tag("Event")<
         scope: Scope.CloseableScope;
       }>
     >;
-    token: Option.Option<string>;
   }>
->() {
-  static fromEventContext = (
-    ctx: EventContext,
-  ): Effect.Effect<Context.Tag.Service<Event>> =>
-    SynchronizedRef.make({
-      request: ctx.request,
-      pullStream: Signal.make({
-        stream: ctx.pullStream.stream,
-        scope: ctx.pullStream.scope,
-      }),
-      token: ctx.token,
-    });
+>() {}
 
-  static replaceToken = (
-    token: Option.Option<string>,
-  ): Effect.Effect<Context.Tag.Service<Event>, never, Event> =>
-    pipe(
-      Effect.Do,
-      Effect.bind("ref", () => Event),
-      Effect.bind("oldContext", ({ ref }) => SynchronizedRef.get(ref)),
-      Effect.tap(({ ref, oldContext }) =>
-        SynchronizedRef.update(ref, () => ({ ...oldContext, token })),
-      ),
-      Effect.map(({ ref }) => ref),
-    );
+export const fromEventContext = (
+  ctx: EventContext,
+): Effect.Effect<Context.Tag.Service<Event>> =>
+  SynchronizedRef.make({
+    request: ctx.request,
+    token: ctx.token,
+    pullStream: Signal.make({
+      stream: ctx.pullStream.stream,
+      scope: ctx.pullStream.scope,
+    }),
+  });
 
-  static replacePullStream = ({
-    stream,
-    scope,
-  }: {
-    stream: Effect.Effect<
-      unknown,
-      MsgpackDecodeError | StreamExhaustedError,
-      never
-    >;
-    scope: Scope.CloseableScope;
-  }): Effect.Effect<Context.Tag.Service<Event>, never, Event> =>
-    pipe(
-      Effect.Do,
-      Effect.bind("ref", () => Event),
-      Effect.bind("oldContext", ({ ref }) => SynchronizedRef.get(ref)),
-      Effect.bind("oldPullStream", ({ oldContext }) =>
-        oldContext.pullStream.peek(),
-      ),
-      Effect.tap(({ oldContext }) =>
-        oldContext.pullStream.setValue({ stream, scope }),
-      ),
-      Effect.tap(({ oldPullStream }) =>
-        Scope.close(oldPullStream.scope, Exit.void),
-      ),
-      Effect.map(({ ref }) => ref),
-    );
+export const replaceToken = (
+  token: Option.Option<string>,
+): Effect.Effect<Context.Tag.Service<Event>, never, Event> =>
+  pipe(
+    Effect.Do,
+    Effect.bind("ref", () => Event),
+    Effect.bind("oldContext", ({ ref }) => SynchronizedRef.get(ref)),
+    Effect.tap(({ ref, oldContext }) =>
+      SynchronizedRef.update(ref, () => ({ ...oldContext, token })),
+    ),
+    Effect.map(({ ref }) => ref),
+  );
 
-  static close = (): Effect.Effect<void, never, Event> =>
-    pipe(
-      Effect.Do,
-      Effect.bind("ref", () => Event),
-      Effect.bind("oldContext", ({ ref }) => SynchronizedRef.get(ref)),
-      Effect.bind("oldPullStream", ({ oldContext }) =>
-        oldContext.pullStream.peek(),
-      ),
-      Effect.tap(({ oldPullStream }) =>
-        Scope.close(oldPullStream.scope, Exit.void),
-      ),
-    );
+export const replacePullStream = ({
+  stream,
+  scope,
+}: {
+  stream: Effect.Effect<
+    unknown,
+    MsgpackDecodeError | StreamExhaustedError,
+    never
+  >;
+  scope: Scope.CloseableScope;
+}): Effect.Effect<Context.Tag.Service<Event>, never, Event> =>
+  pipe(
+    Effect.Do,
+    Effect.bind("ref", () => Event),
+    Effect.bind("oldContext", ({ ref }) => SynchronizedRef.get(ref)),
+    Effect.bind("oldPullStream", ({ oldContext }) =>
+      oldContext.pullStream.peek(),
+    ),
+    Effect.tap(({ oldContext }) =>
+      oldContext.pullStream.setValue({ stream, scope }),
+    ),
+    Effect.tap(({ oldPullStream }) =>
+      Scope.close(oldPullStream.scope, Exit.void),
+    ),
+    Effect.map(({ ref }) => ref),
+  );
 
-  static webRequest = (): Effect.Effect<Request, never, Event> =>
+export const close = (): Effect.Effect<void, never, Event> =>
+  pipe(
+    Effect.Do,
+    Effect.bind("ref", () => Event),
+    Effect.bind("oldContext", ({ ref }) => SynchronizedRef.get(ref)),
+    Effect.bind("oldPullStream", ({ oldContext }) =>
+      oldContext.pullStream.peek(),
+    ),
+    Effect.tap(({ oldPullStream }) =>
+      Scope.close(oldPullStream.scope, Exit.void),
+    ),
+  );
+
+export const webRequest = (): Effect.Effect<Request, never, Event> =>
+  pipe(
+    Event,
+    Effect.flatMap((ref) => SynchronizedRef.get(ref)),
+    Effect.map((ctx) => ctx.request),
+  );
+
+export const request = {
+  raw: () =>
     pipe(
       Event,
       Effect.flatMap((ref) => SynchronizedRef.get(ref)),
-      Effect.map((ctx) => ctx.request),
-    );
-
-  static token = (): Effect.Effect<Option.Option<string>, never, Event> =>
-    pipe(
-      Event,
-      Effect.flatMap((ref) => SynchronizedRef.get(ref)),
-      Effect.map((ctx) => ctx.token),
-    );
-
-  static withConfig<
+      Effect.map((ctx) => ctx.pullStream),
+      Computed.map((pullStream) => pullStream.stream),
+    ),
+  parsed: <
     Config extends
       | HandlerConfig.SubscriptionHandlerConfig
       | HandlerConfig.MutationHandlerConfig,
-  >(config: Config) {
-    return new EventWithConfig(config);
-  }
-}
+  >(
+    config: Config,
+  ) =>
+    pipe(
+      request.raw(),
+      Computed.flatMap(pullStreamToParsed(HandlerConfig.requestParams(config))),
+    ),
+};
+
+export const token = (): Effect.Effect<Option.Option<string>, never, Event> =>
+  pipe(
+    Event,
+    Effect.flatMap((ref) => SynchronizedRef.get(ref)),
+    Effect.map((ctx) => ctx.token),
+  );
