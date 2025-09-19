@@ -2,6 +2,7 @@ import { Message, Peer } from "crossws";
 import type { serve as crosswsServe } from "crossws/server";
 import {
   Array,
+  Boolean,
   Cause,
   Context,
   Data,
@@ -15,6 +16,7 @@ import {
   ManagedRuntime,
   Match,
   Metric,
+  Number,
   Option,
   pipe,
   Scope,
@@ -32,6 +34,7 @@ import {
 } from "typhoon-core/protocol";
 import { Server as BaseServer } from "typhoon-core/server";
 import { Computed, OnceObserver, SideEffect } from "typhoon-core/signal";
+import { parseURL, withoutTrailingSlash } from "ufo";
 import {
   close as closeEvent,
   Event,
@@ -1040,7 +1043,7 @@ const handleWebSocketMessage =
       }),
     );
 
-const handleWebRequest =
+const handleProtocolWebRequest =
   (request: Request) =>
   <R = never>(server: Server<R>) =>
     pipe(
@@ -1122,6 +1125,55 @@ const handleWebRequest =
       Effect.withSpan("Server.handleWebRequest", {
         captureStackTrace: true,
       }),
+    );
+
+const handleWebRequest =
+  (request: Request) =>
+  <R = never>(server: Server<R>) =>
+    pipe(
+      Match.value(withoutTrailingSlash(parseURL(request.url).pathname)),
+      Match.when("/live", () =>
+        handleLive((live) =>
+          Effect.sync(() => new Response("", { status: live ? 200 : 500 })),
+        )(server),
+      ),
+      Match.when("/ready", () =>
+        handleReady((ready) =>
+          Effect.sync(() => new Response("", { status: ready ? 200 : 500 })),
+        )(server),
+      ),
+      Match.orElse(() => handleProtocolWebRequest(request)(server)),
+    );
+
+const isStarted = <R = never>(server: Server<R>) =>
+  pipe(server.startSemaphore.take(0), Effect.map(Number.greaterThan(0)));
+
+const isReady = <R = never>(server: Server<R>) =>
+  pipe(server.runtime, Effect.map(Option.isSome));
+
+const handleLive =
+  <A = never, E = never, R1 = never>(
+    callback: (live: boolean) => Effect.Effect<A, E, R1>,
+  ) =>
+  <R2 = never>(server: Server<R2>) =>
+    pipe(isStarted(server), Effect.flatMap(callback));
+
+const handleReady =
+  <A = never, E = never, R1 = never>(
+    callback: (ready: boolean) => Effect.Effect<A, E, R1>,
+  ) =>
+  <R2 = never>(server: Server<R2>) =>
+    pipe(
+      Effect.Do,
+      Effect.bindAll(
+        () => ({
+          start: isStarted(server),
+          ready: isReady(server),
+        }),
+        { concurrency: "unbounded" },
+      ),
+      Effect.map(({ start, ready }) => Boolean.and(start, ready)),
+      Effect.flatMap(callback),
     );
 
 const start = <R = never>(server: Server<R>) =>
