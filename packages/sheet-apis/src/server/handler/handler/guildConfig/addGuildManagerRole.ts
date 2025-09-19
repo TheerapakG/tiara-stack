@@ -2,23 +2,25 @@ import { addGuildManagerRoleHandlerConfig } from "@/server/handler/config";
 import { GuildConfigManagerRole } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
 import { Effect, pipe, Schema } from "effect";
+import { HandlerContextConfig } from "typhoon-core/config";
 import { OnceObserver } from "typhoon-core/signal";
-import { defineHandlerBuilder, Event } from "typhoon-server/server";
+import { Event } from "typhoon-server/server";
 
 const responseSchema = Schema.OptionFromNullishOr(
   GuildConfigManagerRole,
   undefined,
 );
 
-export const addGuildManagerRoleHandler = defineHandlerBuilder()
-  .config(addGuildManagerRoleHandlerConfig)
-  .handler(
+export const addGuildManagerRoleHandler = pipe(
+  HandlerContextConfig.empty,
+  HandlerContextConfig.Builder.config(addGuildManagerRoleHandlerConfig),
+  HandlerContextConfig.Builder.handler(
     pipe(
       Event.token(),
       Effect.flatMap(Effect.flatMap(AuthService.verify)),
       Effect.flatMap(() =>
         pipe(
-          Event.withConfig(addGuildManagerRoleHandlerConfig).request.parsed(),
+          Event.request.parsed(addGuildManagerRoleHandlerConfig),
           Effect.flatMap(OnceObserver.observeOnce),
         ),
       ),
@@ -30,4 +32,5 @@ export const addGuildManagerRoleHandler = defineHandlerBuilder()
         captureStackTrace: true,
       }),
     ),
-  );
+  ),
+);

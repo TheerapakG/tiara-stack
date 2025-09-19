@@ -1,17 +1,17 @@
 import { botCalcHandlerConfig } from "@/server/handler/config";
 import { CalcConfig, CalcService, PlayerTeam } from "@/server/services";
 import { Chunk, Effect, HashSet, pipe } from "effect";
+import { HandlerContextConfig } from "typhoon-core/config";
 import { Computed } from "typhoon-core/signal";
-import { defineHandlerBuilder, Event } from "typhoon-server/server";
+import { Event } from "typhoon-server/server";
 
-export const botCalcHandler = defineHandlerBuilder()
-  .config(botCalcHandlerConfig)
-  .handler(
+export const botCalcHandler = pipe(
+  HandlerContextConfig.empty,
+  HandlerContextConfig.Builder.config(botCalcHandlerConfig),
+  HandlerContextConfig.Builder.handler(
     pipe(
       Effect.Do,
-      Effect.bind("parsed", () =>
-        Event.withConfig(botCalcHandlerConfig).request.parsed(),
-      ),
+      Effect.bind("parsed", () => Event.request.parsed(botCalcHandlerConfig)),
       Effect.flatMap(({ parsed }) =>
         pipe(
           Computed.make(
@@ -56,4 +56,5 @@ export const botCalcHandler = defineHandlerBuilder()
       ),
       Effect.withSpan("botCalcHandler", { captureStackTrace: true }),
     ),
-  );
+  ),
+);

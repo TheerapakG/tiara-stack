@@ -1,17 +1,17 @@
 import { testOIDCHandlerConfig } from "@/server/handler/config";
 import { AuthService } from "@/server/services";
 import { Effect, pipe } from "effect";
+import { HandlerContextConfig } from "typhoon-core/config";
 import { Computed } from "typhoon-core/signal";
-import { defineHandlerBuilder, Event } from "typhoon-server/server";
+import { Event } from "typhoon-server/server";
 
-export const testOIDCHandler = defineHandlerBuilder()
-  .config(testOIDCHandlerConfig)
-  .handler(
+export const testOIDCHandler = pipe(
+  HandlerContextConfig.empty,
+  HandlerContextConfig.Builder.config(testOIDCHandlerConfig),
+  HandlerContextConfig.Builder.handler(
     pipe(
       Effect.Do,
-      Effect.bind("parsed", () =>
-        Event.withConfig(testOIDCHandlerConfig).request.parsed(),
-      ),
+      Effect.bind("parsed", () => Event.request.parsed(testOIDCHandlerConfig)),
       Effect.flatMap(({ parsed }) =>
         pipe(
           Computed.make(
@@ -29,4 +29,5 @@ export const testOIDCHandler = defineHandlerBuilder()
       ),
       Effect.withSpan("testOIDCHandler", { captureStackTrace: true }),
     ),
-  );
+  ),
+);
