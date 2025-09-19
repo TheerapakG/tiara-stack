@@ -1,5 +1,8 @@
 import { Option } from "effect";
 
+export type ValueExtends<O extends Option.Option<unknown>, E> =
+  O extends Option.Some<infer T extends E> ? T : never;
+
 export const some = <T>(value: T) => Option.some(value) as Option.Some<T>;
 
 export const none = <T = never>() => Option.none<T>() as Option.None<T>;
