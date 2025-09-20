@@ -180,15 +180,9 @@ export const add =
         handlerContextConfigGroup: HandlerContextConfig.Group.add(handler),
       }),
     ) as Exclude<
-      Config extends HandlerContextConfig.SubscriptionHandlerContextConfig
-        ? HandlerContextConfig.SubscriptionHandlerContext<
-            HandlerContextConfig.SubscriptionHandlerOrUndefined<Config>
-          >
-        : Config extends HandlerContextConfig.MutationHandlerContextConfig
-          ? HandlerContextConfig.MutationHandlerContext<
-              HandlerContextConfig.MutationHandlerOrUndefined<Config>
-            >
-          : never,
+      HandlerContextConfig.HandlerContext<
+        HandlerContextConfig.HandlerOrUndefined<Config>
+      >,
       Event
     > extends ServerLayerContext<S>
       ? S
@@ -375,7 +369,7 @@ const getComputedSubscriptionResult = <R = never>(
   R | Event
 > =>
   pipe(
-    HandlerContextConfig.subscriptionHandler(subscriptionHandlerContextConfig),
+    HandlerContextConfig.handler(subscriptionHandlerContextConfig),
     Effect.flatMap((handler) =>
       Computed.make(
         pipe(
@@ -414,17 +408,13 @@ const getComputedSubscriptionResult = <R = never>(
             captureStackTrace: true,
             attributes: {
               handler: HandlerConfig.name(
-                HandlerContextConfig.subscriptionConfig(
-                  subscriptionHandlerContextConfig,
-                ),
+                HandlerContextConfig.config(subscriptionHandlerContextConfig),
               ),
             },
           }),
           Effect.annotateLogs({
             handler: HandlerConfig.name(
-              HandlerContextConfig.subscriptionConfig(
-                subscriptionHandlerContextConfig,
-              ),
+              HandlerContextConfig.config(subscriptionHandlerContextConfig),
             ),
           }),
         ),
@@ -434,17 +424,13 @@ const getComputedSubscriptionResult = <R = never>(
       captureStackTrace: true,
       attributes: {
         handler: HandlerConfig.name(
-          HandlerContextConfig.subscriptionConfig(
-            subscriptionHandlerContextConfig,
-          ),
+          HandlerContextConfig.config(subscriptionHandlerContextConfig),
         ),
       },
     }),
     Effect.annotateLogs({
       handler: HandlerConfig.name(
-        HandlerContextConfig.subscriptionConfig(
-          subscriptionHandlerContextConfig,
-        ),
+        HandlerContextConfig.config(subscriptionHandlerContextConfig),
       ),
     }),
   );
@@ -469,9 +455,7 @@ const getMutationResult = <R = never>(
   pipe(
     Effect.Do,
     Effect.bind("value", () =>
-      Effect.exit(
-        HandlerContextConfig.mutationHandler(mutationHandlerContextConfig),
-      ),
+      Effect.exit(HandlerContextConfig.handler(mutationHandlerContextConfig)),
     ),
     Effect.bind("timestamp", () => DateTime.now),
     Effect.let(
@@ -506,13 +490,13 @@ const getMutationResult = <R = never>(
       captureStackTrace: true,
       attributes: {
         handler: HandlerConfig.name(
-          HandlerContextConfig.mutationConfig(mutationHandlerContextConfig),
+          HandlerContextConfig.config(mutationHandlerContextConfig),
         ),
       },
     }),
     Effect.annotateLogs({
       handler: HandlerConfig.name(
-        HandlerContextConfig.mutationConfig(mutationHandlerContextConfig),
+        HandlerContextConfig.config(mutationHandlerContextConfig),
       ),
     }),
   );
@@ -563,9 +547,7 @@ const getComputedSubscriptionResultEncoded = <R = never>(
       captureStackTrace: true,
       attributes: {
         handler: HandlerConfig.name(
-          HandlerContextConfig.subscriptionConfig(
-            subscriptionHandlerContextConfig,
-          ),
+          HandlerContextConfig.config(subscriptionHandlerContextConfig),
         ),
       },
     }),
@@ -608,7 +590,7 @@ const getMutationResultEncoded = <R = never>(
       captureStackTrace: true,
       attributes: {
         handler: HandlerConfig.name(
-          HandlerContextConfig.mutationConfig(mutationHandlerContextConfig),
+          HandlerContextConfig.config(mutationHandlerContextConfig),
         ),
       },
     }),
