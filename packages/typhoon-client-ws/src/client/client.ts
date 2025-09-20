@@ -9,6 +9,8 @@ import {
   Option,
   Order,
   pipe,
+  Schedule,
+  String,
   SynchronizedRef,
 } from "effect";
 import { HandlerConfig } from "typhoon-core/config";
@@ -65,6 +67,9 @@ export class WebSocketClient<
     private readonly token: SynchronizedRef.SynchronizedRef<
       Option.Option<string>
     >,
+    private readonly status: SynchronizedRef.SynchronizedRef<
+      "disconnecting" | "disconnected" | "connecting" | "connected"
+    >,
   ) {}
 
   static create<
@@ -94,12 +99,17 @@ export class WebSocketClient<
         SynchronizedRef.make(HashMap.empty<string, UpdaterState>()),
       ),
       Effect.bind("token", () => SynchronizedRef.make(Option.none<string>())),
+      Effect.bind("status", () =>
+        SynchronizedRef.make<
+          "disconnected" | "disconnecting" | "connecting" | "connected"
+        >("disconnected"),
+      ),
       Effect.map(
-        ({ ws, updaterStateMapRef, token }) =>
+        ({ ws, updaterStateMapRef, token, status }) =>
           new WebSocketClient<
             SubscriptionHandlerConfigs,
             MutationHandlerConfigs
-          >(url, ws, updaterStateMapRef, configGroup, token),
+          >(url, ws, updaterStateMapRef, configGroup, token, status),
       ),
       Effect.withSpan("WebSocketClient.create"),
     );
@@ -188,6 +198,9 @@ export class WebSocketClient<
   ) =>
     pipe(
       Effect.Do,
+      Effect.tap(() =>
+        SynchronizedRef.update(client.status, () => "connecting" as const),
+      ),
       Effect.bind("latch", () => Effect.makeLatch()),
       Effect.tap(({ latch }) =>
         pipe(
@@ -195,7 +208,7 @@ export class WebSocketClient<
           SynchronizedRef.updateEffect(() => {
             const ws = new WebSocketCtor(client.url);
             ws.binaryType = "blob";
-            ws.onmessage = (event) =>
+            ws.addEventListener("message", (event) =>
               Effect.runPromise(
                 pipe(
                   Effect.Do,
@@ -231,11 +244,34 @@ export class WebSocketClient<
                   Effect.asVoid,
                   Effect.scoped,
                 ),
-              );
-            ws.onopen = () => Effect.runPromise(latch.open);
-            return pipe(Effect.succeed(Option.some(ws)), latch.whenOpen);
+              ),
+            );
+            ws.addEventListener("open", () => Effect.runPromise(latch.open));
+            ws.addEventListener("close", () =>
+              Effect.runPromise(
+                pipe(
+                  WebSocketClient.connect(client),
+                  Effect.unlessEffect(
+                    pipe(
+                      SynchronizedRef.get(client.status),
+                      Effect.map((status) =>
+                        String.Equivalence(status, "disconnecting"),
+                      ),
+                    ),
+                  ),
+                  Effect.retry({
+                    schedule: Schedule.exponential(1000),
+                    times: 3,
+                  }),
+                ),
+              ),
+            );
+            return latch.whenOpen(Effect.succeedSome(ws));
           }),
         ),
+      ),
+      Effect.tap(() =>
+        SynchronizedRef.update(client.status, () => "connected" as const),
       ),
       Effect.withSpan("WebSocketClient.connect"),
     );
@@ -247,12 +283,29 @@ export class WebSocketClient<
     >,
   ) {
     return pipe(
-      client.ws,
-      SynchronizedRef.update((ws) =>
-        Option.flatMap(ws, (ws) => {
-          ws.close();
-          return Option.none();
-        }),
+      SynchronizedRef.update(client.status, () => "disconnecting" as const),
+      Effect.andThen(
+        SynchronizedRef.updateEffect(client.ws, (ws) =>
+          pipe(
+            ws,
+            Effect.transposeMapOption((ws) =>
+              pipe(
+                Effect.makeLatch(),
+                Effect.tap((latch) =>
+                  ws.addEventListener("close", () =>
+                    Effect.runPromise(latch.open),
+                  ),
+                ),
+                Effect.tap(() => ws.close()),
+                Effect.flatMap((latch) => latch.whenOpen(Effect.succeedNone)),
+              ),
+            ),
+            Effect.map(Option.flatten),
+          ),
+        ),
+      ),
+      Effect.andThen(
+        SynchronizedRef.update(client.status, () => "disconnected" as const),
       ),
       Effect.withSpan("WebSocketClient.close"),
     );
