@@ -777,7 +777,7 @@ const handleUnsubscribe =
                       Effect.provideService(Event, event),
                       Effect.as(Option.none()),
                     ),
-                  onNone: () => Effect.succeed(Option.none()),
+                  onNone: () => Effect.succeedNone,
                 }),
               ),
             ),
