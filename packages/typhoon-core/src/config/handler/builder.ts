@@ -2,8 +2,8 @@ import { StandardSchemaV1 } from "@standard-schema/spec";
 import { Option, Struct } from "effect";
 import { StrictOption } from "../../utils";
 import {
-  HandlerConfig,
   NameOption,
+  PartialHandlerConfig,
   RequestParamsConfig,
   RequestParamsOption,
   ResponseConfig,
@@ -32,12 +32,12 @@ const coerceFalse = <T extends boolean | undefined>(
 
 export const type =
   <const Type extends "subscription" | "mutation">(type: Type) =>
-  <const Config extends HandlerConfig>(config: Config) =>
-    new HandlerConfig({
+  <const Config extends PartialHandlerConfig>(config: Config) =>
+    new PartialHandlerConfig({
       data: Struct.evolve(config.data, {
         type: () => StrictOption.some(type),
       }),
-    }) as HandlerConfig<
+    }) as PartialHandlerConfig<
       Option.Some<Type>,
       NameOption<Config>,
       RequestParamsOption<Config>,
@@ -46,12 +46,12 @@ export const type =
 
 export const name =
   <const Name extends string>(name: Name) =>
-  <const Config extends HandlerConfig>(config: Config) =>
-    new HandlerConfig({
+  <const Config extends PartialHandlerConfig>(config: Config) =>
+    new PartialHandlerConfig({
       data: Struct.evolve(config.data, {
         name: () => StrictOption.some(name),
       }),
-    }) as HandlerConfig<
+    }) as PartialHandlerConfig<
       TypeOption<Config>,
       Option.Some<Name>,
       RequestParamsOption<Config>,
@@ -87,13 +87,13 @@ export const requestParams =
   <const RequestParams extends RequestParamsConfigIn>(
     requestParams: RequestParams,
   ) =>
-  <const Config extends HandlerConfig>(config: Config) => {
+  <const Config extends PartialHandlerConfig>(config: Config) => {
     const transformedRequestParams = transformRequestParamConfig(requestParams);
-    return new HandlerConfig({
+    return new PartialHandlerConfig({
       data: Struct.evolve(config.data, {
         requestParams: () => StrictOption.some(transformedRequestParams),
       }),
-    }) as HandlerConfig<
+    }) as PartialHandlerConfig<
       TypeOption<Config>,
       NameOption<Config>,
       Option.Some<typeof transformedRequestParams>,
@@ -123,13 +123,13 @@ const transformResponseConfig = <const CParams extends ResponseConfigIn>(
 
 export const response =
   <const Response extends ResponseConfigIn>(response: Response) =>
-  <const Config extends HandlerConfig>(config: Config) => {
+  <const Config extends PartialHandlerConfig>(config: Config) => {
     const transformedResponse = transformResponseConfig(response);
-    return new HandlerConfig({
+    return new PartialHandlerConfig({
       data: Struct.evolve(config.data, {
         response: () => StrictOption.some(transformedResponse),
       }),
-    }) as HandlerConfig<
+    }) as PartialHandlerConfig<
       TypeOption<Config>,
       NameOption<Config>,
       RequestParamsOption<Config>,
