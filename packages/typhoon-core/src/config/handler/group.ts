@@ -1,5 +1,6 @@
 import { Data, HashMap, Match, pipe } from "effect";
 import {
+  HandlerConfig,
   MutationHandlerConfig,
   NameOrUndefined,
   SubscriptionHandlerConfig,
@@ -127,9 +128,7 @@ export const empty = () =>
   });
 
 export const add =
-  <const Config extends SubscriptionHandlerConfig | MutationHandlerConfig>(
-    handlerConfig: Config,
-  ) =>
+  <const Config extends HandlerConfig>(handlerConfig: Config) =>
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const G extends HandlerConfigGroup<any, any>,
@@ -137,11 +136,7 @@ export const add =
     handlerGroup: G,
   ): AddHandlerConfigGroupHandlerConfig<G, Config> => {
     const newHandlerMaps = pipe(
-      Match.value(
-        type(
-          handlerConfig as SubscriptionHandlerConfig | MutationHandlerConfig,
-        ),
-      ),
+      Match.value(type(handlerConfig as HandlerConfig)),
       Match.when("subscription", () => ({
         subscriptionHandlerMap: HashMap.set(
           handlerGroup.subscriptionHandlerMap,

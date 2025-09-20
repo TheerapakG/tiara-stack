@@ -43,7 +43,7 @@ export type ResponseValidator<Config extends ResponseConfig> =
 
 export type ResponseStream<Config extends ResponseConfig> = Config["stream"];
 
-export type BaseHandlerConfig<
+export type BasePartialHandlerConfig<
   HandlerType extends Option.Option<
     "subscription" | "mutation"
   > = Option.Option<"subscription" | "mutation">,
@@ -61,7 +61,7 @@ export type BaseHandlerConfig<
   response: Response;
 };
 
-export class HandlerConfig<
+export class PartialHandlerConfig<
   const HandlerType extends Option.Option<
     "subscription" | "mutation"
   > = Option.Option<"subscription" | "mutation">,
@@ -73,8 +73,25 @@ export class HandlerConfig<
     ResponseConfig<StandardSchemaV1, boolean>
   > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
 > extends Data.TaggedClass("HandlerConfig")<{
-  data: BaseHandlerConfig<HandlerType, Name, RequestParams, Response>;
+  data: BasePartialHandlerConfig<HandlerType, Name, RequestParams, Response>;
 }> {}
+
+export type BaseHandlerConfig<
+  HandlerType extends "subscription" | "mutation" = "subscription" | "mutation",
+  Name extends string = string,
+  RequestParams extends RequestParamsConfig<
+    StandardSchemaV1,
+    boolean
+  > = RequestParamsConfig<StandardSchemaV1, boolean>,
+  Response extends Option.Option<
+    ResponseConfig<StandardSchemaV1, boolean>
+  > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
+> = PartialHandlerConfig<
+  Option.Some<HandlerType>,
+  Option.Some<Name>,
+  Option.Some<RequestParams>,
+  Response
+>;
 
 export type SubscriptionHandlerConfig<
   Name extends string = string,
@@ -85,12 +102,7 @@ export type SubscriptionHandlerConfig<
   Response extends Option.Option<
     ResponseConfig<StandardSchemaV1, boolean>
   > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
-> = HandlerConfig<
-  Option.Some<"subscription">,
-  Option.Some<Name>,
-  Option.Some<RequestParams>,
-  Response
->;
+> = BaseHandlerConfig<"subscription", Name, RequestParams, Response>;
 
 export type MutationHandlerConfig<
   Name extends string = string,
@@ -101,14 +113,11 @@ export type MutationHandlerConfig<
   Response extends Option.Option<
     ResponseConfig<StandardSchemaV1, boolean>
   > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
-> = HandlerConfig<
-  Option.Some<"mutation">,
-  Option.Some<Name>,
-  Option.Some<RequestParams>,
-  Response
->;
+> = BaseHandlerConfig<"mutation", Name, RequestParams, Response>;
 
-export const empty = new HandlerConfig({
+export type HandlerConfig = SubscriptionHandlerConfig | MutationHandlerConfig;
+
+export const empty = new PartialHandlerConfig({
   data: {
     type: none<"subscription" | "mutation">(),
     name: none<string>(),
@@ -117,28 +126,30 @@ export const empty = new HandlerConfig({
   },
 });
 
-export type TypeOption<Config extends HandlerConfig> = Config["data"]["type"];
-export type TypeOrUndefined<Config extends HandlerConfig> = GetOrUndefined<
-  TypeOption<Config>
->;
+export type TypeOption<Config extends PartialHandlerConfig> =
+  Config["data"]["type"];
+export type TypeOrUndefined<Config extends PartialHandlerConfig> =
+  GetOrUndefined<TypeOption<Config>>;
 
-export const type = <const Config extends HandlerConfig>(config: Config) =>
-  pipe(config.data.type, getOrUndefined) as TypeOrUndefined<Config>;
+export const type = <const Config extends PartialHandlerConfig>(
+  config: Config,
+) => pipe(config.data.type, getOrUndefined) as TypeOrUndefined<Config>;
 
-export type NameOption<Config extends HandlerConfig> = Config["data"]["name"];
-export type NameOrUndefined<Config extends HandlerConfig> = GetOrUndefined<
-  NameOption<Config>
->;
+export type NameOption<Config extends PartialHandlerConfig> =
+  Config["data"]["name"];
+export type NameOrUndefined<Config extends PartialHandlerConfig> =
+  GetOrUndefined<NameOption<Config>>;
 
-export const name = <const Config extends HandlerConfig>(config: Config) =>
-  pipe(config.data.name, getOrUndefined) as NameOrUndefined<Config>;
+export const name = <const Config extends PartialHandlerConfig>(
+  config: Config,
+) => pipe(config.data.name, getOrUndefined) as NameOrUndefined<Config>;
 
-export type RequestParamsOption<Config extends HandlerConfig> =
+export type RequestParamsOption<Config extends PartialHandlerConfig> =
   Config["data"]["requestParams"];
-export type RequestParamsOrUndefined<Config extends HandlerConfig> =
+export type RequestParamsOrUndefined<Config extends PartialHandlerConfig> =
   GetOrUndefined<RequestParamsOption<Config>>;
 
-export const requestParams = <const Config extends HandlerConfig>(
+export const requestParams = <const Config extends PartialHandlerConfig>(
   config: Config,
 ) =>
   pipe(
@@ -146,11 +157,11 @@ export const requestParams = <const Config extends HandlerConfig>(
     getOrUndefined,
   ) as RequestParamsOrUndefined<Config>;
 
-export type ResponseOption<Config extends HandlerConfig> =
+export type ResponseOption<Config extends PartialHandlerConfig> =
   Config["data"]["response"];
-export type ResponseOrUndefined<Config extends HandlerConfig> = GetOrUndefined<
-  ResponseOption<Config>
->;
+export type ResponseOrUndefined<Config extends PartialHandlerConfig> =
+  GetOrUndefined<ResponseOption<Config>>;
 
-export const response = <const Config extends HandlerConfig>(config: Config) =>
-  pipe(config.data.response, getOrUndefined) as ResponseOrUndefined<Config>;
+export const response = <const Config extends PartialHandlerConfig>(
+  config: Config,
+) => pipe(config.data.response, getOrUndefined) as ResponseOrUndefined<Config>;

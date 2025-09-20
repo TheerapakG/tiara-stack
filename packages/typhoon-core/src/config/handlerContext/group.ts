@@ -1,21 +1,20 @@
 import { Data, HashMap, Match, pipe } from "effect";
 import {
+  HandlerConfig,
   MutationHandlerConfig,
   name,
   SubscriptionHandlerConfig,
+  type,
 } from "../handler/data";
 import {
-  mutationConfig,
+  config,
+  HandlerContext,
+  HandlerContextConfig,
+  HandlerOrUndefined,
   MutationHandler,
-  MutationHandlerContext,
   MutationHandlerContextConfig,
-  MutationHandlerOrUndefined,
-  subscriptionConfig,
   SubscriptionHandler,
   SubscriptionHandlerContextConfig,
-  SubscriptionHandlerEffectContext,
-  SubscriptionHandlerOrUndefined,
-  SubscriptionHandlerSignalContext,
 } from "./data";
 
 type SubscriptionHandlerContextConfigMap<R = never> = HashMap.HashMap<
@@ -41,21 +40,11 @@ export type HandlerContextConfigGroupContext<
 type AddHandlerContextConfigGroupHandlerContextConfig<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   G extends HandlerContextConfigGroup<any>,
-  Config extends
-    | SubscriptionHandlerContextConfig
-    | MutationHandlerContextConfig,
-> = [Config] extends [SubscriptionHandlerContextConfig]
-  ? HandlerContextConfigGroup<
-      | HandlerContextConfigGroupContext<G>
-      | SubscriptionHandlerSignalContext<SubscriptionHandlerOrUndefined<Config>>
-      | SubscriptionHandlerEffectContext<SubscriptionHandlerOrUndefined<Config>>
-    >
-  : [Config] extends [MutationHandlerContextConfig]
-    ? HandlerContextConfigGroup<
-        | HandlerContextConfigGroupContext<G>
-        | MutationHandlerContext<MutationHandlerOrUndefined<Config>>
-      >
-    : never;
+  Config extends HandlerContextConfig,
+> = HandlerContextConfigGroup<
+  | HandlerContextConfigGroupContext<G>
+  | HandlerContext<HandlerOrUndefined<Config>>
+>;
 
 type AddHandlerContextConfigGroupHandlerContextConfigGroup<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -81,13 +70,7 @@ export const empty = <R = never>() =>
   });
 
 export const add =
-  <
-    const Config extends
-      | SubscriptionHandlerContextConfig
-      | MutationHandlerContextConfig,
-  >(
-    handlerConfig: Config,
-  ) =>
+  <const Config extends HandlerContextConfig>(handlerContextConfig: Config) =>
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const G extends HandlerContextConfigGroup<any>,
@@ -95,35 +78,26 @@ export const add =
     handlerContextGroup: G,
   ): AddHandlerContextConfigGroupHandlerContextConfig<G, Config> => {
     const newHandlerMaps = pipe(
-      Match.value(
-        handlerConfig as
-          | SubscriptionHandlerContextConfig
-          | MutationHandlerContextConfig,
-      ),
-      Match.tagsExhaustive({
-        PartialSubscriptionHandlerContextConfig: (
-          subscriptionHandlerContextConfig,
-        ) => ({
-          subscriptionHandlerContextMap: HashMap.set(
-            handlerContextGroup.subscriptionHandlerContextMap,
-            name(subscriptionConfig(subscriptionHandlerContextConfig)),
-            handlerConfig as SubscriptionHandlerContextConfig,
-          ),
-          mutationHandlerContextMap:
-            handlerContextGroup.mutationHandlerContextMap,
-        }),
-        PartialMutationHandlerContextConfig: (
-          mutationHandlerContextConfig,
-        ) => ({
-          subscriptionHandlerContextMap:
-            handlerContextGroup.subscriptionHandlerContextMap,
-          mutationHandlerContextMap: HashMap.set(
-            handlerContextGroup.mutationHandlerContextMap,
-            name(mutationConfig(mutationHandlerContextConfig)),
-            handlerConfig as MutationHandlerContextConfig,
-          ),
-        }),
-      }),
+      Match.value(type(config(handlerContextConfig) as HandlerConfig)),
+      Match.when("subscription", () => ({
+        subscriptionHandlerContextMap: HashMap.set(
+          handlerContextGroup.subscriptionHandlerContextMap,
+          name(config(handlerContextConfig)),
+          handlerContextConfig as SubscriptionHandlerContextConfig,
+        ),
+        mutationHandlerContextMap:
+          handlerContextGroup.mutationHandlerContextMap,
+      })),
+      Match.when("mutation", () => ({
+        subscriptionHandlerContextMap:
+          handlerContextGroup.subscriptionHandlerContextMap,
+        mutationHandlerContextMap: HashMap.set(
+          handlerContextGroup.mutationHandlerContextMap,
+          name(config(handlerContextConfig)),
+          handlerContextConfig as MutationHandlerContextConfig,
+        ),
+      })),
+      Match.orElseAbsurd,
     );
 
     return new HandlerContextConfigGroup(

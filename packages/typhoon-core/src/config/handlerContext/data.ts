@@ -4,9 +4,11 @@ import type { DependencySignal } from "../../signal/dependencySignal";
 import {
   getOrUndefined,
   GetOrUndefined,
+  none,
   ValueExtends,
 } from "../../utils/strictOption";
 import {
+  HandlerConfig,
   MutationHandlerConfig,
   RequestParamsConfig,
   ResolvedResponseValidator,
@@ -16,18 +18,6 @@ import {
 } from "../handler";
 
 export type { DependencySignal, GetOrUndefined, ValueExtends };
-
-export type BaseDummyHandlerContextConfig = object;
-
-export class DummyHandlerContextConfig extends Data.TaggedClass(
-  "DummyHandlerContextConfig",
-)<{
-  data: BaseDummyHandlerContextConfig;
-}> {}
-
-export const empty = new DummyHandlerContextConfig({
-  data: {},
-});
 
 export type SubscriptionHandler<
   Config extends SubscriptionHandlerConfig = SubscriptionHandlerConfig,
@@ -48,10 +38,8 @@ export type SubscriptionHandler<
   EffectR
 >;
 
-export type InferSubscriptionHandlerConfig<
-  Handler extends SubscriptionHandler,
-> =
-  Effect.Effect.Success<Handler> extends infer Signal extends DependencySignal<
+export type InferSubscriptionHandlerConfig<H extends SubscriptionHandler> =
+  Effect.Effect.Success<H> extends infer Signal extends DependencySignal<
     unknown,
     unknown,
     unknown
@@ -72,10 +60,8 @@ export type InferSubscriptionHandlerConfig<
       : never
     : never;
 
-export type SubscriptionHandlerSignalContext<
-  Handler extends SubscriptionHandler,
-> =
-  Handler extends SubscriptionHandler<
+export type SubscriptionHandlerSignalContext<H extends SubscriptionHandler> =
+  H extends SubscriptionHandler<
     SubscriptionHandlerConfig,
     infer SignalR,
     unknown
@@ -83,10 +69,8 @@ export type SubscriptionHandlerSignalContext<
     ? SignalR
     : never;
 
-export type SubscriptionHandlerEffectContext<
-  Handler extends SubscriptionHandler,
-> =
-  Handler extends SubscriptionHandler<
+export type SubscriptionHandlerEffectContext<H extends SubscriptionHandler> =
+  H extends SubscriptionHandler<
     SubscriptionHandlerConfig,
     unknown,
     infer EffectR
@@ -94,76 +78,9 @@ export type SubscriptionHandlerEffectContext<
     ? EffectR
     : never;
 
-export type SubscriptionHandlerContext<Handler extends SubscriptionHandler> =
-  | SubscriptionHandlerSignalContext<Handler>
-  | SubscriptionHandlerEffectContext<Handler>;
-
-export type BasePartialSubscriptionHandlerContextConfig<
-  Config extends
-    Option.Option<SubscriptionHandlerConfig> = Option.Option<SubscriptionHandlerConfig>,
-  Handler extends Option.Option<
-    SubscriptionHandler<ValueExtends<Config, SubscriptionHandlerConfig>>
-  > = Option.Option<
-    SubscriptionHandler<ValueExtends<Config, SubscriptionHandlerConfig>>
-  >,
-> = {
-  config: Config;
-  handler: Handler;
-};
-
-export class PartialSubscriptionHandlerContextConfig<
-  const Config extends
-    Option.Option<SubscriptionHandlerConfig> = Option.Option<SubscriptionHandlerConfig>,
-  const Handler extends Option.Option<
-    SubscriptionHandler<ValueExtends<Config, SubscriptionHandlerConfig>>
-  > = Option.Option<
-    SubscriptionHandler<ValueExtends<Config, SubscriptionHandlerConfig>>
-  >,
-> extends Data.TaggedClass("PartialSubscriptionHandlerContextConfig")<{
-  data: BasePartialSubscriptionHandlerContextConfig<Config, Handler>;
-}> {}
-
-export type SubscriptionHandlerContextConfig<
-  Config extends SubscriptionHandlerConfig = SubscriptionHandlerConfig,
-  Handler extends SubscriptionHandler<Config> = SubscriptionHandler<Config>,
-> = PartialSubscriptionHandlerContextConfig<
-  Option.Some<Config>,
-  Option.Some<Handler>
->;
-
-export type SubscriptionConfigOption<
-  Config extends PartialSubscriptionHandlerContextConfig,
-> = Config["data"]["config"];
-export type SubscriptionConfigOrUndefined<
-  Config extends PartialSubscriptionHandlerContextConfig,
-> = GetOrUndefined<SubscriptionConfigOption<Config>>;
-
-export const subscriptionConfig = <
-  const Config extends PartialSubscriptionHandlerContextConfig,
->(
-  config: Config,
-) =>
-  pipe(
-    config.data.config,
-    getOrUndefined,
-  ) as SubscriptionConfigOrUndefined<Config>;
-
-export type SubscriptionHandlerOption<
-  Config extends PartialSubscriptionHandlerContextConfig,
-> = Config["data"]["handler"];
-export type SubscriptionHandlerOrUndefined<
-  Config extends PartialSubscriptionHandlerContextConfig,
-> = GetOrUndefined<SubscriptionHandlerOption<Config>>;
-
-export const subscriptionHandler = <
-  const Config extends PartialSubscriptionHandlerContextConfig,
->(
-  config: Config,
-) =>
-  pipe(
-    config.data.handler,
-    getOrUndefined,
-  ) as SubscriptionHandlerOrUndefined<Config>;
+export type SubscriptionHandlerContext<H extends SubscriptionHandler> =
+  | SubscriptionHandlerSignalContext<H>
+  | SubscriptionHandlerEffectContext<H>;
 
 export type MutationHandler<
   Config extends MutationHandlerConfig = MutationHandlerConfig,
@@ -179,8 +96,8 @@ export type MutationHandler<
   Scope.Scope | R
 >;
 
-export type InferMutationHandlerConfig<Handler extends MutationHandler> =
-  Effect.Effect.Success<Handler> extends infer T
+export type InferMutationHandlerConfig<H extends MutationHandler> =
+  Effect.Effect.Success<H> extends infer T
     ? T extends unknown
       ? MutationHandlerConfig<
           string,
@@ -195,69 +112,85 @@ export type InferMutationHandlerConfig<Handler extends MutationHandler> =
         >
     : never;
 
-export type MutationHandlerContext<Handler extends MutationHandler> =
-  Handler extends MutationHandler<MutationHandlerConfig, infer R> ? R : never;
+export type MutationHandlerContext<H extends MutationHandler> =
+  H extends MutationHandler<MutationHandlerConfig, infer R> ? R : never;
 
-export type BasePartialMutationHandlerContextConfig<
-  Config extends
-    Option.Option<MutationHandlerConfig> = Option.Option<MutationHandlerConfig>,
-  Handler extends Option.Option<
-    MutationHandler<ValueExtends<Config, MutationHandlerConfig>>
-  > = Option.Option<
-    MutationHandler<ValueExtends<Config, MutationHandlerConfig>>
-  >,
+export type Handler<Config extends HandlerConfig = HandlerConfig> =
+  Config extends SubscriptionHandlerConfig
+    ? SubscriptionHandler<Config>
+    : Config extends MutationHandlerConfig
+      ? MutationHandler<Config>
+      : never;
+
+export type InferHandlerConfig<H extends Handler = Handler> =
+  H extends SubscriptionHandler<SubscriptionHandlerConfig>
+    ? SubscriptionHandlerConfig
+    : H extends MutationHandler<MutationHandlerConfig>
+      ? MutationHandlerConfig
+      : never;
+
+export type HandlerContext<H extends Handler> = H extends SubscriptionHandler
+  ? SubscriptionHandlerContext<H>
+  : H extends MutationHandler
+    ? MutationHandlerContext<H>
+    : never;
+
+export type BasePartialHandlerContextConfig<
+  Config extends Option.Option<HandlerConfig> = Option.Option<HandlerConfig>,
+  H extends Option.Option<
+    Handler<ValueExtends<Config, HandlerConfig>>
+  > = Option.Option<Handler<ValueExtends<Config, HandlerConfig>>>,
 > = {
   config: Config;
-  handler: Handler;
+  handler: H;
 };
 
-export class PartialMutationHandlerContextConfig<
+export class PartialHandlerContextConfig<
   const Config extends
-    Option.Option<MutationHandlerConfig> = Option.Option<MutationHandlerConfig>,
-  const Handler extends Option.Option<
-    MutationHandler<ValueExtends<Config, MutationHandlerConfig>>
-  > = Option.Option<
-    MutationHandler<ValueExtends<Config, MutationHandlerConfig>>
-  >,
-> extends Data.TaggedClass("PartialMutationHandlerContextConfig")<{
-  data: BasePartialMutationHandlerContextConfig<Config, Handler>;
+    Option.Option<HandlerConfig> = Option.Option<HandlerConfig>,
+  const H extends Option.Option<
+    Handler<ValueExtends<Config, HandlerConfig>>
+  > = Option.Option<Handler<ValueExtends<Config, HandlerConfig>>>,
+> extends Data.TaggedClass("PartialHandlerContextConfig")<{
+  data: BasePartialHandlerContextConfig<Config, H>;
 }> {}
+
+export const empty = new PartialHandlerContextConfig({
+  data: {
+    config: none<HandlerConfig>(),
+    handler: none(),
+  },
+});
+
+export type SubscriptionHandlerContextConfig<
+  Config extends SubscriptionHandlerConfig = SubscriptionHandlerConfig,
+  H extends Handler<Config> = Handler<Config>,
+> = PartialHandlerContextConfig<Option.Some<Config>, Option.Some<H>>;
 
 export type MutationHandlerContextConfig<
   Config extends MutationHandlerConfig = MutationHandlerConfig,
-  Handler extends MutationHandler<Config> = MutationHandler<Config>,
-> = PartialMutationHandlerContextConfig<
-  Option.Some<Config>,
-  Option.Some<Handler>
->;
+  H extends Handler<Config> = Handler<Config>,
+> = PartialHandlerContextConfig<Option.Some<Config>, Option.Some<H>>;
 
-export type MutationConfigOption<
-  Config extends PartialMutationHandlerContextConfig,
-> = Config["data"]["config"];
-export type MutationConfigOrUndefined<
-  Config extends PartialMutationHandlerContextConfig,
-> = GetOrUndefined<MutationConfigOption<Config>>;
+export type HandlerContextConfig<
+  Config extends HandlerConfig = HandlerConfig,
+  H extends Handler<Config> = Handler<Config>,
+> = PartialHandlerContextConfig<Option.Some<Config>, Option.Some<H>>;
 
-export const mutationConfig = <
-  const Config extends PartialMutationHandlerContextConfig,
->(
+export type ConfigOption<Config extends PartialHandlerContextConfig> =
+  Config["data"]["config"];
+export type ConfigOrUndefined<Config extends PartialHandlerContextConfig> =
+  GetOrUndefined<ConfigOption<Config>>;
+
+export const config = <const Config extends PartialHandlerContextConfig>(
   config: Config,
-) =>
-  pipe(config.data.config, getOrUndefined) as MutationConfigOrUndefined<Config>;
+) => pipe(config.data.config, getOrUndefined) as ConfigOrUndefined<Config>;
 
-export type MutationHandlerOption<
-  Config extends PartialMutationHandlerContextConfig,
-> = Config["data"]["handler"];
-export type MutationHandlerOrUndefined<
-  Config extends PartialMutationHandlerContextConfig,
-> = GetOrUndefined<MutationHandlerOption<Config>>;
+export type HandlerOption<Config extends PartialHandlerContextConfig> =
+  Config["data"]["handler"];
+export type HandlerOrUndefined<Config extends PartialHandlerContextConfig> =
+  GetOrUndefined<HandlerOption<Config>>;
 
-export const mutationHandler = <
-  const Config extends PartialMutationHandlerContextConfig,
->(
+export const handler = <const Config extends PartialHandlerContextConfig>(
   config: Config,
-) =>
-  pipe(
-    config.data.handler,
-    getOrUndefined,
-  ) as MutationHandlerOrUndefined<Config>;
+) => pipe(config.data.handler, getOrUndefined) as HandlerOrUndefined<Config>;
