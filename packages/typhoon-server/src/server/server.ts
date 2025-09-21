@@ -27,9 +27,8 @@ import { HandlerConfig, HandlerContextConfig } from "typhoon-core/config";
 import {
   Header,
   HeaderEncoderDecoder,
-  MsgpackDecodeError,
-  MsgpackEncoderDecoder,
-  StreamExhaustedError,
+  Msgpack,
+  Stream,
 } from "typhoon-core/protocol";
 import { Server as BaseServer } from "typhoon-core/server";
 import { Computed, OnceObserver, SideEffect } from "typhoon-core/signal";
@@ -526,10 +525,10 @@ const getComputedSubscriptionResultEncoded = <R = never>(
             HeaderEncoderDecoder.encode(result.header),
           ),
           Effect.bind("headerEncoded", ({ header }) =>
-            MsgpackEncoderDecoder.encode(header),
+            Msgpack.Encoder.encode(header),
           ),
           Effect.bind("messageEncoded", ({ result }) =>
-            MsgpackEncoderDecoder.encode(result.message),
+            Msgpack.Encoder.encode(result.message),
           ),
           Effect.let("updateBuffer", ({ headerEncoded, messageEncoded }) => {
             const updateBuffer = new Uint8Array(
@@ -572,10 +571,10 @@ const getMutationResultEncoded = <R = never>(
       HeaderEncoderDecoder.encode(result.header),
     ),
     Effect.bind("headerEncoded", ({ header }) =>
-      MsgpackEncoderDecoder.encode(header),
+      Msgpack.Encoder.encode(header),
     ),
     Effect.bind("messageEncoded", ({ result }) =>
-      MsgpackEncoderDecoder.encode(result.message),
+      Msgpack.Encoder.encode(result.message),
     ),
     Effect.let("updateBuffer", ({ headerEncoded, messageEncoded }) => {
       const updateBuffer = new Uint8Array(
@@ -599,9 +598,9 @@ const getMutationResultEncoded = <R = never>(
 const handleSubscribe =
   (
     peer: Peer,
-    pullDecodedStream: Effect.Effect<
+    pullStream: Effect.Effect<
       unknown,
-      MsgpackDecodeError | StreamExhaustedError,
+      Msgpack.Decoder.MsgpackDecodeError | Stream.StreamExhaustedError,
       never
     >,
     header: Header<"client:subscribe">,
@@ -618,7 +617,7 @@ const handleSubscribe =
               onSome: ({ event, effectCleanup }) =>
                 pipe(
                   replacePullStream({
-                    stream: pullDecodedStream,
+                    stream: pullStream,
                     scope,
                   }),
                   Effect.map((event) => ({
@@ -635,7 +634,7 @@ const handleSubscribe =
                     fromEventContext({
                       request: peer.request,
                       pullStream: {
-                        stream: pullDecodedStream,
+                        stream: pullStream,
                         scope,
                       },
                       token: pipe(
@@ -770,9 +769,9 @@ const handleUnsubscribe =
 
 const handleOnce =
   <A, E = never>(
-    pullDecodedStream: Effect.Effect<
+    pullStream: Effect.Effect<
       unknown,
-      MsgpackDecodeError | StreamExhaustedError,
+      Msgpack.Decoder.MsgpackDecodeError | Stream.StreamExhaustedError,
       never
     >,
     request: Request,
@@ -788,7 +787,7 @@ const handleOnce =
         fromEventContext({
           request,
           pullStream: {
-            stream: pullDecodedStream,
+            stream: pullStream,
             scope,
           },
           token: pipe(
@@ -871,9 +870,9 @@ const handleOnce =
 
 const handleMutate =
   <A, E = never>(
-    pullDecodedStream: Effect.Effect<
+    pullStream: Effect.Effect<
       unknown,
-      MsgpackDecodeError | StreamExhaustedError,
+      Msgpack.Decoder.MsgpackDecodeError | Stream.StreamExhaustedError,
       never
     >,
     request: Request,
@@ -889,7 +888,7 @@ const handleMutate =
         fromEventContext({
           request,
           pullStream: {
-            stream: pullDecodedStream,
+            stream: pullStream,
             scope,
           },
           token: pipe(
@@ -959,19 +958,20 @@ const handleWebSocketMessage =
       Effect.Do,
       Effect.bind("scope", () => Scope.make()),
       Effect.let("blob", () => message.blob()),
-      Effect.bind("pullDecodedStream", ({ scope, blob }) =>
+      Effect.bind("pullStream", ({ scope, blob }) =>
         pipe(
-          MsgpackEncoderDecoder.blobToPullDecodedStream(blob),
+          Msgpack.Decoder.blobToStream(blob),
+          Stream.toPullStream,
           Scope.extend(scope),
         ),
       ),
-      Effect.bind("header", ({ pullDecodedStream }) =>
+      Effect.bind("header", ({ pullStream }) =>
         pipe(
-          HeaderEncoderDecoder.decodeUnknownEffect(pullDecodedStream),
+          HeaderEncoderDecoder.decodeUnknownEffect(pullStream),
           Effect.either,
         ),
       ),
-      Effect.flatMap(({ pullDecodedStream, header, scope }) =>
+      Effect.flatMap(({ pullStream, header, scope }) =>
         pipe(
           header,
           Either.match({
@@ -980,19 +980,14 @@ const handleWebSocketMessage =
               pipe(
                 Match.value(header),
                 Match.when({ action: "client:subscribe" }, (header) =>
-                  handleSubscribe(
-                    peer,
-                    pullDecodedStream,
-                    header,
-                    scope,
-                  )(server),
+                  handleSubscribe(peer, pullStream, header, scope)(server),
                 ),
                 Match.when({ action: "client:unsubscribe" }, (header) =>
                   handleUnsubscribe(peer, header)(server),
                 ),
                 Match.when({ action: "client:once" }, (header) =>
                   handleOnce(
-                    pullDecodedStream,
+                    pullStream,
                     peer.request,
                     header,
                     (buffer) =>
@@ -1006,7 +1001,7 @@ const handleWebSocketMessage =
                 ),
                 Match.when({ action: "client:mutate" }, (header) =>
                   handleMutate(
-                    pullDecodedStream,
+                    pullStream,
                     peer.request,
                     header,
                     (buffer) =>
@@ -1035,19 +1030,20 @@ const handleProtocolWebRequest =
       Effect.Do,
       Effect.bind("scope", () => Scope.make()),
       Effect.bind("blob", () => Effect.promise(() => request.blob())),
-      Effect.bind("pullDecodedStream", ({ blob, scope }) =>
+      Effect.bind("pullStream", ({ blob, scope }) =>
         pipe(
-          MsgpackEncoderDecoder.blobToPullDecodedStream(blob),
+          Msgpack.Decoder.blobToStream(blob),
+          Stream.toPullStream,
           Scope.extend(scope),
         ),
       ),
-      Effect.bind("header", ({ pullDecodedStream }) =>
+      Effect.bind("header", ({ pullStream }) =>
         pipe(
-          HeaderEncoderDecoder.decodeUnknownEffect(pullDecodedStream),
+          HeaderEncoderDecoder.decodeUnknownEffect(pullStream),
           Effect.either,
         ),
       ),
-      Effect.flatMap(({ pullDecodedStream, header, scope }) =>
+      Effect.flatMap(({ pullStream, header, scope }) =>
         pipe(
           header,
           Either.match({
@@ -1066,7 +1062,7 @@ const handleProtocolWebRequest =
                 Match.value(header),
                 Match.when({ action: "client:once" }, (header) =>
                   handleOnce(
-                    pullDecodedStream,
+                    pullStream,
                     request,
                     header,
                     (buffer) =>
@@ -1084,7 +1080,7 @@ const handleProtocolWebRequest =
                 ),
                 Match.when({ action: "client:mutate" }, (header) =>
                   handleMutate(
-                    pullDecodedStream,
+                    pullStream,
                     request,
                     header,
                     (buffer) =>
