@@ -8,10 +8,7 @@ import {
   SynchronizedRef,
 } from "effect";
 import { HandlerConfig } from "typhoon-core/config";
-import {
-  MsgpackDecodeError,
-  StreamExhaustedError,
-} from "typhoon-core/protocol";
+import { Msgpack, Stream } from "typhoon-core/protocol";
 import { Computed, Signal } from "typhoon-core/signal";
 import { validate } from "typhoon-core/validator";
 
@@ -22,7 +19,7 @@ const pullStreamToParsed =
   (
     pullStream: Effect.Effect<
       unknown,
-      MsgpackDecodeError | StreamExhaustedError,
+      Msgpack.Decoder.MsgpackDecodeError | Stream.StreamExhaustedError,
       never
     >,
   ) =>
@@ -39,7 +36,7 @@ type EventContext = {
   pullStream: {
     stream: Effect.Effect<
       unknown,
-      MsgpackDecodeError | StreamExhaustedError,
+      Msgpack.Decoder.MsgpackDecodeError | Stream.StreamExhaustedError,
       never
     >;
     scope: Scope.CloseableScope;
@@ -55,7 +52,7 @@ export class Event extends Context.Tag("Event")<
       Readonly<{
         stream: Effect.Effect<
           unknown,
-          MsgpackDecodeError | StreamExhaustedError,
+          Msgpack.Decoder.MsgpackDecodeError | Stream.StreamExhaustedError,
           never
         >;
         scope: Scope.CloseableScope;
@@ -95,7 +92,7 @@ export const replacePullStream = ({
 }: {
   stream: Effect.Effect<
     unknown,
-    MsgpackDecodeError | StreamExhaustedError,
+    Msgpack.Decoder.MsgpackDecodeError | Stream.StreamExhaustedError,
     never
   >;
   scope: Scope.CloseableScope;
