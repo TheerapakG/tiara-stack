@@ -1,10 +1,7 @@
 import { StandardSchemaV1 } from "@standard-schema/spec";
 import { Data, Effect, HashMap, Option, pipe, SynchronizedRef } from "effect";
 import { HandlerConfig } from "typhoon-core/config";
-import {
-  HeaderEncoderDecoder,
-  MsgpackEncoderDecoder,
-} from "typhoon-core/protocol";
+import { HeaderEncoderDecoder, Msgpack, Stream } from "typhoon-core/protocol";
 import { validate } from "typhoon-core/validator";
 import * as v from "valibot";
 
@@ -120,9 +117,9 @@ export class AppsScriptClient<
         }),
       ),
       Effect.bind("requestHeaderEncoded", ({ requestHeader }) =>
-        MsgpackEncoderDecoder.encode(requestHeader),
+        Msgpack.Encoder.encode(requestHeader),
       ),
-      Effect.bind("dataEncoded", () => MsgpackEncoderDecoder.encode(data)),
+      Effect.bind("dataEncoded", () => Msgpack.Encoder.encode(data)),
       Effect.let("requestBuffer", ({ requestHeaderEncoded, dataEncoded }) => {
         const requestBuffer = new Uint8Array(
           requestHeaderEncoded.length + dataEncoded.length,
@@ -142,21 +139,18 @@ export class AppsScriptClient<
         "bytes",
         ({ response }) => new Uint8Array(response.getBlob().getBytes()),
       ),
-      Effect.bind("pullDecodedStream", ({ bytes }) =>
-        MsgpackEncoderDecoder.bytesToPullDecodedStream(bytes),
+      Effect.bind("pullStream", ({ bytes }) =>
+        pipe(Msgpack.Decoder.bytesToStream(bytes), Stream.toPullStream),
       ),
-      Effect.bind("header", ({ pullDecodedStream }) =>
+      Effect.bind("header", ({ pullStream }) =>
         pipe(
-          pullDecodedStream,
+          pullStream,
           Effect.flatMap(validate(v.array(v.tuple([v.number(), v.unknown()])))),
           Effect.flatMap(HeaderEncoderDecoder.decode),
         ),
       ),
       // TODO: check if the response is a valid header
-      Effect.bind(
-        "decodedResponse",
-        ({ pullDecodedStream }) => pullDecodedStream,
-      ),
+      Effect.bind("decodedResponse", ({ pullStream }) => pullStream),
       Effect.bind("config", () =>
         HashMap.get(client.configGroup.subscriptionHandlerMap, handler),
       ),
