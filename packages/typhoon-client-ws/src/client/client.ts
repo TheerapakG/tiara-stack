@@ -17,7 +17,8 @@ import { HandlerConfig } from "typhoon-core/config";
 import {
   Header,
   HeaderEncoderDecoder,
-  MsgpackEncoderDecoder,
+  Msgpack,
+  Stream,
 } from "typhoon-core/protocol";
 import { DependencySignal, Signal } from "typhoon-core/signal";
 import { validate, Validator } from "typhoon-core/validator";
@@ -213,12 +214,15 @@ export class WebSocketClient<
                 pipe(
                   Effect.Do,
                   Effect.let("data", () => event.data as Blob),
-                  Effect.bind("pullDecodedStream", ({ data }) =>
-                    MsgpackEncoderDecoder.blobToPullDecodedStream(data),
-                  ),
-                  Effect.bind("header", ({ pullDecodedStream }) =>
+                  Effect.bind("pullStream", ({ data }) =>
                     pipe(
-                      pullDecodedStream,
+                      Msgpack.Decoder.blobToStream(data),
+                      Stream.toPullStream,
+                    ),
+                  ),
+                  Effect.bind("header", ({ pullStream }) =>
+                    pipe(
+                      pullStream,
                       Effect.flatMap(
                         validate(v.array(v.tuple([v.number(), v.unknown()]))),
                       ),
@@ -227,7 +231,7 @@ export class WebSocketClient<
                   ),
                   Effect.bind(
                     "decodedResponse",
-                    ({ pullDecodedStream }) => pullDecodedStream,
+                    ({ pullStream }) => pullStream,
                   ),
                   Effect.tap(({ header, decodedResponse }) =>
                     pipe(
@@ -422,9 +426,9 @@ export class WebSocketClient<
         }),
       ),
       Effect.bind("requestHeaderEncoded", ({ requestHeader }) =>
-        MsgpackEncoderDecoder.encode(requestHeader),
+        Msgpack.Encoder.encode(requestHeader),
       ),
-      Effect.bind("dataEncoded", () => MsgpackEncoderDecoder.encode(data)),
+      Effect.bind("dataEncoded", () => Msgpack.Encoder.encode(data)),
       Effect.let("requestBuffer", ({ requestHeaderEncoded, dataEncoded }) => {
         const requestBuffer = new Uint8Array(
           requestHeaderEncoded.length + dataEncoded.length,
@@ -494,7 +498,7 @@ export class WebSocketClient<
         }),
       ),
       Effect.bind("headerEncoded", ({ header }) =>
-        MsgpackEncoderDecoder.encode(header),
+        Msgpack.Encoder.encode(header),
       ),
       Effect.bind("ws", () => client.ws),
       Effect.tap(({ ws, headerEncoded }) =>
@@ -601,9 +605,9 @@ export class WebSocketClient<
         }),
       ),
       Effect.bind("requestHeaderEncoded", ({ requestHeader }) =>
-        MsgpackEncoderDecoder.encode(requestHeader),
+        Msgpack.Encoder.encode(requestHeader),
       ),
-      Effect.bind("dataEncoded", () => MsgpackEncoderDecoder.encode(data)),
+      Effect.bind("dataEncoded", () => Msgpack.Encoder.encode(data)),
       Effect.let("requestBuffer", ({ requestHeaderEncoded, dataEncoded }) => {
         const requestBuffer = new Uint8Array(
           requestHeaderEncoded.length + dataEncoded.length,
@@ -709,9 +713,9 @@ export class WebSocketClient<
         }),
       ),
       Effect.bind("requestHeaderEncoded", ({ requestHeader }) =>
-        MsgpackEncoderDecoder.encode(requestHeader),
+        Msgpack.Encoder.encode(requestHeader),
       ),
-      Effect.bind("dataEncoded", () => MsgpackEncoderDecoder.encode(data)),
+      Effect.bind("dataEncoded", () => Msgpack.Encoder.encode(data)),
       Effect.let("requestBuffer", ({ requestHeaderEncoded, dataEncoded }) => {
         const requestBuffer = new Uint8Array(
           requestHeaderEncoded.length + dataEncoded.length,
