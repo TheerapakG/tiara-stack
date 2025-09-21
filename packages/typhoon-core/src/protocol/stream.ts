@@ -13,7 +13,7 @@ export class StreamExhaustedError extends Data.TaggedError(
   "StreamExhaustedError",
 ) {}
 
-export const streamToPullDecodedStream = <A, E, R>(
+export const toPullStream = <A, E, R>(
   stream: Stream.Stream<A, E, R>,
 ): Effect.Effect<
   Effect.Effect<A, StreamExhaustedError | E, R>,
@@ -23,12 +23,12 @@ export const streamToPullDecodedStream = <A, E, R>(
   pipe(
     Effect.Do,
     Effect.bind("scope", () => Effect.scope),
-    Effect.bind("pullDecodedStream", ({ scope }) =>
+    Effect.bind("pullStream", ({ scope }) =>
       pipe(stream, Stream.rechunk(1), Stream.toPull, Scope.extend(scope)),
     ),
-    Effect.map(({ pullDecodedStream }) =>
+    Effect.map(({ pullStream }) =>
       pipe(
-        pullDecodedStream,
+        pullStream,
         Effect.map(Chunk.get(0)),
         Effect.mapError(
           Option.match({
@@ -44,5 +44,5 @@ export const streamToPullDecodedStream = <A, E, R>(
         ),
       ),
     ),
-    Effect.withSpan("decodedStreamToPullDecodedStream"),
+    Effect.withSpan("Stream.toPullStream"),
   );
