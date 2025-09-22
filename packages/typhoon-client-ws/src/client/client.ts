@@ -10,19 +10,14 @@ import {
   Order,
   pipe,
   Schedule,
+  Schema,
   String,
   SynchronizedRef,
 } from "effect";
 import { HandlerConfig } from "typhoon-core/config";
-import {
-  Header,
-  HeaderEncoderDecoder,
-  Msgpack,
-  Stream,
-} from "typhoon-core/protocol";
+import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { DependencySignal, Signal } from "typhoon-core/signal";
-import { validate, Validator } from "typhoon-core/validator";
-import * as v from "valibot";
+import { Validate, Validator } from "typhoon-core/validator";
 
 const WebSocketCtor = globalThis.WebSocket;
 
@@ -147,7 +142,7 @@ export class WebSocketClient<
       );
   }
 
-  static handleUpdate(header: Header, decodedResponse: unknown) {
+  static handleUpdate(header: Header.Header, decodedResponse: unknown) {
     return (
       client: WebSocketClient<
         Record<string, HandlerConfig.SubscriptionHandlerConfig>,
@@ -224,9 +219,10 @@ export class WebSocketClient<
                     pipe(
                       pullStream,
                       Effect.flatMap(
-                        validate(v.array(v.tuple([v.number(), v.unknown()]))),
+                        Validate.validate(
+                          pipe(Header.HeaderSchema, Schema.standardSchemaV1),
+                        ),
                       ),
-                      Effect.flatMap(HeaderEncoderDecoder.decode),
                     ),
                   ),
                   Effect.bind(
@@ -389,7 +385,7 @@ export class WebSocketClient<
                           ),
                         ),
                         Effect.flatMap(({ value, config }) =>
-                          validate(
+                          Validate.validate(
                             HandlerConfig.resolveResponseValidator(
                               HandlerConfig.response(
                                 config as SubscriptionHandlerConfigs[Handler],
@@ -414,7 +410,7 @@ export class WebSocketClient<
       ),
       Effect.bind("token", () => client.token),
       Effect.bind("requestHeader", ({ id, token }) =>
-        HeaderEncoderDecoder.encode({
+        Schema.encode(Header.HeaderSchema)({
           protocol: "typh",
           version: 1,
           id,
@@ -487,7 +483,7 @@ export class WebSocketClient<
       Effect.Do,
       Effect.tap(() => pipe(client, WebSocketClient.removeUpdater(id))),
       Effect.bind("header", () =>
-        HeaderEncoderDecoder.encode({
+        Schema.encode(Header.HeaderSchema)({
           protocol: "typh",
           version: 1,
           id,
@@ -568,7 +564,7 @@ export class WebSocketClient<
                     ),
                   ),
                   Effect.flatMap(({ value, config }) =>
-                    validate(
+                    Validate.validate(
                       HandlerConfig.resolveResponseValidator(
                         HandlerConfig.response(
                           config as SubscriptionHandlerConfigs[Handler],
@@ -593,7 +589,7 @@ export class WebSocketClient<
       ),
       Effect.bind("token", () => client.token),
       Effect.bind("requestHeader", ({ id, token }) =>
-        HeaderEncoderDecoder.encode({
+        Schema.encode(Header.HeaderSchema)({
           protocol: "typh",
           version: 1,
           id,
@@ -676,7 +672,7 @@ export class WebSocketClient<
                     HashMap.get(client.configGroup.mutationHandlerMap, handler),
                   ),
                   Effect.flatMap(({ value, config }) =>
-                    validate(
+                    Validate.validate(
                       HandlerConfig.resolveResponseValidator(
                         HandlerConfig.response(
                           config as MutationHandlerConfigs[Handler],
@@ -701,7 +697,7 @@ export class WebSocketClient<
       ),
       Effect.bind("token", () => client.token),
       Effect.bind("requestHeader", ({ id, token }) =>
-        HeaderEncoderDecoder.encode({
+        Schema.encode(Header.HeaderSchema)({
           protocol: "typh",
           version: 1,
           id,

@@ -4,7 +4,7 @@ import {
   DiscordjsTypeError,
 } from "discord.js";
 import { Cause, Data, Effect, Function, pipe, Schema } from "effect";
-import { validate } from "typhoon-core/validator";
+import { Validate } from "typhoon-core/validator";
 
 export type Constructor<Instance> = abstract new (...args: never[]) => Instance;
 
@@ -21,7 +21,7 @@ export class DiscordError extends Data.TaggedError("DiscordError")<{
   static fromUnknownException = (cause: Cause.UnknownException) => {
     return pipe(
       cause.error,
-      validate(
+      Validate.validate(
         pipe(
           Schema.Union(
             Schema.instanceOf(
