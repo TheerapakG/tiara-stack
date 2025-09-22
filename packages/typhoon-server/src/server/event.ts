@@ -10,7 +10,7 @@ import {
 import { HandlerConfig } from "typhoon-core/config";
 import { Msgpack, Stream } from "typhoon-core/protocol";
 import { Computed, Signal } from "typhoon-core/signal";
-import { validate } from "typhoon-core/validator";
+import { Validate } from "typhoon-core/validator";
 
 const pullStreamToParsed =
   <const RequestParams extends HandlerConfig.RequestParamsConfig | undefined>(
@@ -26,7 +26,9 @@ const pullStreamToParsed =
     pipe(
       pullStream,
       Effect.flatMap(
-        validate(HandlerConfig.resolveRequestParamsValidator(requestParams)),
+        Validate.validate(
+          HandlerConfig.resolveRequestParamsValidator(requestParams),
+        ),
       ),
     );
 

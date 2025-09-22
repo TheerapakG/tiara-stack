@@ -1,13 +1,13 @@
 import { loadConfig } from "c12";
 import { REST, Routes } from "discord.js";
 import { Chunk, Effect, pipe, Schema, Stream } from "effect";
-import { validate } from "typhoon-core/validator";
+import { Validate } from "typhoon-core/validator";
 import { commands } from "./commands/chatInputCommands";
 import { InteractionHandlerMap } from "./types/handler";
 
 await loadConfig({ dotenv: true });
 
-const envValidator = validate(
+const envValidator = Validate.validate(
   pipe(
     Schema.Struct({
       DISCORD_TOKEN: Schema.String,

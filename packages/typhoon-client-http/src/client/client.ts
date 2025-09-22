@@ -1,10 +1,17 @@
 import { StandardSchemaV1 } from "@standard-schema/spec";
-import { Data, Effect, HashMap, Option, pipe, SynchronizedRef } from "effect";
+import {
+  Data,
+  Effect,
+  HashMap,
+  Option,
+  pipe,
+  Schema,
+  SynchronizedRef,
+} from "effect";
 import { ofetch } from "ofetch";
 import { HandlerConfig } from "typhoon-core/config";
-import { HeaderEncoderDecoder, Msgpack, Stream } from "typhoon-core/protocol";
-import { validate } from "typhoon-core/validator";
-import * as v from "valibot";
+import { Header, Msgpack, Stream } from "typhoon-core/protocol";
+import { Validate } from "typhoon-core/validator";
 
 export class HandlerError extends Data.TaggedError("HandlerError") {}
 
@@ -107,7 +114,7 @@ export class HttpClient<
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("token", () => client.token),
       Effect.bind("requestHeader", ({ id, token }) =>
-        HeaderEncoderDecoder.encode({
+        Schema.encode(Header.HeaderSchema)({
           protocol: "typh",
           version: 1,
           id,
@@ -145,8 +152,11 @@ export class HttpClient<
       Effect.bind("header", ({ pullStream }) =>
         pipe(
           pullStream,
-          Effect.flatMap(validate(v.array(v.tuple([v.number(), v.unknown()])))),
-          Effect.flatMap(HeaderEncoderDecoder.decode),
+          Effect.flatMap(
+            Validate.validate(
+              pipe(Header.HeaderSchema, Schema.standardSchemaV1),
+            ),
+          ),
         ),
       ),
       // TODO: check if the response is a valid header
@@ -158,7 +168,7 @@ export class HttpClient<
         header.action === "server:update" && header.payload.success
           ? pipe(
               decodedResponse,
-              validate(
+              Validate.validate(
                 HandlerConfig.resolveResponseValidator(
                   HandlerConfig.response(
                     config as SubscriptionHandlerConfigs[Handler],

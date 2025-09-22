@@ -18,20 +18,17 @@ import {
   Metric,
   Option,
   pipe,
+  Schema,
   Scope,
   String,
   Struct,
   SynchronizedRef,
 } from "effect";
 import { HandlerConfig, HandlerContextConfig } from "typhoon-core/config";
-import {
-  Header,
-  HeaderEncoderDecoder,
-  Msgpack,
-  Stream,
-} from "typhoon-core/protocol";
+import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { Server as BaseServer } from "typhoon-core/server";
 import { Computed, OnceObserver, SideEffect } from "typhoon-core/signal";
+import { Validate } from "typhoon-core/validator";
 import { parseURL, withoutTrailingSlash } from "ufo";
 import {
   close as closeEvent,
@@ -358,7 +355,7 @@ const getComputedSubscriptionResult = <R = never>(
 ): Effect.Effect<
   Computed.Computed<
     {
-      header: Header<"server:update">;
+      header: Header.Header<"server:update">;
       message: unknown;
     },
     never,
@@ -445,7 +442,7 @@ const getMutationResult = <R = never>(
   >,
 ): Effect.Effect<
   {
-    header: Header<"server:update">;
+    header: Header.Header<"server:update">;
     message: unknown;
   },
   unknown,
@@ -522,7 +519,7 @@ const getComputedSubscriptionResultEncoded = <R = never>(
           Effect.Do,
           Effect.bind("result", () => computedResult),
           Effect.bind("header", ({ result }) =>
-            HeaderEncoderDecoder.encode(result.header),
+            Schema.encode(Header.HeaderSchema)(result.header),
           ),
           Effect.bind("headerEncoded", ({ header }) =>
             Msgpack.Encoder.encode(header),
@@ -568,7 +565,7 @@ const getMutationResultEncoded = <R = never>(
       getMutationResult(mutationId, mutationHandlerContextConfig),
     ),
     Effect.bind("header", ({ result }) =>
-      HeaderEncoderDecoder.encode(result.header),
+      Schema.encode(Header.HeaderSchema)(result.header),
     ),
     Effect.bind("headerEncoded", ({ header }) =>
       Msgpack.Encoder.encode(header),
@@ -603,7 +600,7 @@ const handleSubscribe =
       Msgpack.Decoder.MsgpackDecodeError | Stream.StreamExhaustedError,
       never
     >,
-    header: Header<"client:subscribe">,
+    header: Header.Header<"client:subscribe">,
     scope: Scope.CloseableScope,
   ) =>
   <R = never>(server: Server<R>) =>
@@ -739,7 +736,7 @@ const handleSubscribe =
     );
 
 const handleUnsubscribe =
-  (peer: Peer, header: Header<"client:unsubscribe">) =>
+  (peer: Peer, header: Header.Header<"client:unsubscribe">) =>
   <R = never>(server: Server<R>) =>
     pipe(
       server.unsubscribeTotal(Effect.succeed(BigInt(1))),
@@ -775,7 +772,7 @@ const handleOnce =
       never
     >,
     request: Request,
-    header: Header<"client:once">,
+    header: Header.Header<"client:once">,
     callback: (buffer: Uint8Array) => Effect.Effect<A, E, Event>,
     scope: Scope.CloseableScope,
   ) =>
@@ -876,7 +873,7 @@ const handleMutate =
       never
     >,
     request: Request,
-    header: Header<"client:mutate">,
+    header: Header.Header<"client:mutate">,
     callback: (buffer: Uint8Array) => Effect.Effect<A, E, Event>,
     scope: Scope.CloseableScope,
   ) =>
@@ -967,7 +964,12 @@ const handleWebSocketMessage =
       ),
       Effect.bind("header", ({ pullStream }) =>
         pipe(
-          HeaderEncoderDecoder.decodeUnknownEffect(pullStream),
+          pullStream,
+          Effect.flatMap(
+            Validate.validate(
+              pipe(Header.HeaderSchema, Schema.standardSchemaV1),
+            ),
+          ),
           Effect.either,
         ),
       ),
@@ -1039,7 +1041,12 @@ const handleProtocolWebRequest =
       ),
       Effect.bind("header", ({ pullStream }) =>
         pipe(
-          HeaderEncoderDecoder.decodeUnknownEffect(pullStream),
+          pullStream,
+          Effect.flatMap(
+            Validate.validate(
+              pipe(Header.HeaderSchema, Schema.standardSchemaV1),
+            ),
+          ),
           Effect.either,
         ),
       ),

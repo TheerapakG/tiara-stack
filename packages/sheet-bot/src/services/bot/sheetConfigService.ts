@@ -14,7 +14,7 @@ import {
   String,
 } from "effect";
 import { Array as ArrayUtils } from "typhoon-core/utils";
-import { validate, validateOption } from "typhoon-core/validator";
+import { Validate } from "typhoon-core/validator";
 
 const parseValueRange = <A = never, E = never, R = never>(
   valueRange: sheets_v4.Schema$ValueRange,
@@ -72,7 +72,9 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -88,7 +90,7 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(
+            Validate.validateOption(
               pipe(Schema.NumberFromString, Schema.standardSchemaV1),
             ),
           ),
@@ -101,7 +103,9 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -117,7 +121,9 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -133,7 +139,9 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -149,7 +157,9 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -165,7 +175,9 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -181,7 +193,9 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -197,7 +211,9 @@ const dayConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -358,7 +374,9 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -374,7 +392,9 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -390,7 +410,9 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -406,7 +428,9 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -422,7 +446,9 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -438,7 +464,9 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -454,7 +482,9 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -470,7 +500,7 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(
+            Validate.validateOption(
               pipe(
                 Schema.Literal("constants", "ranges"),
                 Schema.standardSchemaV1,
@@ -491,7 +521,9 @@ const teamConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -667,7 +699,9 @@ const runnerConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -683,7 +717,9 @@ const runnerConfigParser = ([
           Array.get(arr, 0),
           Option.flatten,
           Effect.transposeMapOption(
-            validateOption(pipe(Schema.String, Schema.standardSchemaV1)),
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
           ),
           Effect.map(Option.flatten),
           Effect.map(
@@ -748,7 +784,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
               ),
             ),
             Effect.flatMap(
-              validate(
+              Validate.validate(
                 pipe(
                   Schema.Struct({
                     "User IDs": Schema.String,
@@ -819,7 +855,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
               ),
             ),
             Effect.flatMap(
-              validate(
+              Validate.validate(
                 pipe(
                   Schema.Struct({
                     "Start Time": Schema.NumberFromString,

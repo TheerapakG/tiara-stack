@@ -1,7 +1,7 @@
 import { Effect, HashMap, pipe } from "effect";
 import { serverHandlerConfigGroup } from "sheet-apis";
 import { AppsScriptClient } from "typhoon-client-apps-script/client";
-import { validate } from "typhoon-core/validator";
+import { Validate } from "typhoon-core/validator";
 import * as v from "valibot";
 
 function getClient(url: string) {
@@ -42,7 +42,7 @@ function parsePlayerTeam([
   bp,
   percent,
 ]: CellValue[]) {
-  return validate(playerTeamValidator)({
+  return Validate.validate(playerTeamValidator)({
     type,
     tagStr,
     player,
@@ -73,7 +73,9 @@ export function THEECALC(
       Effect.bind("config", () =>
         pipe(
           config,
-          validate(v.array(v.tuple([cellValueValidator, cellValueValidator]))),
+          Validate.validate(
+            v.array(v.tuple([cellValueValidator, cellValueValidator])),
+          ),
           Effect.map(HashMap.fromIterable),
           Effect.flatMap((config) =>
             pipe(
@@ -86,7 +88,7 @@ export function THEECALC(
               ),
             ),
           ),
-          Effect.flatMap(validate(configValidator)),
+          Effect.flatMap(Validate.validate(configValidator)),
         ),
       ),
       Effect.bind("players", () =>
