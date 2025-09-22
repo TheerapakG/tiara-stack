@@ -23,7 +23,6 @@
   },
   "peerDependencies": {
     "effect": "^3.17.13",
-    "valibot": "^1.1.0",
     "typhoon-core": "workspace:*"
   },
   "devDependencies": {
