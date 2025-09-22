@@ -1,3 +1,3 @@
-export * from "./header";
+export * as Header from "./header";
 export * as Msgpack from "./msgpack";
 export * as Stream from "./stream";

@@ -27,5 +27,5 @@ export default defineConfig({
     },
   ],
   plugins: [del({ targets: "dist" }), dts()],
-  external: [...builtinModules, /^node:/, "effect", "valibot"],
+  external: [...builtinModules, /^node:/, "effect"],
 });
