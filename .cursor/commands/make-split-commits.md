@@ -8,7 +8,7 @@ Evaluate what changes has been done within the repository, and commit them. The 
 
 1. **Explore the Changes**
 
-   - Use `git status -s` to list files that got changed in the working directory, and their statuses. The information of the output is as outlined in the "Git Status Short Format" in the "References" section.
+   - Use `git status -s` to list files that got changed in the working directory, both tracked and untracked, and their statuses. The information of the output is as outlined in the "Git Status Short Format" in the "References" section.
    - If there is any staged file, run `git restore --staged .` to unstage all the changes and redo `git status -s` to get the updated file and status list.
    - Use `git -P diff` to view the diff of all tracked files.
    - For every untracked file creation, use your tool to read the file content.
