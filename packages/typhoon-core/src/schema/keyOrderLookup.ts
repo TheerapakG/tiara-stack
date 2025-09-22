@@ -1,0 +1,90 @@
+import { Array, HashMap, Option, ParseResult, pipe, Schema } from "effect";
+
+export const KeyOrderLookupSchema = <
+  Key extends string | number | symbol,
+  Fields extends { readonly [x in Key]: Schema.Struct.Field },
+>(
+  keys: ReadonlyArray<Key>,
+  fields: Fields,
+) => {
+  const reverseLookup = pipe(
+    keys,
+    Array.map((key, index) => [key as string, index] as const),
+    HashMap.fromIterable,
+  );
+
+  const StructSchema = Schema.Struct(fields);
+
+  return pipe(
+    Schema.Array(Schema.Tuple(Schema.Number, Schema.Unknown)),
+    Schema.transformOrFail(StructSchema, {
+      strict: true,
+      decode: (tuples, _, ast) => {
+        const [issues, keyValuePairs] = pipe(
+          tuples,
+          Array.map(([index, value]) =>
+            pipe(
+              Array.get(keys, index),
+              Option.match({
+                onSome: (key) =>
+                  ParseResult.succeed([key, value] as [Key, unknown]),
+                onNone: () =>
+                  ParseResult.fail(
+                    new ParseResult.Unexpected(
+                      index,
+                      `Index ${index} not found in keys array`,
+                    ),
+                  ),
+              }),
+            ),
+          ),
+          Array.separate,
+        );
+
+        return pipe(
+          issues,
+          Array.match({
+            onNonEmpty: (issues) =>
+              ParseResult.fail(new ParseResult.Composite(ast, tuples, issues)),
+            onEmpty: () =>
+              pipe(
+                keyValuePairs,
+                Object.fromEntries,
+                ParseResult.decodeUnknown(Schema.encodedSchema(StructSchema)),
+              ),
+          }),
+        );
+      },
+      encode: (struct, _, ast) => {
+        const [issues, indexValuePairs] = pipe(
+          Object.entries(struct),
+          Array.map(([key, value]) =>
+            pipe(
+              HashMap.get(reverseLookup, key),
+              Option.match({
+                onSome: (index) => ParseResult.succeed([index, value] as const),
+                onNone: () =>
+                  ParseResult.fail(
+                    new ParseResult.Unexpected(
+                      key,
+                      `Key ${key} not found in keys array`,
+                    ),
+                  ),
+              }),
+            ),
+          ),
+          Array.separate,
+        );
+
+        return pipe(
+          issues,
+          Array.match({
+            onNonEmpty: (issues) =>
+              ParseResult.fail(new ParseResult.Composite(ast, struct, issues)),
+            onEmpty: () => ParseResult.succeed(indexValuePairs),
+          }),
+        );
+      },
+    }),
+  );
+};
