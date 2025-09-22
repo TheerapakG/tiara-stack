@@ -27,7 +27,7 @@ export default defineConfig({
       formats: ["es", "cjs"],
     },
     rollupOptions: {
-      external: [...builtinModules, /^node:/, "effect", "valibot"],
+      external: [...builtinModules, /^node:/, "effect"],
     },
   },
 });
