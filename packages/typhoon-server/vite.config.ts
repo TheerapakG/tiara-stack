@@ -27,13 +27,7 @@ export default defineConfig({
       formats: ["es", "cjs"],
     },
     rollupOptions: {
-      external: [
-        ...builtinModules,
-        /^node:/,
-        "effect",
-        "valibot",
-        "typhoon-core",
-      ],
+      external: [...builtinModules, /^node:/, "effect", "typhoon-core"],
     },
   },
 });

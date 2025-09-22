@@ -30,5 +30,5 @@ export default defineConfig({
     ".html": "text",
   },
   plugins: [del({ targets: "dist" }), dts()],
-  external: [...builtinModules, /^node:/, "effect", "valibot", "typhoon-core"],
+  external: [...builtinModules, /^node:/, "effect", "typhoon-core"],
 });
