@@ -1,6 +1,7 @@
 import { StandardSchemaV1 } from "@standard-schema/spec";
 import { Observable } from "../observability";
 import {
+  ValidationError,
   Validator,
   validateOption as validateOptionWithValidator,
   validateSchemaOption as validateSchemaOptionWithValidator,
@@ -9,6 +10,8 @@ import {
   validateWithDefault as validateWithDefaultWithValidator,
   validate as validateWithValidator,
 } from "./validator";
+
+export { ValidationError };
 
 export const validateSchema = <Schema extends StandardSchemaV1>(
   schema: Schema,
