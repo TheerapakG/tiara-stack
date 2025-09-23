@@ -1,51 +1,56 @@
-import { pipe } from "effect";
+import { pipe, Schema } from "effect";
 import { HandlerConfig } from "typhoon-core/config";
-import * as v from "valibot";
 
 export const botCalcHandlerConfig = pipe(
   HandlerConfig.empty,
   HandlerConfig.Builder.name("botCalc"),
   HandlerConfig.Builder.type("subscription"),
   HandlerConfig.Builder.requestParams({
-    validator: v.object({
-      config: v.object({
-        healNeeded: v.number(),
-        considerEnc: v.boolean(),
-      }),
-      players: v.pipe(
-        v.array(
-          v.array(
-            v.object({
-              type: v.string(),
-              tagStr: v.string(),
-              player: v.string(),
-              team: v.string(),
-              lead: v.number(),
-              backline: v.number(),
-              bp: v.union([v.number(), v.literal("")]),
-              percent: v.number(),
-            }),
+    validator: pipe(
+      Schema.Struct({
+        config: Schema.Struct({
+          healNeeded: Schema.Number,
+          considerEnc: Schema.Boolean,
+        }),
+        players: pipe(
+          Schema.Array(
+            Schema.Array(
+              Schema.Struct({
+                type: Schema.String,
+                tagStr: Schema.String,
+                player: Schema.String,
+                team: Schema.String,
+                lead: Schema.Number,
+                backline: Schema.Number,
+                bp: Schema.Union(Schema.Number, Schema.Literal("")),
+                percent: Schema.Number,
+              }),
+            ),
           ),
+          Schema.itemsCount(5),
         ),
-        v.length(5),
-      ),
-    }),
+      }),
+      Schema.standardSchemaV1,
+    ),
   }),
   HandlerConfig.Builder.response({
-    validator: v.array(
-      v.object({
-        averageBp: v.number(),
-        averagePercent: v.number(),
-        room: v.array(
-          v.object({
-            type: v.string(),
-            team: v.string(),
-            bp: v.number(),
-            percent: v.number(),
-            tags: v.array(v.string()),
-          }),
-        ),
-      }),
+    validator: pipe(
+      Schema.Array(
+        Schema.Struct({
+          averageBp: Schema.Number,
+          averagePercent: Schema.Number,
+          room: Schema.Array(
+            Schema.Struct({
+              type: Schema.String,
+              team: Schema.String,
+              bp: Schema.Number,
+              percent: Schema.Number,
+              tags: Schema.Array(Schema.String),
+            }),
+          ),
+        }),
+      ),
+      Schema.standardSchemaV1,
     ),
   }),
 );

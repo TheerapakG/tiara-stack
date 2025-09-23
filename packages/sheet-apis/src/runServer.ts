@@ -13,7 +13,6 @@ import { DB } from "./db";
 import {
   calcHandlerGroup,
   guildConfigHandlerGroup,
-  testHandlerGroup,
 } from "./server/handler/handler";
 import {
   AuthService,
@@ -41,7 +40,6 @@ const serverHandlerGroup = pipe(
   HandlerContextConfig.Group.empty(),
   HandlerContextConfig.Group.addGroup(calcHandlerGroup),
   HandlerContextConfig.Group.addGroup(guildConfigHandlerGroup),
-  HandlerContextConfig.Group.addGroup(testHandlerGroup),
 );
 
 const server = pipe(
