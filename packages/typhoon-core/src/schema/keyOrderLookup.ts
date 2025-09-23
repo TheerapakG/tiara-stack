@@ -1,6 +1,9 @@
 import { Array, HashMap, Option, ParseResult, pipe, Schema } from "effect";
 
-export const KeyOrderLookupSchema = <
+const TypeId = Schema.TypeId;
+export { TypeId };
+
+const KeyOrderLookupSchema$ = <
   Key extends string | number | symbol,
   Fields extends { readonly [x in Key]: Schema.Struct.Field },
 >(
@@ -15,7 +18,7 @@ export const KeyOrderLookupSchema = <
 
   const StructSchema = Schema.Struct(fields);
 
-  return pipe(
+  return class KeyOrderLookupSchema extends pipe(
     Schema.Array(Schema.Tuple(Schema.Number, Schema.Unknown)),
     Schema.transformOrFail(StructSchema, {
       strict: true,
@@ -86,5 +89,10 @@ export const KeyOrderLookupSchema = <
         );
       },
     }),
-  );
+  ) {
+    static keys = keys;
+    static fields = fields;
+  };
 };
+
+export { KeyOrderLookupSchema$ as KeyOrderLookupSchema };

@@ -10,6 +10,9 @@ import {
 import { ArrayLookupSchema } from "../schema/arrayLookup";
 import { KeyOrderLookupSchema } from "../schema/keyOrderLookup";
 
+const TypeId = Schema.TypeId;
+export { TypeId };
+
 export const HeaderActionSchema = ArrayLookupSchema([
   "client:subscribe",
   "client:unsubscribe",
@@ -18,14 +21,17 @@ export const HeaderActionSchema = ArrayLookupSchema([
   "server:update",
 ]);
 
-export const EmptyPayloadSchema = pipe(
+export class EmptyPayloadSchema extends pipe(
   KeyOrderLookupSchema([], {}),
   Schema.transformOrFail(Schema.Unknown, {
     strict: true,
     decode: (value) => ParseResult.succeed(value),
     encode: (value) => pipe(value, ParseResult.decodeUnknown(Schema.Object)),
   }),
-);
+) {
+  static keys = [];
+  static fields = {};
+}
 
 export const HandlerPayloadSchema = KeyOrderLookupSchema(["handler", "token"], {
   handler: Schema.String,
@@ -97,20 +103,19 @@ export type ActionPayload<
   };
 }[Actions];
 
-export const ActionPayloadUnionMemberSchemas = pipe(
-  HeaderActionSchema.to.literals,
-  Array.map((literal) =>
-    Schema.Struct({
-      action: Schema.Literal(literal),
-      payload: Schema.typeSchema(
-        ActionPayloadSchemas[literal] as Schema.Schema<
-          unknown,
-          readonly (readonly [number, unknown])[],
-          never
-        >,
-      ),
-    }),
-  ),
+const makeActionPayloadUnionMemberSchema = <
+  Action extends typeof HeaderActionSchema.Type,
+>(
+  literal: Action,
+) =>
+  Schema.Struct({
+    action: Schema.Literal(literal),
+    payload: Schema.Struct(ActionPayloadSchemas[literal].fields),
+  }) as Schema.Schema<ActionPayload<Action>>;
+
+const ActionPayloadUnionMemberSchemas = pipe(
+  HeaderActionSchema.literals,
+  Array.map(makeActionPayloadUnionMemberSchema),
 ) as {
   [action in typeof HeaderActionSchema.Type]: Schema.Schema<
     ActionPayload<action>
@@ -119,7 +124,7 @@ export const ActionPayloadUnionMemberSchemas = pipe(
 
 export const ActionPayloadSchema = pipe(
   Schema.Struct({
-    action: Schema.Literal(...HeaderActionSchema.to.literals),
+    action: Schema.Literal(...HeaderActionSchema.literals),
     payload: Schema.Array(Schema.Tuple(Schema.Number, Schema.Unknown)),
   }),
   Schema.transformOrFail(Schema.Union(...ActionPayloadUnionMemberSchemas), {
@@ -173,23 +178,22 @@ export type Header<
   };
 }[Actions];
 
-export const HeaderUnionMemberSchemas = pipe(
-  HeaderActionSchema.to.literals,
-  Array.map((literal) =>
-    Schema.Struct({
-      protocol: Schema.String,
-      version: Schema.Number,
-      id: Schema.UUID,
-      action: Schema.Literal(literal),
-      payload: Schema.typeSchema(
-        ActionPayloadSchemas[literal] as Schema.Schema<
-          unknown,
-          readonly (readonly [number, unknown])[],
-          never
-        >,
-      ),
-    }),
-  ),
+const makeHeaderUnionMemberSchema = <
+  Action extends typeof HeaderActionSchema.Type,
+>(
+  literal: Action,
+) =>
+  Schema.Struct({
+    protocol: Schema.String,
+    version: Schema.Number,
+    id: Schema.UUID,
+    action: Schema.Literal(literal),
+    payload: Schema.Struct(ActionPayloadSchemas[literal].fields),
+  }) as Schema.Schema<Header<Action>>;
+
+const HeaderUnionMemberSchemas = pipe(
+  HeaderActionSchema.literals,
+  Array.map(makeHeaderUnionMemberSchema),
 ) as {
   [action in typeof HeaderActionSchema.Type]: Schema.Schema<Header<action>>;
 }[typeof HeaderActionSchema.Type][];
