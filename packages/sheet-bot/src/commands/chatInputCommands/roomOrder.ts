@@ -245,7 +245,7 @@ const handleManual =
                     room.map(({ team, tags }, position) => ({
                       hour,
                       team,
-                      tags,
+                      tags: Array.fromIterable(tags),
                       rank,
                       position,
                     })),
