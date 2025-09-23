@@ -8,7 +8,6 @@ import { command as schedule } from "./schedule";
 import { command as server } from "./server";
 import { command as slot } from "./slot";
 import { command as team } from "./team";
-import { command as testServiceAccountOIDC } from "./testServiceAccountOIDC";
 
 export const commands = pipe(
   chatInputInteractionHandlerMap(),
@@ -20,5 +19,4 @@ export const commands = pipe(
   InteractionHandlerMap.add(schedule),
   InteractionHandlerMap.add(slot),
   InteractionHandlerMap.add(team),
-  InteractionHandlerMap.add(testServiceAccountOIDC),
 );
