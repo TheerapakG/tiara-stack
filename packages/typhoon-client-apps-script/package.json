@@ -12,15 +12,12 @@
   },
   "scripts": {
     "format": "prettier -c .",
-    "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "lint": "oxlint .",
+    "typecheck": "tsgo --noEmit",
     "build": "rolldown -c rolldown.config.ts"
   },
   "keywords": [],
   "author": "",
-  "dependencies": {
-    "typhoon-server": "workspace:*"
-  },
   "peerDependencies": {
     "effect": "^3.17.13",
     "typhoon-core": "workspace:*"
@@ -28,19 +25,13 @@
   "devDependencies": {
     "@standard-schema/spec": "^1.0.0",
     "@types/google-apps-script": "^1.0.99",
+    "@typescript/native-preview": "latest",
     "glob": "^11.0.1",
+    "oxlint": "^1.16.0",
     "pathe": "^2.0.3",
-    "rolldown": "^1.0.0-beta.29",
-    "rolldown-plugin-dts": "^0.13.12",
-    "vite": "npm:rolldown-vite@latest",
-    "@eslint/compat": "^1.3.0",
-    "@eslint/eslintrc": "^3.3.1",
-    "@eslint/js": "^9.29.0",
-    "@typescript-eslint/eslint-plugin": "^8.39.0",
-    "@typescript-eslint/parser": "^8.39.0",
-    "eslint": "^9.29.0",
     "prettier": "^3.5.3",
-    "globals": "^16.2.0",
-    "jiti": "^2.4.2"
+    "rolldown": "1.0.0-beta.36",
+    "rolldown-plugin-dts": "^0.16.8",
+    "vite": "npm:rolldown-vite@latest"
   }
 }

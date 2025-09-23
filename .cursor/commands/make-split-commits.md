@@ -71,7 +71,8 @@ C = copied (if config option status.renames is set to "copies")
 
 The following guidelines are to be followed for `git commit` command.
 
-- Use conventional commit message. However, there is no need to outline what is affected by the changes.
+- Use conventional commit message.
+- There is no need to list functions or symbols affected by the changes seperately from the main commit message body.
 - Use -m for new line in the commit message, and do not use \n anywhere.
   GOOD: `git commit -m "subject" -m "line1" -m "line2"  ...`
   BAD:
