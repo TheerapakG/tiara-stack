@@ -1,12 +1,13 @@
-import { ArkErrors, type } from "arktype";
+import { Effect, Schema } from "effect";
 import "dotenv/config";
 import { defineConfig } from "drizzle-kit";
 
-const env = type({ POSTGRES_URL: "string" })(process.env);
-if (env instanceof ArkErrors) {
-  console.error(env);
-  throw env;
-}
+const env = Effect.runSync(
+  Schema.decodeUnknown(Schema.Struct({ POSTGRES_URL: Schema.String }))(
+    process.env,
+  ),
+);
+
 export default defineConfig({
   schema: "./src/schema.ts",
   dialect: "postgresql",
