@@ -1,35 +1,34 @@
-import { Effect, HashMap, pipe } from "effect";
+import { Effect, HashMap, pipe, Schema } from "effect";
 import { serverHandlerConfigGroup } from "sheet-apis";
 import { AppsScriptClient } from "typhoon-client-apps-script/client";
 import { Validate } from "typhoon-core/validator";
-import * as v from "valibot";
 
 function getClient(url: string) {
   return AppsScriptClient.create(serverHandlerConfigGroup, url);
 }
 
-const cellValueValidator = v.union([
-  v.string(),
-  v.number(),
-  v.boolean(),
-  v.date(),
-]);
-type CellValue = v.InferOutput<typeof cellValueValidator>;
+const cellValueValidator = Schema.Union(
+  Schema.String,
+  Schema.Number,
+  Schema.Boolean,
+  Schema.DateFromSelf,
+);
+type CellValue = typeof cellValueValidator.Type;
 
-const configValidator = v.object({
-  healNeeded: v.number(),
-  considerEnc: v.boolean(),
+const configValidator = Schema.Struct({
+  healNeeded: Schema.Number,
+  considerEnc: Schema.Boolean,
 });
 
-const playerTeamValidator = v.object({
-  type: v.string(),
-  tagStr: v.string(),
-  player: v.string(),
-  team: v.string(),
-  lead: v.number(),
-  backline: v.number(),
-  bp: v.union([v.number(), v.literal("")]),
-  percent: v.number(),
+const playerTeamValidator = Schema.Struct({
+  type: Schema.String,
+  tagStr: Schema.String,
+  player: Schema.String,
+  team: Schema.String,
+  lead: Schema.Number,
+  backline: Schema.Number,
+  bp: Schema.Union(Schema.Number, Schema.Literal("")),
+  percent: Schema.Number,
 });
 
 function parsePlayerTeam([
@@ -42,7 +41,7 @@ function parsePlayerTeam([
   bp,
   percent,
 ]: CellValue[]) {
-  return Validate.validate(playerTeamValidator)({
+  return Validate.validate(pipe(playerTeamValidator, Schema.standardSchemaV1))({
     type,
     tagStr,
     player,
@@ -74,7 +73,12 @@ export function THEECALC(
         pipe(
           config,
           Validate.validate(
-            v.array(v.tuple([cellValueValidator, cellValueValidator])),
+            pipe(
+              Schema.Array(
+                Schema.Tuple(cellValueValidator, cellValueValidator),
+              ),
+              Schema.standardSchemaV1,
+            ),
           ),
           Effect.map(HashMap.fromIterable),
           Effect.flatMap((config) =>
@@ -88,7 +92,9 @@ export function THEECALC(
               ),
             ),
           ),
-          Effect.flatMap(Validate.validate(configValidator)),
+          Effect.flatMap(
+            Validate.validate(pipe(configValidator, Schema.standardSchemaV1)),
+          ),
         ),
       ),
       Effect.bind("players", () =>
