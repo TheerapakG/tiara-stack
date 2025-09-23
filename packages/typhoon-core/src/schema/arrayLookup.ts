@@ -8,7 +8,10 @@ import {
   SchemaAST,
 } from "effect";
 
-export const ArrayLookupSchema = <LiteralValue extends SchemaAST.LiteralValue>(
+const TypeId = Schema.TypeId;
+export { TypeId };
+
+const ArrayLookupSchema$ = <LiteralValue extends SchemaAST.LiteralValue>(
   literals: Array.NonEmptyReadonlyArray<LiteralValue>,
 ) => {
   const reverseLookup = pipe(
@@ -17,7 +20,7 @@ export const ArrayLookupSchema = <LiteralValue extends SchemaAST.LiteralValue>(
     HashMap.fromIterable,
   );
 
-  return pipe(
+  return class ArrayLookupSchema extends pipe(
     Schema.Number,
     Schema.transformOrFail(Schema.Literal(...literals), {
       strict: true,
@@ -50,5 +53,9 @@ export const ArrayLookupSchema = <LiteralValue extends SchemaAST.LiteralValue>(
           }),
         ),
     }),
-  );
+  ) {
+    static literals = literals;
+  };
 };
+
+export { ArrayLookupSchema$ as ArrayLookupSchema };
