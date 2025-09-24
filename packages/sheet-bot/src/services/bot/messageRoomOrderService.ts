@@ -1,9 +1,9 @@
-import { DB } from "@/db";
+import { DBService } from "@/db";
 import { and, asc, eq, isNull, max, min, sql } from "drizzle-orm";
 import { Array, Data, DateTime, Effect, Option, pipe } from "effect";
 import { messageRoomOrder, messageRoomOrderData } from "sheet-db-schema";
 import { Computed } from "typhoon-core/signal";
-import { DBSubscriptionContext } from "typhoon-server/db";
+import { DB } from "typhoon-server/db";
 
 type MessageRoomOrderInsert = typeof messageRoomOrder.$inferInsert;
 type MessageRoomOrderSelect = typeof messageRoomOrder.$inferSelect;
@@ -79,8 +79,8 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
   {
     effect: pipe(
       Effect.Do,
-      Effect.bind("db", () => DB),
-      Effect.bind("dbSubscriptionContext", () => DBSubscriptionContext),
+      Effect.bind("db", () => DBService),
+      Effect.bind("dbSubscriptionContext", () => DB.DBSubscriptionContext),
       Effect.map(({ db, dbSubscriptionContext }) => ({
         getMessageRoomOrder: (messageId: string) =>
           pipe(
@@ -274,7 +274,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
           ),
       })),
     ),
-    dependencies: [DB.Default, DBSubscriptionContext.Default],
+    dependencies: [DBService.Default, DB.DBSubscriptionContext.Default],
     accessors: true,
   },
 ) {}

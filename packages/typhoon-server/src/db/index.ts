@@ -1,1 +1,1 @@
-export * from "./reactiveDb";
+export * as DB from "./db";

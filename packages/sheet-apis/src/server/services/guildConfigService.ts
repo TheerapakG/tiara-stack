@@ -1,4 +1,4 @@
-import { DB } from "@/db";
+import { DBService } from "@/db";
 import {
   GuildChannelConfig,
   GuildConfig,
@@ -12,7 +12,7 @@ import {
   configGuildManagerRole,
 } from "sheet-db-schema";
 import { Computed } from "typhoon-core/signal";
-import { DBSubscriptionContext } from "typhoon-server/db";
+import { DB } from "typhoon-server/db";
 
 type GuildConfigInsert = typeof configGuild.$inferInsert;
 type GuildChannelConfigInsert = typeof configGuildChannel.$inferInsert;
@@ -22,8 +22,8 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
   {
     effect: pipe(
       Effect.Do,
-      Effect.bind("db", () => DB),
-      Effect.bind("dbSubscriptionContext", () => DBSubscriptionContext),
+      Effect.bind("db", () => DBService),
+      Effect.bind("dbSubscriptionContext", () => DB.DBSubscriptionContext),
       Effect.map(({ db, dbSubscriptionContext }) => ({
         getGuildConfigByGuildId: (guildId: string) =>
           pipe(
@@ -300,7 +300,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           ),
       })),
     ),
-    dependencies: [DB.Default, DBSubscriptionContext.Default],
+    dependencies: [DBService.Default, DB.DBSubscriptionContext.Default],
     accessors: true,
   },
 ) {}

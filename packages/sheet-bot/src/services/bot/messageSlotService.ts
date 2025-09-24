@@ -1,9 +1,9 @@
-import { DB } from "@/db";
+import { DBService } from "@/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { Array, Data, Effect, Option, pipe } from "effect";
 import { messageSlot } from "sheet-db-schema";
 import { Computed } from "typhoon-core/signal";
-import { DBSubscriptionContext } from "typhoon-server/db";
+import { DB } from "typhoon-server/db";
 
 type MessageSlotInsert = typeof messageSlot.$inferInsert;
 type MessageSlotSelect = typeof messageSlot.$inferSelect;
@@ -32,8 +32,8 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
   {
     effect: pipe(
       Effect.Do,
-      Effect.bind("db", () => DB),
-      Effect.bind("dbSubscriptionContext", () => DBSubscriptionContext),
+      Effect.bind("db", () => DBService),
+      Effect.bind("dbSubscriptionContext", () => DB.DBSubscriptionContext),
       Effect.map(({ db, dbSubscriptionContext }) => ({
         getMessageSlotData: (messageId: string) =>
           pipe(
@@ -82,7 +82,7 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
           ),
       })),
     ),
-    dependencies: [DB.Default, DBSubscriptionContext.Default],
+    dependencies: [DBService.Default, DB.DBSubscriptionContext.Default],
     accessors: true,
   },
 ) {}

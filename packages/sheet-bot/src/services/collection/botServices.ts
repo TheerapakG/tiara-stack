@@ -1,6 +1,6 @@
 import { SheetApisClient } from "@/client";
 import { Config } from "@/config";
-import { DB } from "@/db";
+import { DBService } from "@/db";
 import { GoogleLive } from "@/google";
 import {
   MessageCheckinService,
@@ -10,7 +10,7 @@ import {
 } from "@/services/bot";
 import { NodeContext } from "@effect/platform-node";
 import { Effect, Layer, pipe } from "effect";
-import { DBSubscriptionContext } from "typhoon-server/db";
+import { DB } from "typhoon-server/db";
 
 export const botServices = pipe(
   Layer.mergeAll(
@@ -21,13 +21,13 @@ export const botServices = pipe(
   ),
   Layer.provideMerge(
     Layer.mergeAll(
-      DB.DefaultWithoutDependencies,
+      DBService.DefaultWithoutDependencies,
       SheetApisClient.DefaultWithoutDependencies,
     ),
   ),
   Layer.provideMerge(
     Layer.mergeAll(
-      DBSubscriptionContext.Default,
+      DB.DBSubscriptionContext.Default,
       GoogleLive,
       Config.Default,
       NodeContext.layer,
