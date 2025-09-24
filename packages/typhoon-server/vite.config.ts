@@ -12,18 +12,21 @@ export default defineConfig({
   build: {
     target: "node20",
     lib: {
-      entry: Object.fromEntries(
-        filePaths.map((filePath) => {
-          const relativePath = path.relative("./src", filePath);
-          const parsed = path.parse(relativePath);
-          const module = path.join(
-            parsed.dir.replace(/\.+\//g, ""),
-            parsed.name,
-          );
+      entry: {
+        index: path.resolve(__dirname, "src/index.ts"),
+        ...Object.fromEntries(
+          filePaths.map((filePath) => {
+            const relativePath = path.relative("./src", filePath);
+            const parsed = path.parse(relativePath);
+            const module = path.join(
+              parsed.dir.replace(/\.+\//g, ""),
+              parsed.name,
+            );
 
-          return [module, filePath];
-        }),
-      ),
+            return [module, filePath];
+          }),
+        ),
+      },
       formats: ["es", "cjs"],
     },
     rollupOptions: {
