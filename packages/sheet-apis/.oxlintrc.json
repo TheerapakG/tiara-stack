@@ -4,6 +4,7 @@
     "browser": true,
     "es2022": true
   },
+  "plugins": ["eslint", "unicorn", "typescript", "oxc"],
   "rules": {
     "no-unused-vars": [
       "error",
