@@ -1,4 +1,4 @@
-import { StandardSchemaV1 } from "@standard-schema/spec";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { Data, Effect, Option, pipe } from "effect";
 import { Observable } from "../observability";
 

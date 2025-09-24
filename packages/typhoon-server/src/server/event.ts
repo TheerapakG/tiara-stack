@@ -12,6 +12,8 @@ import { Msgpack, Stream } from "typhoon-core/protocol";
 import { Computed, Signal } from "typhoon-core/signal";
 import { Validate } from "typhoon-core/validator";
 
+export type { StandardSchemaV1 } from "@standard-schema/spec";
+
 const pullStreamToParsed =
   <const RequestParams extends HandlerConfig.RequestParamsConfig | undefined>(
     requestParams: RequestParams,

@@ -1,12 +1,12 @@
 import { Struct } from "effect";
 import { StrictOption } from "../../utils";
-import { HandlerConfig } from "../handler";
+import { type HandlerConfig } from "../handler";
 import {
-  ConfigOption,
-  Handler,
-  InferHandlerConfig,
+  type ConfigOption,
+  type Handler,
+  type InferHandlerConfig,
   PartialHandlerContextConfig,
-  ValueExtends,
+  type ValueExtends,
 } from "./data";
 
 import { Option } from "effect";
