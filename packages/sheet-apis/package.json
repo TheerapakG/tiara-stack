@@ -3,14 +3,17 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "files": [
+    "./dist/**"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "module": "./dist/index.js"
     },
     "./runServer": {
       "types": "./dist/runServer.d.ts",
-      "import": "./dist/runServer.js"
+      "module": "./dist/runServer.js"
     },
     "./package.json": "./package.json"
   },

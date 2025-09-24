@@ -3,10 +3,17 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "files": [
+    "./dist/**"
+  ],
   "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "module": "./dist/index.js"
+    },
     "./*": {
       "types": "./dist/*/index.d.ts",
-      "import": "./dist/*/index.js"
+      "module": "./dist/*/index.js"
     },
     "./package.json": "./package.json"
   },
@@ -19,6 +26,7 @@
   "keywords": [],
   "author": "",
   "dependencies": {
+    "@standard-schema/spec": "^1.0.0",
     "crossws": "^0.4.1",
     "drizzle-orm": "^0.44.0",
     "ufo": "^1.6.1"
@@ -28,7 +36,6 @@
     "typhoon-core": "workspace:*"
   },
   "devDependencies": {
-    "@standard-schema/spec": "^1.0.0",
     "@typescript/native-preview": "latest",
     "glob": "^11.0.1",
     "oxlint": "^1.16.0",

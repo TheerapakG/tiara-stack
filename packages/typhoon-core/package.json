@@ -3,10 +3,17 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "files": [
+    "./dist/**"
+  ],
   "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "module": "./dist/index.js"
+    },
     "./*": {
       "types": "./dist/*/index.d.ts",
-      "import": "./dist/*/index.js"
+      "module": "./dist/*/index.js"
     },
     "./package.json": "./package.json"
   },
@@ -19,13 +26,13 @@
   "keywords": [],
   "author": "",
   "dependencies": {
-    "@msgpack/msgpack": "^3.1.2"
+    "@msgpack/msgpack": "^3.1.2",
+    "@standard-schema/spec": "^1.0.0"
   },
   "peerDependencies": {
     "effect": "^3.17.13"
   },
   "devDependencies": {
-    "@standard-schema/spec": "^1.0.0",
     "@typescript/native-preview": "latest",
     "glob": "^11.0.1",
     "oxlint": "^1.16.0",
