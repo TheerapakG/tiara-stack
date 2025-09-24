@@ -1,10 +1,10 @@
-import { DB } from "@/db";
+import { DBService } from "@/db";
 import { subHours } from "date-fns/fp";
 import { and, eq, gte, isNull } from "drizzle-orm";
 import { Array, Data, DateTime, Effect, Option, pipe } from "effect";
 import { messageCheckin, messageCheckinMember } from "sheet-db-schema";
 import { Computed } from "typhoon-core/signal";
-import { DBSubscriptionContext } from "typhoon-server/db";
+import { DB } from "typhoon-server/db";
 
 type MessageCheckinInsert = typeof messageCheckin.$inferInsert;
 type MessageCheckinSelect = typeof messageCheckin.$inferSelect;
@@ -63,8 +63,8 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
   {
     effect: pipe(
       Effect.Do,
-      Effect.bind("db", () => DB),
-      Effect.bind("dbSubscriptionContext", () => DBSubscriptionContext),
+      Effect.bind("db", () => DBService),
+      Effect.bind("dbSubscriptionContext", () => DB.DBSubscriptionContext),
       Effect.map(({ db, dbSubscriptionContext }) => ({
         getMessageCheckinData: (messageId: string) =>
           pipe(
@@ -213,7 +213,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
           ),
       })),
     ),
-    dependencies: [DB.Default, DBSubscriptionContext.Default],
+    dependencies: [DBService.Default, DB.DBSubscriptionContext.Default],
     accessors: true,
   },
 ) {}

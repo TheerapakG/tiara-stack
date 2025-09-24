@@ -6,10 +6,10 @@ import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { serve as crosswsServe } from "crossws/server/node";
 import { Effect, Layer, Logger, pipe } from "effect";
 import { HandlerContextConfig } from "typhoon-core/config";
-import { DBSubscriptionContext } from "typhoon-server/db";
+import { DB } from "typhoon-server/db";
 import { Server } from "typhoon-server/server";
 import { Config } from "./config";
-import { DB } from "./db";
+import { DBService } from "./db";
 import {
   calcHandlerGroup,
   guildConfigHandlerGroup,
@@ -26,11 +26,11 @@ const layer = pipe(
     CalcService.Default,
     AuthService.DefaultWithoutDependencies,
   ),
-  Layer.provideMerge(DB.DefaultWithoutDependencies),
+  Layer.provideMerge(DBService.DefaultWithoutDependencies),
   Layer.provideMerge(
     Layer.mergeAll(
       Config.Default,
-      DBSubscriptionContext.Default,
+      DB.DBSubscriptionContext.Default,
       NodeContext.layer,
     ),
   ),

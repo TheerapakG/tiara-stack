@@ -1,5 +1,5 @@
-import { Dialect } from "drizzle-orm";
-import { RunnableQuery } from "drizzle-orm/runnable-query";
+import type { Dialect } from "drizzle-orm";
+import type { RunnableQuery } from "drizzle-orm/runnable-query";
 import {
   Cause,
   Context,

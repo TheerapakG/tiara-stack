@@ -3,7 +3,7 @@ import { Effect, pipe } from "effect";
 import postgres from "postgres";
 import { Config } from "@/config";
 
-export class DB extends Effect.Service<DB>()("DB", {
+export class DBService extends Effect.Service<DBService>()("DBService", {
   scoped: pipe(
     Effect.Do,
     Effect.tap(() => Effect.log("creating db client")),
