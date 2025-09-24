@@ -1,20 +1,20 @@
 import { Data, HashMap, Match, pipe } from "effect";
 import {
-  HandlerConfig,
-  MutationHandlerConfig,
+  type HandlerConfig,
+  type MutationHandlerConfig,
   name,
-  SubscriptionHandlerConfig,
+  type SubscriptionHandlerConfig,
   type,
 } from "../handler/data";
 import {
   config,
-  HandlerContext,
-  HandlerContextConfig,
-  HandlerOrUndefined,
-  MutationHandler,
-  MutationHandlerContextConfig,
-  SubscriptionHandler,
-  SubscriptionHandlerContextConfig,
+  type HandlerContext,
+  type HandlerContextConfig,
+  type HandlerOrUndefined,
+  type MutationHandler,
+  type MutationHandlerContextConfig,
+  type SubscriptionHandler,
+  type SubscriptionHandlerContextConfig,
 } from "./data";
 
 type SubscriptionHandlerContextConfigMap<R = never> = HashMap.HashMap<

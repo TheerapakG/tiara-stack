@@ -1,6 +1,10 @@
-import { StandardSchemaV1 } from "@standard-schema/spec";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { Data, Option, pipe } from "effect";
-import { GetOrUndefined, getOrUndefined, none } from "../../utils/strictOption";
+import {
+  type GetOrUndefined,
+  getOrUndefined,
+  none,
+} from "../../utils/strictOption";
 
 export type { GetOrUndefined };
 

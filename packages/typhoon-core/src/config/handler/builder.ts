@@ -1,14 +1,14 @@
-import { StandardSchemaV1 } from "@standard-schema/spec";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { Option, Struct } from "effect";
 import { StrictOption } from "../../utils";
 import {
-  NameOption,
+  type NameOption,
   PartialHandlerConfig,
   RequestParamsConfig,
-  RequestParamsOption,
+  type RequestParamsOption,
   ResponseConfig,
-  ResponseOption,
-  TypeOption,
+  type ResponseOption,
+  type TypeOption,
 } from "./data";
 
 type CoercedTrue<T extends boolean | undefined> = T extends undefined

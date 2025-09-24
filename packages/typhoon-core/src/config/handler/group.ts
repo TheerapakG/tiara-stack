@@ -1,9 +1,9 @@
 import { Data, HashMap, Match, pipe } from "effect";
 import {
-  HandlerConfig,
-  MutationHandlerConfig,
-  NameOrUndefined,
-  SubscriptionHandlerConfig,
+  type HandlerConfig,
+  type MutationHandlerConfig,
+  type NameOrUndefined,
+  type SubscriptionHandlerConfig,
   name,
   type,
 } from "./data";
