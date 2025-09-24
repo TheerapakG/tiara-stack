@@ -246,6 +246,9 @@ importers:
       '@babel/core':
         specifier: ^7.28.0
         version: 7.28.0
+      '@standard-schema/spec':
+        specifier: ^1.0.0
+        version: 1.0.0
       core-js:
         specifier: ^3.44.0
         version: 3.44.0
@@ -280,9 +283,6 @@ importers:
       '@rollup/plugin-typescript':
         specifier: ^12.1.4
         version: 12.1.4(rollup@4.45.0)(tslib@2.8.1)(typescript@5.9.2)
-      '@standard-schema/spec':
-        specifier: ^1.0.0
-        version: 1.0.0
       '@types/google-apps-script':
         specifier: ^1.0.99
         version: 1.0.99
@@ -316,6 +316,9 @@ importers:
 
   packages/typhoon-client-apps-script:
     dependencies:
+      '@standard-schema/spec':
+        specifier: ^1.0.0
+        version: 1.0.0
       effect:
         specifier: ^3.17.13
         version: 3.17.13
@@ -323,9 +326,6 @@ importers:
         specifier: workspace:*
         version: link:../typhoon-core
     devDependencies:
-      '@standard-schema/spec':
-        specifier: ^1.0.0
-        version: 1.0.0
       '@types/google-apps-script':
         specifier: ^1.0.99
         version: 1.0.99
@@ -356,6 +356,9 @@ importers:
 
   packages/typhoon-client-http:
     dependencies:
+      '@standard-schema/spec':
+        specifier: ^1.0.0
+        version: 1.0.0
       effect:
         specifier: ^3.17.13
         version: 3.17.13
@@ -366,9 +369,6 @@ importers:
         specifier: workspace:*
         version: link:../typhoon-core
     devDependencies:
-      '@standard-schema/spec':
-        specifier: ^1.0.0
-        version: 1.0.0
       '@typescript/native-preview':
         specifier: latest
         version: 7.0.0-dev.20250923.1
@@ -396,6 +396,9 @@ importers:
 
   packages/typhoon-client-ws:
     dependencies:
+      '@standard-schema/spec':
+        specifier: ^1.0.0
+        version: 1.0.0
       effect:
         specifier: ^3.17.13
         version: 3.17.13
@@ -403,9 +406,6 @@ importers:
         specifier: workspace:*
         version: link:../typhoon-core
     devDependencies:
-      '@standard-schema/spec':
-        specifier: ^1.0.0
-        version: 1.0.0
       '@typescript/native-preview':
         specifier: latest
         version: 7.0.0-dev.20250923.1
@@ -436,13 +436,13 @@ importers:
       '@msgpack/msgpack':
         specifier: ^3.1.2
         version: 3.1.2
+      '@standard-schema/spec':
+        specifier: ^1.0.0
+        version: 1.0.0
       effect:
         specifier: ^3.17.13
         version: 3.17.13
     devDependencies:
-      '@standard-schema/spec':
-        specifier: ^1.0.0
-        version: 1.0.0
       '@typescript/native-preview':
         specifier: latest
         version: 7.0.0-dev.20250923.1
@@ -473,6 +473,9 @@ importers:
 
   packages/typhoon-server:
     dependencies:
+      '@standard-schema/spec':
+        specifier: ^1.0.0
+        version: 1.0.0
       crossws:
         specifier: ^0.4.1
         version: 0.4.1(srvx@0.7.1)
@@ -489,9 +492,6 @@ importers:
         specifier: ^1.6.1
         version: 1.6.1
     devDependencies:
-      '@standard-schema/spec':
-        specifier: ^1.0.0
-        version: 1.0.0
       '@typescript/native-preview':
         specifier: latest
         version: 7.0.0-dev.20250923.1

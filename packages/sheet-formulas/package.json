@@ -6,7 +6,7 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "module": "./dist/index.js"
     },
     "./package.json": "./package.json"
   },
@@ -19,6 +19,7 @@
   "keywords": [],
   "author": "",
   "dependencies": {
+    "@standard-schema/spec": "^1.0.0",
     "@babel/core": "^7.28.0",
     "core-js": "^3.44.0",
     "effect": "^3.17.13",
@@ -33,7 +34,6 @@
     "@rollup/plugin-node-resolve": "^16.0.1",
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^12.1.4",
-    "@standard-schema/spec": "^1.0.0",
     "@types/google-apps-script": "^1.0.99",
     "@typescript/native-preview": "latest",
     "oxlint": "^1.16.0",
