@@ -37,25 +37,6 @@ export type HandlerContextConfigGroupContext<
   G extends HandlerContextConfigGroup<any>,
 > = G extends HandlerContextConfigGroup<infer Context> ? Context : never;
 
-type AddHandlerContextConfigGroupHandlerContextConfig<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  G extends HandlerContextConfigGroup<any>,
-  Config extends HandlerContextConfig,
-> = HandlerContextConfigGroup<
-  | HandlerContextConfigGroupContext<G>
-  | HandlerContext<HandlerOrUndefined<Config>>
->;
-
-type AddHandlerContextConfigGroupHandlerContextConfigGroup<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  OtherG extends HandlerContextConfigGroup<any>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ThisG extends HandlerContextConfigGroup<any>,
-> = HandlerContextConfigGroup<
-  | HandlerContextConfigGroupContext<ThisG>
-  | HandlerContextConfigGroupContext<OtherG>
->;
-
 export class HandlerContextConfigGroup<R = never> extends Data.TaggedClass(
   "HandlerGroup",
 )<{
@@ -76,7 +57,7 @@ export const add =
     const G extends HandlerContextConfigGroup<any>,
   >(
     handlerContextGroup: G,
-  ): AddHandlerContextConfigGroupHandlerContextConfig<G, Config> => {
+  ) => {
     const newHandlerMaps = pipe(
       Match.value(type(config(handlerContextConfig) as HandlerConfig)),
       Match.when("subscription", () => ({
@@ -100,19 +81,21 @@ export const add =
       Match.orElseAbsurd,
     );
 
-    return new HandlerContextConfigGroup(
-      newHandlerMaps,
-    ) as unknown as AddHandlerContextConfigGroupHandlerContextConfig<G, Config>;
+    return new HandlerContextConfigGroup<
+      | HandlerContextConfigGroupContext<G>
+      | HandlerContext<HandlerOrUndefined<Config>>
+    >(newHandlerMaps);
   };
 
 export const addGroup =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   <const OtherG extends HandlerContextConfigGroup<any>>(otherGroup: OtherG) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    <const ThisG extends HandlerContextConfigGroup<any>>(
-      thisGroup: ThisG,
-    ): AddHandlerContextConfigGroupHandlerContextConfigGroup<ThisG, OtherG> =>
-      new HandlerContextConfigGroup({
+    <const ThisG extends HandlerContextConfigGroup<any>>(thisGroup: ThisG) =>
+      new HandlerContextConfigGroup<
+        | HandlerContextConfigGroupContext<ThisG>
+        | HandlerContextConfigGroupContext<OtherG>
+      >({
         subscriptionHandlerContextMap: HashMap.union(
           thisGroup.subscriptionHandlerContextMap,
           otherGroup.subscriptionHandlerContextMap,
@@ -121,10 +104,7 @@ export const addGroup =
           thisGroup.mutationHandlerContextMap,
           otherGroup.mutationHandlerContextMap,
         ),
-      }) as unknown as AddHandlerContextConfigGroupHandlerContextConfigGroup<
-        ThisG,
-        OtherG
-      >;
+      });
 
 export const getSubscriptionHandlerContextConfig =
   (key: string) =>

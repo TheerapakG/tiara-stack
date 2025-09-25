@@ -67,44 +67,6 @@ type MergeMutationHandlerConfig<
       : never;
 };
 
-type AddHandlerConfigGroupHandlerConfig<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  G extends HandlerConfigGroup<any, any>,
-  Config extends SubscriptionHandlerConfig | MutationHandlerConfig,
-> = [Config] extends [SubscriptionHandlerConfig]
-  ? HandlerConfigGroup<
-      AddSubscriptionHandlerConfig<
-        HandlerConfigGroupSubscriptionHandlerConfigs<G>,
-        Config
-      >,
-      HandlerConfigGroupMutationHandlerConfigs<G>
-    >
-  : [Config] extends [MutationHandlerConfig]
-    ? HandlerConfigGroup<
-        HandlerConfigGroupSubscriptionHandlerConfigs<G>,
-        AddMutationHandlerConfig<
-          HandlerConfigGroupMutationHandlerConfigs<G>,
-          Config
-        >
-      >
-    : never;
-
-type AddHandlerConfigGroupHandlerConfigGroup<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  OtherG extends HandlerConfigGroup<any, any>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ThisG extends HandlerConfigGroup<any, any>,
-> = HandlerConfigGroup<
-  MergeSubscriptionHandlerConfig<
-    HandlerConfigGroupSubscriptionHandlerConfigs<ThisG>,
-    HandlerConfigGroupSubscriptionHandlerConfigs<OtherG>
-  >,
-  MergeMutationHandlerConfig<
-    HandlerConfigGroupMutationHandlerConfigs<ThisG>,
-    HandlerConfigGroupMutationHandlerConfigs<OtherG>
-  >
->;
-
 export class HandlerConfigGroup<
   _SubscriptionHandlerConfigs extends Record<
     string,
@@ -134,41 +96,58 @@ export const add =
     const G extends HandlerConfigGroup<any, any>,
   >(
     handlerGroup: G,
-  ): AddHandlerConfigGroupHandlerConfig<G, Config> => {
-    const newHandlerMaps = pipe(
-      Match.value(type(handlerConfig as HandlerConfig)),
-      Match.when("subscription", () => ({
-        subscriptionHandlerMap: HashMap.set(
-          handlerGroup.subscriptionHandlerMap,
-          name(handlerConfig),
-          handlerConfig as SubscriptionHandlerConfig,
-        ),
-        mutationHandlerMap: handlerGroup.mutationHandlerMap,
-      })),
-      Match.when("mutation", () => ({
-        subscriptionHandlerMap: handlerGroup.subscriptionHandlerMap,
-        mutationHandlerMap: HashMap.set(
-          handlerGroup.mutationHandlerMap,
-          name(handlerConfig),
-          handlerConfig as MutationHandlerConfig,
-        ),
-      })),
-      Match.orElseAbsurd,
+  ) =>
+    new HandlerConfigGroup<
+      [Config] extends [SubscriptionHandlerConfig]
+        ? AddSubscriptionHandlerConfig<
+            HandlerConfigGroupSubscriptionHandlerConfigs<G>,
+            Config
+          >
+        : HandlerConfigGroupSubscriptionHandlerConfigs<G>,
+      [Config] extends [MutationHandlerConfig]
+        ? AddMutationHandlerConfig<
+            HandlerConfigGroupMutationHandlerConfigs<G>,
+            Config
+          >
+        : HandlerConfigGroupMutationHandlerConfigs<G>
+    >(
+      pipe(
+        Match.value(type(handlerConfig as HandlerConfig)),
+        Match.when("subscription", () => ({
+          subscriptionHandlerMap: HashMap.set(
+            handlerGroup.subscriptionHandlerMap,
+            name(handlerConfig),
+            handlerConfig as SubscriptionHandlerConfig,
+          ),
+          mutationHandlerMap: handlerGroup.mutationHandlerMap,
+        })),
+        Match.when("mutation", () => ({
+          subscriptionHandlerMap: handlerGroup.subscriptionHandlerMap,
+          mutationHandlerMap: HashMap.set(
+            handlerGroup.mutationHandlerMap,
+            name(handlerConfig),
+            handlerConfig as MutationHandlerConfig,
+          ),
+        })),
+        Match.orElseAbsurd,
+      ),
     );
-
-    return new HandlerConfigGroup(
-      newHandlerMaps,
-    ) as unknown as AddHandlerConfigGroupHandlerConfig<G, Config>;
-  };
 
 export const addGroup =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   <const OtherG extends HandlerConfigGroup<any, any>>(otherGroup: OtherG) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    <const ThisG extends HandlerConfigGroup<any, any>>(
-      thisGroup: ThisG,
-    ): AddHandlerConfigGroupHandlerConfigGroup<ThisG, OtherG> =>
-      new HandlerConfigGroup({
+    <const ThisG extends HandlerConfigGroup<any, any>>(thisGroup: ThisG) =>
+      new HandlerConfigGroup<
+        MergeSubscriptionHandlerConfig<
+          HandlerConfigGroupSubscriptionHandlerConfigs<ThisG>,
+          HandlerConfigGroupSubscriptionHandlerConfigs<OtherG>
+        >,
+        MergeMutationHandlerConfig<
+          HandlerConfigGroupMutationHandlerConfigs<ThisG>,
+          HandlerConfigGroupMutationHandlerConfigs<OtherG>
+        >
+      >({
         subscriptionHandlerMap: HashMap.union(
           thisGroup.subscriptionHandlerMap,
           otherGroup.subscriptionHandlerMap,
@@ -177,4 +156,4 @@ export const addGroup =
           thisGroup.mutationHandlerMap,
           otherGroup.mutationHandlerMap,
         ),
-      }) as unknown as AddHandlerConfigGroupHandlerConfigGroup<ThisG, OtherG>;
+      });
