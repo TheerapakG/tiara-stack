@@ -20,6 +20,18 @@ import {
   GuildConfigService,
 } from "./server/services";
 
+const TracesLive = NodeSdk.layer(() => ({
+  resource: { serviceName: "sheet-apis" },
+  spanProcessor: new BatchSpanProcessor(new OTLPTraceExporter()),
+}));
+
+const MetricsLive = NodeSdk.layer(() => ({
+  resource: { serviceName: "sheet-apis" },
+  metricReader: new PrometheusExporter(),
+}));
+
+const baseLayer = Layer.mergeAll(MetricsLive, Logger.logFmt);
+
 const layer = pipe(
   Layer.mergeAll(
     GuildConfigService.DefaultWithoutDependencies,
@@ -34,6 +46,7 @@ const layer = pipe(
       NodeContext.layer,
     ),
   ),
+  Layer.provideMerge(baseLayer),
 );
 
 const serverHandlerGroup = pipe(
@@ -43,29 +56,22 @@ const serverHandlerGroup = pipe(
 );
 
 const server = pipe(
-  Server.create(layer),
+  Server.create(),
   Effect.map(Server.addGroup(serverHandlerGroup)),
+  Effect.map(Server.withTraceProvider(TracesLive)),
 );
 
-const TracesLive = NodeSdk.layer(() => ({
-  resource: { serviceName: "sheet-apis" },
-  spanProcessor: new BatchSpanProcessor(new OTLPTraceExporter()),
-}));
-
-const MetricsLive = NodeSdk.layer(() => ({
-  resource: { serviceName: "sheet-apis" },
-  metricReader: new PrometheusExporter(),
-}));
-
 const serveEffect = pipe(
-  server,
-  Effect.map(Server.withTraceProvider(TracesLive)),
-  Effect.flatMap(Server.serve(crosswsServe)),
-  Effect.flatMap((latch) => latch.await),
+  Effect.Do,
+  Effect.bind("server", () => server),
+  Effect.bind("runtime", () => Layer.toRuntime(layer)),
+  Effect.flatMap(({ server, runtime }) =>
+    Server.start(crosswsServe)(server, runtime),
+  ),
   Effect.sandbox,
   Effect.catchAll((error) => Effect.logError(error)),
-  Effect.provide(MetricsLive),
-  Effect.provide(Logger.logFmt),
+  Effect.provide(baseLayer),
+  Effect.scoped,
 );
 
 NodeRuntime.runMain(serveEffect, {
