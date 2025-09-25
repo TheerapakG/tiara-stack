@@ -194,12 +194,23 @@ export class Computed<A = never, E = never, R = never>
 }
 
 export const make = <A = never, E = never, R = never>(
-  effect: Effect.Effect<A, E, R | SignalContext>,
+  effect: Effect.Effect<A, E, R>,
   options?: Observable.ObservableOptions,
 ) =>
   pipe(
     Deferred.make<A, E>(),
-    Effect.map((value) => new Computed<A, E, R>(effect, value, options ?? {})),
+    Effect.map(
+      (value) =>
+        new Computed<A, E, Exclude<R, SignalContext>>(
+          effect as Effect.Effect<
+            A,
+            E,
+            SignalContext | Exclude<R, SignalContext>
+          >,
+          value,
+          options ?? {},
+        ),
+    ),
     Observable.withSpan(
       { [Observable.ObservableSymbol]: options ?? {} },
       "Computed.make",
