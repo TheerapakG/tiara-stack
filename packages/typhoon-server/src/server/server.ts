@@ -13,16 +13,17 @@ import {
   Function,
   HashMap,
   Layer,
-  ManagedRuntime,
   Match,
   Metric,
   Option,
   pipe,
+  Runtime,
   Schema,
   Scope,
   String,
   Struct,
   SynchronizedRef,
+  Fiber,
 } from "effect";
 import { HandlerConfig, HandlerContextConfig } from "typhoon-core/config";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
@@ -67,11 +68,9 @@ export class Server<R = never>
     unsubscribeTotal: Metric.Metric.Counter<bigint>;
     onceTotal: Metric.Metric.Counter<bigint>;
     mutationTotal: Metric.Metric.Counter<bigint>;
-    layer: Layer.Layer<R, unknown>;
-    runtime: SynchronizedRef.SynchronizedRef<
-      Option.Option<ManagedRuntime.ManagedRuntime<R, unknown>>
+    runFiber: SynchronizedRef.SynchronizedRef<
+      Option.Option<Fiber.Fiber<unknown, unknown>>
     >;
-    startSemaphore: Effect.Semaphore;
     status: SynchronizedRef.SynchronizedRef<"stopped" | "pending" | "ready">;
   }>
   implements BaseServer.Server
@@ -79,7 +78,7 @@ export class Server<R = never>
   readonly [BaseServer.ServerSymbol]: BaseServer.Server = this;
 }
 
-export const create = <R = never>(layer: Layer.Layer<R, unknown>) =>
+export const create = <R = never>() =>
   pipe(
     Effect.Do,
     Effect.bindAll(
@@ -139,11 +138,9 @@ export const create = <R = never>(layer: Layer.Layer<R, unknown>) =>
             incremental: true,
           }),
         ),
-        layer: Effect.succeed(layer),
-        runtime: SynchronizedRef.make(
-          Option.none<ManagedRuntime.ManagedRuntime<R, unknown>>(),
+        runFiber: SynchronizedRef.make(
+          Option.none<Fiber.Fiber<unknown, unknown>>(),
         ),
-        startSemaphore: Effect.makeSemaphore(1),
         status: SynchronizedRef.make<"stopped" | "pending" | "ready">(
           "stopped",
         ),
@@ -175,14 +172,15 @@ export const add =
       Struct.evolve(server, {
         handlerContextConfigGroup: HandlerContextConfig.Group.add(handler),
       }),
-    ) as Exclude<
-      HandlerContextConfig.HandlerContext<
-        HandlerContextConfig.HandlerOrUndefined<Config>
-      >,
-      Event
-    > extends ServerLayerContext<S>
-      ? S
-      : never;
+    ) as Server<
+      | ServerLayerContext<S>
+      | Exclude<
+          HandlerContextConfig.HandlerContext<
+            HandlerContextConfig.HandlerOrUndefined<Config>
+          >,
+          Event
+        >
+    >;
 
 export const addGroup =
   <
@@ -198,12 +196,13 @@ export const addGroup =
         handlerContextConfigGroup:
           HandlerContextConfig.Group.addGroup(handlerContextGroup),
       }),
-    ) as Exclude<
-      HandlerContextConfig.Group.HandlerContextConfigGroupContext<G>,
-      Event
-    > extends ServerLayerContext<S>
-      ? S
-      : never;
+    ) as Server<
+      | ServerLayerContext<S>
+      | Exclude<
+          HandlerContextConfig.Group.HandlerContextConfigGroupContext<G>,
+          Event
+        >
+    >;
 
 const open =
   (peer: Peer) =>
@@ -264,11 +263,11 @@ const close =
     );
 
 const updatePeerState =
-  (
+  <R = never>(
     peer: Peer,
     updater: (
       state: Option.Option<PeerState>,
-    ) => Effect.Effect<Option.Option<PeerState>, unknown, never>,
+    ) => Effect.Effect<Option.Option<PeerState>, unknown, R>,
   ) =>
   <R = never>(server: Server<R>) =>
     pipe(
@@ -289,12 +288,12 @@ const updatePeerState =
       }),
     );
 
-const updatePeerSubscriptionState = (
+const updatePeerSubscriptionState = <R = never>(
   peer: Peer,
   subscriptionId: string,
   updater: (
     state: Option.Option<SubscriptionState>,
-  ) => Effect.Effect<Option.Option<SubscriptionState>, unknown, never>,
+  ) => Effect.Effect<Option.Option<SubscriptionState>, unknown, R>,
 ) =>
   updatePeerState(peer, (peerState) =>
     pipe(
@@ -603,7 +602,7 @@ const handleSubscribe =
     header: Header.Header<"client:subscribe">,
     scope: Scope.CloseableScope,
   ) =>
-  <R = never>(server: Server<R>) =>
+  <R = never>(server: Server<R>, runtime: Runtime.Runtime<R>) =>
     pipe(
       server.subscribeTotal(Effect.succeed(BigInt(1))),
       Effect.andThen(() =>
@@ -671,53 +670,27 @@ const handleSubscribe =
                     "computedBuffer",
                     ({ event, handlerContextConfig }) =>
                       pipe(
-                        SynchronizedRef.get(server.runtime),
-                        Effect.flatMap(
-                          Option.match({
-                            onSome: (runtime) =>
-                              pipe(
-                                getComputedSubscriptionResultEncoded(
-                                  header.id,
-                                  handlerContextConfig,
-                                ),
-                                Effect.provide(runtime),
-                                Effect.provideService(Event, event),
-                              ),
-                            onNone: () =>
-                              Effect.fail("scope layer not initialized"),
-                          }),
+                        getComputedSubscriptionResultEncoded(
+                          header.id,
+                          handlerContextConfig,
                         ),
+                        Effect.provideService(Event, event),
+                        Effect.provide(runtime),
                       ),
                   ),
-                  Effect.bind("providedComputedBuffer", ({ computedBuffer }) =>
-                    Computed.make(
+                  Effect.bind("effectCleanup", ({ event, computedBuffer }) =>
+                    SideEffect.make(
                       pipe(
-                        SynchronizedRef.get(server.runtime),
-                        Effect.flatMap(
-                          Option.match({
-                            onSome: (runtime) =>
-                              pipe(computedBuffer, Effect.provide(runtime)),
-                            onNone: () =>
-                              Effect.fail("scope layer not initialized"),
+                        computedBuffer,
+                        Effect.tap((buffer) =>
+                          peer.send(buffer, {
+                            compress: true,
                           }),
                         ),
+                        Effect.provideService(Event, event),
+                        Effect.provide(runtime),
                       ),
                     ),
-                  ),
-                  Effect.bind(
-                    "effectCleanup",
-                    ({ event, providedComputedBuffer }) =>
-                      SideEffect.make(
-                        pipe(
-                          providedComputedBuffer,
-                          Effect.tap((buffer) =>
-                            peer.send(buffer, {
-                              compress: true,
-                            }),
-                          ),
-                          Effect.provideService(Event, event),
-                        ),
-                      ),
                   ),
                   Effect.map(({ event, effectCleanup }) =>
                     Option.some({
@@ -776,7 +749,7 @@ const handleOnce =
     callback: (buffer: Uint8Array) => Effect.Effect<A, E, Event>,
     scope: Scope.CloseableScope,
   ) =>
-  <R = never>(server: Server<R>) =>
+  <R = never>(server: Server<R>, runtime: Runtime.Runtime<R>) =>
     pipe(
       Effect.Do,
       Effect.tap(() => server.onceTotal(Effect.succeed(BigInt(1)))),
@@ -818,44 +791,19 @@ const handleOnce =
       ),
       Effect.bind("computedBuffer", ({ event, handlerContextConfig }) =>
         pipe(
-          SynchronizedRef.get(server.runtime),
-          Effect.flatMap(
-            Option.match({
-              onSome: (runtime) =>
-                pipe(
-                  getComputedSubscriptionResultEncoded(
-                    header.id,
-                    handlerContextConfig,
-                  ),
-                  Effect.provide(runtime),
-                  Effect.provideService(Event, event),
-                ),
-              onNone: () => Effect.fail("scope layer not initialized"),
-            }),
-          ),
+          getComputedSubscriptionResultEncoded(header.id, handlerContextConfig),
+          Effect.provideService(Event, event),
+          Effect.provide(runtime),
         ),
       ),
-      Effect.bind("providedComputedBuffer", ({ computedBuffer }) =>
-        Computed.make(
-          pipe(
-            SynchronizedRef.get(server.runtime),
-            Effect.flatMap(
-              Option.match({
-                onSome: (runtime) =>
-                  pipe(computedBuffer, Effect.provide(runtime)),
-                onNone: () => Effect.fail("scope layer not initialized"),
-              }),
-            ),
-          ),
-        ),
-      ),
-      Effect.bind("returnValue", ({ event, providedComputedBuffer }) =>
+      Effect.bind("returnValue", ({ event, computedBuffer }) =>
         OnceObserver.observeOnce(
           pipe(
-            providedComputedBuffer,
+            computedBuffer,
             Effect.flatMap((buffer) => callback(buffer)),
             Effect.tap(() => closeEvent()),
             Effect.provideService(Event, event),
+            Effect.provide(runtime),
           ),
         ),
       ),
@@ -877,7 +825,7 @@ const handleMutate =
     callback: (buffer: Uint8Array) => Effect.Effect<A, E, Event>,
     scope: Scope.CloseableScope,
   ) =>
-  <R = never>(server: Server<R>) =>
+  <R = never>(server: Server<R>, runtime: Runtime.Runtime<R>) =>
     pipe(
       Effect.Do,
       Effect.tap(() => server.mutationTotal(Effect.succeed(BigInt(1)))),
@@ -919,18 +867,9 @@ const handleMutate =
       ),
       Effect.bind("buffer", ({ event, handlerContextConfig }) =>
         pipe(
-          SynchronizedRef.get(server.runtime),
-          Effect.flatMap(
-            Option.match({
-              onSome: (runtime) =>
-                pipe(
-                  getMutationResultEncoded(header.id, handlerContextConfig),
-                  Effect.provide(runtime),
-                  Effect.provideService(Event, event),
-                ),
-              onNone: () => Effect.fail("scope layer not initialized"),
-            }),
-          ),
+          getMutationResultEncoded(header.id, handlerContextConfig),
+          Effect.provideService(Event, event),
+          Effect.provide(runtime),
         ),
       ),
       Effect.bind("returnValue", ({ event, buffer }) =>
@@ -950,7 +889,7 @@ const handleMutate =
 
 const handleWebSocketMessage =
   (peer: Peer, message: Message) =>
-  <R = never>(server: Server<R>) =>
+  <R = never>(server: Server<R>, runtime: Runtime.Runtime<R>) =>
     pipe(
       Effect.Do,
       Effect.bind("scope", () => Scope.make()),
@@ -982,7 +921,12 @@ const handleWebSocketMessage =
               pipe(
                 Match.value(header),
                 Match.when({ action: "client:subscribe" }, (header) =>
-                  handleSubscribe(peer, pullStream, header, scope)(server),
+                  handleSubscribe(
+                    peer,
+                    pullStream,
+                    header,
+                    scope,
+                  )(server, runtime),
                 ),
                 Match.when({ action: "client:unsubscribe" }, (header) =>
                   handleUnsubscribe(peer, header)(server),
@@ -999,7 +943,7 @@ const handleWebSocketMessage =
                         });
                       }),
                     scope,
-                  )(server),
+                  )(server, runtime),
                 ),
                 Match.when({ action: "client:mutate" }, (header) =>
                   handleMutate(
@@ -1013,7 +957,7 @@ const handleWebSocketMessage =
                         });
                       }),
                     scope,
-                  )(server),
+                  )(server, runtime),
                 ),
                 Match.orElse(() => Effect.void),
               ),
@@ -1027,7 +971,7 @@ const handleWebSocketMessage =
 
 const handleProtocolWebRequest =
   (request: Request) =>
-  <R = never>(server: Server<R>) =>
+  <R = never>(server: Server<R>, runtime: Runtime.Runtime<R>) =>
     pipe(
       Effect.Do,
       Effect.bind("scope", () => Scope.make()),
@@ -1083,7 +1027,7 @@ const handleProtocolWebRequest =
                           }),
                       ),
                     scope,
-                  )(server),
+                  )(server, runtime),
                 ),
                 Match.when({ action: "client:mutate" }, (header) =>
                   handleMutate(
@@ -1101,7 +1045,7 @@ const handleProtocolWebRequest =
                           }),
                       ),
                     scope,
-                  )(server),
+                  )(server, runtime),
                 ),
                 Match.orElse(() =>
                   Effect.sync(() => new Response("", { status: 404 })),
@@ -1117,7 +1061,7 @@ const handleProtocolWebRequest =
 
 const handleWebRequest =
   (request: Request) =>
-  <R = never>(server: Server<R>) =>
+  <R = never>(server: Server<R>, runtime: Runtime.Runtime<R>) =>
     pipe(
       Match.value(withoutTrailingSlash(parseURL(request.url).pathname)),
       Match.when("/live", () =>
@@ -1130,7 +1074,7 @@ const handleWebRequest =
           Effect.sync(() => new Response("", { status: ready ? 200 : 500 })),
         )(server),
       ),
-      Match.orElse(() => handleProtocolWebRequest(request)(server)),
+      Match.orElse(() => handleProtocolWebRequest(request)(server, runtime)),
     );
 
 const isStarted = <R = never>(server: Server<R>) =>
@@ -1172,52 +1116,12 @@ const handleReady =
       Effect.flatMap(callback),
     );
 
-const start = <R = never>(server: Server<R>) =>
-  server.startSemaphore.withPermits(1)(
-    pipe(
-      SynchronizedRef.update(server.status, () => "pending" as const),
-      Effect.andThen(
-        SynchronizedRef.update(server.runtime, () =>
-          Option.some(ManagedRuntime.make(server.layer)),
-        ),
-      ),
-      Effect.andThen(
-        SynchronizedRef.update(server.status, () => "ready" as const),
-      ),
-      Effect.as(server),
-    ),
-  );
-
-export const stop = <R = never>(server: Server<R>) =>
-  pipe(
-    SynchronizedRef.update(server.status, () => "pending" as const),
-    Effect.andThen(
-      SynchronizedRef.updateEffect(server.runtime, (runtime) =>
-        pipe(
-          runtime,
-          Option.match({
-            onSome: (runtime) => Effect.tryPromise(() => runtime.dispose()),
-            onNone: () => Effect.void,
-          }),
-          Effect.as(Option.none()),
-        ),
-      ),
-    ),
-    Effect.andThen(
-      SynchronizedRef.update(server.status, () => "stopped" as const),
-    ),
-    Effect.tap(() => Effect.log("Server is stopped")),
-    Effect.as(server),
-  );
-
-const handleServeAction = <R = never, A = never, E = never>(
-  action: (server: Server<R>) => Effect.Effect<A, E, never>,
+const transformErrorResult = <A = never, E = never, R = never>(
   onError: (error: Cause.Cause<E>) => Effect.Effect<A, never, never>,
 ) => {
-  return (server: Server<R>) =>
+  return (effect: Effect.Effect<A, E, R>) =>
     pipe(
-      server,
-      action,
+      effect,
       Effect.exit,
       Effect.flatMap(
         Exit.match({
@@ -1231,92 +1135,127 @@ const handleServeAction = <R = never, A = never, E = never>(
             ),
         }),
       ),
-      Effect.withSpan("serve.action", {
+      Effect.withSpan("serve.transformErrorResult", {
         captureStackTrace: true,
       }),
     );
 };
 
-export const serve =
-  <R>(serveFn: typeof crosswsServe) =>
-  (server: Server<R>) => {
-    return pipe(
-      Effect.succeed(server),
-      Effect.andThen(start),
-      Effect.map((server) => {
-        return serveFn({
-          websocket: {
-            open: (peer) => {
-              return Effect.runPromise(
+export const start =
+  (serveFn: typeof crosswsServe) =>
+  <R = never>(server: Server<R>, runtime: Runtime.Runtime<R>) =>
+    pipe(
+      SynchronizedRef.updateEffect(server.runFiber, (fiberOption) =>
+        pipe(
+          SynchronizedRef.update(server.status, () => "pending" as const),
+          Effect.andThen(
+            Effect.transposeMapOption(fiberOption, Fiber.interrupt),
+          ),
+          Effect.andThen(
+            Effect.succeedSome(
+              Runtime.runFork(
+                runtime,
                 pipe(
-                  server,
-                  handleServeAction(open(peer), () => Effect.void),
-                  Effect.withSpan("serve.websocket.open", {
-                    captureStackTrace: true,
-                  }),
-                  Effect.provide(server.traceProvider),
-                ),
-              );
-            },
+                  Effect.try(() =>
+                    serveFn({
+                      websocket: {
+                        open: (peer) => {
+                          return Effect.runPromise(
+                            pipe(
+                              open(peer)(server),
+                              transformErrorResult(() => Effect.void),
+                              Effect.withSpan("serve.websocket.open", {
+                                captureStackTrace: true,
+                              }),
+                              Effect.provide(server.traceProvider),
+                            ),
+                          );
+                        },
 
-            message: (peer, message) => {
-              return Effect.runPromise(
-                pipe(
-                  server,
-                  handleServeAction(
-                    handleWebSocketMessage(peer, message),
-                    () => Effect.void,
+                        message: (peer, message) => {
+                          return Effect.runPromise(
+                            pipe(
+                              handleWebSocketMessage(peer, message)(
+                                server,
+                                runtime,
+                              ),
+                              transformErrorResult(() => Effect.void),
+                              Effect.withSpan("serve.websocket.message", {
+                                captureStackTrace: true,
+                              }),
+                              Effect.provide(server.traceProvider),
+                            ),
+                          );
+                        },
+
+                        close: (peer, _event) => {
+                          return Effect.runPromise(
+                            pipe(
+                              close(peer)(server),
+                              transformErrorResult(() => Effect.void),
+                              Effect.withSpan("serve.websocket.close", {
+                                captureStackTrace: true,
+                              }),
+                              Effect.provide(server.traceProvider),
+                            ),
+                          );
+                        },
+
+                        error: (peer, error) => {
+                          return Effect.runPromise(
+                            pipe(
+                              Effect.log("[ws] error", peer, error),
+                              Effect.withSpan("serve.websocket.error", {
+                                captureStackTrace: true,
+                              }),
+                              Effect.provide(server.traceProvider),
+                            ),
+                          );
+                        },
+                      },
+                      fetch: (request) => {
+                        return Effect.runPromise(
+                          pipe(
+                            handleWebRequest(request)(server, runtime),
+                            transformErrorResult(() =>
+                              Effect.succeed(new Response("", { status: 500 })),
+                            ),
+                            Effect.withSpan("serve.fetch", {
+                              captureStackTrace: true,
+                            }),
+                            Effect.provide(server.traceProvider),
+                          ),
+                        );
+                      },
+                    }),
                   ),
-                  Effect.withSpan("serve.websocket.message", {
-                    captureStackTrace: true,
-                  }),
-                  Effect.provide(server.traceProvider),
+                  Effect.andThen(Effect.makeLatch()),
+                  Effect.andThen((latch) => latch.await),
                 ),
-              );
-            },
-
-            close: (peer, _event) => {
-              return Effect.runPromise(
-                pipe(
-                  server,
-                  handleServeAction(close(peer), () => Effect.void),
-                  Effect.withSpan("serve.websocket.close", {
-                    captureStackTrace: true,
-                  }),
-                  Effect.provide(server.traceProvider),
-                ),
-              );
-            },
-
-            error: (peer, error) => {
-              return Effect.runPromise(
-                pipe(
-                  Effect.log("[ws] error", peer, error),
-                  Effect.withSpan("serve.websocket.error", {
-                    captureStackTrace: true,
-                  }),
-                  Effect.provide(server.traceProvider),
-                ),
-              );
-            },
-          },
-          fetch: (request) => {
-            return Effect.runPromise(
-              pipe(
-                server,
-                handleServeAction(handleWebRequest(request), () =>
-                  Effect.succeed(new Response("", { status: 500 })),
-                ),
-                Effect.withSpan("serve.fetch", {
-                  captureStackTrace: true,
-                }),
-                Effect.provide(server.traceProvider),
               ),
-            );
-          },
-        });
-      }),
-      // TODO: actual server closing method
-      Effect.flatMap(() => Effect.makeLatch(false)),
+            ),
+          ),
+          Effect.tap(
+            SynchronizedRef.update(server.status, () => "ready" as const),
+          ),
+          Effect.tap(() => Effect.log("Server is ready")),
+        ),
+      ),
+      Effect.as(server),
     );
-  };
+
+export const stop = <R = never>(server: Server<R>) =>
+  pipe(
+    SynchronizedRef.updateEffect(server.runFiber, (fiberOption) =>
+      pipe(
+        SynchronizedRef.update(server.status, () => "pending" as const),
+        Effect.andThen(Effect.transposeMapOption(fiberOption, Fiber.interrupt)),
+        Effect.andThen(
+          SynchronizedRef.update(server.status, () => "stopped" as const),
+        ),
+        Effect.andThen(Effect.log("Server is stopped")),
+        Effect.andThen(Effect.succeedNone),
+      ),
+    ),
+    Effect.as(server),
+  );
