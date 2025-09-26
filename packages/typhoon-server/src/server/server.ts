@@ -23,10 +23,10 @@ import {
   String,
   Struct,
   SynchronizedRef,
-  Fiber,
 } from "effect";
 import { HandlerConfig, HandlerContextConfig } from "typhoon-core/config";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
+import { RunState } from "typhoon-core/runtime";
 import { Server as BaseServer } from "typhoon-core/server";
 import { Computed, OnceObserver, SideEffect } from "typhoon-core/signal";
 import { Validate } from "typhoon-core/validator";
@@ -68,10 +68,7 @@ export class Server<R = never>
     unsubscribeTotal: Metric.Metric.Counter<bigint>;
     onceTotal: Metric.Metric.Counter<bigint>;
     mutationTotal: Metric.Metric.Counter<bigint>;
-    runFiber: SynchronizedRef.SynchronizedRef<
-      Option.Option<Fiber.Fiber<unknown, unknown>>
-    >;
-    status: SynchronizedRef.SynchronizedRef<"stopped" | "pending" | "ready">;
+    runState: RunState.RunState<void, Cause.UnknownException>;
   }>
   implements BaseServer.Server
 {
@@ -138,12 +135,7 @@ export const create = <R = never>() =>
             incremental: true,
           }),
         ),
-        runFiber: SynchronizedRef.make(
-          Option.none<Fiber.Fiber<unknown, unknown>>(),
-        ),
-        status: SynchronizedRef.make<"stopped" | "pending" | "ready">(
-          "stopped",
-        ),
+        runState: RunState.make<void, Cause.UnknownException>(),
       }),
       { concurrency: "unbounded" },
     ),
@@ -1079,15 +1071,15 @@ const handleWebRequest =
 
 const isStarted = <R = never>(server: Server<R>) =>
   pipe(
-    server.status,
-    SynchronizedRef.get,
+    server.runState,
+    RunState.status,
     Effect.map((status) => Array.contains(["pending", "ready"], status)),
   );
 
 const isReady = <R = never>(server: Server<R>) =>
   pipe(
-    server.status,
-    SynchronizedRef.get,
+    server.runState,
+    RunState.status,
     Effect.map((status) => String.Equivalence(status, "ready")),
   );
 
@@ -1145,117 +1137,92 @@ export const start =
   (serveFn: typeof crosswsServe) =>
   <R = never>(server: Server<R>, runtime: Runtime.Runtime<R>) =>
     pipe(
-      SynchronizedRef.updateEffect(server.runFiber, (fiberOption) =>
+      server.runState,
+      RunState.start(
         pipe(
-          SynchronizedRef.update(server.status, () => "pending" as const),
-          Effect.andThen(
-            Effect.transposeMapOption(fiberOption, Fiber.interrupt),
-          ),
-          Effect.andThen(
-            Effect.succeedSome(
-              Runtime.runFork(
-                runtime,
-                pipe(
-                  Effect.try(() =>
-                    serveFn({
-                      websocket: {
-                        open: (peer) => {
-                          return Effect.runPromise(
-                            pipe(
-                              open(peer)(server),
-                              transformErrorResult(() => Effect.void),
-                              Effect.withSpan("serve.websocket.open", {
-                                captureStackTrace: true,
-                              }),
-                              Effect.provide(server.traceProvider),
-                            ),
-                          );
-                        },
+          Effect.try(() =>
+            serveFn({
+              websocket: {
+                open: (peer) => {
+                  return Effect.runPromise(
+                    pipe(
+                      open(peer)(server),
+                      transformErrorResult(() => Effect.void),
+                      Effect.withSpan("serve.websocket.open", {
+                        captureStackTrace: true,
+                      }),
+                      Effect.provide(server.traceProvider),
+                    ),
+                  );
+                },
 
-                        message: (peer, message) => {
-                          return Effect.runPromise(
-                            pipe(
-                              handleWebSocketMessage(peer, message)(
-                                server,
-                                runtime,
-                              ),
-                              transformErrorResult(() => Effect.void),
-                              Effect.withSpan("serve.websocket.message", {
-                                captureStackTrace: true,
-                              }),
-                              Effect.provide(server.traceProvider),
-                            ),
-                          );
-                        },
+                message: (peer, message) => {
+                  return Effect.runPromise(
+                    pipe(
+                      handleWebSocketMessage(peer, message)(server, runtime),
+                      transformErrorResult(() => Effect.void),
+                      Effect.withSpan("serve.websocket.message", {
+                        captureStackTrace: true,
+                      }),
+                      Effect.provide(server.traceProvider),
+                    ),
+                  );
+                },
 
-                        close: (peer, _event) => {
-                          return Effect.runPromise(
-                            pipe(
-                              close(peer)(server),
-                              transformErrorResult(() => Effect.void),
-                              Effect.withSpan("serve.websocket.close", {
-                                captureStackTrace: true,
-                              }),
-                              Effect.provide(server.traceProvider),
-                            ),
-                          );
-                        },
+                close: (peer, _event) => {
+                  return Effect.runPromise(
+                    pipe(
+                      close(peer)(server),
+                      transformErrorResult(() => Effect.void),
+                      Effect.withSpan("serve.websocket.close", {
+                        captureStackTrace: true,
+                      }),
+                      Effect.provide(server.traceProvider),
+                    ),
+                  );
+                },
 
-                        error: (peer, error) => {
-                          return Effect.runPromise(
-                            pipe(
-                              Effect.log("[ws] error", peer, error),
-                              Effect.withSpan("serve.websocket.error", {
-                                captureStackTrace: true,
-                              }),
-                              Effect.provide(server.traceProvider),
-                            ),
-                          );
-                        },
-                      },
-                      fetch: (request) => {
-                        return Effect.runPromise(
-                          pipe(
-                            handleWebRequest(request)(server, runtime),
-                            transformErrorResult(() =>
-                              Effect.succeed(new Response("", { status: 500 })),
-                            ),
-                            Effect.withSpan("serve.fetch", {
-                              captureStackTrace: true,
-                            }),
-                            Effect.provide(server.traceProvider),
-                          ),
-                        );
-                      },
+                error: (peer, error) => {
+                  return Effect.runPromise(
+                    pipe(
+                      Effect.log("[ws] error", peer, error),
+                      Effect.withSpan("serve.websocket.error", {
+                        captureStackTrace: true,
+                      }),
+                      Effect.provide(server.traceProvider),
+                    ),
+                  );
+                },
+              },
+              fetch: (request) => {
+                return Effect.runPromise(
+                  pipe(
+                    handleWebRequest(request)(server, runtime),
+                    transformErrorResult(() =>
+                      Effect.succeed(new Response("", { status: 500 })),
+                    ),
+                    Effect.withSpan("serve.fetch", {
+                      captureStackTrace: true,
                     }),
+                    Effect.provide(server.traceProvider),
                   ),
-                  Effect.andThen(Effect.makeLatch()),
-                  Effect.andThen((latch) => latch.await),
-                ),
-              ),
-            ),
+                );
+              },
+            }),
           ),
-          Effect.tap(
-            SynchronizedRef.update(server.status, () => "ready" as const),
-          ),
-          Effect.tap(() => Effect.log("Server is ready")),
+          Effect.andThen(Effect.makeLatch()),
+          Effect.andThen((latch) => latch.await),
         ),
+        runtime,
       ),
+      Effect.tap(() => Effect.log("Server is ready")),
       Effect.as(server),
     );
 
 export const stop = <R = never>(server: Server<R>) =>
   pipe(
-    SynchronizedRef.updateEffect(server.runFiber, (fiberOption) =>
-      pipe(
-        SynchronizedRef.update(server.status, () => "pending" as const),
-        Effect.andThen(Effect.transposeMapOption(fiberOption, Fiber.interrupt)),
-        Effect.andThen(
-          SynchronizedRef.update(server.status, () => "stopped" as const),
-        ),
-        Effect.andThen(Effect.log("Server is stopped")),
-        Effect.andThen(Effect.succeedNone),
-      ),
-    ),
+    server.runState,
+    RunState.stop,
+    Effect.tap(() => Effect.log("Server is stopped")),
     Effect.as(server),
   );
