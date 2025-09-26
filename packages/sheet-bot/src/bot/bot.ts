@@ -51,7 +51,13 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
     InteractionHandlerMapWithMetricsGroup<A, E, R>
   >;
   readonly traceProvider: Layer.Layer<never>;
-  readonly runState: RunState.RunState<void, Cause.UnknownException>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readonly runState: RunState.RunState<
+    Bot<any, any, any>,
+    void,
+    Cause.UnknownException,
+    R
+  >;
 }> {
   static onChatInputCommandInteraction = (
     interaction: ChatInputCommandInteraction,
@@ -215,24 +221,86 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       );
   };
 
-  static create = <A = never, E = never, R = never>() => {
-    return pipe(
-      Effect.Do,
-      bindObject({
-        client: Effect.succeed(
-          new Client({
-            intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
-          }),
+  static makeStartEffect =
+    <A = never, E = never, R = never>(discordToken: string) =>
+    (bot: Bot<A, E, R>, runtime: Runtime.Runtime<R>) =>
+      pipe(
+        Effect.try(() =>
+          bot.client
+            .once(Events.ClientReady, (client) =>
+              Effect.runPromise(
+                pipe(
+                  ClientService.fetchApplication(),
+                  Effect.tap(() => ClientService.fetchGuilds()),
+                  Effect.andThen(() => ClientService.getGuilds()),
+                  Effect.tap((guilds) =>
+                    Effect.forEach(HashMap.values(guilds), (guild) =>
+                      Effect.log(
+                        `guildId: ${guild.id} guildName: ${guild.name}`,
+                      ),
+                    ),
+                  ),
+                  Effect.tap(() =>
+                    pipe(
+                      bot.interactionHandlerMapWithMetricsGroup,
+                      SynchronizedRef.get,
+                      Effect.flatMap(
+                        InteractionHandlerMapWithMetricsGroup.initialize,
+                      ),
+                    ),
+                  ),
+                  Effect.tap(() => Effect.log("Bot is ready")),
+                  Effect.provide(ClientService.Default(client)),
+                ),
+              ),
+            )
+            .on(Events.InteractionCreate, (interaction) =>
+              Effect.runPromise(
+                pipe(
+                  Bot.onInteraction(interaction)(bot, runtime),
+                  Effect.provide(bot.traceProvider),
+                  Effect.catchAll(() => Effect.void),
+                ),
+              ),
+            ),
         ),
-        interactionHandlerMapWithMetricsGroup: SynchronizedRef.make(
-          InteractionHandlerMapWithMetricsGroup.empty<A, E, R>(),
+        Effect.andThen(() =>
+          Effect.promise(() => bot.client.login(discordToken)),
         ),
-        traceProvider: Effect.succeed(Layer.empty),
-        runState: RunState.make<void, Cause.UnknownException>(),
-      }),
-      Effect.map((params) => new Bot<A, E, R>(params)),
+        Effect.andThen(() => Effect.makeLatch()),
+        Effect.andThen((latch) => latch.await),
+      );
+
+  static makeFinalizer =
+    <A = never, E = never, R = never>() =>
+    (bot: Bot<A, E, R>) =>
+      Effect.promise(() => bot.client.destroy());
+
+  static create = <A = never, E = never, R = never>() =>
+    Config.use(({ discordToken }) =>
+      pipe(
+        Effect.Do,
+        bindObject({
+          client: Effect.succeed(
+            new Client({
+              intents: [
+                GatewayIntentBits.Guilds,
+                GatewayIntentBits.GuildMembers,
+              ],
+            }),
+          ),
+          interactionHandlerMapWithMetricsGroup: SynchronizedRef.make(
+            InteractionHandlerMapWithMetricsGroup.empty<A, E, R>(),
+          ),
+          traceProvider: Effect.succeed(Layer.empty),
+          runState: RunState.make(
+            Bot.makeStartEffect<A, E, R>(discordToken),
+            Bot.makeFinalizer<A, E, R>(),
+          ),
+        }),
+        Effect.map((params) => new Bot<A, E, R>(params)),
+      ),
     );
-  };
 
   static withTraceProvider = (traceProvider: Layer.Layer<never>) => {
     return <A = never, E = never, R = never>(bot: Bot<A, E, R>) =>
@@ -245,68 +313,15 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   static start = <A = never, E = never, R = never>(
     bot: Bot<A, E, R>,
     runtime: Runtime.Runtime<R>,
-  ) => {
-    return Config.use(({ discordToken }) =>
-      pipe(
-        bot.runState,
-        RunState.start(
-          pipe(
-            Effect.try(() =>
-              bot.client
-                .once(Events.ClientReady, (client) =>
-                  Effect.runPromise(
-                    pipe(
-                      ClientService.fetchApplication(),
-                      Effect.tap(() => ClientService.fetchGuilds()),
-                      Effect.andThen(() => ClientService.getGuilds()),
-                      Effect.tap((guilds) =>
-                        Effect.forEach(HashMap.values(guilds), (guild) =>
-                          Effect.log(
-                            `guildId: ${guild.id} guildName: ${guild.name}`,
-                          ),
-                        ),
-                      ),
-                      Effect.tap(() =>
-                        pipe(
-                          bot.interactionHandlerMapWithMetricsGroup,
-                          SynchronizedRef.get,
-                          Effect.flatMap(
-                            InteractionHandlerMapWithMetricsGroup.initialize,
-                          ),
-                        ),
-                      ),
-                      Effect.tap(() => Effect.log("Bot is ready")),
-                      Effect.provide(ClientService.Default(client)),
-                    ),
-                  ),
-                )
-                .on(Events.InteractionCreate, (interaction) =>
-                  Effect.runPromise(
-                    pipe(
-                      Bot.onInteraction(interaction)(bot, runtime),
-                      Effect.provide(bot.traceProvider),
-                      Effect.catchAll(() => Effect.void),
-                    ),
-                  ),
-                ),
-            ),
-            Effect.andThen(() =>
-              Effect.promise(() => bot.client.login(discordToken)),
-            ),
-            Effect.andThen(() => Effect.makeLatch()),
-            Effect.andThen((latch) => latch.await),
-          ),
-          runtime,
-        ),
-        Effect.as(bot),
-      ),
-    );
-  };
+  ) => pipe(bot.runState, RunState.start(bot, runtime), Effect.as(bot));
 
-  static stop = <A = never, E = never, R = never>(bot: Bot<A, E, R>) => {
+  static stop = <A = never, E = never, R = never>(
+    bot: Bot<A, E, R>,
+    runtime: Runtime.Runtime<R>,
+  ) => {
     return pipe(
-      Effect.promise(() => bot.client.destroy()),
-      Effect.andThen(RunState.stop(bot.runState)),
+      bot.runState,
+      RunState.stop(bot, runtime),
       Effect.tap(() => Effect.log("Bot is destroyed")),
       Effect.as(bot),
     );
@@ -511,31 +526,5 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         ),
         Effect.map(({ bot }) => bot),
       );
-  };
-
-  static registerProcessHandlers = <A = never, E = never, R = never>(
-    bot: Bot<A, E, R>,
-  ) => {
-    return pipe(
-      Effect.sync(() => {
-        process.on("SIGINT", () =>
-          Effect.runPromise(
-            pipe(
-              Effect.log("SIGINT received, shutting down..."),
-              Effect.andThen(() => Bot.stop(bot)),
-            ),
-          ),
-        );
-        process.on("SIGTERM", () =>
-          Effect.runPromise(
-            pipe(
-              Effect.log("SIGTERM received, shutting down..."),
-              Effect.andThen(() => Bot.stop(bot)),
-            ),
-          ),
-        );
-      }),
-      Effect.as(bot),
-    );
   };
 }
