@@ -1,6 +1,7 @@
 export * as Config from "./config";
 export * as Observability from "./observability";
 export * as Protocol from "./protocol";
+export * as Runtime from "./runtime";
 export * as Schema from "./schema";
 export * as Server from "./server";
 export * as Signal from "./signal";
