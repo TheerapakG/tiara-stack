@@ -72,13 +72,17 @@ export const start =
           ),
         ),
         (fiber) =>
-          SynchronizedRef.set(
-            runState.state,
-            new UnsafeRunState<A, E>({
-              status: "ready",
-              runFiber: Option.some(fiber),
-            }),
+          pipe(
+            SynchronizedRef.set(
+              runState.state,
+              new UnsafeRunState<A, E>({
+                status: "ready",
+                runFiber: Option.some(fiber),
+              }),
+            ),
+            Effect.as(fiber),
           ),
+        Effect.flatMap((fiber) => Fiber.join(fiber)),
       ),
     );
 
