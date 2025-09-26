@@ -68,14 +68,93 @@ export class Server<R = never>
     unsubscribeTotal: Metric.Metric.Counter<bigint>;
     onceTotal: Metric.Metric.Counter<bigint>;
     mutationTotal: Metric.Metric.Counter<bigint>;
-    runState: RunState.RunState<void, Cause.UnknownException>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    runState: RunState.RunState<Server<any>, void, Cause.UnknownException, R>;
   }>
   implements BaseServer.Server
 {
   readonly [BaseServer.ServerSymbol]: BaseServer.Server = this;
 }
 
-export const create = <R = never>() =>
+const makeServeEffect =
+  <R = never>(serveFn: typeof crosswsServe) =>
+  (server: Server<R>, runtime: Runtime.Runtime<R>) =>
+    pipe(
+      Effect.try(() =>
+        serveFn({
+          websocket: {
+            open: (peer) => {
+              return Effect.runPromise(
+                pipe(
+                  open(peer)(server),
+                  transformErrorResult(() => Effect.void),
+                  Effect.withSpan("serve.websocket.open", {
+                    captureStackTrace: true,
+                  }),
+                  Effect.provide(server.traceProvider),
+                ),
+              );
+            },
+
+            message: (peer, message) => {
+              return Effect.runPromise(
+                pipe(
+                  handleWebSocketMessage(peer, message)(server, runtime),
+                  transformErrorResult(() => Effect.void),
+                  Effect.withSpan("serve.websocket.message", {
+                    captureStackTrace: true,
+                  }),
+                  Effect.provide(server.traceProvider),
+                ),
+              );
+            },
+
+            close: (peer, _event) => {
+              return Effect.runPromise(
+                pipe(
+                  close(peer)(server),
+                  transformErrorResult(() => Effect.void),
+                  Effect.withSpan("serve.websocket.close", {
+                    captureStackTrace: true,
+                  }),
+                  Effect.provide(server.traceProvider),
+                ),
+              );
+            },
+
+            error: (peer, error) => {
+              return Effect.runPromise(
+                pipe(
+                  Effect.log("[ws] error", peer, error),
+                  Effect.withSpan("serve.websocket.error", {
+                    captureStackTrace: true,
+                  }),
+                  Effect.provide(server.traceProvider),
+                ),
+              );
+            },
+          },
+          fetch: (request) => {
+            return Effect.runPromise(
+              pipe(
+                handleWebRequest(request)(server, runtime),
+                transformErrorResult(() =>
+                  Effect.succeed(new Response("", { status: 500 })),
+                ),
+                Effect.withSpan("serve.fetch", {
+                  captureStackTrace: true,
+                }),
+                Effect.provide(server.traceProvider),
+              ),
+            );
+          },
+        }),
+      ),
+      Effect.andThen(Effect.makeLatch()),
+      Effect.andThen((latch) => latch.await),
+    );
+
+export const create = <R = never>(serveFn: typeof crosswsServe) =>
   pipe(
     Effect.Do,
     Effect.bindAll(
@@ -135,7 +214,7 @@ export const create = <R = never>() =>
             incremental: true,
           }),
         ),
-        runState: RunState.make<void, Cause.UnknownException>(),
+        runState: RunState.make(makeServeEffect<R>(serveFn), () => Effect.void),
       }),
       { concurrency: "unbounded" },
     ),
@@ -1133,96 +1212,24 @@ const transformErrorResult = <A = never, E = never, R = never>(
     );
 };
 
-export const start =
-  (serveFn: typeof crosswsServe) =>
-  <R = never>(server: Server<R>, runtime: Runtime.Runtime<R>) =>
-    pipe(
-      server.runState,
-      RunState.start(
-        pipe(
-          Effect.try(() =>
-            serveFn({
-              websocket: {
-                open: (peer) => {
-                  return Effect.runPromise(
-                    pipe(
-                      open(peer)(server),
-                      transformErrorResult(() => Effect.void),
-                      Effect.withSpan("serve.websocket.open", {
-                        captureStackTrace: true,
-                      }),
-                      Effect.provide(server.traceProvider),
-                    ),
-                  );
-                },
-
-                message: (peer, message) => {
-                  return Effect.runPromise(
-                    pipe(
-                      handleWebSocketMessage(peer, message)(server, runtime),
-                      transformErrorResult(() => Effect.void),
-                      Effect.withSpan("serve.websocket.message", {
-                        captureStackTrace: true,
-                      }),
-                      Effect.provide(server.traceProvider),
-                    ),
-                  );
-                },
-
-                close: (peer, _event) => {
-                  return Effect.runPromise(
-                    pipe(
-                      close(peer)(server),
-                      transformErrorResult(() => Effect.void),
-                      Effect.withSpan("serve.websocket.close", {
-                        captureStackTrace: true,
-                      }),
-                      Effect.provide(server.traceProvider),
-                    ),
-                  );
-                },
-
-                error: (peer, error) => {
-                  return Effect.runPromise(
-                    pipe(
-                      Effect.log("[ws] error", peer, error),
-                      Effect.withSpan("serve.websocket.error", {
-                        captureStackTrace: true,
-                      }),
-                      Effect.provide(server.traceProvider),
-                    ),
-                  );
-                },
-              },
-              fetch: (request) => {
-                return Effect.runPromise(
-                  pipe(
-                    handleWebRequest(request)(server, runtime),
-                    transformErrorResult(() =>
-                      Effect.succeed(new Response("", { status: 500 })),
-                    ),
-                    Effect.withSpan("serve.fetch", {
-                      captureStackTrace: true,
-                    }),
-                    Effect.provide(server.traceProvider),
-                  ),
-                );
-              },
-            }),
-          ),
-          Effect.andThen(Effect.makeLatch()),
-          Effect.andThen((latch) => latch.await),
-        ),
-        runtime,
-      ),
-      Effect.tap(() => Effect.log("Server is ready")),
-      Effect.as(server),
-    );
-
-export const stop = <R = never>(server: Server<R>) =>
+export const start = <R = never>(
+  server: Server<R>,
+  runtime: Runtime.Runtime<R>,
+) =>
   pipe(
     server.runState,
-    RunState.stop,
+    RunState.start(server, runtime),
+    Effect.tap(() => Effect.log("Server is ready")),
+    Effect.as(server),
+  );
+
+export const stop = <R = never>(
+  server: Server<R>,
+  runtime: Runtime.Runtime<R>,
+) =>
+  pipe(
+    server.runState,
+    RunState.stop(server, runtime),
     Effect.tap(() => Effect.log("Server is stopped")),
     Effect.as(server),
   );
