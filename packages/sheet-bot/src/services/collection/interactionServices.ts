@@ -7,6 +7,10 @@ import {
   PermissionService,
 } from "@/services/interaction";
 
+export type InteractionServices<I extends InteractionT> = Layer.Layer.Success<
+  ReturnType<typeof interactionServices<I>>
+>;
+
 export const interactionServices = <I extends InteractionT>(
   interaction: InteractionKind<I>,
 ) =>

@@ -256,12 +256,30 @@ export class InteractionHandlerMapWithMetricsGroup<
     return <BA = never, BE = never, BR = never>(
       group: InteractionHandlerMapWithMetricsGroup<BA, BE, BR>,
     ) =>
-      new InteractionHandlerMapWithMetricsGroup(
+      new InteractionHandlerMapWithMetricsGroup<
+        A | BA,
+        E | BE,
+        Exclude<R, InteractionContext<ChatInputCommandInteractionT>> | BR
+      >(
         pipe(
           group,
           Struct.evolve({
             chatInputCommandsMap: (map) =>
-              pipe(map, InteractionHandlerMapWithMetrics.add(command)),
+              pipe(
+                map,
+                InteractionHandlerMapWithMetrics.add(
+                  command as HandlerVariantHandlerContext<
+                    ChatInputHandlerVariantT,
+                    A,
+                    E,
+                    | Exclude<
+                        R,
+                        InteractionContext<ChatInputCommandInteractionT>
+                      >
+                    | InteractionContext<ChatInputCommandInteractionT>
+                  >,
+                ),
+              ),
           }),
         ),
       );
@@ -273,12 +291,30 @@ export class InteractionHandlerMapWithMetricsGroup<
     return <BA = never, BE = never, BR = never>(
       group: InteractionHandlerMapWithMetricsGroup<BA, BE, BR>,
     ) =>
-      new InteractionHandlerMapWithMetricsGroup(
+      new InteractionHandlerMapWithMetricsGroup<
+        A | BA,
+        E | BE,
+        Exclude<R, InteractionContext<ChatInputCommandInteractionT>> | BR
+      >(
         pipe(
           group,
           Struct.evolve({
             chatInputCommandsMap: (map) =>
-              pipe(map, InteractionHandlerMapWithMetrics.union(commands)),
+              pipe(
+                map,
+                InteractionHandlerMapWithMetrics.union(
+                  commands as HandlerVariantMap<
+                    ChatInputHandlerVariantT,
+                    A,
+                    E,
+                    | Exclude<
+                        R,
+                        InteractionContext<ChatInputCommandInteractionT>
+                      >
+                    | InteractionContext<ChatInputCommandInteractionT>
+                  >,
+                ),
+              ),
           }),
         ),
       );
@@ -290,12 +326,27 @@ export class InteractionHandlerMapWithMetricsGroup<
     return <BA = never, BE = never, BR = never>(
       group: InteractionHandlerMapWithMetricsGroup<BA, BE, BR>,
     ) =>
-      new InteractionHandlerMapWithMetricsGroup(
+      new InteractionHandlerMapWithMetricsGroup<
+        A | BA,
+        E | BE,
+        Exclude<R, InteractionContext<ButtonInteractionT>> | BR
+      >(
         pipe(
           group,
           Struct.evolve({
             buttonsMap: (map) =>
-              pipe(map, InteractionHandlerMapWithMetrics.add(button)),
+              pipe(
+                map,
+                InteractionHandlerMapWithMetrics.add(
+                  button as HandlerVariantHandlerContext<
+                    ButtonHandlerVariantT,
+                    A,
+                    E,
+                    | Exclude<R, InteractionContext<ButtonInteractionT>>
+                    | InteractionContext<ButtonInteractionT>
+                  >,
+                ),
+              ),
           }),
         ),
       );
@@ -307,12 +358,27 @@ export class InteractionHandlerMapWithMetricsGroup<
     return <BA = never, BE = never, BR = never>(
       group: InteractionHandlerMapWithMetricsGroup<BA, BE, BR>,
     ) =>
-      new InteractionHandlerMapWithMetricsGroup(
+      new InteractionHandlerMapWithMetricsGroup<
+        A | BA,
+        E | BE,
+        Exclude<R, InteractionContext<ButtonInteractionT>> | BR
+      >(
         pipe(
           group,
           Struct.evolve({
             buttonsMap: (map) =>
-              pipe(map, InteractionHandlerMapWithMetrics.union(buttons)),
+              pipe(
+                map,
+                InteractionHandlerMapWithMetrics.union(
+                  buttons as HandlerVariantMap<
+                    ButtonHandlerVariantT,
+                    A,
+                    E,
+                    | Exclude<R, InteractionContext<ButtonInteractionT>>
+                    | InteractionContext<ButtonInteractionT>
+                  >,
+                ),
+              ),
           }),
         ),
       );
@@ -329,12 +395,27 @@ export class InteractionHandlerMapWithMetricsGroup<
     return <BA = never, BE = never, BR = never>(
       group: InteractionHandlerMapWithMetricsGroup<BA, BE, BR>,
     ) =>
-      new InteractionHandlerMapWithMetricsGroup(
+      new InteractionHandlerMapWithMetricsGroup<
+        A | BA,
+        E | BE,
+        Exclude<R, InteractionContext<UserSelectMenuInteractionT>> | BR
+      >(
         pipe(
           group,
           Struct.evolve({
             userSelectMenuMap: (map) =>
-              pipe(map, InteractionHandlerMapWithMetrics.add(userSelectMenu)),
+              pipe(
+                map,
+                InteractionHandlerMapWithMetrics.add(
+                  userSelectMenu as HandlerVariantHandlerContext<
+                    UserSelectMenuHandlerVariantT,
+                    A,
+                    E,
+                    | Exclude<R, InteractionContext<UserSelectMenuInteractionT>>
+                    | InteractionContext<UserSelectMenuInteractionT>
+                  >,
+                ),
+              ),
           }),
         ),
       );
@@ -350,14 +431,26 @@ export class InteractionHandlerMapWithMetricsGroup<
     return <BA = never, BE = never, BR = never>(
       group: InteractionHandlerMapWithMetricsGroup<BA, BE, BR>,
     ) =>
-      new InteractionHandlerMapWithMetricsGroup(
+      new InteractionHandlerMapWithMetricsGroup<
+        A | BA,
+        E | BE,
+        Exclude<R, InteractionContext<UserSelectMenuInteractionT>> | BR
+      >(
         pipe(
           group,
           Struct.evolve({
             userSelectMenuMap: (map) =>
               pipe(
                 map,
-                InteractionHandlerMapWithMetrics.union(userSelectMenus),
+                InteractionHandlerMapWithMetrics.union(
+                  userSelectMenus as HandlerVariantMap<
+                    UserSelectMenuHandlerVariantT,
+                    A,
+                    E,
+                    | Exclude<R, InteractionContext<UserSelectMenuInteractionT>>
+                    | InteractionContext<UserSelectMenuInteractionT>
+                  >,
+                ),
               ),
           }),
         ),

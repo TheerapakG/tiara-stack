@@ -3,7 +3,7 @@ import { NodeRuntime } from "@effect/platform-node";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { Effect, Logger, pipe } from "effect";
+import { Effect, Layer, Logger, pipe } from "effect";
 import { Bot } from "./bot";
 import { commands } from "./commands";
 import { Config } from "./config";
@@ -20,22 +20,27 @@ const MetricsLive = NodeSdk.layer(() => ({
   metricReader: new PrometheusExporter(),
 }));
 
+const baseLayer = pipe(
+  Config.Default,
+  Layer.provideMerge(Layer.mergeAll(MetricsLive, Logger.logFmt)),
+);
+
 NodeRuntime.runMain(
   pipe(
     Effect.Do,
     Effect.bind("bot", () =>
       pipe(
-        Bot.create(botServices),
+        Bot.create(),
         Effect.map(Bot.withTraceProvider(TracesLive)),
         Effect.flatMap(Bot.registerProcessHandlers),
         Effect.flatMap(Bot.addChatInputCommandHandlerMap(commands)),
         Effect.flatMap(Bot.addButtonInteractionHandlerMap(buttons)),
       ),
     ),
-    Effect.flatMap(({ bot }) => Bot.login(bot)),
-    Effect.provide(Config.Default),
-    Effect.provide(MetricsLive),
-    Effect.provide(Logger.logFmt),
+    Effect.bind("runtime", () => Layer.toRuntime(botServices)),
+    Effect.flatMap(({ bot, runtime }) => Bot.start(bot, runtime)),
+    Effect.provide(baseLayer),
+    Effect.scoped,
   ),
   {
     disableErrorReporting: true,
