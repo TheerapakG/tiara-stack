@@ -32,7 +32,6 @@ NodeRuntime.runMain(
       pipe(
         Bot.create(),
         Effect.map(Bot.withTraceProvider(TracesLive)),
-        Effect.flatMap(Bot.registerProcessHandlers),
         Effect.flatMap(Bot.addChatInputCommandHandlerMap(commands)),
         Effect.flatMap(Bot.addButtonInteractionHandlerMap(buttons)),
       ),
