@@ -56,7 +56,7 @@ const serverHandlerGroup = pipe(
 );
 
 const server = pipe(
-  Server.create(),
+  Server.create(crosswsServe),
   Effect.map(Server.addGroup(serverHandlerGroup)),
   Effect.map(Server.withTraceProvider(TracesLive)),
 );
@@ -65,9 +65,7 @@ const serveEffect = pipe(
   Effect.Do,
   Effect.bind("server", () => server),
   Effect.bind("runtime", () => Layer.toRuntime(layer)),
-  Effect.flatMap(({ server, runtime }) =>
-    Server.start(crosswsServe)(server, runtime),
-  ),
+  Effect.flatMap(({ server, runtime }) => Server.start(server, runtime)),
   Effect.sandbox,
   Effect.catchAll((error) => Effect.logError(error)),
   Effect.provide(baseLayer),
