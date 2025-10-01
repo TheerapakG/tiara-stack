@@ -14,7 +14,7 @@ import {
   String,
   SynchronizedRef,
 } from "effect";
-import { HandlerConfig } from "typhoon-core/config";
+import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { DependencySignal, Signal } from "typhoon-core/signal";
 import { Validate, Validator } from "typhoon-core/validator";
@@ -43,12 +43,12 @@ type UpdaterStateMap = HashMap.HashMap<string, UpdaterState>;
 export class WebSocketClient<
   SubscriptionHandlerConfigs extends Record<
     string,
-    HandlerConfig.SubscriptionHandlerConfig
-  > = Record<string, HandlerConfig.SubscriptionHandlerConfig>,
+    Handler.Config.Subscription.SubscriptionHandlerConfig
+  > = Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
   MutationHandlerConfigs extends Record<
     string,
-    HandlerConfig.MutationHandlerConfig
-  > = Record<string, HandlerConfig.MutationHandlerConfig>,
+    Handler.Config.Mutation.MutationHandlerConfig
+  > = Record<string, Handler.Config.Mutation.MutationHandlerConfig>,
 > {
   constructor(
     private readonly url: string,
@@ -56,7 +56,7 @@ export class WebSocketClient<
       Option.Option<WebSocket>
     >,
     private readonly updaterStateMapRef: SynchronizedRef.SynchronizedRef<UpdaterStateMap>,
-    private readonly configGroup: HandlerConfig.Group.HandlerConfigGroup<
+    private readonly configCollection: Handler.Config.Collection.HandlerConfigCollection<
       SubscriptionHandlerConfigs,
       MutationHandlerConfigs
     >,
@@ -71,14 +71,14 @@ export class WebSocketClient<
   static create<
     SubscriptionHandlerConfigs extends Record<
       string,
-      HandlerConfig.SubscriptionHandlerConfig
+      Handler.Config.Subscription.SubscriptionHandlerConfig
     >,
     MutationHandlerConfigs extends Record<
       string,
-      HandlerConfig.MutationHandlerConfig
+      Handler.Config.Mutation.MutationHandlerConfig
     >,
   >(
-    configGroup: HandlerConfig.Group.HandlerConfigGroup<
+    configCollection: Handler.Config.Collection.HandlerConfigCollection<
       SubscriptionHandlerConfigs,
       MutationHandlerConfigs
     >,
@@ -105,7 +105,7 @@ export class WebSocketClient<
           new WebSocketClient<
             SubscriptionHandlerConfigs,
             MutationHandlerConfigs
-          >(url, ws, updaterStateMapRef, configGroup, token, status),
+          >(url, ws, updaterStateMapRef, configCollection, token, status),
       ),
       Effect.withSpan("WebSocketClient.create"),
     );
@@ -117,12 +117,8 @@ export class WebSocketClient<
       value: ResolvedState<unknown>,
     ) => Effect.Effect<void, never, never>,
   ) {
-    return (
-      client: WebSocketClient<
-        Record<string, HandlerConfig.SubscriptionHandlerConfig>,
-        Record<string, HandlerConfig.MutationHandlerConfig>
-      >,
-    ) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (client: WebSocketClient<any, any>) =>
       pipe(
         client.updaterStateMapRef,
         SynchronizedRef.update(HashMap.set(id, { updater })),
@@ -130,12 +126,8 @@ export class WebSocketClient<
   }
 
   static removeUpdater(id: string) {
-    return (
-      client: WebSocketClient<
-        Record<string, HandlerConfig.SubscriptionHandlerConfig>,
-        Record<string, HandlerConfig.MutationHandlerConfig>
-      >,
-    ) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (client: WebSocketClient<any, any>) =>
       pipe(
         client.updaterStateMapRef,
         SynchronizedRef.update(HashMap.remove(id)),
@@ -145,8 +137,8 @@ export class WebSocketClient<
   static handleUpdate(header: Header.Header, decodedResponse: unknown) {
     return (
       client: WebSocketClient<
-        Record<string, HandlerConfig.SubscriptionHandlerConfig>,
-        Record<string, HandlerConfig.MutationHandlerConfig>
+        Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
+        Record<string, Handler.Config.Mutation.MutationHandlerConfig>
       >,
     ) =>
       pipe(
@@ -188,8 +180,8 @@ export class WebSocketClient<
 
   static connect = (
     client: WebSocketClient<
-      Record<string, HandlerConfig.SubscriptionHandlerConfig>,
-      Record<string, HandlerConfig.MutationHandlerConfig>
+      Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
+      Record<string, Handler.Config.Mutation.MutationHandlerConfig>
     >,
   ) =>
     pipe(
@@ -278,8 +270,8 @@ export class WebSocketClient<
 
   static close(
     client: WebSocketClient<
-      Record<string, HandlerConfig.SubscriptionHandlerConfig>,
-      Record<string, HandlerConfig.MutationHandlerConfig>
+      Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
+      Record<string, Handler.Config.Mutation.MutationHandlerConfig>
     >,
   ) {
     return pipe(
@@ -315,8 +307,8 @@ export class WebSocketClient<
     (token: Option.Option<string>) =>
     (
       client: WebSocketClient<
-        Record<string, HandlerConfig.SubscriptionHandlerConfig>,
-        Record<string, HandlerConfig.MutationHandlerConfig>
+        Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
+        Record<string, Handler.Config.Mutation.MutationHandlerConfig>
       >,
     ) =>
       pipe(
@@ -327,18 +319,18 @@ export class WebSocketClient<
   static subscribe<
     SubscriptionHandlerConfigs extends Record<
       string,
-      HandlerConfig.SubscriptionHandlerConfig
+      Handler.Config.Subscription.SubscriptionHandlerConfig
     >,
     Handler extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: WebSocketClient<
       SubscriptionHandlerConfigs,
-      Record<string, HandlerConfig.MutationHandlerConfig>
+      Record<string, Handler.Config.Mutation.MutationHandlerConfig>
     >,
     handler: Handler,
     // TODO: make this conditionally optional
-    data?: HandlerConfig.ResolvedRequestParamsValidator<
-      HandlerConfig.RequestParamsOrUndefined<
+    data?: Handler.Config.ResolvedRequestParamsValidator<
+      Handler.Config.RequestParamsOrUndefined<
         SubscriptionHandlerConfigs[Handler]
       >
     > extends infer Validator extends StandardSchemaV1
@@ -352,8 +344,8 @@ export class WebSocketClient<
         Signal.make<
           SignalState<
             Validator.Validated<
-              HandlerConfig.ResolvedResponseValidator<
-                HandlerConfig.ResponseOrUndefined<
+              Handler.Config.ResolvedResponseValidator<
+                Handler.Config.ResponseOrUndefined<
                   SubscriptionHandlerConfigs[Handler]
                 >
               >
@@ -379,15 +371,15 @@ export class WebSocketClient<
                         Effect.Do,
                         Effect.bind("value", () => value.value),
                         Effect.bind("config", () =>
-                          HashMap.get(
-                            client.configGroup.subscriptionHandlerMap,
+                          Handler.Config.Collection.getHandlerConfig(
+                            "subscription",
                             handler,
-                          ),
+                          )(client.configCollection),
                         ),
                         Effect.flatMap(({ value, config }) =>
                           Validate.validate(
-                            HandlerConfig.resolveResponseValidator(
-                              HandlerConfig.response(
+                            Handler.Config.resolveResponseValidator(
+                              Handler.Config.response(
                                 config as SubscriptionHandlerConfigs[Handler],
                               ),
                             ),
@@ -443,8 +435,8 @@ export class WebSocketClient<
             signal as DependencySignal.DependencySignal<
               SignalState<
                 Validator.Validated<
-                  HandlerConfig.ResolvedResponseValidator<
-                    HandlerConfig.ResponseOrUndefined<
+                  Handler.Config.ResolvedResponseValidator<
+                    Handler.Config.ResponseOrUndefined<
                       SubscriptionHandlerConfigs[Handler]
                     >
                   >
@@ -468,13 +460,13 @@ export class WebSocketClient<
   static unsubscribe<
     SubscriptionHandlerConfigs extends Record<
       string,
-      HandlerConfig.SubscriptionHandlerConfig
+      Handler.Config.Subscription.SubscriptionHandlerConfig
     >,
     Handler extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: WebSocketClient<
       SubscriptionHandlerConfigs,
-      Record<string, HandlerConfig.MutationHandlerConfig>
+      Record<string, Handler.Config.Mutation.MutationHandlerConfig>
     >,
     id: string,
     handler: Handler,
@@ -514,18 +506,18 @@ export class WebSocketClient<
   static once<
     SubscriptionHandlerConfigs extends Record<
       string,
-      HandlerConfig.SubscriptionHandlerConfig
+      Handler.Config.Subscription.SubscriptionHandlerConfig
     >,
     Handler extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: WebSocketClient<
       SubscriptionHandlerConfigs,
-      Record<string, HandlerConfig.MutationHandlerConfig>
+      Record<string, Handler.Config.Mutation.MutationHandlerConfig>
     >,
     handler: Handler,
     // TODO: make this conditionally optional
-    data?: HandlerConfig.ResolvedRequestParamsValidator<
-      HandlerConfig.RequestParamsOrUndefined<
+    data?: Handler.Config.ResolvedRequestParamsValidator<
+      Handler.Config.RequestParamsOrUndefined<
         SubscriptionHandlerConfigs[Handler]
       >
     > extends infer Validator extends StandardSchemaV1
@@ -538,8 +530,8 @@ export class WebSocketClient<
       Effect.bind("deferred", () =>
         Deferred.make<
           Validator.Validated<
-            HandlerConfig.ResolvedResponseValidator<
-              HandlerConfig.ResponseOrUndefined<
+            Handler.Config.ResolvedResponseValidator<
+              Handler.Config.ResponseOrUndefined<
                 SubscriptionHandlerConfigs[Handler]
               >
             >
@@ -558,15 +550,15 @@ export class WebSocketClient<
                   Effect.Do,
                   Effect.bind("value", () => value.value),
                   Effect.bind("config", () =>
-                    HashMap.get(
-                      client.configGroup.subscriptionHandlerMap,
+                    Handler.Config.Collection.getHandlerConfig(
+                      "subscription",
                       handler,
-                    ),
+                    )(client.configCollection),
                   ),
                   Effect.flatMap(({ value, config }) =>
                     Validate.validate(
-                      HandlerConfig.resolveResponseValidator(
-                        HandlerConfig.response(
+                      Handler.Config.resolveResponseValidator(
+                        Handler.Config.response(
                           config as SubscriptionHandlerConfigs[Handler],
                         ),
                       ),
@@ -629,18 +621,18 @@ export class WebSocketClient<
   static mutate<
     MutationHandlerConfigs extends Record<
       string,
-      HandlerConfig.MutationHandlerConfig
+      Handler.Config.Mutation.MutationHandlerConfig
     >,
     Handler extends keyof MutationHandlerConfigs & string,
   >(
     client: WebSocketClient<
-      Record<string, HandlerConfig.SubscriptionHandlerConfig>,
+      Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
       MutationHandlerConfigs
     >,
     handler: Handler,
     // TODO: make this conditionally optional
-    data?: HandlerConfig.ResolvedRequestParamsValidator<
-      HandlerConfig.RequestParamsOrUndefined<MutationHandlerConfigs[Handler]>
+    data?: Handler.Config.ResolvedRequestParamsValidator<
+      Handler.Config.RequestParamsOrUndefined<MutationHandlerConfigs[Handler]>
     > extends infer Validator extends StandardSchemaV1
       ? StandardSchemaV1.InferInput<Validator>
       : never,
@@ -651,8 +643,10 @@ export class WebSocketClient<
       Effect.bind("deferred", () =>
         Deferred.make<
           Validator.Validated<
-            HandlerConfig.ResolvedResponseValidator<
-              HandlerConfig.ResponseOrUndefined<MutationHandlerConfigs[Handler]>
+            Handler.Config.ResolvedResponseValidator<
+              Handler.Config.ResponseOrUndefined<
+                MutationHandlerConfigs[Handler]
+              >
             >
           >,
           HandlerError
@@ -669,12 +663,15 @@ export class WebSocketClient<
                   Effect.Do,
                   Effect.bind("value", () => value.value),
                   Effect.bind("config", () =>
-                    HashMap.get(client.configGroup.mutationHandlerMap, handler),
+                    Handler.Config.Collection.getHandlerConfig(
+                      "mutation",
+                      handler,
+                    )(client.configCollection),
                   ),
                   Effect.flatMap(({ value, config }) =>
                     Validate.validate(
-                      HandlerConfig.resolveResponseValidator(
-                        HandlerConfig.response(
+                      Handler.Config.resolveResponseValidator(
+                        Handler.Config.response(
                           config as MutationHandlerConfigs[Handler],
                         ),
                       ),
