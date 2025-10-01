@@ -37,7 +37,7 @@
     "@typescript/native-preview": "latest",
     "c12": "^3.0.4",
     "drizzle-orm": "^0.44.0",
-    "effect": "^3.17.13",
+    "effect": "^3.17.14",
     "jose": "^6.1.0",
     "postgres": "^3.4.7",
     "sheet-db-schema": "workspace:*",

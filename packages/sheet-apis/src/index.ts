@@ -1,14 +1,14 @@
 import { pipe } from "effect";
-import { HandlerConfig } from "typhoon-core/config";
+import { Handler } from "typhoon-core/server";
 import {
-  calcHandlerConfigGroup,
-  guildConfigHandlerConfigGroup,
+  calcHandlerConfigCollection,
+  guildConfigHandlerConfigCollection,
 } from "./server/handler/config";
 
 export * as Schema from "./server/schema";
 
-export const serverHandlerConfigGroup = pipe(
-  HandlerConfig.Group.empty(),
-  HandlerConfig.Group.addGroup(calcHandlerConfigGroup),
-  HandlerConfig.Group.addGroup(guildConfigHandlerConfigGroup),
+export const serverHandlerConfigCollection = pipe(
+  Handler.Config.Collection.empty(),
+  Handler.Config.Collection.addCollection(calcHandlerConfigCollection),
+  Handler.Config.Collection.addCollection(guildConfigHandlerConfigCollection),
 );

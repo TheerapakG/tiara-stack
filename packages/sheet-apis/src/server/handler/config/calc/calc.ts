@@ -1,11 +1,11 @@
 import { pipe, Schema } from "effect";
-import { HandlerConfig } from "typhoon-core/config";
+import { Handler } from "typhoon-core/server";
 
 export const calcHandlerConfig = pipe(
-  HandlerConfig.empty,
-  HandlerConfig.Builder.name("calc"),
-  HandlerConfig.Builder.type("subscription"),
-  HandlerConfig.Builder.requestParams({
+  Handler.Config.empty(),
+  Handler.Config.Builder.type("subscription"),
+  Handler.Config.Builder.name("calc"),
+  Handler.Config.Builder.requestParams({
     validator: pipe(
       Schema.Struct({
         config: Schema.Struct({
@@ -33,7 +33,7 @@ export const calcHandlerConfig = pipe(
       Schema.standardSchemaV1,
     ),
   }),
-  HandlerConfig.Builder.response({
+  Handler.Config.Builder.response({
     validator: pipe(
       Schema.Array(
         Schema.Struct({

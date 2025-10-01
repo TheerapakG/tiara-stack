@@ -5,14 +5,14 @@ import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { serve as crosswsServe } from "crossws/server/node";
 import { Effect, Layer, Logger, pipe } from "effect";
-import { HandlerContextConfig } from "typhoon-core/config";
+import { Context } from "typhoon-server/handler";
 import { DB } from "typhoon-server/db";
 import { Server } from "typhoon-server/server";
 import { Config } from "./config";
 import { DBService } from "./db";
 import {
-  calcHandlerGroup,
-  guildConfigHandlerGroup,
+  calcHandlerCollection,
+  guildConfigHandlerCollection,
 } from "./server/handler/handler";
 import {
   AuthService,
@@ -49,15 +49,15 @@ const layer = pipe(
   Layer.provideMerge(baseLayer),
 );
 
-const serverHandlerGroup = pipe(
-  HandlerContextConfig.Group.empty(),
-  HandlerContextConfig.Group.addGroup(calcHandlerGroup),
-  HandlerContextConfig.Group.addGroup(guildConfigHandlerGroup),
+const serverHandlerCollection = pipe(
+  Context.Collection.empty(),
+  Context.Collection.addCollection(calcHandlerCollection),
+  Context.Collection.addCollection(guildConfigHandlerCollection),
 );
 
 const server = pipe(
   Server.create(crosswsServe),
-  Effect.map(Server.addGroup(serverHandlerGroup)),
+  Effect.map(Server.addCollection(serverHandlerCollection)),
   Effect.map(Server.withTraceProvider(TracesLive)),
 );
 
