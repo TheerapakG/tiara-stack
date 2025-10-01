@@ -1,14 +1,6 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import {
-  Data,
-  Effect,
-  HashMap,
-  Option,
-  pipe,
-  Schema,
-  SynchronizedRef,
-} from "effect";
-import { HandlerConfig } from "typhoon-core/config";
+import { Data, Effect, Option, pipe, Schema, SynchronizedRef } from "effect";
+import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { Validate } from "typhoon-core/validator";
 
@@ -17,16 +9,16 @@ export class HandlerError extends Data.TaggedError("HandlerError") {}
 export class AppsScriptClient<
   SubscriptionHandlerConfigs extends Record<
     string,
-    HandlerConfig.SubscriptionHandlerConfig
-  > = Record<string, HandlerConfig.SubscriptionHandlerConfig>,
+    Handler.Config.Subscription.SubscriptionHandlerConfig
+  > = Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
   MutationHandlerConfigs extends Record<
     string,
-    HandlerConfig.MutationHandlerConfig
-  > = Record<string, HandlerConfig.MutationHandlerConfig>,
+    Handler.Config.Mutation.MutationHandlerConfig
+  > = Record<string, Handler.Config.Mutation.MutationHandlerConfig>,
 > {
   constructor(
     private readonly url: string,
-    private readonly configGroup: HandlerConfig.Group.HandlerConfigGroup<
+    private readonly configCollection: Handler.Config.Collection.HandlerConfigCollection<
       SubscriptionHandlerConfigs,
       MutationHandlerConfigs
     >,
@@ -38,14 +30,14 @@ export class AppsScriptClient<
   static create<
     SubscriptionHandlerConfigs extends Record<
       string,
-      HandlerConfig.SubscriptionHandlerConfig
+      Handler.Config.Subscription.SubscriptionHandlerConfig
     >,
     MutationHandlerConfigs extends Record<
       string,
-      HandlerConfig.MutationHandlerConfig
+      Handler.Config.Mutation.MutationHandlerConfig
     >,
   >(
-    configGroup: HandlerConfig.Group.HandlerConfigGroup<
+    configCollection: Handler.Config.Collection.HandlerConfigCollection<
       SubscriptionHandlerConfigs,
       MutationHandlerConfigs
     >,
@@ -63,7 +55,7 @@ export class AppsScriptClient<
           new AppsScriptClient<
             SubscriptionHandlerConfigs,
             MutationHandlerConfigs
-          >(url, configGroup, token),
+          >(url, configCollection, token),
       ),
       Effect.withSpan("AppsScriptClient.create", {
         captureStackTrace: true,
@@ -75,8 +67,8 @@ export class AppsScriptClient<
     (token: Option.Option<string>) =>
     (
       client: AppsScriptClient<
-        Record<string, HandlerConfig.SubscriptionHandlerConfig>,
-        Record<string, HandlerConfig.MutationHandlerConfig>
+        Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
+        Record<string, Handler.Config.Mutation.MutationHandlerConfig>
       >,
     ) =>
       pipe(
@@ -89,18 +81,18 @@ export class AppsScriptClient<
   static once<
     SubscriptionHandlerConfigs extends Record<
       string,
-      HandlerConfig.SubscriptionHandlerConfig
+      Handler.Config.Subscription.SubscriptionHandlerConfig
     >,
     Handler extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: AppsScriptClient<
       SubscriptionHandlerConfigs,
-      Record<string, HandlerConfig.MutationHandlerConfig>
+      Record<string, Handler.Config.Mutation.MutationHandlerConfig>
     >,
     handler: Handler,
     // TODO: make this conditionally optional
-    data?: HandlerConfig.ResolvedRequestParamsValidator<
-      HandlerConfig.RequestParamsOrUndefined<
+    data?: Handler.Config.ResolvedRequestParamsValidator<
+      Handler.Config.RequestParamsOrUndefined<
         SubscriptionHandlerConfigs[Handler]
       >
     > extends infer Validator extends StandardSchemaV1
@@ -162,15 +154,18 @@ export class AppsScriptClient<
       // TODO: check if the response is a valid header
       Effect.bind("decodedResponse", ({ pullStream }) => pullStream),
       Effect.bind("config", () =>
-        HashMap.get(client.configGroup.subscriptionHandlerMap, handler),
+        Handler.Config.Collection.getHandlerConfig(
+          "subscription",
+          handler,
+        )(client.configCollection),
       ),
       Effect.flatMap(({ header, decodedResponse, config }) =>
         header.action === "server:update" && header.payload.success
           ? pipe(
               decodedResponse,
               Validate.validate(
-                HandlerConfig.resolveResponseValidator(
-                  HandlerConfig.response(
+                Handler.Config.resolveResponseValidator(
+                  Handler.Config.response(
                     config as SubscriptionHandlerConfigs[Handler],
                   ),
                 ),
