@@ -74,8 +74,12 @@ The following guidelines are to be followed for `git commit` command.
 - Use conventional commit message.
 - There is no need to list functions or symbols affected by the changes seperately from the main commit message body.
 - Use -m for new line in the commit message, and do not use \n anywhere.
+
   GOOD: `git commit -m "subject" -m "line1" -m "line2"  ...`
+
   BAD:
+
   - `git commit -m "subject\nline1\nline2\n..."`
   - `git commit -m "subject" -m "line1\nline2\n..."`.
+
 - DO NOT include the `--no-gpg-sign` flag.
