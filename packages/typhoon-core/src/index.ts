@@ -1,4 +1,4 @@
-export * as Config from "./config";
+export * as Handler from "./handler";
 export * as Observability from "./observability";
 export * as Protocol from "./protocol";
 export * as Runtime from "./runtime";
