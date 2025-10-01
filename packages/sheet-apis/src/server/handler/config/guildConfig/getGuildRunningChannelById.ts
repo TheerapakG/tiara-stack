@@ -1,16 +1,16 @@
 import { GuildChannelConfig } from "@/server/schema";
 import { pipe, Schema } from "effect";
-import { HandlerConfig } from "typhoon-core/config";
+import { Handler } from "typhoon-core/server";
 
 const responseSchema = Schema.OptionFromNullishOr(
   GuildChannelConfig,
   undefined,
 );
 export const getGuildRunningChannelByIdHandlerConfig = pipe(
-  HandlerConfig.empty,
-  HandlerConfig.Builder.name("guildConfig.getGuildRunningChannelById"),
-  HandlerConfig.Builder.type("subscription"),
-  HandlerConfig.Builder.requestParams({
+  Handler.Config.empty(),
+  Handler.Config.Builder.type("subscription"),
+  Handler.Config.Builder.name("guildConfig.getGuildRunningChannelById"),
+  Handler.Config.Builder.requestParams({
     validator: pipe(
       Schema.Struct({
         guildId: Schema.String,
@@ -19,7 +19,7 @@ export const getGuildRunningChannelByIdHandlerConfig = pipe(
       Schema.standardSchemaV1,
     ),
   }),
-  HandlerConfig.Builder.response({
+  Handler.Config.Builder.response({
     validator: pipe(responseSchema, Schema.standardSchemaV1),
   }),
 );

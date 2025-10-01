@@ -6,9 +6,9 @@ import {
   PlayerTeam,
 } from "@/server/services";
 import { Array, Chunk, Effect, HashSet, Option, pipe } from "effect";
-import { HandlerContextConfig } from "typhoon-core/config";
 import { Computed, DependencySignal } from "typhoon-core/signal";
-import { Event } from "typhoon-server/server";
+import { Event } from "typhoon-server/event";
+import { Context } from "typhoon-server/handler";
 
 const getUserAgent = <E, R>(
   request: DependencySignal.DependencySignal<Request, E, R>,
@@ -68,10 +68,11 @@ const getGuildConfigByScriptId = <E, R>(
     ),
   );
 
+const builders = Context.Subscription.Builder.builders();
 export const calcHandler = pipe(
-  HandlerContextConfig.empty,
-  HandlerContextConfig.Builder.config(calcHandlerConfig),
-  HandlerContextConfig.Builder.handler(
+  builders.empty(),
+  builders.data(calcHandlerConfig),
+  builders.handler(
     pipe(
       Effect.Do,
       Effect.bind("request", () => Computed.make(Event.webRequest())),

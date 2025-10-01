@@ -2,16 +2,17 @@ import { removeGuildManagerRoleHandlerConfig } from "@/server/handler/config";
 import { GuildConfigManagerRole } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
 import { Effect, pipe, Schema } from "effect";
-import { HandlerContextConfig } from "typhoon-core/config";
 import { OnceObserver } from "typhoon-core/signal";
-import { Event } from "typhoon-server/server";
+import { Event } from "typhoon-server/event";
+import { Context } from "typhoon-server/handler";
 
 const responseSchema = Schema.Array(GuildConfigManagerRole);
 
+const builders = Context.Mutation.Builder.builders();
 export const removeGuildManagerRoleHandler = pipe(
-  HandlerContextConfig.empty,
-  HandlerContextConfig.Builder.config(removeGuildManagerRoleHandlerConfig),
-  HandlerContextConfig.Builder.handler(
+  builders.empty(),
+  builders.data(removeGuildManagerRoleHandlerConfig),
+  builders.handler(
     pipe(
       Event.token(),
       Effect.flatMap(Effect.flatMap(AuthService.verify)),

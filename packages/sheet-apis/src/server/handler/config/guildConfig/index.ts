@@ -1,5 +1,5 @@
 import { pipe } from "effect";
-import { HandlerConfig } from "typhoon-core/config";
+import { Handler } from "typhoon-core/server";
 
 import { addGuildManagerRoleHandlerConfig } from "./addGuildManagerRole";
 import { getGuildConfigByGuildIdHandlerConfig } from "./getGuildConfigByGuildId";
@@ -23,15 +23,15 @@ export {
   upsertGuildConfigHandlerConfig,
 };
 
-export const guildConfigHandlerConfigGroup = pipe(
-  HandlerConfig.Group.empty(),
-  HandlerConfig.Group.add(getGuildConfigByGuildIdHandlerConfig),
-  HandlerConfig.Group.add(getGuildConfigByScriptIdHandlerConfig),
-  HandlerConfig.Group.add(upsertGuildConfigHandlerConfig),
-  HandlerConfig.Group.add(getGuildManagerRolesHandlerConfig),
-  HandlerConfig.Group.add(addGuildManagerRoleHandlerConfig),
-  HandlerConfig.Group.add(removeGuildManagerRoleHandlerConfig),
-  HandlerConfig.Group.add(upsertGuildChannelConfigHandlerConfig),
-  HandlerConfig.Group.add(getGuildRunningChannelByIdHandlerConfig),
-  HandlerConfig.Group.add(getGuildRunningChannelByNameHandlerConfig),
+export const guildConfigHandlerConfigCollection = pipe(
+  Handler.Config.Collection.empty(),
+  Handler.Config.Collection.add(getGuildConfigByGuildIdHandlerConfig),
+  Handler.Config.Collection.add(getGuildConfigByScriptIdHandlerConfig),
+  Handler.Config.Collection.add(upsertGuildConfigHandlerConfig),
+  Handler.Config.Collection.add(getGuildManagerRolesHandlerConfig),
+  Handler.Config.Collection.add(addGuildManagerRoleHandlerConfig),
+  Handler.Config.Collection.add(removeGuildManagerRoleHandlerConfig),
+  Handler.Config.Collection.add(upsertGuildChannelConfigHandlerConfig),
+  Handler.Config.Collection.add(getGuildRunningChannelByIdHandlerConfig),
+  Handler.Config.Collection.add(getGuildRunningChannelByNameHandlerConfig),
 );

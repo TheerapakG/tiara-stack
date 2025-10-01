@@ -1,13 +1,13 @@
 import { pipe } from "effect";
-import { HandlerConfig } from "typhoon-core/config";
+import { Handler } from "typhoon-core/server";
 
 import { botCalcHandlerConfig } from "./botCalc";
 import { calcHandlerConfig } from "./calc";
 
 export { botCalcHandlerConfig, calcHandlerConfig };
 
-export const calcHandlerConfigGroup = pipe(
-  HandlerConfig.Group.empty(),
-  HandlerConfig.Group.add(calcHandlerConfig),
-  HandlerConfig.Group.add(botCalcHandlerConfig),
+export const calcHandlerConfigCollection = pipe(
+  Handler.Config.Collection.empty(),
+  Handler.Config.Collection.add(calcHandlerConfig),
+  Handler.Config.Collection.add(botCalcHandlerConfig),
 );
