@@ -24,10 +24,10 @@ import {
   Struct,
   SynchronizedRef,
 } from "effect";
-import { HandlerConfig, HandlerContextConfig } from "typhoon-core/config";
+import { Context as HandlerContext, type Type } from "typhoon-core/handler";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { RunState } from "typhoon-core/runtime";
-import { Server as BaseServer } from "typhoon-core/server";
+import { Handler } from "typhoon-core/server";
 import { Computed, OnceObserver, SideEffect } from "typhoon-core/signal";
 import { Validate } from "typhoon-core/validator";
 import { parseURL, withoutTrailingSlash } from "ufo";
@@ -36,7 +36,15 @@ import {
   Event,
   fromEventContext,
   replacePullStream,
-} from "./event";
+} from "../event/event";
+import {
+  type HandlerContextCollection,
+  add as addHandlerContextCollection,
+  addCollection as addCollectionHandlerContextCollection,
+  getHandlerContext as getHandlerContextHandlerContextCollection,
+} from "../handler/context/collection";
+import { type MutationHandlerT } from "../handler/context/mutation/type";
+import { type SubscriptionHandlerT } from "../handler/context/subscription/type";
 import invalidHeaderErrorHtml from "./invalidHeaderError.html";
 
 type SubscriptionState = {
@@ -52,29 +60,22 @@ type PeerState = {
 type PeerStateMap = HashMap.HashMap<string, PeerState>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type ServerLayerContext<S extends Server<any>> =
+type ServerContext<S extends Server<any>> =
   S extends Server<infer R> ? R : never;
 
-export class Server<R = never>
-  extends Data.TaggedClass("Server")<{
-    traceProvider: Layer.Layer<never>;
-    handlerContextConfigGroup: HandlerContextConfig.Group.HandlerContextConfigGroup<
-      R | Event
-    >;
-    peerStateMapRef: SynchronizedRef.SynchronizedRef<PeerStateMap>;
-    peerActive: Metric.Metric.Gauge<bigint>;
-    peerTotal: Metric.Metric.Counter<bigint>;
-    subscribeTotal: Metric.Metric.Counter<bigint>;
-    unsubscribeTotal: Metric.Metric.Counter<bigint>;
-    onceTotal: Metric.Metric.Counter<bigint>;
-    mutationTotal: Metric.Metric.Counter<bigint>;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    runState: RunState.RunState<Server<any>, void, Cause.UnknownException, R>;
-  }>
-  implements BaseServer.Server
-{
-  readonly [BaseServer.ServerSymbol]: BaseServer.Server = this;
-}
+export class Server<R = never> extends Data.TaggedClass("Server")<{
+  traceProvider: Layer.Layer<never>;
+  handlerContextCollection: HandlerContextCollection<R>;
+  peerStateMapRef: SynchronizedRef.SynchronizedRef<PeerStateMap>;
+  peerActive: Metric.Metric.Gauge<bigint>;
+  peerTotal: Metric.Metric.Counter<bigint>;
+  subscribeTotal: Metric.Metric.Counter<bigint>;
+  unsubscribeTotal: Metric.Metric.Counter<bigint>;
+  onceTotal: Metric.Metric.Counter<bigint>;
+  mutationTotal: Metric.Metric.Counter<bigint>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  runState: RunState.RunState<Server<any>, void, Cause.UnknownException, R>;
+}> {}
 
 const makeServeEffect =
   <R = never>(serveFn: typeof crosswsServe) =>
@@ -160,8 +161,26 @@ export const create = <R = never>(serveFn: typeof crosswsServe) =>
     Effect.bindAll(
       () => ({
         traceProvider: Effect.succeed(Layer.empty),
-        handlerContextConfigGroup: Effect.succeed(
-          HandlerContextConfig.Group.empty(),
+        handlerContextCollection: Effect.succeed(
+          HandlerContext.Collection.empty<
+            MutationHandlerT | SubscriptionHandlerT,
+            R
+          >(
+            {
+              subscription: (config) =>
+                Handler.Config.Subscription.name(config),
+              mutation: (config) => Handler.Config.Mutation.name(config),
+            },
+            (context) =>
+              pipe(
+                Match.value(HandlerContext.data(context)),
+                Match.tagsExhaustive({
+                  PartialMutationHandlerConfig: () => "mutation" as const,
+                  PartialSubscriptionHandlerConfig: () =>
+                    "subscription" as const,
+                }),
+              ),
+          ),
         ),
         peerStateMapRef: SynchronizedRef.make(
           HashMap.empty<
@@ -231,49 +250,59 @@ export const withTraceProvider =
 
 export const add =
   <
-    Config extends
-      | HandlerContextConfig.SubscriptionHandlerContextConfig
-      | HandlerContextConfig.MutationHandlerContextConfig,
+    C extends
+      | HandlerContext.HandlerContext<MutationHandlerT>
+      | HandlerContext.HandlerContext<SubscriptionHandlerT>,
   >(
-    handler: Config,
+    handlerContext: C,
   ) =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   <S extends Server<any>>(server: S) =>
     new Server(
       Struct.evolve(server, {
-        handlerContextConfigGroup: HandlerContextConfig.Group.add(handler),
+        handlerContextCollection: (collection) =>
+          addHandlerContextCollection(
+            handlerContext as
+              | HandlerContext.HandlerContext<MutationHandlerT>
+              | HandlerContext.HandlerContext<SubscriptionHandlerT>,
+          )(collection as HandlerContextCollection<ServerContext<S>>),
       }),
-    ) as Server<
-      | ServerLayerContext<S>
-      | Exclude<
-          HandlerContextConfig.HandlerContext<
-            HandlerContextConfig.HandlerOrUndefined<Config>
-          >,
-          Event
+    ) as HandlerContext.HandlerOrUndefined<C> extends infer H extends
+      Type.Handler<HandlerContext.PartialHandlerContextHandlerT<C>>
+      ? Server<
+          | ServerContext<S>
+          | Type.HandlerContext<
+              HandlerContext.PartialHandlerContextHandlerT<C>,
+              H
+            >
         >
-    >;
+      : never;
 
-export const addGroup =
+export const addCollection =
   <
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    G extends HandlerContextConfig.Group.HandlerContextConfigGroup<any>,
+    C extends HandlerContext.Collection.HandlerContextCollection<
+      MutationHandlerT | SubscriptionHandlerT,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      any
+    >,
   >(
-    handlerContextGroup: G,
+    handlerContextCollection: C,
   ) =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   <S extends Server<any>>(server: S) =>
-    new Server(
+    new Server<
+      | ServerContext<S>
+      | HandlerContext.Collection.HandlerContextCollectionContext<C>
+    >(
       Struct.evolve(server, {
-        handlerContextConfigGroup:
-          HandlerContextConfig.Group.addGroup(handlerContextGroup),
+        handlerContextCollection: (collection) =>
+          addCollectionHandlerContextCollection(
+            handlerContextCollection as HandlerContextCollection<
+              HandlerContext.Collection.HandlerContextCollectionContext<C>
+            >,
+          )(collection as HandlerContextCollection<ServerContext<S>>),
       }),
-    ) as Server<
-      | ServerLayerContext<S>
-      | Exclude<
-          HandlerContextConfig.Group.HandlerContextConfigGroupContext<G>,
-          Event
-        >
-    >;
+    );
 
 const open =
   (peer: Peer) =>
@@ -414,13 +443,10 @@ const updatePeerSubscriptionState = <R = never>(
 
 const getComputedSubscriptionResult = <R = never>(
   subscriptionId: string,
-  subscriptionHandlerContextConfig: HandlerContextConfig.SubscriptionHandlerContextConfig<
-    HandlerConfig.SubscriptionHandlerConfig,
-    HandlerContextConfig.SubscriptionHandler<
-      HandlerConfig.SubscriptionHandlerConfig,
-      R | Event,
-      R | Event
-    >
+  subscriptionHandlerContext: HandlerContext.HandlerContext<
+    SubscriptionHandlerT,
+    Type.HandlerData<SubscriptionHandlerT>,
+    Type.Handler<SubscriptionHandlerT, unknown, unknown, R>
   >,
 ): Effect.Effect<
   Computed.Computed<
@@ -435,7 +461,7 @@ const getComputedSubscriptionResult = <R = never>(
   R | Event
 > =>
   pipe(
-    HandlerContextConfig.handler(subscriptionHandlerContextConfig),
+    HandlerContext.handler(subscriptionHandlerContext),
     Effect.flatMap((handler) =>
       Computed.make(
         pipe(
@@ -473,14 +499,14 @@ const getComputedSubscriptionResult = <R = never>(
           Effect.withSpan("subscriptionHandler", {
             captureStackTrace: true,
             attributes: {
-              handler: HandlerConfig.name(
-                HandlerContextConfig.config(subscriptionHandlerContextConfig),
+              handler: Handler.Config.Subscription.name(
+                HandlerContext.data(subscriptionHandlerContext),
               ),
             },
           }),
           Effect.annotateLogs({
-            handler: HandlerConfig.name(
-              HandlerContextConfig.config(subscriptionHandlerContextConfig),
+            handler: Handler.Config.Subscription.name(
+              HandlerContext.data(subscriptionHandlerContext),
             ),
           }),
         ),
@@ -489,26 +515,24 @@ const getComputedSubscriptionResult = <R = never>(
     Effect.withSpan("Server.getComputedSubscriptionResult", {
       captureStackTrace: true,
       attributes: {
-        handler: HandlerConfig.name(
-          HandlerContextConfig.config(subscriptionHandlerContextConfig),
+        handler: Handler.Config.Subscription.name(
+          HandlerContext.data(subscriptionHandlerContext),
         ),
       },
     }),
     Effect.annotateLogs({
-      handler: HandlerConfig.name(
-        HandlerContextConfig.config(subscriptionHandlerContextConfig),
+      handler: Handler.Config.Subscription.name(
+        HandlerContext.data(subscriptionHandlerContext),
       ),
     }),
   );
 
 const getMutationResult = <R = never>(
   mutationId: string,
-  mutationHandlerContextConfig: HandlerContextConfig.MutationHandlerContextConfig<
-    HandlerConfig.MutationHandlerConfig,
-    HandlerContextConfig.MutationHandler<
-      HandlerConfig.MutationHandlerConfig,
-      R | Event
-    >
+  mutationHandlerContextConfig: HandlerContext.HandlerContext<
+    MutationHandlerT,
+    Type.HandlerData<MutationHandlerT>,
+    Type.Handler<MutationHandlerT, unknown, unknown, R>
   >,
 ): Effect.Effect<
   {
@@ -521,7 +545,7 @@ const getMutationResult = <R = never>(
   pipe(
     Effect.Do,
     Effect.bind("value", () =>
-      Effect.exit(HandlerContextConfig.handler(mutationHandlerContextConfig)),
+      Effect.exit(HandlerContext.handler(mutationHandlerContextConfig)),
     ),
     Effect.bind("timestamp", () => DateTime.now),
     Effect.let(
@@ -555,27 +579,24 @@ const getMutationResult = <R = never>(
     Effect.withSpan("Server.getMutationResult", {
       captureStackTrace: true,
       attributes: {
-        handler: HandlerConfig.name(
-          HandlerContextConfig.config(mutationHandlerContextConfig),
+        handler: Handler.Config.Mutation.name(
+          HandlerContext.data(mutationHandlerContextConfig),
         ),
       },
     }),
     Effect.annotateLogs({
-      handler: HandlerConfig.name(
-        HandlerContextConfig.config(mutationHandlerContextConfig),
+      handler: Handler.Config.Mutation.name(
+        HandlerContext.data(mutationHandlerContextConfig),
       ),
     }),
   );
 
 const getComputedSubscriptionResultEncoded = <R = never>(
   subscriptionId: string,
-  subscriptionHandlerContextConfig: HandlerContextConfig.SubscriptionHandlerContextConfig<
-    HandlerConfig.SubscriptionHandlerConfig,
-    HandlerContextConfig.SubscriptionHandler<
-      HandlerConfig.SubscriptionHandlerConfig,
-      R | Event,
-      R | Event
-    >
+  subscriptionHandlerContextConfig: HandlerContext.HandlerContext<
+    SubscriptionHandlerT,
+    Type.HandlerData<SubscriptionHandlerT>,
+    Type.Handler<SubscriptionHandlerT, unknown, unknown, R>
   >,
 ) =>
   pipe(
@@ -612,8 +633,8 @@ const getComputedSubscriptionResultEncoded = <R = never>(
     Effect.withSpan("Server.getComputedSubscriptionResultEncoded", {
       captureStackTrace: true,
       attributes: {
-        handler: HandlerConfig.name(
-          HandlerContextConfig.config(subscriptionHandlerContextConfig),
+        handler: Handler.Config.Subscription.name(
+          HandlerContext.data(subscriptionHandlerContextConfig),
         ),
       },
     }),
@@ -621,12 +642,10 @@ const getComputedSubscriptionResultEncoded = <R = never>(
 
 const getMutationResultEncoded = <R = never>(
   mutationId: string,
-  mutationHandlerContextConfig: HandlerContextConfig.MutationHandlerContextConfig<
-    HandlerConfig.MutationHandlerConfig,
-    HandlerContextConfig.MutationHandler<
-      HandlerConfig.MutationHandlerConfig,
-      R | Event
-    >
+  mutationHandlerContextConfig: HandlerContext.HandlerContext<
+    MutationHandlerT,
+    Type.HandlerData<MutationHandlerT>,
+    Type.Handler<MutationHandlerT, unknown, unknown, R>
   >,
 ) =>
   pipe(
@@ -655,8 +674,8 @@ const getMutationResultEncoded = <R = never>(
     Effect.withSpan("Server.getMutationResultEncoded", {
       captureStackTrace: true,
       attributes: {
-        handler: HandlerConfig.name(
-          HandlerContextConfig.config(mutationHandlerContextConfig),
+        handler: Handler.Config.Mutation.name(
+          HandlerContext.data(mutationHandlerContextConfig),
         ),
       },
     }),
@@ -726,8 +745,9 @@ const handleSubscribe =
                   ),
                   Effect.bind("handlerContextConfig", () =>
                     pipe(
-                      server.handlerContextConfigGroup,
-                      HandlerContextConfig.Group.getSubscriptionHandlerContextConfig(
+                      server.handlerContextCollection,
+                      getHandlerContextHandlerContextCollection<SubscriptionHandlerT>(
+                        "subscription",
                         header.payload.handler,
                       ),
                       Effect.orElse(() =>
@@ -851,8 +871,9 @@ const handleOnce =
       ),
       Effect.bind("handlerContextConfig", () =>
         pipe(
-          server.handlerContextConfigGroup,
-          HandlerContextConfig.Group.getSubscriptionHandlerContextConfig(
+          server.handlerContextCollection,
+          getHandlerContextHandlerContextCollection<SubscriptionHandlerT>(
+            "subscription",
             header.payload.handler,
           ),
           Effect.orElse(() =>
@@ -927,8 +948,9 @@ const handleMutate =
       ),
       Effect.bind("handlerContextConfig", () =>
         pipe(
-          server.handlerContextConfigGroup,
-          HandlerContextConfig.Group.getMutationHandlerContextConfig(
+          server.handlerContextCollection,
+          getHandlerContextHandlerContextCollection<MutationHandlerT>(
+            "mutation",
             header.payload.handler,
           ),
           Effect.orElse(() =>
