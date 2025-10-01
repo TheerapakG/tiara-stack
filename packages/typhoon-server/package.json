@@ -32,7 +32,7 @@
     "ufo": "^1.6.1"
   },
   "peerDependencies": {
-    "effect": "^3.17.13",
+    "effect": "^3.17.14",
     "typhoon-core": "workspace:*"
   },
   "devDependencies": {

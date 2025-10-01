@@ -7,7 +7,7 @@ import {
   Scope,
   SynchronizedRef,
 } from "effect";
-import { HandlerConfig } from "typhoon-core/config";
+import { Handler } from "typhoon-core/server";
 import { Msgpack, Stream } from "typhoon-core/protocol";
 import { Computed, Signal } from "typhoon-core/signal";
 import { Validate } from "typhoon-core/validator";
@@ -15,7 +15,11 @@ import { Validate } from "typhoon-core/validator";
 export type { StandardSchemaV1 } from "@standard-schema/spec";
 
 const pullStreamToParsed =
-  <const RequestParams extends HandlerConfig.RequestParamsConfig | undefined>(
+  <
+    const RequestParams extends
+      | Handler.Config.Shared.RequestParams.RequestParamsConfig
+      | undefined,
+  >(
     requestParams: RequestParams,
   ) =>
   (
@@ -29,7 +33,7 @@ const pullStreamToParsed =
       pullStream,
       Effect.flatMap(
         Validate.validate(
-          HandlerConfig.resolveRequestParamsValidator(requestParams),
+          Handler.Config.resolveRequestParamsValidator(requestParams),
         ),
       ),
     );
@@ -145,16 +149,12 @@ export const request = {
       Effect.map((ctx) => ctx.pullStream),
       Computed.map((pullStream) => pullStream.stream),
     ),
-  parsed: <
-    Config extends
-      | HandlerConfig.SubscriptionHandlerConfig
-      | HandlerConfig.MutationHandlerConfig,
-  >(
-    config: Config,
-  ) =>
+  parsed: <Config extends Handler.Config.TypedHandlerConfig>(config: Config) =>
     pipe(
       request.raw(),
-      Computed.flatMap(pullStreamToParsed(HandlerConfig.requestParams(config))),
+      Computed.flatMap(
+        pullStreamToParsed(Handler.Config.requestParams(config)),
+      ),
     ),
 };
 
