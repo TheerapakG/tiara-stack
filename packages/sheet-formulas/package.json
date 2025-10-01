@@ -22,7 +22,7 @@
     "@standard-schema/spec": "^1.0.0",
     "@babel/core": "^7.28.0",
     "core-js": "^3.44.0",
-    "effect": "^3.17.13",
+    "effect": "^3.17.14",
     "sheet-apis": "workspace:*",
     "typhoon-client-apps-script": "workspace:*",
     "typhoon-core": "workspace:*"

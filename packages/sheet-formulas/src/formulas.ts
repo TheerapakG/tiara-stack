@@ -1,10 +1,10 @@
 import { Effect, HashMap, pipe, Schema } from "effect";
-import { serverHandlerConfigGroup } from "sheet-apis";
+import { serverHandlerConfigCollection } from "sheet-apis";
 import { AppsScriptClient } from "typhoon-client-apps-script/client";
 import { Validate } from "typhoon-core/validator";
 
 function getClient(url: string) {
-  return AppsScriptClient.create(serverHandlerConfigGroup, url);
+  return AppsScriptClient.create(serverHandlerConfigCollection, url);
 }
 
 const cellValueValidator = Schema.Union(
