@@ -30,16 +30,16 @@
     "@standard-schema/spec": "^1.0.0"
   },
   "peerDependencies": {
-    "effect": "^3.17.13"
+    "effect": "^3.17.14"
   },
   "devDependencies": {
     "@typescript/native-preview": "latest",
-    "glob": "^11.0.1",
-    "oxlint": "^1.16.0",
+    "glob": "^11.0.3",
+    "oxlint": "^1.18.0",
     "pathe": "^2.0.3",
-    "prettier": "^3.5.3",
-    "rolldown": "1.0.0-beta.36",
-    "rolldown-plugin-dts": "^0.16.8",
+    "prettier": "^3.6.2",
+    "rolldown": "1.0.0-beta.40",
+    "rolldown-plugin-dts": "^0.16.9",
     "rollup-plugin-delete": "^3.0.1",
     "vite": "npm:rolldown-vite@latest"
   }

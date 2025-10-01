@@ -1,1 +1,1 @@
-export * as Server from "./server";
+export * as Handler from "./handler";

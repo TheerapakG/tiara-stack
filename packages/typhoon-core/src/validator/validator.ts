@@ -2,6 +2,11 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { Data, Effect, Option, pipe } from "effect";
 import { Observable } from "../observability";
 
+export type Input<Schema extends StandardSchemaV1 | undefined> =
+  Schema extends StandardSchemaV1
+    ? StandardSchemaV1.InferInput<Schema>
+    : unknown;
+
 export type Validated<Schema extends StandardSchemaV1 | undefined> =
   Schema extends StandardSchemaV1
     ? StandardSchemaV1.InferOutput<Schema>

@@ -113,5 +113,9 @@ export class Signal<T = unknown>
   }
 }
 
+export type Value<S extends Signal<unknown>> = Effect.Effect.Success<
+  ReturnType<S["peek"]>
+>;
+
 export const make = <T>(value: T, options?: Observable.ObservableOptions) =>
   new Signal(value, options ?? {});

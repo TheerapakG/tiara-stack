@@ -1,4 +1,5 @@
-import { RequestParamsConfig, ResponseConfig } from "./data";
+import { RequestParamsConfig } from "./shared/requestParams";
+import { ResponseConfig } from "./shared/response";
 
 export type ResolvedRequestParamsValidator<
   Config extends RequestParamsConfig | undefined,

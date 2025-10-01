@@ -193,6 +193,15 @@ export class Computed<A = never, E = never, R = never>
   }
 }
 
+export type Success<S extends Computed<unknown, unknown, unknown>> =
+  Effect.Effect.Success<ReturnType<S["peek"]>>;
+
+export type Error<S extends Computed<unknown, unknown, unknown>> =
+  Effect.Effect.Error<ReturnType<S["peek"]>>;
+
+export type Context<S extends Computed<unknown, unknown, unknown>> =
+  Effect.Effect.Context<ReturnType<S["peek"]>>;
+
 export const make = <A = never, E = never, R = never>(
   effect: Effect.Effect<A, E, R>,
   options?: Observable.ObservableOptions,
