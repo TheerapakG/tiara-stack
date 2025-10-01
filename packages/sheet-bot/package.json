@@ -32,7 +32,7 @@
     "c12": "^3.0.4",
     "discord.js": "^14.21.0",
     "drizzle-orm": "^0.44.0",
-    "effect": "^3.17.13",
+    "effect": "^3.17.14",
     "google-auth-library": "^10.1.0",
     "handlebars": "^4.7.8",
     "postgres": "^3.4.7",
