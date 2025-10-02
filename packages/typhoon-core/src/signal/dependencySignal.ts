@@ -96,3 +96,5 @@ export const notifyAllDependents =
       }),
       Effect.ignore,
     );
+
+export const mask = <A, E, R>(signal: DependencySignal<A, E, R>) => signal;

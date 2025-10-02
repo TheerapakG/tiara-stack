@@ -26,3 +26,5 @@ export const isDependentSignal = (signal: unknown): signal is DependentSignal =>
       DependentSymbol in signal &&
       signal[DependentSymbol] === signal,
   );
+
+export const mask = (signal: DependentSignal) => signal;
