@@ -47,6 +47,7 @@ export class DayConfig extends Data.TaggedClass("DayConfig")<{
   sheet: string;
   hourRange: string;
   breakRange: string;
+  monitorRange: string;
   fillRange: string;
   overfillRange: string;
   standbyRange: string;
@@ -59,6 +60,7 @@ const dayConfigParser = ([
   sheet,
   hourRange,
   breakRange,
+  monitorRange,
   fillRange,
   overfillRange,
   standbyRange,
@@ -152,6 +154,24 @@ const dayConfigParser = ([
           ),
         ),
       ),
+      monitorRange: parseValueRange(monitorRange, (arr) =>
+        pipe(
+          Array.get(arr, 0),
+          Option.flatten,
+          Effect.transposeMapOption(
+            Validate.validateOption(
+              pipe(Schema.String, Schema.standardSchemaV1),
+            ),
+          ),
+          Effect.map(Option.flatten),
+          Effect.map(
+            Option.match({
+              onSome: (monitorRange) => ({ monitorRange }),
+              onNone: () => ({ monitorRange: "" }),
+            }),
+          ),
+        ),
+      ),
       fillRange: parseValueRange(fillRange, (arr) =>
         pipe(
           Array.get(arr, 0),
@@ -232,6 +252,7 @@ const dayConfigParser = ([
         sheet,
         hourRange,
         breakRange,
+        monitorRange,
         fillRange,
         overfillRange,
         standbyRange,
@@ -264,6 +285,12 @@ const dayConfigParser = ([
             new ArrayUtils.WithDefault.ArrayWithDefault({
               array: breakRange,
               default: { breakRange: "" },
+            }),
+          ),
+          ArrayUtils.WithDefault.zip(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
+              array: monitorRange,
+              default: { monitorRange: "" },
             }),
           ),
           ArrayUtils.WithDefault.zip(
@@ -302,6 +329,7 @@ const dayConfigParser = ([
             sheet,
             hourRange,
             breakRange,
+            monitorRange,
             fillRange,
             overfillRange,
             standbyRange,
@@ -317,6 +345,7 @@ const dayConfigParser = ([
                     sheet,
                     hourRange,
                     breakRange,
+                    monitorRange,
                     fillRange,
                     overfillRange,
                     standbyRange,
@@ -892,6 +921,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 "'Thee's Sheet Settings'!X8:X",
                 "'Thee's Sheet Settings'!Y8:Y",
                 "'Thee's Sheet Settings'!Z8:Z",
+                "'Thee's Sheet Settings'!AA8:AA",
               ],
             }),
             Effect.flatMap((response) =>
@@ -911,8 +941,8 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
             sheet.get({
               spreadsheetId: sheetId,
               ranges: [
-                "'Thee's Sheet Settings'!AB8:AB",
                 "'Thee's Sheet Settings'!AC8:AC",
+                "'Thee's Sheet Settings'!AD8:AD",
               ],
             }),
             Effect.flatMap((response) =>
