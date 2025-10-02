@@ -1,4 +1,3 @@
-import type { StandardSchemaV1 } from "@standard-schema/spec";
 import {
   Data,
   DateTime,
@@ -329,13 +328,13 @@ export class WebSocketClient<
     >,
     handler: Handler,
     // TODO: make this conditionally optional
-    data?: Handler.Config.ResolvedRequestParamsValidator<
-      Handler.Config.RequestParamsOrUndefined<
-        SubscriptionHandlerConfigs[Handler]
+    data?: Validator.Input<
+      Handler.Config.ResolvedRequestParamsValidator<
+        Handler.Config.RequestParamsOrUndefined<
+          SubscriptionHandlerConfigs[Handler]
+        >
       >
-    > extends infer Validator extends StandardSchemaV1
-      ? StandardSchemaV1.InferInput<Validator>
-      : never,
+    >,
   ) {
     return pipe(
       Effect.Do,
@@ -432,19 +431,7 @@ export class WebSocketClient<
       Effect.map(
         ({ id, signal }) =>
           [
-            signal as DependencySignal.DependencySignal<
-              SignalState<
-                Validator.Validated<
-                  Handler.Config.ResolvedResponseValidator<
-                    Handler.Config.ResponseOrUndefined<
-                      SubscriptionHandlerConfigs[Handler]
-                    >
-                  >
-                >
-              >,
-              never,
-              never
-            >,
+            DependencySignal.mask(signal),
             WebSocketClient.unsubscribe(client, id, handler),
           ] as const,
       ),
@@ -516,13 +503,13 @@ export class WebSocketClient<
     >,
     handler: Handler,
     // TODO: make this conditionally optional
-    data?: Handler.Config.ResolvedRequestParamsValidator<
-      Handler.Config.RequestParamsOrUndefined<
-        SubscriptionHandlerConfigs[Handler]
+    data?: Validator.Input<
+      Handler.Config.ResolvedRequestParamsValidator<
+        Handler.Config.RequestParamsOrUndefined<
+          SubscriptionHandlerConfigs[Handler]
+        >
       >
-    > extends infer Validator extends StandardSchemaV1
-      ? StandardSchemaV1.InferInput<Validator>
-      : never,
+    >,
   ) {
     return pipe(
       Effect.Do,
@@ -631,11 +618,11 @@ export class WebSocketClient<
     >,
     handler: Handler,
     // TODO: make this conditionally optional
-    data?: Handler.Config.ResolvedRequestParamsValidator<
-      Handler.Config.RequestParamsOrUndefined<MutationHandlerConfigs[Handler]>
-    > extends infer Validator extends StandardSchemaV1
-      ? StandardSchemaV1.InferInput<Validator>
-      : never,
+    data?: Validator.Input<
+      Handler.Config.ResolvedRequestParamsValidator<
+        Handler.Config.RequestParamsOrUndefined<MutationHandlerConfigs[Handler]>
+      >
+    >,
   ) {
     return pipe(
       Effect.Do,
