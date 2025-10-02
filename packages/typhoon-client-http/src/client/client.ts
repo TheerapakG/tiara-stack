@@ -1,9 +1,8 @@
-import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { Data, Effect, Option, pipe, Schema, SynchronizedRef } from "effect";
 import { ofetch } from "ofetch";
 import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
-import { Validate } from "typhoon-core/validator";
+import { Validate, Validator } from "typhoon-core/validator";
 
 export class HandlerError extends Data.TaggedError("HandlerError") {}
 
@@ -93,13 +92,13 @@ export class HttpClient<
     >,
     handler: Handler,
     // TODO: make this conditionally optional
-    data?: Handler.Config.ResolvedRequestParamsValidator<
-      Handler.Config.RequestParamsOrUndefined<
-        SubscriptionHandlerConfigs[Handler]
+    data?: Validator.Input<
+      Handler.Config.ResolvedRequestParamsValidator<
+        Handler.Config.RequestParamsOrUndefined<
+          SubscriptionHandlerConfigs[Handler]
+        >
       >
-    > extends infer Validator extends StandardSchemaV1
-      ? StandardSchemaV1.InferInput<Validator>
-      : never,
+    >,
   ) {
     return pipe(
       Effect.Do,
