@@ -759,19 +759,6 @@ export class SheetService extends Effect.Service<SheetService>()(
                   }),
                   { concurrency: "unbounded" },
                 ),
-                Effect.tap(({ dayConfig }) =>
-                  Effect.log(
-                    pipe(
-                      dayConfig,
-                      ArrayUtils.Collect.toHashMap({
-                        keyGetter: ({ day }) => day,
-                        valueInitializer: (a) => [a],
-                        valueReducer: (acc, a) => Array.append(acc, a),
-                      }),
-                      HashMap.toEntries,
-                    ),
-                  ),
-                ),
                 Effect.bind("specificDayConfig", ({ dayConfig }) =>
                   pipe(
                     dayConfig,
