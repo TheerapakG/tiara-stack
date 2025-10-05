@@ -38,7 +38,6 @@ const dayConfigParser = ([
 ]: sheets_v4.Schema$ValueRange[]): Effect.Effect<DayConfig[], never, never> =>
   pipe(
     Effect.Do,
-    Effect.tap(() => Effect.log(day)),
     Effect.bindAll(() => ({
       channel: GoogleSheets.parseValueRange(channel, (arr) =>
         pipe(
@@ -190,6 +189,7 @@ const dayConfigParser = ([
         ),
       ),
     })),
+    Effect.tap(({ day }) => Effect.log(day)),
     Effect.map(
       ({
         channel,
