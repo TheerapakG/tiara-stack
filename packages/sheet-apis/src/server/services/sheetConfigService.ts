@@ -43,7 +43,10 @@ const dayConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -59,8 +62,13 @@ const dayConfigParser = ([
           arr,
           Schema.decodeOption(
             pipe(
-              Schema.Array(Schema.Option(Schema.NumberFromString)),
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
               Schema.head,
+              Schema.compose(
+                Schema.OptionFromSelf(
+                  Schema.OptionFromSelf(Schema.NumberFromString),
+                ),
+              ),
             ),
           ),
           Option.flatten,
@@ -72,7 +80,10 @@ const dayConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -87,7 +98,10 @@ const dayConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -102,7 +116,10 @@ const dayConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -117,7 +134,10 @@ const dayConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -132,7 +152,10 @@ const dayConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -147,7 +170,10 @@ const dayConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -162,7 +188,10 @@ const dayConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -177,7 +206,10 @@ const dayConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -189,7 +221,6 @@ const dayConfigParser = ([
         ),
       ),
     })),
-    Effect.tap(({ day }) => Effect.log(day)),
     Effect.map(
       ({
         channel,
@@ -325,7 +356,10 @@ const teamConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -340,7 +374,10 @@ const teamConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -355,7 +392,10 @@ const teamConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -370,7 +410,10 @@ const teamConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -385,7 +428,10 @@ const teamConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -400,7 +446,10 @@ const teamConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -415,7 +464,10 @@ const teamConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -431,25 +483,28 @@ const teamConfigParser = ([
           arr,
           Schema.decodeOption(
             pipe(
-              Schema.Array(
-                Schema.Option(
-                  pipe(
-                    Schema.String,
-                    Schema.transformOrFail(
-                      Schema.Literal("constants", "ranges"),
-                      {
-                        strict: true,
-                        decode: (str) =>
-                          ParseResult.decodeUnknown(
-                            Schema.Literal("constants", "ranges"),
-                          )(str),
-                        encode: (str) => ParseResult.succeed(str),
-                      },
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+              Schema.compose(
+                Schema.OptionFromSelf(
+                  Schema.OptionFromSelf(
+                    pipe(
+                      Schema.String,
+                      Schema.transformOrFail(
+                        Schema.Literal("constants", "ranges"),
+                        {
+                          strict: true,
+                          decode: (str) =>
+                            ParseResult.decodeUnknown(
+                              Schema.Literal("constants", "ranges"),
+                            )(str),
+                          encode: (str) => ParseResult.succeed(str),
+                        },
+                      ),
                     ),
                   ),
                 ),
               ),
-              Schema.head,
             ),
           ),
           Option.flatten,
@@ -465,7 +520,10 @@ const teamConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -627,7 +685,10 @@ const runnerConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
@@ -642,7 +703,10 @@ const runnerConfigParser = ([
         pipe(
           arr,
           Schema.decodeOption(
-            pipe(Schema.Array(Schema.Option(Schema.String)), Schema.head),
+            pipe(
+              Schema.Array(Schema.OptionFromSelf(Schema.String)),
+              Schema.head,
+            ),
           ),
           Option.flatten,
           Option.flatten,
