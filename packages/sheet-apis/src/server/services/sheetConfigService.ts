@@ -301,6 +301,7 @@ const dayConfigParser = ([
         Array.getSomes,
       ),
     ),
+    Effect.tap((array) => Effect.log(array)),
     Effect.withSpan("dayConfigParser", { captureStackTrace: true }),
   );
 
@@ -697,7 +698,6 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
               spreadsheetId: sheetId,
               ranges: ["'Thee's Sheet Settings'!B8:C"],
             }),
-            Effect.tap((response) => Effect.log(sheetId, response)),
             Effect.flatMap((response) =>
               pipe(
                 Option.fromNullable(response.data.valueRanges),
