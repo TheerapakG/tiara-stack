@@ -1,10 +1,14 @@
 import {
+  Context,
   Deferred,
   Effect,
   Effectable,
   Fiber,
   Function,
   HashSet,
+  Layer,
+  ManagedRuntime,
+  Runtime,
   Option,
   pipe,
 } from "effect";
@@ -266,6 +270,140 @@ export const flatMapComputed =
         Effect.flatMap(Function.identity),
         Effect.flatMap(mapper),
         Effect.flatMap(Function.identity),
+      ),
+      options,
+    );
+
+export const provideLayer =
+  <Rout, E3, RIn>(
+    layer: Layer.Layer<Rout, E3, RIn>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <A, E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    make(
+      pipe(signal, Effect.flatMap(Function.identity), Effect.provide(layer)),
+      options,
+    );
+
+export const provideLayerComputed =
+  <Rout, E3, RIn, E4, R4>(
+    layer: DependencySignal<Layer.Layer<Rout, E3, RIn>, E4, R4>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <A, E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    make(
+      pipe(
+        layer,
+        Effect.flatMap((layer) =>
+          pipe(
+            signal,
+            Effect.flatMap(Function.identity),
+            Effect.provide(layer),
+          ),
+        ),
+      ),
+      options,
+    );
+
+export const provideContext =
+  <R3>(context: Context.Context<R3>, options?: Observable.ObservableOptions) =>
+  <A, E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    make(
+      pipe(signal, Effect.flatMap(Function.identity), Effect.provide(context)),
+      options,
+    );
+
+export const provideContextComputed =
+  <R3, E4, R4>(
+    context: DependencySignal<Context.Context<R3>, E4, R4>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <A, E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    make(
+      pipe(
+        context,
+        Effect.flatMap((context) =>
+          pipe(
+            signal,
+            Effect.flatMap(Function.identity),
+            Effect.provide(context),
+          ),
+        ),
+      ),
+      options,
+    );
+
+export const provideRuntime =
+  <R3>(runtime: Runtime.Runtime<R3>, options?: Observable.ObservableOptions) =>
+  <A, E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    make(
+      pipe(signal, Effect.flatMap(Function.identity), Effect.provide(runtime)),
+      options,
+    );
+
+export const provideRuntimeComputed =
+  <R3, E4, R4>(
+    runtime: DependencySignal<Runtime.Runtime<R3>, E4, R4>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <A, E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    make(
+      pipe(
+        runtime,
+        Effect.flatMap((runtime) =>
+          pipe(
+            signal,
+            Effect.flatMap(Function.identity),
+            Effect.provide(runtime),
+          ),
+        ),
+      ),
+      options,
+    );
+
+export const provideManagedRuntime =
+  <R3, E3>(
+    runtime: ManagedRuntime.ManagedRuntime<R3, E3>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <A, E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    make(
+      pipe(signal, Effect.flatMap(Function.identity), Effect.provide(runtime)),
+      options,
+    );
+
+export const provideManagedRuntimeComputed =
+  <R3, E3, E4, R4>(
+    runtime: DependencySignal<ManagedRuntime.ManagedRuntime<R3, E3>, E4, R4>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <A, E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    make(
+      pipe(
+        runtime,
+        Effect.flatMap((runtime) =>
+          pipe(
+            signal,
+            Effect.flatMap(Function.identity),
+            Effect.provide(runtime),
+          ),
+        ),
       ),
       options,
     );
