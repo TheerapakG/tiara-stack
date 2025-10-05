@@ -13,12 +13,15 @@ import { DBService } from "./db";
 import {
   calcHandlerCollection,
   guildConfigHandlerCollection,
+  sheetHandlerCollection,
 } from "./server/handler/handler";
 import {
   AuthService,
   CalcService,
   GuildConfigService,
+  SheetConfigService,
 } from "./server/services";
+import { GoogleLive } from "./google";
 
 const TracesLive = NodeSdk.layer(() => ({
   resource: { serviceName: "sheet-apis" },
@@ -34,15 +37,17 @@ const baseLayer = Layer.mergeAll(MetricsLive, Logger.logFmt);
 
 const layer = pipe(
   Layer.mergeAll(
-    GuildConfigService.DefaultWithoutDependencies,
-    CalcService.Default,
     AuthService.DefaultWithoutDependencies,
+    CalcService.Default,
+    GuildConfigService.DefaultWithoutDependencies,
+    SheetConfigService.DefaultWithoutDependencies,
   ),
   Layer.provideMerge(DBService.DefaultWithoutDependencies),
   Layer.provideMerge(
     Layer.mergeAll(
-      Config.Default,
       DB.DBSubscriptionContext.Default,
+      GoogleLive,
+      Config.Default,
       NodeContext.layer,
     ),
   ),
@@ -53,6 +58,7 @@ const serverHandlerCollection = pipe(
   Context.Collection.empty(),
   Context.Collection.addCollection(calcHandlerCollection),
   Context.Collection.addCollection(guildConfigHandlerCollection),
+  Context.Collection.addCollection(sheetHandlerCollection),
 );
 
 const server = pipe(
