@@ -6,7 +6,6 @@ import {
   PermissionService,
   PlayerService,
 } from "@/services";
-import { Team } from "@/services/guild/sheetService";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
   ChatInputSubcommandHandlerVariantT,
@@ -20,6 +19,7 @@ import {
   SlashCommandSubcommandBuilder,
 } from "discord.js";
 import { Array, Effect, Number, Option, pipe, String } from "effect";
+import { Schema } from "sheet-apis";
 
 const handleList =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
@@ -76,7 +76,7 @@ const handleList =
                 lead: team.lead,
                 backline: team.backline,
                 talent: team.talent,
-                effectValue: Team.getEffectValue(team),
+                effectValue: Schema.Team.getEffectValue(team),
               })),
               Array.map((team) => ({
                 ...team,

@@ -5,14 +5,11 @@ import {
   FormatService,
   GuildConfigService,
   guildSheetServicesFromInteractionOption,
-  HourRange,
   InteractionContext,
   MessageRoomOrderService,
   PermissionService,
   PlayerService,
-  Schedule,
   SheetService,
-  Team,
 } from "@/services";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
@@ -41,6 +38,7 @@ import {
   pipe,
 } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
+import { Schema } from "sheet-apis";
 
 const handleManual =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
@@ -85,7 +83,7 @@ const handleManual =
               InteractionContext.getNumber("heal"),
               Effect.map(Option.getOrElse(() => 0)),
             ),
-            runnerConfig: SheetService.getRunnerConfig(),
+            runnerConfig: SheetService.runnerConfig,
           }),
           Effect.bind("hour", ({ hourOption }) =>
             pipe(
@@ -109,9 +107,11 @@ const handleManual =
           ),
           Effect.bind("schedule", ({ hour }) =>
             pipe(
-              SheetService.getAllSchedules(),
+              SheetService.allSchedules,
               Effect.map(HashMap.get(hour)),
-              Effect.map(Option.getOrElse(() => Schedule.empty(hour))),
+              Effect.map(
+                Option.getOrElse(() => Schema.Schedule.makeEmpty(hour)),
+              ),
               Effect.flatMap(PlayerService.mapScheduleWithPlayers),
             ),
           ),
@@ -138,14 +138,14 @@ const handleManual =
                       teams,
                       Array.map(
                         (team) =>
-                          new Team({
+                          new Schema.Team({
                             ...team,
                             tags: pipe(
                               team.tags,
                               team.tags.includes("tierer_hint") &&
                                 Array.some(
                                   runnerHours,
-                                  HourRange.includes(hour),
+                                  Schema.HourRange.includes(hour),
                                 )
                                 ? Array.append("fixed")
                                 : Function.identity,

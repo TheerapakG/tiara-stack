@@ -1,7 +1,18 @@
 import { bindObject } from "@/utils";
-import { Array, Data, Effect, HashMap, Match, Option, pipe } from "effect";
+import {
+  Array,
+  Data,
+  Effect,
+  HashMap,
+  Match,
+  Number,
+  Option,
+  Order,
+  pipe,
+} from "effect";
 import { Array as ArrayUtils } from "typhoon-core/utils";
-import { Schedule, SheetService } from "./sheetService";
+import { SheetService } from "./sheetService";
+import { Schema } from "sheet-apis";
 
 export class Player extends Data.TaggedClass("Player")<{
   id: string;
@@ -26,8 +37,13 @@ export class ScheduleWithPlayers extends Data.TaggedClass(
   fills: readonly Option.Option<Player | PartialNamePlayer>[];
   overfills: readonly (Player | PartialNamePlayer)[];
   standbys: readonly (Player | PartialNamePlayer)[];
-  empty: number;
-}> {}
+}> {
+  static empty = ({ fills, overfills }: ScheduleWithPlayers) =>
+    Order.max(Number.Order)(
+      5 - fills.filter(Option.isSome).length - overfills.length,
+      0,
+    );
+}
 
 export class PlayerService extends Effect.Service<PlayerService>()(
   "PlayerService",
@@ -38,7 +54,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
       Effect.bindAll(({ sheetService }) => ({
         playerMaps: Effect.cached(
           pipe(
-            sheetService.getPlayers(),
+            sheetService.players,
             Effect.map(
               Array.map(({ id, name, idIndex, nameIndex }) =>
                 Option.isSome(id) && Option.isSome(name)
@@ -160,7 +176,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
         getPlayerMaps,
         getById,
         getByName,
-        mapScheduleWithPlayers: (schedule: Schedule) =>
+        mapScheduleWithPlayers: (schedule: Schema.Schedule) =>
           pipe(
             Effect.Do,
             bindObject({
@@ -201,7 +217,6 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                   fills,
                   overfills,
                   standbys,
-                  empty: schedule.empty,
                 }),
             ),
             Effect.withSpan("PlayerService.mapScheduleWithPlayers", {
@@ -212,7 +227,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
           pipe(
             Effect.Do,
             bindObject({
-              teams: sheetService.getTeams(),
+              teams: sheetService.teams,
               playerNames: pipe(
                 getByName(name),
                 Effect.map(Array.map((player) => player.name)),
@@ -240,7 +255,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
           pipe(
             Effect.Do,
             bindObject({
-              teams: sheetService.getTeams(),
+              teams: sheetService.teams,
               playerNames: pipe(
                 getById(id),
                 Effect.map(

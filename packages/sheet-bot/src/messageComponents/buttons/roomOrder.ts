@@ -129,7 +129,7 @@ export const roomOrderPreviousButton =
             "message",
           ),
           bindObject({
-            eventConfig: SheetService.getEventConfig(),
+            eventConfig: SheetService.eventConfig,
           }),
           Effect.bind("messageRoomOrder", ({ message }) =>
             pipe(
@@ -164,7 +164,7 @@ export const roomOrderNextButton =
             "message",
           ),
           bindObject({
-            eventConfig: SheetService.getEventConfig(),
+            eventConfig: SheetService.eventConfig,
           }),
           Effect.bind("messageRoomOrder", ({ message }) =>
             pipe(
@@ -204,7 +204,7 @@ export const roomOrderSendButton =
             "message",
           ),
           bindObject({
-            eventConfig: SheetService.getEventConfig(),
+            eventConfig: SheetService.eventConfig,
           }),
           Effect.bind("messageRoomOrder", ({ message }) =>
             pipe(

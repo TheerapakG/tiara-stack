@@ -32,7 +32,7 @@ export const guildSheetServices = (guildId: string) =>
     Layer.provideMerge(
       Layer.mergeAll(ConverterService.Default, PlayerService.Default),
     ),
-    Layer.provideMerge(SheetService.ofGuild()),
+    Layer.provideMerge(SheetService.DefaultWithoutDependencies),
     Layer.provideMerge(guildServices(guildId)),
     Effect.succeed,
     Effect.withSpan("guildServices", {

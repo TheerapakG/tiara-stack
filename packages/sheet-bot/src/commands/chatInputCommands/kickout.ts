@@ -10,7 +10,6 @@ import {
   PermissionService,
   Player,
   PlayerService,
-  Schedule,
   SheetService,
 } from "@/services";
 import {
@@ -39,6 +38,7 @@ import {
   Order,
   pipe,
 } from "effect";
+import { Schema } from "sheet-apis";
 
 class ArgumentError extends Data.TaggedError("ArgumentError")<{
   readonly message: string;
@@ -66,7 +66,7 @@ const getKickoutData = ({
   pipe(
     Effect.Do,
     bindObject({
-      schedules: SheetService.getAllSchedules(),
+      schedules: SheetService.allSchedules,
       runningChannel: pipe(
         GuildConfigService.getGuildRunningChannelByName(channelName),
         Effect.flatMap(
@@ -83,7 +83,7 @@ const getKickoutData = ({
     Effect.bind("schedule", ({ schedules }) =>
       pipe(
         HashMap.get(schedules, hour),
-        Option.getOrElse(() => Schedule.empty(hour)),
+        Option.getOrElse(() => Schema.Schedule.makeEmpty(hour)),
         PlayerService.mapScheduleWithPlayers,
       ),
     ),

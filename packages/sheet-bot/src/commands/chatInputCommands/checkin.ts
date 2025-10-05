@@ -12,7 +12,6 @@ import {
   PermissionService,
   Player,
   PlayerService,
-  Schedule,
   ScheduleWithPlayers,
   SendableChannelContext,
   SheetService,
@@ -45,6 +44,7 @@ import {
   Option,
   pipe,
 } from "effect";
+import { Schema } from "sheet-apis";
 
 class ArgumentError extends Data.TaggedError("ArgumentError")<{
   readonly message: string;
@@ -64,19 +64,19 @@ const getCheckinData = ({
   pipe(
     Effect.Do,
     bindObject({
-      schedules: SheetService.getAllSchedules(),
+      schedules: SheetService.allSchedules,
     }),
     Effect.bind("prevSchedule", ({ schedules }) =>
       pipe(
         HashMap.get(schedules, hour - 1),
-        Option.getOrElse(() => Schedule.empty(hour - 1)),
+        Option.getOrElse(() => Schema.Schedule.makeEmpty(hour - 1)),
         PlayerService.mapScheduleWithPlayers,
       ),
     ),
     Effect.bind("schedule", ({ schedules }) =>
       pipe(
         HashMap.get(schedules, hour),
-        Option.getOrElse(() => Schedule.empty(hour)),
+        Option.getOrElse(() => Schema.Schedule.makeEmpty(hour)),
         PlayerService.mapScheduleWithPlayers,
       ),
     ),
