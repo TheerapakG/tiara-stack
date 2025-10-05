@@ -39,6 +39,9 @@ importers:
       '@effect/platform-node':
         specifier: ^0.96.1
         version: 0.96.1(@effect/cluster@0.48.5(@effect/platform@0.90.9(effect@3.17.14))(@effect/rpc@0.69.2(@effect/platform@0.90.9(effect@3.17.14))(effect@3.17.14))(@effect/sql@0.44.2(@effect/experimental@0.54.6(@effect/platform@0.90.9(effect@3.17.14))(effect@3.17.14))(@effect/platform@0.90.9(effect@3.17.14))(effect@3.17.14))(@effect/workflow@0.9.5(@effect/platform@0.90.9(effect@3.17.14))(@effect/rpc@0.69.2(@effect/platform@0.90.9(effect@3.17.14))(effect@3.17.14))(effect@3.17.14))(effect@3.17.14))(@effect/platform@0.90.9(effect@3.17.14))(@effect/rpc@0.69.2(@effect/platform@0.90.9(effect@3.17.14))(effect@3.17.14))(@effect/sql@0.44.2(@effect/experimental@0.54.6(@effect/platform@0.90.9(effect@3.17.14))(effect@3.17.14))(@effect/platform@0.90.9(effect@3.17.14))(effect@3.17.14))(effect@3.17.14)
+      '@googleapis/sheets':
+        specifier: ^10.0.1
+        version: 10.0.1
       '@opentelemetry/exporter-prometheus':
         specifier: ^0.202.0
         version: 0.202.0(@opentelemetry/api@1.9.0)
@@ -66,6 +69,9 @@ importers:
       effect:
         specifier: ^3.17.14
         version: 3.17.14
+      google-auth-library:
+        specifier: ^10.1.0
+        version: 10.1.0
       jose:
         specifier: ^6.1.0
         version: 6.1.0
@@ -4606,7 +4612,7 @@ snapshots:
       '@babel/core': 7.28.0
       '@babel/helper-compilation-targets': 7.27.2
       '@babel/helper-plugin-utils': 7.27.1
-      debug: 4.4.1
+      debug: 4.4.3
       lodash.debounce: 4.0.8
       resolve: 1.22.10
     transitivePeerDependencies:
@@ -5180,7 +5186,7 @@ snapshots:
       '@babel/parser': 7.28.0
       '@babel/template': 7.27.2
       '@babel/types': 7.28.1
-      debug: 4.4.1
+      debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
 
@@ -5566,7 +5572,7 @@ snapshots:
 
   '@kwsites/file-exists@1.1.1':
     dependencies:
-      debug: 4.4.1
+      debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
 
@@ -6316,7 +6322,7 @@ snapshots:
 
   '@typescript/vfs@1.6.1(typescript@5.9.2)':
     dependencies:
-      debug: 4.4.1
+      debug: 4.4.3
       typescript: 5.9.2
     transitivePeerDependencies:
       - supports-color
@@ -7051,7 +7057,7 @@ snapshots:
   https-proxy-agent@7.0.6:
     dependencies:
       agent-base: 7.1.3
-      debug: 4.4.1
+      debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
 
