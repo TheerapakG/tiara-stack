@@ -29,22 +29,25 @@ const playerParser = ([
 ]: sheets_v4.Schema$ValueRange[]): Effect.Effect<RawPlayer[], never, never> =>
   pipe(
     Effect.Do,
-    Effect.bindAll(() => ({
-      userIds: GoogleSheets.parseValueRange(userIds, (arr, index) =>
-        Effect.succeed({
-          id: pipe(Array.get(arr, 0), Option.flatten),
-          idIndex: index,
-        }),
-      ),
-      userSheetNames: GoogleSheets.parseValueRange(
-        userSheetNames,
-        (arr, index) =>
+    Effect.bindAll(
+      () => ({
+        userIds: GoogleSheets.parseValueRange(userIds, (arr, index) =>
           Effect.succeed({
-            name: pipe(Array.get(arr, 0), Option.flatten),
-            nameIndex: index,
+            id: pipe(Array.get(arr, 0), Option.flatten),
+            idIndex: index,
           }),
-      ),
-    })),
+        ),
+        userSheetNames: GoogleSheets.parseValueRange(
+          userSheetNames,
+          (arr, index) =>
+            Effect.succeed({
+              name: pipe(Array.get(arr, 0), Option.flatten),
+              nameIndex: index,
+            }),
+        ),
+      }),
+      { concurrency: "unbounded" },
+    ),
     Effect.map(({ userIds, userSheetNames }) =>
       pipe(
         new ArrayUtils.WithDefault.ArrayWithDefault({
@@ -77,101 +80,104 @@ const teamParser = (
     Effect.forEach((teamConfig) =>
       pipe(
         Effect.Do,
-        Effect.bindAll(() => ({
-          playerName: pipe(
-            sheet,
-            HashMap.get(`${teamConfig.name}!playerName`),
-            Effect.flatMap((playerName) =>
-              GoogleSheets.parseValueRange(playerName, (arr) =>
-                Effect.succeed({
-                  playerName: pipe(Array.get(arr, 0), Option.flatten),
-                }),
-              ),
-            ),
-          ),
-          teamName: pipe(
-            sheet,
-            HashMap.get(`${teamConfig.name}!teamName`),
-            Effect.flatMap((teamName) =>
-              GoogleSheets.parseValueRange(teamName, (arr) =>
-                Effect.succeed({
-                  teamName: pipe(Array.get(arr, 0), Option.flatten),
-                }),
-              ),
-            ),
-          ),
-          lead: pipe(
-            sheet,
-            HashMap.get(`${teamConfig.name}!lead`),
-            Effect.flatMap((lead) =>
-              GoogleSheets.parseValueRange(lead, (arr) =>
-                Effect.succeed({
-                  lead: pipe(
-                    Array.get(arr, 0),
-                    Option.flatten,
-                    Option.flatMapNullable((lead) => parseInt(lead, 10)),
-                  ),
-                }),
-              ),
-            ),
-          ),
-          backline: pipe(
-            sheet,
-            HashMap.get(`${teamConfig.name}!backline`),
-            Effect.flatMap((backline) =>
-              GoogleSheets.parseValueRange(backline, (arr) =>
-                Effect.succeed({
-                  backline: pipe(
-                    Array.get(arr, 0),
-                    Option.flatten,
-                    Option.flatMapNullable((backline) =>
-                      parseInt(backline, 10),
-                    ),
-                  ),
-                }),
-              ),
-            ),
-          ),
-          talent: pipe(
-            sheet,
-            HashMap.get(`${teamConfig.name}!talent`),
-            Effect.flatMap((talent) =>
-              GoogleSheets.parseValueRange(talent, (arr) =>
-                Effect.succeed({
-                  talent: pipe(
-                    Array.get(arr, 0),
-                    Option.flatten,
-                    Option.flatMapNullable((talent) => parseInt(talent, 10)),
-                  ),
-                }),
-              ),
-            ),
-          ),
-          tags: pipe(
-            Match.value(teamConfig.tagsConfig),
-            Match.tagsExhaustive({
-              TeamTagsConstantsConfig: () => Effect.succeed([]),
-              TeamTagsRangesConfig: () =>
-                pipe(
-                  sheet,
-                  HashMap.get(`${teamConfig.name}!tags`),
-                  Effect.flatMap((tags) =>
-                    GoogleSheets.parseValueRange(tags, (arr) =>
-                      Effect.succeed({
-                        tags: pipe(
-                          Array.get(arr, 0),
-                          Option.flatten,
-                          Option.map(String.split(",")),
-                          Option.map(Array.map(String.trim)),
-                          Option.getOrElse(() => []),
-                        ),
-                      }),
-                    ),
-                  ),
+        Effect.bindAll(
+          () => ({
+            playerName: pipe(
+              sheet,
+              HashMap.get(`${teamConfig.name}!playerName`),
+              Effect.flatMap((playerName) =>
+                GoogleSheets.parseValueRange(playerName, (arr) =>
+                  Effect.succeed({
+                    playerName: pipe(Array.get(arr, 0), Option.flatten),
+                  }),
                 ),
-            }),
-          ),
-        })),
+              ),
+            ),
+            teamName: pipe(
+              sheet,
+              HashMap.get(`${teamConfig.name}!teamName`),
+              Effect.flatMap((teamName) =>
+                GoogleSheets.parseValueRange(teamName, (arr) =>
+                  Effect.succeed({
+                    teamName: pipe(Array.get(arr, 0), Option.flatten),
+                  }),
+                ),
+              ),
+            ),
+            lead: pipe(
+              sheet,
+              HashMap.get(`${teamConfig.name}!lead`),
+              Effect.flatMap((lead) =>
+                GoogleSheets.parseValueRange(lead, (arr) =>
+                  Effect.succeed({
+                    lead: pipe(
+                      Array.get(arr, 0),
+                      Option.flatten,
+                      Option.flatMapNullable((lead) => parseInt(lead, 10)),
+                    ),
+                  }),
+                ),
+              ),
+            ),
+            backline: pipe(
+              sheet,
+              HashMap.get(`${teamConfig.name}!backline`),
+              Effect.flatMap((backline) =>
+                GoogleSheets.parseValueRange(backline, (arr) =>
+                  Effect.succeed({
+                    backline: pipe(
+                      Array.get(arr, 0),
+                      Option.flatten,
+                      Option.flatMapNullable((backline) =>
+                        parseInt(backline, 10),
+                      ),
+                    ),
+                  }),
+                ),
+              ),
+            ),
+            talent: pipe(
+              sheet,
+              HashMap.get(`${teamConfig.name}!talent`),
+              Effect.flatMap((talent) =>
+                GoogleSheets.parseValueRange(talent, (arr) =>
+                  Effect.succeed({
+                    talent: pipe(
+                      Array.get(arr, 0),
+                      Option.flatten,
+                      Option.flatMapNullable((talent) => parseInt(talent, 10)),
+                    ),
+                  }),
+                ),
+              ),
+            ),
+            tags: pipe(
+              Match.value(teamConfig.tagsConfig),
+              Match.tagsExhaustive({
+                TeamTagsConstantsConfig: () => Effect.succeed([]),
+                TeamTagsRangesConfig: () =>
+                  pipe(
+                    sheet,
+                    HashMap.get(`${teamConfig.name}!tags`),
+                    Effect.flatMap((tags) =>
+                      GoogleSheets.parseValueRange(tags, (arr) =>
+                        Effect.succeed({
+                          tags: pipe(
+                            Array.get(arr, 0),
+                            Option.flatten,
+                            Option.map(String.split(",")),
+                            Option.map(Array.map(String.trim)),
+                            Option.getOrElse(() => []),
+                          ),
+                        }),
+                      ),
+                    ),
+                  ),
+              }),
+            ),
+          }),
+          { concurrency: "unbounded" },
+        ),
         Effect.map(({ playerName, teamName, lead, backline, talent, tags }) =>
           pipe(
             new ArrayUtils.WithDefault.ArrayWithDefault({
@@ -282,60 +288,63 @@ const scheduleParser = (
 ): Effect.Effect<ScheduleMap, never, never> =>
   pipe(
     Effect.Do,
-    Effect.bindAll(() => ({
-      hours: GoogleSheets.parseValueRange(hours, (arr) =>
-        Effect.succeed({
-          hour: pipe(
-            Array.get(arr, 0),
-            Option.flatten,
-            Option.flatMapNullable((v) => parseInt(v, 10)),
-          ),
-        }),
-      ),
-      fills: GoogleSheets.parseValueRange(fills, (arr) =>
-        Effect.succeed({
-          fills: Array.makeBy(5, (i) =>
-            pipe(Array.get(arr, i), Option.flatten),
-          ),
-        }),
-      ),
-      overfills: GoogleSheets.parseValueRange(overfills, (arr) =>
-        Effect.succeed({
-          overfills: pipe(
-            Array.get(arr, 0),
-            Option.flatten,
-            Option.map((v) =>
-              pipe(v, String.split(","), Array.map(String.trim)),
+    Effect.bindAll(
+      () => ({
+        hours: GoogleSheets.parseValueRange(hours, (arr) =>
+          Effect.succeed({
+            hour: pipe(
+              Array.get(arr, 0),
+              Option.flatten,
+              Option.flatMapNullable((v) => parseInt(v, 10)),
             ),
-            Option.getOrElse(() => []),
-          ),
-        }),
-      ),
-      standbys: GoogleSheets.parseValueRange(standbys, (arr) =>
-        Effect.succeed({
-          standbys: pipe(
-            Array.get(arr, 0),
-            Option.flatten,
-            Option.map((v) =>
-              pipe(v, String.split(","), Array.map(String.trim)),
+          }),
+        ),
+        fills: GoogleSheets.parseValueRange(fills, (arr) =>
+          Effect.succeed({
+            fills: Array.makeBy(5, (i) =>
+              pipe(Array.get(arr, i), Option.flatten),
             ),
-            Option.getOrElse(() => []),
-          ),
-        }),
-      ),
-      breaks: detectBreak
-        ? Effect.succeed([])
-        : GoogleSheets.parseValueRange(breaks, (arr) =>
-            Effect.succeed({
-              breakHour: pipe(
-                Array.get(arr, 0),
-                Option.flatten,
-                Option.map((v) => String.Equivalence(v, "TRUE")),
-                Option.getOrElse(() => false),
+          }),
+        ),
+        overfills: GoogleSheets.parseValueRange(overfills, (arr) =>
+          Effect.succeed({
+            overfills: pipe(
+              Array.get(arr, 0),
+              Option.flatten,
+              Option.map((v) =>
+                pipe(v, String.split(","), Array.map(String.trim)),
               ),
-            }),
-          ),
-    })),
+              Option.getOrElse(() => []),
+            ),
+          }),
+        ),
+        standbys: GoogleSheets.parseValueRange(standbys, (arr) =>
+          Effect.succeed({
+            standbys: pipe(
+              Array.get(arr, 0),
+              Option.flatten,
+              Option.map((v) =>
+                pipe(v, String.split(","), Array.map(String.trim)),
+              ),
+              Option.getOrElse(() => []),
+            ),
+          }),
+        ),
+        breaks: detectBreak
+          ? Effect.succeed([])
+          : GoogleSheets.parseValueRange(breaks, (arr) =>
+              Effect.succeed({
+                breakHour: pipe(
+                  Array.get(arr, 0),
+                  Option.flatten,
+                  Option.map((v) => String.Equivalence(v, "TRUE")),
+                  Option.getOrElse(() => false),
+                ),
+              }),
+            ),
+      }),
+      { concurrency: "unbounded" },
+    ),
     Effect.map(({ hours, fills, overfills, standbys, breaks }) =>
       pipe(
         new ArrayUtils.WithDefault.ArrayWithDefault({
@@ -422,10 +431,13 @@ export class SheetService extends Effect.Service<SheetService>()(
     effect: (sheetId: string) =>
       pipe(
         Effect.Do,
-        Effect.bindAll(() => ({
-          sheet: GoogleSheets,
-          sheetConfigService: SheetConfigService,
-        })),
+        Effect.bindAll(
+          () => ({
+            sheet: GoogleSheets,
+            sheetConfigService: SheetConfigService,
+          }),
+          { concurrency: "unbounded" },
+        ),
         Effect.bindAll(
           ({ sheetConfigService }) => ({
             rangesConfig: Effect.cached(
@@ -615,10 +627,13 @@ export class SheetService extends Effect.Service<SheetService>()(
             ),
             allSchedules: pipe(
               Effect.Do,
-              Effect.bindAll(() => ({
-                rangesConfig,
-                runnerConfig,
-              })),
+              Effect.bindAll(
+                () => ({
+                  rangesConfig,
+                  runnerConfig,
+                }),
+                { concurrency: "unbounded" },
+              ),
               Effect.bind("sheet", ({ rangesConfig }) =>
                 sheetGet({
                   ranges: pipe(
@@ -736,11 +751,14 @@ export class SheetService extends Effect.Service<SheetService>()(
             getDaySchedules: (day: number) =>
               pipe(
                 Effect.Do,
-                Effect.bindAll(() => ({
-                  rangesConfig,
-                  dayConfig,
-                  runnerConfig,
-                })),
+                Effect.bindAll(
+                  () => ({
+                    rangesConfig,
+                    dayConfig,
+                    runnerConfig,
+                  }),
+                  { concurrency: "unbounded" },
+                ),
                 Effect.bind("specificDayConfig", ({ dayConfig }) =>
                   pipe(
                     dayConfig,
