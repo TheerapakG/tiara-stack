@@ -15,7 +15,7 @@ export class ConverterService extends Effect.Service<ConverterService>()(
       Effect.map(({ sheetService }) => ({
         convertHourToHourWindow: (hour: number) =>
           pipe(
-            sheetService.getEventConfig(),
+            sheetService.eventConfig,
             Effect.map(
               (eventConfig) =>
                 new HourWindow({
@@ -35,7 +35,7 @@ export class ConverterService extends Effect.Service<ConverterService>()(
           ),
         convertDateTimeToHour: (dateTime: DateTime.DateTime) =>
           pipe(
-            sheetService.getEventConfig(),
+            sheetService.eventConfig,
             Effect.map((eventConfig) =>
               pipe(
                 dateTime,

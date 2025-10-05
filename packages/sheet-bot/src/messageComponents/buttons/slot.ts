@@ -28,7 +28,7 @@ const getSlotMessage = (day: number) =>
   pipe(
     Effect.Do,
     bindObject({
-      daySchedule: SheetService.getDaySchedules(day),
+      daySchedule: SheetService.daySchedules(day),
     }),
     Effect.bindAll(({ daySchedule }) => ({
       title: Effect.succeed(`Day ${day} Slots~`),

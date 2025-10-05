@@ -18,7 +18,7 @@ import {
   Player,
   ScheduleWithPlayers,
 } from "./playerService";
-import { Schedule } from "./sheetService";
+import { Schema } from "sheet-apis";
 
 export class FormattedHourWindow extends Data.TaggedClass(
   "FormattedHourWindow",
@@ -50,9 +50,20 @@ export class FormatService extends Effect.Service<FormatService>()(
       Effect.map(({ converterService, formatDateTime, formatHourWindow }) => ({
         formatDateTime,
         formatHourWindow,
-        formatOpenSlot: ({ hour, breakHour, empty }: Schedule) =>
+        formatOpenSlot: (schedule: Schema.Schedule | ScheduleWithPlayers) =>
           pipe(
-            Effect.succeed({ hour, breakHour, empty }),
+            Effect.succeed({
+              hour: schedule.hour,
+              breakHour: schedule.breakHour,
+              empty: pipe(
+                Match.value(schedule),
+                Match.tagsExhaustive({
+                  Schedule: (schedule) => Schema.Schedule.empty(schedule),
+                  ScheduleWithPlayers: (schedule) =>
+                    ScheduleWithPlayers.empty(schedule),
+                }),
+              ),
+            }),
             Effect.flatMap(({ hour, breakHour, empty }) =>
               Order.greaterThan(Number.Order)(empty, 0) && !breakHour
                 ? pipe(
@@ -69,9 +80,20 @@ export class FormatService extends Effect.Service<FormatService>()(
               captureStackTrace: true,
             }),
           ),
-        formatFilledSlot: ({ hour, breakHour, empty }: Schedule) =>
+        formatFilledSlot: (schedule: Schema.Schedule | ScheduleWithPlayers) =>
           pipe(
-            Effect.succeed({ hour, breakHour, empty }),
+            Effect.succeed({
+              hour: schedule.hour,
+              breakHour: schedule.breakHour,
+              empty: pipe(
+                Match.value(schedule),
+                Match.tagsExhaustive({
+                  Schedule: (schedule) => Schema.Schedule.empty(schedule),
+                  ScheduleWithPlayers: (schedule) =>
+                    ScheduleWithPlayers.empty(schedule),
+                }),
+              ),
+            }),
             Effect.flatMap(({ hour, breakHour, empty }) =>
               Number.Equivalence(empty, 0) && !breakHour
                 ? pipe(
@@ -153,14 +175,13 @@ export class FormatService extends Effect.Service<FormatService>()(
                 ),
               ),
             ),
+            Effect.let("empty", () => ScheduleWithPlayers.empty(schedule)),
             Effect.let(
               "emptySlotMessage",
-              () =>
+              ({ empty }) =>
                 `${
-                  Order.greaterThan(Number.Order)(schedule.empty, 0)
-                    ? `+${schedule.empty}`
-                    : "No"
-                } empty slot${Order.greaterThan(Number.Order)(schedule.empty, 1) ? "s" : ""}`,
+                  Order.greaterThan(Number.Order)(empty, 0) ? `+${empty}` : "No"
+                } empty slot${Order.greaterThan(Number.Order)(empty, 1) ? "s" : ""}`,
             ),
             Effect.let(
               "playersMessage",
