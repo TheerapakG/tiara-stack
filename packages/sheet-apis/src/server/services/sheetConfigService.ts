@@ -22,6 +22,7 @@ import {
   String,
 } from "effect";
 import { Array as ArrayUtils } from "typhoon-core/utils";
+import { DefaultTaggedStruct } from "typhoon-core/schema";
 import { Validate } from "typhoon-core/validator";
 
 const dayConfigParser = ([
@@ -847,9 +848,9 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
               ),
             ),
             Effect.flatMap(
-              Validate.validate(
+              Schema.decodeUnknown(
                 pipe(
-                  Schema.Struct({
+                  DefaultTaggedStruct.DefaultTaggedStruct(EventConfig._tag, {
                     "Start Time": pipe(
                       Schema.NumberFromString,
                       Schema.transform(Schema.Number, {
@@ -863,7 +864,6 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                     "Start Time": "startTime",
                   }),
                   Schema.compose(EventConfig),
-                  Schema.standardSchemaV1,
                 ),
               ),
             ),
