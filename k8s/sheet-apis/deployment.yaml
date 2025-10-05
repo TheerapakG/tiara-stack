@@ -62,7 +62,15 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 2
             failureThreshold: 12
+          volumeMounts:
+            - name: sheet-apis-secret-path
+              readOnly: true
+              mountPath: "/.secret"
       serviceAccountName: sheet-apis
+      volumes:
+        - name: sheet-apis-secret-path
+          secret:
+            secretName: sheet-apis-secret-path
 ---
 apiVersion: v1
 kind: Service
