@@ -3,8 +3,7 @@ import {
   DiscordjsRangeError,
   DiscordjsTypeError,
 } from "discord.js";
-import { Cause, Data, Effect, Function, pipe, Schema } from "effect";
-import { Validate } from "typhoon-core/validator";
+import { Cause, Data, Effect, Either, Function, pipe, Schema } from "effect";
 
 export type Constructor<Instance> = abstract new (...args: never[]) => Instance;
 
@@ -12,16 +11,10 @@ export class DiscordError extends Data.TaggedError("DiscordError")<{
   readonly message: string;
   readonly cause: DiscordjsError | DiscordjsTypeError | DiscordjsRangeError;
 }> {
-  constructor(
-    cause: DiscordjsError | DiscordjsTypeError | DiscordjsRangeError,
-  ) {
-    super({ message: cause.message, cause });
-  }
-
   static fromUnknownException = (cause: Cause.UnknownException) => {
     return pipe(
       cause.error,
-      Validate.validate(
+      Schema.decodeUnknown(
         pipe(
           Schema.Union(
             Schema.instanceOf(
@@ -34,11 +27,16 @@ export class DiscordError extends Data.TaggedError("DiscordError")<{
               DiscordjsRangeError as unknown as Constructor<DiscordjsRangeError>,
             ),
           ),
-          Schema.standardSchemaV1,
         ),
       ),
-      Effect.map((error) => new DiscordError(error)),
-      Effect.catchTag("ValidationError", () => Effect.succeed(cause)),
+      Effect.either,
+      Effect.map(
+        Either.match({
+          onLeft: () => cause,
+          onRight: (error) =>
+            new DiscordError({ message: error.message, cause: error }),
+        }),
+      ),
     );
   };
 

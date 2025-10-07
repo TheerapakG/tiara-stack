@@ -1,7 +1,6 @@
 import { Effect, HashMap, pipe, Schema } from "effect";
 import { serverHandlerConfigCollection } from "sheet-apis";
 import { AppsScriptClient } from "typhoon-client-apps-script/client";
-import { Validate } from "typhoon-core/validator";
 
 function getClient(url: string) {
   return AppsScriptClient.create(serverHandlerConfigCollection, url);
@@ -41,7 +40,7 @@ function parsePlayerTeam([
   bp,
   percent,
 ]: CellValue[]) {
-  return Validate.validate(pipe(playerTeamValidator, Schema.standardSchemaV1))({
+  return Schema.decodeUnknown(playerTeamValidator)({
     type,
     tagStr,
     player,
@@ -72,13 +71,8 @@ export function THEECALC(
       Effect.bind("config", () =>
         pipe(
           config,
-          Validate.validate(
-            pipe(
-              Schema.Array(
-                Schema.Tuple(cellValueValidator, cellValueValidator),
-              ),
-              Schema.standardSchemaV1,
-            ),
+          Schema.decodeUnknown(
+            Schema.Array(Schema.Tuple(cellValueValidator, cellValueValidator)),
           ),
           Effect.map(HashMap.fromIterable),
           Effect.flatMap((config) =>
@@ -92,9 +86,7 @@ export function THEECALC(
               ),
             ),
           ),
-          Effect.flatMap(
-            Validate.validate(pipe(configValidator, Schema.standardSchemaV1)),
-          ),
+          Effect.flatMap(Schema.decodeUnknown(configValidator)),
         ),
       ),
       Effect.bind("players", () =>
