@@ -1,12 +1,10 @@
 import { removeGuildManagerRoleHandlerConfig } from "@/server/handler/config";
-import { GuildConfigManagerRole } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
 import { Effect, pipe, Schema } from "effect";
+import { Handler } from "typhoon-core/server";
 import { OnceObserver } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
-
-const responseSchema = Schema.Array(GuildConfigManagerRole);
 
 const builders = Context.Mutation.Builder.builders();
 export const removeGuildManagerRoleHandler = pipe(
@@ -28,7 +26,13 @@ export const removeGuildManagerRoleHandler = pipe(
           parsed.roleId,
         ),
       ),
-      Effect.flatMap(Schema.encodeEither(responseSchema)),
+      Effect.flatMap(
+        Schema.encodeEither(
+          Handler.Config.resolveResponseValidator(
+            Handler.Config.response(removeGuildManagerRoleHandlerConfig),
+          ),
+        ),
+      ),
       Effect.withSpan("removeGuildManagerRoleHandler", {
         captureStackTrace: true,
       }),

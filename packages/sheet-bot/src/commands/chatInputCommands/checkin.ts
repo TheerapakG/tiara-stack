@@ -3,7 +3,6 @@ import {
   channelServicesFromGuildChannelId,
   ConverterService,
   FormatService,
-  GuildChannelConfig,
   GuildConfigService,
   guildSheetServicesFromInteractionOption,
   InteractionContext,
@@ -59,7 +58,7 @@ const getCheckinData = ({
   runningChannel,
 }: {
   hour: number;
-  runningChannel: GuildChannelConfig;
+  runningChannel: Schema.GuildChannelConfig;
 }) =>
   pipe(
     Effect.Do,

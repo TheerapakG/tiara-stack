@@ -1,12 +1,10 @@
 import { getGuildManagerRolesHandlerConfig } from "@/server/handler/config";
-import { GuildConfigManagerRole } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
 import { Effect, Function, pipe, Schema } from "effect";
+import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
-
-const responseSchema = Schema.Array(GuildConfigManagerRole);
 
 const builders = Context.Subscription.Builder.builders();
 export const getGuildManagerRolesHandler = pipe(
@@ -23,7 +21,13 @@ export const getGuildManagerRolesHandler = pipe(
         GuildConfigService.getGuildManagerRoles(parsed),
       ),
       Computed.flatMap(Function.identity),
-      Computed.flatMap(Schema.encodeEither(responseSchema)),
+      Computed.flatMap(
+        Schema.encodeEither(
+          Handler.Config.resolveResponseValidator(
+            Handler.Config.response(getGuildManagerRolesHandlerConfig),
+          ),
+        ),
+      ),
       Effect.withSpan("getGuildManagerRolesHandler", {
         captureStackTrace: true,
       }),
