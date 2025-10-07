@@ -5,10 +5,11 @@ import {
   GuildConfigService,
   PlayerTeam,
 } from "@/server/services";
-import { Array, Chunk, Effect, HashSet, Option, pipe } from "effect";
+import { Array, Chunk, Effect, HashSet, Option, pipe, Schema } from "effect";
 import { Computed, DependencySignal } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
+import { Handler } from "typhoon-core/server";
 
 const getUserAgent = <E, R>(
   request: DependencySignal.DependencySignal<Request, E, R>,
@@ -133,6 +134,13 @@ export const calcHandler = pipe(
                 })),
               ),
               Effect.map(Chunk.toArray),
+              Effect.flatMap(
+                Schema.encodeEither(
+                  Handler.Config.resolveResponseValidator(
+                    Handler.Config.response(calcHandlerConfig),
+                  ),
+                ),
+              ),
             ),
           ),
           Computed.annotateLogs("scriptId", googleAppsScriptId),
