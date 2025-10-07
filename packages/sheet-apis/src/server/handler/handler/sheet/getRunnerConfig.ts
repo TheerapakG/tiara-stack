@@ -1,7 +1,7 @@
 import { getRunnerConfigHandlerConfig } from "@/server/handler/config";
-import { RunnerConfig } from "@/server/schema";
-import { AuthService, SheetService } from "@/server/services";
+import { AuthService, Sheet } from "@/server/services";
 import { Effect, pipe, Schema } from "effect";
+import { Handler } from "typhoon-core/server";
 import { Computed, Signal } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
@@ -19,10 +19,10 @@ export const getRunnerConfigHandler = pipe(
       ),
       Computed.flatMapComputed(({ guildId }) =>
         pipe(
-          SheetService.ofGuild(guildId),
+          Sheet.layerOfGuildId(guildId),
           Effect.flatMap((layer) =>
             pipe(
-              SheetService.getRunnerConfig(),
+              Sheet.SheetService.getRunnerConfig(),
               Effect.map(Signal.make),
               Computed.provideLayerComputed(layer),
             ),
@@ -31,10 +31,9 @@ export const getRunnerConfigHandler = pipe(
       ),
       Computed.flatMap(
         Schema.encodeEither(
-          Schema.HashMap({
-            key: Schema.String,
-            value: RunnerConfig,
-          }),
+          Handler.Config.resolveResponseValidator(
+            Handler.Config.response(getRunnerConfigHandlerConfig),
+          ),
         ),
       ),
       Effect.withSpan("getRunnerConfigHandler", {
