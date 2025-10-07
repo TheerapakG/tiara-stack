@@ -604,16 +604,11 @@ const encodeServerUpdateResult = (result: ServerUpdateResult) =>
     Effect.bindAll(
       () => ({
         headerEncoded: pipe(
-          Effect.succeed(result.header),
-          Effect.tap((header) => Effect.log(header)),
-          Effect.flatMap(Schema.encode(Header.HeaderSchema)),
+          result.header,
+          Schema.encode(Header.HeaderSchema),
           Effect.flatMap(Msgpack.Encoder.encode),
         ),
-        messageEncoded: pipe(
-          Effect.succeed(result.message),
-          Effect.tap((message) => Effect.log(message)),
-          Effect.flatMap(Msgpack.Encoder.encode),
-        ),
+        messageEncoded: pipe(result.message, Msgpack.Encoder.encode),
       }),
       { concurrency: "unbounded" },
     ),
