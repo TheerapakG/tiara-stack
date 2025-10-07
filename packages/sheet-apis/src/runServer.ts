@@ -14,6 +14,7 @@ import {
   calcHandlerCollection,
   guildConfigHandlerCollection,
   sheetHandlerCollection,
+  playerHandlerCollection,
 } from "./server/handler/handler";
 import {
   AuthService,
@@ -59,6 +60,7 @@ const serverHandlerCollection = pipe(
   Context.Collection.addCollection(calcHandlerCollection),
   Context.Collection.addCollection(guildConfigHandlerCollection),
   Context.Collection.addCollection(sheetHandlerCollection),
+  Context.Collection.addCollection(playerHandlerCollection),
 );
 
 const server = pipe(

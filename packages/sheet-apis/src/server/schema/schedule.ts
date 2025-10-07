@@ -1,9 +1,12 @@
-import { Array, Number, Option, Order, Schema } from "effect";
+import { Array, Number, Option, Order, pipe, Schema } from "effect";
 
 export class Schedule extends Schema.TaggedClass<Schedule>()("Schedule", {
   hour: Schema.Number,
   breakHour: Schema.Boolean,
-  fills: Schema.Array(Schema.OptionFromNullishOr(Schema.String, undefined)),
+  fills: pipe(
+    Schema.Array(Schema.OptionFromNullishOr(Schema.String, undefined)),
+    Schema.itemsCount(5),
+  ),
   overfills: Schema.Array(Schema.String),
   standbys: Schema.Array(Schema.String),
 }) {
