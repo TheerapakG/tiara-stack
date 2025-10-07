@@ -1,6 +1,5 @@
 import {
   ClientService,
-  GuildChannelConfig,
   GuildConfigService,
   guildSheetServicesFromInteractionOption,
   InteractionContext,
@@ -23,8 +22,9 @@ import {
   SlashCommandSubcommandBuilder,
 } from "discord.js";
 import { Effect, Function, Option, pipe } from "effect";
+import { Schema } from "sheet-apis";
 
-const configFields = (config: GuildChannelConfig) => [
+const configFields = (config: Schema.GuildChannelConfig) => [
   {
     name: "Name",
     value: pipe(

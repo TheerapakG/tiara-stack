@@ -1,12 +1,10 @@
 import { getGuildConfigByGuildIdHandlerConfig } from "@/server/handler/config";
-import { GuildConfig } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
 import { Effect, Function, pipe, Schema } from "effect";
+import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
-
-const responseSchema = Schema.OptionFromNullishOr(GuildConfig, undefined);
 
 const builders = Context.Subscription.Builder.builders();
 export const getGuildConfigByGuildIdHandler = pipe(
@@ -23,7 +21,13 @@ export const getGuildConfigByGuildIdHandler = pipe(
         GuildConfigService.getGuildConfigByGuildId(parsed),
       ),
       Computed.flatMap(Function.identity),
-      Computed.flatMap(Schema.encodeEither(responseSchema)),
+      Computed.flatMap(
+        Schema.encodeEither(
+          Handler.Config.resolveResponseValidator(
+            Handler.Config.response(getGuildConfigByGuildIdHandlerConfig),
+          ),
+        ),
+      ),
       Effect.withSpan("getGuildConfigByGuildIdHandler", {
         captureStackTrace: true,
       }),
