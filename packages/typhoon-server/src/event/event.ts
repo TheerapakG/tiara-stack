@@ -69,7 +69,7 @@ export class Event extends Context.Tag("Event")<
   }>
 >() {}
 
-export const fromEventContext = (
+export const makeEventService = (
   ctx: EventContext,
 ): Effect.Effect<Context.Tag.Service<Event>> =>
   SynchronizedRef.make({
@@ -141,12 +141,35 @@ export const webRequest = (): Effect.Effect<Request, never, Event> =>
     Effect.map((ctx) => ctx.request),
   );
 
+export const token = (): Effect.Effect<Option.Option<string>, never, Event> =>
+  pipe(
+    Event,
+    Effect.flatMap((ref) => SynchronizedRef.get(ref)),
+    Effect.map((ctx) => ctx.token),
+  );
+
+export const pullStream = (): Effect.Effect<
+  Signal.Signal<{
+    stream: Effect.Effect<
+      unknown,
+      Msgpack.Decoder.MsgpackDecodeError | Stream.StreamExhaustedError,
+      never
+    >;
+    scope: Scope.CloseableScope;
+  }>,
+  never,
+  Event
+> =>
+  pipe(
+    Event,
+    Effect.flatMap((ref) => SynchronizedRef.get(ref)),
+    Effect.map((ctx) => ctx.pullStream),
+  );
+
 export const request = {
   raw: () =>
     pipe(
-      Event,
-      Effect.flatMap((ref) => SynchronizedRef.get(ref)),
-      Effect.map((ctx) => ctx.pullStream),
+      pullStream(),
       Computed.map((pullStream) => pullStream.stream),
     ),
   parsed: <Config extends Handler.Config.TypedHandlerConfig>(config: Config) =>
@@ -157,10 +180,3 @@ export const request = {
       ),
     ),
 };
-
-export const token = (): Effect.Effect<Option.Option<string>, never, Event> =>
-  pipe(
-    Event,
-    Effect.flatMap((ref) => SynchronizedRef.get(ref)),
-    Effect.map((ctx) => ctx.token),
-  );

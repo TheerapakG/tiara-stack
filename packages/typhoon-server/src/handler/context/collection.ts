@@ -52,3 +52,19 @@ export const getHandlerContext =
       type,
       key,
     )(handlerContextCollection);
+
+export const getMutationHandlerContext =
+  (key: string) =>
+  <R = never>(handlerContextCollection: HandlerContextCollection<R>) =>
+    getHandlerContext<MutationHandlerT>(
+      "mutation",
+      key,
+    )(handlerContextCollection);
+
+export const getSubscriptionHandlerContext =
+  (key: string) =>
+  <R = never>(handlerContextCollection: HandlerContextCollection<R>) =>
+    getHandlerContext<SubscriptionHandlerT>(
+      "subscription",
+      key,
+    )(handlerContextCollection);
