@@ -22,8 +22,8 @@ import {
 } from "effect";
 import { Computed } from "typhoon-core/signal";
 import { Array as ArrayUtils } from "typhoon-core/utils";
-import { GuildConfigService } from "./guildConfigService";
-import { RunnerConfigMap, SheetConfigService } from "./sheetConfigService";
+import { GuildConfigService } from "../guildConfigService";
+import { RunnerConfigMap, SheetConfigService } from "../sheetConfigService";
 
 const playerParser = ([
   userIds,
