@@ -28,10 +28,7 @@ export type ResponseConfigIn<
 };
 
 export type ResponseConfigInValidator<Config extends ResponseConfigIn> =
-  StandardSchemaV1<
-    StandardSchemaV1.InferInput<Config["validator"]>,
-    StandardSchemaV1.InferOutput<Config["validator"]>
-  >;
+  Config["validator"];
 export type ResponseConfigInStream<Config extends ResponseConfigIn> =
   "stream" extends keyof Config ? Config["stream"] : undefined;
 
