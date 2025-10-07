@@ -506,41 +506,40 @@ class ServerUpdateResult extends Data.TaggedClass("ServerUpdateResult")<{
   message: unknown;
 }> {}
 
-const runHandler = <R = never>(
-  id: string,
-  handler: Effect.Effect<unknown, unknown, R>,
-) =>
-  pipe(
-    Effect.Do,
-    Effect.bind("value", () => Effect.exit(handler)),
-    Effect.bind("timestamp", () => DateTime.now),
-    Effect.map(
-      ({ value, timestamp }) =>
-        new ServerUpdateResult({
-          header: {
-            protocol: "typh",
-            version: 1,
-            id,
-            action: "server:update",
-            payload: {
-              success: Exit.isSuccess(value),
-              timestamp: DateTime.toDate(timestamp),
-            },
-          } as const,
-          message: pipe(
-            value,
-            Exit.match({
-              onSuccess: Function.identity,
-              onFailure: Cause.squash,
-            }),
-          ),
-        }),
-    ),
-    Effect.scoped,
-    Effect.withSpan("Server.runHandler", {
-      captureStackTrace: true,
-    }),
-  );
+const runHandler =
+  (id: string) =>
+  <R = never>(handler: Effect.Effect<unknown, unknown, R>) =>
+    pipe(
+      Effect.Do,
+      Effect.bind("value", () => Effect.exit(handler)),
+      Effect.bind("timestamp", () => DateTime.now),
+      Effect.map(
+        ({ value, timestamp }) =>
+          new ServerUpdateResult({
+            header: {
+              protocol: "typh",
+              version: 1,
+              id,
+              action: "server:update",
+              payload: {
+                success: Exit.isSuccess(value),
+                timestamp: DateTime.toDate(timestamp),
+              },
+            } as const,
+            message: pipe(
+              value,
+              Exit.match({
+                onSuccess: Function.identity,
+                onFailure: Cause.squash,
+              }),
+            ),
+          }),
+      ),
+      Effect.scoped,
+      Effect.withSpan("Server.runHandler", {
+        captureStackTrace: true,
+      }),
+    );
 
 const getComputedSubscriptionResult =
   (header: Header.Header<"client:subscribe" | "client:once">) =>
@@ -555,10 +554,12 @@ const getComputedSubscriptionResult =
       serverWithRuntime.server.handlerContextCollection,
       getSubscriptionHandlerContext(header.payload.handler),
       Effect.orElse(() => Effect.fail(`handler not found`)),
-      Effect.flatMap((handlerContextConfig) =>
+      Effect.flatMap(HandlerContext.handler),
+      Effect.flatMap((innerHandler) =>
         Computed.make(
           pipe(
-            runHandler(header.id, HandlerContext.handler(handlerContextConfig)),
+            innerHandler,
+            runHandler(header.id),
             Effect.provide(serverWithRuntime.runtime),
             Effect.withSpan("subscriptionHandler", {
               captureStackTrace: true,
@@ -589,9 +590,8 @@ const getMutationResult =
       serverWithRuntime.server.handlerContextCollection,
       getMutationHandlerContext(header.payload.handler),
       Effect.orElse(() => Effect.fail(`handler not found`)),
-      Effect.flatMap((handlerContextConfig) =>
-        runHandler(header.id, HandlerContext.handler(handlerContextConfig)),
-      ),
+      Effect.map(HandlerContext.handler),
+      Effect.flatMap(runHandler(header.id)),
       Effect.provide(serverWithRuntime.runtime),
       Effect.withSpan("Server.getMutationResult", {
         captureStackTrace: true,
