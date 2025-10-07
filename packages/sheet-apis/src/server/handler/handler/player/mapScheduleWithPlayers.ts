@@ -6,7 +6,7 @@ import { Computed, Signal } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
 
-const builders = Context.Mutation.Builder.builders();
+const builders = Context.Subscription.Builder.builders();
 export const mapScheduleWithPlayersHandler = pipe(
   builders.empty(),
   builders.data(mapScheduleWithPlayersHandlerConfig),

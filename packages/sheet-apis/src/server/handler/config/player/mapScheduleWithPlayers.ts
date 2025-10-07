@@ -5,7 +5,7 @@ import { Schedule, ScheduleWithPlayers } from "@/server/schema";
 
 export const mapScheduleWithPlayersHandlerConfig = pipe(
   Handler.Config.empty(),
-  Handler.Config.Builder.type("mutation"),
+  Handler.Config.Builder.type("subscription"),
   Handler.Config.Builder.name("player.mapScheduleWithPlayers"),
   Handler.Config.Builder.requestParams({
     validator: pipe(
