@@ -217,4 +217,5 @@ export const HeaderSchema = pipe(
         })),
       ),
   }),
+  Schema.asSchema,
 );
