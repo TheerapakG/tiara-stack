@@ -1,4 +1,4 @@
-import { Effect, Fiber, HashSet, Option, pipe } from "effect";
+import { Context, Effect, Fiber, HashSet, Option, pipe } from "effect";
 import { Observable } from "../observability";
 import { DependencySignal } from "./dependencySignal";
 import { DependentSignal, DependentSymbol } from "./dependentSignal";
@@ -8,19 +8,22 @@ import {
   SignalContext,
 } from "./signalContext";
 
-export class SideEffect implements DependentSignal {
+export class SideEffect<R = never> implements DependentSignal {
   readonly [DependentSymbol]: DependentSignal = this;
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
-  private _effect: Effect.Effect<unknown, unknown, SignalContext>;
+  private _effect: Effect.Effect<unknown, unknown, R | SignalContext>;
+  private _context: Context.Context<R>;
   private _fiber: Option.Option<Fiber.Fiber<unknown, unknown>>;
   private _dependencies: HashSet.HashSet<DependencySignal>;
 
   constructor(
-    effect: Effect.Effect<unknown, unknown, SignalContext>,
+    effect: Effect.Effect<unknown, unknown, R | SignalContext>,
+    context: Context.Context<R>,
     options: Observable.ObservableOptions,
   ) {
     this._effect = effect;
+    this._context = context;
     this._fiber = Option.none();
     this._dependencies = HashSet.empty();
     this[Observable.ObservableSymbol] = options;
@@ -75,6 +78,7 @@ export class SideEffect implements DependentSignal {
           ),
         ),
       ]),
+      Effect.provide(this._context),
       Observable.withSpan(this, "SideEffect.notify", {
         captureStackTrace: true,
       }),
@@ -99,12 +103,42 @@ export const make = (
   options?: Observable.ObservableOptions,
 ) =>
   pipe(
-    Effect.succeed(new SideEffect(effect, options ?? {})),
+    Effect.succeed(
+      new SideEffect<never>(effect, Context.empty(), options ?? {}),
+    ),
     Effect.tap((sideEffect) => sideEffect.notify()),
     Effect.map((sideEffect) => sideEffect.cleanup()),
     Observable.withSpan(
       { [Observable.ObservableSymbol]: options ?? {} },
       "SideEffect.make",
+      {
+        captureStackTrace: true,
+      },
+    ),
+  );
+
+export const makeWithContext = <R = never>(
+  effect: Effect.Effect<unknown, unknown, R>,
+  context: Context.Context<Exclude<R, SignalContext>>,
+  options?: Observable.ObservableOptions,
+) =>
+  pipe(
+    Effect.succeed(
+      new SideEffect<Exclude<R, SignalContext>>(
+        effect as Effect.Effect<
+          unknown,
+          unknown,
+          SignalContext | Exclude<R, SignalContext>
+        >,
+        context,
+        options ?? {},
+      ),
+    ),
+    Effect.tap((sideEffect) => sideEffect.notify()),
+    Effect.map((sideEffect) => sideEffect.cleanup()),
+    Observable.withSpan(
+      { [Observable.ObservableSymbol]: options ?? {} },
+      "SideEffect.makeWithContext",
       {
         captureStackTrace: true,
       },
