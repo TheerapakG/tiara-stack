@@ -23,11 +23,7 @@ export const HeaderActionSchema = ArrayLookupSchema([
 
 export class EmptyPayloadSchema extends pipe(
   KeyOrderLookupSchema([], {}),
-  Schema.transformOrFail(Schema.Unknown, {
-    strict: true,
-    decode: (value) => ParseResult.succeed(value),
-    encode: (value) => pipe(value, ParseResult.decodeUnknown(Schema.Object)),
-  }),
+  Schema.compose(Schema.Unknown),
 ) {
   static keys = [];
   static fields = {};
