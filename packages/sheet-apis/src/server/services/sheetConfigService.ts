@@ -22,8 +22,7 @@ import {
   String,
 } from "effect";
 import { Array as ArrayUtils } from "typhoon-core/utils";
-import { DefaultTaggedStruct } from "typhoon-core/schema";
-import { Validate } from "typhoon-core/validator";
+import { DefaultTaggedClass } from "typhoon-core/schema";
 
 const dayConfigParser = ([
   channel,
@@ -40,185 +39,165 @@ const dayConfigParser = ([
   pipe(
     Effect.Do,
     Effect.bindAll(() => ({
-      channel: GoogleSheets.parseValueRange(channel, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      channel: pipe(
+        GoogleSheets.parseValueRange(
+          channel,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (channel) => ({ channel }),
+              onNone: () => ({ channel: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (channel) => ({ channel }),
-            onNone: () => ({ channel: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
-      day: GoogleSheets.parseValueRange(day, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-              Schema.compose(
-                Schema.OptionFromSelf(
-                  Schema.OptionFromSelf(Schema.NumberFromString),
-                ),
+      day: pipe(
+        GoogleSheets.parseValueRange(
+          day,
+          pipe(
+            Schema.Array(Schema.OptionFromSelf(Schema.String)),
+            Schema.head,
+            Schema.compose(
+              Schema.OptionFromSelf(
+                Schema.OptionFromSelf(Schema.NumberFromString),
               ),
             ),
           ),
-          Option.flatten,
-          Option.flatten,
-          (day) => Effect.succeed({ day }),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map((day) => ({ day }))),
+      ),
+      sheet: pipe(
+        GoogleSheets.parseValueRange(
+          sheet,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (sheet) => ({ sheet }),
+              onNone: () => ({ sheet: "" }),
+            }),
+          ),
         ),
       ),
-      sheet: GoogleSheets.parseValueRange(sheet, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      hourRange: pipe(
+        GoogleSheets.parseValueRange(
+          hourRange,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (hourRange) => ({ hourRange }),
+              onNone: () => ({ hourRange: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (sheet) => ({ sheet }),
-            onNone: () => ({ sheet: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
-      hourRange: GoogleSheets.parseValueRange(hourRange, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      breakRange: pipe(
+        GoogleSheets.parseValueRange(
+          breakRange,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (breakRange) => ({ breakRange }),
+              onNone: () => ({ breakRange: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (hourRange) => ({ hourRange }),
-            onNone: () => ({ hourRange: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
-      breakRange: GoogleSheets.parseValueRange(breakRange, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      monitorRange: pipe(
+        GoogleSheets.parseValueRange(
+          monitorRange,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (monitorRange) => ({ monitorRange }),
+              onNone: () => ({ monitorRange: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (breakRange) => ({ breakRange }),
-            onNone: () => ({ breakRange: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
-      monitorRange: GoogleSheets.parseValueRange(monitorRange, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      fillRange: pipe(
+        GoogleSheets.parseValueRange(
+          fillRange,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (fillRange) => ({ fillRange }),
+              onNone: () => ({ fillRange: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (monitorRange) => ({ monitorRange }),
-            onNone: () => ({ monitorRange: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
-      fillRange: GoogleSheets.parseValueRange(fillRange, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      overfillRange: pipe(
+        GoogleSheets.parseValueRange(
+          overfillRange,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (overfillRange) => ({ overfillRange }),
+              onNone: () => ({ overfillRange: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (fillRange) => ({ fillRange }),
-            onNone: () => ({ fillRange: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
-      overfillRange: GoogleSheets.parseValueRange(overfillRange, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      standbyRange: pipe(
+        GoogleSheets.parseValueRange(
+          standbyRange,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (standbyRange) => ({ standbyRange }),
+              onNone: () => ({ standbyRange: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (overfillRange) => ({ overfillRange }),
-            onNone: () => ({ overfillRange: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
-      standbyRange: GoogleSheets.parseValueRange(standbyRange, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
-          ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (standbyRange) => ({ standbyRange }),
-            onNone: () => ({ standbyRange: "" }),
-          }),
-          Effect.succeed,
+      draft: pipe(
+        GoogleSheets.parseValueRange(
+          draft,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
         ),
-      ),
-      draft: GoogleSheets.parseValueRange(draft, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (draft) => ({ draft }),
+              onNone: () => ({ draft: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (draft) => ({ draft }),
-            onNone: () => ({ draft: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
     })),
@@ -353,186 +332,171 @@ const teamConfigParser = ([
   pipe(
     Effect.Do,
     Effect.bindAll(() => ({
-      name: GoogleSheets.parseValueRange(name, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      name: pipe(
+        GoogleSheets.parseValueRange(
+          name,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (name) => ({ name }),
+              onNone: () => ({ name: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (name) => ({ name }),
-            onNone: () => ({ name: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
-      sheet: GoogleSheets.parseValueRange(sheet, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      sheet: pipe(
+        GoogleSheets.parseValueRange(
+          sheet,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (sheet) => ({ sheet }),
+              onNone: () => ({ sheet: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (sheet) => ({ sheet }),
-            onNone: () => ({ sheet: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
-      playerNameRange: GoogleSheets.parseValueRange(playerNameRange, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      playerNameRange: pipe(
+        GoogleSheets.parseValueRange(
+          playerNameRange,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (playerNameRange) => ({ playerNameRange }),
+              onNone: () => ({ playerNameRange: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (playerNameRange) => ({ playerNameRange }),
-            onNone: () => ({ playerNameRange: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
-      teamNameRange: GoogleSheets.parseValueRange(teamNameRange, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      teamNameRange: pipe(
+        GoogleSheets.parseValueRange(
+          teamNameRange,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (teamNameRange) => ({ teamNameRange }),
+              onNone: () => ({ teamNameRange: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (teamNameRange) => ({ teamNameRange }),
-            onNone: () => ({ teamNameRange: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
-      leadRange: GoogleSheets.parseValueRange(leadRange, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      leadRange: pipe(
+        GoogleSheets.parseValueRange(
+          leadRange,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (leadRange) => ({ leadRange }),
+              onNone: () => ({ leadRange: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (leadRange) => ({ leadRange }),
-            onNone: () => ({ leadRange: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
-      backlineRange: GoogleSheets.parseValueRange(backlineRange, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      backlineRange: pipe(
+        GoogleSheets.parseValueRange(
+          backlineRange,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (backlineRange) => ({ backlineRange }),
+              onNone: () => ({ backlineRange: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (backlineRange) => ({ backlineRange }),
-            onNone: () => ({ backlineRange: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
-      talentRange: GoogleSheets.parseValueRange(talentRange, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      talentRange: pipe(
+        GoogleSheets.parseValueRange(
+          talentRange,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (talentRange) => ({ talentRange }),
+              onNone: () => ({ talentRange: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (talentRange) => ({ talentRange }),
-            onNone: () => ({ talentRange: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
-      tagsType: GoogleSheets.parseValueRange(tagsType, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-              Schema.compose(
+      tagsType: pipe(
+        GoogleSheets.parseValueRange(
+          tagsType,
+          pipe(
+            Schema.Array(Schema.OptionFromSelf(Schema.String)),
+            Schema.head,
+            Schema.compose(
+              Schema.OptionFromSelf(
                 Schema.OptionFromSelf(
-                  Schema.OptionFromSelf(
-                    pipe(
-                      Schema.String,
-                      Schema.transformOrFail(
-                        Schema.Literal("constants", "ranges"),
-                        {
-                          strict: true,
-                          decode: (str) =>
-                            ParseResult.decodeUnknown(
-                              Schema.Literal("constants", "ranges"),
-                            )(str),
-                          encode: (str) => ParseResult.succeed(str),
-                        },
-                      ),
+                  pipe(
+                    Schema.String,
+                    Schema.transformOrFail(
+                      Schema.Literal("constants", "ranges"),
+                      {
+                        strict: true,
+                        decode: (str) =>
+                          ParseResult.decodeUnknown(
+                            Schema.Literal("constants", "ranges"),
+                          )(str),
+                        encode: (str) => ParseResult.succeed(str),
+                      },
                     ),
                   ),
                 ),
               ),
             ),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (tagsType) => ({ tagsType }),
-            onNone: () => ({ tagsType: "constants" as const }),
-          }),
-          Effect.succeed,
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (tagsType) => ({ tagsType }),
+              onNone: () => ({ tagsType: "constants" as const }),
+            }),
+          ),
         ),
       ),
-      tags: GoogleSheets.parseValueRange(tags, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      tags: pipe(
+        GoogleSheets.parseValueRange(
+          tags,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (tags) => ({ tags }),
+              onNone: () => ({ tags: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (tags) => ({ tags }),
-            onNone: () => ({ tags: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
     })),
@@ -682,40 +646,36 @@ const runnerConfigParser = ([
   pipe(
     Effect.Do,
     Effect.bindAll(() => ({
-      name: GoogleSheets.parseValueRange(name, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      name: pipe(
+        GoogleSheets.parseValueRange(
+          name,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (name) => ({ name }),
+              onNone: () => ({ name: "" }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (name) => ({ name }),
-            onNone: () => ({ name: "" }),
-          }),
-          Effect.succeed,
         ),
       ),
-      hours: GoogleSheets.parseValueRange(hours, (arr) =>
-        pipe(
-          arr,
-          Schema.decodeOption(
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.String)),
-              Schema.head,
-            ),
+      hours: pipe(
+        GoogleSheets.parseValueRange(
+          hours,
+          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
+        ),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.flatten)),
+        Effect.map(
+          Array.map(
+            Option.match({
+              onSome: (hours) => ({ hours: hourRangesParser(hours) }),
+              onNone: () => ({ hours: [] }),
+            }),
           ),
-          Option.flatten,
-          Option.flatten,
-          Option.match({
-            onSome: (hours) => ({ hours: hourRangesParser(hours) }),
-            onNone: () => ({ hours: [] }),
-          }),
-          Effect.succeed,
         ),
       ),
     })),
@@ -772,7 +732,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
               ),
             ),
             Effect.flatMap(
-              Validate.validate(
+              Schema.decodeUnknown(
                 pipe(
                   Schema.Struct({
                     "User IDs": Schema.String,
@@ -792,12 +752,9 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                     Overfills: "overfills",
                     Standbys: "standbys",
                   }),
-                  Schema.transform(RangesConfig, {
-                    strict: true,
-                    decode: (value) => RangesConfig.make(value),
-                    encode: (value) => value,
-                  }),
-                  Schema.standardSchemaV1,
+                  Schema.compose(
+                    DefaultTaggedClass.DefaultTaggedClass(RangesConfig),
+                  ),
                 ),
               ),
             ),
@@ -850,7 +807,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
             Effect.flatMap(
               Schema.decodeUnknown(
                 pipe(
-                  DefaultTaggedStruct.DefaultTaggedStruct(EventConfig._tag, {
+                  Schema.Struct({
                     "Start Time": pipe(
                       Schema.NumberFromString,
                       Schema.transform(Schema.Number, {
@@ -863,7 +820,9 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                   Schema.rename({
                     "Start Time": "startTime",
                   }),
-                  Schema.compose(EventConfig),
+                  Schema.compose(
+                    DefaultTaggedClass.DefaultTaggedClass(EventConfig),
+                  ),
                 ),
               ),
             ),

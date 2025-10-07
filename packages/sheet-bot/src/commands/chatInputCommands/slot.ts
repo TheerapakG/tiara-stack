@@ -42,7 +42,6 @@ import {
   Schema,
   String,
 } from "effect";
-import { Validate } from "typhoon-core/validator";
 
 const getSlotMessage = (day: number) =>
   pipe(
@@ -129,12 +128,7 @@ const handleList =
               InteractionContext.getString("message_type"),
               Effect.map(Option.getOrElse(() => "ephemeral")),
               Effect.flatMap(
-                Validate.validate(
-                  pipe(
-                    Schema.Literal("persistent", "ephemeral"),
-                    Schema.standardSchemaV1,
-                  ),
-                ),
+                Schema.decodeUnknown(Schema.Literal("persistent", "ephemeral")),
               ),
             ),
           }),

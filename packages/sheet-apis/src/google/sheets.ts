@@ -87,22 +87,25 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
     accessors: true,
   },
 ) {
-  static parseValueRange = <A, E, R>(
+  static parseValueRange = <A, R>(
     valueRange: sheets_v4.Schema$ValueRange,
-    rowParser: (
-      row: readonly Option.Option<string>[],
-      index: number,
-    ) => Effect.Effect<A, E, R>,
-  ): Effect.Effect<A[], E, R> =>
+    rowSchema: Schema.Schema<A, readonly Option.Option<string>[], R>,
+  ): Effect.Effect<Option.Option<A>[], never, R> =>
     pipe(
       Option.fromNullable(valueRange.values),
-      Option.flatMap(
-        Schema.decodeUnknownOption(
-          Schema.Array(Schema.Array(Schema.OptionFromNonEmptyTrimmedString)),
+      Option.getOrElse(() => []),
+      Effect.forEach((value) =>
+        pipe(
+          value,
+          Schema.decodeUnknown(
+            pipe(
+              Schema.Array(Schema.OptionFromNonEmptyTrimmedString),
+              Schema.compose(rowSchema),
+            ),
+          ),
+          Effect.option,
         ),
       ),
-      Option.map(Effect.forEach(rowParser)),
-      Option.getOrElse(() => Effect.succeed([])),
       Effect.withSpan("parseValueRange", { captureStackTrace: true }),
     );
 }

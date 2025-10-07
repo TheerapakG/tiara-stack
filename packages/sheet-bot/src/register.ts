@@ -1,32 +1,28 @@
 import { loadConfig } from "c12";
 import { REST, Routes } from "discord.js";
 import { Chunk, Effect, pipe, Schema, Stream } from "effect";
-import { Validate } from "typhoon-core/validator";
 import { commands } from "./commands/chatInputCommands";
 import { InteractionHandlerMap } from "./types/handler";
 
 await loadConfig({ dotenv: true });
 
-const envValidator = Validate.validate(
-  pipe(
-    Schema.Struct({
-      DISCORD_TOKEN: Schema.String,
-      DISCORD_CLIENT_ID: Schema.String,
-      DISCORD_GUILD_ID: Schema.optional(Schema.String),
-    }),
-    Schema.rename({
-      DISCORD_TOKEN: "discordToken",
-      DISCORD_CLIENT_ID: "discordClientId",
-      DISCORD_GUILD_ID: "discordGuildId",
-    }),
-    Schema.standardSchemaV1,
-  ),
+const envSchema = pipe(
+  Schema.Struct({
+    DISCORD_TOKEN: Schema.String,
+    DISCORD_CLIENT_ID: Schema.String,
+    DISCORD_GUILD_ID: Schema.optional(Schema.String),
+  }),
+  Schema.rename({
+    DISCORD_TOKEN: "discordToken",
+    DISCORD_CLIENT_ID: "discordClientId",
+    DISCORD_GUILD_ID: "discordGuildId",
+  }),
 );
 
 await Effect.runPromise(
   pipe(
     Effect.Do,
-    Effect.bind("env", () => envValidator(process.env)),
+    Effect.bind("env", () => Schema.decodeUnknown(envSchema)(process.env)),
     Effect.let("rest", ({ env }) => new REST().setToken(env.discordToken)),
     Effect.bind("commands", () =>
       pipe(
