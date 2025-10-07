@@ -1,7 +1,7 @@
 import { getEventConfigHandlerConfig } from "@/server/handler/config";
-import { EventConfig } from "@/server/schema";
-import { AuthService, SheetService } from "@/server/services";
+import { AuthService, Sheet } from "@/server/services";
 import { Effect, pipe, Schema } from "effect";
+import { Handler } from "typhoon-core/server";
 import { Computed, Signal } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
@@ -19,17 +19,23 @@ export const getEventConfigHandler = pipe(
       ),
       Computed.flatMapComputed(({ guildId }) =>
         pipe(
-          SheetService.ofGuild(guildId),
+          Sheet.layerOfGuildId(guildId),
           Effect.flatMap((layer) =>
             pipe(
-              SheetService.getEventConfig(),
+              Sheet.SheetService.getEventConfig(),
               Effect.map(Signal.make),
               Computed.provideLayerComputed(layer),
             ),
           ),
         ),
       ),
-      Computed.flatMap(Schema.encodeEither(EventConfig)),
+      Computed.flatMap(
+        Schema.encodeEither(
+          Handler.Config.resolveResponseValidator(
+            Handler.Config.response(getEventConfigHandlerConfig),
+          ),
+        ),
+      ),
       Effect.withSpan("getEventConfigHandler", {
         captureStackTrace: true,
       }),
