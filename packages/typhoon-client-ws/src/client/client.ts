@@ -20,7 +20,9 @@ import { Validate, Validator } from "typhoon-core/validator";
 
 const WebSocketCtor = globalThis.WebSocket;
 
-export class HandlerError extends Data.TaggedError("HandlerError") {}
+export class HandlerError extends Data.TaggedError("HandlerError")<{
+  cause: unknown;
+}> {}
 
 type LoadingState = {
   state: "loading";
@@ -162,7 +164,7 @@ export class WebSocketClient<
                           value: header.payload.success
                             ? Effect.succeed(decodedResponse)
                             : Effect.fail(
-                                new HandlerError(decodedResponse as void),
+                                new HandlerError({ cause: decodedResponse }),
                               ),
                         }),
                       ),
@@ -370,25 +372,28 @@ export class WebSocketClient<
                         Effect.Do,
                         Effect.bind("value", () => value.value),
                         Effect.bind("config", () =>
-                          Handler.Config.Collection.getHandlerConfig(
-                            "subscription",
-                            handler,
-                          )(client.configCollection),
+                          pipe(
+                            Handler.Config.Collection.getHandlerConfig(
+                              "subscription",
+                              handler,
+                            )(client.configCollection),
+                            Effect.catchAll((error) =>
+                              Effect.fail(new HandlerError({ cause: error })),
+                            ),
+                          ),
                         ),
                         Effect.flatMap(({ value, config }) =>
-                          Validate.validate(
-                            Handler.Config.resolveResponseValidator(
-                              Handler.Config.response(
-                                config as SubscriptionHandlerConfigs[Handler],
+                          pipe(
+                            Validate.validate(
+                              Handler.Config.resolveResponseValidator(
+                                Handler.Config.response(
+                                  config as SubscriptionHandlerConfigs[Handler],
+                                ),
                               ),
+                            )(value),
+                            Effect.catchAll((error) =>
+                              Effect.fail(new HandlerError({ cause: error })),
                             ),
-                          )(value),
-                        ),
-                        Effect.catchAll((error) =>
-                          Effect.fail(
-                            new HandlerError({
-                              cause: error,
-                            } as unknown as void),
                           ),
                         ),
                       ),
@@ -552,9 +557,7 @@ export class WebSocketClient<
                     )(value),
                   ),
                   Effect.catchAll((error) =>
-                    Effect.fail(
-                      new HandlerError({ cause: error } as unknown as void),
-                    ),
+                    Effect.fail(new HandlerError({ cause: error })),
                   ),
                 ),
               ),
@@ -665,9 +668,7 @@ export class WebSocketClient<
                     )(value),
                   ),
                   Effect.catchAll((error) =>
-                    Effect.fail(
-                      new HandlerError({ cause: error } as unknown as void),
-                    ),
+                    Effect.fail(new HandlerError({ cause: error })),
                   ),
                 ),
               ),
