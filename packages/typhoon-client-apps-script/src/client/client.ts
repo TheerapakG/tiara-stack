@@ -3,7 +3,9 @@ import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { Validate, Validator } from "typhoon-core/validator";
 
-export class HandlerError extends Data.TaggedError("HandlerError") {}
+export class HandlerError extends Data.TaggedError("HandlerError")<{
+  cause: unknown;
+}> {}
 
 export class AppsScriptClient<
   SubscriptionHandlerConfigs extends Record<
@@ -170,12 +172,10 @@ export class AppsScriptClient<
                 ),
               ),
               Effect.catchAll((error) =>
-                Effect.fail(
-                  new HandlerError({ cause: error } as unknown as void),
-                ),
+                Effect.fail(new HandlerError({ cause: error })),
               ),
             )
-          : Effect.fail(new HandlerError(decodedResponse as void)),
+          : Effect.fail(new HandlerError({ cause: decodedResponse })),
       ),
       Effect.scoped,
       Effect.withSpan("AppsScriptClient.once"),
