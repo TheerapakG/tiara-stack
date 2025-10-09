@@ -1,5 +1,5 @@
 import { bindObject } from "@/utils";
-import { Effect, Number, pipe } from "effect";
+import { Effect, Number, pipe, String } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { SheetApisClient } from "@/client/sheetApis";
 import { GuildService } from "./guildService";
@@ -60,17 +60,17 @@ export class SheetService extends Effect.Service<SheetService>()(
               }),
             ),
           ),
-          dayConfig: Effect.cached(
+          scheduleConfig: Effect.cached(
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
                 WebSocketClient.once(
                   sheetApisClient.get(),
-                  "sheetConfig.getDayConfig",
+                  "sheetConfig.getScheduleConfig",
                   { guildId },
                 ),
               ),
-              Effect.withSpan("SheetService.dayConfig", {
+              Effect.withSpan("SheetService.scheduleConfig", {
                 captureStackTrace: true,
               }),
             ),
@@ -137,6 +137,20 @@ export class SheetService extends Effect.Service<SheetService>()(
                 ),
               ),
             Number.Equivalence,
+          ),
+          channelSchedules: Effect.cachedFunction(
+            (channel: string) =>
+              pipe(
+                guildService.getId(),
+                Effect.flatMap((guildId) =>
+                  WebSocketClient.once(
+                    sheetApisClient.get(),
+                    "sheet.getChannelSchedules",
+                    { guildId, channel },
+                  ),
+                ),
+              ),
+            String.Equivalence,
           ),
         }),
         { concurrency: "unbounded" },

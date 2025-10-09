@@ -57,28 +57,24 @@ class TimeError extends Data.TaggedError("TimeError")<{
 
 const getKickoutData = ({
   hour,
-  channelName,
+  runningChannel,
 }: {
   hour: number;
-  channelName: string;
+  runningChannel: Schema.GuildChannelConfig;
 }) =>
   pipe(
     Effect.Do,
-    bindObject({
-      schedules: SheetService.allSchedules,
-      runningChannel: pipe(
-        GuildConfigService.getGuildRunningChannelByName(channelName),
-        Effect.flatMap(
-          Option.match({
-            onSome: (channel) => Effect.succeed(channel),
-            onNone: () =>
-              Effect.fail(
-                new ArgumentError(`No such running channel: ${channelName}`),
-              ),
-          }),
+    Effect.bind("schedules", () =>
+      pipe(
+        runningChannel.name,
+        Effect.flatMap(SheetService.channelSchedules),
+        Effect.map(
+          HashMap.reduce(HashMap.empty<number, Schema.Schedule>(), (acc, a) =>
+            HashMap.union(acc, a),
+          ),
         ),
       ),
-    }),
+    ),
     Effect.bind("schedule", ({ schedules }) =>
       pipe(
         {
@@ -90,13 +86,9 @@ const getKickoutData = ({
         Utils.mapPositional(PlayerService.mapScheduleWithPlayers),
       ),
     ),
-    Effect.map(({ schedule, runningChannel }) => ({
+    Effect.map(({ schedule }) => ({
       schedule: schedule.schedule,
-      runningChannel: {
-        channelId: runningChannel.channelId,
-        channelName,
-        roleId: runningChannel.roleId,
-      },
+      runningChannel,
     })),
   );
 
@@ -109,8 +101,7 @@ const handleManual =
         .addStringOption((option) =>
           option
             .setName("channel_name")
-            .setDescription("The name of the running channel")
-            .setRequired(true),
+            .setDescription("The name of the running channel"),
         )
         .addStringOption((option) =>
           option
@@ -136,7 +127,7 @@ const handleManual =
           ),
           bindObject({
             hourOption: InteractionContext.getNumber("hour"),
-            channelName: InteractionContext.getString("channel_name", true),
+            channelNameOption: InteractionContext.getString("channel_name"),
             guildName: GuildService.getName(),
           }),
           Effect.bind("date", () => DateTime.now),
@@ -162,8 +153,31 @@ const handleManual =
               }),
             ),
           ),
-          Effect.bind("kickoutData", ({ hour, channelName }) =>
-            getKickoutData({ hour, channelName }),
+          Effect.bind("runningChannel", ({ channelNameOption }) =>
+            pipe(
+              channelNameOption,
+              Option.match({
+                onSome: (channelName) =>
+                  GuildConfigService.getGuildRunningChannelByName(channelName),
+                onNone: () =>
+                  pipe(
+                    InteractionContext.channel(true).sync(),
+                    Effect.flatMap((channel) =>
+                      GuildConfigService.getGuildRunningChannelById(channel.id),
+                    ),
+                  ),
+              }),
+              Effect.flatMap(
+                Option.match({
+                  onSome: Effect.succeed,
+                  onNone: () =>
+                    Effect.fail(new ArgumentError("No such running channel")),
+                }),
+              ),
+            ),
+          ),
+          Effect.bind("kickoutData", ({ hour, runningChannel }) =>
+            getKickoutData({ hour, runningChannel }),
           ),
           Effect.bind("role", ({ kickoutData }) =>
             pipe(

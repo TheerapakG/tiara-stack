@@ -42,12 +42,21 @@ import {
   Schema,
   String,
 } from "effect";
+import { Schema as SheetSchema } from "sheet-apis";
 
 const getSlotMessage = (day: number) =>
   pipe(
     Effect.Do,
     bindObject({
-      daySchedule: SheetService.daySchedules(day),
+      daySchedule: pipe(
+        SheetService.daySchedules(day),
+        Effect.map(
+          HashMap.reduce(
+            HashMap.empty<number, SheetSchema.Schedule>(),
+            (acc, a) => HashMap.union(acc, a),
+          ),
+        ),
+      ),
     }),
     Effect.bindAll(({ daySchedule }) => ({
       title: Effect.succeed(`Day ${day} Slots~`),

@@ -61,8 +61,18 @@ const getCheckinData = ({
   pipe(
     Effect.Do,
     bindObject({
-      schedules: SheetService.allSchedules,
+      channelName: runningChannel.name,
     }),
+    Effect.bind("schedules", ({ channelName }) =>
+      pipe(
+        SheetService.channelSchedules(channelName),
+        Effect.map(
+          HashMap.reduce(HashMap.empty<number, Schema.Schedule>(), (acc, a) =>
+            HashMap.union(acc, a),
+          ),
+        ),
+      ),
+    ),
     Effect.flatMap(({ schedules }) =>
       pipe(
         {
