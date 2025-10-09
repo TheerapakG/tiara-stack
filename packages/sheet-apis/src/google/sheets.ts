@@ -1,6 +1,6 @@
 import { MethodOptions, sheets, sheets_v4 } from "@googleapis/sheets";
-import { Effect, HashMap, Option, pipe, Schema } from "effect";
-import { Array as ArrayUtils } from "typhoon-core/utils";
+import { Array, Effect, HashMap, Option, pipe, Schema } from "effect";
+import { Utils } from "typhoon-core/utils";
 import { GoogleAuth } from "./auth";
 
 export class GoogleSheets extends Effect.Service<GoogleSheets>()(
@@ -28,7 +28,6 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
           ),
         getHashMap: <K>(
           ranges: HashMap.HashMap<K, string>,
-          defaultKey: K,
           params?: Omit<
             sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
             "ranges"
@@ -36,41 +35,16 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
           options?: MethodOptions,
         ) =>
           pipe(
-            Effect.Do,
-            Effect.let("entries", () => HashMap.toEntries(ranges)),
-            Effect.bind("sheet", ({ entries }) =>
-              Effect.tryPromise(() =>
-                sheets.spreadsheets.values.batchGet(
-                  { ...params, ranges: entries.map(([_, range]) => range) },
-                  options,
-                ),
-              ),
-            ),
-            Effect.map(({ entries, sheet }) =>
+            ranges,
+            Utils.HashMapPositional((ranges: readonly string[]) =>
               pipe(
-                new ArrayUtils.WithDefault.ArrayWithDefault({
-                  array: entries.map(([key, _]) => ({ key })),
-                  default: { key: defaultKey },
-                }),
-                ArrayUtils.WithDefault.zip(
-                  new ArrayUtils.WithDefault.ArrayWithDefault({
-                    array:
-                      sheet.data.valueRanges?.map((valueRange) => ({
-                        valueRange,
-                      })) ?? [],
-                    default: { valueRange: { values: [] } },
-                  }),
+                Effect.tryPromise(() =>
+                  sheets.spreadsheets.values.batchGet(
+                    { ...params, ranges: Array.copy(ranges) },
+                    options,
+                  ),
                 ),
-              ),
-            ),
-            Effect.map(({ array }) =>
-              pipe(
-                array,
-                ArrayUtils.Collect.toHashMap({
-                  keyGetter: ({ key }) => key,
-                  valueInitializer: ({ valueRange }) => valueRange,
-                  valueReducer: (_, { valueRange }) => valueRange,
-                }),
+                Effect.map((sheet) => sheet.data.valueRanges ?? []),
               ),
             ),
           ),

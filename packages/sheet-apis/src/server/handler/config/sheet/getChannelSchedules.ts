@@ -10,15 +10,15 @@ const responseSchema = Schema.HashMap({
   }),
 });
 
-export const getDaySchedulesHandlerConfig = pipe(
+export const getChannelSchedulesHandlerConfig = pipe(
   Handler.Config.empty(),
   Handler.Config.Builder.type("subscription"),
-  Handler.Config.Builder.name("sheet.getDaySchedules"),
+  Handler.Config.Builder.name("sheet.getChannelSchedules"),
   Handler.Config.Builder.requestParams({
     validator: pipe(
       Schema.Struct({
         guildId: Schema.String,
-        day: Schema.Number,
+        channel: Schema.String,
       }),
       Schema.standardSchemaV1,
     ),

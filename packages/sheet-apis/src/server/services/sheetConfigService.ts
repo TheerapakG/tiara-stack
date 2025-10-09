@@ -1,6 +1,6 @@
 import { GoogleSheets } from "@/google/sheets";
 import {
-  DayConfig,
+  ScheduleConfig,
   EventConfig,
   HourRange,
   RangesConfig,
@@ -35,7 +35,11 @@ const dayConfigParser = ([
   overfillRange,
   standbyRange,
   draft,
-]: sheets_v4.Schema$ValueRange[]): Effect.Effect<DayConfig[], never, never> =>
+]: sheets_v4.Schema$ValueRange[]): Effect.Effect<
+  ScheduleConfig[],
+  never,
+  never
+> =>
   pipe(
     Effect.Do,
     Effect.bindAll(() => ({
@@ -295,7 +299,7 @@ const dayConfigParser = ([
               day,
               Option.map(
                 (day) =>
-                  new DayConfig({
+                  new ScheduleConfig({
                     channel,
                     day,
                     sheet,
@@ -830,7 +834,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
               captureStackTrace: true,
             }),
           ),
-        getDayConfig: (sheetId: string) =>
+        getScheduleConfig: (sheetId: string) =>
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
@@ -855,7 +859,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 Effect.flatten,
               ),
             ),
-            Effect.withSpan("SheetConfigService.getDayConfig", {
+            Effect.withSpan("SheetConfigService.getScheduleConfig", {
               captureStackTrace: true,
             }),
           ),

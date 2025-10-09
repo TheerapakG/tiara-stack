@@ -1,11 +1,11 @@
-import { DayConfig } from "@/server/schema";
+import { ScheduleConfig } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 
-export const getDayConfigHandlerConfig = pipe(
+export const getScheduleConfigHandlerConfig = pipe(
   Handler.Config.empty(),
   Handler.Config.Builder.type("subscription"),
-  Handler.Config.Builder.name("sheetConfig.getDayConfig"),
+  Handler.Config.Builder.name("sheetConfig.getScheduleConfig"),
   Handler.Config.Builder.requestParams({
     validator: pipe(
       Schema.Struct({
@@ -15,6 +15,6 @@ export const getDayConfigHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(Schema.Array(DayConfig), Schema.standardSchemaV1),
+    validator: pipe(Schema.Array(ScheduleConfig), Schema.standardSchemaV1),
   }),
 );

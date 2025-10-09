@@ -1,4 +1,3 @@
-export * from "./dayConfig";
 export * from "./eventConfig";
 export * from "./guildChannelConfig";
 export * from "./guildConfig";
@@ -11,6 +10,7 @@ export * from "./rangesConfig";
 export * from "./rawPlayer";
 export * from "./runnerConfig";
 export * from "./schedule";
+export * from "./scheduleConfig";
 export * from "./scheduleWithPlayers";
 export * from "./team";
 export * from "./teamConfig";

@@ -3,12 +3,15 @@ import {
   HourRange,
   RawPlayer,
   Schedule,
+  ScheduleConfig,
+  ScheduleIndex,
   Team,
   TeamConfig,
 } from "@/server/schema";
 import { type MethodOptions, type sheets_v4 } from "@googleapis/sheets";
 import {
   Array,
+  Data,
   Effect,
   Function,
   HashMap,
@@ -94,9 +97,69 @@ const playerParser = ([
     Effect.withSpan("playerParser", { captureStackTrace: true }),
   );
 
+class TeamConfigField extends Data.TaggedClass("TeamConfigField")<{
+  name: string;
+  field: string;
+}> {}
+
+const teamRanges = (teamConfigValues: TeamConfig[]) =>
+  pipe(
+    teamConfigValues,
+    Array.reduce(
+      HashMap.empty<TeamConfigField, Option.Option<string>>(),
+      (acc, a) =>
+        pipe(
+          acc,
+          HashMap.set(
+            new TeamConfigField({
+              name: a.name,
+              field: "playerName",
+            }),
+            Option.some(`'${a.sheet}'!${a.playerNameRange}`),
+          ),
+          HashMap.set(
+            new TeamConfigField({
+              name: a.name,
+              field: "teamName",
+            }),
+            Option.some(`'${a.sheet}'!${a.teamNameRange}`),
+          ),
+          HashMap.set(
+            new TeamConfigField({ name: a.name, field: "lead" }),
+            Option.some(`'${a.sheet}'!${a.leadRange}`),
+          ),
+          HashMap.set(
+            new TeamConfigField({
+              name: a.name,
+              field: "backline",
+            }),
+            Option.some(`'${a.sheet}'!${a.backlineRange}`),
+          ),
+          HashMap.set(
+            new TeamConfigField({
+              name: a.name,
+              field: "talent",
+            }),
+            Option.some(`'${a.sheet}'!${a.talentRange}`),
+          ),
+          HashMap.set(
+            new TeamConfigField({ name: a.name, field: "tags" }),
+            pipe(
+              Match.value(a.tagsConfig),
+              Match.tag("TeamTagsRangesConfig", (tagsConfig) =>
+                Option.some(`'${a.sheet}'!${tagsConfig.tagsRange}`),
+              ),
+              Match.orElse(() => Option.none()),
+            ),
+          ),
+        ),
+    ),
+    HashMap.filterMap((a, _) => a),
+  );
+
 const teamParser = (
   teamConfigValues: TeamConfig[],
-  sheet: HashMap.HashMap<string, sheets_v4.Schema$ValueRange>,
+  sheet: HashMap.HashMap<TeamConfigField, sheets_v4.Schema$ValueRange>,
 ) =>
   pipe(
     teamConfigValues,
@@ -107,7 +170,12 @@ const teamParser = (
           () => ({
             playerName: pipe(
               sheet,
-              HashMap.get(`${teamConfig.name}!playerName`),
+              HashMap.get(
+                new TeamConfigField({
+                  name: teamConfig.name,
+                  field: "playerName",
+                }),
+              ),
               Effect.flatMap((playerName) =>
                 pipe(
                   GoogleSheets.parseValueRange(
@@ -129,7 +197,12 @@ const teamParser = (
             ),
             teamName: pipe(
               sheet,
-              HashMap.get(`${teamConfig.name}!teamName`),
+              HashMap.get(
+                new TeamConfigField({
+                  name: teamConfig.name,
+                  field: "teamName",
+                }),
+              ),
               Effect.flatMap((teamName) =>
                 pipe(
                   GoogleSheets.parseValueRange(
@@ -151,7 +224,9 @@ const teamParser = (
             ),
             lead: pipe(
               sheet,
-              HashMap.get(`${teamConfig.name}!lead`),
+              HashMap.get(
+                new TeamConfigField({ name: teamConfig.name, field: "lead" }),
+              ),
               Effect.flatMap((lead) =>
                 pipe(
                   GoogleSheets.parseValueRange(
@@ -175,7 +250,12 @@ const teamParser = (
             ),
             backline: pipe(
               sheet,
-              HashMap.get(`${teamConfig.name}!backline`),
+              HashMap.get(
+                new TeamConfigField({
+                  name: teamConfig.name,
+                  field: "backline",
+                }),
+              ),
               Effect.flatMap((backline) =>
                 pipe(
                   GoogleSheets.parseValueRange(
@@ -199,7 +279,9 @@ const teamParser = (
             ),
             talent: pipe(
               sheet,
-              HashMap.get(`${teamConfig.name}!talent`),
+              HashMap.get(
+                new TeamConfigField({ name: teamConfig.name, field: "talent" }),
+              ),
               Effect.flatMap((talent) =>
                 pipe(
                   GoogleSheets.parseValueRange(
@@ -238,7 +320,12 @@ const teamParser = (
                 TeamTagsRangesConfig: () =>
                   pipe(
                     sheet,
-                    HashMap.get(`${teamConfig.name}!tags`),
+                    HashMap.get(
+                      new TeamConfigField({
+                        name: teamConfig.name,
+                        field: "tags",
+                      }),
+                    ),
                     Effect.flatMap((tags) =>
                       pipe(
                         GoogleSheets.parseValueRange(
@@ -375,219 +462,373 @@ const teamParser = (
     Effect.withSpan("teamParser", { captureStackTrace: true }),
   );
 
-export type ScheduleMap = HashMap.HashMap<number, Schedule>;
+export type ScheduleMap = HashMap.HashMap<
+  ScheduleIndex,
+  HashMap.HashMap<number, Schedule>
+>;
+
+class ScheduleConfigField extends Data.TaggedClass("ScheduleConfigField")<{
+  channel: string;
+  day: number;
+  field: string;
+}> {}
+
+const scheduleRanges = (scheduleConfigValues: ScheduleConfig[]) =>
+  pipe(
+    scheduleConfigValues,
+    Array.reduce(
+      HashMap.empty<ScheduleConfigField, Option.Option<string>>(),
+      (acc, a) =>
+        pipe(
+          acc,
+          HashMap.set(
+            new ScheduleConfigField({
+              channel: a.channel,
+              day: a.day,
+              field: "hours",
+            }),
+            Option.some(`'${a.sheet}'!${a.hourRange}`),
+          ),
+          HashMap.set(
+            new ScheduleConfigField({
+              channel: a.channel,
+              day: a.day,
+              field: "fills",
+            }),
+            Option.some(`'${a.sheet}'!${a.fillRange}`),
+          ),
+          HashMap.set(
+            new ScheduleConfigField({
+              channel: a.channel,
+              day: a.day,
+              field: "overfills",
+            }),
+            Option.some(`'${a.sheet}'!${a.overfillRange}`),
+          ),
+          HashMap.set(
+            new ScheduleConfigField({
+              channel: a.channel,
+              day: a.day,
+              field: "standbys",
+            }),
+            Option.some(`'${a.sheet}'!${a.standbyRange}`),
+          ),
+          HashMap.set(
+            new ScheduleConfigField({
+              channel: a.channel,
+              day: a.day,
+              field: "breaks",
+            }),
+            pipe(
+              `'${a.sheet}'!${a.breakRange}`,
+              Option.liftPredicate(
+                () => !String.Equivalence(a.breakRange, "detect"),
+              ),
+            ),
+          ),
+        ),
+    ),
+    HashMap.filterMap((a, _) => a),
+  );
 
 const scheduleParser = (
-  [hours, fills, overfills, standbys, breaks]: sheets_v4.Schema$ValueRange[],
-  { detectBreak }: { detectBreak?: RunnerConfigMap },
-): Effect.Effect<ScheduleMap, never, never> =>
+  scheduleConfigValues: ScheduleConfig[],
+  sheet: HashMap.HashMap<ScheduleConfigField, sheets_v4.Schema$ValueRange>,
+  runnerConfigMap: RunnerConfigMap,
+) =>
   pipe(
-    Effect.Do,
-    Effect.bindAll(
-      () => ({
-        hours: pipe(
-          GoogleSheets.parseValueRange(
-            hours,
-            pipe(
-              Schema.Array(Schema.OptionFromSelf(Schema.NumberFromString)),
-              Schema.head,
-            ),
-          ),
-          Effect.map(Array.map(Option.flatten)),
-          Effect.map(Array.map(Option.flatten)),
-          Effect.map(
-            Array.map((hour) => ({
-              hour,
-            })),
-          ),
-        ),
-        fills: pipe(
-          GoogleSheets.parseValueRange(
-            fills,
-            Schema.Array(Schema.OptionFromSelf(Schema.String)),
-          ),
-          Effect.map(Array.map(Option.getOrElse(() => []))),
-          Effect.map(
-            Array.map((fills) => ({
-              fills: Array.makeBy(5, (i) =>
-                pipe(Array.get(fills, i), Option.flatten),
+    scheduleConfigValues,
+    Effect.forEach((scheduleConfig) =>
+      pipe(
+        Effect.Do,
+        Effect.bindAll(
+          () => ({
+            hours: pipe(
+              sheet,
+              HashMap.get(
+                new ScheduleConfigField({
+                  channel: scheduleConfig.channel,
+                  day: scheduleConfig.day,
+                  field: "hours",
+                }),
               ),
-            })),
-          ),
-        ),
-        overfills: pipe(
-          GoogleSheets.parseValueRange(
-            overfills,
-            pipe(
-              Schema.Array(
-                Schema.OptionFromSelf(
-                  pipe(
-                    Schema.split(","),
-                    Schema.compose(Schema.Array(Schema.Trim)),
-                  ),
-                ),
-              ),
-              Schema.head,
-            ),
-          ),
-          Effect.map(Array.map(Option.flatten)),
-          Effect.map(Array.map(Option.flatten)),
-          Effect.map(
-            Array.map((overfills) => ({
-              overfills: pipe(
-                overfills,
-                Option.getOrElse(() => []),
-              ),
-            })),
-          ),
-        ),
-        standbys: pipe(
-          GoogleSheets.parseValueRange(
-            standbys,
-            pipe(
-              Schema.Array(
-                Schema.OptionFromSelf(
-                  pipe(
-                    Schema.split(","),
-                    Schema.compose(Schema.Array(Schema.Trim)),
-                  ),
-                ),
-              ),
-              Schema.head,
-            ),
-          ),
-          Effect.map(Array.map(Option.flatten)),
-          Effect.map(Array.map(Option.flatten)),
-          Effect.map(
-            Array.map((standbys) => ({
-              standbys: pipe(
-                standbys,
-                Option.getOrElse(() => []),
-              ),
-            })),
-          ),
-        ),
-        breaks: detectBreak
-          ? Effect.succeed([])
-          : pipe(
-              GoogleSheets.parseValueRange(
-                breaks,
+              Effect.flatMap((hours) =>
                 pipe(
-                  Schema.Array(
-                    Schema.OptionFromSelf(
-                      pipe(
-                        Schema.String,
-                        Schema.transformOrFail(
-                          Schema.Literal("TRUE", "FALSE"),
-                          {
-                            strict: true,
-                            decode: (str) =>
-                              ParseResult.decodeUnknown(
-                                Schema.Literal("TRUE", "FALSE"),
-                              )(str),
-                            encode: (str) => ParseResult.succeed(str),
-                          },
-                        ),
-                        Schema.compose(
-                          Schema.transformLiterals(
-                            ["TRUE", true],
-                            ["FALSE", false],
+                  GoogleSheets.parseValueRange(
+                    hours,
+                    pipe(
+                      Schema.Array(
+                        Schema.OptionFromSelf(Schema.NumberFromString),
+                      ),
+                      Schema.head,
+                    ),
+                  ),
+                  Effect.map(Array.map(Option.flatten)),
+                  Effect.map(Array.map(Option.flatten)),
+                  Effect.map(
+                    Array.map((hour) => ({
+                      hour,
+                    })),
+                  ),
+                ),
+              ),
+            ),
+            fills: pipe(
+              sheet,
+              HashMap.get(
+                new ScheduleConfigField({
+                  channel: scheduleConfig.channel,
+                  day: scheduleConfig.day,
+                  field: "fills",
+                }),
+              ),
+              Effect.flatMap((fills) =>
+                pipe(
+                  GoogleSheets.parseValueRange(
+                    fills,
+                    Schema.Array(Schema.OptionFromSelf(Schema.String)),
+                  ),
+                  Effect.map(Array.map(Option.getOrElse(() => []))),
+                  Effect.map(
+                    Array.map((fills) => ({
+                      fills: Array.makeBy(5, (i) =>
+                        pipe(Array.get(fills, i), Option.flatten),
+                      ),
+                    })),
+                  ),
+                ),
+              ),
+            ),
+            overfills: pipe(
+              sheet,
+              HashMap.get(
+                new ScheduleConfigField({
+                  channel: scheduleConfig.channel,
+                  day: scheduleConfig.day,
+                  field: "overfills",
+                }),
+              ),
+              Effect.flatMap((overfills) =>
+                pipe(
+                  GoogleSheets.parseValueRange(
+                    overfills,
+                    pipe(
+                      Schema.Array(
+                        Schema.OptionFromSelf(
+                          pipe(
+                            Schema.split(","),
+                            Schema.compose(Schema.Array(Schema.Trim)),
                           ),
                         ),
                       ),
+                      Schema.head,
                     ),
                   ),
-                  Schema.head,
+                  Effect.map(Array.map(Option.flatten)),
+                  Effect.map(Array.map(Option.flatten)),
+                  Effect.map(
+                    Array.map((overfills) => ({
+                      overfills: pipe(
+                        overfills,
+                        Option.getOrElse(() => []),
+                      ),
+                    })),
+                  ),
                 ),
               ),
-              Effect.map(Array.map(Option.flatten)),
-              Effect.map(Array.map(Option.flatten)),
-              Effect.map(
-                Array.map((breaks) => ({
-                  breakHour: pipe(
-                    breaks,
-                    Option.getOrElse(() => false),
-                  ),
-                })),
-              ),
             ),
-      }),
-      { concurrency: "unbounded" },
-    ),
-    Effect.map(({ hours, fills, overfills, standbys, breaks }) =>
-      pipe(
-        new ArrayUtils.WithDefault.ArrayWithDefault({
-          array: hours,
-          default: { hour: Option.none() },
-        }),
-        ArrayUtils.WithDefault.zip(
-          new ArrayUtils.WithDefault.ArrayWithDefault({
-            array: fills,
-            default: {
-              fills: Array.makeBy(5, () => Option.none()),
-            },
-          }),
-        ),
-        ArrayUtils.WithDefault.zip(
-          new ArrayUtils.WithDefault.ArrayWithDefault({
-            array: overfills,
-            default: { overfills: [] },
-          }),
-        ),
-        ArrayUtils.WithDefault.zip(
-          new ArrayUtils.WithDefault.ArrayWithDefault({
-            array: standbys,
-            default: { standbys: [] },
-          }),
-        ),
-        ArrayUtils.WithDefault.zip(
-          new ArrayUtils.WithDefault.ArrayWithDefault({
-            array: breaks,
-            default: { breakHour: false },
-          }),
-        ),
-        ArrayUtils.WithDefault.map(
-          ({ hour, breakHour, fills, overfills, standbys }) =>
-            pipe(
-              hour,
-              Option.map((hour) =>
-                Schedule.make({
-                  hour,
-                  breakHour: detectBreak
-                    ? pipe(
-                        fills,
-                        Array.getSomes,
-                        Array.map((fill) =>
-                          pipe(detectBreak, HashMap.get(fill)),
-                        ),
-                        Array.getSomes,
-                        Array.filter((config) =>
-                          pipe(
-                            config.hours,
-                            Array.some(HourRange.includes(hour)),
-                          ),
-                        ),
-                        Array.isEmptyArray,
-                      )
-                    : breakHour,
-                  fills,
-                  overfills,
-                  standbys,
+            standbys: pipe(
+              sheet,
+              HashMap.get(
+                new ScheduleConfigField({
+                  channel: scheduleConfig.channel,
+                  day: scheduleConfig.day,
+                  field: "standbys",
                 }),
               ),
-              Option.map(Schedule.toEmptyIfBreak),
+              Effect.flatMap((standbys) =>
+                pipe(
+                  GoogleSheets.parseValueRange(
+                    standbys,
+                    pipe(
+                      Schema.Array(
+                        Schema.OptionFromSelf(
+                          pipe(
+                            Schema.split(","),
+                            Schema.compose(Schema.Array(Schema.Trim)),
+                          ),
+                        ),
+                      ),
+                      Schema.head,
+                    ),
+                  ),
+                  Effect.map(Array.map(Option.flatten)),
+                  Effect.map(Array.map(Option.flatten)),
+                  Effect.map(
+                    Array.map((standbys) => ({
+                      standbys: pipe(
+                        standbys,
+                        Option.getOrElse(() => []),
+                      ),
+                    })),
+                  ),
+                ),
+              ),
             ),
+            breaks: String.Equivalence(scheduleConfig.breakRange, "detect")
+              ? Effect.succeed([])
+              : pipe(
+                  sheet,
+                  HashMap.get(
+                    new ScheduleConfigField({
+                      channel: scheduleConfig.channel,
+                      day: scheduleConfig.day,
+                      field: "breaks",
+                    }),
+                  ),
+                  Effect.flatMap((breaks) =>
+                    pipe(
+                      GoogleSheets.parseValueRange(
+                        breaks,
+                        pipe(
+                          Schema.Array(
+                            Schema.OptionFromSelf(
+                              pipe(
+                                Schema.String,
+                                Schema.transformOrFail(
+                                  Schema.Literal("TRUE", "FALSE"),
+                                  {
+                                    strict: true,
+                                    decode: (str) =>
+                                      ParseResult.decodeUnknown(
+                                        Schema.Literal("TRUE", "FALSE"),
+                                      )(str),
+                                    encode: (str) => ParseResult.succeed(str),
+                                  },
+                                ),
+                                Schema.compose(
+                                  Schema.transformLiterals(
+                                    ["TRUE", true],
+                                    ["FALSE", false],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Schema.head,
+                        ),
+                      ),
+                      Effect.map(Array.map(Option.flatten)),
+                      Effect.map(Array.map(Option.flatten)),
+                      Effect.map(
+                        Array.map((breaks) => ({
+                          breakHour: pipe(
+                            breaks,
+                            Option.getOrElse(() => false),
+                          ),
+                        })),
+                      ),
+                    ),
+                  ),
+                ),
+          }),
+          { concurrency: "unbounded" },
+        ),
+        Effect.map(({ hours, fills, overfills, standbys, breaks }) =>
+          pipe(
+            new ArrayUtils.WithDefault.ArrayWithDefault({
+              array: hours,
+              default: { hour: Option.none() },
+            }),
+            ArrayUtils.WithDefault.zip(
+              new ArrayUtils.WithDefault.ArrayWithDefault({
+                array: fills,
+                default: {
+                  fills: Array.makeBy(5, () => Option.none()),
+                },
+              }),
+            ),
+            ArrayUtils.WithDefault.zip(
+              new ArrayUtils.WithDefault.ArrayWithDefault({
+                array: overfills,
+                default: { overfills: [] },
+              }),
+            ),
+            ArrayUtils.WithDefault.zip(
+              new ArrayUtils.WithDefault.ArrayWithDefault({
+                array: standbys,
+                default: { standbys: [] },
+              }),
+            ),
+            ArrayUtils.WithDefault.zip(
+              new ArrayUtils.WithDefault.ArrayWithDefault({
+                array: breaks,
+                default: { breakHour: false },
+              }),
+            ),
+            ArrayUtils.WithDefault.map(
+              ({ hour, breakHour, fills, overfills, standbys }) =>
+                pipe(
+                  hour,
+                  Option.map((hour) =>
+                    Schedule.make({
+                      hour,
+                      breakHour: String.Equivalence(
+                        scheduleConfig.breakRange,
+                        "detect",
+                      )
+                        ? pipe(
+                            fills,
+                            Array.getSomes,
+                            Array.map((fill) =>
+                              pipe(runnerConfigMap, HashMap.get(fill)),
+                            ),
+                            Array.getSomes,
+                            Array.filter((config) =>
+                              pipe(
+                                config.hours,
+                                Array.some(HourRange.includes(hour)),
+                              ),
+                            ),
+                            Array.isEmptyArray,
+                          )
+                        : breakHour,
+                      fills,
+                      overfills,
+                      standbys,
+                    }),
+                  ),
+                  Option.map(Schedule.toEmptyIfBreak),
+                ),
+            ),
+          ),
+        ),
+        Effect.map(({ array }) =>
+          pipe({
+            scheduleIndex: new ScheduleIndex({
+              channel: scheduleConfig.channel,
+              day: scheduleConfig.day,
+            }),
+            schedules: pipe(
+              array,
+              Array.getSomes,
+              ArrayUtils.Collect.toHashMap({
+                keyGetter: ({ hour }) => hour,
+                valueInitializer: (a) => a,
+                valueReducer: (_, a) => a,
+              }),
+            ),
+          }),
         ),
       ),
     ),
-    Effect.map(({ array }) =>
+    Effect.map((array) =>
       pipe(
         array,
-        Array.getSomes,
         ArrayUtils.Collect.toHashMap({
-          keyGetter: ({ hour }) => hour,
-          valueInitializer: (a) => a,
-          valueReducer: (_, a) => a,
+          keyGetter: ({ scheduleIndex }) => scheduleIndex,
+          valueInitializer: ({ schedules }) => schedules,
+          valueReducer: (acc, { schedules }) => HashMap.union(acc, schedules),
         }),
       ),
     ),
@@ -633,10 +874,10 @@ export class SheetService extends Effect.Service<SheetService>()(
                 }),
               ),
             ),
-            dayConfig: Effect.cached(
+            scheduleConfig: Effect.cached(
               pipe(
-                sheetConfigService.getDayConfig(sheetId),
-                Effect.withSpan("SheetService.dayConfig", {
+                sheetConfigService.getScheduleConfig(sheetId),
+                Effect.withSpan("SheetService.scheduleConfig", {
                   captureStackTrace: true,
                 }),
               ),
@@ -674,7 +915,6 @@ export class SheetService extends Effect.Service<SheetService>()(
           ({ sheet }) =>
             <K>(
               ranges: HashMap.HashMap<K, string>,
-              defaultKey: K,
               params?: Omit<
                 sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
                 "spreadsheetId"
@@ -684,7 +924,6 @@ export class SheetService extends Effect.Service<SheetService>()(
               pipe(
                 sheet.getHashMap(
                   ranges,
-                  defaultKey,
                   { spreadsheetId: sheetId, ...params },
                   options,
                 ),
@@ -715,6 +954,7 @@ export class SheetService extends Effect.Service<SheetService>()(
             sheetGet,
             sheetGetHashMap,
             rangesConfig,
+            scheduleConfig,
             teamConfig,
             runnerConfig,
           }) => ({
@@ -741,51 +981,9 @@ export class SheetService extends Effect.Service<SheetService>()(
                 HashMap.toValues(teamConfig),
               ),
               Effect.let("ranges", ({ teamConfigValues }) =>
-                pipe(
-                  teamConfigValues,
-                  Array.reduce(
-                    HashMap.empty<string, Option.Option<string>>(),
-                    (acc, a) =>
-                      pipe(
-                        acc,
-                        HashMap.set(
-                          `${a.name}!playerName`,
-                          Option.some(`'${a.sheet}'!${a.playerNameRange}`),
-                        ),
-                        HashMap.set(
-                          `${a.name}!teamName`,
-                          Option.some(`'${a.sheet}'!${a.teamNameRange}`),
-                        ),
-                        HashMap.set(
-                          `${a.name}!lead`,
-                          Option.some(`'${a.sheet}'!${a.leadRange}`),
-                        ),
-                        HashMap.set(
-                          `${a.name}!backline`,
-                          Option.some(`'${a.sheet}'!${a.backlineRange}`),
-                        ),
-                        HashMap.set(
-                          `${a.name}!talent`,
-                          Option.some(`'${a.sheet}'!${a.talentRange}`),
-                        ),
-                        HashMap.set(
-                          `${a.name}!tags`,
-                          pipe(
-                            Match.value(a.tagsConfig),
-                            Match.tag("TeamTagsRangesConfig", (tagsConfig) =>
-                              Option.some(
-                                `'${a.sheet}'!${tagsConfig.tagsRange}`,
-                              ),
-                            ),
-                            Match.orElse(() => Option.none()),
-                          ),
-                        ),
-                      ),
-                  ),
-                  HashMap.filterMap((a, _) => a),
-                ),
+                teamRanges(teamConfigValues),
               ),
-              Effect.bind("sheet", ({ ranges }) => sheetGetHashMap(ranges, "")),
+              Effect.bind("sheet", ({ ranges }) => sheetGetHashMap(ranges)),
               Effect.flatMap(({ teamConfigValues, sheet }) =>
                 teamParser(teamConfigValues, sheet),
               ),
@@ -798,42 +996,19 @@ export class SheetService extends Effect.Service<SheetService>()(
               Effect.Do,
               Effect.bindAll(
                 () => ({
-                  rangesConfig,
+                  scheduleConfigs: scheduleConfig,
                   runnerConfig,
                 }),
                 { concurrency: "unbounded" },
               ),
-              Effect.bind("sheet", ({ rangesConfig }) =>
-                sheetGet({
-                  ranges: pipe(
-                    [
-                      Option.some(rangesConfig.hours),
-                      Option.some(rangesConfig.fills),
-                      Option.some(rangesConfig.overfills),
-                      Option.some(rangesConfig.standbys),
-                      pipe(
-                        rangesConfig.breaks,
-                        Option.liftPredicate(
-                          () =>
-                            !String.Equivalence(rangesConfig.breaks, "detect"),
-                        ),
-                      ),
-                    ],
-                    Array.getSomes,
-                  ),
-                }),
+              Effect.let("ranges", ({ scheduleConfigs }) =>
+                scheduleRanges(scheduleConfigs),
               ),
+              Effect.bind("sheet", ({ ranges }) => sheetGetHashMap(ranges)),
               Effect.bind(
                 "schedules",
-                ({ sheet, rangesConfig, runnerConfig }) =>
-                  scheduleParser(sheet.data.valueRanges ?? [], {
-                    detectBreak: String.Equivalence(
-                      rangesConfig.breaks,
-                      "detect",
-                    )
-                      ? runnerConfig
-                      : undefined,
-                  }),
+                ({ sheet, scheduleConfigs, runnerConfig }) =>
+                  scheduleParser(scheduleConfigs, sheet, runnerConfig),
               ),
               Effect.map(({ schedules }) => schedules),
               Effect.withSpan("SheetService.allSchedules", {
@@ -852,7 +1027,7 @@ export class SheetService extends Effect.Service<SheetService>()(
             rangesConfig,
             teamConfig,
             eventConfig,
-            dayConfig,
+            scheduleConfig,
             players,
             teams,
             allSchedules,
@@ -882,10 +1057,10 @@ export class SheetService extends Effect.Service<SheetService>()(
                   captureStackTrace: true,
                 }),
               ),
-            getDayConfig: () =>
+            getScheduleConfig: () =>
               pipe(
-                dayConfig,
-                Effect.withSpan("SheetService.getDayConfig", {
+                scheduleConfig,
+                Effect.withSpan("SheetService.getScheduleConfig", {
                   captureStackTrace: true,
                 }),
               ),
@@ -922,68 +1097,58 @@ export class SheetService extends Effect.Service<SheetService>()(
                 Effect.Do,
                 Effect.bindAll(
                   () => ({
-                    rangesConfig,
-                    dayConfig,
+                    scheduleConfigs: scheduleConfig,
                     runnerConfig,
                   }),
                   { concurrency: "unbounded" },
                 ),
-                Effect.bind("specificDayConfig", ({ dayConfig }) =>
-                  pipe(
-                    dayConfig,
-                    ArrayUtils.Collect.toHashMap({
-                      keyGetter: ({ day }) => day,
-                      valueInitializer: (a) => [a],
-                      valueReducer: (acc, a) => Array.append(acc, a),
-                    }),
-                    HashMap.get(day),
+                Effect.let("ranges", ({ scheduleConfigs }) =>
+                  scheduleRanges(
+                    pipe(
+                      scheduleConfigs,
+                      Array.filter((a) => Number.Equivalence(a.day, day)),
+                    ),
                   ),
                 ),
-                Effect.bind("sheet", ({ specificDayConfig }) =>
-                  sheetGet({
-                    ranges: pipe(
-                      [
-                        Option.some(
-                          `'${specificDayConfig[0].sheet}'!${specificDayConfig[0].hourRange}`,
-                        ),
-                        Option.some(
-                          `'${specificDayConfig[0].sheet}'!${specificDayConfig[0].fillRange}`,
-                        ),
-                        Option.some(
-                          `'${specificDayConfig[0].sheet}'!${specificDayConfig[0].overfillRange}`,
-                        ),
-                        Option.some(
-                          `'${specificDayConfig[0].sheet}'!${specificDayConfig[0].standbyRange}`,
-                        ),
-                        pipe(
-                          `'${specificDayConfig[0].sheet}'!${specificDayConfig[0].breakRange}`,
-                          Option.liftPredicate(
-                            () =>
-                              !String.Equivalence(
-                                specificDayConfig[0].breakRange,
-                                "detect",
-                              ),
-                          ),
-                        ),
-                      ],
-                      Array.getSomes,
-                    ),
-                  }),
-                ),
+                Effect.bind("sheet", ({ ranges }) => sheetGetHashMap(ranges)),
                 Effect.bind(
                   "schedules",
-                  ({ specificDayConfig, sheet, runnerConfig }) =>
-                    scheduleParser(sheet.data.valueRanges ?? [], {
-                      detectBreak: String.Equivalence(
-                        specificDayConfig[0].breakRange,
-                        "detect",
-                      )
-                        ? runnerConfig
-                        : undefined,
-                    }),
+                  ({ sheet, scheduleConfigs, runnerConfig }) =>
+                    scheduleParser(scheduleConfigs, sheet, runnerConfig),
                 ),
                 Effect.map(({ schedules }) => schedules),
-                Effect.withSpan("SheetService.getDaySchedules", {
+                Effect.withSpan("SheetService.daySchedules", {
+                  captureStackTrace: true,
+                }),
+              ),
+            getChannelSchedules: (channel: string) =>
+              pipe(
+                Effect.Do,
+                Effect.bindAll(
+                  () => ({
+                    scheduleConfigs: scheduleConfig,
+                    runnerConfig,
+                  }),
+                  { concurrency: "unbounded" },
+                ),
+                Effect.let("ranges", ({ scheduleConfigs }) =>
+                  scheduleRanges(
+                    pipe(
+                      scheduleConfigs,
+                      Array.filter((a) =>
+                        String.Equivalence(a.channel, channel),
+                      ),
+                    ),
+                  ),
+                ),
+                Effect.bind("sheet", ({ ranges }) => sheetGetHashMap(ranges)),
+                Effect.bind(
+                  "schedules",
+                  ({ sheet, scheduleConfigs, runnerConfig }) =>
+                    scheduleParser(scheduleConfigs, sheet, runnerConfig),
+                ),
+                Effect.map(({ schedules }) => schedules),
+                Effect.withSpan("SheetService.channelSchedules", {
                   captureStackTrace: true,
                 }),
               ),
