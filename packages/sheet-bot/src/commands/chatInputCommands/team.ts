@@ -1,7 +1,7 @@
 import {
   ClientService,
   GuildConfigService,
-  guildSheetServicesFromInteractionOption,
+  guildServicesFromInteractionOption,
   InteractionContext,
   PermissionService,
   PlayerService,
@@ -20,6 +20,7 @@ import {
 } from "discord.js";
 import { Array, Effect, Number, Option, pipe, String } from "effect";
 import { Schema } from "sheet-apis";
+import { Utils } from "typhoon-core/utils";
 
 const handleList =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
@@ -39,7 +40,7 @@ const handleList =
         ),
     )
     .handler(
-      Effect.provide(guildSheetServicesFromInteractionOption("server_id"))(
+      Effect.provide(guildServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
           InteractionContext.deferReply.tap(),
@@ -64,11 +65,16 @@ const handleList =
             ),
           ),
           Effect.bind("teams", ({ user }) =>
-            PlayerService.getTeamsById(user.id),
+            pipe(
+              {
+                user: user.id,
+              },
+              Utils.mapPositional(PlayerService.getTeamsById),
+            ),
           ),
           Effect.let("formattedTeams", ({ teams }) =>
             pipe(
-              teams,
+              teams.user,
               Array.filter((team) => !team.tags.includes("tierer_hint")),
               Array.map((team) => ({
                 name: team.name,

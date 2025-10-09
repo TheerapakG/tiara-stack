@@ -4,7 +4,7 @@ import {
   ConverterService,
   FormatService,
   GuildConfigService,
-  guildSheetServicesFromInteractionOption,
+  guildServicesFromInteractionOption,
   InteractionContext,
   MessageRoomOrderService,
   PermissionService,
@@ -39,6 +39,7 @@ import {
 } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { Schema } from "sheet-apis";
+import { Utils } from "typhoon-core/utils";
 
 const handleManual =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
@@ -59,7 +60,7 @@ const handleManual =
         ),
     )
     .handler(
-      Effect.provide(guildSheetServicesFromInteractionOption("server_id"))(
+      Effect.provide(guildServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
           InteractionContext.deferReply.tap(() => ({
@@ -83,6 +84,7 @@ const handleManual =
               InteractionContext.getNumber("heal"),
               Effect.map(Option.getOrElse(() => 0)),
             ),
+            schedules: SheetService.allSchedules,
             runnerConfig: SheetService.runnerConfig,
           }),
           Effect.bind("hour", ({ hourOption }) =>
@@ -105,55 +107,65 @@ const handleManual =
               Effect.flatMap(FormatService.formatHourWindow),
             ),
           ),
-          Effect.bind("schedule", ({ hour }) =>
+          Effect.bind("schedule", ({ hour, schedules }) =>
             pipe(
-              SheetService.allSchedules,
-              Effect.map(HashMap.get(hour)),
-              Effect.map(
-                Option.getOrElse(() => Schema.Schedule.makeEmpty(hour)),
-              ),
-              Effect.flatMap(PlayerService.mapScheduleWithPlayers),
+              {
+                schedule: pipe(
+                  HashMap.get(schedules, hour),
+                  Option.getOrElse(() => Schema.Schedule.makeEmpty(hour)),
+                ),
+              },
+              Utils.mapPositional(PlayerService.mapScheduleWithPlayers),
             ),
           ),
           Effect.bind("scheduleTeams", ({ schedule, runnerConfig, hour }) =>
             pipe(
-              schedule.fills,
-              Array.getSomes,
-              Effect.forEach((player) =>
+              Effect.Do,
+              Effect.let("players", () =>
+                pipe(schedule.schedule.fills, Array.getSomes),
+              ),
+              Effect.bind("teams", ({ players }) =>
                 pipe(
-                  Effect.Do,
-                  Effect.bind("teams", () =>
-                    PlayerService.getTeamsByName(player.name),
-                  ),
-                  Effect.let("runnerHours", () =>
-                    pipe(
-                      HashMap.get(runnerConfig, player.name),
-                      Option.map(({ hours }) => hours),
-                      Option.getOrElse(() => []),
-                    ),
-                  ),
-                  Effect.map(({ teams, runnerHours }) => ({
-                    player,
-                    teams: pipe(
-                      teams,
-                      Array.map(
-                        (team) =>
-                          new Schema.Team({
-                            ...team,
-                            tags: pipe(
-                              team.tags,
-                              team.tags.includes("tierer_hint") &&
-                                Array.some(
-                                  runnerHours,
-                                  Schema.HourRange.includes(hour),
-                                )
-                                ? Array.append("fixed")
-                                : Function.identity,
-                            ),
-                          }),
+                  players,
+                  Array.map((player) => player.name),
+                  PlayerService.getTeamsByName,
+                ),
+              ),
+              Effect.map(({ players, teams }) => Array.zip(players, teams)),
+              Effect.flatMap(
+                Effect.forEach(([player, teams]) =>
+                  pipe(
+                    Effect.Do,
+                    Effect.let("runnerHours", () =>
+                      pipe(
+                        HashMap.get(runnerConfig, player.name),
+                        Option.map(({ hours }) => hours),
+                        Option.getOrElse(() => []),
                       ),
                     ),
-                  })),
+                    Effect.map(({ runnerHours }) => ({
+                      player,
+                      teams: pipe(
+                        teams,
+                        Array.map(
+                          (team) =>
+                            new Schema.Team({
+                              ...team,
+                              tags: pipe(
+                                team.tags,
+                                team.tags.includes("tierer_hint") &&
+                                  Array.some(
+                                    runnerHours,
+                                    Schema.HourRange.includes(hour),
+                                  )
+                                  ? Array.append("fixed")
+                                  : Function.identity,
+                              ),
+                            }),
+                        ),
+                      ),
+                    })),
+                  ),
                 ),
               ),
             ),

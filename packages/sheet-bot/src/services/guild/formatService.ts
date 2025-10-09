@@ -13,11 +13,6 @@ import {
   pipe,
 } from "effect";
 import { ConverterService, HourWindow } from "./converterService";
-import {
-  PartialNamePlayer,
-  Player,
-  ScheduleWithPlayers,
-} from "./playerService";
 import { Schema } from "sheet-apis";
 
 export class FormattedHourWindow extends Data.TaggedClass(
@@ -50,7 +45,9 @@ export class FormatService extends Effect.Service<FormatService>()(
       Effect.map(({ converterService, formatDateTime, formatHourWindow }) => ({
         formatDateTime,
         formatHourWindow,
-        formatOpenSlot: (schedule: Schema.Schedule | ScheduleWithPlayers) =>
+        formatOpenSlot: (
+          schedule: Schema.Schedule | Schema.ScheduleWithPlayers,
+        ) =>
           pipe(
             Effect.succeed({
               hour: schedule.hour,
@@ -60,7 +57,7 @@ export class FormatService extends Effect.Service<FormatService>()(
                 Match.tagsExhaustive({
                   Schedule: (schedule) => Schema.Schedule.empty(schedule),
                   ScheduleWithPlayers: (schedule) =>
-                    ScheduleWithPlayers.empty(schedule),
+                    Schema.ScheduleWithPlayers.empty(schedule),
                 }),
               ),
             }),
@@ -80,7 +77,9 @@ export class FormatService extends Effect.Service<FormatService>()(
               captureStackTrace: true,
             }),
           ),
-        formatFilledSlot: (schedule: Schema.Schedule | ScheduleWithPlayers) =>
+        formatFilledSlot: (
+          schedule: Schema.Schedule | Schema.ScheduleWithPlayers,
+        ) =>
           pipe(
             Effect.succeed({
               hour: schedule.hour,
@@ -90,7 +89,7 @@ export class FormatService extends Effect.Service<FormatService>()(
                 Match.tagsExhaustive({
                   Schedule: (schedule) => Schema.Schedule.empty(schedule),
                   ScheduleWithPlayers: (schedule) =>
-                    ScheduleWithPlayers.empty(schedule),
+                    Schema.ScheduleWithPlayers.empty(schedule),
                 }),
               ),
             }),
@@ -115,8 +114,8 @@ export class FormatService extends Effect.Service<FormatService>()(
           schedule,
           channelString,
         }: {
-          prevSchedule: ScheduleWithPlayers;
-          schedule: ScheduleWithPlayers;
+          prevSchedule: Schema.ScheduleWithPlayers;
+          schedule: Schema.ScheduleWithPlayers;
           channelString: string;
         }) =>
           pipe(
@@ -129,7 +128,7 @@ export class FormatService extends Effect.Service<FormatService>()(
                     Array.getSomes,
                     Array.map((player) =>
                       pipe(
-                        Match.type<Player | PartialNamePlayer>(),
+                        Match.type<Schema.Player | Schema.PartialNamePlayer>(),
                         Match.tag("Player", (player) => userMention(player.id)),
                         Match.tag("PartialNamePlayer", (player) => player.name),
                         Match.exhaustive,
@@ -146,7 +145,7 @@ export class FormatService extends Effect.Service<FormatService>()(
                     Array.getSomes,
                     Array.map((player) =>
                       pipe(
-                        Match.type<Player | PartialNamePlayer>(),
+                        Match.type<Schema.Player | Schema.PartialNamePlayer>(),
                         Match.tag("Player", (player) => userMention(player.id)),
                         Match.tag("PartialNamePlayer", (player) => player.name),
                         Match.exhaustive,
@@ -175,7 +174,9 @@ export class FormatService extends Effect.Service<FormatService>()(
                 ),
               ),
             ),
-            Effect.let("empty", () => ScheduleWithPlayers.empty(schedule)),
+            Effect.let("empty", () =>
+              Schema.ScheduleWithPlayers.empty(schedule),
+            ),
             Effect.let(
               "emptySlotMessage",
               ({ empty }) =>
@@ -193,7 +194,7 @@ export class FormatService extends Effect.Service<FormatService>()(
                 Array.getSomes,
                 Array.map((player) =>
                   pipe(
-                    Match.type<Player | PartialNamePlayer>(),
+                    Match.type<Schema.Player | Schema.PartialNamePlayer>(),
                     Match.tag("Player", () => Option.none()),
                     Match.tag("PartialNamePlayer", (player) =>
                       Option.some(player),

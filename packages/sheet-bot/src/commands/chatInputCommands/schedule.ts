@@ -1,10 +1,8 @@
 import {
   ClientService,
-  guildSheetServicesFromInteractionOption,
+  guildServicesFromInteractionOption,
   InteractionContext,
-  PartialNamePlayer,
   PermissionService,
-  Player,
   PlayerService,
   SheetService,
 } from "@/services";
@@ -31,6 +29,8 @@ import {
   pipe,
   String,
 } from "effect";
+import { Schema } from "sheet-apis";
+import { Utils } from "typhoon-core/utils";
 
 const formatHourRanges = (hours: readonly number[]): string => {
   if (Array.isEmptyReadonlyArray(hours)) return "None";
@@ -70,7 +70,7 @@ const handleList =
         ),
     )
     .handler(
-      Effect.provide(guildSheetServicesFromInteractionOption("server_id"))(
+      Effect.provide(guildServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
@@ -85,10 +85,10 @@ const handleList =
           Effect.bind("schedulesWithPlayers", ({ daySchedules }) =>
             pipe(
               daySchedules,
-              HashMap.values,
-              Array.sortBy(Order.mapInput(Number.Order, ({ hour }) => hour)),
-              Effect.forEach((schedule) =>
-                PlayerService.mapScheduleWithPlayers(schedule),
+              Utils.HashMapPositional(PlayerService.mapScheduleWithPlayers),
+              Effect.map(HashMap.values),
+              Effect.map(
+                Array.sortBy(Order.mapInput(Number.Order, ({ hour }) => hour)),
               ),
             ),
           ),
@@ -102,7 +102,7 @@ const handleList =
                   Array.getSomes,
                   Array.some((p) =>
                     pipe(
-                      Match.type<Player | PartialNamePlayer>(),
+                      Match.type<Schema.Player | Schema.PartialNamePlayer>(),
                       Match.tag("Player", (player) =>
                         String.Equivalence(player.id, user.id),
                       ),
@@ -125,7 +125,7 @@ const handleList =
                   s.overfills,
                   Array.some((p) =>
                     pipe(
-                      Match.type<Player | PartialNamePlayer>(),
+                      Match.type<Schema.Player | Schema.PartialNamePlayer>(),
                       Match.tag("Player", (player) =>
                         String.Equivalence(player.id, user.id),
                       ),
@@ -148,7 +148,7 @@ const handleList =
                   s.standbys,
                   Array.some((p) =>
                     pipe(
-                      Match.type<Player | PartialNamePlayer>(),
+                      Match.type<Schema.Player | Schema.PartialNamePlayer>(),
                       Match.tag("Player", (player) =>
                         String.Equivalence(player.id, user.id),
                       ),

@@ -4,7 +4,7 @@ import {
   ClientService,
   FormatService,
   GuildConfigService,
-  guildSheetServicesFromInteractionOption,
+  guildServicesFromInteractionOption,
   InteractionContext,
   MessageSlotService,
   PermissionService,
@@ -117,7 +117,7 @@ const handleList =
         ),
     )
     .handler(
-      Effect.provide(guildSheetServicesFromInteractionOption("server_id"))(
+      Effect.provide(guildServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
@@ -195,7 +195,7 @@ const handleButton =
     .handler(
       Effect.provide(
         Layer.mergeAll(
-          guildSheetServicesFromInteractionOption("server_id"),
+          guildServicesFromInteractionOption("server_id"),
           channelServicesFromInteraction(),
         ),
       )(
