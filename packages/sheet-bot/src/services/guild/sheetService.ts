@@ -1,7 +1,7 @@
 import { bindObject } from "@/utils";
 import { Effect, Number, pipe } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
-import { SheetApisClient } from "~~/src/client/sheetApis";
+import { SheetApisClient } from "@/client/sheetApis";
 import { GuildService } from "./guildService";
 
 export class SheetService extends Effect.Service<SheetService>()(
