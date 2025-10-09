@@ -30,6 +30,7 @@ import {
 } from "discord.js";
 import {
   Array,
+  Data,
   DateTime,
   Effect,
   Function,
@@ -41,12 +42,25 @@ import { WebSocketClient } from "typhoon-client-ws/client";
 import { Schema } from "sheet-apis";
 import { Utils } from "typhoon-core/utils";
 
+class ArgumentError extends Data.TaggedError("ArgumentError")<{
+  readonly message: string;
+}> {
+  constructor(message: string) {
+    super({ message });
+  }
+}
+
 const handleManual =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
     .data(
       new SlashCommandSubcommandBuilder()
         .setName("manual")
         .setDescription("Manual room order commands")
+        .addStringOption((option) =>
+          option
+            .setName("channel_name")
+            .setDescription("The name of the running channel"),
+        )
         .addNumberOption((option) =>
           option.setName("hour").setDescription("The hour to order rooms for"),
         )
@@ -80,11 +94,11 @@ const handleManual =
           InteractionContext.user.bind("user"),
           bindObject({
             hourOption: InteractionContext.getNumber("hour"),
+            channelNameOption: InteractionContext.getString("channel_name"),
             heal: pipe(
               InteractionContext.getNumber("heal"),
               Effect.map(Option.getOrElse(() => 0)),
             ),
-            schedules: SheetService.allSchedules,
             runnerConfig: SheetService.runnerConfig,
           }),
           Effect.bind("hour", ({ hourOption }) =>
@@ -101,10 +115,45 @@ const handleManual =
               }),
             ),
           ),
+          Effect.bind("runningChannel", ({ channelNameOption }) =>
+            pipe(
+              channelNameOption,
+              Option.match({
+                onSome: (channelName) =>
+                  GuildConfigService.getGuildRunningChannelByName(channelName),
+                onNone: () =>
+                  pipe(
+                    InteractionContext.channel(true).sync(),
+                    Effect.flatMap((channel) =>
+                      GuildConfigService.getGuildRunningChannelById(channel.id),
+                    ),
+                  ),
+              }),
+              Effect.flatMap(
+                Option.match({
+                  onSome: Effect.succeed,
+                  onNone: () =>
+                    Effect.fail(new ArgumentError("No such running channel")),
+                }),
+              ),
+            ),
+          ),
           Effect.bind("formattedHourWindow", ({ hour }) =>
             pipe(
               ConverterService.convertHourToHourWindow(hour),
               Effect.flatMap(FormatService.formatHourWindow),
+            ),
+          ),
+          Effect.bind("schedules", ({ runningChannel }) =>
+            pipe(
+              runningChannel.name,
+              Effect.flatMap(SheetService.channelSchedules),
+              Effect.map(
+                HashMap.reduce(
+                  HashMap.empty<number, Schema.Schedule>(),
+                  (acc, a) => HashMap.union(acc, a),
+                ),
+              ),
             ),
           ),
           Effect.bind("schedule", ({ hour, schedules }) =>

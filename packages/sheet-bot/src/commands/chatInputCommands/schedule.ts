@@ -80,7 +80,15 @@ const handleList =
           InteractionContext.user.bind("user"),
           Effect.bind("day", () => InteractionContext.getNumber("day", true)),
           Effect.bind("daySchedules", ({ day }) =>
-            SheetService.daySchedules(day),
+            pipe(
+              SheetService.daySchedules(day),
+              Effect.map(
+                HashMap.reduce(
+                  HashMap.empty<number, Schema.Schedule>(),
+                  (acc, a) => HashMap.union(acc, a),
+                ),
+              ),
+            ),
           ),
           Effect.bind("schedulesWithPlayers", ({ daySchedules }) =>
             pipe(
