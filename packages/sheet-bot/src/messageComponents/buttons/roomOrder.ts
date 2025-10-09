@@ -4,7 +4,7 @@ import {
   channelServicesFromInteraction,
   ConverterService,
   FormatService,
-  guildSheetServicesFromInteraction,
+  guildServicesFromInteraction,
   InteractionContext,
   MessageRoomOrder,
   MessageRoomOrderService,
@@ -121,7 +121,7 @@ export const roomOrderPreviousButton =
   handlerVariantContextBuilder<ButtonHandlerVariantT>()
     .data(roomOrderPreviousButtonData)
     .handler(
-      Effect.provide(guildSheetServicesFromInteraction())(
+      Effect.provide(guildServicesFromInteraction())(
         pipe(
           Effect.Do,
           InteractionContext.deferUpdate.tap(),
@@ -156,7 +156,7 @@ export const roomOrderNextButton =
   handlerVariantContextBuilder<ButtonHandlerVariantT>()
     .data(roomOrderNextButtonData)
     .handler(
-      Effect.provide(guildSheetServicesFromInteraction())(
+      Effect.provide(guildServicesFromInteraction())(
         pipe(
           Effect.Do,
           InteractionContext.deferUpdate.tap(),
@@ -193,7 +193,7 @@ export const roomOrderSendButton =
     .handler(
       Effect.provide(
         Layer.mergeAll(
-          guildSheetServicesFromInteraction(),
+          guildServicesFromInteraction(),
           channelServicesFromInteraction(),
         ),
       )(

@@ -4,7 +4,7 @@ import {
   channelServicesFromGuildChannelId,
   GuildMemberContext,
   guildMemberServicesFromInteraction,
-  guildSheetServicesFromInteraction,
+  guildServicesFromInteraction,
   InGuildMessageContext,
   InteractionContext,
   MessageCheckinService,
@@ -57,7 +57,7 @@ class CheckinError extends Data.TaggedError("CheckinError")<{
 export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
   .data(buttonData)
   .handler(
-    Effect.provide(guildSheetServicesFromInteraction())(
+    Effect.provide(guildServicesFromInteraction())(
       pipe(
         Effect.Do,
         InteractionContext.deferReply.tap(() => ({

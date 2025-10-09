@@ -4,14 +4,11 @@ import {
   ConverterService,
   FormatService,
   GuildConfigService,
-  guildSheetServicesFromInteractionOption,
+  guildServicesFromInteractionOption,
   InteractionContext,
   MessageCheckinService,
-  PartialNamePlayer,
   PermissionService,
-  Player,
   PlayerService,
-  ScheduleWithPlayers,
   SendableChannelContext,
   SheetService,
 } from "@/services";
@@ -44,6 +41,7 @@ import {
   pipe,
 } from "effect";
 import { Schema } from "sheet-apis";
+import { Utils } from "typhoon-core/utils";
 
 class ArgumentError extends Data.TaggedError("ArgumentError")<{
   readonly message: string;
@@ -65,18 +63,19 @@ const getCheckinData = ({
     bindObject({
       schedules: SheetService.allSchedules,
     }),
-    Effect.bind("prevSchedule", ({ schedules }) =>
+    Effect.flatMap(({ schedules }) =>
       pipe(
-        HashMap.get(schedules, hour - 1),
-        Option.getOrElse(() => Schema.Schedule.makeEmpty(hour - 1)),
-        PlayerService.mapScheduleWithPlayers,
-      ),
-    ),
-    Effect.bind("schedule", ({ schedules }) =>
-      pipe(
-        HashMap.get(schedules, hour),
-        Option.getOrElse(() => Schema.Schedule.makeEmpty(hour)),
-        PlayerService.mapScheduleWithPlayers,
+        {
+          prevSchedule: pipe(
+            HashMap.get(schedules, hour - 1),
+            Option.getOrElse(() => Schema.Schedule.makeEmpty(hour - 1)),
+          ),
+          schedule: pipe(
+            HashMap.get(schedules, hour),
+            Option.getOrElse(() => Schema.Schedule.makeEmpty(hour)),
+          ),
+        },
+        Utils.mapPositional(PlayerService.mapScheduleWithPlayers),
       ),
     ),
     Effect.map(({ prevSchedule, schedule }) => ({
@@ -88,8 +87,8 @@ const getCheckinData = ({
   );
 
 const getCheckinMessages = (data: {
-  prevSchedule: ScheduleWithPlayers;
-  schedule: ScheduleWithPlayers;
+  prevSchedule: Schema.ScheduleWithPlayers;
+  schedule: Schema.ScheduleWithPlayers;
   runningChannel: {
     channelId: string;
     name: Option.Option<string>;
@@ -134,7 +133,7 @@ const handleManual =
         ),
     )
     .handler(
-      Effect.provide(guildSheetServicesFromInteractionOption("server_id"))(
+      Effect.provide(guildServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
           InteractionContext.deferReply.tap(() => ({
@@ -213,7 +212,7 @@ const handleManual =
               Array.getSomes,
               Array.map((player) =>
                 pipe(
-                  Match.type<Player | PartialNamePlayer>(),
+                  Match.type<Schema.Player | Schema.PartialNamePlayer>(),
                   Match.tag("Player", (player) => Option.some(player.id)),
                   Match.tag("PartialNamePlayer", () => Option.none()),
                   Match.exhaustive,

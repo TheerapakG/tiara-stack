@@ -4,11 +4,9 @@ import {
   GuildMemberContext,
   guildMemberServices,
   GuildService,
-  guildSheetServicesFromInteractionOption,
+  guildServicesFromInteractionOption,
   InteractionContext,
-  PartialNamePlayer,
   PermissionService,
-  Player,
   PlayerService,
   SheetService,
 } from "@/services";
@@ -39,6 +37,7 @@ import {
   pipe,
 } from "effect";
 import { Schema } from "sheet-apis";
+import { Utils } from "typhoon-core/utils";
 
 class ArgumentError extends Data.TaggedError("ArgumentError")<{
   readonly message: string;
@@ -82,13 +81,17 @@ const getKickoutData = ({
     }),
     Effect.bind("schedule", ({ schedules }) =>
       pipe(
-        HashMap.get(schedules, hour),
-        Option.getOrElse(() => Schema.Schedule.makeEmpty(hour)),
-        PlayerService.mapScheduleWithPlayers,
+        {
+          schedule: pipe(
+            HashMap.get(schedules, hour),
+            Option.getOrElse(() => Schema.Schedule.makeEmpty(hour)),
+          ),
+        },
+        Utils.mapPositional(PlayerService.mapScheduleWithPlayers),
       ),
     ),
     Effect.map(({ schedule, runningChannel }) => ({
-      schedule,
+      schedule: schedule.schedule,
       runningChannel: {
         channelId: runningChannel.channelId,
         channelName,
@@ -116,7 +119,7 @@ const handleManual =
         ),
     )
     .handler(
-      Effect.provide(guildSheetServicesFromInteractionOption("server_id"))(
+      Effect.provide(guildServicesFromInteractionOption("server_id"))(
         pipe(
           Effect.Do,
           InteractionContext.deferReply.tap(),
@@ -176,7 +179,7 @@ const handleManual =
               Array.getSomes,
               Array.map((player) =>
                 pipe(
-                  Match.type<Player | PartialNamePlayer>(),
+                  Match.type<Schema.Player | Schema.PartialNamePlayer>(),
                   Match.tag("Player", (player) => Option.some(player.id)),
                   Match.tag("PartialNamePlayer", () => Option.none()),
                   Match.exhaustive,
