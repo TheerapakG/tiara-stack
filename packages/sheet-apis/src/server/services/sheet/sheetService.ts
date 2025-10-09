@@ -10,6 +10,7 @@ import { type MethodOptions, type sheets_v4 } from "@googleapis/sheets";
 import {
   Array,
   Effect,
+  Function,
   HashMap,
   Match,
   Number,
@@ -205,7 +206,17 @@ const teamParser = (
                     talent,
                     pipe(
                       Schema.Array(
-                        Schema.OptionFromSelf(Schema.NumberFromString),
+                        Schema.OptionFromSelf(
+                          pipe(
+                            Schema.String,
+                            Schema.transform(Schema.String, {
+                              strict: true,
+                              decode: (str) => str.replaceAll(/[^0-9]/g, ""),
+                              encode: Function.identity,
+                            }),
+                            Schema.compose(Schema.NumberFromString),
+                          ),
+                        ),
                       ),
                       Schema.head,
                     ),
