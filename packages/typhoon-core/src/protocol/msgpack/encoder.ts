@@ -1,9 +1,16 @@
 import { encode as msgpackEncode } from "@msgpack/msgpack";
-import { Effect, pipe } from "effect";
+import { Data, Effect, pipe } from "effect";
+
+export class MsgpackEncodeError extends Data.TaggedError("MsgpackEncodeError")<{
+  error: Error;
+}> {}
 
 export const encode = (input: unknown) =>
   pipe(
-    Effect.sync(() => msgpackEncode(input)),
+    Effect.try(() => msgpackEncode(input)),
+    Effect.catchTag("UnknownException", (error) =>
+      Effect.fail(new MsgpackEncodeError({ error: error.error as Error })),
+    ),
     Effect.withSpan("Msgpack.Encoder.encode", {
       captureStackTrace: true,
     }),
