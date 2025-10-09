@@ -1,5 +1,13 @@
 import { Array, Number, Option, Order, pipe, Schema } from "effect";
 
+export class ScheduleIndex extends Schema.TaggedClass<ScheduleIndex>()(
+  "ScheduleIndex",
+  {
+    channel: Schema.String,
+    day: Schema.Number,
+  },
+) {}
+
 export class Schedule extends Schema.TaggedClass<Schedule>()("Schedule", {
   hour: Schema.Number,
   breakHour: Schema.Boolean,

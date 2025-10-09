@@ -1,10 +1,13 @@
-import { Schedule } from "@/server/schema";
+import { Schedule, ScheduleIndex } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 
 const responseSchema = Schema.HashMap({
-  key: Schema.Number,
-  value: Schedule,
+  key: ScheduleIndex,
+  value: Schema.HashMap({
+    key: Schema.Number,
+    value: Schedule,
+  }),
 });
 
 export const getAllSchedulesHandlerConfig = pipe(
