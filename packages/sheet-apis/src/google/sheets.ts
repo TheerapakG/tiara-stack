@@ -8,6 +8,7 @@ import {
   ParseResult,
   pipe,
   Schema,
+  String,
 } from "effect";
 import { Utils } from "typhoon-core/utils";
 import { GoogleAuth } from "./auth";
@@ -107,20 +108,23 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
             parseValueRange(
               valueRange,
               pipe(
-                Schema.Array(
+                Schema.Array(Schema.OptionFromSelf(Schema.String)),
+                Schema.head,
+                Schema.compose(
                   Schema.OptionFromSelf(
-                    pipe(
-                      Schema.String,
-                      Schema.transform(Schema.String, {
-                        strict: true,
-                        decode: (str) => str.replaceAll(/[^0-9]/g, ""),
-                        encode: Function.identity,
-                      }),
-                      Schema.compose(Schema.NumberFromString),
+                    Schema.OptionFromSelf(
+                      pipe(
+                        Schema.String,
+                        Schema.transform(Schema.String, {
+                          strict: true,
+                          decode: (str) => str.replaceAll(/[^0-9]/g, ""),
+                          encode: Function.identity,
+                        }),
+                        Schema.compose(Schema.NumberFromString),
+                      ),
                     ),
                   ),
                 ),
-                Schema.head,
               ),
             ),
             Effect.map(Array.map(Option.flatten)),
@@ -133,28 +137,34 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
             parseValueRange(
               valueRange,
               pipe(
-                Schema.Array(
+                Schema.Array(Schema.OptionFromSelf(Schema.String)),
+                Schema.head,
+                Schema.compose(
                   Schema.OptionFromSelf(
-                    pipe(
-                      Schema.String,
-                      Schema.transformOrFail(Schema.Literal("TRUE", "FALSE"), {
-                        strict: true,
-                        decode: (str) =>
-                          ParseResult.decodeUnknown(
-                            Schema.Literal("TRUE", "FALSE"),
-                          )(str),
-                        encode: (str) => ParseResult.succeed(str),
-                      }),
-                      Schema.compose(
-                        Schema.transformLiterals(
-                          ["TRUE", true],
-                          ["FALSE", false],
+                    Schema.OptionFromSelf(
+                      pipe(
+                        Schema.String,
+                        Schema.transformOrFail(
+                          Schema.Literal("TRUE", "FALSE"),
+                          {
+                            strict: true,
+                            decode: (str) =>
+                              ParseResult.decodeUnknown(
+                                Schema.Literal("TRUE", "FALSE"),
+                              )(str),
+                            encode: (str) => ParseResult.succeed(str),
+                          },
+                        ),
+                        Schema.compose(
+                          Schema.transformLiterals(
+                            ["TRUE", true],
+                            ["FALSE", false],
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-                Schema.head,
               ),
             ),
             Effect.map(Array.map(Option.flatten)),
@@ -167,20 +177,26 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
             parseValueRange(
               valueRange,
               pipe(
-                Schema.Array(
+                Schema.Array(Schema.OptionFromSelf(Schema.String)),
+                Schema.head,
+                Schema.compose(
                   Schema.OptionFromSelf(
-                    pipe(
-                      Schema.split(","),
-                      Schema.compose(Schema.Array(Schema.Trim)),
+                    Schema.OptionFromSelf(
+                      pipe(
+                        Schema.split(","),
+                        Schema.compose(Schema.Array(Schema.Trim)),
+                      ),
                     ),
                   ),
                 ),
-                Schema.head,
               ),
             ),
             Effect.map(Array.map(Option.flatten)),
             Effect.map(Array.map(Option.flatten)),
-            Effect.map(Array.map(Option.getOrElse(() => []))),
+            Effect.map(
+              Array.map(Option.getOrElse(() => [] as readonly string[])),
+            ),
+            Effect.map(Array.map(Array.filter(String.isNonEmpty))),
           ),
         parseValueRangeFromStringOptionArrayToStringOptionArray: (
           valueRange: sheets_v4.Schema$ValueRange,
@@ -199,4 +215,39 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
   },
 ) {
   static parseValueRange = parseValueRange;
+
+  static parseValueRangeToLiteralOption = <
+    const Literals extends Array.NonEmptyReadonlyArray<string>,
+  >(
+    literals: Literals,
+    valueRange: sheets_v4.Schema$ValueRange,
+  ) =>
+    pipe(
+      parseValueRange(
+        valueRange,
+        pipe(
+          Schema.Array(Schema.OptionFromSelf(Schema.String)),
+          Schema.head,
+          Schema.compose(
+            Schema.OptionFromSelf(
+              Schema.OptionFromSelf(
+                pipe(
+                  Schema.String,
+                  Schema.transformOrFail(Schema.Literal(...literals), {
+                    strict: true,
+                    decode: (str) =>
+                      ParseResult.decodeUnknown(Schema.Literal(...literals))(
+                        str,
+                      ),
+                    encode: (str) => ParseResult.succeed(str),
+                  }),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      Effect.map(Array.map(Option.flatten)),
+      Effect.map(Array.map(Option.flatten)),
+    );
 }
