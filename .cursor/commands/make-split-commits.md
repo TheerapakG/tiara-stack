@@ -71,7 +71,7 @@ C = copied (if config option status.renames is set to "copies")
 
 The following guidelines are to be followed for `git commit` command.
 
-- Use conventional commit message.
+- Use conventional commit message. If the work is done insside a package, use the name of the package (or a shortened version if it is not ambiguated) of the changes as the scope of the commit. Optionally, you could also append the area where the work was done inside the package e.g. `feat(example-package/utils): implement new utility x`
 - There is no need to list functions or symbols affected by the changes seperately from the main commit message body.
 - Use -m for new line in the commit message, and do not use \n anywhere.
 
