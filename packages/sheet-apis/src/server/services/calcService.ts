@@ -248,9 +248,7 @@ export class CalcService extends Effect.Service<CalcService>()("CalcService", {
   succeed: {
     calc: (config: CalcConfig, playerTeams: PlayerTeam[][]) =>
       pipe(
-        Effect.forEach(playerTeams, (playerTeam) =>
-          filterFixedTeams(playerTeam),
-        ),
+        Effect.forEach(playerTeams, filterFixedTeams),
         Effect.flatMap(
           Array.match({
             onEmpty: () => Effect.succeed(Chunk.empty()),
