@@ -542,22 +542,29 @@ export class WebSocketClient<
                   Effect.Do,
                   Effect.bind("value", () => value.value),
                   Effect.bind("config", () =>
-                    Handler.Config.Collection.getHandlerConfig(
-                      "subscription",
-                      handler,
-                    )(client.configCollection),
+                    pipe(
+                      Handler.Config.Collection.getHandlerConfig(
+                        "subscription",
+                        handler,
+                      )(client.configCollection),
+                      Effect.catchAll((error) =>
+                        Effect.fail(new HandlerError({ cause: error })),
+                      ),
+                    ),
                   ),
                   Effect.flatMap(({ value, config }) =>
-                    Validate.validate(
-                      Handler.Config.resolveResponseValidator(
-                        Handler.Config.response(
-                          config as SubscriptionHandlerConfigs[Handler],
+                    pipe(
+                      Validate.validate(
+                        Handler.Config.resolveResponseValidator(
+                          Handler.Config.response(
+                            config as SubscriptionHandlerConfigs[Handler],
+                          ),
                         ),
+                      )(value),
+                      Effect.catchAll((error) =>
+                        Effect.fail(new HandlerError({ cause: error })),
                       ),
-                    )(value),
-                  ),
-                  Effect.catchAll((error) =>
-                    Effect.fail(new HandlerError({ cause: error })),
+                    ),
                   ),
                 ),
               ),
@@ -653,22 +660,29 @@ export class WebSocketClient<
                   Effect.Do,
                   Effect.bind("value", () => value.value),
                   Effect.bind("config", () =>
-                    Handler.Config.Collection.getHandlerConfig(
-                      "mutation",
-                      handler,
-                    )(client.configCollection),
+                    pipe(
+                      Handler.Config.Collection.getHandlerConfig(
+                        "mutation",
+                        handler,
+                      )(client.configCollection),
+                      Effect.catchAll((error) =>
+                        Effect.fail(new HandlerError({ cause: error })),
+                      ),
+                    ),
                   ),
                   Effect.flatMap(({ value, config }) =>
-                    Validate.validate(
-                      Handler.Config.resolveResponseValidator(
-                        Handler.Config.response(
-                          config as MutationHandlerConfigs[Handler],
+                    pipe(
+                      Validate.validate(
+                        Handler.Config.resolveResponseValidator(
+                          Handler.Config.response(
+                            config as MutationHandlerConfigs[Handler],
+                          ),
                         ),
+                      )(value),
+                      Effect.catchAll((error) =>
+                        Effect.fail(new HandlerError({ cause: error })),
                       ),
-                    )(value),
-                  ),
-                  Effect.catchAll((error) =>
-                    Effect.fail(new HandlerError({ cause: error })),
+                    ),
                   ),
                 ),
               ),
