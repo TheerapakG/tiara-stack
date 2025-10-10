@@ -155,10 +155,15 @@ export class AppsScriptClient<
       // TODO: check if the response is a valid header
       Effect.bind("decodedResponse", ({ pullStream }) => pullStream),
       Effect.bind("config", () =>
-        Handler.Config.Collection.getHandlerConfig(
-          "subscription",
-          handler,
-        )(client.configCollection),
+        pipe(
+          Handler.Config.Collection.getHandlerConfig(
+            "subscription",
+            handler,
+          )(client.configCollection),
+          Effect.catchAll((error) =>
+            Effect.fail(new HandlerError({ cause: error })),
+          ),
+        ),
       ),
       Effect.flatMap(({ header, decodedResponse, config }) =>
         header.action === "server:update" && header.payload.success
