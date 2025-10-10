@@ -811,13 +811,12 @@ export class SheetService extends Effect.Service<SheetService>()(
                 }),
                 { concurrency: "unbounded" },
               ),
-              Effect.let("ranges", ({ scheduleConfigs }) =>
-                scheduleRanges(scheduleConfigs),
+              Effect.bind("sheet", ({ scheduleConfigs }) =>
+                sheetGetHashMap(scheduleRanges(scheduleConfigs)),
               ),
-              Effect.bind("sheet", ({ ranges }) => sheetGetHashMap(ranges)),
               Effect.bind(
                 "schedules",
-                ({ sheet, scheduleConfigs, runnerConfig }) =>
+                ({ scheduleConfigs, sheet, runnerConfig }) =>
                   scheduleParser(scheduleConfigs, sheet, runnerConfig),
               ),
               Effect.map(({ schedules }) => schedules),
@@ -914,19 +913,23 @@ export class SheetService extends Effect.Service<SheetService>()(
                   }),
                   { concurrency: "unbounded" },
                 ),
-                Effect.let("ranges", ({ scheduleConfigs }) =>
-                  scheduleRanges(
-                    pipe(
-                      scheduleConfigs,
-                      Array.filter((a) => Number.Equivalence(a.day, day)),
-                    ),
+                Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
+                  pipe(
+                    scheduleConfigs,
+                    Array.filter((a) => Number.Equivalence(a.day, day)),
                   ),
                 ),
-                Effect.bind("sheet", ({ ranges }) => sheetGetHashMap(ranges)),
+                Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
+                  sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
+                ),
                 Effect.bind(
                   "schedules",
-                  ({ sheet, scheduleConfigs, runnerConfig }) =>
-                    scheduleParser(scheduleConfigs, sheet, runnerConfig),
+                  ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
+                    scheduleParser(
+                      filteredScheduleConfigs,
+                      sheet,
+                      runnerConfig,
+                    ),
                 ),
                 Effect.map(({ schedules }) => schedules),
                 Effect.provideService(GoogleSheets, sheet),
@@ -944,21 +947,23 @@ export class SheetService extends Effect.Service<SheetService>()(
                   }),
                   { concurrency: "unbounded" },
                 ),
-                Effect.let("ranges", ({ scheduleConfigs }) =>
-                  scheduleRanges(
-                    pipe(
-                      scheduleConfigs,
-                      Array.filter((a) =>
-                        String.Equivalence(a.channel, channel),
-                      ),
-                    ),
+                Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
+                  pipe(
+                    scheduleConfigs,
+                    Array.filter((a) => String.Equivalence(a.channel, channel)),
                   ),
                 ),
-                Effect.bind("sheet", ({ ranges }) => sheetGetHashMap(ranges)),
+                Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
+                  sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
+                ),
                 Effect.bind(
                   "schedules",
-                  ({ sheet, scheduleConfigs, runnerConfig }) =>
-                    scheduleParser(scheduleConfigs, sheet, runnerConfig),
+                  ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
+                    scheduleParser(
+                      filteredScheduleConfigs,
+                      sheet,
+                      runnerConfig,
+                    ),
                 ),
                 Effect.map(({ schedules }) => schedules),
                 Effect.provideService(GoogleSheets, sheet),
