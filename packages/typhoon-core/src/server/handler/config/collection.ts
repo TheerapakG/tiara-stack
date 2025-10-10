@@ -168,14 +168,12 @@ export const add =
         Match.tagsExhaustive({
           PartialSubscriptionHandlerConfig: (config) => ({
             struct: Struct.evolve(handlerGroup.struct, {
-              PartialSubscriptionHandlerConfig: (map) =>
-                addHandlerConfigGroup(config as SubscriptionHandlerConfig)(map),
+              PartialSubscriptionHandlerConfig: addHandlerConfigGroup(config),
             }),
           }),
           PartialMutationHandlerConfig: (config) => ({
             struct: Struct.evolve(handlerGroup.struct, {
-              PartialMutationHandlerConfig: (map) =>
-                addHandlerConfigGroup(config as MutationHandlerConfig)(map),
+              PartialMutationHandlerConfig: addHandlerConfigGroup(config),
             }),
           }),
         }),
@@ -201,14 +199,14 @@ export const addCollection =
           HandlerConfigCollectionMutationHandlerConfigs<OtherG>
         >
       >({
-        struct: {
+        struct: Struct.evolve(thisCollection.struct, {
           PartialSubscriptionHandlerConfig: addGroupHandlerConfigGroup(
             otherCollection.struct.PartialSubscriptionHandlerConfig,
-          )(thisCollection.struct.PartialSubscriptionHandlerConfig),
+          ),
           PartialMutationHandlerConfig: addGroupHandlerConfigGroup(
             otherCollection.struct.PartialMutationHandlerConfig,
-          )(thisCollection.struct.PartialMutationHandlerConfig),
-        },
+          ),
+        }),
       });
 
 export const getHandlerConfig =
