@@ -511,7 +511,14 @@ const runHandler =
   <R = never>(handler: Effect.Effect<unknown, unknown, R>) =>
     pipe(
       Effect.Do,
-      Effect.bind("value", () => Effect.exit(handler)),
+      Effect.bind("value", () =>
+        Effect.exit(
+          pipe(
+            handler,
+            Effect.withSpan("handler", { captureStackTrace: true }),
+          ),
+        ),
+      ),
       Effect.bind("timestamp", () => DateTime.now),
       Effect.map(
         ({ value, timestamp }) =>
