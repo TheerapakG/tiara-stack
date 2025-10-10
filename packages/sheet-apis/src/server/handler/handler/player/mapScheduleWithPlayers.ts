@@ -22,10 +22,13 @@ export const mapScheduleWithPlayersHandler = pipe(
           Sheet.layerOfGuildId(guildId),
           Effect.flatMap((layer) =>
             pipe(
-              schedules,
-              Effect.forEach(Sheet.PlayerService.mapScheduleWithPlayers, {
-                concurrency: "unbounded",
-              }),
+              Effect.forEach(
+                schedules,
+                Sheet.PlayerService.mapScheduleWithPlayers,
+                {
+                  concurrency: "unbounded",
+                },
+              ),
               Effect.map(Signal.make),
               Computed.provideLayerComputed(layer),
             ),
