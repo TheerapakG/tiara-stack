@@ -16,7 +16,6 @@ import {
   HashMap,
   Number,
   Option,
-  ParseResult,
   pipe,
   Schema,
   String,
@@ -35,173 +34,90 @@ const dayConfigParser = ([
   overfillRange,
   standbyRange,
   draft,
-]: sheets_v4.Schema$ValueRange[]): Effect.Effect<
-  ScheduleConfig[],
-  never,
-  never
-> =>
+]: sheets_v4.Schema$ValueRange[]) =>
   pipe(
     Effect.Do,
     Effect.bindAll(() => ({
       channel: pipe(
-        GoogleSheets.parseValueRange(
-          channel,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(channel),
+        Effect.map(Array.map((channel) => ({ channel }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (channel) => ({ channel }),
-              onNone: () => ({ channel: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({ default: { channel: Option.none() } }),
         ),
       ),
       day: pipe(
-        GoogleSheets.parseValueRange(
-          day,
-          pipe(
-            Schema.Array(Schema.OptionFromSelf(Schema.String)),
-            Schema.head,
-            Schema.compose(
-              Schema.OptionFromSelf(
-                Schema.OptionFromSelf(Schema.NumberFromString),
-              ),
-            ),
-          ),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToNumberOption(day),
         Effect.map(Array.map((day) => ({ day }))),
+        Effect.map(
+          ArrayUtils.WithDefault.wrap({ default: { day: Option.none() } }),
+        ),
       ),
       sheet: pipe(
-        GoogleSheets.parseValueRange(
-          sheet,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(sheet),
+        Effect.map(Array.map((sheet) => ({ sheet }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (sheet) => ({ sheet }),
-              onNone: () => ({ sheet: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({ default: { sheet: Option.none() } }),
         ),
       ),
       hourRange: pipe(
-        GoogleSheets.parseValueRange(
-          hourRange,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(hourRange),
+        Effect.map(Array.map((hourRange) => ({ hourRange }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (hourRange) => ({ hourRange }),
-              onNone: () => ({ hourRange: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({
+            default: { hourRange: Option.none() },
+          }),
         ),
       ),
       breakRange: pipe(
-        GoogleSheets.parseValueRange(
-          breakRange,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(breakRange),
+        Effect.map(Array.map((breakRange) => ({ breakRange }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (breakRange) => ({ breakRange }),
-              onNone: () => ({ breakRange: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({
+            default: { breakRange: Option.none() },
+          }),
         ),
       ),
       monitorRange: pipe(
-        GoogleSheets.parseValueRange(
-          monitorRange,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(monitorRange),
+        Effect.map(Array.map((monitorRange) => ({ monitorRange }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (monitorRange) => ({ monitorRange }),
-              onNone: () => ({ monitorRange: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({
+            default: { monitorRange: Option.none() },
+          }),
         ),
       ),
       fillRange: pipe(
-        GoogleSheets.parseValueRange(
-          fillRange,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(fillRange),
+        Effect.map(Array.map((fillRange) => ({ fillRange }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (fillRange) => ({ fillRange }),
-              onNone: () => ({ fillRange: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({
+            default: { fillRange: Option.none() },
+          }),
         ),
       ),
       overfillRange: pipe(
-        GoogleSheets.parseValueRange(
-          overfillRange,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(overfillRange),
+        Effect.map(Array.map((overfillRange) => ({ overfillRange }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (overfillRange) => ({ overfillRange }),
-              onNone: () => ({ overfillRange: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({
+            default: { overfillRange: Option.none() },
+          }),
         ),
       ),
       standbyRange: pipe(
-        GoogleSheets.parseValueRange(
-          standbyRange,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(standbyRange),
+        Effect.map(Array.map((standbyRange) => ({ standbyRange }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (standbyRange) => ({ standbyRange }),
-              onNone: () => ({ standbyRange: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({
+            default: { standbyRange: Option.none() },
+          }),
         ),
       ),
       draft: pipe(
-        GoogleSheets.parseValueRange(
-          draft,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(draft),
+        Effect.map(Array.map((draft) => ({ draft }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (draft) => ({ draft }),
-              onNone: () => ({ draft: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({ default: { draft: Option.none() } }),
         ),
       ),
     })),
@@ -219,64 +135,16 @@ const dayConfigParser = ([
         draft,
       }) =>
         pipe(
-          new ArrayUtils.WithDefault.ArrayWithDefault({
-            array: channel,
-            default: { channel: "" },
-          }),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: day,
-              default: { day: Option.none<number>() },
-            }),
-          ),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: sheet,
-              default: { sheet: "" },
-            }),
-          ),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: hourRange,
-              default: { hourRange: "" },
-            }),
-          ),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: breakRange,
-              default: { breakRange: "" },
-            }),
-          ),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: monitorRange,
-              default: { monitorRange: "" },
-            }),
-          ),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: fillRange,
-              default: { fillRange: "" },
-            }),
-          ),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: overfillRange,
-              default: { overfillRange: "" },
-            }),
-          ),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: standbyRange,
-              default: { standbyRange: "" },
-            }),
-          ),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: draft,
-              default: { draft: "" },
-            }),
-          ),
+          channel,
+          ArrayUtils.WithDefault.zip(day),
+          ArrayUtils.WithDefault.zip(sheet),
+          ArrayUtils.WithDefault.zip(hourRange),
+          ArrayUtils.WithDefault.zip(breakRange),
+          ArrayUtils.WithDefault.zip(monitorRange),
+          ArrayUtils.WithDefault.zip(fillRange),
+          ArrayUtils.WithDefault.zip(overfillRange),
+          ArrayUtils.WithDefault.zip(standbyRange),
+          ArrayUtils.WithDefault.zip(draft),
         ),
     ),
     Effect.map(({ array }) =>
@@ -296,22 +164,18 @@ const dayConfigParser = ([
             draft,
           }) =>
             pipe(
-              day,
-              Option.map(
-                (day) =>
-                  new ScheduleConfig({
-                    channel,
-                    day,
-                    sheet,
-                    hourRange,
-                    breakRange,
-                    monitorRange,
-                    fillRange,
-                    overfillRange,
-                    standbyRange,
-                    draft,
-                  }),
-              ),
+              Option.Do,
+              Option.bind("channel", () => channel),
+              Option.bind("day", () => day),
+              Option.bind("sheet", () => sheet),
+              Option.bind("hourRange", () => hourRange),
+              Option.bind("breakRange", () => breakRange),
+              Option.bind("monitorRange", () => monitorRange),
+              Option.bind("fillRange", () => fillRange),
+              Option.bind("overfillRange", () => overfillRange),
+              Option.bind("standbyRange", () => standbyRange),
+              Option.bind("draft", () => draft),
+              Option.map((config) => new ScheduleConfig(config)),
             ),
         ),
         Array.getSomes,
@@ -332,176 +196,85 @@ const teamConfigParser = ([
   talentRange,
   tagsType,
   tags,
-]: sheets_v4.Schema$ValueRange[]): Effect.Effect<TeamConfigMap, never, never> =>
+]: sheets_v4.Schema$ValueRange[]) =>
   pipe(
     Effect.Do,
     Effect.bindAll(() => ({
       name: pipe(
-        GoogleSheets.parseValueRange(
-          name,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(name),
+        Effect.map(Array.map((name) => ({ name }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (name) => ({ name }),
-              onNone: () => ({ name: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({ default: { name: Option.none() } }),
         ),
       ),
       sheet: pipe(
-        GoogleSheets.parseValueRange(
-          sheet,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(sheet),
+        Effect.map(Array.map((sheet) => ({ sheet }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (sheet) => ({ sheet }),
-              onNone: () => ({ sheet: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({ default: { sheet: Option.none() } }),
         ),
       ),
       playerNameRange: pipe(
-        GoogleSheets.parseValueRange(
-          playerNameRange,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(playerNameRange),
+        Effect.map(Array.map((playerNameRange) => ({ playerNameRange }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (playerNameRange) => ({ playerNameRange }),
-              onNone: () => ({ playerNameRange: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({
+            default: { playerNameRange: Option.none() },
+          }),
         ),
       ),
       teamNameRange: pipe(
-        GoogleSheets.parseValueRange(
-          teamNameRange,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(teamNameRange),
+        Effect.map(Array.map((teamNameRange) => ({ teamNameRange }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (teamNameRange) => ({ teamNameRange }),
-              onNone: () => ({ teamNameRange: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({
+            default: { teamNameRange: Option.none() },
+          }),
         ),
       ),
       leadRange: pipe(
-        GoogleSheets.parseValueRange(
-          leadRange,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(leadRange),
+        Effect.map(Array.map((leadRange) => ({ leadRange }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (leadRange) => ({ leadRange }),
-              onNone: () => ({ leadRange: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({
+            default: { leadRange: Option.none() },
+          }),
         ),
       ),
       backlineRange: pipe(
-        GoogleSheets.parseValueRange(
-          backlineRange,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(backlineRange),
+        Effect.map(Array.map((backlineRange) => ({ backlineRange }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (backlineRange) => ({ backlineRange }),
-              onNone: () => ({ backlineRange: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({
+            default: { backlineRange: Option.none() },
+          }),
         ),
       ),
       talentRange: pipe(
-        GoogleSheets.parseValueRange(
-          talentRange,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(talentRange),
+        Effect.map(Array.map((talentRange) => ({ talentRange }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (talentRange) => ({ talentRange }),
-              onNone: () => ({ talentRange: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({
+            default: { talentRange: Option.none() },
+          }),
         ),
       ),
       tagsType: pipe(
-        GoogleSheets.parseValueRange(
+        GoogleSheets.parseValueRangeToLiteralOption(
+          ["constants", "ranges"],
           tagsType,
-          pipe(
-            Schema.Array(Schema.OptionFromSelf(Schema.String)),
-            Schema.head,
-            Schema.compose(
-              Schema.OptionFromSelf(
-                Schema.OptionFromSelf(
-                  pipe(
-                    Schema.String,
-                    Schema.transformOrFail(
-                      Schema.Literal("constants", "ranges"),
-                      {
-                        strict: true,
-                        decode: (str) =>
-                          ParseResult.decodeUnknown(
-                            Schema.Literal("constants", "ranges"),
-                          )(str),
-                        encode: (str) => ParseResult.succeed(str),
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
         ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        Effect.map(Array.map(Option.getOrElse(() => "constants"))),
+        Effect.map(Array.map((tagsType) => ({ tagsType }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (tagsType) => ({ tagsType }),
-              onNone: () => ({ tagsType: "constants" as const }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({ default: { tagsType: "constants" } }),
         ),
       ),
       tags: pipe(
-        GoogleSheets.parseValueRange(
-          tags,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (tags) => ({ tags }),
-              onNone: () => ({ tags: "" }),
-            }),
-          ),
-        ),
+        GoogleSheets.parseValueRangeToStringOption(tags),
+        Effect.map(Array.map(Option.getOrElse(() => ""))),
+        Effect.map(Array.map((tags) => ({ tags }))),
+        Effect.map(ArrayUtils.WithDefault.wrap({ default: { tags: "" } })),
       ),
     })),
     Effect.map(
@@ -517,64 +290,21 @@ const teamConfigParser = ([
         tags,
       }) =>
         pipe(
-          new ArrayUtils.WithDefault.ArrayWithDefault({
-            array: name,
-            default: { name: "" },
-          }),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: sheet,
-              default: { sheet: "" },
-            }),
-          ),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: playerNameRange,
-              default: { playerNameRange: "" },
-            }),
-          ),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: teamNameRange,
-              default: { teamNameRange: "" },
-            }),
-          ),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: leadRange,
-              default: { leadRange: "" },
-            }),
-          ),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: backlineRange,
-              default: { backlineRange: "" },
-            }),
-          ),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: talentRange,
-              default: { talentRange: "" },
-            }),
-          ),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: tagsType,
-              default: { tagsType: "constants" },
-            }),
-          ),
-          ArrayUtils.WithDefault.zip(
-            new ArrayUtils.WithDefault.ArrayWithDefault({
-              array: tags,
-              default: { tags: "" },
-            }),
-          ),
+          name,
+          ArrayUtils.WithDefault.zip(sheet),
+          ArrayUtils.WithDefault.zip(playerNameRange),
+          ArrayUtils.WithDefault.zip(teamNameRange),
+          ArrayUtils.WithDefault.zip(leadRange),
+          ArrayUtils.WithDefault.zip(backlineRange),
+          ArrayUtils.WithDefault.zip(talentRange),
+          ArrayUtils.WithDefault.zip(tagsType),
+          ArrayUtils.WithDefault.zip(tags),
+          ArrayUtils.WithDefault.toArray,
         ),
     ),
-    Effect.map(({ array }) =>
+    Effect.map((array) =>
       pipe(
         array,
-        Array.filter(({ name }) => name !== ""),
         Array.map(
           ({
             name,
@@ -587,27 +317,37 @@ const teamConfigParser = ([
             tagsType,
             tags,
           }) =>
-            new TeamConfig({
-              name,
-              sheet,
-              playerNameRange,
-              teamNameRange,
-              leadRange,
-              backlineRange,
-              talentRange,
-              tagsConfig:
-                tagsType === "constants"
-                  ? new TeamTagsConstantsConfig({
-                      tags: pipe(
-                        tags,
-                        String.split(","),
-                        Array.map(String.trim),
-                        Array.filter(String.isNonEmpty),
-                      ),
-                    })
-                  : new TeamTagsRangesConfig({ tagsRange: tags }),
-            }),
+            pipe(
+              Option.Do,
+              Option.bind("name", () => name),
+              Option.bind("sheet", () => sheet),
+              Option.bind("playerNameRange", () => playerNameRange),
+              Option.bind("teamNameRange", () => teamNameRange),
+              Option.bind("leadRange", () => leadRange),
+              Option.bind("backlineRange", () => backlineRange),
+              Option.bind("talentRange", () => talentRange),
+              Option.let("tagsType", () => tagsType),
+              Option.let("tags", () => tags),
+              Option.map(
+                ({ tagsType, tags, ...config }) =>
+                  new TeamConfig({
+                    ...config,
+                    tagsConfig:
+                      tagsType === "constants"
+                        ? new TeamTagsConstantsConfig({
+                            tags: pipe(
+                              tags,
+                              String.split(","),
+                              Array.map(String.trim),
+                              Array.filter(String.isNonEmpty),
+                            ),
+                          })
+                        : new TeamTagsRangesConfig({ tagsRange: tags }),
+                  }),
+              ),
+            ),
         ),
+        Array.getSomes,
         ArrayUtils.Collect.toHashMap({
           keyGetter: ({ name }) => name,
           valueInitializer: (a) => a,
@@ -618,92 +358,54 @@ const teamConfigParser = ([
     Effect.withSpan("teamConfigParser", { captureStackTrace: true }),
   );
 
-const hourRangesParser = (ranges: string): HourRange[] =>
+const hourRangeParser = (range: string): HourRange =>
   pipe(
-    ranges,
-    String.split(","),
-    Array.map(String.trim),
-    Array.map((range) =>
-      pipe(
-        range,
-        String.split("-"),
-        Array.map(String.trim),
-        ([start, end]) =>
-          new HourRange({
-            start: parseInt(start, 10),
-            end: parseInt(end, 10),
-          }),
-      ),
+    pipe(
+      range,
+      String.split("-"),
+      Array.map(String.trim),
+      ([start, end]) =>
+        new HourRange({
+          start: parseInt(start, 10),
+          end: parseInt(end, 10),
+        }),
     ),
   );
 
 export type RunnerConfigMap = HashMap.HashMap<string, RunnerConfig>;
 
-const runnerConfigParser = ([
-  name,
-  hours,
-]: sheets_v4.Schema$ValueRange[]): Effect.Effect<
-  RunnerConfigMap,
-  never,
-  never
-> =>
+const runnerConfigParser = ([name, hours]: sheets_v4.Schema$ValueRange[]) =>
   pipe(
     Effect.Do,
     Effect.bindAll(() => ({
       name: pipe(
-        GoogleSheets.parseValueRange(
-          name,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
+        GoogleSheets.parseValueRangeToStringOption(name),
+        Effect.map(Array.map((name) => ({ name }))),
         Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (name) => ({ name }),
-              onNone: () => ({ name: "" }),
-            }),
-          ),
+          ArrayUtils.WithDefault.wrap({ default: { name: Option.none() } }),
         ),
       ),
       hours: pipe(
-        GoogleSheets.parseValueRange(
-          hours,
-          pipe(Schema.Array(Schema.OptionFromSelf(Schema.String)), Schema.head),
-        ),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(Array.map(Option.flatten)),
-        Effect.map(
-          Array.map(
-            Option.match({
-              onSome: (hours) => ({ hours: hourRangesParser(hours) }),
-              onNone: () => ({ hours: [] }),
-            }),
-          ),
-        ),
+        GoogleSheets.parseValueRangeFromStringListToStringArray(hours),
+        Effect.map(Array.map(Array.map(hourRangeParser))),
+        Effect.map(Array.map((hours) => ({ hours }))),
+        Effect.map(ArrayUtils.WithDefault.wrap({ default: { hours: [] } })),
       ),
     })),
     Effect.map(({ name, hours }) =>
       pipe(
-        new ArrayUtils.WithDefault.ArrayWithDefault({
-          array: name,
-          default: { name: "" },
-        }),
-        ArrayUtils.WithDefault.zip(
-          new ArrayUtils.WithDefault.ArrayWithDefault({
-            array: hours,
-            default: { hours: [] },
-          }),
+        name,
+        ArrayUtils.WithDefault.zip(hours),
+        ArrayUtils.WithDefault.toArray,
+        Array.map(({ name, hours }) =>
+          pipe(
+            Option.Do,
+            Option.bind("name", () => name),
+            Option.let("hours", () => hours),
+            Option.map(({ name, hours }) => new RunnerConfig({ name, hours })),
+          ),
         ),
-        ArrayUtils.WithDefault.map(
-          ({ name, hours }) => new RunnerConfig({ name, hours }),
-        ),
-      ),
-    ),
-    Effect.map(({ array }) =>
-      pipe(
-        array,
-        Array.filter(({ name }) => name !== ""),
+        Array.getSomes,
         ArrayUtils.Collect.toHashMap({
           keyGetter: ({ name }) => name,
           valueInitializer: (a) => a,
@@ -788,6 +490,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 Option.map(teamConfigParser),
                 Effect.transposeOption,
                 Effect.flatten,
+                Effect.provideService(GoogleSheets, sheet),
               ),
             ),
             Effect.withSpan("SheetConfigService.getTeamConfig", {
@@ -857,6 +560,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 Option.map(dayConfigParser),
                 Effect.transposeOption,
                 Effect.flatten,
+                Effect.provideService(GoogleSheets, sheet),
               ),
             ),
             Effect.withSpan("SheetConfigService.getScheduleConfig", {
@@ -878,6 +582,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 Option.map(runnerConfigParser),
                 Effect.transposeOption,
                 Effect.flatten,
+                Effect.provideService(GoogleSheets, sheet),
               ),
             ),
             Effect.withSpan("SheetConfigService.getRunnerConfig", {
