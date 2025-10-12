@@ -36,21 +36,22 @@
     "google-auth-library": "^10.1.0",
     "handlebars": "^4.7.8",
     "postgres": "^3.4.7",
+    "sheet-apis": "workspace:*",
     "sheet-db-schema": "workspace:*",
-    "typhoon-core": "workspace:*",
-    "typhoon-server": "workspace:*",
     "typhoon-client-ws": "workspace:*",
-    "sheet-apis": "workspace:*"
+    "typhoon-core": "workspace:*",
+    "typhoon-server": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^24.7.2",
     "@typescript/native-preview": "latest",
     "date-fns": "^4.1.0",
     "drizzle-kit": "^0.31.4",
     "oxlint": "^1.16.0",
     "pathe": "^2.0.3",
     "prettier": "^3.5.3",
+    "simple-git": "^3.28.0",
     "tsdown": "^0.15.6",
-    "typescript": "^5.9.3",
-    "simple-git": "^3.28.0"
+    "typescript": "^5.9.3"
   }
 }
