@@ -30,30 +30,22 @@ const playerTeamValidator = Schema.Struct({
   percent: Schema.Number,
 });
 
-function parsePlayerTeam([
-  type,
-  tagStr,
-  player,
-  team,
-  lead,
-  backline,
-  bp,
-  percent,
-]: CellValue[]) {
-  return Schema.decodeUnknown(playerTeamValidator)({
-    type,
-    tagStr,
+function parsePlayer(player: CellValue[][]) {
+  return pipe(
     player,
-    team,
-    lead,
-    backline,
-    bp,
-    percent,
-  });
+    Effect.forEach((player) =>
+      pipe(player, Schema.decodeUnknown(playerTeamValidator)),
+    ),
+  );
 }
 
-function parsePlayer(player: CellValue[][]) {
-  return pipe(player, Effect.forEach(parsePlayerTeam));
+function parsePlayerNames(playerNames: CellValue[][]) {
+  return pipe(
+    playerNames,
+    Effect.forEach((playerName) =>
+      pipe(playerName, Schema.decodeUnknown(Schema.String)),
+    ),
+  );
 }
 
 export function THEECALC(
@@ -101,6 +93,70 @@ export function THEECALC(
       Effect.bind("client", () => getClient(url)),
       Effect.bind("result", ({ client, config, players }) =>
         AppsScriptClient.once(client, "calc", {
+          config,
+          players,
+        }),
+      ),
+      Effect.tap(({ result }) => Effect.log(result)),
+      Effect.map(({ result }) =>
+        result.map((r) => [
+          "",
+          r.averageBp,
+          r.averagePercent,
+          ...r.room.map((r) => [r.tags.join(", "), r.team]).flat(),
+        ]),
+      ),
+      Effect.catchAll((e) =>
+        pipe(
+          Effect.logError(e),
+          Effect.andThen(() => Effect.succeed([[e.message]])),
+        ),
+      ),
+      Effect.tap((result) => Effect.log(result)),
+    ),
+  );
+}
+
+export function THEECALC2(
+  url: string,
+  config: CellValue[][],
+  players: CellValue[][],
+) {
+  return Effect.runSync(
+    pipe(
+      Effect.Do,
+      Effect.bind("config", () =>
+        pipe(
+          config,
+          Schema.decodeUnknown(
+            Schema.Array(Schema.Tuple(cellValueValidator, cellValueValidator)),
+          ),
+          Effect.map(HashMap.fromIterable),
+          Effect.flatMap((config) =>
+            pipe(
+              Effect.Do,
+              Effect.bind("healNeeded", () =>
+                HashMap.get(config, "heal_needed"),
+              ),
+              Effect.bind("considerEnc", () =>
+                HashMap.get(config, "consider_enc"),
+              ),
+            ),
+          ),
+          Effect.flatMap(Schema.decodeUnknown(configValidator)),
+        ),
+      ),
+      Effect.bind("players", () => parsePlayerNames(players)),
+      Effect.catchAll((e) =>
+        pipe(
+          Effect.logError(e),
+          Effect.andThen(() => Effect.fail({ message: "sheet value error" })),
+        ),
+      ),
+      Effect.bind("client", () => getClient(url)),
+      Effect.bind("result", ({ client, config, players }) =>
+        AppsScriptClient.once(client, "calc.sheet", {
+          sheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
           config,
           players,
         }),
