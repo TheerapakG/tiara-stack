@@ -1,5 +1,8 @@
-import { Array, Effect, HashMap, pipe, Schema } from "effect";
-import { serverHandlerConfigCollection } from "sheet-apis";
+import { Array, Chunk, Effect, HashMap, pipe, Schema } from "effect";
+import {
+  serverHandlerConfigCollection,
+  Schema as SheetSchema,
+} from "sheet-apis";
 import { AppsScriptClient } from "typhoon-client-apps-script/client";
 
 function getClient(url: string) {
@@ -14,46 +17,103 @@ const cellValueValidator = Schema.Union(
 );
 type CellValue = typeof cellValueValidator.Type;
 
-const configValidator = Schema.Struct({
+const calcConfigValidator = Schema.Struct({
   healNeeded: Schema.Number,
   considerEnc: Schema.Boolean,
 });
 
-const playerTeamValidator = Schema.Struct({
-  type: Schema.String,
-  tagStr: Schema.String,
-  player: Schema.String,
-  team: Schema.String,
-  lead: Schema.Number,
-  backline: Schema.Number,
-  bp: Schema.Union(Schema.Number, Schema.Literal("")),
-  percent: Schema.Number,
+const calc2ConfigValidator = Schema.Struct({
+  cc: Schema.Boolean,
+  considerEnc: Schema.Boolean,
+  healNeeded: Schema.Number,
 });
 
+const playerTeamValidator = pipe(
+  Schema.Tuple(
+    Schema.String,
+    Schema.String,
+    Schema.String,
+    Schema.String,
+    Schema.Number,
+    Schema.Number,
+    Schema.Union(Schema.Number, Schema.Literal("")),
+    Schema.Number,
+  ),
+  Schema.transform(
+    Schema.Struct({
+      type: Schema.String,
+      tagStr: Schema.String,
+      player: Schema.String,
+      team: Schema.String,
+      lead: Schema.Number,
+      backline: Schema.Number,
+      talent: Schema.Union(Schema.Number, Schema.Literal("")),
+      effectValue: Schema.Number,
+    }),
+    {
+      strict: true,
+      decode: ([
+        type,
+        tagStr,
+        player,
+        team,
+        lead,
+        backline,
+        talent,
+        effectValue,
+      ]) => ({
+        type,
+        tagStr,
+        player,
+        team,
+        lead,
+        backline,
+        talent,
+        effectValue,
+      }),
+      encode: ({
+        type,
+        tagStr,
+        player,
+        team,
+        lead,
+        backline,
+        talent,
+        effectValue,
+      }) =>
+        [
+          type,
+          tagStr,
+          player,
+          team,
+          lead,
+          backline,
+          talent,
+          effectValue,
+        ] as const,
+    },
+  ),
+);
+
 function parsePlayerTeam(player: CellValue[][]) {
-  return pipe(
-    player,
-    Effect.forEach((player) =>
-      pipe(player, Schema.decodeUnknown(playerTeamValidator)),
-    ),
-  );
+  return pipe(player, Schema.decodeUnknown(Schema.Array(playerTeamValidator)));
 }
 
 function parsePlayers(players: CellValue[][]) {
   return pipe(
     players,
     Schema.decodeUnknown(
-      pipe(
-        Schema.Array(Schema.Tuple(Schema.String, Schema.Boolean)),
-        Schema.transform(
-          Schema.Array(
+      Schema.Array(
+        pipe(
+          Schema.Tuple(Schema.String, Schema.Boolean),
+          Schema.transform(
             Schema.Struct({ name: Schema.String, encable: Schema.Boolean }),
+            {
+              strict: true,
+              decode: ([name, encable]) => ({ name, encable }),
+              encode: ({ name, encable }) => [name, encable] as const,
+            },
           ),
-          {
-            strict: true,
-            decode: Array.map(([name, encable]) => ({ name, encable })),
-            encode: Array.map(({ name, encable }) => [name, encable] as const),
-          },
         ),
       ),
     ),
@@ -111,7 +171,7 @@ export function THEECALC(
               ),
             ),
           ),
-          Effect.flatMap(Schema.decodeUnknown(configValidator)),
+          Effect.flatMap(Schema.decodeUnknown(calcConfigValidator)),
         ),
       ),
       Effect.bind("players", () =>
@@ -134,8 +194,8 @@ export function THEECALC(
       Effect.map(({ result }) =>
         result.map((r) => [
           "",
-          r.averageBp,
-          r.averagePercent,
+          r.averageTalent,
+          r.averageEffectValue,
           ...r.room.map((r) => [r.tags.join(", "), r.team]).flat(),
         ]),
       ),
@@ -169,19 +229,34 @@ export function THEECALC2(
           Effect.flatMap((config) =>
             pipe(
               Effect.Do,
-              Effect.bind("healNeeded", () =>
-                HashMap.get(config, "heal_needed"),
-              ),
+              Effect.bind("cc", () => HashMap.get(config, "cc")),
               Effect.bind("considerEnc", () =>
                 HashMap.get(config, "consider_enc"),
               ),
+              Effect.bind("healNeeded", () =>
+                HashMap.get(config, "heal_needed"),
+              ),
             ),
           ),
-          Effect.flatMap(Schema.decodeUnknown(configValidator)),
+          Effect.flatMap(Schema.decodeUnknown(calc2ConfigValidator)),
         ),
       ),
-      Effect.bind("players", () => parsePlayers(players)),
-      Effect.bind("fixedTeams", () => parseFixedTeams(fixedTeams)),
+      Effect.bind("players", () =>
+        parsePlayers(
+          pipe(
+            players,
+            Array.filter(([name]) => name !== ""),
+          ),
+        ),
+      ),
+      Effect.bind("fixedTeams", () =>
+        parseFixedTeams(
+          pipe(
+            fixedTeams,
+            Array.filter(([name]) => name !== ""),
+          ),
+        ),
+      ),
       Effect.catchAll((e) =>
         pipe(
           Effect.logError(e),
@@ -201,9 +276,19 @@ export function THEECALC2(
       Effect.map(({ result }) =>
         result.map((r) => [
           "",
-          r.averageBp,
-          r.averagePercent,
-          ...r.room.map((r) => [r.tags.join(", "), r.team]).flat(),
+          SheetSchema.Room.avgTalent(r),
+          SheetSchema.Room.avgEffectValue(r),
+          ...pipe(
+            r.teams,
+            Chunk.toArray,
+            Array.map((team) => [
+              team.team,
+              team.lead,
+              team.backline,
+              team.talent,
+              SheetSchema.PlayerTeam.getEffectValue(team),
+            ]),
+          ).flat(),
         ]),
       ),
       Effect.catchAll((e) =>
