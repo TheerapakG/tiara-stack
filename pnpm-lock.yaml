@@ -310,15 +310,15 @@ importers:
       terser:
         specifier: ^5.43.0
         version: 5.43.0
+      tsdown:
+        specifier: ^0.15.6
+        version: 0.15.6(@typescript/native-preview@7.0.0-dev.20251011.1)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
       unplugin-dts:
         specifier: 1.0.0-beta.0
         version: 1.0.0-beta.0(@microsoft/api-extractor@7.52.8(@types/node@24.7.2))(esbuild@0.25.5)(rollup@4.45.0)(typescript@5.9.3)(vite@6.3.5(@types/node@24.7.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.0))
-      vite:
-        specifier: ^6.3.5
-        version: 6.3.5(@types/node@24.7.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.0)
-      vite-plugin-dts:
-        specifier: ^4.5.4
-        version: 4.5.4(@types/node@24.7.2)(rollup@4.45.0)(typescript@5.9.3)(vite@6.3.5(@types/node@24.7.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.0))
 
   packages/typhoon-client-apps-script:
     dependencies:
@@ -4026,15 +4026,6 @@ packages:
     resolution: {integrity: sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==}
     hasBin: true
 
-  vite-plugin-dts@4.5.4:
-    resolution: {integrity: sha512-d4sOM8M/8z7vRXHHq/ebbblfaxENjogAAekcfcDCCwAyvGqnPrc7f4NZbvItS+g4WTgerW0xDwSz5qz11JT3vg==}
-    peerDependencies:
-      typescript: '*'
-      vite: '*'
-    peerDependenciesMeta:
-      vite:
-        optional: true
-
   vite@6.3.5:
     resolution: {integrity: sha512-cZn6NDFE7wdTpINgs++ZJ4N49W2vRp8LCKrn3Ob1kYNtOo21vfDoaV5GzBfLU4MovSAB8uNRm4jgzVQZ+mBzPQ==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
@@ -5235,6 +5226,7 @@ snapshots:
       '@rushstack/node-core-library': 5.13.1(@types/node@24.7.2)
     transitivePeerDependencies:
       - '@types/node'
+    optional: true
 
   '@microsoft/api-extractor@7.52.8(@types/node@24.7.2)':
     dependencies:
@@ -5253,6 +5245,7 @@ snapshots:
       typescript: 5.8.2
     transitivePeerDependencies:
       - '@types/node'
+    optional: true
 
   '@microsoft/tsdoc-config@0.17.1':
     dependencies:
@@ -5260,8 +5253,10 @@ snapshots:
       ajv: 8.12.0
       jju: 1.4.0
       resolve: 1.22.10
+    optional: true
 
-  '@microsoft/tsdoc@0.15.1': {}
+  '@microsoft/tsdoc@0.15.1':
+    optional: true
 
   '@msgpack/msgpack@3.1.2': {}
 
@@ -5744,11 +5739,13 @@ snapshots:
       semver: 7.5.4
     optionalDependencies:
       '@types/node': 24.7.2
+    optional: true
 
   '@rushstack/rig-package@0.5.3':
     dependencies:
       resolve: 1.22.10
       strip-json-comments: 3.1.1
+    optional: true
 
   '@rushstack/terminal@0.15.3(@types/node@24.7.2)':
     dependencies:
@@ -5756,6 +5753,7 @@ snapshots:
       supports-color: 8.1.1
     optionalDependencies:
       '@types/node': 24.7.2
+    optional: true
 
   '@rushstack/ts-command-line@5.0.1(@types/node@24.7.2)':
     dependencies:
@@ -5765,6 +5763,7 @@ snapshots:
       string-argv: 0.3.2
     transitivePeerDependencies:
       - '@types/node'
+    optional: true
 
   '@sapphire/async-queue@1.5.5': {}
 
@@ -5788,7 +5787,8 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@types/argparse@1.0.38': {}
+  '@types/argparse@1.0.38':
+    optional: true
 
   '@types/estree@1.0.8': {}
 
@@ -5925,10 +5925,12 @@ snapshots:
   ajv-draft-04@1.0.0(ajv@8.13.0):
     optionalDependencies:
       ajv: 8.13.0
+    optional: true
 
   ajv-formats@3.0.1(ajv@8.13.0):
     optionalDependencies:
       ajv: 8.13.0
+    optional: true
 
   ajv@8.12.0:
     dependencies:
@@ -5936,6 +5938,7 @@ snapshots:
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
       uri-js: 4.4.1
+    optional: true
 
   ajv@8.13.0:
     dependencies:
@@ -5943,6 +5946,7 @@ snapshots:
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
       uri-js: 4.4.1
+    optional: true
 
   alien-signals@0.4.14: {}
 
@@ -6030,6 +6034,7 @@ snapshots:
     dependencies:
       balanced-match: 1.0.2
       concat-map: 0.0.1
+    optional: true
 
   brace-expansion@2.0.2:
     dependencies:
@@ -6133,7 +6138,8 @@ snapshots:
 
   compare-versions@6.1.1: {}
 
-  concat-map@0.0.1: {}
+  concat-map@0.0.1:
+    optional: true
 
   confbox@0.1.8: {}
 
@@ -6572,7 +6578,8 @@ snapshots:
 
   ignore@5.3.2: {}
 
-  import-lazy@4.0.0: {}
+  import-lazy@4.0.0:
+    optional: true
 
   inherits@2.0.4: {}
 
@@ -6625,7 +6632,8 @@ snapshots:
 
   jiti@2.6.1: {}
 
-  jju@1.4.0: {}
+  jju@1.4.0:
+    optional: true
 
   jose@6.1.0: {}
 
@@ -6644,7 +6652,8 @@ snapshots:
     dependencies:
       bignumber.js: 9.3.0
 
-  json-schema-traverse@1.0.0: {}
+  json-schema-traverse@1.0.0:
+    optional: true
 
   json5@2.2.3: {}
 
@@ -6756,6 +6765,7 @@ snapshots:
   lru-cache@6.0.0:
     dependencies:
       yallist: 4.0.0
+    optional: true
 
   magic-bytes.js@1.12.1: {}
 
@@ -6793,6 +6803,7 @@ snapshots:
   minimatch@3.0.8:
     dependencies:
       brace-expansion: 1.1.12
+    optional: true
 
   minimatch@9.0.3:
     dependencies:
@@ -6835,7 +6846,8 @@ snapshots:
 
   multipasta@0.2.7: {}
 
-  nanoid@3.3.11: {}
+  nanoid@3.3.11:
+    optional: true
 
   neo-async@2.6.2: {}
 
@@ -7085,6 +7097,7 @@ snapshots:
       nanoid: 3.3.11
       picocolors: 1.1.1
       source-map-js: 1.2.1
+    optional: true
 
   postgres-array@2.0.0:
     optional: true
@@ -7146,7 +7159,8 @@ snapshots:
 
   proxy-from-env@1.1.0: {}
 
-  punycode@2.3.1: {}
+  punycode@2.3.1:
+    optional: true
 
   pure-rand@6.1.0: {}
 
@@ -7200,7 +7214,8 @@ snapshots:
 
   require-directory@2.1.1: {}
 
-  require-from-string@2.0.2: {}
+  require-from-string@2.0.2:
+    optional: true
 
   resolve-pkg-maps@1.0.0: {}
 
@@ -7288,6 +7303,7 @@ snapshots:
   semver@7.5.4:
     dependencies:
       lru-cache: 6.0.0
+    optional: true
 
   semver@7.7.2: {}
 
@@ -7366,7 +7382,8 @@ snapshots:
       cookie-es: 2.0.0
     optional: true
 
-  string-argv@0.3.2: {}
+  string-argv@0.3.2:
+    optional: true
 
   string-width@4.2.3:
     dependencies:
@@ -7394,7 +7411,8 @@ snapshots:
 
   strip-bom@3.0.0: {}
 
-  strip-json-comments@3.1.1: {}
+  strip-json-comments@3.1.1:
+    optional: true
 
   strong-log-transformer@2.1.0:
     dependencies:
@@ -7409,6 +7427,7 @@ snapshots:
   supports-color@8.1.1:
     dependencies:
       has-flag: 4.0.0
+    optional: true
 
   supports-preserve-symlinks-flag@1.0.0: {}
 
@@ -7441,6 +7460,7 @@ snapshots:
     dependencies:
       fdir: 6.5.0(picomatch@4.0.3)
       picomatch: 4.0.3
+    optional: true
 
   tinyglobby@0.2.15:
     dependencies:
@@ -7492,7 +7512,8 @@ snapshots:
 
   tslib@2.8.1: {}
 
-  typescript@5.8.2: {}
+  typescript@5.8.2:
+    optional: true
 
   typescript@5.9.3: {}
 
@@ -7562,31 +7583,13 @@ snapshots:
   uri-js@4.4.1:
     dependencies:
       punycode: 2.3.1
+    optional: true
 
   url-template@2.0.8: {}
 
   util-deprecate@1.0.2: {}
 
   uuid@11.1.0: {}
-
-  vite-plugin-dts@4.5.4(@types/node@24.7.2)(rollup@4.45.0)(typescript@5.9.3)(vite@6.3.5(@types/node@24.7.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.0)):
-    dependencies:
-      '@microsoft/api-extractor': 7.52.8(@types/node@24.7.2)
-      '@rollup/pluginutils': 5.1.4(rollup@4.45.0)
-      '@volar/typescript': 2.4.14
-      '@vue/language-core': 2.2.0(typescript@5.9.3)
-      compare-versions: 6.1.1
-      debug: 4.4.1
-      kolorist: 1.8.0
-      local-pkg: 1.1.1
-      magic-string: 0.30.17
-      typescript: 5.9.3
-    optionalDependencies:
-      vite: 6.3.5(@types/node@24.7.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.0)
-    transitivePeerDependencies:
-      - '@types/node'
-      - rollup
-      - supports-color
 
   vite@6.3.5(@types/node@24.7.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.0):
     dependencies:
@@ -7602,6 +7605,7 @@ snapshots:
       jiti: 2.6.1
       lightningcss: 1.30.2
       terser: 5.43.0
+    optional: true
 
   vscode-uri@3.1.0: {}
 
@@ -7642,7 +7646,8 @@ snapshots:
 
   yallist@3.1.1: {}
 
-  yallist@4.0.0: {}
+  yallist@4.0.0:
+    optional: true
 
   yargs-parser@20.2.9: {}
 

@@ -9,11 +9,10 @@ import { onEdit as _onEdit } from "./levi";
  *
  * @customfunction
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function THEECALC(...args: Parameters<typeof _THEECALC>) {
+export function THEECALC(...args: Parameters<typeof _THEECALC>) {
   return _THEECALC(...args);
 }
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function onEdit(...args: Parameters<typeof _onEdit>) {
+
+export function onEdit(...args: Parameters<typeof _onEdit>) {
   return _onEdit(...args);
 }
