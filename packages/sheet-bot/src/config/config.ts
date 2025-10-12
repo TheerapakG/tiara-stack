@@ -3,12 +3,10 @@ import { Effect, pipe, Schema } from "effect";
 
 const configSchema = pipe(
   Schema.Struct({
-    POSTGRES_URL: Schema.String,
     DISCORD_TOKEN: Schema.String,
     SHEET_APIS_BASE_URL: Schema.String,
   }),
   Schema.rename({
-    POSTGRES_URL: "postgresUrl",
     DISCORD_TOKEN: "discordToken",
     SHEET_APIS_BASE_URL: "sheetApisBaseUrl",
   }),
