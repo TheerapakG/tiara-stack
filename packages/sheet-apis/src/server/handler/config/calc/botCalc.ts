@@ -22,8 +22,8 @@ export const botCalcHandlerConfig = pipe(
                 team: Schema.String,
                 lead: Schema.Number,
                 backline: Schema.Number,
-                bp: Schema.Union(Schema.Number, Schema.Literal("")),
-                percent: Schema.Number,
+                talent: Schema.Union(Schema.Number, Schema.Literal("")),
+                effectValue: Schema.Number,
               }),
             ),
           ),
@@ -37,14 +37,14 @@ export const botCalcHandlerConfig = pipe(
     validator: pipe(
       Schema.Array(
         Schema.Struct({
-          averageBp: Schema.Number,
-          averagePercent: Schema.Number,
+          averageTalent: Schema.Number,
+          averageEffectValue: Schema.Number,
           room: Schema.Array(
             Schema.Struct({
               type: Schema.String,
               team: Schema.String,
-              bp: Schema.Number,
-              percent: Schema.Number,
+              talent: Schema.Number,
+              effectValue: Schema.Number,
               tags: Schema.Array(Schema.String),
             }),
           ),

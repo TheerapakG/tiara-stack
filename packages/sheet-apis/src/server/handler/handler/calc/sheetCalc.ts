@@ -1,5 +1,6 @@
 import { sheetCalcHandlerConfig } from "@/server/handler/config";
-import { CalcConfig, CalcService, PlayerTeam, Sheet } from "@/server/services";
+import { CalcConfig, CalcService, Sheet } from "@/server/services";
+import { PlayerTeam } from "@/server/schema";
 import {
   Array,
   Chunk,
@@ -41,7 +42,9 @@ export const sheetCalcHandler = pipe(
             Effect.forEach(players, ({ name, encable }) =>
               pipe(
                 Sheet.PlayerService.getTeamsByName(name),
-                Effect.map(Array.map(PlayerTeam.fromTeam)),
+                Effect.map(
+                  Array.map((team) => PlayerTeam.fromTeam(config.cc, team)),
+                ),
                 Effect.map(Array.getSomes),
                 Effect.map(
                   Array.map((team) =>
@@ -66,23 +69,6 @@ export const sheetCalcHandler = pipe(
           ),
           Effect.flatMap(({ config, playerTeams }) =>
             CalcService.calc(config, playerTeams),
-          ),
-          Effect.map(
-            Chunk.map(({ bp, percent, teams }) => ({
-              averageBp: bp / 5,
-              averagePercent: percent / 5,
-              room: pipe(
-                teams,
-                Chunk.map(({ type, team, bp, percent, tags }) => ({
-                  type,
-                  team,
-                  bp,
-                  percent,
-                  tags: HashSet.toValues(tags),
-                })),
-                Chunk.toArray,
-              ),
-            })),
           ),
           Effect.map(Chunk.toArray),
           Effect.flatMap(
