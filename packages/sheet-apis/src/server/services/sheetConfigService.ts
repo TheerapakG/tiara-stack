@@ -443,20 +443,10 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                   Schema.Struct({
                     "User IDs": Schema.String,
                     "User Sheet Names": Schema.String,
-                    Hours: Schema.String,
-                    Breaks: Schema.String,
-                    Fills: Schema.String,
-                    Overfills: Schema.String,
-                    Standbys: Schema.String,
                   }),
                   Schema.rename({
                     "User IDs": "userIds",
                     "User Sheet Names": "userSheetNames",
-                    Hours: "hours",
-                    Breaks: "breaks",
-                    Fills: "fills",
-                    Overfills: "overfills",
-                    Standbys: "standbys",
                   }),
                   Schema.compose(
                     DefaultTaggedClass.DefaultTaggedClass(RangesConfig),
