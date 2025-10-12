@@ -21,7 +21,7 @@
     "format": "prettier -c .",
     "lint": "oxlint .",
     "typecheck": "tsgo --noEmit",
-    "build": "rolldown -c rolldown.config.ts && tar -acf dist.tar.zst ./dist"
+    "build": "tsdown -c tsdown.config.ts && tar -acf dist.tar.zst ./dist"
   },
   "keywords": [],
   "author": "",
@@ -51,8 +51,7 @@
     "oxlint": "^1.16.0",
     "pathe": "^2.0.3",
     "prettier": "^3.5.3",
-    "rolldown": "1.0.0-beta.36",
-    "rolldown-plugin-dts": "^0.16.8",
-    "vite": "npm:rolldown-vite@latest"
+    "tsdown": "^0.15.6",
+    "typescript": "^5.9.3"
   }
 }
