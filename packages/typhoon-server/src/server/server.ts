@@ -1,4 +1,4 @@
-import { Message, Peer } from "crossws";
+import type { Message, Peer } from "crossws";
 import type { serve as crosswsServe } from "crossws/server";
 import {
   Array,
