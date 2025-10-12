@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@types/google-apps-script": "^1.0.99",
+    "@types/node": "^24.7.2",
     "@typescript/native-preview": "latest",
     "oxlint": "^1.16.0",
     "pathe": "^2.0.3",
