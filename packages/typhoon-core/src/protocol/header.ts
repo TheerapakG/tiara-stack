@@ -2,7 +2,6 @@ import {
   Array,
   Chunk,
   Effect,
-  Option,
   ParseResult,
   pipe,
   Schema,
@@ -32,14 +31,7 @@ export class EmptyPayloadSchema extends pipe(
 
 export const HandlerPayloadSchema = KeyOrderLookupSchema(["handler", "token"], {
   handler: Schema.String,
-  token: Schema.optionalToOptional(
-    Schema.OptionFromNullishOr(Schema.String, undefined),
-    Schema.String,
-    {
-      decode: Option.flatten,
-      encode: Option.map(Option.some),
-    },
-  ),
+  token: Schema.optionalWith(Schema.String, { nullable: true }),
 });
 
 export const SuccessTimestampPayloadSchema = KeyOrderLookupSchema(
