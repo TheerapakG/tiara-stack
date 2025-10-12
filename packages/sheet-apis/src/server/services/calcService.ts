@@ -1,3 +1,4 @@
+import { Team } from "@/server/schema";
 import {
   Array,
   Chunk,
@@ -59,6 +60,23 @@ export class PlayerTeam extends Data.TaggedClass("PlayerTeam")<{
         tags: HashSet.fromIterable(
           apiObject.tagStr.split(/\s*,\s*/).filter(Boolean),
         ),
+      }),
+    );
+  }
+
+  static fromTeam(team: Team) {
+    if (team.name === "" || Option.isNone(team.talent)) return Option.none();
+
+    return Option.some(
+      new PlayerTeam({
+        type: team.type,
+        team: team.name,
+        bp: team.talent.value,
+        percent: pipe(
+          Team.getEffectValue(team),
+          Option.getOrElse(() => 1),
+        ),
+        tags: HashSet.fromIterable(team.tags.filter(Boolean)),
       }),
     );
   }
