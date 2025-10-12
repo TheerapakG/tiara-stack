@@ -28,11 +28,6 @@ spec:
             - containerPort: 9464
               name: sheet-bot-met
           env:
-            - name: POSTGRES_URL
-              valueFrom:
-                secretKeyRef:
-                  name: sheet-bot-secret
-                  key: postgresUrl
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               valueFrom:
                 secretKeyRef:
@@ -54,17 +49,11 @@ spec:
                   name: sheet-bot-secret
                   key: sheetApisBaseUrl
           volumeMounts:
-            - name: sheet-bot-secret-path
-              readOnly: true
-              mountPath: "/.secret"
             - name: sheet-bot-tokens
               readOnly: true
               mountPath: "/var/run/secrets/tokens"
       serviceAccountName: sheet-bot
       volumes:
-        - name: sheet-bot-secret-path
-          secret:
-            secretName: sheet-bot-secret-path
         - name: sheet-bot-tokens
           projected:
             sources:

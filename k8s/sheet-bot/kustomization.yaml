@@ -4,9 +4,6 @@ secretGenerator:
   - name: sheet-bot-secret
     envs:
       - .env.secret
-  - name: sheet-bot-secret-path
-    files:
-      - google-service-account.json
 configMapGenerator:
 generatorOptions:
   disableNameSuffixHash: true
