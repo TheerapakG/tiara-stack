@@ -14,15 +14,12 @@
     "format": "prettier -c .",
     "lint": "oxlint .",
     "typecheck": "tsgo --noEmit",
-    "build:rollup": "rollup --config rollup.config.ts --configPlugin @rollup/plugin-typescript",
-    "build:tsdown": "tsdown -c tsdown.config.ts",
-    "build": "pnpm run build:tsdown"
+    "build": "tsdown -c tsdown.config.ts"
   },
   "keywords": [],
   "author": "",
   "dependencies": {
     "@standard-schema/spec": "^1.0.0",
-    "@babel/core": "^7.28.0",
     "core-js": "^3.44.0",
     "effect": "^3.17.14",
     "sheet-apis": "workspace:*",
@@ -30,21 +27,12 @@
     "typhoon-core": "workspace:*"
   },
   "devDependencies": {
-    "@babel/preset-env": "^7.28.0",
-    "@rollup/plugin-babel": "^6.0.4",
-    "@rollup/plugin-commonjs": "^28.0.6",
-    "@rollup/plugin-node-resolve": "^16.0.1",
-    "@rollup/plugin-terser": "^0.4.4",
-    "@rollup/plugin-typescript": "^12.1.4",
     "@types/google-apps-script": "^1.0.99",
     "@typescript/native-preview": "latest",
     "oxlint": "^1.16.0",
     "pathe": "^2.0.3",
     "prettier": "^3.5.3",
-    "rollup": "^4.45.0",
-    "terser": "^5.43.0",
     "tsdown": "^0.15.6",
-    "typescript": "^5.9.3",
-    "unplugin-dts": "1.0.0-beta.0"
+    "typescript": "^5.9.3"
   }
 }
