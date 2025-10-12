@@ -1,55 +1,22 @@
-import { DBService } from "@/db";
-import { and, eq, isNull } from "drizzle-orm";
-import { Array, Data, Effect, Option, pipe } from "effect";
-import { messageSlot } from "sheet-db-schema";
-import { Computed } from "typhoon-core/signal";
-import { DB } from "typhoon-server/db";
-
-type MessageSlotInsert = typeof messageSlot.$inferInsert;
-type MessageSlotSelect = typeof messageSlot.$inferSelect;
-
-export class MessageSlot extends Data.TaggedClass("MessageSlot")<{
-  id: number;
-  messageId: string;
-  day: number;
-  createdAt: Date;
-  updatedAt: Date;
-  deletedAt: Option.Option<Date>;
-}> {
-  static fromDbSelect = (select: MessageSlotSelect) =>
-    new MessageSlot({
-      id: select.id,
-      messageId: select.messageId,
-      day: select.day,
-      createdAt: select.createdAt,
-      updatedAt: select.updatedAt,
-      deletedAt: Option.fromNullable(select.deletedAt),
-    });
-}
+import { SheetApisClient } from "@/client/sheetApis";
+import { Effect, pipe } from "effect";
+import { WebSocketClient } from "typhoon-client-ws/client";
+import type { messageSlot } from "sheet-db-schema";
 
 export class MessageSlotService extends Effect.Service<MessageSlotService>()(
   "MessageSlotService",
   {
     effect: pipe(
       Effect.Do,
-      Effect.bind("db", () => DBService),
-      Effect.bind("dbSubscriptionContext", () => DB.DBSubscriptionContext),
-      Effect.map(({ db, dbSubscriptionContext }) => ({
+      Effect.bind("client", () => SheetApisClient.get()),
+      Effect.map(({ client }) => ({
         getMessageSlotData: (messageId: string) =>
           pipe(
-            dbSubscriptionContext.subscribeQuery(
-              db
-                .select()
-                .from(messageSlot)
-                .where(
-                  and(
-                    eq(messageSlot.messageId, messageId),
-                    isNull(messageSlot.deletedAt),
-                  ),
-                ),
+            WebSocketClient.once(
+              client,
+              "messageSlot.getMessageSlotData",
+              messageId,
             ),
-            Computed.map(Array.head),
-            Computed.map(Option.map(MessageSlot.fromDbSelect)),
             Effect.withSpan("MessageSlotService.getMessageSlotData", {
               captureStackTrace: true,
             }),
@@ -57,24 +24,15 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
         upsertMessageSlotData: (
           messageId: string,
           data: Omit<
-            MessageSlotInsert,
+            typeof messageSlot.$inferInsert,
             "id" | "createdAt" | "updatedAt" | "deletedAt" | "messageId"
           >,
         ) =>
           pipe(
-            dbSubscriptionContext.mutateQuery(
-              db
-                .insert(messageSlot)
-                .values({
-                  messageId,
-                  ...data,
-                })
-                .onConflictDoUpdate({
-                  target: [messageSlot.messageId],
-                  set: {
-                    ...data,
-                  },
-                }),
+            WebSocketClient.mutate(
+              client,
+              "messageSlot.upsertMessageSlotData",
+              { messageId, ...data },
             ),
             Effect.withSpan("MessageSlotService.upsertMessageSlotData", {
               captureStackTrace: true,
@@ -82,7 +40,7 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
           ),
       })),
     ),
-    dependencies: [DBService.Default, DB.DBSubscriptionContext.Default],
+    dependencies: [SheetApisClient.Default],
     accessors: true,
   },
 ) {}

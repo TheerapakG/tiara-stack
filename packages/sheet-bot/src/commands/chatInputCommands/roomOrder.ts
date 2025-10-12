@@ -298,8 +298,9 @@ const handleManual =
                 hour,
                 rank: 0,
               }),
-              MessageRoomOrderService.upsertMessageRoomOrderData(
+              MessageRoomOrderService.upsertMessageRoomOrderEntry(
                 message.id,
+                hour,
                 pipe(
                   roomOrders,
                   Array.map(({ room }, rank) =>

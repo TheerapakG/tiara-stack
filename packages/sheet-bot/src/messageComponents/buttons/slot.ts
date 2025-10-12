@@ -15,14 +15,12 @@ import {
   Array,
   Chunk,
   Effect,
-  Function,
   HashMap,
   Number,
   Order,
   pipe,
   String,
 } from "effect";
-import { OnceObserver } from "typhoon-core/signal";
 import { Schema } from "sheet-apis";
 
 const getSlotMessage = (day: number) =>
@@ -96,8 +94,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         Effect.bind("messageSlotData", ({ message }) =>
           pipe(
             MessageSlotService.getMessageSlotData(message.id),
-            Effect.flatMap(OnceObserver.observeOnce),
-            Effect.flatMap(Function.identity),
+            Effect.flatten,
           ),
         ),
         Effect.bind("slotMessage", ({ messageSlotData }) =>

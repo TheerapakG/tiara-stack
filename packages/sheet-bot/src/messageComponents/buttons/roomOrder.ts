@@ -6,7 +6,6 @@ import {
   FormatService,
   guildServicesFromInteraction,
   InteractionContext,
-  MessageRoomOrder,
   MessageRoomOrderService,
   SendableChannelContext,
   SheetService,
@@ -26,7 +25,7 @@ import {
   TimestampStyles,
 } from "discord.js";
 import { Effect, Function, Layer, Number, pipe } from "effect";
-import { OnceObserver } from "typhoon-core/signal";
+import type { Schema } from "sheet-apis";
 
 const roomOrderPreviousButtonData = {
   type: ComponentType.Button,
@@ -67,7 +66,7 @@ export const roomOrderActionRow = (
     .addComponents(new ButtonBuilder(roomOrderSendButtonData));
 
 export const roomOrderInteractionGetReply = (
-  messageRoomOrder: MessageRoomOrder,
+  messageRoomOrder: Schema.MessageRoomOrder,
 ) =>
   pipe(
     Effect.Do,
@@ -76,15 +75,11 @@ export const roomOrderInteractionGetReply = (
       ({ message }) => ({
         messageRoomOrderRange: pipe(
           MessageRoomOrderService.getMessageRoomOrderRange(message.id),
-          Effect.flatMap(OnceObserver.observeOnce),
-          Effect.flatMap(Function.identity),
+          Effect.flatten,
         ),
-        messageRoomOrderData: pipe(
-          MessageRoomOrderService.getMessageRoomOrderData(
-            message.id,
-            messageRoomOrder.rank,
-          ),
-          Effect.flatMap(OnceObserver.observeOnce),
+        messageRoomOrderEntry: MessageRoomOrderService.getMessageRoomOrderEntry(
+          message.id,
+          messageRoomOrder.rank,
         ),
         formattedHourWindow: pipe(
           ConverterService.convertHourToHourWindow(messageRoomOrder.hour),
@@ -95,14 +90,14 @@ export const roomOrderInteractionGetReply = (
     ),
     Effect.map(
       ({
-        messageRoomOrderData,
+        messageRoomOrderEntry,
         messageRoomOrderRange,
         formattedHourWindow: { start, end },
       }) => ({
         content: [
           `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
           "",
-          ...messageRoomOrderData.map(
+          ...messageRoomOrderEntry.map(
             ({ team, tags, position }) =>
               `${inlineCode(`P${position + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : tags.includes("doormat") ? " (doormat)" : ""}`,
           ),
@@ -209,8 +204,7 @@ export const roomOrderSendButton =
           Effect.bind("messageRoomOrder", ({ message }) =>
             pipe(
               MessageRoomOrderService.getMessageRoomOrder(message.id),
-              Effect.flatMap(OnceObserver.observeOnce),
-              Effect.flatMap(Function.identity),
+              Effect.flatten,
             ),
           ),
           Effect.bind("messageRoomOrderReply", ({ messageRoomOrder }) =>

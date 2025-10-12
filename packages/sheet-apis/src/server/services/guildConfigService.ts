@@ -5,12 +5,13 @@ import {
   GuildConfigManagerRole,
 } from "@/server/schema";
 import { and, eq, isNull } from "drizzle-orm";
-import { Array, DateTime, Effect, Option, pipe, Schema } from "effect";
+import { Array, DateTime, Effect, pipe, Schema } from "effect";
 import {
   configGuild,
   configGuildChannel,
   configGuildManagerRole,
 } from "sheet-db-schema";
+import { DefaultTaggedClass } from "typhoon-core/schema";
 import { Computed } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
 
@@ -39,15 +40,13 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 ),
             ),
             Computed.map(Array.head),
-            Computed.map(
-              Option.map((v) =>
-                Schema.decodeEither(GuildConfig)({
-                  _tag: GuildConfig._tag,
-                  ...v,
-                }),
+            Computed.flatMap(
+              Schema.decode(
+                Schema.OptionFromSelf(
+                  DefaultTaggedClass.DefaultTaggedClass(GuildConfig),
+                ),
               ),
             ),
-            Computed.flatMap(Effect.transposeOption),
             Effect.withSpan("GuildConfigService.getConfig", {
               captureStackTrace: true,
             }),
@@ -66,15 +65,13 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 ),
             ),
             Computed.map(Array.head),
-            Computed.map(
-              Option.map((v) =>
-                Schema.decodeEither(GuildConfig)({
-                  _tag: GuildConfig._tag,
-                  ...v,
-                }),
+            Computed.flatMap(
+              Schema.decode(
+                Schema.OptionFromSelf(
+                  DefaultTaggedClass.DefaultTaggedClass(GuildConfig),
+                ),
               ),
             ),
-            Computed.flatMap(Effect.transposeOption),
             Effect.withSpan("GuildConfigService.getGuildConfigByScriptId", {
               captureStackTrace: true,
             }),
@@ -103,15 +100,13 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 .returning(),
             ),
             Effect.map(Array.head),
-            Effect.map(
-              Option.map((v) =>
-                Schema.decodeEither(GuildConfig)({
-                  _tag: GuildConfig._tag,
-                  ...v,
-                }),
+            Effect.flatMap(
+              Schema.decode(
+                Schema.OptionFromSelf(
+                  DefaultTaggedClass.DefaultTaggedClass(GuildConfig),
+                ),
               ),
             ),
-            Effect.flatMap(Effect.transposeOption),
             Effect.withSpan("GuildConfigService.upsertGuildConfig", {
               captureStackTrace: true,
             }),
@@ -130,11 +125,10 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 ),
             ),
             Computed.flatMap(
-              Effect.forEach((v) =>
-                Schema.decodeEither(GuildConfigManagerRole)({
-                  _tag: GuildConfigManagerRole._tag,
-                  ...v,
-                }),
+              Schema.decode(
+                Schema.Array(
+                  DefaultTaggedClass.DefaultTaggedClass(GuildConfigManagerRole),
+                ),
               ),
             ),
             Effect.withSpan("GuildConfigService.getGuildManagerRoles", {
@@ -157,15 +151,13 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 .returning(),
             ),
             Effect.map(Array.head),
-            Effect.map(
-              Option.map((v) =>
-                Schema.decodeEither(GuildConfigManagerRole)({
-                  _tag: GuildConfigManagerRole._tag,
-                  ...v,
-                }),
+            Effect.flatMap(
+              Schema.decode(
+                Schema.OptionFromSelf(
+                  DefaultTaggedClass.DefaultTaggedClass(GuildConfigManagerRole),
+                ),
               ),
             ),
-            Effect.flatMap(Effect.transposeOption),
             Effect.withSpan("GuildConfigService.addGuildManagerRole", {
               captureStackTrace: true,
             }),
@@ -189,11 +181,10 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
             ),
             Effect.flatMap(
-              Effect.forEach((v) =>
-                Schema.decodeEither(GuildConfigManagerRole)({
-                  _tag: GuildConfigManagerRole._tag,
-                  ...v,
-                }),
+              Schema.decode(
+                Schema.Array(
+                  DefaultTaggedClass.DefaultTaggedClass(GuildConfigManagerRole),
+                ),
               ),
             ),
             Effect.withSpan("GuildConfigService.removeGuildManagerRole", {
@@ -229,15 +220,13 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               // TODO: handle channel conflict
             ),
             Effect.map(Array.head),
-            Effect.map(
-              Option.map((v) =>
-                Schema.decodeEither(GuildChannelConfig)({
-                  _tag: GuildChannelConfig._tag,
-                  ...v,
-                }),
+            Effect.flatMap(
+              Schema.decode(
+                Schema.OptionFromSelf(
+                  DefaultTaggedClass.DefaultTaggedClass(GuildChannelConfig),
+                ),
               ),
             ),
-            Effect.flatMap(Effect.transposeOption),
             Effect.withSpan("GuildConfigService.upsertGuildChannelConfig", {
               captureStackTrace: true,
             }),
@@ -257,15 +246,13 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 ),
             ),
             Computed.map(Array.head),
-            Computed.map(
-              Option.map((v) =>
-                Schema.decodeEither(GuildChannelConfig)({
-                  _tag: GuildChannelConfig._tag,
-                  ...v,
-                }),
+            Computed.flatMap(
+              Schema.decode(
+                Schema.OptionFromSelf(
+                  DefaultTaggedClass.DefaultTaggedClass(GuildChannelConfig),
+                ),
               ),
             ),
-            Computed.flatMap(Effect.transposeOption),
             Effect.withSpan("GuildConfigService.getGuildRunningChannelById", {
               captureStackTrace: true,
             }),
@@ -285,15 +272,13 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 ),
             ),
             Computed.map(Array.head),
-            Computed.map(
-              Option.map((v) =>
-                Schema.decodeEither(GuildChannelConfig)({
-                  _tag: GuildChannelConfig._tag,
-                  ...v,
-                }),
+            Computed.flatMap(
+              Schema.decode(
+                Schema.OptionFromSelf(
+                  DefaultTaggedClass.DefaultTaggedClass(GuildChannelConfig),
+                ),
               ),
             ),
-            Computed.flatMap(Effect.transposeOption),
             Effect.withSpan("GuildConfigService.getGuildRunningChannelByName", {
               captureStackTrace: true,
             }),

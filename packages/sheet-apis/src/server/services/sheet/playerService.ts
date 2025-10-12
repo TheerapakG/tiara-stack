@@ -1,11 +1,11 @@
 import { Array, Effect, HashMap, Match, Option, pipe } from "effect";
 import { Array as ArrayUtils } from "typhoon-core/utils";
 import { SheetService } from "./sheetService";
-import { Schema } from "sheet-apis";
 import {
   Player,
   PartialIdPlayer,
   PartialNamePlayer,
+  Schedule,
   ScheduleWithPlayers,
 } from "@/server/schema";
 
@@ -140,7 +140,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
         getPlayerMaps,
         getById,
         getByName,
-        mapScheduleWithPlayers: (schedule: Schema.Schedule) =>
+        mapScheduleWithPlayers: (schedule: Schedule) =>
           pipe(
             Effect.Do,
             Effect.bindAll(() => ({
