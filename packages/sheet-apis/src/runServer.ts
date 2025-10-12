@@ -15,11 +15,17 @@ import {
   guildConfigHandlerCollection,
   sheetHandlerCollection,
   playerHandlerCollection,
+  messageCheckinHandlerCollection,
+  messageRoomOrderHandlerCollection,
+  messageSlotHandlerCollection,
 } from "./server/handler/handler";
 import {
   AuthService,
   CalcService,
   GuildConfigService,
+  MessageCheckinService,
+  MessageRoomOrderService,
+  MessageSlotService,
   SheetConfigService,
 } from "./server/services";
 import { GoogleLive } from "./google";
@@ -41,6 +47,9 @@ const layer = pipe(
     AuthService.DefaultWithoutDependencies,
     CalcService.Default,
     GuildConfigService.DefaultWithoutDependencies,
+    MessageCheckinService.DefaultWithoutDependencies,
+    MessageRoomOrderService.DefaultWithoutDependencies,
+    MessageSlotService.DefaultWithoutDependencies,
     SheetConfigService.DefaultWithoutDependencies,
   ),
   Layer.provideMerge(DBService.DefaultWithoutDependencies),
@@ -61,6 +70,9 @@ const serverHandlerCollection = pipe(
   Context.Collection.addCollection(guildConfigHandlerCollection),
   Context.Collection.addCollection(sheetHandlerCollection),
   Context.Collection.addCollection(playerHandlerCollection),
+  Context.Collection.addCollection(messageCheckinHandlerCollection),
+  Context.Collection.addCollection(messageRoomOrderHandlerCollection),
+  Context.Collection.addCollection(messageSlotHandlerCollection),
 );
 
 const server = pipe(

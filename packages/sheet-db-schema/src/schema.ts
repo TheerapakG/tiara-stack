@@ -172,8 +172,8 @@ export const messageRoomOrder = pgTable(
   ],
 );
 
-export const messageRoomOrderData = pgTable(
-  "message_room_order_data",
+export const messageRoomOrderEntry = pgTable(
+  "message_room_order_entry",
   {
     id: serial("id").primaryKey(),
     messageId: varchar("message_id").notNull(),
@@ -192,12 +192,12 @@ export const messageRoomOrderData = pgTable(
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
   },
   (table) => [
-    uniqueIndex("message_room_order_data_message_id_rank_position_idx").on(
+    uniqueIndex("message_room_order_entry_message_id_rank_position_idx").on(
       table.messageId,
       table.rank,
       table.position,
     ),
-    index("message_room_order_data_message_id_rank_idx").on(
+    index("message_room_order_entry_message_id_rank_idx").on(
       table.messageId,
       table.rank,
     ),
