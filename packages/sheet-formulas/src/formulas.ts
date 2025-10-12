@@ -1,4 +1,4 @@
-import { Effect, HashMap, pipe, Schema } from "effect";
+import { Array, Effect, HashMap, pipe, Schema } from "effect";
 import { serverHandlerConfigCollection } from "sheet-apis";
 import { AppsScriptClient } from "typhoon-client-apps-script/client";
 
@@ -30,7 +30,7 @@ const playerTeamValidator = Schema.Struct({
   percent: Schema.Number,
 });
 
-function parsePlayer(player: CellValue[][]) {
+function parsePlayerTeam(player: CellValue[][]) {
   return pipe(
     player,
     Effect.forEach((player) =>
@@ -39,11 +39,44 @@ function parsePlayer(player: CellValue[][]) {
   );
 }
 
-function parsePlayerNames(playerNames: CellValue[][]) {
+function parsePlayers(players: CellValue[][]) {
   return pipe(
-    playerNames,
-    Effect.forEach((playerName) =>
-      pipe(playerName, Schema.decodeUnknown(Schema.String)),
+    players,
+    Schema.decodeUnknown(
+      pipe(
+        Schema.Array(Schema.Tuple(Schema.String, Schema.Boolean)),
+        Schema.transform(
+          Schema.Array(
+            Schema.Struct({ name: Schema.String, encable: Schema.Boolean }),
+          ),
+          {
+            strict: true,
+            decode: Array.map(([name, encable]) => ({ name, encable })),
+            encode: Array.map(({ name, encable }) => [name, encable] as const),
+          },
+        ),
+      ),
+    ),
+  );
+}
+
+function parseFixedTeams(fixedTeams: CellValue[][]) {
+  return pipe(
+    fixedTeams,
+    Schema.decodeUnknown(
+      pipe(
+        Schema.Array(Schema.Tuple(Schema.String, Schema.Boolean)),
+        Schema.transform(
+          Schema.Array(
+            Schema.Struct({ name: Schema.String, heal: Schema.Boolean }),
+          ),
+          {
+            strict: true,
+            decode: Array.map(([name, heal]) => ({ name, heal })),
+            encode: Array.map(({ name, heal }) => [name, heal] as const),
+          },
+        ),
+      ),
     ),
   );
 }
@@ -82,7 +115,7 @@ export function THEECALC(
         ),
       ),
       Effect.bind("players", () =>
-        pipe([p1, p2, p3, p4, p5], Effect.forEach(parsePlayer)),
+        pipe([p1, p2, p3, p4, p5], Effect.forEach(parsePlayerTeam)),
       ),
       Effect.catchAll((e) =>
         pipe(
@@ -121,6 +154,7 @@ export function THEECALC2(
   url: string,
   config: CellValue[][],
   players: CellValue[][],
+  fixedTeams: CellValue[][],
 ) {
   return Effect.runSync(
     pipe(
@@ -146,7 +180,8 @@ export function THEECALC2(
           Effect.flatMap(Schema.decodeUnknown(configValidator)),
         ),
       ),
-      Effect.bind("players", () => parsePlayerNames(players)),
+      Effect.bind("players", () => parsePlayers(players)),
+      Effect.bind("fixedTeams", () => parseFixedTeams(fixedTeams)),
       Effect.catchAll((e) =>
         pipe(
           Effect.logError(e),
@@ -154,11 +189,12 @@ export function THEECALC2(
         ),
       ),
       Effect.bind("client", () => getClient(url)),
-      Effect.bind("result", ({ client, config, players }) =>
+      Effect.bind("result", ({ client, config, players, fixedTeams }) =>
         AppsScriptClient.once(client, "calc.sheet", {
           sheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
           config,
           players,
+          fixedTeams,
         }),
       ),
       Effect.tap(({ result }) => Effect.log(result)),
