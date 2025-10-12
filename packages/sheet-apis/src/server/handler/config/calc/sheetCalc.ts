@@ -13,7 +13,18 @@ export const sheetCalcHandlerConfig = pipe(
           healNeeded: Schema.Number,
           considerEnc: Schema.Boolean,
         }),
-        players: pipe(Schema.Array(Schema.String), Schema.itemsCount(5)),
+        players: pipe(
+          Schema.Array(
+            Schema.Struct({ name: Schema.String, encable: Schema.Boolean }),
+          ),
+          Schema.itemsCount(5),
+        ),
+        fixedTeams: Schema.Array(
+          Schema.Struct({
+            name: Schema.String,
+            heal: Schema.Boolean,
+          }),
+        ),
       }),
       Schema.standardSchemaV1,
     ),
