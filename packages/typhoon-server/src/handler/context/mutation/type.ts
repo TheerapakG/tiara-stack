@@ -50,7 +50,7 @@ interface TransformDataSuccessOut extends HKT.TypeLambda {
           boolean
         >
       >
-      ? Validator.Validated<Handler.Config.ResolvedResponseValidator<Response>>
+      ? Validator.Output<Handler.Config.ResolvedResponseValidator<Response>>
       : unknown
     : never;
 }

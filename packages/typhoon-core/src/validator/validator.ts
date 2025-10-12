@@ -7,7 +7,7 @@ export type Input<Schema extends StandardSchemaV1 | undefined> =
     ? StandardSchemaV1.InferInput<Schema>
     : unknown;
 
-export type Validated<Schema extends StandardSchemaV1 | undefined> =
+export type Output<Schema extends StandardSchemaV1 | undefined> =
   Schema extends StandardSchemaV1
     ? StandardSchemaV1.InferOutput<Schema>
     : unknown;
@@ -117,18 +117,18 @@ export const validateSchemaWithDefault =
 export const validate =
   <
     Schema extends StandardSchemaV1 | undefined,
-    Output extends Validated<Schema> = Validated<Schema>,
+    Out extends Output<Schema> = Output<Schema>,
   >(
     validator: Validator<Schema>,
   ) =>
-  (value: unknown): Effect.Effect<Output, ValidationError> =>
+  (value: unknown): Effect.Effect<Out, ValidationError> =>
     pipe(
       hasSchema(validator)
         ? (validateSchema(validator)(value) as Effect.Effect<
-            Output,
+            Out,
             ValidationError
           >)
-        : Effect.succeed(value as Output),
+        : Effect.succeed(value as Out),
       Observable.withSpan(validator, "Validator.validate", {
         captureStackTrace: true,
       }),
@@ -137,14 +137,14 @@ export const validate =
 export const validateOption =
   <
     Schema extends StandardSchemaV1 | undefined,
-    Output extends Validated<Schema> = Validated<Schema>,
+    Out extends Output<Schema> = Output<Schema>,
   >(
     validator: Validator<Schema>,
   ) =>
-  (value: unknown): Effect.Effect<Option.Option<Output>> =>
+  (value: unknown): Effect.Effect<Option.Option<Out>> =>
     pipe(
       value,
-      validate<Schema, Output>(validator),
+      validate<Schema, Out>(validator),
       Effect.map(Option.some),
       Effect.catchTag("ValidationError", () => Effect.succeedNone),
       Observable.withSpan(validator, "Validator.validateOption", {
@@ -155,15 +155,15 @@ export const validateOption =
 export const validateWithDefault =
   <
     Schema extends StandardSchemaV1 | undefined,
-    Output extends Validated<Schema> = Validated<Schema>,
+    Out extends Output<Schema> = Output<Schema>,
   >(
     validator: Validator<Schema>,
-    defaultValue: Output,
+    defaultValue: Out,
   ) =>
-  (value: unknown): Effect.Effect<Output> =>
+  (value: unknown): Effect.Effect<Out> =>
     pipe(
       value,
-      validate<Schema, Output>(validator),
+      validate<Schema, Out>(validator),
       Effect.catchTag("ValidationError", () => Effect.succeed(defaultValue)),
       Observable.withSpan(validator, "Validator.validateWithDefault", {
         captureStackTrace: true,
