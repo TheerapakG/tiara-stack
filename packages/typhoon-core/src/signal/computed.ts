@@ -1,5 +1,5 @@
 import {
-  Context,
+  Context as EffectContext,
   Deferred,
   Effect,
   Effectable,
@@ -310,7 +310,10 @@ export const provideLayerComputed =
     );
 
 export const provideContext =
-  <R3>(context: Context.Context<R3>, options?: Observable.ObservableOptions) =>
+  <R3>(
+    context: EffectContext.Context<R3>,
+    options?: Observable.ObservableOptions,
+  ) =>
   <A, E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
@@ -321,7 +324,7 @@ export const provideContext =
 
 export const provideContextComputed =
   <R3, E4, R4>(
-    context: DependencySignal<Context.Context<R3>, E4, R4>,
+    context: DependencySignal<EffectContext.Context<R3>, E4, R4>,
     options?: Observable.ObservableOptions,
   ) =>
   <A, E1, R1, E2, R2>(

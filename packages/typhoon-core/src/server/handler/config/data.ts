@@ -11,8 +11,6 @@ import { PartialMutationHandlerConfig } from "./mutation/data";
 import { RequestParamsConfig } from "./shared/requestParams";
 import { ResponseConfig } from "./shared/response";
 
-export type { GetOrUndefined };
-
 export class DummyHandlerConfig extends Data.TaggedClass(
   "DummyHandlerConfig",
 ) {}

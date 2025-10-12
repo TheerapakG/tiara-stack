@@ -7,8 +7,6 @@ import {
 } from "../shared/group";
 import { type SubscriptionHandlerConfig } from "./data";
 
-export { HandlerConfigGroupTypeId } from "../shared/group";
-
 export type SubscriptionHandlerConfigGroup =
   HandlerConfigGroup<SubscriptionHandlerConfig>;
 

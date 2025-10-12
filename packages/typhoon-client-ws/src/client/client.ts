@@ -344,7 +344,7 @@ export class WebSocketClient<
       Effect.let("signal", () =>
         Signal.make<
           SignalState<
-            Validator.Validated<
+            Validator.Output<
               Handler.Config.ResolvedResponseValidator<
                 Handler.Config.ResponseOrUndefined<
                   SubscriptionHandlerConfigs[Handler]
@@ -521,7 +521,7 @@ export class WebSocketClient<
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("deferred", () =>
         Deferred.make<
-          Validator.Validated<
+          Validator.Output<
             Handler.Config.ResolvedResponseValidator<
               Handler.Config.ResponseOrUndefined<
                 SubscriptionHandlerConfigs[Handler]
@@ -639,7 +639,7 @@ export class WebSocketClient<
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("deferred", () =>
         Deferred.make<
-          Validator.Validated<
+          Validator.Output<
             Handler.Config.ResolvedResponseValidator<
               Handler.Config.ResponseOrUndefined<
                 MutationHandlerConfigs[Handler]

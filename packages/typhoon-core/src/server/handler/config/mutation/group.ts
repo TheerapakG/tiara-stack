@@ -7,8 +7,6 @@ import {
 } from "../shared/group";
 import { type MutationHandlerConfig } from "./data";
 
-export { HandlerConfigGroupTypeId } from "../shared/group";
-
 export type MutationHandlerConfigGroup =
   HandlerConfigGroup<MutationHandlerConfig>;
 
