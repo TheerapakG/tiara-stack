@@ -891,6 +891,7 @@ const makeHeaderAndEventServiceFromPullStream = (
   pipe(
     pullStream.stream,
     Effect.flatMap(Schema.decodeUnknown(Header.HeaderSchema)),
+    Effect.tapError((error) => Effect.log(error)),
     Effect.option,
     Effect.flatMap(
       Effect.transposeMapOption((header) =>
