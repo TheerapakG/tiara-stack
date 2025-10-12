@@ -47,6 +47,7 @@
     "typhoon-server": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^24.7.2",
     "crossws": "^0.4.1",
     "oxlint": "^1.16.0",
     "pathe": "^2.0.3",
