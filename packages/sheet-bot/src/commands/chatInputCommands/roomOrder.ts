@@ -242,11 +242,11 @@ const handleManual =
                             team.backline,
                             Option.getOrElse(() => 0),
                           );
-                          const bp = pipe(
+                          const talent = pipe(
                             team.talent,
                             Option.getOrElse(() => 0),
                           );
-                          const percent = lead + (backline - lead) / 5;
+                          const effectValue = lead + (backline - lead) / 5;
                           return {
                             type: team.type,
                             tagStr: pipe(team.tags, Array.join(", ")),
@@ -254,8 +254,8 @@ const handleManual =
                             team: team.name,
                             lead,
                             backline,
-                            bp,
-                            percent,
+                            talent,
+                            effectValue,
                           };
                         }),
                       ),
