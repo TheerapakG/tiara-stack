@@ -1,5 +1,6 @@
 import { botCalcHandlerConfig } from "@/server/handler/config";
-import { CalcConfig, CalcService, PlayerTeam } from "@/server/services";
+import { CalcConfig, CalcService } from "@/server/services";
+import { PlayerTeam, Room } from "@/server/schema";
 import { Chunk, Effect, HashSet, pipe, Schema } from "effect";
 import { Computed } from "typhoon-core/signal";
 import { Handler } from "typhoon-core/server";
@@ -35,17 +36,17 @@ export const botCalcHandler = pipe(
                 CalcService.calc(config, players),
               ),
               Effect.map(
-                Chunk.map(({ bp, percent, teams }) => ({
-                  averageBp: bp / 5,
-                  averagePercent: percent / 5,
+                Chunk.map((room) => ({
+                  averageTalent: Room.avgTalent(room),
+                  averageEffectValue: Room.avgEffectValue(room),
                   room: pipe(
-                    teams,
-                    Chunk.map(({ type, team, bp, percent, tags }) => ({
-                      type,
-                      team,
-                      bp,
-                      percent,
-                      tags: HashSet.toValues(tags),
+                    room.teams,
+                    Chunk.map((team) => ({
+                      type: team.type,
+                      team: team.team,
+                      talent: team.talent,
+                      effectValue: PlayerTeam.getEffectValue(team),
+                      tags: HashSet.toValues(team.tags),
                     })),
                     Chunk.toArray,
                   ),

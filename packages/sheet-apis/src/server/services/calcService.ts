@@ -1,4 +1,4 @@
-import { Team } from "@/server/schema";
+import { PlayerTeam, Room } from "@/server/schema";
 import {
   Array,
   Chunk,
@@ -7,7 +7,6 @@ import {
   Function,
   HashSet,
   Option,
-  Order,
   pipe,
   Stream,
 } from "effect";
@@ -16,71 +15,6 @@ export class CalcConfig extends Data.TaggedClass("CalcConfig")<{
   healNeeded: number;
   considerEnc: boolean;
 }> {}
-
-export class PlayerTeam extends Data.TaggedClass("PlayerTeam")<{
-  type: string;
-  team: string;
-  bp: number;
-  percent: number;
-  tags: HashSet.HashSet<string>;
-}> {
-  static addTags(tags: HashSet.HashSet<string>) {
-    return (playerTeam: PlayerTeam) =>
-      new PlayerTeam({
-        type: playerTeam.type,
-        team: playerTeam.team,
-        bp: playerTeam.bp,
-        percent: playerTeam.percent,
-        tags: HashSet.union(playerTeam.tags, tags),
-      });
-  }
-
-  static clone(playerTeam: PlayerTeam) {
-    return PlayerTeam.addTags(HashSet.empty())(playerTeam);
-  }
-
-  static fromApiObject(apiObject: {
-    type: string;
-    tagStr: string;
-    player: string;
-    team: string;
-    lead: number;
-    backline: number;
-    bp: "" | number;
-    percent: number;
-  }) {
-    if (apiObject.team === "" || apiObject.bp === "") return Option.none();
-
-    return Option.some(
-      new PlayerTeam({
-        type: apiObject.type,
-        team: apiObject.team,
-        bp: apiObject.bp,
-        percent: apiObject.percent ?? 1,
-        tags: HashSet.fromIterable(
-          apiObject.tagStr.split(/\s*,\s*/).filter(Boolean),
-        ),
-      }),
-    );
-  }
-
-  static fromTeam(team: Team) {
-    if (team.name === "" || Option.isNone(team.talent)) return Option.none();
-
-    return Option.some(
-      new PlayerTeam({
-        type: team.type,
-        team: team.name,
-        bp: team.talent.value,
-        percent: pipe(
-          Team.getEffectValue(team),
-          Option.getOrElse(() => 1),
-        ),
-        tags: HashSet.fromIterable(team.tags.filter(Boolean)),
-      }),
-    );
-  }
-}
 
 const filterFixedTeams = (playerTeams: PlayerTeam[]) =>
   pipe(
@@ -99,101 +33,80 @@ const filterFixedTeams = (playerTeams: PlayerTeam[]) =>
     ),
   );
 
-class Room extends Data.TaggedClass("Room")<{
-  enced: boolean;
-  tiererEnced: boolean;
-  healed: number;
-  bp: number;
-  percent: number;
-  teams: Chunk.Chunk<PlayerTeam>;
-}> {
-  static byBp = Order.mapInput(Order.number, ({ bp }: Room) => bp);
-  static byPercent = Order.mapInput(
-    Order.number,
-    ({ percent }: Room) => percent,
-  );
-  static Order = Order.combine(Room.byBp, Order.reverse(Room.byPercent));
+const baseRoom = (teams: ReadonlyArray<PlayerTeam>) => {
+  return new Room({
+    enced: false,
+    tiererEnced: false,
+    healed: pipe(
+      teams,
+      Array.reduce(0, (acc, t) => acc + (HashSet.has(t.tags, "heal") ? 1 : 0)),
+    ),
+    talent: pipe(
+      teams,
+      Array.reduce(0, (acc, t) => acc + t.talent),
+    ),
+    effectValue: pipe(
+      teams,
+      Array.reduce(0, (acc, t) => acc + PlayerTeam.getEffectValue(t)),
+    ),
+    teams: Chunk.fromIterable(teams),
+  });
+};
 
-  static base(teams: ReadonlyArray<PlayerTeam>) {
-    return new Room({
-      enced: false,
-      tiererEnced: false,
-      healed: pipe(
-        teams,
-        Array.reduce(
-          0,
-          (acc, t) => acc + (HashSet.has(t.tags, "heal") ? 1 : 0),
-        ),
-      ),
-      bp: pipe(
-        teams,
-        Array.reduce(0, (acc, t) => acc + t.bp),
-      ),
-      percent: pipe(
-        teams,
-        Array.reduce(0, (acc, t) => acc + t.percent),
-      ),
-      teams: Chunk.fromIterable(
-        pipe(
-          teams,
-          Array.map((t) => PlayerTeam.clone(t)),
-        ),
-      ),
-    });
+const applyRoomEncAndDoormat = (roomTeam: Room) => {
+  const teams = Chunk.toArray(roomTeam.teams);
+
+  let encIndex = -1;
+  let bestEffectValue = -Infinity;
+  for (let i = 0; i < teams.length; i++) {
+    const t = teams[i];
+    if (
+      HashSet.has(t.tags, "encable") &&
+      PlayerTeam.getEffectValue(t) > bestEffectValue
+    ) {
+      bestEffectValue = PlayerTeam.getEffectValue(t);
+      encIndex = i;
+    }
   }
 
-  static applyEncAndDoormat = (roomTeam: Room) => {
-    const teams = Chunk.toArray(roomTeam.teams);
-
-    let encIndex = -1;
-    let bestPercent = -Infinity;
+  let tiererOverride = false;
+  if (encIndex === -1) {
+    let bestTalent = -Infinity;
     for (let i = 0; i < teams.length; i++) {
       const t = teams[i];
-      if (HashSet.has(t.tags, "encable") && t.percent > bestPercent) {
-        bestPercent = t.percent;
+      if (HashSet.has(t.tags, "tierer") && t.talent > bestTalent) {
+        bestTalent = t.talent;
         encIndex = i;
+        tiererOverride = true;
       }
     }
+  }
 
-    let tiererOverride = false;
-    if (encIndex === -1) {
-      let bestBp = -Infinity;
-      for (let i = 0; i < teams.length; i++) {
-        const t = teams[i];
-        if (HashSet.has(t.tags, "tierer") && t.bp > bestBp) {
-          bestBp = t.bp;
-          encIndex = i;
-          tiererOverride = true;
-        }
-      }
+  if (encIndex === -1) {
+    return roomTeam;
+  }
+
+  const encTeam = teams[encIndex];
+  const updatedTeams = teams.map((t, i) => {
+    if (i === encIndex) {
+      return PlayerTeam.addTags(
+        HashSet.make(tiererOverride ? "tierer_enc_override" : "enc"),
+      )(t);
     }
+    return t.talent > encTeam.talent
+      ? PlayerTeam.addTags(HashSet.make("doormat"))(t)
+      : t;
+  });
 
-    if (encIndex === -1) {
-      return roomTeam;
-    }
-
-    const encTeam = teams[encIndex];
-    const updatedTeams = teams.map((t, i) => {
-      if (i === encIndex) {
-        return PlayerTeam.addTags(
-          HashSet.make(tiererOverride ? "tierer_enc_override" : "enc"),
-        )(t);
-      }
-      return t.bp > encTeam.bp
-        ? PlayerTeam.addTags(HashSet.make("doormat"))(t)
-        : t;
-    });
-
-    return new Room({
-      enced: true,
-      tiererEnced: tiererOverride,
-      healed: roomTeam.healed,
-      bp: roomTeam.bp,
-      percent: roomTeam.percent + encTeam.percent,
-      teams: Chunk.fromIterable(updatedTeams),
-    });
-  };
-}
+  return new Room({
+    enced: true,
+    tiererEnced: tiererOverride,
+    healed: roomTeam.healed,
+    talent: roomTeam.talent,
+    effectValue: roomTeam.effectValue + PlayerTeam.getEffectValue(encTeam),
+    teams: Chunk.fromIterable(updatedTeams),
+  });
+};
 
 const cartesian = <T>(
   arrays: Array.NonEmptyReadonlyArray<ReadonlyArray<T>>,
@@ -227,8 +140,8 @@ const deriveRoomsFromCartesian =
       Effect.succeed(
         cartesian(playerTeams).map((teams) =>
           pipe(
-            Room.base(teams),
-            config.considerEnc ? Room.applyEncAndDoormat : Function.identity,
+            baseRoom(teams),
+            config.considerEnc ? applyRoomEncAndDoormat : Function.identity,
           ),
         ),
       ),
@@ -252,9 +165,9 @@ const filterConfigRooms = (config: CalcConfig) => (rooms: Chunk.Chunk<Room>) =>
 const filterBestRooms = (rooms: Chunk.Chunk<Room>) =>
   pipe(
     Stream.fromIterable(rooms),
-    Stream.mapAccum(0, (bestPercent, room) => [
-      Math.max(bestPercent, room.percent),
-      room.percent > bestPercent ? Option.some(room) : Option.none(),
+    Stream.mapAccum(0, (bestEffectValue, room) => [
+      Math.max(bestEffectValue, room.effectValue),
+      room.effectValue > bestEffectValue ? Option.some(room) : Option.none(),
     ]),
     Stream.filter(Option.isSome),
     Stream.map(({ value }) => value),

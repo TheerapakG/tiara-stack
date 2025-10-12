@@ -1,3 +1,4 @@
+import { Room } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 
@@ -10,8 +11,9 @@ export const sheetCalcHandlerConfig = pipe(
       Schema.Struct({
         sheetId: Schema.String,
         config: Schema.Struct({
-          healNeeded: Schema.Number,
+          cc: Schema.Boolean,
           considerEnc: Schema.Boolean,
+          healNeeded: Schema.Number,
         }),
         players: pipe(
           Schema.Array(
@@ -30,23 +32,6 @@ export const sheetCalcHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(
-      Schema.Array(
-        Schema.Struct({
-          averageBp: Schema.Number,
-          averagePercent: Schema.Number,
-          room: Schema.Array(
-            Schema.Struct({
-              type: Schema.String,
-              team: Schema.String,
-              bp: Schema.Number,
-              percent: Schema.Number,
-              tags: Schema.Array(Schema.String),
-            }),
-          ),
-        }),
-      ),
-      Schema.standardSchemaV1,
-    ),
+    validator: pipe(Schema.Array(Room), Schema.standardSchemaV1),
   }),
 );
