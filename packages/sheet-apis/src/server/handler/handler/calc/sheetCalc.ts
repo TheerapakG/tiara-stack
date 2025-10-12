@@ -1,6 +1,15 @@
 import { sheetCalcHandlerConfig } from "@/server/handler/config";
 import { CalcConfig, CalcService, PlayerTeam, Sheet } from "@/server/services";
-import { Array, Chunk, Effect, HashSet, pipe, Schema } from "effect";
+import {
+  Array,
+  Chunk,
+  Effect,
+  HashMap,
+  HashSet,
+  pipe,
+  Schema,
+  Option,
+} from "effect";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
@@ -13,16 +22,45 @@ export const sheetCalcHandler = pipe(
   builders.handler(
     pipe(
       Event.request.parsed(sheetCalcHandlerConfig),
-      Computed.flatMap(({ sheetId, config, players }) =>
+      Computed.flatMap(({ sheetId, config, players, fixedTeams }) =>
         pipe(
           Effect.Do,
           Effect.let("config", () => new CalcConfig(config)),
-          Effect.bind("playerTeams", () =>
-            Effect.forEach(players, (player) =>
+          Effect.let("fixedTeams", () =>
+            HashMap.fromIterable(
+              fixedTeams.map(({ name, heal }) => [
+                name,
+                pipe(
+                  HashSet.make("fixed"),
+                  HashSet.union(heal ? HashSet.make("heal") : HashSet.empty()),
+                ),
+              ]),
+            ),
+          ),
+          Effect.bind("playerTeams", ({ fixedTeams }) =>
+            Effect.forEach(players, ({ name, encable }) =>
               pipe(
-                Sheet.PlayerService.getTeamsByName(player),
+                Sheet.PlayerService.getTeamsByName(name),
                 Effect.map(Array.map(PlayerTeam.fromTeam)),
                 Effect.map(Array.getSomes),
+                Effect.map(
+                  Array.map((team) =>
+                    PlayerTeam.addTags(
+                      pipe(
+                        HashSet.empty(),
+                        HashSet.union(
+                          encable ? HashSet.make("encable") : HashSet.empty(),
+                        ),
+                        HashSet.union(
+                          pipe(
+                            HashMap.get(fixedTeams, name),
+                            Option.getOrElse(() => HashSet.empty()),
+                          ),
+                        ),
+                      ),
+                    )(team),
+                  ),
+                ),
               ),
             ),
           ),
