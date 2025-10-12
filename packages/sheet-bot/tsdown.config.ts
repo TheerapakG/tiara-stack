@@ -17,4 +17,5 @@ export default defineConfig({
     BUILD_HASH: hash,
     BUILD_VERSION: `${date}-${hash}`,
   },
+  noExternal: [/^.*$/],
 });
