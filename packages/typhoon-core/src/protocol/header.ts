@@ -10,7 +10,7 @@ import {
 import { ArrayLookupSchema } from "../schema/arrayLookup";
 import { KeyOrderLookupSchema } from "../schema/keyOrderLookup";
 
-const TypeId = Schema.TypeId;
+const TypeId: typeof Schema.TypeId = Schema.TypeId;
 export { TypeId };
 
 export const HeaderActionSchema = ArrayLookupSchema([

@@ -1,6 +1,6 @@
 import { Array, HashMap, Option, ParseResult, pipe, Schema } from "effect";
 
-const TypeId = Schema.TypeId;
+const TypeId: typeof Schema.TypeId = Schema.TypeId;
 export { TypeId };
 
 const KeyOrderLookupSchema$ = <
