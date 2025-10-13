@@ -19,6 +19,7 @@ import {
   pipe,
   Schema,
   String,
+  Cache,
 } from "effect";
 import { Array as ArrayUtils } from "typhoon-core/utils";
 import { DefaultTaggedClass } from "typhoon-core/schema";
@@ -364,7 +365,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
       Effect.Do,
       Effect.bind("sheet", () => GoogleSheets),
       Effect.map(({ sheet }) => ({
-        getRangesConfig: (sheetId: string) =>
+        uncachedGetRangesConfig: (sheetId: string) =>
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
@@ -395,11 +396,11 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 ),
               ),
             ),
-            Effect.withSpan("SheetConfigService.getRangesConfig", {
+            Effect.withSpan("SheetConfigService.uncachedGetRangesConfig", {
               captureStackTrace: true,
             }),
           ),
-        getTeamConfig: (sheetId: string) =>
+        uncachedGetTeamConfig: (sheetId: string) =>
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
@@ -414,11 +415,11 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 Effect.provideService(GoogleSheets, sheet),
               ),
             ),
-            Effect.withSpan("SheetConfigService.getTeamConfig", {
+            Effect.withSpan("SheetConfigService.uncachedGetTeamConfig", {
               captureStackTrace: true,
             }),
           ),
-        getEventConfig: (sheetId: string) =>
+        uncachedGetEventConfig: (sheetId: string) =>
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
@@ -454,11 +455,11 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 ),
               ),
             ),
-            Effect.withSpan("SheetConfigService.getEventConfig", {
+            Effect.withSpan("SheetConfigService.uncachedGetEventConfig", {
               captureStackTrace: true,
             }),
           ),
-        getScheduleConfig: (sheetId: string) =>
+        uncachedGetScheduleConfig: (sheetId: string) =>
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
@@ -484,11 +485,11 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 Effect.provideService(GoogleSheets, sheet),
               ),
             ),
-            Effect.withSpan("SheetConfigService.getScheduleConfig", {
+            Effect.withSpan("SheetConfigService.uncachedGetScheduleConfig", {
               captureStackTrace: true,
             }),
           ),
-        getRunnerConfig: (sheetId: string) =>
+        uncachedGetRunnerConfig: (sheetId: string) =>
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
@@ -506,11 +507,135 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 Effect.provideService(GoogleSheets, sheet),
               ),
             ),
-            Effect.withSpan("SheetConfigService.getRunnerConfig", {
+            Effect.withSpan("SheetConfigService.uncachedGetRunnerConfig", {
               captureStackTrace: true,
             }),
           ),
       })),
+      Effect.bindAll(
+        ({
+          uncachedGetRangesConfig,
+          uncachedGetTeamConfig,
+          uncachedGetEventConfig,
+          uncachedGetScheduleConfig,
+          uncachedGetRunnerConfig,
+        }) => ({
+          getRangesConfigCache: Cache.make({
+            capacity: 128,
+            timeToLive: "1 day",
+            lookup: uncachedGetRangesConfig,
+          }),
+          getTeamConfigCache: Cache.make({
+            capacity: 128,
+            timeToLive: "1 day",
+            lookup: uncachedGetTeamConfig,
+          }),
+          getEventConfigCache: Cache.make({
+            capacity: 128,
+            timeToLive: "1 day",
+            lookup: uncachedGetEventConfig,
+          }),
+          getScheduleConfigCache: Cache.make({
+            capacity: 128,
+            timeToLive: "1 day",
+            lookup: uncachedGetScheduleConfig,
+          }),
+          getRunnerConfigCache: Cache.make({
+            capacity: 128,
+            timeToLive: "1 day",
+            lookup: uncachedGetRunnerConfig,
+          }),
+        }),
+      ),
+      Effect.map(
+        ({
+          getRangesConfigCache,
+          getTeamConfigCache,
+          getEventConfigCache,
+          getScheduleConfigCache,
+          getRunnerConfigCache,
+        }) => ({
+          getRangesConfig: (sheetId: string) =>
+            pipe(
+              getRangesConfigCache.get(sheetId),
+              Effect.withSpan("SheetConfigService.getRangesConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          invalidateRangesConfigCache: (sheetId: string) =>
+            pipe(
+              getRangesConfigCache.invalidate(sheetId),
+              Effect.withSpan(
+                "SheetConfigService.invalidateRangesConfigCache",
+                {
+                  captureStackTrace: true,
+                },
+              ),
+            ),
+          getTeamConfig: (sheetId: string) =>
+            pipe(
+              getTeamConfigCache.get(sheetId),
+              Effect.withSpan("SheetConfigService.getTeamConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          invalidateTeamConfigCache: (sheetId: string) =>
+            pipe(
+              getTeamConfigCache.invalidate(sheetId),
+              Effect.withSpan("SheetConfigService.invalidateTeamConfigCache", {
+                captureStackTrace: true,
+              }),
+            ),
+          getEventConfig: (sheetId: string) =>
+            pipe(
+              getEventConfigCache.get(sheetId),
+              Effect.withSpan("SheetConfigService.getEventConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          invalidateEventConfigCache: (sheetId: string) =>
+            pipe(
+              getEventConfigCache.invalidate(sheetId),
+              Effect.withSpan("SheetConfigService.invalidateEventConfigCache", {
+                captureStackTrace: true,
+              }),
+            ),
+          getScheduleConfig: (sheetId: string) =>
+            pipe(
+              getScheduleConfigCache.get(sheetId),
+              Effect.withSpan("SheetConfigService.getScheduleConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          invalidateScheduleConfigCache: (sheetId: string) =>
+            pipe(
+              getScheduleConfigCache.invalidate(sheetId),
+              Effect.withSpan(
+                "SheetConfigService.invalidateScheduleConfigCache",
+                {
+                  captureStackTrace: true,
+                },
+              ),
+            ),
+          getRunnerConfig: (sheetId: string) =>
+            pipe(
+              getRunnerConfigCache.get(sheetId),
+              Effect.withSpan("SheetConfigService.getRunnerConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          invalidateRunnerConfigCache: (sheetId: string) =>
+            pipe(
+              getRunnerConfigCache.invalidate(sheetId),
+              Effect.withSpan(
+                "SheetConfigService.invalidateRunnerConfigCache",
+                {
+                  captureStackTrace: true,
+                },
+              ),
+            ),
+        }),
+      ),
     ),
     dependencies: [GoogleSheets.Default],
     accessors: true,
