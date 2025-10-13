@@ -132,8 +132,11 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
           params?: sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
           options?: MethodOptions,
         ) =>
-          Effect.tryPromise(() =>
-            sheets.spreadsheets.values.batchGet(params, options),
+          pipe(
+            Effect.tryPromise(() =>
+              sheets.spreadsheets.values.batchGet(params, options),
+            ),
+            Effect.withSpan("GoogleSheets.get", { captureStackTrace: true }),
           ),
         getHashMap: <K>(
           ranges: HashMap.HashMap<K, string>,
@@ -156,13 +159,19 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
                 Effect.map((sheet) => sheet.data.valueRanges ?? []),
               ),
             ),
+            Effect.withSpan("GoogleSheets.getHashMap", {
+              captureStackTrace: true,
+            }),
           ),
         update: (
           params?: sheets_v4.Params$Resource$Spreadsheets$Values$Batchupdate,
           options?: MethodOptions,
         ) =>
-          Effect.tryPromise(() =>
-            sheets.spreadsheets.values.batchUpdate(params, options),
+          pipe(
+            Effect.tryPromise(() =>
+              sheets.spreadsheets.values.batchUpdate(params, options),
+            ),
+            Effect.withSpan("GoogleSheets.update", { captureStackTrace: true }),
           ),
         parseValueRangeToStringOption: (
           valueRange: sheets_v4.Schema$ValueRange,
