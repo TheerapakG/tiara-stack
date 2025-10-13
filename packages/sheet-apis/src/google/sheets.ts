@@ -9,7 +9,12 @@ import {
   pipe,
   Schema,
   String,
+  Types,
 } from "effect";
+import {
+  OptionArrayToOptionTupleSchema,
+  TupleToStructSchema,
+} from "typhoon-core/schema";
 import { Utils } from "typhoon-core/utils";
 import { GoogleAuth } from "./auth";
 
@@ -34,6 +39,78 @@ const parseValueRange = <A, R>(
     ),
     Effect.withSpan("parseValueRange", { captureStackTrace: true }),
   );
+
+const rangeSchema = Schema.Array(Schema.OptionFromSelf(Schema.String));
+const rangeToStructOptionSchema = <const Keys extends ReadonlyArray<string>>(
+  keys: Keys,
+) =>
+  pipe(
+    rangeSchema,
+    Schema.compose(
+      OptionArrayToOptionTupleSchema.OptionArrayToOptionTupleSchema(
+        keys.length as Keys["length"],
+        Schema.String,
+      ) as unknown as Schema.Schema<
+        Types.TupleOf<Keys["length"], Option.Option<string>>,
+        readonly Option.Option<string>[],
+        never
+      >,
+    ),
+    Schema.compose(
+      TupleToStructSchema.TupleToStructSchema(
+        keys,
+        Array.makeBy(keys.length, () =>
+          Schema.OptionFromSelf(Schema.String),
+        ) as Types.TupleOf<
+          Keys["length"],
+          Schema.OptionFromSelf<typeof Schema.String>
+        >,
+      ) as unknown as Schema.Schema<
+        { [K in Keys[number]]: Option.Option<string> },
+        Types.TupleOf<Keys["length"], Option.Option<string>>,
+        never
+      >,
+    ),
+  );
+
+const toStringSchema = Schema.Trim;
+const toNumberSchema = pipe(
+  Schema.String,
+  Schema.transform(Schema.String, {
+    strict: true,
+    decode: (str) => str.replaceAll(/[^0-9]/g, ""),
+    encode: Function.identity,
+  }),
+  Schema.compose(Schema.NumberFromString),
+);
+const toBooleanSchema = pipe(
+  Schema.String,
+  Schema.transformOrFail(Schema.Literal("TRUE", "FALSE"), {
+    strict: true,
+    decode: (str) =>
+      ParseResult.decodeUnknown(Schema.Literal("TRUE", "FALSE"))(str),
+    encode: (str) => ParseResult.succeed(str),
+  }),
+  Schema.compose(Schema.transformLiterals(["TRUE", true], ["FALSE", false])),
+);
+const toLiteralSchema = <
+  const Literals extends Array.NonEmptyReadonlyArray<string>,
+>(
+  literals: Literals,
+) =>
+  pipe(
+    Schema.String,
+    Schema.transformOrFail(Schema.Literal(...literals), {
+      strict: true,
+      decode: (str) =>
+        ParseResult.decodeUnknown(Schema.Literal(...literals))(str),
+      encode: (str) => ParseResult.succeed(str),
+    }),
+  );
+const toStringArraySchema = pipe(
+  Schema.split(","),
+  Schema.compose(Schema.Array(Schema.Trim)),
+);
 
 export class GoogleSheets extends Effect.Service<GoogleSheets>()(
   "GoogleSheets",
@@ -94,8 +171,11 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
             parseValueRange(
               valueRange,
               pipe(
-                Schema.Array(Schema.OptionFromSelf(Schema.Trim)),
+                rangeSchema,
                 Schema.head,
+                Schema.compose(
+                  Schema.OptionFromSelf(Schema.OptionFromSelf(toStringSchema)),
+                ),
               ),
             ),
             Effect.map(Array.map(Option.flatten)),
@@ -108,22 +188,10 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
             parseValueRange(
               valueRange,
               pipe(
-                Schema.Array(Schema.OptionFromSelf(Schema.String)),
+                rangeSchema,
                 Schema.head,
                 Schema.compose(
-                  Schema.OptionFromSelf(
-                    Schema.OptionFromSelf(
-                      pipe(
-                        Schema.String,
-                        Schema.transform(Schema.String, {
-                          strict: true,
-                          decode: (str) => str.replaceAll(/[^0-9]/g, ""),
-                          encode: Function.identity,
-                        }),
-                        Schema.compose(Schema.NumberFromString),
-                      ),
-                    ),
-                  ),
+                  Schema.OptionFromSelf(Schema.OptionFromSelf(toNumberSchema)),
                 ),
               ),
             ),
@@ -137,33 +205,10 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
             parseValueRange(
               valueRange,
               pipe(
-                Schema.Array(Schema.OptionFromSelf(Schema.String)),
+                rangeSchema,
                 Schema.head,
                 Schema.compose(
-                  Schema.OptionFromSelf(
-                    Schema.OptionFromSelf(
-                      pipe(
-                        Schema.String,
-                        Schema.transformOrFail(
-                          Schema.Literal("TRUE", "FALSE"),
-                          {
-                            strict: true,
-                            decode: (str) =>
-                              ParseResult.decodeUnknown(
-                                Schema.Literal("TRUE", "FALSE"),
-                              )(str),
-                            encode: (str) => ParseResult.succeed(str),
-                          },
-                        ),
-                        Schema.compose(
-                          Schema.transformLiterals(
-                            ["TRUE", true],
-                            ["FALSE", false],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  Schema.OptionFromSelf(Schema.OptionFromSelf(toBooleanSchema)),
                 ),
               ),
             ),
@@ -177,16 +222,11 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
             parseValueRange(
               valueRange,
               pipe(
-                Schema.Array(Schema.OptionFromSelf(Schema.String)),
+                rangeSchema,
                 Schema.head,
                 Schema.compose(
                   Schema.OptionFromSelf(
-                    Schema.OptionFromSelf(
-                      pipe(
-                        Schema.split(","),
-                        Schema.compose(Schema.Array(Schema.Trim)),
-                      ),
-                    ),
+                    Schema.OptionFromSelf(toStringArraySchema),
                   ),
                 ),
               ),
@@ -202,10 +242,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
           valueRange: sheets_v4.Schema$ValueRange,
         ) =>
           pipe(
-            parseValueRange(
-              valueRange,
-              Schema.Array(Schema.OptionFromSelf(Schema.Trim)),
-            ),
+            parseValueRange(valueRange, rangeSchema),
             Effect.map(Array.map(Option.getOrElse(() => []))),
           ),
       })),
@@ -215,6 +252,14 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
   },
 ) {
   static parseValueRange = parseValueRange;
+
+  static rangeSchema = rangeSchema;
+  static rangeToStructOptionSchema = rangeToStructOptionSchema;
+  static toStringSchema = toStringSchema;
+  static toNumberSchema = toNumberSchema;
+  static toBooleanSchema = toBooleanSchema;
+  static toLiteralSchema = toLiteralSchema;
+  static toStringArraySchema = toStringArraySchema;
 
   static parseValueRangeToLiteralOption = <
     const Literals extends Array.NonEmptyReadonlyArray<string>,
@@ -230,19 +275,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
           Schema.head,
           Schema.compose(
             Schema.OptionFromSelf(
-              Schema.OptionFromSelf(
-                pipe(
-                  Schema.String,
-                  Schema.transformOrFail(Schema.Literal(...literals), {
-                    strict: true,
-                    decode: (str) =>
-                      ParseResult.decodeUnknown(Schema.Literal(...literals))(
-                        str,
-                      ),
-                    encode: (str) => ParseResult.succeed(str),
-                  }),
-                ),
-              ),
+              Schema.OptionFromSelf(toLiteralSchema(literals)),
             ),
           ),
         ),
