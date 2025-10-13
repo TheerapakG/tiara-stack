@@ -8,7 +8,7 @@ import {
   SchemaAST,
 } from "effect";
 
-const TypeId = Schema.TypeId;
+const TypeId: typeof Schema.TypeId = Schema.TypeId;
 export { TypeId };
 
 const ArrayLookupSchema$ = <LiteralValue extends SchemaAST.LiteralValue>(
