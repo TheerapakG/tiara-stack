@@ -223,7 +223,7 @@ const handleManual =
             pipe(
               SheetApisClient.get(),
               Effect.flatMap((client) =>
-                WebSocketClient.once(client, "botCalc", {
+                WebSocketClient.once(client, "calc.bot", {
                   config: {
                     healNeeded: heal,
                     considerEnc: true,

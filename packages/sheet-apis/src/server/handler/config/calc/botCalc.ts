@@ -4,7 +4,7 @@ import { Handler } from "typhoon-core/server";
 export const botCalcHandlerConfig = pipe(
   Handler.Config.empty(),
   Handler.Config.Builder.type("subscription"),
-  Handler.Config.Builder.name("botCalc"),
+  Handler.Config.Builder.name("calc.bot"),
   Handler.Config.Builder.requestParams({
     validator: pipe(
       Schema.Struct({
