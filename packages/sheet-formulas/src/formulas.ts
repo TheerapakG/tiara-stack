@@ -1,4 +1,4 @@
-import { Array, Chunk, Effect, HashMap, pipe, Schema } from "effect";
+import { Array, Chunk, Effect, HashMap, Option, pipe, Schema } from "effect";
 import {
   serverHandlerConfigCollection,
   Schema as SheetSchema,
@@ -210,95 +210,137 @@ export function THEECALC(
   );
 }
 
-export function THEECALC2(
-  url: string,
-  config: CellValue[][],
-  players: CellValue[][],
-  fixedTeams: CellValue[][],
-) {
+export function THEECALC2() {
   return Effect.runSync(
     pipe(
       Effect.Do,
-      Effect.bind("config", () =>
-        pipe(
-          config,
-          Schema.decodeUnknown(
-            Schema.Array(Schema.Tuple(cellValueValidator, cellValueValidator)),
-          ),
-          Effect.map(HashMap.fromIterable),
-          Effect.flatMap((config) =>
-            pipe(
-              Effect.Do,
-              Effect.bind("cc", () => HashMap.get(config, "cc")),
-              Effect.bind("considerEnc", () =>
-                HashMap.get(config, "consider_enc"),
-              ),
-              Effect.bind("healNeeded", () =>
-                HashMap.get(config, "heal_needed"),
-              ),
+      Effect.bindAll(
+        () => ({
+          settingSheet: Option.fromNullable(
+            SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
+              "Thee's Sheet Settings",
             ),
           ),
-          Effect.flatMap(Schema.decodeUnknown(calc2ConfigValidator)),
-        ),
-      ),
-      Effect.bind("players", () =>
-        parsePlayers(
-          pipe(
-            players,
-            Array.filter(([name]) => name !== ""),
+          calcSheet: Option.fromNullable(
+            SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
+              "Thee's Calc v1.16",
+            ),
           ),
-        ),
-      ),
-      Effect.bind("fixedTeams", () =>
-        parseFixedTeams(
-          pipe(
-            fixedTeams,
-            Array.filter(([name]) => name !== ""),
-          ),
-        ),
-      ),
-      Effect.catchAll((e) =>
-        pipe(
-          Effect.logError(e),
-          Effect.andThen(() => Effect.fail({ message: "sheet value error" })),
-        ),
-      ),
-      Effect.bind("client", () => getClient(url)),
-      Effect.bind("result", ({ client, config, players, fixedTeams }) =>
-        AppsScriptClient.once(client, "calc.sheet", {
-          sheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
-          config,
-          players,
-          fixedTeams,
         }),
+        { concurrency: "unbounded" },
       ),
-      Effect.tap(({ result }) => Effect.log(result)),
-      Effect.map(({ result }) =>
-        result.map((r) => [
-          "",
-          SheetSchema.Room.avgTalent(r),
-          SheetSchema.Room.avgEffectValue(r),
-          ...pipe(
-            r.teams,
-            Chunk.toArray,
-            Array.map((team) => [
-              team.team,
-              team.lead,
-              team.backline,
-              SheetSchema.PlayerTeam.getEffectValue(team),
-              team.talent,
-              pipe(team.tags, Array.join(", ")),
-            ]),
-          ).flat(),
-        ]),
+      Effect.tap(({ calcSheet }) =>
+        calcSheet.getRange(`AX30:CD`).clearContent(),
       ),
-      Effect.catchAll((e) =>
+      Effect.andThen(({ settingSheet, calcSheet }) =>
         pipe(
-          Effect.logError(e),
-          Effect.andThen(() => Effect.succeed([[e.message]])),
+          Effect.Do,
+          Effect.bind("url", () =>
+            pipe(
+              settingSheet.getRange("AG8").getValue(),
+              Schema.decodeUnknown(Schema.String),
+            ),
+          ),
+          Effect.bind("config", () =>
+            pipe(
+              calcSheet.getRange("U30:V32").getValues(),
+              Schema.decodeUnknown(
+                Schema.Array(
+                  Schema.Tuple(cellValueValidator, cellValueValidator),
+                ),
+              ),
+              Effect.map(HashMap.fromIterable),
+              Effect.flatMap((config) =>
+                pipe(
+                  Effect.Do,
+                  Effect.bind("cc", () => HashMap.get(config, "cc")),
+                  Effect.bind("considerEnc", () =>
+                    HashMap.get(config, "consider_enc"),
+                  ),
+                  Effect.bind("healNeeded", () =>
+                    HashMap.get(config, "heal_needed"),
+                  ),
+                ),
+              ),
+              Effect.flatMap(Schema.decodeUnknown(calc2ConfigValidator)),
+            ),
+          ),
+          Effect.bind("players", () =>
+            pipe(
+              calcSheet.getRange("AQ30:AR34").getValues(),
+              Array.filter(([name]) => name !== ""),
+              parsePlayers,
+            ),
+          ),
+          Effect.bind("fixedTeams", () =>
+            pipe(
+              calcSheet.getRange("AU30:AV45").getValues(),
+              Array.filter(([name]) => name !== ""),
+              parseFixedTeams,
+            ),
+          ),
+          Effect.tapBoth({
+            onFailure: (e) =>
+              pipe(
+                Effect.logError(e),
+                Effect.andThen(() =>
+                  calcSheet.getRange(`AX30`).setValue("sheet value error"),
+                ),
+              ),
+            onSuccess: ({ url, config, players, fixedTeams }) =>
+              pipe(
+                Effect.Do,
+                Effect.bind("client", () => getClient(url)),
+                Effect.tap(() => Effect.log("calc.sheet")),
+                Effect.bind("result", ({ client }) =>
+                  AppsScriptClient.once(client, "calc.sheet", {
+                    sheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
+                    config,
+                    players,
+                    fixedTeams,
+                  }),
+                ),
+                Effect.map(({ result }) =>
+                  result.map((r) => [
+                    "",
+                    SheetSchema.Room.avgTalent(r),
+                    SheetSchema.Room.avgEffectValue(r),
+                    ...pipe(
+                      r.teams,
+                      Chunk.toArray,
+                      Array.map((team) => [
+                        team.team,
+                        team.lead,
+                        team.backline,
+                        SheetSchema.PlayerTeam.getEffectValue(team),
+                        team.talent,
+                        pipe(team.tags, Array.join(", ")),
+                      ]),
+                    ).flat(),
+                  ]),
+                ),
+                Effect.tapBoth({
+                  onFailure: (e) =>
+                    pipe(
+                      Effect.logError(e),
+                      Effect.andThen(() =>
+                        calcSheet.getRange(`AX30`).setValue(e.message),
+                      ),
+                    ),
+                  onSuccess: (result) =>
+                    pipe(
+                      Effect.log(result),
+                      Effect.andThen(() =>
+                        calcSheet
+                          .getRange(`AX30:CD${result.length + 29}`)
+                          .setValues(result),
+                      ),
+                    ),
+                }),
+              ),
+          }),
         ),
       ),
-      Effect.tap((result) => Effect.log(result)),
     ),
   );
 }
