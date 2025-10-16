@@ -561,7 +561,6 @@ const scheduleParser = (
           }),
           { concurrency: "unbounded" },
         ),
-        Effect.tap(Effect.log),
         Effect.map(({ hours, fills, overfills, standbys, breaks }) =>
           pipe(
             hours,
