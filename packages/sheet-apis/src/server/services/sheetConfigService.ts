@@ -24,7 +24,7 @@ import {
 import { Array as ArrayUtils } from "typhoon-core/utils";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 
-const dayConfigParser = ([
+const scheduleConfigParser = ([
   channel,
   day,
   sheet,
@@ -175,7 +175,7 @@ const dayConfigParser = ([
               Option.bind("fillRange", () => fillRange),
               Option.bind("overfillRange", () => overfillRange),
               Option.bind("standbyRange", () => standbyRange),
-              Option.bind("draft", () => draft),
+              Option.let("draft", () => draft),
               Option.map((config) => new ScheduleConfig(config)),
             ),
         ),
@@ -479,7 +479,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
             Effect.flatMap((response) =>
               pipe(
                 Option.fromNullable(response.data.valueRanges),
-                Option.map(dayConfigParser),
+                Option.map(scheduleConfigParser),
                 Effect.transposeOption,
                 Effect.flatten,
                 Effect.provideService(GoogleSheets, sheet),
