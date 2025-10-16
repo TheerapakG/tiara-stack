@@ -12,6 +12,6 @@ export class ScheduleConfig extends Schema.TaggedClass<ScheduleConfig>()(
     fillRange: Schema.String,
     overfillRange: Schema.String,
     standbyRange: Schema.String,
-    draft: Schema.String,
+    draft: Schema.OptionFromNullishOr(Schema.String, undefined),
   },
 ) {}
