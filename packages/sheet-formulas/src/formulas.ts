@@ -244,7 +244,9 @@ export function onEditInstallable(e: GoogleAppsScript.Events.SheetsOnEdit) {
       () => {
         const sheet = e.range.getSheet();
         const rows =
-          sheet.getRange("C13").getValue() - sheet.getRange("C12").getValue();
+          sheet.getRange("C13").getValue() -
+          sheet.getRange("C12").getValue() +
+          1;
         const targetSheet =
           SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
             sheet.getRange("S12").getValue(),
