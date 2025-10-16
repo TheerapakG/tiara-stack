@@ -15,7 +15,6 @@ import {
 import { AppsScriptClient } from "typhoon-client-apps-script/client";
 
 const SETTING_SHEET_NAME = "Thee's Sheet Settings";
-const CALC_SHEET_NAME = "Thee's Calc v1.16";
 
 function getClient(url: string) {
   return AppsScriptClient.create(serverHandlerConfigCollection, url);
@@ -86,14 +85,14 @@ export function THEECALC(
   _p4: CellValue[][],
   _p5: CellValue[][],
 ) {
-  return Effect.succeed([
+  return [
     [
       "The legacy formula-based calc is sunsetted. Use the button menu version instead.",
     ],
-  ]);
+  ];
 }
 
-export function THEECALC2() {
+export function THEECALC2(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
   return Effect.runSync(
     pipe(
       Effect.Do,
@@ -104,18 +103,11 @@ export function THEECALC2() {
               SETTING_SHEET_NAME,
             ),
           ),
-          calcSheet: Option.fromNullable(
-            SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
-              CALC_SHEET_NAME,
-            ),
-          ),
         }),
         { concurrency: "unbounded" },
       ),
-      Effect.tap(({ calcSheet }) =>
-        calcSheet.getRange(`AX30:CD`).clearContent(),
-      ),
-      Effect.andThen(({ settingSheet, calcSheet }) =>
+      Effect.tap(() => calcSheet.getRange(`AX30:CD`).clearContent()),
+      Effect.andThen(({ settingSheet }) =>
         pipe(
           Effect.Do,
           Effect.bind("url", () =>
@@ -231,12 +223,37 @@ export function THEECALC2() {
 export function onEditInstallable(e: GoogleAppsScript.Events.SheetsOnEdit) {
   pipe(
     Match.value({
+      template: e.range.getSheet().getRange("A2").getValue(),
       name: e.range.getSheet().getName(),
       cell: e.range.getA1Notation(),
     }),
-    Match.when({ name: CALC_SHEET_NAME, cell: "B27" }, () => {
-      THEECALC2();
-    }),
+    Match.when(
+      {
+        template: "Template: UniversalTeamCalc v1.16 on TheeCalc v7.0",
+        cell: "B27",
+      },
+      () => {
+        THEECALC2(e.range.getSheet());
+      },
+    ),
+    Match.when(
+      {
+        template: "Template: Drafter v1.0",
+        cell: "S13",
+      },
+      () => {
+        const sheet = e.range.getSheet();
+        const rows =
+          sheet.getRange("C13").getValue() - sheet.getRange("C12").getValue();
+        const targetSheet =
+          SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
+            sheet.getRange("S12").getValue(),
+          );
+        targetSheet
+          ?.getRange(`D11:X${rows + 11}`)
+          .setValues(sheet.getRange(`P16:AJ${rows + 16}`).getValues());
+      },
+    ),
     Match.orElse(() => {}),
   );
 }
