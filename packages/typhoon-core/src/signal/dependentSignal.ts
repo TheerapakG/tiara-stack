@@ -2,7 +2,9 @@ import { Effect } from "effect";
 import { Observable } from "../observability";
 import type * as DependencySignal from "./dependencySignal";
 
-export const DependentSymbol = Symbol("Typhoon/Signal/Dependent");
+export const DependentSymbol: unique symbol = Symbol(
+  "Typhoon/Signal/Dependent",
+);
 
 export abstract class DependentSignal implements Observable.Observable {
   abstract readonly [DependentSymbol]: DependentSignal;

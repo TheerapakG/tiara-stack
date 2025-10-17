@@ -3,7 +3,9 @@ import { Observable } from "../observability";
 import type * as DependentSignal from "./dependentSignal";
 import type { SignalContext } from "./signalContext";
 
-export const DependencySymbol = Symbol("Typhoon/Signal/Dependency");
+export const DependencySymbol: unique symbol = Symbol(
+  "Typhoon/Signal/Dependency",
+);
 
 export abstract class DependencySignal<A = never, E = never, R = never>
   extends Effectable.Class<A, E, R | SignalContext>
