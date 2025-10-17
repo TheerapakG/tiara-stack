@@ -1,11 +1,17 @@
 import { Array, Data, Order, pipe } from "effect";
 
-export class ArrayWithDefault<
-  S extends ReadonlyArray<object>,
-> extends Data.TaggedClass("ArrayWithDefault")<{
+type ArrayWithDefaultData<S extends ReadonlyArray<object>> = {
   array: S;
   default: Array.ReadonlyArray.Infer<S>;
-}> {}
+};
+const ArrayWithDefaultTaggedClass: new <S extends ReadonlyArray<object>>(
+  args: Readonly<ArrayWithDefaultData<S>>,
+) => Readonly<ArrayWithDefaultData<S>> & {
+  readonly _tag: "ArrayWithDefault";
+} = Data.TaggedClass("ArrayWithDefault");
+export class ArrayWithDefault<
+  const S extends ReadonlyArray<object>,
+> extends ArrayWithDefaultTaggedClass<S> {}
 
 export const wrap =
   <S extends ReadonlyArray<object>>(options: {

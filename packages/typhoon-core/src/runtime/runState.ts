@@ -8,19 +8,20 @@ import {
   String,
   Struct,
   SynchronizedRef,
+  Scope,
 } from "effect";
 
-class UnsafeRunState<A, E> extends Data.TaggedClass("RunState")<{
+type UnsafeRunStateData<A, E> = {
   status: "stopped" | "pending" | "ready";
   runFiber: Option.Option<Fiber.Fiber<A, E>>;
-}> {}
+};
+const UnsafeRunStateTaggedClass: new <A, E>(
+  args: Readonly<UnsafeRunStateData<A, E>>,
+) => Readonly<UnsafeRunStateData<A, E>> & { readonly _tag: "UnsafeRunState" } =
+  Data.TaggedClass("UnsafeRunState");
+class UnsafeRunState<A, E> extends UnsafeRunStateTaggedClass<A, E> {}
 
-export class RunState<
-  Context = never,
-  A = never,
-  E = never,
-  R = never,
-> extends Data.TaggedClass("RunState")<{
+type RunStateData<Context, A, E, R> = {
   semaphore: Effect.Semaphore;
   effect: (ctx: Context, runtime: Runtime.Runtime<R>) => Effect.Effect<A, E, R>;
   finalizer: (
@@ -28,12 +29,22 @@ export class RunState<
     runtime: Runtime.Runtime<R>,
   ) => Effect.Effect<unknown, never, never>;
   state: SynchronizedRef.SynchronizedRef<UnsafeRunState<A, E>>;
-}> {}
+};
+const RunStateTaggedClass: new <Context, A, E, R>(
+  args: Readonly<RunStateData<Context, A, E, R>>,
+) => Readonly<RunStateData<Context, A, E, R>> & { readonly _tag: "RunState" } =
+  Data.TaggedClass("RunState");
+export class RunState<
+  Context = never,
+  A = never,
+  E = never,
+  R = never,
+> extends RunStateTaggedClass<Context, A, E, R> {}
 
 export const make = <Context = never, A = never, E = never, R = never>(
   effect: (ctx: Context, runtime: Runtime.Runtime<R>) => Effect.Effect<A, E, R>,
   finalizer: (ctx: Context) => Effect.Effect<unknown, never, never>,
-) =>
+): Effect.Effect<RunState<Context, A, E, R>, never, never> =>
   pipe(
     Effect.Do,
     Effect.bind("semaphore", () => Effect.makeSemaphore(1)),
@@ -53,7 +64,9 @@ export const make = <Context = never, A = never, E = never, R = never>(
 
 export const start =
   <Context, R>(ctx: Context, runtime: Runtime.Runtime<R>) =>
-  <A, E>(runState: RunState<Context, A, E, R>) =>
+  <A, E>(
+    runState: RunState<Context, A, E, R>,
+  ): Effect.Effect<Option.Option<A>, E, Scope.Scope> =>
     Effect.whenEffect(
       runState.semaphore.withPermits(1)(
         pipe(
@@ -104,7 +117,9 @@ export const start =
 
 export const stop =
   <Context, R>(ctx: Context, runtime: Runtime.Runtime<R>) =>
-  <A, E>(runState: RunState<Context, A, E, R>) =>
+  <A, E>(
+    runState: RunState<Context, A, E, R>,
+  ): Effect.Effect<Option.Option<void>, never, never> =>
     Effect.whenEffect(
       runState.semaphore.withPermits(1)(
         pipe(
@@ -146,7 +161,7 @@ export const stop =
 
 export const status = <Context, A, E, R>(
   runState: RunState<Context, A, E, R>,
-) =>
+): Effect.Effect<"stopped" | "pending" | "ready", never, never> =>
   pipe(
     SynchronizedRef.get(runState.state),
     Effect.map(({ status }) => status),
