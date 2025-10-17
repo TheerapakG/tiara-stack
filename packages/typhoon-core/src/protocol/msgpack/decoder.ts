@@ -1,9 +1,17 @@
 import { DecodeError, decodeMulti, decodeMultiStream } from "@msgpack/msgpack";
-import { Data, Effect, pipe, Stream } from "effect";
+import { Cause, Data, Effect, pipe, Stream } from "effect";
 
-export class MsgpackDecodeError extends Data.TaggedError("MsgpackDecodeError")<{
+type MsgpackDecodeErrorData = {
   error: RangeError | DecodeError;
-}> {}
+};
+const MsgpackDecodeErrorTaggedError: new (
+  args: Readonly<MsgpackDecodeErrorData>,
+) => Cause.YieldableError & {
+  readonly _tag: "MsgpackDecodeError";
+} & Readonly<MsgpackDecodeErrorData> = Data.TaggedError(
+  "MsgpackDecodeError",
+)<MsgpackDecodeErrorData>;
+export class MsgpackDecodeError extends MsgpackDecodeErrorTaggedError {}
 
 export const blobToStream = (blob: Blob) =>
   pipe(

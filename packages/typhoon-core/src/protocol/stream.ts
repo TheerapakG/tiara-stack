@@ -1,4 +1,5 @@
 import {
+  Cause,
   Chunk,
   Data,
   Effect,
@@ -9,9 +10,12 @@ import {
   Stream,
 } from "effect";
 
-export class StreamExhaustedError extends Data.TaggedError(
-  "StreamExhaustedError",
-) {}
+const StreamExhaustedErrorTaggedError: new (
+  args: void,
+) => Cause.YieldableError & {
+  readonly _tag: "StreamExhaustedError";
+} = Data.TaggedError("StreamExhaustedError");
+export class StreamExhaustedError extends StreamExhaustedErrorTaggedError {}
 
 export const toPullStream = <A, E, R>(
   stream: Stream.Stream<A, E, R>,
