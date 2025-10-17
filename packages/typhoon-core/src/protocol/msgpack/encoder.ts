@@ -1,9 +1,17 @@
 import { encode as msgpackEncode } from "@msgpack/msgpack";
-import { Data, Effect, pipe } from "effect";
+import { Cause, Data, Effect, pipe } from "effect";
 
-export class MsgpackEncodeError extends Data.TaggedError("MsgpackEncodeError")<{
+type MsgpackEncodeErrorData = {
   error: Error;
-}> {}
+};
+const MsgpackEncodeErrorTaggedError: new (
+  args: Readonly<MsgpackEncodeErrorData>,
+) => Cause.YieldableError & {
+  readonly _tag: "MsgpackEncodeError";
+} & Readonly<MsgpackEncodeErrorData> = Data.TaggedError(
+  "MsgpackEncodeError",
+)<MsgpackEncodeErrorData>;
+export class MsgpackEncodeError extends MsgpackEncodeErrorTaggedError {}
 
 export const encode = (input: unknown) =>
   pipe(

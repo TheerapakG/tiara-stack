@@ -10,10 +10,15 @@ import {
 import { ArrayLookupSchema } from "../schema/arrayLookup";
 import { KeyOrderLookupSchema } from "../schema/keyOrderLookup";
 
-const TypeId: typeof Schema.TypeId = Schema.TypeId;
-export { TypeId };
-
-export const HeaderActionSchema = ArrayLookupSchema([
+export const HeaderActionSchema: ArrayLookupSchema<
+  [
+    "client:subscribe",
+    "client:unsubscribe",
+    "client:once",
+    "client:mutate",
+    "server:update",
+  ]
+> = ArrayLookupSchema([
   "client:subscribe",
   "client:unsubscribe",
   "client:once",
@@ -21,13 +26,8 @@ export const HeaderActionSchema = ArrayLookupSchema([
   "server:update",
 ]);
 
-export class EmptyPayloadSchema extends pipe(
-  KeyOrderLookupSchema([], {}),
-  Schema.compose(Schema.Unknown),
-) {
-  static keys = [];
-  static fields = {};
-}
+export const EmptyPayloadSchema: KeyOrderLookupSchema<[], {}> =
+  KeyOrderLookupSchema([], {});
 
 export const HandlerPayloadSchema = KeyOrderLookupSchema(["handler", "token"], {
   handler: Schema.String,
