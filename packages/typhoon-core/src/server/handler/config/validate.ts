@@ -16,17 +16,26 @@ export type ResolvedResponseValidator<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Config extends ResponseConfig<infer T, any> ? T : undefined;
 
-export const resolveRequestParamsValidator = <
+export const resolveRequestParamsValidator: <
   const Config extends RequestParamsConfig | undefined,
 >(
   config: Config,
-) =>
+) => ResolvedRequestParamsValidator<Config> = <
+  const Config extends RequestParamsConfig | undefined,
+>(
+  config: Config,
+): ResolvedRequestParamsValidator<Config> =>
   (config?.validate
     ? config.validator
     : undefined) as ResolvedRequestParamsValidator<Config>;
 
-export const resolveResponseValidator = <
+export const resolveResponseValidator: <
   const Config extends ResponseConfig | undefined,
 >(
   config: Config,
-) => config?.validator as ResolvedResponseValidator<Config>;
+) => ResolvedResponseValidator<Config> = <
+  const Config extends ResponseConfig | undefined,
+>(
+  config: Config,
+): ResolvedResponseValidator<Config> =>
+  config?.validator as ResolvedResponseValidator<Config>;

@@ -25,14 +25,20 @@ export type SetPartialMutationHandlerName<
   RequestParamsOption<Config>,
   ResponseOption<Config>
 >;
-export const name =
+export const name: <const Name extends string>(
+  name: Name,
+) => <const Config extends PartialMutationHandlerConfig>(
+  config: Config,
+) => SetPartialMutationHandlerName<Name, Config> =
   <const Name extends string>(name: Name) =>
-  <const Config extends PartialMutationHandlerConfig>(config: Config) =>
+  <const Config extends PartialMutationHandlerConfig>(
+    config: Config,
+  ): SetPartialMutationHandlerName<Name, Config> =>
     new PartialMutationHandlerConfig({
       data: Struct.evolve(config.data, {
         name: () => some(name),
       }),
-    }) as SetPartialMutationHandlerName<Name, Config>;
+    });
 
 export type SetPartialMutationHandlerRequestParams<
   RequestParams extends RequestParamsConfigIn,
@@ -42,16 +48,22 @@ export type SetPartialMutationHandlerRequestParams<
   Option.Some<TransformedRequestParamsConfig<RequestParams>>,
   ResponseOption<Config>
 >;
-export const requestParams =
+export const requestParams: <const RequestParams extends RequestParamsConfigIn>(
+  requestParams: RequestParams,
+) => <const Config extends PartialMutationHandlerConfig>(
+  config: Config,
+) => SetPartialMutationHandlerRequestParams<RequestParams, Config> =
   <const RequestParams extends RequestParamsConfigIn>(
     requestParams: RequestParams,
   ) =>
-  <const Config extends PartialMutationHandlerConfig>(config: Config) =>
+  <const Config extends PartialMutationHandlerConfig>(
+    config: Config,
+  ): SetPartialMutationHandlerRequestParams<RequestParams, Config> =>
     new PartialMutationHandlerConfig({
       data: Struct.evolve(config.data, {
         requestParams: () => some(transformRequestParamConfig(requestParams)),
       }),
-    }) as SetPartialMutationHandlerRequestParams<RequestParams, Config>;
+    });
 
 export type SetPartialMutationHandlerResponse<
   Response extends ResponseConfigIn,
@@ -61,11 +73,17 @@ export type SetPartialMutationHandlerResponse<
   RequestParamsOption<Config>,
   Option.Some<TransformedResponseConfig<Response>>
 >;
-export const response =
+export const response: <const Response extends ResponseConfigIn>(
+  response: Response,
+) => <const Config extends PartialMutationHandlerConfig>(
+  config: Config,
+) => SetPartialMutationHandlerResponse<Response, Config> =
   <const Response extends ResponseConfigIn>(response: Response) =>
-  <const Config extends PartialMutationHandlerConfig>(config: Config) =>
+  <const Config extends PartialMutationHandlerConfig>(
+    config: Config,
+  ): SetPartialMutationHandlerResponse<Response, Config> =>
     new PartialMutationHandlerConfig({
       data: Struct.evolve(config.data, {
         response: () => some(transformResponseConfig(response)),
       }),
-    }) as SetPartialMutationHandlerResponse<Response, Config>;
+    });

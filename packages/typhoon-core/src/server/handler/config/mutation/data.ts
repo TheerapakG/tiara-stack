@@ -16,6 +16,32 @@ import {
 } from "../shared/data";
 import { none } from "../../../../utils/strictOption";
 
+type PartialMutationHandlerConfigData<
+  Name extends Option.Option<string> = Option.Option<string>,
+  RequestParams extends Option.Option<
+    RequestParamsConfig<StandardSchemaV1, boolean>
+  > = Option.Option<RequestParamsConfig<StandardSchemaV1, boolean>>,
+  Response extends Option.Option<
+    ResponseConfig<StandardSchemaV1, boolean>
+  > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
+> = { data: BasePartialHandlerConfig<Name, RequestParams, Response> };
+const PartialMutationHandlerConfigTaggedClass: new <
+  Name extends Option.Option<string> = Option.Option<string>,
+  RequestParams extends Option.Option<
+    RequestParamsConfig<StandardSchemaV1, boolean>
+  > = Option.Option<RequestParamsConfig<StandardSchemaV1, boolean>>,
+  Response extends Option.Option<
+    ResponseConfig<StandardSchemaV1, boolean>
+  > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
+>(
+  args: Readonly<
+    PartialMutationHandlerConfigData<Name, RequestParams, Response>
+  >,
+) => Readonly<
+  PartialMutationHandlerConfigData<Name, RequestParams, Response>
+> & {
+  readonly _tag: "PartialMutationHandlerConfig";
+} = Data.TaggedClass("PartialMutationHandlerConfig");
 export class PartialMutationHandlerConfig<
   const Name extends Option.Option<string> = Option.Option<string>,
   const RequestParams extends Option.Option<
@@ -24,9 +50,11 @@ export class PartialMutationHandlerConfig<
   const Response extends Option.Option<
     ResponseConfig<StandardSchemaV1, boolean>
   > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
-> extends Data.TaggedClass("PartialMutationHandlerConfig")<{
-  data: BasePartialHandlerConfig<Name, RequestParams, Response>;
-}> {}
+> extends PartialMutationHandlerConfigTaggedClass<
+  Name,
+  RequestParams,
+  Response
+> {}
 
 export const empty = () =>
   new PartialMutationHandlerConfig({
