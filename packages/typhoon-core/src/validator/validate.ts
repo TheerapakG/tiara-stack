@@ -1,7 +1,10 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
+import { Effect, Option } from "effect";
 import { Observable } from "../observability";
 import {
+  type Output,
   Validator,
+  ValidationError,
   validateOption as validateOptionWithValidator,
   validateSchemaOption as validateSchemaOptionWithValidator,
   validateSchemaWithDefault as validateSchemaWithDefaultWithValidator,
@@ -13,7 +16,9 @@ import {
 export const validateSchema = <Schema extends StandardSchemaV1>(
   schema: Schema,
   options?: Observable.ObservableOptions,
-) =>
+): ((
+  value: unknown,
+) => Effect.Effect<StandardSchemaV1.InferOutput<Schema>, ValidationError>) =>
   validateSchemaWithValidator(
     new Validator({
       [Observable.ObservableSymbol]: options ?? {},
@@ -24,7 +29,9 @@ export const validateSchema = <Schema extends StandardSchemaV1>(
 export const validateSchemaOption = <Schema extends StandardSchemaV1>(
   schema: Schema,
   options?: Observable.ObservableOptions,
-) =>
+): ((
+  value: unknown,
+) => Effect.Effect<Option.Option<StandardSchemaV1.InferOutput<Schema>>>) =>
   validateSchemaOptionWithValidator(
     new Validator({
       [Observable.ObservableSymbol]: options ?? {},
@@ -40,7 +47,7 @@ export const validateSchemaWithDefault = <
   schema: Schema,
   defaultValue: Output,
   options?: Observable.ObservableOptions,
-) =>
+): ((value: unknown) => Effect.Effect<Output>) =>
   validateSchemaWithDefaultWithValidator(
     new Validator({
       [Observable.ObservableSymbol]: options ?? {},
@@ -52,7 +59,7 @@ export const validateSchemaWithDefault = <
 export const validate = <Schema extends StandardSchemaV1 | undefined>(
   schema: Schema,
   options?: Observable.ObservableOptions,
-) =>
+): ((value: unknown) => Effect.Effect<Output<Schema>, ValidationError>) =>
   validateWithValidator(
     new Validator({
       [Observable.ObservableSymbol]: options ?? {},
@@ -63,7 +70,7 @@ export const validate = <Schema extends StandardSchemaV1 | undefined>(
 export const validateOption = <Schema extends StandardSchemaV1 | undefined>(
   schema: Schema,
   options?: Observable.ObservableOptions,
-) =>
+): ((value: unknown) => Effect.Effect<Option.Option<Output<Schema>>>) =>
   validateOptionWithValidator(
     new Validator({
       [Observable.ObservableSymbol]: options ?? {},
@@ -79,7 +86,7 @@ export const validateWithDefault = <
     ? StandardSchemaV1.InferOutput<Schema>
     : unknown,
   options?: Observable.ObservableOptions,
-) =>
+): ((value: unknown) => Effect.Effect<Output<Schema>>) =>
   validateWithDefaultWithValidator(
     new Validator({
       [Observable.ObservableSymbol]: options ?? {},
