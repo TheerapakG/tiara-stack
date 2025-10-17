@@ -1,5 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import { Data, Effect, Option, pipe } from "effect";
+import { Cause, Data, Effect, Option, pipe } from "effect";
 import { Observable } from "../observability";
 
 export type Input<Schema extends StandardSchemaV1 | undefined> =
@@ -12,32 +12,47 @@ export type Output<Schema extends StandardSchemaV1 | undefined> =
     ? StandardSchemaV1.InferOutput<Schema>
     : unknown;
 
-export class ValidationError extends Data.TaggedError("ValidationError")<{
+type ValidationErrorData = {
   issues: readonly StandardSchemaV1.Issue[];
   message: string;
-}> {
-  constructor({
+};
+const ValidationErrorTaggedError: new (
+  args: Readonly<ValidationErrorData>,
+) => Cause.YieldableError & {
+  readonly _tag: "ValidationError";
+} & Readonly<ValidationErrorData> = Data.TaggedError("ValidationError")<{
+  issues: readonly StandardSchemaV1.Issue[];
+  message: string;
+}>;
+export class ValidationError extends ValidationErrorTaggedError {}
+
+const fromStandardSchemaV1Issues = (
+  issues: readonly StandardSchemaV1.Issue[],
+): ValidationError => {
+  return new ValidationError({
     issues,
-  }: {
-    readonly issues: readonly StandardSchemaV1.Issue[];
-  }) {
-    super({ issues, message: issues.map((issue) => issue.message).join("\n") });
-  }
-}
+    message: issues.map((issue) => issue.message).join("\n"),
+  });
+};
 
 const parseStandardSchemaV1Result = <Output = unknown>(
   result: StandardSchemaV1.Result<Output>,
 ): Effect.Effect<Output, ValidationError> => {
   return result.issues
-    ? Effect.fail(new ValidationError({ issues: result.issues }))
+    ? Effect.fail(fromStandardSchemaV1Issues(result.issues))
     : Effect.succeed(result.value);
 };
 
+type ValidatorData<Schema extends StandardSchemaV1 | undefined> = {
+  [Observable.ObservableSymbol]: Observable.ObservableOptions;
+  schema: Schema;
+};
+const ValidatorTaggedClass: new <Schema extends StandardSchemaV1 | undefined>(
+  args: Readonly<ValidatorData<Schema>>,
+) => Readonly<ValidatorData<Schema>> & { readonly _tag: "Validator" } =
+  Data.TaggedClass("Validator");
 export class Validator<Schema extends StandardSchemaV1 | undefined>
-  extends Data.TaggedClass("Validator")<{
-    [Observable.ObservableSymbol]: Observable.ObservableOptions;
-    schema: Schema;
-  }>
+  extends ValidatorTaggedClass<Schema>
   implements Observable.Observable {}
 
 export const hasSchema = <Schema extends StandardSchemaV1 | undefined>(
