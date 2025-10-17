@@ -98,9 +98,9 @@ class OnceObserver<A = never, E = never>
 }
 
 export const observeOnce = <A = never, E = never, R = never>(
-  effect: Effect.Effect<A, E, R | SignalContext>,
+  effect: Effect.Effect<A, E, R>,
   options?: Observable.ObservableOptions,
-) =>
+): Effect.Effect<A, E, Exclude<R, SignalContext>> =>
   pipe(
     OnceObserver.make(effect, options ?? {}),
     Effect.flatMap((observer) => observer),

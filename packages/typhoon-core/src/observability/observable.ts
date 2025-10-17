@@ -1,6 +1,8 @@
 import { Effect, Tracer } from "effect";
 
-export const ObservableSymbol = Symbol("Typhoon/Observability/Observable");
+export const ObservableSymbol: unique symbol = Symbol(
+  "Typhoon/Observability/Observable",
+);
 
 export type ObservableOptions = {
   readonly withSpan?: boolean;

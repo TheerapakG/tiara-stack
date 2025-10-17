@@ -3,12 +3,15 @@ import { Observable } from "../observability";
 import type * as DependencySignal from "./dependencySignal";
 import type * as DependentSignal from "./dependentSignal";
 
-export class SignalContext extends Context.Tag("SignalContext")<
+type SignalContextShape = {
+  readonly signal: DependentSignal.DependentSignal;
+};
+const SignalContextTag: Context.TagClass<
   SignalContext,
-  {
-    readonly signal: DependentSignal.DependentSignal;
-  }
->() {}
+  "SignalContext",
+  SignalContextShape
+> = Context.Tag("SignalContext")<SignalContext, SignalContextShape>();
+export class SignalContext extends SignalContextTag {}
 
 export const fromDependent = (
   dependent: DependentSignal.DependentSignal,
@@ -18,7 +21,7 @@ export const fromDependent = (
 
 export const getSignal = (
   dependency: DependencySignal.DependencySignal<unknown, unknown, unknown>,
-) =>
+): Effect.Effect<DependentSignal.DependentSignal, never, SignalContext> =>
   pipe(
     SignalContext,
     Effect.map(({ signal }) => signal),
@@ -29,7 +32,7 @@ export const getSignal = (
 
 export const bindScopeDependency = (
   dependency: DependencySignal.DependencySignal<unknown, unknown, unknown>,
-) =>
+): Effect.Effect<void, never, SignalContext> =>
   pipe(
     getSignal(dependency),
     Effect.flatMap((signal) =>
@@ -45,10 +48,10 @@ export const bindScopeDependency = (
   );
 
 export const runAndTrackEffect =
-  <A = never, E = never, R = never>(
-    effect: Effect.Effect<A, E, R | SignalContext>,
-  ) =>
-  (ctx: Context.Tag.Service<SignalContext>) => {
+  <A = never, E = never, R = never>(effect: Effect.Effect<A, E, R>) =>
+  (
+    ctx: Context.Tag.Service<SignalContext>,
+  ): Effect.Effect<A, E, Exclude<R, SignalContext>> => {
     return pipe(
       effect,
       Effect.provideService(SignalContext, ctx),
