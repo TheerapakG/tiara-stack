@@ -23,7 +23,18 @@ type Struct<
   Fields extends ReadonlyArray<Schema.Schema.Any>,
 > = StructHelper<Keys, Fields>;
 
-const StructToTupleSchema$ = <
+interface StructToTupleSchema<
+  Keys extends ReadonlyArray<string>,
+  Fields extends Types.TupleOf<Keys["length"], Schema.Schema.Any>,
+> extends Schema.transform<
+    Schema.Struct<Struct<Keys, Fields>>,
+    Schema.Tuple<Fields>
+  > {
+  readonly keys: Keys;
+  readonly fields: Fields;
+}
+
+const makeStructToTupleClass = <
   const Keys extends ReadonlyArray<string>,
   const Fields extends Types.TupleOf<Keys["length"], Schema.Schema.Any>,
 >(
@@ -35,25 +46,29 @@ const StructToTupleSchema$ = <
     Object.fromEntries(Array.zip(keys, fields)) as Struct<Keys, Fields>,
   );
 
-  return class StructToTupleSchema extends Schema.transform(
-    StructSchema,
-    TupleSchema,
-    {
-      strict: true,
-      decode: (struct) =>
-        pipe(
-          keys,
-          Tuple.map(
-            (key) =>
-              struct[key as keyof Schema.Struct.Type<Struct<Keys, Fields>>],
-          ),
-        ) as Schema.Schema.Encoded<typeof TupleSchema>,
-      encode: (tuple) => pipe(Array.zip(keys, tuple), Object.fromEntries),
-    },
-  ) {
+  return class extends Schema.transform(StructSchema, TupleSchema, {
+    strict: true,
+    decode: (struct) =>
+      pipe(
+        keys,
+        Tuple.map(
+          (key) =>
+            struct[key as keyof Schema.Struct.Type<Struct<Keys, Fields>>],
+        ),
+      ) as Schema.Schema.Encoded<typeof TupleSchema>,
+    encode: (tuple) => pipe(Array.zip(keys, tuple), Object.fromEntries),
+  }) {
     static keys = keys;
     static fields = fields;
-  };
+  } as StructToTupleSchema<Keys, Fields>;
 };
 
-export { StructToTupleSchema$ as StructToTupleSchema };
+const StructToTupleSchema = <
+  const Keys extends ReadonlyArray<string>,
+  const Fields extends Types.TupleOf<Keys["length"], Schema.Schema.Any>,
+>(
+  keys: Keys,
+  fields: Fields,
+): StructToTupleSchema<Keys, Fields> => makeStructToTupleClass(keys, fields);
+
+export { StructToTupleSchema };

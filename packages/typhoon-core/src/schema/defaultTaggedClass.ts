@@ -1,12 +1,26 @@
-import { pipe, Schema } from "effect";
+import { pipe, Schema, Types } from "effect";
 
 export const DefaultTaggedClass = <
-  Self,
-  Tag extends string,
-  Fields extends { readonly _tag: Schema.tag<Tag> } & Schema.Struct.Fields,
+  TaggedClass extends Schema.Schema.Any & {
+    readonly _tag: string;
+    readonly fields: Schema.Struct.Fields;
+  },
+  Self extends
+    Schema.Schema.Type<TaggedClass> = Schema.Schema.Type<TaggedClass>,
+  Tag extends TaggedClass["_tag"] = TaggedClass["_tag"],
+  Fields extends TaggedClass["fields"] = TaggedClass["fields"],
+  OmitFields extends Types.Simplify<Omit<Fields, "_tag">> &
+    Schema.Struct.Fields = Types.Simplify<Omit<Fields, "_tag">> &
+    Schema.Struct.Fields,
 >(
-  taggedClass: Schema.TaggedClass<Self, Tag, Fields>,
-) =>
+  taggedClass: TaggedClass,
+): Schema.Schema<
+  Self,
+  Schema.Struct.Encoded<OmitFields> & {
+    readonly _tag?: Tag;
+  },
+  Schema.Schema.Context<TaggedClass>
+> =>
   pipe(
     Schema.extend(
       Schema.encodedSchema(Schema.Struct(taggedClass.fields).omit("_tag")),
@@ -21,11 +35,22 @@ export const DefaultTaggedClass = <
         ),
       }),
     ) as unknown as Schema.Schema<
-      Schema.Schema.Encoded<Schema.Struct<Fields>>,
-      Schema.Schema.Encoded<Schema.Struct<Omit<Fields, "_tag">>> & {
+      Schema.Struct.Encoded<Fields>,
+      Schema.Struct.Encoded<OmitFields> & {
         readonly _tag?: Tag;
-      },
-      never
+      }
     >,
-    Schema.compose(taggedClass),
-  );
+    Schema.compose(
+      taggedClass as Schema.Schema<
+        Self,
+        Schema.Struct.Encoded<Fields>,
+        Schema.Schema.Context<TaggedClass>
+      >,
+    ),
+  ) as Schema.Schema<
+    Self,
+    Schema.Struct.Encoded<OmitFields> & {
+      readonly _tag?: Tag;
+    },
+    Schema.Schema.Context<TaggedClass>
+  >;

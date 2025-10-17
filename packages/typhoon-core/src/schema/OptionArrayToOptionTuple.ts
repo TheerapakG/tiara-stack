@@ -3,7 +3,18 @@ import { Array, Function, Option, pipe, Schema, Types } from "effect";
 const TypeId: typeof Schema.TypeId = Schema.TypeId;
 export { TypeId };
 
-const OptionArrayToOptionTupleSchema$ = <
+interface OptionArrayToOptionTupleSchema<
+  Count extends number,
+  Value extends Schema.Schema.Any,
+> extends Schema.transform<
+    Schema.Array$<Schema.OptionFromSelf<Value>>,
+    Schema.Tuple<Types.TupleOf<Count, Schema.OptionFromSelf<Value>>>
+  > {
+  readonly count: Count;
+  readonly value: Value;
+}
+
+const makeOptionArrayToOptionTupleClass = <
   const Count extends number,
   const Value extends Schema.Schema.Any,
 >(
@@ -17,23 +28,27 @@ const OptionArrayToOptionTupleSchema$ = <
     ) as Types.TupleOf<Count, Schema.OptionFromSelf<Value>>),
   );
 
-  return class OptionArrayToOptionTupleSchema extends Schema.transform(
-    ArraySchema,
-    TupleSchema,
-    {
-      strict: true,
-      decode: (array) =>
-        pipe(
-          TupleSchema.elements,
-          Array.map((_, index) =>
-            pipe(Array.get(array, index), Option.flatten),
-          ),
-        ) as unknown as Schema.Schema.Encoded<typeof TupleSchema>,
-      encode: Function.identity,
-    },
-  ) {
+  return class extends Schema.transform(ArraySchema, TupleSchema, {
+    strict: true,
+    decode: (array) =>
+      pipe(
+        TupleSchema.elements,
+        Array.map((_, index) => pipe(Array.get(array, index), Option.flatten)),
+      ) as unknown as Schema.Schema.Encoded<typeof TupleSchema>,
+    encode: Function.identity,
+  }) {
+    static count = count;
     static value = value;
-  };
+  } as OptionArrayToOptionTupleSchema<Count, Value>;
 };
 
-export { OptionArrayToOptionTupleSchema$ as OptionArrayToOptionTupleSchema };
+const OptionArrayToOptionTupleSchema = <
+  const Count extends number,
+  const Value extends Schema.Schema.Any,
+>(
+  count: Count,
+  value: Value,
+): OptionArrayToOptionTupleSchema<Count, Value> =>
+  makeOptionArrayToOptionTupleClass(count, value);
+
+export { OptionArrayToOptionTupleSchema };

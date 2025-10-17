@@ -1,13 +1,21 @@
 import { Array, HashMap, Option, ParseResult, pipe, Schema } from "effect";
 
-const TypeId: typeof Schema.TypeId = Schema.TypeId;
-export { TypeId };
+interface KeyOrderLookupSchema<
+  Keys extends ReadonlyArray<string | number | symbol>,
+  Fields extends { readonly [x in Keys[number]]: Schema.Struct.Field },
+> extends Schema.transformOrFail<
+    Schema.Array$<Schema.Tuple<[typeof Schema.Number, typeof Schema.Unknown]>>,
+    Schema.Struct<Fields>
+  > {
+  readonly keys: Keys;
+  readonly fields: Fields;
+}
 
-const KeyOrderLookupSchema$ = <
-  Key extends string | number | symbol,
-  Fields extends { readonly [x in Key]: Schema.Struct.Field },
+const makeKeyOrderLookupClass = <
+  Keys extends ReadonlyArray<string | number | symbol>,
+  Fields extends { readonly [x in Keys[number]]: Schema.Struct.Field },
 >(
-  keys: ReadonlyArray<Key>,
+  keys: Keys,
   fields: Fields,
 ) => {
   const reverseLookup = pipe(
@@ -18,7 +26,7 @@ const KeyOrderLookupSchema$ = <
 
   const StructSchema = Schema.Struct(fields);
 
-  return class KeyOrderLookupSchema extends pipe(
+  return class extends pipe(
     Schema.Array(Schema.Tuple(Schema.Number, Schema.Unknown)),
     Schema.transformOrFail(StructSchema, {
       strict: true,
@@ -30,7 +38,7 @@ const KeyOrderLookupSchema$ = <
               Array.get(keys, index),
               Option.match({
                 onSome: (key) =>
-                  ParseResult.succeed([key, value] as [Key, unknown]),
+                  ParseResult.succeed([key, value] as [Keys[number], unknown]),
                 onNone: () =>
                   ParseResult.fail(
                     new ParseResult.Unexpected(
@@ -92,7 +100,15 @@ const KeyOrderLookupSchema$ = <
   ) {
     static keys = keys;
     static fields = fields;
-  };
+  } as KeyOrderLookupSchema<Keys, Fields>;
 };
 
-export { KeyOrderLookupSchema$ as KeyOrderLookupSchema };
+const KeyOrderLookupSchema = <
+  Keys extends ReadonlyArray<string | number | symbol>,
+  Fields extends { readonly [x in Keys[number]]: Schema.Struct.Field },
+>(
+  keys: Keys,
+  fields: Fields,
+): KeyOrderLookupSchema<Keys, Fields> => makeKeyOrderLookupClass(keys, fields);
+
+export { KeyOrderLookupSchema };

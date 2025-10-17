@@ -8,11 +8,19 @@ import {
   SchemaAST,
 } from "effect";
 
-const TypeId: typeof Schema.TypeId = Schema.TypeId;
-export { TypeId };
+interface ArrayLookupSchema<
+  Literals extends Array.NonEmptyReadonlyArray<SchemaAST.LiteralValue>,
+> extends Schema.transformOrFail<
+    typeof Schema.Number,
+    Schema.Literal<Literals>
+  > {
+  readonly literals: Literals;
+}
 
-const ArrayLookupSchema$ = <LiteralValue extends SchemaAST.LiteralValue>(
-  literals: Array.NonEmptyReadonlyArray<LiteralValue>,
+const makeArrayLookupClass = <
+  Literals extends Array.NonEmptyReadonlyArray<SchemaAST.LiteralValue>,
+>(
+  literals: Literals,
 ) => {
   const reverseLookup = pipe(
     literals,
@@ -20,9 +28,10 @@ const ArrayLookupSchema$ = <LiteralValue extends SchemaAST.LiteralValue>(
     HashMap.fromIterable,
   );
 
-  return class ArrayLookupSchema extends pipe(
+  return class extends Schema.transformOrFail(
     Schema.Number,
-    Schema.transformOrFail(Schema.Literal(...literals), {
+    Schema.Literal<Literals>(...literals),
+    {
       strict: true,
       decode: (index) =>
         pipe(
@@ -40,7 +49,10 @@ const ArrayLookupSchema$ = <LiteralValue extends SchemaAST.LiteralValue>(
         ),
       encode: (literal) =>
         pipe(
-          HashMap.get(reverseLookup, literal),
+          HashMap.get(
+            reverseLookup,
+            literal as Array.ReadonlyArray.Infer<Literals>,
+          ),
           Option.match({
             onSome: ParseResult.succeed,
             onNone: () =>
@@ -52,10 +64,16 @@ const ArrayLookupSchema$ = <LiteralValue extends SchemaAST.LiteralValue>(
               ),
           }),
         ),
-    }),
+    },
   ) {
     static literals = literals;
-  };
+  } as ArrayLookupSchema<Literals>;
 };
 
-export { ArrayLookupSchema$ as ArrayLookupSchema };
+const ArrayLookupSchema = <
+  Literals extends Array.NonEmptyReadonlyArray<SchemaAST.LiteralValue>,
+>(
+  literals: Literals,
+): ArrayLookupSchema<Literals> => makeArrayLookupClass(literals);
+
+export { ArrayLookupSchema };
