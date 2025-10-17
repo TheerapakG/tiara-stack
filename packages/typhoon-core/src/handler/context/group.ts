@@ -1,4 +1,4 @@
-import { Data, Function, HashMap, Struct, Types } from "effect";
+import { Data, Function, HashMap, Option, Struct, Types } from "effect";
 import {
   type BaseHandlerT,
   type Handler,
@@ -127,5 +127,13 @@ export const getHandlerContext =
   <HandlerT extends BaseHandlerT>(
     key: HandlerDataKey<HandlerT, HandlerData<HandlerT>>,
   ) =>
-  <R>(handlerContextGroup: HandlerContextGroup<HandlerT, R>) =>
+  <R>(
+    handlerContextGroup: HandlerContextGroup<HandlerT, R>,
+  ): Option.Option<
+    HandlerContext<
+      HandlerT,
+      HandlerData<HandlerT>,
+      Handler<HandlerT, unknown, unknown, R>
+    >
+  > =>
     HashMap.get(handlerContextGroup.map, key);

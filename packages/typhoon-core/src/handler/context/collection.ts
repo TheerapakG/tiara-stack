@@ -1,4 +1,4 @@
-import { Data, Function, Struct, Types } from "effect";
+import { Data, Function, Struct, Types, Option } from "effect";
 import {
   HandlerContextGroup,
   empty as emptyHandlerContextGroup,
@@ -185,7 +185,13 @@ export const getHandlerContext =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   <const C extends HandlerContextCollection<any, any>>(
     handlerContextCollection: C,
-  ) =>
+  ): Option.Option<
+    HandlerContext<
+      HandlerT,
+      HandlerData<HandlerT>,
+      Handler<HandlerT, unknown, unknown, HandlerContextCollectionContext<C>>
+    >
+  > =>
     getGroupHandlerContext(key)(
       handlerContextCollection.struct[
         type
