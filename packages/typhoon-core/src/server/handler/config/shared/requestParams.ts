@@ -10,12 +10,18 @@ export type BaseRequestParamsConfig<
   validate: Validate;
 };
 
+const RequestParamsConfigTaggedClass: new <
+  T extends StandardSchemaV1 = StandardSchemaV1,
+  Validate extends boolean = boolean,
+>(
+  args: Readonly<BaseRequestParamsConfig<T, Validate>>,
+) => Readonly<BaseRequestParamsConfig<T, Validate>> & {
+  readonly _tag: "RequestParamsConfig";
+} = Data.TaggedClass("RequestParamsConfig");
 export class RequestParamsConfig<
   const T extends StandardSchemaV1 = StandardSchemaV1,
   const Validate extends boolean = boolean,
-> extends Data.TaggedClass("RequestParamsConfig")<
-  BaseRequestParamsConfig<T, Validate>
-> {}
+> extends RequestParamsConfigTaggedClass<T, Validate> {}
 
 export type RequestParamsValidator<Config extends RequestParamsConfig> =
   Config["validator"];

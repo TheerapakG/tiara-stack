@@ -1,3 +1,4 @@
+import { Option } from "effect";
 import {
   empty as baseEmpty,
   HandlerConfigGroup,
@@ -12,10 +13,19 @@ export type MutationHandlerConfigGroup =
 
 export const empty = () => baseEmpty<MutationHandlerConfig>();
 
-export const add = (handlerConfig: MutationHandlerConfig) =>
-  baseAdd(handlerConfig);
+export const add = (
+  handlerConfig: MutationHandlerConfig,
+): ((
+  handlerConfigGroup: MutationHandlerConfigGroup,
+) => MutationHandlerConfigGroup) => baseAdd(handlerConfig);
 
-export const addGroup = (otherGroup: MutationHandlerConfigGroup) =>
+export const addGroup = (
+  otherGroup: MutationHandlerConfigGroup,
+): ((thisGroup: MutationHandlerConfigGroup) => MutationHandlerConfigGroup) =>
   baseAddGroup(otherGroup);
 
-export const getHandlerConfig = (key: string) => baseGetHandlerConfig(key);
+export const getHandlerConfig = (
+  key: string,
+): ((
+  handlerConfigGroup: MutationHandlerConfigGroup,
+) => Option.Option<MutationHandlerConfig>) => baseGetHandlerConfig(key);

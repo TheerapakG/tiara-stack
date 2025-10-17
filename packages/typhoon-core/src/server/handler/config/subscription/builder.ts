@@ -25,14 +25,20 @@ export type SetPartialSubscriptionHandlerName<
   RequestParamsOption<Config>,
   ResponseOption<Config>
 >;
-export const name =
+export const name: <const Name extends string>(
+  name: Name,
+) => <const Config extends PartialSubscriptionHandlerConfig>(
+  config: Config,
+) => SetPartialSubscriptionHandlerName<Name, Config> =
   <const Name extends string>(name: Name) =>
-  <const Config extends PartialSubscriptionHandlerConfig>(config: Config) =>
+  <const Config extends PartialSubscriptionHandlerConfig>(
+    config: Config,
+  ): SetPartialSubscriptionHandlerName<Name, Config> =>
     new PartialSubscriptionHandlerConfig({
       data: Struct.evolve(config.data, {
         name: () => some(name),
       }),
-    }) as SetPartialSubscriptionHandlerName<Name, Config>;
+    });
 
 export type SetPartialSubscriptionHandlerRequestParams<
   RequestParams extends RequestParamsConfigIn,
@@ -42,16 +48,22 @@ export type SetPartialSubscriptionHandlerRequestParams<
   Option.Some<TransformedRequestParamsConfig<RequestParams>>,
   ResponseOption<Config>
 >;
-export const requestParams =
+export const requestParams: <const RequestParams extends RequestParamsConfigIn>(
+  requestParams: RequestParams,
+) => <const Config extends PartialSubscriptionHandlerConfig>(
+  config: Config,
+) => SetPartialSubscriptionHandlerRequestParams<RequestParams, Config> =
   <const RequestParams extends RequestParamsConfigIn>(
     requestParams: RequestParams,
   ) =>
-  <const Config extends PartialSubscriptionHandlerConfig>(config: Config) =>
+  <const Config extends PartialSubscriptionHandlerConfig>(
+    config: Config,
+  ): SetPartialSubscriptionHandlerRequestParams<RequestParams, Config> =>
     new PartialSubscriptionHandlerConfig({
       data: Struct.evolve(config.data, {
         requestParams: () => some(transformRequestParamConfig(requestParams)),
       }),
-    }) as SetPartialSubscriptionHandlerRequestParams<RequestParams, Config>;
+    });
 
 export type SetPartialSubscriptionHandlerResponse<
   Response extends ResponseConfigIn,
@@ -61,11 +73,17 @@ export type SetPartialSubscriptionHandlerResponse<
   RequestParamsOption<Config>,
   Option.Some<TransformedResponseConfig<Response>>
 >;
-export const response =
+export const response: <const Response extends ResponseConfigIn>(
+  response: Response,
+) => <const Config extends PartialSubscriptionHandlerConfig>(
+  config: Config,
+) => SetPartialSubscriptionHandlerResponse<Response, Config> =
   <const Response extends ResponseConfigIn>(response: Response) =>
-  <const Config extends PartialSubscriptionHandlerConfig>(config: Config) =>
+  <const Config extends PartialSubscriptionHandlerConfig>(
+    config: Config,
+  ): SetPartialSubscriptionHandlerResponse<Response, Config> =>
     new PartialSubscriptionHandlerConfig({
       data: Struct.evolve(config.data, {
         response: () => some(transformResponseConfig(response)),
       }),
-    }) as SetPartialSubscriptionHandlerResponse<Response, Config>;
+    });

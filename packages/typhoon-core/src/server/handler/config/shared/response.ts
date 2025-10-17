@@ -10,10 +10,18 @@ export type BaseResponseConfig<
   stream: Stream;
 };
 
+const ResponseConfigTaggedClass: new <
+  T extends StandardSchemaV1 = StandardSchemaV1,
+  Stream extends boolean = boolean,
+>(
+  args: Readonly<BaseResponseConfig<T, Stream>>,
+) => Readonly<BaseResponseConfig<T, Stream>> & {
+  readonly _tag: "ResponseConfig";
+} = Data.TaggedClass("ResponseConfig");
 export class ResponseConfig<
   const T extends StandardSchemaV1 = StandardSchemaV1,
   const Stream extends boolean = boolean,
-> extends Data.TaggedClass("ResponseConfig")<BaseResponseConfig<T, Stream>> {}
+> extends ResponseConfigTaggedClass<T, Stream> {}
 
 export type ResponseValidator<Config extends ResponseConfig> =
   Config["validator"];

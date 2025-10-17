@@ -1,3 +1,4 @@
+import { Option } from "effect";
 import {
   empty as baseEmpty,
   HandlerConfigGroup,
@@ -12,10 +13,20 @@ export type SubscriptionHandlerConfigGroup =
 
 export const empty = () => baseEmpty<SubscriptionHandlerConfig>();
 
-export const add = (handlerConfig: SubscriptionHandlerConfig) =>
-  baseAdd(handlerConfig);
+export const add = (
+  handlerConfig: SubscriptionHandlerConfig,
+): ((
+  handlerConfigGroup: SubscriptionHandlerConfigGroup,
+) => SubscriptionHandlerConfigGroup) => baseAdd(handlerConfig);
 
-export const addGroup = (otherGroup: SubscriptionHandlerConfigGroup) =>
-  baseAddGroup(otherGroup);
+export const addGroup = (
+  otherGroup: SubscriptionHandlerConfigGroup,
+): ((
+  thisGroup: SubscriptionHandlerConfigGroup,
+) => SubscriptionHandlerConfigGroup) => baseAddGroup(otherGroup);
 
-export const getHandlerConfig = (key: string) => baseGetHandlerConfig(key);
+export const getHandlerConfig = (
+  key: string,
+): ((
+  handlerConfigGroup: SubscriptionHandlerConfigGroup,
+) => Option.Option<SubscriptionHandlerConfig>) => baseGetHandlerConfig(key);

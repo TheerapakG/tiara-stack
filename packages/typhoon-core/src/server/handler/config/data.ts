@@ -11,9 +11,10 @@ import { PartialMutationHandlerConfig } from "./mutation/data";
 import { RequestParamsConfig } from "./shared/requestParams";
 import { ResponseConfig } from "./shared/response";
 
-export class DummyHandlerConfig extends Data.TaggedClass(
-  "DummyHandlerConfig",
-) {}
+const DummyHandlerConfigTaggedClass: new (args: void) => {
+  readonly _tag: "DummyHandlerConfig";
+} = Data.TaggedClass("DummyHandlerConfig");
+export class DummyHandlerConfig extends DummyHandlerConfigTaggedClass {}
 
 export const empty = () => new DummyHandlerConfig();
 

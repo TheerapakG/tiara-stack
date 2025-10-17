@@ -16,6 +16,32 @@ import {
 } from "../shared/data";
 import { none } from "../../../../utils/strictOption";
 
+type PartialSubscriptionHandlerConfigData<
+  Name extends Option.Option<string> = Option.Option<string>,
+  RequestParams extends Option.Option<
+    RequestParamsConfig<StandardSchemaV1, boolean>
+  > = Option.Option<RequestParamsConfig<StandardSchemaV1, boolean>>,
+  Response extends Option.Option<
+    ResponseConfig<StandardSchemaV1, boolean>
+  > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
+> = { data: BasePartialHandlerConfig<Name, RequestParams, Response> };
+const PartialSubscriptionHandlerConfigTaggedClass: new <
+  Name extends Option.Option<string> = Option.Option<string>,
+  RequestParams extends Option.Option<
+    RequestParamsConfig<StandardSchemaV1, boolean>
+  > = Option.Option<RequestParamsConfig<StandardSchemaV1, boolean>>,
+  Response extends Option.Option<
+    ResponseConfig<StandardSchemaV1, boolean>
+  > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
+>(
+  args: Readonly<
+    PartialSubscriptionHandlerConfigData<Name, RequestParams, Response>
+  >,
+) => Readonly<
+  PartialSubscriptionHandlerConfigData<Name, RequestParams, Response>
+> & { readonly _tag: "PartialSubscriptionHandlerConfig" } = Data.TaggedClass(
+  "PartialSubscriptionHandlerConfig",
+);
 export class PartialSubscriptionHandlerConfig<
   const Name extends Option.Option<string> = Option.Option<string>,
   const RequestParams extends Option.Option<
@@ -24,9 +50,11 @@ export class PartialSubscriptionHandlerConfig<
   const Response extends Option.Option<
     ResponseConfig<StandardSchemaV1, boolean>
   > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
-> extends Data.TaggedClass("PartialSubscriptionHandlerConfig")<{
-  data: BasePartialHandlerConfig<Name, RequestParams, Response>;
-}> {}
+> extends PartialSubscriptionHandlerConfigTaggedClass<
+  Name,
+  RequestParams,
+  Response
+> {}
 
 export const empty = () =>
   new PartialSubscriptionHandlerConfig({
