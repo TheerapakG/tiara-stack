@@ -22,4 +22,7 @@ export default defineConfig({
       return [module, filePath];
     }),
   ),
+  dts: {
+    tsgo: true,
+  },
 });
