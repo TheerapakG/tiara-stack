@@ -5,6 +5,7 @@ import {
   GuildService,
   PlayerService,
   SheetService,
+  ScreenshotService,
 } from "@/services/guild";
 import {
   CachedInteractionContext,
@@ -16,12 +17,12 @@ export const guildServices = (guildId: string) =>
   pipe(
     FormatService.Default,
     Layer.provideMerge(ConverterService.Default),
-    Layer.provideMerge(SheetService.DefaultWithoutDependencies),
     Layer.provideMerge(
       Layer.mergeAll(
         GuildConfigService.DefaultWithoutDependencies,
         SheetService.DefaultWithoutDependencies,
         PlayerService.DefaultWithoutDependencies,
+        ScreenshotService.DefaultWithoutDependencies,
       ),
     ),
     Layer.provideMerge(GuildService.fromGuildId(guildId)),
