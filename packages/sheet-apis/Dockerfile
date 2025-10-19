@@ -6,6 +6,7 @@ RUN apt install -y libargon2-1 zstd
 COPY ./cert/ca-certificate.crt /usr/local/share/ca-certificates/
 RUN update-ca-certificates
 
+RUN npm install -g playwright
 RUN npx playwright install --with-deps chromium
 
 COPY ./dist.tar.zst ./dist.tar.zst
