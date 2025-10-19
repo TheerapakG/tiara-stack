@@ -72,13 +72,14 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()(
               ({ sheetGid, screenshotRange }) =>
                 `https://docs.google.com/spreadsheets/d/${sheetService.sheetId}/htmlembed/sheet?gid=${sheetGid}&range=${screenshotRange}`,
             ),
-            Effect.tap(({ url }) => Effect.log(url)),
             Effect.flatMap(({ url }) =>
               Effect.tryPromise(async () => {
                 const browser = await chromium.launch();
-                const page = await browser.newPage();
+                const context = await browser.newContext({
+                  permissions: ["local-fonts"],
+                });
+                const page = await context.newPage();
                 await page.goto(url);
-                console.log(await page.content());
                 const boundingBox = await page.locator("table").boundingBox();
                 if (!boundingBox) {
                   throw new Error("Table not found");
