@@ -8,6 +8,7 @@ import {
   messageCheckinHandlerConfigCollection,
   messageRoomOrderHandlerConfigCollection,
   messageSlotHandlerConfigCollection,
+  screenshotHandlerConfigCollection,
 } from "./server/handler/config";
 
 export * as Schema from "./server/schema";
@@ -25,4 +26,5 @@ export const serverHandlerConfigCollection = pipe(
     messageRoomOrderHandlerConfigCollection,
   ),
   Handler.Config.Collection.addCollection(messageSlotHandlerConfigCollection),
+  Handler.Config.Collection.addCollection(screenshotHandlerConfigCollection),
 );

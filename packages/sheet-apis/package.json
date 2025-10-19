@@ -41,6 +41,7 @@
     "effect": "^3.17.14",
     "google-auth-library": "^10.1.0",
     "jose": "^6.1.0",
+    "playwright": "^1.56.1",
     "postgres": "^3.4.7",
     "sheet-db-schema": "workspace:*",
     "typhoon-core": "workspace:*",

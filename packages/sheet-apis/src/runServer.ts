@@ -18,6 +18,7 @@ import {
   messageCheckinHandlerCollection,
   messageRoomOrderHandlerCollection,
   messageSlotHandlerCollection,
+  screenshotHandlerCollection,
 } from "./server/handler/handler";
 import {
   AuthService,
@@ -73,6 +74,7 @@ const serverHandlerCollection = pipe(
   Context.Collection.addCollection(messageCheckinHandlerCollection),
   Context.Collection.addCollection(messageRoomOrderHandlerCollection),
   Context.Collection.addCollection(messageSlotHandlerCollection),
+  Context.Collection.addCollection(screenshotHandlerCollection),
 );
 
 const server = pipe(

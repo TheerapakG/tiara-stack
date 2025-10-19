@@ -756,6 +756,17 @@ export class SheetService extends Effect.Service<SheetService>()(
                 }),
               ),
         ),
+        Effect.let(
+          "sheetGetSheetGids",
+          ({ sheet }) =>
+            () =>
+              pipe(
+                sheet.getSheetGids(sheetId),
+                Effect.withSpan("SheetService.getSheetGids", {
+                  captureStackTrace: true,
+                }),
+              ),
+        ),
         Effect.bindAll(
           ({
             sheet,
@@ -835,6 +846,7 @@ export class SheetService extends Effect.Service<SheetService>()(
             sheetGet,
             sheetGetHashMap,
             sheetUpdate,
+            sheetGetSheetGids,
             rangesConfig,
             teamConfig,
             eventConfig,
@@ -844,9 +856,11 @@ export class SheetService extends Effect.Service<SheetService>()(
             allSchedules,
             runnerConfig,
           }) => ({
+            sheetId: sheetId,
             get: sheetGet,
             getHashMap: () => sheetGetHashMap,
             update: sheetUpdate,
+            getSheetGids: sheetGetSheetGids,
             getRangesConfig: () =>
               pipe(
                 rangesConfig,

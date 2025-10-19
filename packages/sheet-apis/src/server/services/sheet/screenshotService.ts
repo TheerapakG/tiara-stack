@@ -1,0 +1,101 @@
+import { GoogleSheets } from "@/google/sheets";
+import { Array, Effect, HashMap, Number, pipe, String } from "effect";
+import { chromium } from "playwright";
+import { SheetService } from "./sheetService";
+
+export class ScreenshotService extends Effect.Service<ScreenshotService>()(
+  "ScreenshotService",
+  {
+    effect: pipe(
+      Effect.Do,
+      Effect.bindAll(
+        () => ({
+          sheetService: SheetService,
+        }),
+        { concurrency: "unbounded" },
+      ),
+      Effect.bindAll(
+        ({ sheetService }) => ({
+          sheetGids: Effect.cached(
+            pipe(
+              sheetService.getSheetGids(),
+              Effect.withSpan("ScreenshotService.sheetGids", {
+                captureStackTrace: true,
+              }),
+            ),
+          ),
+          scheduleConfig: Effect.cached(
+            pipe(
+              sheetService.getScheduleConfig(),
+              Effect.withSpan("ScreenshotService.scheduleConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          ),
+        }),
+        { concurrency: "unbounded" },
+      ),
+      Effect.map(({ sheetService, sheetGids, scheduleConfig }) => ({
+        getScreenshot: (channel: string, day: number) =>
+          pipe(
+            Effect.Do,
+            Effect.bindAll(
+              () => ({
+                scheduleConfigs: scheduleConfig,
+              }),
+              { concurrency: "unbounded" },
+            ),
+            Effect.bind("filteredScheduleConfig", ({ scheduleConfigs }) =>
+              pipe(
+                scheduleConfigs,
+                Array.filter(
+                  (a) =>
+                    String.Equivalence(a.channel, channel) &&
+                    Number.Equivalence(a.day, day),
+                ),
+                Array.head,
+              ),
+            ),
+            Effect.let("sheetGid", ({ filteredScheduleConfig }) =>
+              pipe(
+                sheetGids,
+                Effect.map(HashMap.get(filteredScheduleConfig.sheet)),
+              ),
+            ),
+            Effect.bind(
+              "screenshotRange",
+              ({ filteredScheduleConfig }) =>
+                filteredScheduleConfig.screenshotRange,
+            ),
+            Effect.flatMap(({ sheetGid, screenshotRange }) =>
+              Effect.tryPromise(async () => {
+                const browser = await chromium.launch();
+                const page = await browser.newPage();
+                await page.goto(
+                  `https://docs.google.com/spreadsheets/d/${sheetService.sheetId}/htmlembed/sheet?gid=${sheetGid}&range=${screenshotRange}`,
+                );
+                const boundingBox = await page.locator("table").boundingBox();
+                if (!boundingBox) {
+                  throw new Error("Table not found");
+                }
+                await page.setViewportSize({
+                  width: boundingBox.width,
+                  height: boundingBox.height,
+                });
+                const buffer = await page
+                  .locator("table")
+                  .screenshot({ type: "png" });
+                await browser.close();
+                return new Uint8Array(buffer);
+              }),
+            ),
+            Effect.withSpan("ScreenshotService.getScreenshot", {
+              captureStackTrace: true,
+            }),
+          ),
+      })),
+    ),
+    dependencies: [GoogleSheets.Default],
+    accessors: true,
+  },
+) {}
