@@ -56,10 +56,10 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()(
                 Array.head,
               ),
             ),
-            Effect.let("sheetGid", ({ filteredScheduleConfig }) =>
+            Effect.bind("sheetGid", ({ filteredScheduleConfig }) =>
               pipe(
                 sheetGids,
-                Effect.map(HashMap.get(filteredScheduleConfig.sheet)),
+                Effect.flatMap(HashMap.get(filteredScheduleConfig.sheet)),
               ),
             ),
             Effect.bind(
