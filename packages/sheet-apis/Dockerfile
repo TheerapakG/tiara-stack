@@ -6,6 +6,8 @@ RUN apt install -y libargon2-1 zstd
 COPY ./cert/ca-certificate.crt /usr/local/share/ca-certificates/
 RUN update-ca-certificates
 
+WORKDIR /app
+
 RUN npm init -y
 RUN npm pkg set type="module"
 RUN npm install playwright
