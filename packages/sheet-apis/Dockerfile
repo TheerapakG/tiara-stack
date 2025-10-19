@@ -6,10 +6,7 @@ RUN apt install -y libargon2-1 zstd
 COPY ./cert/ca-certificate.crt /usr/local/share/ca-certificates/
 RUN update-ca-certificates
 
-RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.bashrc" SHELL="$(which bash)" bash -
-ENV PNPM_HOME="/root/.local/share/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN pnpm exec playwright install --with-deps chromium
+RUN npx playwright install --with-deps chromium
 
 COPY ./dist.tar.zst ./dist.tar.zst
 
