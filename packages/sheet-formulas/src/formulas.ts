@@ -4,9 +4,13 @@ import {
   Effect,
   HashMap,
   Option,
+  Number,
   pipe,
   Schema,
   Match,
+  DateTime,
+  Duration,
+  String,
 } from "effect";
 import {
   serverHandlerConfigCollection,
@@ -107,6 +111,7 @@ export function THEECALC2(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
         { concurrency: "unbounded" },
       ),
       Effect.tap(() => calcSheet.getRange(`AX30:CD`).clearContent()),
+      Effect.tap(() => calcSheet.getRange(`AX30`).setValue("calculating")),
       Effect.andThen(({ settingSheet }) =>
         pipe(
           Effect.Do,
@@ -206,14 +211,221 @@ export function THEECALC2(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
                     pipe(
                       Effect.log(result),
                       Effect.andThen(() =>
-                        calcSheet
-                          .getRange(`AX30:CD${result.length + 29}`)
-                          .setValues(result),
+                        result.length > 0
+                          ? calcSheet
+                              .getRange(`AX30:CD${result.length + 29}`)
+                              .setValues(result)
+                          : calcSheet.getRange(`AX30:CD30`).clearContent(),
                       ),
                     ),
                 }),
               ),
           }),
+        ),
+      ),
+    ),
+  );
+}
+
+export function TZSHORTSTAMPS(
+  start: CellValue,
+  tzs: CellValue[][],
+  hours: CellValue[][],
+) {
+  return Effect.runSync(
+    pipe(
+      Effect.Do,
+      Effect.bind("start", () =>
+        pipe(
+          start,
+          Schema.decodeUnknown(
+            pipe(
+              Schema.Number,
+              Schema.transform(Schema.Number, {
+                strict: true,
+                decode: Number.multiply(1000),
+                encode: Number.unsafeDivide(1000),
+              }),
+              Schema.compose(Schema.DateTimeUtcFromNumber),
+            ),
+          ),
+        ),
+      ),
+      Effect.bind("tzs", () =>
+        pipe(
+          tzs,
+          Array.flatten,
+          Schema.decodeUnknown(Schema.Array(Schema.String)),
+        ),
+      ),
+      Effect.bind("hours", () =>
+        pipe(
+          hours,
+          Array.flatten,
+          Schema.decodeUnknown(Schema.Array(Schema.Number)),
+        ),
+      ),
+      Effect.andThen(({ start, tzs, hours }) =>
+        pipe(
+          hours,
+          Effect.forEach((hour) =>
+            pipe(
+              Effect.Do,
+              Effect.let("startTime", () =>
+                pipe(start, DateTime.addDuration(Duration.hours(hour - 1))),
+              ),
+              Effect.map(({ startTime }) =>
+                pipe(
+                  tzs,
+                  Array.map((tz) =>
+                    pipe(
+                      Option.Do,
+                      Option.bind("startTimeTz", () =>
+                        DateTime.makeZoned(startTime, { timeZone: tz }),
+                      ),
+                      Option.let("startTimeTzHours", ({ startTimeTz }) =>
+                        pipe(
+                          startTimeTz,
+                          DateTime.getPart("hours"),
+                          (n) => n.toString(),
+                          String.padStart(2, "0"),
+                        ),
+                      ),
+                      Option.let("startTimeTzMinutes", ({ startTimeTz }) =>
+                        pipe(
+                          startTimeTz,
+                          DateTime.getPart("minutes"),
+                          (n) => n.toString(),
+                          String.padStart(2, "0"),
+                        ),
+                      ),
+                      Option.map(
+                        ({ startTimeTzHours, startTimeTzMinutes }) =>
+                          `${startTimeTzHours}:${startTimeTzMinutes}`,
+                      ),
+                      Option.getOrElse(() => ""),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+export function TZLONGSTAMPS(
+  start: CellValue,
+  tzs: CellValue[][],
+  hours: CellValue[][],
+) {
+  return Effect.runSync(
+    pipe(
+      Effect.Do,
+      Effect.bind("start", () =>
+        pipe(
+          start,
+          Schema.decodeUnknown(
+            pipe(
+              Schema.Number,
+              Schema.transform(Schema.Number, {
+                strict: true,
+                decode: Number.multiply(1000),
+                encode: Number.unsafeDivide(1000),
+              }),
+              Schema.compose(Schema.DateTimeUtcFromNumber),
+            ),
+          ),
+        ),
+      ),
+      Effect.bind("tzs", () =>
+        pipe(
+          tzs,
+          Array.flatten,
+          Schema.decodeUnknown(Schema.Array(Schema.String)),
+        ),
+      ),
+      Effect.bind("hours", () =>
+        pipe(
+          hours,
+          Array.flatten,
+          Schema.decodeUnknown(Schema.Array(Schema.Number)),
+        ),
+      ),
+      Effect.andThen(({ start, tzs, hours }) =>
+        pipe(
+          hours,
+          Effect.forEach((hour) =>
+            pipe(
+              Effect.Do,
+              Effect.let("startTime", () =>
+                pipe(start, DateTime.addDuration(Duration.hours(hour - 1))),
+              ),
+              Effect.let("endTime", () =>
+                pipe(start, DateTime.addDuration(Duration.hours(hour))),
+              ),
+              Effect.map(({ startTime, endTime }) =>
+                pipe(
+                  tzs,
+                  Array.map((tz) =>
+                    pipe(
+                      Option.Do,
+                      Option.bind("startTimeTz", () =>
+                        DateTime.makeZoned(startTime, { timeZone: tz }),
+                      ),
+                      Option.bind("endTimeTz", () =>
+                        DateTime.makeZoned(endTime, { timeZone: tz }),
+                      ),
+                      Option.let("startTimeTzHours", ({ startTimeTz }) =>
+                        pipe(
+                          startTimeTz,
+                          DateTime.getPart("hours"),
+                          (n) => n.toString(),
+                          String.padStart(2, "0"),
+                        ),
+                      ),
+                      Option.let("startTimeTzMinutes", ({ startTimeTz }) =>
+                        pipe(
+                          startTimeTz,
+                          DateTime.getPart("minutes"),
+                          (n) => n.toString(),
+                          String.padStart(2, "0"),
+                        ),
+                      ),
+                      Option.let("endTimeTzHours", ({ endTimeTz }) =>
+                        pipe(
+                          endTimeTz,
+                          DateTime.getPart("hours"),
+                          (n) => n.toString(),
+                          String.padStart(2, "0"),
+                        ),
+                      ),
+                      Option.let("endTimeTzMinutes", ({ endTimeTz }) =>
+                        pipe(
+                          endTimeTz,
+                          DateTime.getPart("minutes"),
+                          (n) => n.toString(),
+                          String.padStart(2, "0"),
+                        ),
+                      ),
+                      Option.map(
+                        ({
+                          startTimeTzHours,
+                          startTimeTzMinutes,
+                          endTimeTzHours,
+                          endTimeTzMinutes,
+                        }) =>
+                          `${startTimeTzHours}:${startTimeTzMinutes} - ${endTimeTzHours}:${endTimeTzMinutes}`,
+                      ),
+                      Option.getOrElse(() => ""),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     ),
