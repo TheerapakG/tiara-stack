@@ -173,6 +173,23 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
             ),
             Effect.withSpan("GoogleSheets.update", { captureStackTrace: true }),
           ),
+        getSheetGids: (sheetId: string) =>
+          pipe(
+            Effect.tryPromise(() =>
+              sheets.spreadsheets.get({ spreadsheetId: sheetId }),
+            ),
+            Effect.map((sheet) => sheet.data.sheets ?? []),
+            Effect.map(
+              Array.map(
+                (sheet) =>
+                  [sheet.properties?.title, sheet.properties?.sheetId] as const,
+              ),
+            ),
+            Effect.map(HashMap.fromIterable),
+            Effect.withSpan("GoogleSheets.getSheetGids", {
+              captureStackTrace: true,
+            }),
+          ),
         parseValueRangeToStringOption: (
           valueRange: sheets_v4.Schema$ValueRange,
         ) =>

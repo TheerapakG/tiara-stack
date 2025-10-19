@@ -3,11 +3,16 @@ import { SheetService } from "./sheetService";
 import { Layer } from "effect";
 import { pipe } from "effect";
 import { Computed } from "typhoon-core/signal";
+import { ScreenshotService } from "./screenshotService";
 
 export * from "./playerService";
 export * from "./sheetService";
+export * from "./screenshotService";
 
-const sheetServiceDependendents = PlayerService.Default;
+const sheetServiceDependendents = Layer.mergeAll(
+  PlayerService.Default,
+  ScreenshotService.Default,
+);
 
 export const layerOfSheetId = (sheetId: string) =>
   pipe(

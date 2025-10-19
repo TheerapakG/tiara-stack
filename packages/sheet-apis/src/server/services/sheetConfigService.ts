@@ -34,6 +34,7 @@ const scheduleConfigParser = ([
   fillRange,
   overfillRange,
   standbyRange,
+  screenshotRange,
   draft,
 ]: sheets_v4.Schema$ValueRange[]) =>
   pipe(
@@ -114,6 +115,15 @@ const scheduleConfigParser = ([
           }),
         ),
       ),
+      screenshotRange: pipe(
+        GoogleSheets.parseValueRangeToStringOption(screenshotRange),
+        Effect.map(Array.map((screenshotRange) => ({ screenshotRange }))),
+        Effect.map(
+          ArrayUtils.WithDefault.wrap({
+            default: { screenshotRange: Option.none() },
+          }),
+        ),
+      ),
       draft: pipe(
         GoogleSheets.parseValueRangeToStringOption(draft),
         Effect.map(Array.map((draft) => ({ draft }))),
@@ -133,6 +143,7 @@ const scheduleConfigParser = ([
         fillRange,
         overfillRange,
         standbyRange,
+        screenshotRange,
         draft,
       }) =>
         pipe(
@@ -145,6 +156,7 @@ const scheduleConfigParser = ([
           ArrayUtils.WithDefault.zip(fillRange),
           ArrayUtils.WithDefault.zip(overfillRange),
           ArrayUtils.WithDefault.zip(standbyRange),
+          ArrayUtils.WithDefault.zip(screenshotRange),
           ArrayUtils.WithDefault.zip(draft),
         ),
     ),
@@ -162,6 +174,7 @@ const scheduleConfigParser = ([
             fillRange,
             overfillRange,
             standbyRange,
+            screenshotRange,
             draft,
           }) =>
             pipe(
@@ -175,6 +188,7 @@ const scheduleConfigParser = ([
               Option.bind("fillRange", () => fillRange),
               Option.bind("overfillRange", () => overfillRange),
               Option.bind("standbyRange", () => standbyRange),
+              Option.let("screenshotRange", () => screenshotRange),
               Option.let("draft", () => draft),
               Option.map((config) => new ScheduleConfig(config)),
             ),
@@ -474,6 +488,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 "'Thee's Sheet Settings'!Y8:Y",
                 "'Thee's Sheet Settings'!Z8:Z",
                 "'Thee's Sheet Settings'!AA8:AA",
+                "'Thee's Sheet Settings'!AB8:AB",
               ],
             }),
             Effect.flatMap((response) =>
@@ -494,8 +509,8 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
             sheet.get({
               spreadsheetId: sheetId,
               ranges: [
-                "'Thee's Sheet Settings'!AC8:AC",
                 "'Thee's Sheet Settings'!AD8:AD",
+                "'Thee's Sheet Settings'!AE8:AE",
               ],
             }),
             Effect.flatMap((response) =>
