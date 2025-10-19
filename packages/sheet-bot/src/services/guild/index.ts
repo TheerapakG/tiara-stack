@@ -4,3 +4,4 @@ export * from "./guildConfigService";
 export * from "./guildService";
 export * from "./playerService";
 export * from "./sheetService";
+export * from "./screenshotService";
