@@ -6,9 +6,9 @@ RUN apt install -y libargon2-1 zstd
 COPY ./cert/ca-certificate.crt /usr/local/share/ca-certificates/
 RUN update-ca-certificates
 
-COPY ./package.json ./package.json
-RUN npm install
+RUN npm install -g playwright
 RUN npx playwright install --with-deps chromium
+RUN echo "NODE_PATH=$(npm root -g)" >> /etc/environment
 
 COPY ./dist.tar.zst ./dist.tar.zst
 
