@@ -11,6 +11,7 @@ export default defineConfig([
     entry: {
       runServer: path.resolve(__dirname, "src/runServer.ts"),
     },
+    external: ["playwright", "playwright-core"],
     noExternal: [/^.*$/],
   },
 ]);
