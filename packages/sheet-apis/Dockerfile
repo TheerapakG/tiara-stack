@@ -6,6 +6,9 @@ RUN apt install -y libargon2-1 zstd
 COPY ./cert/ca-certificate.crt /usr/local/share/ca-certificates/
 RUN update-ca-certificates
 
+COPY ./fonts/ /usr/share/fonts/truetype/
+RUN fc-cache -f -v
+
 WORKDIR /app
 
 RUN npm init -y
