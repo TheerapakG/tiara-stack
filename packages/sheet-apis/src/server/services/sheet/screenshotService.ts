@@ -3,6 +3,7 @@ import { Array, Effect, HashMap, Number, pipe, String } from "effect";
 import { chromium } from "playwright";
 import { SheetService } from "./sheetService";
 import { joinURL, withQuery } from "ufo";
+import screenshotServiceStyle from "./screenshotServiceStyle.css";
 
 export class ScreenshotService extends Effect.Service<ScreenshotService>()(
   "ScreenshotService",
@@ -89,6 +90,7 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()(
                 });
                 const page = await context.newPage();
                 await page.goto(url);
+                await page.addStyleTag({ content: screenshotServiceStyle });
                 const boundingBox = await page.locator("table").boundingBox();
                 if (!boundingBox) {
                   throw new Error("Table not found");
