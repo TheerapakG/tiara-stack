@@ -6,6 +6,9 @@ export default defineConfig([
     entry: {
       index: path.resolve(__dirname, "src/index.ts"),
     },
+    loader: {
+      ".css": "text",
+    },
   },
   {
     entry: {
@@ -13,5 +16,8 @@ export default defineConfig([
     },
     external: ["playwright", "playwright-core"],
     noExternal: [/^.*$/],
+    loader: {
+      ".css": "text",
+    },
   },
 ]);
