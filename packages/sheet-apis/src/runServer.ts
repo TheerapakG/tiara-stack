@@ -1,4 +1,5 @@
 import { NodeSdk } from "@effect/opentelemetry";
+import { FetchHttpClient } from "@effect/platform";
 import { NodeContext, NodeRuntime } from "@effect/platform-node";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
@@ -59,6 +60,7 @@ const layer = pipe(
       DB.DBSubscriptionContext.Default,
       GoogleLive,
       Config.Default,
+      FetchHttpClient.layer,
       NodeContext.layer,
     ),
   ),

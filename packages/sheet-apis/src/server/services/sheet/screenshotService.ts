@@ -1,9 +1,9 @@
 import { GoogleSheets } from "@/google/sheets";
 import { Array, Effect, HashMap, Number, pipe, String } from "effect";
+import { HttpClient } from "@effect/platform";
 import { chromium } from "playwright";
 import { SheetService } from "./sheetService";
 import { joinURL, withQuery } from "ufo";
-import screenshotServiceStyle from "./screenshotServiceStyle.css";
 
 export class ScreenshotService extends Effect.Service<ScreenshotService>()(
   "ScreenshotService",
@@ -82,7 +82,24 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()(
                 },
               ),
             ),
-            Effect.flatMap(({ url }) =>
+            Effect.bind("css", () =>
+              pipe(
+                HttpClient.get(
+                  withQuery("https://fonts.googleapis.com/css2", {
+                    family: ["Lexend:wght@100..900", "Pacifico"],
+                    display: "swap",
+                  }),
+                ),
+                Effect.flatMap((response) => response.text),
+                Effect.map((css) =>
+                  css.replace(
+                    /font-family: '([^']+)';/g,
+                    `font-family: 'docs-$1';`,
+                  ),
+                ),
+              ),
+            ),
+            Effect.flatMap(({ url, css }) =>
               Effect.tryPromise(async () => {
                 const browser = await chromium.launch();
                 const context = await browser.newContext({
@@ -90,7 +107,7 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()(
                 });
                 const page = await context.newPage();
                 await page.goto(url);
-                await page.addStyleTag({ content: screenshotServiceStyle });
+                await page.addStyleTag({ content: css });
                 const boundingBox = await page.locator("table").boundingBox();
                 if (!boundingBox) {
                   throw new Error("Table not found");
