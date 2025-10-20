@@ -147,10 +147,12 @@ const makeServeEffect =
                 );
               },
 
-              error: (peer, error) => {
+              error: (peer) => {
                 return Effect.runPromise(
                   pipe(
-                    Effect.log("[ws] error", peer, error),
+                    serverWithRuntime,
+                    close(peer),
+                    transformErrorResult(() => Effect.void),
                     Effect.withSpan("serve.websocket.error", {
                       captureStackTrace: true,
                     }),
