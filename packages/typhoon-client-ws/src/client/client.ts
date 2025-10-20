@@ -190,6 +190,7 @@ export class WebSocketClient<
       Effect.tap(() =>
         SynchronizedRef.update(client.status, () => "connecting" as const),
       ),
+      Effect.tap(() => Effect.log("connecting to websocket")),
       Effect.bind("latch", () => Effect.makeLatch()),
       Effect.tap(({ latch }) =>
         pipe(
@@ -243,19 +244,21 @@ export class WebSocketClient<
             ws.addEventListener("close", () =>
               Effect.runPromise(
                 pipe(
-                  WebSocketClient.connect(client),
-                  Effect.unlessEffect(
+                  Effect.log("websocket closed"),
+                  Effect.andThen(() =>
                     pipe(
-                      SynchronizedRef.get(client.status),
-                      Effect.map((status) =>
-                        String.Equivalence(status, "disconnecting"),
+                      WebSocketClient.connect(client),
+                      Effect.unlessEffect(
+                        pipe(
+                          SynchronizedRef.get(client.status),
+                          Effect.map((status) =>
+                            String.Equivalence(status, "disconnecting"),
+                          ),
+                        ),
                       ),
+                      Effect.retry(Schedule.exponential(1000)),
                     ),
                   ),
-                  Effect.retry({
-                    schedule: Schedule.exponential(1000),
-                    times: 3,
-                  }),
                 ),
               ),
             );
@@ -266,7 +269,9 @@ export class WebSocketClient<
       Effect.tap(() =>
         SynchronizedRef.update(client.status, () => "connected" as const),
       ),
-      Effect.withSpan("WebSocketClient.connect"),
+      Effect.withSpan("WebSocketClient.connect", {
+        captureStackTrace: true,
+      }),
     );
 
   static close(
@@ -277,6 +282,7 @@ export class WebSocketClient<
   ) {
     return pipe(
       SynchronizedRef.update(client.status, () => "disconnecting" as const),
+      Effect.tap(() => Effect.log("disconnecting from websocket")),
       Effect.andThen(
         SynchronizedRef.updateEffect(client.ws, (ws) =>
           pipe(
@@ -300,7 +306,9 @@ export class WebSocketClient<
       Effect.andThen(
         SynchronizedRef.update(client.status, () => "disconnected" as const),
       ),
-      Effect.withSpan("WebSocketClient.close"),
+      Effect.withSpan("WebSocketClient.close", {
+        captureStackTrace: true,
+      }),
     );
   }
 
@@ -314,7 +322,9 @@ export class WebSocketClient<
     ) =>
       pipe(
         SynchronizedRef.update(client.token, () => token),
-        Effect.withSpan("WebSocketClient.token"),
+        Effect.withSpan("WebSocketClient.token", {
+          captureStackTrace: true,
+        }),
       );
 
   static subscribe<
