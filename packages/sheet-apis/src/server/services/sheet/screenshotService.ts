@@ -2,6 +2,7 @@ import { GoogleSheets } from "@/google/sheets";
 import { Array, Effect, HashMap, Number, pipe, String } from "effect";
 import { chromium } from "playwright";
 import { SheetService } from "./sheetService";
+import { joinURL, withQuery } from "ufo";
 
 export class ScreenshotService extends Effect.Service<ScreenshotService>()(
   "ScreenshotService",
@@ -67,10 +68,18 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()(
               ({ filteredScheduleConfig }) =>
                 filteredScheduleConfig.screenshotRange,
             ),
-            Effect.let(
-              "url",
-              ({ sheetGid, screenshotRange }) =>
-                `https://docs.google.com/spreadsheets/d/${sheetService.sheetId}/htmlembed/sheet?gid=${sheetGid}&range=${screenshotRange}`,
+            Effect.let("url", ({ sheetGid, screenshotRange }) =>
+              withQuery(
+                joinURL(
+                  "https://docs.google.com/spreadsheets/d",
+                  `/${sheetService.sheetId}`,
+                  `/htmlembed/sheet`,
+                ),
+                {
+                  gid: sheetGid,
+                  range: screenshotRange,
+                },
+              ),
             ),
             Effect.flatMap(({ url }) =>
               Effect.tryPromise(async () => {
