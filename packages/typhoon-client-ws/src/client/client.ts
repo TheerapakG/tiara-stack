@@ -108,7 +108,9 @@ export class WebSocketClient<
             MutationHandlerConfigs
           >(url, ws, updaterStateMapRef, configCollection, token, status),
       ),
-      Effect.withSpan("WebSocketClient.create"),
+      Effect.withSpan("WebSocketClient.create", {
+        captureStackTrace: true,
+      }),
     );
   }
 
@@ -241,13 +243,13 @@ export class WebSocketClient<
               ),
             );
             ws.addEventListener("open", () => Effect.runPromise(latch.open));
-            ws.addEventListener("close", () =>
+            ws.addEventListener("error", () =>
               Effect.runPromise(
                 pipe(
-                  Effect.log("websocket closed"),
+                  Effect.log("websocket errored"),
                   Effect.andThen(() =>
                     pipe(
-                      WebSocketClient.connect(client),
+                      WebSocketClient.retryConnect(client),
                       Effect.unlessEffect(
                         pipe(
                           SynchronizedRef.get(client.status),
@@ -256,9 +258,30 @@ export class WebSocketClient<
                           ),
                         ),
                       ),
-                      Effect.retry(Schedule.exponential(1000)),
                     ),
                   ),
+                  Effect.andThen(() => latch.open),
+                ),
+              ),
+            );
+            ws.addEventListener("close", () =>
+              Effect.runPromise(
+                pipe(
+                  Effect.log("websocket closed"),
+                  Effect.andThen(() =>
+                    pipe(
+                      WebSocketClient.retryConnect(client),
+                      Effect.unlessEffect(
+                        pipe(
+                          SynchronizedRef.get(client.status),
+                          Effect.map((status) =>
+                            String.Equivalence(status, "disconnecting"),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Effect.andThen(() => latch.open),
                 ),
               ),
             );
@@ -273,6 +296,21 @@ export class WebSocketClient<
         captureStackTrace: true,
       }),
     );
+
+  static retryConnect(
+    client: WebSocketClient<
+      Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
+      Record<string, Handler.Config.Mutation.MutationHandlerConfig>
+    >,
+  ) {
+    return pipe(
+      WebSocketClient.connect(client),
+      Effect.retry(Schedule.exponential(1000)),
+      Effect.withSpan("WebSocketClient.retryConnect", {
+        captureStackTrace: true,
+      }),
+    );
+  }
 
   static close(
     client: WebSocketClient<
