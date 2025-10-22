@@ -548,6 +548,13 @@ const scheduleParser = (
                   Effect.flatMap((breaks) =>
                     GoogleSheets.parseValueRangeToBooleanOption(breaks),
                   ),
+                  Effect.tap((breaks) =>
+                    Effect.log(
+                      scheduleConfig.channel,
+                      scheduleConfig.day,
+                      breaks,
+                    ),
+                  ),
                   Effect.map(Array.map(Option.getOrElse(() => false))),
                   Effect.map(Array.map((breakHour) => ({ breakHour }))),
                   Effect.map(
