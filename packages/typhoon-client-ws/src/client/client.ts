@@ -20,6 +20,10 @@ import { Validate, Validator } from "typhoon-core/validator";
 
 const WebSocketCtor = globalThis.WebSocket;
 
+class WebSocketError extends Data.TaggedError("WebSocketError")<{
+  cause: Event;
+}> {}
+
 export class HandlerError extends Data.TaggedError("HandlerError")<{
   cause: unknown;
 }> {}
@@ -181,7 +185,7 @@ export class WebSocketClient<
       );
   }
 
-  static connect = (
+  static connectOnce = (
     client: WebSocketClient<
       Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
       Record<string, Handler.Config.Mutation.MutationHandlerConfig>
@@ -193,8 +197,10 @@ export class WebSocketClient<
         SynchronizedRef.update(client.status, () => "connecting" as const),
       ),
       Effect.tap(() => Effect.log("connecting to websocket")),
-      Effect.bind("latch", () => Effect.makeLatch()),
-      Effect.tap(({ latch }) =>
+      Effect.bind("deferred", () =>
+        Deferred.make<Option.Option<WebSocket>, WebSocketError>(),
+      ),
+      Effect.tap(({ deferred }) =>
         pipe(
           client.ws,
           SynchronizedRef.updateEffect(() => {
@@ -242,50 +248,37 @@ export class WebSocketClient<
                 ),
               ),
             );
-            ws.addEventListener("open", () => Effect.runPromise(latch.open));
-            ws.addEventListener("error", () =>
+            ws.addEventListener("open", () =>
+              Effect.runPromise(
+                pipe(
+                  Effect.log("websocket opened"),
+                  Effect.andThen(() =>
+                    pipe(deferred, Deferred.succeed(Option.some(ws))),
+                  ),
+                ),
+              ),
+            );
+            ws.addEventListener("error", (errorEvent) =>
               Effect.runPromise(
                 pipe(
                   Effect.log("websocket errored"),
                   Effect.andThen(() =>
-                    pipe(
-                      WebSocketClient.retryConnect(client),
-                      Effect.unlessEffect(
-                        pipe(
-                          SynchronizedRef.get(client.status),
-                          Effect.map((status) =>
-                            String.Equivalence(status, "disconnecting"),
-                          ),
-                        ),
-                      ),
-                    ),
+                    Deferred.fail(new WebSocketError({ cause: errorEvent })),
                   ),
-                  Effect.andThen(() => latch.open),
                 ),
               ),
             );
-            ws.addEventListener("close", () =>
+            ws.addEventListener("close", (closeEvent) =>
               Effect.runPromise(
                 pipe(
                   Effect.log("websocket closed"),
                   Effect.andThen(() =>
-                    pipe(
-                      WebSocketClient.retryConnect(client),
-                      Effect.unlessEffect(
-                        pipe(
-                          SynchronizedRef.get(client.status),
-                          Effect.map((status) =>
-                            String.Equivalence(status, "disconnecting"),
-                          ),
-                        ),
-                      ),
-                    ),
+                    Deferred.fail(new WebSocketError({ cause: closeEvent })),
                   ),
-                  Effect.andThen(() => latch.open),
                 ),
               ),
             );
-            return latch.whenOpen(Effect.succeedSome(ws));
+            return Deferred.await(deferred);
           }),
         ),
       ),
@@ -297,14 +290,20 @@ export class WebSocketClient<
       }),
     );
 
-  static retryConnect(
+  static connect(
     client: WebSocketClient<
       Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
       Record<string, Handler.Config.Mutation.MutationHandlerConfig>
     >,
   ) {
     return pipe(
-      WebSocketClient.connect(client),
+      WebSocketClient.connectOnce(client),
+      Effect.unlessEffect(
+        pipe(
+          SynchronizedRef.get(client.status),
+          Effect.map((status) => String.Equivalence(status, "disconnecting")),
+        ),
+      ),
       Effect.retry(Schedule.exponential(1000)),
       Effect.withSpan("WebSocketClient.retryConnect", {
         captureStackTrace: true,
