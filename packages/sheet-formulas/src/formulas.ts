@@ -110,14 +110,22 @@ export function THEECALC2(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
         }),
         { concurrency: "unbounded" },
       ),
-      Effect.tap(() => calcSheet.getRange(`AX30:CD`).clearContent()),
-      Effect.tap(() => calcSheet.getRange(`AX30`).setValue("calculating")),
-      Effect.andThen(({ settingSheet }) =>
+      Effect.bind("hour", () =>
+        pipe(
+          calcSheet.getRange("D23").getValue(),
+          Schema.decodeUnknown(Schema.Number),
+        ),
+      ),
+      Effect.tap(() => calcSheet.getRange(`AX30:CC`).clearContent()),
+      Effect.tap(({ hour }) =>
+        calcSheet.getRange(`AX30:AY30`).setValues([[hour, "calculating"]]),
+      ),
+      Effect.andThen(({ hour, settingSheet }) =>
         pipe(
           Effect.Do,
           Effect.bind("url", () =>
             pipe(
-              settingSheet.getRange("AG8").getValue(),
+              settingSheet.getRange("AH8").getValue(),
               Schema.decodeUnknown(Schema.String),
             ),
           ),
@@ -164,7 +172,9 @@ export function THEECALC2(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
               pipe(
                 Effect.logError(e),
                 Effect.andThen(() =>
-                  calcSheet.getRange(`AX30`).setValue("sheet value error"),
+                  calcSheet
+                    .getRange(`AX30:AY30`)
+                    .setValues([[hour, "sheet value error"]]),
                 ),
               ),
             onSuccess: ({ url, config, players, fixedTeams }) =>
@@ -182,7 +192,6 @@ export function THEECALC2(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
                 ),
                 Effect.map(({ result }) =>
                   result.map((r) => [
-                    "",
                     SheetSchema.Room.avgTalent(r),
                     SheetSchema.Room.avgEffectValue(r),
                     ...pipe(
@@ -204,18 +213,23 @@ export function THEECALC2(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
                     pipe(
                       Effect.logError(e),
                       Effect.andThen(() =>
-                        calcSheet.getRange(`AX30`).setValue(e.message),
+                        calcSheet
+                          .getRange(`AX30:AY30`)
+                          .setValues([[hour, e.message]]),
                       ),
                     ),
                   onSuccess: (result) =>
                     pipe(
                       Effect.log(result),
                       Effect.andThen(() =>
+                        calcSheet.getRange(`AX30:AY30`).setValues([[hour, ""]]),
+                      ),
+                      Effect.andThen(() =>
                         result.length > 0
                           ? calcSheet
-                              .getRange(`AX30:CD${result.length + 29}`)
+                              .getRange(`AX31:CC${result.length + 30}`)
                               .setValues(result)
-                          : calcSheet.getRange(`AX30:CD30`).clearContent(),
+                          : undefined,
                       ),
                     ),
                 }),
