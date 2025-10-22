@@ -73,6 +73,7 @@ const getCheckinData = ({
         ),
       ),
     ),
+    Effect.tap(({ schedules }) => Effect.log(HashMap.toEntries(schedules))),
     Effect.flatMap(({ schedules }) =>
       pipe(
         {
