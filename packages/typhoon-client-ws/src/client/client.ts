@@ -263,7 +263,17 @@ export class WebSocketClient<
                 pipe(
                   Effect.log("websocket errored"),
                   Effect.andThen(() =>
-                    Deferred.fail(new WebSocketError({ cause: errorEvent })),
+                    pipe(
+                      WebSocketClient.connect(client),
+                      Effect.unlessEffect(
+                        pipe(
+                          deferred,
+                          Deferred.fail(
+                            new WebSocketError({ cause: errorEvent }),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -273,7 +283,19 @@ export class WebSocketClient<
                 pipe(
                   Effect.log("websocket closed"),
                   Effect.andThen(() =>
-                    Deferred.fail(new WebSocketError({ cause: closeEvent })),
+                    pipe(
+                      WebSocketClient.connect(client),
+                      Effect.unlessEffect(
+                        pipe(
+                          pipe(
+                            deferred,
+                            Deferred.fail(
+                              new WebSocketError({ cause: closeEvent }),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
