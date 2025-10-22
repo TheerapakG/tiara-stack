@@ -24,6 +24,7 @@ import {
   ApplicationIntegrationType,
   InteractionContextType,
   SlashCommandBuilder,
+  AttachmentBuilder,
 } from "discord.js";
 import { Effect, Layer, pipe, Schema } from "effect";
 
@@ -124,9 +125,21 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
               | PermissionService
             >,
         ),
-        InteractionContext.editReply.tap(({ result }) => ({
-          content: `Result: ${JSON.stringify(result)}`,
-        })),
+        Effect.tap(({ result }) => Effect.log(result)),
+        Effect.let("stringResult", ({ result }) =>
+          JSON.stringify(result, null, 2),
+        ),
+        InteractionContext.editReply.tap(({ stringResult }) =>
+          stringResult.length > 500
+            ? {
+                files: [
+                  new AttachmentBuilder(Buffer.from(stringResult), {
+                    name: "result.txt",
+                  }),
+                ],
+              }
+            : { content: stringResult },
+        ),
         Effect.withSpan("handleDebug", { captureStackTrace: true }),
       ),
     ),
