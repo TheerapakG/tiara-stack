@@ -13,6 +13,25 @@ const MsgpackDecodeErrorTaggedError: new (
 )<MsgpackDecodeErrorData>;
 export class MsgpackDecodeError extends MsgpackDecodeErrorTaggedError {}
 
+export const streamToStream = <E, R>(
+  stream: Stream.Stream<Uint8Array, E, R>,
+): Stream.Stream<unknown, MsgpackDecodeError, R> =>
+  pipe(
+    Stream.toReadableStreamEffect(stream),
+    Effect.map((stream) =>
+      Stream.fromAsyncIterable(
+        decodeMultiStream(stream),
+        (error) =>
+          new MsgpackDecodeError({ error: error as RangeError | DecodeError }),
+      ),
+    ),
+    Stream.unwrap,
+    Stream.rechunk(1),
+    Stream.withSpan("Msgpack.Decoder.streamToStream", {
+      captureStackTrace: true,
+    }),
+  );
+
 export const blobToStream = (blob: Blob) =>
   pipe(
     Stream.fromAsyncIterable(
