@@ -56,13 +56,23 @@ const baseRoom = (teams: ReadonlyArray<PlayerTeam>) => {
 const applyRoomEncAndDoormat = (roomTeam: Room) => {
   const teams = Chunk.toArray(roomTeam.teams);
 
+  const tiererTalent = pipe(
+    teams,
+    Array.filter((t) => HashSet.has(t.tags, "tierer")),
+    Array.match({
+      onEmpty: () => 0,
+      onNonEmpty: (self) => Array.max(self, PlayerTeam.byTalent).talent,
+    }),
+  );
+
   let encIndex = -1;
   let bestEffectValue = -Infinity;
   for (let i = 0; i < teams.length; i++) {
     const t = teams[i];
     if (
       HashSet.has(t.tags, "encable") &&
-      PlayerTeam.getEffectValue(t) > bestEffectValue
+      PlayerTeam.getEffectValue(t) > bestEffectValue &&
+      t.talent > tiererTalent
     ) {
       bestEffectValue = PlayerTeam.getEffectValue(t);
       encIndex = i;
@@ -93,7 +103,7 @@ const applyRoomEncAndDoormat = (roomTeam: Room) => {
         HashSet.make(tiererOverride ? "tierer_enc_override" : "enc"),
       )(t);
     }
-    return t.talent > encTeam.talent
+    return t.talent > encTeam.talent && !HashSet.has(t.tags, "tierer")
       ? PlayerTeam.addTags(HashSet.make("doormat"))(t)
       : t;
   });

@@ -1,4 +1,4 @@
-import { HashSet, Schema } from "effect";
+import { HashSet, Order, Schema } from "effect";
 import { Team } from "./team";
 import { Option, pipe } from "effect";
 
@@ -10,6 +10,11 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
   talent: Schema.Number,
   tags: Schema.HashSet(Schema.String),
 }) {
+  static byTalent = Order.mapInput(
+    Order.number,
+    ({ talent }: PlayerTeam) => talent,
+  );
+
   static addTags(tags: HashSet.HashSet<string>) {
     return (playerTeam: PlayerTeam) =>
       new PlayerTeam({
