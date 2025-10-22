@@ -1,5 +1,5 @@
+import { HttpClient as EffectHttpClient, HttpBody } from "@effect/platform";
 import { Data, Effect, Option, pipe, Schema, SynchronizedRef } from "effect";
-import { ofetch } from "ofetch";
 import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { Validate, Validator } from "typhoon-core/validator";
@@ -130,17 +130,19 @@ export class HttpClient<
         requestBuffer.set(dataEncoded, requestHeaderEncoded.length);
         return requestBuffer;
       }),
-      Effect.bind("blob", ({ requestBuffer }) =>
-        Effect.tryPromise(() =>
-          ofetch(client.url, {
-            method: "POST",
-            body: requestBuffer,
-            responseType: "blob",
+      Effect.bind("stream", ({ requestBuffer }) =>
+        pipe(
+          EffectHttpClient.post(client.url, {
+            body: HttpBody.uint8Array(
+              requestBuffer,
+              "application/octet-stream",
+            ),
           }),
+          Effect.map((response) => response.stream),
         ),
       ),
-      Effect.bind("pullStream", ({ blob }) =>
-        pipe(Msgpack.Decoder.blobToStream(blob), Stream.toPullStream),
+      Effect.bind("pullStream", ({ stream }) =>
+        pipe(Msgpack.Decoder.streamToStream(stream), Stream.toPullStream),
       ),
       Effect.bind("header", ({ pullStream }) =>
         pipe(
