@@ -59,7 +59,7 @@ const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
       ),
     ),
     Effect.map(Array.getSomes),
-    Effect.map(Array.map(ScheduleConfig.make)),
+    Effect.map(Array.map((config) => ScheduleConfig.make(config))),
     Effect.withSpan("scheduleConfigParser", { captureStackTrace: true }),
   );
 
