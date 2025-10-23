@@ -40,7 +40,8 @@ const parseValueRange = <A, R>(
     Effect.withSpan("parseValueRange", { captureStackTrace: true }),
   );
 
-const rangeSchema = Schema.Array(Schema.OptionFromSelf(Schema.String));
+const cellSchema = Schema.OptionFromSelf(Schema.String);
+const rangeSchema = Schema.Array(cellSchema);
 const rangeToStructOptionSchema = <const Keys extends ReadonlyArray<string>>(
   keys: Keys,
 ) =>
@@ -59,11 +60,9 @@ const rangeToStructOptionSchema = <const Keys extends ReadonlyArray<string>>(
     Schema.compose(
       TupleToStructSchema.TupleToStructSchema(
         keys,
-        Array.makeBy(keys.length, () =>
-          Schema.OptionFromSelf(Schema.String),
-        ) as Types.TupleOf<
+        Array.makeBy(keys.length, () => cellSchema) as Types.TupleOf<
           Keys["length"],
-          Schema.OptionFromSelf<typeof Schema.String>
+          typeof cellSchema
         >,
       ) as unknown as Schema.Schema<
         { [K in Keys[number]]: Option.Option<string> },
@@ -279,13 +278,23 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
 ) {
   static parseValueRange = parseValueRange;
 
+  static cellSchema = cellSchema;
   static rangeSchema = rangeSchema;
   static rangeToStructOptionSchema = rangeToStructOptionSchema;
   static toStringSchema = toStringSchema;
+  static cellToStringSchema = Schema.OptionFromSelf(toStringSchema);
   static toNumberSchema = toNumberSchema;
+  static cellToNumberSchema = Schema.OptionFromSelf(toNumberSchema);
   static toBooleanSchema = toBooleanSchema;
+  static cellToBooleanSchema = Schema.OptionFromSelf(toBooleanSchema);
   static toLiteralSchema = toLiteralSchema;
+  static cellToLiteralSchema = <
+    const Literals extends Array.NonEmptyReadonlyArray<string>,
+  >(
+    literals: Literals,
+  ) => Schema.OptionFromSelf(toLiteralSchema(literals));
   static toStringArraySchema = toStringArraySchema;
+  static cellToStringArraySchema = Schema.OptionFromSelf(toStringArraySchema);
 
   static parseValueRangeToLiteralOption = <
     const Literals extends Array.NonEmptyReadonlyArray<string>,
