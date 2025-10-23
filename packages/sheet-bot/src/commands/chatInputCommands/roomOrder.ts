@@ -167,6 +167,9 @@ const handleManual =
               Utils.mapPositional(PlayerService.mapScheduleWithPlayers),
             ),
           ),
+          Effect.tap(({ schedules, schedule, hour }) =>
+            Effect.log(HashMap.get(schedules, hour), schedule),
+          ),
           Effect.bind("scheduleTeams", ({ schedule, runnerConfig, hour }) =>
             pipe(
               Effect.Do,
