@@ -162,37 +162,7 @@ const scheduleConfigParser = ([
     Effect.map(({ array }) =>
       pipe(
         array,
-        Array.map(
-          ({
-            channel,
-            day,
-            sheet,
-            hourRange,
-            breakRange,
-            monitorRange,
-            fillRange,
-            overfillRange,
-            standbyRange,
-            screenshotRange,
-            draft,
-          }) =>
-            pipe(
-              Option.Do,
-              Option.bind("channel", () => channel),
-              Option.bind("day", () => day),
-              Option.bind("sheet", () => sheet),
-              Option.bind("hourRange", () => hourRange),
-              Option.bind("breakRange", () => breakRange),
-              Option.bind("monitorRange", () => monitorRange),
-              Option.bind("fillRange", () => fillRange),
-              Option.bind("overfillRange", () => overfillRange),
-              Option.bind("standbyRange", () => standbyRange),
-              Option.let("screenshotRange", () => screenshotRange),
-              Option.let("draft", () => draft),
-              Option.map((config) => new ScheduleConfig(config)),
-            ),
-        ),
-        Array.getSomes,
+        Array.map((config) => new ScheduleConfig(config)),
       ),
     ),
     Effect.withSpan("dayConfigParser", { captureStackTrace: true }),

@@ -4,6 +4,7 @@ import { HttpClient } from "@effect/platform";
 import { chromium } from "playwright";
 import { SheetService } from "./sheetService";
 import { joinURL, withQuery } from "ufo";
+import { Utils } from "typhoon-core/utils";
 
 export class ScreenshotService extends Effect.Service<ScreenshotService>()(
   "ScreenshotService",
@@ -50,6 +51,15 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()(
             Effect.bind("filteredScheduleConfig", ({ scheduleConfigs }) =>
               pipe(
                 scheduleConfigs,
+                Array.map(
+                  Utils.getSomeFields([
+                    "channel",
+                    "day",
+                    "sheet",
+                    "screenshotRange",
+                  ]),
+                ),
+                Array.getSomes,
                 Array.filter(
                   (a) =>
                     String.Equivalence(a.channel, channel) &&
@@ -64,12 +74,7 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()(
                 Effect.flatMap(HashMap.get(filteredScheduleConfig.sheet)),
               ),
             ),
-            Effect.bind(
-              "screenshotRange",
-              ({ filteredScheduleConfig }) =>
-                filteredScheduleConfig.screenshotRange,
-            ),
-            Effect.let("url", ({ sheetGid, screenshotRange }) =>
+            Effect.let("url", ({ sheetGid, filteredScheduleConfig }) =>
               withQuery(
                 joinURL(
                   "https://docs.google.com/spreadsheets/d",
@@ -78,7 +83,7 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()(
                 ),
                 {
                   gid: sheetGid,
-                  range: screenshotRange,
+                  range: filteredScheduleConfig.screenshotRange,
                 },
               ),
             ),
