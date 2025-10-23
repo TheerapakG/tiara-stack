@@ -59,8 +59,6 @@ const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
         Schema.compose(DefaultTaggedClass.DefaultTaggedClass(ScheduleConfig)),
       ),
     ),
-    Effect.tap(() => Effect.log(range.values)),
-    Effect.tap((config) => Effect.log(config)),
     Effect.map(Array.getSomes),
     Effect.withSpan("scheduleConfigParser", { captureStackTrace: true }),
   );
