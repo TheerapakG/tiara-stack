@@ -56,10 +56,10 @@ const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
             draft: GoogleSheets.cellToStringSchema,
           }),
         ),
-        Schema.compose(DefaultTaggedClass.DefaultTaggedClass(ScheduleConfig)),
       ),
     ),
     Effect.map(Array.getSomes),
+    Effect.map(Array.map(ScheduleConfig.make)),
     Effect.withSpan("scheduleConfigParser", { captureStackTrace: true }),
   );
 
