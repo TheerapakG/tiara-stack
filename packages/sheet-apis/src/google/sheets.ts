@@ -34,7 +34,6 @@ const parseValueRange = <A, R>(
             Schema.compose(rowSchema),
           ),
         ),
-        Effect.tapError(Effect.log),
         Effect.option,
       ),
     ),
