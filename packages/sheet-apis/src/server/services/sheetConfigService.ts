@@ -23,149 +23,44 @@ import {
 import { Array as ArrayUtils } from "typhoon-core/utils";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 
-const scheduleConfigParser = ([
-  channel,
-  day,
-  sheet,
-  hourRange,
-  breakRange,
-  monitorRange,
-  fillRange,
-  overfillRange,
-  standbyRange,
-  screenshotRange,
-  draft,
-]: sheets_v4.Schema$ValueRange[]) =>
+const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
   pipe(
-    Effect.Do,
-    Effect.bindAll(() => ({
-      channel: pipe(
-        GoogleSheets.parseValueRangeToStringOption(channel),
-        Effect.map(Array.map((channel) => ({ channel }))),
-        Effect.map(
-          ArrayUtils.WithDefault.wrap({ default: { channel: Option.none() } }),
-        ),
-      ),
-      day: pipe(
-        GoogleSheets.parseValueRangeToNumberOption(day),
-        Effect.map(Array.map((day) => ({ day }))),
-        Effect.map(
-          ArrayUtils.WithDefault.wrap({ default: { day: Option.none() } }),
-        ),
-      ),
-      sheet: pipe(
-        GoogleSheets.parseValueRangeToStringOption(sheet),
-        Effect.map(Array.map((sheet) => ({ sheet }))),
-        Effect.map(
-          ArrayUtils.WithDefault.wrap({ default: { sheet: Option.none() } }),
-        ),
-      ),
-      hourRange: pipe(
-        GoogleSheets.parseValueRangeToStringOption(hourRange),
-        Effect.map(Array.map((hourRange) => ({ hourRange }))),
-        Effect.map(
-          ArrayUtils.WithDefault.wrap({
-            default: { hourRange: Option.none() },
-          }),
-        ),
-      ),
-      breakRange: pipe(
-        GoogleSheets.parseValueRangeToStringOption(breakRange),
-        Effect.map(Array.map((breakRange) => ({ breakRange }))),
-        Effect.map(
-          ArrayUtils.WithDefault.wrap({
-            default: { breakRange: Option.none() },
-          }),
-        ),
-      ),
-      monitorRange: pipe(
-        GoogleSheets.parseValueRangeToStringOption(monitorRange),
-        Effect.map(Array.map((monitorRange) => ({ monitorRange }))),
-        Effect.map(
-          ArrayUtils.WithDefault.wrap({
-            default: { monitorRange: Option.none() },
-          }),
-        ),
-      ),
-      fillRange: pipe(
-        GoogleSheets.parseValueRangeToStringOption(fillRange),
-        Effect.map(Array.map((fillRange) => ({ fillRange }))),
-        Effect.map(
-          ArrayUtils.WithDefault.wrap({
-            default: { fillRange: Option.none() },
-          }),
-        ),
-      ),
-      overfillRange: pipe(
-        GoogleSheets.parseValueRangeToStringOption(overfillRange),
-        Effect.map(Array.map((overfillRange) => ({ overfillRange }))),
-        Effect.map(
-          ArrayUtils.WithDefault.wrap({
-            default: { overfillRange: Option.none() },
-          }),
-        ),
-      ),
-      standbyRange: pipe(
-        GoogleSheets.parseValueRangeToStringOption(standbyRange),
-        Effect.map(Array.map((standbyRange) => ({ standbyRange }))),
-        Effect.map(
-          ArrayUtils.WithDefault.wrap({
-            default: { standbyRange: Option.none() },
-          }),
-        ),
-      ),
-      screenshotRange: pipe(
-        GoogleSheets.parseValueRangeToStringOption(screenshotRange),
-        Effect.map(Array.map((screenshotRange) => ({ screenshotRange }))),
-        Effect.map(
-          ArrayUtils.WithDefault.wrap({
-            default: { screenshotRange: Option.none() },
-          }),
-        ),
-      ),
-      draft: pipe(
-        GoogleSheets.parseValueRangeToStringOption(draft),
-        Effect.map(Array.map((draft) => ({ draft }))),
-        Effect.map(
-          ArrayUtils.WithDefault.wrap({ default: { draft: Option.none() } }),
-        ),
-      ),
-    })),
-    Effect.map(
-      ({
-        channel,
-        day,
-        sheet,
-        hourRange,
-        breakRange,
-        monitorRange,
-        fillRange,
-        overfillRange,
-        standbyRange,
-        screenshotRange,
-        draft,
-      }) =>
-        pipe(
-          channel,
-          ArrayUtils.WithDefault.zip(day),
-          ArrayUtils.WithDefault.zip(sheet),
-          ArrayUtils.WithDefault.zip(hourRange),
-          ArrayUtils.WithDefault.zip(breakRange),
-          ArrayUtils.WithDefault.zip(monitorRange),
-          ArrayUtils.WithDefault.zip(fillRange),
-          ArrayUtils.WithDefault.zip(overfillRange),
-          ArrayUtils.WithDefault.zip(standbyRange),
-          ArrayUtils.WithDefault.zip(screenshotRange),
-          ArrayUtils.WithDefault.zip(draft),
-        ),
-    ),
-    Effect.map(({ array }) =>
+    GoogleSheets.parseValueRange(
+      range,
       pipe(
-        array,
-        Array.map((config) => new ScheduleConfig(config)),
+        GoogleSheets.rangeToStructOptionSchema([
+          "channel",
+          "day",
+          "sheet",
+          "hourRange",
+          "breakRange",
+          "monitorRange",
+          "fillRange",
+          "overfillRange",
+          "standbyRange",
+          "screenshotRange",
+          "draft",
+        ]),
+        Schema.compose(
+          Schema.Struct({
+            channel: GoogleSheets.cellToStringSchema,
+            day: GoogleSheets.cellToNumberSchema,
+            sheet: GoogleSheets.cellToStringSchema,
+            hourRange: GoogleSheets.cellToStringSchema,
+            breakRange: GoogleSheets.cellToStringSchema,
+            monitorRange: GoogleSheets.cellToStringSchema,
+            fillRange: GoogleSheets.cellToStringSchema,
+            overfillRange: GoogleSheets.cellToStringSchema,
+            standbyRange: GoogleSheets.cellToStringSchema,
+            screenshotRange: GoogleSheets.cellToStringSchema,
+            draft: GoogleSheets.cellToStringSchema,
+          }),
+        ),
       ),
     ),
-    Effect.withSpan("dayConfigParser", { captureStackTrace: true }),
+    Effect.map(Array.getSomes),
+    Effect.map(Array.map((config) => new ScheduleConfig(config))),
+    Effect.withSpan("scheduleConfigParser", { captureStackTrace: true }),
   );
 
 export type TeamConfigMap = HashMap.HashMap<string, TeamConfig>;
@@ -446,19 +341,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              ranges: [
-                "'Thee's Sheet Settings'!R8:R",
-                "'Thee's Sheet Settings'!S8:S",
-                "'Thee's Sheet Settings'!T8:T",
-                "'Thee's Sheet Settings'!U8:U",
-                "'Thee's Sheet Settings'!V8:V",
-                "'Thee's Sheet Settings'!W8:W",
-                "'Thee's Sheet Settings'!X8:X",
-                "'Thee's Sheet Settings'!Y8:Y",
-                "'Thee's Sheet Settings'!Z8:Z",
-                "'Thee's Sheet Settings'!AA8:AA",
-                "'Thee's Sheet Settings'!AB8:AB",
-              ],
+              ranges: ["'Thee's Sheet Settings'!R8:AB"],
             }),
             Effect.flatMap((response) =>
               pipe(
