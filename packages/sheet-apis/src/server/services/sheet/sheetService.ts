@@ -22,7 +22,7 @@ import {
   String,
 } from "effect";
 import { Computed } from "typhoon-core/signal";
-import { Array as ArrayUtils } from "typhoon-core/utils";
+import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 import { GuildConfigService } from "../guildConfigService";
 import { RunnerConfigMap, SheetConfigService } from "../sheetConfigService";
 
@@ -363,7 +363,29 @@ class ScheduleConfigField extends Data.TaggedClass("ScheduleConfigField")<{
   field: string;
 }> {}
 
-const scheduleRanges = (scheduleConfigValues: ScheduleConfig[]) =>
+const scheduleConfigFields = [
+  "channel",
+  "day",
+  "sheet",
+  "hourRange",
+  "breakRange",
+  "monitorRange",
+  "fillRange",
+  "overfillRange",
+  "standbyRange",
+] as const;
+
+type FilteredScheduleConfigValue = Option.Option.Value<
+  Utils.GetSomeFields<ScheduleConfig, (typeof scheduleConfigFields)[number]>
+>;
+const filterScheduleConfigValues = (scheduleConfigValues: ScheduleConfig[]) =>
+  pipe(
+    scheduleConfigValues,
+    Array.map(Utils.getSomeFields(scheduleConfigFields)),
+    Array.getSomes,
+  );
+
+const scheduleRanges = (scheduleConfigValues: FilteredScheduleConfigValue[]) =>
   pipe(
     scheduleConfigValues,
     Array.reduce(
@@ -421,7 +443,7 @@ const scheduleRanges = (scheduleConfigValues: ScheduleConfig[]) =>
   );
 
 const scheduleParser = (
-  scheduleConfigValues: ScheduleConfig[],
+  scheduleConfigValues: FilteredScheduleConfigValue[],
   sheet: HashMap.HashMap<ScheduleConfigField, sheets_v4.Schema$ValueRange>,
   runnerConfigMap: RunnerConfigMap,
 ) =>
@@ -822,13 +844,16 @@ export class SheetService extends Effect.Service<SheetService>()(
                 }),
                 { concurrency: "unbounded" },
               ),
-              Effect.bind("sheet", ({ scheduleConfigs }) =>
-                sheetGetHashMap(scheduleRanges(scheduleConfigs)),
+              Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
+                filterScheduleConfigValues(scheduleConfigs),
+              ),
+              Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
+                sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
               ),
               Effect.bind(
                 "schedules",
-                ({ scheduleConfigs, sheet, runnerConfig }) =>
-                  scheduleParser(scheduleConfigs, sheet, runnerConfig),
+                ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
+                  scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
               ),
               Effect.map(({ schedules }) => schedules),
               Effect.provideService(GoogleSheets, sheet),
@@ -930,6 +955,7 @@ export class SheetService extends Effect.Service<SheetService>()(
                 Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
                   pipe(
                     scheduleConfigs,
+                    filterScheduleConfigValues,
                     Array.filter((a) => Number.Equivalence(a.day, day)),
                   ),
                 ),
@@ -964,6 +990,7 @@ export class SheetService extends Effect.Service<SheetService>()(
                 Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
                   pipe(
                     scheduleConfigs,
+                    filterScheduleConfigValues,
                     Array.filter((a) => String.Equivalence(a.channel, channel)),
                   ),
                 ),
