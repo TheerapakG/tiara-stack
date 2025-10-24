@@ -25,6 +25,7 @@ class WebSocketError extends Data.TaggedError("WebSocketError")<{
 }> {}
 
 export class HandlerError extends Data.TaggedError("HandlerError")<{
+  message: string;
   cause: unknown;
 }> {}
 
@@ -169,8 +170,28 @@ export class WebSocketClient<
                           timestamp,
                           value: header.payload.success
                             ? Effect.succeed(decodedResponse)
-                            : Effect.fail(
-                                new HandlerError({ cause: decodedResponse }),
+                            : pipe(
+                                decodedResponse,
+                                Schema.decodeUnknown(
+                                  Schema.Struct({ message: Schema.String }),
+                                ),
+                                Effect.option,
+                                Effect.flatMap((messageOption) =>
+                                  Effect.fail(
+                                    new HandlerError({
+                                      message: pipe(
+                                        messageOption,
+                                        Option.map(
+                                          (message) => message.message,
+                                        ),
+                                        Option.getOrElse(
+                                          () => "An unknown error occurred",
+                                        ),
+                                      ),
+                                      cause: decodedResponse,
+                                    }),
+                                  ),
+                                ),
                               ),
                         }),
                       ),
@@ -447,7 +468,12 @@ export class WebSocketClient<
                               handler,
                             )(client.configCollection),
                             Effect.catchAll((error) =>
-                              Effect.fail(new HandlerError({ cause: error })),
+                              Effect.fail(
+                                new HandlerError({
+                                  message: `Failed to get handler config for ${handler}`,
+                                  cause: error,
+                                }),
+                              ),
                             ),
                           ),
                         ),
@@ -461,7 +487,12 @@ export class WebSocketClient<
                               ),
                             )(value),
                             Effect.catchAll((error) =>
-                              Effect.fail(new HandlerError({ cause: error })),
+                              Effect.fail(
+                                new HandlerError({
+                                  message: `Failed to validate response for ${handler}`,
+                                  cause: error,
+                                }),
+                              ),
                             ),
                           ),
                         ),
@@ -617,7 +648,12 @@ export class WebSocketClient<
                         handler,
                       )(client.configCollection),
                       Effect.catchAll((error) =>
-                        Effect.fail(new HandlerError({ cause: error })),
+                        Effect.fail(
+                          new HandlerError({
+                            message: `Failed to get handler config for ${handler}`,
+                            cause: error,
+                          }),
+                        ),
                       ),
                     ),
                   ),
@@ -631,7 +667,12 @@ export class WebSocketClient<
                         ),
                       )(value),
                       Effect.catchAll((error) =>
-                        Effect.fail(new HandlerError({ cause: error })),
+                        Effect.fail(
+                          new HandlerError({
+                            message: `Failed to validate response for ${handler}`,
+                            cause: error,
+                          }),
+                        ),
                       ),
                     ),
                   ),
@@ -735,7 +776,12 @@ export class WebSocketClient<
                         handler,
                       )(client.configCollection),
                       Effect.catchAll((error) =>
-                        Effect.fail(new HandlerError({ cause: error })),
+                        Effect.fail(
+                          new HandlerError({
+                            message: `Failed to get handler config for ${handler}`,
+                            cause: error,
+                          }),
+                        ),
                       ),
                     ),
                   ),
@@ -749,7 +795,12 @@ export class WebSocketClient<
                         ),
                       )(value),
                       Effect.catchAll((error) =>
-                        Effect.fail(new HandlerError({ cause: error })),
+                        Effect.fail(
+                          new HandlerError({
+                            message: `Failed to validate response for ${handler}`,
+                            cause: error,
+                          }),
+                        ),
                       ),
                     ),
                   ),
