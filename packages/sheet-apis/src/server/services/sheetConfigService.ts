@@ -19,6 +19,7 @@ import {
   pipe,
   Schema,
   String,
+  Match,
 } from "effect";
 import { Array as ArrayUtils } from "typhoon-core/utils";
 import { DefaultTaggedClass } from "typhoon-core/schema";
@@ -69,21 +70,41 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
   pipe(
     GoogleSheets.parseValueRange(
       range,
-      GoogleSheets.rangeToStructOptionSchema([
-        "name",
-        "sheet",
-        "playerNameRange",
-        "teamNameRange",
-        "leadRange",
-        "backlineRange",
-        "talentRange",
-        "tagsType",
-        "tags",
-      ]),
+      pipe(
+        GoogleSheets.rangeToStructOptionSchema([
+          "name",
+          "sheet",
+          "playerNameRange",
+          "teamNameRange",
+          "leadRange",
+          "backlineRange",
+          "talentRange",
+          "tagsType",
+          "tags",
+        ]),
+        Schema.compose(
+          pipe(
+            Schema.Struct({
+              name: GoogleSheets.cellToStringSchema,
+              sheet: GoogleSheets.cellToStringSchema,
+              playerNameRange: GoogleSheets.cellToStringSchema,
+              teamNameRange: GoogleSheets.cellToStringSchema,
+              leadRange: GoogleSheets.cellToStringSchema,
+              backlineRange: GoogleSheets.cellToStringSchema,
+              talentRange: GoogleSheets.cellToStringSchema,
+              tagsType: GoogleSheets.cellToLiteralSchema([
+                "constants",
+                "ranges",
+              ]),
+              tags: GoogleSheets.cellToStringSchema,
+            }),
+          ),
+        ),
+      ),
     ),
     Effect.map(Array.getSomes),
-    Effect.flatMap(
-      Effect.forEach(
+    Effect.map(
+      Array.map(
         ({
           name,
           sheet,
@@ -95,38 +116,7 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
           tagsType,
           tags,
         }) =>
-          pipe(
-            Effect.Do,
-            Effect.bindAll(() => ({
-              name: Effect.succeed(name),
-              sheet: Effect.succeed(sheet),
-              playerNameRange: Effect.succeed(playerNameRange),
-              teamNameRange: Effect.succeed(teamNameRange),
-              leadRange: Effect.succeed(leadRange),
-              backlineRange: Effect.succeed(backlineRange),
-              talentRange: Effect.succeed(talentRange),
-              tagsType: pipe(
-                tagsType,
-                Effect.transposeMapOption(
-                  Schema.decode(
-                    GoogleSheets.toLiteralSchema(["constants", "ranges"]),
-                  ),
-                ),
-                Effect.map(Option.orElseSome(() => "constants" as const)),
-              ),
-              tags: pipe(
-                Effect.succeed(tags),
-                Effect.map(Option.orElseSome(() => "")),
-              ),
-            })),
-          ),
-      ),
-    ),
-    Effect.map((array) =>
-      pipe(
-        array,
-        Array.map(
-          ({
+          TeamConfig.make({
             name,
             sheet,
             playerNameRange,
@@ -134,45 +124,37 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
             leadRange,
             backlineRange,
             talentRange,
-            tagsType,
-            tags,
-          }) =>
-            pipe(
-              Option.Do,
-              Option.bind("name", () => name),
-              Option.bind("sheet", () => sheet),
-              Option.bind("playerNameRange", () => playerNameRange),
-              Option.bind("teamNameRange", () => teamNameRange),
-              Option.bind("leadRange", () => leadRange),
-              Option.bind("backlineRange", () => backlineRange),
-              Option.bind("talentRange", () => talentRange),
-              Option.bind("tagsType", () => tagsType),
-              Option.bind("tags", () => tags),
-              Option.map(
-                ({ tagsType, tags, ...config }) =>
-                  new TeamConfig({
-                    ...config,
-                    tagsConfig:
-                      tagsType === "constants"
-                        ? new TeamTagsConstantsConfig({
-                            tags: pipe(
-                              tags,
-                              String.split(","),
-                              Array.map(String.trim),
-                              Array.filter(String.isNonEmpty),
-                            ),
-                          })
-                        : new TeamTagsRangesConfig({ tagsRange: tags }),
-                  }),
+            tagsConfig: pipe(
+              tagsType,
+              Option.flatMap((tagsType) =>
+                pipe(
+                  Match.value(tagsType),
+                  Match.when("constants", () =>
+                    Option.some(
+                      new TeamTagsConstantsConfig({
+                        tags: pipe(
+                          tags,
+                          Option.getOrElse(() => ""),
+                          String.split(","),
+                          Array.map(String.trim),
+                          Array.filter(String.isNonEmpty),
+                        ),
+                      }),
+                    ),
+                  ),
+                  Match.when("ranges", () =>
+                    pipe(
+                      tags,
+                      Option.map(
+                        (tags) => new TeamTagsRangesConfig({ tagsRange: tags }),
+                      ),
+                    ),
+                  ),
+                  Match.exhaustive,
+                ),
               ),
             ),
-        ),
-        Array.getSomes,
-        ArrayUtils.Collect.toHashMap({
-          keyGetter: ({ name }) => name,
-          valueInitializer: (a) => a,
-          valueReducer: (_, a) => a,
-        }),
+          }),
       ),
     ),
     Effect.withSpan("teamConfigParser", { captureStackTrace: true }),
