@@ -4,6 +4,7 @@ import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { Validate, Validator } from "typhoon-core/validator";
 
 export class HandlerError extends Data.TaggedError("HandlerError")<{
+  message: string;
   cause: unknown;
 }> {}
 
@@ -161,7 +162,12 @@ export class AppsScriptClient<
             handler,
           )(client.configCollection),
           Effect.catchAll((error) =>
-            Effect.fail(new HandlerError({ cause: error })),
+            Effect.fail(
+              new HandlerError({
+                message: `Failed to get handler config for ${handler}`,
+                cause: error,
+              }),
+            ),
           ),
         ),
       ),
@@ -177,10 +183,31 @@ export class AppsScriptClient<
                 ),
               ),
               Effect.catchAll((error) =>
-                Effect.fail(new HandlerError({ cause: error })),
+                Effect.fail(
+                  new HandlerError({
+                    message: `Failed to validate response for ${handler}`,
+                    cause: error,
+                  }),
+                ),
               ),
             )
-          : Effect.fail(new HandlerError({ cause: decodedResponse })),
+          : pipe(
+              decodedResponse,
+              Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
+              Effect.option,
+              Effect.flatMap((messageOption) =>
+                Effect.fail(
+                  new HandlerError({
+                    message: pipe(
+                      messageOption,
+                      Option.map((message) => message.message),
+                      Option.getOrElse(() => "An unknown error occurred"),
+                    ),
+                    cause: decodedResponse,
+                  }),
+                ),
+              ),
+            ),
       ),
       Effect.scoped,
       Effect.withSpan("AppsScriptClient.once"),
