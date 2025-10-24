@@ -92,7 +92,28 @@ class TeamConfigField extends Data.TaggedClass("TeamConfigField")<{
   field: string;
 }> {}
 
-const teamRanges = (teamConfigValues: TeamConfig[]) =>
+const teamConfigFields = [
+  "name",
+  "sheet",
+  "playerNameRange",
+  "teamNameRange",
+  "leadRange",
+  "backlineRange",
+  "talentRange",
+  "tagsConfig",
+] as const;
+
+type FilteredTeamConfigValue = Option.Option.Value<
+  Utils.GetSomeFields<TeamConfig, (typeof teamConfigFields)[number]>
+>;
+const filterTeamConfigValues = (teamConfigValues: TeamConfig[]) =>
+  pipe(
+    teamConfigValues,
+    Array.map(Utils.getSomeFields(teamConfigFields)),
+    Array.getSomes,
+  );
+
+const teamRanges = (teamConfigValues: FilteredTeamConfigValue[]) =>
   pipe(
     teamConfigValues,
     Array.reduce(
@@ -148,7 +169,7 @@ const teamRanges = (teamConfigValues: TeamConfig[]) =>
   );
 
 const teamParser = (
-  teamConfigValues: TeamConfig[],
+  teamConfigValues: FilteredTeamConfigValue[],
   sheet: HashMap.HashMap<TeamConfigField, sheets_v4.Schema$ValueRange>,
 ) =>
   pipe(
@@ -818,16 +839,16 @@ export class SheetService extends Effect.Service<SheetService>()(
             ),
             teams: pipe(
               Effect.Do,
-              Effect.bind("teamConfig", () => teamConfig),
-              Effect.let("teamConfigValues", ({ teamConfig }) =>
-                HashMap.toValues(teamConfig),
+              Effect.bind("teamConfigs", () => teamConfig),
+              Effect.let("filteredTeamConfigValues", ({ teamConfigs }) =>
+                filterTeamConfigValues(teamConfigs),
               ),
-              Effect.let("ranges", ({ teamConfigValues }) =>
-                teamRanges(teamConfigValues),
+              Effect.let("ranges", ({ filteredTeamConfigValues }) =>
+                teamRanges(filteredTeamConfigValues),
               ),
               Effect.bind("sheet", ({ ranges }) => sheetGetHashMap(ranges)),
-              Effect.flatMap(({ teamConfigValues, sheet }) =>
-                teamParser(teamConfigValues, sheet),
+              Effect.flatMap(({ filteredTeamConfigValues, sheet }) =>
+                teamParser(filteredTeamConfigValues, sheet),
               ),
               Effect.provideService(GoogleSheets, sheet),
               Effect.withSpan("SheetService.teams", {
