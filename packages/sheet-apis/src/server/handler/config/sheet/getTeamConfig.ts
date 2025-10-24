@@ -2,10 +2,7 @@ import { TeamConfig } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 
-const responseSchema = Schema.HashMap({
-  key: Schema.String,
-  value: TeamConfig,
-});
+const responseSchema = Schema.Array(TeamConfig);
 
 export const getTeamConfigHandlerConfig = pipe(
   Handler.Config.empty(),
