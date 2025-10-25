@@ -232,15 +232,15 @@ export class WebSocketClient<
                 pipe(
                   Effect.Do,
                   Effect.let("data", () => event.data as Blob),
-                  Effect.bind("pullStream", ({ data }) =>
+                  Effect.bind("pullEffect", ({ data }) =>
                     pipe(
                       Msgpack.Decoder.blobToStream(data),
-                      Stream.toPullStream,
+                      Stream.toPullEffect,
                     ),
                   ),
-                  Effect.bind("header", ({ pullStream }) =>
+                  Effect.bind("header", ({ pullEffect }) =>
                     pipe(
-                      pullStream,
+                      pullEffect,
                       Effect.flatMap(
                         Validate.validate(
                           pipe(Header.HeaderSchema, Schema.standardSchemaV1),
@@ -250,7 +250,7 @@ export class WebSocketClient<
                   ),
                   Effect.bind(
                     "decodedResponse",
-                    ({ pullStream }) => pullStream,
+                    ({ pullEffect }) => pullEffect,
                   ),
                   Effect.tap(({ header, decodedResponse }) =>
                     pipe(
@@ -505,7 +505,16 @@ export class WebSocketClient<
         ),
       ),
       Effect.bind("token", () => client.token),
-      Effect.bind("requestHeader", ({ id, token }) =>
+      Effect.bind("span", () =>
+        pipe(
+          Effect.currentSpan,
+          Effect.mapBoth({
+            onSuccess: Option.some,
+            onFailure: () => Option.none(),
+          }),
+        ),
+      ),
+      Effect.bind("requestHeader", ({ id, token, span }) =>
         Schema.encode(Header.HeaderSchema)({
           protocol: "typh",
           version: 1,
@@ -515,6 +524,14 @@ export class WebSocketClient<
             handler: handler,
             token: Option.getOrUndefined(token),
           },
+          span: pipe(
+            span,
+            Option.map((span) => ({
+              traceId: span.traceId,
+              spanId: span.spanId,
+            })),
+            Option.getOrUndefined,
+          ),
         }),
       ),
       Effect.bind("requestHeaderEncoded", ({ requestHeader }) =>
@@ -566,7 +583,16 @@ export class WebSocketClient<
     return pipe(
       Effect.Do,
       Effect.tap(() => pipe(client, WebSocketClient.removeUpdater(id))),
-      Effect.bind("header", () =>
+      Effect.bind("span", () =>
+        pipe(
+          Effect.currentSpan,
+          Effect.mapBoth({
+            onSuccess: Option.some,
+            onFailure: () => Option.none(),
+          }),
+        ),
+      ),
+      Effect.bind("header", ({ span }) =>
         Schema.encode(Header.HeaderSchema)({
           protocol: "typh",
           version: 1,
@@ -575,6 +601,14 @@ export class WebSocketClient<
           payload: {
             handler: handler,
           },
+          span: pipe(
+            span,
+            Option.map((span) => ({
+              traceId: span.traceId,
+              spanId: span.spanId,
+            })),
+            Option.getOrUndefined,
+          ),
         }),
       ),
       Effect.bind("headerEncoded", ({ header }) =>
@@ -687,7 +721,16 @@ export class WebSocketClient<
         ),
       ),
       Effect.bind("token", () => client.token),
-      Effect.bind("requestHeader", ({ id, token }) =>
+      Effect.bind("span", () =>
+        pipe(
+          Effect.currentSpan,
+          Effect.mapBoth({
+            onSuccess: Option.some,
+            onFailure: () => Option.none(),
+          }),
+        ),
+      ),
+      Effect.bind("requestHeader", ({ id, token, span }) =>
         Schema.encode(Header.HeaderSchema)({
           protocol: "typh",
           version: 1,
@@ -697,6 +740,14 @@ export class WebSocketClient<
             handler: handler,
             token: Option.getOrUndefined(token),
           },
+          span: pipe(
+            span,
+            Option.map((span) => ({
+              traceId: span.traceId,
+              spanId: span.spanId,
+            })),
+            Option.getOrUndefined,
+          ),
         }),
       ),
       Effect.bind("requestHeaderEncoded", ({ requestHeader }) =>
@@ -815,7 +866,16 @@ export class WebSocketClient<
         ),
       ),
       Effect.bind("token", () => client.token),
-      Effect.bind("requestHeader", ({ id, token }) =>
+      Effect.bind("span", () =>
+        pipe(
+          Effect.currentSpan,
+          Effect.mapBoth({
+            onSuccess: Option.some,
+            onFailure: () => Option.none(),
+          }),
+        ),
+      ),
+      Effect.bind("requestHeader", ({ id, token, span }) =>
         Schema.encode(Header.HeaderSchema)({
           protocol: "typh",
           version: 1,
@@ -825,6 +885,14 @@ export class WebSocketClient<
             handler: handler,
             token: Option.getOrUndefined(token),
           },
+          span: pipe(
+            span,
+            Option.map((span) => ({
+              traceId: span.traceId,
+              spanId: span.spanId,
+            })),
+            Option.getOrUndefined,
+          ),
         }),
       ),
       Effect.bind("requestHeaderEncoded", ({ requestHeader }) =>
