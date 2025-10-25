@@ -13,8 +13,8 @@ export const upsertMessageRoomOrderHandler = pipe(
   builders.data(upsertMessageRoomOrderHandlerConfig),
   builders.handler(
     pipe(
-      Event.token(),
-      Effect.flatMap(Effect.flatMap(AuthService.verify)),
+      Event.someToken(),
+      Effect.flatMap(AuthService.verify),
       Effect.flatMap(() =>
         pipe(
           Event.request.parsed(upsertMessageRoomOrderHandlerConfig),

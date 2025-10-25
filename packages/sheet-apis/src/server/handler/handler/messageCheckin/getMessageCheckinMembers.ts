@@ -13,8 +13,8 @@ export const getMessageCheckinMembersHandler = pipe(
   builders.data(getMessageCheckinMembersHandlerConfig),
   builders.handler(
     pipe(
-      Computed.make(Event.token()),
-      Computed.flatMap(Effect.flatMap(AuthService.verify)),
+      Computed.make(Event.someToken()),
+      Computed.flatMap(AuthService.verify),
       Computed.flatMapComputed(() =>
         Event.request.parsed(getMessageCheckinMembersHandlerConfig),
       ),

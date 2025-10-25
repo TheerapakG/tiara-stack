@@ -1,11 +1,8 @@
 import { FileSystem } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
-import { Data, Effect, pipe } from "effect";
+import { Effect, pipe } from "effect";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-
-export class AuthError extends Data.TaggedError("AuthError")<{
-  message: string;
-}> {}
+import { Authorization } from "typhoon-core/error";
 
 export class AuthService extends Effect.Service<AuthService>()("AuthService", {
   effect: pipe(
@@ -38,7 +35,11 @@ export class AuthService extends Effect.Service<AuthService>()("AuthService", {
                 issuer: "https://kubernetes.default.svc.cluster.local",
                 audience: "sheet-apis",
               }),
-            catch: () => new AuthError({ message: "Error verifying token" }),
+            catch: (cause) =>
+              Authorization.makeAuthorizationError(
+                "Error verifying authorization token",
+                cause,
+              ),
           }),
           Effect.withSpan("AuthService.verify", { captureStackTrace: true }),
         ),
