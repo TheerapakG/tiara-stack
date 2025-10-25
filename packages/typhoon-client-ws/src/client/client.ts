@@ -12,6 +12,7 @@ import {
   Schema,
   String,
   SynchronizedRef,
+  Tracer,
 } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
@@ -508,9 +509,9 @@ export class WebSocketClient<
       Effect.bind("span", () =>
         pipe(
           Effect.currentSpan,
-          Effect.mapBoth({
+          Effect.match({
             onSuccess: Option.some,
-            onFailure: () => Option.none(),
+            onFailure: () => Option.none<Tracer.Span>(),
           }),
         ),
       ),
@@ -586,9 +587,9 @@ export class WebSocketClient<
       Effect.bind("span", () =>
         pipe(
           Effect.currentSpan,
-          Effect.mapBoth({
+          Effect.match({
             onSuccess: Option.some,
-            onFailure: () => Option.none(),
+            onFailure: () => Option.none<Tracer.Span>(),
           }),
         ),
       ),
@@ -724,9 +725,9 @@ export class WebSocketClient<
       Effect.bind("span", () =>
         pipe(
           Effect.currentSpan,
-          Effect.mapBoth({
+          Effect.match({
             onSuccess: Option.some,
-            onFailure: () => Option.none(),
+            onFailure: () => Option.none<Tracer.Span>(),
           }),
         ),
       ),
@@ -869,9 +870,9 @@ export class WebSocketClient<
       Effect.bind("span", () =>
         pipe(
           Effect.currentSpan,
-          Effect.mapBoth({
+          Effect.match({
             onSuccess: Option.some,
-            onFailure: () => Option.none(),
+            onFailure: () => Option.none<Tracer.Span>(),
           }),
         ),
       ),
