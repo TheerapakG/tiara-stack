@@ -8,14 +8,19 @@ import {
   SynchronizedRef,
 } from "effect";
 import { Handler } from "typhoon-core/server";
-import { Msgpack, Stream } from "typhoon-core/protocol";
 import { Computed, Signal } from "typhoon-core/signal";
 import { Validate, Validator } from "typhoon-core/validator";
-import { Authorization } from "typhoon-core/error";
+import { Authorization, Msgpack, Stream } from "typhoon-core/error";
 
 export type { Validator };
 
-const pullStreamToParsed =
+export type MsgpackPullEffect = Effect.Effect<
+  unknown,
+  Msgpack.MsgpackDecodeError | Stream.StreamExhaustedError,
+  never
+>;
+
+const pullEffectToParsed =
   <
     const RequestParams extends
       | Handler.Config.Shared.RequestParams.RequestParamsConfig
@@ -23,15 +28,9 @@ const pullStreamToParsed =
   >(
     requestParams: RequestParams,
   ) =>
-  (
-    pullStream: Effect.Effect<
-      unknown,
-      Msgpack.Decoder.MsgpackDecodeError | Stream.StreamExhaustedError,
-      never
-    >,
-  ) =>
+  (pullEffect: MsgpackPullEffect) =>
     pipe(
-      pullStream,
+      pullEffect,
       Effect.flatMap(
         Validate.validate(
           Handler.Config.resolveRequestParamsValidator(requestParams),
@@ -42,12 +41,8 @@ const pullStreamToParsed =
 type EventContext = {
   request: Request;
   token: Option.Option<string>;
-  pullStream: {
-    stream: Effect.Effect<
-      unknown,
-      Msgpack.Decoder.MsgpackDecodeError | Stream.StreamExhaustedError,
-      never
-    >;
+  pullEffect: {
+    effect: MsgpackPullEffect;
     scope: Scope.CloseableScope;
   };
 };
@@ -57,13 +52,9 @@ export class Event extends Context.Tag("Event")<
   SynchronizedRef.SynchronizedRef<{
     request: Request;
     token: Option.Option<string>;
-    pullStream: Signal.Signal<
+    pullEffect: Signal.Signal<
       Readonly<{
-        stream: Effect.Effect<
-          unknown,
-          Msgpack.Decoder.MsgpackDecodeError | Stream.StreamExhaustedError,
-          never
-        >;
+        effect: MsgpackPullEffect;
         scope: Scope.CloseableScope;
       }>
     >;
@@ -76,9 +67,9 @@ export const makeEventService = (
   SynchronizedRef.make({
     request: ctx.request,
     token: ctx.token,
-    pullStream: Signal.make({
-      stream: ctx.pullStream.stream,
-      scope: ctx.pullStream.scope,
+    pullEffect: Signal.make({
+      effect: ctx.pullEffect.effect,
+      scope: ctx.pullEffect.scope,
     }),
   });
 
@@ -96,14 +87,10 @@ export const replaceToken = (
   );
 
 export const replacePullStream = ({
-  stream,
+  effect,
   scope,
 }: {
-  stream: Effect.Effect<
-    unknown,
-    Msgpack.Decoder.MsgpackDecodeError | Stream.StreamExhaustedError,
-    never
-  >;
+  effect: MsgpackPullEffect;
   scope: Scope.CloseableScope;
 }): Effect.Effect<Context.Tag.Service<Event>, never, Event> =>
   pipe(
@@ -111,10 +98,10 @@ export const replacePullStream = ({
     Effect.bind("ref", () => Event),
     Effect.bind("oldContext", ({ ref }) => SynchronizedRef.get(ref)),
     Effect.bind("oldPullStream", ({ oldContext }) =>
-      oldContext.pullStream.peek(),
+      oldContext.pullEffect.peek(),
     ),
     Effect.tap(({ oldContext }) =>
-      oldContext.pullStream.setValue({ stream, scope }),
+      oldContext.pullEffect.setValue({ effect, scope }),
     ),
     Effect.tap(({ oldPullStream }) =>
       Scope.close(oldPullStream.scope, Exit.void),
@@ -128,7 +115,7 @@ export const close = (): Effect.Effect<void, never, Event> =>
     Effect.bind("ref", () => Event),
     Effect.bind("oldContext", ({ ref }) => SynchronizedRef.get(ref)),
     Effect.bind("oldPullStream", ({ oldContext }) =>
-      oldContext.pullStream.peek(),
+      oldContext.pullEffect.peek(),
     ),
     Effect.tap(({ oldPullStream }) =>
       Scope.close(oldPullStream.scope, Exit.void),
@@ -169,13 +156,9 @@ export const someToken = (): Effect.Effect<
     ),
   );
 
-export const pullStream = (): Effect.Effect<
+export const pullEffect = (): Effect.Effect<
   Signal.Signal<{
-    stream: Effect.Effect<
-      unknown,
-      Msgpack.Decoder.MsgpackDecodeError | Stream.StreamExhaustedError,
-      never
-    >;
+    effect: MsgpackPullEffect;
     scope: Scope.CloseableScope;
   }>,
   never,
@@ -184,20 +167,20 @@ export const pullStream = (): Effect.Effect<
   pipe(
     Event,
     Effect.flatMap((ref) => SynchronizedRef.get(ref)),
-    Effect.map((ctx) => ctx.pullStream),
+    Effect.map((ctx) => ctx.pullEffect),
   );
 
 export const request = {
   raw: () =>
     pipe(
-      pullStream(),
-      Computed.map((pullStream) => pullStream.stream),
+      pullEffect(),
+      Computed.map((pullEffect) => pullEffect.effect),
     ),
   parsed: <Config extends Handler.Config.TypedHandlerConfig>(config: Config) =>
     pipe(
       request.raw(),
       Computed.flatMap(
-        pullStreamToParsed(Handler.Config.requestParams(config)),
+        pullEffectToParsed(Handler.Config.requestParams(config)),
       ),
     ),
 };
