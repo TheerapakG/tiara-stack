@@ -1,6 +1,7 @@
 import { MethodOptions, sheets, sheets_v4 } from "@googleapis/sheets";
 import {
   Array,
+  Data,
   Effect,
   Function,
   HashMap,
@@ -17,6 +18,11 @@ import {
 } from "typhoon-core/schema";
 import { Utils } from "typhoon-core/utils";
 import { GoogleAuth } from "./auth";
+
+export class GoogleSheetsError extends Data.TaggedError("GoogleSheetsError")<{
+  message: string;
+  cause: unknown;
+}> {}
 
 const parseValueRange = <A, R>(
   valueRange: sheets_v4.Schema$ValueRange,
@@ -132,8 +138,28 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
           options?: MethodOptions,
         ) =>
           pipe(
-            Effect.tryPromise(() =>
-              sheets.spreadsheets.values.batchGet(params, options),
+            Effect.tryPromise({
+              try: () => sheets.spreadsheets.values.batchGet(params, options),
+              catch: Function.identity,
+            }),
+            Effect.catchAll((error) =>
+              pipe(
+                error,
+                Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
+                Effect.option,
+                Effect.flatMap((message) =>
+                  Effect.fail(
+                    new GoogleSheetsError({
+                      message: pipe(
+                        message,
+                        Option.map((message) => message.message),
+                        Option.getOrElse(() => "An unknown error occurred"),
+                      ),
+                      cause: error,
+                    }),
+                  ),
+                ),
+              ),
             ),
             Effect.withSpan("GoogleSheets.get", { captureStackTrace: true }),
           ),
@@ -149,10 +175,33 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
             ranges,
             Utils.HashMapPositional((ranges: readonly string[]) =>
               pipe(
-                Effect.tryPromise(() =>
-                  sheets.spreadsheets.values.batchGet(
-                    { ...params, ranges: Array.copy(ranges) },
-                    options,
+                Effect.tryPromise({
+                  try: () =>
+                    sheets.spreadsheets.values.batchGet(
+                      { ...params, ranges: Array.copy(ranges) },
+                      options,
+                    ),
+                  catch: Function.identity,
+                }),
+                Effect.catchAll((error) =>
+                  pipe(
+                    error,
+                    Schema.decodeUnknown(
+                      Schema.Struct({ message: Schema.String }),
+                    ),
+                    Effect.option,
+                    Effect.flatMap((message) =>
+                      Effect.fail(
+                        new GoogleSheetsError({
+                          message: pipe(
+                            message,
+                            Option.map((message) => message.message),
+                            Option.getOrElse(() => "An unknown error occurred"),
+                          ),
+                          cause: error,
+                        }),
+                      ),
+                    ),
                   ),
                 ),
                 Effect.map((sheet) => sheet.data.valueRanges ?? []),
@@ -167,15 +216,56 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
           options?: MethodOptions,
         ) =>
           pipe(
-            Effect.tryPromise(() =>
-              sheets.spreadsheets.values.batchUpdate(params, options),
+            Effect.tryPromise({
+              try: () =>
+                sheets.spreadsheets.values.batchUpdate(params, options),
+              catch: Function.identity,
+            }),
+            Effect.catchAll((error) =>
+              pipe(
+                error,
+                Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
+                Effect.option,
+                Effect.flatMap((message) =>
+                  Effect.fail(
+                    new GoogleSheetsError({
+                      message: pipe(
+                        message,
+                        Option.map((message) => message.message),
+                        Option.getOrElse(() => "An unknown error occurred"),
+                      ),
+                      cause: error,
+                    }),
+                  ),
+                ),
+              ),
             ),
             Effect.withSpan("GoogleSheets.update", { captureStackTrace: true }),
           ),
         getSheetGids: (sheetId: string) =>
           pipe(
-            Effect.tryPromise(() =>
-              sheets.spreadsheets.get({ spreadsheetId: sheetId }),
+            Effect.tryPromise({
+              try: () => sheets.spreadsheets.get({ spreadsheetId: sheetId }),
+              catch: Function.identity,
+            }),
+            Effect.catchAll((error) =>
+              pipe(
+                error,
+                Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
+                Effect.option,
+                Effect.flatMap((message) =>
+                  Effect.fail(
+                    new GoogleSheetsError({
+                      message: pipe(
+                        message,
+                        Option.map((message) => message.message),
+                        Option.getOrElse(() => "An unknown error occurred"),
+                      ),
+                      cause: error,
+                    }),
+                  ),
+                ),
+              ),
             ),
             Effect.map((sheet) => sheet.data.sheets ?? []),
             Effect.map(
