@@ -4,7 +4,7 @@ import {
   none,
   type GetOrUndefined,
   getOrUndefined,
-} from "../../utils/strictOption";
+} from "~/utils/strictOption";
 import type { BaseHandlerT, HandlerData, Handler } from "../type";
 
 export type BasePartialHandlerContext<

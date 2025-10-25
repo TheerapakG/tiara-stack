@@ -1,5 +1,5 @@
 import { Struct } from "effect";
-import { some } from "../../utils/strictOption";
+import { some } from "~/utils/strictOption";
 import type {
   BaseHandlerT,
   Handler,
