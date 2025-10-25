@@ -26,6 +26,12 @@ import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 import { GuildConfigService } from "../guildConfigService";
 import { RunnerConfigMap, SheetConfigService } from "../sheetConfigService";
 
+export class ParserFieldError extends Data.TaggedError("ParserFieldError")<{
+  message: string;
+  range: unknown;
+  field: string;
+}> {}
+
 const playerParser = ([
   userIds,
   userSheetNames,
@@ -187,6 +193,19 @@ const teamParser = (
                   field: "playerName",
                 }),
               ),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  Effect.fail(
+                    new ParserFieldError({
+                      message:
+                        "Error getting player name, no config field found",
+                      range: { name: teamConfig.name },
+                      field: "playerName",
+                    }),
+                  ),
+              }),
+              (e) => Effect.suspend(() => e),
               Effect.flatMap((playerName) =>
                 GoogleSheets.parseValueRangeToStringOption(playerName),
               ),
@@ -205,6 +224,18 @@ const teamParser = (
                   field: "teamName",
                 }),
               ),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  Effect.fail(
+                    new ParserFieldError({
+                      message: "Error getting team name, no config field found",
+                      range: { name: teamConfig.name },
+                      field: "teamName",
+                    }),
+                  ),
+              }),
+              (e) => Effect.suspend(() => e),
               Effect.flatMap((teamName) =>
                 GoogleSheets.parseValueRangeToStringOption(teamName),
               ),
@@ -220,6 +251,18 @@ const teamParser = (
               HashMap.get(
                 new TeamConfigField({ name: teamConfig.name, field: "lead" }),
               ),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  Effect.fail(
+                    new ParserFieldError({
+                      message: "Error getting lead, no config field found",
+                      range: { name: teamConfig.name },
+                      field: "lead",
+                    }),
+                  ),
+              }),
+              (e) => Effect.suspend(() => e),
               Effect.flatMap((lead) =>
                 GoogleSheets.parseValueRangeToNumberOption(lead),
               ),
@@ -238,6 +281,18 @@ const teamParser = (
                   field: "backline",
                 }),
               ),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  Effect.fail(
+                    new ParserFieldError({
+                      message: "Error getting backline, no config field found",
+                      range: { name: teamConfig.name },
+                      field: "backline",
+                    }),
+                  ),
+              }),
+              (e) => Effect.suspend(() => e),
               Effect.flatMap((backline) =>
                 GoogleSheets.parseValueRangeToNumberOption(backline),
               ),
@@ -253,6 +308,18 @@ const teamParser = (
               HashMap.get(
                 new TeamConfigField({ name: teamConfig.name, field: "talent" }),
               ),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  Effect.fail(
+                    new ParserFieldError({
+                      message: "Error getting talent, no config field found",
+                      range: { name: teamConfig.name },
+                      field: "talent",
+                    }),
+                  ),
+              }),
+              (e) => Effect.suspend(() => e),
               Effect.flatMap((talent) =>
                 pipe(GoogleSheets.parseValueRangeToNumberOption(talent)),
               ),
@@ -284,6 +351,19 @@ const teamParser = (
                         field: "tags",
                       }),
                     ),
+                    Option.match({
+                      onSome: Effect.succeed,
+                      onNone: () =>
+                        Effect.fail(
+                          new ParserFieldError({
+                            message:
+                              "Error getting tags, no config field found",
+                            range: { name: teamConfig.name },
+                            field: "tags",
+                          }),
+                        ),
+                    }),
+                    (e) => Effect.suspend(() => e),
                     Effect.flatMap((tags) =>
                       GoogleSheets.parseValueRangeFromStringListToStringArray(
                         tags,
@@ -484,6 +564,21 @@ const scheduleParser = (
                   field: "hours",
                 }),
               ),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  Effect.fail(
+                    new ParserFieldError({
+                      message: "Error getting hours, no config field found",
+                      range: {
+                        channel: scheduleConfig.channel,
+                        day: scheduleConfig.day,
+                      },
+                      field: "hours",
+                    }),
+                  ),
+              }),
+              (e) => Effect.suspend(() => e),
               Effect.flatMap((hours) =>
                 GoogleSheets.parseValueRangeToNumberOption(hours),
               ),
@@ -503,6 +598,21 @@ const scheduleParser = (
                   field: "fills",
                 }),
               ),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  Effect.fail(
+                    new ParserFieldError({
+                      message: "Error getting fills, no config field found",
+                      range: {
+                        channel: scheduleConfig.channel,
+                        day: scheduleConfig.day,
+                      },
+                      field: "fills",
+                    }),
+                  ),
+              }),
+              (e) => Effect.suspend(() => e),
               Effect.flatMap((fills) =>
                 GoogleSheets.parseValueRangeFromStringOptionArrayToStringOptionArray(
                   fills,
@@ -533,6 +643,21 @@ const scheduleParser = (
                   field: "overfills",
                 }),
               ),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  Effect.fail(
+                    new ParserFieldError({
+                      message: "Error getting overfills, no config field found",
+                      range: {
+                        channel: scheduleConfig.channel,
+                        day: scheduleConfig.day,
+                      },
+                      field: "overfills",
+                    }),
+                  ),
+              }),
+              (e) => Effect.suspend(() => e),
               Effect.flatMap((overfills) =>
                 GoogleSheets.parseValueRangeFromStringListToStringArray(
                   overfills,
@@ -554,6 +679,21 @@ const scheduleParser = (
                   field: "standbys",
                 }),
               ),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  Effect.fail(
+                    new ParserFieldError({
+                      message: "Error getting standbys, no config field found",
+                      range: {
+                        channel: scheduleConfig.channel,
+                        day: scheduleConfig.day,
+                      },
+                      field: "standbys",
+                    }),
+                  ),
+              }),
+              (e) => Effect.suspend(() => e),
               Effect.flatMap((standbys) =>
                 GoogleSheets.parseValueRangeFromStringListToStringArray(
                   standbys,
@@ -588,6 +728,22 @@ const scheduleParser = (
                       field: "breaks",
                     }),
                   ),
+                  Option.match({
+                    onSome: Effect.succeed,
+                    onNone: () =>
+                      Effect.fail(
+                        new ParserFieldError({
+                          message:
+                            "Error getting breaks, no config field found",
+                          range: {
+                            channel: scheduleConfig.channel,
+                            day: scheduleConfig.day,
+                          },
+                          field: "breaks",
+                        }),
+                      ),
+                  }),
+                  (e) => Effect.suspend(() => e),
                   Effect.flatMap((breaks) =>
                     GoogleSheets.parseValueRangeToBooleanOption(breaks),
                   ),

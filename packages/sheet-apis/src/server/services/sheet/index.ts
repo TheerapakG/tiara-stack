@@ -11,7 +11,7 @@ export * from "./screenshotService";
 
 const sheetServiceDependendents = Layer.mergeAll(
   PlayerService.Default,
-  ScreenshotService.Default,
+  ScreenshotService.DefaultWithoutDependencies,
 );
 
 export const layerOfSheetId = (sheetId: string) =>
