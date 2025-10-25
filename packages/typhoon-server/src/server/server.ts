@@ -23,6 +23,7 @@ import {
   Struct,
   SynchronizedRef,
   Fiber,
+  Tracer,
 } from "effect";
 import { Context as HandlerContext, type Type } from "typhoon-core/handler";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
@@ -34,7 +35,8 @@ import {
   close as closeEvent,
   Event,
   makeEventService,
-  pullStream as eventPullStream,
+  type MsgpackPullEffect,
+  pullEffect as eventPullEffect,
   replacePullStream,
 } from "../event/event";
 import {
@@ -646,11 +648,11 @@ const handleSubscribe =
           updatePeerSubscriptionState(peer, header.id, {
             onSome: ({ event, effectCleanup }) =>
               pipe(
-                eventPullStream(),
+                eventPullEffect(),
                 Effect.flatMap(OnceObserver.observeOnce),
-                Effect.flatMap((pullStream) =>
+                Effect.flatMap((pullEffect) =>
                   pipe(
-                    replacePullStream(pullStream),
+                    replacePullStream(pullEffect),
                     Effect.map((event) =>
                       Option.some(
                         new SubscriptionState({
@@ -829,12 +831,8 @@ const handleMutate =
 const makeEventServiceFromHeader = (
   request: Request,
   header: Header.Header,
-  pullStream: {
-    stream: Effect.Effect<
-      unknown,
-      Msgpack.Decoder.MsgpackDecodeError | Stream.StreamExhaustedError,
-      never
-    >;
+  pullEffect: {
+    effect: MsgpackPullEffect;
     scope: Scope.CloseableScope;
   },
 ) =>
@@ -849,7 +847,7 @@ const makeEventServiceFromHeader = (
     Effect.flatMap((payload) =>
       makeEventService({
         request,
-        pullStream,
+        pullEffect,
         token: pipe(
           Option.fromNullable(payload.token),
           Option.orElse(() =>
@@ -881,23 +879,19 @@ const makeEventServiceFromHeader = (
 
 const makeHeaderAndEventServiceFromPullStream = (
   request: Request,
-  pullStream: {
-    stream: Effect.Effect<
-      unknown,
-      Msgpack.Decoder.MsgpackDecodeError | Stream.StreamExhaustedError,
-      never
-    >;
+  pullEffect: {
+    effect: MsgpackPullEffect;
     scope: Scope.CloseableScope;
   },
 ) =>
   pipe(
-    pullStream.stream,
+    pullEffect.effect,
     Effect.flatMap(Schema.decodeUnknown(Header.HeaderSchema)),
     Effect.option,
     Effect.flatMap(
       Effect.transposeMapOption((header) =>
         pipe(
-          makeEventServiceFromHeader(request, header, pullStream),
+          makeEventServiceFromHeader(request, header, pullEffect),
           Effect.map((event) => ({ header, event })),
         ),
       ),
@@ -906,6 +900,26 @@ const makeHeaderAndEventServiceFromPullStream = (
       captureStackTrace: true,
     }),
   );
+
+const applyExternalSpan =
+  (spanName: string, externalSpan?: { traceId: string; spanId: string }) =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    externalSpan
+      ? pipe(
+          Effect.Do,
+          Effect.bind("currentSpan", () => Effect.currentSpan),
+          Effect.flatMap(({ currentSpan }) =>
+            pipe(
+              effect,
+              Effect.tap(() => Effect.linkSpanCurrent(currentSpan)),
+              Effect.withSpan(spanName, {
+                captureStackTrace: true,
+              }),
+              Effect.withParentSpan(Tracer.externalSpan(externalSpan)),
+            ),
+          ),
+        )
+      : pipe(effect, Effect.withSpan(spanName, { captureStackTrace: true }));
 
 const sendPeerBuffer = (peer: Peer) => (buffer: Uint8Array) =>
   pipe(
@@ -922,16 +936,16 @@ const handleProtocolWebSocketMessage =
       Effect.Do,
       Effect.bind("scope", () => Scope.make()),
       Effect.let("blob", () => message.blob()),
-      Effect.bind("pullStream", ({ scope, blob }) =>
+      Effect.bind("pullEffect", ({ scope, blob }) =>
         pipe(
           Msgpack.Decoder.blobToStream(blob),
-          Stream.toPullStream,
+          Stream.toPullEffect,
           Scope.extend(scope),
         ),
       ),
-      Effect.flatMap(({ pullStream, scope }) =>
+      Effect.flatMap(({ pullEffect, scope }) =>
         makeHeaderAndEventServiceFromPullStream(peer.request, {
-          stream: pullStream,
+          effect: pullEffect,
           scope,
         }),
       ),
@@ -961,6 +975,7 @@ const handleProtocolWebSocketMessage =
                 Match.orElse(() => () => Effect.void),
               ),
               Effect.provideService(Event, event),
+              applyExternalSpan("Server.handleWebSocketEvent", header.span),
             ),
           onNone: () => Effect.void,
         }),
@@ -1009,16 +1024,16 @@ const handleProtocolWebRequest =
       Effect.Do,
       Effect.bind("scope", () => Scope.make()),
       Effect.bind("blob", () => Effect.promise(() => request.blob())),
-      Effect.bind("pullStream", ({ blob, scope }) =>
+      Effect.bind("pullEffect", ({ blob, scope }) =>
         pipe(
           Msgpack.Decoder.blobToStream(blob),
-          Stream.toPullStream,
+          Stream.toPullEffect,
           Scope.extend(scope),
         ),
       ),
-      Effect.flatMap(({ pullStream, scope }) =>
+      Effect.flatMap(({ pullEffect, scope }) =>
         makeHeaderAndEventServiceFromPullStream(request, {
-          stream: pullStream,
+          effect: pullEffect,
           scope,
         }),
       ),
@@ -1040,11 +1055,15 @@ const handleProtocolWebRequest =
                 Match.orElse(() => returnNotFoundError),
               ),
               Effect.provideService(Event, event),
+              applyExternalSpan(
+                "Server.handleProtocolWebRequestEvent",
+                header.span,
+              ),
             ),
           onNone: returnInvalidHeaderError,
         }),
       ),
-      Effect.withSpan("Server.handleWebRequest", {
+      Effect.withSpan("Server.handleProtocolWebRequest", {
         captureStackTrace: true,
       }),
     );
