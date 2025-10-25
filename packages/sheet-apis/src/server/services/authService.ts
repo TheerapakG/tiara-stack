@@ -1,7 +1,11 @@
 import { FileSystem } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
-import { Effect, pipe } from "effect";
+import { Data, Effect, pipe } from "effect";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+
+export class AuthError extends Data.TaggedError("AuthError")<{
+  message: string;
+}> {}
 
 export class AuthService extends Effect.Service<AuthService>()("AuthService", {
   effect: pipe(
@@ -28,12 +32,14 @@ export class AuthService extends Effect.Service<AuthService>()("AuthService", {
     Effect.map(({ jwks }) => ({
       verify: (token: string) =>
         pipe(
-          Effect.tryPromise(() =>
-            jwtVerify(token, jwks, {
-              issuer: "https://kubernetes.default.svc.cluster.local",
-              audience: "sheet-apis",
-            }),
-          ),
+          Effect.tryPromise({
+            try: () =>
+              jwtVerify(token, jwks, {
+                issuer: "https://kubernetes.default.svc.cluster.local",
+                audience: "sheet-apis",
+              }),
+            catch: () => new AuthError({ message: "Error verifying token" }),
+          }),
           Effect.withSpan("AuthService.verify", { captureStackTrace: true }),
         ),
     })),
