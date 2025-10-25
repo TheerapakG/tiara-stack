@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import { Cause, Data, Effect, Option, pipe } from "effect";
+import { Data, Effect, Option, pipe } from "effect";
 import { Observable } from "../observability";
+import { Validation } from "~/error";
 
 export type Input<Schema extends StandardSchemaV1 | undefined> =
   Schema extends StandardSchemaV1
@@ -12,34 +13,11 @@ export type Output<Schema extends StandardSchemaV1 | undefined> =
     ? StandardSchemaV1.InferOutput<Schema>
     : unknown;
 
-type ValidationErrorData = {
-  issues: readonly StandardSchemaV1.Issue[];
-  message: string;
-};
-const ValidationErrorTaggedError: new (
-  args: Readonly<ValidationErrorData>,
-) => Cause.YieldableError & {
-  readonly _tag: "ValidationError";
-} & Readonly<ValidationErrorData> = Data.TaggedError("ValidationError")<{
-  issues: readonly StandardSchemaV1.Issue[];
-  message: string;
-}>;
-export class ValidationError extends ValidationErrorTaggedError {}
-
-const fromStandardSchemaV1Issues = (
-  issues: readonly StandardSchemaV1.Issue[],
-): ValidationError => {
-  return new ValidationError({
-    issues,
-    message: issues.map((issue) => issue.message).join("\n"),
-  });
-};
-
 const parseStandardSchemaV1Result = <Output = unknown>(
   result: StandardSchemaV1.Result<Output>,
-): Effect.Effect<Output, ValidationError> => {
+): Effect.Effect<Output, Validation.ValidationError> => {
   return result.issues
-    ? Effect.fail(fromStandardSchemaV1Issues(result.issues))
+    ? Effect.fail(Validation.makeValidationError(result.issues))
     : Effect.succeed(result.value);
 };
 
@@ -68,7 +46,7 @@ export const validateSchema =
   >(
     validator: Validator<Schema>,
   ) =>
-  (value: unknown): Effect.Effect<Output, ValidationError> =>
+  (value: unknown): Effect.Effect<Output, Validation.ValidationError> =>
     pipe(
       Effect.Do,
       Effect.let(
@@ -136,12 +114,12 @@ export const validate =
   >(
     validator: Validator<Schema>,
   ) =>
-  (value: unknown): Effect.Effect<Out, ValidationError> =>
+  (value: unknown): Effect.Effect<Out, Validation.ValidationError> =>
     pipe(
       hasSchema(validator)
         ? (validateSchema(validator)(value) as Effect.Effect<
             Out,
-            ValidationError
+            Validation.ValidationError
           >)
         : Effect.succeed(value as Out),
       Observable.withSpan(validator, "Validator.validate", {

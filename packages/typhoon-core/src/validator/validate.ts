@@ -4,7 +4,6 @@ import { Observable } from "../observability";
 import {
   type Output,
   Validator,
-  ValidationError,
   validateOption as validateOptionWithValidator,
   validateSchemaOption as validateSchemaOptionWithValidator,
   validateSchemaWithDefault as validateSchemaWithDefaultWithValidator,
@@ -12,13 +11,17 @@ import {
   validateWithDefault as validateWithDefaultWithValidator,
   validate as validateWithValidator,
 } from "./validator";
+import { Validation } from "~/error";
 
 export const validateSchema = <Schema extends StandardSchemaV1>(
   schema: Schema,
   options?: Observable.ObservableOptions,
 ): ((
   value: unknown,
-) => Effect.Effect<StandardSchemaV1.InferOutput<Schema>, ValidationError>) =>
+) => Effect.Effect<
+  StandardSchemaV1.InferOutput<Schema>,
+  Validation.ValidationError
+>) =>
   validateSchemaWithValidator(
     new Validator({
       [Observable.ObservableSymbol]: options ?? {},
@@ -59,7 +62,9 @@ export const validateSchemaWithDefault = <
 export const validate = <Schema extends StandardSchemaV1 | undefined>(
   schema: Schema,
   options?: Observable.ObservableOptions,
-): ((value: unknown) => Effect.Effect<Output<Schema>, ValidationError>) =>
+): ((
+  value: unknown,
+) => Effect.Effect<Output<Schema>, Validation.ValidationError>) =>
   validateWithValidator(
     new Validator({
       [Observable.ObservableSymbol]: options ?? {},

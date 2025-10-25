@@ -1,52 +1,37 @@
-import {
-  Cause,
-  Chunk,
-  Data,
-  Effect,
-  Function,
-  Option,
-  pipe,
-  Scope,
-  Stream,
-} from "effect";
+import { Chunk, Effect, Function, Option, pipe, Scope, Stream } from "effect";
+import { Stream as StreamError } from "~/error";
 
-const StreamExhaustedErrorTaggedError: new (
-  args: void,
-) => Cause.YieldableError & {
-  readonly _tag: "StreamExhaustedError";
-} = Data.TaggedError("StreamExhaustedError");
-export class StreamExhaustedError extends StreamExhaustedErrorTaggedError {}
-
-export const toPullStream = <A, E, R>(
+export const toPullEffect = <A, E, R>(
   stream: Stream.Stream<A, E, R>,
 ): Effect.Effect<
-  Effect.Effect<A, StreamExhaustedError | E, R>,
+  Effect.Effect<A, StreamError.StreamExhaustedError | E, R>,
   never,
   R | Scope.Scope
 > =>
   pipe(
-    Effect.Do,
-    Effect.bind("scope", () => Effect.scope),
-    Effect.bind("pullStream", ({ scope }) =>
-      pipe(stream, Stream.rechunk(1), Stream.toPull, Scope.extend(scope)),
-    ),
-    Effect.map(({ pullStream }) =>
+    stream,
+    Stream.rechunk(1),
+    Stream.toPull,
+    Effect.map((pullEffect) =>
       pipe(
-        pullStream,
+        pullEffect,
         Effect.map(Chunk.get(0)),
-        Effect.mapError(
-          Option.match({
-            onSome: Function.identity,
-            onNone: () => new StreamExhaustedError(),
-          }),
-        ),
         Effect.flatMap(
           Option.match({
             onSome: Effect.succeed,
-            onNone: () => Effect.fail(new StreamExhaustedError()),
+            onNone: () => Effect.fail(Option.none<E>()),
+          }),
+        ),
+        Effect.mapError(
+          Option.match({
+            onSome: Function.identity,
+            onNone: () =>
+              StreamError.makeStreamExhaustedError("Stream exhausted"),
           }),
         ),
       ),
     ),
-    Effect.withSpan("Stream.toPullStream"),
+    Effect.withSpan("Stream.toPullEffect", {
+      captureStackTrace: true,
+    }),
   );
