@@ -107,7 +107,16 @@ export class HttpClient<
       Effect.Do,
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("token", () => client.token),
-      Effect.bind("requestHeader", ({ id, token }) =>
+      Effect.bind("span", () =>
+        pipe(
+          Effect.currentSpan,
+          Effect.mapBoth({
+            onSuccess: Option.some,
+            onFailure: () => Option.none(),
+          }),
+        ),
+      ),
+      Effect.bind("requestHeader", ({ id, token, span }) =>
         Schema.encode(Header.HeaderSchema)({
           protocol: "typh",
           version: 1,
@@ -117,6 +126,14 @@ export class HttpClient<
             handler: handler,
             token: Option.getOrUndefined(token),
           },
+          span: pipe(
+            span,
+            Option.map((span) => ({
+              traceId: span.traceId,
+              spanId: span.spanId,
+            })),
+            Option.getOrUndefined,
+          ),
         }),
       ),
       Effect.bind("requestHeaderEncoded", ({ requestHeader }) =>
@@ -142,12 +159,12 @@ export class HttpClient<
           Effect.map((response) => response.stream),
         ),
       ),
-      Effect.bind("pullStream", ({ stream }) =>
-        pipe(Msgpack.Decoder.streamToStream(stream), Stream.toPullStream),
+      Effect.bind("pullEffect", ({ stream }) =>
+        pipe(Msgpack.Decoder.streamToStream(stream), Stream.toPullEffect),
       ),
-      Effect.bind("header", ({ pullStream }) =>
+      Effect.bind("header", ({ pullEffect }) =>
         pipe(
-          pullStream,
+          pullEffect,
           Effect.flatMap(
             Validate.validate(
               pipe(Header.HeaderSchema, Schema.standardSchemaV1),
@@ -156,7 +173,7 @@ export class HttpClient<
         ),
       ),
       // TODO: check if the response is a valid header
-      Effect.bind("decodedResponse", ({ pullStream }) => pullStream),
+      Effect.bind("decodedResponse", ({ pullEffect }) => pullEffect),
       Effect.bind("config", () =>
         pipe(
           Handler.Config.Collection.getHandlerConfig(

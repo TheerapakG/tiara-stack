@@ -105,7 +105,16 @@ export class AppsScriptClient<
       Effect.Do,
       Effect.let("id", () => Utilities.getUuid() as string),
       Effect.bind("token", () => client.token),
-      Effect.bind("requestHeader", ({ id, token }) =>
+      Effect.bind("span", () =>
+        pipe(
+          Effect.currentSpan,
+          Effect.mapBoth({
+            onSuccess: Option.some,
+            onFailure: () => Option.none(),
+          }),
+        ),
+      ),
+      Effect.bind("requestHeader", ({ id, token, span }) =>
         Schema.encode(Header.HeaderSchema)({
           protocol: "typh",
           version: 1,
@@ -115,6 +124,14 @@ export class AppsScriptClient<
             handler: handler,
             token: Option.getOrUndefined(token),
           },
+          span: pipe(
+            span,
+            Option.map((span) => ({
+              traceId: span.traceId,
+              spanId: span.spanId,
+            })),
+            Option.getOrUndefined,
+          ),
         }),
       ),
       Effect.bind("requestHeaderEncoded", ({ requestHeader }) =>
@@ -140,12 +157,12 @@ export class AppsScriptClient<
         "bytes",
         ({ response }) => new Uint8Array(response.getBlob().getBytes()),
       ),
-      Effect.bind("pullStream", ({ bytes }) =>
-        pipe(Msgpack.Decoder.bytesToStream(bytes), Stream.toPullStream),
+      Effect.bind("pullEffect", ({ bytes }) =>
+        pipe(Msgpack.Decoder.bytesToStream(bytes), Stream.toPullEffect),
       ),
-      Effect.bind("header", ({ pullStream }) =>
+      Effect.bind("header", ({ pullEffect }) =>
         pipe(
-          pullStream,
+          pullEffect,
           Effect.flatMap(
             Validate.validate(
               pipe(Header.HeaderSchema, Schema.standardSchemaV1),
@@ -154,7 +171,7 @@ export class AppsScriptClient<
         ),
       ),
       // TODO: check if the response is a valid header
-      Effect.bind("decodedResponse", ({ pullStream }) => pullStream),
+      Effect.bind("decodedResponse", ({ pullEffect }) => pullEffect),
       Effect.bind("config", () =>
         pipe(
           Handler.Config.Collection.getHandlerConfig(
