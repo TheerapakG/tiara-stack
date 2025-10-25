@@ -43,7 +43,7 @@ export const SuccessTimestampPayloadSchema = KeyOrderLookupSchema(
 );
 
 export const BaseHeaderSchema = KeyOrderLookupSchema(
-  ["protocol", "version", "id", "action", "payload"],
+  ["protocol", "version", "id", "action", "payload", "span"],
   {
     protocol: Schema.String,
     version: Schema.Number,
@@ -78,6 +78,13 @@ export const BaseHeaderSchema = KeyOrderLookupSchema(
     ),
     action: HeaderActionSchema,
     payload: Schema.Array(Schema.Tuple(Schema.Number, Schema.Unknown)),
+    span: Schema.optionalWith(
+      Schema.Struct({
+        traceId: Schema.String,
+        spanId: Schema.String,
+      }),
+      { nullable: true },
+    ),
   },
 );
 
@@ -171,6 +178,10 @@ export type Header<
     id: string;
     action: action;
     payload: (typeof ActionPayloadSchemas)[action]["Type"];
+    span?: {
+      traceId: string;
+      spanId: string;
+    };
   };
 }[Actions];
 
@@ -185,6 +196,13 @@ const makeHeaderUnionMemberSchema = <
     id: Schema.UUID,
     action: Schema.Literal(literal),
     payload: Schema.Struct(ActionPayloadSchemas[literal].fields),
+    span: Schema.optionalWith(
+      Schema.Struct({
+        traceId: Schema.String,
+        spanId: Schema.String,
+      }),
+      { nullable: true },
+    ),
   }) as Schema.Schema<Header<Action>>;
 
 const HeaderUnionMemberSchemas = pipe(
