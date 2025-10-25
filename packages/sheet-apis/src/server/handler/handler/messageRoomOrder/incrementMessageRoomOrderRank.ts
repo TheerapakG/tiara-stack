@@ -13,8 +13,8 @@ export const incrementMessageRoomOrderRankHandler = pipe(
   builders.data(incrementMessageRoomOrderRankHandlerConfig),
   builders.handler(
     pipe(
-      Event.token(),
-      Effect.flatMap(Effect.flatMap(AuthService.verify)),
+      Event.someToken(),
+      Effect.flatMap(AuthService.verify),
       Effect.flatMap(() =>
         pipe(
           Event.request.parsed(incrementMessageRoomOrderRankHandlerConfig),

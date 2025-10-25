@@ -12,8 +12,8 @@ export const addGuildManagerRoleHandler = pipe(
   builders.data(addGuildManagerRoleHandlerConfig),
   builders.handler(
     pipe(
-      Event.token(),
-      Effect.flatMap(Effect.flatMap(AuthService.verify)),
+      Event.someToken(),
+      Effect.flatMap(AuthService.verify),
       Effect.flatMap(() =>
         pipe(
           Event.request.parsed(addGuildManagerRoleHandlerConfig),
