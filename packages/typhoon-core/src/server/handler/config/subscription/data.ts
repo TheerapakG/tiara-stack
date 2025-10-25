@@ -14,7 +14,7 @@ import {
   requestParams as baseRequestParams,
   response as baseResponse,
 } from "../shared/data";
-import { none } from "../../../../utils/strictOption";
+import { none } from "~/utils/strictOption";
 
 type PartialSubscriptionHandlerConfigData<
   Name extends Option.Option<string> = Option.Option<string>,

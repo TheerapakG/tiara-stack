@@ -2,10 +2,7 @@ import { Option, pipe } from "effect";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { RequestParamsConfig } from "./requestParams";
 import { ResponseConfig } from "./response";
-import {
-  type GetOrUndefined,
-  getOrUndefined,
-} from "../../../../utils/strictOption";
+import { type GetOrUndefined, getOrUndefined } from "~/utils/strictOption";
 
 export type BasePartialHandlerConfig<
   Name extends Option.Option<string> = Option.Option<string>,

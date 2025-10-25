@@ -5,7 +5,7 @@ import {
   getOrUndefined,
   none,
   some,
-} from "../../../utils/strictOption";
+} from "~/utils/strictOption";
 import { PartialSubscriptionHandlerConfig } from "./subscription/data";
 import { PartialMutationHandlerConfig } from "./mutation/data";
 import { RequestParamsConfig } from "./shared/requestParams";

@@ -1,5 +1,5 @@
 import { Option, Struct } from "effect";
-import { some } from "../../../../utils/strictOption";
+import { some } from "~/utils/strictOption";
 import {
   PartialSubscriptionHandlerConfig,
   type NameOption,

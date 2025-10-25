@@ -11,6 +11,7 @@ import { Handler } from "typhoon-core/server";
 import { Msgpack, Stream } from "typhoon-core/protocol";
 import { Computed, Signal } from "typhoon-core/signal";
 import { Validate, Validator } from "typhoon-core/validator";
+import { Authorization } from "typhoon-core/error";
 
 export type { Validator };
 
@@ -146,6 +147,26 @@ export const token = (): Effect.Effect<Option.Option<string>, never, Event> =>
     Event,
     Effect.flatMap((ref) => SynchronizedRef.get(ref)),
     Effect.map((ctx) => ctx.token),
+  );
+
+export const someToken = (): Effect.Effect<
+  string,
+  Authorization.AuthorizationError,
+  Event
+> =>
+  pipe(
+    token(),
+    Effect.flatMap(
+      Option.match({
+        onSome: Effect.succeed,
+        onNone: () =>
+          Effect.fail(
+            Authorization.makeAuthorizationError(
+              "No authorization token found for event",
+            ),
+          ),
+      }),
+    ),
   );
 
 export const pullStream = (): Effect.Effect<

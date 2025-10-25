@@ -1,6 +1,6 @@
 import { Data } from "effect";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import { coerceTrue, type CoercedTrue } from "../../../../utils/coerce";
+import { coerceTrue, type CoercedTrue } from "~/utils/coerce";
 
 export type BaseRequestParamsConfig<
   T extends StandardSchemaV1 = StandardSchemaV1,
