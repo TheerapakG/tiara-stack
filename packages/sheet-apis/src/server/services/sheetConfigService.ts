@@ -12,6 +12,7 @@ import {
 import { type sheets_v4 } from "@googleapis/sheets";
 import {
   Array,
+  Data,
   Effect,
   HashMap,
   Number,
@@ -23,6 +24,10 @@ import {
 } from "effect";
 import { Array as ArrayUtils } from "typhoon-core/utils";
 import { DefaultTaggedClass } from "typhoon-core/schema";
+
+export class SheetConfigError extends Data.TaggedError("SheetConfigError")<{
+  message: string;
+}> {}
 
 const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
   pipe(
@@ -237,6 +242,16 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 Option.flatMap(Array.get(0)),
                 Option.flatMap((range) => Option.fromNullable(range.values)),
                 Option.map(Object.fromEntries),
+                Option.match({
+                  onSome: Effect.succeed,
+                  onNone: () =>
+                    Effect.fail(
+                      new SheetConfigError({
+                        message:
+                          "Error getting ranges config, no value ranges found",
+                      }),
+                    ),
+                }),
               ),
             ),
             Effect.flatMap(
@@ -269,9 +284,17 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
             Effect.flatMap((response) =>
               pipe(
                 Option.fromNullable(response.data.valueRanges),
-                Option.map(teamConfigParser),
-                Effect.transposeOption,
-                Effect.flatten,
+                Option.match({
+                  onSome: Effect.succeed,
+                  onNone: () =>
+                    Effect.fail(
+                      new SheetConfigError({
+                        message:
+                          "Error getting team config, no value ranges found",
+                      }),
+                    ),
+                }),
+                Effect.flatMap(teamConfigParser),
                 Effect.provideService(GoogleSheets, sheet),
               ),
             ),
@@ -291,6 +314,16 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 Option.flatMap(Array.get(0)),
                 Option.flatMap((range) => Option.fromNullable(range.values)),
                 Option.map(Object.fromEntries),
+                Option.match({
+                  onSome: Effect.succeed,
+                  onNone: () =>
+                    Effect.fail(
+                      new SheetConfigError({
+                        message:
+                          "Error getting event config, no value ranges found",
+                      }),
+                    ),
+                }),
               ),
             ),
             Effect.flatMap(
@@ -328,9 +361,17 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
             Effect.flatMap((response) =>
               pipe(
                 Option.fromNullable(response.data.valueRanges),
-                Option.map(scheduleConfigParser),
-                Effect.transposeOption,
-                Effect.flatten,
+                Option.match({
+                  onSome: Effect.succeed,
+                  onNone: () =>
+                    Effect.fail(
+                      new SheetConfigError({
+                        message:
+                          "Error getting schedule config, no value ranges found",
+                      }),
+                    ),
+                }),
+                Effect.flatMap(scheduleConfigParser),
                 Effect.provideService(GoogleSheets, sheet),
               ),
             ),
@@ -350,9 +391,17 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
             Effect.flatMap((response) =>
               pipe(
                 Option.fromNullable(response.data.valueRanges),
-                Option.map(runnerConfigParser),
-                Effect.transposeOption,
-                Effect.flatten,
+                Option.match({
+                  onSome: Effect.succeed,
+                  onNone: () =>
+                    Effect.fail(
+                      new SheetConfigError({
+                        message:
+                          "Error getting runner config, no value ranges found",
+                      }),
+                    ),
+                }),
+                Effect.flatMap(runnerConfigParser),
                 Effect.provideService(GoogleSheets, sheet),
               ),
             ),
