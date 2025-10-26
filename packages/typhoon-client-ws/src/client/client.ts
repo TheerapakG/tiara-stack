@@ -16,7 +16,7 @@ import {
 } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
-import { DependencySignal, Signal } from "typhoon-core/signal";
+import { DependencySignal, Signal, Computed } from "typhoon-core/signal";
 import { Validate, Validator } from "typhoon-core/validator";
 
 const WebSocketCtor = globalThis.WebSocket;
@@ -38,6 +38,10 @@ type ResolvedState<T = unknown> = {
   state: "resolved";
   timestamp: DateTime.DateTime;
   value: Effect.Effect<T, HandlerError, never>;
+  span?: {
+    traceId: string;
+    spanId: string;
+  };
 };
 
 type SignalState<T = unknown> = LoadingState | ResolvedState<T>;
@@ -194,6 +198,7 @@ export class WebSocketClient<
                                   ),
                                 ),
                               ),
+                          span: header.span,
                         }),
                       ),
                     ),
@@ -551,10 +556,28 @@ export class WebSocketClient<
       Effect.tap(({ ws, requestBuffer }) =>
         Option.map(ws, (ws) => ws.send(requestBuffer)),
       ),
+      Effect.bind("maskedSignal", ({ signal }) =>
+        Computed.make(
+          pipe(
+            signal,
+            Effect.tap((value) =>
+              pipe(
+                Match.value(value),
+                Match.when({ state: "resolved" }, (value) =>
+                  value.span
+                    ? Effect.linkSpanCurrent(Tracer.externalSpan(value.span))
+                    : Effect.void,
+                ),
+                Match.orElse(() => Effect.void),
+              ),
+            ),
+          ),
+        ),
+      ),
       Effect.map(
-        ({ id, signal }) =>
+        ({ id, maskedSignal }) =>
           [
-            DependencySignal.mask(signal),
+            pipe(maskedSignal, DependencySignal.mask),
             WebSocketClient.unsubscribe(client, id, handler),
           ] as const,
       ),
@@ -656,26 +679,29 @@ export class WebSocketClient<
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("deferred", () =>
         Deferred.make<
-          Validator.Output<
-            Handler.Config.ResolvedResponseValidator<
-              Handler.Config.ResponseOrUndefined<
-                SubscriptionHandlerConfigs[Handler]
+          {
+            value: Validator.Output<
+              Handler.Config.ResolvedResponseValidator<
+                Handler.Config.ResponseOrUndefined<
+                  SubscriptionHandlerConfigs[Handler]
+                >
               >
-            >
-          >,
+            >;
+            span: { traceId: string; spanId: string } | undefined;
+          },
           HandlerError
         >(),
       ),
       Effect.tap(({ id, deferred }) =>
         pipe(
           client,
-          WebSocketClient.addUpdater(id, (value) =>
+          WebSocketClient.addUpdater(id, (state) =>
             pipe(
               deferred,
               Deferred.complete(
                 pipe(
                   Effect.Do,
-                  Effect.bind("value", () => value.value),
+                  Effect.bind("value", () => state.value),
                   Effect.bind("config", () =>
                     pipe(
                       Handler.Config.Collection.getHandlerConfig(
@@ -711,6 +737,7 @@ export class WebSocketClient<
                       ),
                     ),
                   ),
+                  Effect.map((value) => ({ value, span: state.span })),
                 ),
               ),
               Effect.andThen(() =>
@@ -768,6 +795,10 @@ export class WebSocketClient<
         Option.map(ws, (ws) => ws.send(requestBuffer)),
       ),
       Effect.flatMap(({ deferred }) => Deferred.await(deferred)),
+      Effect.tap(({ span }) =>
+        span ? Effect.linkSpanCurrent(Tracer.externalSpan(span)) : Effect.void,
+      ),
+      Effect.map(({ value }) => value),
       Effect.withSpan("WebSocketClient.once", {
         attributes: {
           handler,
