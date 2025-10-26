@@ -180,6 +180,11 @@ export class HttpClient<
           ),
         ),
       ),
+      Effect.tap(({ header }) =>
+        header.span
+          ? Effect.linkSpanCurrent(Tracer.externalSpan(header.span))
+          : Effect.void,
+      ),
       // TODO: check if the response is a valid header
       Effect.bind("decodedResponse", ({ pullEffect }) => pullEffect),
       Effect.bind("config", () =>
