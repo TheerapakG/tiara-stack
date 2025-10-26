@@ -124,9 +124,14 @@ const makeServeEffect =
               message: (peer, message) => {
                 return Effect.runPromise(
                   pipe(
-                    serverWithRuntime,
-                    handleProtocolWebSocketMessage(peer, message),
-                    transformErrorResult(() => Effect.void),
+                    Effect.currentSpan,
+                    Effect.flatMap((span) =>
+                      pipe(
+                        serverWithRuntime,
+                        handleProtocolWebSocketMessage(peer, message, span),
+                        transformErrorResult(() => Effect.void),
+                      ),
+                    ),
                     Effect.withSpan("serve.websocket.message", {
                       captureStackTrace: true,
                     }),
@@ -166,10 +171,15 @@ const makeServeEffect =
             fetch: (request) => {
               return Effect.runPromise(
                 pipe(
-                  serverWithRuntime,
-                  handleWebRequest(request),
-                  transformErrorResult(() =>
-                    Effect.succeed(new Response("", { status: 500 })),
+                  Effect.currentSpan,
+                  Effect.flatMap((span) =>
+                    pipe(
+                      serverWithRuntime,
+                      handleWebRequest(request, span),
+                      transformErrorResult(() =>
+                        Effect.succeed(new Response("", { status: 500 })),
+                      ),
+                    ),
                   ),
                   Effect.withSpan("serve.fetch", {
                     captureStackTrace: true,
@@ -511,7 +521,7 @@ class ServerUpdateResult extends Data.TaggedClass("ServerUpdateResult")<{
 }> {}
 
 const runHandler =
-  (id: string) =>
+  (id: string, span: Tracer.Span) =>
   <R = never>(handler: Effect.Effect<unknown, unknown, R>) =>
     pipe(
       Effect.Do,
@@ -536,6 +546,10 @@ const runHandler =
                 success: Exit.isSuccess(value),
                 timestamp: DateTime.toDate(timestamp),
               },
+              span: {
+                traceId: span.traceId,
+                spanId: span.spanId,
+              },
             } as const,
             message: pipe(
               value,
@@ -553,7 +567,10 @@ const runHandler =
     );
 
 const getComputedSubscriptionResult =
-  (header: Header.Header<"client:subscribe" | "client:once">) =>
+  (
+    header: Header.Header<"client:subscribe" | "client:once">,
+    span: Tracer.Span,
+  ) =>
   <R = never>(
     serverWithRuntime: ServerWithRuntime<R>,
   ): Effect.Effect<
@@ -570,7 +587,7 @@ const getComputedSubscriptionResult =
         Computed.make(
           pipe(
             innerHandler,
-            runHandler(header.id),
+            runHandler(header.id, span),
             Effect.provide(serverWithRuntime.runtime),
             Effect.withSpan("subscriptionHandler", {
               captureStackTrace: true,
@@ -593,7 +610,7 @@ const getComputedSubscriptionResult =
     );
 
 const getMutationResult =
-  (header: Header.Header<"client:mutate">) =>
+  (header: Header.Header<"client:mutate">, span: Tracer.Span) =>
   <R = never>(
     serverWithRuntime: ServerWithRuntime<R>,
   ): Effect.Effect<ServerUpdateResult, unknown, Event> =>
@@ -602,7 +619,7 @@ const getMutationResult =
       getMutationHandlerContext(header.payload.handler),
       Effect.orElse(() => Effect.fail(`handler not found`)),
       Effect.map(HandlerContext.handler),
-      Effect.flatMap(runHandler(header.id)),
+      Effect.flatMap(runHandler(header.id, span)),
       Effect.provide(serverWithRuntime.runtime),
       Effect.withSpan("Server.getMutationResult", {
         captureStackTrace: true,
@@ -638,7 +655,7 @@ const encodeServerUpdateResult = (result: ServerUpdateResult) =>
   );
 
 const handleSubscribe =
-  (peer: Peer, header: Header.Header<"client:subscribe">) =>
+  (peer: Peer, header: Header.Header<"client:subscribe">, span: Tracer.Span) =>
   <R = never>(serverWithRuntime: ServerWithRuntime<R>) =>
     pipe(
       serverWithRuntime.server.subscribeTotal(Effect.succeed(BigInt(1))),
@@ -672,7 +689,7 @@ const handleSubscribe =
                 Effect.bind("computedBuffer", () =>
                   pipe(
                     serverWithRuntime,
-                    getComputedSubscriptionResult(header),
+                    getComputedSubscriptionResult(header, span),
                     Computed.flatMap(encodeServerUpdateResult),
                   ),
                 ),
@@ -716,7 +733,11 @@ const handleSubscribe =
     );
 
 const handleUnsubscribe =
-  (peer: Peer, header: Header.Header<"client:unsubscribe">) =>
+  (
+    peer: Peer,
+    header: Header.Header<"client:unsubscribe">,
+    _span: Tracer.Span,
+  ) =>
   <R = never>(serverWithRuntime: ServerWithRuntime<R>) =>
     pipe(
       serverWithRuntime.server.unsubscribeTotal(Effect.succeed(BigInt(1))),
@@ -751,6 +772,7 @@ const handleOnce =
   <A, E = never>(
     header: Header.Header<"client:once">,
     callback: (buffer: Uint8Array) => Effect.Effect<A, E, Event>,
+    span: Tracer.Span,
   ) =>
   <R = never>(serverWithRuntime: ServerWithRuntime<R>) =>
     pipe(
@@ -762,7 +784,7 @@ const handleOnce =
         OnceObserver.observeOnce(
           pipe(
             serverWithRuntime,
-            getComputedSubscriptionResult(header),
+            getComputedSubscriptionResult(header, span),
             Computed.flatMap(encodeServerUpdateResult),
             Effect.flatMap((computedBuffer) =>
               pipe(
@@ -792,6 +814,7 @@ const handleMutate =
   <A, E = never>(
     header: Header.Header<"client:mutate">,
     callback: (buffer: Uint8Array) => Effect.Effect<A, E, Event>,
+    span: Tracer.Span,
   ) =>
   <R = never>(serverWithRuntime: ServerWithRuntime<R>) =>
     pipe(
@@ -802,7 +825,7 @@ const handleMutate =
       Effect.bind("buffer", () =>
         pipe(
           serverWithRuntime,
-          getMutationResult(header),
+          getMutationResult(header, span),
           Effect.flatMap(encodeServerUpdateResult),
         ),
       ),
@@ -901,25 +924,18 @@ const makeHeaderAndEventServiceFromPullStream = (
     }),
   );
 
-const applyExternalSpan =
-  (spanName: string, externalSpan?: { traceId: string; spanId: string }) =>
-  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-    externalSpan
-      ? pipe(
-          Effect.Do,
-          Effect.bind("currentSpan", () => Effect.currentSpan),
-          Effect.flatMap(({ currentSpan }) =>
-            pipe(
-              effect,
-              Effect.tap(() => Effect.linkSpanCurrent(currentSpan)),
-              Effect.withSpan(spanName, {
-                captureStackTrace: true,
-              }),
-              Effect.withParentSpan(Tracer.externalSpan(externalSpan)),
-            ),
-          ),
-        )
-      : pipe(effect, Effect.withSpan(spanName, { captureStackTrace: true }));
+const applySpanLink = (span: Tracer.Span, linkSpan: Tracer.AnySpan) =>
+  Effect.sync(() =>
+    span.addLinks([{ _tag: "SpanLink", span: linkSpan, attributes: {} }]),
+  );
+
+const applyExternalSpanLink = (
+  span: Tracer.Span,
+  externalSpan?: { traceId: string; spanId: string },
+) =>
+  externalSpan
+    ? applySpanLink(span, Tracer.externalSpan(externalSpan))
+    : Effect.void;
 
 const sendPeerBuffer = (peer: Peer) => (buffer: Uint8Array) =>
   pipe(
@@ -930,7 +946,7 @@ const sendPeerBuffer = (peer: Peer) => (buffer: Uint8Array) =>
   );
 
 const handleProtocolWebSocketMessage =
-  (peer: Peer, message: Message) =>
+  (peer: Peer, message: Message, span: Tracer.Span) =>
   <R = never>(serverWithRuntime: ServerWithRuntime<R>) =>
     pipe(
       Effect.Do,
@@ -953,29 +969,35 @@ const handleProtocolWebSocketMessage =
         Option.match({
           onSome: ({ header, event }) =>
             pipe(
-              serverWithRuntime,
-              pipe(
-                Match.value(header),
-                Match.when(
-                  { action: "client:subscribe" },
-                  (header) => handleSubscribe(peer, header)<R>,
+              applyExternalSpanLink(span, header.span),
+              Effect.andThen(() =>
+                pipe(
+                  serverWithRuntime,
+                  pipe(
+                    Match.value(header),
+                    Match.when(
+                      { action: "client:subscribe" },
+                      (header) => handleSubscribe(peer, header, span)<R>,
+                    ),
+                    Match.when(
+                      { action: "client:unsubscribe" },
+                      (header) => handleUnsubscribe(peer, header, span)<R>,
+                    ),
+                    Match.when(
+                      { action: "client:once" },
+                      (header) =>
+                        handleOnce(header, sendPeerBuffer(peer), span)<R>,
+                    ),
+                    Match.when(
+                      { action: "client:mutate" },
+                      (header) =>
+                        handleMutate(header, sendPeerBuffer(peer), span)<R>,
+                    ),
+                    Match.orElse(() => () => Effect.void),
+                  ),
+                  Effect.provideService(Event, event),
                 ),
-                Match.when(
-                  { action: "client:unsubscribe" },
-                  (header) => handleUnsubscribe(peer, header)<R>,
-                ),
-                Match.when(
-                  { action: "client:once" },
-                  (header) => handleOnce(header, sendPeerBuffer(peer))<R>,
-                ),
-                Match.when(
-                  { action: "client:mutate" },
-                  (header) => handleMutate(header, sendPeerBuffer(peer))<R>,
-                ),
-                Match.orElse(() => () => Effect.void),
               ),
-              Effect.provideService(Event, event),
-              applyExternalSpan("Server.handleWebSocketEvent", header.span),
             ),
           onNone: () => Effect.void,
         }),
@@ -1018,7 +1040,7 @@ const returnInvalidHeaderError = () =>
   );
 
 const handleProtocolWebRequest =
-  (request: Request) =>
+  (request: Request, span: Tracer.Span) =>
   <R = never>(serverWithRuntime: ServerWithRuntime<R>) =>
     pipe(
       Effect.Do,
@@ -1041,23 +1063,26 @@ const handleProtocolWebRequest =
         Option.match({
           onSome: ({ header, event }) =>
             pipe(
-              serverWithRuntime,
-              pipe(
-                Match.value(header),
-                Match.when(
-                  { action: "client:once" },
-                  (header) => handleOnce(header, returnBufferSuccess)<R>,
+              applyExternalSpanLink(span, header.span),
+              Effect.andThen(() =>
+                pipe(
+                  serverWithRuntime,
+                  pipe(
+                    Match.value(header),
+                    Match.when(
+                      { action: "client:once" },
+                      (header) =>
+                        handleOnce(header, returnBufferSuccess, span)<R>,
+                    ),
+                    Match.when(
+                      { action: "client:mutate" },
+                      (header) =>
+                        handleMutate(header, returnBufferSuccess, span)<R>,
+                    ),
+                    Match.orElse(() => returnNotFoundError),
+                  ),
+                  Effect.provideService(Event, event),
                 ),
-                Match.when(
-                  { action: "client:mutate" },
-                  (header) => handleMutate(header, returnBufferSuccess)<R>,
-                ),
-                Match.orElse(() => returnNotFoundError),
-              ),
-              Effect.provideService(Event, event),
-              applyExternalSpan(
-                "Server.handleProtocolWebRequestEvent",
-                header.span,
               ),
             ),
           onNone: returnInvalidHeaderError,
@@ -1069,7 +1094,7 @@ const handleProtocolWebRequest =
     );
 
 const handleWebRequest =
-  (request: Request) =>
+  (request: Request, span: Tracer.Span) =>
   <R = never>(serverWithRuntime: ServerWithRuntime<R>) =>
     pipe(
       serverWithRuntime,
@@ -1091,7 +1116,7 @@ const handleWebRequest =
               ),
             )<R>,
         ),
-        Match.orElse(() => handleProtocolWebRequest(request)<R>),
+        Match.orElse(() => handleProtocolWebRequest(request, span)<R>),
       ),
     );
 
