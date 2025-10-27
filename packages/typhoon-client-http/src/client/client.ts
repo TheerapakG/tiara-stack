@@ -1,21 +1,9 @@
 import { HttpClient as EffectHttpClient, HttpBody } from "@effect/platform";
-import {
-  Data,
-  Effect,
-  Option,
-  pipe,
-  Schema,
-  SynchronizedRef,
-  Tracer,
-} from "effect";
+import { Effect, Option, pipe, Schema, SynchronizedRef, Tracer } from "effect";
+import { Rpc, Validation } from "typhoon-core/error";
 import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { Validate, Validator } from "typhoon-core/validator";
-
-export class HandlerError extends Data.TaggedError("HandlerError")<{
-  message: string;
-  cause: unknown;
-}> {}
 
 export class HttpClient<
   SubscriptionHandlerConfigs extends Record<
@@ -185,20 +173,16 @@ export class HttpClient<
           ? Effect.linkSpanCurrent(Tracer.externalSpan(header.span))
           : Effect.void,
       ),
-      // TODO: check if the response is a valid header
       Effect.bind("decodedResponse", ({ pullEffect }) => pullEffect),
-      Effect.bind("config", () =>
+      Effect.let("config", () =>
         pipe(
           Handler.Config.Collection.getHandlerConfig(
             "subscription",
             handler,
           )(client.configCollection),
-          Effect.catchAll((error) =>
-            Effect.fail(
-              new HandlerError({
-                message: `Failed to get handler config for ${handler}`,
-                cause: error,
-              }),
+          Option.getOrThrowWith(() =>
+            Rpc.makeMissingRpcConfigError(
+              `Failed to get handler config for ${handler}`,
             ),
           ),
         ),
@@ -214,14 +198,6 @@ export class HttpClient<
                   ),
                 ),
               ),
-              Effect.catchAll((error) =>
-                Effect.fail(
-                  new HandlerError({
-                    message: `Failed to validate response for ${handler}`,
-                    cause: error,
-                  }),
-                ),
-              ),
             )
           : pipe(
               decodedResponse,
@@ -229,14 +205,14 @@ export class HttpClient<
               Effect.option,
               Effect.flatMap((messageOption) =>
                 Effect.fail(
-                  new HandlerError({
-                    message: pipe(
+                  Rpc.makeRpcError(
+                    pipe(
                       messageOption,
                       Option.map((message) => message.message),
                       Option.getOrElse(() => "An unknown error occurred"),
                     ),
-                    cause: decodedResponse,
-                  }),
+                    decodedResponse,
+                  ) as Rpc.RpcError | Validation.ValidationError,
                 ),
               ),
             ),
