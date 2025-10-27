@@ -1172,7 +1172,9 @@ const transformErrorResult = <A = never, E = never, R = never>(
           onFailure: (cause) =>
             pipe(
               Effect.Do,
-              Effect.let("pretty", () => Cause.pretty(cause)),
+              Effect.let("pretty", () =>
+                Cause.pretty(cause, { renderErrorCause: true }),
+              ),
               Effect.tap(({ pretty }) => Effect.log(pretty)),
               Effect.flatMap(() => onError(cause)),
             ),
