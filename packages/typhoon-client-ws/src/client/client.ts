@@ -14,6 +14,7 @@ import {
   SynchronizedRef,
   Tracer,
 } from "effect";
+import { Rpc, Validation } from "typhoon-core/error";
 import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { DependencySignal, Signal, Computed } from "typhoon-core/signal";
@@ -25,11 +26,6 @@ class WebSocketError extends Data.TaggedError("WebSocketError")<{
   cause: Event;
 }> {}
 
-export class HandlerError extends Data.TaggedError("HandlerError")<{
-  message: string;
-  cause: unknown;
-}> {}
-
 type LoadingState = {
   state: "loading";
 };
@@ -37,7 +33,7 @@ type LoadingState = {
 type ResolvedState<T = unknown> = {
   state: "resolved";
   timestamp: DateTime.DateTime;
-  value: Effect.Effect<T, HandlerError, never>;
+  value: Effect.Effect<T, Rpc.RpcError | Validation.ValidationError, never>;
   span?: {
     traceId: string;
     spanId: string;
@@ -183,8 +179,8 @@ export class WebSocketClient<
                                 Effect.option,
                                 Effect.flatMap((messageOption) =>
                                   Effect.fail(
-                                    new HandlerError({
-                                      message: pipe(
+                                    Rpc.makeRpcError(
+                                      pipe(
                                         messageOption,
                                         Option.map(
                                           (message) => message.message,
@@ -193,8 +189,8 @@ export class WebSocketClient<
                                           () => "An unknown error occurred",
                                         ),
                                       ),
-                                      cause: decodedResponse,
-                                    }),
+                                      decodedResponse,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -467,37 +463,27 @@ export class WebSocketClient<
                       value: pipe(
                         Effect.Do,
                         Effect.bind("value", () => value.value),
-                        Effect.bind("config", () =>
+                        Effect.let("config", () =>
                           pipe(
                             Handler.Config.Collection.getHandlerConfig(
                               "subscription",
                               handler,
                             )(client.configCollection),
-                            Effect.catchAll((error) =>
-                              Effect.fail(
-                                new HandlerError({
-                                  message: `Failed to get handler config for ${handler}`,
-                                  cause: error,
-                                }),
+                            Option.getOrThrowWith(() =>
+                              Rpc.makeMissingRpcConfigError(
+                                `Failed to get handler config for ${handler}`,
                               ),
                             ),
                           ),
                         ),
                         Effect.flatMap(({ value, config }) =>
                           pipe(
+                            value,
                             Validate.validate(
                               Handler.Config.resolveResponseValidator(
                                 Handler.Config.response(
                                   config as SubscriptionHandlerConfigs[Handler],
                                 ),
-                              ),
-                            )(value),
-                            Effect.catchAll((error) =>
-                              Effect.fail(
-                                new HandlerError({
-                                  message: `Failed to validate response for ${handler}`,
-                                  cause: error,
-                                }),
                               ),
                             ),
                           ),
@@ -689,7 +675,7 @@ export class WebSocketClient<
             >;
             span: { traceId: string; spanId: string } | undefined;
           },
-          HandlerError
+          Validation.ValidationError | Rpc.RpcError
         >(),
       ),
       Effect.tap(({ id, deferred }) =>
@@ -702,37 +688,27 @@ export class WebSocketClient<
                 pipe(
                   Effect.Do,
                   Effect.bind("value", () => state.value),
-                  Effect.bind("config", () =>
+                  Effect.let("config", () =>
                     pipe(
                       Handler.Config.Collection.getHandlerConfig(
                         "subscription",
                         handler,
                       )(client.configCollection),
-                      Effect.catchAll((error) =>
-                        Effect.fail(
-                          new HandlerError({
-                            message: `Failed to get handler config for ${handler}`,
-                            cause: error,
-                          }),
+                      Option.getOrThrowWith(() =>
+                        Rpc.makeMissingRpcConfigError(
+                          `Failed to get handler config for ${handler}`,
                         ),
                       ),
                     ),
                   ),
                   Effect.flatMap(({ value, config }) =>
                     pipe(
+                      value,
                       Validate.validate(
                         Handler.Config.resolveResponseValidator(
                           Handler.Config.response(
                             config as SubscriptionHandlerConfigs[Handler],
                           ),
-                        ),
-                      )(value),
-                      Effect.catchAll((error) =>
-                        Effect.fail(
-                          new HandlerError({
-                            message: `Failed to validate response for ${handler}`,
-                            cause: error,
-                          }),
                         ),
                       ),
                     ),
@@ -839,7 +815,7 @@ export class WebSocketClient<
               >
             >
           >,
-          HandlerError
+          Rpc.RpcError | Validation.ValidationError
         >(),
       ),
       Effect.tap(({ id, deferred }) =>
@@ -852,37 +828,27 @@ export class WebSocketClient<
                 pipe(
                   Effect.Do,
                   Effect.bind("value", () => value.value),
-                  Effect.bind("config", () =>
+                  Effect.let("config", () =>
                     pipe(
                       Handler.Config.Collection.getHandlerConfig(
                         "mutation",
                         handler,
                       )(client.configCollection),
-                      Effect.catchAll((error) =>
-                        Effect.fail(
-                          new HandlerError({
-                            message: `Failed to get handler config for ${handler}`,
-                            cause: error,
-                          }),
+                      Option.getOrThrowWith(() =>
+                        Rpc.makeMissingRpcConfigError(
+                          `Failed to get handler config for ${handler}`,
                         ),
                       ),
                     ),
                   ),
                   Effect.flatMap(({ value, config }) =>
                     pipe(
+                      value,
                       Validate.validate(
                         Handler.Config.resolveResponseValidator(
                           Handler.Config.response(
                             config as MutationHandlerConfigs[Handler],
                           ),
-                        ),
-                      )(value),
-                      Effect.catchAll((error) =>
-                        Effect.fail(
-                          new HandlerError({
-                            message: `Failed to validate response for ${handler}`,
-                            cause: error,
-                          }),
                         ),
                       ),
                     ),
