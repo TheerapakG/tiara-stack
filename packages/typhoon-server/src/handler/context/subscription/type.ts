@@ -38,10 +38,8 @@ interface TransformDataKey extends HKT.TypeLambda {
 interface TransformDataSuccessIn extends HKT.TypeLambda {
   readonly type: this["In"] extends infer Config extends SubscriptionData
     ? Handler.Config.ResponseOption<Config> extends Option.Some<
-        infer Response extends Handler.Config.Shared.Response.ResponseConfig<
-          StandardSchemaV1,
-          boolean
-        >
+        infer Response extends
+          Handler.Config.Shared.Response.ResponseConfig<StandardSchemaV1>
       >
       ? Validator.Input<Handler.Config.ResolvedResponseValidator<Response>>
       : unknown
@@ -51,10 +49,8 @@ interface TransformDataSuccessIn extends HKT.TypeLambda {
 interface TransformDataSuccessOut extends HKT.TypeLambda {
   readonly type: this["In"] extends infer Config extends SubscriptionData
     ? Handler.Config.ResponseOption<Config> extends Option.Some<
-        infer Response extends Handler.Config.Shared.Response.ResponseConfig<
-          StandardSchemaV1,
-          boolean
-        >
+        infer Response extends
+          Handler.Config.Shared.Response.ResponseConfig<StandardSchemaV1>
       >
       ? Validator.Output<Handler.Config.ResolvedResponseValidator<Response>>
       : unknown
