@@ -10,8 +10,8 @@ export type BasePartialHandlerConfig<
     RequestParamsConfig<StandardSchemaV1, boolean>
   > = Option.Option<RequestParamsConfig<StandardSchemaV1, boolean>>,
   Response extends Option.Option<
-    ResponseConfig<StandardSchemaV1, boolean>
-  > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
+    ResponseConfig<StandardSchemaV1>
+  > = Option.Option<ResponseConfig<StandardSchemaV1>>,
 > = {
   name: Name;
   requestParams: RequestParams;
@@ -25,8 +25,8 @@ export type BaseHandlerConfig<
     boolean
   > = RequestParamsConfig<StandardSchemaV1, boolean>,
   Response extends Option.Option<
-    ResponseConfig<StandardSchemaV1, boolean>
-  > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
+    ResponseConfig<StandardSchemaV1>
+  > = Option.Option<ResponseConfig<StandardSchemaV1>>,
 > = {
   data: BasePartialHandlerConfig<
     Option.Some<Name>,

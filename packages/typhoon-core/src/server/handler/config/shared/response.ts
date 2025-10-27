@@ -1,59 +1,40 @@
 import { Data } from "effect";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import { coerceFalse, type CoercedFalse } from "~/utils/coerce";
 
-export type BaseResponseConfig<
-  T extends StandardSchemaV1 = StandardSchemaV1,
-  Stream extends boolean = boolean,
-> = {
-  validator: T;
-  stream: Stream;
-};
+export type BaseResponseConfig<T extends StandardSchemaV1 = StandardSchemaV1> =
+  {
+    validator: T;
+  };
 
 const ResponseConfigTaggedClass: new <
   T extends StandardSchemaV1 = StandardSchemaV1,
-  Stream extends boolean = boolean,
 >(
-  args: Readonly<BaseResponseConfig<T, Stream>>,
-) => Readonly<BaseResponseConfig<T, Stream>> & {
+  args: Readonly<BaseResponseConfig<T>>,
+) => Readonly<BaseResponseConfig<T>> & {
   readonly _tag: "ResponseConfig";
 } = Data.TaggedClass("ResponseConfig");
 export class ResponseConfig<
   const T extends StandardSchemaV1 = StandardSchemaV1,
-  const Stream extends boolean = boolean,
-> extends ResponseConfigTaggedClass<T, Stream> {}
+> extends ResponseConfigTaggedClass<T> {}
 
 export type ResponseValidator<Config extends ResponseConfig> =
   Config["validator"];
-export type ResponseStream<Config extends ResponseConfig> = Config["stream"];
 
-export type ResponseConfigIn<
-  T extends StandardSchemaV1 = StandardSchemaV1,
-  Stream extends boolean | undefined = boolean | undefined,
-> = {
+export type ResponseConfigIn<T extends StandardSchemaV1 = StandardSchemaV1> = {
   validator: T;
-  stream?: Stream;
 };
 
 export type ResponseConfigInValidator<Config extends ResponseConfigIn> =
   Config["validator"];
-export type ResponseConfigInStream<Config extends ResponseConfigIn> =
-  "stream" extends keyof Config ? Config["stream"] : undefined;
 
 const configInValidator = <Config extends ResponseConfigIn>(config: Config) =>
   config.validator as ResponseConfigInValidator<Config>;
-const configInStream = <Config extends ResponseConfigIn>(config: Config) =>
-  config.stream as ResponseConfigInStream<Config>;
 
 export type TransformedResponseConfig<Config extends ResponseConfigIn> =
-  ResponseConfig<
-    ResponseConfigInValidator<Config>,
-    CoercedFalse<ResponseConfigInStream<Config>>
-  >;
+  ResponseConfig<ResponseConfigInValidator<Config>>;
 export const transformResponseConfig = <const CParams extends ResponseConfigIn>(
   config: CParams,
 ) =>
   new ResponseConfig({
     validator: configInValidator(config),
-    stream: coerceFalse(configInStream(config)),
   });

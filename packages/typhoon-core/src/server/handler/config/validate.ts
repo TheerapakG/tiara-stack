@@ -12,9 +12,7 @@ export type ResolvedRequestParamsValidator<
 
 export type ResolvedResponseValidator<
   Config extends ResponseConfig | undefined,
-> =
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Config extends ResponseConfig<infer T, any> ? T : undefined;
+> = Config extends ResponseConfig<infer T> ? T : undefined;
 
 export const resolveRequestParamsValidator: <
   const Config extends RequestParamsConfig | undefined,
