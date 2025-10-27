@@ -24,8 +24,8 @@ export type TypedPartialHandlerConfig<
     RequestParamsConfig<StandardSchemaV1, boolean>
   > = Option.Option<RequestParamsConfig<StandardSchemaV1, boolean>>,
   Response extends Option.Option<
-    ResponseConfig<StandardSchemaV1, boolean>
-  > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
+    ResponseConfig<StandardSchemaV1>
+  > = Option.Option<ResponseConfig<StandardSchemaV1>>,
 > =
   | PartialSubscriptionHandlerConfig<Name, RequestParams, Response>
   | PartialMutationHandlerConfig<Name, RequestParams, Response>;
@@ -41,8 +41,8 @@ export type TypedHandlerConfig<
     boolean
   > = RequestParamsConfig<StandardSchemaV1, boolean>,
   Response extends Option.Option<
-    ResponseConfig<StandardSchemaV1, boolean>
-  > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
+    ResponseConfig<StandardSchemaV1>
+  > = Option.Option<ResponseConfig<StandardSchemaV1>>,
 > = TypedPartialHandlerConfig<
   Option.Some<Name>,
   Option.Some<RequestParams>,
@@ -115,7 +115,7 @@ export const requestParams = <const Config extends PartialHandlerConfig>(
 export type ResponseOption<Config extends PartialHandlerConfig> =
   Config extends TypedPartialHandlerConfig
     ? Config["data"]["response"]
-    : Option.None<ResponseConfig<StandardSchemaV1, boolean>>;
+    : Option.None<ResponseConfig<StandardSchemaV1>>;
 export type ResponseOrUndefined<Config extends PartialHandlerConfig> =
   GetOrUndefined<ResponseOption<Config>>;
 
@@ -125,8 +125,7 @@ export const response = <const Config extends PartialHandlerConfig>(
   pipe(
     Match.value(config as PartialHandlerConfig),
     Match.tagsExhaustive({
-      DummyHandlerConfig: () =>
-        none<ResponseConfig<StandardSchemaV1, boolean>>(),
+      DummyHandlerConfig: () => none<ResponseConfig<StandardSchemaV1>>(),
       PartialSubscriptionHandlerConfig: (config) => config.data.response,
       PartialMutationHandlerConfig: (config) => config.data.response,
     }),

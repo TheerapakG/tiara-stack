@@ -22,8 +22,8 @@ type PartialMutationHandlerConfigData<
     RequestParamsConfig<StandardSchemaV1, boolean>
   > = Option.Option<RequestParamsConfig<StandardSchemaV1, boolean>>,
   Response extends Option.Option<
-    ResponseConfig<StandardSchemaV1, boolean>
-  > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
+    ResponseConfig<StandardSchemaV1>
+  > = Option.Option<ResponseConfig<StandardSchemaV1>>,
 > = { data: BasePartialHandlerConfig<Name, RequestParams, Response> };
 const PartialMutationHandlerConfigTaggedClass: new <
   Name extends Option.Option<string> = Option.Option<string>,
@@ -31,8 +31,8 @@ const PartialMutationHandlerConfigTaggedClass: new <
     RequestParamsConfig<StandardSchemaV1, boolean>
   > = Option.Option<RequestParamsConfig<StandardSchemaV1, boolean>>,
   Response extends Option.Option<
-    ResponseConfig<StandardSchemaV1, boolean>
-  > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
+    ResponseConfig<StandardSchemaV1>
+  > = Option.Option<ResponseConfig<StandardSchemaV1>>,
 >(
   args: Readonly<
     PartialMutationHandlerConfigData<Name, RequestParams, Response>
@@ -48,8 +48,8 @@ export class PartialMutationHandlerConfig<
     RequestParamsConfig<StandardSchemaV1, boolean>
   > = Option.Option<RequestParamsConfig<StandardSchemaV1, boolean>>,
   const Response extends Option.Option<
-    ResponseConfig<StandardSchemaV1, boolean>
-  > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
+    ResponseConfig<StandardSchemaV1>
+  > = Option.Option<ResponseConfig<StandardSchemaV1>>,
 > extends PartialMutationHandlerConfigTaggedClass<
   Name,
   RequestParams,
@@ -61,7 +61,7 @@ export const empty = () =>
     data: {
       name: none<string>(),
       requestParams: none<RequestParamsConfig<StandardSchemaV1, boolean>>(),
-      response: none<ResponseConfig<StandardSchemaV1, boolean>>(),
+      response: none<ResponseConfig<StandardSchemaV1>>(),
     },
   });
 
@@ -72,8 +72,8 @@ export type MutationHandlerConfig<
     boolean
   > = RequestParamsConfig<StandardSchemaV1, boolean>,
   Response extends Option.Option<
-    ResponseConfig<StandardSchemaV1, boolean>
-  > = Option.Option<ResponseConfig<StandardSchemaV1, boolean>>,
+    ResponseConfig<StandardSchemaV1>
+  > = Option.Option<ResponseConfig<StandardSchemaV1>>,
 > = PartialMutationHandlerConfig<
   Option.Some<Name>,
   Option.Some<RequestParams>,
