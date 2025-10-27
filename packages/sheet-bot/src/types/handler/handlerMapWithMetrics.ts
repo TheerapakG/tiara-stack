@@ -175,8 +175,11 @@ export class InteractionHandlerMapWithMetrics<
               Effect.Do,
               InteractionContext.replied.bind("replied"),
               InteractionContext.deferred.bind("deferred"),
-              Effect.tap(() => Effect.log(cause)),
-              Effect.tap(({ replied, deferred }) =>
+              Effect.let("pretty", () =>
+                Cause.pretty(cause, { renderErrorCause: true }),
+              ),
+              Effect.tap(({ pretty }) => Effect.log(pretty)),
+              Effect.tap(({ replied, deferred, pretty }) =>
                 pipe(
                   Effect.suspend<
                     Message | InteractionResponse,
@@ -186,7 +189,7 @@ export class InteractionHandlerMapWithMetrics<
                     (replied || deferred
                       ? InteractionContext.followUp.sync
                       : InteractionContext.reply.sync)({
-                      content: Cause.pretty(cause),
+                      content: pretty,
                       flags: MessageFlags.Ephemeral,
                     }),
                   ),
