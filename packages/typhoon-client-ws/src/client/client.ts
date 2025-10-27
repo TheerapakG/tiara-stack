@@ -3,6 +3,7 @@ import {
   DateTime,
   Deferred,
   Effect,
+  Either,
   HashMap,
   Match,
   Option,
@@ -32,8 +33,8 @@ type LoadingState = {
 
 type ResolvedState<T = unknown> = {
   state: "resolved";
-  timestamp: DateTime.DateTime;
-  value: Effect.Effect<T, Rpc.RpcError | Validation.ValidationError, never>;
+  timestamp: Option.Option<DateTime.DateTime>;
+  value: Either.Either<T, Rpc.RpcError | Validation.ValidationError>;
   span?: {
     traceId: string;
     spanId: string;
@@ -42,8 +43,11 @@ type ResolvedState<T = unknown> = {
 
 type SignalState<T = unknown> = LoadingState | ResolvedState<T>;
 
-type UpdaterState<T = unknown> = {
-  updater: (value: ResolvedState<T>) => Effect.Effect<void, never, never>;
+type UpdaterState = {
+  updater: (
+    header: Header.Header<"server:update">,
+    result: Either.Either<unknown, Rpc.RpcError>,
+  ) => Effect.Effect<void, never, never>;
 };
 type UpdaterStateMap = HashMap.HashMap<string, UpdaterState>;
 
@@ -123,7 +127,8 @@ export class WebSocketClient<
   static addUpdater(
     id: string,
     updater: (
-      value: ResolvedState<unknown>,
+      header: Header.Header<"server:update">,
+      result: Either.Either<unknown, Rpc.RpcError>,
     ) => Effect.Effect<void, never, never>,
   ) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -164,39 +169,31 @@ export class WebSocketClient<
                   Match.value(header),
                   Match.when({ action: "server:update" }, (header) =>
                     pipe(
-                      DateTime.make(header.payload.timestamp),
-                      Effect.transposeMapOption((timestamp) =>
-                        updater({
-                          state: "resolved",
-                          timestamp,
-                          value: header.payload.success
-                            ? Effect.succeed(decodedResponse)
-                            : pipe(
-                                decodedResponse,
-                                Schema.decodeUnknown(
-                                  Schema.Struct({ message: Schema.String }),
-                                ),
-                                Effect.option,
-                                Effect.flatMap((messageOption) =>
-                                  Effect.fail(
-                                    Rpc.makeRpcError(
-                                      pipe(
-                                        messageOption,
-                                        Option.map(
-                                          (message) => message.message,
-                                        ),
-                                        Option.getOrElse(
-                                          () => "An unknown error occurred",
-                                        ),
-                                      ),
-                                      decodedResponse,
+                      header.payload.success
+                        ? Effect.succeed(decodedResponse)
+                        : pipe(
+                            decodedResponse,
+                            Schema.decodeUnknown(
+                              Schema.Struct({ message: Schema.String }),
+                            ),
+                            Effect.option,
+                            Effect.flatMap((messageOption) =>
+                              Effect.fail(
+                                Rpc.makeRpcError(
+                                  pipe(
+                                    messageOption,
+                                    Option.map((message) => message.message),
+                                    Option.getOrElse(
+                                      () => "An unknown error occurred",
                                     ),
                                   ),
+                                  decodedResponse,
                                 ),
                               ),
-                          span: header.span,
-                        }),
-                      ),
+                            ),
+                          ),
+                      Effect.either,
+                      Effect.flatMap((result) => updater(header, result)),
                     ),
                   ),
                   Match.orElse(() => Effect.void),
@@ -432,6 +429,19 @@ export class WebSocketClient<
   ) {
     return pipe(
       Effect.Do,
+      Effect.let("config", () =>
+        pipe(
+          Handler.Config.Collection.getHandlerConfig(
+            "subscription",
+            handler,
+          )(client.configCollection),
+          Option.getOrThrowWith(() =>
+            Rpc.makeMissingRpcConfigError(
+              `Failed to get handler config for ${handler}`,
+            ),
+          ),
+        ),
+      ),
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.let("signal", () =>
         Signal.make<
@@ -446,52 +456,35 @@ export class WebSocketClient<
           >
         >({ state: "loading" }),
       ),
-      Effect.tap(({ id, signal }) =>
+      Effect.tap(({ id, signal, config }) =>
         pipe(
           client,
-          WebSocketClient.addUpdater(id, (value) =>
+          WebSocketClient.addUpdater(id, (header, result) =>
             signal.updateValue((prev) =>
-              Effect.succeed(
-                prev.state === "loading" ||
-                  Order.lessThan(DateTime.Order)(
-                    prev.timestamp,
-                    value.timestamp,
-                  )
-                  ? {
-                      state: "resolved",
-                      timestamp: value.timestamp,
-                      value: pipe(
-                        Effect.Do,
-                        Effect.bind("value", () => value.value),
-                        Effect.let("config", () =>
-                          pipe(
-                            Handler.Config.Collection.getHandlerConfig(
-                              "subscription",
-                              handler,
-                            )(client.configCollection),
-                            Option.getOrThrowWith(() =>
-                              Rpc.makeMissingRpcConfigError(
-                                `Failed to get handler config for ${handler}`,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Effect.flatMap(({ value, config }) =>
-                          pipe(
-                            value,
-                            Validate.validate(
-                              Handler.Config.resolveResponseValidator(
-                                Handler.Config.response(
-                                  config as SubscriptionHandlerConfigs[Handler],
-                                ),
-                              ),
-                            ),
+              prev.state === "loading" ||
+              Order.lessThan(Option.getOrder(DateTime.Order))(
+                prev.timestamp,
+                DateTime.make(header.payload.timestamp),
+              )
+                ? pipe(
+                    result,
+                    Effect.flatMap(
+                      Validate.validate(
+                        Handler.Config.resolveResponseValidator(
+                          Handler.Config.response(
+                            config as SubscriptionHandlerConfigs[Handler],
                           ),
                         ),
                       ),
-                    }
-                  : prev,
-              ),
+                    ),
+                    Effect.either,
+                    Effect.map((value) => ({
+                      state: "resolved",
+                      timestamp: DateTime.make(header.payload.timestamp),
+                      value,
+                    })),
+                  )
+                : Effect.succeed(prev),
             ),
           ),
         ),
@@ -662,58 +655,58 @@ export class WebSocketClient<
   ) {
     return pipe(
       Effect.Do,
+      Effect.let("config", () =>
+        pipe(
+          Handler.Config.Collection.getHandlerConfig(
+            "subscription",
+            handler,
+          )(client.configCollection),
+          Option.getOrThrowWith(() =>
+            Rpc.makeMissingRpcConfigError(
+              `Failed to get handler config for ${handler}`,
+            ),
+          ),
+        ),
+      ),
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("deferred", () =>
         Deferred.make<
           {
-            value: Validator.Output<
-              Handler.Config.ResolvedResponseValidator<
-                Handler.Config.ResponseOrUndefined<
-                  SubscriptionHandlerConfigs[Handler]
+            result: Either.Either<
+              Validator.Output<
+                Handler.Config.ResolvedResponseValidator<
+                  Handler.Config.ResponseOrUndefined<
+                    SubscriptionHandlerConfigs[Handler]
+                  >
                 >
-              >
+              >,
+              Rpc.RpcError | Validation.ValidationError
             >;
             span: { traceId: string; spanId: string } | undefined;
           },
-          Validation.ValidationError | Rpc.RpcError
+          never
         >(),
       ),
-      Effect.tap(({ id, deferred }) =>
+      Effect.tap(({ id, deferred, config }) =>
         pipe(
           client,
-          WebSocketClient.addUpdater(id, (state) =>
+          WebSocketClient.addUpdater(id, (header, result) =>
             pipe(
               deferred,
               Deferred.complete(
                 pipe(
-                  Effect.Do,
-                  Effect.bind("value", () => state.value),
-                  Effect.let("config", () =>
-                    pipe(
-                      Handler.Config.Collection.getHandlerConfig(
-                        "subscription",
-                        handler,
-                      )(client.configCollection),
-                      Option.getOrThrowWith(() =>
-                        Rpc.makeMissingRpcConfigError(
-                          `Failed to get handler config for ${handler}`,
+                  result,
+                  Effect.flatMap(
+                    Validate.validate(
+                      Handler.Config.resolveResponseValidator(
+                        Handler.Config.response(
+                          config as SubscriptionHandlerConfigs[Handler],
                         ),
                       ),
                     ),
                   ),
-                  Effect.flatMap(({ value, config }) =>
-                    pipe(
-                      value,
-                      Validate.validate(
-                        Handler.Config.resolveResponseValidator(
-                          Handler.Config.response(
-                            config as SubscriptionHandlerConfigs[Handler],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Effect.map((value) => ({ value, span: state.span })),
+                  Effect.either,
+                  Effect.map((result) => ({ result, span: header.span })),
                 ),
               ),
               Effect.andThen(() =>
@@ -774,7 +767,7 @@ export class WebSocketClient<
       Effect.tap(({ span }) =>
         span ? Effect.linkSpanCurrent(Tracer.externalSpan(span)) : Effect.void,
       ),
-      Effect.map(({ value }) => value),
+      Effect.flatMap(({ result }) => result),
       Effect.withSpan("WebSocketClient.once", {
         attributes: {
           handler,
@@ -805,54 +798,58 @@ export class WebSocketClient<
   ) {
     return pipe(
       Effect.Do,
+      Effect.let("config", () =>
+        pipe(
+          Handler.Config.Collection.getHandlerConfig(
+            "mutation",
+            handler,
+          )(client.configCollection),
+          Option.getOrThrowWith(() =>
+            Rpc.makeMissingRpcConfigError(
+              `Failed to get handler config for ${handler}`,
+            ),
+          ),
+        ),
+      ),
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("deferred", () =>
         Deferred.make<
-          Validator.Output<
-            Handler.Config.ResolvedResponseValidator<
-              Handler.Config.ResponseOrUndefined<
-                MutationHandlerConfigs[Handler]
-              >
-            >
-          >,
-          Rpc.RpcError | Validation.ValidationError
+          {
+            result: Either.Either<
+              Validator.Output<
+                Handler.Config.ResolvedResponseValidator<
+                  Handler.Config.ResponseOrUndefined<
+                    MutationHandlerConfigs[Handler]
+                  >
+                >
+              >,
+              Rpc.RpcError | Validation.ValidationError
+            >;
+            span: { traceId: string; spanId: string } | undefined;
+          },
+          never
         >(),
       ),
-      Effect.tap(({ id, deferred }) =>
+      Effect.tap(({ id, deferred, config }) =>
         pipe(
           client,
-          WebSocketClient.addUpdater(id, (value) =>
+          WebSocketClient.addUpdater(id, (header, result) =>
             pipe(
               deferred,
               Deferred.complete(
                 pipe(
-                  Effect.Do,
-                  Effect.bind("value", () => value.value),
-                  Effect.let("config", () =>
-                    pipe(
-                      Handler.Config.Collection.getHandlerConfig(
-                        "mutation",
-                        handler,
-                      )(client.configCollection),
-                      Option.getOrThrowWith(() =>
-                        Rpc.makeMissingRpcConfigError(
-                          `Failed to get handler config for ${handler}`,
+                  result,
+                  Effect.flatMap(
+                    Validate.validate(
+                      Handler.Config.resolveResponseValidator(
+                        Handler.Config.response(
+                          config as MutationHandlerConfigs[Handler],
                         ),
                       ),
                     ),
                   ),
-                  Effect.flatMap(({ value, config }) =>
-                    pipe(
-                      value,
-                      Validate.validate(
-                        Handler.Config.resolveResponseValidator(
-                          Handler.Config.response(
-                            config as MutationHandlerConfigs[Handler],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  Effect.either,
+                  Effect.map((result) => ({ result, span: header.span })),
                 ),
               ),
               Effect.andThen(() =>
@@ -910,6 +907,10 @@ export class WebSocketClient<
         Option.map(ws, (ws) => ws.send(requestBuffer)),
       ),
       Effect.flatMap(({ deferred }) => Deferred.await(deferred)),
+      Effect.tap(({ span }) =>
+        span ? Effect.linkSpanCurrent(Tracer.externalSpan(span)) : Effect.void,
+      ),
+      Effect.flatMap(({ result }) => result),
       Effect.withSpan("WebSocketClient.mutate", {
         attributes: {
           handler,
