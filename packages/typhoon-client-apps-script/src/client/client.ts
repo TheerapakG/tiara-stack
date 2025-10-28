@@ -1,6 +1,8 @@
 import {
   Data,
   Effect,
+  Either,
+  Function,
   Option,
   pipe,
   Schema,
@@ -10,7 +12,8 @@ import {
 import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { Validate, Validator } from "typhoon-core/validator";
-import { Rpc, Validation } from "typhoon-core/error";
+import { Rpc } from "typhoon-core/error";
+import { FromStandardSchemaV1 } from "typhoon-core/schema";
 
 export class HandlerError extends Data.TaggedError("HandlerError")<{
   message: string;
@@ -112,6 +115,26 @@ export class AppsScriptClient<
   ) {
     return pipe(
       Effect.Do,
+      Effect.let("config", () =>
+        pipe(
+          Handler.Config.Collection.getHandlerConfig(
+            "subscription",
+            handler,
+          )(client.configCollection),
+          Option.getOrThrowWith(() =>
+            Rpc.makeMissingRpcConfigError(
+              `Failed to get handler config for ${handler}`,
+            ),
+          ),
+        ),
+      ),
+      Effect.let("responseErrorValidator", ({ config }) =>
+        pipe(
+          Handler.Config.resolveResponseErrorValidator(
+            Handler.Config.responseError(config),
+          ),
+        ),
+      ),
       Effect.let("id", () => Utilities.getUuid() as string),
       Effect.bind("token", () => client.token),
       Effect.bind("span", () =>
@@ -185,48 +208,51 @@ export class AppsScriptClient<
           : Effect.void,
       ),
       Effect.bind("decodedResponse", ({ pullEffect }) => pullEffect),
-      Effect.let("config", () =>
-        pipe(
-          Handler.Config.Collection.getHandlerConfig(
-            "subscription",
-            handler,
-          )(client.configCollection),
-          Option.getOrThrowWith(() =>
-            Rpc.makeMissingRpcConfigError(
-              `Failed to get handler config for ${handler}`,
+      Effect.flatMap(
+        ({ header, decodedResponse, config, responseErrorValidator }) =>
+          pipe(
+            decodedResponse,
+            Either.liftPredicate(
+              () => header.action === "server:update" && header.payload.success,
+              Function.identity,
             ),
+            Handler.Config.decodeResponseUnknown(config),
+            Effect.map(
+              Either.mapLeft((error) =>
+                Rpc.makeRpcError(
+                  (responseErrorValidator === undefined
+                    ? Schema.Unknown
+                    : FromStandardSchemaV1.FromStandardSchemaV1(
+                        responseErrorValidator,
+                      )) as Schema.Schema<
+                    Validator.Output<
+                      Handler.Config.ResolvedResponseErrorValidator<
+                        Handler.Config.ResponseErrorOrUndefined<
+                          SubscriptionHandlerConfigs[Handler]
+                        >
+                      >
+                    >,
+                    Validator.Input<
+                      Handler.Config.ResolvedResponseErrorValidator<
+                        Handler.Config.ResponseErrorOrUndefined<
+                          SubscriptionHandlerConfigs[Handler]
+                        >
+                      >
+                    >
+                  >,
+                )(
+                  typeof error === "object" &&
+                    error !== null &&
+                    "message" in error &&
+                    typeof error.message === "string"
+                    ? error.message
+                    : "An unknown error occurred",
+                  error,
+                ),
+              ),
+            ),
+            Effect.flatten,
           ),
-        ),
-      ),
-      Effect.flatMap(({ header, decodedResponse, config }) =>
-        header.action === "server:update" && header.payload.success
-          ? pipe(
-              decodedResponse,
-              Validate.validate(
-                Handler.Config.resolveResponseValidator(
-                  Handler.Config.response(
-                    config as SubscriptionHandlerConfigs[Handler],
-                  ),
-                ),
-              ),
-            )
-          : pipe(
-              decodedResponse,
-              Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
-              Effect.option,
-              Effect.flatMap((messageOption) =>
-                Effect.fail(
-                  Rpc.makeRpcError(
-                    pipe(
-                      messageOption,
-                      Option.map((message) => message.message),
-                      Option.getOrElse(() => "An unknown error occurred"),
-                    ),
-                    decodedResponse,
-                  ) as Rpc.RpcError | Validation.ValidationError,
-                ),
-              ),
-            ),
       ),
       Effect.scoped,
       Effect.withSpan("AppsScriptClient.once"),
