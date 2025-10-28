@@ -10,6 +10,7 @@ import { PartialSubscriptionHandlerConfig } from "./subscription/data";
 import { PartialMutationHandlerConfig } from "./mutation/data";
 import { RequestParamsConfig } from "./shared/requestParams";
 import { ResponseConfig } from "./shared/response";
+import { ResponseErrorConfig } from "./shared/responseError";
 
 const DummyHandlerConfigTaggedClass: new (args: void) => {
   readonly _tag: "DummyHandlerConfig";
@@ -131,3 +132,23 @@ export const response = <const Config extends PartialHandlerConfig>(
     }),
     getOrUndefined,
   ) as ResponseOrUndefined<Config>;
+
+export type ResponseErrorOption<Config extends PartialHandlerConfig> =
+  Config extends TypedPartialHandlerConfig
+    ? Config["data"]["responseError"]
+    : Option.None<ResponseErrorConfig<StandardSchemaV1>>;
+export type ResponseErrorOrUndefined<Config extends PartialHandlerConfig> =
+  GetOrUndefined<ResponseErrorOption<Config>>;
+
+export const responseError = <const Config extends PartialHandlerConfig>(
+  config: Config,
+) =>
+  pipe(
+    Match.value(config as PartialHandlerConfig),
+    Match.tagsExhaustive({
+      DummyHandlerConfig: () => none<ResponseErrorConfig<StandardSchemaV1>>(),
+      PartialSubscriptionHandlerConfig: (config) => config.data.responseError,
+      PartialMutationHandlerConfig: (config) => config.data.responseError,
+    }),
+    getOrUndefined,
+  ) as ResponseErrorOrUndefined<Config>;

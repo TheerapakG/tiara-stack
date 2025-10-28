@@ -2,6 +2,7 @@ import { Data, Option } from "effect";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { RequestParamsConfig } from "../shared/requestParams";
 import { ResponseConfig } from "../shared/response";
+import { ResponseErrorConfig } from "../shared/responseError";
 import {
   type BasePartialHandlerConfig,
   type NameOption as BaseNameOption,
@@ -10,9 +11,12 @@ import {
   type RequestParamsOrUndefined as BaseRequestParamsOrUndefined,
   type ResponseOption as BaseResponseOption,
   type ResponseOrUndefined as BaseResponseOrUndefined,
+  type ResponseErrorOption as BaseResponseErrorOption,
+  type ResponseErrorOrUndefined as BaseResponseErrorOrUndefined,
   name as baseName,
   requestParams as baseRequestParams,
   response as baseResponse,
+  responseError as baseResponseError,
 } from "../shared/data";
 import { none } from "~/utils/strictOption";
 
@@ -24,7 +28,12 @@ type PartialSubscriptionHandlerConfigData<
   Response extends Option.Option<
     ResponseConfig<StandardSchemaV1>
   > = Option.Option<ResponseConfig<StandardSchemaV1>>,
-> = { data: BasePartialHandlerConfig<Name, RequestParams, Response> };
+  ResponseError extends Option.Option<
+    ResponseErrorConfig<StandardSchemaV1>
+  > = Option.Option<ResponseErrorConfig<StandardSchemaV1>>,
+> = {
+  data: BasePartialHandlerConfig<Name, RequestParams, Response, ResponseError>;
+};
 const PartialSubscriptionHandlerConfigTaggedClass: new <
   Name extends Option.Option<string> = Option.Option<string>,
   RequestParams extends Option.Option<
@@ -33,12 +42,25 @@ const PartialSubscriptionHandlerConfigTaggedClass: new <
   Response extends Option.Option<
     ResponseConfig<StandardSchemaV1>
   > = Option.Option<ResponseConfig<StandardSchemaV1>>,
+  ResponseError extends Option.Option<
+    ResponseErrorConfig<StandardSchemaV1>
+  > = Option.Option<ResponseErrorConfig<StandardSchemaV1>>,
 >(
   args: Readonly<
-    PartialSubscriptionHandlerConfigData<Name, RequestParams, Response>
+    PartialSubscriptionHandlerConfigData<
+      Name,
+      RequestParams,
+      Response,
+      ResponseError
+    >
   >,
 ) => Readonly<
-  PartialSubscriptionHandlerConfigData<Name, RequestParams, Response>
+  PartialSubscriptionHandlerConfigData<
+    Name,
+    RequestParams,
+    Response,
+    ResponseError
+  >
 > & { readonly _tag: "PartialSubscriptionHandlerConfig" } = Data.TaggedClass(
   "PartialSubscriptionHandlerConfig",
 );
@@ -50,10 +72,14 @@ export class PartialSubscriptionHandlerConfig<
   const Response extends Option.Option<
     ResponseConfig<StandardSchemaV1>
   > = Option.Option<ResponseConfig<StandardSchemaV1>>,
+  ResponseError extends Option.Option<
+    ResponseErrorConfig<StandardSchemaV1>
+  > = Option.Option<ResponseErrorConfig<StandardSchemaV1>>,
 > extends PartialSubscriptionHandlerConfigTaggedClass<
   Name,
   RequestParams,
-  Response
+  Response,
+  ResponseError
 > {}
 
 export const empty = () =>
@@ -62,6 +88,7 @@ export const empty = () =>
       name: none<string>(),
       requestParams: none<RequestParamsConfig<StandardSchemaV1, boolean>>(),
       response: none<ResponseConfig<StandardSchemaV1>>(),
+      responseError: none<ResponseErrorConfig<StandardSchemaV1>>(),
     },
   });
 
@@ -74,10 +101,14 @@ export type SubscriptionHandlerConfig<
   Response extends Option.Option<
     ResponseConfig<StandardSchemaV1>
   > = Option.Option<ResponseConfig<StandardSchemaV1>>,
+  ResponseError extends Option.Option<
+    ResponseErrorConfig<StandardSchemaV1>
+  > = Option.Option<ResponseErrorConfig<StandardSchemaV1>>,
 > = PartialSubscriptionHandlerConfig<
   Option.Some<Name>,
   Option.Some<RequestParams>,
-  Response
+  Response,
+  ResponseError
 >;
 
 export type NameOption<Config extends PartialSubscriptionHandlerConfig> =
@@ -111,3 +142,16 @@ export type ResponseOrUndefined<
 export const response = <const Config extends PartialSubscriptionHandlerConfig>(
   config: Config,
 ) => baseResponse(config.data) as ResponseOrUndefined<Config>;
+
+export type ResponseErrorOption<
+  Config extends PartialSubscriptionHandlerConfig,
+> = BaseResponseErrorOption<Config["data"]>;
+export type ResponseErrorOrUndefined<
+  Config extends PartialSubscriptionHandlerConfig,
+> = BaseResponseErrorOrUndefined<Config["data"]>;
+
+export const responseError = <
+  const Config extends PartialSubscriptionHandlerConfig,
+>(
+  config: Config,
+) => baseResponseError(config.data) as ResponseErrorOrUndefined<Config>;

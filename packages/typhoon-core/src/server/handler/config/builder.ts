@@ -2,6 +2,7 @@ import { Match, pipe } from "effect";
 import { type TypedPartialHandlerConfig, DummyHandlerConfig } from "./data";
 import { type RequestParamsConfigIn } from "./shared/requestParams";
 import { type ResponseConfigIn } from "./shared/response";
+import { type ResponseErrorConfigIn } from "./shared/responseError";
 import {
   empty as emptySubscription,
   PartialSubscriptionHandlerConfig,
@@ -13,6 +14,8 @@ import {
   type SetPartialSubscriptionHandlerRequestParams,
   response as responseSubscription,
   type SetPartialSubscriptionHandlerResponse,
+  responseError as responseErrorSubscription,
+  type SetPartialSubscriptionHandlerResponseError,
 } from "./subscription/builder";
 import {
   empty as emptyMutation,
@@ -25,6 +28,8 @@ import {
   type SetPartialMutationHandlerRequestParams,
   response as responseMutation,
   type SetPartialMutationHandlerResponse,
+  responseError as responseErrorMutation,
+  type SetPartialMutationHandlerResponseError,
 } from "./mutation/builder";
 
 export type SetTypedPartialHandlerType<
@@ -107,3 +112,26 @@ export const response =
           responseMutation(response)(config),
       }),
     ) as SetTypedPartialHandlerResponse<Response, Config>;
+
+export type SetTypedPartialHandlerResponseError<
+  ResponseError extends ResponseErrorConfigIn,
+  Config extends TypedPartialHandlerConfig,
+> = Config extends PartialSubscriptionHandlerConfig
+  ? SetPartialSubscriptionHandlerResponseError<ResponseError, Config>
+  : Config extends PartialMutationHandlerConfig
+    ? SetPartialMutationHandlerResponseError<ResponseError, Config>
+    : never;
+export const responseError =
+  <const ResponseError extends ResponseErrorConfigIn>(
+    responseError: ResponseError,
+  ) =>
+  <const Config extends TypedPartialHandlerConfig>(config: Config) =>
+    pipe(
+      Match.value(config as TypedPartialHandlerConfig),
+      Match.tagsExhaustive({
+        PartialSubscriptionHandlerConfig: (config) =>
+          responseErrorSubscription(responseError)(config),
+        PartialMutationHandlerConfig: (config) =>
+          responseErrorMutation(responseError)(config),
+      }),
+    ) as SetTypedPartialHandlerResponseError<ResponseError, Config>;

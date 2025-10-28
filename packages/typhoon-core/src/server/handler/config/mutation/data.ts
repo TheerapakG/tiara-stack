@@ -2,6 +2,7 @@ import { Data, Option } from "effect";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { RequestParamsConfig } from "../shared/requestParams";
 import { ResponseConfig } from "../shared/response";
+import { ResponseErrorConfig } from "../shared/responseError";
 import {
   type BasePartialHandlerConfig,
   type NameOption as BaseNameOption,
@@ -10,9 +11,12 @@ import {
   type RequestParamsOrUndefined as BaseRequestParamsOrUndefined,
   type ResponseOption as BaseResponseOption,
   type ResponseOrUndefined as BaseResponseOrUndefined,
+  type ResponseErrorOption as BaseResponseErrorOption,
+  type ResponseErrorOrUndefined as BaseResponseErrorOrUndefined,
   name as baseName,
   requestParams as baseRequestParams,
   response as baseResponse,
+  responseError as baseResponseError,
 } from "../shared/data";
 import { none } from "~/utils/strictOption";
 
@@ -24,7 +28,12 @@ type PartialMutationHandlerConfigData<
   Response extends Option.Option<
     ResponseConfig<StandardSchemaV1>
   > = Option.Option<ResponseConfig<StandardSchemaV1>>,
-> = { data: BasePartialHandlerConfig<Name, RequestParams, Response> };
+  ResponseError extends Option.Option<
+    ResponseErrorConfig<StandardSchemaV1>
+  > = Option.Option<ResponseErrorConfig<StandardSchemaV1>>,
+> = {
+  data: BasePartialHandlerConfig<Name, RequestParams, Response, ResponseError>;
+};
 const PartialMutationHandlerConfigTaggedClass: new <
   Name extends Option.Option<string> = Option.Option<string>,
   RequestParams extends Option.Option<
@@ -33,12 +42,20 @@ const PartialMutationHandlerConfigTaggedClass: new <
   Response extends Option.Option<
     ResponseConfig<StandardSchemaV1>
   > = Option.Option<ResponseConfig<StandardSchemaV1>>,
+  ResponseError extends Option.Option<
+    ResponseErrorConfig<StandardSchemaV1>
+  > = Option.Option<ResponseErrorConfig<StandardSchemaV1>>,
 >(
   args: Readonly<
-    PartialMutationHandlerConfigData<Name, RequestParams, Response>
+    PartialMutationHandlerConfigData<
+      Name,
+      RequestParams,
+      Response,
+      ResponseError
+    >
   >,
 ) => Readonly<
-  PartialMutationHandlerConfigData<Name, RequestParams, Response>
+  PartialMutationHandlerConfigData<Name, RequestParams, Response, ResponseError>
 > & {
   readonly _tag: "PartialMutationHandlerConfig";
 } = Data.TaggedClass("PartialMutationHandlerConfig");
@@ -50,10 +67,14 @@ export class PartialMutationHandlerConfig<
   const Response extends Option.Option<
     ResponseConfig<StandardSchemaV1>
   > = Option.Option<ResponseConfig<StandardSchemaV1>>,
+  ResponseError extends Option.Option<
+    ResponseErrorConfig<StandardSchemaV1>
+  > = Option.Option<ResponseErrorConfig<StandardSchemaV1>>,
 > extends PartialMutationHandlerConfigTaggedClass<
   Name,
   RequestParams,
-  Response
+  Response,
+  ResponseError
 > {}
 
 export const empty = () =>
@@ -62,6 +83,7 @@ export const empty = () =>
       name: none<string>(),
       requestParams: none<RequestParamsConfig<StandardSchemaV1, boolean>>(),
       response: none<ResponseConfig<StandardSchemaV1>>(),
+      responseError: none<ResponseErrorConfig<StandardSchemaV1>>(),
     },
   });
 
@@ -74,10 +96,14 @@ export type MutationHandlerConfig<
   Response extends Option.Option<
     ResponseConfig<StandardSchemaV1>
   > = Option.Option<ResponseConfig<StandardSchemaV1>>,
+  ResponseError extends Option.Option<
+    ResponseErrorConfig<StandardSchemaV1>
+  > = Option.Option<ResponseErrorConfig<StandardSchemaV1>>,
 > = PartialMutationHandlerConfig<
   Option.Some<Name>,
   Option.Some<RequestParams>,
-  Response
+  Response,
+  ResponseError
 >;
 
 export type NameOption<Config extends PartialMutationHandlerConfig> =
@@ -109,3 +135,15 @@ export type ResponseOrUndefined<Config extends PartialMutationHandlerConfig> =
 export const response = <const Config extends PartialMutationHandlerConfig>(
   config: Config,
 ) => baseResponse(config.data) as ResponseOrUndefined<Config>;
+
+export type ResponseErrorOption<Config extends PartialMutationHandlerConfig> =
+  BaseResponseErrorOption<Config["data"]>;
+export type ResponseErrorOrUndefined<
+  Config extends PartialMutationHandlerConfig,
+> = BaseResponseErrorOrUndefined<Config["data"]>;
+
+export const responseError = <
+  const Config extends PartialMutationHandlerConfig,
+>(
+  config: Config,
+) => baseResponseError(config.data) as ResponseErrorOrUndefined<Config>;

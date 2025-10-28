@@ -5,6 +5,7 @@ import {
   type NameOption,
   type RequestParamsOption,
   type ResponseOption,
+  type ResponseErrorOption,
 } from "./data";
 import {
   type RequestParamsConfigIn,
@@ -16,6 +17,11 @@ import {
   type TransformedResponseConfig,
   transformResponseConfig,
 } from "../shared/response";
+import {
+  type ResponseErrorConfigIn,
+  type TransformedResponseErrorConfig,
+  transformResponseErrorConfig,
+} from "../shared/responseError";
 
 export type SetPartialMutationHandlerName<
   Name extends string,
@@ -23,7 +29,8 @@ export type SetPartialMutationHandlerName<
 > = PartialMutationHandlerConfig<
   Option.Some<Name>,
   RequestParamsOption<Config>,
-  ResponseOption<Config>
+  ResponseOption<Config>,
+  ResponseErrorOption<Config>
 >;
 export const name: <const Name extends string>(
   name: Name,
@@ -46,7 +53,8 @@ export type SetPartialMutationHandlerRequestParams<
 > = PartialMutationHandlerConfig<
   NameOption<Config>,
   Option.Some<TransformedRequestParamsConfig<RequestParams>>,
-  ResponseOption<Config>
+  ResponseOption<Config>,
+  ResponseErrorOption<Config>
 >;
 export const requestParams: <const RequestParams extends RequestParamsConfigIn>(
   requestParams: RequestParams,
@@ -71,7 +79,8 @@ export type SetPartialMutationHandlerResponse<
 > = PartialMutationHandlerConfig<
   NameOption<Config>,
   RequestParamsOption<Config>,
-  Option.Some<TransformedResponseConfig<Response>>
+  Option.Some<TransformedResponseConfig<Response>>,
+  ResponseErrorOption<Config>
 >;
 export const response: <const Response extends ResponseConfigIn>(
   response: Response,
@@ -85,5 +94,31 @@ export const response: <const Response extends ResponseConfigIn>(
     new PartialMutationHandlerConfig({
       data: Struct.evolve(config.data, {
         response: () => some(transformResponseConfig(response)),
+      }),
+    });
+
+export type SetPartialMutationHandlerResponseError<
+  ResponseError extends ResponseErrorConfigIn,
+  Config extends PartialMutationHandlerConfig,
+> = PartialMutationHandlerConfig<
+  NameOption<Config>,
+  RequestParamsOption<Config>,
+  ResponseOption<Config>,
+  Option.Some<TransformedResponseErrorConfig<ResponseError>>
+>;
+export const responseError: <const ResponseError extends ResponseErrorConfigIn>(
+  responseError: ResponseError,
+) => <const Config extends PartialMutationHandlerConfig>(
+  config: Config,
+) => SetPartialMutationHandlerResponseError<ResponseError, Config> =
+  <const ResponseError extends ResponseErrorConfigIn>(
+    responseError: ResponseError,
+  ) =>
+  <const Config extends PartialMutationHandlerConfig>(
+    config: Config,
+  ): SetPartialMutationHandlerResponseError<ResponseError, Config> =>
+    new PartialMutationHandlerConfig({
+      data: Struct.evolve(config.data, {
+        responseError: () => some(transformResponseErrorConfig(responseError)),
       }),
     });

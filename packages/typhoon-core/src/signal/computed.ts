@@ -4,7 +4,6 @@ import {
   Effect,
   Effectable,
   Fiber,
-  Function,
   HashSet,
   Layer,
   ManagedRuntime,
@@ -233,15 +232,22 @@ export const make = <A = never, E = never, R = never>(
     ),
   );
 
+export const mapEffect =
+  <A, E1, R1, B, E2, R2>(
+    mapper: (
+      effect: Effect.Effect<A, E1, R1 | SignalContext>,
+    ) => Effect.Effect<B, E2, R2>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <E2, R2>(signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>) =>
+    make(pipe(signal, Effect.map(mapper), Effect.flatten), options);
+
 export const map =
   <A, B>(mapper: (value: A) => B, options?: Observable.ObservableOptions) =>
   <E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(
-      pipe(signal, Effect.flatMap(Function.identity), Effect.map(mapper)),
-      options,
-    );
+    make(pipe(signal, Effect.flatten, Effect.map(mapper)), options);
 
 export const flatMap =
   <A, B, E3, R3>(
@@ -251,10 +257,7 @@ export const flatMap =
   <E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(
-      pipe(signal, Effect.flatMap(Function.identity), Effect.flatMap(mapper)),
-      options,
-    );
+    make(pipe(signal, Effect.flatten, Effect.flatMap(mapper)), options);
 
 export const flatMapComputed =
   <A, B, E3, R3, E4, R4>(
@@ -265,12 +268,7 @@ export const flatMapComputed =
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
     make(
-      pipe(
-        signal,
-        Effect.flatMap(Function.identity),
-        Effect.flatMap(mapper),
-        Effect.flatMap(Function.identity),
-      ),
+      pipe(signal, Effect.flatten, Effect.flatMap(mapper), Effect.flatten),
       options,
     );
 
@@ -282,10 +280,7 @@ export const provideLayer =
   <A, E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(
-      pipe(signal, Effect.flatMap(Function.identity), Effect.provide(layer)),
-      options,
-    );
+    make(pipe(signal, Effect.flatten, Effect.provide(layer)), options);
 
 export const provideLayerComputed =
   <Rout, E3, RIn, E4, R4>(
@@ -299,11 +294,7 @@ export const provideLayerComputed =
       pipe(
         layer,
         Effect.flatMap((layer) =>
-          pipe(
-            signal,
-            Effect.flatMap(Function.identity),
-            Effect.provide(layer),
-          ),
+          pipe(signal, Effect.flatten, Effect.provide(layer)),
         ),
       ),
       options,
@@ -317,10 +308,7 @@ export const provideContext =
   <A, E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(
-      pipe(signal, Effect.flatMap(Function.identity), Effect.provide(context)),
-      options,
-    );
+    make(pipe(signal, Effect.flatten, Effect.provide(context)), options);
 
 export const provideContextComputed =
   <R3, E4, R4>(
@@ -334,11 +322,7 @@ export const provideContextComputed =
       pipe(
         context,
         Effect.flatMap((context) =>
-          pipe(
-            signal,
-            Effect.flatMap(Function.identity),
-            Effect.provide(context),
-          ),
+          pipe(signal, Effect.flatten, Effect.provide(context)),
         ),
       ),
       options,
@@ -349,10 +333,7 @@ export const provideRuntime =
   <A, E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(
-      pipe(signal, Effect.flatMap(Function.identity), Effect.provide(runtime)),
-      options,
-    );
+    make(pipe(signal, Effect.flatten, Effect.provide(runtime)), options);
 
 export const provideRuntimeComputed =
   <R3, E4, R4>(
@@ -366,11 +347,7 @@ export const provideRuntimeComputed =
       pipe(
         runtime,
         Effect.flatMap((runtime) =>
-          pipe(
-            signal,
-            Effect.flatMap(Function.identity),
-            Effect.provide(runtime),
-          ),
+          pipe(signal, Effect.flatten, Effect.provide(runtime)),
         ),
       ),
       options,
@@ -384,10 +361,7 @@ export const provideManagedRuntime =
   <A, E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(
-      pipe(signal, Effect.flatMap(Function.identity), Effect.provide(runtime)),
-      options,
-    );
+    make(pipe(signal, Effect.flatten, Effect.provide(runtime)), options);
 
 export const provideManagedRuntimeComputed =
   <R3, E3, E4, R4>(
@@ -401,11 +375,7 @@ export const provideManagedRuntimeComputed =
       pipe(
         runtime,
         Effect.flatMap((runtime) =>
-          pipe(
-            signal,
-            Effect.flatMap(Function.identity),
-            Effect.provide(runtime),
-          ),
+          pipe(signal, Effect.flatten, Effect.provide(runtime)),
         ),
       ),
       options,
@@ -423,11 +393,7 @@ export const annotateLogs =
       pipe(
         value,
         Effect.flatMap((value) =>
-          pipe(
-            signal,
-            Effect.flatMap(Function.identity),
-            Effect.annotateLogs(key, value),
-          ),
+          pipe(signal, Effect.flatten, Effect.annotateLogs(key, value)),
         ),
       ),
     );
@@ -444,11 +410,7 @@ export const annotateSpans =
       pipe(
         value,
         Effect.flatMap((value) =>
-          pipe(
-            signal,
-            Effect.flatMap(Function.identity),
-            Effect.annotateSpans(key, value),
-          ),
+          pipe(signal, Effect.flatten, Effect.annotateSpans(key, value)),
         ),
       ),
     );

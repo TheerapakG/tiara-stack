@@ -5,7 +5,7 @@ import type {
   Handler,
   HandlerData,
   HandlerDataContext,
-  HandlerDataError,
+  HandlerDataErrorIn,
   HandlerDataSuccessIn,
   HandlerContext,
   HandlerError,
@@ -57,7 +57,7 @@ export type SetHandlerOutput<
         HandlerContext<HandlerT, H>,
       ] extends [
         HandlerDataSuccessIn<HandlerT, D>,
-        HandlerDataError<HandlerT, D>,
+        HandlerDataErrorIn<HandlerT, D>,
         HandlerDataContext<HandlerT, D>,
       ]
       ? PartialHandlerContext<HandlerT, Option.Some<D>, Option.Some<H>>
@@ -67,7 +67,13 @@ export type SetHandlerOutput<
 export const handler =
   <HandlerT extends BaseHandlerT>() =>
   <const H extends Handler<HandlerT>>(h: H) =>
-  <const Input extends SetHandlerInput<HandlerT>>(config: Input) =>
+  <
+    const Input extends [SetHandlerOutput<HandlerT, Input, H>] extends [never]
+      ? never
+      : SetHandlerInput<HandlerT>,
+  >(
+    config: Input,
+  ) =>
     new PartialHandlerContext({
       data: Struct.evolve(config.data, {
         handler: () => some(h),
@@ -87,7 +93,11 @@ export type Builders<HandlerT extends BaseHandlerT> = {
   ) => SetDataOutput<HandlerT, D>;
   handler: <const H extends Handler<HandlerT>>(
     h: H,
-  ) => <const Input extends SetHandlerInput<HandlerT>>(
+  ) => <
+    const Input extends [SetHandlerOutput<HandlerT, Input, H>] extends [never]
+      ? never
+      : SetHandlerInput<HandlerT>,
+  >(
     config: Input,
   ) => SetHandlerOutput<HandlerT, Input, H>;
 };
