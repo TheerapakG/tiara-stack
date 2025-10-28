@@ -14,8 +14,10 @@ import {
   String,
   SynchronizedRef,
   Tracer,
+  Function,
 } from "effect";
 import { Rpc, Validation } from "typhoon-core/error";
+import { FromStandardSchemaV1 } from "typhoon-core/schema";
 import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { DependencySignal, Signal, Computed } from "typhoon-core/signal";
@@ -31,22 +33,22 @@ type LoadingState = {
   state: "loading";
 };
 
-type ResolvedState<T = unknown> = {
+type ResolvedState<A = unknown, E = unknown> = {
   state: "resolved";
   timestamp: Option.Option<DateTime.DateTime>;
-  value: Either.Either<T, Rpc.RpcError | Validation.ValidationError>;
+  value: Either.Either<A, Rpc.RpcError<E> | Validation.ValidationError>;
   span?: {
     traceId: string;
     spanId: string;
   };
 };
 
-type SignalState<T = unknown> = LoadingState | ResolvedState<T>;
+type SignalState<A = unknown, E = unknown> = LoadingState | ResolvedState<A, E>;
 
 type UpdaterState = {
   updater: (
     header: Header.Header<"server:update">,
-    result: Either.Either<unknown, Rpc.RpcError>,
+    result: Either.Either<unknown, unknown>,
   ) => Effect.Effect<void, never, never>;
 };
 type UpdaterStateMap = HashMap.HashMap<string, UpdaterState>;
@@ -128,7 +130,7 @@ export class WebSocketClient<
     id: string,
     updater: (
       header: Header.Header<"server:update">,
-      result: Either.Either<unknown, Rpc.RpcError>,
+      result: Either.Either<unknown, unknown>,
     ) => Effect.Effect<void, never, never>,
   ) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -168,32 +170,15 @@ export class WebSocketClient<
                 pipe(
                   Match.value(header),
                   Match.when({ action: "server:update" }, (header) =>
-                    pipe(
-                      header.payload.success
-                        ? Effect.succeed(decodedResponse)
-                        : pipe(
-                            decodedResponse,
-                            Schema.decodeUnknown(
-                              Schema.Struct({ message: Schema.String }),
-                            ),
-                            Effect.option,
-                            Effect.flatMap((messageOption) =>
-                              Effect.fail(
-                                Rpc.makeRpcError(
-                                  pipe(
-                                    messageOption,
-                                    Option.map((message) => message.message),
-                                    Option.getOrElse(
-                                      () => "An unknown error occurred",
-                                    ),
-                                  ),
-                                  decodedResponse,
-                                ),
-                              ),
-                            ),
-                          ),
-                      Effect.either,
-                      Effect.flatMap((result) => updater(header, result)),
+                    updater(
+                      header,
+                      pipe(
+                        decodedResponse,
+                        Either.liftPredicate(
+                          () => header.payload.success,
+                          Function.identity,
+                        ),
+                      ),
                     ),
                   ),
                   Match.orElse(() => Effect.void),
@@ -442,6 +427,13 @@ export class WebSocketClient<
           ),
         ),
       ),
+      Effect.let("responseErrorValidator", ({ config }) =>
+        pipe(
+          Handler.Config.resolveResponseErrorValidator(
+            Handler.Config.responseError(config),
+          ),
+        ),
+      ),
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.let("signal", () =>
         Signal.make<
@@ -452,11 +444,18 @@ export class WebSocketClient<
                   SubscriptionHandlerConfigs[Handler]
                 >
               >
+            >,
+            Validator.Output<
+              Handler.Config.ResolvedResponseErrorValidator<
+                Handler.Config.ResponseErrorOrUndefined<
+                  SubscriptionHandlerConfigs[Handler]
+                >
+              >
             >
           >
         >({ state: "loading" }),
       ),
-      Effect.tap(({ id, signal, config }) =>
+      Effect.tap(({ id, signal, config, responseErrorValidator }) =>
         pipe(
           client,
           WebSocketClient.addUpdater(id, (header, result) =>
@@ -468,15 +467,42 @@ export class WebSocketClient<
               )
                 ? pipe(
                     result,
-                    Effect.flatMap(
-                      Validate.validate(
-                        Handler.Config.resolveResponseValidator(
-                          Handler.Config.response(
-                            config as SubscriptionHandlerConfigs[Handler],
-                          ),
+                    Handler.Config.decodeResponseUnknown(config),
+                    Effect.map(
+                      Either.mapLeft((error) =>
+                        Rpc.makeRpcError(
+                          (responseErrorValidator === undefined
+                            ? Schema.Unknown
+                            : FromStandardSchemaV1.FromStandardSchemaV1(
+                                responseErrorValidator,
+                              )) as Schema.Schema<
+                            Validator.Output<
+                              Handler.Config.ResolvedResponseErrorValidator<
+                                Handler.Config.ResponseErrorOrUndefined<
+                                  SubscriptionHandlerConfigs[Handler]
+                                >
+                              >
+                            >,
+                            Validator.Input<
+                              Handler.Config.ResolvedResponseErrorValidator<
+                                Handler.Config.ResponseErrorOrUndefined<
+                                  SubscriptionHandlerConfigs[Handler]
+                                >
+                              >
+                            >
+                          >,
+                        )(
+                          typeof error === "object" &&
+                            error !== null &&
+                            "message" in error &&
+                            typeof error.message === "string"
+                            ? error.message
+                            : "An unknown error occurred",
+                          error,
                         ),
                       ),
                     ),
+                    Effect.flatten,
                     Effect.either,
                     Effect.map((value) => ({
                       state: "resolved",
@@ -668,6 +694,13 @@ export class WebSocketClient<
           ),
         ),
       ),
+      Effect.let("responseErrorValidator", ({ config }) =>
+        pipe(
+          Handler.Config.resolveResponseErrorValidator(
+            Handler.Config.responseError(config),
+          ),
+        ),
+      ),
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("deferred", () =>
         Deferred.make<
@@ -680,14 +713,23 @@ export class WebSocketClient<
                   >
                 >
               >,
-              Rpc.RpcError | Validation.ValidationError
+              | Rpc.RpcError<
+                  Validator.Output<
+                    Handler.Config.ResolvedResponseErrorValidator<
+                      Handler.Config.ResponseErrorOrUndefined<
+                        SubscriptionHandlerConfigs[Handler]
+                      >
+                    >
+                  >
+                >
+              | Validation.ValidationError
             >;
             span: { traceId: string; spanId: string } | undefined;
           },
           never
         >(),
       ),
-      Effect.tap(({ id, deferred, config }) =>
+      Effect.tap(({ id, deferred, config, responseErrorValidator }) =>
         pipe(
           client,
           WebSocketClient.addUpdater(id, (header, result) =>
@@ -696,15 +738,42 @@ export class WebSocketClient<
               Deferred.complete(
                 pipe(
                   result,
-                  Effect.flatMap(
-                    Validate.validate(
-                      Handler.Config.resolveResponseValidator(
-                        Handler.Config.response(
-                          config as SubscriptionHandlerConfigs[Handler],
-                        ),
+                  Handler.Config.decodeResponseUnknown(config),
+                  Effect.map(
+                    Either.mapLeft((error) =>
+                      Rpc.makeRpcError(
+                        (responseErrorValidator === undefined
+                          ? Schema.Unknown
+                          : FromStandardSchemaV1.FromStandardSchemaV1(
+                              responseErrorValidator,
+                            )) as Schema.Schema<
+                          Validator.Output<
+                            Handler.Config.ResolvedResponseErrorValidator<
+                              Handler.Config.ResponseErrorOrUndefined<
+                                SubscriptionHandlerConfigs[Handler]
+                              >
+                            >
+                          >,
+                          Validator.Input<
+                            Handler.Config.ResolvedResponseErrorValidator<
+                              Handler.Config.ResponseErrorOrUndefined<
+                                SubscriptionHandlerConfigs[Handler]
+                              >
+                            >
+                          >
+                        >,
+                      )(
+                        typeof error === "object" &&
+                          error !== null &&
+                          "message" in error &&
+                          typeof error.message === "string"
+                          ? error.message
+                          : "An unknown error occurred",
+                        error,
                       ),
                     ),
                   ),
+                  Effect.flatten,
                   Effect.either,
                   Effect.map((result) => ({ result, span: header.span })),
                 ),
@@ -811,6 +880,13 @@ export class WebSocketClient<
           ),
         ),
       ),
+      Effect.let("responseErrorValidator", ({ config }) =>
+        pipe(
+          Handler.Config.resolveResponseErrorValidator(
+            Handler.Config.responseError(config),
+          ),
+        ),
+      ),
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("deferred", () =>
         Deferred.make<
@@ -823,14 +899,23 @@ export class WebSocketClient<
                   >
                 >
               >,
-              Rpc.RpcError | Validation.ValidationError
+              | Rpc.RpcError<
+                  Validator.Output<
+                    Handler.Config.ResolvedResponseErrorValidator<
+                      Handler.Config.ResponseErrorOrUndefined<
+                        MutationHandlerConfigs[Handler]
+                      >
+                    >
+                  >
+                >
+              | Validation.ValidationError
             >;
             span: { traceId: string; spanId: string } | undefined;
           },
           never
         >(),
       ),
-      Effect.tap(({ id, deferred, config }) =>
+      Effect.tap(({ id, deferred, config, responseErrorValidator }) =>
         pipe(
           client,
           WebSocketClient.addUpdater(id, (header, result) =>
@@ -839,15 +924,42 @@ export class WebSocketClient<
               Deferred.complete(
                 pipe(
                   result,
-                  Effect.flatMap(
-                    Validate.validate(
-                      Handler.Config.resolveResponseValidator(
-                        Handler.Config.response(
-                          config as MutationHandlerConfigs[Handler],
-                        ),
+                  Handler.Config.decodeResponseUnknown(config),
+                  Effect.map(
+                    Either.mapLeft((error) =>
+                      Rpc.makeRpcError(
+                        (responseErrorValidator === undefined
+                          ? Schema.Unknown
+                          : FromStandardSchemaV1.FromStandardSchemaV1(
+                              responseErrorValidator,
+                            )) as Schema.Schema<
+                          Validator.Output<
+                            Handler.Config.ResolvedResponseErrorValidator<
+                              Handler.Config.ResponseErrorOrUndefined<
+                                MutationHandlerConfigs[Handler]
+                              >
+                            >
+                          >,
+                          Validator.Input<
+                            Handler.Config.ResolvedResponseErrorValidator<
+                              Handler.Config.ResponseErrorOrUndefined<
+                                MutationHandlerConfigs[Handler]
+                              >
+                            >
+                          >
+                        >,
+                      )(
+                        typeof error === "object" &&
+                          error !== null &&
+                          "message" in error &&
+                          typeof error.message === "string"
+                          ? error.message
+                          : "An unknown error occurred",
+                        error,
                       ),
                     ),
                   ),
+                  Effect.flatten,
                   Effect.either,
                   Effect.map((result) => ({ result, span: header.span })),
                 ),
