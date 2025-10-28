@@ -51,6 +51,32 @@ interface TransformDataSuccessOut extends HKT.TypeLambda {
     : never;
 }
 
+interface TransformDataErrorIn extends HKT.TypeLambda {
+  readonly type: this["In"] extends infer Config extends MutationData
+    ? Handler.Config.ResponseErrorOption<Config> extends Option.Some<
+        infer ResponseError extends
+          Handler.Config.Shared.ResponseError.ResponseErrorConfig<StandardSchemaV1>
+      >
+      ? Validator.Input<
+          Handler.Config.ResolvedResponseErrorValidator<ResponseError>
+        >
+      : unknown
+    : never;
+}
+
+interface TransformDataErrorOut extends HKT.TypeLambda {
+  readonly type: this["In"] extends infer Config extends MutationData
+    ? Handler.Config.ResponseErrorOption<Config> extends Option.Some<
+        infer ResponseError extends
+          Handler.Config.Shared.ResponseError.ResponseErrorConfig<StandardSchemaV1>
+      >
+      ? Validator.Output<
+          Handler.Config.ResolvedResponseErrorValidator<ResponseError>
+        >
+      : unknown
+    : never;
+}
+
 interface TransformHandlerSuccess extends HKT.TypeLambda {
   readonly type: this["In"] extends infer H extends MutationHandler
     ? Effect.Effect.Success<H>
@@ -77,7 +103,8 @@ export interface MutationHandlerT extends Type.BaseHandlerT {
   readonly TransformDataKey: TransformDataKey;
   readonly TransformDataSuccessIn: TransformDataSuccessIn;
   readonly TransformDataSuccessOut: TransformDataSuccessOut;
-  readonly TransformDataError: TransformUnknown;
+  readonly TransformDataErrorIn: TransformDataErrorIn;
+  readonly TransformDataErrorOut: TransformDataErrorOut;
   readonly TransformDataContext: TransformUnknown;
   readonly TransformHandlerSuccess: TransformHandlerSuccess;
   readonly TransformHandlerError: TransformHandlerError;

@@ -29,7 +29,8 @@ export interface BaseHandlerT {
   readonly TransformDataKey: HKT.TypeLambda;
   readonly TransformDataSuccessIn: HKT.TypeLambda;
   readonly TransformDataSuccessOut: HKT.TypeLambda;
-  readonly TransformDataError: HKT.TypeLambda;
+  readonly TransformDataErrorIn: HKT.TypeLambda;
+  readonly TransformDataErrorOut: HKT.TypeLambda;
   readonly TransformDataContext: HKT.TypeLambda;
   readonly TransformHandlerSuccess: HKT.TypeLambda;
   readonly TransformHandlerError: HKT.TypeLambda;
@@ -73,10 +74,18 @@ export type HandlerDataSuccessOut<
     ? HKT.Kind<F, DD, unknown, unknown, unknown>
     : never
   : never;
-export type HandlerDataError<
+export type HandlerDataErrorIn<
   HandlerT extends BaseHandlerT,
   D extends HandlerData<HandlerT>,
-> = HandlerT["TransformDataError"] extends infer F extends HKT.TypeLambda
+> = HandlerT["TransformDataErrorIn"] extends infer F extends HKT.TypeLambda
+  ? D extends infer DD
+    ? HKT.Kind<F, DD, unknown, unknown, unknown>
+    : never
+  : never;
+export type HandlerDataErrorOut<
+  HandlerT extends BaseHandlerT,
+  D extends HandlerData<HandlerT>,
+> = HandlerT["TransformDataErrorOut"] extends infer F extends HKT.TypeLambda
   ? D extends infer DD
     ? HKT.Kind<F, DD, unknown, unknown, unknown>
     : never

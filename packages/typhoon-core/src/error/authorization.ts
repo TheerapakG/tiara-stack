@@ -1,16 +1,19 @@
-import { Cause, Data } from "effect";
+import { Schema } from "effect";
 
-type AuthorizationErrorData = {
-  message: string;
-  cause?: unknown;
-};
-const AuthorizationErrorTaggedError: new (
-  args: Readonly<AuthorizationErrorData>,
-) => Cause.YieldableError & {
-  readonly _tag: "AuthorizationError";
-} & Readonly<AuthorizationErrorData> = Data.TaggedError(
+const AuthorizationErrorData = Schema.Struct({
+  message: Schema.String,
+  cause: Schema.optionalWith(Schema.Unknown, { nullable: true }),
+});
+const AuthorizationErrorTaggedError: Schema.TaggedErrorClass<
+  AuthorizationError,
   "AuthorizationError",
-)<AuthorizationErrorData>;
+  {
+    readonly _tag: Schema.tag<"AuthorizationError">;
+  } & (typeof AuthorizationErrorData)["fields"]
+> = Schema.TaggedError<AuthorizationError>()(
+  "AuthorizationError",
+  AuthorizationErrorData,
+);
 export class AuthorizationError extends AuthorizationErrorTaggedError {}
 
 export const makeAuthorizationError = (message: string, cause?: unknown) =>

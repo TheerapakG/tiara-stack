@@ -1,17 +1,21 @@
-import { Cause, Data } from "effect";
+import { Schema } from "effect";
 import { DecodeError } from "@msgpack/msgpack";
 
-type MsgpackDecodeErrorData = {
-  message: string;
-  cause: RangeError | DecodeError;
-};
-const MsgpackDecodeErrorTaggedError: new (
-  args: Readonly<MsgpackDecodeErrorData>,
-) => Cause.YieldableError & {
-  readonly _tag: "MsgpackDecodeError";
-} & Readonly<MsgpackDecodeErrorData> = Data.TaggedError(
+// TODO: omit cause when encoding
+const MsgpackDecodeErrorData = Schema.Struct({
+  message: Schema.String,
+  cause: Schema.Unknown, // Schema.Union(RangeErrorSchema, DecodeErrorSchema),
+});
+const MsgpackDecodeErrorTaggedError: Schema.TaggedErrorClass<
+  MsgpackDecodeError,
   "MsgpackDecodeError",
-)<MsgpackDecodeErrorData>;
+  {
+    readonly _tag: Schema.tag<"MsgpackDecodeError">;
+  } & (typeof MsgpackDecodeErrorData)["fields"]
+> = Schema.TaggedError<MsgpackDecodeError>()(
+  "MsgpackDecodeError",
+  MsgpackDecodeErrorData,
+);
 export class MsgpackDecodeError extends MsgpackDecodeErrorTaggedError {}
 
 export const makeMsgpackDecodeError = (cause: RangeError | DecodeError) =>
@@ -20,17 +24,23 @@ export const makeMsgpackDecodeError = (cause: RangeError | DecodeError) =>
     cause,
   });
 
-type MsgpackEncodeErrorData = {
-  message: string;
-  cause: Error;
-};
-const MsgpackEncodeErrorTaggedError: new (
-  args: Readonly<MsgpackEncodeErrorData>,
-) => Cause.YieldableError & {
-  readonly _tag: "MsgpackEncodeError";
-} & Readonly<MsgpackEncodeErrorData> = Data.TaggedError(
+const ErrorSchema = Schema.declare((input: unknown) => input instanceof Error);
+
+// TODO: omit cause when encoding
+const MsgpackEncodeErrorData = Schema.Struct({
+  message: Schema.String,
+  cause: ErrorSchema,
+});
+const MsgpackEncodeErrorTaggedError: Schema.TaggedErrorClass<
+  MsgpackEncodeError,
   "MsgpackEncodeError",
-)<MsgpackEncodeErrorData>;
+  {
+    readonly _tag: Schema.tag<"MsgpackEncodeError">;
+  } & (typeof MsgpackEncodeErrorData)["fields"]
+> = Schema.TaggedError<MsgpackEncodeError>()(
+  "MsgpackEncodeError",
+  MsgpackEncodeErrorData,
+);
 export class MsgpackEncodeError extends MsgpackEncodeErrorTaggedError {}
 
 export const makeMsgpackEncodeError = (cause: Error) =>

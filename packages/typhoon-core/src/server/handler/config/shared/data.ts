@@ -2,6 +2,7 @@ import { Option, pipe } from "effect";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { RequestParamsConfig } from "./requestParams";
 import { ResponseConfig } from "./response";
+import { ResponseErrorConfig } from "./responseError";
 import { type GetOrUndefined, getOrUndefined } from "~/utils/strictOption";
 
 export type BasePartialHandlerConfig<
@@ -12,10 +13,14 @@ export type BasePartialHandlerConfig<
   Response extends Option.Option<
     ResponseConfig<StandardSchemaV1>
   > = Option.Option<ResponseConfig<StandardSchemaV1>>,
+  ResponseError extends Option.Option<
+    ResponseErrorConfig<StandardSchemaV1>
+  > = Option.Option<ResponseErrorConfig<StandardSchemaV1>>,
 > = {
   name: Name;
   requestParams: RequestParams;
   response: Response;
+  responseError: ResponseError;
 };
 
 export type BaseHandlerConfig<
@@ -27,11 +32,15 @@ export type BaseHandlerConfig<
   Response extends Option.Option<
     ResponseConfig<StandardSchemaV1>
   > = Option.Option<ResponseConfig<StandardSchemaV1>>,
+  ResponseError extends Option.Option<
+    ResponseErrorConfig<StandardSchemaV1>
+  > = Option.Option<ResponseErrorConfig<StandardSchemaV1>>,
 > = {
   data: BasePartialHandlerConfig<
     Option.Some<Name>,
     Option.Some<RequestParams>,
-    Response
+    Response,
+    ResponseError
   >;
 };
 
@@ -65,3 +74,16 @@ export type ResponseOrUndefined<Config extends BasePartialHandlerConfig> =
 export const response = <const Config extends BasePartialHandlerConfig>(
   config: Config,
 ) => pipe(config.response, getOrUndefined) as ResponseOrUndefined<Config>;
+
+export type ResponseErrorOption<Config extends BasePartialHandlerConfig> =
+  Config["responseError"];
+export type ResponseErrorOrUndefined<Config extends BasePartialHandlerConfig> =
+  GetOrUndefined<ResponseErrorOption<Config>>;
+
+export const responseError = <const Config extends BasePartialHandlerConfig>(
+  config: Config,
+) =>
+  pipe(
+    config.responseError,
+    getOrUndefined,
+  ) as ResponseErrorOrUndefined<Config>;
