@@ -8,11 +8,11 @@ import {
   TeamConfig,
   TeamTagsConstantsConfig,
   TeamTagsRangesConfig,
+  Error,
 } from "@/server/schema";
 import { type sheets_v4 } from "@googleapis/sheets";
 import {
   Array,
-  Data,
   Effect,
   HashMap,
   Number,
@@ -24,10 +24,6 @@ import {
 } from "effect";
 import { Array as ArrayUtils } from "typhoon-core/utils";
 import { DefaultTaggedClass } from "typhoon-core/schema";
-
-export class SheetConfigError extends Data.TaggedError("SheetConfigError")<{
-  message: string;
-}> {}
 
 const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
   pipe(
@@ -246,7 +242,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                   onSome: Effect.succeed,
                   onNone: () =>
                     Effect.fail(
-                      new SheetConfigError({
+                      new Error.SheetConfigError({
                         message:
                           "Error getting ranges config, no value ranges found",
                       }),
@@ -288,7 +284,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                   onSome: Effect.succeed,
                   onNone: () =>
                     Effect.fail(
-                      new SheetConfigError({
+                      new Error.SheetConfigError({
                         message:
                           "Error getting team config, no value ranges found",
                       }),
@@ -318,7 +314,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                   onSome: Effect.succeed,
                   onNone: () =>
                     Effect.fail(
-                      new SheetConfigError({
+                      new Error.SheetConfigError({
                         message:
                           "Error getting event config, no value ranges found",
                       }),
@@ -365,7 +361,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                   onSome: Effect.succeed,
                   onNone: () =>
                     Effect.fail(
-                      new SheetConfigError({
+                      new Error.SheetConfigError({
                         message:
                           "Error getting schedule config, no value ranges found",
                       }),
@@ -395,7 +391,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                   onSome: Effect.succeed,
                   onNone: () =>
                     Effect.fail(
-                      new SheetConfigError({
+                      new Error.SheetConfigError({
                         message:
                           "Error getting runner config, no value ranges found",
                       }),
