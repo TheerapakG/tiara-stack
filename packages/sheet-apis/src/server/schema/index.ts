@@ -1,3 +1,4 @@
+export * as Error from "./error";
 export * from "./eventConfig";
 export * from "./guildChannelConfig";
 export * from "./guildConfig";

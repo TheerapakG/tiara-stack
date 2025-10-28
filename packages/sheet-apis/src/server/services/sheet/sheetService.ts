@@ -1,5 +1,6 @@
 import { GoogleSheets } from "@/google/sheets";
 import {
+  Error,
   HourRange,
   RawPlayer,
   Schedule,
@@ -25,12 +26,6 @@ import { Computed } from "typhoon-core/signal";
 import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 import { GuildConfigService } from "../guildConfigService";
 import { RunnerConfigMap, SheetConfigService } from "../sheetConfigService";
-
-export class ParserFieldError extends Data.TaggedError("ParserFieldError")<{
-  message: string;
-  range: unknown;
-  field: string;
-}> {}
 
 const playerParser = ([
   userIds,
@@ -197,7 +192,7 @@ const teamParser = (
                 onSome: Effect.succeed,
                 onNone: () =>
                   Effect.fail(
-                    new ParserFieldError({
+                    new Error.ParserFieldError({
                       message:
                         "Error getting player name, no config field found",
                       range: { name: teamConfig.name },
@@ -228,7 +223,7 @@ const teamParser = (
                 onSome: Effect.succeed,
                 onNone: () =>
                   Effect.fail(
-                    new ParserFieldError({
+                    new Error.ParserFieldError({
                       message: "Error getting team name, no config field found",
                       range: { name: teamConfig.name },
                       field: "teamName",
@@ -255,7 +250,7 @@ const teamParser = (
                 onSome: Effect.succeed,
                 onNone: () =>
                   Effect.fail(
-                    new ParserFieldError({
+                    new Error.ParserFieldError({
                       message: "Error getting lead, no config field found",
                       range: { name: teamConfig.name },
                       field: "lead",
@@ -285,7 +280,7 @@ const teamParser = (
                 onSome: Effect.succeed,
                 onNone: () =>
                   Effect.fail(
-                    new ParserFieldError({
+                    new Error.ParserFieldError({
                       message: "Error getting backline, no config field found",
                       range: { name: teamConfig.name },
                       field: "backline",
@@ -312,7 +307,7 @@ const teamParser = (
                 onSome: Effect.succeed,
                 onNone: () =>
                   Effect.fail(
-                    new ParserFieldError({
+                    new Error.ParserFieldError({
                       message: "Error getting talent, no config field found",
                       range: { name: teamConfig.name },
                       field: "talent",
@@ -355,7 +350,7 @@ const teamParser = (
                       onSome: Effect.succeed,
                       onNone: () =>
                         Effect.fail(
-                          new ParserFieldError({
+                          new Error.ParserFieldError({
                             message:
                               "Error getting tags, no config field found",
                             range: { name: teamConfig.name },
@@ -568,7 +563,7 @@ const scheduleParser = (
                 onSome: Effect.succeed,
                 onNone: () =>
                   Effect.fail(
-                    new ParserFieldError({
+                    new Error.ParserFieldError({
                       message: "Error getting hours, no config field found",
                       range: {
                         channel: scheduleConfig.channel,
@@ -602,7 +597,7 @@ const scheduleParser = (
                 onSome: Effect.succeed,
                 onNone: () =>
                   Effect.fail(
-                    new ParserFieldError({
+                    new Error.ParserFieldError({
                       message: "Error getting fills, no config field found",
                       range: {
                         channel: scheduleConfig.channel,
@@ -647,7 +642,7 @@ const scheduleParser = (
                 onSome: Effect.succeed,
                 onNone: () =>
                   Effect.fail(
-                    new ParserFieldError({
+                    new Error.ParserFieldError({
                       message: "Error getting overfills, no config field found",
                       range: {
                         channel: scheduleConfig.channel,
@@ -683,7 +678,7 @@ const scheduleParser = (
                 onSome: Effect.succeed,
                 onNone: () =>
                   Effect.fail(
-                    new ParserFieldError({
+                    new Error.ParserFieldError({
                       message: "Error getting standbys, no config field found",
                       range: {
                         channel: scheduleConfig.channel,
@@ -732,7 +727,7 @@ const scheduleParser = (
                     onSome: Effect.succeed,
                     onNone: () =>
                       Effect.fail(
-                        new ParserFieldError({
+                        new Error.ParserFieldError({
                           message:
                             "Error getting breaks, no config field found",
                           range: {

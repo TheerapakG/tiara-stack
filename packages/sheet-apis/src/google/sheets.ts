@@ -1,7 +1,7 @@
 import { MethodOptions, sheets, sheets_v4 } from "@googleapis/sheets";
+import { Error } from "@/server/schema";
 import {
   Array,
-  Data,
   Effect,
   Function,
   HashMap,
@@ -18,11 +18,6 @@ import {
 } from "typhoon-core/schema";
 import { Utils } from "typhoon-core/utils";
 import { GoogleAuth } from "./auth";
-
-export class GoogleSheetsError extends Data.TaggedError("GoogleSheetsError")<{
-  message: string;
-  cause: unknown;
-}> {}
 
 const parseValueRange = <A, R>(
   valueRange: sheets_v4.Schema$ValueRange,
@@ -149,7 +144,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
                 Effect.option,
                 Effect.flatMap((message) =>
                   Effect.fail(
-                    new GoogleSheetsError({
+                    new Error.GoogleSheetsError({
                       message: pipe(
                         message,
                         Option.map((message) => message.message),
@@ -192,7 +187,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
                     Effect.option,
                     Effect.flatMap((message) =>
                       Effect.fail(
-                        new GoogleSheetsError({
+                        new Error.GoogleSheetsError({
                           message: pipe(
                             message,
                             Option.map((message) => message.message),
@@ -228,7 +223,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
                 Effect.option,
                 Effect.flatMap((message) =>
                   Effect.fail(
-                    new GoogleSheetsError({
+                    new Error.GoogleSheetsError({
                       message: pipe(
                         message,
                         Option.map((message) => message.message),
@@ -255,7 +250,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
                 Effect.option,
                 Effect.flatMap((message) =>
                   Effect.fail(
-                    new GoogleSheetsError({
+                    new Error.GoogleSheetsError({
                       message: pipe(
                         message,
                         Option.map((message) => message.message),
