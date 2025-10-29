@@ -1,6 +1,7 @@
 import { setMessageCheckinMemberCheckinAtHandlerConfig } from "@/server/handler/config";
+import { Error } from "@/server/schema";
 import { AuthService, MessageCheckinService } from "@/server/services";
-import { Effect, pipe, Schema } from "effect";
+import { Effect, Option, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { OnceObserver } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -21,20 +22,21 @@ export const setMessageCheckinMemberCheckinAtHandler = pipe(
           Effect.flatMap(OnceObserver.observeOnce),
         ),
       ),
-      Effect.flatMap(({ messageId, memberId }) =>
-        MessageCheckinService.setMessageCheckinMemberCheckinAt(
-          messageId,
-          memberId,
-        ),
-      ),
+      Effect.flatMap(MessageCheckinService.setMessageCheckinMemberCheckinAt),
       Effect.flatMap(
-        Schema.encodeEither(
-          Handler.Config.resolveResponseValidator(
-            Handler.Config.response(
-              setMessageCheckinMemberCheckinAtHandlerConfig,
+        Option.match({
+          onSome: Effect.succeed,
+          onNone: () =>
+            Effect.fail(
+              Error.Core.makeArgumentError(
+                "Cannot check in member, message might not be registered, member is not on this message, or the checkin time is not within the allowed time frame",
+              ),
             ),
-          ),
-        ),
+        }),
+      ),
+      Error.Core.catchParseErrorAsValidationError,
+      Handler.Config.encodeResponseEffect(
+        setMessageCheckinMemberCheckinAtHandlerConfig,
       ),
       Effect.withSpan("setMessageCheckinMemberCheckinAtHandler", {
         captureStackTrace: true,

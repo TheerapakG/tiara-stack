@@ -1,8 +1,6 @@
-import { MessageCheckin } from "@/server/schema";
+import { Error, MessageCheckin } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
-
-const responseSchema = Schema.OptionFromNullishOr(MessageCheckin, undefined);
 
 export const getMessageCheckinDataHandlerConfig = pipe(
   Handler.Config.empty(),
@@ -12,6 +10,19 @@ export const getMessageCheckinDataHandlerConfig = pipe(
     validator: pipe(Schema.String, Schema.standardSchemaV1),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(responseSchema, Schema.standardSchemaV1),
+    validator: pipe(MessageCheckin, Schema.standardSchemaV1),
+  }),
+  Handler.Config.Builder.responseError({
+    validator: pipe(
+      Schema.Union(
+        Error.Core.ArgumentError,
+        Error.Core.AuthorizationError,
+        Error.Core.DBQueryError,
+        Error.Core.MsgpackDecodeError,
+        Error.Core.StreamExhaustedError,
+        Error.Core.ValidationError,
+      ),
+      Schema.standardSchemaV1,
+    ),
   }),
 );

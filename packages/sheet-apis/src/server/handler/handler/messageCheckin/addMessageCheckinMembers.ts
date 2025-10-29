@@ -1,6 +1,7 @@
 import { addMessageCheckinMembersHandlerConfig } from "@/server/handler/config";
+import { Error } from "@/server/schema";
 import { AuthService, MessageCheckinService } from "@/server/services";
-import { Effect, pipe, Schema } from "effect";
+import { Effect, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { OnceObserver } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -22,16 +23,11 @@ export const addMessageCheckinMembersHandler = pipe(
         ),
       ),
       Effect.flatMap(({ messageId, memberIds }) =>
-        MessageCheckinService.addMessageCheckinMembers(messageId, [
-          ...memberIds,
-        ]),
+        MessageCheckinService.addMessageCheckinMembers(messageId, memberIds),
       ),
-      Effect.flatMap(
-        Schema.encodeEither(
-          Handler.Config.resolveResponseValidator(
-            Handler.Config.response(addMessageCheckinMembersHandlerConfig),
-          ),
-        ),
+      Error.Core.catchParseErrorAsValidationError,
+      Handler.Config.encodeResponseEffect(
+        addMessageCheckinMembersHandlerConfig,
       ),
       Effect.withSpan("addMessageCheckinMembersHandler", {
         captureStackTrace: true,

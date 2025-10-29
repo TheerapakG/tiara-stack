@@ -1,6 +1,7 @@
 import { upsertMessageCheckinDataHandlerConfig } from "@/server/handler/config";
+import { Error } from "@/server/schema";
 import { AuthService, MessageCheckinService } from "@/server/services";
-import { Effect, pipe, Schema } from "effect";
+import { Effect, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { OnceObserver } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -24,12 +25,9 @@ export const upsertMessageCheckinDataHandler = pipe(
       Effect.flatMap(({ messageId, ...data }) =>
         MessageCheckinService.upsertMessageCheckinData(messageId, data),
       ),
-      Effect.flatMap(
-        Schema.encodeEither(
-          Handler.Config.resolveResponseValidator(
-            Handler.Config.response(upsertMessageCheckinDataHandlerConfig),
-          ),
-        ),
+      Error.Core.catchParseErrorAsValidationError,
+      Handler.Config.encodeResponseEffect(
+        upsertMessageCheckinDataHandlerConfig,
       ),
       Effect.withSpan("upsertMessageCheckinDataHandler", {
         captureStackTrace: true,

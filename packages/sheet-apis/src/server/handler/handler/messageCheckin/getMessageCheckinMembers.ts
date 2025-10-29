@@ -1,6 +1,7 @@
 import { getMessageCheckinMembersHandlerConfig } from "@/server/handler/config";
+import { Error } from "@/server/schema";
 import { AuthService, MessageCheckinService } from "@/server/services";
-import { Effect, Function, pipe, Schema } from "effect";
+import { Effect, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -18,13 +19,11 @@ export const getMessageCheckinMembersHandler = pipe(
       Computed.flatMapComputed(() =>
         Event.request.parsed(getMessageCheckinMembersHandlerConfig),
       ),
-      Computed.flatMap(MessageCheckinService.getMessageCheckinMembers),
-      Computed.flatMap(Function.identity),
-      Computed.flatMap(
-        Schema.encodeEither(
-          Handler.Config.resolveResponseValidator(
-            Handler.Config.response(getMessageCheckinMembersHandlerConfig),
-          ),
+      Computed.flatMapComputed(MessageCheckinService.getMessageCheckinMembers),
+      Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
+      Computed.mapEffect(
+        Handler.Config.encodeResponseEffect(
+          getMessageCheckinMembersHandlerConfig,
         ),
       ),
       Effect.withSpan("getMessageCheckinMembersHandler", {
