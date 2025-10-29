@@ -2,7 +2,6 @@ import { GuildConfig } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 
-const responseSchema = Schema.OptionFromNullishOr(GuildConfig, undefined);
 export const upsertGuildConfigHandlerConfig = pipe(
   Handler.Config.empty(),
   Handler.Config.Builder.type("mutation"),
@@ -18,6 +17,6 @@ export const upsertGuildConfigHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(responseSchema, Schema.standardSchemaV1),
+    validator: pipe(GuildConfig, Schema.standardSchemaV1),
   }),
 );

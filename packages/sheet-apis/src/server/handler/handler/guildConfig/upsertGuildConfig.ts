@@ -20,8 +20,8 @@ export const upsertGuildConfigHandler = pipe(
           Effect.flatMap(OnceObserver.observeOnce),
         ),
       ),
-      Effect.flatMap((parsed) =>
-        GuildConfigService.upsertGuildConfig(parsed.guildId, parsed),
+      Effect.flatMap(({ guildId, ...config }) =>
+        GuildConfigService.upsertGuildConfig(guildId, config),
       ),
       Effect.flatMap(
         Schema.encodeEither(

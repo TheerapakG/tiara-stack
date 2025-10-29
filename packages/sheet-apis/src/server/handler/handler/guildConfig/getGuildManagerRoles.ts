@@ -1,6 +1,6 @@
 import { getGuildManagerRolesHandlerConfig } from "@/server/handler/config";
 import { AuthService, GuildConfigService } from "@/server/services";
-import { Effect, Function, pipe, Schema } from "effect";
+import { Effect, pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -17,10 +17,9 @@ export const getGuildManagerRolesHandler = pipe(
       Computed.flatMapComputed(() =>
         Event.request.parsed(getGuildManagerRolesHandlerConfig),
       ),
-      Computed.flatMap((parsed) =>
+      Computed.flatMapComputed((parsed) =>
         GuildConfigService.getGuildManagerRoles(parsed),
       ),
-      Computed.flatMap(Function.identity),
       Computed.flatMap(
         Schema.encodeEither(
           Handler.Config.resolveResponseValidator(

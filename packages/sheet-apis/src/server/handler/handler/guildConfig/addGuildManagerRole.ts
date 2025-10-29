@@ -20,8 +20,8 @@ export const addGuildManagerRoleHandler = pipe(
           Effect.flatMap(OnceObserver.observeOnce),
         ),
       ),
-      Effect.flatMap((parsed) =>
-        GuildConfigService.addGuildManagerRole(parsed.guildId, parsed.roleId),
+      Effect.flatMap(({ guildId, roleId }) =>
+        GuildConfigService.addGuildManagerRole(guildId, roleId),
       ),
       Effect.flatMap(
         Schema.encodeEither(

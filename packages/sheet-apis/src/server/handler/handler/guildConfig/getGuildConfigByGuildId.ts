@@ -1,6 +1,7 @@
 import { getGuildConfigByGuildIdHandlerConfig } from "@/server/handler/config";
 import { AuthService, GuildConfigService } from "@/server/services";
-import { Effect, Function, pipe, Schema } from "effect";
+import { Effect, Option, pipe, Schema } from "effect";
+import { Argument } from "typhoon-core/error";
 import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -17,10 +18,20 @@ export const getGuildConfigByGuildIdHandler = pipe(
       Computed.flatMapComputed(() =>
         Event.request.parsed(getGuildConfigByGuildIdHandlerConfig),
       ),
-      Computed.flatMap((parsed) =>
+      Computed.flatMapComputed((parsed) =>
         GuildConfigService.getGuildConfigByGuildId(parsed),
       ),
-      Computed.flatMap(Function.identity),
+      Computed.flatMap(
+        Option.match({
+          onSome: Effect.succeed,
+          onNone: () =>
+            Effect.fail(
+              new Argument.ArgumentError({
+                message: "No such guild config, guild might not be registered",
+              }),
+            ),
+        }),
+      ),
       Computed.flatMap(
         Schema.encodeEither(
           Handler.Config.resolveResponseValidator(

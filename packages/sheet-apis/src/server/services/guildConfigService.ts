@@ -11,6 +11,7 @@ import {
   configGuildChannel,
   configGuildManagerRole,
 } from "sheet-db-schema";
+import { DB as DBError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 import { Computed } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
@@ -99,13 +100,20 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 })
                 .returning(),
             ),
-            Effect.map(Array.head),
             Effect.flatMap(
-              Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(GuildConfig),
-                ),
-              ),
+              Array.match({
+                onNonEmpty: Effect.succeed,
+                onEmpty: () =>
+                  Effect.die(
+                    new DBError.DBQueryError({
+                      message: "Failed to upsert guild config",
+                    }),
+                  ),
+              }),
+            ),
+            Effect.map(Array.headNonEmpty),
+            Effect.flatMap(
+              Schema.decode(DefaultTaggedClass.DefaultTaggedClass(GuildConfig)),
             ),
             Effect.withSpan("GuildConfigService.upsertGuildConfig", {
               captureStackTrace: true,
@@ -150,12 +158,21 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 })
                 .returning(),
             ),
-            Effect.map(Array.head),
+            Effect.flatMap(
+              Array.match({
+                onNonEmpty: Effect.succeed,
+                onEmpty: () =>
+                  Effect.die(
+                    new DBError.DBQueryError({
+                      message: "Failed to add guild manager role",
+                    }),
+                  ),
+              }),
+            ),
+            Effect.map(Array.headNonEmpty),
             Effect.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(GuildConfigManagerRole),
-                ),
+                DefaultTaggedClass.DefaultTaggedClass(GuildConfigManagerRole),
               ),
             ),
             Effect.withSpan("GuildConfigService.addGuildManagerRole", {
@@ -219,12 +236,21 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 .returning(),
               // TODO: handle channel conflict
             ),
-            Effect.map(Array.head),
+            Effect.flatMap(
+              Array.match({
+                onNonEmpty: Effect.succeed,
+                onEmpty: () =>
+                  Effect.die(
+                    new DBError.DBQueryError({
+                      message: "Failed to upsert guild channel config",
+                    }),
+                  ),
+              }),
+            ),
+            Effect.map(Array.headNonEmpty),
             Effect.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(GuildChannelConfig),
-                ),
+                DefaultTaggedClass.DefaultTaggedClass(GuildChannelConfig),
               ),
             ),
             Effect.withSpan("GuildConfigService.upsertGuildChannelConfig", {
