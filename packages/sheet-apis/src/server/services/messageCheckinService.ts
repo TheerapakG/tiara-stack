@@ -3,6 +3,7 @@ import { MessageCheckin, MessageCheckinMember } from "@/server/schema";
 import { and, eq, gte, isNull } from "drizzle-orm";
 import { Array, DateTime, Effect, pipe, Schema } from "effect";
 import { messageCheckin, messageCheckinMember } from "sheet-db-schema";
+import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 import { Computed } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
@@ -65,12 +66,20 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
                 })
                 .returning(),
             ),
-            Effect.map(Array.head),
+
+            Effect.flatMap(
+              Array.match({
+                onNonEmpty: Effect.succeed,
+                onEmpty: () =>
+                  Effect.die(
+                    makeDBQueryError("Failed to upsert message checkin data"),
+                  ),
+              }),
+            ),
+            Effect.map(Array.headNonEmpty),
             Effect.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(MessageCheckin),
-                ),
+                DefaultTaggedClass.DefaultTaggedClass(MessageCheckin),
               ),
             ),
             Effect.withSpan("MessageCheckinService.upsertMessageCheckinData", {
@@ -101,7 +110,10 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
               captureStackTrace: true,
             }),
           ),
-        addMessageCheckinMembers: (messageId: string, memberIds: string[]) =>
+        addMessageCheckinMembers: (
+          messageId: string,
+          memberIds: readonly string[],
+        ) =>
           pipe(
             dbSubscriptionContext.mutateQuery(
               db
@@ -136,10 +148,13 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
               captureStackTrace: true,
             }),
           ),
-        setMessageCheckinMemberCheckinAt: (
-          messageId: string,
-          memberId: string,
-        ) =>
+        setMessageCheckinMemberCheckinAt: ({
+          messageId,
+          memberId,
+        }: {
+          messageId: string;
+          memberId: string;
+        }) =>
           pipe(
             DateTime.now,
             Effect.flatMap((now) =>
