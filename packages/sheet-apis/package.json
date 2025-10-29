@@ -44,11 +44,9 @@
     "playwright": "^1.56.1",
     "postgres": "^3.4.7",
     "sheet-db-schema": "workspace:*",
+    "typhoon-core": "workspace:*",
     "typhoon-server": "workspace:*",
     "ufo": "^1.6.1"
-  },
-  "peerDependencies": {
-    "typhoon-core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",
