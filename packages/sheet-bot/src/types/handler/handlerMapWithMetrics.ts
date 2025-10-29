@@ -8,6 +8,7 @@ import {
 } from "@/services";
 import { DiscordError } from "@/types/error/discordError";
 import {
+  AttachmentBuilder,
   InteractionButtonComponentData,
   InteractionResponse,
   Message,
@@ -189,7 +190,12 @@ export class InteractionHandlerMapWithMetrics<
                     (replied || deferred
                       ? InteractionContext.followUp.sync
                       : InteractionContext.reply.sync)({
-                      content: pretty,
+                      content: pretty.slice(0, pretty.indexOf("\n")),
+                      files: [
+                        new AttachmentBuilder(Buffer.from(pretty), {
+                          name: "error.txt",
+                        }),
+                      ],
                       flags: MessageFlags.Ephemeral,
                     }),
                   ),
