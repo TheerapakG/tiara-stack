@@ -1,45 +1,42 @@
 import { Schema } from "effect";
 
-type RpcErrorFields<Cause> = {
+type BaseRpcErrorFields = {
   readonly _tag: Schema.tag<"RpcError">;
   readonly message: typeof Schema.String;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly cause: Schema.optionalWith<
-    Schema.Schema<Cause, any, any>,
-    { nullable: true }
-  >;
 };
+type RpcErrorFields<CauseType, CauseEncoded, CauseContext> =
+  BaseRpcErrorFields & {
+    readonly cause: Schema.Schema<CauseType, CauseEncoded, CauseContext>;
+  };
 
-interface RpcErrorClass<Cause>
+interface RpcErrorClass<CauseType, CauseEncoded, CauseContext>
   extends Schema.TaggedErrorClass<
-    RpcError<Cause>,
+    RpcError<CauseType>,
     "RpcError",
-    RpcErrorFields<Cause>
+    RpcErrorFields<CauseType, CauseEncoded, CauseContext>
   > {}
 
 export interface RpcError<Cause>
-  extends Schema.Struct.Type<RpcErrorFields<Cause>> {}
+  extends Schema.Struct.Type<BaseRpcErrorFields> {
+  readonly cause: Cause;
+}
 
-const RpcErrorClass = <CauseSchema extends Schema.Schema.Any>(
-  causeSchema: CauseSchema,
+const RpcErrorClass = <CauseType, CauseEncoded, CauseContext>(
+  causeSchema: Schema.Schema<CauseType, CauseEncoded, CauseContext>,
 ) => {
-  return class extends Schema.TaggedError<
-    RpcError<Schema.Schema.Type<CauseSchema>>
-  >()("RpcError", {
+  return class extends Schema.TaggedError<RpcError<CauseType>>()("RpcError", {
     message: Schema.String,
-    cause: Schema.optionalWith(causeSchema, { nullable: true }),
-  }) {} as RpcErrorClass<Schema.Schema.Type<CauseSchema>>;
+    cause: causeSchema as Schema.Schema.Any,
+  }) {} as RpcErrorClass<CauseType, CauseEncoded, CauseContext>;
 };
 
-export const makeRpcError: <CauseSchema extends Schema.Schema.Any>(
-  causeSchema: CauseSchema,
-) => (
-  message: string,
-  cause?: Schema.Schema.Type<CauseSchema>,
-) => RpcError<Schema.Schema.Type<CauseSchema>> &
-  Schema.Struct.Type<RpcErrorFields<Schema.Schema.Type<CauseSchema>>> =
-  <CauseSchema extends Schema.Schema.Any>(causeSchema: CauseSchema) =>
-  (message: string, cause?: Schema.Schema.Type<CauseSchema>) => {
+export const makeRpcError: <CauseType, CauseEncoded, CauseContext>(
+  causeSchema: Schema.Schema<CauseType, CauseEncoded, CauseContext>,
+) => (message: string, cause: CauseType) => RpcError<CauseType> =
+  <CauseType, CauseEncoded, CauseContext>(
+    causeSchema: Schema.Schema<CauseType, CauseEncoded, CauseContext>,
+  ) =>
+  (message: string, cause: CauseType) => {
     const constructor = RpcErrorClass(causeSchema);
     return new constructor({ message, cause });
   };
