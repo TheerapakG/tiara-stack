@@ -16,7 +16,12 @@ import {
   Tracer,
   Function,
 } from "effect";
-import { Rpc, Validation } from "typhoon-core/error";
+import {
+  makeRpcError,
+  makeMissingRpcConfigError,
+  type RpcError,
+  ValidationError,
+} from "typhoon-core/error";
 import { FromStandardSchemaV1 } from "typhoon-core/schema";
 import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
@@ -36,7 +41,7 @@ type LoadingState = {
 type ResolvedState<A = unknown, E = unknown> = {
   state: "resolved";
   timestamp: Option.Option<DateTime.DateTime>;
-  value: Either.Either<A, Rpc.RpcError<E> | Validation.ValidationError>;
+  value: Either.Either<A, RpcError<E> | ValidationError>;
   span?: {
     traceId: string;
     spanId: string;
@@ -421,7 +426,7 @@ export class WebSocketClient<
             handler,
           )(client.configCollection),
           Option.getOrThrowWith(() =>
-            Rpc.makeMissingRpcConfigError(
+            makeMissingRpcConfigError(
               `Failed to get handler config for ${handler}`,
             ),
           ),
@@ -470,7 +475,7 @@ export class WebSocketClient<
                     Handler.Config.decodeResponseUnknown(config),
                     Effect.map(
                       Either.mapLeft((error) =>
-                        Rpc.makeRpcError(
+                        makeRpcError(
                           (responseErrorValidator === undefined
                             ? Schema.Unknown
                             : FromStandardSchemaV1.FromStandardSchemaV1(
@@ -688,7 +693,7 @@ export class WebSocketClient<
             handler,
           )(client.configCollection),
           Option.getOrThrowWith(() =>
-            Rpc.makeMissingRpcConfigError(
+            makeMissingRpcConfigError(
               `Failed to get handler config for ${handler}`,
             ),
           ),
@@ -713,7 +718,7 @@ export class WebSocketClient<
                   >
                 >
               >,
-              | Rpc.RpcError<
+              | RpcError<
                   Validator.Output<
                     Handler.Config.ResolvedResponseErrorValidator<
                       Handler.Config.ResponseErrorOrUndefined<
@@ -722,7 +727,7 @@ export class WebSocketClient<
                     >
                   >
                 >
-              | Validation.ValidationError
+              | ValidationError
             >;
             span: { traceId: string; spanId: string } | undefined;
           },
@@ -741,7 +746,7 @@ export class WebSocketClient<
                   Handler.Config.decodeResponseUnknown(config),
                   Effect.map(
                     Either.mapLeft((error) =>
-                      Rpc.makeRpcError(
+                      makeRpcError(
                         (responseErrorValidator === undefined
                           ? Schema.Unknown
                           : FromStandardSchemaV1.FromStandardSchemaV1(
@@ -874,7 +879,7 @@ export class WebSocketClient<
             handler,
           )(client.configCollection),
           Option.getOrThrowWith(() =>
-            Rpc.makeMissingRpcConfigError(
+            makeMissingRpcConfigError(
               `Failed to get handler config for ${handler}`,
             ),
           ),
@@ -899,7 +904,7 @@ export class WebSocketClient<
                   >
                 >
               >,
-              | Rpc.RpcError<
+              | RpcError<
                   Validator.Output<
                     Handler.Config.ResolvedResponseErrorValidator<
                       Handler.Config.ResponseErrorOrUndefined<
@@ -908,7 +913,7 @@ export class WebSocketClient<
                     >
                   >
                 >
-              | Validation.ValidationError
+              | ValidationError
             >;
             span: { traceId: string; spanId: string } | undefined;
           },
@@ -927,7 +932,7 @@ export class WebSocketClient<
                   Handler.Config.decodeResponseUnknown(config),
                   Effect.map(
                     Either.mapLeft((error) =>
-                      Rpc.makeRpcError(
+                      makeRpcError(
                         (responseErrorValidator === undefined
                           ? Schema.Unknown
                           : FromStandardSchemaV1.FromStandardSchemaV1(

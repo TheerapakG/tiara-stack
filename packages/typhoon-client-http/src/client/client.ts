@@ -9,7 +9,7 @@ import {
   Tracer,
   Function,
 } from "effect";
-import { Rpc } from "typhoon-core/error";
+import { makeMissingRpcConfigError, makeRpcError } from "typhoon-core/error";
 import { FromStandardSchemaV1 } from "typhoon-core/schema";
 import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
@@ -118,7 +118,7 @@ export class HttpClient<
             handler,
           )(client.configCollection),
           Option.getOrThrowWith(() =>
-            Rpc.makeMissingRpcConfigError(
+            makeMissingRpcConfigError(
               `Failed to get handler config for ${handler}`,
             ),
           ),
@@ -215,7 +215,7 @@ export class HttpClient<
             Handler.Config.decodeResponseUnknown(config),
             Effect.map(
               Either.mapLeft((error) =>
-                Rpc.makeRpcError(
+                makeRpcError(
                   (responseErrorValidator === undefined
                     ? Schema.Unknown
                     : FromStandardSchemaV1.FromStandardSchemaV1(
