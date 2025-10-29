@@ -22,6 +22,7 @@ export default defineConfig({
       return [module, filePath];
     }),
   ),
+  sourcemap: true,
   dts: {
     tsgo: true,
   },
