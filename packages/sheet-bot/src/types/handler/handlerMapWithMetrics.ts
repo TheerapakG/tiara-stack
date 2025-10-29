@@ -18,6 +18,7 @@ import {
   UserSelectMenuComponentData,
 } from "discord.js";
 import {
+  Array,
   Cause,
   Data,
   Effect,
@@ -190,7 +191,11 @@ export class InteractionHandlerMapWithMetrics<
                     (replied || deferred
                       ? InteractionContext.followUp.sync
                       : InteractionContext.reply.sync)({
-                      content: pretty.slice(0, pretty.indexOf("\n")),
+                      content: pipe(
+                        Cause.prettyErrors(cause),
+                        Array.map((error) => `${error.name}: ${error.message}`),
+                        Array.join("\n"),
+                      ),
                       files: [
                         new AttachmentBuilder(Buffer.from(pretty), {
                           name: "error.txt",
