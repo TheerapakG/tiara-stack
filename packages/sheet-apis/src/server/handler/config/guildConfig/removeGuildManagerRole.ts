@@ -1,4 +1,4 @@
-import { GuildConfigManagerRole } from "@/server/schema";
+import { Error, GuildConfigManagerRole } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 
@@ -18,5 +18,17 @@ export const removeGuildManagerRoleHandlerConfig = pipe(
   }),
   Handler.Config.Builder.response({
     validator: pipe(responseSchema, Schema.standardSchemaV1),
+  }),
+  Handler.Config.Builder.responseError({
+    validator: pipe(
+      Schema.Union(
+        Error.Core.AuthorizationError,
+        Error.Core.DBQueryError,
+        Error.Core.MsgpackDecodeError,
+        Error.Core.StreamExhaustedError,
+        Error.Core.ValidationError,
+      ),
+      Schema.standardSchemaV1,
+    ),
   }),
 );

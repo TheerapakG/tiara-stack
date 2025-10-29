@@ -1,6 +1,7 @@
 import { getGuildManagerRolesHandlerConfig } from "@/server/handler/config";
+import { Error } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
-import { Effect, pipe, Schema } from "effect";
+import { Effect, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -20,13 +21,13 @@ export const getGuildManagerRolesHandler = pipe(
       Computed.flatMapComputed((parsed) =>
         GuildConfigService.getGuildManagerRoles(parsed),
       ),
+      Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
+      Computed.mapEffect(Effect.either),
       Computed.flatMap(
-        Schema.encodeEither(
-          Handler.Config.resolveResponseValidator(
-            Handler.Config.response(getGuildManagerRolesHandlerConfig),
-          ),
-        ),
+        Handler.Config.encodeResponse(getGuildManagerRolesHandlerConfig),
       ),
+      Computed.mapEffect(Effect.orDie),
+      Computed.mapEffect(Effect.flatten),
       Effect.withSpan("getGuildManagerRolesHandler", {
         captureStackTrace: true,
       }),

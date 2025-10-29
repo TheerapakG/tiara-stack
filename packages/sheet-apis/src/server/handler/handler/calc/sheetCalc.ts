@@ -1,12 +1,11 @@
 import { sheetCalcHandlerConfig } from "@/server/handler/config";
 import { CalcConfig, CalcService, Sheet } from "@/server/services";
-import { PlayerTeam } from "@/server/schema";
+import { Error, PlayerTeam } from "@/server/schema";
 import { Array, Chunk, Effect, HashMap, HashSet, pipe, Option } from "effect";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
 import { Handler } from "typhoon-core/server";
-import { Validation } from "typhoon-core/error";
 
 const builders = Context.Subscription.Builder.builders();
 export const sheetCalcHandler = pipe(
@@ -66,16 +65,11 @@ export const sheetCalcHandler = pipe(
         ),
       ),
       Computed.map(Chunk.toArray),
-      Computed.mapEffect(Validation.catchParseErrorAsValidationError),
-      Computed.mapEffect((effect) =>
-        pipe(
-          effect,
-          Effect.either,
-          Effect.flatMap(Handler.Config.encodeResponse(sheetCalcHandlerConfig)),
-          Effect.orDie,
-          Effect.flatten,
-        ),
-      ),
+      Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
+      Computed.mapEffect(Effect.either),
+      Computed.flatMap(Handler.Config.encodeResponse(sheetCalcHandlerConfig)),
+      Computed.mapEffect(Effect.orDie),
+      Computed.mapEffect(Effect.flatten),
       Effect.withSpan("sheetCalcHandler", { captureStackTrace: true }),
     ),
   ),

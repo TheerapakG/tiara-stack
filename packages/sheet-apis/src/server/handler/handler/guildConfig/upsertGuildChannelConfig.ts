@@ -1,6 +1,7 @@
 import { upsertGuildChannelConfigHandlerConfig } from "@/server/handler/config";
+import { Error } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
-import { Effect, pipe, Schema } from "effect";
+import { Effect, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { OnceObserver } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -29,13 +30,13 @@ export const upsertGuildChannelConfigHandler = pipe(
             checkinChannelId,
           }),
       ),
+      Error.Core.catchParseErrorAsValidationError,
+      Effect.either,
       Effect.flatMap(
-        Schema.encodeEither(
-          Handler.Config.resolveResponseValidator(
-            Handler.Config.response(upsertGuildChannelConfigHandlerConfig),
-          ),
-        ),
+        Handler.Config.encodeResponse(upsertGuildChannelConfigHandlerConfig),
       ),
+      Effect.orDie,
+      Effect.flatten,
       Effect.withSpan("upsertGuildChannelConfigHandler", {
         captureStackTrace: true,
       }),
