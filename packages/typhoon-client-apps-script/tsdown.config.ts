@@ -22,4 +22,5 @@ export default defineConfig({
       return [module, filePath];
     }),
   ),
+  sourcemap: true,
 });
