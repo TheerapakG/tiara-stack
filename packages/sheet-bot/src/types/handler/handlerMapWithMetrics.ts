@@ -178,7 +178,7 @@ export class InteractionHandlerMapWithMetrics<
               Effect.let("pretty", () =>
                 Cause.pretty(cause, { renderErrorCause: true }),
               ),
-              Effect.tap(({ pretty }) => Effect.log(pretty)),
+              Effect.tap(({ pretty }) => Effect.logError(pretty)),
               Effect.tap(({ replied, deferred, pretty }) =>
                 pipe(
                   Effect.suspend<
@@ -194,7 +194,11 @@ export class InteractionHandlerMapWithMetrics<
                     }),
                   ),
                   // TODO: handle errors
-                  Effect.catchAll(() => Effect.void),
+                  Effect.catchAllCause((cause) =>
+                    Effect.logError(
+                      Cause.pretty(cause, { renderErrorCause: true }),
+                    ),
+                  ),
                 ),
               ),
             ),
