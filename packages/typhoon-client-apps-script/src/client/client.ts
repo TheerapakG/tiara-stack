@@ -12,7 +12,7 @@ import {
 import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { Validate, Validator } from "typhoon-core/validator";
-import { Rpc } from "typhoon-core/error";
+import { makeMissingRpcConfigError, makeRpcError } from "typhoon-core/error";
 import { FromStandardSchemaV1 } from "typhoon-core/schema";
 
 export class HandlerError extends Data.TaggedError("HandlerError")<{
@@ -122,7 +122,7 @@ export class AppsScriptClient<
             handler,
           )(client.configCollection),
           Option.getOrThrowWith(() =>
-            Rpc.makeMissingRpcConfigError(
+            makeMissingRpcConfigError(
               `Failed to get handler config for ${handler}`,
             ),
           ),
@@ -219,7 +219,7 @@ export class AppsScriptClient<
             Handler.Config.decodeResponseUnknown(config),
             Effect.map(
               Either.mapLeft((error) =>
-                Rpc.makeRpcError(
+                makeRpcError(
                   (responseErrorValidator === undefined
                     ? Schema.Unknown
                     : FromStandardSchemaV1.FromStandardSchemaV1(
