@@ -1,7 +1,7 @@
 import { getGuildConfigByScriptIdHandlerConfig } from "@/server/handler/config";
+import { Error } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
-import { Effect, Option, pipe, Schema } from "effect";
-import { Argument } from "typhoon-core/error";
+import { Effect, Option, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -26,19 +26,19 @@ export const getGuildConfigByScriptIdHandler = pipe(
           onSome: Effect.succeed,
           onNone: () =>
             Effect.fail(
-              new Argument.ArgumentError({
-                message: "No such guild config, script might not be registered",
-              }),
+              Error.Core.makeArgumentError(
+                "No such guild config, script might not be registered",
+              ),
             ),
         }),
       ),
+      Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
+      Computed.mapEffect(Effect.either),
       Computed.flatMap(
-        Schema.encodeEither(
-          Handler.Config.resolveResponseValidator(
-            Handler.Config.response(getGuildConfigByScriptIdHandlerConfig),
-          ),
-        ),
+        Handler.Config.encodeResponse(getGuildConfigByScriptIdHandlerConfig),
       ),
+      Computed.mapEffect(Effect.orDie),
+      Computed.mapEffect(Effect.flatten),
       Effect.withSpan("getGuildConfigByScriptIdHandler", {
         captureStackTrace: true,
       }),

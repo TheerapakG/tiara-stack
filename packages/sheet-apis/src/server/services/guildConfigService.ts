@@ -11,7 +11,7 @@ import {
   configGuildChannel,
   configGuildManagerRole,
 } from "sheet-db-schema";
-import { DB as DBError } from "typhoon-core/error";
+import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 import { Computed } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
@@ -104,11 +104,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               Array.match({
                 onNonEmpty: Effect.succeed,
                 onEmpty: () =>
-                  Effect.die(
-                    new DBError.DBQueryError({
-                      message: "Failed to upsert guild config",
-                    }),
-                  ),
+                  Effect.die(makeDBQueryError("Failed to upsert guild config")),
               }),
             ),
             Effect.map(Array.headNonEmpty),
@@ -163,9 +159,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 onNonEmpty: Effect.succeed,
                 onEmpty: () =>
                   Effect.die(
-                    new DBError.DBQueryError({
-                      message: "Failed to add guild manager role",
-                    }),
+                    makeDBQueryError("Failed to add guild manager role"),
                   ),
               }),
             ),
@@ -241,9 +235,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 onNonEmpty: Effect.succeed,
                 onEmpty: () =>
                   Effect.die(
-                    new DBError.DBQueryError({
-                      message: "Failed to upsert guild channel config",
-                    }),
+                    makeDBQueryError("Failed to upsert guild channel config"),
                   ),
               }),
             ),

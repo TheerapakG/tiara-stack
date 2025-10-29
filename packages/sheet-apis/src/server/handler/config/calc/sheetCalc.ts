@@ -1,7 +1,6 @@
 import { Error, Room } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
-import { Msgpack, Stream, Validation } from "typhoon-core/error";
 
 export const sheetCalcHandlerConfig = pipe(
   Handler.Config.empty(),
@@ -38,9 +37,9 @@ export const sheetCalcHandlerConfig = pipe(
   Handler.Config.Builder.responseError({
     validator: pipe(
       Schema.Union(
-        Msgpack.MsgpackDecodeError,
-        Stream.StreamExhaustedError,
-        Validation.ValidationError,
+        Error.Core.MsgpackDecodeError,
+        Error.Core.StreamExhaustedError,
+        Error.Core.ValidationError,
         Error.GoogleSheetsError,
         Error.ParserFieldError,
         Error.SheetConfigError,

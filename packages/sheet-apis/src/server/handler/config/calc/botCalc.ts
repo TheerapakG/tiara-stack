@@ -1,5 +1,5 @@
+import { Error } from "@/server/schema";
 import { pipe, Schema } from "effect";
-import { Msgpack, Stream, Validation } from "typhoon-core/error";
 import { Handler } from "typhoon-core/server";
 
 export const botCalcHandlerConfig = pipe(
@@ -57,9 +57,9 @@ export const botCalcHandlerConfig = pipe(
   Handler.Config.Builder.responseError({
     validator: pipe(
       Schema.Union(
-        Msgpack.MsgpackDecodeError,
-        Stream.StreamExhaustedError,
-        Validation.ValidationError,
+        Error.Core.MsgpackDecodeError,
+        Error.Core.StreamExhaustedError,
+        Error.Core.ValidationError,
       ),
       Schema.standardSchemaV1,
     ),

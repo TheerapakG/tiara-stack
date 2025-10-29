@@ -1,4 +1,4 @@
-import { GuildChannelConfig } from "@/server/schema";
+import { Error, GuildChannelConfig } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 
@@ -21,5 +21,17 @@ export const upsertGuildChannelConfigHandlerConfig = pipe(
   }),
   Handler.Config.Builder.response({
     validator: pipe(GuildChannelConfig, Schema.standardSchemaV1),
+  }),
+  Handler.Config.Builder.responseError({
+    validator: pipe(
+      Schema.Union(
+        Error.Core.AuthorizationError,
+        Error.Core.DBQueryError,
+        Error.Core.MsgpackDecodeError,
+        Error.Core.StreamExhaustedError,
+        Error.Core.ValidationError,
+      ),
+      Schema.standardSchemaV1,
+    ),
   }),
 );

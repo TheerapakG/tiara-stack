@@ -1,8 +1,7 @@
 import { botCalcHandlerConfig } from "@/server/handler/config";
 import { CalcConfig, CalcService } from "@/server/services";
-import { PlayerTeam, Room } from "@/server/schema";
+import { Error, PlayerTeam, Room } from "@/server/schema";
 import { Chunk, Effect, HashSet, pipe } from "effect";
-import { Validation } from "typhoon-core/error";
 import { Computed } from "typhoon-core/signal";
 import { Handler } from "typhoon-core/server";
 import { Event } from "typhoon-server/event";
@@ -49,16 +48,11 @@ export const botCalcHandler = pipe(
         ),
       ),
       Computed.map(Chunk.toArray),
-      Computed.mapEffect(Validation.catchParseErrorAsValidationError),
-      Computed.mapEffect((effect) =>
-        pipe(
-          effect,
-          Effect.either,
-          Effect.flatMap(Handler.Config.encodeResponse(botCalcHandlerConfig)),
-          Effect.orDie,
-          Effect.flatten,
-        ),
-      ),
+      Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
+      Computed.mapEffect(Effect.either),
+      Computed.flatMap(Handler.Config.encodeResponse(botCalcHandlerConfig)),
+      Computed.mapEffect(Effect.orDie),
+      Computed.mapEffect(Effect.flatten),
       Effect.withSpan("botCalcHandler", { captureStackTrace: true }),
     ),
   ),

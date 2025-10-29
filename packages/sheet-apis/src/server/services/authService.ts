@@ -2,7 +2,7 @@ import { FileSystem } from "@effect/platform";
 import { NodeContext } from "@effect/platform-node";
 import { Effect, pipe } from "effect";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import { Authorization } from "typhoon-core/error";
+import { Error } from "@/server/schema";
 
 export class AuthService extends Effect.Service<AuthService>()("AuthService", {
   effect: pipe(
@@ -36,7 +36,7 @@ export class AuthService extends Effect.Service<AuthService>()("AuthService", {
                 audience: "sheet-apis",
               }),
             catch: (cause) =>
-              Authorization.makeAuthorizationError(
+              Error.Core.makeAuthorizationError(
                 "Error verifying authorization token",
                 cause,
               ),
