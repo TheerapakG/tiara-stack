@@ -1,9 +1,7 @@
 import type { Dialect } from "drizzle-orm";
 import type { RunnableQuery } from "drizzle-orm/runnable-query";
 import {
-  Cause,
   Context,
-  Data,
   Effect,
   HashMap,
   HashSet,
@@ -12,6 +10,7 @@ import {
   pipe,
   SynchronizedRef,
 } from "effect";
+import { DB } from "typhoon-core/error";
 import { Computed, SignalContext } from "typhoon-core/signal";
 
 type TransactionSubscription = { mode: "subscription" };
@@ -147,12 +146,8 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
   },
 ) {}
 
-export class QueryError extends Data.TaggedError("QueryError")<{
-  cause: Cause.UnknownException;
-}> {}
-
 type QueryAnalysis<T> = {
-  query: Effect.Effect<T, QueryError>;
+  query: Effect.Effect<T, DB.DBQueryError>;
   tables: HashSet.HashSet<string>;
 };
 
@@ -168,8 +163,20 @@ export const query = <T, TDialect extends Dialect>(
     ),
     Effect.let("query", ({ preparedQuery }) =>
       pipe(
-        Effect.tryPromise(() => preparedQuery.execute() as Promise<T>),
-        Effect.mapError((error) => new QueryError({ cause: error })),
+        Effect.tryPromise({
+          try: () => preparedQuery.execute() as Promise<T>,
+          catch: (error) =>
+            new DB.DBQueryError({
+              message:
+                typeof error === "object" &&
+                error !== null &&
+                "message" in error &&
+                typeof error.message === "string"
+                  ? error.message
+                  : "Failed to execute query",
+              cause: error,
+            }),
+        }),
       ),
     ),
     Effect.map(({ query, tables }) => ({ query, tables })),
