@@ -2,7 +2,6 @@ import { Error, GuildConfigManagerRole } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 
-const responseSchema = Schema.Array(GuildConfigManagerRole);
 export const removeGuildManagerRoleHandlerConfig = pipe(
   Handler.Config.empty(),
   Handler.Config.Builder.type("mutation"),
@@ -17,7 +16,7 @@ export const removeGuildManagerRoleHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(responseSchema, Schema.standardSchemaV1),
+    validator: pipe(GuildConfigManagerRole, Schema.standardSchemaV1),
   }),
   Handler.Config.Builder.responseError({
     validator: pipe(
