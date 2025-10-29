@@ -10,7 +10,7 @@ import {
   type ResponseErrorOrUndefined,
 } from "./data";
 import { Validate, Validator } from "~/validator";
-import { Validation } from "~/error";
+import { ValidationError } from "~/error";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 export type ResolvedRequestParamsValidator<
@@ -74,74 +74,112 @@ export const resolveResponseErrorValidator: <
 ): ResolvedResponseErrorValidator<Config> =>
   config?.validator as ResolvedResponseErrorValidator<Config>;
 
+type EffectSchemaType<V> = V extends Schema.Schema.All
+  ? Schema.Schema.Type<V>
+  : unknown;
+
+type EffectSchemaEncoded<T, V> = V extends Schema.Schema.All
+  ? Schema.Schema.Encoded<V>
+  : T;
+
 export const encodeResponse =
   <const Config extends PartialHandlerConfig>(config: Config) =>
-  (
-    either: [
-      ResolvedResponseValidator<ResponseOrUndefined<Config>>,
-      ResolvedResponseErrorValidator<ResponseErrorOrUndefined<Config>>,
-    ] extends [
-      infer A extends Schema.Schema.All,
-      infer E extends Schema.Schema.All,
-    ]
-      ? Either.Either<Schema.Schema.Type<A>, Schema.Schema.Type<E>>
-      : never,
-  ): [
-    ResolvedResponseValidator<ResponseOrUndefined<Config>>,
-    ResolvedResponseErrorValidator<ResponseErrorOrUndefined<Config>>,
-  ] extends [
-    infer A extends Schema.Schema.All,
-    infer E extends Schema.Schema.All,
-  ]
-    ? Effect.Effect<
-        Either.Either<Schema.Schema.Encoded<A>, Schema.Schema.Encoded<E>>,
-        ParseResult.ParseError
+  <
+    A extends EffectSchemaType<
+      ResolvedResponseValidator<ResponseOrUndefined<Config>>
+    >,
+    E extends EffectSchemaType<
+      ResolvedResponseErrorValidator<ResponseErrorOrUndefined<Config>>
+    >,
+  >(
+    either: Either.Either<A, E>,
+  ): Effect.Effect<
+    Either.Either<
+      EffectSchemaEncoded<
+        A,
+        ResolvedResponseValidator<ResponseOrUndefined<Config>>
+      >,
+      EffectSchemaEncoded<
+        E,
+        ResolvedResponseErrorValidator<ResponseErrorOrUndefined<Config>>
       >
-    : never =>
+    >,
+    ParseResult.ParseError
+  > =>
     pipe(
       either,
       Either.match({
-        onRight: (v) =>
-          pipe(
+        onRight: (v) => {
+          const responseValidator = resolveResponseValidator(response(config));
+          if (!Schema.isSchema(responseValidator)) {
+            return Effect.succeed(Either.right(v));
+          }
+
+          return pipe(
             v,
-            Schema.encode(
-              resolveResponseValidator(
-                response(config),
-              ) as unknown as ResolvedResponseValidator<
-                ResponseOrUndefined<Config>
-              > extends infer A extends Schema.Schema.Any
-                ? A
-                : never,
-            ),
+            Schema.encode(responseValidator),
             Effect.map(Either.right),
-          ),
-        onLeft: (v) =>
-          pipe(
+          );
+        },
+        onLeft: (v) => {
+          const responseErrorValidator = resolveResponseErrorValidator(
+            responseError(config),
+          );
+          if (!Schema.isSchema(responseErrorValidator)) {
+            return Effect.succeed(Either.left(v));
+          }
+
+          return pipe(
             v,
-            Schema.encode(
-              resolveResponseErrorValidator(
-                responseError(config),
-              ) as unknown as ResolvedResponseErrorValidator<
-                ResponseErrorOrUndefined<Config>
-              > extends infer E extends Schema.Schema.Any
-                ? E
-                : never,
-            ),
+            Schema.encode(responseErrorValidator),
             Effect.map(Either.left),
-          ),
+          );
+        },
       }),
-    ) as unknown as [
-      ResolvedResponseValidator<ResponseOrUndefined<Config>>,
-      ResolvedResponseErrorValidator<ResponseErrorOrUndefined<Config>>,
-    ] extends [
-      infer A extends Schema.Schema.All,
-      infer E extends Schema.Schema.All,
-    ]
-      ? Effect.Effect<
-          Either.Either<Schema.Schema.Encoded<A>, Schema.Schema.Encoded<E>>,
-          ParseResult.ParseError
+    ) as unknown as Effect.Effect<
+      Either.Either<
+        EffectSchemaEncoded<
+          A,
+          ResolvedResponseValidator<ResponseOrUndefined<Config>>
+        >,
+        EffectSchemaEncoded<
+          E,
+          ResolvedResponseErrorValidator<ResponseErrorOrUndefined<Config>>
         >
-      : never;
+      >,
+      ParseResult.ParseError
+    >;
+
+export const encodeResponseEffect =
+  <const Config extends PartialHandlerConfig>(config: Config) =>
+  <
+    A extends EffectSchemaType<
+      ResolvedResponseValidator<ResponseOrUndefined<Config>>
+    >,
+    E extends EffectSchemaType<
+      ResolvedResponseErrorValidator<ResponseErrorOrUndefined<Config>>
+    >,
+    R,
+  >(
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<
+    EffectSchemaEncoded<
+      A,
+      ResolvedResponseValidator<ResponseOrUndefined<Config>>
+    >,
+    EffectSchemaEncoded<
+      E,
+      ResolvedResponseErrorValidator<ResponseErrorOrUndefined<Config>>
+    >,
+    R
+  > =>
+    pipe(
+      effect,
+      Effect.either,
+      Effect.flatMap(encodeResponse(config)),
+      Effect.orDie,
+      Effect.flatten,
+    );
 
 export const decodeResponseUnknown =
   <const Config extends PartialHandlerConfig>(config: Config) =>
@@ -154,7 +192,7 @@ export const decodeResponseUnknown =
         ResolvedResponseErrorValidator<ResponseErrorOrUndefined<Config>>
       >
     >,
-    Validation.ValidationError
+    ValidationError
   > =>
     pipe(
       either,

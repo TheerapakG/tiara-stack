@@ -1,10 +1,10 @@
 import { Chunk, Effect, Function, Option, pipe, Scope, Stream } from "effect";
-import { Stream as StreamError } from "~/error";
+import { StreamExhaustedError, makeStreamExhaustedError } from "~/error";
 
 export const toPullEffect = <A, E, R>(
   stream: Stream.Stream<A, E, R>,
 ): Effect.Effect<
-  Effect.Effect<A, StreamError.StreamExhaustedError | E, R>,
+  Effect.Effect<A, StreamExhaustedError | E, R>,
   never,
   R | Scope.Scope
 > =>
@@ -25,8 +25,7 @@ export const toPullEffect = <A, E, R>(
         Effect.mapError(
           Option.match({
             onSome: Function.identity,
-            onNone: () =>
-              StreamError.makeStreamExhaustedError("Stream exhausted"),
+            onNone: () => makeStreamExhaustedError("Stream exhausted"),
           }),
         ),
       ),
