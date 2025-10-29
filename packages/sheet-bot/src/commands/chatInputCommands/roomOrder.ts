@@ -30,7 +30,6 @@ import {
 } from "discord.js";
 import {
   Array,
-  Data,
   DateTime,
   Effect,
   Function,
@@ -41,14 +40,6 @@ import {
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { Schema } from "sheet-apis";
 import { Utils } from "typhoon-core/utils";
-
-class ArgumentError extends Data.TaggedError("ArgumentError")<{
-  readonly message: string;
-}> {
-  constructor(message: string) {
-    super({ message });
-  }
-}
 
 const handleManual =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
@@ -129,13 +120,6 @@ const handleManual =
                     ),
                   ),
               }),
-              Effect.flatMap(
-                Option.match({
-                  onSome: Effect.succeed,
-                  onNone: () =>
-                    Effect.fail(new ArgumentError("No such running channel")),
-                }),
-              ),
             ),
           ),
           Effect.bind("formattedHourWindow", ({ hour }) =>

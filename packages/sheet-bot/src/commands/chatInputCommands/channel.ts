@@ -21,7 +21,7 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Effect, Function, Option, pipe } from "effect";
+import { Effect, Option, pipe } from "effect";
 import { Schema } from "sheet-apis";
 
 const configFields = (config: Schema.GuildChannelConfig) => [
@@ -113,7 +113,6 @@ const handleSet =
                     Option.getOrUndefined,
                   ),
                 }),
-                Effect.flatMap(Function.identity),
               ),
           ),
           InteractionContext.editReply.tapEffect(({ channel, config }) =>
@@ -186,7 +185,6 @@ const handleUnset =
                   Option.getOrUndefined,
                 ),
               }),
-              Effect.flatMap(Function.identity),
             ),
           ),
           InteractionContext.editReply.tapEffect(({ channel, config }) =>

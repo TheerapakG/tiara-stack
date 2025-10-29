@@ -52,15 +52,13 @@ const handleListConfig =
           }),
           Effect.bindAll(({ guildConfig }) => ({
             sheetId: pipe(
-              guildConfig,
-              Option.flatMap((guildConfig) => guildConfig.sheetId),
+              guildConfig.sheetId,
               Option.map(escapeMarkdown),
               Option.getOrElse(() => "None"),
               Effect.succeed,
             ),
             scriptId: pipe(
-              guildConfig,
-              Option.flatMap((guildConfig) => guildConfig.scriptId),
+              guildConfig.scriptId,
               Option.map(escapeMarkdown),
               Option.getOrElse(() => "None"),
               Effect.succeed,

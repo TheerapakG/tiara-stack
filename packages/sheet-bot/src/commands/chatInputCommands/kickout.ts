@@ -39,14 +39,6 @@ import {
 import { Schema } from "sheet-apis";
 import { Utils } from "typhoon-core/utils";
 
-class ArgumentError extends Data.TaggedError("ArgumentError")<{
-  readonly message: string;
-}> {
-  constructor(message: string) {
-    super({ message });
-  }
-}
-
 class TimeError extends Data.TaggedError("TimeError")<{
   readonly message: string;
 }> {
@@ -167,13 +159,6 @@ const handleManual =
                     ),
                   ),
               }),
-              Effect.flatMap(
-                Option.match({
-                  onSome: Effect.succeed,
-                  onNone: () =>
-                    Effect.fail(new ArgumentError("No such running channel")),
-                }),
-              ),
             ),
           ),
           Effect.bind("kickoutData", ({ hour, runningChannel }) =>

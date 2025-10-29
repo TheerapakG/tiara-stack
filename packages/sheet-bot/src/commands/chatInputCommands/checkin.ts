@@ -31,7 +31,6 @@ import {
 } from "discord.js";
 import {
   Array,
-  Data,
   DateTime,
   Effect,
   Function,
@@ -42,14 +41,6 @@ import {
 } from "effect";
 import { Schema } from "sheet-apis";
 import { Utils } from "typhoon-core/utils";
-
-class ArgumentError extends Data.TaggedError("ArgumentError")<{
-  readonly message: string;
-}> {
-  constructor(message: string) {
-    super({ message });
-  }
-}
 
 const getCheckinData = ({
   hour,
@@ -195,13 +186,6 @@ const handleManual =
                     ),
                   ),
               }),
-              Effect.flatMap(
-                Option.match({
-                  onSome: Effect.succeed,
-                  onNone: () =>
-                    Effect.fail(new ArgumentError("No such running channel")),
-                }),
-              ),
             ),
           ),
           Effect.bind("checkinChannelId", ({ runningChannel }) =>
