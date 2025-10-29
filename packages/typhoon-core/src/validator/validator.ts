@@ -1,7 +1,7 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { Data, Effect, Option, pipe } from "effect";
 import { Observable } from "../observability";
-import { Validation } from "~/error";
+import { ValidationError, makeValidationError } from "~/error";
 
 export type Input<Schema extends StandardSchemaV1 | undefined> =
   Schema extends StandardSchemaV1
@@ -15,9 +15,9 @@ export type Output<Schema extends StandardSchemaV1 | undefined> =
 
 const parseStandardSchemaV1Result = <Output = unknown>(
   result: StandardSchemaV1.Result<Output>,
-): Effect.Effect<Output, Validation.ValidationError> => {
+): Effect.Effect<Output, ValidationError> => {
   return result.issues
-    ? Effect.fail(Validation.makeValidationError(result.issues))
+    ? Effect.fail(makeValidationError(result.issues))
     : Effect.succeed(result.value);
 };
 
@@ -46,7 +46,7 @@ export const validateSchema =
   >(
     validator: Validator<Schema>,
   ) =>
-  (value: unknown): Effect.Effect<Output, Validation.ValidationError> =>
+  (value: unknown): Effect.Effect<Output, ValidationError> =>
     pipe(
       Effect.Do,
       Effect.let(
@@ -114,12 +114,12 @@ export const validate =
   >(
     validator: Validator<Schema>,
   ) =>
-  (value: unknown): Effect.Effect<Out, Validation.ValidationError> =>
+  (value: unknown): Effect.Effect<Out, ValidationError> =>
     pipe(
       hasSchema(validator)
         ? (validateSchema(validator)(value) as Effect.Effect<
             Out,
-            Validation.ValidationError
+            ValidationError
           >)
         : Effect.succeed(value as Out),
       Observable.withSpan(validator, "Validator.validate", {

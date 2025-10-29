@@ -1,7 +1,7 @@
-export * as Argument from "./argument";
-export * as Authorization from "./authorization";
-export * as DB from "./db";
-export * as Stream from "./stream";
-export * as Rpc from "./rpc";
-export * as Msgpack from "./msgpack";
-export * as Validation from "./validation";
+export * from "./argument";
+export * from "./authorization";
+export * from "./db";
+export * from "./stream";
+export * from "./rpc";
+export * from "./msgpack";
+export * from "./validation";
