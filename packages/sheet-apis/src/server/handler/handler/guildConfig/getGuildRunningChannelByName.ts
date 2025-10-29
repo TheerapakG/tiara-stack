@@ -33,14 +33,11 @@ export const getGuildRunningChannelByNameHandler = pipe(
         }),
       ),
       Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
-      Computed.mapEffect(Effect.either),
-      Computed.flatMap(
-        Handler.Config.encodeResponse(
+      Computed.mapEffect(
+        Handler.Config.encodeResponseEffect(
           getGuildRunningChannelByNameHandlerConfig,
         ),
       ),
-      Computed.mapEffect(Effect.orDie),
-      Computed.mapEffect(Effect.flatten),
       Effect.withSpan("getGuildRunningChannelByNameHandler", {
         captureStackTrace: true,
       }),

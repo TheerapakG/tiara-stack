@@ -25,12 +25,7 @@ export const removeGuildManagerRoleHandler = pipe(
         GuildConfigService.removeGuildManagerRole(guildId, roleId),
       ),
       Error.Core.catchParseErrorAsValidationError,
-      Effect.either,
-      Effect.flatMap(
-        Handler.Config.encodeResponse(removeGuildManagerRoleHandlerConfig),
-      ),
-      Effect.orDie,
-      Effect.flatten,
+      Handler.Config.encodeResponseEffect(removeGuildManagerRoleHandlerConfig),
       Effect.withSpan("removeGuildManagerRoleHandler", {
         captureStackTrace: true,
       }),

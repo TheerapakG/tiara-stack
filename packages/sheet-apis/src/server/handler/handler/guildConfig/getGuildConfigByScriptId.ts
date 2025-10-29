@@ -33,12 +33,11 @@ export const getGuildConfigByScriptIdHandler = pipe(
         }),
       ),
       Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
-      Computed.mapEffect(Effect.either),
-      Computed.flatMap(
-        Handler.Config.encodeResponse(getGuildConfigByScriptIdHandlerConfig),
+      Computed.mapEffect(
+        Handler.Config.encodeResponseEffect(
+          getGuildConfigByScriptIdHandlerConfig,
+        ),
       ),
-      Computed.mapEffect(Effect.orDie),
-      Computed.mapEffect(Effect.flatten),
       Effect.withSpan("getGuildConfigByScriptIdHandler", {
         captureStackTrace: true,
       }),
