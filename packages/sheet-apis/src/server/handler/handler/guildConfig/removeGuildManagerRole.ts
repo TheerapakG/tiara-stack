@@ -20,11 +20,8 @@ export const removeGuildManagerRoleHandler = pipe(
           Effect.flatMap(OnceObserver.observeOnce),
         ),
       ),
-      Effect.flatMap((parsed) =>
-        GuildConfigService.removeGuildManagerRole(
-          parsed.guildId,
-          parsed.roleId,
-        ),
+      Effect.flatMap(({ guildId, roleId }) =>
+        GuildConfigService.removeGuildManagerRole(guildId, roleId),
       ),
       Effect.flatMap(
         Schema.encodeEither(

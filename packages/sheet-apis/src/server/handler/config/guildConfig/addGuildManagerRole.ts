@@ -2,10 +2,6 @@ import { GuildConfigManagerRole } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 
-const responseSchema = Schema.OptionFromNullishOr(
-  GuildConfigManagerRole,
-  undefined,
-);
 export const addGuildManagerRoleHandlerConfig = pipe(
   Handler.Config.empty(),
   Handler.Config.Builder.type("mutation"),
@@ -20,6 +16,6 @@ export const addGuildManagerRoleHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(responseSchema, Schema.standardSchemaV1),
+    validator: pipe(GuildConfigManagerRole, Schema.standardSchemaV1),
   }),
 );
