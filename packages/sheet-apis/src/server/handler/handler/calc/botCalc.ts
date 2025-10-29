@@ -49,10 +49,9 @@ export const botCalcHandler = pipe(
       ),
       Computed.map(Chunk.toArray),
       Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
-      Computed.mapEffect(Effect.either),
-      Computed.flatMap(Handler.Config.encodeResponse(botCalcHandlerConfig)),
-      Computed.mapEffect(Effect.orDie),
-      Computed.mapEffect(Effect.flatten),
+      Computed.mapEffect(
+        Handler.Config.encodeResponseEffect(botCalcHandlerConfig),
+      ),
       Effect.withSpan("botCalcHandler", { captureStackTrace: true }),
     ),
   ),

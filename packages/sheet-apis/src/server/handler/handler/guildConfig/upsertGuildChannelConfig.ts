@@ -31,12 +31,9 @@ export const upsertGuildChannelConfigHandler = pipe(
           }),
       ),
       Error.Core.catchParseErrorAsValidationError,
-      Effect.either,
-      Effect.flatMap(
-        Handler.Config.encodeResponse(upsertGuildChannelConfigHandlerConfig),
+      Handler.Config.encodeResponseEffect(
+        upsertGuildChannelConfigHandlerConfig,
       ),
-      Effect.orDie,
-      Effect.flatten,
       Effect.withSpan("upsertGuildChannelConfigHandler", {
         captureStackTrace: true,
       }),

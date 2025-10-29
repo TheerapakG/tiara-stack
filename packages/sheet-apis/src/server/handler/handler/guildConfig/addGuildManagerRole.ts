@@ -25,12 +25,7 @@ export const addGuildManagerRoleHandler = pipe(
         GuildConfigService.addGuildManagerRole(guildId, roleId),
       ),
       Error.Core.catchParseErrorAsValidationError,
-      Effect.either,
-      Effect.flatMap(
-        Handler.Config.encodeResponse(addGuildManagerRoleHandlerConfig),
-      ),
-      Effect.orDie,
-      Effect.flatten,
+      Handler.Config.encodeResponseEffect(addGuildManagerRoleHandlerConfig),
       Effect.withSpan("addGuildManagerRoleHandler", {
         captureStackTrace: true,
       }),

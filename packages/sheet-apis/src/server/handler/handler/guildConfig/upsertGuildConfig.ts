@@ -25,12 +25,7 @@ export const upsertGuildConfigHandler = pipe(
         GuildConfigService.upsertGuildConfig(guildId, config),
       ),
       Error.Core.catchParseErrorAsValidationError,
-      Effect.either,
-      Effect.flatMap(
-        Handler.Config.encodeResponse(upsertGuildConfigHandlerConfig),
-      ),
-      Effect.orDie,
-      Effect.flatten,
+      Handler.Config.encodeResponseEffect(upsertGuildConfigHandlerConfig),
       Effect.withSpan("upsertGuildConfigHandler", {
         captureStackTrace: true,
       }),

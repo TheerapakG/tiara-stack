@@ -22,12 +22,9 @@ export const getGuildManagerRolesHandler = pipe(
         GuildConfigService.getGuildManagerRoles(parsed),
       ),
       Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
-      Computed.mapEffect(Effect.either),
-      Computed.flatMap(
-        Handler.Config.encodeResponse(getGuildManagerRolesHandlerConfig),
+      Computed.mapEffect(
+        Handler.Config.encodeResponseEffect(getGuildManagerRolesHandlerConfig),
       ),
-      Computed.mapEffect(Effect.orDie),
-      Computed.mapEffect(Effect.flatten),
       Effect.withSpan("getGuildManagerRolesHandler", {
         captureStackTrace: true,
       }),
