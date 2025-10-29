@@ -12,6 +12,7 @@ export default defineConfig({
     index: path.resolve(__dirname, "src/index.ts"),
     register: path.resolve(__dirname, "src/register.ts"),
   },
+  sourcemap: true,
   env: {
     BUILD_DATE: date,
     BUILD_HASH: hash,
