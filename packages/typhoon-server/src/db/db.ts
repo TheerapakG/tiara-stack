@@ -10,7 +10,7 @@ import {
   pipe,
   SynchronizedRef,
 } from "effect";
-import { DB } from "typhoon-core/error";
+import { DBQueryError, makeDBQueryError } from "typhoon-core/error";
 import { Computed, SignalContext } from "typhoon-core/signal";
 
 type TransactionSubscription = { mode: "subscription" };
@@ -147,7 +147,7 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
 ) {}
 
 type QueryAnalysis<T> = {
-  query: Effect.Effect<T, DB.DBQueryError>;
+  query: Effect.Effect<T, DBQueryError>;
   tables: HashSet.HashSet<string>;
 };
 
@@ -166,16 +166,15 @@ export const query = <T, TDialect extends Dialect>(
         Effect.tryPromise({
           try: () => preparedQuery.execute() as Promise<T>,
           catch: (error) =>
-            new DB.DBQueryError({
-              message:
-                typeof error === "object" &&
+            makeDBQueryError(
+              typeof error === "object" &&
                 error !== null &&
                 "message" in error &&
                 typeof error.message === "string"
-                  ? error.message
-                  : "Failed to execute query",
-              cause: error,
-            }),
+                ? error.message
+                : "Failed to execute query",
+              error,
+            ),
         }),
       ),
     ),

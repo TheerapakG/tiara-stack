@@ -10,13 +10,18 @@ import {
 import { Handler } from "typhoon-core/server";
 import { Computed, Signal } from "typhoon-core/signal";
 import { Validate, Validator } from "typhoon-core/validator";
-import { Authorization, Msgpack, Stream } from "typhoon-core/error";
+import {
+  AuthorizationError,
+  makeAuthorizationError,
+  MsgpackDecodeError,
+  StreamExhaustedError,
+} from "typhoon-core/error";
 
 export type { Validator };
 
 export type MsgpackPullEffect = Effect.Effect<
   unknown,
-  Msgpack.MsgpackDecodeError | Stream.StreamExhaustedError,
+  MsgpackDecodeError | StreamExhaustedError,
   never
 >;
 
@@ -136,11 +141,7 @@ export const token = (): Effect.Effect<Option.Option<string>, never, Event> =>
     Effect.map((ctx) => ctx.token),
   );
 
-export const someToken = (): Effect.Effect<
-  string,
-  Authorization.AuthorizationError,
-  Event
-> =>
+export const someToken = (): Effect.Effect<string, AuthorizationError, Event> =>
   pipe(
     token(),
     Effect.flatMap(
@@ -148,9 +149,7 @@ export const someToken = (): Effect.Effect<
         onSome: Effect.succeed,
         onNone: () =>
           Effect.fail(
-            Authorization.makeAuthorizationError(
-              "No authorization token found for event",
-            ),
+            makeAuthorizationError("No authorization token found for event"),
           ),
       }),
     ),
