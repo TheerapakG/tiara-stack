@@ -9,7 +9,6 @@ import {
   InteractionContext,
   MessageCheckinService,
   messageServices,
-  RepliableInteractionT,
   SendableChannelContext,
 } from "@/services";
 import { ButtonHandlerVariantT, handlerVariantContextBuilder } from "@/types";
@@ -19,22 +18,11 @@ import {
   ButtonStyle,
   ComponentType,
   InteractionButtonComponentData,
-  Message,
   MessageActionRowComponentBuilder,
   MessageFlags,
   userMention,
 } from "discord.js";
-import {
-  Array,
-  Cause,
-  Data,
-  Effect,
-  Number,
-  Option,
-  Order,
-  pipe,
-} from "effect";
-import { DiscordError } from "~~/src/types";
+import { Array, Effect, Number, Option, Order, pipe } from "effect";
 
 const buttonData = {
   type: ComponentType.Button,
@@ -43,14 +31,6 @@ const buttonData = {
   style: ButtonStyle.Primary,
   emoji: "907705464215711834",
 } as const satisfies InteractionButtonComponentData;
-
-class CheckinError extends Data.TaggedError("CheckinError")<{
-  readonly message: string;
-}> {
-  constructor(message: string) {
-    super({ message });
-  }
-}
 
 export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
   .data(buttonData)
@@ -64,42 +44,17 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         InteractionContext.user.bind("user"),
         CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
         Effect.bind("messageCheckinData", ({ message }) =>
-          pipe(
-            MessageCheckinService.getMessageCheckinData(message.id),
-            Effect.flatten,
-          ),
+          MessageCheckinService.getMessageCheckinData(message.id),
         ),
         Effect.tap(({ message, user }) =>
-          pipe(
-            MessageCheckinService.setMessageCheckinMemberCheckinAt(
-              message.id,
-              user.id,
-            ),
-            Effect.flatMap((checkinData) =>
-              Effect.suspend<
-                Message,
-                CheckinError | DiscordError | Cause.UnknownException,
-                InteractionContext<RepliableInteractionT>
-              >(() =>
-                pipe(
-                  checkinData,
-                  Option.match({
-                    onSome: () =>
-                      InteractionContext.editReply.sync({
-                        content: "You have been checked in!",
-                      }),
-                    onNone: () =>
-                      Effect.fail(
-                        new CheckinError(
-                          "I don't think you are in the list of players to check in...",
-                        ),
-                      ),
-                  }),
-                ),
-              ),
-            ),
+          MessageCheckinService.setMessageCheckinMemberCheckinAt(
+            message.id,
+            user.id,
           ),
         ),
+        InteractionContext.editReply.tap(() => ({
+          content: "You have been checked in!",
+        })),
         Effect.bind("checkedInMentions", ({ message }) =>
           pipe(
             MessageCheckinService.getMessageCheckinMembers(message.id),
