@@ -3,4 +3,5 @@ import { defineConfig } from "tsdown";
 
 export default defineConfig({
   entry: { index: path.resolve(__dirname, "src/schema.ts") },
+  sourcemap: true,
 });
