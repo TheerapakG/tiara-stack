@@ -16,7 +16,9 @@ export class Signal<T = unknown>
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
   private _value: T;
-  private _dependents: HashSet.HashSet<DependentSignal>;
+  private _dependents: HashSet.HashSet<
+    WeakRef<DependentSignal> | DependentSignal
+  >;
 
   constructor(value: T, options: Observable.ObservableOptions) {
     super();
@@ -25,13 +27,13 @@ export class Signal<T = unknown>
     this[Observable.ObservableSymbol] = options;
   }
 
-  addDependent(dependent: DependentSignal) {
+  addDependent(dependent: WeakRef<DependentSignal> | DependentSignal) {
     return Effect.sync(() => {
       this._dependents = HashSet.add(this._dependents, dependent);
     });
   }
 
-  removeDependent(dependent: DependentSignal) {
+  removeDependent(dependent: WeakRef<DependentSignal> | DependentSignal) {
     return Effect.sync(() => {
       this._dependents = HashSet.remove(this._dependents, dependent);
     });
@@ -40,13 +42,19 @@ export class Signal<T = unknown>
   clearDependents() {
     return Effect.sync(() => {
       HashSet.forEach(this._dependents, (dependent) =>
-        dependent.removeDependency(this),
+        dependent instanceof WeakRef
+          ? dependent.deref()?.removeDependency(this)
+          : dependent.removeDependency(this),
       );
       this._dependents = HashSet.empty();
     });
   }
 
-  getDependents(): Effect.Effect<DependentSignal[], never, never> {
+  getDependents(): Effect.Effect<
+    (WeakRef<DependentSignal> | DependentSignal)[],
+    never,
+    never
+  > {
     return Effect.sync(() => HashSet.toValues(this._dependents));
   }
 

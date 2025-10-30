@@ -36,8 +36,11 @@ export class Computed<A = never, E = never, R = never>
   private _effect: Effect.Effect<A, E, R | SignalContext>;
   private _value: Deferred.Deferred<A, E>;
   private _fiber: Option.Option<Fiber.Fiber<boolean, never>>;
-  private _dependents: HashSet.HashSet<DependentSignal>;
+  private _dependents: HashSet.HashSet<
+    WeakRef<DependentSignal> | DependentSignal
+  >;
   private _dependencies: HashSet.HashSet<DependencySignal>;
+  private _reference: WeakRef<Computed<A, E, R>>;
 
   constructor(
     effect: Effect.Effect<A, E, R | SignalContext>,
@@ -50,16 +53,17 @@ export class Computed<A = never, E = never, R = never>
     this._fiber = Option.none();
     this._dependents = HashSet.empty();
     this._dependencies = HashSet.empty();
+    this._reference = new WeakRef(this);
     this[Observable.ObservableSymbol] = options;
   }
 
-  addDependent(dependent: DependentSignal) {
+  addDependent(dependent: WeakRef<DependentSignal> | DependentSignal) {
     return Effect.sync(() => {
       this._dependents = HashSet.add(this._dependents, dependent);
     });
   }
 
-  removeDependent(dependent: DependentSignal) {
+  removeDependent(dependent: WeakRef<DependentSignal> | DependentSignal) {
     return Effect.sync(() => {
       this._dependents = HashSet.remove(this._dependents, dependent);
     });
@@ -68,7 +72,9 @@ export class Computed<A = never, E = never, R = never>
   clearDependents() {
     return Effect.sync(() => {
       HashSet.forEach(this._dependents, (dependent) =>
-        dependent.removeDependency(this),
+        dependent instanceof WeakRef
+          ? dependent.deref()?.removeDependency(this)
+          : dependent.removeDependency(this),
       );
       this._dependents = HashSet.empty();
     });
@@ -95,7 +101,11 @@ export class Computed<A = never, E = never, R = never>
     });
   }
 
-  getDependents(): Effect.Effect<DependentSignal[], never, never> {
+  getDependents(): Effect.Effect<
+    (WeakRef<DependentSignal> | DependentSignal)[],
+    never,
+    never
+  > {
     return Effect.sync(() => HashSet.toValues(this._dependents));
   }
 
@@ -173,6 +183,14 @@ export class Computed<A = never, E = never, R = never>
         captureStackTrace: true,
       }),
     );
+  }
+
+  getReferenceForDependency(): Effect.Effect<
+    WeakRef<DependentSignal> | DependentSignal,
+    never,
+    never
+  > {
+    return Effect.sync(() => this._reference);
   }
 
   notify(): Effect.Effect<unknown, never, never> {
