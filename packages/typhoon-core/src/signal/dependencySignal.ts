@@ -1,4 +1,4 @@
-import { Effect, Effectable, pipe } from "effect";
+import { Array, Effect, Effectable, pipe } from "effect";
 import { Observable } from "../observability";
 import type * as DependentSignal from "./dependentSignal";
 import type { SignalContext } from "./signalContext";
@@ -15,15 +15,22 @@ export abstract class DependencySignal<A = never, E = never, R = never>
   abstract readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
   abstract addDependent(
-    dependent: DependentSignal.DependentSignal,
+    dependent:
+      | WeakRef<DependentSignal.DependentSignal>
+      | DependentSignal.DependentSignal,
   ): Effect.Effect<void, never, never>;
   abstract removeDependent(
-    dependent: DependentSignal.DependentSignal,
+    dependent:
+      | WeakRef<DependentSignal.DependentSignal>
+      | DependentSignal.DependentSignal,
   ): Effect.Effect<void, never, never>;
   abstract clearDependents(): Effect.Effect<void, never, never>;
 
   abstract getDependents(): Effect.Effect<
-    DependentSignal.DependentSignal[],
+    (
+      | WeakRef<DependentSignal.DependentSignal>
+      | DependentSignal.DependentSignal
+    )[],
     never,
     never
   >;
@@ -47,21 +54,32 @@ export const getDependentsUpdateOrder = (
 ): Effect.Effect<DependentSignal.DependentSignal[], never, never> =>
   pipe(
     Effect.Do,
-    Effect.bind("thisDependents", () => dependency.getDependents()),
+    Effect.bind("thisDependents", () =>
+      pipe(
+        dependency.getDependents(),
+        Effect.andThen(
+          Array.map((dependent) =>
+            dependent instanceof WeakRef ? dependent.deref() : dependent,
+          ),
+        ),
+        Effect.andThen(Array.filter((dependent) => dependent !== undefined)),
+      ),
+    ),
     Effect.bind("nestedDependents", ({ thisDependents }) =>
       pipe(
         Effect.all(
-          thisDependents
-            .filter((dependent) => isDependencySignal(dependent))
-            .map((dependent) => getDependentsUpdateOrder(dependent)),
+          pipe(
+            thisDependents,
+            Array.filter((dependency) => isDependencySignal(dependency)),
+            Array.map(getDependentsUpdateOrder),
+          ),
         ),
-        Effect.map((nestedDependents) => nestedDependents.flat()),
+        Effect.map(Array.flatten),
       ),
     ),
-    Effect.let("dependents", ({ thisDependents, nestedDependents }) => [
-      ...thisDependents,
-      ...nestedDependents,
-    ]),
+    Effect.let("dependents", ({ thisDependents, nestedDependents }) =>
+      Array.appendAll(thisDependents, nestedDependents),
+    ),
     Effect.map(({ dependents }) => {
       const seen = new Set();
       return dependents
