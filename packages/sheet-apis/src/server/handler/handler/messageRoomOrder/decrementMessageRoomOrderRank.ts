@@ -1,6 +1,7 @@
 import { decrementMessageRoomOrderRankHandlerConfig } from "@/server/handler/config";
+import { Error } from "@/server/schema";
 import { AuthService, MessageRoomOrderService } from "@/server/services";
-import { Effect, pipe, Schema } from "effect";
+import { Effect, Option, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { OnceObserver } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -25,11 +26,19 @@ export const decrementMessageRoomOrderRankHandler = pipe(
         MessageRoomOrderService.decrementMessageRoomOrderRank(messageId),
       ),
       Effect.flatMap(
-        Schema.encodeEither(
-          Handler.Config.resolveResponseValidator(
-            Handler.Config.response(decrementMessageRoomOrderRankHandlerConfig),
-          ),
-        ),
+        Option.match({
+          onSome: Effect.succeed,
+          onNone: () =>
+            Effect.fail(
+              Error.Core.makeArgumentError(
+                "Cannot decrement message room order rank, the message might not be registered",
+              ),
+            ),
+        }),
+      ),
+      Error.Core.catchParseErrorAsValidationError,
+      Handler.Config.encodeResponseEffect(
+        decrementMessageRoomOrderRankHandlerConfig,
       ),
       Effect.withSpan("decrementMessageRoomOrderRankHandler", {
         captureStackTrace: true,
