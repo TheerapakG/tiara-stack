@@ -27,7 +27,7 @@ export const getGuildRunningChannelByIdHandler = pipe(
           onNone: () =>
             Effect.fail(
               Error.Core.makeArgumentError(
-                "No such guild running channel, channel might not be registered",
+                "Cannot get running channel by id, the guild or the channel might not be registered",
               ),
             ),
         }),

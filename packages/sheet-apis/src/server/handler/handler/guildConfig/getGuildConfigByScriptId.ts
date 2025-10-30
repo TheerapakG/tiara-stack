@@ -27,7 +27,7 @@ export const getGuildConfigByScriptIdHandler = pipe(
           onNone: () =>
             Effect.fail(
               Error.Core.makeArgumentError(
-                "No such guild config, script might not be registered",
+                "Cannot get guild config by script id, the script might not be registered",
               ),
             ),
         }),

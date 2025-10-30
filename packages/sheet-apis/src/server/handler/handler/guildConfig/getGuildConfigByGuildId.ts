@@ -27,7 +27,7 @@ export const getGuildConfigByGuildIdHandler = pipe(
           onNone: () =>
             Effect.fail(
               Error.Core.makeArgumentError(
-                "No such guild config, guild might not be registered",
+                "Cannot get guild config by guild id, the guild might not be registered",
               ),
             ),
         }),
