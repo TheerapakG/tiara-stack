@@ -29,7 +29,7 @@ export const setMessageCheckinMemberCheckinAtHandler = pipe(
           onNone: () =>
             Effect.fail(
               Error.Core.makeArgumentError(
-                "Cannot check in member, message might not be registered, member is not on this message, or the checkin time is not within the allowed time frame",
+                "Cannot check in member, the message might not be registered, the member is not on this message, or the checkin time is not within the allowed time frame",
               ),
             ),
         }),

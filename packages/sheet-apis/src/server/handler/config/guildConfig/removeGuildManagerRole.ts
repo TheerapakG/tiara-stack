@@ -21,6 +21,7 @@ export const removeGuildManagerRoleHandlerConfig = pipe(
   Handler.Config.Builder.responseError({
     validator: pipe(
       Schema.Union(
+        Error.Core.ArgumentError,
         Error.Core.AuthorizationError,
         Error.Core.DBQueryError,
         Error.Core.MsgpackDecodeError,
