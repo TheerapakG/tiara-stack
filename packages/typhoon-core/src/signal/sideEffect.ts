@@ -50,6 +50,14 @@ export class SideEffect<R = never> implements DependentSignal {
     });
   }
 
+  getReferenceForDependency(): Effect.Effect<
+    WeakRef<DependentSignal> | DependentSignal,
+    never,
+    never
+  > {
+    return Effect.sync(() => this);
+  }
+
   notify(): Effect.Effect<unknown, never, never> {
     return pipe(
       Effect.all([

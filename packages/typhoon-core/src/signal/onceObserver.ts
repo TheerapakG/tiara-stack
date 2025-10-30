@@ -87,6 +87,14 @@ class OnceObserver<A = never, E = never>
     );
   }
 
+  getReferenceForDependency(): Effect.Effect<
+    WeakRef<DependentSignal> | DependentSignal,
+    never,
+    never
+  > {
+    return Effect.sync(() => this);
+  }
+
   notify(): Effect.Effect<unknown, never, never> {
     return pipe(
       this.clearDependencies(),
