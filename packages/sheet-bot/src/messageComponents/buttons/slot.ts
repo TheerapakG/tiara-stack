@@ -92,10 +92,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         })),
         CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
         Effect.bind("messageSlotData", ({ message }) =>
-          pipe(
-            MessageSlotService.getMessageSlotData(message.id),
-            Effect.flatten,
-          ),
+          MessageSlotService.getMessageSlotData(message.id),
         ),
         Effect.bind("slotMessage", ({ messageSlotData }) =>
           getSlotMessage(messageSlotData.day),
