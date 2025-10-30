@@ -191,19 +191,12 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                   .returning(),
               ),
             ),
-            Effect.flatMap(
-              Array.match({
-                onNonEmpty: Effect.succeed,
-                onEmpty: () =>
-                  Effect.die(
-                    makeDBQueryError("Failed to remove guild manager role"),
-                  ),
-              }),
-            ),
-            Effect.map(Array.headNonEmpty),
+            Effect.map(Array.head),
             Effect.flatMap(
               Schema.decode(
-                DefaultTaggedClass.DefaultTaggedClass(GuildConfigManagerRole),
+                Schema.OptionFromSelf(
+                  DefaultTaggedClass.DefaultTaggedClass(GuildConfigManagerRole),
+                ),
               ),
             ),
             Effect.withSpan("GuildConfigService.removeGuildManagerRole", {

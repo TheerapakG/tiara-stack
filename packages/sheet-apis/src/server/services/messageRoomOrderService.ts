@@ -7,6 +7,7 @@ import {
 import { and, asc, eq, isNull, max, min, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Option, pipe, Schema } from "effect";
 import { messageRoomOrder, messageRoomOrderEntry } from "sheet-db-schema";
+import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 import { Computed } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
@@ -123,12 +124,19 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                 })
                 .returning(),
             ),
-            Effect.map(Array.head),
+            Effect.flatMap(
+              Array.match({
+                onNonEmpty: Effect.succeed,
+                onEmpty: () =>
+                  Effect.die(
+                    makeDBQueryError("Failed to upsert message room order"),
+                  ),
+              }),
+            ),
+            Effect.map(Array.headNonEmpty),
             Effect.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(MessageRoomOrder),
-                ),
+                DefaultTaggedClass.DefaultTaggedClass(MessageRoomOrder),
               ),
             ),
             Effect.withSpan("MessageRoomOrderService.upsertMessageRoomOrder", {
