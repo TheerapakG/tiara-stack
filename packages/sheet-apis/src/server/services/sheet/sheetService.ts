@@ -140,57 +140,48 @@ const filterTeamConfigValues = (teamConfigValues: TeamConfig[]) =>
     Array.getSomes,
   );
 
+const makeTeamConfigField = (
+  teamConfigValue: FilteredTeamConfigValue,
+  field: string,
+) =>
+  new TeamConfigField({
+    range: new TeamConfigRange({ name: teamConfigValue.name }),
+    field,
+  });
+
 const teamRange = (teamConfigValue: FilteredTeamConfigValue) => ({
   playerName: {
-    field: new TeamConfigField({
-      range: new TeamConfigRange({ name: teamConfigValue.name }),
-      field: "playerName",
-    }),
+    field: makeTeamConfigField(teamConfigValue, "playerName"),
     range: Option.some(
       `'${teamConfigValue.sheet}'!${teamConfigValue.playerNameRange}`,
     ),
   },
   teamName: {
-    field: new TeamConfigField({
-      range: new TeamConfigRange({ name: teamConfigValue.name }),
-      field: "teamName",
-    }),
+    field: makeTeamConfigField(teamConfigValue, "teamName"),
     range: Option.some(
       `'${teamConfigValue.sheet}'!${teamConfigValue.teamNameRange}`,
     ),
   },
   lead: {
-    field: new TeamConfigField({
-      range: new TeamConfigRange({ name: teamConfigValue.name }),
-      field: "lead",
-    }),
+    field: makeTeamConfigField(teamConfigValue, "lead"),
     range: Option.some(
       `'${teamConfigValue.sheet}'!${teamConfigValue.leadRange}`,
     ),
   },
   backline: {
-    field: new TeamConfigField({
-      range: new TeamConfigRange({ name: teamConfigValue.name }),
-      field: "backline",
-    }),
+    field: makeTeamConfigField(teamConfigValue, "backline"),
     range: Option.some(
       `'${teamConfigValue.sheet}'!${teamConfigValue.backlineRange}`,
     ),
   },
   talent: {
-    field: new TeamConfigField({
-      range: new TeamConfigRange({ name: teamConfigValue.name }),
-      field: "talent",
-    }),
+    field: makeTeamConfigField(teamConfigValue, "talent"),
     range: Option.some(
       `'${teamConfigValue.sheet}'!${teamConfigValue.talentRange}`,
     ),
   },
   tags: {
-    field: new TeamConfigField({
-      range: new TeamConfigRange({ name: teamConfigValue.name }),
-      field: "tags",
-    }),
+    field: makeTeamConfigField(teamConfigValue, "tags"),
     range: pipe(
       Match.value(teamConfigValue.tagsConfig),
       Match.tag("TeamTagsRangesConfig", (tagsConfig) =>
@@ -437,63 +428,45 @@ const filterScheduleConfigValues = (scheduleConfigValues: ScheduleConfig[]) =>
     Array.getSomes,
   );
 
+const makeScheduleConfigField = (
+  scheduleConfigValue: FilteredScheduleConfigValue,
+  field: string,
+) =>
+  new ScheduleConfigField({
+    range: new ScheduleConfigRange({
+      channel: scheduleConfigValue.channel,
+      day: scheduleConfigValue.day,
+    }),
+    field,
+  });
+
 const scheduleRange = (scheduleConfigValue: FilteredScheduleConfigValue) => ({
   hours: {
-    field: new ScheduleConfigField({
-      range: new ScheduleConfigRange({
-        channel: scheduleConfigValue.channel,
-        day: scheduleConfigValue.day,
-      }),
-      field: "hours",
-    }),
+    field: makeScheduleConfigField(scheduleConfigValue, "hours"),
     range: Option.some(
       `'${scheduleConfigValue.sheet}'!${scheduleConfigValue.hourRange}`,
     ),
   },
   fills: {
-    field: new ScheduleConfigField({
-      range: new ScheduleConfigRange({
-        channel: scheduleConfigValue.channel,
-        day: scheduleConfigValue.day,
-      }),
-      field: "fills",
-    }),
+    field: makeScheduleConfigField(scheduleConfigValue, "fills"),
     range: Option.some(
       `'${scheduleConfigValue.sheet}'!${scheduleConfigValue.fillRange}`,
     ),
   },
   overfills: {
-    field: new ScheduleConfigField({
-      range: new ScheduleConfigRange({
-        channel: scheduleConfigValue.channel,
-        day: scheduleConfigValue.day,
-      }),
-      field: "overfills",
-    }),
+    field: makeScheduleConfigField(scheduleConfigValue, "overfills"),
     range: Option.some(
       `'${scheduleConfigValue.sheet}'!${scheduleConfigValue.overfillRange}`,
     ),
   },
   standbys: {
-    field: new ScheduleConfigField({
-      range: new ScheduleConfigRange({
-        channel: scheduleConfigValue.channel,
-        day: scheduleConfigValue.day,
-      }),
-      field: "standbys",
-    }),
+    field: makeScheduleConfigField(scheduleConfigValue, "standbys"),
     range: Option.some(
       `'${scheduleConfigValue.sheet}'!${scheduleConfigValue.standbyRange}`,
     ),
   },
   breaks: {
-    field: new ScheduleConfigField({
-      range: new ScheduleConfigRange({
-        channel: scheduleConfigValue.channel,
-        day: scheduleConfigValue.day,
-      }),
-      field: "breaks",
-    }),
+    field: makeScheduleConfigField(scheduleConfigValue, "breaks"),
     range: pipe(
       Match.value(scheduleConfigValue.breakRange),
       Match.when("detect", () => Option.none()),
