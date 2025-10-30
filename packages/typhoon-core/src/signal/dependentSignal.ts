@@ -18,6 +18,11 @@ export abstract class DependentSignal implements Observable.Observable {
   ): Effect.Effect<void, never, never>;
   abstract clearDependencies(): Effect.Effect<void, never, never>;
 
+  abstract getReferenceForDependency(): Effect.Effect<
+    WeakRef<DependentSignal> | DependentSignal,
+    never,
+    never
+  >;
   abstract notify(): Effect.Effect<unknown, never, never>;
 }
 
