@@ -114,10 +114,10 @@ const playerParser = ([
     Effect.withSpan("playerParser", { captureStackTrace: true }),
   );
 
-class TeamConfigField extends Data.TaggedClass("TeamConfigField")<{
+class TeamConfigRange extends Data.TaggedClass("TeamConfigRange")<{
   name: string;
-  field: string;
 }> {}
+class TeamConfigField extends ConfigField<TeamConfigRange> {}
 
 const teamConfigFields = [
   "name",
@@ -140,57 +140,84 @@ const filterTeamConfigValues = (teamConfigValues: TeamConfig[]) =>
     Array.getSomes,
   );
 
+const teamRange = (teamConfigValue: FilteredTeamConfigValue) => ({
+  playerName: {
+    field: new TeamConfigField({
+      range: new TeamConfigRange({ name: teamConfigValue.name }),
+      field: "playerName",
+    }),
+    range: Option.some(
+      `'${teamConfigValue.sheet}'!${teamConfigValue.playerNameRange}`,
+    ),
+  },
+  teamName: {
+    field: new TeamConfigField({
+      range: new TeamConfigRange({ name: teamConfigValue.name }),
+      field: "teamName",
+    }),
+    range: Option.some(
+      `'${teamConfigValue.sheet}'!${teamConfigValue.teamNameRange}`,
+    ),
+  },
+  lead: {
+    field: new TeamConfigField({
+      range: new TeamConfigRange({ name: teamConfigValue.name }),
+      field: "lead",
+    }),
+    range: Option.some(
+      `'${teamConfigValue.sheet}'!${teamConfigValue.leadRange}`,
+    ),
+  },
+  backline: {
+    field: new TeamConfigField({
+      range: new TeamConfigRange({ name: teamConfigValue.name }),
+      field: "backline",
+    }),
+    range: Option.some(
+      `'${teamConfigValue.sheet}'!${teamConfigValue.backlineRange}`,
+    ),
+  },
+  talent: {
+    field: new TeamConfigField({
+      range: new TeamConfigRange({ name: teamConfigValue.name }),
+      field: "talent",
+    }),
+    range: Option.some(
+      `'${teamConfigValue.sheet}'!${teamConfigValue.talentRange}`,
+    ),
+  },
+  tags: {
+    field: new TeamConfigField({
+      range: new TeamConfigRange({ name: teamConfigValue.name }),
+      field: "tags",
+    }),
+    range: pipe(
+      Match.value(teamConfigValue.tagsConfig),
+      Match.tag("TeamTagsRangesConfig", (tagsConfig) =>
+        Option.some(`'${teamConfigValue.sheet}'!${tagsConfig.tagsRange}`),
+      ),
+      Match.orElse(() => Option.none()),
+    ),
+  },
+});
+
 const teamRanges = (teamConfigValues: FilteredTeamConfigValue[]) =>
   pipe(
     teamConfigValues,
     Array.reduce(
       HashMap.empty<TeamConfigField, Option.Option<string>>(),
-      (acc, a) =>
-        pipe(
+      (acc, a) => {
+        const range = teamRange(a);
+        return pipe(
           acc,
-          HashMap.set(
-            new TeamConfigField({
-              name: a.name,
-              field: "playerName",
-            }),
-            Option.some(`'${a.sheet}'!${a.playerNameRange}`),
-          ),
-          HashMap.set(
-            new TeamConfigField({
-              name: a.name,
-              field: "teamName",
-            }),
-            Option.some(`'${a.sheet}'!${a.teamNameRange}`),
-          ),
-          HashMap.set(
-            new TeamConfigField({ name: a.name, field: "lead" }),
-            Option.some(`'${a.sheet}'!${a.leadRange}`),
-          ),
-          HashMap.set(
-            new TeamConfigField({
-              name: a.name,
-              field: "backline",
-            }),
-            Option.some(`'${a.sheet}'!${a.backlineRange}`),
-          ),
-          HashMap.set(
-            new TeamConfigField({
-              name: a.name,
-              field: "talent",
-            }),
-            Option.some(`'${a.sheet}'!${a.talentRange}`),
-          ),
-          HashMap.set(
-            new TeamConfigField({ name: a.name, field: "tags" }),
-            pipe(
-              Match.value(a.tagsConfig),
-              Match.tag("TeamTagsRangesConfig", (tagsConfig) =>
-                Option.some(`'${a.sheet}'!${tagsConfig.tagsRange}`),
-              ),
-              Match.orElse(() => Option.none()),
-            ),
-          ),
-        ),
+          HashMap.set(range.playerName.field, range.playerName.range),
+          HashMap.set(range.teamName.field, range.teamName.range),
+          HashMap.set(range.lead.field, range.lead.range),
+          HashMap.set(range.backline.field, range.backline.range),
+          HashMap.set(range.talent.field, range.talent.range),
+          HashMap.set(range.tags.field, range.tags.range),
+        );
+      },
     ),
     HashMap.filterMap((a, _) => a),
   );
@@ -204,29 +231,12 @@ const teamParser = (
     Effect.forEach((teamConfig) =>
       pipe(
         Effect.Do,
+        Effect.let("range", () => teamRange(teamConfig)),
         Effect.bindAll(
-          () => ({
+          ({ range }) => ({
             playerName: pipe(
               sheet,
-              HashMap.get(
-                new TeamConfigField({
-                  name: teamConfig.name,
-                  field: "playerName",
-                }),
-              ),
-              Option.match({
-                onSome: Effect.succeed,
-                onNone: () =>
-                  Effect.fail(
-                    new Error.ParserFieldError({
-                      message:
-                        "Error getting player name, no config field found",
-                      range: { name: teamConfig.name },
-                      field: "playerName",
-                    }),
-                  ),
-              }),
-              (e) => Effect.suspend(() => e),
+              getConfigFieldValueRange(range.playerName.field),
               Effect.flatMap((playerName) =>
                 GoogleSheets.parseValueRangeToStringOption(playerName),
               ),
@@ -239,24 +249,7 @@ const teamParser = (
             ),
             teamName: pipe(
               sheet,
-              HashMap.get(
-                new TeamConfigField({
-                  name: teamConfig.name,
-                  field: "teamName",
-                }),
-              ),
-              Option.match({
-                onSome: Effect.succeed,
-                onNone: () =>
-                  Effect.fail(
-                    new Error.ParserFieldError({
-                      message: "Error getting team name, no config field found",
-                      range: { name: teamConfig.name },
-                      field: "teamName",
-                    }),
-                  ),
-              }),
-              (e) => Effect.suspend(() => e),
+              getConfigFieldValueRange(range.teamName.field),
               Effect.flatMap((teamName) =>
                 GoogleSheets.parseValueRangeToStringOption(teamName),
               ),
@@ -269,21 +262,7 @@ const teamParser = (
             ),
             lead: pipe(
               sheet,
-              HashMap.get(
-                new TeamConfigField({ name: teamConfig.name, field: "lead" }),
-              ),
-              Option.match({
-                onSome: Effect.succeed,
-                onNone: () =>
-                  Effect.fail(
-                    new Error.ParserFieldError({
-                      message: "Error getting lead, no config field found",
-                      range: { name: teamConfig.name },
-                      field: "lead",
-                    }),
-                  ),
-              }),
-              (e) => Effect.suspend(() => e),
+              getConfigFieldValueRange(range.lead.field),
               Effect.flatMap((lead) =>
                 GoogleSheets.parseValueRangeToNumberOption(lead),
               ),
@@ -296,24 +275,7 @@ const teamParser = (
             ),
             backline: pipe(
               sheet,
-              HashMap.get(
-                new TeamConfigField({
-                  name: teamConfig.name,
-                  field: "backline",
-                }),
-              ),
-              Option.match({
-                onSome: Effect.succeed,
-                onNone: () =>
-                  Effect.fail(
-                    new Error.ParserFieldError({
-                      message: "Error getting backline, no config field found",
-                      range: { name: teamConfig.name },
-                      field: "backline",
-                    }),
-                  ),
-              }),
-              (e) => Effect.suspend(() => e),
+              getConfigFieldValueRange(range.backline.field),
               Effect.flatMap((backline) =>
                 GoogleSheets.parseValueRangeToNumberOption(backline),
               ),
@@ -326,21 +288,7 @@ const teamParser = (
             ),
             talent: pipe(
               sheet,
-              HashMap.get(
-                new TeamConfigField({ name: teamConfig.name, field: "talent" }),
-              ),
-              Option.match({
-                onSome: Effect.succeed,
-                onNone: () =>
-                  Effect.fail(
-                    new Error.ParserFieldError({
-                      message: "Error getting talent, no config field found",
-                      range: { name: teamConfig.name },
-                      field: "talent",
-                    }),
-                  ),
-              }),
-              (e) => Effect.suspend(() => e),
+              getConfigFieldValueRange(range.talent.field),
               Effect.flatMap((talent) =>
                 pipe(GoogleSheets.parseValueRangeToNumberOption(talent)),
               ),
@@ -366,25 +314,7 @@ const teamParser = (
                 TeamTagsRangesConfig: () =>
                   pipe(
                     sheet,
-                    HashMap.get(
-                      new TeamConfigField({
-                        name: teamConfig.name,
-                        field: "tags",
-                      }),
-                    ),
-                    Option.match({
-                      onSome: Effect.succeed,
-                      onNone: () =>
-                        Effect.fail(
-                          new Error.ParserFieldError({
-                            message:
-                              "Error getting tags, no config field found",
-                            range: { name: teamConfig.name },
-                            field: "tags",
-                          }),
-                        ),
-                    }),
-                    (e) => Effect.suspend(() => e),
+                    getConfigFieldValueRange(range.tags.field),
                     Effect.flatMap((tags) =>
                       GoogleSheets.parseValueRangeFromStringListToStringArray(
                         tags,
