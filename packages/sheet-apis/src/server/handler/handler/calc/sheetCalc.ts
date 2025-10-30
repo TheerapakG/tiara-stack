@@ -30,29 +30,38 @@ export const sheetCalcHandler = pipe(
             ),
           ),
           Effect.bind("playerTeams", ({ fixedTeams }) =>
-            Effect.forEach(players, ({ name, encable }) =>
-              pipe(
-                Sheet.PlayerService.getTeamsByName(name),
-                Effect.map(
-                  Array.map((team) => PlayerTeam.fromTeam(config.cc, team)),
-                ),
-                Effect.map(Array.getSomes),
-                Effect.map(
-                  Array.map((team) =>
-                    PlayerTeam.addTags(
-                      pipe(
-                        HashSet.empty(),
-                        HashSet.union(
-                          encable ? HashSet.make("encable") : HashSet.empty(),
-                        ),
-                        HashSet.union(
-                          pipe(
-                            HashMap.get(fixedTeams, team.team),
-                            Option.getOrElse(() => HashSet.empty()),
+            pipe(
+              Sheet.PlayerService.getTeamsByNames(
+                Array.map(players, ({ name }) => name),
+              ),
+              Effect.map(
+                Array.zipWith(players, (teams, { encable }) => ({
+                  teams,
+                  encable,
+                })),
+              ),
+              Effect.map(
+                Array.map(({ teams, encable }) =>
+                  pipe(
+                    teams,
+                    Array.map((team) => PlayerTeam.fromTeam(config.cc, team)),
+                    Array.getSomes,
+                    Array.map((team) =>
+                      PlayerTeam.addTags(
+                        pipe(
+                          HashSet.empty(),
+                          HashSet.union(
+                            encable ? HashSet.make("encable") : HashSet.empty(),
+                          ),
+                          HashSet.union(
+                            pipe(
+                              HashMap.get(fixedTeams, team.team),
+                              Option.getOrElse(() => HashSet.empty()),
+                            ),
                           ),
                         ),
-                      ),
-                    )(team),
+                      )(team),
+                    ),
                   ),
                 ),
               ),

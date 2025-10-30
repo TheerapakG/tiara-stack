@@ -22,9 +22,8 @@ export const getTeamsByNameHandler = pipe(
           Sheet.layerOfGuildId(guildId),
           Effect.flatMap((layer) =>
             pipe(
-              Effect.forEach(names, Sheet.PlayerService.getTeamsByName, {
-                concurrency: "unbounded",
-              }),
+              names,
+              Sheet.PlayerService.getTeamsByNames,
               Effect.map(Signal.make),
               Computed.provideLayerComputed(layer),
             ),
