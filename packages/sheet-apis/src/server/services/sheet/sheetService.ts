@@ -27,6 +27,32 @@ import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 import { GuildConfigService } from "../guildConfigService";
 import { RunnerConfigMap, SheetConfigService } from "../sheetConfigService";
 
+class ConfigField<Range> extends Data.TaggedClass("ConfigField")<{
+  range: Range;
+  field: string;
+}> {}
+
+const getConfigFieldValueRange =
+  <Range>(configField: ConfigField<Range>) =>
+  (sheet: HashMap.HashMap<ConfigField<Range>, sheets_v4.Schema$ValueRange>) =>
+    pipe(
+      sheet,
+      HashMap.get(configField),
+      Option.match({
+        onSome: Effect.succeed,
+        onNone: () =>
+          Effect.fail(
+            new Error.ParserFieldError({
+              message: `Error getting ${configField.field}, no config field found`,
+              range: configField.range,
+              field: configField.field,
+            }),
+          ),
+      }),
+      (e) => Effect.suspend(() => e),
+      Effect.withSpan("getConfigFieldValueRange", { captureStackTrace: true }),
+    );
+
 const playerParser = ([
   userIds,
   userSheetNames,
