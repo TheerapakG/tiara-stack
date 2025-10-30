@@ -1,6 +1,7 @@
 import { getMessageRoomOrderEntryHandlerConfig } from "@/server/handler/config";
+import { Error } from "@/server/schema";
 import { AuthService, MessageRoomOrderService } from "@/server/services";
-import { Effect, Function, pipe, Schema } from "effect";
+import { Effect, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -18,15 +19,13 @@ export const getMessageRoomOrderEntryHandler = pipe(
       Computed.flatMapComputed(() =>
         Event.request.parsed(getMessageRoomOrderEntryHandlerConfig),
       ),
-      Computed.flatMap(({ messageId, rank }) =>
+      Computed.flatMapComputed(({ messageId, rank }) =>
         MessageRoomOrderService.getMessageRoomOrderEntry(messageId, rank),
       ),
-      Computed.flatMap(Function.identity),
-      Computed.flatMap(
-        Schema.encodeEither(
-          Handler.Config.resolveResponseValidator(
-            Handler.Config.response(getMessageRoomOrderEntryHandlerConfig),
-          ),
+      Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
+      Computed.mapEffect(
+        Handler.Config.encodeResponseEffect(
+          getMessageRoomOrderEntryHandlerConfig,
         ),
       ),
       Effect.withSpan("getMessageRoomOrderEntryHandler", {

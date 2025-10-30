@@ -1,6 +1,7 @@
 import { removeMessageRoomOrderEntryHandlerConfig } from "@/server/handler/config";
+import { Error } from "@/server/schema";
 import { AuthService, MessageRoomOrderService } from "@/server/services";
-import { Effect, pipe, Schema } from "effect";
+import { Effect, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { OnceObserver } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -24,12 +25,9 @@ export const removeMessageRoomOrderEntryHandler = pipe(
       Effect.flatMap(({ messageId }) =>
         MessageRoomOrderService.removeMessageRoomOrderEntry(messageId),
       ),
-      Effect.flatMap(
-        Schema.encodeEither(
-          Handler.Config.resolveResponseValidator(
-            Handler.Config.response(removeMessageRoomOrderEntryHandlerConfig),
-          ),
-        ),
+      Error.Core.catchParseErrorAsValidationError,
+      Handler.Config.encodeResponseEffect(
+        removeMessageRoomOrderEntryHandlerConfig,
       ),
       Effect.withSpan("removeMessageRoomOrderEntryHandler", {
         captureStackTrace: true,
