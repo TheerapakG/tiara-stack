@@ -93,84 +93,84 @@ export class PlayerService extends Effect.Service<PlayerService>()(
               captureStackTrace: true,
             }),
           ),
-        getByName: (name: string) =>
+        getByNames: (names: readonly string[]) =>
           pipe(
             playerMaps,
-            Effect.map(({ nameToPlayer }) => HashMap.get(nameToPlayer, name)),
-            Effect.map(
-              Option.map(
-                ({ players }) =>
-                  players as Array.NonEmptyArray<Player | PartialNamePlayer>,
-              ),
-            ),
-            Effect.map(
-              Option.getOrElse(() =>
-                Array.make<Array.NonEmptyArray<Player | PartialNamePlayer>>(
-                  new PartialNamePlayer({ name }),
+            Effect.map(({ nameToPlayer }) =>
+              Array.map(names, (name) =>
+                pipe(
+                  nameToPlayer,
+                  HashMap.get(name),
+                  Option.map(
+                    ({ players }) =>
+                      players as Array.NonEmptyArray<
+                        Player | PartialNamePlayer
+                      >,
+                  ),
+                  Option.getOrElse(() =>
+                    Array.make<Array.NonEmptyArray<Player | PartialNamePlayer>>(
+                      new PartialNamePlayer({ name }),
+                    ),
+                  ),
                 ),
               ),
             ),
-            Effect.withSpan("PlayerService.getByName", {
+            Effect.withSpan("PlayerService.getByNames", {
               captureStackTrace: true,
             }),
           ),
-        getById: (id: string) =>
+        getByIds: (ids: readonly string[]) =>
           pipe(
             playerMaps,
-            Effect.map(({ idToPlayer }) => HashMap.get(idToPlayer, id)),
-            Effect.map(
-              Option.map(
-                ({ players }) =>
-                  players as Array.NonEmptyArray<Player | PartialIdPlayer>,
-              ),
-            ),
-            Effect.map(
-              Option.getOrElse(() =>
-                Array.make<Array.NonEmptyArray<Player | PartialIdPlayer>>(
-                  new PartialIdPlayer({ id }),
+            Effect.map(({ idToPlayer }) =>
+              Array.map(ids, (id) =>
+                pipe(
+                  idToPlayer,
+                  HashMap.get(id),
+                  Option.map(
+                    ({ players }) =>
+                      players as Array.NonEmptyArray<Player | PartialIdPlayer>,
+                  ),
+                  Option.getOrElse(() =>
+                    Array.make<Array.NonEmptyArray<Player | PartialIdPlayer>>(
+                      new PartialIdPlayer({ id }),
+                    ),
+                  ),
                 ),
               ),
             ),
-            Effect.withSpan("PlayerService.getById", {
+            Effect.withSpan("PlayerService.getByIds", {
               captureStackTrace: true,
             }),
           ),
       })),
-      Effect.map(({ sheetService, getPlayerMaps, getById, getByName }) => ({
+      Effect.map(({ sheetService, getPlayerMaps, getByIds, getByNames }) => ({
         getPlayerMaps,
-        getById,
-        getByName,
+        getByIds,
+        getByNames,
         mapScheduleWithPlayers: (schedule: Schedule) =>
           pipe(
             Effect.Do,
             Effect.bindAll(() => ({
               fills: pipe(
                 schedule.fills,
-                Effect.forEach(
-                  (fill) =>
-                    pipe(
-                      fill,
-                      Effect.transposeMapOption(getByName),
-                      Effect.map(Option.map(Array.headNonEmpty)),
-                    ),
-                  { concurrency: "unbounded" },
+                Array.getSomes,
+                getByNames,
+                Effect.map((fills) =>
+                  Array.makeBy(5, (i) =>
+                    pipe(fills, Array.get(i), Option.map(Array.headNonEmpty)),
+                  ),
                 ),
               ),
               overfills: pipe(
                 schedule.overfills,
-                Effect.forEach(
-                  (overfill) =>
-                    pipe(overfill, getByName, Effect.map(Array.headNonEmpty)),
-                  { concurrency: "unbounded" },
-                ),
+                getByNames,
+                Effect.map(Array.map(Array.headNonEmpty)),
               ),
               standbys: pipe(
                 schedule.standbys,
-                Effect.forEach(
-                  (standby) =>
-                    pipe(standby, getByName, Effect.map(Array.headNonEmpty)),
-                  { concurrency: "unbounded" },
-                ),
+                getByNames,
+                Effect.map(Array.map(Array.headNonEmpty)),
               ),
             })),
             Effect.map(
@@ -187,67 +187,66 @@ export class PlayerService extends Effect.Service<PlayerService>()(
               captureStackTrace: true,
             }),
           ),
-        getTeamsByName: (name: string) =>
+        getTeamsByNames: (names: readonly string[]) =>
           pipe(
             Effect.Do,
             Effect.bindAll(() => ({
               teams: sheetService.getTeams(),
-              playerNames: pipe(
-                getByName(name),
-                Effect.map(Array.map((player) => player.name)),
-              ),
+              players: getByNames(names),
             })),
-            Effect.map(({ playerNames, teams }) =>
+            Effect.map(({ players, teams }) =>
               pipe(
-                playerNames,
-                Array.map((player) =>
-                  pipe(
-                    teams,
-                    HashMap.get(player),
-                    Option.map(({ teams }) => teams),
+                players,
+                Array.map(
+                  Array.map((player) =>
+                    pipe(
+                      teams,
+                      HashMap.get(player.name),
+                      Option.map(({ teams }) => teams),
+                    ),
                   ),
                 ),
-                Array.getSomes,
-                Array.flatten,
+                Array.map(Array.getSomes),
+                Array.map(Array.flatten),
               ),
             ),
             Effect.withSpan("PlayerService.getTeamsByName", {
               captureStackTrace: true,
             }),
           ),
-        getTeamsById: (id: string) =>
+        getTeamsByIds: (ids: readonly string[]) =>
           pipe(
             Effect.Do,
             Effect.bindAll(() => ({
               teams: sheetService.getTeams(),
-              playerNames: pipe(
-                getById(id),
-                Effect.map(
+              players: getByIds(ids),
+            })),
+            Effect.map(({ players, teams }) =>
+              pipe(
+                players,
+                Array.map(
                   Array.map((player) =>
                     pipe(
                       Match.value(player),
                       Match.tagsExhaustive({
-                        Player: (player) => Option.some(player.name),
+                        Player: (player) => Option.some(player),
                         PartialIdPlayer: () => Option.none(),
                       }),
                     ),
                   ),
                 ),
-                Effect.map(Array.getSomes),
-              ),
-            })),
-            Effect.map(({ playerNames, teams }) =>
-              pipe(
-                playerNames,
-                Array.map((player) =>
-                  pipe(
-                    teams,
-                    HashMap.get(player),
-                    Option.map(({ teams }) => teams),
+                Array.map(Array.getSomes),
+                Array.map(
+                  Array.map((player) =>
+                    pipe(
+                      teams,
+                      HashMap.get(player.name),
+                      Option.map(({ teams }) => teams),
+                    ),
                   ),
                 ),
-                Array.getSomes,
-                Array.flatten,
+                Array.map(Array.getSomes),
+                Array.map(Array.flatten),
               ),
             ),
             Effect.withSpan("PlayerService.getTeamsById", {
