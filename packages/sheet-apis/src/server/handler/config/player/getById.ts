@@ -2,8 +2,6 @@ import { Player, PartialIdPlayer } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 
-const responseSchema = Schema.Array(Schema.Union(Player, PartialIdPlayer));
-
 export const getByIdHandlerConfig = pipe(
   Handler.Config.empty(),
   Handler.Config.Builder.type("subscription"),
@@ -18,6 +16,9 @@ export const getByIdHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(Schema.Array(responseSchema), Schema.standardSchemaV1),
+    validator: pipe(
+      Schema.Array(Schema.Array(Schema.Union(Player, PartialIdPlayer))),
+      Schema.standardSchemaV1,
+    ),
   }),
 );

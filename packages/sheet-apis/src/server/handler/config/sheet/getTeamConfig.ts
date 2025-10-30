@@ -2,8 +2,6 @@ import { TeamConfig } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 
-const responseSchema = Schema.Array(TeamConfig);
-
 export const getTeamConfigHandlerConfig = pipe(
   Handler.Config.empty(),
   Handler.Config.Builder.type("subscription"),
@@ -17,6 +15,6 @@ export const getTeamConfigHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(responseSchema, Schema.standardSchemaV1),
+    validator: pipe(Schema.Array(TeamConfig), Schema.standardSchemaV1),
   }),
 );

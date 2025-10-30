@@ -2,14 +2,6 @@ import { Schedule, ScheduleIndex } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 
-const responseSchema = Schema.HashMap({
-  key: ScheduleIndex,
-  value: Schema.HashMap({
-    key: Schema.Number,
-    value: Schedule,
-  }),
-});
-
 export const getDaySchedulesHandlerConfig = pipe(
   Handler.Config.empty(),
   Handler.Config.Builder.type("subscription"),
@@ -24,6 +16,15 @@ export const getDaySchedulesHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(responseSchema, Schema.standardSchemaV1),
+    validator: pipe(
+      Schema.HashMap({
+        key: ScheduleIndex,
+        value: Schema.HashMap({
+          key: Schema.Number,
+          value: Schedule,
+        }),
+      }),
+      Schema.standardSchemaV1,
+    ),
   }),
 );
