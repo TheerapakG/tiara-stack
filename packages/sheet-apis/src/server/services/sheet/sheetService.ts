@@ -409,11 +409,11 @@ export type ScheduleMap = HashMap.HashMap<
   HashMap.HashMap<number, Schedule>
 >;
 
-class ScheduleConfigField extends Data.TaggedClass("ScheduleConfigField")<{
+class ScheduleConfigRange extends Data.TaggedClass("ScheduleConfigRange")<{
   channel: string;
   day: number;
-  field: string;
 }> {}
+class ScheduleConfigField extends ConfigField<ScheduleConfigRange> {}
 
 const scheduleConfigFields = [
   "channel",
@@ -437,59 +437,91 @@ const filterScheduleConfigValues = (scheduleConfigValues: ScheduleConfig[]) =>
     Array.getSomes,
   );
 
+const scheduleRange = (scheduleConfigValue: FilteredScheduleConfigValue) => ({
+  hours: {
+    field: new ScheduleConfigField({
+      range: new ScheduleConfigRange({
+        channel: scheduleConfigValue.channel,
+        day: scheduleConfigValue.day,
+      }),
+      field: "hours",
+    }),
+    range: Option.some(
+      `'${scheduleConfigValue.sheet}'!${scheduleConfigValue.hourRange}`,
+    ),
+  },
+  fills: {
+    field: new ScheduleConfigField({
+      range: new ScheduleConfigRange({
+        channel: scheduleConfigValue.channel,
+        day: scheduleConfigValue.day,
+      }),
+      field: "fills",
+    }),
+    range: Option.some(
+      `'${scheduleConfigValue.sheet}'!${scheduleConfigValue.fillRange}`,
+    ),
+  },
+  overfills: {
+    field: new ScheduleConfigField({
+      range: new ScheduleConfigRange({
+        channel: scheduleConfigValue.channel,
+        day: scheduleConfigValue.day,
+      }),
+      field: "overfills",
+    }),
+    range: Option.some(
+      `'${scheduleConfigValue.sheet}'!${scheduleConfigValue.overfillRange}`,
+    ),
+  },
+  standbys: {
+    field: new ScheduleConfigField({
+      range: new ScheduleConfigRange({
+        channel: scheduleConfigValue.channel,
+        day: scheduleConfigValue.day,
+      }),
+      field: "standbys",
+    }),
+    range: Option.some(
+      `'${scheduleConfigValue.sheet}'!${scheduleConfigValue.standbyRange}`,
+    ),
+  },
+  breaks: {
+    field: new ScheduleConfigField({
+      range: new ScheduleConfigRange({
+        channel: scheduleConfigValue.channel,
+        day: scheduleConfigValue.day,
+      }),
+      field: "breaks",
+    }),
+    range: pipe(
+      Match.value(scheduleConfigValue.breakRange),
+      Match.when("detect", () => Option.none()),
+      Match.orElse(() =>
+        Option.some(
+          `'${scheduleConfigValue.sheet}'!${scheduleConfigValue.breakRange}`,
+        ),
+      ),
+    ),
+  },
+});
+
 const scheduleRanges = (scheduleConfigValues: FilteredScheduleConfigValue[]) =>
   pipe(
     scheduleConfigValues,
     Array.reduce(
       HashMap.empty<ScheduleConfigField, Option.Option<string>>(),
-      (acc, a) =>
-        pipe(
+      (acc, a) => {
+        const range = scheduleRange(a);
+        return pipe(
           acc,
-          HashMap.set(
-            new ScheduleConfigField({
-              channel: a.channel,
-              day: a.day,
-              field: "hours",
-            }),
-            Option.some(`'${a.sheet}'!${a.hourRange}`),
-          ),
-          HashMap.set(
-            new ScheduleConfigField({
-              channel: a.channel,
-              day: a.day,
-              field: "fills",
-            }),
-            Option.some(`'${a.sheet}'!${a.fillRange}`),
-          ),
-          HashMap.set(
-            new ScheduleConfigField({
-              channel: a.channel,
-              day: a.day,
-              field: "overfills",
-            }),
-            Option.some(`'${a.sheet}'!${a.overfillRange}`),
-          ),
-          HashMap.set(
-            new ScheduleConfigField({
-              channel: a.channel,
-              day: a.day,
-              field: "standbys",
-            }),
-            Option.some(`'${a.sheet}'!${a.standbyRange}`),
-          ),
-          HashMap.set(
-            new ScheduleConfigField({
-              channel: a.channel,
-              day: a.day,
-              field: "breaks",
-            }),
-            pipe(
-              Match.value(a.breakRange),
-              Match.when("detect", () => Option.none()),
-              Match.orElse(() => Option.some(`'${a.sheet}'!${a.breakRange}`)),
-            ),
-          ),
-        ),
+          HashMap.set(range.hours.field, range.hours.range),
+          HashMap.set(range.fills.field, range.fills.range),
+          HashMap.set(range.overfills.field, range.overfills.range),
+          HashMap.set(range.standbys.field, range.standbys.range),
+          HashMap.set(range.breaks.field, range.breaks.range),
+        );
+      },
     ),
     HashMap.filterMap((a, _) => a),
   );
@@ -504,32 +536,12 @@ const scheduleParser = (
     Effect.forEach((scheduleConfig) =>
       pipe(
         Effect.Do,
+        Effect.let("range", () => scheduleRange(scheduleConfig)),
         Effect.bindAll(
-          () => ({
+          ({ range }) => ({
             hours: pipe(
               sheet,
-              HashMap.get(
-                new ScheduleConfigField({
-                  channel: scheduleConfig.channel,
-                  day: scheduleConfig.day,
-                  field: "hours",
-                }),
-              ),
-              Option.match({
-                onSome: Effect.succeed,
-                onNone: () =>
-                  Effect.fail(
-                    new Error.ParserFieldError({
-                      message: "Error getting hours, no config field found",
-                      range: {
-                        channel: scheduleConfig.channel,
-                        day: scheduleConfig.day,
-                      },
-                      field: "hours",
-                    }),
-                  ),
-              }),
-              (e) => Effect.suspend(() => e),
+              getConfigFieldValueRange(range.hours.field),
               Effect.flatMap((hours) =>
                 GoogleSheets.parseValueRangeToNumberOption(hours),
               ),
@@ -542,28 +554,7 @@ const scheduleParser = (
             ),
             fills: pipe(
               sheet,
-              HashMap.get(
-                new ScheduleConfigField({
-                  channel: scheduleConfig.channel,
-                  day: scheduleConfig.day,
-                  field: "fills",
-                }),
-              ),
-              Option.match({
-                onSome: Effect.succeed,
-                onNone: () =>
-                  Effect.fail(
-                    new Error.ParserFieldError({
-                      message: "Error getting fills, no config field found",
-                      range: {
-                        channel: scheduleConfig.channel,
-                        day: scheduleConfig.day,
-                      },
-                      field: "fills",
-                    }),
-                  ),
-              }),
-              (e) => Effect.suspend(() => e),
+              getConfigFieldValueRange(range.fills.field),
               Effect.flatMap((fills) =>
                 GoogleSheets.parseValueRangeFromStringOptionArrayToStringOptionArray(
                   fills,
@@ -587,28 +578,7 @@ const scheduleParser = (
             ),
             overfills: pipe(
               sheet,
-              HashMap.get(
-                new ScheduleConfigField({
-                  channel: scheduleConfig.channel,
-                  day: scheduleConfig.day,
-                  field: "overfills",
-                }),
-              ),
-              Option.match({
-                onSome: Effect.succeed,
-                onNone: () =>
-                  Effect.fail(
-                    new Error.ParserFieldError({
-                      message: "Error getting overfills, no config field found",
-                      range: {
-                        channel: scheduleConfig.channel,
-                        day: scheduleConfig.day,
-                      },
-                      field: "overfills",
-                    }),
-                  ),
-              }),
-              (e) => Effect.suspend(() => e),
+              getConfigFieldValueRange(range.overfills.field),
               Effect.flatMap((overfills) =>
                 GoogleSheets.parseValueRangeFromStringListToStringArray(
                   overfills,
@@ -623,28 +593,7 @@ const scheduleParser = (
             ),
             standbys: pipe(
               sheet,
-              HashMap.get(
-                new ScheduleConfigField({
-                  channel: scheduleConfig.channel,
-                  day: scheduleConfig.day,
-                  field: "standbys",
-                }),
-              ),
-              Option.match({
-                onSome: Effect.succeed,
-                onNone: () =>
-                  Effect.fail(
-                    new Error.ParserFieldError({
-                      message: "Error getting standbys, no config field found",
-                      range: {
-                        channel: scheduleConfig.channel,
-                        day: scheduleConfig.day,
-                      },
-                      field: "standbys",
-                    }),
-                  ),
-              }),
-              (e) => Effect.suspend(() => e),
+              getConfigFieldValueRange(range.standbys.field),
               Effect.flatMap((standbys) =>
                 GoogleSheets.parseValueRangeFromStringListToStringArray(
                   standbys,
@@ -672,29 +621,7 @@ const scheduleParser = (
               Match.orElse(() =>
                 pipe(
                   sheet,
-                  HashMap.get(
-                    new ScheduleConfigField({
-                      channel: scheduleConfig.channel,
-                      day: scheduleConfig.day,
-                      field: "breaks",
-                    }),
-                  ),
-                  Option.match({
-                    onSome: Effect.succeed,
-                    onNone: () =>
-                      Effect.fail(
-                        new Error.ParserFieldError({
-                          message:
-                            "Error getting breaks, no config field found",
-                          range: {
-                            channel: scheduleConfig.channel,
-                            day: scheduleConfig.day,
-                          },
-                          field: "breaks",
-                        }),
-                      ),
-                  }),
-                  (e) => Effect.suspend(() => e),
+                  getConfigFieldValueRange(range.breaks.field),
                   Effect.flatMap((breaks) =>
                     GoogleSheets.parseValueRangeToBooleanOption(breaks),
                   ),
