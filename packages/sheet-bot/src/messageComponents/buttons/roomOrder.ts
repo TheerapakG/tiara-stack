@@ -24,7 +24,7 @@ import {
   time,
   TimestampStyles,
 } from "discord.js";
-import { Effect, Function, Layer, Number, pipe } from "effect";
+import { Effect, Layer, Number, pipe } from "effect";
 import type { Schema } from "sheet-apis";
 
 const roomOrderPreviousButtonData = {
@@ -73,9 +73,8 @@ export const roomOrderInteractionGetReply = (
     CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
     Effect.bindAll(
       ({ message }) => ({
-        messageRoomOrderRange: pipe(
-          MessageRoomOrderService.getMessageRoomOrderRange(message.id),
-          Effect.flatten,
+        messageRoomOrderRange: MessageRoomOrderService.getMessageRoomOrderRange(
+          message.id,
         ),
         messageRoomOrderEntry: MessageRoomOrderService.getMessageRoomOrderEntry(
           message.id,
@@ -127,10 +126,7 @@ export const roomOrderPreviousButton =
             eventConfig: SheetService.eventConfig,
           }),
           Effect.bind("messageRoomOrder", ({ message }) =>
-            pipe(
-              MessageRoomOrderService.decrementMessageRoomOrderRank(message.id),
-              Effect.flatMap(Function.identity),
-            ),
+            MessageRoomOrderService.decrementMessageRoomOrderRank(message.id),
           ),
           Effect.bind("messageRoomOrderReply", ({ messageRoomOrder }) =>
             roomOrderInteractionGetReply(messageRoomOrder),
@@ -162,10 +158,7 @@ export const roomOrderNextButton =
             eventConfig: SheetService.eventConfig,
           }),
           Effect.bind("messageRoomOrder", ({ message }) =>
-            pipe(
-              MessageRoomOrderService.incrementMessageRoomOrderRank(message.id),
-              Effect.flatMap(Function.identity),
-            ),
+            MessageRoomOrderService.incrementMessageRoomOrderRank(message.id),
           ),
           Effect.bind("messageRoomOrderReply", ({ messageRoomOrder }) =>
             roomOrderInteractionGetReply(messageRoomOrder),
@@ -202,10 +195,7 @@ export const roomOrderSendButton =
             eventConfig: SheetService.eventConfig,
           }),
           Effect.bind("messageRoomOrder", ({ message }) =>
-            pipe(
-              MessageRoomOrderService.getMessageRoomOrder(message.id),
-              Effect.flatten,
-            ),
+            MessageRoomOrderService.getMessageRoomOrder(message.id),
           ),
           Effect.bind("messageRoomOrderReply", ({ messageRoomOrder }) =>
             roomOrderInteractionGetReply(messageRoomOrder),
