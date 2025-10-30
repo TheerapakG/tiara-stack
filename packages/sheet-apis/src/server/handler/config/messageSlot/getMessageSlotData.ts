@@ -1,4 +1,4 @@
-import { MessageSlot } from "@/server/schema";
+import { Error, MessageSlot } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 
@@ -10,8 +10,18 @@ export const getMessageSlotDataHandlerConfig = pipe(
     validator: pipe(Schema.String, Schema.standardSchemaV1),
   }),
   Handler.Config.Builder.response({
+    validator: pipe(MessageSlot, Schema.standardSchemaV1),
+  }),
+  Handler.Config.Builder.responseError({
     validator: pipe(
-      Schema.OptionFromNullishOr(MessageSlot, undefined),
+      Schema.Union(
+        Error.Core.ArgumentError,
+        Error.Core.AuthorizationError,
+        Error.Core.DBQueryError,
+        Error.Core.MsgpackDecodeError,
+        Error.Core.StreamExhaustedError,
+        Error.Core.ValidationError,
+      ),
       Schema.standardSchemaV1,
     ),
   }),

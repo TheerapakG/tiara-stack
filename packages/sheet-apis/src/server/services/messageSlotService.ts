@@ -3,6 +3,7 @@ import { MessageSlot } from "@/server/schema";
 import { and, eq, isNull } from "drizzle-orm";
 import { Array, Effect, pipe, Schema } from "effect";
 import { messageSlot } from "sheet-db-schema";
+import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 import { Computed } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
@@ -65,13 +66,18 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
                 })
                 .returning(),
             ),
-            Effect.map(Array.head),
             Effect.flatMap(
-              Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(MessageSlot),
-                ),
-              ),
+              Array.match({
+                onNonEmpty: Effect.succeed,
+                onEmpty: () =>
+                  Effect.die(
+                    makeDBQueryError("Failed to upsert message slot data"),
+                  ),
+              }),
+            ),
+            Effect.map(Array.headNonEmpty),
+            Effect.flatMap(
+              Schema.decode(DefaultTaggedClass.DefaultTaggedClass(MessageSlot)),
             ),
             Effect.withSpan("MessageSlotService.upsertMessageSlotData", {
               captureStackTrace: true,
