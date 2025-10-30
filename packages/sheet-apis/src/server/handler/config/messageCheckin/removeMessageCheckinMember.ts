@@ -16,14 +16,12 @@ export const removeMessageCheckinMemberHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(
-      Schema.OptionFromNullishOr(MessageCheckinMember, undefined),
-      Schema.standardSchemaV1,
-    ),
+    validator: pipe(MessageCheckinMember, Schema.standardSchemaV1),
   }),
   Handler.Config.Builder.responseError({
     validator: pipe(
       Schema.Union(
+        Error.Core.ArgumentError,
         Error.Core.AuthorizationError,
         Error.Core.DBQueryError,
         Error.Core.MsgpackDecodeError,
