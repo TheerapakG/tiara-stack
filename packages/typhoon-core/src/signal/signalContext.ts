@@ -37,7 +37,10 @@ export const bindScopeDependency = (
     getSignal(dependency),
     Effect.flatMap((signal) =>
       Effect.all([
-        dependency.addDependent(signal),
+        pipe(
+          signal.getReferenceForDependency(),
+          Effect.andThen((reference) => dependency.addDependent(reference)),
+        ),
         signal.addDependency(dependency),
       ]),
     ),
