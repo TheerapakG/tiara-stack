@@ -1,20 +1,20 @@
 import { Array, Data, Order, pipe } from "effect";
 
-type ArrayWithDefaultData<S extends ReadonlyArray<object>> = {
+type ArrayWithDefaultData<S extends ReadonlyArray<unknown>> = {
   array: S;
   default: () => Array.ReadonlyArray.Infer<S>;
 };
-const ArrayWithDefaultTaggedClass: new <S extends ReadonlyArray<object>>(
+const ArrayWithDefaultTaggedClass: new <S extends ReadonlyArray<unknown>>(
   args: Readonly<ArrayWithDefaultData<S>>,
 ) => Readonly<ArrayWithDefaultData<S>> & {
   readonly _tag: "ArrayWithDefault";
 } = Data.TaggedClass("ArrayWithDefault");
 export class ArrayWithDefault<
-  const S extends ReadonlyArray<object>,
+  const S extends ReadonlyArray<unknown>,
 > extends ArrayWithDefaultTaggedClass<S> {}
 
 export const wrap =
-  <S extends ReadonlyArray<object>>(options: {
+  <S extends ReadonlyArray<unknown>>(options: {
     default: () => Array.ReadonlyArray.Infer<S>;
   }) =>
   (array: S) =>
@@ -23,15 +23,15 @@ export const wrap =
       default: options.default,
     });
 
-export type InferArray<A extends ArrayWithDefault<ReadonlyArray<object>>> =
+export type InferArray<A extends ArrayWithDefault<ReadonlyArray<unknown>>> =
   A extends ArrayWithDefault<infer S> ? S : never;
-export type Infer<A extends ArrayWithDefault<ReadonlyArray<object>>> =
+export type Infer<A extends ArrayWithDefault<ReadonlyArray<unknown>>> =
   Array.ReadonlyArray.Infer<InferArray<A>>;
 
-export const toArray = <S extends ArrayWithDefault<ReadonlyArray<object>>>(
+export const toArray = <S extends ArrayWithDefault<ReadonlyArray<unknown>>>(
   a: S,
 ) => a.array as InferArray<S>;
-export const getDefault = <S extends ArrayWithDefault<ReadonlyArray<object>>>(
+export const getDefault = <S extends ArrayWithDefault<ReadonlyArray<unknown>>>(
   a: S,
 ) => a.default() as Infer<S>;
 
@@ -51,11 +51,11 @@ export const zip =
         Array.zip(
           Array.appendAll(
             Array.copy(arrayA),
-            Array.makeBy(maxLength - Array.length(arrayA), a.default),
+            Array.makeBy(maxLength - Array.length(arrayA), () => getDefault(a)),
           ),
           Array.appendAll(
             Array.copy(arrayB),
-            Array.makeBy(maxLength - Array.length(arrayB), b.default),
+            Array.makeBy(maxLength - Array.length(arrayB), () => getDefault(b)),
           ),
         ),
         Array.map(([a, b]) => ({ ...a, ...b }) as Infer<S> & Infer<T>),
@@ -64,8 +64,38 @@ export const zip =
     });
   };
 
+export const zipArray =
+  <T extends ArrayWithDefault<ReadonlyArray<ReadonlyArray<unknown>>>>(b: T) =>
+  <S extends ArrayWithDefault<ReadonlyArray<ReadonlyArray<unknown>>>>(a: S) => {
+    const arrayA = toArray(a);
+    const arrayB = toArray(b);
+
+    const maxLength = Order.max(Order.number)(
+      Array.length(arrayA),
+      Array.length(arrayB),
+    );
+
+    return new ArrayWithDefault({
+      array: pipe(
+        Array.zip(
+          Array.appendAll(
+            Array.copy(arrayA),
+            Array.makeBy(maxLength - Array.length(arrayA), () => getDefault(a)),
+          ),
+          Array.appendAll(
+            Array.copy(arrayB),
+            Array.makeBy(maxLength - Array.length(arrayB), () => getDefault(b)),
+          ),
+        ),
+        Array.map(([a, b]) => [...a, ...b] as [...Infer<S>, ...Infer<T>]),
+      ),
+      default: () =>
+        [...getDefault(a), ...getDefault(b)] as [...Infer<S>, ...Infer<T>],
+    });
+  };
+
 export const map =
-  <S extends ArrayWithDefault<ReadonlyArray<object>>, B extends object>(
+  <S extends ArrayWithDefault<ReadonlyArray<unknown>>, B>(
     mapper: (a: Infer<S>) => B,
   ) =>
   (a: S) =>
@@ -83,3 +113,13 @@ export const zipMap =
   ) =>
   (a: S) =>
     pipe(a, zip(pipe(a, map(mapper))));
+
+export const zipMapArray =
+  <
+    S extends ArrayWithDefault<ReadonlyArray<unknown[]>>,
+    B extends ReadonlyArray<unknown>,
+  >(
+    mapper: (a: Infer<S>) => B,
+  ) =>
+  (a: S) =>
+    pipe(a, zipArray(pipe(a, map(mapper))));
