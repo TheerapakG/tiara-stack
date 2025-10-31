@@ -1,4 +1,4 @@
-import { Array, Effect, HashMap, Match, Option, pipe } from "effect";
+import { Array, Effect, Function, HashMap, Match, Option, pipe } from "effect";
 import { Array as ArrayUtils } from "typhoon-core/utils";
 import { SheetService } from "./sheetService";
 import {
@@ -37,25 +37,11 @@ export class PlayerService extends Effect.Service<PlayerService>()(
             Effect.map((players) => ({
               privateNameToPlayer: pipe(
                 players,
-                ArrayUtils.Collect.toHashMap({
-                  keyGetter: ({ name }) => name,
-                  valueInitializer: (player) => player,
-                  valueReducer: (_, player) => player,
-                }),
+                ArrayUtils.Collect.toHashMapByKey("name"),
               ),
               idToPlayer: pipe(
                 players,
-                ArrayUtils.Collect.toHashMap({
-                  keyGetter: ({ id }) => id,
-                  valueInitializer: (player) => ({
-                    id: player.id,
-                    players: Array.make(player),
-                  }),
-                  valueReducer: ({ id, players }, player) => ({
-                    id,
-                    players: Array.append(players, player),
-                  }),
-                }),
+                ArrayUtils.Collect.toArrayHashMapByKey("id"),
               ),
             })),
             Effect.map(({ privateNameToPlayer, idToPlayer }) => ({
@@ -63,11 +49,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                 privateNameToPlayer,
                 HashMap.map((player) => ({
                   name: player.name,
-                  players: pipe(
-                    idToPlayer,
-                    HashMap.get(player.id),
-                    Option.map(({ players }) => players),
-                  ),
+                  players: pipe(idToPlayer, HashMap.get(player.id)),
                 })),
                 HashMap.filterMap((a, _) =>
                   pipe(
@@ -127,15 +109,10 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                 pipe(
                   idToPlayer,
                   HashMap.get(id),
-                  Option.map(
-                    ({ players }) =>
-                      players as Array.NonEmptyArray<Player | PartialIdPlayer>,
-                  ),
                   Option.getOrElse(() =>
-                    Array.make<Array.NonEmptyArray<Player | PartialIdPlayer>>(
-                      new PartialIdPlayer({ id }),
-                    ),
+                    Array.make(new PartialIdPlayer({ id })),
                   ),
+                  Array.map(Function.identity),
                 ),
               ),
             ),

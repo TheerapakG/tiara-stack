@@ -12,10 +12,7 @@ const getPlayerMapsResponseSchema = Schema.Struct({
   }),
   idToPlayer: Schema.HashMap({
     key: Schema.String,
-    value: Schema.Struct({
-      id: Schema.String,
-      players: Schema.Array(Schema.Union(Player, PartialIdPlayer)),
-    }),
+    value: Schema.Array(Schema.Union(Player, PartialIdPlayer)),
   }),
 });
 
