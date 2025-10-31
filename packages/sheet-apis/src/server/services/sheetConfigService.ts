@@ -22,7 +22,6 @@ import {
   String,
   Match,
 } from "effect";
-import { Array as ArrayUtils } from "typhoon-core/utils";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 
 const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
@@ -175,44 +174,32 @@ const hourRangeParser = (range: string): HourRange =>
     ),
   );
 
-export type RunnerConfigMap = HashMap.HashMap<string, RunnerConfig>;
-
-const runnerConfigParser = ([name, hours]: sheets_v4.Schema$ValueRange[]) =>
+const runnerConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
   pipe(
-    Effect.Do,
-    Effect.bindAll(() => ({
-      name: pipe(
-        GoogleSheets.parseValueRangeToStringOption(name),
-        Effect.map(Array.map((name) => ({ name }))),
-        Effect.map(
-          ArrayUtils.WithDefault.wrap({ default: { name: Option.none() } }),
-        ),
-      ),
-      hours: pipe(
-        GoogleSheets.parseValueRangeFromStringListToStringArray(hours),
-        Effect.map(Array.map(Array.map(hourRangeParser))),
-        Effect.map(Array.map((hours) => ({ hours }))),
-        Effect.map(ArrayUtils.WithDefault.wrap({ default: { hours: [] } })),
-      ),
-    })),
-    Effect.map(({ name, hours }) =>
+    GoogleSheets.parseValueRange(
+      range,
       pipe(
-        name,
-        ArrayUtils.WithDefault.zip(hours),
-        ArrayUtils.WithDefault.toArray,
-        Array.map(({ name, hours }) =>
+        GoogleSheets.rangeToStructOptionSchema(["name", "hours"]),
+        Schema.compose(
           pipe(
-            Option.Do,
-            Option.bind("name", () => name),
-            Option.let("hours", () => hours),
-            Option.map(({ name, hours }) => new RunnerConfig({ name, hours })),
+            Schema.Struct({
+              name: GoogleSheets.cellToStringSchema,
+              hours: GoogleSheets.cellToStringArraySchema,
+            }),
           ),
         ),
-        Array.getSomes,
-        ArrayUtils.Collect.toHashMap({
-          keyGetter: ({ name }) => name,
-          valueInitializer: (a) => a,
-          valueReducer: (_, a) => a,
+      ),
+    ),
+    Effect.map(Array.getSomes),
+    Effect.map(
+      Array.map(({ name, hours }) =>
+        RunnerConfig.make({
+          name,
+          hours: pipe(
+            hours,
+            Option.getOrElse(() => []),
+            Array.map(hourRangeParser),
+          ),
         }),
       ),
     ),
@@ -379,10 +366,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              ranges: [
-                "'Thee's Sheet Settings'!AD8:AD",
-                "'Thee's Sheet Settings'!AE8:AE",
-              ],
+              ranges: ["'Thee's Sheet Settings'!AD8:AE"],
             }),
             Effect.flatMap((response) =>
               pipe(
