@@ -39,7 +39,7 @@ import {
 } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { Schema } from "sheet-apis";
-import { Utils } from "typhoon-core/utils";
+import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 
 const handleManual =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
@@ -122,6 +122,9 @@ const handleManual =
               }),
             ),
           ),
+          Effect.let("runnerConfigMap", ({ runnerConfig }) =>
+            pipe(runnerConfig, ArrayUtils.Collect.toHashMapByKey("name")),
+          ),
           Effect.bind("formattedHourWindow", ({ hour }) =>
             pipe(
               ConverterService.convertHourToHourWindow(hour),
@@ -151,7 +154,7 @@ const handleManual =
               Utils.mapPositional(PlayerService.mapScheduleWithPlayers),
             ),
           ),
-          Effect.bind("scheduleTeams", ({ schedule, runnerConfig, hour }) =>
+          Effect.bind("scheduleTeams", ({ schedule, runnerConfigMap, hour }) =>
             pipe(
               Effect.Do,
               Effect.let("players", () =>
@@ -171,7 +174,7 @@ const handleManual =
                     Effect.Do,
                     Effect.let("runnerHours", () =>
                       pipe(
-                        HashMap.get(runnerConfig, player.name),
+                        HashMap.get(runnerConfigMap, Option.some(player.name)),
                         Option.map(({ hours }) => hours),
                         Option.getOrElse(() => []),
                       ),

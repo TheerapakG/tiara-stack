@@ -15,12 +15,6 @@ export const getRunnerConfigHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(
-      Schema.HashMap({
-        key: Schema.String,
-        value: RunnerConfig,
-      }),
-      Schema.standardSchemaV1,
-    ),
+    validator: pipe(Schema.Array(RunnerConfig), Schema.standardSchemaV1),
   }),
 );
