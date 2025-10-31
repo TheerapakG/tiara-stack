@@ -30,19 +30,66 @@ const parseValueRange = <A, R>(
   pipe(
     Option.fromNullable(valueRange.values),
     Option.getOrElse(() => []),
-    Effect.forEach((value) =>
-      pipe(
-        value,
-        Schema.decodeUnknown(
-          pipe(
-            Schema.Array(Schema.OptionFromNonEmptyTrimmedString),
-            Schema.compose(rowSchema),
+    Effect.forEach(
+      (row) =>
+        pipe(
+          row,
+          Schema.decodeUnknown(
+            pipe(
+              Schema.Array(Schema.OptionFromNonEmptyTrimmedString),
+              Schema.compose(rowSchema),
+            ),
           ),
+          Effect.either,
         ),
-        Effect.either,
-      ),
+      { concurrency: "unbounded" },
     ),
     Effect.withSpan("parseValueRange", { captureStackTrace: true }),
+  );
+
+const parseValueRanges = <A, R>(
+  valueRanges: sheets_v4.Schema$ValueRange[],
+  rowSchemas: Schema.Schema<
+    A,
+    readonly (readonly Option.Option<string>[])[],
+    R
+  >,
+): Effect.Effect<Either.Either<A, ParseResult.ParseError>[], never, R> =>
+  pipe(
+    valueRanges,
+    Array.map(({ values }) => values),
+    Array.map(Option.fromNullable),
+    Array.map(Option.getOrElse(() => [])),
+    Array.map(ArrayUtils.WithDefault.wrap({ default: () => [] })),
+    Array.map(ArrayUtils.WithDefault.map((row) => [row])),
+    Array.match({
+      onEmpty: () =>
+        pipe([], ArrayUtils.WithDefault.wrap<never[][]>({ default: () => [] })),
+      onNonEmpty: (ranges) =>
+        Array.reduce(
+          Array.tailNonEmpty(ranges),
+          Array.headNonEmpty(ranges),
+          (acc, curr) => pipe(acc, ArrayUtils.WithDefault.zipArray(curr)),
+        ),
+    }),
+    ArrayUtils.WithDefault.toArray,
+    Effect.forEach(
+      (rows) =>
+        pipe(
+          rows,
+          Schema.decodeUnknown(
+            pipe(
+              Schema.Array(
+                Schema.Array(Schema.OptionFromNonEmptyTrimmedString),
+              ),
+              Schema.compose(rowSchemas),
+            ),
+          ),
+          Effect.either,
+        ),
+      { concurrency: "unbounded" },
+    ),
+    Effect.withSpan("parseValueRanges", { captureStackTrace: true }),
   );
 
 const cellSchema = Schema.OptionFromSelf(Schema.String);
@@ -321,6 +368,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
   },
 ) {
   static parseValueRange = parseValueRange;
+  static parseValueRanges = parseValueRanges;
 
   static cellSchema = cellSchema;
   static rowSchema = rowSchema;
