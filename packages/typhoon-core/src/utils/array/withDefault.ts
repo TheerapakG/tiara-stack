@@ -1,4 +1,4 @@
-import { Array, Data, Order, pipe } from "effect";
+import { Array, Data, Either, Option, Order, pipe } from "effect";
 
 type ArrayWithDefaultData<S extends ReadonlyArray<unknown>> = {
   array: S;
@@ -20,6 +20,39 @@ export const wrap =
   (array: S) =>
     new ArrayWithDefault({
       array,
+      default: options.default,
+    });
+
+export const wrapEither =
+  <S extends ReadonlyArray<Either.Either<unknown, unknown>>>(options: {
+    default: () => Either.Either.Right<Array.ReadonlyArray.Infer<S>>;
+  }) =>
+  (array: S) =>
+    new ArrayWithDefault({
+      array: pipe(
+        array as ReadonlyArray<
+          Either.Either<
+            Either.Either.Right<Array.ReadonlyArray.Infer<S>>,
+            unknown
+          >
+        >,
+        Array.map(Either.getOrElse(options.default)),
+      ),
+      default: options.default,
+    });
+
+export const wrapOption =
+  <S extends ReadonlyArray<Option.Option<unknown>>>(options: {
+    default: () => Option.Option.Value<Array.ReadonlyArray.Infer<S>>;
+  }) =>
+  (array: S) =>
+    new ArrayWithDefault({
+      array: pipe(
+        array as ReadonlyArray<
+          Option.Option<Option.Option.Value<Array.ReadonlyArray.Infer<S>>>
+        >,
+        Array.map(Option.getOrElse(options.default)),
+      ),
       default: options.default,
     });
 
