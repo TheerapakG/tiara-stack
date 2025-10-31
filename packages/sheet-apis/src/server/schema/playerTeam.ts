@@ -1,4 +1,4 @@
-import { HashSet, Order, Schema } from "effect";
+import { Array, HashSet, Order, Schema, String } from "effect";
 import { Team } from "./team";
 import { Option, pipe } from "effect";
 
@@ -48,8 +48,12 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
         lead: apiObject.lead,
         backline: apiObject.backline,
         talent: apiObject.talent,
-        tags: HashSet.fromIterable(
-          apiObject.tagStr.split(/\s*,\s*/).filter(Boolean),
+        tags: pipe(
+          apiObject.tagStr,
+          String.split(","),
+          Array.map(String.trim),
+          Array.filter(String.isNonEmpty),
+          HashSet.fromIterable,
         ),
       }),
     );
