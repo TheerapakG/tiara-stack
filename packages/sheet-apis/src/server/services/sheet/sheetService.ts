@@ -15,7 +15,6 @@ import {
   Array,
   Data,
   Effect,
-  Either,
   HashMap,
   Match,
   Number,
@@ -192,103 +191,55 @@ const teamParser = (
         Effect.let("range", () => teamRange(teamConfig)),
         Effect.bindAll(
           ({ range }) => ({
-            playerName: pipe(
-              sheet,
-              getConfigFieldValueRange(range.playerName.field),
-              Effect.flatMap((playerName) =>
-                GoogleSheets.parseValueRange(
-                  playerName,
-                  pipe(
-                    GoogleSheets.rowToCellSchema,
-                    Schema.compose(GoogleSheets.cellToStringSchema),
-                  ),
-                ),
-              ),
-              Effect.map(Array.map(Either.getOrElse(Option.none<string>))),
-              Effect.map(Array.map((playerName) => ({ playerName }))),
-              Effect.map(
-                ArrayUtils.WithDefault.wrap({
-                  default: () => ({ playerName: Option.none<string>() }),
-                }),
-              ),
+            requiredValueRanges: Effect.all([
+              pipe(sheet, getConfigFieldValueRange(range.playerName.field)),
+              pipe(sheet, getConfigFieldValueRange(range.teamName.field)),
+              pipe(sheet, getConfigFieldValueRange(range.lead.field)),
+              pipe(sheet, getConfigFieldValueRange(range.backline.field)),
+              pipe(sheet, getConfigFieldValueRange(range.talent.field)),
+            ]),
+            tagsValueRange: Effect.succeed(
+              pipe(sheet, getConfigFieldValueRange(range.tags.field)),
             ),
-            teamName: pipe(
-              sheet,
-              getConfigFieldValueRange(range.teamName.field),
-              Effect.flatMap((teamName) =>
-                GoogleSheets.parseValueRange(
-                  teamName,
-                  pipe(
-                    GoogleSheets.rowToCellSchema,
-                    Schema.compose(GoogleSheets.cellToStringSchema),
+          }),
+          { concurrency: "unbounded" },
+        ),
+        Effect.bindAll(
+          ({ requiredValueRanges, tagsValueRange }) => ({
+            requiredConfig: pipe(
+              GoogleSheets.parseValueRanges(
+                requiredValueRanges,
+                pipe(
+                  Schema.Array(GoogleSheets.rowToCellSchema),
+                  Schema.compose(
+                    GoogleSheets.rowToCellStructSchema([
+                      "playerName",
+                      "teamName",
+                      "lead",
+                      "backline",
+                      "talent",
+                    ]),
+                  ),
+                  Schema.compose(
+                    Schema.Struct({
+                      playerName: GoogleSheets.cellToStringSchema,
+                      teamName: GoogleSheets.cellToStringSchema,
+                      lead: GoogleSheets.cellToNumberSchema,
+                      backline: GoogleSheets.cellToNumberSchema,
+                      talent: GoogleSheets.cellToNumberSchema,
+                    }),
                   ),
                 ),
               ),
-              Effect.map(Array.map(Either.getOrElse(Option.none<string>))),
-              Effect.map(Array.map((teamName) => ({ teamName }))),
               Effect.map(
-                ArrayUtils.WithDefault.wrap({
-                  default: () => ({ teamName: Option.none<string>() }),
-                }),
-              ),
-            ),
-            lead: pipe(
-              sheet,
-              getConfigFieldValueRange(range.lead.field),
-              Effect.flatMap((lead) =>
-                GoogleSheets.parseValueRange(
-                  lead,
-                  pipe(
-                    GoogleSheets.rowToCellSchema,
-                    Schema.compose(GoogleSheets.cellToNumberSchema),
-                  ),
-                ),
-              ),
-              Effect.map(Array.map(Either.getOrElse(Option.none<number>))),
-              Effect.map(Array.map((lead) => ({ lead }))),
-              Effect.map(
-                ArrayUtils.WithDefault.wrap({
-                  default: () => ({ lead: Option.none<number>() }),
-                }),
-              ),
-            ),
-            backline: pipe(
-              sheet,
-              getConfigFieldValueRange(range.backline.field),
-              Effect.flatMap((backline) =>
-                GoogleSheets.parseValueRange(
-                  backline,
-                  pipe(
-                    GoogleSheets.rowToCellSchema,
-                    Schema.compose(GoogleSheets.cellToNumberSchema),
-                  ),
-                ),
-              ),
-              Effect.map(Array.map(Either.getOrElse(Option.none<number>))),
-              Effect.map(Array.map((backline) => ({ backline }))),
-              Effect.map(
-                ArrayUtils.WithDefault.wrap({
-                  default: () => ({ backline: Option.none<number>() }),
-                }),
-              ),
-            ),
-            talent: pipe(
-              sheet,
-              getConfigFieldValueRange(range.talent.field),
-              Effect.flatMap((talent) =>
-                GoogleSheets.parseValueRange(
-                  talent,
-                  pipe(
-                    GoogleSheets.rowToCellSchema,
-                    Schema.compose(GoogleSheets.cellToNumberSchema),
-                  ),
-                ),
-              ),
-              Effect.map(Array.map(Either.getOrElse(Option.none<number>))),
-              Effect.map(Array.map((talent) => ({ talent }))),
-              Effect.map(
-                ArrayUtils.WithDefault.wrap({
-                  default: () => ({ talent: Option.none<number>() }),
+                ArrayUtils.WithDefault.wrapEither({
+                  default: () => ({
+                    playerName: Option.none<string>(),
+                    teamName: Option.none<string>(),
+                    lead: Option.none<number>(),
+                    backline: Option.none<number>(),
+                    talent: Option.none<number>(),
+                  }),
                 }),
               ),
             ),
@@ -306,11 +257,10 @@ const teamParser = (
                   ),
                 TeamTagsRangesConfig: () =>
                   pipe(
-                    sheet,
-                    getConfigFieldValueRange(range.tags.field),
-                    Effect.flatMap((tags) =>
+                    tagsValueRange,
+                    Effect.flatMap((tagsValueRange) =>
                       GoogleSheets.parseValueRange(
-                        tags,
+                        tagsValueRange,
                         pipe(
                           GoogleSheets.rowToCellSchema,
                           Schema.compose(GoogleSheets.cellToStringArraySchema),
@@ -318,14 +268,15 @@ const teamParser = (
                       ),
                     ),
                     Effect.map(
-                      Array.map(Either.getOrElse(Option.none<string[]>)),
-                    ),
-                    Effect.map(Array.map(Option.getOrElse(() => []))),
-                    Effect.map(Array.map((tags) => ({ tags }))),
-                    Effect.map(
-                      ArrayUtils.WithDefault.wrap({
-                        default: () => ({ tags: [] }),
+                      ArrayUtils.WithDefault.wrapEither({
+                        default: Option.none<string[]>,
                       }),
+                    ),
+                    Effect.map(
+                      ArrayUtils.WithDefault.map(Option.getOrElse(() => [])),
+                    ),
+                    Effect.map(
+                      ArrayUtils.WithDefault.map((tags) => ({ tags })),
                     ),
                   ),
               }),
@@ -333,13 +284,9 @@ const teamParser = (
           }),
           { concurrency: "unbounded" },
         ),
-        Effect.map(({ playerName, teamName, lead, backline, talent, tags }) =>
+        Effect.map(({ requiredConfig, tags }) =>
           pipe(
-            playerName,
-            ArrayUtils.WithDefault.zip(teamName),
-            ArrayUtils.WithDefault.zip(lead),
-            ArrayUtils.WithDefault.zip(backline),
-            ArrayUtils.WithDefault.zip(talent),
+            requiredConfig,
             ArrayUtils.WithDefault.zip(tags),
             ArrayUtils.WithDefault.toArray,
             Array.map(
@@ -518,90 +465,73 @@ const scheduleParser = (
           Effect.let("range", () => scheduleRange(scheduleConfig)),
           Effect.bindAll(
             ({ range }) => ({
-              hours: pipe(
+              requiredValueRanges: Effect.all([
+                pipe(sheet, getConfigFieldValueRange(range.hours.field)),
+                pipe(sheet, getConfigFieldValueRange(range.fills.field)),
+                pipe(sheet, getConfigFieldValueRange(range.overfills.field)),
+                pipe(sheet, getConfigFieldValueRange(range.standbys.field)),
+              ]),
+              fillValueRange: pipe(
                 sheet,
-                getConfigFieldValueRange(range.hours.field),
-                Effect.flatMap((hours) =>
-                  GoogleSheets.parseValueRange(
-                    hours,
-                    pipe(
-                      GoogleSheets.rowToCellSchema,
-                      Schema.compose(GoogleSheets.cellToNumberSchema),
+                getConfigFieldValueRange(range.fills.field),
+              ),
+              breakValueRange: Effect.succeed(
+                pipe(sheet, getConfigFieldValueRange(range.breaks.field)),
+              ),
+            }),
+            { concurrency: "unbounded" },
+          ),
+          Effect.bindAll(
+            ({ requiredValueRanges, fillValueRange, breakValueRange }) => ({
+              requiredConfig: pipe(
+                GoogleSheets.parseValueRanges(
+                  requiredValueRanges,
+                  pipe(
+                    Schema.Array(GoogleSheets.rowToCellSchema),
+                    Schema.compose(
+                      GoogleSheets.rowToCellStructSchema([
+                        "hour",
+                        "overfills",
+                        "standbys",
+                      ]),
+                    ),
+                    Schema.compose(
+                      Schema.Struct({
+                        hour: GoogleSheets.cellToNumberSchema,
+                        overfills: GoogleSheets.cellToStringArraySchema,
+                        standbys: GoogleSheets.cellToStringArraySchema,
+                      }),
                     ),
                   ),
                 ),
-                Effect.map(Array.map(Either.getOrElse(Option.none<number>))),
-                Effect.map(Array.map((hour) => ({ hour }))),
                 Effect.map(
-                  ArrayUtils.WithDefault.wrap({
-                    default: () => ({ hour: Option.none<number>() }),
+                  ArrayUtils.WithDefault.wrapEither({
+                    default: () => ({
+                      hour: Option.none<number>(),
+                      overfills: Option.none<string[]>(),
+                      standbys: Option.none<string[]>(),
+                    }),
                   }),
                 ),
               ),
               fills: pipe(
-                sheet,
-                getConfigFieldValueRange(range.fills.field),
-                Effect.flatMap((fills) =>
-                  GoogleSheets.parseValueRange(fills, GoogleSheets.rowSchema),
+                GoogleSheets.parseValueRange(
+                  fillValueRange,
+                  GoogleSheets.rowSchema,
                 ),
-                Effect.map(Array.map(Either.getOrElse(() => []))),
                 Effect.map(
-                  Array.map((fills) =>
+                  ArrayUtils.WithDefault.wrapEither({
+                    default: () => [],
+                  }),
+                ),
+                Effect.map(
+                  ArrayUtils.WithDefault.map((fills) =>
                     Array.makeBy(5, (i) =>
                       pipe(Array.get(fills, i), Option.flatten),
                     ),
                   ),
                 ),
-                Effect.map(Array.map((fills) => ({ fills }))),
-                Effect.map(
-                  ArrayUtils.WithDefault.wrap({
-                    default: () => ({
-                      fills: Array.makeBy(5, () => Option.none<string>()),
-                    }),
-                  }),
-                ),
-              ),
-              overfills: pipe(
-                sheet,
-                getConfigFieldValueRange(range.overfills.field),
-                Effect.flatMap((overfills) =>
-                  GoogleSheets.parseValueRange(
-                    overfills,
-                    pipe(
-                      GoogleSheets.rowToCellSchema,
-                      Schema.compose(GoogleSheets.cellToStringArraySchema),
-                    ),
-                  ),
-                ),
-                Effect.map(Array.map(Either.getOrElse(Option.none<string[]>))),
-                Effect.map(Array.map(Option.getOrElse(() => []))),
-                Effect.map(Array.map((overfills) => ({ overfills }))),
-                Effect.map(
-                  ArrayUtils.WithDefault.wrap({
-                    default: () => ({ overfills: [] }),
-                  }),
-                ),
-              ),
-              standbys: pipe(
-                sheet,
-                getConfigFieldValueRange(range.standbys.field),
-                Effect.flatMap((standbys) =>
-                  GoogleSheets.parseValueRange(
-                    standbys,
-                    pipe(
-                      GoogleSheets.rowToCellSchema,
-                      Schema.compose(GoogleSheets.cellToStringArraySchema),
-                    ),
-                  ),
-                ),
-                Effect.map(Array.map(Either.getOrElse(Option.none<string[]>))),
-                Effect.map(Array.map(Option.getOrElse(() => []))),
-                Effect.map(Array.map((standbys) => ({ standbys }))),
-                Effect.map(
-                  ArrayUtils.WithDefault.wrap({
-                    default: () => ({ standbys: [] }),
-                  }),
-                ),
+                Effect.map(ArrayUtils.WithDefault.map((fills) => ({ fills }))),
               ),
               breaks: pipe(
                 Match.value(scheduleConfig.breakRange),
@@ -617,11 +547,10 @@ const scheduleParser = (
                 ),
                 Match.orElse(() =>
                   pipe(
-                    sheet,
-                    getConfigFieldValueRange(range.breaks.field),
-                    Effect.flatMap((breaks) =>
+                    breakValueRange,
+                    Effect.flatMap((breakValueRange) =>
                       GoogleSheets.parseValueRange(
-                        breaks,
+                        breakValueRange,
                         pipe(
                           GoogleSheets.rowToCellSchema,
                           Schema.compose(GoogleSheets.cellToBooleanSchema),
@@ -629,14 +558,17 @@ const scheduleParser = (
                       ),
                     ),
                     Effect.map(
-                      Array.map(Either.getOrElse(Option.none<boolean>)),
-                    ),
-                    Effect.map(Array.map(Option.getOrElse(() => false))),
-                    Effect.map(Array.map((breakHour) => ({ breakHour }))),
-                    Effect.map(
-                      ArrayUtils.WithDefault.wrap({
-                        default: () => ({ breakHour: false }),
+                      ArrayUtils.WithDefault.wrapEither({
+                        default: Option.none<boolean>,
                       }),
+                    ),
+                    Effect.map(
+                      ArrayUtils.WithDefault.map(Option.getOrElse(() => false)),
+                    ),
+                    Effect.map(
+                      ArrayUtils.WithDefault.map((breakHour) => ({
+                        breakHour,
+                      })),
                     ),
                   ),
                 ),
@@ -644,12 +576,10 @@ const scheduleParser = (
             }),
             { concurrency: "unbounded" },
           ),
-          Effect.map(({ hours, fills, overfills, standbys, breaks }) =>
+          Effect.map(({ requiredConfig, fills, breaks }) =>
             pipe(
-              hours,
+              requiredConfig,
               ArrayUtils.WithDefault.zip(fills),
-              ArrayUtils.WithDefault.zip(overfills),
-              ArrayUtils.WithDefault.zip(standbys),
               ArrayUtils.WithDefault.zip(breaks),
               ArrayUtils.WithDefault.toArray,
               Array.map(({ hour, breakHour, fills, overfills, standbys }) =>
@@ -658,38 +588,40 @@ const scheduleParser = (
                   Option.bind("hour", () => hour),
                   Option.let("breakHour", () => breakHour),
                   Option.let("fills", () => fills),
-                  Option.let("overfills", () => overfills),
-                  Option.let("standbys", () => standbys),
-                  Option.map(({ hour, breakHour, fills, ...config }) =>
-                    Schedule.make({
-                      ...config,
-                      hour,
-                      fills,
-                      breakHour: pipe(
-                        Match.value(scheduleConfig.breakRange),
-                        Match.when("detect", () =>
-                          pipe(
-                            fills,
-                            Array.getSomes,
-                            Array.map((fill) =>
-                              pipe(
-                                runnerConfigMap,
-                                HashMap.get(Option.some(fill)),
+                  Option.bind("overfills", () => overfills),
+                  Option.bind("standbys", () => standbys),
+                  Option.map(
+                    ({ hour, breakHour, fills, overfills, standbys }) =>
+                      Schedule.make({
+                        hour,
+                        fills,
+                        overfills,
+                        standbys,
+                        breakHour: pipe(
+                          Match.value(scheduleConfig.breakRange),
+                          Match.when("detect", () =>
+                            pipe(
+                              fills,
+                              Array.getSomes,
+                              Array.map((fill) =>
+                                pipe(
+                                  runnerConfigMap,
+                                  HashMap.get(Option.some(fill)),
+                                ),
                               ),
-                            ),
-                            Array.getSomes,
-                            Array.filter((config) =>
-                              pipe(
-                                config.hours,
-                                Array.some(HourRange.includes(hour)),
+                              Array.getSomes,
+                              Array.filter((config) =>
+                                pipe(
+                                  config.hours,
+                                  Array.some(HourRange.includes(hour)),
+                                ),
                               ),
+                              Array.isEmptyArray,
                             ),
-                            Array.isEmptyArray,
                           ),
+                          Match.orElse(() => breakHour),
                         ),
-                        Match.orElse(() => breakHour),
-                      ),
-                    }),
+                      }),
                   ),
                   Option.map(Schedule.toEmptyIfBreak),
                 ),
