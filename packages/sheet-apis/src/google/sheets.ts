@@ -16,7 +16,7 @@ import {
   OptionArrayToOptionTupleSchema,
   TupleToStructSchema,
 } from "typhoon-core/schema";
-import { Utils } from "typhoon-core/utils";
+import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 import { GoogleAuth } from "./auth";
 
 const parseValueRange = <A, R>(
@@ -263,13 +263,11 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
               ),
             ),
             Effect.map((sheet) => sheet.data.sheets ?? []),
-            Effect.map(
-              Array.map(
-                (sheet) =>
-                  [sheet.properties?.title, sheet.properties?.sheetId] as const,
-              ),
-            ),
-            Effect.map(HashMap.fromIterable),
+            Effect.map(Array.map((sheet) => sheet.properties)),
+            Effect.map(Array.map(Option.fromNullable)),
+            Effect.map(Array.getSomes),
+            Effect.map(ArrayUtils.Collect.toHashMapByKey("title")),
+            Effect.map(HashMap.map(({ sheetId }) => sheetId)),
             Effect.withSpan("GoogleSheets.getSheetGids", {
               captureStackTrace: true,
             }),

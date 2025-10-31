@@ -6,6 +6,7 @@ import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
 import { Handler } from "typhoon-core/server";
+import { Array as ArrayUtils } from "typhoon-core/utils";
 
 const builders = Context.Subscription.Builder.builders();
 export const sheetCalcHandler = pipe(
@@ -19,14 +20,15 @@ export const sheetCalcHandler = pipe(
           Effect.Do,
           Effect.let("config", () => new CalcConfig(config)),
           Effect.let("fixedTeams", () =>
-            HashMap.fromIterable(
-              fixedTeams.map(({ name, heal }) => [
-                name,
+            pipe(
+              fixedTeams,
+              ArrayUtils.Collect.toHashMapByKey("name"),
+              HashMap.map(({ heal }) =>
                 pipe(
                   HashSet.make("fixed"),
                   HashSet.union(heal ? HashSet.make("heal") : HashSet.empty()),
                 ),
-              ]),
+              ),
             ),
           ),
           Effect.bind("playerTeams", ({ fixedTeams }) =>
