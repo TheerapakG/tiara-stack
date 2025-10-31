@@ -1,8 +1,7 @@
 import { Schema } from "effect";
 
 export class Player extends Schema.TaggedClass<Player>()("Player", {
+  index: Schema.Number,
   id: Schema.String,
-  idIndex: Schema.Number,
   name: Schema.String,
-  nameIndex: Schema.Number,
 }) {}
