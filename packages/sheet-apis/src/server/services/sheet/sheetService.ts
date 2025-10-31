@@ -15,12 +15,14 @@ import {
   Array,
   Data,
   Effect,
+  Either,
   HashMap,
   Match,
   Number,
   Option,
   Order,
   pipe,
+  Schema,
   String,
 } from "effect";
 import { Computed } from "typhoon-core/signal";
@@ -67,7 +69,14 @@ const playerParser = ([
     Effect.bindAll(
       () => ({
         userIds: pipe(
-          GoogleSheets.parseValueRangeToStringOption(userIds),
+          GoogleSheets.parseValueRange(
+            userIds,
+            pipe(
+              GoogleSheets.rowToCellSchema,
+              Schema.compose(GoogleSheets.cellToStringSchema),
+            ),
+          ),
+          Effect.map(Array.map(Either.getOrElse(Option.none<string>))),
           Effect.map(
             Array.map((id, index) => ({
               id,
@@ -84,7 +93,14 @@ const playerParser = ([
           ),
         ),
         userSheetNames: pipe(
-          GoogleSheets.parseValueRangeToStringOption(userSheetNames),
+          GoogleSheets.parseValueRange(
+            userSheetNames,
+            pipe(
+              GoogleSheets.rowToCellSchema,
+              Schema.compose(GoogleSheets.cellToStringSchema),
+            ),
+          ),
+          Effect.map(Array.map(Either.getOrElse(Option.none<string>))),
           Effect.map(
             Array.map((name, index) => ({
               name,
@@ -230,8 +246,15 @@ const teamParser = (
               sheet,
               getConfigFieldValueRange(range.playerName.field),
               Effect.flatMap((playerName) =>
-                GoogleSheets.parseValueRangeToStringOption(playerName),
+                GoogleSheets.parseValueRange(
+                  playerName,
+                  pipe(
+                    GoogleSheets.rowToCellSchema,
+                    Schema.compose(GoogleSheets.cellToStringSchema),
+                  ),
+                ),
               ),
+              Effect.map(Array.map(Either.getOrElse(Option.none<string>))),
               Effect.map(Array.map((playerName) => ({ playerName }))),
               Effect.map(
                 ArrayUtils.WithDefault.wrap({
@@ -243,8 +266,15 @@ const teamParser = (
               sheet,
               getConfigFieldValueRange(range.teamName.field),
               Effect.flatMap((teamName) =>
-                GoogleSheets.parseValueRangeToStringOption(teamName),
+                GoogleSheets.parseValueRange(
+                  teamName,
+                  pipe(
+                    GoogleSheets.rowToCellSchema,
+                    Schema.compose(GoogleSheets.cellToStringSchema),
+                  ),
+                ),
               ),
+              Effect.map(Array.map(Either.getOrElse(Option.none<string>))),
               Effect.map(Array.map((teamName) => ({ teamName }))),
               Effect.map(
                 ArrayUtils.WithDefault.wrap({
@@ -256,8 +286,15 @@ const teamParser = (
               sheet,
               getConfigFieldValueRange(range.lead.field),
               Effect.flatMap((lead) =>
-                GoogleSheets.parseValueRangeToNumberOption(lead),
+                GoogleSheets.parseValueRange(
+                  lead,
+                  pipe(
+                    GoogleSheets.rowToCellSchema,
+                    Schema.compose(GoogleSheets.cellToNumberSchema),
+                  ),
+                ),
               ),
+              Effect.map(Array.map(Either.getOrElse(Option.none<number>))),
               Effect.map(Array.map((lead) => ({ lead }))),
               Effect.map(
                 ArrayUtils.WithDefault.wrap({
@@ -269,8 +306,15 @@ const teamParser = (
               sheet,
               getConfigFieldValueRange(range.backline.field),
               Effect.flatMap((backline) =>
-                GoogleSheets.parseValueRangeToNumberOption(backline),
+                GoogleSheets.parseValueRange(
+                  backline,
+                  pipe(
+                    GoogleSheets.rowToCellSchema,
+                    Schema.compose(GoogleSheets.cellToNumberSchema),
+                  ),
+                ),
               ),
+              Effect.map(Array.map(Either.getOrElse(Option.none<number>))),
               Effect.map(Array.map((backline) => ({ backline }))),
               Effect.map(
                 ArrayUtils.WithDefault.wrap({
@@ -282,8 +326,15 @@ const teamParser = (
               sheet,
               getConfigFieldValueRange(range.talent.field),
               Effect.flatMap((talent) =>
-                pipe(GoogleSheets.parseValueRangeToNumberOption(talent)),
+                GoogleSheets.parseValueRange(
+                  talent,
+                  pipe(
+                    GoogleSheets.rowToCellSchema,
+                    Schema.compose(GoogleSheets.cellToNumberSchema),
+                  ),
+                ),
               ),
+              Effect.map(Array.map(Either.getOrElse(Option.none<number>))),
               Effect.map(Array.map((talent) => ({ talent }))),
               Effect.map(
                 ArrayUtils.WithDefault.wrap({
@@ -308,10 +359,18 @@ const teamParser = (
                     sheet,
                     getConfigFieldValueRange(range.tags.field),
                     Effect.flatMap((tags) =>
-                      GoogleSheets.parseValueRangeFromStringListToStringArray(
+                      GoogleSheets.parseValueRange(
                         tags,
+                        pipe(
+                          GoogleSheets.rowToCellSchema,
+                          Schema.compose(GoogleSheets.cellToStringArraySchema),
+                        ),
                       ),
                     ),
+                    Effect.map(
+                      Array.map(Either.getOrElse(Option.none<string[]>)),
+                    ),
+                    Effect.map(Array.map(Option.getOrElse(() => []))),
                     Effect.map(Array.map((tags) => ({ tags }))),
                     Effect.map(
                       ArrayUtils.WithDefault.wrap({
@@ -513,8 +572,15 @@ const scheduleParser = (
                 sheet,
                 getConfigFieldValueRange(range.hours.field),
                 Effect.flatMap((hours) =>
-                  GoogleSheets.parseValueRangeToNumberOption(hours),
+                  GoogleSheets.parseValueRange(
+                    hours,
+                    pipe(
+                      GoogleSheets.rowToCellSchema,
+                      Schema.compose(GoogleSheets.cellToNumberSchema),
+                    ),
+                  ),
                 ),
+                Effect.map(Array.map(Either.getOrElse(Option.none<number>))),
                 Effect.map(Array.map((hour) => ({ hour }))),
                 Effect.map(
                   ArrayUtils.WithDefault.wrap({
@@ -526,10 +592,9 @@ const scheduleParser = (
                 sheet,
                 getConfigFieldValueRange(range.fills.field),
                 Effect.flatMap((fills) =>
-                  GoogleSheets.parseValueRangeFromStringOptionArrayToStringOptionArray(
-                    fills,
-                  ),
+                  GoogleSheets.parseValueRange(fills, GoogleSheets.rowSchema),
                 ),
+                Effect.map(Array.map(Either.getOrElse(() => []))),
                 Effect.map(
                   Array.map((fills) =>
                     Array.makeBy(5, (i) =>
@@ -550,10 +615,16 @@ const scheduleParser = (
                 sheet,
                 getConfigFieldValueRange(range.overfills.field),
                 Effect.flatMap((overfills) =>
-                  GoogleSheets.parseValueRangeFromStringListToStringArray(
+                  GoogleSheets.parseValueRange(
                     overfills,
+                    pipe(
+                      GoogleSheets.rowToCellSchema,
+                      Schema.compose(GoogleSheets.cellToStringArraySchema),
+                    ),
                   ),
                 ),
+                Effect.map(Array.map(Either.getOrElse(Option.none<string[]>))),
+                Effect.map(Array.map(Option.getOrElse(() => []))),
                 Effect.map(Array.map((overfills) => ({ overfills }))),
                 Effect.map(
                   ArrayUtils.WithDefault.wrap({
@@ -565,10 +636,16 @@ const scheduleParser = (
                 sheet,
                 getConfigFieldValueRange(range.standbys.field),
                 Effect.flatMap((standbys) =>
-                  GoogleSheets.parseValueRangeFromStringListToStringArray(
+                  GoogleSheets.parseValueRange(
                     standbys,
+                    pipe(
+                      GoogleSheets.rowToCellSchema,
+                      Schema.compose(GoogleSheets.cellToStringArraySchema),
+                    ),
                   ),
                 ),
+                Effect.map(Array.map(Either.getOrElse(Option.none<string[]>))),
+                Effect.map(Array.map(Option.getOrElse(() => []))),
                 Effect.map(Array.map((standbys) => ({ standbys }))),
                 Effect.map(
                   ArrayUtils.WithDefault.wrap({
@@ -593,7 +670,16 @@ const scheduleParser = (
                     sheet,
                     getConfigFieldValueRange(range.breaks.field),
                     Effect.flatMap((breaks) =>
-                      GoogleSheets.parseValueRangeToBooleanOption(breaks),
+                      GoogleSheets.parseValueRange(
+                        breaks,
+                        pipe(
+                          GoogleSheets.rowToCellSchema,
+                          Schema.compose(GoogleSheets.cellToBooleanSchema),
+                        ),
+                      ),
+                    ),
+                    Effect.map(
+                      Array.map(Either.getOrElse(Option.none<boolean>)),
                     ),
                     Effect.map(Array.map(Option.getOrElse(() => false))),
                     Effect.map(Array.map((breakHour) => ({ breakHour }))),
