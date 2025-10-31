@@ -59,74 +59,24 @@ const getConfigFieldValueRange =
 const playerParser = ([
   userIds,
   userSheetNames,
-]: sheets_v4.Schema$ValueRange[]): Effect.Effect<
-  RawPlayer[],
-  never,
-  GoogleSheets
-> =>
+]: sheets_v4.Schema$ValueRange[]) =>
   pipe(
-    Effect.Do,
-    Effect.bindAll(
-      () => ({
-        userIds: pipe(
-          GoogleSheets.parseValueRange(
-            userIds,
-            pipe(
-              GoogleSheets.rowToCellSchema,
-              Schema.compose(GoogleSheets.cellToStringSchema),
-            ),
-          ),
-          Effect.map(Array.map(Either.getOrElse(Option.none<string>))),
-          Effect.map(
-            Array.map((id, index) => ({
-              id,
-              idIndex: index,
-            })),
-          ),
-          Effect.map(
-            ArrayUtils.WithDefault.wrap({
-              default: () => ({
-                id: Option.none<string>(),
-                idIndex: globalThis.Number.NaN,
-              }),
-            }),
-          ),
-        ),
-        userSheetNames: pipe(
-          GoogleSheets.parseValueRange(
-            userSheetNames,
-            pipe(
-              GoogleSheets.rowToCellSchema,
-              Schema.compose(GoogleSheets.cellToStringSchema),
-            ),
-          ),
-          Effect.map(Array.map(Either.getOrElse(Option.none<string>))),
-          Effect.map(
-            Array.map((name, index) => ({
-              name,
-              nameIndex: index,
-            })),
-          ),
-          Effect.map(
-            ArrayUtils.WithDefault.wrap({
-              default: () => ({
-                name: Option.none<string>(),
-                nameIndex: globalThis.Number.NaN,
-              }),
-            }),
-          ),
-        ),
-      }),
-      { concurrency: "unbounded" },
-    ),
-    Effect.map(({ userIds, userSheetNames }) =>
-      pipe(userIds, ArrayUtils.WithDefault.zip(userSheetNames)),
-    ),
-    Effect.map(({ array }) =>
+    GoogleSheets.parseValueRanges(
+      [userIds, userSheetNames],
       pipe(
-        array,
-        Array.map((value) => new RawPlayer(value)),
+        Schema.Array(GoogleSheets.rowToCellSchema),
+        Schema.compose(GoogleSheets.rowToCellStructSchema(["id", "name"])),
+        Schema.compose(
+          Schema.Struct({
+            id: GoogleSheets.cellToStringSchema,
+            name: GoogleSheets.cellToStringSchema,
+          }),
+        ),
       ),
+    ),
+    Effect.map(Array.getRights),
+    Effect.map(
+      Array.map((config, index) => new RawPlayer({ index, ...config })),
     ),
     Effect.withSpan("playerParser", { captureStackTrace: true }),
   );

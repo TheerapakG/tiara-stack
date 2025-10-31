@@ -20,14 +20,13 @@ export class PlayerService extends Effect.Service<PlayerService>()(
           pipe(
             sheetService.getPlayers(),
             Effect.map(
-              Array.map(({ id, name, idIndex, nameIndex }) =>
+              Array.map(({ index, id, name }) =>
                 Option.isSome(id) && Option.isSome(name)
                   ? Option.some(
                       new Player({
+                        index,
                         id: id.value,
-                        idIndex,
                         name: name.value,
-                        nameIndex,
                       }),
                     )
                   : Option.none(),
