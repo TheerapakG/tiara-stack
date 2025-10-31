@@ -2,7 +2,7 @@ import { Array, Data, Order, pipe } from "effect";
 
 type ArrayWithDefaultData<S extends ReadonlyArray<object>> = {
   array: S;
-  default: Array.ReadonlyArray.Infer<S>;
+  default: () => Array.ReadonlyArray.Infer<S>;
 };
 const ArrayWithDefaultTaggedClass: new <S extends ReadonlyArray<object>>(
   args: Readonly<ArrayWithDefaultData<S>>,
@@ -15,7 +15,7 @@ export class ArrayWithDefault<
 
 export const wrap =
   <S extends ReadonlyArray<object>>(options: {
-    default: Array.ReadonlyArray.Infer<S>;
+    default: () => Array.ReadonlyArray.Infer<S>;
   }) =>
   (array: S) =>
     new ArrayWithDefault({
@@ -33,25 +33,34 @@ export const toArray = <S extends ArrayWithDefault<ReadonlyArray<object>>>(
 ) => a.array as InferArray<S>;
 export const getDefault = <S extends ArrayWithDefault<ReadonlyArray<object>>>(
   a: S,
-) => a.default as Infer<S>;
+) => a.default() as Infer<S>;
 
 export const zip =
   <T extends ArrayWithDefault<ReadonlyArray<object>>>(b: T) =>
   <S extends ArrayWithDefault<ReadonlyArray<object>>>(a: S) => {
+    const arrayA = toArray(a);
+    const arrayB = toArray(b);
+
     const maxLength = Order.max(Order.number)(
-      Array.length(toArray(a)),
-      Array.length(toArray(b)),
+      Array.length(arrayA),
+      Array.length(arrayB),
     );
 
     return new ArrayWithDefault({
       array: pipe(
         Array.zip(
-          Array.pad(Array.copy(toArray(a)), maxLength, a.default),
-          Array.pad(Array.copy(toArray(b)), maxLength, b.default),
+          Array.appendAll(
+            Array.copy(arrayA),
+            Array.makeBy(maxLength - Array.length(arrayA), a.default),
+          ),
+          Array.appendAll(
+            Array.copy(arrayB),
+            Array.makeBy(maxLength - Array.length(arrayB), b.default),
+          ),
         ),
         Array.map(([a, b]) => ({ ...a, ...b }) as Infer<S> & Infer<T>),
       ),
-      default: { ...getDefault(a), ...getDefault(b) },
+      default: () => ({ ...getDefault(a), ...getDefault(b) }),
     });
   };
 
@@ -62,9 +71,10 @@ export const map =
   (a: S) =>
     new ArrayWithDefault({
       array: Array.map(toArray(a), mapper),
-      default: mapper(getDefault(a)) as Array.ReadonlyArray.Infer<
-        Array.ReadonlyArray.With<InferArray<S>, B>
-      >,
+      default: () =>
+        mapper(getDefault(a)) as Array.ReadonlyArray.Infer<
+          Array.ReadonlyArray.With<InferArray<S>, B>
+        >,
     });
 
 export const zipMap =
