@@ -1,5 +1,8 @@
 import { MethodOptions, sheets, sheets_v4 } from "@googleapis/sheets";
 import { Error } from "@/server/schema";
+import { regex, Regex } from "arkregex";
+import type { RegexExecArray } from "arkregex/internal/execArray.ts";
+import type { RegexContext } from "arkregex/internal/regex.ts";
 import {
   Array,
   Effect,
@@ -73,12 +76,36 @@ const rangeToStructOptionSchema = <const Keys extends ReadonlyArray<string>>(
     ),
   );
 
+const matchAll =
+  <Pattern extends string, Context extends RegexContext>(
+    regex: Regex<Pattern, Context>,
+  ) =>
+  (str: string) => {
+    const matches: RegexExecArray<
+      [Pattern, ...(typeof regex)["inferCaptures"]],
+      (typeof regex)["inferNamedCaptures"],
+      (typeof regex)["flags"]
+    >[] = [];
+    while (true) {
+      const match = regex.exec(str);
+      if (!match) break;
+      matches.push(match);
+    }
+    return matches;
+  };
+
 const toStringSchema = Schema.Trim;
 const toNumberSchema = pipe(
   Schema.String,
   Schema.transform(Schema.String, {
     strict: true,
-    decode: (str) => str.replaceAll(/[^0-9]/g, ""),
+    decode: (str) =>
+      pipe(
+        str,
+        matchAll(regex("\\d+", "g")),
+        Array.map((match) => match[0]),
+        Array.join(""),
+      ),
     encode: Function.identity,
   }),
   Schema.compose(Schema.NumberFromString),
@@ -110,6 +137,11 @@ const toLiteralSchema = <
 const toStringArraySchema = pipe(
   Schema.split(","),
   Schema.compose(Schema.Array(Schema.Trim)),
+  Schema.transform(Schema.Array(Schema.String), {
+    strict: true,
+    decode: Array.filter(String.isNonEmpty),
+    encode: Function.identity,
+  }),
 );
 
 export class GoogleSheets extends Effect.Service<GoogleSheets>()(
