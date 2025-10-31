@@ -6,6 +6,7 @@ import type { RegexContext } from "arkregex/internal/regex.ts";
 import {
   Array,
   Effect,
+  Either,
   Function,
   HashMap,
   Option,
@@ -25,7 +26,7 @@ import { GoogleAuth } from "./auth";
 const parseValueRange = <A, R>(
   valueRange: sheets_v4.Schema$ValueRange,
   rowSchema: Schema.Schema<A, readonly Option.Option<string>[], R>,
-): Effect.Effect<Option.Option<A>[], never, R> =>
+): Effect.Effect<Either.Either<A, ParseResult.ParseError>[], never, R> =>
   pipe(
     Option.fromNullable(valueRange.values),
     Option.getOrElse(() => []),
@@ -38,19 +39,19 @@ const parseValueRange = <A, R>(
             Schema.compose(rowSchema),
           ),
         ),
-        Effect.option,
+        Effect.either,
       ),
     ),
     Effect.withSpan("parseValueRange", { captureStackTrace: true }),
   );
 
 const cellSchema = Schema.OptionFromSelf(Schema.String);
-const rangeSchema = Schema.Array(cellSchema);
-const rangeToStructOptionSchema = <const Keys extends ReadonlyArray<string>>(
+const rowSchema = Schema.Array(cellSchema);
+const rowToCellStructSchema = <const Keys extends ReadonlyArray<string>>(
   keys: Keys,
 ) =>
   pipe(
-    rangeSchema,
+    rowSchema,
     Schema.compose(
       OptionArrayToOptionTupleSchema.OptionArrayToOptionTupleSchema(
         keys.length as Keys["length"],
@@ -75,6 +76,15 @@ const rangeToStructOptionSchema = <const Keys extends ReadonlyArray<string>>(
       >,
     ),
   );
+const rowToCellSchema = pipe(
+  rowSchema,
+  Schema.head,
+  Schema.transform(cellSchema, {
+    strict: true,
+    decode: Option.flatten,
+    encode: Option.some,
+  }),
+);
 
 const matchAll =
   <Pattern extends string, Context extends RegexContext>(
@@ -304,87 +314,6 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
               captureStackTrace: true,
             }),
           ),
-        parseValueRangeToStringOption: (
-          valueRange: sheets_v4.Schema$ValueRange,
-        ) =>
-          pipe(
-            parseValueRange(
-              valueRange,
-              pipe(
-                rangeSchema,
-                Schema.head,
-                Schema.compose(
-                  Schema.OptionFromSelf(Schema.OptionFromSelf(toStringSchema)),
-                ),
-              ),
-            ),
-            Effect.map(Array.map(Option.flatten)),
-            Effect.map(Array.map(Option.flatten)),
-          ),
-        parseValueRangeToNumberOption: (
-          valueRange: sheets_v4.Schema$ValueRange,
-        ) =>
-          pipe(
-            parseValueRange(
-              valueRange,
-              pipe(
-                rangeSchema,
-                Schema.head,
-                Schema.compose(
-                  Schema.OptionFromSelf(Schema.OptionFromSelf(toNumberSchema)),
-                ),
-              ),
-            ),
-            Effect.map(Array.map(Option.flatten)),
-            Effect.map(Array.map(Option.flatten)),
-          ),
-        parseValueRangeToBooleanOption: (
-          valueRange: sheets_v4.Schema$ValueRange,
-        ) =>
-          pipe(
-            parseValueRange(
-              valueRange,
-              pipe(
-                rangeSchema,
-                Schema.head,
-                Schema.compose(
-                  Schema.OptionFromSelf(Schema.OptionFromSelf(toBooleanSchema)),
-                ),
-              ),
-            ),
-            Effect.map(Array.map(Option.flatten)),
-            Effect.map(Array.map(Option.flatten)),
-          ),
-        parseValueRangeFromStringListToStringArray: (
-          valueRange: sheets_v4.Schema$ValueRange,
-        ) =>
-          pipe(
-            parseValueRange(
-              valueRange,
-              pipe(
-                rangeSchema,
-                Schema.head,
-                Schema.compose(
-                  Schema.OptionFromSelf(
-                    Schema.OptionFromSelf(toStringArraySchema),
-                  ),
-                ),
-              ),
-            ),
-            Effect.map(Array.map(Option.flatten)),
-            Effect.map(Array.map(Option.flatten)),
-            Effect.map(
-              Array.map(Option.getOrElse(() => [] as readonly string[])),
-            ),
-            Effect.map(Array.map(Array.filter(String.isNonEmpty))),
-          ),
-        parseValueRangeFromStringOptionArrayToStringOptionArray: (
-          valueRange: sheets_v4.Schema$ValueRange,
-        ) =>
-          pipe(
-            parseValueRange(valueRange, rangeSchema),
-            Effect.map(Array.map(Option.getOrElse(() => []))),
-          ),
       })),
     ),
     dependencies: [GoogleAuth.Default],
@@ -394,8 +323,9 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
   static parseValueRange = parseValueRange;
 
   static cellSchema = cellSchema;
-  static rangeSchema = rangeSchema;
-  static rangeToStructOptionSchema = rangeToStructOptionSchema;
+  static rowSchema = rowSchema;
+  static rowToCellStructSchema = rowToCellStructSchema;
+  static rowToCellSchema = rowToCellSchema;
   static toStringSchema = toStringSchema;
   static cellToStringSchema = Schema.OptionFromSelf(toStringSchema);
   static toNumberSchema = toNumberSchema;
@@ -410,27 +340,4 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
   ) => Schema.OptionFromSelf(toLiteralSchema(literals));
   static toStringArraySchema = toStringArraySchema;
   static cellToStringArraySchema = Schema.OptionFromSelf(toStringArraySchema);
-
-  static parseValueRangeToLiteralOption = <
-    const Literals extends Array.NonEmptyReadonlyArray<string>,
-  >(
-    literals: Literals,
-    valueRange: sheets_v4.Schema$ValueRange,
-  ) =>
-    pipe(
-      parseValueRange(
-        valueRange,
-        pipe(
-          Schema.Array(Schema.OptionFromSelf(Schema.String)),
-          Schema.head,
-          Schema.compose(
-            Schema.OptionFromSelf(
-              Schema.OptionFromSelf(toLiteralSchema(literals)),
-            ),
-          ),
-        ),
-      ),
-      Effect.map(Array.map(Option.flatten)),
-      Effect.map(Array.map(Option.flatten)),
-    );
 }
