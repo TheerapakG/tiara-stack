@@ -29,7 +29,7 @@ const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
     GoogleSheets.parseValueRange(
       range,
       pipe(
-        GoogleSheets.rangeToStructOptionSchema([
+        GoogleSheets.rowToCellStructSchema([
           "channel",
           "day",
           "sheet",
@@ -59,7 +59,7 @@ const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
         ),
       ),
     ),
-    Effect.map(Array.getSomes),
+    Effect.map(Array.getRights),
     Effect.map(Array.map((config) => ScheduleConfig.make(config))),
     Effect.withSpan("scheduleConfigParser", { captureStackTrace: true }),
   );
@@ -71,7 +71,7 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
     GoogleSheets.parseValueRange(
       range,
       pipe(
-        GoogleSheets.rangeToStructOptionSchema([
+        GoogleSheets.rowToCellStructSchema([
           "name",
           "sheet",
           "playerNameRange",
@@ -102,7 +102,7 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
         ),
       ),
     ),
-    Effect.map(Array.getSomes),
+    Effect.map(Array.getRights),
     Effect.map(
       Array.map(
         ({
@@ -179,7 +179,7 @@ const runnerConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
     GoogleSheets.parseValueRange(
       range,
       pipe(
-        GoogleSheets.rangeToStructOptionSchema(["name", "hours"]),
+        GoogleSheets.rowToCellStructSchema(["name", "hours"]),
         Schema.compose(
           pipe(
             Schema.Struct({
@@ -190,7 +190,7 @@ const runnerConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
         ),
       ),
     ),
-    Effect.map(Array.getSomes),
+    Effect.map(Array.getRights),
     Effect.map(
       Array.map(({ name, hours }) =>
         RunnerConfig.make({
