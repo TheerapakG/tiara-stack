@@ -1,4 +1,4 @@
-import { Array, HashMap, Option } from "effect";
+import { Array, Function, HashMap, Option, Struct, Tuple, Types } from "effect";
 
 export const toHashMap =
   <A, B, K>({
@@ -10,7 +10,7 @@ export const toHashMap =
     valueInitializer: (a: A) => B;
     valueReducer: (b: NoInfer<B>, a: NoInfer<A>) => NoInfer<B>;
   }) =>
-  (a: Array<A>) =>
+  (a: ReadonlyArray<A>) =>
     Array.reduce(a, HashMap.empty<K, B>(), (acc, v) =>
       HashMap.modifyAt(
         acc,
@@ -21,3 +21,38 @@ export const toHashMap =
         }),
       ),
     );
+
+export const toHashMapByKeyWith =
+  <K extends PropertyKey, A extends { [P in K]?: any }, B>({
+    key,
+    valueInitializer,
+    valueReducer,
+  }: {
+    key: K;
+    valueInitializer: (a: A) => B;
+    valueReducer: (b: NoInfer<B>, a: NoInfer<A>) => NoInfer<B>;
+  }) =>
+  (a: ReadonlyArray<A>) =>
+    toHashMap<A, B, Types.MatchRecord<A, A[K] | undefined, A[K]>>({
+      keyGetter: Struct.get(key),
+      valueInitializer: valueInitializer,
+      valueReducer: valueReducer,
+    })(a);
+
+export const toHashMapByKey =
+  <K extends PropertyKey>(key: K) =>
+  <A extends { [P in K]?: any }>(a: ReadonlyArray<A>) =>
+    toHashMapByKeyWith<K, A, A>({
+      key,
+      valueInitializer: Function.identity,
+      valueReducer: Function.untupled(Tuple.getSecond),
+    })(a);
+
+export const toArrayHashMapByKey =
+  <K extends PropertyKey>(key: K) =>
+  <A extends { [P in K]?: any }>(a: ReadonlyArray<A>) =>
+    toHashMapByKeyWith<K, A, Array.NonEmptyArray<A>>({
+      key,
+      valueInitializer: Array.make,
+      valueReducer: Array.append,
+    })(a);
