@@ -631,6 +631,7 @@ const scheduleParser = (
               Array.getSomes,
             ),
           ),
+          Effect.tap((array) => Effect.log(array)),
           Effect.map((array) =>
             pipe({
               scheduleIndex: new ScheduleIndex({
