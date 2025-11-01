@@ -562,6 +562,7 @@ const scheduleParser = (
               }),
             ),
           ),
+          Effect.tap((a) => Effect.log(a.array)),
           Effect.map(
             ArrayUtils.WithDefault.map(
               ({ hour, fills, overfills, standbys, breakHour }) => ({
