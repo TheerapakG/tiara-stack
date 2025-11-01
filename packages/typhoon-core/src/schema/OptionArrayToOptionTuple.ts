@@ -1,7 +1,7 @@
 import { Array, Function, Option, pipe, Schema, Types } from "effect";
 
-const TypeId: typeof Schema.TypeId = Schema.TypeId;
-export { TypeId };
+const OptionArrayToOptionTupleTypeId: typeof Schema.TypeId = Schema.TypeId;
+export { OptionArrayToOptionTupleTypeId };
 
 interface OptionArrayToOptionTupleSchema<
   Count extends number,
