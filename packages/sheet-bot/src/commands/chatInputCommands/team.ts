@@ -77,7 +77,7 @@ const handleList =
               teams.user,
               Array.filter((team) => !team.tags.includes("tierer_hint")),
               Array.map((team) => ({
-                name: team.name,
+                name: team.teamName,
                 tags: team.tags,
                 lead: team.lead,
                 backline: team.backline,
