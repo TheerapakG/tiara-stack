@@ -17,11 +17,8 @@ export const getTeamsHandlerConfig = pipe(
   Handler.Config.Builder.response({
     validator: pipe(
       Schema.HashMap({
-        key: Schema.String,
-        value: Schema.Struct({
-          name: Schema.String,
-          teams: Schema.Array(Team),
-        }),
+        key: Schema.OptionFromNullishOr(Schema.String, undefined),
+        value: Schema.NonEmptyArray(Team),
       }),
       Schema.standardSchemaV1,
     ),

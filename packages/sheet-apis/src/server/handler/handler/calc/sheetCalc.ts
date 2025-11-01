@@ -57,7 +57,7 @@ export const sheetCalcHandler = pipe(
                           ),
                           HashSet.union(
                             pipe(
-                              HashMap.get(fixedTeams, team.team),
+                              HashMap.get(fixedTeams, team.teamName),
                               Option.getOrElse(() => HashSet.empty()),
                             ),
                           ),
