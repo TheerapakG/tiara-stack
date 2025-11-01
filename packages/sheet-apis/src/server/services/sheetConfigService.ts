@@ -26,41 +26,43 @@ import { DefaultTaggedClass } from "typhoon-core/schema";
 
 const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
   pipe(
-    GoogleSheets.parseValueRange(
-      range,
-      pipe(
-        GoogleSheets.rowToCellStructSchema([
-          "channel",
-          "day",
-          "sheet",
-          "hourRange",
-          "breakRange",
-          "monitorRange",
-          "fillRange",
-          "overfillRange",
-          "standbyRange",
-          "screenshotRange",
-          "draft",
-        ]),
-        Schema.compose(
-          Schema.Struct({
-            channel: GoogleSheets.cellToStringSchema,
-            day: GoogleSheets.cellToNumberSchema,
-            sheet: GoogleSheets.cellToStringSchema,
-            hourRange: GoogleSheets.cellToStringSchema,
-            breakRange: GoogleSheets.cellToStringSchema,
-            monitorRange: GoogleSheets.cellToStringSchema,
-            fillRange: GoogleSheets.cellToStringSchema,
-            overfillRange: GoogleSheets.cellToStringSchema,
-            standbyRange: GoogleSheets.cellToStringSchema,
-            screenshotRange: GoogleSheets.cellToStringSchema,
-            draft: GoogleSheets.cellToStringSchema,
-          }),
+    GoogleSheets.parseValueRanges(
+      [range],
+      Schema.Tuple(
+        pipe(
+          GoogleSheets.rowToCellStructSchema([
+            "channel",
+            "day",
+            "sheet",
+            "hourRange",
+            "breakRange",
+            "monitorRange",
+            "fillRange",
+            "overfillRange",
+            "standbyRange",
+            "screenshotRange",
+            "draft",
+          ]),
+          Schema.compose(
+            Schema.Struct({
+              channel: GoogleSheets.cellToStringSchema,
+              day: GoogleSheets.cellToNumberSchema,
+              sheet: GoogleSheets.cellToStringSchema,
+              hourRange: GoogleSheets.cellToStringSchema,
+              breakRange: GoogleSheets.cellToStringSchema,
+              monitorRange: GoogleSheets.cellToStringSchema,
+              fillRange: GoogleSheets.cellToStringSchema,
+              overfillRange: GoogleSheets.cellToStringSchema,
+              standbyRange: GoogleSheets.cellToStringSchema,
+              screenshotRange: GoogleSheets.cellToStringSchema,
+              draft: GoogleSheets.cellToStringSchema,
+            }),
+          ),
         ),
       ),
     ),
     Effect.map(Array.getRights),
-    Effect.map(Array.map((config) => ScheduleConfig.make(config))),
+    Effect.map(Array.map(([config]) => ScheduleConfig.make(config))),
     Effect.withSpan("scheduleConfigParser", { captureStackTrace: true }),
   );
 
@@ -68,36 +70,38 @@ export type TeamConfigMap = HashMap.HashMap<string, TeamConfig>;
 
 const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
   pipe(
-    GoogleSheets.parseValueRange(
-      range,
-      pipe(
-        GoogleSheets.rowToCellStructSchema([
-          "name",
-          "sheet",
-          "playerNameRange",
-          "teamNameRange",
-          "leadRange",
-          "backlineRange",
-          "talentRange",
-          "tagsType",
-          "tags",
-        ]),
-        Schema.compose(
-          pipe(
-            Schema.Struct({
-              name: GoogleSheets.cellToStringSchema,
-              sheet: GoogleSheets.cellToStringSchema,
-              playerNameRange: GoogleSheets.cellToStringSchema,
-              teamNameRange: GoogleSheets.cellToStringSchema,
-              leadRange: GoogleSheets.cellToStringSchema,
-              backlineRange: GoogleSheets.cellToStringSchema,
-              talentRange: GoogleSheets.cellToStringSchema,
-              tagsType: GoogleSheets.cellToLiteralSchema([
-                "constants",
-                "ranges",
-              ]),
-              tags: GoogleSheets.cellToStringSchema,
-            }),
+    GoogleSheets.parseValueRanges(
+      [range],
+      Schema.Tuple(
+        pipe(
+          GoogleSheets.rowToCellStructSchema([
+            "name",
+            "sheet",
+            "playerNameRange",
+            "teamNameRange",
+            "leadRange",
+            "backlineRange",
+            "talentRange",
+            "tagsType",
+            "tags",
+          ]),
+          Schema.compose(
+            pipe(
+              Schema.Struct({
+                name: GoogleSheets.cellToStringSchema,
+                sheet: GoogleSheets.cellToStringSchema,
+                playerNameRange: GoogleSheets.cellToStringSchema,
+                teamNameRange: GoogleSheets.cellToStringSchema,
+                leadRange: GoogleSheets.cellToStringSchema,
+                backlineRange: GoogleSheets.cellToStringSchema,
+                talentRange: GoogleSheets.cellToStringSchema,
+                tagsType: GoogleSheets.cellToLiteralSchema([
+                  "constants",
+                  "ranges",
+                ]),
+                tags: GoogleSheets.cellToStringSchema,
+              }),
+            ),
           ),
         ),
       ),
@@ -105,17 +109,19 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
     Effect.map(Array.getRights),
     Effect.map(
       Array.map(
-        ({
-          name,
-          sheet,
-          playerNameRange,
-          teamNameRange,
-          leadRange,
-          backlineRange,
-          talentRange,
-          tagsType,
-          tags,
-        }) =>
+        ([
+          {
+            name,
+            sheet,
+            playerNameRange,
+            teamNameRange,
+            leadRange,
+            backlineRange,
+            talentRange,
+            tagsType,
+            tags,
+          },
+        ]) =>
           TeamConfig.make({
             name,
             sheet,
@@ -176,23 +182,25 @@ const hourRangeParser = (range: string): HourRange =>
 
 const runnerConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
   pipe(
-    GoogleSheets.parseValueRange(
-      range,
-      pipe(
-        GoogleSheets.rowToCellStructSchema(["name", "hours"]),
-        Schema.compose(
-          pipe(
-            Schema.Struct({
-              name: GoogleSheets.cellToStringSchema,
-              hours: GoogleSheets.cellToStringArraySchema,
-            }),
+    GoogleSheets.parseValueRanges(
+      [range],
+      Schema.Tuple(
+        pipe(
+          GoogleSheets.rowToCellStructSchema(["name", "hours"]),
+          Schema.compose(
+            pipe(
+              Schema.Struct({
+                name: GoogleSheets.cellToStringSchema,
+                hours: GoogleSheets.cellToStringArraySchema,
+              }),
+            ),
           ),
         ),
       ),
     ),
     Effect.map(Array.getRights),
     Effect.map(
-      Array.map(({ name, hours }) =>
+      Array.map(([{ name, hours }]) =>
         RunnerConfig.make({
           name,
           hours: pipe(
