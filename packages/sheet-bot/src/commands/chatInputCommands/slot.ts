@@ -59,7 +59,6 @@ const getSlotMessage = (day: number) =>
       ),
     }),
     Effect.bindAll(({ daySchedule }) => ({
-      title: Effect.succeed(`Day ${day} Slots~`),
       openSlots: pipe(
         daySchedule,
         HashMap.values,
@@ -89,12 +88,15 @@ const getSlotMessage = (day: number) =>
         ),
       ),
     })),
-    Effect.map(({ title, openSlots, filledSlots }) => ({
-      title,
-      fields: [
-        { name: "Open Slots", value: openSlots },
-        { name: "Filled Slots", value: filledSlots },
-      ],
+    Effect.map(({ openSlots, filledSlots }) => ({
+      open: {
+        title: `Day ${day} Open Slots~`,
+        description: openSlots,
+      },
+      filled: {
+        title: `Day ${day} Filled Slots~`,
+        description: filledSlots,
+      },
     })),
   );
 
@@ -172,12 +174,18 @@ const handleList =
           Effect.bind("slotMessage", ({ day }) => getSlotMessage(day)),
           InteractionContext.editReply.tapEffect(({ slotMessage }) =>
             pipe(
-              ClientService.makeEmbedBuilder(),
-              Effect.map((embed) => ({
+              Effect.all({
+                openEmbed: ClientService.makeEmbedBuilder(),
+                filledEmbed: ClientService.makeEmbedBuilder(),
+              }),
+              Effect.map(({ openEmbed, filledEmbed }) => ({
                 embeds: [
-                  embed
-                    .setTitle(slotMessage.title)
-                    .setFields(...slotMessage.fields),
+                  openEmbed
+                    .setTitle(slotMessage.open.title)
+                    .setDescription(slotMessage.open.description),
+                  filledEmbed
+                    .setTitle(slotMessage.filled.title)
+                    .setDescription(slotMessage.filled.description),
                 ],
               })),
             ),
