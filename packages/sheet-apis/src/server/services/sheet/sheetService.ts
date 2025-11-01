@@ -25,7 +25,7 @@ import {
   String,
 } from "effect";
 import { Computed } from "typhoon-core/signal";
-import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
+import { Array as ArrayUtils, Struct as StructUtils } from "typhoon-core/utils";
 import { GuildConfigService } from "../guildConfigService";
 import { SheetConfigService } from "../sheetConfigService";
 
@@ -63,8 +63,10 @@ const playerParser = ([
     GoogleSheets.parseValueRanges(
       [userIds, userSheetNames],
       pipe(
-        Schema.Array(GoogleSheets.rowToCellSchema),
-        Schema.compose(GoogleSheets.rowToCellStructSchema(["id", "name"])),
+        GoogleSheets.rowTupleToCellTupleSchema(2),
+        Schema.compose(
+          GoogleSheets.cellTupleToCellStructSchema(["id", "name"]),
+        ),
         Schema.compose(
           Schema.Struct({
             id: GoogleSheets.cellToStringSchema,
@@ -97,12 +99,15 @@ const teamConfigFields = [
 ] as const;
 
 type FilteredTeamConfigValue = Option.Option.Value<
-  Utils.GetSomeFields<TeamConfig, (typeof teamConfigFields)[number]>
+  StructUtils.GetSomeFields.GetSomeFields<
+    TeamConfig,
+    (typeof teamConfigFields)[number]
+  >
 >;
 const filterTeamConfigValues = (teamConfigValues: TeamConfig[]) =>
   pipe(
     teamConfigValues,
-    Array.map(Utils.getSomeFields(teamConfigFields)),
+    Array.map(StructUtils.GetSomeFields.getSomeFields(teamConfigFields)),
     Array.getSomes,
   );
 
@@ -210,9 +215,9 @@ const teamParser = (
               GoogleSheets.parseValueRanges(
                 requiredValueRanges,
                 pipe(
-                  Schema.Array(GoogleSheets.rowToCellSchema),
+                  GoogleSheets.rowTupleToCellTupleSchema(5),
                   Schema.compose(
-                    GoogleSheets.rowToCellStructSchema([
+                    GoogleSheets.cellTupleToCellStructSchema([
                       "playerName",
                       "teamName",
                       "lead",
@@ -259,19 +264,24 @@ const teamParser = (
                   pipe(
                     tagsValueRange,
                     Effect.flatMap((tagsValueRange) =>
-                      GoogleSheets.parseValueRange(
-                        tagsValueRange,
-                        pipe(
-                          GoogleSheets.rowToCellSchema,
-                          Schema.compose(GoogleSheets.cellToStringArraySchema),
+                      GoogleSheets.parseValueRanges(
+                        [tagsValueRange],
+                        Schema.Tuple(
+                          pipe(
+                            GoogleSheets.rowToCellSchema,
+                            Schema.compose(
+                              GoogleSheets.cellToStringArraySchema,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                     Effect.map(
                       ArrayUtils.WithDefault.wrapEither({
-                        default: Option.none<string[]>,
+                        default: () => [Option.none<string[]>()],
                       }),
                     ),
+                    Effect.map(ArrayUtils.WithDefault.map(([tags]) => tags)),
                     Effect.map(
                       ArrayUtils.WithDefault.map(Option.getOrElse(() => [])),
                     ),
@@ -368,12 +378,15 @@ const scheduleConfigFields = [
 ] as const;
 
 type FilteredScheduleConfigValue = Option.Option.Value<
-  Utils.GetSomeFields<ScheduleConfig, (typeof scheduleConfigFields)[number]>
+  StructUtils.GetSomeFields.GetSomeFields<
+    ScheduleConfig,
+    (typeof scheduleConfigFields)[number]
+  >
 >;
 const filterScheduleConfigValues = (scheduleConfigValues: ScheduleConfig[]) =>
   pipe(
     scheduleConfigValues,
-    Array.map(Utils.getSomeFields(scheduleConfigFields)),
+    Array.map(StructUtils.GetSomeFields.getSomeFields(scheduleConfigFields)),
     Array.getSomes,
   );
 
@@ -486,9 +499,9 @@ const scheduleParser = (
                 GoogleSheets.parseValueRanges(
                   requiredValueRanges,
                   pipe(
-                    Schema.Array(GoogleSheets.rowToCellSchema),
+                    GoogleSheets.rowTupleToCellTupleSchema(3),
                     Schema.compose(
-                      GoogleSheets.rowToCellStructSchema([
+                      GoogleSheets.cellTupleToCellStructSchema([
                         "hour",
                         "overfills",
                         "standbys",
@@ -529,15 +542,16 @@ const scheduleParser = (
                 ),
               ),
               fills: pipe(
-                GoogleSheets.parseValueRange(
-                  fillValueRange,
-                  GoogleSheets.rowSchema,
+                GoogleSheets.parseValueRanges(
+                  [fillValueRange],
+                  Schema.Tuple(GoogleSheets.rowSchema),
                 ),
                 Effect.map(
                   ArrayUtils.WithDefault.wrapEither({
-                    default: () => [],
+                    default: () => [[]],
                   }),
                 ),
+                Effect.map(ArrayUtils.WithDefault.map(([fills]) => fills)),
                 Effect.map(
                   ArrayUtils.WithDefault.map((fills) =>
                     Array.makeBy(5, (i) =>
@@ -564,18 +578,23 @@ const scheduleParser = (
                   pipe(
                     breakValueRange,
                     Effect.flatMap((breakValueRange) =>
-                      GoogleSheets.parseValueRange(
-                        breakValueRange,
-                        pipe(
-                          GoogleSheets.rowToCellSchema,
-                          Schema.compose(GoogleSheets.cellToBooleanSchema),
+                      GoogleSheets.parseValueRanges(
+                        [breakValueRange],
+                        Schema.Tuple(
+                          pipe(
+                            GoogleSheets.rowToCellSchema,
+                            Schema.compose(GoogleSheets.cellToBooleanSchema),
+                          ),
                         ),
                       ),
                     ),
                     Effect.map(
                       ArrayUtils.WithDefault.wrapEither({
-                        default: Option.none<boolean>,
+                        default: () => [Option.none<boolean>()],
                       }),
+                    ),
+                    Effect.map(
+                      ArrayUtils.WithDefault.map(([breakHour]) => breakHour),
                     ),
                     Effect.map(
                       ArrayUtils.WithDefault.map(Option.getOrElse(() => false)),

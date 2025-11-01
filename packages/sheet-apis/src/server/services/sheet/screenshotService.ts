@@ -4,7 +4,7 @@ import { HttpClient } from "@effect/platform";
 import { chromium } from "playwright";
 import { SheetService } from "./sheetService";
 import { joinURL, withQuery } from "ufo";
-import { Utils } from "typhoon-core/utils";
+import { Struct as StructUtils } from "typhoon-core/utils";
 
 export class ScreenshotService extends Effect.Service<ScreenshotService>()(
   "ScreenshotService",
@@ -52,7 +52,7 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()(
               pipe(
                 scheduleConfigs,
                 Array.map(
-                  Utils.getSomeFields([
+                  StructUtils.GetSomeFields.getSomeFields([
                     "channel",
                     "day",
                     "sheet",

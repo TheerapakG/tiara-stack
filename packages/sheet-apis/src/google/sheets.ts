@@ -23,92 +23,97 @@ import {
 import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 import { GoogleAuth } from "./auth";
 
-const parseValueRange = <A, R>(
-  valueRange: sheets_v4.Schema$ValueRange,
-  rowSchema: Schema.Schema<A, readonly Option.Option<string>[], R>,
-): Effect.Effect<Either.Either<A, ParseResult.ParseError>[], never, R> =>
-  pipe(
-    Option.fromNullable(valueRange.values),
-    Option.getOrElse(() => []),
-    Effect.forEach(
-      (row) =>
-        pipe(
-          row,
-          Schema.decodeUnknown(
-            pipe(
-              Schema.Array(Schema.OptionFromNonEmptyTrimmedString),
-              Schema.compose(rowSchema),
-            ),
-          ),
-          Effect.either,
-        ),
-      { concurrency: "unbounded" },
-    ),
-    Effect.withSpan("parseValueRange", { captureStackTrace: true }),
-  );
-
-const parseValueRanges = <A, R>(
-  valueRanges: sheets_v4.Schema$ValueRange[],
+const parseValueRanges = <
+  Ranges extends Array.NonEmptyReadonlyArray<sheets_v4.Schema$ValueRange>,
+  A,
+  R,
+  Length extends Ranges["length"] = Ranges["length"],
+>(
+  valueRanges: Ranges,
   rowSchemas: Schema.Schema<
     A,
-    readonly (readonly Option.Option<string>[])[],
+    Readonly<Types.TupleOf<Length, readonly Option.Option<string>[]>>,
     R
   >,
-): Effect.Effect<Either.Either<A, ParseResult.ParseError>[], never, R> =>
-  pipe(
+): Effect.Effect<Either.Either<A, ParseResult.ParseError>[], never, R> => {
+  const rowSchema = Schema.Array(Schema.OptionFromNonEmptyTrimmedString);
+  const rowTupleSchema = Schema.Tuple(
+    ...(Array.makeBy(valueRanges.length, () => rowSchema) as Types.TupleOf<
+      Length,
+      typeof rowSchema
+    >),
+  ) as unknown as Schema.Schema<
+    Types.TupleOf<Length, readonly Option.Option<string>[]>,
+    Types.TupleOf<Length, readonly string[]>,
+    never
+  >;
+  const decodeSchema = pipe(
+    rowTupleSchema,
+    Schema.compose(rowSchemas),
+  ) as Schema.Schema<A, Types.TupleOf<Length, readonly string[]>, R>;
+
+  return pipe(
     valueRanges,
     Array.map(({ values }) => values),
     Array.map(Option.fromNullable),
     Array.map(Option.getOrElse(() => [])),
-    Array.map(ArrayUtils.WithDefault.wrap({ default: () => [] })),
+    Array.map(ArrayUtils.WithDefault.wrap<any[][]>({ default: () => [] })),
     Array.map(ArrayUtils.WithDefault.map((row) => [row])),
-    Array.match({
-      onEmpty: () =>
-        pipe([], ArrayUtils.WithDefault.wrap<never[][]>({ default: () => [] })),
-      onNonEmpty: (ranges) =>
-        Array.reduce(
-          Array.tailNonEmpty(ranges),
-          Array.headNonEmpty(ranges),
-          (acc, curr) => pipe(acc, ArrayUtils.WithDefault.zipArray(curr)),
-        ),
-    }),
+    (ranges) =>
+      Array.reduce(
+        Array.tailNonEmpty(ranges),
+        Array.headNonEmpty(ranges),
+        (acc, curr) => pipe(acc, ArrayUtils.WithDefault.zipArray(curr)),
+      ),
     ArrayUtils.WithDefault.toArray,
     Effect.forEach(
-      (rows) =>
-        pipe(
-          rows,
-          Schema.decodeUnknown(
-            pipe(
-              Schema.Array(
-                Schema.Array(Schema.OptionFromNonEmptyTrimmedString),
-              ),
-              Schema.compose(rowSchemas),
-            ),
-          ),
-          Effect.either,
-        ),
+      (rows) => pipe(rows, Schema.decodeUnknown(decodeSchema), Effect.either),
       { concurrency: "unbounded" },
     ),
     Effect.withSpan("parseValueRanges", { captureStackTrace: true }),
   );
+};
 
 const cellSchema = Schema.OptionFromSelf(Schema.String);
 const rowSchema = Schema.Array(cellSchema);
-const rowToCellStructSchema = <const Keys extends ReadonlyArray<string>>(
+
+const rowToCellSchema = pipe(
+  rowSchema,
+  Schema.head,
+  Schema.transform(cellSchema, {
+    strict: true,
+    decode: Option.flatten,
+    encode: Option.some,
+  }),
+);
+const rowToCellTupleSchema = <const Length extends number>(length: Length) =>
+  OptionArrayToOptionTupleSchema.OptionArrayToOptionTupleSchema(
+    length,
+    Schema.String,
+  ) as unknown as Schema.Schema<
+    Types.TupleOf<Length, Option.Option<string>>,
+    readonly Option.Option<string>[],
+    never
+  >;
+const rowTupleToCellTupleSchema = <const Length extends number>(
+  length: Length,
+) =>
+  Schema.Tuple(
+    ...(Array.makeBy(length, () => rowToCellSchema) as Types.TupleOf<
+      Length,
+      typeof rowToCellSchema
+    >),
+  );
+
+const cellTupleToCellStructSchema = <const Keys extends ReadonlyArray<string>>(
   keys: Keys,
 ) =>
   pipe(
-    rowSchema,
-    Schema.compose(
-      OptionArrayToOptionTupleSchema.OptionArrayToOptionTupleSchema(
-        keys.length as Keys["length"],
-        Schema.String,
-      ) as unknown as Schema.Schema<
-        Types.TupleOf<Keys["length"], Option.Option<string>>,
-        readonly Option.Option<string>[],
-        never
-      >,
-    ),
+    Schema.Tuple(
+      ...Array.makeBy(keys.length, () => cellSchema),
+    ) as unknown as Schema.Schema<
+      Types.TupleOf<Keys["length"], Option.Option<string>>
+    >,
     Schema.compose(
       TupleToStructSchema.TupleToStructSchema(
         keys,
@@ -123,15 +128,13 @@ const rowToCellStructSchema = <const Keys extends ReadonlyArray<string>>(
       >,
     ),
   );
-const rowToCellSchema = pipe(
-  rowSchema,
-  Schema.head,
-  Schema.transform(cellSchema, {
-    strict: true,
-    decode: Option.flatten,
-    encode: Option.some,
-  }),
-);
+const rowToCellStructSchema = <const Keys extends ReadonlyArray<string>>(
+  keys: Keys,
+) =>
+  pipe(
+    rowToCellTupleSchema(keys.length as Keys["length"]),
+    Schema.compose(cellTupleToCellStructSchema(keys)),
+  );
 
 const matchAll =
   <Pattern extends string, Context extends RegexContext>(
@@ -367,13 +370,15 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
     accessors: true,
   },
 ) {
-  static parseValueRange = parseValueRange;
   static parseValueRanges = parseValueRanges;
 
   static cellSchema = cellSchema;
   static rowSchema = rowSchema;
-  static rowToCellStructSchema = rowToCellStructSchema;
   static rowToCellSchema = rowToCellSchema;
+  static rowToCellTupleSchema = rowToCellTupleSchema;
+  static rowTupleToCellTupleSchema = rowTupleToCellTupleSchema;
+  static cellTupleToCellStructSchema = cellTupleToCellStructSchema;
+  static rowToCellStructSchema = rowToCellStructSchema;
   static toStringSchema = toStringSchema;
   static cellToStringSchema = Schema.OptionFromSelf(toStringSchema);
   static toNumberSchema = toNumberSchema;
