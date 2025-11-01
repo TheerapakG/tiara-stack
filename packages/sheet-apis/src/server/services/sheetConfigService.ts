@@ -30,19 +30,22 @@ const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
       [range],
       Schema.Tuple(
         pipe(
-          GoogleSheets.rowToCellStructSchema([
-            "channel",
-            "day",
-            "sheet",
-            "hourRange",
-            "breakRange",
-            "monitorRange",
-            "fillRange",
-            "overfillRange",
-            "standbyRange",
-            "screenshotRange",
-            "draft",
-          ]),
+          GoogleSheets.rowToCellTupleSchema(11),
+          Schema.compose(
+            GoogleSheets.cellTupleToCellStructSchema([
+              "channel",
+              "day",
+              "sheet",
+              "hourRange",
+              "breakRange",
+              "monitorRange",
+              "fillRange",
+              "overfillRange",
+              "standbyRange",
+              "screenshotRange",
+              "draft",
+            ]),
+          ),
           Schema.compose(
             Schema.Struct({
               channel: GoogleSheets.cellToStringSchema,
@@ -74,17 +77,20 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
       [range],
       Schema.Tuple(
         pipe(
-          GoogleSheets.rowToCellStructSchema([
-            "name",
-            "sheet",
-            "playerNameRange",
-            "teamNameRange",
-            "leadRange",
-            "backlineRange",
-            "talentRange",
-            "tagsType",
-            "tags",
-          ]),
+          GoogleSheets.rowToCellTupleSchema(9),
+          Schema.compose(
+            GoogleSheets.cellTupleToCellStructSchema([
+              "name",
+              "sheet",
+              "playerNameRange",
+              "teamNameRange",
+              "leadRange",
+              "backlineRange",
+              "talentRange",
+              "tagsType",
+              "tags",
+            ]),
+          ),
           Schema.compose(
             pipe(
               Schema.Struct({
@@ -186,7 +192,10 @@ const runnerConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
       [range],
       Schema.Tuple(
         pipe(
-          GoogleSheets.rowToCellStructSchema(["name", "hours"]),
+          GoogleSheets.rowToCellTupleSchema(2),
+          Schema.compose(
+            GoogleSheets.cellTupleToCellStructSchema(["name", "hours"]),
+          ),
           Schema.compose(
             pipe(
               Schema.Struct({

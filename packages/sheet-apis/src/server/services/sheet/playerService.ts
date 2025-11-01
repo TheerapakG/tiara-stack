@@ -175,11 +175,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                 players,
                 Array.map(
                   Array.map((player) =>
-                    pipe(
-                      teams,
-                      HashMap.get(player.name),
-                      Option.map(({ teams }) => teams),
-                    ),
+                    pipe(teams, HashMap.get(Option.some(player.name))),
                   ),
                 ),
                 Array.map(Array.getSomes),
@@ -214,11 +210,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                 Array.map(Array.getSomes),
                 Array.map(
                   Array.map((player) =>
-                    pipe(
-                      teams,
-                      HashMap.get(player.name),
-                      Option.map(({ teams }) => teams),
-                    ),
+                    pipe(teams, HashMap.get(Option.some(player.name))),
                   ),
                 ),
                 Array.map(Array.getSomes),
