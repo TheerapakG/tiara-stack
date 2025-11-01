@@ -26,7 +26,7 @@ export const getMessageCheckinDataHandler = pipe(
           onNone: () =>
             Effect.fail(
               Error.Core.makeArgumentError(
-                "No checkin data for this message, message might not be registered",
+                "Cannot get chesckin data, the message might not be registered",
               ),
             ),
         }),
