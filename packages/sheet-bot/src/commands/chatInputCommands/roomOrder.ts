@@ -36,9 +36,10 @@ import {
   HashMap,
   Option,
   pipe,
+  Schema,
 } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
-import { Schema } from "sheet-apis";
+import { Schema as SheetSchema } from "sheet-apis";
 import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 
 const handleManual =
@@ -137,7 +138,7 @@ const handleManual =
               Effect.flatMap(SheetService.channelSchedules),
               Effect.map(
                 HashMap.reduce(
-                  HashMap.empty<number, Schema.Schedule>(),
+                  HashMap.empty<number, SheetSchema.Schedule>(),
                   (acc, a) => HashMap.union(acc, a),
                 ),
               ),
@@ -148,7 +149,7 @@ const handleManual =
               {
                 schedule: pipe(
                   HashMap.get(schedules, hour),
-                  Option.getOrElse(() => Schema.Schedule.makeEmpty(hour)),
+                  Option.getOrElse(() => SheetSchema.Schedule.makeEmpty(hour)),
                 ),
               },
               Utils.mapPositional(PlayerService.mapScheduleWithPlayers),
@@ -185,14 +186,14 @@ const handleManual =
                         teams,
                         Array.map(
                           (team) =>
-                            new Schema.Team({
+                            new SheetSchema.Team({
                               ...team,
                               tags: pipe(
                                 team.tags,
                                 team.tags.includes("tierer_hint") &&
                                   Array.some(
                                     runnerHours,
-                                    Schema.HourRange.includes(hour),
+                                    SheetSchema.HourRange.includes(hour),
                                   )
                                   ? Array.append("fixed")
                                   : Function.identity,
@@ -206,7 +207,20 @@ const handleManual =
               ),
             ),
           ),
-          Effect.bind("roomOrders", ({ heal, scheduleTeams }) =>
+          Effect.bind("teams", ({ scheduleTeams }) =>
+            pipe(
+              scheduleTeams,
+              Array.map(({ teams }) =>
+                pipe(
+                  teams,
+                  Array.map((team) => Schema.encode(SheetSchema.Team)(team)),
+                  Effect.all,
+                ),
+              ),
+              Effect.all,
+            ),
+          ),
+          Effect.bind("roomOrders", ({ heal, teams }) =>
             pipe(
               SheetApisClient.get(),
               Effect.flatMap((client) =>
@@ -215,10 +229,7 @@ const handleManual =
                     healNeeded: heal,
                     considerEnc: true,
                   },
-                  players: pipe(
-                    scheduleTeams,
-                    Array.map(({ teams }) => teams),
-                  ),
+                  players: teams,
                 }),
               ),
             ),
