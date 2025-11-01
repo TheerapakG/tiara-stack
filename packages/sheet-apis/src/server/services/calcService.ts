@@ -136,7 +136,8 @@ const cartesian = <T>(
           Array.flatMap((product) =>
             pipe(
               Array.headNonEmpty(arrays),
-              Array.map((head) => [head, ...product]),
+              Array.map((head) => Array.make(head)),
+              Array.map(Array.appendAll(product)),
             ),
           ),
         ),
@@ -147,8 +148,23 @@ const deriveRoomsFromCartesian =
   (config: CalcConfig) =>
   (playerTeams: Array.NonEmptyReadonlyArray<ReadonlyArray<PlayerTeam>>) =>
     pipe(
-      Effect.succeed(
-        cartesian(playerTeams).map((teams) =>
+      Effect.succeed(cartesian(playerTeams)),
+      Effect.map(
+        Array.filter(
+          (teams) =>
+            Array.length(teams) ===
+            HashSet.size(
+              HashSet.fromIterable(
+                pipe(
+                  teams,
+                  Array.map((t) => t.playerName),
+                ),
+              ),
+            ),
+        ),
+      ),
+      Effect.map(
+        Array.map((teams) =>
           pipe(
             baseRoom(teams),
             config.considerEnc ? applyRoomEncAndDoormat : Function.identity,
