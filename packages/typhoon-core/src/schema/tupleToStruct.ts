@@ -20,11 +20,19 @@ type Struct<
   Fields extends ReadonlyArray<Schema.Schema.Any>,
 > = StructHelper<Keys, Fields>;
 
+type EncodedFields<Fields extends ReadonlyArray<Schema.Schema.Any>> =
+  Fields extends readonly [
+    infer Head extends Schema.Schema.Any,
+    ...infer Tail extends ReadonlyArray<Schema.Schema.Any>,
+  ]
+    ? [Schema.Schema.Encoded<Head>, ...EncodedFields<Tail>]
+    : [];
+
 interface TupleToStructSchema<
   Keys extends ReadonlyArray<string>,
   Fields extends Types.TupleOf<Keys["length"], Schema.Schema.Any>,
 > extends Schema.transform<
-    Schema.Tuple<Fields>,
+    Schema.Tuple<EncodedFields<Fields>>,
     Schema.Struct<Struct<Keys, Fields>>
   > {
   readonly keys: Keys;
@@ -38,7 +46,9 @@ const makeTupleToStructClass = <
   keys: Keys,
   fields: Fields,
 ) => {
-  const TupleSchema = Schema.Tuple<Fields>(...fields);
+  const TupleSchema = Schema.Tuple<EncodedFields<Fields>>(
+    ...(pipe(fields, Array.map(Schema.encodedSchema)) as EncodedFields<Fields>),
+  );
   const StructSchema = Schema.Struct(
     Object.fromEntries(Array.zip(keys, fields)) as Struct<Keys, Fields>,
   );
