@@ -467,7 +467,6 @@ const scheduleParser = (
             ({ range }) => ({
               requiredValueRanges: Effect.all([
                 pipe(sheet, getConfigFieldValueRange(range.hours.field)),
-                pipe(sheet, getConfigFieldValueRange(range.fills.field)),
                 pipe(sheet, getConfigFieldValueRange(range.overfills.field)),
                 pipe(sheet, getConfigFieldValueRange(range.standbys.field)),
               ]),
