@@ -1,10 +1,11 @@
-import { Array, HashSet, Order, Schema, String } from "effect";
+import { HashSet, Order, Schema } from "effect";
 import { Team } from "./team";
 import { Option, pipe } from "effect";
 
 export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
   type: Schema.String,
-  team: Schema.String,
+  playerName: Schema.String,
+  teamName: Schema.String,
   lead: Schema.Number,
   backline: Schema.Number,
   talent: Schema.Number,
@@ -19,7 +20,8 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
     return (playerTeam: PlayerTeam) =>
       new PlayerTeam({
         type: playerTeam.type,
-        team: playerTeam.team,
+        playerName: playerTeam.playerName,
+        teamName: playerTeam.teamName,
         lead: playerTeam.lead,
         backline: playerTeam.backline,
         talent: playerTeam.talent,
@@ -30,35 +32,6 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
   static getEffectValue = (playerTeam: PlayerTeam) =>
     playerTeam.lead + (playerTeam.backline - playerTeam.lead) / 5;
 
-  static fromApiObject(apiObject: {
-    type: string;
-    tagStr: string;
-    player: string;
-    team: string;
-    lead: number;
-    backline: number;
-    talent: "" | number;
-  }) {
-    if (apiObject.team === "" || apiObject.talent === "") return Option.none();
-
-    return Option.some(
-      new PlayerTeam({
-        type: apiObject.type,
-        team: apiObject.team,
-        lead: apiObject.lead,
-        backline: apiObject.backline,
-        talent: apiObject.talent,
-        tags: pipe(
-          apiObject.tagStr,
-          String.split(","),
-          Array.map(String.trim),
-          Array.filter(String.isNonEmpty),
-          HashSet.fromIterable,
-        ),
-      }),
-    );
-  }
-
   static fromTeam(cc: boolean, team: Team) {
     const talent = cc
       ? team.talent
@@ -67,7 +40,7 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
           Option.orElseSome(() => 0),
         );
     if (
-      team.name === "" ||
+      team.teamName === "" ||
       Option.isNone(team.lead) ||
       Option.isNone(team.backline) ||
       Option.isNone(talent)
@@ -77,7 +50,8 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
     return Option.some(
       new PlayerTeam({
         type: team.type,
-        team: team.name,
+        playerName: team.playerName,
+        teamName: team.teamName,
         lead: team.lead.value,
         backline: team.backline.value,
         talent: talent.value,
