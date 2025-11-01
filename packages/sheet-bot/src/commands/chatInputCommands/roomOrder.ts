@@ -168,6 +168,7 @@ const handleManual =
                   PlayerService.getTeamsByName,
                 ),
               ),
+              Effect.tap(({ players, teams }) => Effect.log(players, teams)),
               Effect.map(({ players, teams }) => Array.zip(players, teams)),
               Effect.flatMap(
                 Effect.forEach(([player, teams]) =>
