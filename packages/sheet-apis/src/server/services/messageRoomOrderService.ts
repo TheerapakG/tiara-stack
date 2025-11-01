@@ -39,9 +39,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             Computed.map(Array.head),
             Computed.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(MessageRoomOrder),
-                ),
+                Schema.OptionFromSelf(DefaultTaggedClass(MessageRoomOrder)),
               ),
             ),
             Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder", {
@@ -65,9 +63,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             Effect.map(Array.head),
             Effect.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(MessageRoomOrder),
-                ),
+                Schema.OptionFromSelf(DefaultTaggedClass(MessageRoomOrder)),
               ),
             ),
             Effect.withSpan(
@@ -94,9 +90,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             Effect.map(Array.head),
             Effect.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(MessageRoomOrder),
-                ),
+                Schema.OptionFromSelf(DefaultTaggedClass(MessageRoomOrder)),
               ),
             ),
             Effect.withSpan(
@@ -134,11 +128,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
               }),
             ),
             Effect.map(Array.headNonEmpty),
-            Effect.flatMap(
-              Schema.decode(
-                DefaultTaggedClass.DefaultTaggedClass(MessageRoomOrder),
-              ),
-            ),
+            Effect.flatMap(Schema.decode(DefaultTaggedClass(MessageRoomOrder))),
             Effect.withSpan("MessageRoomOrderService.upsertMessageRoomOrder", {
               captureStackTrace: true,
             }),
@@ -160,9 +150,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ),
             Computed.flatMap(
               Schema.decode(
-                Schema.Array(
-                  DefaultTaggedClass.DefaultTaggedClass(MessageRoomOrderEntry),
-                ),
+                Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)),
               ),
             ),
             Effect.withSpan(
@@ -201,7 +189,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             Computed.flatMap(
               Schema.decode(
                 Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(MessageRoomOrderRange),
+                  DefaultTaggedClass(MessageRoomOrderRange),
                 ),
               ),
             ),
@@ -244,9 +232,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ),
             Effect.flatMap(
               Schema.decode(
-                Schema.Array(
-                  DefaultTaggedClass.DefaultTaggedClass(MessageRoomOrderEntry),
-                ),
+                Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)),
               ),
             ),
             Effect.withSpan(
@@ -275,9 +261,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ),
             Effect.flatMap(
               Schema.decode(
-                Schema.Array(
-                  DefaultTaggedClass.DefaultTaggedClass(MessageRoomOrderEntry),
-                ),
+                Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)),
               ),
             ),
             Effect.withSpan(

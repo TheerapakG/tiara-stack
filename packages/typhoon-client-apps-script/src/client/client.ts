@@ -222,7 +222,7 @@ export class AppsScriptClient<
                 makeRpcError(
                   (responseErrorValidator === undefined
                     ? Schema.Unknown
-                    : FromStandardSchemaV1.FromStandardSchemaV1(
+                    : FromStandardSchemaV1(
                         responseErrorValidator,
                       )) as Schema.Schema<
                     Validator.Output<

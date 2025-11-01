@@ -43,9 +43,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Computed.map(Array.head),
             Computed.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(GuildConfig),
-                ),
+                Schema.OptionFromSelf(DefaultTaggedClass(GuildConfig)),
               ),
             ),
             Effect.withSpan("GuildConfigService.getConfig", {
@@ -68,9 +66,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Computed.map(Array.head),
             Computed.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(GuildConfig),
-                ),
+                Schema.OptionFromSelf(DefaultTaggedClass(GuildConfig)),
               ),
             ),
             Effect.withSpan("GuildConfigService.getGuildConfigByScriptId", {
@@ -108,9 +104,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               }),
             ),
             Effect.map(Array.headNonEmpty),
-            Effect.flatMap(
-              Schema.decode(DefaultTaggedClass.DefaultTaggedClass(GuildConfig)),
-            ),
+            Effect.flatMap(Schema.decode(DefaultTaggedClass(GuildConfig))),
             Effect.withSpan("GuildConfigService.upsertGuildConfig", {
               captureStackTrace: true,
             }),
@@ -130,9 +124,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             ),
             Computed.flatMap(
               Schema.decode(
-                Schema.Array(
-                  DefaultTaggedClass.DefaultTaggedClass(GuildConfigManagerRole),
-                ),
+                Schema.Array(DefaultTaggedClass(GuildConfigManagerRole)),
               ),
             ),
             Effect.withSpan("GuildConfigService.getGuildManagerRoles", {
@@ -165,9 +157,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             ),
             Effect.map(Array.headNonEmpty),
             Effect.flatMap(
-              Schema.decode(
-                DefaultTaggedClass.DefaultTaggedClass(GuildConfigManagerRole),
-              ),
+              Schema.decode(DefaultTaggedClass(GuildConfigManagerRole)),
             ),
             Effect.withSpan("GuildConfigService.addGuildManagerRole", {
               captureStackTrace: true,
@@ -195,7 +185,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Effect.flatMap(
               Schema.decode(
                 Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(GuildConfigManagerRole),
+                  DefaultTaggedClass(GuildConfigManagerRole),
                 ),
               ),
             ),
@@ -242,9 +232,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             ),
             Effect.map(Array.headNonEmpty),
             Effect.flatMap(
-              Schema.decode(
-                DefaultTaggedClass.DefaultTaggedClass(GuildChannelConfig),
-              ),
+              Schema.decode(DefaultTaggedClass(GuildChannelConfig)),
             ),
             Effect.withSpan("GuildConfigService.upsertGuildChannelConfig", {
               captureStackTrace: true,
@@ -267,9 +255,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Computed.map(Array.head),
             Computed.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(GuildChannelConfig),
-                ),
+                Schema.OptionFromSelf(DefaultTaggedClass(GuildChannelConfig)),
               ),
             ),
             Effect.withSpan("GuildConfigService.getGuildRunningChannelById", {
@@ -293,9 +279,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Computed.map(Array.head),
             Computed.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(GuildChannelConfig),
-                ),
+                Schema.OptionFromSelf(DefaultTaggedClass(GuildChannelConfig)),
               ),
             ),
             Effect.withSpan("GuildConfigService.getGuildRunningChannelByName", {

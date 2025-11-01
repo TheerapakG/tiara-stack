@@ -96,7 +96,7 @@ const rowToCellSchema = pipe(
 );
 
 const rowToCellTupleSchema = <const Length extends number>(length: Length) =>
-  OptionArrayToOptionTupleSchema.OptionArrayToOptionTupleSchema(
+  OptionArrayToOptionTupleSchema(
     length,
     Schema.String,
   ) as unknown as Schema.Schema<
@@ -108,7 +108,7 @@ const rowToCellTupleSchema = <const Length extends number>(length: Length) =>
 const cellTupleToCellStructSchema = <const Keys extends ReadonlyArray<string>>(
   keys: Keys,
 ) =>
-  TupleToStructSchema.TupleToStructSchema(
+  TupleToStructSchema(
     keys,
     Array.makeBy(keys.length, () => cellSchema) as Types.TupleOf<
       Keys["length"],
