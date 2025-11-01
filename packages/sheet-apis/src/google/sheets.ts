@@ -74,6 +74,14 @@ const parseValueRanges = <
   );
 };
 
+const tupleSchema = <const Length extends number, S extends Schema.Schema.Any>(
+  length: Length,
+  schema: S,
+) =>
+  Schema.Tuple(
+    ...(Array.makeBy(length, () => schema) as Types.TupleOf<Length, S>),
+  );
+
 const cellSchema = Schema.OptionFromSelf(Schema.String);
 const rowSchema = Schema.Array(cellSchema);
 
@@ -86,6 +94,7 @@ const rowToCellSchema = pipe(
     encode: Option.some,
   }),
 );
+
 const rowToCellTupleSchema = <const Length extends number>(length: Length) =>
   OptionArrayToOptionTupleSchema.OptionArrayToOptionTupleSchema(
     length,
@@ -95,46 +104,21 @@ const rowToCellTupleSchema = <const Length extends number>(length: Length) =>
     readonly Option.Option<string>[],
     never
   >;
-const rowTupleToCellTupleSchema = <const Length extends number>(
-  length: Length,
-) =>
-  Schema.Tuple(
-    ...(Array.makeBy(length, () => rowToCellSchema) as Types.TupleOf<
-      Length,
-      typeof rowToCellSchema
-    >),
-  );
 
 const cellTupleToCellStructSchema = <const Keys extends ReadonlyArray<string>>(
   keys: Keys,
 ) =>
-  pipe(
-    Schema.Tuple(
-      ...Array.makeBy(keys.length, () => cellSchema),
-    ) as unknown as Schema.Schema<
-      Types.TupleOf<Keys["length"], Option.Option<string>>
+  TupleToStructSchema.TupleToStructSchema(
+    keys,
+    Array.makeBy(keys.length, () => cellSchema) as Types.TupleOf<
+      Keys["length"],
+      typeof cellSchema
     >,
-    Schema.compose(
-      TupleToStructSchema.TupleToStructSchema(
-        keys,
-        Array.makeBy(keys.length, () => cellSchema) as Types.TupleOf<
-          Keys["length"],
-          typeof cellSchema
-        >,
-      ) as unknown as Schema.Schema<
-        { [K in Keys[number]]: Option.Option<string> },
-        Types.TupleOf<Keys["length"], Option.Option<string>>,
-        never
-      >,
-    ),
-  );
-const rowToCellStructSchema = <const Keys extends ReadonlyArray<string>>(
-  keys: Keys,
-) =>
-  pipe(
-    rowToCellTupleSchema(keys.length as Keys["length"]),
-    Schema.compose(cellTupleToCellStructSchema(keys)),
-  );
+  ) as unknown as Schema.Schema<
+    { [K in Keys[number]]: Option.Option<string> },
+    Types.TupleOf<Keys["length"], Option.Option<string>>,
+    never
+  >;
 
 const matchAll =
   <Pattern extends string, Context extends RegexContext>(
@@ -372,13 +356,12 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
 ) {
   static parseValueRanges = parseValueRanges;
 
+  static tupleSchema = tupleSchema;
   static cellSchema = cellSchema;
   static rowSchema = rowSchema;
   static rowToCellSchema = rowToCellSchema;
   static rowToCellTupleSchema = rowToCellTupleSchema;
-  static rowTupleToCellTupleSchema = rowTupleToCellTupleSchema;
   static cellTupleToCellStructSchema = cellTupleToCellStructSchema;
-  static rowToCellStructSchema = rowToCellStructSchema;
   static toStringSchema = toStringSchema;
   static cellToStringSchema = Schema.OptionFromSelf(toStringSchema);
   static toNumberSchema = toNumberSchema;
