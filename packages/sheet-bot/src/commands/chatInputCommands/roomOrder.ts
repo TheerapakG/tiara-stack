@@ -217,36 +217,7 @@ const handleManual =
                   },
                   players: pipe(
                     scheduleTeams,
-                    Array.map(({ player, teams }) =>
-                      pipe(
-                        teams,
-                        Array.map((team) => {
-                          const lead = pipe(
-                            team.lead,
-                            Option.getOrElse(() => 0),
-                          );
-                          const backline = pipe(
-                            team.backline,
-                            Option.getOrElse(() => 0),
-                          );
-                          const talent = pipe(
-                            team.talent,
-                            Option.getOrElse(() => 0),
-                          );
-                          const effectValue = lead + (backline - lead) / 5;
-                          return {
-                            type: team.type,
-                            tagStr: pipe(team.tags, Array.join(", ")),
-                            player: player.name,
-                            team: team.name,
-                            lead,
-                            backline,
-                            talent,
-                            effectValue,
-                          };
-                        }),
-                      ),
-                    ),
+                    Array.map(({ teams }) => teams),
                   ),
                 }),
               ),

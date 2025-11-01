@@ -198,7 +198,7 @@ export function THEECALC2(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
                       r.teams,
                       Chunk.toArray,
                       Array.map((team) => [
-                        team.team,
+                        team.teamName,
                         team.lead,
                         team.backline,
                         SheetSchema.PlayerTeam.getEffectValue(team),
