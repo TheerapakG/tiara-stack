@@ -560,7 +560,6 @@ const scheduleParser = (
                   ),
                 ),
                 Effect.map(ArrayUtils.WithDefault.map((fills) => ({ fills }))),
-                Effect.tap(({ array }) => Effect.log(array)),
               ),
               breaks: pipe(
                 Match.value(scheduleConfig.breakRange),
@@ -606,7 +605,6 @@ const scheduleParser = (
                     ),
                   ),
                 ),
-                Effect.tap(({ array }) => Effect.log(array)),
               ),
             }),
             { concurrency: "unbounded" },
@@ -664,7 +662,6 @@ const scheduleParser = (
               Array.getSomes,
             ),
           ),
-          Effect.tap((array) => Effect.log(array)),
           Effect.map((array) =>
             pipe({
               scheduleIndex: new ScheduleIndex({
