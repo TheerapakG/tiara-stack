@@ -34,9 +34,7 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
             Computed.map(Array.head),
             Computed.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(MessageSlot),
-                ),
+                Schema.OptionFromSelf(DefaultTaggedClass(MessageSlot)),
               ),
             ),
             Effect.withSpan("MessageSlotService.getMessageSlotData", {
@@ -76,9 +74,7 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
               }),
             ),
             Effect.map(Array.headNonEmpty),
-            Effect.flatMap(
-              Schema.decode(DefaultTaggedClass.DefaultTaggedClass(MessageSlot)),
-            ),
+            Effect.flatMap(Schema.decode(DefaultTaggedClass(MessageSlot))),
             Effect.withSpan("MessageSlotService.upsertMessageSlotData", {
               captureStackTrace: true,
             }),

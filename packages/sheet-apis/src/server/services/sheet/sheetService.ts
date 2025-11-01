@@ -509,7 +509,7 @@ const scheduleParser = (
               pipe(
                 GoogleSheets.tupleSchema(5, GoogleSheets.rowSchema),
                 Schema.compose(
-                  TupleToStructSchema.TupleToStructSchema(
+                  TupleToStructSchema(
                     ["hour", "fills", "overfills", "standbys", "breakHour"],
                     [
                       GoogleSheets.rowToCellSchema,

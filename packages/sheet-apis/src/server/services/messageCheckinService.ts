@@ -34,9 +34,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
             Computed.map(Array.head),
             Computed.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(MessageCheckin),
-                ),
+                Schema.OptionFromSelf(DefaultTaggedClass(MessageCheckin)),
               ),
             ),
             Effect.withSpan("MessageCheckinService.getMessageCheckinData", {
@@ -77,11 +75,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
               }),
             ),
             Effect.map(Array.headNonEmpty),
-            Effect.flatMap(
-              Schema.decode(
-                DefaultTaggedClass.DefaultTaggedClass(MessageCheckin),
-              ),
-            ),
+            Effect.flatMap(Schema.decode(DefaultTaggedClass(MessageCheckin))),
             Effect.withSpan("MessageCheckinService.upsertMessageCheckinData", {
               captureStackTrace: true,
             }),
@@ -101,9 +95,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
             ),
             Computed.flatMap(
               Schema.decode(
-                Schema.Array(
-                  DefaultTaggedClass.DefaultTaggedClass(MessageCheckinMember),
-                ),
+                Schema.Array(DefaultTaggedClass(MessageCheckinMember)),
               ),
             ),
             Effect.withSpan("MessageCheckinService.getMessageCheckinMembers", {
@@ -139,9 +131,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
             ),
             Effect.flatMap(
               Schema.decode(
-                Schema.Array(
-                  DefaultTaggedClass.DefaultTaggedClass(MessageCheckinMember),
-                ),
+                Schema.Array(DefaultTaggedClass(MessageCheckinMember)),
               ),
             ),
             Effect.withSpan("MessageCheckinService.addMessageCheckinMembers", {
@@ -183,9 +173,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
             Effect.map(Array.head),
             Effect.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(MessageCheckinMember),
-                ),
+                Schema.OptionFromSelf(DefaultTaggedClass(MessageCheckinMember)),
               ),
             ),
             Effect.withSpan(
@@ -214,9 +202,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
             Effect.map(Array.head),
             Effect.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass.DefaultTaggedClass(MessageCheckinMember),
-                ),
+                Schema.OptionFromSelf(DefaultTaggedClass(MessageCheckinMember)),
               ),
             ),
             Effect.withSpan(

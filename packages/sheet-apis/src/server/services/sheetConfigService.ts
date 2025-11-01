@@ -265,9 +265,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                     "User IDs": "userIds",
                     "User Sheet Names": "userSheetNames",
                   }),
-                  Schema.compose(
-                    DefaultTaggedClass.DefaultTaggedClass(RangesConfig),
-                  ),
+                  Schema.compose(DefaultTaggedClass(RangesConfig)),
                 ),
               ),
             ),
@@ -342,9 +340,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                   Schema.rename({
                     "Start Time": "startTime",
                   }),
-                  Schema.compose(
-                    DefaultTaggedClass.DefaultTaggedClass(EventConfig),
-                  ),
+                  Schema.compose(DefaultTaggedClass(EventConfig)),
                 ),
               ),
             ),
