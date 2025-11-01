@@ -513,6 +513,21 @@ const scheduleParser = (
                     }),
                   }),
                 ),
+                Effect.map(
+                  ArrayUtils.WithDefault.map(
+                    ({ hour, overfills, standbys }) => ({
+                      hour,
+                      overfills: pipe(
+                        overfills,
+                        Option.getOrElse(() => []),
+                      ),
+                      standbys: pipe(
+                        standbys,
+                        Option.getOrElse(() => []),
+                      ),
+                    }),
+                  ),
+                ),
               ),
               fills: pipe(
                 GoogleSheets.parseValueRange(
@@ -590,8 +605,8 @@ const scheduleParser = (
                   Option.bind("hour", () => hour),
                   Option.let("breakHour", () => breakHour),
                   Option.let("fills", () => fills),
-                  Option.bind("overfills", () => overfills),
-                  Option.bind("standbys", () => standbys),
+                  Option.let("overfills", () => overfills),
+                  Option.let("standbys", () => standbys),
                   Option.map(
                     ({ hour, breakHour, fills, overfills, standbys }) =>
                       Schedule.make({
