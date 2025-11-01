@@ -532,6 +532,7 @@ const scheduleParser = (
               ),
             ),
           ),
+          Effect.tap((a) => Effect.log(pipe(a, Array.getLefts))),
           Effect.map(
             ArrayUtils.WithDefault.wrapEither({
               default: () => ({
