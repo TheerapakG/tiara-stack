@@ -21,7 +21,8 @@ export const botCalcHandler = pipe(
           Effect.bind("playerTeams", () =>
             Effect.forEach(players, (player) =>
               Effect.allSuccesses(
-                player.map((team) => PlayerTeam.fromApiObject(team)),
+                // TODO: read cc
+                player.map((team) => PlayerTeam.fromTeam(false, team)),
               ),
             ),
           ),
@@ -36,7 +37,7 @@ export const botCalcHandler = pipe(
                 room.teams,
                 Chunk.map((team) => ({
                   type: team.type,
-                  team: team.team,
+                  team: team.teamName,
                   talent: team.talent,
                   effectValue: PlayerTeam.getEffectValue(team),
                   tags: HashSet.toValues(team.tags),

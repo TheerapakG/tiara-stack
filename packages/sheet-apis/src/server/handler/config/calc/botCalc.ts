@@ -1,6 +1,7 @@
-import { Error } from "@/server/schema";
+import { Error, Team } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
+import { DefaultTaggedClass } from "typhoon-core/schema";
 
 export const botCalcHandlerConfig = pipe(
   Handler.Config.empty(),
@@ -15,18 +16,7 @@ export const botCalcHandlerConfig = pipe(
         }),
         players: pipe(
           Schema.Array(
-            Schema.Array(
-              Schema.Struct({
-                type: Schema.String,
-                tagStr: Schema.String,
-                player: Schema.String,
-                team: Schema.String,
-                lead: Schema.Number,
-                backline: Schema.Number,
-                talent: Schema.Union(Schema.Number, Schema.Literal("")),
-                effectValue: Schema.Number,
-              }),
-            ),
+            Schema.Array(DefaultTaggedClass.DefaultTaggedClass(Team)),
           ),
           Schema.itemsCount(5),
         ),
