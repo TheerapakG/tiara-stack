@@ -1,7 +1,7 @@
 import { Array, Tuple, pipe, Schema, Types } from "effect";
 
-const TypeId: typeof Schema.TypeId = Schema.TypeId;
-export { TypeId };
+const StructToTupleTypeId: typeof Schema.TypeId = Schema.TypeId;
+export { StructToTupleTypeId };
 
 type StructHelper<
   A extends ReadonlyArray<string>,

@@ -1,8 +1,8 @@
-export * as ArrayLookupSchema from "./arrayLookup";
-export * as DefaultTaggedClass from "./defaultTaggedClass";
-export * as DefaultTaggedStruct from "./defaultTaggedStruct";
-export * as FromStandardSchemaV1 from "./fromStandardSchemaV1";
-export * as KeyOrderLookupSchema from "./keyOrderLookup";
-export * as OptionArrayToOptionTupleSchema from "./OptionArrayToOptionTuple";
-export * as StructToTupleSchema from "./structToTuple";
-export * as TupleToStructSchema from "./tupleToStruct";
+export * from "./arrayLookup";
+export * from "./defaultTaggedClass";
+export * from "./defaultTaggedStruct";
+export * from "./fromStandardSchemaV1";
+export * from "./keyOrderLookup";
+export * from "./OptionArrayToOptionTuple";
+export * from "./structToTuple";
+export * from "./tupleToStruct";
