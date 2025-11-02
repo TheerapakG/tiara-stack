@@ -15,12 +15,6 @@ export const getTeamsHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(
-      Schema.HashMap({
-        key: Schema.OptionFromNullishOr(Schema.String, undefined),
-        value: Schema.NonEmptyArray(Team),
-      }),
-      Schema.standardSchemaV1,
-    ),
+    validator: pipe(Schema.Array(Team), Schema.standardSchemaV1),
   }),
 );
