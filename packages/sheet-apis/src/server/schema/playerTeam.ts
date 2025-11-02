@@ -11,9 +11,17 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
   talent: Schema.Number,
   tags: Schema.HashSet(Schema.String),
 }) {
+  static byPlayerName = Order.mapInput(
+    Option.getOrder(Schema.String.Order),
+    ({ playerName }: PlayerTeam) => playerName,
+  );
   static byTalent = Order.mapInput(
     Order.number,
     ({ talent }: PlayerTeam) => talent,
+  );
+  static byEffectValue = Order.mapInput(
+    Option.getOrder(Order.number),
+    PlayerTeam.getEffectValue,
   );
 
   static addTags(tags: HashSet.HashSet<string>) {
