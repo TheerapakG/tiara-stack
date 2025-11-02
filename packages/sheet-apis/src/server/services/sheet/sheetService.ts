@@ -532,7 +532,6 @@ const scheduleParser = (
               ),
             ),
           ),
-          Effect.tap((a) => Effect.log(pipe(a, Array.getLefts))),
           Effect.map(
             ArrayUtils.WithDefault.wrapEither({
               default: () => ({
@@ -563,7 +562,6 @@ const scheduleParser = (
               }),
             ),
           ),
-          Effect.tap((a) => Effect.log(a.array)),
           Effect.map(
             ArrayUtils.WithDefault.map(
               ({ hour, fills, overfills, standbys, breakHour }) => ({
