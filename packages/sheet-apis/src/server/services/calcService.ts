@@ -126,7 +126,7 @@ const cartesianHeadTeams = (teams: ReadonlyArray<PlayerTeam>) =>
         Array.make(
           new PlayerTeam({
             type: "Placeholder",
-            playerName: "Placeholder",
+            playerName: Option.some("Placeholder"),
             teamName: "Placeholder",
             lead: 0,
             backline: 0,
