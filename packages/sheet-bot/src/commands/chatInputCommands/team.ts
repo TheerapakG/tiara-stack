@@ -18,7 +18,16 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, Effect, Number, Order, Option, pipe, String } from "effect";
+import {
+  Array,
+  Effect,
+  Function,
+  Number,
+  Option,
+  Order,
+  pipe,
+  String,
+} from "effect";
 import { Schema } from "sheet-apis";
 import { Utils } from "typhoon-core/utils";
 
@@ -76,6 +85,13 @@ const handleList =
             pipe(
               teams.user,
               Array.filter((team) => !team.tags.includes("tierer_hint")),
+              Array.sortWith(
+                Function.identity,
+                Order.combine(
+                  Schema.Team.byPlayerName,
+                  Order.reverse(Schema.Team.byEffectValue),
+                ),
+              ),
               Array.map((team) => ({
                 teamName: team.teamName,
                 tags: team.tags,
@@ -110,10 +126,6 @@ const handleList =
                     ),
                   })),
                 ),
-              ),
-              Array.sortWith(
-                ({ effectValue }) => effectValue,
-                Order.reverse(Option.getOrder(Number.Order)),
               ),
             ),
           ),
