@@ -167,7 +167,12 @@ export class PlayerService extends Effect.Service<PlayerService>()(
           pipe(
             Effect.Do,
             Effect.bindAll(() => ({
-              teams: sheetService.getTeams(),
+              teams: pipe(
+                sheetService.getTeams(),
+                Effect.map(
+                  ArrayUtils.Collect.toArrayHashMapByKey("playerName"),
+                ),
+              ),
               players: getByNames(names),
             })),
             Effect.map(({ players, teams }) =>
@@ -190,7 +195,12 @@ export class PlayerService extends Effect.Service<PlayerService>()(
           pipe(
             Effect.Do,
             Effect.bindAll(() => ({
-              teams: sheetService.getTeams(),
+              teams: pipe(
+                sheetService.getTeams(),
+                Effect.map(
+                  ArrayUtils.Collect.toArrayHashMapByKey("playerName"),
+                ),
+              ),
               players: getByIds(ids),
             })),
             Effect.map(({ players, teams }) =>

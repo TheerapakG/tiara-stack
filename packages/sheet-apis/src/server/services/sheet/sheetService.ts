@@ -20,7 +20,6 @@ import {
   Match,
   Number,
   Option,
-  Order,
   pipe,
   Schema,
   String,
@@ -262,8 +261,7 @@ const teamParser = (
               playerName: pipe(
                 playerName,
                 Option.map(
-                  (name) =>
-                    playerNameRegex.exec(name)?.groups?.name ?? name,
+                  (name) => playerNameRegex.exec(name)?.groups?.name ?? name,
                 ),
               ),
               teamName,
@@ -287,42 +285,16 @@ const teamParser = (
         ),
         Effect.map(ArrayUtils.WithDefault.toArray),
         Effect.map(
-          Array.map(({ playerName, teamName, lead, backline, talent, tags }) =>
-            pipe(
-              Option.Do,
-              Option.bind("playerName", () => playerName),
-              Option.bind("teamName", () => teamName),
-              Option.let("lead", () => lead),
-              Option.let("backline", () => backline),
-              Option.let("talent", () => talent),
-              Option.let("tags", () => tags),
-              Option.map((config) => ({
-                playerName: config.playerName,
-                team: Team.make({
-                  type: teamConfig.name,
-                  ...config,
-                }),
-              })),
-            ),
+          Array.map((config) =>
+            Team.make({
+              type: teamConfig.name,
+              ...config,
+            }),
           ),
         ),
-        Effect.map(Array.getSomes),
       ),
     ),
     Effect.map(Array.flatten),
-    Effect.map(ArrayUtils.Collect.toArrayHashMapByKey("playerName")),
-    Effect.map(
-      HashMap.map((teams) =>
-        pipe(
-          teams,
-          Array.map(({ team }) => team),
-          Array.sortWith(
-            Team.getEffectValue,
-            Order.reverse(Option.getOrder(Number.Order)),
-          ),
-        ),
-      ),
-    ),
     Effect.withSpan("teamParser", { captureStackTrace: true }),
   );
 
