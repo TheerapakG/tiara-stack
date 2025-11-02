@@ -10,6 +10,7 @@ import {
   Team,
   TeamConfig,
 } from "@/server/schema";
+import { regex } from "arkregex";
 import { type MethodOptions, type sheets_v4 } from "@googleapis/sheets";
 import {
   Array,
@@ -186,6 +187,8 @@ const teamRanges = (teamConfigValues: FilteredTeamConfigValue[]) =>
     HashMap.filterMap((a, _) => a),
   );
 
+const playerNameRegex = regex("^(?<name>.*?)(?:\\s+\\(e(?:nc)?\\))?$");
+
 const teamParser = (
   teamConfigValues: FilteredTeamConfigValue[],
   sheet: HashMap.HashMap<TeamConfigField, sheets_v4.Schema$ValueRange>,
@@ -256,7 +259,13 @@ const teamParser = (
         Effect.map(
           ArrayUtils.WithDefault.map(
             ({ playerName, teamName, lead, backline, talent, tags }) => ({
-              playerName,
+              playerName: pipe(
+                playerName,
+                Option.map(
+                  (name) =>
+                    playerNameRegex.exec(name)?.groups?.name ?? name,
+                ),
+              ),
               teamName,
               lead,
               backline,
@@ -288,7 +297,7 @@ const teamParser = (
               Option.let("talent", () => talent),
               Option.let("tags", () => tags),
               Option.map((config) => ({
-                playerName,
+                playerName: config.playerName,
                 team: Team.make({
                   type: teamConfig.name,
                   ...config,
