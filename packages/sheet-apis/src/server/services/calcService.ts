@@ -1,4 +1,5 @@
 import { PlayerTeam, Room } from "@/server/schema";
+import { regex } from "arkregex";
 import {
   Array,
   Chunk,
@@ -138,6 +139,8 @@ const cartesianHeadTeams = (teams: ReadonlyArray<PlayerTeam>) =>
     }),
   );
 
+const playerNameRegex = regex("^(?<name>.*?)(?:\\s+(?:e(?:nc)?))?$");
+
 const cartesianTeams = (
   playerTeams: Array.NonEmptyReadonlyArray<ReadonlyArray<PlayerTeam>>,
 ): readonly PlayerTeam[][] =>
@@ -170,7 +173,11 @@ const cartesianTeams = (
                         HashSet.fromIterable(
                           pipe(
                             teams,
-                            Array.map((t) => t.playerName),
+                            Array.map(
+                              (t) =>
+                                playerNameRegex.exec(t.playerName)?.groups
+                                  ?.name ?? "",
+                            ),
                           ),
                         ),
                       ),
@@ -182,8 +189,10 @@ const cartesianTeams = (
                           new PlayerTeam({
                             type: "Placeholder",
                             playerName:
-                              Array.headNonEmpty(headTeams).playerName,
-                            teamName: `${Array.headNonEmpty(headTeams).playerName} | placeholder`,
+                              playerNameRegex.exec(
+                                Array.headNonEmpty(headTeams).playerName,
+                              )?.groups?.name ?? "",
+                            teamName: `${playerNameRegex.exec(Array.headNonEmpty(headTeams).playerName)?.groups?.name ?? ""} | placeholder`,
                             lead: 0,
                             backline: 0,
                             talent: 0,
