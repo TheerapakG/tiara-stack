@@ -18,7 +18,7 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, Effect, Number, Option, pipe, String } from "effect";
+import { Array, Effect, Number, Order, Option, pipe, String } from "effect";
 import { Schema } from "sheet-apis";
 import { Utils } from "typhoon-core/utils";
 
@@ -77,34 +77,44 @@ const handleList =
               teams.user,
               Array.filter((team) => !team.tags.includes("tierer_hint")),
               Array.map((team) => ({
-                name: team.teamName,
+                teamName: team.teamName,
                 tags: team.tags,
                 lead: team.lead,
                 backline: team.backline,
                 talent: team.talent,
                 effectValue: Schema.Team.getEffectValue(team),
               })),
-              Array.map((team) => ({
-                ...team,
-                leadFormatted: pipe(
-                  team.lead,
-                  Option.getOrElse(() => "?"),
+              Array.filterMap((team) =>
+                pipe(
+                  team.teamName,
+                  Option.map((teamName) => ({
+                    ...team,
+                    teamNameFormatted: teamName,
+                    leadFormatted: pipe(
+                      team.lead,
+                      Option.getOrElse(() => "?"),
+                    ),
+                    backlineFormatted: pipe(
+                      team.backline,
+                      Option.getOrElse(() => "?"),
+                    ),
+                    talentFormatted: pipe(
+                      team.talent,
+                      Option.map((talent) => `/${talent}k`),
+                      Option.getOrElse(() => ""),
+                    ),
+                    effectValueFormatted: pipe(
+                      team.effectValue,
+                      Option.map((effectValue) => ` (+${effectValue}%)`),
+                      Option.getOrElse(() => ""),
+                    ),
+                  })),
                 ),
-                backlineFormatted: pipe(
-                  team.backline,
-                  Option.getOrElse(() => "?"),
-                ),
-                talentFormatted: pipe(
-                  team.talent,
-                  Option.map((talent) => `/${talent}k`),
-                  Option.getOrElse(() => ""),
-                ),
-                effectValueFormatted: pipe(
-                  team.effectValue,
-                  Option.map((effectValue) => ` (+${effectValue}%)`),
-                  Option.getOrElse(() => ""),
-                ),
-              })),
+              ),
+              Array.sortWith(
+                ({ effectValue }) => effectValue,
+                Order.reverse(Option.getOrder(Number.Order)),
+              ),
             ),
           ),
           InteractionContext.editReply.tapEffect(({ user, formattedTeams }) =>
@@ -121,7 +131,7 @@ const handleList =
                     )
                     .addFields(
                       formattedTeams.map((team) => ({
-                        name: escapeMarkdown(team.name),
+                        name: escapeMarkdown(team.teamNameFormatted),
                         value: [
                           `Tags: ${
                             Number.Equivalence(team.tags.length, 0)
