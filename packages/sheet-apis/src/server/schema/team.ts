@@ -1,4 +1,4 @@
-import { Option, pipe, Schema } from "effect";
+import { Option, Order, pipe, Schema } from "effect";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 
 export class Team extends Schema.TaggedClass<Team>()("Team", {
@@ -10,6 +10,19 @@ export class Team extends Schema.TaggedClass<Team>()("Team", {
   backline: Schema.OptionFromNullishOr(Schema.Number, undefined),
   talent: Schema.OptionFromNullishOr(Schema.Number, undefined),
 }) {
+  static byPlayerName = Order.mapInput(
+    Option.getOrder(Schema.String.Order),
+    ({ playerName }: Team) => playerName,
+  );
+  static byTalent = Order.mapInput(
+    Option.getOrder(Order.number),
+    ({ talent }: Team) => talent,
+  );
+  static byEffectValue = Order.mapInput(
+    Option.getOrder(Order.number),
+    Team.getEffectValue,
+  );
+
   static getEffectValue = (team: Team) =>
     pipe(
       Option.Do,
