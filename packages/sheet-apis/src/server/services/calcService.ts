@@ -139,7 +139,7 @@ const cartesianHeadTeams = (teams: ReadonlyArray<PlayerTeam>) =>
     }),
   );
 
-const playerNameRegex = regex("^(?<name>.*?)(?:\\s+(?:e(?:nc)?))?$");
+const playerNameRegex = regex("^(?<name>.*?)(?:\\s+\\(e(?:nc)?\\))?$");
 
 const cartesianTeams = (
   playerTeams: Array.NonEmptyReadonlyArray<ReadonlyArray<PlayerTeam>>,
