@@ -164,21 +164,18 @@ const cartesianTeams = (
               (headTeams) =>
                 pipe(
                   headTeams,
-                  Array.map((headTeam) => Array.make(headTeam)),
-                  Array.map(Array.appendAll(product)),
                   Array.filter(
-                    (teams) =>
-                      Array.length(teams) ===
-                      HashSet.size(
-                        HashSet.fromIterable(
-                          pipe(
-                            teams,
-                            Array.map(
-                              (t) =>
-                                playerNameRegex.exec(t.playerName)?.groups
-                                  ?.name ?? "",
-                            ),
-                          ),
+                    (headTeam) =>
+                      !pipe(
+                        product,
+                        Array.map(
+                          (t) =>
+                            playerNameRegex.exec(t.playerName)?.groups?.name ??
+                            "",
+                        ),
+                        Array.contains(
+                          playerNameRegex.exec(headTeam.playerName)?.groups
+                            ?.name ?? "",
                         ),
                       ),
                   ),
@@ -199,11 +196,11 @@ const cartesianTeams = (
                             tags: HashSet.make("placeholder"),
                           }),
                         ),
-                        Array.appendAll(product),
-                        Array.make,
                       ),
                     onNonEmpty: Function.identity,
                   }),
+                  Array.map((headTeam) => Array.make(headTeam)),
+                  Array.map(Array.appendAll(product)),
                 ),
             ),
           ),
