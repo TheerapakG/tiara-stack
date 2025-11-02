@@ -33,11 +33,11 @@ import {
   Array,
   DateTime,
   Effect,
-  Function,
   HashMap,
   Match,
   Option,
   pipe,
+  HashSet,
 } from "effect";
 import { Schema } from "sheet-apis";
 import { Utils } from "typhoon-core/utils";
@@ -206,14 +206,16 @@ const handleManual =
               Array.getSomes,
               Array.map((player) =>
                 pipe(
-                  Match.type<Schema.Player | Schema.PartialNamePlayer>(),
-                  Match.tag("Player", (player) => Option.some(player.id)),
-                  Match.tag("PartialNamePlayer", () => Option.none()),
-                  Match.exhaustive,
-                  Function.apply(player),
+                  Match.value(player),
+                  Match.tagsExhaustive({
+                    Player: (player) => Option.some(player.id),
+                    PartialNamePlayer: () => Option.none(),
+                  }),
                 ),
               ),
               Array.getSomes,
+              HashSet.fromIterable,
+              HashSet.toValues,
             ),
           ),
           Effect.bind("checkinMessages", ({ checkinData }) =>
