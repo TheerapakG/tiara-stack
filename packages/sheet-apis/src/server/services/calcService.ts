@@ -135,7 +135,7 @@ const cartesianHeadTeams = (teams: ReadonlyArray<PlayerTeam>) =>
             tags: HashSet.make("placeholder"),
           }),
         ),
-      onNonEmpty: (self) => self,
+      onNonEmpty: Function.identity,
     }),
   );
 
@@ -202,7 +202,7 @@ const cartesianTeams = (
                         Array.appendAll(product),
                         Array.make,
                       ),
-                    onNonEmpty: (self) => self,
+                    onNonEmpty: Function.identity,
                   }),
                 ),
             ),
