@@ -3,8 +3,8 @@ import { DefaultTaggedClass } from "typhoon-core/schema";
 
 export class Team extends Schema.TaggedClass<Team>()("Team", {
   type: Schema.String,
-  playerName: Schema.String,
-  teamName: Schema.String,
+  playerName: Schema.OptionFromNullishOr(Schema.String, undefined),
+  teamName: Schema.OptionFromNullishOr(Schema.String, undefined),
   tags: Schema.Array(Schema.String),
   lead: Schema.OptionFromNullishOr(Schema.Number, undefined),
   backline: Schema.OptionFromNullishOr(Schema.Number, undefined),

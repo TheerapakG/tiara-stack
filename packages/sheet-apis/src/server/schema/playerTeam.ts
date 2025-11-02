@@ -4,7 +4,7 @@ import { Option, pipe } from "effect";
 
 export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
   type: Schema.String,
-  playerName: Schema.String,
+  playerName: Schema.OptionFromNullishOr(Schema.String, undefined),
   teamName: Schema.String,
   lead: Schema.Number,
   backline: Schema.Number,
@@ -40,7 +40,7 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
           Option.orElseSome(() => 0),
         );
     if (
-      team.teamName === "" ||
+      Option.isNone(team.teamName) ||
       Option.isNone(team.lead) ||
       Option.isNone(team.backline) ||
       Option.isNone(talent)
@@ -51,7 +51,7 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
       new PlayerTeam({
         type: team.type,
         playerName: team.playerName,
-        teamName: team.teamName,
+        teamName: team.teamName.value,
         lead: team.lead.value,
         backline: team.backline.value,
         talent: talent.value,
