@@ -1,10 +1,19 @@
-import { Effect } from "effect";
-import { GoogleAuth as GoogleAuthLibrary } from "google-auth-library";
+import { Effect, pipe } from "effect";
+import { GoogleAuth } from "google-auth-library";
 
-export class GoogleAuth extends Effect.Service<GoogleAuth>()("GoogleAuth", {
-  sync: () =>
-    new GoogleAuthLibrary({
-      keyFile: "/.secret/google-service-account.json",
-      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-    }),
-}) {}
+export class GoogleAuthService extends Effect.Service<GoogleAuthService>()(
+  "GoogleAuthService",
+  {
+    sync: () =>
+      pipe(
+        new GoogleAuth({
+          keyFile: "/.secret/google-service-account.json",
+          scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+        }),
+        (auth) => ({
+          getAuth: () => auth,
+        }),
+      ),
+    accessors: true,
+  },
+) {}

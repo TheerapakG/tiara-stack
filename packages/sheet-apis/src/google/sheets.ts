@@ -21,7 +21,7 @@ import {
   TupleToStructSchema,
 } from "typhoon-core/schema";
 import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
-import { GoogleAuth } from "./auth";
+import { GoogleAuthService } from "./auth";
 
 const parseValueRanges = <
   Ranges extends Array.NonEmptyReadonlyArray<sheets_v4.Schema$ValueRange>,
@@ -193,7 +193,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
   {
     effect: pipe(
       Effect.Do,
-      Effect.bind("auth", () => GoogleAuth),
+      Effect.bind("auth", () => GoogleAuthService.getAuth()),
       Effect.bind("sheets", ({ auth }) =>
         Effect.try(() =>
           sheets({
@@ -350,7 +350,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
           ),
       })),
     ),
-    dependencies: [GoogleAuth.Default],
+    dependencies: [GoogleAuthService.Default],
     accessors: true,
   },
 ) {
