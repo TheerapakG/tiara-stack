@@ -1,5 +1,4 @@
 import { Option, Order, pipe, Schema } from "effect";
-import { DefaultTaggedClass } from "typhoon-core/schema";
 
 export class Team extends Schema.TaggedClass<Team>()("Team", {
   type: Schema.String,
