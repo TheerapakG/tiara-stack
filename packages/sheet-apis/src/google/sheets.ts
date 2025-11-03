@@ -16,10 +16,6 @@ import {
   String,
   Types,
 } from "effect";
-import {
-  OptionArrayToOptionTupleSchema,
-  TupleToStructSchema,
-} from "typhoon-core/schema";
 import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 import { GoogleAuthService } from "./auth";
 
@@ -94,31 +90,6 @@ const rowToCellSchema = pipe(
     encode: Option.some,
   }),
 );
-
-const rowToCellTupleSchema = <const Length extends number>(length: Length) =>
-  OptionArrayToOptionTupleSchema(
-    length,
-    Schema.String,
-  ) as unknown as Schema.Schema<
-    Types.TupleOf<Length, Option.Option<string>>,
-    readonly Option.Option<string>[],
-    never
-  >;
-
-const cellTupleToCellStructSchema = <const Keys extends ReadonlyArray<string>>(
-  keys: Keys,
-) =>
-  TupleToStructSchema(
-    keys,
-    Array.makeBy(keys.length, () => cellSchema) as Types.TupleOf<
-      Keys["length"],
-      typeof cellSchema
-    >,
-  ) as unknown as Schema.Schema<
-    { [K in Keys[number]]: Option.Option<string> },
-    Types.TupleOf<Keys["length"], Option.Option<string>>,
-    never
-  >;
 
 const matchAll =
   <Pattern extends string, Context extends RegexContext>(
@@ -360,8 +331,6 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
   static cellSchema = cellSchema;
   static rowSchema = rowSchema;
   static rowToCellSchema = rowToCellSchema;
-  static rowToCellTupleSchema = rowToCellTupleSchema;
-  static cellTupleToCellStructSchema = cellTupleToCellStructSchema;
   static toStringSchema = toStringSchema;
   static cellToStringSchema = Schema.OptionFromSelf(toStringSchema);
   static toNumberSchema = toNumberSchema;

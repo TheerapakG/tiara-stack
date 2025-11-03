@@ -22,7 +22,10 @@ import {
   String,
   Match,
 } from "effect";
-import { DefaultTaggedClass } from "typhoon-core/schema";
+import {
+  DefaultTaggedClass,
+  OptionArrayToOptionStructValueSchema,
+} from "typhoon-core/schema";
 
 const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
   pipe(
@@ -30,9 +33,8 @@ const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
       [range],
       Schema.Tuple(
         pipe(
-          GoogleSheets.rowToCellTupleSchema(11),
-          Schema.compose(
-            GoogleSheets.cellTupleToCellStructSchema([
+          OptionArrayToOptionStructValueSchema(
+            [
               "channel",
               "day",
               "sheet",
@@ -44,7 +46,8 @@ const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
               "standbyRange",
               "screenshotRange",
               "draft",
-            ]),
+            ],
+            Schema.String,
           ),
           Schema.compose(
             Schema.Struct({
@@ -77,9 +80,8 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
       [range],
       Schema.Tuple(
         pipe(
-          GoogleSheets.rowToCellTupleSchema(9),
-          Schema.compose(
-            GoogleSheets.cellTupleToCellStructSchema([
+          OptionArrayToOptionStructValueSchema(
+            [
               "name",
               "sheet",
               "playerNameRange",
@@ -89,7 +91,8 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
               "talentRange",
               "tagsType",
               "tags",
-            ]),
+            ],
+            Schema.String,
           ),
           Schema.compose(
             pipe(
@@ -192,9 +195,9 @@ const runnerConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
       [range],
       Schema.Tuple(
         pipe(
-          GoogleSheets.rowToCellTupleSchema(2),
-          Schema.compose(
-            GoogleSheets.cellTupleToCellStructSchema(["name", "hours"]),
+          OptionArrayToOptionStructValueSchema(
+            ["name", "hours"],
+            Schema.String,
           ),
           Schema.compose(
             pipe(

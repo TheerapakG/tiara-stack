@@ -25,7 +25,7 @@ import {
   String,
   Boolean,
 } from "effect";
-import { TupleToStructSchema } from "typhoon-core/schema";
+import { TupleToStructValueSchema } from "typhoon-core/schema";
 import { Computed } from "typhoon-core/signal";
 import { Array as ArrayUtils, Struct as StructUtils } from "typhoon-core/utils";
 import { GuildConfigService } from "../guildConfigService";
@@ -65,10 +65,7 @@ const playerParser = ([
     GoogleSheets.parseValueRanges(
       [userIds, userSheetNames],
       pipe(
-        GoogleSheets.tupleSchema(2, GoogleSheets.rowToCellSchema),
-        Schema.compose(
-          GoogleSheets.cellTupleToCellStructSchema(["id", "name"]),
-        ),
+        TupleToStructValueSchema(["id", "name"], GoogleSheets.rowToCellSchema),
         Schema.compose(
           Schema.Struct({
             id: GoogleSheets.cellToStringSchema,
@@ -219,16 +216,16 @@ const teamParser = (
           GoogleSheets.parseValueRanges(
             valueRanges,
             pipe(
-              GoogleSheets.tupleSchema(6, GoogleSheets.rowToCellSchema),
-              Schema.compose(
-                GoogleSheets.cellTupleToCellStructSchema([
+              TupleToStructValueSchema(
+                [
                   "playerName",
                   "teamName",
                   "lead",
                   "backline",
                   "talent",
                   "tags",
-                ]),
+                ],
+                GoogleSheets.rowToCellSchema,
               ),
               Schema.compose(
                 Schema.Struct({
@@ -488,26 +485,29 @@ const scheduleParser = (
             GoogleSheets.parseValueRanges(
               valueRanges,
               pipe(
-                GoogleSheets.tupleSchema(5, GoogleSheets.rowSchema),
-                Schema.compose(
-                  TupleToStructSchema(
-                    ["hour", "fills", "overfills", "standbys", "breakHour"],
-                    [
-                      GoogleSheets.rowToCellSchema,
-                      GoogleSheets.rowSchema,
-                      GoogleSheets.rowToCellSchema,
-                      GoogleSheets.rowToCellSchema,
-                      GoogleSheets.rowToCellSchema,
-                    ],
-                  ),
+                TupleToStructValueSchema(
+                  ["hour", "fills", "overfills", "standbys", "breakHour"],
+                  GoogleSheets.rowSchema,
                 ),
                 Schema.compose(
                   Schema.Struct({
-                    hour: GoogleSheets.cellToNumberSchema,
+                    hour: pipe(
+                      GoogleSheets.rowToCellSchema,
+                      Schema.compose(GoogleSheets.cellToNumberSchema),
+                    ),
                     fills: GoogleSheets.rowSchema,
-                    overfills: GoogleSheets.cellToStringArraySchema,
-                    standbys: GoogleSheets.cellToStringArraySchema,
-                    breakHour: GoogleSheets.cellToBooleanSchema,
+                    overfills: pipe(
+                      GoogleSheets.rowToCellSchema,
+                      Schema.compose(GoogleSheets.cellToStringArraySchema),
+                    ),
+                    standbys: pipe(
+                      GoogleSheets.rowToCellSchema,
+                      Schema.compose(GoogleSheets.cellToStringArraySchema),
+                    ),
+                    breakHour: pipe(
+                      GoogleSheets.rowToCellSchema,
+                      Schema.compose(GoogleSheets.cellToBooleanSchema),
+                    ),
                   }),
                 ),
               ),
