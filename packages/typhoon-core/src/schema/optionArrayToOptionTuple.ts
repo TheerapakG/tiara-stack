@@ -3,16 +3,18 @@ import { Array, Function, Option, pipe, Schema, Types } from "effect";
 const OptionArrayToOptionTupleTypeId: typeof Schema.TypeId = Schema.TypeId;
 export { OptionArrayToOptionTupleTypeId };
 
-interface OptionArrayToOptionTupleSchema<
+type OptionArrayToOptionTupleSchema<
   Count extends number,
   Value extends Schema.Schema.Any,
-> extends Schema.transform<
-    Schema.Array$<Schema.OptionFromSelf<Value>>,
-    Schema.Tuple<Types.TupleOf<Count, Schema.OptionFromSelf<Value>>>
-  > {
+> = Schema.transform<
+  Schema.Array$<
+    Schema.OptionFromSelf<Schema.SchemaClass<Schema.Schema.Encoded<Value>>>
+  >,
+  Schema.Tuple<Types.TupleOf<Count, Schema.OptionFromSelf<Value>>>
+> & {
   readonly count: Count;
   readonly value: Value;
-}
+};
 
 const makeOptionArrayToOptionTupleClass = <
   const Count extends number,
@@ -21,7 +23,9 @@ const makeOptionArrayToOptionTupleClass = <
   count: Count,
   value: Value,
 ) => {
-  const ArraySchema = Schema.Array(Schema.OptionFromSelf(value));
+  const ArraySchema = Schema.Array(
+    Schema.OptionFromSelf(Schema.encodedSchema(value)),
+  );
   const TupleSchema = Schema.Tuple(
     ...(Array.makeBy(count, () =>
       Schema.OptionFromSelf(value),
@@ -39,7 +43,7 @@ const makeOptionArrayToOptionTupleClass = <
   }) {
     static count = count;
     static value = value;
-  } as OptionArrayToOptionTupleSchema<Count, Value>;
+  } as unknown as OptionArrayToOptionTupleSchema<Count, Value>;
 };
 
 const OptionArrayToOptionTupleSchema = <
