@@ -1,6 +1,6 @@
 import { HashSet, Order, Schema } from "effect";
 import { Team } from "./team";
-import { Option, pipe } from "effect";
+import { Option, pipe, String } from "effect";
 
 export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
   type: Schema.String,
@@ -11,8 +11,11 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
   talent: Schema.Number,
   tags: Schema.HashSet(Schema.String),
 }) {
+  static getEffectValue = (playerTeam: PlayerTeam) =>
+    playerTeam.lead + (playerTeam.backline - playerTeam.lead) / 5;
+
   static byPlayerName = Order.mapInput(
-    Option.getOrder(Schema.String.Order),
+    Option.getOrder(String.Order),
     ({ playerName }: PlayerTeam) => playerName,
   );
   static byTalent = Order.mapInput(
@@ -20,7 +23,7 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
     ({ talent }: PlayerTeam) => talent,
   );
   static byEffectValue = Order.mapInput(
-    Option.getOrder(Order.number),
+    Order.number,
     PlayerTeam.getEffectValue,
   );
 
@@ -36,9 +39,6 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
         tags: HashSet.union(playerTeam.tags, tags),
       });
   }
-
-  static getEffectValue = (playerTeam: PlayerTeam) =>
-    playerTeam.lead + (playerTeam.backline - playerTeam.lead) / 5;
 
   static fromTeam(cc: boolean, team: Team) {
     const talent = cc

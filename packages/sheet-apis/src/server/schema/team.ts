@@ -1,4 +1,4 @@
-import { Option, Order, pipe, Schema } from "effect";
+import { Option, Number, Order, pipe, Schema, String } from "effect";
 
 export class Team extends Schema.TaggedClass<Team>()("Team", {
   type: Schema.String,
@@ -9,19 +9,6 @@ export class Team extends Schema.TaggedClass<Team>()("Team", {
   backline: Schema.OptionFromNullishOr(Schema.Number, undefined),
   talent: Schema.OptionFromNullishOr(Schema.Number, undefined),
 }) {
-  static byPlayerName = Order.mapInput(
-    Option.getOrder(Schema.String.Order),
-    ({ playerName }: Team) => playerName,
-  );
-  static byTalent = Order.mapInput(
-    Option.getOrder(Order.number),
-    ({ talent }: Team) => talent,
-  );
-  static byEffectValue = Order.mapInput(
-    Option.getOrder(Order.number),
-    Team.getEffectValue,
-  );
-
   static getEffectValue = (team: Team) =>
     pipe(
       Option.Do,
@@ -29,4 +16,17 @@ export class Team extends Schema.TaggedClass<Team>()("Team", {
       Option.bind("backline", () => team.backline),
       Option.map(({ lead, backline }) => lead + (backline - lead) / 5),
     );
+
+  static byPlayerName = Order.mapInput(
+    Option.getOrder(String.Order),
+    ({ playerName }: Team) => playerName,
+  );
+  static byTalent = Order.mapInput(
+    Option.getOrder(Number.Order),
+    ({ talent }: Team) => talent,
+  );
+  static byEffectValue = Order.mapInput(
+    Option.getOrder(Number.Order),
+    Team.getEffectValue,
+  );
 }
