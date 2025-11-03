@@ -1,56 +1,67 @@
-import { pipe, Schema, Types } from "effect";
+import { Option, pipe, Schema } from "effect";
 
-export const DefaultTaggedClass = <
-  TaggedClass extends Schema.Schema.Any & {
-    readonly _tag: string;
-    readonly fields: Schema.Struct.Fields;
-  },
-  Self extends
-    Schema.Schema.Type<TaggedClass> = Schema.Schema.Type<TaggedClass>,
-  Tag extends TaggedClass["_tag"] = TaggedClass["_tag"],
-  Fields extends TaggedClass["fields"] = TaggedClass["fields"],
-  OmitFields extends Types.Simplify<Omit<Fields, "_tag">> &
-    Schema.Struct.Fields = Types.Simplify<Omit<Fields, "_tag">> &
-    Schema.Struct.Fields,
->(
-  taggedClass: TaggedClass,
+type TaggedClass = Schema.Schema.Any & {
+  readonly _tag: string;
+  readonly fields: Schema.Struct.Fields & { _tag: Schema.tag<any> };
+};
+
+type Tag<Tagged extends TaggedClass> = Tagged["_tag"];
+type Fields<Tagged extends TaggedClass> = Tagged["fields"];
+
+export const DefaultTaggedClass = <Tagged extends TaggedClass>(
+  taggedClass: Tagged,
 ): Schema.Schema<
-  Self,
-  Schema.Struct.Encoded<OmitFields> & {
-    readonly _tag?: Tag;
-  },
-  Schema.Schema.Context<TaggedClass>
+  Schema.Schema.Type<Tagged>,
+  Schema.Struct.Encoded<Omit<Fields<Tagged>, "_tag">> &
+    Schema.Struct.Encoded<{
+      _tag: Schema.PropertySignature<
+        ":",
+        Tag<Tagged>,
+        never,
+        "?:",
+        Tag<Tagged>,
+        false,
+        never
+      >;
+    }>,
+  Schema.Schema.Context<Tagged>
 > =>
   pipe(
-    Schema.extend(
-      Schema.encodedSchema(Schema.Struct(taggedClass.fields).omit("_tag")),
-      Schema.Struct({
-        _tag: pipe(
-          Schema.Literal(taggedClass._tag),
-          Schema.optional,
-          Schema.withDefaults({
-            constructor: () => taggedClass._tag,
-            decoding: () => taggedClass._tag,
-          }),
-        ),
-      }),
+    pipe(
+      Schema.Struct(taggedClass.fields).omit("_tag"),
+      Schema.encodedSchema,
+      Schema.extend(
+        Schema.Struct({
+          _tag: Schema.optionalToRequired(
+            Schema.Literal(taggedClass._tag),
+            Schema.Literal(taggedClass._tag),
+            {
+              decode: Option.getOrElse(() => taggedClass._tag),
+              encode: (value) => Option.some(value),
+            },
+          ),
+        }),
+      ),
     ) as unknown as Schema.Schema<
-      Schema.Struct.Encoded<Fields>,
-      Schema.Struct.Encoded<OmitFields> & {
-        readonly _tag?: Tag;
-      }
+      Schema.Struct.Encoded<Fields<Tagged>>,
+      Schema.Struct.Encoded<Omit<Fields<Tagged>, "_tag">> &
+        Schema.Struct.Encoded<{
+          _tag: Schema.PropertySignature<
+            ":",
+            Tag<Tagged>,
+            never,
+            "?:",
+            Tag<Tagged>,
+            false,
+            never
+          >;
+        }>
     >,
     Schema.compose(
       taggedClass as Schema.Schema<
-        Self,
-        Schema.Struct.Encoded<Fields>,
-        Schema.Schema.Context<TaggedClass>
+        Schema.Schema.Type<Tagged>,
+        Schema.Struct.Encoded<Fields<Tagged>>,
+        Schema.Schema.Context<Tagged>
       >,
     ),
-  ) as Schema.Schema<
-    Self,
-    Schema.Struct.Encoded<OmitFields> & {
-      readonly _tag?: Tag;
-    },
-    Schema.Schema.Context<TaggedClass>
-  >;
+  );
