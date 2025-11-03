@@ -1,5 +1,6 @@
-import { Error, DefaultTaggedTeam } from "@/server/schema";
+import { Error, Team } from "@/server/schema";
 import { pipe, Schema } from "effect";
+import { DefaultTaggedClass } from "typhoon-core/schema";
 import { Handler } from "typhoon-core/server";
 
 export const botCalcHandlerConfig = pipe(
@@ -14,7 +15,7 @@ export const botCalcHandlerConfig = pipe(
           considerEnc: Schema.Boolean,
         }),
         players: pipe(
-          Schema.Array(Schema.Array(DefaultTaggedTeam)),
+          Schema.Array(Schema.Array(DefaultTaggedClass(Team))),
           Schema.itemsCount(5),
         ),
       }),

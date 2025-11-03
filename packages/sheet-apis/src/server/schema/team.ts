@@ -31,5 +31,3 @@ export class Team extends Schema.TaggedClass<Team>()("Team", {
       Option.map(({ lead, backline }) => lead + (backline - lead) / 5),
     );
 }
-
-export const DefaultTaggedTeam = DefaultTaggedClass(Team);
