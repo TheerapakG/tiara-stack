@@ -21,7 +21,7 @@
   "dependencies": {
     "@standard-schema/spec": "^1.0.0",
     "core-js": "^3.44.0",
-    "effect": "^3.17.14",
+    "effect": "^3.18.4",
     "sheet-apis": "workspace:*",
     "typhoon-client-apps-script": "workspace:*",
     "typhoon-core": "workspace:*"
