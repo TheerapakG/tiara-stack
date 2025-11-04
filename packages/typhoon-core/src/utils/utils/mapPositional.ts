@@ -1,6 +1,6 @@
-import { Array, Effect, HashMap, Struct, pipe, Tuple } from "effect";
+import { Array, Effect, HashMap, Option, Struct, pipe, Tuple } from "effect";
 
-export const HashMapPositional =
+export const hashMapPositional =
   <In, Out, E, R>(
     f: (a: ReadonlyArray<In>) => Effect.Effect<ReadonlyArray<Out>, E, R>,
   ) =>
@@ -46,4 +46,36 @@ export const mapPositional =
       Effect.map(({ keys, resultValues }) =>
         pipe(Array.zip(keys, resultValues), Object.fromEntries),
       ),
+    );
+
+export const arraySomesPositional =
+  <In, Out, E, R>(
+    f: (a: ReadonlyArray<In>) => Effect.Effect<ReadonlyArray<Out>, E, R>,
+  ) =>
+  (
+    array: ReadonlyArray<Option.Option<In>>,
+  ): Effect.Effect<ReadonlyArray<Option.Option<Out>>, E, R> =>
+    pipe(
+      Effect.Do,
+      Effect.let("values", () => pipe(array, Array.getSomes)),
+      Effect.bind("resultValues", ({ values }) => f(values)),
+      Effect.map(({ resultValues }) =>
+        pipe(
+          array,
+          Array.reduce(
+            { resultIndex: 0, result: [] as Option.Option<Out>[] },
+            ({ resultIndex, result }, value) => ({
+              resultIndex: Option.isSome(value) ? resultIndex + 1 : resultIndex,
+              result: Array.append(
+                result,
+                pipe(
+                  value,
+                  Option.flatMap(() => Array.get(resultValues, resultIndex)),
+                ),
+              ),
+            }),
+          ),
+        ),
+      ),
+      Effect.map(({ result }) => result),
     );

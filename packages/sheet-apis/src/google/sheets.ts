@@ -215,7 +215,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
         ) =>
           pipe(
             ranges,
-            Utils.HashMapPositional((ranges: readonly string[]) =>
+            Utils.hashMapPositional((ranges: readonly string[]) =>
               pipe(
                 Effect.tryPromise({
                   try: () =>
