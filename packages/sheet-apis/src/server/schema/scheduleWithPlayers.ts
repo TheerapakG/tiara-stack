@@ -84,7 +84,7 @@ export class ScheduleWithPlayers extends Schema.TaggedClass<ScheduleWithPlayers>
             5 - fills.filter(Option.isSome).length - overfills.length,
             0,
           ),
-        EmptyScheduleWithPlayers: () => 0,
+        EmptyScheduleWithPlayers: () => 5,
       }),
     );
 }

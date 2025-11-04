@@ -67,7 +67,7 @@ export class Schedule extends Schema.TaggedClass<Schedule>()("Schedule", {
             5 - fills.filter(Option.isSome).length - overfills.length,
             0,
           ),
-        EmptySchedule: () => 0,
+        EmptySchedule: () => 5,
       }),
     );
 }
