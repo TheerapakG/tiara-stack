@@ -7,7 +7,9 @@ type BaseRpcErrorFields = {
 type RpcErrorFields<CauseType, CauseEncoded, CauseContext> =
   BaseRpcErrorFields & {
     readonly cause: Schema.Schema<CauseType, CauseEncoded, CauseContext>;
-  };
+  } extends infer B
+    ? B
+    : never;
 
 interface RpcErrorClass<CauseType, CauseEncoded, CauseContext>
   extends Schema.TaggedErrorClass<

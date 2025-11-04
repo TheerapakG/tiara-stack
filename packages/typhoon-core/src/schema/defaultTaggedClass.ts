@@ -8,10 +8,9 @@ type TaggedClass = Schema.Schema.Any & {
 type Tag<Tagged extends TaggedClass> = Tagged["_tag"];
 type Fields<Tagged extends TaggedClass> = Tagged["fields"];
 
-export const DefaultTaggedClass = <Tagged extends TaggedClass>(
-  taggedClass: Tagged,
-): Schema.Schema<
-  Schema.Schema.Type<Tagged>,
+type DefaultTaggedClassType<Tagged extends TaggedClass> =
+  Schema.Schema.Type<Tagged>;
+type DefaultTaggedClassEncoded<Tagged extends TaggedClass> =
   Schema.Struct.Encoded<Omit<Fields<Tagged>, "_tag">> &
     Schema.Struct.Encoded<{
       _tag: Schema.PropertySignature<
@@ -23,9 +22,20 @@ export const DefaultTaggedClass = <Tagged extends TaggedClass>(
         false,
         never
       >;
-    }>,
-  Schema.Schema.Context<Tagged>
-> =>
+    }> extends infer B
+    ? B
+    : never;
+type DefaultTaggedClassContext<Tagged extends TaggedClass> =
+  Schema.Schema.Context<Tagged>;
+type DefaultTaggedClass<Tagged extends TaggedClass> = Schema.Schema<
+  DefaultTaggedClassType<Tagged>,
+  DefaultTaggedClassEncoded<Tagged>,
+  DefaultTaggedClassContext<Tagged>
+>;
+
+export const DefaultTaggedClass = <Tagged extends TaggedClass>(
+  taggedClass: Tagged,
+): DefaultTaggedClass<Tagged> =>
   pipe(
     pipe(
       Schema.Struct(taggedClass.fields).omit("_tag"),
@@ -44,24 +54,13 @@ export const DefaultTaggedClass = <Tagged extends TaggedClass>(
       ),
     ) as unknown as Schema.Schema<
       Schema.Struct.Encoded<Fields<Tagged>>,
-      Schema.Struct.Encoded<Omit<Fields<Tagged>, "_tag">> &
-        Schema.Struct.Encoded<{
-          _tag: Schema.PropertySignature<
-            ":",
-            Tag<Tagged>,
-            never,
-            "?:",
-            Tag<Tagged>,
-            false,
-            never
-          >;
-        }>
+      DefaultTaggedClassEncoded<Tagged>
     >,
     Schema.compose(
       taggedClass as Schema.Schema<
-        Schema.Schema.Type<Tagged>,
+        DefaultTaggedClassType<Tagged>,
         Schema.Struct.Encoded<Fields<Tagged>>,
-        Schema.Schema.Context<Tagged>
+        DefaultTaggedClassContext<Tagged>
       >,
     ),
-  );
+  ) as DefaultTaggedClass<Tagged>;

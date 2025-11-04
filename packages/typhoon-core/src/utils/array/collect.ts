@@ -1,4 +1,14 @@
-import { Array, Function, HashMap, Option, Struct, Tuple, Types } from "effect";
+import {
+  Array,
+  Data,
+  Function,
+  HashMap,
+  Option,
+  pipe,
+  Struct,
+  Tuple,
+  Types,
+} from "effect";
 
 export const toHashMap =
   <A, B, K>({
@@ -10,7 +20,7 @@ export const toHashMap =
     valueInitializer: (a: A) => B;
     valueReducer: (b: NoInfer<B>, a: NoInfer<A>) => NoInfer<B>;
   }) =>
-  (a: ReadonlyArray<A>) =>
+  (a: ReadonlyArray<A>): HashMap.HashMap<K, B> =>
     Array.reduce(a, HashMap.empty<K, B>(), (acc, v) =>
       HashMap.modifyAt(
         acc,
@@ -23,7 +33,7 @@ export const toHashMap =
     );
 
 export const toHashMapByKeyWith =
-  <K extends PropertyKey, A extends { [P in K]?: any }, B>({
+  <const K extends PropertyKey, A extends { [P in K]?: any }, B>({
     key,
     valueInitializer,
     valueReducer,
@@ -32,7 +42,9 @@ export const toHashMapByKeyWith =
     valueInitializer: (a: A) => B;
     valueReducer: (b: NoInfer<B>, a: NoInfer<A>) => NoInfer<B>;
   }) =>
-  (a: ReadonlyArray<A>) =>
+  (
+    a: ReadonlyArray<A>,
+  ): HashMap.HashMap<Types.MatchRecord<A, A[K] | undefined, A[K]>, B> =>
     toHashMap<A, B, Types.MatchRecord<A, A[K] | undefined, A[K]>>({
       keyGetter: Struct.get(key),
       valueInitializer: valueInitializer,
@@ -40,8 +52,10 @@ export const toHashMapByKeyWith =
     })(a);
 
 export const toHashMapByKey =
-  <K extends PropertyKey>(key: K) =>
-  <A extends { [P in K]?: any }>(a: ReadonlyArray<A>) =>
+  <const K extends PropertyKey>(key: K) =>
+  <A extends { [P in K]?: any }>(
+    a: ReadonlyArray<A>,
+  ): HashMap.HashMap<Types.MatchRecord<A, A[K] | undefined, A[K]>, A> =>
     toHashMapByKeyWith<K, A, A>({
       key,
       valueInitializer: Function.identity,
@@ -49,10 +63,73 @@ export const toHashMapByKey =
     })(a);
 
 export const toArrayHashMapByKey =
-  <K extends PropertyKey>(key: K) =>
-  <A extends { [P in K]?: any }>(a: ReadonlyArray<A>) =>
+  <const K extends PropertyKey>(key: K) =>
+  <A extends { [P in K]?: any }>(
+    a: ReadonlyArray<A>,
+  ): HashMap.HashMap<
+    Types.MatchRecord<A, A[K] | undefined, A[K]>,
+    Array.NonEmptyArray<A>
+  > =>
     toHashMapByKeyWith<K, A, Array.NonEmptyArray<A>>({
       key,
+      valueInitializer: Array.make,
+      valueReducer: Array.append,
+    })(a);
+
+type MapStructKeyValues<
+  Keys extends Array.NonEmptyReadonlyArray<PropertyKey>,
+  A extends { [P in Keys[number]]?: any },
+> = {
+  [K in Keys[number]]: Types.MatchRecord<A, A[K] | undefined, A[K]>;
+} extends infer B
+  ? B
+  : never;
+
+export const toHashMapByKeysWith =
+  <
+    const Keys extends Array.NonEmptyReadonlyArray<PropertyKey>,
+    A extends { [P in Keys[number]]?: any },
+    B,
+  >({
+    keys,
+    valueInitializer,
+    valueReducer,
+  }: {
+    keys: Keys;
+    valueInitializer: (a: A) => B;
+    valueReducer: (b: NoInfer<B>, a: NoInfer<A>) => NoInfer<B>;
+  }) =>
+  (a: ReadonlyArray<A>): HashMap.HashMap<MapStructKeyValues<Keys, A>, B> =>
+    toHashMap<A, B, MapStructKeyValues<Keys, A>>({
+      keyGetter: (a) =>
+        pipe(
+          keys,
+          Array.map((key) => [key, pipe(a, Struct.get(key))]),
+          Object.fromEntries,
+          Data.struct,
+        ) as unknown as MapStructKeyValues<Keys, A>,
+      valueInitializer: valueInitializer,
+      valueReducer: valueReducer,
+    })(a);
+
+export const toHashMapByKeys =
+  <const Keys extends Array.NonEmptyReadonlyArray<PropertyKey>>(keys: Keys) =>
+  <A extends { [P in Keys[number]]?: any }>(
+    a: ReadonlyArray<A>,
+  ): HashMap.HashMap<MapStructKeyValues<Keys, A>, A> =>
+    toHashMapByKeysWith<Keys, A, A>({
+      keys,
+      valueInitializer: Function.identity,
+      valueReducer: Function.untupled(Tuple.getSecond),
+    })(a);
+
+export const toArrayHashMapByKeys =
+  <const Keys extends Array.NonEmptyReadonlyArray<PropertyKey>>(keys: Keys) =>
+  <A extends { [P in Keys[number]]?: any }>(
+    a: ReadonlyArray<A>,
+  ): HashMap.HashMap<MapStructKeyValues<Keys, A>, Array.NonEmptyArray<A>> =>
+    toHashMapByKeysWith<Keys, A, Array.NonEmptyArray<A>>({
+      keys,
       valueInitializer: Array.make,
       valueReducer: Array.append,
     })(a);
