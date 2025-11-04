@@ -21,16 +21,14 @@ import {
 import {
   Array,
   Effect,
-  Function,
-  HashMap,
   Match,
   Number,
+  Option,
   Order,
   pipe,
   String,
 } from "effect";
 import { Schema } from "sheet-apis";
-import { Utils } from "typhoon-core/utils";
 
 const formatHourRanges = (hours: readonly number[]): string => {
   if (Array.isEmptyReadonlyArray(hours)) return "None";
@@ -83,20 +81,27 @@ const handleList =
             pipe(
               SheetService.daySchedules(day),
               Effect.map(
-                HashMap.reduce(
-                  HashMap.empty<number, Schema.Schedule>(),
-                  (acc, a) => HashMap.union(acc, a),
+                Array.map((s) =>
+                  pipe(
+                    s.hour,
+                    Option.map(() => s),
+                  ),
                 ),
               ),
+              Effect.map(Array.getSomes),
             ),
           ),
           Effect.bind("schedulesWithPlayers", ({ daySchedules }) =>
             pipe(
               daySchedules,
-              Utils.HashMapPositional(PlayerService.mapScheduleWithPlayers),
-              Effect.map(HashMap.values),
+              PlayerService.mapScheduleWithPlayers,
               Effect.map(
-                Array.sortBy(Order.mapInput(Number.Order, ({ hour }) => hour)),
+                Array.sortBy(
+                  Order.mapInput(
+                    Option.getOrder(Number.Order),
+                    ({ hour }) => hour,
+                  ),
+                ),
               ),
             ),
           ),
@@ -106,22 +111,22 @@ const handleList =
               Array.filter((s) => !s.breakHour),
               Array.filter((s) =>
                 pipe(
-                  s.fills,
+                  Schema.ScheduleWithPlayers.getFills(s),
                   Array.getSomes,
                   Array.some((p) =>
                     pipe(
-                      Match.type<Schema.Player | Schema.PartialNamePlayer>(),
-                      Match.tag("Player", (player) =>
-                        String.Equivalence(player.id, user.id),
-                      ),
-                      Match.tag("PartialNamePlayer", () => false),
-                      Match.exhaustive,
-                      Function.apply(p),
+                      Match.value(p),
+                      Match.tagsExhaustive({
+                        Player: (player) =>
+                          String.Equivalence(player.id, user.id),
+                        PartialNamePlayer: () => false,
+                      }),
                     ),
                   ),
                 ),
               ),
               Array.map((s) => s.hour),
+              Array.getSomes,
             ),
           ),
           Effect.let("overfillHours", ({ schedulesWithPlayers, user }) =>
@@ -130,21 +135,21 @@ const handleList =
               Array.filter((s) => !s.breakHour),
               Array.filter((s) =>
                 pipe(
-                  s.overfills,
+                  Schema.ScheduleWithPlayers.getOverfills(s),
                   Array.some((p) =>
                     pipe(
-                      Match.type<Schema.Player | Schema.PartialNamePlayer>(),
-                      Match.tag("Player", (player) =>
-                        String.Equivalence(player.id, user.id),
-                      ),
-                      Match.tag("PartialNamePlayer", () => false),
-                      Match.exhaustive,
-                      Function.apply(p),
+                      Match.value(p),
+                      Match.tagsExhaustive({
+                        Player: (player) =>
+                          String.Equivalence(player.id, user.id),
+                        PartialNamePlayer: () => false,
+                      }),
                     ),
                   ),
                 ),
               ),
               Array.map((s) => s.hour),
+              Array.getSomes,
             ),
           ),
           Effect.let("standbyHours", ({ schedulesWithPlayers, user }) =>
@@ -153,21 +158,21 @@ const handleList =
               Array.filter((s) => !s.breakHour),
               Array.filter((s) =>
                 pipe(
-                  s.standbys,
+                  Schema.ScheduleWithPlayers.getStandbys(s),
                   Array.some((p) =>
                     pipe(
-                      Match.type<Schema.Player | Schema.PartialNamePlayer>(),
-                      Match.tag("Player", (player) =>
-                        String.Equivalence(player.id, user.id),
-                      ),
-                      Match.tag("PartialNamePlayer", () => false),
-                      Match.exhaustive,
-                      Function.apply(p),
+                      Match.value(p),
+                      Match.tagsExhaustive({
+                        Player: (player) =>
+                          String.Equivalence(player.id, user.id),
+                        PartialNamePlayer: () => false,
+                      }),
                     ),
                   ),
                 ),
               ),
               Array.map((s) => s.hour),
+              Array.getSomes,
             ),
           ),
           InteractionContext.editReply.tapEffect(

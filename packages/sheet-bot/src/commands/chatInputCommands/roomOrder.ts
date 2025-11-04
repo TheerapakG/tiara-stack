@@ -137,11 +137,16 @@ const handleManual =
               runningChannel.name,
               Effect.flatMap(SheetService.channelSchedules),
               Effect.map(
-                HashMap.reduce(
-                  HashMap.empty<number, SheetSchema.Schedule>(),
-                  (acc, a) => HashMap.union(acc, a),
+                Array.map((s) =>
+                  pipe(
+                    s.hour,
+                    Option.map((hour) => ({ hour, schedule: s })),
+                  ),
                 ),
               ),
+              Effect.map(Array.getSomes),
+              Effect.map(ArrayUtils.Collect.toHashMapByKey("hour")),
+              Effect.map(HashMap.map(({ schedule }) => schedule)),
             ),
           ),
           Effect.bind("schedule", ({ hour, schedules }) =>
@@ -149,7 +154,9 @@ const handleManual =
               {
                 schedule: pipe(
                   HashMap.get(schedules, hour),
-                  Option.getOrElse(() => SheetSchema.Schedule.makeEmpty(hour)),
+                  Option.getOrElse(() =>
+                    SheetSchema.Schedule.makeEmpty(Option.some(hour)),
+                  ),
                 ),
               },
               Utils.mapPositional(PlayerService.mapScheduleWithPlayers),
@@ -159,7 +166,10 @@ const handleManual =
             pipe(
               Effect.Do,
               Effect.let("players", () =>
-                pipe(schedule.schedule.fills, Array.getSomes),
+                pipe(
+                  SheetSchema.ScheduleWithPlayers.getFills(schedule.schedule),
+                  Array.getSomes,
+                ),
               ),
               Effect.bind("teams", ({ players }) =>
                 pipe(
