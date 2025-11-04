@@ -6,6 +6,7 @@ import {
   PartialIdPlayer,
   PartialNamePlayer,
   Schedule,
+  EmptySchedule,
   ScheduleWithPlayers,
 } from "@/server/schema";
 
@@ -124,41 +125,59 @@ export class PlayerService extends Effect.Service<PlayerService>()(
         getPlayerMaps,
         getByIds,
         getByNames,
-        mapScheduleWithPlayers: (schedule: Schedule) =>
+        mapScheduleWithPlayers: (schedule: Schedule | EmptySchedule) =>
           pipe(
-            Effect.Do,
-            Effect.bindAll(() => ({
-              fills: pipe(
-                schedule.fills,
-                Array.getSomes,
-                getByNames,
-                Effect.map((fills) =>
-                  Array.makeBy(5, (i) =>
-                    pipe(fills, Array.get(i), Option.map(Array.headNonEmpty)),
+            Match.value(schedule),
+            Match.tagsExhaustive({
+              Schedule: (schedule) =>
+                pipe(
+                  Effect.Do,
+                  Effect.bindAll(() => ({
+                    fills: pipe(
+                      schedule.fills,
+                      Array.getSomes,
+                      getByNames,
+                      Effect.map((fills) =>
+                        Array.makeBy(5, (i) =>
+                          pipe(
+                            fills,
+                            Array.get(i),
+                            Option.map(Array.headNonEmpty),
+                          ),
+                        ),
+                      ),
+                    ),
+                    overfills: pipe(
+                      schedule.overfills,
+                      getByNames,
+                      Effect.map(Array.map(Array.headNonEmpty)),
+                    ),
+                    standbys: pipe(
+                      schedule.standbys,
+                      getByNames,
+                      Effect.map(Array.map(Array.headNonEmpty)),
+                    ),
+                  })),
+                  Effect.map(({ fills, overfills, standbys }) =>
+                    ScheduleWithPlayers.make({
+                      channel: schedule.channel,
+                      day: schedule.day,
+                      hour: schedule.hour,
+                      breakHour: schedule.breakHour,
+                      fills,
+                      overfills,
+                      standbys,
+                    }),
                   ),
                 ),
-              ),
-              overfills: pipe(
-                schedule.overfills,
-                getByNames,
-                Effect.map(Array.map(Array.headNonEmpty)),
-              ),
-              standbys: pipe(
-                schedule.standbys,
-                getByNames,
-                Effect.map(Array.map(Array.headNonEmpty)),
-              ),
-            })),
-            Effect.map(
-              ({ fills, overfills, standbys }) =>
-                new ScheduleWithPlayers({
-                  hour: schedule.hour,
-                  breakHour: schedule.breakHour,
-                  fills,
-                  overfills,
-                  standbys,
-                }),
-            ),
+              EmptySchedule: () =>
+                Effect.succeed(
+                  ScheduleWithPlayers.makeEmpty(
+                    schedule.hour,
+                    schedule.breakHour,
+                  ),
+                ),
+            }),
             Effect.withSpan("PlayerService.mapScheduleWithPlayers", {
               captureStackTrace: true,
             }),
