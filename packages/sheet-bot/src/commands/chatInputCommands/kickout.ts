@@ -76,14 +76,11 @@ const getKickoutData = ({
     Effect.bind("schedule", ({ schedules }) =>
       pipe(
         {
-          schedule: pipe(
-            HashMap.get(schedules, hour),
-            Option.getOrElse(() =>
-              Schema.Schedule.makeEmpty(Option.some(hour)),
-            ),
-          ),
+          schedule: HashMap.get(schedules, hour),
         },
-        Utils.mapPositional(PlayerService.mapScheduleWithPlayers),
+        Utils.mapPositional(
+          Utils.arraySomesPositional(PlayerService.mapScheduleWithPlayers),
+        ),
       ),
     ),
     Effect.map(({ schedule }) => ({
@@ -182,7 +179,17 @@ const handleManual =
           ),
           Effect.let("fillIds", ({ kickoutData }) =>
             pipe(
-              Schema.ScheduleWithPlayers.getFills(kickoutData.schedule),
+              kickoutData.schedule,
+              Option.map((schedule) =>
+                pipe(
+                  Match.value(schedule),
+                  Match.tagsExhaustive({
+                    BreakSchedule: () => [],
+                    ScheduleWithPlayers: (schedule) => schedule.fills,
+                  }),
+                ),
+              ),
+              Option.getOrElse(() => []),
               Array.getSomes,
               Array.map((player) =>
                 pipe(

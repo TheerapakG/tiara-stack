@@ -28,7 +28,6 @@ import {
   pipe,
   String,
 } from "effect";
-import { Schema } from "sheet-apis";
 
 const formatHourRanges = (hours: readonly number[]): string => {
   if (Array.isEmptyReadonlyArray(hours)) return "None";
@@ -108,10 +107,19 @@ const handleList =
           Effect.let("fillHours", ({ schedulesWithPlayers, user }) =>
             pipe(
               schedulesWithPlayers,
-              Array.filter((s) => !s.breakHour),
-              Array.filter((s) =>
+              Array.map((schedule) =>
                 pipe(
-                  Schema.ScheduleWithPlayers.getFills(s),
+                  Match.value(schedule),
+                  Match.tagsExhaustive({
+                    BreakSchedule: () => Option.none(),
+                    ScheduleWithPlayers: (schedule) => Option.some(schedule),
+                  }),
+                ),
+              ),
+              Array.getSomes,
+              Array.filter((schedule) =>
+                pipe(
+                  schedule.fills,
                   Array.getSomes,
                   Array.some((p) =>
                     pipe(
@@ -125,17 +133,26 @@ const handleList =
                   ),
                 ),
               ),
-              Array.map((s) => s.hour),
+              Array.map((schedule) => schedule.hour),
               Array.getSomes,
             ),
           ),
           Effect.let("overfillHours", ({ schedulesWithPlayers, user }) =>
             pipe(
               schedulesWithPlayers,
-              Array.filter((s) => !s.breakHour),
-              Array.filter((s) =>
+              Array.map((schedule) =>
                 pipe(
-                  Schema.ScheduleWithPlayers.getOverfills(s),
+                  Match.value(schedule),
+                  Match.tagsExhaustive({
+                    BreakSchedule: () => Option.none(),
+                    ScheduleWithPlayers: (schedule) => Option.some(schedule),
+                  }),
+                ),
+              ),
+              Array.getSomes,
+              Array.filter((schedule) =>
+                pipe(
+                  schedule.overfills,
                   Array.some((p) =>
                     pipe(
                       Match.value(p),
@@ -148,17 +165,26 @@ const handleList =
                   ),
                 ),
               ),
-              Array.map((s) => s.hour),
+              Array.map((schedule) => schedule.hour),
               Array.getSomes,
             ),
           ),
           Effect.let("standbyHours", ({ schedulesWithPlayers, user }) =>
             pipe(
               schedulesWithPlayers,
-              Array.filter((s) => !s.breakHour),
-              Array.filter((s) =>
+              Array.map((schedule) =>
                 pipe(
-                  Schema.ScheduleWithPlayers.getStandbys(s),
+                  Match.value(schedule),
+                  Match.tagsExhaustive({
+                    BreakSchedule: () => Option.none(),
+                    ScheduleWithPlayers: (schedule) => Option.some(schedule),
+                  }),
+                ),
+              ),
+              Array.getSomes,
+              Array.filter((schedule) =>
+                pipe(
+                  schedule.standbys,
                   Array.some((p) =>
                     pipe(
                       Match.value(p),
@@ -171,7 +197,7 @@ const handleList =
                   ),
                 ),
               ),
-              Array.map((s) => s.hour),
+              Array.map((schedule) => schedule.hour),
               Array.getSomes,
             ),
           ),

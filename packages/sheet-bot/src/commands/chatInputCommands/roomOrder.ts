@@ -33,6 +33,7 @@ import {
   DateTime,
   Effect,
   Function,
+  Match,
   HashMap,
   Option,
   pipe,
@@ -152,14 +153,13 @@ const handleManual =
           Effect.bind("schedule", ({ hour, schedules }) =>
             pipe(
               {
-                schedule: pipe(
-                  HashMap.get(schedules, hour),
-                  Option.getOrElse(() =>
-                    SheetSchema.Schedule.makeEmpty(Option.some(hour)),
-                  ),
-                ),
+                schedule: HashMap.get(schedules, hour),
               },
-              Utils.mapPositional(PlayerService.mapScheduleWithPlayers),
+              Utils.mapPositional(
+                Utils.arraySomesPositional(
+                  PlayerService.mapScheduleWithPlayers,
+                ),
+              ),
             ),
           ),
           Effect.bind("scheduleTeams", ({ schedule, runnerConfigMap, hour }) =>
@@ -167,7 +167,17 @@ const handleManual =
               Effect.Do,
               Effect.let("players", () =>
                 pipe(
-                  SheetSchema.ScheduleWithPlayers.getFills(schedule.schedule),
+                  schedule.schedule,
+                  Option.map((schedule) =>
+                    pipe(
+                      Match.value(schedule),
+                      Match.tagsExhaustive({
+                        BreakSchedule: () => [],
+                        ScheduleWithPlayers: (schedule) => schedule.fills,
+                      }),
+                    ),
+                  ),
+                  Option.getOrElse(() => []),
                   Array.getSomes,
                 ),
               ),
