@@ -73,20 +73,12 @@ const getCheckinData = ({
     Effect.flatMap(({ schedules }) =>
       pipe(
         {
-          prevSchedule: pipe(
-            HashMap.get(schedules, hour - 1),
-            Option.getOrElse(() =>
-              Schema.Schedule.makeEmpty(Option.some(hour - 1)),
-            ),
-          ),
-          schedule: pipe(
-            HashMap.get(schedules, hour),
-            Option.getOrElse(() =>
-              Schema.Schedule.makeEmpty(Option.some(hour)),
-            ),
-          ),
+          prevSchedule: HashMap.get(schedules, hour - 1),
+          schedule: HashMap.get(schedules, hour),
         },
-        Utils.mapPositional(PlayerService.mapScheduleWithPlayers),
+        Utils.mapPositional(
+          Utils.arraySomesPositional(PlayerService.mapScheduleWithPlayers),
+        ),
       ),
     ),
     Effect.map(({ prevSchedule, schedule }) => ({
@@ -98,8 +90,10 @@ const getCheckinData = ({
   );
 
 const getCheckinMessages = (data: {
-  prevSchedule: Schema.ScheduleWithPlayers | Schema.EmptyScheduleWithPlayers;
-  schedule: Schema.ScheduleWithPlayers | Schema.EmptyScheduleWithPlayers;
+  prevSchedule: Option.Option<
+    Schema.ScheduleWithPlayers | Schema.BreakSchedule
+  >;
+  schedule: Option.Option<Schema.ScheduleWithPlayers | Schema.BreakSchedule>;
   runningChannel: {
     channelId: string;
     name: Option.Option<string>;
@@ -212,7 +206,17 @@ const handleManual =
           ),
           Effect.let("fillIds", ({ checkinData }) =>
             pipe(
-              Schema.ScheduleWithPlayers.getFills(checkinData.schedule),
+              checkinData.schedule,
+              Option.map((schedule) =>
+                pipe(
+                  Match.value(schedule),
+                  Match.tagsExhaustive({
+                    BreakSchedule: () => [],
+                    ScheduleWithPlayers: (schedule) => schedule.fills,
+                  }),
+                ),
+              ),
+              Option.getOrElse(() => []),
               Array.getSomes,
               Array.map((player) =>
                 pipe(

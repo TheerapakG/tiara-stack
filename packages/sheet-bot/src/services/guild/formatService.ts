@@ -44,120 +44,100 @@ export class FormatService extends Effect.Service<FormatService>()(
       Effect.map(({ converterService, formatDateTime, formatHourWindow }) => ({
         formatDateTime,
         formatHourWindow,
-        formatOpenSlot: (
-          schedule:
-            | Schema.EmptySchedule
-            | Schema.EmptyScheduleWithPlayers
-            | Schema.Schedule
-            | Schema.ScheduleWithPlayers,
-        ) =>
+        formatOpenSlot: (schedule: Schema.BreakSchedule | Schema.Schedule) =>
           pipe(
-            Effect.succeed({
-              hour: schedule.hour,
-              breakHour: schedule.breakHour,
-              empty: pipe(
-                Match.value(schedule),
-                Match.tagsExhaustive({
-                  EmptySchedule: (schedule) => Schema.Schedule.empty(schedule),
-                  Schedule: (schedule) => Schema.Schedule.empty(schedule),
-                  EmptyScheduleWithPlayers: (schedule) =>
-                    Schema.ScheduleWithPlayers.empty(schedule),
-                  ScheduleWithPlayers: (schedule) =>
-                    Schema.ScheduleWithPlayers.empty(schedule),
-                }),
-              ),
+            Match.value(schedule),
+            Match.tagsExhaustive({
+              BreakSchedule: () => Effect.succeed(""),
+              Schedule: (schedule) =>
+                pipe(
+                  Effect.succeed({
+                    hour: schedule.hour,
+                    empty: Schema.Schedule.empty(schedule),
+                  }),
+                  Effect.flatMap(({ hour, empty }) =>
+                    Order.greaterThan(Number.Order)(empty, 0)
+                      ? pipe(
+                          hour,
+                          Effect.transposeMapOption(
+                            converterService.convertHourToHourWindow,
+                          ),
+                          Effect.map(Option.map(formatHourWindow)),
+                          Effect.map(
+                            (range) =>
+                              `${bold(
+                                `+${empty} | ${pipe(
+                                  hour,
+                                  Option.getOrElse(() => "?"),
+                                )}`,
+                              )} ${pipe(
+                                range,
+                                Option.map(({ start }) =>
+                                  time(start, TimestampStyles.ShortTime),
+                                ),
+                                Option.getOrElse(() => "?"),
+                              )}-${pipe(
+                                range,
+                                Option.map(({ end }) =>
+                                  time(end, TimestampStyles.ShortTime),
+                                ),
+                                Option.getOrElse(() => "?"),
+                              )}`,
+                          ),
+                        )
+                      : Effect.succeed(""),
+                  ),
+                ),
             }),
-            Effect.flatMap(({ hour, breakHour, empty }) =>
-              Order.greaterThan(Number.Order)(empty, 0) && !breakHour
-                ? pipe(
-                    hour,
-                    Effect.transposeMapOption(
-                      converterService.convertHourToHourWindow,
-                    ),
-                    Effect.map(Option.map(formatHourWindow)),
-                    Effect.map(
-                      (range) =>
-                        `${bold(
-                          `+${empty} | ${pipe(
-                            hour,
-                            Option.getOrElse(() => "?"),
-                          )}`,
-                        )} ${pipe(
-                          range,
-                          Option.map(({ start }) =>
-                            time(start, TimestampStyles.ShortTime),
-                          ),
-                          Option.getOrElse(() => "?"),
-                        )}-${pipe(
-                          range,
-                          Option.map(({ end }) =>
-                            time(end, TimestampStyles.ShortTime),
-                          ),
-                          Option.getOrElse(() => "?"),
-                        )}`,
-                    ),
-                  )
-                : Effect.succeed(""),
-            ),
             Effect.withSpan("FormatService.formatOpenSlot", {
               captureStackTrace: true,
             }),
           ),
-        formatFilledSlot: (
-          schedule:
-            | Schema.EmptySchedule
-            | Schema.EmptyScheduleWithPlayers
-            | Schema.Schedule
-            | Schema.ScheduleWithPlayers,
-        ) =>
+        formatFilledSlot: (schedule: Schema.BreakSchedule | Schema.Schedule) =>
           pipe(
-            Effect.succeed({
-              hour: schedule.hour,
-              breakHour: schedule.breakHour,
-              empty: pipe(
-                Match.value(schedule),
-                Match.tagsExhaustive({
-                  EmptySchedule: (schedule) => Schema.Schedule.empty(schedule),
-                  Schedule: (schedule) => Schema.Schedule.empty(schedule),
-                  EmptyScheduleWithPlayers: (schedule) =>
-                    Schema.ScheduleWithPlayers.empty(schedule),
-                  ScheduleWithPlayers: (schedule) =>
-                    Schema.ScheduleWithPlayers.empty(schedule),
-                }),
-              ),
+            Match.value(schedule),
+            Match.tagsExhaustive({
+              BreakSchedule: () => Effect.succeed(""),
+              Schedule: (schedule) =>
+                pipe(
+                  Effect.succeed({
+                    hour: schedule.hour,
+                    empty: Schema.Schedule.empty(schedule),
+                  }),
+                  Effect.flatMap(({ hour, empty }) =>
+                    Number.Equivalence(empty, 0)
+                      ? pipe(
+                          hour,
+                          Effect.transposeMapOption(
+                            converterService.convertHourToHourWindow,
+                          ),
+                          Effect.map(Option.map(formatHourWindow)),
+                          Effect.map(
+                            (range) =>
+                              `${bold(
+                                `${pipe(
+                                  hour,
+                                  Option.getOrElse(() => "?"),
+                                )}`,
+                              )} ${pipe(
+                                range,
+                                Option.map(({ start }) =>
+                                  time(start, TimestampStyles.ShortTime),
+                                ),
+                                Option.getOrElse(() => "?"),
+                              )}-${pipe(
+                                range,
+                                Option.map(({ end }) =>
+                                  time(end, TimestampStyles.ShortTime),
+                                ),
+                                Option.getOrElse(() => "?"),
+                              )}`,
+                          ),
+                        )
+                      : Effect.succeed(""),
+                  ),
+                ),
             }),
-            Effect.flatMap(({ hour, breakHour, empty }) =>
-              Number.Equivalence(empty, 0) && !breakHour
-                ? pipe(
-                    hour,
-                    Effect.transposeMapOption(
-                      converterService.convertHourToHourWindow,
-                    ),
-                    Effect.map(Option.map(formatHourWindow)),
-                    Effect.map(
-                      (range) =>
-                        `${bold(
-                          `${pipe(
-                            hour,
-                            Option.getOrElse(() => "?"),
-                          )}`,
-                        )} ${pipe(
-                          range,
-                          Option.map(({ start }) =>
-                            time(start, TimestampStyles.ShortTime),
-                          ),
-                          Option.getOrElse(() => "?"),
-                        )}-${pipe(
-                          range,
-                          Option.map(({ end }) =>
-                            time(end, TimestampStyles.ShortTime),
-                          ),
-                          Option.getOrElse(() => "?"),
-                        )}`,
-                    ),
-                  )
-                : Effect.succeed(""),
-            ),
             Effect.withSpan("FormatService.formatFilledSlot", {
               captureStackTrace: true,
             }),
@@ -167,60 +147,82 @@ export class FormatService extends Effect.Service<FormatService>()(
           schedule,
           channelString,
         }: {
-          prevSchedule:
-            | Schema.ScheduleWithPlayers
-            | Schema.EmptyScheduleWithPlayers;
-          schedule:
-            | Schema.ScheduleWithPlayers
-            | Schema.EmptyScheduleWithPlayers;
+          prevSchedule: Option.Option<
+            Schema.ScheduleWithPlayers | Schema.BreakSchedule
+          >;
+          schedule: Option.Option<
+            Schema.ScheduleWithPlayers | Schema.BreakSchedule
+          >;
           channelString: string;
         }) =>
           pipe(
             Effect.Do,
+            Effect.let("hour", () =>
+              pipe(
+                schedule,
+                Option.flatMap((schedule) => schedule.hour),
+              ),
+            ),
             Effect.let("prevFills", () =>
-              prevSchedule.breakHour
-                ? []
-                : pipe(
-                    Schema.ScheduleWithPlayers.getFills(prevSchedule),
-                    Array.getSomes,
-                    Array.map((player) =>
-                      pipe(
-                        Match.value(player),
-                        Match.tagsExhaustive({
-                          Player: (player) => userMention(player.id),
-                          PartialNamePlayer: (player) => player.name,
-                        }),
-                      ),
-                    ),
+              pipe(
+                prevSchedule,
+                Option.map((prevSchedule) =>
+                  pipe(
+                    Match.value(prevSchedule),
+                    Match.tagsExhaustive({
+                      BreakSchedule: () => [],
+                      ScheduleWithPlayers: (prevSchedule) => prevSchedule.fills,
+                    }),
                   ),
+                ),
+                Option.getOrElse(() => []),
+                Array.getSomes,
+                Array.map((player) =>
+                  pipe(
+                    Match.value(player),
+                    Match.tagsExhaustive({
+                      Player: (player) => userMention(player.id),
+                      PartialNamePlayer: (player) => player.name,
+                    }),
+                  ),
+                ),
+              ),
             ),
             Effect.let("fills", () =>
-              schedule.breakHour
-                ? []
-                : pipe(
-                    Schema.ScheduleWithPlayers.getFills(schedule),
-                    Array.getSomes,
-                    Array.map((player) =>
-                      pipe(
-                        Match.value(player),
-                        Match.tagsExhaustive({
-                          Player: (player) => userMention(player.id),
-                          PartialNamePlayer: (player) => player.name,
-                        }),
-                      ),
-                    ),
-                  ),
-            ),
-            Effect.bind("range", () =>
               pipe(
-                schedule.hour,
+                schedule,
+                Option.map((schedule) =>
+                  pipe(
+                    Match.value(schedule),
+                    Match.tagsExhaustive({
+                      BreakSchedule: () => [],
+                      ScheduleWithPlayers: (schedule) => schedule.fills,
+                    }),
+                  ),
+                ),
+                Option.getOrElse(() => []),
+                Array.getSomes,
+                Array.map((player) =>
+                  pipe(
+                    Match.value(player),
+                    Match.tagsExhaustive({
+                      Player: (player) => userMention(player.id),
+                      PartialNamePlayer: (player) => player.name,
+                    }),
+                  ),
+                ),
+              ),
+            ),
+            Effect.bind("range", ({ hour }) =>
+              pipe(
+                hour,
                 Effect.transposeMapOption(
                   converterService.convertHourToHourWindow,
                 ),
                 Effect.map(Option.map(formatHourWindow)),
               ),
             ),
-            Effect.let("checkinMessage", ({ fills, prevFills, range }) =>
+            Effect.let("checkinMessage", ({ fills, prevFills, hour, range }) =>
               pipe(
                 HashSet.fromIterable(fills),
                 HashSet.difference(pipe(HashSet.fromIterable(prevFills))),
@@ -231,7 +233,7 @@ export class FormatService extends Effect.Service<FormatService>()(
                 Option.map(
                   (mentions) =>
                     `${mentions} React to this message to check in, and ${channelString}${pipe(
-                      schedule.hour,
+                      hour,
                       Option.map((hour) => ` for ${bold(`hour ${hour}`)}`),
                       Option.getOrElse(() => ""),
                     )}${pipe(
@@ -245,7 +247,20 @@ export class FormatService extends Effect.Service<FormatService>()(
               ),
             ),
             Effect.let("empty", () =>
-              Schema.ScheduleWithPlayers.empty(schedule),
+              pipe(
+                schedule,
+                Option.map((schedule) =>
+                  pipe(
+                    Match.value(schedule),
+                    Match.tagsExhaustive({
+                      BreakSchedule: () => 5,
+                      ScheduleWithPlayers: (schedule) =>
+                        Schema.ScheduleWithPlayers.empty(schedule),
+                    }),
+                  ),
+                ),
+                Option.getOrElse(() => 5),
+              ),
             ),
             Effect.let(
               "emptySlotMessage",
@@ -260,7 +275,17 @@ export class FormatService extends Effect.Service<FormatService>()(
             ),
             Effect.let("lookupFailedMessage", () =>
               pipe(
-                Schema.ScheduleWithPlayers.getFills(schedule),
+                schedule,
+                Option.map((schedule) =>
+                  pipe(
+                    Match.value(schedule),
+                    Match.tagsExhaustive({
+                      BreakSchedule: () => [],
+                      ScheduleWithPlayers: (schedule) => schedule.fills,
+                    }),
+                  ),
+                ),
+                Option.getOrElse(() => []),
                 Array.getSomes,
                 Array.map((player) =>
                   pipe(

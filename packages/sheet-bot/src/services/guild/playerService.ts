@@ -96,7 +96,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
           ),
         mapScheduleWithPlayers: (
           schedules: ReadonlyArray<
-            SheetSchema.Schedule | SheetSchema.EmptySchedule
+            SheetSchema.Schedule | SheetSchema.BreakSchedule
           >,
         ) =>
           pipe(
@@ -110,7 +110,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                     Schema.Array(
                       Schema.Union(
                         DefaultTaggedClass(SheetSchema.Schedule),
-                        DefaultTaggedClass(SheetSchema.EmptySchedule),
+                        DefaultTaggedClass(SheetSchema.BreakSchedule),
                       ),
                     ),
                   ),
