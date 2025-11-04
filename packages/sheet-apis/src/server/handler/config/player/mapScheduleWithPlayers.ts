@@ -1,9 +1,4 @@
-import {
-  EmptySchedule,
-  EmptyScheduleWithPlayers,
-  Schedule,
-  ScheduleWithPlayers,
-} from "@/server/schema";
+import { BreakSchedule, Schedule, ScheduleWithPlayers } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 import { DefaultTaggedClass } from "typhoon-core/schema";
@@ -19,7 +14,7 @@ export const mapScheduleWithPlayersHandlerConfig = pipe(
         schedules: Schema.Array(
           Schema.Union(
             DefaultTaggedClass(Schedule),
-            DefaultTaggedClass(EmptySchedule),
+            DefaultTaggedClass(BreakSchedule),
           ),
         ),
       }),
@@ -28,7 +23,7 @@ export const mapScheduleWithPlayersHandlerConfig = pipe(
   }),
   Handler.Config.Builder.response({
     validator: pipe(
-      Schema.Array(Schema.Union(ScheduleWithPlayers, EmptyScheduleWithPlayers)),
+      Schema.Array(Schema.Union(ScheduleWithPlayers, BreakSchedule)),
       Schema.standardSchemaV1,
     ),
   }),

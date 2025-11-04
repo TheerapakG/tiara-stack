@@ -4,10 +4,10 @@ import {
   HourRange,
   RunnerConfig,
   RawPlayer,
-  Schedule,
   ScheduleConfig,
   Team,
   TeamConfig,
+  makeSchedule,
 } from "@/server/schema";
 import { regex } from "arkregex";
 import { type MethodOptions, type sheets_v4 } from "@googleapis/sheets";
@@ -561,14 +561,11 @@ const scheduleParser = (
           Effect.map(ArrayUtils.WithDefault.toArray),
           Effect.map(
             Array.map((config) =>
-              pipe(
-                Schedule.make({
-                  channel: scheduleConfig.channel,
-                  day: scheduleConfig.day,
-                  ...config,
-                }),
-                Schedule.toEmptyIfBreak,
-              ),
+              makeSchedule({
+                channel: scheduleConfig.channel,
+                day: scheduleConfig.day,
+                ...config,
+              }),
             ),
           ),
         ),

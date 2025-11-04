@@ -1,4 +1,4 @@
-import { EmptySchedule, Schedule } from "@/server/schema";
+import { BreakSchedule, Schedule } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 
@@ -17,7 +17,7 @@ export const getChannelSchedulesHandlerConfig = pipe(
   }),
   Handler.Config.Builder.response({
     validator: pipe(
-      Schema.Array(Schema.Union(Schedule, EmptySchedule)),
+      Schema.Array(Schema.Union(Schedule, BreakSchedule)),
       Schema.standardSchemaV1,
     ),
   }),

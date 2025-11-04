@@ -1,10 +1,11 @@
-import { Array, Match, Number, Option, Order, pipe, Schema } from "effect";
+import { Match, Number, Option, Order, pipe, Schema } from "effect";
 
-export class EmptySchedule extends Schema.TaggedClass<EmptySchedule>()(
-  "EmptySchedule",
+export class BreakSchedule extends Schema.TaggedClass<BreakSchedule>()(
+  "BreakSchedule",
   {
+    channel: Schema.String,
+    day: Schema.Number,
     hour: Schema.OptionFromNullishOr(Schema.Number, undefined),
-    breakHour: Schema.Boolean,
   },
 ) {}
 
@@ -12,7 +13,6 @@ export class Schedule extends Schema.TaggedClass<Schedule>()("Schedule", {
   channel: Schema.String,
   day: Schema.Number,
   hour: Schema.OptionFromNullishOr(Schema.Number, undefined),
-  breakHour: Schema.Boolean,
   fills: pipe(
     Schema.Array(Schema.OptionFromNullishOr(Schema.String, undefined)),
     Schema.itemsCount(5),
@@ -20,54 +20,48 @@ export class Schedule extends Schema.TaggedClass<Schedule>()("Schedule", {
   overfills: Schema.Array(Schema.String),
   standbys: Schema.Array(Schema.String),
 }) {
-  static makeEmpty = (hour: Option.Option<number>, breakHour?: boolean) =>
-    new EmptySchedule({
-      hour,
-      breakHour: breakHour ?? false,
-    });
-
-  static toEmptyIfBreak = (schedule: Schedule) =>
-    schedule.breakHour
-      ? Schedule.makeEmpty(schedule.hour, schedule.breakHour)
-      : schedule;
-
-  static getFills = (schedule: Schedule | EmptySchedule) =>
-    pipe(
-      Match.value(schedule),
-      Match.tagsExhaustive({
-        Schedule: (schedule) => schedule.fills,
-        EmptySchedule: () => Array.makeBy(5, () => Option.none<string>()),
-      }),
-    );
-
-  static getOverfills = (schedule: Schedule | EmptySchedule) =>
-    pipe(
-      Match.value(schedule),
-      Match.tagsExhaustive({
-        Schedule: (schedule) => schedule.overfills,
-        EmptySchedule: () => [] as string[],
-      }),
-    );
-
-  static getStandbys = (schedule: Schedule | EmptySchedule) =>
-    pipe(
-      Match.value(schedule),
-      Match.tagsExhaustive({
-        Schedule: (schedule) => schedule.standbys,
-        EmptySchedule: () => [] as string[],
-      }),
-    );
-
-  static empty = (schedule: Schedule | EmptySchedule) =>
-    pipe(
-      Match.value(schedule),
-      Match.tagsExhaustive({
-        Schedule: ({ fills, overfills }) =>
-          Order.max(Number.Order)(
-            5 - fills.filter(Option.isSome).length - overfills.length,
-            0,
-          ),
-        EmptySchedule: () => 5,
-      }),
+  static empty = ({ fills, overfills }: Schedule) =>
+    Order.max(Number.Order)(
+      5 - fills.filter(Option.isSome).length - overfills.length,
+      0,
     );
 }
+
+export const makeSchedule = ({
+  channel,
+  day,
+  hour,
+  breakHour,
+  fills,
+  overfills,
+  standbys,
+}: {
+  channel: string;
+  day: number;
+  hour: Option.Option<number>;
+  breakHour: boolean;
+  fills: readonly Option.Option<string>[];
+  overfills: readonly string[];
+  standbys: readonly string[];
+}) =>
+  pipe(
+    Match.value(breakHour),
+    Match.when(true, () =>
+      BreakSchedule.make({
+        channel,
+        day,
+        hour,
+      }),
+    ),
+    Match.when(false, () =>
+      Schedule.make({
+        channel,
+        day,
+        hour,
+        fills,
+        overfills,
+        standbys,
+      }),
+    ),
+    Match.exhaustive,
+  );
