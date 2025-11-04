@@ -37,7 +37,7 @@ import {
   pipe,
 } from "effect";
 import { Schema } from "sheet-apis";
-import { Utils } from "typhoon-core/utils";
+import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 
 class TimeError extends Data.TaggedError("TimeError")<{
   readonly message: string;
@@ -61,10 +61,16 @@ const getKickoutData = ({
         runningChannel.name,
         Effect.flatMap(SheetService.channelSchedules),
         Effect.map(
-          HashMap.reduce(HashMap.empty<number, Schema.Schedule>(), (acc, a) =>
-            HashMap.union(acc, a),
+          Array.map((s) =>
+            pipe(
+              s.hour,
+              Option.map((hour) => ({ hour, schedule: s })),
+            ),
           ),
         ),
+        Effect.map(Array.getSomes),
+        Effect.map(ArrayUtils.Collect.toHashMapByKey("hour")),
+        Effect.map(HashMap.map(({ schedule }) => schedule)),
       ),
     ),
     Effect.bind("schedule", ({ schedules }) =>
@@ -72,7 +78,9 @@ const getKickoutData = ({
         {
           schedule: pipe(
             HashMap.get(schedules, hour),
-            Option.getOrElse(() => Schema.Schedule.makeEmpty(hour)),
+            Option.getOrElse(() =>
+              Schema.Schedule.makeEmpty(Option.some(hour)),
+            ),
           ),
         },
         Utils.mapPositional(PlayerService.mapScheduleWithPlayers),
@@ -174,15 +182,15 @@ const handleManual =
           ),
           Effect.let("fillIds", ({ kickoutData }) =>
             pipe(
-              kickoutData.schedule.fills,
+              Schema.ScheduleWithPlayers.getFills(kickoutData.schedule),
               Array.getSomes,
               Array.map((player) =>
                 pipe(
-                  Match.type<Schema.Player | Schema.PartialNamePlayer>(),
-                  Match.tag("Player", (player) => Option.some(player.id)),
-                  Match.tag("PartialNamePlayer", () => Option.none()),
-                  Match.exhaustive,
-                  Function.apply(player),
+                  Match.value(player),
+                  Match.tagsExhaustive({
+                    Player: (player) => Option.some(player.id),
+                    PartialNamePlayer: () => Option.none(),
+                  }),
                 ),
               ),
               Array.getSomes,

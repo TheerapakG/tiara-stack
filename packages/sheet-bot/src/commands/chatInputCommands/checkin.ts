@@ -40,7 +40,7 @@ import {
   HashSet,
 } from "effect";
 import { Schema } from "sheet-apis";
-import { Utils } from "typhoon-core/utils";
+import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 
 const getCheckinData = ({
   hour,
@@ -58,10 +58,16 @@ const getCheckinData = ({
       pipe(
         SheetService.channelSchedules(channelName),
         Effect.map(
-          HashMap.reduce(HashMap.empty<number, Schema.Schedule>(), (acc, a) =>
-            HashMap.union(acc, a),
+          Array.map((s) =>
+            pipe(
+              s.hour,
+              Option.map((hour) => ({ hour, schedule: s })),
+            ),
           ),
         ),
+        Effect.map(Array.getSomes),
+        Effect.map(ArrayUtils.Collect.toHashMapByKey("hour")),
+        Effect.map(HashMap.map(({ schedule }) => schedule)),
       ),
     ),
     Effect.flatMap(({ schedules }) =>
@@ -69,11 +75,15 @@ const getCheckinData = ({
         {
           prevSchedule: pipe(
             HashMap.get(schedules, hour - 1),
-            Option.getOrElse(() => Schema.Schedule.makeEmpty(hour - 1)),
+            Option.getOrElse(() =>
+              Schema.Schedule.makeEmpty(Option.some(hour - 1)),
+            ),
           ),
           schedule: pipe(
             HashMap.get(schedules, hour),
-            Option.getOrElse(() => Schema.Schedule.makeEmpty(hour)),
+            Option.getOrElse(() =>
+              Schema.Schedule.makeEmpty(Option.some(hour)),
+            ),
           ),
         },
         Utils.mapPositional(PlayerService.mapScheduleWithPlayers),
@@ -88,8 +98,8 @@ const getCheckinData = ({
   );
 
 const getCheckinMessages = (data: {
-  prevSchedule: Schema.ScheduleWithPlayers;
-  schedule: Schema.ScheduleWithPlayers;
+  prevSchedule: Schema.ScheduleWithPlayers | Schema.EmptyScheduleWithPlayers;
+  schedule: Schema.ScheduleWithPlayers | Schema.EmptyScheduleWithPlayers;
   runningChannel: {
     channelId: string;
     name: Option.Option<string>;
@@ -202,7 +212,7 @@ const handleManual =
           ),
           Effect.let("fillIds", ({ checkinData }) =>
             pipe(
-              checkinData.schedule.fills,
+              Schema.ScheduleWithPlayers.getFills(checkinData.schedule),
               Array.getSomes,
               Array.map((player) =>
                 pipe(

@@ -4,7 +4,6 @@ import {
   Data,
   DateTime,
   Effect,
-  Function,
   HashSet,
   Match,
   Number,
@@ -46,7 +45,11 @@ export class FormatService extends Effect.Service<FormatService>()(
         formatDateTime,
         formatHourWindow,
         formatOpenSlot: (
-          schedule: Schema.Schedule | Schema.ScheduleWithPlayers,
+          schedule:
+            | Schema.EmptySchedule
+            | Schema.EmptyScheduleWithPlayers
+            | Schema.Schedule
+            | Schema.ScheduleWithPlayers,
         ) =>
           pipe(
             Effect.succeed({
@@ -55,7 +58,10 @@ export class FormatService extends Effect.Service<FormatService>()(
               empty: pipe(
                 Match.value(schedule),
                 Match.tagsExhaustive({
+                  EmptySchedule: (schedule) => Schema.Schedule.empty(schedule),
                   Schedule: (schedule) => Schema.Schedule.empty(schedule),
+                  EmptyScheduleWithPlayers: (schedule) =>
+                    Schema.ScheduleWithPlayers.empty(schedule),
                   ScheduleWithPlayers: (schedule) =>
                     Schema.ScheduleWithPlayers.empty(schedule),
                 }),
@@ -64,11 +70,31 @@ export class FormatService extends Effect.Service<FormatService>()(
             Effect.flatMap(({ hour, breakHour, empty }) =>
               Order.greaterThan(Number.Order)(empty, 0) && !breakHour
                 ? pipe(
-                    converterService.convertHourToHourWindow(hour),
-                    Effect.map(formatHourWindow),
+                    hour,
+                    Effect.transposeMapOption(
+                      converterService.convertHourToHourWindow,
+                    ),
+                    Effect.map(Option.map(formatHourWindow)),
                     Effect.map(
-                      ({ start, end }) =>
-                        `${bold(`+${empty} | ${hour}`)} ${time(start, TimestampStyles.ShortTime)}-${time(end, TimestampStyles.ShortTime)}`,
+                      (range) =>
+                        `${bold(
+                          `+${empty} | ${pipe(
+                            hour,
+                            Option.getOrElse(() => "?"),
+                          )}`,
+                        )} ${pipe(
+                          range,
+                          Option.map(({ start }) =>
+                            time(start, TimestampStyles.ShortTime),
+                          ),
+                          Option.getOrElse(() => "?"),
+                        )}-${pipe(
+                          range,
+                          Option.map(({ end }) =>
+                            time(end, TimestampStyles.ShortTime),
+                          ),
+                          Option.getOrElse(() => "?"),
+                        )}`,
                     ),
                   )
                 : Effect.succeed(""),
@@ -78,7 +104,11 @@ export class FormatService extends Effect.Service<FormatService>()(
             }),
           ),
         formatFilledSlot: (
-          schedule: Schema.Schedule | Schema.ScheduleWithPlayers,
+          schedule:
+            | Schema.EmptySchedule
+            | Schema.EmptyScheduleWithPlayers
+            | Schema.Schedule
+            | Schema.ScheduleWithPlayers,
         ) =>
           pipe(
             Effect.succeed({
@@ -87,7 +117,10 @@ export class FormatService extends Effect.Service<FormatService>()(
               empty: pipe(
                 Match.value(schedule),
                 Match.tagsExhaustive({
+                  EmptySchedule: (schedule) => Schema.Schedule.empty(schedule),
                   Schedule: (schedule) => Schema.Schedule.empty(schedule),
+                  EmptyScheduleWithPlayers: (schedule) =>
+                    Schema.ScheduleWithPlayers.empty(schedule),
                   ScheduleWithPlayers: (schedule) =>
                     Schema.ScheduleWithPlayers.empty(schedule),
                 }),
@@ -96,11 +129,31 @@ export class FormatService extends Effect.Service<FormatService>()(
             Effect.flatMap(({ hour, breakHour, empty }) =>
               Number.Equivalence(empty, 0) && !breakHour
                 ? pipe(
-                    converterService.convertHourToHourWindow(hour),
-                    Effect.map(formatHourWindow),
+                    hour,
+                    Effect.transposeMapOption(
+                      converterService.convertHourToHourWindow,
+                    ),
+                    Effect.map(Option.map(formatHourWindow)),
                     Effect.map(
-                      ({ start, end }) =>
-                        `${bold(`${hour}`)} ${time(start, TimestampStyles.ShortTime)}-${time(end, TimestampStyles.ShortTime)}`,
+                      (range) =>
+                        `${bold(
+                          `${pipe(
+                            hour,
+                            Option.getOrElse(() => "?"),
+                          )}`,
+                        )} ${pipe(
+                          range,
+                          Option.map(({ start }) =>
+                            time(start, TimestampStyles.ShortTime),
+                          ),
+                          Option.getOrElse(() => "?"),
+                        )}-${pipe(
+                          range,
+                          Option.map(({ end }) =>
+                            time(end, TimestampStyles.ShortTime),
+                          ),
+                          Option.getOrElse(() => "?"),
+                        )}`,
                     ),
                   )
                 : Effect.succeed(""),
@@ -114,8 +167,12 @@ export class FormatService extends Effect.Service<FormatService>()(
           schedule,
           channelString,
         }: {
-          prevSchedule: Schema.ScheduleWithPlayers;
-          schedule: Schema.ScheduleWithPlayers;
+          prevSchedule:
+            | Schema.ScheduleWithPlayers
+            | Schema.EmptyScheduleWithPlayers;
+          schedule:
+            | Schema.ScheduleWithPlayers
+            | Schema.EmptyScheduleWithPlayers;
           channelString: string;
         }) =>
           pipe(
@@ -124,15 +181,15 @@ export class FormatService extends Effect.Service<FormatService>()(
               prevSchedule.breakHour
                 ? []
                 : pipe(
-                    prevSchedule.fills,
+                    Schema.ScheduleWithPlayers.getFills(prevSchedule),
                     Array.getSomes,
                     Array.map((player) =>
                       pipe(
-                        Match.type<Schema.Player | Schema.PartialNamePlayer>(),
-                        Match.tag("Player", (player) => userMention(player.id)),
-                        Match.tag("PartialNamePlayer", (player) => player.name),
-                        Match.exhaustive,
-                        Function.apply(player),
+                        Match.value(player),
+                        Match.tagsExhaustive({
+                          Player: (player) => userMention(player.id),
+                          PartialNamePlayer: (player) => player.name,
+                        }),
                       ),
                     ),
                   ),
@@ -141,23 +198,26 @@ export class FormatService extends Effect.Service<FormatService>()(
               schedule.breakHour
                 ? []
                 : pipe(
-                    schedule.fills,
+                    Schema.ScheduleWithPlayers.getFills(schedule),
                     Array.getSomes,
                     Array.map((player) =>
                       pipe(
-                        Match.type<Schema.Player | Schema.PartialNamePlayer>(),
-                        Match.tag("Player", (player) => userMention(player.id)),
-                        Match.tag("PartialNamePlayer", (player) => player.name),
-                        Match.exhaustive,
-                        Function.apply(player),
+                        Match.value(player),
+                        Match.tagsExhaustive({
+                          Player: (player) => userMention(player.id),
+                          PartialNamePlayer: (player) => player.name,
+                        }),
                       ),
                     ),
                   ),
             ),
             Effect.bind("range", () =>
               pipe(
-                converterService.convertHourToHourWindow(schedule.hour),
-                Effect.map(formatHourWindow),
+                schedule.hour,
+                Effect.transposeMapOption(
+                  converterService.convertHourToHourWindow,
+                ),
+                Effect.map(Option.map(formatHourWindow)),
               ),
             ),
             Effect.let("checkinMessage", ({ fills, prevFills, range }) =>
@@ -170,7 +230,17 @@ export class FormatService extends Effect.Service<FormatService>()(
                 Option.map(Array.join(" ")),
                 Option.map(
                   (mentions) =>
-                    `${mentions} React to this message to check in, and ${channelString} for ${bold(`hour ${schedule.hour}`)} ${time(range.start, TimestampStyles.RelativeTime)}`,
+                    `${mentions} React to this message to check in, and ${channelString}${pipe(
+                      schedule.hour,
+                      Option.map((hour) => ` for ${bold(`hour ${hour}`)}`),
+                      Option.getOrElse(() => ""),
+                    )}${pipe(
+                      range,
+                      Option.map(({ start }) =>
+                        time(start, TimestampStyles.RelativeTime),
+                      ),
+                      Option.getOrElse(() => ""),
+                    )}`,
                 ),
               ),
             ),
@@ -190,17 +260,15 @@ export class FormatService extends Effect.Service<FormatService>()(
             ),
             Effect.let("lookupFailedMessage", () =>
               pipe(
-                schedule.fills,
+                Schema.ScheduleWithPlayers.getFills(schedule),
                 Array.getSomes,
                 Array.map((player) =>
                   pipe(
-                    Match.type<Schema.Player | Schema.PartialNamePlayer>(),
-                    Match.tag("Player", () => Option.none()),
-                    Match.tag("PartialNamePlayer", (player) =>
-                      Option.some(player),
-                    ),
-                    Match.exhaustive,
-                    Function.apply(player),
+                    Match.value(player),
+                    Match.tagsExhaustive({
+                      Player: () => Option.none(),
+                      PartialNamePlayer: (player) => Option.some(player),
+                    }),
                   ),
                 ),
                 Array.getSomes,

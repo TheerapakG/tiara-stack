@@ -32,7 +32,6 @@ import {
   Array,
   Chunk,
   Effect,
-  HashMap,
   Layer,
   Number,
   Option,
@@ -42,7 +41,6 @@ import {
   Schema,
   String,
 } from "effect";
-import { Schema as SheetSchema } from "sheet-apis";
 
 const getSlotMessage = (day: number) =>
   pipe(
@@ -51,18 +49,22 @@ const getSlotMessage = (day: number) =>
       daySchedule: pipe(
         SheetService.daySchedules(day),
         Effect.map(
-          HashMap.reduce(
-            HashMap.empty<number, SheetSchema.Schedule>(),
-            (acc, a) => HashMap.union(acc, a),
+          Array.map((s) =>
+            pipe(
+              s.hour,
+              Option.map(() => s),
+            ),
           ),
         ),
+        Effect.map(Array.getSomes),
       ),
     }),
     Effect.bindAll(({ daySchedule }) => ({
       openSlots: pipe(
         daySchedule,
-        HashMap.values,
-        Array.sortBy(Order.mapInput(Number.Order, ({ hour }) => hour)),
+        Array.sortBy(
+          Order.mapInput(Option.getOrder(Number.Order), ({ hour }) => hour),
+        ),
         Effect.forEach((schedule) => FormatService.formatOpenSlot(schedule)),
         Effect.map(Chunk.fromIterable),
         Effect.map(Chunk.dedupeAdjacent),
@@ -75,8 +77,9 @@ const getSlotMessage = (day: number) =>
       ),
       filledSlots: pipe(
         daySchedule,
-        HashMap.values,
-        Array.sortBy(Order.mapInput(Number.Order, ({ hour }) => hour)),
+        Array.sortBy(
+          Order.mapInput(Option.getOrder(Number.Order), ({ hour }) => hour),
+        ),
         Effect.forEach((schedule) => FormatService.formatFilledSlot(schedule)),
         Effect.map(Chunk.fromIterable),
         Effect.map(Chunk.dedupeAdjacent),

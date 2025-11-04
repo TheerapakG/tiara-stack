@@ -4,6 +4,7 @@ import { WebSocketClient } from "typhoon-client-ws/client";
 import { SheetApisClient } from "@/client/sheetApis";
 import { GuildService } from "./guildService";
 import { Schema as SheetSchema } from "sheet-apis";
+import { DefaultTaggedClass } from "typhoon-core/schema";
 
 export class PlayerService extends Effect.Service<PlayerService>()(
   "PlayerService",
@@ -94,7 +95,9 @@ export class PlayerService extends Effect.Service<PlayerService>()(
             }),
           ),
         mapScheduleWithPlayers: (
-          schedules: ReadonlyArray<SheetSchema.Schedule>,
+          schedules: ReadonlyArray<
+            SheetSchema.Schedule | SheetSchema.EmptySchedule
+          >,
         ) =>
           pipe(
             Effect.Do,
@@ -103,7 +106,14 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                 guildId: guildService.getId(),
                 schedules: pipe(
                   schedules,
-                  Schema.encode(Schema.Array(SheetSchema.Schedule)),
+                  Schema.encode(
+                    Schema.Array(
+                      Schema.Union(
+                        DefaultTaggedClass(SheetSchema.Schedule),
+                        DefaultTaggedClass(SheetSchema.EmptySchedule),
+                      ),
+                    ),
+                  ),
                 ),
               }),
               { concurrency: "unbounded" },
