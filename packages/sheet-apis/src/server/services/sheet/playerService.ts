@@ -6,7 +6,7 @@ import {
   PartialIdPlayer,
   PartialNamePlayer,
   Schedule,
-  EmptySchedule,
+  BreakSchedule,
   ScheduleWithPlayers,
 } from "@/server/schema";
 
@@ -125,7 +125,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
         getPlayerMaps,
         getByIds,
         getByNames,
-        mapScheduleWithPlayers: (schedule: Schedule | EmptySchedule) =>
+        mapScheduleWithPlayers: (schedule: Schedule | BreakSchedule) =>
           pipe(
             Match.value(schedule),
             Match.tagsExhaustive({
@@ -163,20 +163,13 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                       channel: schedule.channel,
                       day: schedule.day,
                       hour: schedule.hour,
-                      breakHour: schedule.breakHour,
                       fills,
                       overfills,
                       standbys,
                     }),
                   ),
                 ),
-              EmptySchedule: () =>
-                Effect.succeed(
-                  ScheduleWithPlayers.makeEmpty(
-                    schedule.hour,
-                    schedule.breakHour,
-                  ),
-                ),
+              BreakSchedule: (schedule) => Effect.succeed(schedule),
             }),
             Effect.withSpan("PlayerService.mapScheduleWithPlayers", {
               captureStackTrace: true,
