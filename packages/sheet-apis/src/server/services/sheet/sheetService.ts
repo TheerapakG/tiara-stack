@@ -6,7 +6,6 @@ import {
   RawPlayer,
   Schedule,
   ScheduleConfig,
-  ScheduleIndex,
   Team,
   TeamConfig,
 } from "@/server/schema";
@@ -295,11 +294,6 @@ const teamParser = (
     Effect.withSpan("teamParser", { captureStackTrace: true }),
   );
 
-export type ScheduleMap = HashMap.HashMap<
-  ScheduleIndex,
-  HashMap.HashMap<number, Schedule>
->;
-
 class ScheduleConfigRange extends Data.TaggedClass("ScheduleConfigRange")<{
   channel: string;
   day: number;
@@ -566,42 +560,21 @@ const scheduleParser = (
           ),
           Effect.map(ArrayUtils.WithDefault.toArray),
           Effect.map(
-            Array.map(({ hour, breakHour, fills, overfills, standbys }) =>
+            Array.map((config) =>
               pipe(
-                Option.Do,
-                Option.bind("hour", () => hour),
-                Option.let("breakHour", () => breakHour),
-                Option.let("fills", () => fills),
-                Option.let("overfills", () => overfills),
-                Option.let("standbys", () => standbys),
-                Option.map((config) => Schedule.make(config)),
-                Option.map(Schedule.toEmptyIfBreak),
+                Schedule.make({
+                  channel: scheduleConfig.channel,
+                  day: scheduleConfig.day,
+                  ...config,
+                }),
+                Schedule.toEmptyIfBreak,
               ),
             ),
-          ),
-          Effect.map(Array.getSomes),
-          Effect.map((array) =>
-            pipe({
-              scheduleIndex: new ScheduleIndex({
-                channel: scheduleConfig.channel,
-                day: scheduleConfig.day,
-              }),
-              schedules: pipe(array, ArrayUtils.Collect.toHashMapByKey("hour")),
-            }),
           ),
         ),
       ),
     ),
-    Effect.map((array) =>
-      pipe(
-        array,
-        ArrayUtils.Collect.toHashMapByKeyWith({
-          key: "scheduleIndex",
-          valueInitializer: ({ schedules }) => schedules,
-          valueReducer: (acc, { schedules }) => HashMap.union(acc, schedules),
-        }),
-      ),
-    ),
+    Effect.map(Array.flatten),
     Effect.withSpan("scheduleParser", { captureStackTrace: true }),
   );
 
