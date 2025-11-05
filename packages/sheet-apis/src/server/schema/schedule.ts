@@ -5,6 +5,7 @@ export class BreakSchedule extends Schema.TaggedClass<BreakSchedule>()(
   {
     channel: Schema.String,
     day: Schema.Number,
+    visible: Schema.Boolean,
     hour: Schema.OptionFromNullishOr(Schema.Number, undefined),
   },
 ) {}
@@ -12,6 +13,7 @@ export class BreakSchedule extends Schema.TaggedClass<BreakSchedule>()(
 export class Schedule extends Schema.TaggedClass<Schedule>()("Schedule", {
   channel: Schema.String,
   day: Schema.Number,
+  visible: Schema.Boolean,
   hour: Schema.OptionFromNullishOr(Schema.Number, undefined),
   fills: pipe(
     Schema.Array(Schema.OptionFromNullishOr(Schema.String, undefined)),
@@ -30,6 +32,7 @@ export class Schedule extends Schema.TaggedClass<Schedule>()("Schedule", {
 export const makeSchedule = ({
   channel,
   day,
+  visible,
   hour,
   breakHour,
   fills,
@@ -38,6 +41,7 @@ export const makeSchedule = ({
 }: {
   channel: string;
   day: number;
+  visible: boolean;
   hour: Option.Option<number>;
   breakHour: boolean;
   fills: readonly Option.Option<string>[];
@@ -50,6 +54,7 @@ export const makeSchedule = ({
       BreakSchedule.make({
         channel,
         day,
+        visible,
         hour,
       }),
     ),
@@ -57,6 +62,7 @@ export const makeSchedule = ({
       Schedule.make({
         channel,
         day,
+        visible,
         hour,
         fills,
         overfills,
