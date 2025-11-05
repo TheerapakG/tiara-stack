@@ -397,6 +397,7 @@ const scheduleRanges = (scheduleConfigValues: FilteredScheduleConfigValue[]) =>
           HashMap.set(range.overfills.field, range.overfills.range),
           HashMap.set(range.standbys.field, range.standbys.range),
           HashMap.set(range.breaks.field, range.breaks.range),
+          HashMap.set(range.visible.field, range.visible.range),
         );
       },
     ),
