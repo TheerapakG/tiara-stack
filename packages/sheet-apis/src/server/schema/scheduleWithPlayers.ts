@@ -8,6 +8,7 @@ export class ScheduleWithPlayers extends Schema.TaggedClass<ScheduleWithPlayers>
   {
     channel: Schema.String,
     day: Schema.Number,
+    visible: Schema.Boolean,
     hour: Schema.OptionFromNullishOr(Schema.Number, undefined),
     fills: pipe(
       Schema.Array(
@@ -32,6 +33,7 @@ export class ScheduleWithPlayers extends Schema.TaggedClass<ScheduleWithPlayers>
 export const makeScheduleWithPlayers = (
   channel: string,
   day: number,
+  visible: boolean,
   hour: Option.Option<number>,
   breakHour: boolean,
   fills: readonly Option.Option<Player | PartialNamePlayer>[],
@@ -44,6 +46,7 @@ export const makeScheduleWithPlayers = (
       BreakSchedule.make({
         channel,
         day,
+        visible,
         hour,
       }),
     ),
@@ -51,6 +54,7 @@ export const makeScheduleWithPlayers = (
       ScheduleWithPlayers.make({
         channel,
         day,
+        visible,
         hour,
         fills,
         overfills,
