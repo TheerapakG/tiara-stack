@@ -310,6 +310,7 @@ const scheduleConfigFields = [
   "fillRange",
   "overfillRange",
   "standbyRange",
+  "visibleCell",
 ] as const;
 
 type FilteredScheduleConfigValue = Option.Option.Value<
@@ -372,6 +373,12 @@ const scheduleRange = (scheduleConfigValue: FilteredScheduleConfigValue) => ({
           `'${scheduleConfigValue.sheet}'!${scheduleConfigValue.breakRange}`,
         ),
       ),
+    ),
+  },
+  visible: {
+    field: makeScheduleConfigField(scheduleConfigValue, "visibleCell"),
+    range: Option.some(
+      `'${scheduleConfigValue.sheet}'!${scheduleConfigValue.visibleCell}`,
     ),
   },
 });
@@ -471,6 +478,7 @@ const scheduleParser = (
                     pipe(sheet, getConfigFieldValueRange(range.breaks.field)),
                   ),
                 ),
+                pipe(sheet, getConfigFieldValueRange(range.visible.field)),
               ],
               { concurrency: "unbounded" },
             ),
@@ -480,7 +488,14 @@ const scheduleParser = (
               valueRanges,
               pipe(
                 TupleToStructValueSchema(
-                  ["hour", "fills", "overfills", "standbys", "breakHour"],
+                  [
+                    "hour",
+                    "fills",
+                    "overfills",
+                    "standbys",
+                    "breakHour",
+                    "visible",
+                  ],
                   GoogleSheets.rowSchema,
                 ),
                 Schema.compose(
@@ -502,6 +517,10 @@ const scheduleParser = (
                       GoogleSheets.rowToCellSchema,
                       Schema.compose(GoogleSheets.cellToBooleanSchema),
                     ),
+                    visible: pipe(
+                      GoogleSheets.rowToCellSchema,
+                      Schema.compose(GoogleSheets.cellToBooleanSchema),
+                    ),
                   }),
                 ),
               ),
@@ -515,12 +534,27 @@ const scheduleParser = (
                 overfills: Option.none<string[]>(),
                 standbys: Option.none<string[]>(),
                 breakHour: Option.none<boolean>(),
+                visible: Option.none<boolean>(),
               }),
             }),
           ),
+          Effect.map((arrayWithDefault) =>
+            pipe(
+              arrayWithDefault,
+              ArrayUtils.WithDefault.map((config) => ({
+                ...config,
+                visible: pipe(
+                  ArrayUtils.WithDefault.toArray(arrayWithDefault),
+                  Array.get(0),
+                  Option.flatMap((config) => config.visible),
+                  Option.getOrElse(() => true),
+                ),
+              })),
+            ),
+          ),
           Effect.map(
             ArrayUtils.WithDefault.map(
-              ({ hour, fills, overfills, standbys, breakHour }) => ({
+              ({ hour, fills, overfills, standbys, breakHour, visible }) => ({
                 hour,
                 fills: Array.makeBy(5, (i) =>
                   pipe(Array.get(fills, i), Option.flatten),
@@ -534,12 +568,13 @@ const scheduleParser = (
                   Option.getOrElse(() => []),
                 ),
                 breakHour,
+                visible,
               }),
             ),
           ),
           Effect.map(
             ArrayUtils.WithDefault.map(
-              ({ hour, fills, overfills, standbys, breakHour }) => ({
+              ({ hour, fills, overfills, standbys, breakHour, visible }) => ({
                 hour,
                 fills,
                 overfills,
@@ -555,6 +590,7 @@ const scheduleParser = (
                     ),
                   ),
                 ),
+                visible,
               }),
             ),
           ),

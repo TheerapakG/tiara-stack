@@ -162,6 +162,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                     ScheduleWithPlayers.make({
                       channel: schedule.channel,
                       day: schedule.day,
+                      visible: schedule.visible,
                       hour: schedule.hour,
                       fills,
                       overfills,

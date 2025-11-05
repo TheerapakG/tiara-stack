@@ -45,6 +45,7 @@ const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
               "overfillRange",
               "standbyRange",
               "screenshotRange",
+              "visibleCell",
               "draft",
             ],
             Schema.String,
@@ -61,6 +62,7 @@ const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
               overfillRange: GoogleSheets.cellToStringSchema,
               standbyRange: GoogleSheets.cellToStringSchema,
               screenshotRange: GoogleSheets.cellToStringSchema,
+              visibleCell: GoogleSheets.cellToStringSchema,
               draft: GoogleSheets.cellToStringSchema,
             }),
           ),
@@ -355,7 +357,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!R8:AB"],
+              ranges: ["'Thee's Sheet Settings'!R8:AC"],
             }),
             Effect.flatMap((response) =>
               pipe(
@@ -382,7 +384,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!AD8:AE"],
+              ranges: ["'Thee's Sheet Settings'!AE8:AF"],
             }),
             Effect.flatMap((response) =>
               pipe(
