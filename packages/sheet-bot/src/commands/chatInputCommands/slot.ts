@@ -136,7 +136,9 @@ const handleList =
           Effect.Do,
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
           bindObject({
-            messageFlags: Ref.make(new MessageFlagsBitField()),
+            messageFlags: Effect.suspend(() =>
+              Ref.make(new MessageFlagsBitField()),
+            ),
             day: InteractionContext.getNumber("day", true),
             messageType: pipe(
               InteractionContext.getString("message_type"),
