@@ -102,21 +102,29 @@ const handleList =
                   ),
                 ),
               ),
+              Effect.map(
+                Array.map((schedule) =>
+                  pipe(
+                    Match.value(schedule),
+                    Match.tagsExhaustive({
+                      BreakSchedule: () => Option.none(),
+                      ScheduleWithPlayers: (schedule) => Option.some(schedule),
+                    }),
+                  ),
+                ),
+              ),
+              Effect.map(Array.getSomes),
+            ),
+          ),
+          Effect.let("invisible", ({ schedulesWithPlayers }) =>
+            pipe(
+              schedulesWithPlayers,
+              Array.some(({ visible }) => !visible),
             ),
           ),
           Effect.let("fillHours", ({ schedulesWithPlayers, user }) =>
             pipe(
               schedulesWithPlayers,
-              Array.map((schedule) =>
-                pipe(
-                  Match.value(schedule),
-                  Match.tagsExhaustive({
-                    BreakSchedule: () => Option.none(),
-                    ScheduleWithPlayers: (schedule) => Option.some(schedule),
-                  }),
-                ),
-              ),
-              Array.getSomes,
               Array.filter((schedule) =>
                 pipe(
                   schedule.fills,
@@ -140,16 +148,6 @@ const handleList =
           Effect.let("overfillHours", ({ schedulesWithPlayers, user }) =>
             pipe(
               schedulesWithPlayers,
-              Array.map((schedule) =>
-                pipe(
-                  Match.value(schedule),
-                  Match.tagsExhaustive({
-                    BreakSchedule: () => Option.none(),
-                    ScheduleWithPlayers: (schedule) => Option.some(schedule),
-                  }),
-                ),
-              ),
-              Array.getSomes,
               Array.filter((schedule) =>
                 pipe(
                   schedule.overfills,
@@ -172,16 +170,6 @@ const handleList =
           Effect.let("standbyHours", ({ schedulesWithPlayers, user }) =>
             pipe(
               schedulesWithPlayers,
-              Array.map((schedule) =>
-                pipe(
-                  Match.value(schedule),
-                  Match.tagsExhaustive({
-                    BreakSchedule: () => Option.none(),
-                    ScheduleWithPlayers: (schedule) => Option.some(schedule),
-                  }),
-                ),
-              ),
-              Array.getSomes,
               Array.filter((schedule) =>
                 pipe(
                   schedule.standbys,
@@ -202,27 +190,44 @@ const handleList =
             ),
           ),
           InteractionContext.editReply.tapEffect(
-            ({ day, user, fillHours, overfillHours, standbyHours }) =>
+            ({
+              day,
+              user,
+              invisible,
+              fillHours,
+              overfillHours,
+              standbyHours,
+            }) =>
               pipe(
                 ClientService.makeEmbedBuilder(),
                 Effect.map((embed) => ({
                   embeds: [
-                    embed
-                      .setTitle(`${user.username}'s Schedule for Day ${day}`)
-                      .addFields(
-                        {
-                          name: "Fill",
-                          value: formatHourRanges(fillHours),
-                        },
-                        {
-                          name: "Overfill",
-                          value: formatHourRanges(overfillHours),
-                        },
-                        {
-                          name: "Standby",
-                          value: formatHourRanges(standbyHours),
-                        },
-                      ),
+                    invisible
+                      ? embed
+                          .setTitle(
+                            `${user.username}'s Schedule for Day ${day}`,
+                          )
+                          .setDescription(
+                            "It is kinda foggy around here... This schedule is not visible to you yet.",
+                          )
+                      : embed
+                          .setTitle(
+                            `${user.username}'s Schedule for Day ${day}`,
+                          )
+                          .addFields(
+                            {
+                              name: "Fill",
+                              value: formatHourRanges(fillHours),
+                            },
+                            {
+                              name: "Overfill",
+                              value: formatHourRanges(overfillHours),
+                            },
+                            {
+                              name: "Standby",
+                              value: formatHourRanges(standbyHours),
+                            },
+                          ),
                   ],
                 })),
               ),

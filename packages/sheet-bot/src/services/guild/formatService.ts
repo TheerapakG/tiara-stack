@@ -10,6 +10,7 @@ import {
   Option,
   Order,
   pipe,
+  String,
 } from "effect";
 import { ConverterService, HourWindow } from "./converterService";
 import { Schema } from "sheet-apis";
@@ -55,37 +56,45 @@ export class FormatService extends Effect.Service<FormatService>()(
                     hour: schedule.hour,
                     empty: Schema.Schedule.empty(schedule),
                   }),
-                  Effect.flatMap(({ hour, empty }) =>
-                    Order.greaterThan(Number.Order)(empty, 0)
-                      ? pipe(
-                          hour,
-                          Effect.transposeMapOption(
-                            converterService.convertHourToHourWindow,
+                  Effect.let("slotCountString", ({ empty }) =>
+                    schedule.visible ? bold(`+${empty} |`) : "",
+                  ),
+                  Effect.let("hourString", ({ hour }) =>
+                    pipe(
+                      hour,
+                      Option.map((hour) => bold(`hour ${hour}`)),
+                      Option.getOrElse(() => bold("hour ??")),
+                    ),
+                  ),
+                  Effect.bind("rangeString", ({ hour }) =>
+                    pipe(
+                      hour,
+                      Effect.transposeMapOption(
+                        converterService.convertHourToHourWindow,
+                      ),
+                      Effect.map(Option.map(formatHourWindow)),
+                      Effect.map((range) =>
+                        pipe(
+                          range,
+                          Option.map(
+                            ({ start, end }) =>
+                              `${time(start, TimestampStyles.ShortTime)}-${time(end, TimestampStyles.ShortTime)}`,
                           ),
-                          Effect.map(Option.map(formatHourWindow)),
-                          Effect.map(
-                            (range) =>
-                              `${bold(
-                                `+${empty} | ${pipe(
-                                  hour,
-                                  Option.getOrElse(() => "?"),
-                                )}`,
-                              )} ${pipe(
-                                range,
-                                Option.map(({ start }) =>
-                                  time(start, TimestampStyles.ShortTime),
-                                ),
-                                Option.getOrElse(() => "?"),
-                              )}-${pipe(
-                                range,
-                                Option.map(({ end }) =>
-                                  time(end, TimestampStyles.ShortTime),
-                                ),
-                                Option.getOrElse(() => "?"),
-                              )}`,
-                          ),
-                        )
-                      : Effect.succeed(""),
+                          Option.getOrElse(() => "??-??"),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Effect.map(
+                    ({ empty, slotCountString, hourString, rangeString }) =>
+                      !schedule.visible ||
+                      Order.greaterThan(Number.Order)(empty, 0)
+                        ? pipe(
+                            [slotCountString, hourString, rangeString],
+                            Array.filter(String.isNonEmpty),
+                            Array.join(" "),
+                          )
+                        : "",
                   ),
                 ),
             }),
@@ -104,37 +113,40 @@ export class FormatService extends Effect.Service<FormatService>()(
                     hour: schedule.hour,
                     empty: Schema.Schedule.empty(schedule),
                   }),
-                  Effect.flatMap(({ hour, empty }) =>
-                    Number.Equivalence(empty, 0)
+                  Effect.let("hourString", ({ hour }) =>
+                    pipe(
+                      hour,
+                      Option.map((hour) => bold(`hour ${hour}`)),
+                      Option.getOrElse(() => bold("hour ??")),
+                    ),
+                  ),
+                  Effect.bind("rangeString", ({ hour }) =>
+                    pipe(
+                      hour,
+                      Effect.transposeMapOption(
+                        converterService.convertHourToHourWindow,
+                      ),
+                      Effect.map(Option.map(formatHourWindow)),
+                      Effect.map((range) =>
+                        pipe(
+                          range,
+                          Option.map(
+                            ({ start, end }) =>
+                              `${time(start, TimestampStyles.ShortTime)}-${time(end, TimestampStyles.ShortTime)}`,
+                          ),
+                          Option.getOrElse(() => "??-??"),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Effect.map(({ empty, hourString, rangeString }) =>
+                    schedule.visible && Number.Equivalence(empty, 0)
                       ? pipe(
-                          hour,
-                          Effect.transposeMapOption(
-                            converterService.convertHourToHourWindow,
-                          ),
-                          Effect.map(Option.map(formatHourWindow)),
-                          Effect.map(
-                            (range) =>
-                              `${bold(
-                                `${pipe(
-                                  hour,
-                                  Option.getOrElse(() => "?"),
-                                )}`,
-                              )} ${pipe(
-                                range,
-                                Option.map(({ start }) =>
-                                  time(start, TimestampStyles.ShortTime),
-                                ),
-                                Option.getOrElse(() => "?"),
-                              )}-${pipe(
-                                range,
-                                Option.map(({ end }) =>
-                                  time(end, TimestampStyles.ShortTime),
-                                ),
-                                Option.getOrElse(() => "?"),
-                              )}`,
-                          ),
+                          [hourString, rangeString],
+                          Array.filter(String.isNonEmpty),
+                          Array.join(" "),
                         )
-                      : Effect.succeed(""),
+                      : "",
                   ),
                 ),
             }),
