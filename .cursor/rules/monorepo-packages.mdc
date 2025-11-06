@@ -1,0 +1,105 @@
+---
+description: High-level overview of all packages in the tiara-stack monorepo
+alwaysApply: true
+---
+
+# TiaraStack Monorepo Package Overview
+
+This monorepo contains the following packages:
+
+## Core Infrastructure Packages
+
+### `typhoon-core` (packages/typhoon-core)
+Core framework for building RPC-like communication systems with WebSocket support.
+- **Main export** (`packages/typhoon-core/src/index.ts`): Exports Handler, Observability, Protocol, Runtime, Schema, Server, Signal, Utils, Validator modules
+- **Sub-exports** (`packages/typhoon-core/src/*`): Each subdirectory can be imported as `typhoon-core/<module-name>`
+- **Handler** (`packages/typhoon-core/src/handler`): Request/response handler context and types
+- **Protocol** (`packages/typhoon-core/src/protocol`): Communication protocol definitions including Msgpack serialization
+- **Runtime** (`packages/typhoon-core/src/runtime`): Runtime state management
+- **Server** (`packages/typhoon-core/src/server`): Server-side handler configuration and utilities
+- **Schema** (`packages/typhoon-core/src/schema`): Schema definitions for validation
+- **Utils** (`packages/typhoon-core/src/utils`): Utility functions and data structures
+- **Validator** (`packages/typhoon-core/src/validator`): Validation utilities
+- **Signal** (`packages/typhoon-core/src/signal`): Signal/event handling
+- **Observability** (`packages/typhoon-core/src/observability`): Observability and monitoring utilities
+
+### `typhoon-server` (packages/typhoon-server)
+Server-side implementation for the Typhoon framework.
+- **Main export** (`packages/typhoon-server/src/index.ts`): Exports DB, Event, Server modules
+- **Sub-exports** (`packages/typhoon-server/src/*`): Each subdirectory can be imported as `typhoon-server/<module-name>`
+- **Server** (`packages/typhoon-server/src/server`): Server implementation and WebSocket handling
+- **DB** (`packages/typhoon-server/src/db`): Database connection and context management
+- **Event** (`packages/typhoon-server/src/event`): Event handling system
+- **Handler** (`packages/typhoon-server/src/handler`): Server-side handler context and collections
+
+### `typhoon-client-ws` (packages/typhoon-client-ws)
+WebSocket client implementation for Typhoon.
+- **Main export** (`packages/typhoon-client-ws/src/index.ts`): Exports Client module
+- **Sub-exports** (`packages/typhoon-client-ws/src/*`): Each subdirectory can be imported as `typhoon-client-ws/<module-name>`
+- **Client** (`packages/typhoon-client-ws/src/client`): WebSocket client implementation
+
+### `typhoon-client-http` (packages/typhoon-client-http)
+HTTP client implementation for Typhoon.
+- **Main export** (`packages/typhoon-client-http/src/index.ts`): Exports Client module
+- **Sub-exports** (`packages/typhoon-client-http/src/*`): Each subdirectory can be imported as `typhoon-client-http/<module-name>`
+- **Client** (`packages/typhoon-client-http/src/client`): HTTP client implementation using Effect Platform
+
+### `typhoon-client-apps-script` (packages/typhoon-client-apps-script)
+Google Apps Script client implementation for Typhoon.
+- **Main export** (`packages/typhoon-client-apps-script/src/index.ts`): Exports Client module
+- **Sub-exports** (`packages/typhoon-client-apps-script/src/*`): Each subdirectory can be imported as `typhoon-client-apps-script/<module-name>`
+- **Client** (`packages/typhoon-client-apps-script/src/client`): Google Apps Script client implementation
+
+## Application Packages
+
+### `sheet-apis` (packages/sheet-apis)
+Backend API server for Google Sheets integration, providing RPC handlers for sheet operations, calculations, guild configuration, and message management.
+- **Main export** (`packages/sheet-apis/src/index.ts`): Exports Schema and serverHandlerConfigCollection
+- **runServer export** (`packages/sheet-apis/src/runServer.ts`): Server entry point that sets up WebSocket server, handlers, and services
+- **Server** (`packages/sheet-apis/src/server`): RPC handler implementations for:
+  - Calc: Sheet calculation operations
+  - GuildConfig: Discord guild configuration management
+  - Sheet: Google Sheets operations
+  - Player: Player data management
+  - MessageCheckin: Check-in message handling
+  - MessageRoomOrder: Room ordering message handling
+  - MessageSlot: Slot message handling
+  - Screenshot: Screenshot generation
+- **DB** (`packages/sheet-apis/src/db`): Database service layer
+- **Google** (`packages/sheet-apis/src/google`): Google Sheets API integration
+- **Config** (`packages/sheet-apis/src/config`): Configuration management
+
+### `sheet-bot` (packages/sheet-bot)
+Discord bot application that integrates with sheet-apis to provide Discord commands and interactions.
+- **Main export** (`packages/sheet-bot/src/index.ts`): Bot entry point that initializes Discord bot with commands and handlers
+- **Bot** (`packages/sheet-bot/src/bot`): Discord bot implementation
+- **Commands** (`packages/sheet-bot/src/commands`): Discord slash command handlers
+- **Services** (`packages/sheet-bot/src/services`): Business logic services for guild, member, collection, message, channel, and interaction management
+- **Client** (`packages/sheet-bot/src/client`): Client wrapper for typhoon-client-ws
+- **MessageComponents** (`packages/sheet-bot/src/messageComponents`): Discord message component handlers (buttons, etc.)
+- **Types** (`packages/sheet-bot/src/types`): Type definitions for handlers and errors
+- **Config** (`packages/sheet-bot/src/config`): Configuration management
+- **Utils** (`packages/sheet-bot/src/utils`): Utility functions
+
+### `sheet-formulas` (packages/sheet-formulas)
+Google Apps Script formulas library for performing calculations and operations on Google Sheets.
+- **Main export** (`packages/sheet-formulas/src/index.ts`): Exports formula functions
+- **Formulas** (`packages/sheet-formulas/src/formulas.ts`): Formula implementations for parsing players, calculating stats, and performing sheet operations
+
+### `sheet-db-schema` (packages/sheet-db-schema)
+Database schema definitions using Drizzle ORM for PostgreSQL.
+- **Main export** (`packages/sheet-db-schema/src/schema.ts`): Exports Drizzle table definitions:
+  - configGuild: Guild configuration table
+  - configGuildManagerRole: Guild manager role configuration
+  - configGuildChannel: Guild channel configuration
+  - messageSlot: Message slot tracking
+  - messageCheckin: Check-in message tracking
+  - messageCheckinMember: Member check-in records
+  - messageRoomOrder: Room order message tracking
+  - messageRoomOrderEntry: Room order entry records
+
+## Utility Packages
+
+### `bob` (packages/bob)
+Configuration builder utility library for building type-safe configuration objects with validation.
+- **Main export** (`packages/bob/src/builder/index.ts`): Exports configBuilderBuilder function and ConfigBuilder/ConfigBuilderBuilder classes for creating type-safe configuration builders with Standard Schema validation
