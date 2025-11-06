@@ -91,17 +91,17 @@ const getCheckinData = ({
 
 const getCheckinMessages = (
   data: {
-  prevSchedule: Option.Option<
-    Schema.ScheduleWithPlayers | Schema.BreakSchedule
-  >;
-  schedule: Option.Option<Schema.ScheduleWithPlayers | Schema.BreakSchedule>;
-  runningChannel: {
-    channelId: string;
-    name: Option.Option<string>;
-  };
-  showChannelMention: boolean;
+    prevSchedule: Option.Option<
+      Schema.ScheduleWithPlayers | Schema.BreakSchedule
+    >;
+    schedule: Option.Option<Schema.ScheduleWithPlayers | Schema.BreakSchedule>;
+    runningChannel: {
+      channelId: string;
+      name: Option.Option<string>;
+    };
+    showChannelMention: boolean;
   },
-  templateOption?: Option.Option<string>,
+  template: Option.Option<string>,
 ) =>
   FormatService.formatCheckIn({
     prevSchedule: data.prevSchedule,
@@ -116,10 +116,7 @@ const getCheckinMessages = (
               "await further instructions from the manager on where the running channel is",
           ),
         ),
-    template: pipe(
-      templateOption,
-      Option.match({ onSome: (t) => t, onNone: () => undefined }),
-    ),
+    template: pipe(template, Option.getOrUndefined),
   });
 
 const handleManual =
