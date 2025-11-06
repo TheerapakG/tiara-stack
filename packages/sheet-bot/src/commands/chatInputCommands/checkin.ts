@@ -89,7 +89,8 @@ const getCheckinData = ({
     })),
   );
 
-const getCheckinMessages = (data: {
+const getCheckinMessages = (
+  data: {
   prevSchedule: Option.Option<
     Schema.ScheduleWithPlayers | Schema.BreakSchedule
   >;
@@ -99,7 +100,9 @@ const getCheckinMessages = (data: {
     name: Option.Option<string>;
   };
   showChannelMention: boolean;
-}) =>
+  },
+  templateOption?: Option.Option<string>,
+) =>
   FormatService.formatCheckIn({
     prevSchedule: data.prevSchedule,
     schedule: data.schedule,
@@ -113,6 +116,10 @@ const getCheckinMessages = (data: {
               "await further instructions from the manager on where the running channel is",
           ),
         ),
+    template: pipe(
+      templateOption,
+      Option.match({ onSome: (t) => t, onNone: () => undefined }),
+    ),
   });
 
 const handleManual =
@@ -135,6 +142,13 @@ const handleManual =
           option
             .setName("server_id")
             .setDescription("The server to check in users for"),
+        )
+        .addStringOption((option) =>
+          option
+            .setName("template")
+            .setDescription(
+              "Optional Handlebars template for the check-in message",
+            ),
         ),
     )
     .handler(
@@ -161,6 +175,7 @@ const handleManual =
           bindObject({
             hourOption: InteractionContext.getNumber("hour"),
             channelNameOption: InteractionContext.getString("channel_name"),
+            templateOption: InteractionContext.getString("template"),
           }),
           Effect.bind("hour", ({ hourOption }) =>
             pipe(
@@ -232,8 +247,8 @@ const handleManual =
               HashSet.toValues,
             ),
           ),
-          Effect.bind("checkinMessages", ({ checkinData }) =>
-            getCheckinMessages(checkinData),
+          Effect.bind("checkinMessages", ({ checkinData, templateOption }) =>
+            getCheckinMessages(checkinData, templateOption),
           ),
           Effect.bind(
             "message",

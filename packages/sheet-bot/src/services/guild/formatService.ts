@@ -1,4 +1,5 @@
 import { bold, time, TimestampStyles, userMention } from "discord.js";
+import Handlebars from "handlebars";
 import {
   Array,
   Data,
@@ -158,6 +159,7 @@ export class FormatService extends Effect.Service<FormatService>()(
           prevSchedule,
           schedule,
           channelString,
+          template,
         }: {
           prevSchedule: Option.Option<
             Schema.ScheduleWithPlayers | Schema.BreakSchedule
@@ -166,6 +168,7 @@ export class FormatService extends Effect.Service<FormatService>()(
             Schema.ScheduleWithPlayers | Schema.BreakSchedule
           >;
           channelString: string;
+          template?: string;
         }) =>
           pipe(
             Effect.Do,
@@ -234,29 +237,42 @@ export class FormatService extends Effect.Service<FormatService>()(
                 Effect.map(Option.map(formatHourWindow)),
               ),
             ),
-            Effect.let("checkinMessage", ({ fills, prevFills, hour, range }) =>
-              pipe(
-                HashSet.fromIterable(fills),
-                HashSet.difference(pipe(HashSet.fromIterable(prevFills))),
-                HashSet.toValues,
-                Option.some,
-                Option.filter(Array.isNonEmptyArray),
-                Option.map(Array.join(" ")),
-                Option.map(
-                  (mentions) =>
-                    `${mentions} React to this message to check in, and ${channelString}${pipe(
+            Effect.let(
+              "checkinMessage",
+              ({ fills, prevFills, hour, range }) =>
+                pipe(
+                  HashSet.fromIterable(fills),
+                  HashSet.difference(pipe(HashSet.fromIterable(prevFills))),
+                  HashSet.toValues,
+                  Option.some,
+                  Option.filter(Array.isNonEmptyArray),
+                  Option.map(Array.join(" ")),
+                  // Build strings for template and render via Handlebars
+                  Option.map((mentionsString) => {
+                    const hourString = pipe(
                       hour,
-                      Option.map((hour) => ` for ${bold(`hour ${hour}`)}`),
+                      Option.map((h) => `for ${bold(`hour ${h}`)}`),
                       Option.getOrElse(() => ""),
-                    )}${pipe(
+                    );
+                    const timeStampString = pipe(
                       range,
                       Option.map(({ start }) =>
                         time(start, TimestampStyles.RelativeTime),
                       ),
                       Option.getOrElse(() => ""),
-                    )}`,
+                    );
+                    const templateString =
+                      template ??
+                      "{{mentionsString}} React to this message to check in, and {{channelString}} {{hourString}} {{timeStampString}}";
+                    const render = Handlebars.compile(templateString);
+                    return render({
+                      mentionsString,
+                      channelString,
+                      hourString,
+                      timeStampString,
+                    });
+                  }),
                 ),
-              ),
             ),
             Effect.let("empty", () =>
               pipe(
