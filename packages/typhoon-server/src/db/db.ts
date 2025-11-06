@@ -8,16 +8,26 @@ import {
   Match,
   Option,
   pipe,
+  Schema,
   SynchronizedRef,
+  Array,
 } from "effect";
 import { DBQueryError, makeDBQueryError } from "typhoon-core/error";
 import { Computed, SignalContext } from "typhoon-core/signal";
 
-type TransactionSubscription = { mode: "subscription" };
-type TransactionMutation = {
-  mode: "mutation";
-  tables: HashSet.HashSet<string>;
-};
+class TransactionSubscription extends Schema.TaggedClass<TransactionSubscription>()(
+  "TransactionSubscription",
+  {
+    tables: Schema.HashSetFromSelf(Schema.String),
+  },
+) {}
+
+class TransactionMutation extends Schema.TaggedClass<TransactionMutation>()(
+  "TransactionMutation",
+  {
+    tables: Schema.HashSetFromSelf(Schema.String),
+  },
+) {}
 
 export class TransactionContext extends Context.Tag("TransactionContext")<
   TransactionContext,
@@ -27,19 +37,28 @@ export class TransactionContext extends Context.Tag("TransactionContext")<
   static subscription(): Effect.Effect<
     SynchronizedRef.SynchronizedRef<TransactionSubscription>
   > {
-    return SynchronizedRef.make({ mode: "subscription" });
+    return SynchronizedRef.make(
+      TransactionSubscription.make({
+        tables: HashSet.empty<string>(),
+      }),
+    );
   }
 
   static mutation(): Effect.Effect<
     SynchronizedRef.SynchronizedRef<TransactionMutation>
   > {
-    return SynchronizedRef.make({
-      mode: "mutation",
-      tables: HashSet.empty<string>(),
-    });
+    return SynchronizedRef.make(
+      TransactionMutation.make({
+        tables: HashSet.empty<string>(),
+      }),
+    );
   }
 
-  static mode() {
+  static tables(): Effect.Effect<
+    HashSet.HashSet<string>,
+    never,
+    TransactionContext
+  > {
     return pipe(
       TransactionContext,
       Effect.flatMap((context) =>
@@ -49,27 +68,8 @@ export class TransactionContext extends Context.Tag("TransactionContext")<
           >,
         ),
       ),
-      Effect.map((context) => context.mode),
+      Effect.map((context) => context.tables),
     );
-  }
-
-  static ofMode<T extends "subscription" | "mutation">(
-    mode: T,
-  ): T extends "subscription"
-    ? Effect.Effect<SynchronizedRef.SynchronizedRef<TransactionSubscription>>
-    : T extends "mutation"
-      ? Effect.Effect<SynchronizedRef.SynchronizedRef<TransactionMutation>>
-      : never {
-    return pipe(
-      Match.value(mode as "subscription" | "mutation"),
-      Match.when("subscription", () => TransactionContext.subscription()),
-      Match.when("mutation", () => TransactionContext.mutation()),
-      Match.exhaustive,
-    ) as unknown as T extends "subscription"
-      ? Effect.Effect<SynchronizedRef.SynchronizedRef<TransactionSubscription>>
-      : T extends "mutation"
-        ? Effect.Effect<SynchronizedRef.SynchronizedRef<TransactionMutation>>
-        : never;
   }
 }
 
@@ -85,15 +85,14 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
       ),
       Effect.map(({ subscriptions }) => ({
         subscriptions,
-        subscribeTables: (tables: string[]) =>
+        subscribeTables: (tables: Iterable<string>) =>
           pipe(
             subscriptions,
             SynchronizedRef.updateAndGetEffect((subscriptions) =>
               Effect.reduce(tables, subscriptions, (subscriptions, table) =>
                 pipe(
-                  Effect.Do,
-                  Effect.bind("newComputed", () => Computed.make(Effect.void)),
-                  Effect.let("newSubscriptions", ({ newComputed }) =>
+                  Computed.make(Effect.void),
+                  Effect.map((newComputed) =>
                     pipe(
                       subscriptions,
                       HashMap.modifyAt(table, (signal) =>
@@ -107,34 +106,29 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
                       ),
                     ),
                   ),
-                  Effect.tap(({ newSubscriptions }) =>
+                  Effect.tap((newSubscriptions) =>
                     SignalContext.bindScopeDependency(
                       HashMap.unsafeGet(newSubscriptions, table),
                     ),
                   ),
-                  Effect.map(({ newSubscriptions }) => newSubscriptions),
+                  Effect.map((newSubscriptions) => newSubscriptions),
                 ),
               ),
             ),
           ),
-        notifyTables: (tables: string[]) =>
+        notifyTables: (tables: Iterable<string>) =>
           pipe(
             SynchronizedRef.get(subscriptions),
-            Effect.map((subscriptions) =>
-              tables.map((table) => HashMap.get(subscriptions, table)),
-            ),
-            Effect.map((signals) =>
-              signals.map((signal) =>
-                pipe(
-                  signal,
-                  Option.match({
-                    onNone: () => Effect.void,
-                    onSome: (signal) => signal.recompute(),
-                  }),
-                ),
+            Effect.flatMap((subscriptions) =>
+              pipe(
+                tables,
+                Array.fromIterable,
+                Array.map((table) => HashMap.get(subscriptions, table)),
+                Array.getSomes,
+                Array.map((signal) => signal.recompute()),
+                Effect.all,
               ),
             ),
-            Effect.flatMap(Effect.all),
           ),
       })),
       Effect.map(({ subscribeTables, notifyTables }) => ({
@@ -193,34 +187,31 @@ export const run = <T, E>(
         Effect.provideService(TransactionContext, transactionContext),
       ),
     ),
+    Effect.bind("result", ({ queryAnalysis }) =>
+      pipe(queryAnalysis.query, Effect.either),
+    ),
     Effect.tap(({ transactionContext, queryAnalysis }) =>
-      SynchronizedRef.updateEffect(
+      SynchronizedRef.update(
         transactionContext as SynchronizedRef.SynchronizedRef<
           TransactionSubscription | TransactionMutation
         >,
         (context) =>
           pipe(
             Match.value(context),
-            Match.when({ mode: "subscription" }, (context) =>
-              pipe(
-                BaseDBSubscriptionContext.subscribeTables(
-                  HashSet.toValues(queryAnalysis.tables),
+            Match.tagsExhaustive({
+              TransactionSubscription: (context) =>
+                pipe(
+                  TransactionSubscription.make({
+                    tables: HashSet.union(context.tables, queryAnalysis.tables),
+                  }),
                 ),
-                Effect.as(context),
-              ),
-            ),
-            Match.when({ mode: "mutation" }, (context) =>
-              Effect.succeed({
-                ...context,
-                tables: HashSet.union(context.tables, queryAnalysis.tables),
-              }),
-            ),
-            Match.exhaustive,
+              TransactionMutation: (context) =>
+                TransactionMutation.make({
+                  tables: HashSet.union(context.tables, queryAnalysis.tables),
+                }),
+            }),
           ),
       ),
-    ),
-    Effect.bind("result", ({ queryAnalysis }) =>
-      pipe(queryAnalysis.query, Effect.either),
     ),
     Effect.flatMap(({ result }) => result),
   );
@@ -233,26 +224,28 @@ export const subscribe = <A, E>(
   >,
 ) =>
   pipe(
-    Effect.Do,
-    Effect.bind("transactionContext", () =>
-      TransactionContext.ofMode("subscription"),
-    ),
-    Effect.bind("dbSubscriptionContext", () => BaseDBSubscriptionContext),
-    Effect.bind(
-      "computedQuery",
-      ({ transactionContext, dbSubscriptionContext }) =>
-        Computed.make(
-          pipe(
-            query,
-            Effect.provideService(TransactionContext, transactionContext),
-            Effect.provideService(
-              BaseDBSubscriptionContext,
-              dbSubscriptionContext,
+    BaseDBSubscriptionContext,
+    Effect.flatMap((baseDBSubscriptionContext) =>
+      Computed.make(
+        pipe(
+          query,
+          Effect.tap(() =>
+            pipe(
+              TransactionContext.tables(),
+              Effect.flatMap(BaseDBSubscriptionContext.subscribeTables),
             ),
           ),
+          Effect.provideServiceEffect(
+            TransactionContext,
+            TransactionContext.subscription(),
+          ),
+          Effect.provideService(
+            BaseDBSubscriptionContext,
+            baseDBSubscriptionContext,
+          ),
         ),
+      ),
     ),
-    Effect.map(({ computedQuery }) => computedQuery),
   );
 
 export const subscribeQuery = <T, TDialect extends Dialect>(
@@ -267,42 +260,20 @@ export const mutate = <A, E>(
   >,
 ) =>
   pipe(
-    Effect.Do,
-    Effect.bind("dummyComputed", () => Computed.make(Effect.void)),
-    Effect.bind("result", ({ dummyComputed }) =>
+    query,
+    Effect.tap(() =>
       pipe(
-        query,
-        Effect.provideService(
-          SignalContext.SignalContext,
-          SignalContext.fromDependent(dummyComputed),
-        ),
-        Effect.either,
-      ),
-    ),
-    Effect.bind("transactionContext", () => TransactionContext),
-    Effect.tap(({ transactionContext }) =>
-      pipe(
-        SynchronizedRef.get(
-          transactionContext as SynchronizedRef.SynchronizedRef<
-            TransactionSubscription | TransactionMutation
-          >,
-        ),
-        Effect.map((context) =>
-          pipe(
-            Match.value(context),
-            Match.when({ mode: "subscription" }, () => HashSet.empty<string>()),
-            Match.when({ mode: "mutation" }, (context) => context.tables),
-            Match.exhaustive,
-          ),
-        ),
-        Effect.map(HashSet.toValues),
+        TransactionContext.tables(),
         Effect.flatMap(BaseDBSubscriptionContext.notifyTables),
       ),
     ),
-    Effect.flatMap(({ result }) => result),
+    Effect.provideServiceEffect(
+      SignalContext.SignalContext,
+      pipe(Computed.make(Effect.void), Effect.map(SignalContext.fromDependent)),
+    ),
     Effect.provideServiceEffect(
       TransactionContext,
-      TransactionContext.ofMode("mutation"),
+      TransactionContext.mutation(),
     ),
   );
 
