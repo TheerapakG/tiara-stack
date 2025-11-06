@@ -539,20 +539,7 @@ const scheduleParser = (
               }),
             }),
           ),
-          Effect.map((arrayWithDefault) =>
-            pipe(
-              arrayWithDefault,
-              ArrayUtils.WithDefault.map((config) => ({
-                ...config,
-                visible: pipe(
-                  ArrayUtils.WithDefault.toArray(arrayWithDefault),
-                  Array.get(0),
-                  Option.flatMap((config) => config.visible),
-                  Option.getOrElse(() => true),
-                ),
-              })),
-            ),
-          ),
+          Effect.map(ArrayUtils.WithDefault.replaceKeysFromHead("visible")),
           Effect.map(
             ArrayUtils.WithDefault.map(
               ({ hour, fills, overfills, standbys, breakHour, visible }) => ({
@@ -569,7 +556,10 @@ const scheduleParser = (
                   Option.getOrElse(() => []),
                 ),
                 breakHour,
-                visible,
+                visible: pipe(
+                  visible,
+                  Option.getOrElse(() => true),
+                ),
               }),
             ),
           ),
