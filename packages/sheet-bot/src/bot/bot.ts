@@ -267,6 +267,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                               pipe(
                                 task,
                                 Effect.provide(bot.traceProvider),
+                                Effect.provide(ClientService.Default(client)),
                                 Effect.catchAll(() => Effect.void),
                               ),
                             ),
