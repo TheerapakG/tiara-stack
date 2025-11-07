@@ -26,7 +26,6 @@ import {
   Schema,
   String,
   Boolean,
-  Either,
 } from "effect";
 import { TupleToStructValueSchema } from "typhoon-core/schema";
 import { Computed } from "typhoon-core/signal";
@@ -151,74 +150,37 @@ const teamBaseParser = (
   pipe(
     Effect.Do,
     Effect.let("range", () => teamBaseRange(teamConfigValue)),
-    Effect.let("isAutoTeamName", () =>
-      pipe(
-        Match.value(teamConfigValue.teamNameRange),
-        Match.when("auto", () => true),
-        Match.orElse(() => false),
-      ),
-    ),
-    Effect.flatMap(({ range, isAutoTeamName }) =>
-      isAutoTeamName
-        ? pipe(
-            Effect.all(
-              [pipe(sheet, getConfigFieldValueRange(range.playerName.field))],
-              { concurrency: "unbounded" },
-            ),
-            Effect.flatMap((valueRanges) =>
-              GoogleSheets.parseValueRanges(
-                valueRanges,
-                pipe(
-                  TupleToStructValueSchema(
-                    ["playerName"],
-                    GoogleSheets.rowToCellSchema,
-                  ),
-                  Schema.compose(
-                    Schema.Struct({
-                      playerName: GoogleSheets.cellToStringSchema,
-                    }),
-                  ),
-                ),
-              ),
-            ),
-            Effect.map(
-              Array.map(
-                Either.map(({ playerName }) => ({
-                  playerName,
-                  teamName: pipe(
-                    playerName,
-                    Option.map((name) => `${name} | ${teamConfigValue.name}`),
-                  ),
-                })),
-              ),
-            ),
-          )
-        : pipe(
-            Effect.all(
-              [
-                pipe(sheet, getConfigFieldValueRange(range.playerName.field)),
-                pipe(sheet, getConfigFieldValueRange(range.teamName.field)),
-              ],
-              { concurrency: "unbounded" },
-            ),
-            Effect.flatMap((valueRanges) =>
-              GoogleSheets.parseValueRanges(
-                valueRanges,
-                pipe(
-                  TupleToStructValueSchema(
-                    ["playerName", "teamName"],
-                    GoogleSheets.rowToCellSchema,
-                  ),
-                  Schema.compose(
-                    Schema.Struct({
-                      playerName: GoogleSheets.cellToStringSchema,
-                      teamName: GoogleSheets.cellToStringSchema,
-                    }),
-                  ),
-                ),
-              ),
+    Effect.flatMap(({ range }) =>
+      Effect.all(
+        [
+          pipe(sheet, getConfigFieldValueRange(range.playerName.field)),
+          pipe(
+            Match.value(teamConfigValue.teamNameRange),
+            Match.when("auto", () => Effect.succeed({ values: [] })),
+            Match.orElse(() =>
+              pipe(sheet, getConfigFieldValueRange(range.teamName.field)),
             ),
           ),
+        ],
+        { concurrency: "unbounded" },
+      ),
+    ),
+    Effect.flatMap((valueRanges) =>
+      GoogleSheets.parseValueRanges(
+        valueRanges,
+        pipe(
+          TupleToStructValueSchema(
+            ["playerName", "teamName"],
+            GoogleSheets.rowToCellSchema,
+          ),
+          Schema.compose(
+            Schema.Struct({
+              playerName: GoogleSheets.cellToStringSchema,
+              teamName: GoogleSheets.cellToStringSchema,
+            }),
+          ),
+        ),
+      ),
     ),
     Effect.map(
       ArrayUtils.WithDefault.wrapEither({
@@ -236,7 +198,16 @@ const teamBaseParser = (
             (name) => playerNameRegex.exec(name)?.groups?.name ?? name,
           ),
         ),
-        teamName,
+        teamName: pipe(
+          Match.value(teamConfigValue.teamNameRange),
+          Match.when("auto", () =>
+            pipe(
+              playerName,
+              Option.map((name) => `${name} | ${teamConfigValue.name}`),
+            ),
+          ),
+          Match.orElse(() => teamName),
+        ),
       })),
     ),
   );
