@@ -10,6 +10,7 @@ import { getGuildRunningChannelByNameHandler } from "./getGuildRunningChannelByN
 import { removeGuildManagerRoleHandler } from "./removeGuildManagerRole";
 import { upsertGuildChannelConfigHandler } from "./upsertGuildChannelConfig";
 import { upsertGuildConfigHandler } from "./upsertGuildConfig";
+import { getAutoCheckinGuildsHandler } from "./getAutoCheckinGuilds";
 
 export const guildConfigHandlerCollection = pipe(
   Context.Collection.empty(),
@@ -22,4 +23,5 @@ export const guildConfigHandlerCollection = pipe(
   Context.Collection.add(upsertGuildChannelConfigHandler),
   Context.Collection.add(getGuildRunningChannelByIdHandler),
   Context.Collection.add(getGuildRunningChannelByNameHandler),
+  Context.Collection.add(getAutoCheckinGuildsHandler),
 );

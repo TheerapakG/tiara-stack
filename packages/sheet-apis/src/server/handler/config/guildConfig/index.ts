@@ -10,6 +10,7 @@ import { getGuildRunningChannelByNameHandlerConfig } from "./getGuildRunningChan
 import { removeGuildManagerRoleHandlerConfig } from "./removeGuildManagerRole";
 import { upsertGuildChannelConfigHandlerConfig } from "./upsertGuildChannelConfig";
 import { upsertGuildConfigHandlerConfig } from "./upsertGuildConfig";
+import { getAutoCheckinGuildsHandlerConfig } from "./getAutoCheckinGuilds";
 
 export {
   addGuildManagerRoleHandlerConfig,
@@ -21,6 +22,7 @@ export {
   removeGuildManagerRoleHandlerConfig,
   upsertGuildChannelConfigHandlerConfig,
   upsertGuildConfigHandlerConfig,
+  getAutoCheckinGuildsHandlerConfig,
 };
 
 export const guildConfigHandlerConfigCollection = pipe(
@@ -34,4 +36,5 @@ export const guildConfigHandlerConfigCollection = pipe(
   Handler.Config.Collection.add(upsertGuildChannelConfigHandlerConfig),
   Handler.Config.Collection.add(getGuildRunningChannelByIdHandlerConfig),
   Handler.Config.Collection.add(getGuildRunningChannelByNameHandlerConfig),
+  Handler.Config.Collection.add(getAutoCheckinGuildsHandlerConfig),
 );

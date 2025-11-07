@@ -27,6 +27,26 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
       Effect.bind("db", () => DBService),
       Effect.bind("dbSubscriptionContext", () => DB.DBSubscriptionContext),
       Effect.map(({ db, dbSubscriptionContext }) => ({
+        getAutoCheckinGuilds: () =>
+          pipe(
+            dbSubscriptionContext.subscribeQuery(
+              db
+                .select()
+                .from(configGuild)
+                .where(
+                  and(
+                    eq(configGuild.autoCheckin, true),
+                    isNull(configGuild.deletedAt),
+                  ),
+                ),
+            ),
+            Computed.flatMap(
+              Schema.decode(Schema.Array(DefaultTaggedClass(GuildConfig))),
+            ),
+            Effect.withSpan("GuildConfigService.getAutoCheckinGuilds", {
+              captureStackTrace: true,
+            }),
+          ),
         getGuildConfigByGuildId: (guildId: string) =>
           pipe(
             dbSubscriptionContext.subscribeQuery(

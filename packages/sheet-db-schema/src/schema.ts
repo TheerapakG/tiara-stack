@@ -16,6 +16,7 @@ export const configGuild = pgTable(
     guildId: varchar("guild_id").notNull(),
     scriptId: varchar("script_id"),
     sheetId: varchar("sheet_id"),
+    autoCheckin: boolean("auto_checkin").notNull().default(false),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
