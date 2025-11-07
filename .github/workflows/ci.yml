@@ -7,6 +7,12 @@ on:
       - "k8s/**"
       - "packages/**"
     branches: ["master"]
+  pull_request:
+    paths:
+      - ".github/workflows/ci.yml"
+      - "k8s/**"
+      - "packages/**"
+    branches: ["master"]
   workflow_dispatch:
 
 jobs:
