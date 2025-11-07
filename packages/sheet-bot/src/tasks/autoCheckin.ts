@@ -22,6 +22,7 @@ import {
   HashSet,
   Option,
   Schedule,
+  Cron,
   pipe,
 } from "effect";
 
@@ -248,24 +249,24 @@ const runOnce = pipe(
   Effect.withSpan("autoCheckin.runOnce", { captureStackTrace: true }),
 );
 
+const cron45 = Cron.make({
+  seconds: [0],
+  minutes: [45],
+  hours: [],
+  days: [],
+  months: [],
+  weekdays: [],
+});
+
 const waitToNext = pipe(
-  Effect.sync(() => {
-    const now = new Date();
-    const next = new Date(now);
-    if (now.getMinutes() < 45) {
-      next.setMinutes(45, 0, 0);
-    } else {
-      next.setHours(now.getHours() + 1, 45, 0, 0);
-    }
-    return next.getTime() - now.getTime();
-  }),
-  Effect.flatMap((ms) => Effect.sleep(Duration.millis(ms))),
+  Effect.void,
+  Effect.repeat(
+    Schedule.addDelay(Schedule.recurs(1), () => Duration.millis(0)),
+  ),
+  Effect.repeat(Schedule.cron(cron45)),
 );
 
-const hourlyRun = pipe(
-  runOnce,
-  Effect.repeat(Schedule.spaced(Duration.hours(1))),
-);
+const hourlyRun = pipe(runOnce, Effect.repeat(Schedule.cron(cron45)));
 
 export const autoCheckinTask = pipe(
   waitToNext,
