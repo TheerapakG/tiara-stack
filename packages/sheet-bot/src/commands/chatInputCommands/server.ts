@@ -339,6 +339,63 @@ const handleSetScript =
     )
     .build();
 
+const handleSetAutoCheckin =
+  handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
+    .data(
+      new SlashCommandSubcommandBuilder()
+        .setName("auto_checkin")
+        .setDescription("Set whether automatic check-in is enabled")
+        .addBooleanOption((option) =>
+          option
+            .setName("auto_checkin")
+            .setDescription("Enable automatic check-in")
+            .setRequired(true),
+        )
+        .addStringOption((option) =>
+          option
+            .setName("server_id")
+            .setDescription("The server id to set auto check-in for"),
+        ),
+    )
+    .handler(
+      Effect.provide(guildServicesFromInteractionOption("server_id"))(
+        pipe(
+          Effect.Do,
+          InteractionContext.deferReply.tap(),
+          PermissionService.checkPermissions.tap(() => ({
+            permissions: PermissionFlagsBits.ManageGuild,
+          })),
+          bindObject({
+            enabled: InteractionContext.getBoolean("auto_checkin", true),
+            guildName: GuildService.getName(),
+          }),
+          Effect.tap(({ enabled }) =>
+            GuildConfigService.upsertGuildConfig({
+              autoCheckin: enabled,
+            }),
+          ),
+          InteractionContext.editReply.tapEffect(({ guildName, enabled }) =>
+            pipe(
+              ClientService.makeEmbedBuilder(),
+              Effect.map((embed) => ({
+                embeds: [
+                  embed
+                    .setTitle(`Success!`)
+                    .setDescription(
+                      `Auto check-in for ${escapeMarkdown(guildName)} is now ${enabled ? "enabled" : "disabled"}.`,
+                    ),
+                ],
+              })),
+            ),
+          ),
+          Effect.withSpan("handleServerSetAutoCheckin", {
+            captureStackTrace: true,
+          }),
+        ),
+      ),
+    )
+    .build();
+
 const handleSet = chatInputSubcommandGroupSubcommandHandlerContextBuilder()
   .data(
     new SlashCommandSubcommandGroupBuilder()
@@ -347,6 +404,7 @@ const handleSet = chatInputSubcommandGroupSubcommandHandlerContextBuilder()
   )
   .addSubcommandHandler(handleSetSheet)
   .addSubcommandHandler(handleSetScript)
+  .addSubcommandHandler(handleSetAutoCheckin)
   .build();
 
 export const command = chatInputCommandSubcommandHandlerContextBuilder()
