@@ -35,6 +35,7 @@ import {
   Data,
   Effect,
   HashMap,
+  HashSet,
   Layer,
   Match,
   pipe,
@@ -51,6 +52,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
     InteractionHandlerMapWithMetricsGroup<A, E, R>
   >;
   readonly traceProvider: Layer.Layer<never>;
+  readonly tasks: SynchronizedRef.SynchronizedRef<
+    HashSet.HashSet<Effect.Effect<unknown, unknown, R>>
+  >;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly runState: RunState.RunState<
     Bot<any, any, any>,
@@ -250,6 +254,27 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                     ),
                   ),
                   Effect.tap(() => Effect.log("Bot is ready")),
+                  // Fork all predefined tasks using the provided runtime
+                  Effect.tap(() =>
+                    pipe(
+                      bot.tasks,
+                      SynchronizedRef.get,
+                      Effect.flatMap((tasks) =>
+                        Effect.forEach(HashSet.toValues(tasks), (task) =>
+                          Effect.sync(() =>
+                            Runtime.runFork(
+                              runtime,
+                              pipe(
+                                task,
+                                Effect.provide(bot.traceProvider),
+                                Effect.catchAll(() => Effect.void),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                   Effect.provide(ClientService.Default(client)),
                 ),
               ),
@@ -291,6 +316,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
           ),
           interactionHandlerMapWithMetricsGroup: SynchronizedRef.make(
             InteractionHandlerMapWithMetricsGroup.empty<A, E, R>(),
+          ),
+          tasks: SynchronizedRef.make(
+            HashSet.empty<Effect.Effect<unknown, unknown, R>>(),
           ),
           traceProvider: Effect.succeed(Layer.empty),
           runState: RunState.make(
@@ -521,6 +549,49 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 E,
                 Exclude<R, InteractionServices<UserSelectMenuInteractionT>>
               >,
+            ),
+          ),
+        ),
+        Effect.map(({ bot }) => bot),
+      );
+  };
+
+  // Predefined tasks registration
+  static addTask = <R1 = never>(task: Effect.Effect<unknown, unknown, R1>) => {
+    return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
+      pipe(
+        Effect.Do,
+        Effect.let("bot", () => bot as Bot<BA, BE, BR | R1>),
+        Effect.tap(({ bot }) =>
+          SynchronizedRef.update(bot.tasks, (tasks) =>
+            HashSet.add(
+              tasks as HashSet.HashSet<
+                Effect.Effect<unknown, unknown, BR | R1>
+              >,
+              task as Effect.Effect<unknown, unknown, BR | R1>,
+            ),
+          ),
+        ),
+        Effect.map(({ bot }) => bot),
+      );
+  };
+
+  static addTasks = <R1 = never>(
+    tasks: Iterable<Effect.Effect<unknown, unknown, R1>>,
+  ) => {
+    return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
+      pipe(
+        Effect.Do,
+        Effect.let("bot", () => bot as Bot<BA, BE, BR | R1>),
+        Effect.tap(({ bot }) =>
+          SynchronizedRef.update(bot.tasks, (existing) =>
+            HashSet.union(
+              existing as HashSet.HashSet<
+                Effect.Effect<unknown, unknown, BR | R1>
+              >,
+              HashSet.fromIterable(
+                tasks as Iterable<Effect.Effect<unknown, unknown, BR | R1>>,
+              ),
             ),
           ),
         ),
