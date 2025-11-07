@@ -7,6 +7,7 @@ import { getGuildConfigByScriptIdHandlerConfig } from "./getGuildConfigByScriptI
 import { getGuildManagerRolesHandlerConfig } from "./getGuildManagerRoles";
 import { getGuildRunningChannelByIdHandlerConfig } from "./getGuildRunningChannelById";
 import { getGuildRunningChannelByNameHandlerConfig } from "./getGuildRunningChannelByName";
+import { getAutoCheckinGuildsHandlerConfig } from "./getAutoCheckinGuilds";
 import { removeGuildManagerRoleHandlerConfig } from "./removeGuildManagerRole";
 import { upsertGuildChannelConfigHandlerConfig } from "./upsertGuildChannelConfig";
 import { upsertGuildConfigHandlerConfig } from "./upsertGuildConfig";
@@ -21,6 +22,7 @@ export {
   removeGuildManagerRoleHandlerConfig,
   upsertGuildChannelConfigHandlerConfig,
   upsertGuildConfigHandlerConfig,
+  getAutoCheckinGuildsHandlerConfig,
 };
 
 export const guildConfigHandlerConfigCollection = pipe(
@@ -34,4 +36,5 @@ export const guildConfigHandlerConfigCollection = pipe(
   Handler.Config.Collection.add(upsertGuildChannelConfigHandlerConfig),
   Handler.Config.Collection.add(getGuildRunningChannelByIdHandlerConfig),
   Handler.Config.Collection.add(getGuildRunningChannelByNameHandlerConfig),
+  Handler.Config.Collection.add(getAutoCheckinGuildsHandlerConfig),
 );
