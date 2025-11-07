@@ -237,42 +237,40 @@ export class FormatService extends Effect.Service<FormatService>()(
                 Effect.map(Option.map(formatHourWindow)),
               ),
             ),
-            Effect.let(
-              "checkinMessage",
-              ({ fills, prevFills, hour, range }) =>
-                pipe(
-                  HashSet.fromIterable(fills),
-                  HashSet.difference(pipe(HashSet.fromIterable(prevFills))),
-                  HashSet.toValues,
-                  Option.some,
-                  Option.filter(Array.isNonEmptyArray),
-                  Option.map(Array.join(" ")),
-                  // Build strings for template and render via Handlebars
-                  Option.map((mentionsString) => {
-                    const hourString = pipe(
-                      hour,
-                      Option.map((h) => `for ${bold(`hour ${h}`)}`),
-                      Option.getOrElse(() => ""),
-                    );
-                    const timeStampString = pipe(
-                      range,
-                      Option.map(({ start }) =>
-                        time(start, TimestampStyles.RelativeTime),
-                      ),
-                      Option.getOrElse(() => ""),
-                    );
-                    const templateString =
-                      template ??
-                      "{{mentionsString}} React to this message to check in, and {{channelString}} {{hourString}} {{timeStampString}}";
-                    const render = Handlebars.compile(templateString);
-                    return render({
-                      mentionsString,
-                      channelString,
-                      hourString,
-                      timeStampString,
-                    });
-                  }),
-                ),
+            Effect.let("checkinMessage", ({ fills, prevFills, hour, range }) =>
+              pipe(
+                HashSet.fromIterable(fills),
+                HashSet.difference(pipe(HashSet.fromIterable(prevFills))),
+                HashSet.toValues,
+                Option.some,
+                Option.filter(Array.isNonEmptyArray),
+                Option.map(Array.join(" ")),
+                // Build strings for template and render via Handlebars
+                Option.map((mentionsString) => {
+                  const hourString = pipe(
+                    hour,
+                    Option.map((h) => `for ${bold(`hour ${h}`)}`),
+                    Option.getOrElse(() => ""),
+                  );
+                  const timeStampString = pipe(
+                    range,
+                    Option.map(({ start }) =>
+                      time(start, TimestampStyles.RelativeTime),
+                    ),
+                    Option.getOrElse(() => ""),
+                  );
+                  const templateString =
+                    template ??
+                    "{{mentionsString}} React to this message to check in, and {{channelString}} {{hourString}} {{timeStampString}}";
+                  const render = Handlebars.compile(templateString);
+                  return render({
+                    mentionsString,
+                    channelString,
+                    hourString,
+                    timeStampString,
+                  });
+                }),
+              ),
             ),
             Effect.let("empty", () =>
               pipe(
