@@ -580,7 +580,7 @@ const scheduleRange = (scheduleConfigValue: FilteredScheduleConfigValue) => ({
     field: makeScheduleConfigField(scheduleConfigValue, "breaks"),
     range: pipe(
       Match.value(scheduleConfigValue.breakRange),
-      Match.when("detect", () => Option.none()),
+      Match.when("auto", () => Option.none()),
       Match.orElse(() =>
         Option.some(
           `'${scheduleConfigValue.sheet}'!${scheduleConfigValue.breakRange}`,
@@ -649,7 +649,7 @@ const breakHourResolverForFills =
       Option.getOrElse(() =>
         pipe(
           Match.value(scheduleConfig.breakRange),
-          Match.when("detect", () =>
+          Match.when("auto", () =>
             pipe(
               hour,
               Option.map((hour) =>
@@ -687,7 +687,7 @@ const scheduleParser = (
                 pipe(sheet, getConfigFieldValueRange(range.standbys.field)),
                 pipe(
                   Match.value(scheduleConfig.breakRange),
-                  Match.when("detect", () => Effect.succeed({ values: [] })),
+                  Match.when("auto", () => Effect.succeed({ values: [] })),
                   Match.orElse(() =>
                     pipe(sheet, getConfigFieldValueRange(range.breaks.field)),
                   ),
