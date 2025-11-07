@@ -4,6 +4,9 @@
     "format": {
       "cache": false
     },
+    "format:apply": {
+      "cache": false
+    },
     "lint": {
       "dependsOn": ["^build"],
       "cache": false

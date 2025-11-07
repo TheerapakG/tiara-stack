@@ -7,6 +7,7 @@
   },
   "scripts": {
     "checks": "nx run-many -t format,lint,typecheck --output-style=stream",
+    "format:apply": "nx run-many -t format:apply --output-style=stream",
     "build": "nx run-many -t build --output-style=stream"
   }
 }
