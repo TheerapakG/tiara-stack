@@ -9,6 +9,8 @@ import {
   TeamTagsConstantsConfig,
   TeamTagsRangesConfig,
   Error,
+  TeamIsvCombinedConfig,
+  TeamIsvSplitConfig,
 } from "@/server/schema";
 import { type sheets_v4 } from "@googleapis/sheets";
 import {
@@ -88,9 +90,8 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
               "sheet",
               "playerNameRange",
               "teamNameRange",
-              "leadRange",
-              "backlineRange",
-              "talentRange",
+              "isvType",
+              "isvRanges",
               "tagsType",
               "tags",
             ],
@@ -103,9 +104,11 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
                 sheet: GoogleSheets.cellToStringSchema,
                 playerNameRange: GoogleSheets.cellToStringSchema,
                 teamNameRange: GoogleSheets.cellToStringSchema,
-                leadRange: GoogleSheets.cellToStringSchema,
-                backlineRange: GoogleSheets.cellToStringSchema,
-                talentRange: GoogleSheets.cellToStringSchema,
+                isvType: GoogleSheets.cellToLiteralSchema([
+                  "split",
+                  "combined",
+                ]),
+                isvRanges: GoogleSheets.cellToStringSchema,
                 tagsType: GoogleSheets.cellToLiteralSchema([
                   "constants",
                   "ranges",
@@ -126,9 +129,8 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
             sheet,
             playerNameRange,
             teamNameRange,
-            leadRange,
-            backlineRange,
-            talentRange,
+            isvType,
+            isvRanges,
             tagsType,
             tags,
           },
@@ -138,9 +140,44 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
             sheet,
             playerNameRange,
             teamNameRange,
-            leadRange,
-            backlineRange,
-            talentRange,
+            isvConfig: pipe(
+              isvType,
+              Option.flatMap((t) =>
+                pipe(
+                  t,
+                  Match.value,
+                  Match.when("split", () =>
+                    pipe(
+                      isvRanges,
+                      Option.map((v) =>
+                        pipe(
+                          v,
+                          String.split(","),
+                          Array.map(String.trim),
+                          (array) =>
+                            TeamIsvSplitConfig.make({
+                              leadRange: pipe(array, Array.get(0)),
+                              backlineRange: pipe(array, Array.get(1)),
+                              talentRange: pipe(array, Array.get(2)),
+                            }),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Match.when("combined", () =>
+                    pipe(
+                      isvRanges,
+                      Option.map((isvRange) =>
+                        TeamIsvCombinedConfig.make({
+                          isvRange: Option.some(isvRange),
+                        }),
+                      ),
+                    ),
+                  ),
+                  Match.exhaustive,
+                ),
+              ),
+            ),
             tagsConfig: pipe(
               tagsType,
               Option.flatMap((tagsType) =>
@@ -282,7 +319,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!E8:M"],
+              ranges: ["'Thee's Sheet Settings'!E8:L"],
             }),
             Effect.flatMap((response) =>
               pipe(
@@ -309,7 +346,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!O8:P"],
+              ranges: ["'Thee's Sheet Settings'!N8:O"],
             }),
             Effect.flatMap((response) =>
               pipe(
@@ -357,7 +394,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!R8:AC"],
+              ranges: ["'Thee's Sheet Settings'!Q8:AB"],
             }),
             Effect.flatMap((response) =>
               pipe(
@@ -384,7 +421,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!AE8:AF"],
+              ranges: ["'Thee's Sheet Settings'!AD8:AE"],
             }),
             Effect.flatMap((response) =>
               pipe(

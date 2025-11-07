@@ -7,7 +7,10 @@ import {
   ScheduleConfig,
   Team,
   TeamConfig,
+  TeamIsvSplitConfig,
+  TeamIsvCombinedConfig,
   makeSchedule,
+  TeamTagsRangesConfig,
 } from "@/server/schema";
 import { regex } from "arkregex";
 import { type MethodOptions, type sheets_v4 } from "@googleapis/sheets";
@@ -90,9 +93,7 @@ const teamConfigFields = [
   "sheet",
   "playerNameRange",
   "teamNameRange",
-  "leadRange",
-  "backlineRange",
-  "talentRange",
+  "isvConfig",
   "tagsConfig",
 ] as const;
 
@@ -118,48 +119,282 @@ const makeTeamConfigField = (
     field,
   });
 
-const teamRange = (teamConfigValue: FilteredTeamConfigValue) => ({
-  playerName: {
-    field: makeTeamConfigField(teamConfigValue, "playerName"),
-    range: Option.some(
-      `'${teamConfigValue.sheet}'!${teamConfigValue.playerNameRange}`,
-    ),
-  },
-  teamName: {
-    field: makeTeamConfigField(teamConfigValue, "teamName"),
-    range: Option.some(
-      `'${teamConfigValue.sheet}'!${teamConfigValue.teamNameRange}`,
-    ),
-  },
-  lead: {
-    field: makeTeamConfigField(teamConfigValue, "lead"),
-    range: Option.some(
-      `'${teamConfigValue.sheet}'!${teamConfigValue.leadRange}`,
-    ),
-  },
-  backline: {
-    field: makeTeamConfigField(teamConfigValue, "backline"),
-    range: Option.some(
-      `'${teamConfigValue.sheet}'!${teamConfigValue.backlineRange}`,
-    ),
-  },
-  talent: {
-    field: makeTeamConfigField(teamConfigValue, "talent"),
-    range: Option.some(
-      `'${teamConfigValue.sheet}'!${teamConfigValue.talentRange}`,
-    ),
-  },
-  tags: {
-    field: makeTeamConfigField(teamConfigValue, "tags"),
-    range: pipe(
-      Match.value(teamConfigValue.tagsConfig),
-      Match.tag("TeamTagsRangesConfig", (tagsConfig) =>
-        Option.some(`'${teamConfigValue.sheet}'!${tagsConfig.tagsRange}`),
+const teamBaseRange = (teamConfigValue: FilteredTeamConfigValue) =>
+  ({
+    playerName: {
+      field: makeTeamConfigField(teamConfigValue, "playerName"),
+      range: Option.some(
+        `'${teamConfigValue.sheet}'!${teamConfigValue.playerNameRange}`,
       ),
-      Match.orElse(() => Option.none()),
+    },
+    teamName: {
+      field: makeTeamConfigField(teamConfigValue, "teamName"),
+      range: Option.some(
+        `'${teamConfigValue.sheet}'!${teamConfigValue.teamNameRange}`,
+      ),
+    },
+  }) as const;
+
+const playerNameRegex = regex("^(?<name>.*?)(?:\\s+\\(e(?:nc)?\\))?$");
+
+const teamBaseParser = (
+  teamConfigValue: FilteredTeamConfigValue,
+  sheet: HashMap.HashMap<TeamConfigField, sheets_v4.Schema$ValueRange>,
+) =>
+  pipe(
+    Effect.Do,
+    Effect.let("range", () => teamBaseRange(teamConfigValue)),
+    Effect.flatMap(({ range }) =>
+      Effect.all(
+        [
+          pipe(sheet, getConfigFieldValueRange(range.playerName.field)),
+          pipe(sheet, getConfigFieldValueRange(range.teamName.field)),
+        ],
+        { concurrency: "unbounded" },
+      ),
     ),
-  },
-});
+    Effect.flatMap((valueRanges) =>
+      GoogleSheets.parseValueRanges(
+        valueRanges,
+        pipe(
+          TupleToStructValueSchema(
+            ["playerName", "teamName"],
+            GoogleSheets.rowToCellSchema,
+          ),
+          Schema.compose(
+            Schema.Struct({
+              playerName: GoogleSheets.cellToStringSchema,
+              teamName: GoogleSheets.cellToStringSchema,
+            }),
+          ),
+        ),
+      ),
+    ),
+    Effect.map(
+      ArrayUtils.WithDefault.wrapEither({
+        default: () => ({
+          playerName: Option.none<string>(),
+          teamName: Option.none<string>(),
+        }),
+      }),
+    ),
+    Effect.map(
+      ArrayUtils.WithDefault.map(({ playerName, teamName }) => ({
+        playerName: pipe(
+          playerName,
+          Option.map(
+            (name) => playerNameRegex.exec(name)?.groups?.name ?? name,
+          ),
+        ),
+        teamName,
+      })),
+    ),
+  );
+
+const teamSplitIsvRange = (
+  teamConfigValue: FilteredTeamConfigValue,
+  cfg: TeamIsvSplitConfig,
+) =>
+  ({
+    lead: {
+      field: makeTeamConfigField(teamConfigValue, "lead"),
+      range: Option.some(`'${teamConfigValue.sheet}'!${cfg.leadRange}`),
+    },
+    backline: {
+      field: makeTeamConfigField(teamConfigValue, "backline"),
+      range: Option.some(`'${teamConfigValue.sheet}'!${cfg.backlineRange}`),
+    },
+    talent: {
+      field: makeTeamConfigField(teamConfigValue, "talent"),
+      range: Option.some(`'${teamConfigValue.sheet}'!${cfg.talentRange}`),
+    },
+  }) as const;
+
+const teamSplitIsvParser = (
+  teamConfigValue: FilteredTeamConfigValue,
+  cfg: TeamIsvSplitConfig,
+  sheet: HashMap.HashMap<TeamConfigField, sheets_v4.Schema$ValueRange>,
+) =>
+  pipe(
+    Effect.Do,
+    Effect.let("range", () => teamSplitIsvRange(teamConfigValue, cfg)),
+    Effect.flatMap(({ range }) =>
+      Effect.all(
+        [
+          pipe(sheet, getConfigFieldValueRange(range.lead.field)),
+          pipe(sheet, getConfigFieldValueRange(range.backline.field)),
+          pipe(sheet, getConfigFieldValueRange(range.talent.field)),
+        ],
+        { concurrency: "unbounded" },
+      ),
+    ),
+    Effect.flatMap((valueRanges) =>
+      GoogleSheets.parseValueRanges(
+        valueRanges,
+        pipe(
+          TupleToStructValueSchema(
+            ["lead", "backline", "talent"],
+            GoogleSheets.rowToCellSchema,
+          ),
+          Schema.compose(
+            Schema.Struct({
+              lead: GoogleSheets.cellToNumberSchema,
+              backline: GoogleSheets.cellToNumberSchema,
+              talent: GoogleSheets.cellToNumberSchema,
+            }),
+          ),
+        ),
+      ),
+    ),
+    Effect.map(
+      ArrayUtils.WithDefault.wrapEither({
+        default: () => ({
+          lead: Option.none<number>(),
+          backline: Option.none<number>(),
+          talent: Option.none<number>(),
+        }),
+      }),
+    ),
+  );
+
+const teamCombinedIsvRange = (
+  teamConfigValue: FilteredTeamConfigValue,
+  cfg: TeamIsvCombinedConfig,
+) =>
+  ({
+    isv: {
+      field: makeTeamConfigField(teamConfigValue, "isv"),
+      range: Option.some(`'${teamConfigValue.sheet}'!${cfg.isvRange}`),
+    },
+  }) as const;
+
+const teamCombinedIsvParser = (
+  teamConfigValue: FilteredTeamConfigValue,
+  cfg: TeamIsvCombinedConfig,
+  sheet: HashMap.HashMap<TeamConfigField, sheets_v4.Schema$ValueRange>,
+) =>
+  pipe(
+    Effect.Do,
+    Effect.let("range", () => teamCombinedIsvRange(teamConfigValue, cfg)),
+    Effect.flatMap(({ range }) =>
+      Effect.all([pipe(sheet, getConfigFieldValueRange(range.isv.field))], {
+        concurrency: "unbounded",
+      }),
+    ),
+    Effect.flatMap((valueRanges) =>
+      GoogleSheets.parseValueRanges(
+        valueRanges,
+        pipe(
+          TupleToStructValueSchema(["isv"], GoogleSheets.rowToCellSchema),
+          Schema.compose(
+            Schema.Struct({
+              isv: GoogleSheets.cellToStringSchema,
+            }),
+          ),
+        ),
+      ),
+    ),
+    Effect.map(
+      ArrayUtils.WithDefault.wrapEither({
+        default: () => ({
+          isv: Option.none<string>(),
+        }),
+      }),
+    ),
+    Effect.map(
+      ArrayUtils.WithDefault.map(({ isv }) =>
+        pipe(
+          isv,
+          Option.map(String.split("/")),
+          Option.map(Array.map(String.trim)),
+          (isv) => ({
+            lead: pipe(isv, Option.flatMap(Array.get(0))),
+            backline: pipe(isv, Option.flatMap(Array.get(1))),
+            talent: pipe(isv, Option.flatMap(Array.get(2))),
+          }),
+        ),
+      ),
+    ),
+    Effect.map(ArrayUtils.WithDefault.toArray),
+    Effect.flatMap(
+      Effect.forEach((isv) =>
+        pipe(
+          isv,
+          Schema.decode(
+            Schema.Struct({
+              lead: GoogleSheets.cellToNumberSchema,
+              backline: GoogleSheets.cellToNumberSchema,
+              talent: GoogleSheets.cellToNumberSchema,
+            }),
+          ),
+          Effect.either,
+        ),
+      ),
+    ),
+    Effect.map(
+      ArrayUtils.WithDefault.wrapEither({
+        default: () => ({
+          lead: Option.none<number>(),
+          backline: Option.none<number>(),
+          talent: Option.none<number>(),
+        }),
+      }),
+    ),
+  );
+
+const teamRangesTagsRange = (
+  teamConfigValue: FilteredTeamConfigValue,
+  cfg: TeamTagsRangesConfig,
+) =>
+  ({
+    tags: {
+      field: makeTeamConfigField(teamConfigValue, "tags"),
+      range: Option.some(`'${teamConfigValue.sheet}'!${cfg.tagsRange}`),
+    },
+  }) as const;
+
+const teamRangesTagsParser = (
+  teamConfigValue: FilteredTeamConfigValue,
+  cfg: TeamTagsRangesConfig,
+  sheet: HashMap.HashMap<TeamConfigField, sheets_v4.Schema$ValueRange>,
+) =>
+  pipe(
+    Effect.Do,
+    Effect.let("range", () => teamRangesTagsRange(teamConfigValue, cfg)),
+    Effect.flatMap(({ range }) =>
+      Effect.all([pipe(sheet, getConfigFieldValueRange(range.tags.field))], {
+        concurrency: "unbounded",
+      }),
+    ),
+    Effect.flatMap((valueRanges) =>
+      GoogleSheets.parseValueRanges(
+        valueRanges,
+        pipe(
+          TupleToStructValueSchema(["tags"], GoogleSheets.rowToCellSchema),
+          Schema.compose(
+            Schema.Struct({
+              tags: GoogleSheets.cellToStringArraySchema,
+            }),
+          ),
+        ),
+      ),
+    ),
+    Effect.map(
+      ArrayUtils.WithDefault.wrapEither({
+        default: () => ({
+          tags: Option.none<string[]>(),
+        }),
+      }),
+    ),
+    Effect.map(
+      ArrayUtils.WithDefault.map(({ tags }) => ({
+        tags: pipe(
+          tags,
+          Option.getOrElse(() => []),
+        ),
+      })),
+    ),
+  );
 
 const teamRanges = (teamConfigValues: FilteredTeamConfigValue[]) =>
   pipe(
@@ -167,22 +402,52 @@ const teamRanges = (teamConfigValues: FilteredTeamConfigValue[]) =>
     Array.reduce(
       HashMap.empty<TeamConfigField, Option.Option<string>>(),
       (acc, a) => {
-        const range = teamRange(a);
+        const range = teamBaseRange(a);
         return pipe(
           acc,
           HashMap.set(range.playerName.field, range.playerName.range),
           HashMap.set(range.teamName.field, range.teamName.range),
-          HashMap.set(range.lead.field, range.lead.range),
-          HashMap.set(range.backline.field, range.backline.range),
-          HashMap.set(range.talent.field, range.talent.range),
-          HashMap.set(range.tags.field, range.tags.range),
+          (map) =>
+            pipe(
+              Match.value(a.isvConfig),
+              Match.tagsExhaustive({
+                TeamIsvSplitConfig: (cfg) => {
+                  const range = teamSplitIsvRange(a, cfg);
+                  return pipe(
+                    map,
+                    HashMap.set(range.lead.field, range.lead.range),
+                    HashMap.set(range.backline.field, range.backline.range),
+                    HashMap.set(range.talent.field, range.talent.range),
+                  );
+                },
+                TeamIsvCombinedConfig: (cfg) => {
+                  const range = teamCombinedIsvRange(a, cfg);
+                  return pipe(
+                    map,
+                    HashMap.set(range.isv.field, range.isv.range),
+                  );
+                },
+              }),
+            ),
+          (map) =>
+            pipe(
+              Match.value(a.tagsConfig),
+              Match.tagsExhaustive({
+                TeamTagsConstantsConfig: () => map,
+                TeamTagsRangesConfig: (cfg) => {
+                  const range = teamRangesTagsRange(a, cfg);
+                  return pipe(
+                    map,
+                    HashMap.set(range.tags.field, range.tags.range),
+                  );
+                },
+              }),
+            ),
         );
       },
     ),
     HashMap.filterMap((a, _) => a),
   );
-
-const playerNameRegex = regex("^(?<name>.*?)(?:\\s+\\(e(?:nc)?\\))?$");
 
 const teamParser = (
   teamConfigValues: FilteredTeamConfigValue[],
@@ -192,91 +457,39 @@ const teamParser = (
     teamConfigValues,
     Effect.forEach((teamConfig) =>
       pipe(
-        Effect.Do,
-        Effect.let("range", () => teamRange(teamConfig)),
-        Effect.flatMap(({ range }) =>
-          Effect.all([
-            pipe(sheet, getConfigFieldValueRange(range.playerName.field)),
-            pipe(sheet, getConfigFieldValueRange(range.teamName.field)),
-            pipe(sheet, getConfigFieldValueRange(range.lead.field)),
-            pipe(sheet, getConfigFieldValueRange(range.backline.field)),
-            pipe(sheet, getConfigFieldValueRange(range.talent.field)),
-            pipe(
-              Match.value(teamConfig.tagsConfig),
-              Match.tagsExhaustive({
-                TeamTagsConstantsConfig: () => Effect.succeed({ values: [] }),
-                TeamTagsRangesConfig: () =>
-                  pipe(sheet, getConfigFieldValueRange(range.tags.field)),
-              }),
-            ),
-          ]),
-        ),
-        Effect.flatMap((valueRanges) =>
-          GoogleSheets.parseValueRanges(
-            valueRanges,
-            pipe(
-              TupleToStructValueSchema(
-                [
-                  "playerName",
-                  "teamName",
-                  "lead",
-                  "backline",
-                  "talent",
-                  "tags",
-                ],
-                GoogleSheets.rowToCellSchema,
-              ),
-              Schema.compose(
-                Schema.Struct({
-                  playerName: GoogleSheets.cellToStringSchema,
-                  teamName: GoogleSheets.cellToStringSchema,
-                  lead: GoogleSheets.cellToNumberSchema,
-                  backline: GoogleSheets.cellToNumberSchema,
-                  talent: GoogleSheets.cellToNumberSchema,
-                  tags: GoogleSheets.cellToStringArraySchema,
-                }),
-              ),
-            ),
-          ),
-        ),
-        Effect.map(
-          ArrayUtils.WithDefault.wrapEither({
-            default: () => ({
-              playerName: Option.none<string>(),
-              teamName: Option.none<string>(),
-              lead: Option.none<number>(),
-              backline: Option.none<number>(),
-              talent: Option.none<number>(),
-              tags: Option.none<string[]>(),
+        Effect.all({
+          base: teamBaseParser(teamConfig, sheet),
+          isv: pipe(
+            Match.value(teamConfig.isvConfig),
+            Match.tagsExhaustive({
+              TeamIsvSplitConfig: (cfg) =>
+                teamSplitIsvParser(teamConfig, cfg, sheet),
+              TeamIsvCombinedConfig: (cfg) =>
+                teamCombinedIsvParser(teamConfig, cfg, sheet),
             }),
-          }),
-        ),
-        Effect.map(
-          ArrayUtils.WithDefault.map(
-            ({ playerName, teamName, lead, backline, talent, tags }) => ({
-              playerName: pipe(
-                playerName,
-                Option.map(
-                  (name) => playerNameRegex.exec(name)?.groups?.name ?? name,
-                ),
-              ),
-              teamName,
-              lead,
-              backline,
-              talent,
-              tags: pipe(
-                tags,
-                Option.getOrElse(() =>
+          ),
+          tags: pipe(
+            Match.value(teamConfig.tagsConfig),
+            Match.tagsExhaustive({
+              TeamTagsConstantsConfig: (cfg) =>
+                Effect.succeed(
                   pipe(
-                    Match.value(teamConfig.tagsConfig),
-                    Match.tagsExhaustive({
-                      TeamTagsConstantsConfig: (teamConfig) => teamConfig.tags,
-                      TeamTagsRangesConfig: () => [],
+                    [],
+                    ArrayUtils.WithDefault.wrap<{ tags: readonly string[] }[]>({
+                      default: () => ({ tags: cfg.tags }),
                     }),
                   ),
                 ),
-              ),
+              TeamTagsRangesConfig: (cfg) =>
+                teamRangesTagsParser(teamConfig, cfg, sheet),
             }),
+          ),
+        }),
+        Effect.map(({ base, isv, tags }) =>
+          pipe(
+            base,
+            ArrayUtils.WithDefault.zip(isv),
+            ArrayUtils.WithDefault.zip(tags),
           ),
         ),
         Effect.map(ArrayUtils.WithDefault.toArray),
