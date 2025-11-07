@@ -149,7 +149,7 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
                   Match.when("split", () =>
                     pipe(
                       isvRanges,
-                      Option.map((v) =>
+                      Option.flatMap((v) =>
                         pipe(
                           v,
                           String.split(","),
@@ -160,7 +160,9 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
                               backlineRange: pipe(array, Array.get(1)),
                               talentRange: pipe(array, Array.get(2)),
                             }),
-                          TeamIsvSplitConfig.make,
+                          Option.map((config) =>
+                            TeamIsvSplitConfig.make(config),
+                          ),
                         ),
                       ),
                     ),
