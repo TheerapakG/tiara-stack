@@ -21,6 +21,7 @@ import {
   Effect,
   HashSet,
   Option,
+  Schedule,
   pipe,
 } from "effect";
 
@@ -222,17 +223,23 @@ const runOnce = pipe(
   Effect.withSpan("autoCheckin.runOnce", { captureStackTrace: true }),
 );
 
-export const autoCheckinTask = pipe(
-  Effect.sync(() => msUntilNextMinute(45)),
-  Effect.flatMap((ms: number) => Effect.sleep(Duration.millis(ms))),
-  Effect.andThen(
-    Effect.forever(
-      pipe(
-        runOnce,
-        Effect.flatMap(() => Effect.sleep(Duration.hours(1))),
-        Effect.catchAll(() => Effect.void),
-      ),
+const initialDelay = pipe(
+  Effect.void,
+  Effect.repeat(
+    pipe(
+      Schedule.recurs(1),
+      Schedule.addDelay(() => Duration.millis(msUntilNextMinute(45))),
     ),
   ),
+);
+
+const hourlyRun = pipe(
+  runOnce,
+  Effect.repeat(pipe(Schedule.spaced(Duration.hours(1)))),
+);
+
+export const autoCheckinTask = pipe(
+  initialDelay,
+  Effect.andThen(hourlyRun),
   Effect.withSpan("autoCheckinTask", { captureStackTrace: true }),
 );

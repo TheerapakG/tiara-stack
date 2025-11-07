@@ -1,8 +1,13 @@
 import { autoCheckinTask } from "./autoCheckin";
-import { Effect } from "effect";
+import { Effect, pipe } from "effect";
+import { botServices } from "@/services";
 
 export const tasks = [
-  autoCheckinTask as unknown as Effect.Effect<unknown, unknown, never>,
+  pipe(autoCheckinTask, Effect.provide(botServices)) as Effect.Effect<
+    unknown,
+    unknown,
+    never
+  >,
 ];
 
 export { autoCheckinTask };
