@@ -63,9 +63,10 @@ const handleListConfig =
               Option.getOrElse(() => "None"),
               Effect.succeed,
             ),
+            autoCheckin: pipe(guildConfig.autoCheckin, Effect.succeed),
           })),
           InteractionContext.editReply.tapEffect(
-            ({ guildName, sheetId, scriptId, managerRoles }) =>
+            ({ guildName, sheetId, scriptId, autoCheckin, managerRoles }) =>
               pipe(
                 ClientService.makeEmbedBuilder(),
                 Effect.map((embed) => ({
@@ -76,6 +77,7 @@ const handleListConfig =
                         [
                           `Sheet id: ${sheetId}`,
                           `Script id: ${scriptId}`,
+                          `Auto check-in: ${autoCheckin ? "Enabled" : "Disabled"}`,
                           `Manager roles: ${
                             pipe(
                               managerRoles,
