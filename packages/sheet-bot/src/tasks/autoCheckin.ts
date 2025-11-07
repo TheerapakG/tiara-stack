@@ -133,87 +133,105 @@ const runOnce = pipe(
           ),
         ),
         Effect.flatMap(({ hour, channels }) =>
-          Effect.forEach(
-            channels,
-            (channelName) =>
-              pipe(
-                GuildConfigService.getGuildRunningChannelByName(channelName),
-                Effect.flatMap((runningChannel) =>
-                  pipe(
-                    Effect.Do,
-                    Effect.bind("checkinChannelId", () =>
-                      pipe(
-                        runningChannel.checkinChannelId,
-                        Option.match({
-                          onSome: Effect.succeed,
-                          onNone: () =>
-                            Effect.succeed(runningChannel.channelId),
-                        }),
-                      ),
-                    ),
-                    Effect.bind("checkinData", () =>
-                      getCheckinData({ hour, runningChannel }),
-                    ),
-                    Effect.bind("checkinMessages", ({ checkinData }) =>
-                      getCheckinMessages(checkinData),
-                    ),
-                    Effect.bind(
-                      "message",
-                      ({ checkinData, checkinMessages, checkinChannelId }) =>
+          pipe(
+            Effect.forEach(
+              channels,
+              (channelName) =>
+                pipe(
+                  GuildConfigService.getGuildRunningChannelByName(channelName),
+                  Effect.flatMap((runningChannel) =>
+                    pipe(
+                      Effect.Do,
+                      Effect.bind("checkinChannelId", () =>
                         pipe(
-                          checkinMessages.checkinMessage,
-                          Effect.transposeMapOption((checkinMessage) =>
-                            pipe(
-                              Effect.Do,
-                              Effect.let(
-                                "initialMessage",
-                                () => checkinMessage,
-                              ),
-                              SendableChannelContext.send().bind(
-                                "message",
-                                () => ({
-                                  content: checkinMessage,
-                                  components: checkinData.runningChannel.roleId
-                                    ? [
-                                        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                                          new ButtonBuilder(checkinButton.data),
-                                        ),
-                                      ]
-                                    : [],
-                                }),
-                              ),
-                            ),
-                          ),
-                          Effect.provide(
-                            channelServicesFromGuildChannelId(checkinChannelId),
-                          ),
-                        ),
-                    ),
-                    Effect.tap(({ checkinData, message }) =>
-                      pipe(
-                        message,
-                        Effect.transposeMapOption(
-                          ({ initialMessage, message }) =>
-                            MessageCheckinService.upsertMessageCheckinData(
-                              message.id,
-                              {
-                                initialMessage,
-                                hour,
-                                channelId: checkinData.runningChannel.channelId,
-                                roleId: Option.getOrNull(
-                                  checkinData.runningChannel.roleId,
-                                ),
-                              },
-                            ),
+                          runningChannel.checkinChannelId,
+                          Option.match({
+                            onSome: Effect.succeed,
+                            onNone: () =>
+                              Effect.succeed(runningChannel.channelId),
+                          }),
                         ),
                       ),
+                      Effect.bind("checkinData", () =>
+                        getCheckinData({ hour, runningChannel }),
+                      ),
+                      Effect.bind("checkinMessages", ({ checkinData }) =>
+                        getCheckinMessages(checkinData),
+                      ),
+                      Effect.bind(
+                        "message",
+                        ({ checkinData, checkinMessages, checkinChannelId }) =>
+                          pipe(
+                            checkinMessages.checkinMessage,
+                            Effect.transposeMapOption((checkinMessage) =>
+                              pipe(
+                                Effect.Do,
+                                Effect.let(
+                                  "initialMessage",
+                                  () => checkinMessage,
+                                ),
+                                SendableChannelContext.send().bind(
+                                  "message",
+                                  () => ({
+                                    content: checkinMessage,
+                                    components: checkinData.runningChannel
+                                      .roleId
+                                      ? [
+                                          new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                                            new ButtonBuilder(
+                                              checkinButton.data,
+                                            ),
+                                          ),
+                                        ]
+                                      : [],
+                                  }),
+                                ),
+                              ),
+                            ),
+                            Effect.provide(
+                              channelServicesFromGuildChannelId(
+                                checkinChannelId,
+                              ),
+                            ),
+                          ),
+                      ),
+                      Effect.tap(({ checkinData, message }) =>
+                        pipe(
+                          message,
+                          Effect.transposeMapOption(
+                            ({ initialMessage, message }) =>
+                              MessageCheckinService.upsertMessageCheckinData(
+                                message.id,
+                                {
+                                  initialMessage,
+                                  hour,
+                                  channelId:
+                                    checkinData.runningChannel.channelId,
+                                  roleId: Option.getOrNull(
+                                    checkinData.runningChannel.roleId,
+                                  ),
+                                },
+                              ),
+                          ),
+                        ),
+                      ),
+                      Effect.map(({ message }) =>
+                        Option.isSome(message) ? 1 : 0,
+                      ),
                     ),
-                    Effect.asVoid,
                   ),
+                  Effect.catchAll(() => Effect.succeed(0)),
                 ),
-                Effect.catchAll(() => Effect.void),
+              { concurrency: "unbounded" },
+            ),
+            Effect.map((counts) =>
+              counts.reduce((acc: number, n: number) => acc + n, 0),
+            ),
+            Effect.tap((sent) =>
+              Effect.log(
+                `autoCheckin: sent ${sent} check-in message(s) for guild ${guild.guildId}`,
               ),
-            { concurrency: "unbounded" },
+            ),
           ),
         ),
         Effect.provide(guildServices(guild.guildId)),
