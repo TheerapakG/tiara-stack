@@ -104,7 +104,10 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
                 sheet: GoogleSheets.cellToStringSchema,
                 playerNameRange: GoogleSheets.cellToStringSchema,
                 teamNameRange: GoogleSheets.cellToStringSchema,
-                isvType: GoogleSheets.cellToLiteralSchema(["split", "combined"]),
+                isvType: GoogleSheets.cellToLiteralSchema([
+                  "split",
+                  "combined",
+                ]),
                 isvRanges: GoogleSheets.cellToStringSchema,
                 tagsType: GoogleSheets.cellToLiteralSchema([
                   "constants",
@@ -151,8 +154,12 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
                           v.split(",").map((s) => s.trim()),
                           ([lead, back, talent]) =>
                             new IsvSplitConfig({
-                              leadRange: lead ?? "",
-                              backlineRange: back ?? "",
+                              leadRange: lead
+                                ? Option.some(lead)
+                                : Option.none<string>(),
+                              backlineRange: back
+                                ? Option.some(back)
+                                : Option.none<string>(),
                               talentRange: talent
                                 ? Option.some(talent)
                                 : Option.none<string>(),
@@ -164,7 +171,10 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
                   Match.when("combined", () =>
                     pipe(
                       isvRanges,
-                      Option.map((v) => new IsvCombinedConfig({ isvRange: v })),
+                      Option.map(
+                        (v) =>
+                          new IsvCombinedConfig({ isvRange: Option.some(v) }),
+                      ),
                     ),
                   ),
                   Match.exhaustive,

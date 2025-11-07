@@ -17,8 +17,8 @@ export class TeamTagsRangesConfig extends Schema.TaggedClass<TeamTagsRangesConfi
 export class IsvSplitConfig extends Schema.TaggedClass<IsvSplitConfig>()(
   "IsvSplitConfig",
   {
-    leadRange: Schema.String,
-    backlineRange: Schema.String,
+    leadRange: Schema.OptionFromNullishOr(Schema.String, undefined),
+    backlineRange: Schema.OptionFromNullishOr(Schema.String, undefined),
     talentRange: Schema.OptionFromNullishOr(Schema.String, undefined),
   },
 ) {}
@@ -26,7 +26,7 @@ export class IsvSplitConfig extends Schema.TaggedClass<IsvSplitConfig>()(
 export class IsvCombinedConfig extends Schema.TaggedClass<IsvCombinedConfig>()(
   "IsvCombinedConfig",
   {
-    isvRange: Schema.String,
+    isvRange: Schema.OptionFromNullishOr(Schema.String, undefined),
   },
 ) {}
 

@@ -159,46 +159,65 @@ const teamRange = (
     IsvCombinedConfig | IsvSplitConfig
   >;
   if (Option.isSome(isvOpt)) {
-    const cfg = isvOpt.value;
-    return pipe(
-      cfg,
-      Match.value,
-      Match.tagsExhaustive({
-        IsvCombinedConfig: (cfg: IsvCombinedConfig) => {
-          const isv = {
-            field: makeTeamConfigField(teamConfigValue, "isv"),
-            range: Option.some(`'${teamConfigValue.sheet}'!${cfg.isvRange}`),
-          } as const;
-          return { playerName, teamName, tags, isv } as TeamRangeResult;
-        },
-        IsvSplitConfig: (cfg: IsvSplitConfig) => {
-          const lead = {
-            field: makeTeamConfigField(teamConfigValue, "lead"),
-            range: Option.some(`'${teamConfigValue.sheet}'!${cfg.leadRange}`),
-          } as const;
-          const backline = {
-            field: makeTeamConfigField(teamConfigValue, "backline"),
-            range: Option.some(`'${teamConfigValue.sheet}'!${cfg.backlineRange}`),
-          } as const;
-          const talent = Option.isSome(cfg.talentRange)
-            ? ({
-                field: makeTeamConfigField(teamConfigValue, "talent"),
-                range: Option.some(
-                  `'${teamConfigValue.sheet}'!${cfg.talentRange.value}`,
-                ),
-              } as const)
-            : undefined;
-          return {
-            playerName,
-            teamName,
-            tags,
-            lead,
-            backline,
-            talent,
-          } as TeamRangeResult;
-        },
-      }),
-    );
+    const cfg = isvOpt.value as IsvCombinedConfig | IsvSplitConfig;
+    if ((cfg as any)._tag === "IsvCombinedConfig") {
+      const isvRange = (cfg as IsvCombinedConfig).isvRange;
+      const isv = pipe(
+        isvRange,
+        Option.map(
+          (r) =>
+            ({
+              field: makeTeamConfigField(teamConfigValue, "isv"),
+              range: Option.some(`'${teamConfigValue.sheet}'!${r}`),
+            }) as const,
+        ),
+        Option.getOrUndefined,
+      );
+      return { playerName, teamName, tags, isv } as TeamRangeResult;
+    } else {
+      const split = cfg as IsvSplitConfig;
+      const lead = pipe(
+        split.leadRange,
+        Option.map(
+          (r) =>
+            ({
+              field: makeTeamConfigField(teamConfigValue, "lead"),
+              range: Option.some(`'${teamConfigValue.sheet}'!${r}`),
+            }) as const,
+        ),
+        Option.getOrUndefined,
+      );
+      const backline = pipe(
+        split.backlineRange,
+        Option.map(
+          (r) =>
+            ({
+              field: makeTeamConfigField(teamConfigValue, "backline"),
+              range: Option.some(`'${teamConfigValue.sheet}'!${r}`),
+            }) as const,
+        ),
+        Option.getOrUndefined,
+      );
+      const talent = pipe(
+        split.talentRange,
+        Option.map(
+          (r) =>
+            ({
+              field: makeTeamConfigField(teamConfigValue, "talent"),
+              range: Option.some(`'${teamConfigValue.sheet}'!${r}`),
+            }) as const,
+        ),
+        Option.getOrUndefined,
+      );
+      return {
+        playerName,
+        teamName,
+        tags,
+        lead,
+        backline,
+        talent,
+      } as TeamRangeResult;
+    }
   }
   return { playerName, teamName, tags } as TeamRangeResult;
 };
