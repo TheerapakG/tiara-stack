@@ -2,23 +2,15 @@ import { Error, GuildConfig } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 
-export const upsertGuildConfigHandlerConfig = pipe(
+export const getAutoCheckinGuildsHandlerConfig = pipe(
   Handler.Config.empty(),
-  Handler.Config.Builder.type("mutation"),
-  Handler.Config.Builder.name("guildConfig.upsertGuildConfig"),
+  Handler.Config.Builder.type("subscription"),
+  Handler.Config.Builder.name("guildConfig.getAutoCheckinGuilds"),
   Handler.Config.Builder.requestParams({
-    validator: pipe(
-      Schema.Struct({
-        guildId: Schema.String,
-        scriptId: Schema.optional(Schema.NullishOr(Schema.String)),
-        sheetId: Schema.optional(Schema.NullishOr(Schema.String)),
-        autoCheckin: Schema.optional(Schema.Boolean),
-      }),
-      Schema.standardSchemaV1,
-    ),
+    validator: pipe(Schema.Struct({}), Schema.standardSchemaV1),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(GuildConfig, Schema.standardSchemaV1),
+    validator: pipe(Schema.Array(GuildConfig), Schema.standardSchemaV1),
   }),
   Handler.Config.Builder.responseError({
     validator: pipe(
