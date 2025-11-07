@@ -103,16 +103,7 @@ const getCheckinMessages = (data: {
     template: undefined,
   });
 
-const msUntilNextMinute = (targetMinute: number) => {
-  const now = new Date();
-  const next = new Date(now);
-  if (now.getMinutes() < targetMinute) {
-    next.setMinutes(targetMinute, 0, 0);
-  } else {
-    next.setHours(now.getHours() + 1, targetMinute, 0, 0);
-  }
-  return Math.max(0, next.getTime() - now.getTime());
-};
+// removed: legacy minute alignment helper; we align using cron for the first tick
 
 const runOnce = pipe(
   Effect.Do,
@@ -257,23 +248,27 @@ const runOnce = pipe(
   Effect.withSpan("autoCheckin.runOnce", { captureStackTrace: true }),
 );
 
-const initialDelay = pipe(
-  Effect.void,
-  Effect.repeat(
-    pipe(
-      Schedule.recurs(1),
-      Schedule.addDelay(() => Duration.millis(msUntilNextMinute(45))),
-    ),
-  ),
+const waitToNext = pipe(
+  Effect.sync(() => {
+    const now = new Date();
+    const next = new Date(now);
+    if (now.getMinutes() < 45) {
+      next.setMinutes(45, 0, 0);
+    } else {
+      next.setHours(now.getHours() + 1, 45, 0, 0);
+    }
+    return next.getTime() - now.getTime();
+  }),
+  Effect.flatMap((ms) => Effect.sleep(Duration.millis(ms))),
 );
 
 const hourlyRun = pipe(
   runOnce,
-  Effect.repeat(pipe(Schedule.spaced(Duration.hours(1)))),
+  Effect.repeat(Schedule.spaced(Duration.hours(1))),
 );
 
 export const autoCheckinTask = pipe(
-  initialDelay,
+  waitToNext,
   Effect.andThen(hourlyRun),
   Effect.withSpan("autoCheckinTask", { captureStackTrace: true }),
 );
