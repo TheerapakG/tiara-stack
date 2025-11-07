@@ -9,8 +9,8 @@ import {
   TeamTagsConstantsConfig,
   TeamTagsRangesConfig,
   Error,
-  IsvCombinedConfig,
-  IsvSplitConfig,
+  TeamIsvCombinedConfig,
+  TeamIsvSplitConfig,
 } from "@/server/schema";
 import { type sheets_v4 } from "@googleapis/sheets";
 import {
@@ -151,18 +151,14 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
                       isvRanges,
                       Option.map((v) =>
                         pipe(
-                          v.split(",").map((s) => s.trim()),
-                          ([lead, back, talent]) =>
-                            new IsvSplitConfig({
-                              leadRange: lead
-                                ? Option.some(lead)
-                                : Option.none<string>(),
-                              backlineRange: back
-                                ? Option.some(back)
-                                : Option.none<string>(),
-                              talentRange: talent
-                                ? Option.some(talent)
-                                : Option.none<string>(),
+                          v,
+                          String.split(","),
+                          Array.map(String.trim),
+                          (array) =>
+                            TeamIsvSplitConfig.make({
+                              leadRange: pipe(array, Array.get(0)),
+                              backlineRange: pipe(array, Array.get(1)),
+                              talentRange: pipe(array, Array.get(2)),
                             }),
                         ),
                       ),
@@ -171,9 +167,10 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
                   Match.when("combined", () =>
                     pipe(
                       isvRanges,
-                      Option.map(
-                        (v) =>
-                          new IsvCombinedConfig({ isvRange: Option.some(v) }),
+                      Option.map((isvRange) =>
+                        TeamIsvCombinedConfig.make({
+                          isvRange: Option.some(isvRange),
+                        }),
                       ),
                     ),
                   ),
@@ -322,7 +319,6 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              // Updated width: still aligned with isvType + isvRanges columns
               ranges: ["'Thee's Sheet Settings'!E8:L"],
             }),
             Effect.flatMap((response) =>
@@ -350,7 +346,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!O8:P"],
+              ranges: ["'Thee's Sheet Settings'!N8:O"],
             }),
             Effect.flatMap((response) =>
               pipe(
@@ -398,7 +394,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!R8:AC"],
+              ranges: ["'Thee's Sheet Settings'!Q8:AB"],
             }),
             Effect.flatMap((response) =>
               pipe(
@@ -425,7 +421,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!AE8:AF"],
+              ranges: ["'Thee's Sheet Settings'!AD8:AE"],
             }),
             Effect.flatMap((response) =>
               pipe(
