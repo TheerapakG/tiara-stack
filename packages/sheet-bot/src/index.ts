@@ -9,6 +9,7 @@ import { commands } from "./commands";
 import { Config } from "./config";
 import { buttons } from "./messageComponents";
 import { botServices } from "./services";
+import { tasks } from "./tasks";
 
 const TracesLive = NodeSdk.layer(() => ({
   resource: { serviceName: "sheet-bot" },
@@ -34,6 +35,7 @@ NodeRuntime.runMain(
         Effect.map(Bot.withTraceProvider(TracesLive)),
         Effect.flatMap(Bot.addChatInputCommandHandlerMap(commands)),
         Effect.flatMap(Bot.addButtonInteractionHandlerMap(buttons)),
+        Effect.flatMap(Bot.addTasks(tasks)),
       ),
     ),
     Effect.bind("runtime", () => Layer.toRuntime(botServices)),
