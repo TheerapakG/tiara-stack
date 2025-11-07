@@ -26,6 +26,7 @@ import {
   Schema,
   String,
   Boolean,
+  Either,
 } from "effect";
 import { TupleToStructValueSchema } from "typhoon-core/schema";
 import { Computed } from "typhoon-core/signal";
@@ -129,8 +130,14 @@ const teamBaseRange = (teamConfigValue: FilteredTeamConfigValue) =>
     },
     teamName: {
       field: makeTeamConfigField(teamConfigValue, "teamName"),
-      range: Option.some(
-        `'${teamConfigValue.sheet}'!${teamConfigValue.teamNameRange}`,
+      range: pipe(
+        Match.value(teamConfigValue.teamNameRange),
+        Match.when("auto", () => Option.none()),
+        Match.orElse(() =>
+          Option.some(
+            `'${teamConfigValue.sheet}'!${teamConfigValue.teamNameRange}`,
+          ),
+        ),
       ),
     },
   }) as const;
@@ -144,31 +151,74 @@ const teamBaseParser = (
   pipe(
     Effect.Do,
     Effect.let("range", () => teamBaseRange(teamConfigValue)),
-    Effect.flatMap(({ range }) =>
-      Effect.all(
-        [
-          pipe(sheet, getConfigFieldValueRange(range.playerName.field)),
-          pipe(sheet, getConfigFieldValueRange(range.teamName.field)),
-        ],
-        { concurrency: "unbounded" },
+    Effect.let("isAutoTeamName", () =>
+      pipe(
+        Match.value(teamConfigValue.teamNameRange),
+        Match.when("auto", () => true),
+        Match.orElse(() => false),
       ),
     ),
-    Effect.flatMap((valueRanges) =>
-      GoogleSheets.parseValueRanges(
-        valueRanges,
-        pipe(
-          TupleToStructValueSchema(
-            ["playerName", "teamName"],
-            GoogleSheets.rowToCellSchema,
+    Effect.flatMap(({ range, isAutoTeamName }) =>
+      isAutoTeamName
+        ? pipe(
+            Effect.all(
+              [pipe(sheet, getConfigFieldValueRange(range.playerName.field))],
+              { concurrency: "unbounded" },
+            ),
+            Effect.flatMap((valueRanges) =>
+              GoogleSheets.parseValueRanges(
+                valueRanges,
+                pipe(
+                  TupleToStructValueSchema(
+                    ["playerName"],
+                    GoogleSheets.rowToCellSchema,
+                  ),
+                  Schema.compose(
+                    Schema.Struct({
+                      playerName: GoogleSheets.cellToStringSchema,
+                    }),
+                  ),
+                ),
+              ),
+            ),
+            Effect.map(
+              Array.map(
+                Either.map(({ playerName }) => ({
+                  playerName,
+                  teamName: pipe(
+                    playerName,
+                    Option.map((name) => `${name} | ${teamConfigValue.name}`),
+                  ),
+                })),
+              ),
+            ),
+          )
+        : pipe(
+            Effect.all(
+              [
+                pipe(sheet, getConfigFieldValueRange(range.playerName.field)),
+                pipe(sheet, getConfigFieldValueRange(range.teamName.field)),
+              ],
+              { concurrency: "unbounded" },
+            ),
+            Effect.flatMap((valueRanges) =>
+              GoogleSheets.parseValueRanges(
+                valueRanges,
+                pipe(
+                  TupleToStructValueSchema(
+                    ["playerName", "teamName"],
+                    GoogleSheets.rowToCellSchema,
+                  ),
+                  Schema.compose(
+                    Schema.Struct({
+                      playerName: GoogleSheets.cellToStringSchema,
+                      teamName: GoogleSheets.cellToStringSchema,
+                    }),
+                  ),
+                ),
+              ),
+            ),
           ),
-          Schema.compose(
-            Schema.Struct({
-              playerName: GoogleSheets.cellToStringSchema,
-              teamName: GoogleSheets.cellToStringSchema,
-            }),
-          ),
-        ),
-      ),
     ),
     Effect.map(
       ArrayUtils.WithDefault.wrapEither({
