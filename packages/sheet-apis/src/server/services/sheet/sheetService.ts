@@ -144,16 +144,7 @@ const teamRange = (
       `'${teamConfigValue.sheet}'!${teamConfigValue.teamNameRange}`,
     ),
   } as const;
-  const tags = {
-    field: makeTeamConfigField(teamConfigValue, "tags"),
-    range: pipe(
-      Match.value(teamConfigValue.tagsConfig),
-      Match.tag("TeamTagsRangesConfig", (tagsConfig) =>
-        Option.some(`'${teamConfigValue.sheet}'!${tagsConfig.tagsRange}`),
-      ),
-      Match.orElse(() => Option.none()),
-    ),
-  } as const;
+  const tags = teamTagsRangesRange(teamConfigValue);
 
   const isvOpt = teamConfigValue.isvConfig as unknown as Option.Option<
     IsvCombinedConfig | IsvSplitConfig
@@ -258,6 +249,134 @@ const teamRanges = (teamConfigValues: FilteredTeamConfigValue[]) =>
 
 const playerNameRegex = regex("^(?<name>.*?)(?:\\s+\\(e(?:nc)?\\))?$");
 
+// Range helpers
+const teamTagsRangesRange = (teamConfigValue: FilteredTeamConfigValue) => ({
+  field: makeTeamConfigField(teamConfigValue, "tags"),
+  range: pipe(
+    Match.value(teamConfigValue.tagsConfig),
+    Match.tag("TeamTagsRangesConfig", (tagsConfig) =>
+      Option.some(`'${teamConfigValue.sheet}'!${tagsConfig.tagsRange}`),
+    ),
+    Match.orElse(() => Option.none()),
+  ),
+}) as const;
+
+const teamCombinedIsvRange = (
+  teamConfigValue: FilteredTeamConfigValue,
+  cfg: IsvCombinedConfig,
+) =>
+  pipe(
+    cfg.isvRange,
+    Option.map((r) => ({
+      field: makeTeamConfigField(teamConfigValue, "isv"),
+      range: Option.some(`'${teamConfigValue.sheet}'!${r}`),
+    }) as const),
+    Option.getOrUndefined,
+  );
+
+const teamSplitIsvRange = (
+  teamConfigValue: FilteredTeamConfigValue,
+  cfg: IsvSplitConfig,
+) => {
+  const lead = pipe(
+    cfg.leadRange,
+    Option.map((r) => ({
+      field: makeTeamConfigField(teamConfigValue, "lead"),
+      range: Option.some(`'${teamConfigValue.sheet}'!${r}`),
+    }) as const),
+    Option.getOrUndefined,
+  );
+  const backline = pipe(
+    cfg.backlineRange,
+    Option.map((r) => ({
+      field: makeTeamConfigField(teamConfigValue, "backline"),
+      range: Option.some(`'${teamConfigValue.sheet}'!${r}`),
+    }) as const),
+    Option.getOrUndefined,
+  );
+  const talent = pipe(
+    cfg.talentRange,
+    Option.map((r) => ({
+      field: makeTeamConfigField(teamConfigValue, "talent"),
+      range: Option.some(`'${teamConfigValue.sheet}'!${r}`),
+    }) as const),
+    Option.getOrUndefined,
+  );
+  return { lead, backline, talent } as const;
+};
+
+// Parser helpers
+const getTagsValueRange = (
+  teamConfig: FilteredTeamConfigValue,
+  range: ReturnType<typeof teamRange>,
+  sheet: HashMap.HashMap<TeamConfigField, sheets_v4.Schema$ValueRange>,
+) =>
+  pipe(
+    Match.value(teamConfig.tagsConfig),
+    Match.tagsExhaustive({
+      TeamTagsConstantsConfig: () => Effect.succeed({ values: [] }),
+      TeamTagsRangesConfig: () =>
+        pipe(sheet, getConfigFieldValueRange(range.tags.field)),
+    }),
+  );
+
+const getIsvValueRanges = (
+  range: ReturnType<typeof teamRange>,
+  sheet: HashMap.HashMap<TeamConfigField, sheets_v4.Schema$ValueRange>,
+) =>
+  Effect.Do.pipe(
+    Effect.bind("leadVR", () =>
+      range.isv
+        ? pipe(
+            sheet,
+            getConfigFieldValueRange(range.isv.field),
+            Effect.map((isvVR) => {
+              const rows = isvVR.values ?? [];
+              const values = rows.map((r: any[]) => [
+                (r?.[0] ?? "").toString().split("/")[0] ?? "",
+              ]);
+              return { values } as sheets_v4.Schema$ValueRange;
+            }),
+          )
+        : pipe(sheet, getConfigFieldValueRange(range.lead!.field)),
+    ),
+    Effect.bind("backlineVR", () =>
+      range.isv
+        ? pipe(
+            sheet,
+            getConfigFieldValueRange(range.isv.field),
+            Effect.map((isvVR) => {
+              const rows = isvVR.values ?? [];
+              const values = rows.map((r: any[]) => [
+                (r?.[0] ?? "").toString().split("/")[1] ?? "",
+              ]);
+              return { values } as sheets_v4.Schema$ValueRange;
+            }),
+          )
+        : pipe(sheet, getConfigFieldValueRange(range.backline!.field)),
+    ),
+    Effect.bind("talentVR", () =>
+      range.isv
+        ? pipe(
+            sheet,
+            getConfigFieldValueRange(range.isv.field),
+            Effect.map((isvVR) => {
+              const rows = isvVR.values ?? [];
+              const values = rows.map((r: any[]) => [
+                (r?.[0] ?? "").toString().split("/")[2] ?? "",
+              ]);
+              return { values } as sheets_v4.Schema$ValueRange;
+            }),
+          )
+        : range.talent
+        ? pipe(sheet, getConfigFieldValueRange(range.talent.field))
+        : Effect.map(
+            Effect.succeed(null as unknown as void),
+            () => ({ values: [] } as sheets_v4.Schema$ValueRange),
+          ),
+    ),
+  );
+
 const teamParser = (
   teamConfigValues: FilteredTeamConfigValue[],
   sheet: HashMap.HashMap<TeamConfigField, sheets_v4.Schema$ValueRange>,
@@ -277,73 +396,13 @@ const teamParser = (
             Effect.bind("teamNameVR", () =>
               pipe(sheet, getConfigFieldValueRange(range.teamName.field)),
             ),
-            Effect.bind("tagsVR", () =>
-              pipe(
-                Match.value(teamConfig.tagsConfig),
-                Match.tagsExhaustive({
-                  TeamTagsConstantsConfig: () => Effect.succeed({ values: [] }),
-                  TeamTagsRangesConfig: () =>
-                    pipe(sheet, getConfigFieldValueRange(range.tags.field)),
-                }),
-              ),
-            ),
-            Effect.bind("leadVR", ({ playerNameVR }) =>
-              range.isv
-                ? pipe(
-                    sheet,
-                    getConfigFieldValueRange(range.isv.field),
-                    Effect.map((isvVR) => {
-                      const rows = isvVR.values ?? [];
-                      const values = rows.map((r: any[]) => [
-                        (r?.[0] ?? "").toString().split("/")[0] ?? "",
-                      ]);
-                      return { values } as sheets_v4.Schema$ValueRange;
-                    }),
-                  )
-                : pipe(sheet, getConfigFieldValueRange(range.lead!.field)),
-            ),
-            Effect.bind("backlineVR", () =>
-              range.isv
-                ? pipe(
-                    sheet,
-                    getConfigFieldValueRange(range.isv.field),
-                    Effect.map((isvVR) => {
-                      const rows = isvVR.values ?? [];
-                      const values = rows.map((r: any[]) => [
-                        (r?.[0] ?? "").toString().split("/")[1] ?? "",
-                      ]);
-                      return { values } as sheets_v4.Schema$ValueRange;
-                    }),
-                  )
-                : pipe(sheet, getConfigFieldValueRange(range.backline!.field)),
-            ),
-            Effect.bind("talentVR", () =>
-              range.isv
-                ? pipe(
-                    sheet,
-                    getConfigFieldValueRange(range.isv.field),
-                    Effect.map((isvVR) => {
-                      const rows = isvVR.values ?? [];
-                      const values = rows.map((r: any[]) => [
-                        (r?.[0] ?? "").toString().split("/")[2] ?? "",
-                      ]);
-                      return { values } as sheets_v4.Schema$ValueRange;
-                    }),
-                  )
-                : range.talent
-                  ? pipe(sheet, getConfigFieldValueRange(range.talent.field))
-                  : Effect.map(
-                      Effect.succeed(null as unknown as void),
-                      () => ({ values: [] }) as sheets_v4.Schema$ValueRange,
-                    ),
-            ),
+            Effect.bind("tagsVR", () => getTagsValueRange(teamConfig, range, sheet)),
+            Effect.bind("isvVRs", () => getIsvValueRanges(range, sheet)),
             Effect.map(
               ({
                 playerNameVR,
                 teamNameVR,
-                leadVR,
-                backlineVR,
-                talentVR,
+                isvVRs: { leadVR, backlineVR, talentVR },
                 tagsVR,
               }) =>
                 [
