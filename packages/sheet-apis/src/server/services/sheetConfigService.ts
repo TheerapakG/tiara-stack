@@ -88,9 +88,8 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
               "sheet",
               "playerNameRange",
               "teamNameRange",
-              "leadRange",
-              "backlineRange",
-              "talentRange",
+              "isvType",
+              "isvRanges",
               "tagsType",
               "tags",
             ],
@@ -103,9 +102,11 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
                 sheet: GoogleSheets.cellToStringSchema,
                 playerNameRange: GoogleSheets.cellToStringSchema,
                 teamNameRange: GoogleSheets.cellToStringSchema,
-                leadRange: GoogleSheets.cellToStringSchema,
-                backlineRange: GoogleSheets.cellToStringSchema,
-                talentRange: GoogleSheets.cellToStringSchema,
+                isvType: GoogleSheets.cellToLiteralSchema([
+                  "split",
+                  "combined",
+                ]),
+                isvRanges: GoogleSheets.cellToStringSchema,
                 tagsType: GoogleSheets.cellToLiteralSchema([
                   "constants",
                   "ranges",
@@ -126,9 +127,8 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
             sheet,
             playerNameRange,
             teamNameRange,
-            leadRange,
-            backlineRange,
-            talentRange,
+            isvType,
+            isvRanges,
             tagsType,
             tags,
           },
@@ -138,9 +138,8 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
             sheet,
             playerNameRange,
             teamNameRange,
-            leadRange,
-            backlineRange,
-            talentRange,
+            isvType,
+            isvRanges,
             tagsConfig: pipe(
               tagsType,
               Option.flatMap((tagsType) =>
@@ -282,7 +281,8 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!E8:M"],
+              // Updated width: replaced 3 ISV columns with 2 (isvType, isvRanges)
+              ranges: ["'Thee's Sheet Settings'!E8:L"],
             }),
             Effect.flatMap((response) =>
               pipe(
