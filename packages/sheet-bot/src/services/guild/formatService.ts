@@ -237,7 +237,7 @@ export class FormatService extends Effect.Service<FormatService>()(
                 Effect.map(Option.map(formatHourWindow)),
               ),
             ),
-            Effect.let("checkinMessage", ({ fills, prevFills, hour, range }) =>
+            Effect.let("mentionsString", ({ fills, prevFills }) =>
               pipe(
                 HashSet.fromIterable(fills),
                 HashSet.difference(pipe(HashSet.fromIterable(prevFills))),
@@ -245,32 +245,45 @@ export class FormatService extends Effect.Service<FormatService>()(
                 Option.some,
                 Option.filter(Array.isNonEmptyArray),
                 Option.map(Array.join(" ")),
-                // Build strings for template and render via Handlebars
-                Option.map((mentionsString) => {
-                  const hourString = pipe(
-                    hour,
-                    Option.map((h) => `for ${bold(`hour ${h}`)}`),
-                    Option.getOrElse(() => ""),
-                  );
-                  const timeStampString = pipe(
-                    range,
-                    Option.map(({ start }) =>
-                      time(start, TimestampStyles.RelativeTime),
-                    ),
-                    Option.getOrElse(() => ""),
-                  );
-                  const templateString =
-                    template ??
-                    "{{mentionsString}} React to this message to check in, and {{channelString}} {{hourString}} {{timeStampString}}";
-                  const render = Handlebars.compile(templateString);
-                  return render({
-                    mentionsString,
-                    channelString,
-                    hourString,
-                    timeStampString,
-                  });
-                }),
               ),
+            ),
+            Effect.let("hourString", ({ hour }) =>
+              pipe(
+                hour,
+                Option.map((h) => `for ${bold(`hour ${h}`)}`),
+                Option.getOrElse(() => ""),
+              ),
+            ),
+            Effect.let("timeStampString", ({ range }) =>
+              pipe(
+                range,
+                Option.map(({ start }) =>
+                  time(start, TimestampStyles.RelativeTime),
+                ),
+                Option.getOrElse(() => ""),
+              ),
+            ),
+            Effect.let(
+              "checkinMessage",
+              ({ mentionsString, hourString, timeStampString }) =>
+                pipe(
+                  mentionsString,
+                  Option.map((mentionsString) => {
+                    const render = Handlebars.compile(
+                      template ??
+                        "{{mentionsString}} React to this message to check in, and {{channelString}} {{hourString}} {{timeStampString}}",
+                      {
+                        noEscape: true,
+                      },
+                    );
+                    return render({
+                      mentionsString,
+                      channelString,
+                      hourString,
+                      timeStampString,
+                    });
+                  }),
+                ),
             ),
             Effect.let("empty", () =>
               pipe(
