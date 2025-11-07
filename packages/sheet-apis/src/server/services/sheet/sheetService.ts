@@ -7,6 +7,8 @@ import {
   ScheduleConfig,
   Team,
   TeamConfig,
+  IsvSplitConfig,
+  IsvCombinedConfig,
   makeSchedule,
 } from "@/server/schema";
 import { regex } from "arkregex";
@@ -23,6 +25,7 @@ import {
   Schema,
   String,
   Boolean,
+  Function,
 } from "effect";
 import { TupleToStructValueSchema } from "typhoon-core/schema";
 import { Computed } from "typhoon-core/signal";
@@ -90,8 +93,7 @@ const teamConfigFields = [
   "sheet",
   "playerNameRange",
   "teamNameRange",
-  "isvType",
-  "isvRanges",
+  "isvConfig",
   "tagsConfig",
 ] as const;
 
@@ -153,45 +155,52 @@ const teamRange = (
     ),
   } as const;
 
-  const isvType = teamConfigValue.isvType;
-  if (Option.isSome(isvType) && isvType.value === "combined") {
-    const isv = {
-      field: makeTeamConfigField(teamConfigValue, "isv"),
-      range: pipe(
-        teamConfigValue.isvRanges,
-        Option.map((r) => `'${teamConfigValue.sheet}'!${r}`),
-      ),
-    } as const;
-    return { playerName, teamName, tags, isv };
-  }
-  if (Option.isSome(isvType) && isvType.value === "split") {
-    const rangesStr = pipe(
-      teamConfigValue.isvRanges,
-      Option.getOrElse(() => ""),
+  const isvOpt = teamConfigValue.isvConfig as unknown as Option.Option<
+    IsvCombinedConfig | IsvSplitConfig
+  >;
+  if (Option.isSome(isvOpt)) {
+    const cfg = isvOpt.value;
+    return pipe(
+      cfg,
+      Match.value,
+      Match.tagsExhaustive({
+        IsvCombinedConfig: (cfg: IsvCombinedConfig) => {
+          const isv = {
+            field: makeTeamConfigField(teamConfigValue, "isv"),
+            range: Option.some(`'${teamConfigValue.sheet}'!${cfg.isvRange}`),
+          } as const;
+          return { playerName, teamName, tags, isv } as TeamRangeResult;
+        },
+        IsvSplitConfig: (cfg: IsvSplitConfig) => {
+          const lead = {
+            field: makeTeamConfigField(teamConfigValue, "lead"),
+            range: Option.some(`'${teamConfigValue.sheet}'!${cfg.leadRange}`),
+          } as const;
+          const backline = {
+            field: makeTeamConfigField(teamConfigValue, "backline"),
+            range: Option.some(`'${teamConfigValue.sheet}'!${cfg.backlineRange}`),
+          } as const;
+          const talent = Option.isSome(cfg.talentRange)
+            ? ({
+                field: makeTeamConfigField(teamConfigValue, "talent"),
+                range: Option.some(
+                  `'${teamConfigValue.sheet}'!${cfg.talentRange.value}`,
+                ),
+              } as const)
+            : undefined;
+          return {
+            playerName,
+            teamName,
+            tags,
+            lead,
+            backline,
+            talent,
+          } as TeamRangeResult;
+        },
+      }),
     );
-    const ranges = rangesStr.split(",").map((s) => s.trim());
-    const [leadR, backlineR, talentR] = ranges;
-    const lead = leadR
-      ? {
-          field: makeTeamConfigField(teamConfigValue, "lead"),
-          range: Option.some(`'${teamConfigValue.sheet}'!${leadR}`),
-        }
-      : undefined;
-    const backline = backlineR
-      ? {
-          field: makeTeamConfigField(teamConfigValue, "backline"),
-          range: Option.some(`'${teamConfigValue.sheet}'!${backlineR}`),
-        }
-      : undefined;
-    const talent = talentR
-      ? {
-          field: makeTeamConfigField(teamConfigValue, "talent"),
-          range: Option.some(`'${teamConfigValue.sheet}'!${talentR}`),
-        }
-      : undefined;
-    return { playerName, teamName, tags, lead, backline, talent };
   }
-  return { playerName, teamName, tags };
+  return { playerName, teamName, tags } as TeamRangeResult;
 };
 
 const teamRanges = (teamConfigValues: FilteredTeamConfigValue[]) =>
@@ -209,26 +218,19 @@ const teamRanges = (teamConfigValues: FilteredTeamConfigValue[]) =>
           HashMap.set(range.playerName.field, range.playerName.range),
           HashMap.set(range.teamName.field, range.teamName.range),
           HashMap.set(range.tags.field, range.tags.range),
+          range.isv
+            ? HashMap.set(range.isv.field, range.isv.range)
+            : Function.identity,
+          range.lead
+            ? HashMap.set(range.lead.field, range.lead.range)
+            : Function.identity,
+          range.backline
+            ? HashMap.set(range.backline.field, range.backline.range)
+            : Function.identity,
+          range.talent
+            ? HashMap.set(range.talent.field, range.talent.range)
+            : Function.identity,
         );
-        // Add ISV ranges depending on type
-        if (range.isv) {
-          // combined
-          next = pipe(next, HashMap.set(range.isv.field, range.isv.range));
-        } else {
-          // split
-          if (range.lead)
-            next = pipe(next, HashMap.set(range.lead.field, range.lead.range));
-          if (range.backline)
-            next = pipe(
-              next,
-              HashMap.set(range.backline.field, range.backline.range),
-            );
-          if (range.talent)
-            next = pipe(
-              next,
-              HashMap.set(range.talent.field, range.talent.range),
-            );
-        }
         return next;
       },
     ),

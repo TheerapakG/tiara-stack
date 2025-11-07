@@ -9,6 +9,8 @@ import {
   TeamTagsConstantsConfig,
   TeamTagsRangesConfig,
   Error,
+  IsvCombinedConfig,
+  IsvSplitConfig,
 } from "@/server/schema";
 import { type sheets_v4 } from "@googleapis/sheets";
 import {
@@ -102,10 +104,7 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
                 sheet: GoogleSheets.cellToStringSchema,
                 playerNameRange: GoogleSheets.cellToStringSchema,
                 teamNameRange: GoogleSheets.cellToStringSchema,
-                isvType: GoogleSheets.cellToLiteralSchema([
-                  "split",
-                  "combined",
-                ]),
+                isvType: GoogleSheets.cellToLiteralSchema(["split", "combined"]),
                 isvRanges: GoogleSheets.cellToStringSchema,
                 tagsType: GoogleSheets.cellToLiteralSchema([
                   "constants",
@@ -138,8 +137,40 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
             sheet,
             playerNameRange,
             teamNameRange,
-            isvType,
-            isvRanges,
+            isvConfig: pipe(
+              isvType,
+              Option.flatMap((t) =>
+                pipe(
+                  t,
+                  Match.value,
+                  Match.when("split", () =>
+                    pipe(
+                      isvRanges,
+                      Option.map((v) =>
+                        pipe(
+                          v.split(",").map((s) => s.trim()),
+                          ([lead, back, talent]) =>
+                            new IsvSplitConfig({
+                              leadRange: lead ?? "",
+                              backlineRange: back ?? "",
+                              talentRange: talent
+                                ? Option.some(talent)
+                                : Option.none<string>(),
+                            }),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Match.when("combined", () =>
+                    pipe(
+                      isvRanges,
+                      Option.map((v) => new IsvCombinedConfig({ isvRange: v })),
+                    ),
+                  ),
+                  Match.exhaustive,
+                ),
+              ),
+            ),
             tagsConfig: pipe(
               tagsType,
               Option.flatMap((tagsType) =>
@@ -281,7 +312,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              // Updated width: replaced 3 ISV columns with 2 (isvType, isvRanges)
+              // Updated width: still aligned with isvType + isvRanges columns
               ranges: ["'Thee's Sheet Settings'!E8:L"],
             }),
             Effect.flatMap((response) =>
