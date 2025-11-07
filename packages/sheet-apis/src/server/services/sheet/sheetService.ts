@@ -129,8 +129,14 @@ const teamBaseRange = (teamConfigValue: FilteredTeamConfigValue) =>
     },
     teamName: {
       field: makeTeamConfigField(teamConfigValue, "teamName"),
-      range: Option.some(
-        `'${teamConfigValue.sheet}'!${teamConfigValue.teamNameRange}`,
+      range: pipe(
+        Match.value(teamConfigValue.teamNameRange),
+        Match.when("auto", () => Option.none()),
+        Match.orElse(() =>
+          Option.some(
+            `'${teamConfigValue.sheet}'!${teamConfigValue.teamNameRange}`,
+          ),
+        ),
       ),
     },
   }) as const;
@@ -148,7 +154,13 @@ const teamBaseParser = (
       Effect.all(
         [
           pipe(sheet, getConfigFieldValueRange(range.playerName.field)),
-          pipe(sheet, getConfigFieldValueRange(range.teamName.field)),
+          pipe(
+            Match.value(teamConfigValue.teamNameRange),
+            Match.when("auto", () => Effect.succeed({ values: [] })),
+            Match.orElse(() =>
+              pipe(sheet, getConfigFieldValueRange(range.teamName.field)),
+            ),
+          ),
         ],
         { concurrency: "unbounded" },
       ),
@@ -186,7 +198,16 @@ const teamBaseParser = (
             (name) => playerNameRegex.exec(name)?.groups?.name ?? name,
           ),
         ),
-        teamName,
+        teamName: pipe(
+          Match.value(teamConfigValue.teamNameRange),
+          Match.when("auto", () =>
+            pipe(
+              playerName,
+              Option.map((name) => `${name} | ${teamConfigValue.name}`),
+            ),
+          ),
+          Match.orElse(() => teamName),
+        ),
       })),
     ),
   );
