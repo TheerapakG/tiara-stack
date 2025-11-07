@@ -155,11 +155,12 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
                           String.split(","),
                           Array.map(String.trim),
                           (array) =>
-                            TeamIsvSplitConfig.make({
+                            Option.all({
                               leadRange: pipe(array, Array.get(0)),
                               backlineRange: pipe(array, Array.get(1)),
                               talentRange: pipe(array, Array.get(2)),
                             }),
+                          TeamIsvSplitConfig.make,
                         ),
                       ),
                     ),
@@ -169,7 +170,7 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
                       isvRanges,
                       Option.map((isvRange) =>
                         TeamIsvCombinedConfig.make({
-                          isvRange: Option.some(isvRange),
+                          isvRange,
                         }),
                       ),
                     ),
