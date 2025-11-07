@@ -14,14 +14,31 @@ export class TeamTagsRangesConfig extends Schema.TaggedClass<TeamTagsRangesConfi
   },
 ) {}
 
+export class TeamIsvSplitConfig extends Schema.TaggedClass<TeamIsvSplitConfig>()(
+  "TeamIsvSplitConfig",
+  {
+    leadRange: Schema.OptionFromNullishOr(Schema.String, undefined),
+    backlineRange: Schema.OptionFromNullishOr(Schema.String, undefined),
+    talentRange: Schema.OptionFromNullishOr(Schema.String, undefined),
+  },
+) {}
+
+export class TeamIsvCombinedConfig extends Schema.TaggedClass<TeamIsvCombinedConfig>()(
+  "TeamIsvCombinedConfig",
+  {
+    isvRange: Schema.OptionFromNullishOr(Schema.String, undefined),
+  },
+) {}
+
 export class TeamConfig extends Schema.TaggedClass<TeamConfig>()("TeamConfig", {
   name: Schema.OptionFromNullishOr(Schema.String, undefined),
   sheet: Schema.OptionFromNullishOr(Schema.String, undefined),
   playerNameRange: Schema.OptionFromNullishOr(Schema.String, undefined),
   teamNameRange: Schema.OptionFromNullishOr(Schema.String, undefined),
-  leadRange: Schema.OptionFromNullishOr(Schema.String, undefined),
-  backlineRange: Schema.OptionFromNullishOr(Schema.String, undefined),
-  talentRange: Schema.OptionFromNullishOr(Schema.String, undefined),
+  isvConfig: Schema.OptionFromNullishOr(
+    Schema.Union(TeamIsvSplitConfig, TeamIsvCombinedConfig),
+    undefined,
+  ),
   tagsConfig: Schema.OptionFromNullishOr(
     Schema.Union(TeamTagsConstantsConfig, TeamTagsRangesConfig),
     undefined,

@@ -1,4 +1,13 @@
-import { Array, Data, Either, Option, Order, pipe, Struct } from "effect";
+import {
+  Array,
+  Data,
+  Either,
+  Effect,
+  Option,
+  Order,
+  pipe,
+  Struct,
+} from "effect";
 
 type SimplifyObject<A> = {
   [K in keyof A]: A[K];
@@ -190,6 +199,34 @@ export const map =
             Array.ReadonlyArray.With<InferArray<S>, B>
           >,
       }),
+    );
+
+export const mapEffect =
+  <S extends ArrayWithDefault<ReadonlyArray<unknown>>, B, E, R>(
+    mapper: (a: Infer<S>) => Effect.Effect<B, E, R>,
+  ) =>
+  (a: S): Effect.Effect<ArrayWithDefault<ReadonlyArray<B>>, E, R> =>
+    pipe(
+      Effect.all(
+        {
+          array: Effect.forEach(toArray(a), mapper, {
+            concurrency: "unbounded",
+          }) as Effect.Effect<Array.ReadonlyArray.With<InferArray<S>, B>, E, R>,
+          default: mapper(getDefault(a)) as Effect.Effect<B, E, R>,
+        },
+        { concurrency: "unbounded" },
+      ),
+      Effect.map(({ array, default: defaultValue }) =>
+        pipe(
+          array as Array.ReadonlyArray.With<InferArray<S>, B>,
+          wrap({
+            default: () =>
+              defaultValue as Array.ReadonlyArray.Infer<
+                Array.ReadonlyArray.With<InferArray<S>, B>
+              >,
+          }),
+        ),
+      ),
     );
 
 export const zipMap =
