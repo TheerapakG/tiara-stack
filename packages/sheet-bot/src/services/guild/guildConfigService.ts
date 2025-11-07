@@ -18,6 +18,17 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
         sheetApisClient: SheetApisClient,
       }),
       Effect.map(({ guildService, sheetApisClient }) => ({
+        getAutoCheckinGuilds: () =>
+          pipe(
+            WebSocketClient.once(
+              sheetApisClient.get(),
+              "guildConfig.getAutoCheckinGuilds",
+              {},
+            ),
+            Effect.withSpan("GuildConfigService.getAutoCheckinGuilds", {
+              captureStackTrace: true,
+            }),
+          ),
         getGuildConfigByGuildId: () =>
           pipe(
             guildService.getId(),
