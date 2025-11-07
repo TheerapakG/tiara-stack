@@ -12,6 +12,7 @@
   },
   "scripts": {
     "format": "prettier -c .",
+    "format:apply": "prettier -w .",
     "lint": "oxlint .",
     "typecheck": "tsgo --noEmit",
     "build": "tsdown -c tsdown.config.ts && tar -acf dist.tar.zst ./dist"
