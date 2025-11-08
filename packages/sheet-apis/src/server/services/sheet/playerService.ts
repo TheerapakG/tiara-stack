@@ -1,5 +1,5 @@
 import { Array, Effect, Function, HashMap, Match, Option, pipe } from "effect";
-import { Array as ArrayUtils } from "typhoon-core/utils";
+import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 import { SheetService } from "./sheetService";
 import {
   Player,
@@ -8,6 +8,7 @@ import {
   Schedule,
   BreakSchedule,
   ScheduleWithPlayers,
+  SchedulePlayer,
 } from "@/server/schema";
 
 export class PlayerService extends Effect.Service<PlayerService>()(
@@ -136,26 +137,45 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                     fills: pipe(
                       schedule.fills,
                       Array.getSomes,
-                      getByNames,
+                      Utils.keyPositional("player", getByNames),
                       Effect.map((fills) =>
                         Array.makeBy(5, (i) =>
                           pipe(
                             fills,
                             Array.get(i),
-                            Option.map(Array.headNonEmpty),
+                            Option.map((fill) =>
+                              SchedulePlayer.make({
+                                player: pipe(fill.player, Array.headNonEmpty),
+                                enc: fill.enc,
+                              }),
+                            ),
                           ),
                         ),
                       ),
                     ),
                     overfills: pipe(
                       schedule.overfills,
-                      getByNames,
-                      Effect.map(Array.map(Array.headNonEmpty)),
+                      Utils.keyPositional("player", getByNames),
+                      Effect.map(
+                        Array.map((overfill) =>
+                          SchedulePlayer.make({
+                            player: pipe(overfill.player, Array.headNonEmpty),
+                            enc: overfill.enc,
+                          }),
+                        ),
+                      ),
                     ),
                     standbys: pipe(
                       schedule.standbys,
-                      getByNames,
-                      Effect.map(Array.map(Array.headNonEmpty)),
+                      Utils.keyPositional("player", getByNames),
+                      Effect.map(
+                        Array.map((standby) =>
+                          SchedulePlayer.make({
+                            player: pipe(standby.player, Array.headNonEmpty),
+                            enc: standby.enc,
+                          }),
+                        ),
+                      ),
                     ),
                   })),
                   Effect.map(({ fills, overfills, standbys }) =>

@@ -5,6 +5,7 @@ import {
   RunnerConfig,
   RawPlayer,
   ScheduleConfig,
+  RawSchedulePlayer,
   Team,
   TeamConfig,
   TeamIsvSplitConfig,
@@ -141,7 +142,7 @@ const teamBaseRange = (teamConfigValue: FilteredTeamConfigValue) =>
     },
   }) as const;
 
-const playerNameRegex = regex("^(?<name>.*?)(?:\\s+\\(e(?:nc)?\\))?$");
+const playerNameRegex = regex("^(?<name>.*?)\\s+(?<enc>\\(e(?:nc)?\\))?$");
 
 const teamBaseParser = (
   teamConfigValue: FilteredTeamConfigValue,
@@ -541,6 +542,7 @@ const scheduleConfigFields = [
   "hourRange",
   "breakRange",
   "monitorRange",
+  "encType",
   "fillRange",
   "overfillRange",
   "standbyRange",
@@ -643,12 +645,12 @@ const runnerInFills =
     runnerConfigMap: HashMap.HashMap<Option.Option<string>, RunnerConfig>,
     hour: number,
   ) =>
-  (fills: Option.Option<string>[]) =>
+  (fills: Option.Option<RawSchedulePlayer>[]) =>
     pipe(
       fills,
       Array.getSomes,
       Array.map((fill) =>
-        pipe(runnerConfigMap, HashMap.get(Option.some(fill))),
+        pipe(runnerConfigMap, HashMap.get(Option.some(fill.player))),
       ),
       Array.getSomes,
       Array.filter((config) =>
@@ -663,7 +665,7 @@ const breakHourResolverForFills =
     runnerConfigMap: HashMap.HashMap<Option.Option<string>, RunnerConfig>,
     hour: Option.Option<number>,
   ) =>
-  (fills: Option.Option<string>[]) =>
+  (fills: Option.Option<RawSchedulePlayer>[]) =>
   (breakHour: Option.Option<boolean>) =>
     pipe(
       breakHour,
@@ -779,15 +781,48 @@ const scheduleParser = (
               ({ hour, fills, overfills, standbys, breakHour, visible }) => ({
                 hour,
                 fills: Array.makeBy(5, (i) =>
-                  pipe(Array.get(fills, i), Option.flatten),
+                  pipe(
+                    Array.get(fills, i),
+                    Option.flatten,
+                    Option.map((fill) =>
+                      RawSchedulePlayer.make({
+                        player: fill,
+                        enc:
+                          scheduleConfig.encType === "regex"
+                            ? playerNameRegex.exec(fill)?.groups?.enc !==
+                              undefined
+                            : false,
+                      }),
+                    ),
+                  ),
                 ),
                 overfills: pipe(
                   overfills,
                   Option.getOrElse(() => []),
+                  Array.map((overfill) =>
+                    RawSchedulePlayer.make({
+                      player: overfill,
+                      enc:
+                        scheduleConfig.encType === "regex"
+                          ? playerNameRegex.exec(overfill)?.groups?.enc !==
+                            undefined
+                          : false,
+                    }),
+                  ),
                 ),
                 standbys: pipe(
                   standbys,
                   Option.getOrElse(() => []),
+                  Array.map((standby) =>
+                    RawSchedulePlayer.make({
+                      player: standby,
+                      enc:
+                        scheduleConfig.encType === "regex"
+                          ? playerNameRegex.exec(standby)?.groups?.enc !==
+                            undefined
+                          : false,
+                    }),
+                  ),
                 ),
                 breakHour,
                 visible: pipe(
