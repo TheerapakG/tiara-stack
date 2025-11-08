@@ -92,7 +92,6 @@ const handleManual =
               InteractionContext.getNumber("heal"),
               Effect.map(Option.getOrElse(() => 0)),
             ),
-            runnerConfig: SheetService.runnerConfig,
           }),
           Effect.bind("hour", ({ hourOption }) =>
             pipe(
@@ -123,9 +122,6 @@ const handleManual =
                   ),
               }),
             ),
-          ),
-          Effect.let("runnerConfigMap", ({ runnerConfig }) =>
-            pipe(runnerConfig, ArrayUtils.Collect.toHashMapByKey("name")),
           ),
           Effect.bind("formattedHourWindow", ({ hour }) =>
             pipe(
@@ -162,49 +158,61 @@ const handleManual =
               ),
             ),
           ),
-          Effect.bind("scheduleTeams", ({ schedule, runnerConfigMap, hour }) =>
+          Effect.bindAll(({ schedule }) => ({
+            fills: pipe(
+              schedule.schedule,
+              Option.map((schedule) =>
+                pipe(
+                  Match.value(schedule),
+                  Match.tagsExhaustive({
+                    BreakSchedule: () => [],
+                    ScheduleWithPlayers: (schedule) => schedule.fills,
+                  }),
+                ),
+              ),
+              Option.getOrElse(() => []),
+              Array.getSomes,
+              Effect.succeed,
+            ),
+            runners: pipe(
+              schedule.schedule,
+              Option.map((schedule) =>
+                pipe(
+                  Match.value(schedule),
+                  Match.tagsExhaustive({
+                    BreakSchedule: () => [],
+                    ScheduleWithPlayers: (schedule) => schedule.fills,
+                  }),
+                ),
+              ),
+              Option.getOrElse(() => []),
+              Array.getSomes,
+              Effect.succeed,
+            ),
+          })),
+          Effect.bind("scheduleTeams", ({ fills, runners }) =>
             pipe(
               Effect.Do,
-              Effect.let("players", () =>
+              Effect.let("fillNames", () =>
                 pipe(
-                  schedule.schedule,
-                  Option.map((schedule) =>
-                    pipe(
-                      Match.value(schedule),
-                      Match.tagsExhaustive({
-                        BreakSchedule: () => [],
-                        ScheduleWithPlayers: (schedule) => schedule.fills,
-                      }),
-                    ),
-                  ),
-                  Option.getOrElse(() => []),
-                  Array.getSomes,
-                ),
-              ),
-              Effect.bind("teams", ({ players }) =>
-                pipe(
-                  players,
+                  fills,
                   Array.map((player) => player.player.name),
-                  PlayerService.getTeamsByName,
                 ),
               ),
-              Effect.map(({ players, teams }) => Array.zip(players, teams)),
-              Effect.flatMap(
-                Effect.forEach(([player, teams]) =>
+              Effect.let("runnerNames", () =>
+                pipe(
+                  runners,
+                  Array.map((player) => player.player.name),
+                ),
+              ),
+              Effect.bind("teams", ({ fillNames }) =>
+                PlayerService.getTeamsByName(fillNames),
+              ),
+              Effect.flatMap(({ runnerNames, teams }) =>
+                Effect.forEach(Array.zip(fills, teams), ([fill, teams]) =>
                   pipe(
                     Effect.Do,
-                    Effect.let("runnerHours", () =>
-                      pipe(
-                        HashMap.get(
-                          runnerConfigMap,
-                          Option.some(player.player.name),
-                        ),
-                        Option.map(({ hours }) => hours),
-                        Option.getOrElse(() => []),
-                      ),
-                    ),
-                    Effect.map(({ runnerHours }) => ({
-                      player,
+                    Effect.map(() => ({
                       teams: pipe(
                         teams,
                         Array.map(
@@ -214,13 +222,10 @@ const handleManual =
                               tags: pipe(
                                 team.tags,
                                 team.tags.includes("tierer_hint") &&
-                                  Array.some(
-                                    runnerHours,
-                                    SheetSchema.HourRange.includes(hour),
-                                  )
-                                  ? Array.append("fixed")
+                                  Array.contains(runnerNames, fill.player.name)
+                                  ? Array.append("tierer")
                                   : Function.identity,
-                                player.enc
+                                fill.enc
                                   ? Array.append("encable")
                                   : Function.identity,
                               ),
