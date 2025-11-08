@@ -1,4 +1,13 @@
-import { Array, Effect, HashMap, Option, Struct, pipe, Tuple } from "effect";
+import {
+  Array,
+  Effect,
+  HashMap,
+  Option,
+  Struct,
+  pipe,
+  Tuple,
+  Types,
+} from "effect";
 
 export const hashMapPositional =
   <In, Out, E, R>(
@@ -78,4 +87,29 @@ export const arraySomesPositional =
         ),
       ),
       Effect.map(({ result }) => result),
+    );
+
+export const keyPositional =
+  <In, Out, E, R, const Key extends keyof In>(
+    key: Key,
+    f: (
+      a: ReadonlyArray<Types.MatchRecord<In, In[Key] | undefined, In[Key]>>,
+    ) => Effect.Effect<ReadonlyArray<Out>, E, R>,
+  ) =>
+  (
+    array: ReadonlyArray<In>,
+  ): Effect.Effect<ReadonlyArray<Omit<In, Key> & { [K in Key]: Out }>, E, R> =>
+    pipe(
+      Effect.Do,
+      Effect.let("values", () => pipe(array, Array.map(Struct.get(key)))),
+      Effect.bind("resultValues", ({ values }) => f(values)),
+      Effect.map(({ resultValues }) =>
+        pipe(
+          Array.zip(array, resultValues),
+          Array.map(([value, resultValue]) => ({
+            ...value,
+            [key]: resultValue,
+          })),
+        ),
+      ),
     );
