@@ -1,5 +1,13 @@
 import { Match, Number, Option, Order, pipe, Schema } from "effect";
 
+export class RawSchedulePlayer extends Schema.TaggedClass<RawSchedulePlayer>()(
+  "RawSchedulePlayer",
+  {
+    player: Schema.String,
+    enc: Schema.Boolean,
+  },
+) {}
+
 export class BreakSchedule extends Schema.TaggedClass<BreakSchedule>()(
   "BreakSchedule",
   {
@@ -16,11 +24,11 @@ export class Schedule extends Schema.TaggedClass<Schedule>()("Schedule", {
   visible: Schema.Boolean,
   hour: Schema.OptionFromNullishOr(Schema.Number, undefined),
   fills: pipe(
-    Schema.Array(Schema.OptionFromNullishOr(Schema.String, undefined)),
+    Schema.Array(Schema.OptionFromNullishOr(RawSchedulePlayer, undefined)),
     Schema.itemsCount(5),
   ),
-  overfills: Schema.Array(Schema.String),
-  standbys: Schema.Array(Schema.String),
+  overfills: Schema.Array(RawSchedulePlayer),
+  standbys: Schema.Array(RawSchedulePlayer),
 }) {
   static empty = ({ fills, overfills }: Schedule) =>
     Order.max(Number.Order)(
@@ -44,9 +52,9 @@ export const makeSchedule = ({
   visible: boolean;
   hour: Option.Option<number>;
   breakHour: boolean;
-  fills: readonly Option.Option<string>[];
-  overfills: readonly string[];
-  standbys: readonly string[];
+  fills: readonly Option.Option<RawSchedulePlayer>[];
+  overfills: readonly RawSchedulePlayer[];
+  standbys: readonly RawSchedulePlayer[];
 }) =>
   pipe(
     Match.value(breakHour),

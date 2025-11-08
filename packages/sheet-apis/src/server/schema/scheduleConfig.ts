@@ -9,6 +9,7 @@ export class ScheduleConfig extends Schema.TaggedClass<ScheduleConfig>()(
     hourRange: Schema.OptionFromNullishOr(Schema.String, undefined),
     breakRange: Schema.OptionFromNullishOr(Schema.String, undefined),
     monitorRange: Schema.OptionFromNullishOr(Schema.String, undefined),
+    encType: Schema.OptionFromNullishOr(Schema.String, undefined),
     fillRange: Schema.OptionFromNullishOr(Schema.String, undefined),
     overfillRange: Schema.OptionFromNullishOr(Schema.String, undefined),
     standbyRange: Schema.OptionFromNullishOr(Schema.String, undefined),
