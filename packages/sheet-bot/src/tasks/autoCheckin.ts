@@ -106,7 +106,7 @@ const getCheckinMessages = (data: {
 const runOnce = pipe(
   Effect.Do,
   Effect.bind("guilds", () => GuildConfigService.getAutoCheckinGuilds()),
-  Effect.flatMap(({ guilds }) =>
+  Effect.bind("guildCounts", ({ guilds }) =>
     pipe(
       Effect.forEach(guilds, (guild) =>
         Effect.provide(guildServices(guild.guildId))(
@@ -233,14 +233,14 @@ const runOnce = pipe(
           ),
         ),
       ),
-      Effect.map((guildCounts) =>
-        guildCounts.reduce((acc: number, n: number) => acc + n, 0),
-      ),
-      Effect.tap((total) =>
-        Effect.log(
-          `autoCheckin: sent ${total} check-in message(s) across all ${guilds.length} guilds`,
-        ),
-      ),
+    ),
+  ),
+  Effect.let("total", ({ guildCounts }) =>
+    guildCounts.reduce((acc: number, n: number) => acc + n, 0),
+  ),
+  Effect.tap(({ total, guildCounts }) =>
+    Effect.log(
+      `sent ${total} check-in message(s) across all ${guildCounts.length} guilds`,
     ),
   ),
   Effect.withSpan("autoCheckin.runOnce", { captureStackTrace: true }),
@@ -260,5 +260,9 @@ export const autoCheckinTask = pipe(
       }),
     ),
   ),
-  Effect.withSpan("autoCheckinTask", { captureStackTrace: true }),
+  Effect.withSpan("autoCheckinTask", {
+    attributes: { task: "autoCheckin" },
+    captureStackTrace: true,
+  }),
+  Effect.annotateLogs({ task: "autoCheckin" }),
 );
