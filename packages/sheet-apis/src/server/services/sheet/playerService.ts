@@ -177,8 +177,20 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                         ),
                       ),
                     ),
+                    runners: pipe(
+                      schedule.runners,
+                      Utils.keyPositional("player", getByNames),
+                      Effect.map(
+                        Array.map((runner) =>
+                          SchedulePlayer.make({
+                            player: pipe(runner.player, Array.headNonEmpty),
+                            enc: runner.enc,
+                          }),
+                        ),
+                      ),
+                    ),
                   })),
-                  Effect.map(({ fills, overfills, standbys }) =>
+                  Effect.map(({ fills, overfills, standbys, runners }) =>
                     ScheduleWithPlayers.make({
                       channel: schedule.channel,
                       day: schedule.day,
@@ -187,6 +199,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                       fills,
                       overfills,
                       standbys,
+                      runners,
                     }),
                   ),
                 ),
