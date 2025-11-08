@@ -177,7 +177,11 @@ const cartesianTeams = (
                             type: "Placeholder",
                             playerName:
                               Array.headNonEmpty(headTeams).playerName,
-                            teamName: `${Array.headNonEmpty(headTeams).playerName} | placeholder`,
+                            teamName: pipe(
+                              Array.headNonEmpty(headTeams).playerName,
+                              Option.map((name) => `${name} | placeholder`),
+                              Option.getOrElse(() => "Placeholder"),
+                            ),
                             lead: 0,
                             backline: 0,
                             talent: 0,
