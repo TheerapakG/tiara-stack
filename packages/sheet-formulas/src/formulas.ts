@@ -125,7 +125,7 @@ export function THEECALC2(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
           Effect.Do,
           Effect.bind("url", () =>
             pipe(
-              settingSheet.getRange("AH8").getValue(),
+              settingSheet.getRange("AI8").getValue(),
               Schema.decodeUnknown(Schema.String),
             ),
           ),
