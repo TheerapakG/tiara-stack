@@ -24,6 +24,7 @@ export class ScheduleWithPlayers extends Schema.TaggedClass<ScheduleWithPlayers>
     ),
     overfills: Schema.Array(SchedulePlayer),
     standbys: Schema.Array(SchedulePlayer),
+    runners: Schema.Array(SchedulePlayer),
   },
 ) {
   static empty = ({ fills, overfills }: ScheduleWithPlayers) =>
@@ -42,6 +43,7 @@ export const makeScheduleWithPlayers = (
   fills: readonly Option.Option<SchedulePlayer>[],
   overfills: readonly SchedulePlayer[],
   standbys: readonly SchedulePlayer[],
+  runners: readonly SchedulePlayer[],
 ) =>
   pipe(
     Match.value(breakHour),
@@ -62,6 +64,7 @@ export const makeScheduleWithPlayers = (
         fills,
         overfills,
         standbys,
+        runners,
       }),
     ),
     Match.exhaustive,
