@@ -24,7 +24,7 @@ import {
   time,
   TimestampStyles,
 } from "discord.js";
-import { Effect, Layer, Number, pipe } from "effect";
+import { Array, Effect, HashSet, Layer, Number, pipe } from "effect";
 import type { Schema } from "sheet-apis";
 
 const roomOrderPreviousButtonData = {
@@ -96,10 +96,26 @@ export const roomOrderInteractionGetReply = (
         content: [
           `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
           "",
-          ...messageRoomOrderEntry.map(
-            ({ team, tags, position }) =>
-              `${inlineCode(`P${position + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : tags.includes("doormat") ? " (doormat)" : ""}`,
+          ...pipe(
+            messageRoomOrderEntry,
+            Array.map(
+              ({ team, tags, position }) =>
+                `${inlineCode(`P${position + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : tags.includes("doormat") ? " (doormat)" : ""}`,
+            ),
           ),
+          "",
+          `${inlineCode("In:")} ${pipe(
+            HashSet.fromIterable(messageRoomOrder.fills),
+            HashSet.difference(messageRoomOrder.previousFills),
+            HashSet.toValues,
+            Array.join(", "),
+          )}`,
+          `${inlineCode("Out:")} ${pipe(
+            HashSet.fromIterable(messageRoomOrder.previousFills),
+            HashSet.difference(messageRoomOrder.fills),
+            HashSet.toValues,
+            Array.join(", "),
+          )}`,
         ].join("\n"),
         components: [
           roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank),
