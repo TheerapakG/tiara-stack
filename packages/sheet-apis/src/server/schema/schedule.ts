@@ -29,6 +29,7 @@ export class Schedule extends Schema.TaggedClass<Schedule>()("Schedule", {
   ),
   overfills: Schema.Array(RawSchedulePlayer),
   standbys: Schema.Array(RawSchedulePlayer),
+  runners: Schema.Array(RawSchedulePlayer),
 }) {
   static empty = ({ fills, overfills }: Schedule) =>
     Order.max(Number.Order)(
@@ -46,6 +47,7 @@ export const makeSchedule = ({
   fills,
   overfills,
   standbys,
+  runners,
 }: {
   channel: string;
   day: number;
@@ -55,6 +57,7 @@ export const makeSchedule = ({
   fills: readonly Option.Option<RawSchedulePlayer>[];
   overfills: readonly RawSchedulePlayer[];
   standbys: readonly RawSchedulePlayer[];
+  runners: readonly RawSchedulePlayer[];
 }) =>
   pipe(
     Match.value(breakHour),
@@ -75,6 +78,7 @@ export const makeSchedule = ({
         fills,
         overfills,
         standbys,
+        runners,
       }),
     ),
     Match.exhaustive,
