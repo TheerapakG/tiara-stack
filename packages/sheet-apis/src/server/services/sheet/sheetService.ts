@@ -26,7 +26,6 @@ import {
   pipe,
   Schema,
   String,
-  Boolean,
 } from "effect";
 import { TupleToStructValueSchema } from "typhoon-core/schema";
 import { Computed } from "typhoon-core/signal";
@@ -640,7 +639,7 @@ const scheduleRanges = (scheduleConfigValues: FilteredScheduleConfigValue[]) =>
     HashMap.filterMap((a, _) => a),
   );
 
-const runnerInFills =
+const runnersInFills =
   (
     runnerConfigMap: HashMap.HashMap<Option.Option<string>, RunnerConfig>,
     hour: number,
@@ -649,41 +648,21 @@ const runnerInFills =
     pipe(
       fills,
       Array.getSomes,
-      Array.map((fill) =>
-        pipe(runnerConfigMap, HashMap.get(Option.some(fill.player))),
-      ),
-      Array.getSomes,
-      Array.filter((config) =>
-        pipe(config.hours, Array.some(HourRange.includes(hour))),
-      ),
-      Array.isNonEmptyArray,
-    );
-
-const breakHourResolverForFills =
-  (
-    scheduleConfig: FilteredScheduleConfigValue,
-    runnerConfigMap: HashMap.HashMap<Option.Option<string>, RunnerConfig>,
-    hour: Option.Option<number>,
-  ) =>
-  (fills: Option.Option<RawSchedulePlayer>[]) =>
-  (breakHour: Option.Option<boolean>) =>
-    pipe(
-      breakHour,
-      Option.getOrElse(() =>
+      Array.map((player) =>
         pipe(
-          Match.value(scheduleConfig.breakRange),
-          Match.when("auto", () =>
-            pipe(
-              hour,
-              Option.map((hour) =>
-                pipe(fills, runnerInFills(runnerConfigMap, hour), Boolean.not),
-              ),
-              Option.getOrElse(() => false),
-            ),
-          ),
-          Match.orElse(() => false),
+          runnerConfigMap,
+          HashMap.get(Option.some(player.player)),
+          Option.map((config) => ({
+            player,
+            config,
+          })),
         ),
       ),
+      Array.getSomes,
+      Array.filter(({ config }) =>
+        pipe(config.hours, Array.some(HourRange.includes(hour))),
+      ),
+      Array.map(({ player }) => player),
     );
 
 const scheduleParser = (
@@ -833,26 +812,33 @@ const scheduleParser = (
             ),
           ),
           Effect.map(
-            ArrayUtils.WithDefault.map(
-              ({ hour, fills, overfills, standbys, breakHour, visible }) => ({
-                hour,
-                fills,
-                overfills,
-                standbys,
-                breakHour: pipe(
-                  breakHour,
+            ArrayUtils.WithDefault.map((config) => ({
+              ...config,
+              runners: pipe(
+                config.hour,
+                Option.map((hour) =>
+                  pipe(config.fills, runnersInFills(runnerConfigMap, hour)),
+                ),
+                Option.getOrElse(() => []),
+              ),
+            })),
+          ),
+          Effect.map(
+            ArrayUtils.WithDefault.map((config) => ({
+              ...config,
+              breakHour: pipe(
+                config.breakHour,
+                Option.getOrElse(() =>
                   pipe(
-                    fills,
-                    breakHourResolverForFills(
-                      scheduleConfig,
-                      runnerConfigMap,
-                      hour,
+                    Match.value(scheduleConfig.breakRange),
+                    Match.when("auto", () =>
+                      Array.isEmptyArray(config.runners),
                     ),
+                    Match.orElse(() => false),
                   ),
                 ),
-                visible,
-              }),
-            ),
+              ),
+            })),
           ),
           Effect.map(ArrayUtils.WithDefault.toArray),
           Effect.map(
