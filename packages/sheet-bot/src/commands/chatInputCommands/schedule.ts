@@ -129,9 +129,9 @@ const handleList =
                 pipe(
                   schedule.fills,
                   Array.getSomes,
-                  Array.some((p) =>
+                  Array.some((fill) =>
                     pipe(
-                      Match.value(p),
+                      Match.value(fill.player),
                       Match.tagsExhaustive({
                         Player: (player) =>
                           String.Equivalence(player.id, user.id),
@@ -151,9 +151,9 @@ const handleList =
               Array.filter((schedule) =>
                 pipe(
                   schedule.overfills,
-                  Array.some((p) =>
+                  Array.some((overfill) =>
                     pipe(
-                      Match.value(p),
+                      Match.value(overfill.player),
                       Match.tagsExhaustive({
                         Player: (player) =>
                           String.Equivalence(player.id, user.id),
@@ -173,9 +173,9 @@ const handleList =
               Array.filter((schedule) =>
                 pipe(
                   schedule.standbys,
-                  Array.some((p) =>
+                  Array.some((standby) =>
                     pipe(
-                      Match.value(p),
+                      Match.value(standby.player),
                       Match.tagsExhaustive({
                         Player: (player) =>
                           String.Equivalence(player.id, user.id),

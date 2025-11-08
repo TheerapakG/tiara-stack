@@ -184,7 +184,7 @@ const handleManual =
               Effect.bind("teams", ({ players }) =>
                 pipe(
                   players,
-                  Array.map((player) => player.name),
+                  Array.map((player) => player.player.name),
                   PlayerService.getTeamsByName,
                 ),
               ),
@@ -195,7 +195,10 @@ const handleManual =
                     Effect.Do,
                     Effect.let("runnerHours", () =>
                       pipe(
-                        HashMap.get(runnerConfigMap, Option.some(player.name)),
+                        HashMap.get(
+                          runnerConfigMap,
+                          Option.some(player.player.name),
+                        ),
                         Option.map(({ hours }) => hours),
                         Option.getOrElse(() => []),
                       ),
@@ -216,6 +219,9 @@ const handleManual =
                                     SheetSchema.HourRange.includes(hour),
                                   )
                                   ? Array.append("fixed")
+                                  : Function.identity,
+                                player.enc
+                                  ? Array.append("encable")
                                   : Function.identity,
                               ),
                             }),

@@ -232,7 +232,7 @@ const handleManual =
               Array.getSomes,
               Array.map((player) =>
                 pipe(
-                  Match.value(player),
+                  Match.value(player.player),
                   Match.tagsExhaustive({
                     Player: (player) => Option.some(player.id),
                     PartialNamePlayer: () => Option.none(),

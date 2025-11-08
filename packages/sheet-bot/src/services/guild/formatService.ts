@@ -194,7 +194,7 @@ export class FormatService extends Effect.Service<FormatService>()(
                 Array.getSomes,
                 Array.map((player) =>
                   pipe(
-                    Match.value(player),
+                    Match.value(player.player),
                     Match.tagsExhaustive({
                       Player: (player) => userMention(player.id),
                       PartialNamePlayer: (player) => player.name,
@@ -219,7 +219,7 @@ export class FormatService extends Effect.Service<FormatService>()(
                 Array.getSomes,
                 Array.map((player) =>
                   pipe(
-                    Match.value(player),
+                    Match.value(player.player),
                     Match.tagsExhaustive({
                       Player: (player) => userMention(player.id),
                       PartialNamePlayer: (player) => player.name,
@@ -328,7 +328,7 @@ export class FormatService extends Effect.Service<FormatService>()(
                 Array.getSomes,
                 Array.map((player) =>
                   pipe(
-                    Match.value(player),
+                    Match.value(player.player),
                     Match.tagsExhaustive({
                       Player: () => Option.none(),
                       PartialNamePlayer: (player) => Option.some(player),
