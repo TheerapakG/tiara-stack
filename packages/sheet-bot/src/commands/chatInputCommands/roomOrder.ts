@@ -30,9 +30,11 @@ import {
 } from "discord.js";
 import {
   Array,
+  Cause,
   DateTime,
   Effect,
   Function,
+  HashSet,
   Match,
   HashMap,
   Option,
@@ -149,6 +151,7 @@ const handleManual =
           Effect.bind("schedule", ({ hour, schedules }) =>
             pipe(
               {
+                prevSchedule: HashMap.get(schedules, hour - 1),
                 schedule: HashMap.get(schedules, hour),
               },
               Utils.mapPositional(
@@ -159,6 +162,21 @@ const handleManual =
             ),
           ),
           Effect.bindAll(({ schedule }) => ({
+            previousFills: pipe(
+              schedule.prevSchedule,
+              Option.map((schedule) =>
+                pipe(
+                  Match.value(schedule),
+                  Match.tagsExhaustive({
+                    BreakSchedule: () => [],
+                    ScheduleWithPlayers: (schedule) => schedule.fills,
+                  }),
+                ),
+              ),
+              Option.getOrElse(() => []),
+              Array.getSomes,
+              Effect.succeed,
+            ),
             fills: pipe(
               schedule.schedule,
               Option.map((schedule) =>
@@ -190,65 +208,48 @@ const handleManual =
               Effect.succeed,
             ),
           })),
-          Effect.bind("scheduleTeams", ({ fills, runners }) =>
+          Effect.bindAll(({ previousFills, fills, runners }) => ({
+            previousFillNames: pipe(
+              previousFills,
+              Array.map((player) => player.player.name),
+              Effect.succeed,
+            ),
+            fillNames: pipe(
+              fills,
+              Array.map((player) => player.player.name),
+              Effect.succeed,
+            ),
+            runnerNames: pipe(
+              runners,
+              Array.map((player) => player.player.name),
+              Effect.succeed,
+            ),
+          })),
+          Effect.bind("teams", ({ fills, fillNames, runnerNames }) =>
             pipe(
-              Effect.Do,
-              Effect.let("fillNames", () =>
-                pipe(
-                  fills,
-                  Array.map((player) => player.player.name),
-                ),
-              ),
-              Effect.let("runnerNames", () =>
-                pipe(
-                  runners,
-                  Array.map((player) => player.player.name),
-                ),
-              ),
-              Effect.bind("teams", ({ fillNames }) =>
-                PlayerService.getTeamsByName(fillNames),
-              ),
-              Effect.flatMap(({ runnerNames, teams }) =>
+              PlayerService.getTeamsByName(fillNames),
+              Effect.flatMap((teams) =>
                 Effect.forEach(Array.zip(fills, teams), ([fill, teams]) =>
-                  pipe(
-                    Effect.Do,
-                    Effect.map(() => ({
-                      teams: pipe(
-                        teams,
-                        Array.map(
-                          (team) =>
-                            new SheetSchema.Team({
-                              ...team,
-                              tags: pipe(
-                                team.tags,
-                                team.tags.includes("tierer_hint") &&
-                                  Array.contains(runnerNames, fill.player.name)
-                                  ? Array.append("tierer")
-                                  : Function.identity,
-                                fill.enc
-                                  ? Array.append("encable")
-                                  : Function.identity,
-                              ),
-                            }),
+                  Effect.forEach(teams, (team) =>
+                    pipe(
+                      new SheetSchema.Team({
+                        ...team,
+                        tags: pipe(
+                          team.tags,
+                          team.tags.includes("tierer_hint") &&
+                            Array.contains(runnerNames, fill.player.name)
+                            ? Array.append("tierer")
+                            : Function.identity,
+                          fill.enc
+                            ? Array.append("encable")
+                            : Function.identity,
                         ),
-                      ),
-                    })),
+                      }),
+                      Schema.encode(SheetSchema.Team),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-          Effect.bind("teams", ({ scheduleTeams }) =>
-            pipe(
-              scheduleTeams,
-              Array.map(({ teams }) =>
-                pipe(
-                  teams,
-                  Array.map((team) => Schema.encode(SheetSchema.Team)(team)),
-                  Effect.all,
-                ),
-              ),
-              Effect.all,
             ),
           ),
           Effect.bind("roomOrders", ({ heal, teams }) =>
@@ -263,26 +264,51 @@ const handleManual =
                   players: teams,
                 }),
               ),
+              Effect.flatMap(
+                Array.match({
+                  onEmpty: () =>
+                    Effect.fail(
+                      new Cause.NoSuchElementException(
+                        "cannot calculate room orders with given teams",
+                      ),
+                    ),
+                  onNonEmpty: Effect.succeed,
+                }),
+              ),
             ),
-          ),
-          Effect.bind("roomOrder", ({ roomOrders }) =>
-            pipe(roomOrders, Array.head),
           ),
           InteractionContext.editReply.bind(
             "message",
             ({
               hour,
+              previousFillNames,
+              fillNames,
               formattedHourWindow: { start, end },
               roomOrders,
-              roomOrder,
             }) => ({
               content: [
                 `${bold(`Hour ${hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
                 "",
-                ...roomOrder.room.map(
-                  ({ team, tags }, i) =>
-                    `${inlineCode(`P${i + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : tags.includes("doormat") ? " (doormat)" : ""}`,
+                ...pipe(
+                  Array.headNonEmpty(roomOrders).room,
+                  Array.map(
+                    ({ team, tags }, i) =>
+                      `${inlineCode(`P${i + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : tags.includes("doormat") ? " (doormat)" : ""}`,
+                  ),
                 ),
+                "",
+                `${inlineCode("In:")} ${pipe(
+                  HashSet.fromIterable(fillNames),
+                  HashSet.difference(previousFillNames),
+                  HashSet.toValues,
+                  Array.join(", "),
+                )}`,
+                `${inlineCode("Out:")} ${pipe(
+                  HashSet.fromIterable(previousFillNames),
+                  HashSet.difference(fillNames),
+                  HashSet.toValues,
+                  Array.join(", "),
+                )}`,
               ].join("\n"),
               components: [
                 roomOrderActionRow(
@@ -292,30 +318,33 @@ const handleManual =
               ],
             }),
           ),
-          Effect.tap(({ hour, message, roomOrders }) =>
-            Effect.all([
-              MessageRoomOrderService.upsertMessageRoomOrder(message.id, {
-                hour,
-                rank: 0,
-              }),
-              MessageRoomOrderService.upsertMessageRoomOrderEntry(
-                message.id,
-                hour,
-                pipe(
-                  roomOrders,
-                  Array.map(({ room }, rank) =>
-                    room.map(({ team, tags }, position) => ({
-                      hour,
-                      team,
-                      tags: Array.fromIterable(tags),
-                      rank,
-                      position,
-                    })),
+          Effect.tap(
+            ({ hour, previousFillNames, fillNames, message, roomOrders }) =>
+              Effect.all([
+                MessageRoomOrderService.upsertMessageRoomOrder(message.id, {
+                  hour,
+                  previousFills: previousFillNames,
+                  fills: fillNames,
+                  rank: 0,
+                }),
+                MessageRoomOrderService.upsertMessageRoomOrderEntry(
+                  message.id,
+                  hour,
+                  pipe(
+                    roomOrders,
+                    Array.map(({ room }, rank) =>
+                      room.map(({ team, tags }, position) => ({
+                        hour,
+                        team,
+                        tags: Array.fromIterable(tags),
+                        rank,
+                        position,
+                      })),
+                    ),
+                    Array.flatten,
                   ),
-                  Array.flatten,
                 ),
-              ),
-            ]),
+              ]),
           ),
           Effect.asVoid,
           Effect.withSpan("handleRoomOrderManual", { captureStackTrace: true }),
