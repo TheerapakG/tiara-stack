@@ -6,6 +6,8 @@ export class MessageRoomOrder extends Schema.TaggedClass<MessageRoomOrder>()(
     id: Schema.Number,
     messageId: Schema.String,
     hour: Schema.Number,
+    previousFills: Schema.Array(Schema.String),
+    fills: Schema.Array(Schema.String),
     rank: Schema.Number,
     createdAt: Schema.DateTimeUtcFromDate,
     updatedAt: Schema.DateTimeUtcFromDate,

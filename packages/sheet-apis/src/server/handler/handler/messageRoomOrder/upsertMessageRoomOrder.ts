@@ -1,7 +1,7 @@
 import { upsertMessageRoomOrderHandlerConfig } from "@/server/handler/config";
 import { Error } from "@/server/schema";
 import { AuthService, MessageRoomOrderService } from "@/server/services";
-import { Effect, pipe } from "effect";
+import { Array, Effect, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { OnceObserver } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -23,7 +23,11 @@ export const upsertMessageRoomOrderHandler = pipe(
         ),
       ),
       Effect.flatMap(({ messageId, ...data }) =>
-        MessageRoomOrderService.upsertMessageRoomOrder(messageId, data),
+        MessageRoomOrderService.upsertMessageRoomOrder(messageId, {
+          ...data,
+          previousFills: Array.copy(data.previousFills),
+          fills: Array.copy(data.fills),
+        }),
       ),
       Error.Core.catchParseErrorAsValidationError,
       Handler.Config.encodeResponseEffect(upsertMessageRoomOrderHandlerConfig),

@@ -11,6 +11,8 @@ export const upsertMessageRoomOrderHandlerConfig = pipe(
       Schema.Struct({
         messageId: Schema.String,
         hour: Schema.Number,
+        previousFills: Schema.Array(Schema.String),
+        fills: Schema.Array(Schema.String),
         rank: Schema.Number,
       }),
       Schema.standardSchemaV1,
