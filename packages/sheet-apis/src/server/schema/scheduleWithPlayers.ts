@@ -3,6 +3,14 @@ import { Player } from "./player";
 import { PartialNamePlayer } from "./partialNamePlayer";
 import { BreakSchedule } from "./schedule";
 
+export class SchedulePlayer extends Schema.TaggedClass<SchedulePlayer>()(
+  "SchedulePlayer",
+  {
+    player: Schema.Union(Player, PartialNamePlayer),
+    enc: Schema.Boolean,
+  },
+) {}
+
 export class ScheduleWithPlayers extends Schema.TaggedClass<ScheduleWithPlayers>()(
   "ScheduleWithPlayers",
   {
@@ -11,16 +19,11 @@ export class ScheduleWithPlayers extends Schema.TaggedClass<ScheduleWithPlayers>
     visible: Schema.Boolean,
     hour: Schema.OptionFromNullishOr(Schema.Number, undefined),
     fills: pipe(
-      Schema.Array(
-        Schema.OptionFromNullishOr(
-          Schema.Union(Player, PartialNamePlayer),
-          undefined,
-        ),
-      ),
+      Schema.Array(Schema.OptionFromNullishOr(SchedulePlayer, undefined)),
       Schema.itemsCount(5),
     ),
-    overfills: Schema.Array(Schema.Union(Player, PartialNamePlayer)),
-    standbys: Schema.Array(Schema.Union(Player, PartialNamePlayer)),
+    overfills: Schema.Array(SchedulePlayer),
+    standbys: Schema.Array(SchedulePlayer),
   },
 ) {
   static empty = ({ fills, overfills }: ScheduleWithPlayers) =>
@@ -36,9 +39,9 @@ export const makeScheduleWithPlayers = (
   visible: boolean,
   hour: Option.Option<number>,
   breakHour: boolean,
-  fills: readonly Option.Option<Player | PartialNamePlayer>[],
-  overfills: readonly (Player | PartialNamePlayer)[],
-  standbys: readonly (Player | PartialNamePlayer)[],
+  fills: readonly Option.Option<SchedulePlayer>[],
+  overfills: readonly SchedulePlayer[],
+  standbys: readonly SchedulePlayer[],
 ) =>
   pipe(
     Match.value(breakHour),
