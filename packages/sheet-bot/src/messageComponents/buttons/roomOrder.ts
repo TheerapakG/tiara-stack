@@ -27,6 +27,12 @@ import {
 import { Array, Effect, HashSet, Layer, Number, pipe } from "effect";
 import type { Schema } from "sheet-apis";
 
+const formatEffectValue = (effectValue: number): string => {
+  const rounded = Math.round(effectValue * 10) / 10;
+  const formatted = rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(1);
+  return ` (+${formatted}%)`;
+};
+
 const roomOrderPreviousButtonData = {
   type: ComponentType.Button,
   customId: "interaction:roomOrder:Previous",
@@ -98,10 +104,18 @@ export const roomOrderInteractionGetReply = (
           "",
           ...pipe(
             messageRoomOrderEntry,
-            Array.map(
-              ({ team, tags, position }) =>
-                `${inlineCode(`P${position + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : tags.includes("doormat") ? " (doormat)" : ""}`,
-            ),
+            Array.map(({ team, tags, position, effectValue }) => {
+              const hasTiererTag = tags.includes("tierer");
+              const effectValueStr = hasTiererTag
+                ? ""
+                : formatEffectValue(effectValue);
+              const tagStr = tags.includes("enc")
+                ? `, enc`
+                : tags.includes("doormat")
+                  ? `, doormat`
+                  : "";
+              return `${inlineCode(`P${position + 1}:`)}  ${team}${effectValueStr}${tagStr}`;
+            }),
           ),
           "",
           `${inlineCode("In:")} ${pipe(

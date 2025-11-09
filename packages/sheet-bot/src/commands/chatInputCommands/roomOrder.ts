@@ -45,6 +45,12 @@ import { WebSocketClient } from "typhoon-client-ws/client";
 import { Schema as SheetSchema } from "sheet-apis";
 import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 
+const formatEffectValue = (effectValue: number): string => {
+  const rounded = Math.round(effectValue * 10) / 10;
+  const formatted = rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(1);
+  return ` (+${formatted}%)`;
+};
+
 const handleManual =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
     .data(
@@ -291,10 +297,18 @@ const handleManual =
                 "",
                 ...pipe(
                   Array.headNonEmpty(roomOrders).room,
-                  Array.map(
-                    ({ team, tags }, i) =>
-                      `${inlineCode(`P${i + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : tags.includes("doormat") ? " (doormat)" : ""}`,
-                  ),
+                  Array.map(({ team, tags, effectValue }, i) => {
+                    const hasTiererTag = tags.includes("tierer");
+                    const effectValueStr = hasTiererTag
+                      ? ""
+                      : formatEffectValue(effectValue);
+                    const tagStr = tags.includes("enc")
+                      ? `, enc`
+                      : tags.includes("doormat")
+                        ? `, doormat`
+                        : "";
+                    return `${inlineCode(`P${i + 1}:`)}  ${team}${effectValueStr}${tagStr}`;
+                  }),
                 ),
                 "",
                 `${inlineCode("In:")} ${pipe(
