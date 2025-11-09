@@ -1,4 +1,4 @@
-import { Effect, Fiber, pipe, PubSub, Queue, Ref, Scope } from "effect";
+import { Effect, Option, pipe, PubSub, Queue, Ref, Scope } from "effect";
 import type { ExternalSource } from "./externalComputed";
 
 /**
@@ -26,19 +26,20 @@ export const make = <T>(
   pipe(
     Effect.all([
       Ref.make(initial), // Current value from PubSub
-      Ref.make<Fiber.RuntimeFiber<never, never> | null>(null), // Main fiber
       Ref.make(false), // started flag
-      Ref.make<((value: T) => Effect.Effect<void, never, never>) | null>(null), // onEmit callback
+      Ref.make<Option.Option<(value: T) => Effect.Effect<void, never, never>>>(
+        Option.none(),
+      ), // onEmit callback
     ]),
-    Effect.flatMap(([valueRef, fiberRef, startedRef, onEmitRef]) =>
+    Effect.flatMap(([valueRef, startedRef, onEmitRef]) =>
       pipe(
         pubsub,
         PubSub.subscribe,
         Effect.flatMap((queue) => {
           // Spawn a single fiber that both stores and emits values
           // This fiber runs regardless of start/stop state to keep values fresh
-          // When the queue is closed/unsubscribed, Queue.take will fail and the loop will stop
-          const mainFiber = pipe(
+          // When the queue is closed/unsubscribed, Queue.take will fail and Effect.forever will stop
+          pipe(
             Effect.forever(
               pipe(
                 Queue.take(queue),
@@ -52,12 +53,12 @@ export const make = <T>(
                           if (started) {
                             return pipe(
                               Ref.get(onEmitRef),
-                              Effect.flatMap((onEmit) => {
-                                if (onEmit) {
-                                  return onEmit(value);
-                                }
-                                return Effect.void;
-                              }),
+                              Effect.flatMap((onEmitOption) =>
+                                Option.match(onEmitOption, {
+                                  onNone: () => Effect.void,
+                                  onSome: (onEmit) => onEmit(value),
+                                }),
+                              ),
                             );
                           }
                           return Effect.void;
@@ -66,32 +67,18 @@ export const make = <T>(
                     ),
                   ),
                 ),
-                Effect.catchAllCause((cause) =>
-                  // Handle interruption gracefully - if the queue is closed/unsubscribed,
-                  // we stop the loop by not continuing forever
-                  Effect.failCause(cause),
-                ),
               ),
             ),
             Effect.forkDaemon,
           );
 
-          return pipe(
-            mainFiber,
-            Effect.flatMap((fiber) =>
-              pipe(
-                Ref.set(fiberRef, fiber),
-                Effect.map(() => ({
-                  poll: Ref.get(valueRef),
-                  emit: (
-                    onEmit: (value: T) => Effect.Effect<void, never, never>,
-                  ) => pipe(Ref.set(onEmitRef, onEmit), Effect.asVoid),
-                  start: pipe(Ref.set(startedRef, true), Effect.asVoid),
-                  stop: pipe(Ref.set(startedRef, false), Effect.asVoid),
-                })),
-              ),
-            ),
-          );
+          return Effect.succeed({
+            poll: Ref.get(valueRef),
+            emit: (onEmit: (value: T) => Effect.Effect<void, never, never>) =>
+              pipe(Ref.set(onEmitRef, Option.some(onEmit)), Effect.asVoid),
+            start: pipe(Ref.set(startedRef, true), Effect.asVoid),
+            stop: pipe(Ref.set(startedRef, false), Effect.asVoid),
+          });
         }),
       ),
     ),
