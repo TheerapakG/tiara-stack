@@ -48,7 +48,7 @@ import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 const formatEffectValue = (effectValue: number): string => {
   const rounded = Math.round(effectValue * 10) / 10;
   const formatted = rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(1);
-  return ` (+${formatted}%)`;
+  return formatted;
 };
 
 const handleManual =
@@ -299,15 +299,21 @@ const handleManual =
                   Array.headNonEmpty(roomOrders).room,
                   Array.map(({ team, tags, effectValue }, i) => {
                     const hasTiererTag = tags.includes("tierer");
-                    const effectValueStr = hasTiererTag
-                      ? ""
-                      : formatEffectValue(effectValue);
-                    const tagStr = tags.includes("enc")
-                      ? `, enc`
-                      : tags.includes("doormat")
-                        ? `, doormat`
+                    const effectParts = hasTiererTag
+                      ? []
+                      : pipe(
+                          [
+                            `${formatEffectValue(effectValue)}%`,
+                            tags.includes("enc") ? "enc" : undefined,
+                            tags.includes("doormat") ? "doormat" : undefined,
+                          ],
+                          Array.filter((s): s is string => s !== undefined),
+                        );
+                    const effectStr =
+                      effectParts.length > 0
+                        ? ` (+${Array.join(effectParts, ", ")})`
                         : "";
-                    return `${inlineCode(`P${i + 1}:`)}  ${team}${effectValueStr}${tagStr}`;
+                    return `${inlineCode(`P${i + 1}:`)}  ${team}${effectStr}`;
                   }),
                 ),
                 "",

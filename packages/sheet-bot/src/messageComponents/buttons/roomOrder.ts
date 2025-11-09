@@ -30,7 +30,7 @@ import type { Schema } from "sheet-apis";
 const formatEffectValue = (effectValue: number): string => {
   const rounded = Math.round(effectValue * 10) / 10;
   const formatted = rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(1);
-  return ` (+${formatted}%)`;
+  return formatted;
 };
 
 const roomOrderPreviousButtonData = {
@@ -106,15 +106,21 @@ export const roomOrderInteractionGetReply = (
             messageRoomOrderEntry,
             Array.map(({ team, tags, position, effectValue }) => {
               const hasTiererTag = tags.includes("tierer");
-              const effectValueStr = hasTiererTag
-                ? ""
-                : formatEffectValue(effectValue);
-              const tagStr = tags.includes("enc")
-                ? `, enc`
-                : tags.includes("doormat")
-                  ? `, doormat`
+              const effectParts = hasTiererTag
+                ? []
+                : pipe(
+                    [
+                      `${formatEffectValue(effectValue)}%`,
+                      tags.includes("enc") ? "enc" : undefined,
+                      tags.includes("doormat") ? "doormat" : undefined,
+                    ],
+                    Array.filter((s): s is string => s !== undefined),
+                  );
+              const effectStr =
+                effectParts.length > 0
+                  ? ` (+${Array.join(effectParts, ", ")})`
                   : "";
-              return `${inlineCode(`P${position + 1}:`)}  ${team}${effectValueStr}${tagStr}`;
+              return `${inlineCode(`P${position + 1}:`)}  ${team}${effectStr}`;
             }),
           ),
           "",
