@@ -54,18 +54,11 @@ export const make = <T>(
             Ref.set(valueRef, value),
             Effect.tap(() =>
               pipe(
-                Effect.all({
-                  started: Ref.get(startedRef),
-                  onEmit: Ref.get(onEmitRef),
-                }),
-                Effect.flatMap(({ started, onEmit }) =>
-                  started
-                    ? Option.match(onEmit, {
-                        onNone: () => Effect.void,
-                        onSome: (onEmit) => onEmit(value),
-                      })
-                    : Effect.void,
+                Ref.get(onEmitRef),
+                Effect.flatMap(
+                  Effect.transposeMapOption((onEmit) => onEmit(value)),
                 ),
+                Effect.whenEffect(Ref.get(startedRef)),
               ),
             ),
           ),
