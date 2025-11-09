@@ -53,6 +53,7 @@ import invalidHeaderErrorHtml from "./invalidHeaderError.html";
 class SubscriptionState extends Data.TaggedClass("SubscriptionState")<{
   event: Context.Tag.Service<Event>;
   effectCleanup: Effect.Effect<void, never, never>;
+  scope: Scope.CloseableScope;
 }> {}
 type SubscriptionStateMap = HashMap.HashMap<string, SubscriptionState>;
 
@@ -478,8 +479,13 @@ const cleanupPeer =
             pipe(
               peerState.subscriptionStateMap,
               HashMap.values,
-              Effect.forEach(({ effectCleanup }) =>
-                Effect.forkDaemon(effectCleanup),
+              Effect.forEach(({ effectCleanup, scope }) =>
+                Effect.forkDaemon(
+                  pipe(
+                    effectCleanup,
+                    Effect.andThen(() => Scope.close(scope, Exit.void)),
+                  ),
+                ),
               ),
               Effect.map(Fiber.joinAll),
             ),
@@ -576,7 +582,7 @@ const getComputedSubscriptionResult =
   ): Effect.Effect<
     Computed.Computed<ServerUpdateResult, never, Event>,
     unknown,
-    Event
+    Event | Scope.Scope
   > =>
     pipe(
       serverWithRuntime.server.handlerContextCollection,
@@ -663,7 +669,7 @@ const handleSubscribe =
         pipe(
           serverWithRuntime,
           updatePeerSubscriptionState(peer, header.id, {
-            onSome: ({ event, effectCleanup }) =>
+            onSome: ({ event, effectCleanup, scope }) =>
               pipe(
                 eventPullEffect(),
                 Effect.flatMap(OnceObserver.observeOnce),
@@ -675,6 +681,7 @@ const handleSubscribe =
                         new SubscriptionState({
                           event,
                           effectCleanup,
+                          scope,
                         }),
                       ),
                     ),
@@ -685,12 +692,14 @@ const handleSubscribe =
             onNone: () =>
               pipe(
                 Effect.Do,
+                Effect.bind("scope", () => Scope.make()),
                 Effect.bind("event", () => Event),
-                Effect.bind("computedBuffer", () =>
+                Effect.bind("computedBuffer", ({ scope }) =>
                   pipe(
                     serverWithRuntime,
                     getComputedSubscriptionResult(header, span),
                     Computed.flatMap(encodeServerUpdateResult),
+                    Scope.extend(scope),
                   ),
                 ),
                 Effect.bind("effectCleanup", ({ event, computedBuffer }) =>
@@ -706,11 +715,12 @@ const handleSubscribe =
                     Context.make(Event, event),
                   ),
                 ),
-                Effect.map(({ event, effectCleanup }) =>
+                Effect.map(({ event, effectCleanup, scope }) =>
                   Option.some(
                     new SubscriptionState({
                       event,
                       effectCleanup,
+                      scope,
                     }),
                   ),
                 ),
@@ -793,6 +803,7 @@ const handleOnce =
                 Effect.tap(() => closeEvent()),
               ),
             ),
+            Effect.scoped,
           ),
         ),
       ),

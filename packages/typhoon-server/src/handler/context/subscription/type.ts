@@ -1,5 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import { Effect, HKT, Option } from "effect";
+import { Effect, HKT, Option, Scope } from "effect";
 import type { Type } from "typhoon-core/handler";
 import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
@@ -111,7 +111,7 @@ export interface SubscriptionHandlerT extends Type.BaseHandlerT {
   readonly Type: "subscription";
   readonly Data: SubscriptionData;
   readonly Handler: SubscriptionHandlerTypeLambda;
-  readonly DefaultHandlerContext: Event;
+  readonly DefaultHandlerContext: Event | Scope.Scope;
   readonly TransformDataKey: TransformDataKey;
   readonly TransformDataSuccessIn: TransformDataSuccessIn;
   readonly TransformDataSuccessOut: TransformDataSuccessOut;
