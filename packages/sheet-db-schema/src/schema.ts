@@ -3,6 +3,7 @@ import {
   index,
   integer,
   pgTable,
+  real,
   serial,
   timestamp,
   uniqueIndex,
@@ -185,6 +186,7 @@ export const messageRoomOrderEntry = pgTable(
     position: integer("position").notNull(),
     team: varchar("team").notNull(),
     tags: varchar("tags").array().notNull(),
+    effectValue: real("effect_value").notNull(),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
