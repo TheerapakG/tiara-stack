@@ -129,6 +129,41 @@ export const make = (
     ),
   );
 
+export const mapEffect =
+  <A, E1, R1, B, E2>(
+    mapper: (
+      effect: Effect.Effect<A, E1, R1 | SignalContext>,
+    ) => Effect.Effect<B, E2, SignalContext>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <E3, R3>(signal: Effect.Effect<DependencySignal<A, E1, R1>, E3, R3>) =>
+    pipe(
+      signal,
+      Effect.flatMap((signal) => make(pipe(signal, mapper), options)),
+    );
+
+export const tap =
+  <A, X>(
+    mapper: (
+      value: A,
+    ) => [X] extends [Effect.Effect<infer _A3, infer _E3, infer R3>]
+      ? [R3] extends [never]
+        ? X
+        : never
+      : X,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <E1, E2, R2>(signal: Effect.Effect<DependencySignal<A, E1, never>, E2, R2>) =>
+    pipe(
+      signal,
+      mapEffect(
+        Effect.tap(mapper) as (
+          effect: Effect.Effect<A, E1, SignalContext>,
+        ) => Effect.Effect<A, unknown, SignalContext>,
+        options,
+      ),
+    );
+
 export const makeWithContext = <R = never>(
   effect: Effect.Effect<unknown, unknown, R>,
   context: Context.Context<Exclude<R, SignalContext>>,
@@ -156,3 +191,53 @@ export const makeWithContext = <R = never>(
       },
     ),
   );
+
+export const mapEffectWithContext =
+  <A, E1, R1, B, E2, R2>(
+    mapper: (
+      effect: Effect.Effect<A, E1, R1 | SignalContext>,
+    ) => Effect.Effect<B, E2, R2>,
+    context: Context.Context<Exclude<R2, SignalContext>>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <E3, R3>(signal: Effect.Effect<DependencySignal<A, E1, R1>, E3, R3>) =>
+    pipe(
+      signal,
+      Effect.flatMap((signal) =>
+        makeWithContext(pipe(signal, mapper), context, options),
+      ),
+    );
+
+export const tapWithContext =
+  <A, X, R1>(
+    mapper: (value: A) => X,
+    context: Context.Context<
+      Exclude<
+        | R1
+        | ([X] extends [Effect.Effect<infer _A2, infer _E2, infer R2>]
+            ? R2
+            : never),
+        SignalContext
+      >
+    >,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <E1, E2, R2>(signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>) =>
+    pipe(
+      signal,
+      mapEffectWithContext(
+        Effect.tap(mapper) as (
+          effect: Effect.Effect<A, E1, R1 | SignalContext>,
+        ) => Effect.Effect<
+          A,
+          unknown,
+          | R1
+          | ([X] extends [Effect.Effect<infer _A2, infer _E2, infer R2>]
+              ? R2
+              : never)
+          | SignalContext
+        >,
+        context,
+        options,
+      ),
+    );
