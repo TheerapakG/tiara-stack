@@ -4,6 +4,7 @@ import {
   DependencySignal,
   DependencySymbol,
   notifyAllDependents,
+  getDependentsUpdateOrder,
 } from "./dependencySignal";
 import { DependentSignal } from "./dependentSignal";
 import { bindScopeDependency, SignalContext } from "./signalContext";
@@ -119,6 +120,19 @@ export class ExternalComputed<T = unknown>
 
   requestStart(): Effect.Effect<void, never, never> {
     return this._maybeSetEmitting(true);
+  }
+
+  reconcile(): Effect.Effect<void, never, never> {
+    return pipe(
+      getDependentsUpdateOrder(this),
+      Effect.map((dependents) =>
+        dependents.some((d) => !(d instanceof WeakRef)),
+      ),
+      Effect.flatMap((watched) => this._maybeSetEmitting(watched)),
+      Observable.withSpan(this, "ExternalComputed.reconcile", {
+        captureStackTrace: true,
+      }),
+    );
   }
 
   private _maybeSetEmitting(

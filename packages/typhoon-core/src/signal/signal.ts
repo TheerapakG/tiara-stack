@@ -119,6 +119,10 @@ export class Signal<T = unknown>
       }),
     );
   }
+
+  reconcile(): Effect.Effect<void, never, never> {
+    return Effect.void;
+  }
 }
 
 export type Value<S extends Signal<unknown>> = Effect.Effect.Success<

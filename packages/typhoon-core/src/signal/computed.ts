@@ -216,6 +216,10 @@ export class Computed<A = never, E = never, R = never>
       }),
     );
   }
+
+  reconcile(): Effect.Effect<void, never, never> {
+    return Effect.void;
+  }
 }
 
 export type Success<S extends Computed<unknown, unknown, unknown>> =
