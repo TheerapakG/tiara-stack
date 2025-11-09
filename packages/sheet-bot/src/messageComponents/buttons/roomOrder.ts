@@ -24,8 +24,14 @@ import {
   time,
   TimestampStyles,
 } from "discord.js";
-import { Array, Effect, HashSet, Layer, Number, pipe } from "effect";
+import { Array, Effect, HashSet, Layer, Number, Option, pipe } from "effect";
 import type { Schema } from "sheet-apis";
+
+const formatEffectValue = (effectValue: number): string => {
+  const rounded = Math.round(effectValue * 10) / 10;
+  const formatted = rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(1);
+  return `+${formatted}%`;
+};
 
 const roomOrderPreviousButtonData = {
   type: ComponentType.Button,
@@ -98,10 +104,26 @@ export const roomOrderInteractionGetReply = (
           "",
           ...pipe(
             messageRoomOrderEntry,
-            Array.map(
-              ({ team, tags, position }) =>
-                `${inlineCode(`P${position + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : tags.includes("doormat") ? " (doormat)" : ""}`,
-            ),
+            Array.map(({ team, tags, position, effectValue }) => {
+              const hasTiererTag = tags.includes("tierer");
+              const effectParts = hasTiererTag
+                ? []
+                : pipe(
+                    [
+                      Option.some(formatEffectValue(effectValue)),
+                      tags.includes("enc") ? Option.some("enc") : Option.none(),
+                      tags.includes("doormat")
+                        ? Option.some("doormat")
+                        : Option.none(),
+                    ],
+                    Array.getSomes,
+                  );
+              const effectStr =
+                effectParts.length > 0
+                  ? ` (${Array.join(effectParts, ", ")})`
+                  : "";
+              return `${inlineCode(`P${position + 1}:`)}  ${team}${effectStr}`;
+            }),
           ),
           "",
           `${inlineCode("In:")} ${pipe(
