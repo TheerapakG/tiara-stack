@@ -10,6 +10,7 @@ import {
   Runtime,
   Option,
   pipe,
+  Cause,
 } from "effect";
 import { Observable } from "../observability";
 import {
@@ -270,6 +271,19 @@ export const mapEffect =
       signal,
       Effect.flatMap((signal) => make(pipe(signal, mapper), options)),
     );
+
+export const tap =
+  <A, X>(mapper: (value: A) => X, options?: Observable.ObservableOptions) =>
+  <E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    pipe(signal, mapEffect(Effect.tap(mapper), options)) as [X] extends [
+      Effect.Effect<infer _A3, infer E3, infer R3>,
+    ]
+      ? Effect.Effect<Computed<A, E3 | E1, R3 | R1>, E2, R2>
+      : [X] extends [PromiseLike<infer _A3>]
+        ? Effect.Effect<Computed<A, E1 | Cause.UnknownException, R1>, E2, R2>
+        : Effect.Effect<Computed<A, E1, R1>, E2, R2>;
 
 export const map =
   <A, B>(mapper: (value: A) => B, options?: Observable.ObservableOptions) =>
