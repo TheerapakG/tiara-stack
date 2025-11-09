@@ -33,8 +33,7 @@ export const make = <T>(
     ]),
     Effect.flatMap(([valueRef, startedRef, onEmitRef]) =>
       pipe(
-        pubsub,
-        PubSub.subscribe,
+        PubSub.subscribe(pubsub),
         Effect.flatMap((queue) => {
           // Spawn a single fiber that both stores and emits values
           // This fiber runs regardless of start/stop state to keep values fresh
@@ -43,27 +42,22 @@ export const make = <T>(
             Effect.forever(
               pipe(
                 Queue.take(queue),
+                Effect.tap((value) => Ref.set(valueRef, value)),
                 Effect.flatMap((value) =>
                   pipe(
-                    Ref.set(valueRef, value),
-                    Effect.flatMap(() =>
-                      pipe(
-                        Ref.get(startedRef),
-                        Effect.flatMap((started) => {
-                          if (started) {
-                            return pipe(
-                              Ref.get(onEmitRef),
-                              Effect.flatMap((onEmitOption) =>
-                                Option.match(onEmitOption, {
-                                  onNone: () => Effect.void,
-                                  onSome: (onEmit) => onEmit(value),
-                                }),
-                              ),
-                            );
-                          }
-                          return Effect.void;
-                        }),
-                      ),
+                    Ref.get(startedRef),
+                    Effect.flatMap((started) =>
+                      started
+                        ? pipe(
+                            Ref.get(onEmitRef),
+                            Effect.flatMap((onEmitOption) =>
+                              Option.match(onEmitOption, {
+                                onNone: () => Effect.void,
+                                onSome: (onEmit) => onEmit(value),
+                              }),
+                            ),
+                          )
+                        : Effect.void,
                     ),
                   ),
                 ),
