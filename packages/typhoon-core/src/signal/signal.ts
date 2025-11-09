@@ -84,7 +84,7 @@ export class Signal<T = unknown>
   setValue(value: T): Effect.Effect<void, never, never> {
     return pipe(
       this,
-      notifyAllDependents(
+      notifyAllDependents(() =>
         Effect.suspend(() =>
           Effect.sync(() => {
             this._value = value;
@@ -102,7 +102,7 @@ export class Signal<T = unknown>
   ): Effect.Effect<void, never, never> {
     return pipe(
       this,
-      notifyAllDependents(
+      notifyAllDependents(() =>
         Effect.suspend(() =>
           pipe(
             updater(this._value),

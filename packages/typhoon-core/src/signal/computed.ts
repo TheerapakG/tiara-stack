@@ -206,7 +206,7 @@ export class Computed<A = never, E = never, R = never>
   recompute(): Effect.Effect<void, never, never> {
     return pipe(
       this,
-      notifyAllDependents(this.reset()),
+      notifyAllDependents(() => this.reset()),
       Observable.withSpan(this, "Computed.recompute", {
         captureStackTrace: true,
       }),

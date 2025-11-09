@@ -101,13 +101,16 @@ export const getDependentsUpdateOrder = (
   );
 
 export const notifyAllDependents =
-  (beforeNotify: Effect.Effect<void, never, never>) =>
+  (beforeNotify: (watched: boolean) => Effect.Effect<void, never, never>) =>
   (signal: DependencySignal<unknown, unknown, unknown>) =>
     pipe(
       Effect.Do,
       Effect.bind("dependents", () => getDependentsUpdateOrder(signal)),
+      Effect.let("watched", ({ dependents }) =>
+        dependents.some((dependent) => !isDependencySignal(dependent)),
+      ),
       Effect.tap(signal.clearDependents()),
-      Effect.tap(beforeNotify),
+      Effect.tap(({ watched }) => beforeNotify(watched)),
       Effect.flatMap(({ dependents }) =>
         Effect.all(dependents.map((dependent) => dependent.notify())),
       ),
