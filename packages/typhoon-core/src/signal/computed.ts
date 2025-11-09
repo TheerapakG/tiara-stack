@@ -101,6 +101,10 @@ export class Computed<A = never, E = never, R = never>
     });
   }
 
+  getDependencies(): Effect.Effect<DependencySignal[], never, never> {
+    return Effect.sync(() => HashSet.toValues(this._dependencies));
+  }
+
   getDependents(): Effect.Effect<
     (WeakRef<DependentSignal> | DependentSignal)[],
     never,
@@ -206,11 +210,15 @@ export class Computed<A = never, E = never, R = never>
   recompute(): Effect.Effect<void, never, never> {
     return pipe(
       this,
-      notifyAllDependents(this.reset()),
+      notifyAllDependents(() => this.reset()),
       Observable.withSpan(this, "Computed.recompute", {
         captureStackTrace: true,
       }),
     );
+  }
+
+  reconcile(): Effect.Effect<void, never, never> {
+    return Effect.void;
   }
 }
 

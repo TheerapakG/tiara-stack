@@ -1,7 +1,7 @@
 import { Context, Effect, pipe } from "effect";
 import { Observable } from "../observability";
 import type * as DependencySignal from "./dependencySignal";
-import type * as DependentSignal from "./dependentSignal";
+import * as DependentSignal from "./dependentSignal";
 
 type SignalContextShape = {
   readonly signal: DependentSignal.DependentSignal;
@@ -58,6 +58,7 @@ export const runAndTrackEffect =
     return pipe(
       effect,
       Effect.provideService(SignalContext, ctx),
+      Effect.tap(() => DependentSignal.reconcileAllDependencies(ctx.signal)),
       Observable.withSpan(ctx.signal, "SignalContext.runAndTrackEffect", {
         captureStackTrace: true,
       }),

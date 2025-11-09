@@ -72,6 +72,10 @@ class OnceObserver<A = never, E = never>
     });
   }
 
+  getDependencies() {
+    return Effect.sync(() => HashSet.toValues(this._dependencies));
+  }
+
   commit(): Effect.Effect<A, E, never> {
     return this.value;
   }
