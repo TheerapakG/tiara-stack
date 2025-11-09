@@ -1,5 +1,5 @@
 import { Effect, Option, pipe, PubSub, Queue, Ref, Scope } from "effect";
-import type { ExternalSource } from "./externalComputed";
+import type { ExternalSource } from "../externalComputed";
 
 /**
  * Creates an ExternalSource adapter for Effect PubSub.
