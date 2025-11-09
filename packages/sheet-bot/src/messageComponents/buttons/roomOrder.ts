@@ -99,8 +99,8 @@ export const roomOrderInteractionGetReply = (
           ...pipe(
             messageRoomOrderEntry,
             Array.map(
-              ({ team, tags, position, effectValue }) =>
-                `${inlineCode(`P${position + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : tags.includes("doormat") ? " (doormat)" : ""} (+${effectValue}%)`,
+              ({ team, tags, position }) =>
+                `${inlineCode(`P${position + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : tags.includes("doormat") ? " (doormat)" : ""}`,
             ),
           ),
           "",

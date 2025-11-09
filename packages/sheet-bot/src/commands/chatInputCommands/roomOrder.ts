@@ -290,12 +290,11 @@ const handleManual =
                 `${bold(`Hour ${hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
                 "",
                 ...pipe(
-                  Array.headNonEmpty(roomOrders),
-                  ({ room, averageEffectValue }) =>
-                    room.map(
-                      ({ team, tags }, i) =>
-                        `${inlineCode(`P${i + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : tags.includes("doormat") ? " (doormat)" : ""} (+${averageEffectValue}%)`,
-                    ),
+                  Array.headNonEmpty(roomOrders).room,
+                  Array.map(
+                    ({ team, tags }, i) =>
+                      `${inlineCode(`P${i + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : tags.includes("doormat") ? " (doormat)" : ""}`,
+                  ),
                 ),
                 "",
                 `${inlineCode("In:")} ${pipe(
