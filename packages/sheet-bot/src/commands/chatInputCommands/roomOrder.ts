@@ -48,7 +48,7 @@ import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 const formatEffectValue = (effectValue: number): string => {
   const rounded = Math.round(effectValue * 10) / 10;
   const formatted = rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(1);
-  return formatted;
+  return `+${formatted}%`;
 };
 
 const handleManual =
@@ -303,7 +303,7 @@ const handleManual =
                       ? []
                       : pipe(
                           [
-                            Option.some(`${formatEffectValue(effectValue)}%`),
+                            Option.some(formatEffectValue(effectValue)),
                             tags.includes("enc")
                               ? Option.some("enc")
                               : Option.none(),
@@ -315,7 +315,7 @@ const handleManual =
                         );
                     const effectStr =
                       effectParts.length > 0
-                        ? ` (+${Array.join(effectParts, ", ")})`
+                        ? ` (${Array.join(effectParts, ", ")})`
                         : "";
                     return `${inlineCode(`P${i + 1}:`)}  ${team}${effectStr}`;
                   }),
