@@ -121,15 +121,15 @@ export const make = (
           new SideEffect<never>(effect, Context.empty(), options ?? {}),
         ),
         Effect.tap((sideEffect) => sideEffect.notify()),
-        Observable.withSpan(
-          { [Observable.ObservableSymbol]: options ?? {} },
-          "SideEffect.make",
-          {
-            captureStackTrace: true,
-          },
-        ),
       ),
       (sideEffect) => sideEffect.cleanup(),
+    ),
+    Observable.withSpan(
+      { [Observable.ObservableSymbol]: options ?? {} },
+      "SideEffect.make",
+      {
+        captureStackTrace: true,
+      },
     ),
   );
 
@@ -188,15 +188,15 @@ export const makeWithContext = <R = never>(
           ),
         ),
         Effect.tap((sideEffect) => sideEffect.notify()),
-        Observable.withSpan(
-          { [Observable.ObservableSymbol]: options ?? {} },
-          "SideEffect.makeWithContext",
-          {
-            captureStackTrace: true,
-          },
-        ),
       ),
       (sideEffect) => sideEffect.cleanup(),
+    ),
+    Observable.withSpan(
+      { [Observable.ObservableSymbol]: options ?? {} },
+      "SideEffect.makeWithContext",
+      {
+        captureStackTrace: true,
+      },
     ),
   );
 

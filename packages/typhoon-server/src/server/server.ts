@@ -478,8 +478,14 @@ const cleanupPeer =
             pipe(
               peerState.subscriptionStateMap,
               HashMap.values,
-              Effect.forEach(({ scope }) =>
-                Effect.forkDaemon(Scope.close(scope, Exit.void)),
+              Effect.forEach(({ event, scope }) =>
+                Effect.forkDaemon(
+                  pipe(
+                    closeEvent(),
+                    Effect.provideService(Event, event),
+                    Effect.andThen(() => Scope.close(scope, Exit.void)),
+                  ),
+                ),
               ),
               Effect.map(Fiber.joinAll),
             ),
@@ -749,9 +755,9 @@ const handleUnsubscribe =
           updatePeerSubscriptionState(peer, header.id, {
             onSome: ({ event, scope }) =>
               pipe(
-                Scope.close(scope, Exit.void),
-                Effect.andThen(closeEvent()),
+                closeEvent(),
                 Effect.provideService(Event, event),
+                Effect.andThen(() => Scope.close(scope, Exit.void)),
                 Effect.as(Option.none()),
               ),
             onNone: () => Effect.succeedNone,
