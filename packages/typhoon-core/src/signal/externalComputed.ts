@@ -118,10 +118,6 @@ export class ExternalComputed<T = unknown>
     );
   }
 
-  requestStart(): Effect.Effect<void, never, never> {
-    return this._maybeSetEmitting(true);
-  }
-
   reconcile(): Effect.Effect<void, never, never> {
     return pipe(
       getDependentsUpdateOrder(this),
