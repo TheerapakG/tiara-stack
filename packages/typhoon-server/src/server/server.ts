@@ -703,16 +703,15 @@ const handleSubscribe =
                   ),
                 ),
                 Effect.bind("effectCleanup", ({ event, computedBuffer }) =>
-                  SideEffect.makeWithContext(
-                    pipe(
-                      computedBuffer,
-                      Effect.tap((buffer) =>
+                  pipe(
+                    Effect.succeed(computedBuffer),
+                    SideEffect.tapWithContext(
+                      (buffer) =>
                         peer.send(buffer, {
                           compress: true,
                         }),
-                      ),
+                      Context.make(Event, event),
                     ),
-                    Context.make(Event, event),
                   ),
                 ),
                 Effect.map(({ event, effectCleanup, scope }) =>
