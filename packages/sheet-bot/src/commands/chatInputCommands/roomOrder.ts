@@ -332,14 +332,14 @@ const handleManual =
                   hour,
                   pipe(
                     roomOrders,
-                    Array.map(({ room, averageEffectValue }, rank) =>
-                      room.map(({ team, tags }, position) => ({
+                    Array.map(({ room }, rank) =>
+                      room.map(({ team, tags, effectValue }, position) => ({
                         hour,
                         team,
                         tags: Array.fromIterable(tags),
                         rank,
                         position,
-                        effectValue: averageEffectValue,
+                        effectValue,
                       })),
                     ),
                     Array.flatten,
