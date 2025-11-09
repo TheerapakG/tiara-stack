@@ -72,7 +72,7 @@ const applyRoomEncAndDoormat = (roomTeam: Room) => {
     if (
       HashSet.has(t.tags, "encable") &&
       PlayerTeam.getEffectValue(t) > bestEffectValue &&
-      t.talent > tiererTalent
+      t.talent >= tiererTalent
     ) {
       bestEffectValue = PlayerTeam.getEffectValue(t);
       encIndex = i;
@@ -103,7 +103,7 @@ const applyRoomEncAndDoormat = (roomTeam: Room) => {
         HashSet.make(tiererOverride ? "tierer_enc_override" : "enc"),
       )(t);
     }
-    return t.talent > encTeam.talent && !HashSet.has(t.tags, "tierer")
+    return t.talent >= encTeam.talent && !HashSet.has(t.tags, "tierer")
       ? PlayerTeam.addTags(HashSet.make("doormat"))(t)
       : t;
   });
