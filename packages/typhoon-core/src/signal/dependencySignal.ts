@@ -38,9 +38,8 @@ export abstract class DependencySignal<A = never, E = never, R = never>
   abstract get value(): Effect.Effect<A, E, R | SignalContext>;
   abstract peek(): Effect.Effect<A, E, R>;
 
-  // Optional hook for dependencies to reconcile internal state after graph updates
-  // Default implementations can no-op; specific signals like ExternalComputed may override.
-  reconcile?(): Effect.Effect<void, never, never>;
+  // Reconcile internal state after graph updates (e.g., ExternalComputed start/stop)
+  abstract reconcile(): Effect.Effect<void, never, never>;
 }
 
 export const isDependencySignal = (

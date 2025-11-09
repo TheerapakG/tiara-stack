@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Array, Effect, pipe } from "effect";
 import { Observable } from "../observability";
 import type * as DependencySignal from "./dependencySignal";
 
@@ -49,43 +49,51 @@ export const getDependencyUpdateOrder = (
   never,
   never
 > =>
-  Effect.gen(function* () {
-    const visited = new Set<
-      DependencySignal.DependencySignal<unknown, unknown, unknown>
-    >();
-    const ordered: Array<
-      DependencySignal.DependencySignal<unknown, unknown, unknown>
-    > = [];
-
-    const dfs = (node: DependentSignal): Effect.Effect<void, never, never> =>
-      Effect.flatMap(node.getDependencies(), (deps) =>
-        Effect.forEach(
-          deps,
-          (dep) =>
-            Effect.suspend(() => {
-              // Avoid revisiting
-              if (visited.has(dep as any)) return Effect.void;
-              visited.add(dep as any);
-              ordered.push(dep as any);
-              return isDependentSignal(dep as any)
-                ? dfs(dep as unknown as DependentSignal)
-                : Effect.void;
-            }),
-          { discard: true },
+  pipe(
+    Effect.Do,
+    Effect.bind("thisDependencies", () => dependent.getDependencies()),
+    Effect.bind("nestedDependencies", ({ thisDependencies }) =>
+      pipe(
+        Effect.all(
+          thisDependencies.map((dependency) =>
+            isDependentSignal(dependency as any)
+              ? getDependencyUpdateOrder(
+                  dependency as unknown as DependentSignal,
+                )
+              : Effect.succeed([]),
+          ),
         ),
-      );
-
-    yield* dfs(dependent);
-    return ordered;
-  });
+        Effect.map(Array.flatten),
+      ),
+    ),
+    Effect.let("dependencies", ({ thisDependencies, nestedDependencies }) =>
+      Array.appendAll(thisDependencies, nestedDependencies),
+    ),
+    Effect.map(({ dependencies }) => {
+      const seen = new Set();
+      return dependencies
+        .reverse()
+        .filter((item) => {
+          if (seen.has(item)) return false;
+          seen.add(item);
+          return true;
+        })
+        .reverse();
+    }),
+    Observable.withSpan(dependent, "DependentSignal.getDependencyUpdateOrder", {
+      captureStackTrace: true,
+    }),
+  );
 
 export const reconcileAllDependencies = (
   dependent: DependentSignal,
 ): Effect.Effect<void, never, never> =>
-  Effect.flatMap(getDependencyUpdateOrder(dependent), (deps) =>
-    Effect.forEach(
-      deps,
-      (dep) => (dep.reconcile ? dep.reconcile() : Effect.void),
-      { discard: true },
+  pipe(
+    getDependencyUpdateOrder(dependent),
+    Effect.flatMap((deps) =>
+      Effect.forEach(deps, (dep) => dep.reconcile(), { discard: true }),
     ),
+    Observable.withSpan(dependent, "DependentSignal.reconcileAllDependencies", {
+      captureStackTrace: true,
+    }),
   );
