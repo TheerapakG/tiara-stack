@@ -266,14 +266,17 @@ export const mapEffect =
     options?: Observable.ObservableOptions,
   ) =>
   <E2, R2>(signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>) =>
-    make(pipe(signal, Effect.map(mapper), Effect.flatten), options);
+    pipe(
+      signal,
+      Effect.flatMap((signal) => make(pipe(signal, mapper), options)),
+    );
 
 export const map =
   <A, B>(mapper: (value: A) => B, options?: Observable.ObservableOptions) =>
   <E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(pipe(signal, Effect.flatten, Effect.map(mapper)), options);
+    pipe(signal, mapEffect(Effect.map(mapper), options));
 
 export const flatMap =
   <A, B, E3, R3>(
@@ -283,7 +286,7 @@ export const flatMap =
   <E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(pipe(signal, Effect.flatten, Effect.flatMap(mapper)), options);
+    pipe(signal, mapEffect(Effect.flatMap(mapper), options));
 
 export const flatMapComputed =
   <A, B, E3, R3, E4, R4>(
@@ -293,9 +296,12 @@ export const flatMapComputed =
   <E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(
-      pipe(signal, Effect.flatten, Effect.flatMap(mapper), Effect.flatten),
-      options,
+    pipe(
+      signal,
+      mapEffect(
+        (signal) => pipe(Effect.flatMap(signal, mapper), Effect.flatten),
+        options,
+      ),
     );
 
 export const provideLayer =
@@ -306,7 +312,7 @@ export const provideLayer =
   <A, E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(pipe(signal, Effect.flatten, Effect.provide(layer)), options);
+    pipe(signal, mapEffect(Effect.provide(layer), options));
 
 export const provideLayerComputed =
   <Rout, E3, RIn, E4, R4>(
@@ -316,14 +322,11 @@ export const provideLayerComputed =
   <A, E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(
-      pipe(
-        layer,
-        Effect.flatMap((layer) =>
-          pipe(signal, Effect.flatten, Effect.provide(layer)),
-        ),
+    pipe(
+      Effect.all({ signal, layer }),
+      Effect.flatMap(({ signal, layer }) =>
+        make(pipe(signal, Effect.provide(layer)), options),
       ),
-      options,
     );
 
 export const provideContext =
@@ -334,7 +337,7 @@ export const provideContext =
   <A, E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(pipe(signal, Effect.flatten, Effect.provide(context)), options);
+    pipe(signal, mapEffect(Effect.provide(context), options));
 
 export const provideContextComputed =
   <R3, E4, R4>(
@@ -344,14 +347,11 @@ export const provideContextComputed =
   <A, E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(
-      pipe(
-        context,
-        Effect.flatMap((context) =>
-          pipe(signal, Effect.flatten, Effect.provide(context)),
-        ),
+    pipe(
+      Effect.all({ signal, context }),
+      Effect.flatMap(({ signal, context }) =>
+        make(pipe(signal, Effect.provide(context)), options),
       ),
-      options,
     );
 
 export const provideRuntime =
@@ -359,7 +359,7 @@ export const provideRuntime =
   <A, E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(pipe(signal, Effect.flatten, Effect.provide(runtime)), options);
+    pipe(signal, mapEffect(Effect.provide(runtime), options));
 
 export const provideRuntimeComputed =
   <R3, E4, R4>(
@@ -369,14 +369,11 @@ export const provideRuntimeComputed =
   <A, E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(
-      pipe(
-        runtime,
-        Effect.flatMap((runtime) =>
-          pipe(signal, Effect.flatten, Effect.provide(runtime)),
-        ),
+    pipe(
+      Effect.all({ signal, runtime }),
+      Effect.flatMap(({ signal, runtime }) =>
+        make(pipe(signal, Effect.provide(runtime)), options),
       ),
-      options,
     );
 
 export const provideManagedRuntime =
@@ -387,7 +384,7 @@ export const provideManagedRuntime =
   <A, E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(pipe(signal, Effect.flatten, Effect.provide(runtime)), options);
+    pipe(signal, mapEffect(Effect.provide(runtime), options));
 
 export const provideManagedRuntimeComputed =
   <R3, E3, E4, R4>(
@@ -397,46 +394,31 @@ export const provideManagedRuntimeComputed =
   <A, E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
-    make(
-      pipe(
-        runtime,
-        Effect.flatMap((runtime) =>
-          pipe(signal, Effect.flatten, Effect.provide(runtime)),
-        ),
+    pipe(
+      Effect.all({ signal, runtime }),
+      Effect.flatMap(({ signal, runtime }) =>
+        make(pipe(signal, Effect.provide(runtime)), options),
       ),
-      options,
     );
 
 export const annotateLogs =
   <E1 = never, R1 = never>(
     key: string,
     value: DependencySignal<unknown, E1, R1>,
+    options?: Observable.ObservableOptions,
   ) =>
   <A = never, E2 = never, R2 = never, E3 = never, R3 = never>(
     signal: Effect.Effect<DependencySignal<A, E2, R2>, E3, R3>,
   ) =>
-    make(
-      pipe(
-        value,
-        Effect.flatMap((value) =>
-          pipe(signal, Effect.flatten, Effect.annotateLogs(key, value)),
-        ),
-      ),
-    );
+    pipe(signal, mapEffect(Effect.annotateLogs(key, value), options));
 
 export const annotateSpans =
   <E1 = never, R1 = never>(
     key: string,
     value: DependencySignal<unknown, E1, R1>,
+    options?: Observable.ObservableOptions,
   ) =>
   <A = never, E2 = never, R2 = never, E3 = never, R3 = never>(
     signal: Effect.Effect<DependencySignal<A, E2, R2>, E3, R3>,
   ) =>
-    make(
-      pipe(
-        value,
-        Effect.flatMap((value) =>
-          pipe(signal, Effect.flatten, Effect.annotateSpans(key, value)),
-        ),
-      ),
-    );
+    pipe(signal, mapEffect(Effect.annotateSpans(key, value), options));
