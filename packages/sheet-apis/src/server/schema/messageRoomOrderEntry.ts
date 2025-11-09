@@ -9,6 +9,7 @@ export class MessageRoomOrderEntry extends Schema.TaggedClass<MessageRoomOrderEn
     position: Schema.Number,
     team: Schema.String,
     tags: Schema.Array(Schema.String),
+    effectValue: Schema.Number,
     createdAt: Schema.DateTimeUtcFromDate,
     updatedAt: Schema.DateTimeUtcFromDate,
     deletedAt: Schema.OptionFromNullishOr(

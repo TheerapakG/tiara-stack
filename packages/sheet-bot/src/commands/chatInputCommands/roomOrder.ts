@@ -290,11 +290,12 @@ const handleManual =
                 `${bold(`Hour ${hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
                 "",
                 ...pipe(
-                  Array.headNonEmpty(roomOrders).room,
-                  Array.map(
-                    ({ team, tags }, i) =>
-                      `${inlineCode(`P${i + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : tags.includes("doormat") ? " (doormat)" : ""}`,
-                  ),
+                  Array.headNonEmpty(roomOrders),
+                  ({ room, averageEffectValue }) =>
+                    room.map(
+                      ({ team, tags }, i) =>
+                        `${inlineCode(`P${i + 1}:`)}  ${team}${tags.includes("enc") ? " (enc)" : tags.includes("doormat") ? " (doormat)" : ""} (+${averageEffectValue}%)`,
+                    ),
                 ),
                 "",
                 `${inlineCode("In:")} ${pipe(
@@ -332,13 +333,14 @@ const handleManual =
                   hour,
                   pipe(
                     roomOrders,
-                    Array.map(({ room }, rank) =>
+                    Array.map(({ room, averageEffectValue }, rank) =>
                       room.map(({ team, tags }, position) => ({
                         hour,
                         team,
                         tags: Array.fromIterable(tags),
                         rank,
                         position,
+                        effectValue: averageEffectValue,
                       })),
                     ),
                     Array.flatten,
