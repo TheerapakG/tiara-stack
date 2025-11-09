@@ -38,7 +38,6 @@ export abstract class DependencySignal<A = never, E = never, R = never>
   abstract get value(): Effect.Effect<A, E, R | SignalContext>;
   abstract peek(): Effect.Effect<A, E, R>;
 
-  // Reconcile internal state after graph updates (e.g., ExternalComputed start/stop)
   abstract reconcile(): Effect.Effect<void, never, never>;
 }
 

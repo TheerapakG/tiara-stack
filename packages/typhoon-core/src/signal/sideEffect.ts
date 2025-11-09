@@ -110,8 +110,6 @@ export class SideEffect<R = never> implements DependentSignal {
   }
 }
 
-// Reconciliation of dependencies is handled centrally via SignalContext.runAndTrackEffect
-
 export const make = (
   effect: Effect.Effect<unknown, unknown, SignalContext>,
   options?: Observable.ObservableOptions,
