@@ -37,6 +37,8 @@ export abstract class DependencySignal<A = never, E = never, R = never>
 
   abstract get value(): Effect.Effect<A, E, R | SignalContext>;
   abstract peek(): Effect.Effect<A, E, R>;
+
+  abstract reconcile(): Effect.Effect<void, never, never>;
 }
 
 export const isDependencySignal = (
@@ -101,13 +103,16 @@ export const getDependentsUpdateOrder = (
   );
 
 export const notifyAllDependents =
-  (beforeNotify: Effect.Effect<void, never, never>) =>
+  (beforeNotify: (watched: boolean) => Effect.Effect<void, never, never>) =>
   (signal: DependencySignal<unknown, unknown, unknown>) =>
     pipe(
       Effect.Do,
       Effect.bind("dependents", () => getDependentsUpdateOrder(signal)),
+      Effect.let("watched", ({ dependents }) =>
+        dependents.some((dependent) => !isDependencySignal(dependent)),
+      ),
       Effect.tap(signal.clearDependents()),
-      Effect.tap(beforeNotify),
+      Effect.tap(({ watched }) => beforeNotify(watched)),
       Effect.flatMap(({ dependents }) =>
         Effect.all(dependents.map((dependent) => dependent.notify())),
       ),
