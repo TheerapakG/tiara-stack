@@ -2,7 +2,7 @@ import { mapScheduleWithPlayersHandlerConfig } from "@/server/handler/config";
 import { AuthService, Sheet } from "@/server/services";
 import { Effect, pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
-import { Computed, Signal } from "typhoon-core/signal";
+import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
 
@@ -29,7 +29,7 @@ export const mapScheduleWithPlayersHandler = pipe(
                   concurrency: "unbounded",
                 },
               ),
-              Effect.map(Signal.make),
+              Computed.make,
               Computed.provideLayerComputed(layer),
             ),
           ),

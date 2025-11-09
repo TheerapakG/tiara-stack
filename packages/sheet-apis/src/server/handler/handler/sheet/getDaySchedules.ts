@@ -2,7 +2,7 @@ import { getDaySchedulesHandlerConfig } from "@/server/handler/config";
 import { AuthService, Sheet } from "@/server/services";
 import { Effect, pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
-import { Computed, Signal } from "typhoon-core/signal";
+import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
 
@@ -23,7 +23,7 @@ export const getDaySchedulesHandler = pipe(
           Effect.flatMap((layer) =>
             pipe(
               Sheet.SheetService.getDaySchedules(day),
-              Effect.map(Signal.make),
+              Computed.make,
               Computed.provideLayerComputed(layer),
             ),
           ),
