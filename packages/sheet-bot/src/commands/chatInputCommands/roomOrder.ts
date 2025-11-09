@@ -303,11 +303,15 @@ const handleManual =
                       ? []
                       : pipe(
                           [
-                            `${formatEffectValue(effectValue)}%`,
-                            tags.includes("enc") ? "enc" : undefined,
-                            tags.includes("doormat") ? "doormat" : undefined,
+                            Option.some(`${formatEffectValue(effectValue)}%`),
+                            tags.includes("enc")
+                              ? Option.some("enc")
+                              : Option.none(),
+                            tags.includes("doormat")
+                              ? Option.some("doormat")
+                              : Option.none(),
                           ],
-                          Array.filter((s): s is string => s !== undefined),
+                          Array.getSomes,
                         );
                     const effectStr =
                       effectParts.length > 0
