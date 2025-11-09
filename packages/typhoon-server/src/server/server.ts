@@ -52,7 +52,6 @@ import invalidHeaderErrorHtml from "./invalidHeaderError.html";
 
 class SubscriptionState extends Data.TaggedClass("SubscriptionState")<{
   event: Context.Tag.Service<Event>;
-  effectCleanup: Effect.Effect<void, never, never>;
   scope: Scope.CloseableScope;
 }> {}
 type SubscriptionStateMap = HashMap.HashMap<string, SubscriptionState>;
@@ -479,13 +478,8 @@ const cleanupPeer =
             pipe(
               peerState.subscriptionStateMap,
               HashMap.values,
-              Effect.forEach(({ effectCleanup, scope }) =>
-                Effect.forkDaemon(
-                  pipe(
-                    effectCleanup,
-                    Effect.andThen(() => Scope.close(scope, Exit.void)),
-                  ),
-                ),
+              Effect.forEach(({ scope }) =>
+                Effect.forkDaemon(Scope.close(scope, Exit.void)),
               ),
               Effect.map(Fiber.joinAll),
             ),
@@ -669,7 +663,7 @@ const handleSubscribe =
         pipe(
           serverWithRuntime,
           updatePeerSubscriptionState(peer, header.id, {
-            onSome: ({ event, effectCleanup, scope }) =>
+            onSome: ({ event, scope }) =>
               pipe(
                 eventPullEffect(),
                 Effect.flatMap(OnceObserver.observeOnce),
@@ -680,7 +674,6 @@ const handleSubscribe =
                       Option.some(
                         new SubscriptionState({
                           event,
-                          effectCleanup,
                           scope,
                         }),
                       ),
@@ -702,7 +695,7 @@ const handleSubscribe =
                     Scope.extend(scope),
                   ),
                 ),
-                Effect.bind("effectCleanup", ({ event, computedBuffer }) =>
+                Effect.bind("sideEffect", ({ event, computedBuffer, scope }) =>
                   pipe(
                     Effect.succeed(computedBuffer),
                     SideEffect.tapWithContext(
@@ -712,13 +705,13 @@ const handleSubscribe =
                         }),
                       Context.make(Event, event),
                     ),
+                    Scope.extend(scope),
                   ),
                 ),
-                Effect.map(({ event, effectCleanup, scope }) =>
+                Effect.map(({ event, scope }) =>
                   Option.some(
                     new SubscriptionState({
                       event,
-                      effectCleanup,
                       scope,
                     }),
                   ),
@@ -754,9 +747,9 @@ const handleUnsubscribe =
         pipe(
           serverWithRuntime,
           updatePeerSubscriptionState(peer, header.id, {
-            onSome: ({ event, effectCleanup }) =>
+            onSome: ({ event, scope }) =>
               pipe(
-                effectCleanup,
+                Scope.close(scope, Exit.void),
                 Effect.andThen(closeEvent()),
                 Effect.provideService(Event, event),
                 Effect.as(Option.none()),

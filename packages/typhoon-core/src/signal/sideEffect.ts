@@ -1,4 +1,4 @@
-import { Context, Effect, Fiber, HashSet, Option, pipe } from "effect";
+import { Context, Effect, Fiber, HashSet, Option, pipe, Scope } from "effect";
 import { Observable } from "../observability";
 import { DependencySignal } from "./dependencySignal";
 import { DependentSignal, DependentSymbol } from "./dependentSignal";
@@ -113,19 +113,23 @@ export class SideEffect<R = never> implements DependentSignal {
 export const make = (
   effect: Effect.Effect<unknown, unknown, SignalContext>,
   options?: Observable.ObservableOptions,
-) =>
+): Effect.Effect<SideEffect<never>, never, Scope.Scope> =>
   pipe(
-    Effect.succeed(
-      new SideEffect<never>(effect, Context.empty(), options ?? {}),
-    ),
-    Effect.tap((sideEffect) => sideEffect.notify()),
-    Effect.map((sideEffect) => sideEffect.cleanup()),
-    Observable.withSpan(
-      { [Observable.ObservableSymbol]: options ?? {} },
-      "SideEffect.make",
-      {
-        captureStackTrace: true,
-      },
+    Effect.acquireRelease(
+      pipe(
+        Effect.succeed(
+          new SideEffect<never>(effect, Context.empty(), options ?? {}),
+        ),
+        Effect.tap((sideEffect) => sideEffect.notify()),
+        Observable.withSpan(
+          { [Observable.ObservableSymbol]: options ?? {} },
+          "SideEffect.make",
+          {
+            captureStackTrace: true,
+          },
+        ),
+      ),
+      (sideEffect) => sideEffect.cleanup(),
     ),
   );
 
@@ -168,27 +172,31 @@ export const makeWithContext = <R = never>(
   effect: Effect.Effect<unknown, unknown, R>,
   context: Context.Context<Exclude<R, SignalContext>>,
   options?: Observable.ObservableOptions,
-) =>
+): Effect.Effect<SideEffect<Exclude<R, SignalContext>>, never, Scope.Scope> =>
   pipe(
-    Effect.succeed(
-      new SideEffect<Exclude<R, SignalContext>>(
-        effect as Effect.Effect<
-          unknown,
-          unknown,
-          SignalContext | Exclude<R, SignalContext>
-        >,
-        context,
-        options ?? {},
+    Effect.acquireRelease(
+      pipe(
+        Effect.succeed(
+          new SideEffect<Exclude<R, SignalContext>>(
+            effect as Effect.Effect<
+              unknown,
+              unknown,
+              SignalContext | Exclude<R, SignalContext>
+            >,
+            context,
+            options ?? {},
+          ),
+        ),
+        Effect.tap((sideEffect) => sideEffect.notify()),
+        Observable.withSpan(
+          { [Observable.ObservableSymbol]: options ?? {} },
+          "SideEffect.makeWithContext",
+          {
+            captureStackTrace: true,
+          },
+        ),
       ),
-    ),
-    Effect.tap((sideEffect) => sideEffect.notify()),
-    Effect.map((sideEffect) => sideEffect.cleanup()),
-    Observable.withSpan(
-      { [Observable.ObservableSymbol]: options ?? {} },
-      "SideEffect.makeWithContext",
-      {
-        captureStackTrace: true,
-      },
+      (sideEffect) => sideEffect.cleanup(),
     ),
   );
 
