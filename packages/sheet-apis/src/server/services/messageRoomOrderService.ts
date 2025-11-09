@@ -226,7 +226,13 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                     messageRoomOrderEntry.rank,
                     messageRoomOrderEntry.position,
                   ],
-                  set: { deletedAt: null },
+                  set: {
+                    deletedAt: null,
+                    hour: sql`excluded.hour`,
+                    team: sql`excluded.team`,
+                    tags: sql`excluded.tags`,
+                    effectValue: sql`excluded.effect_value`,
+                  },
                 })
                 .returning(),
             ),

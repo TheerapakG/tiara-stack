@@ -18,6 +18,7 @@ export const upsertMessageRoomOrderEntryHandlerConfig = pipe(
             position: Schema.Number,
             team: Schema.String,
             tags: Schema.Array(Schema.String),
+            effectValue: Schema.Number,
           }),
         ),
       }),
