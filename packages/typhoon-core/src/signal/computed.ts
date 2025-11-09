@@ -101,6 +101,10 @@ export class Computed<A = never, E = never, R = never>
     });
   }
 
+  getDependencies(): Effect.Effect<DependencySignal[], never, never> {
+    return Effect.sync(() => HashSet.toValues(this._dependencies));
+  }
+
   getDependents(): Effect.Effect<
     (WeakRef<DependentSignal> | DependentSignal)[],
     never,

@@ -50,6 +50,10 @@ export class SideEffect<R = never> implements DependentSignal {
     });
   }
 
+  getDependencies() {
+    return Effect.sync(() => HashSet.toValues(this._dependencies));
+  }
+
   getReferenceForDependency(): Effect.Effect<
     WeakRef<DependentSignal> | DependentSignal,
     never,
@@ -87,10 +91,13 @@ export class SideEffect<R = never> implements DependentSignal {
         ),
       ]),
       Effect.provide(this._context),
+      // Scan upstream and start external sources if present.
+      Effect.tap(() => startExternalSourcesIfAny(this)),
       Observable.withSpan(this, "SideEffect.notify", {
         captureStackTrace: true,
       }),
-    );
+      Effect.ignore,
+    ) as unknown as Effect.Effect<unknown, never, never>;
   }
 
   cleanup() {
@@ -105,6 +112,46 @@ export class SideEffect<R = never> implements DependentSignal {
     );
   }
 }
+
+// Walk dependencies recursively to locate ExternalComputed instances and request emitting start.
+const startExternalSourcesIfAny = (root: SideEffect<any>) =>
+  pipe(
+    collectDependenciesRecursive(root),
+    Effect.flatMap((deps) =>
+      Effect.all(
+        deps.map((dep) =>
+          importExternalComputed().pipe(
+            Effect.flatMap(({ ExternalComputed }) =>
+              dep instanceof ExternalComputed.ExternalComputed
+                ? (dep as any).requestStart()
+                : Effect.void,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+const collectDependenciesRecursive = (
+  node: DependentSignal,
+): Effect.Effect<any[], never, never> =>
+  pipe(
+    node.getDependencies(),
+    Effect.flatMap((deps) =>
+      Effect.all(
+        deps.map((dep) =>
+          // If a dependency is also a DependentSignal (e.g., Computed), recurse upstream
+          DependentSymbol in (dep as any) &&
+          (dep as any)[DependentSymbol] === dep
+            ? collectDependenciesRecursive(dep as unknown as DependentSignal)
+            : Effect.succeed<any[]>([]),
+        ),
+      ).pipe(Effect.map((nesteds) => [deps, ...nesteds].flat())),
+    ),
+  );
+
+const importExternalComputed = () =>
+  Effect.sync(() => require("./externalComputed"));
 
 export const make = (
   effect: Effect.Effect<unknown, unknown, SignalContext>,

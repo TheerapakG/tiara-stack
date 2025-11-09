@@ -3,15 +3,16 @@ import { Observable } from "../observability";
 import {
   DependencySignal,
   DependencySymbol,
-  getDependentsUpdateOrder,
   notifyAllDependents,
-  isDependencySignal,
 } from "./dependencySignal";
 import { DependentSignal } from "./dependentSignal";
 import { bindScopeDependency, SignalContext } from "./signalContext";
 
 export interface ExternalSource<T> {
   poll: Effect.Effect<T, never, never>;
+  emit: (
+    onEmit: (value: T) => Effect.Effect<void, never, never>,
+  ) => Effect.Effect<void, never, never>;
   start: Effect.Effect<void, never, never>;
   stop: Effect.Effect<void, never, never>;
 }
@@ -44,35 +45,26 @@ export class ExternalComputed<T = unknown>
   }
 
   addDependent(dependent: WeakRef<DependentSignal> | DependentSignal) {
-    return pipe(
-      Effect.sync(() => {
-        this._dependents = HashSet.add(this._dependents, dependent);
-      }),
-      Effect.andThen(this._reconcileEmitting()),
-    );
+    return Effect.sync(() => {
+      this._dependents = HashSet.add(this._dependents, dependent);
+    });
   }
 
   removeDependent(dependent: WeakRef<DependentSignal> | DependentSignal) {
-    return pipe(
-      Effect.sync(() => {
-        this._dependents = HashSet.remove(this._dependents, dependent);
-      }),
-      Effect.andThen(this._reconcileEmitting()),
-    );
+    return Effect.sync(() => {
+      this._dependents = HashSet.remove(this._dependents, dependent);
+    });
   }
 
   clearDependents() {
-    return pipe(
-      Effect.sync(() => {
-        HashSet.forEach(this._dependents, (dependent) =>
-          dependent instanceof WeakRef
-            ? dependent.deref()?.removeDependency(this)
-            : dependent.removeDependency(this),
-        );
-        this._dependents = HashSet.empty();
-      }),
-      Effect.andThen(this._reconcileEmitting()),
-    );
+    return Effect.sync(() => {
+      HashSet.forEach(this._dependents, (dependent) =>
+        dependent instanceof WeakRef
+          ? dependent.deref()?.removeDependency(this)
+          : dependent.removeDependency(this),
+      );
+      this._dependents = HashSet.empty();
+    });
   }
 
   getDependents(): Effect.Effect<
@@ -106,12 +98,11 @@ export class ExternalComputed<T = unknown>
     );
   }
 
-  emit(value: T): Effect.Effect<void, never, never> {
+  handleEmit(value: T): Effect.Effect<void, never, never> {
     return pipe(
       this,
       notifyAllDependents((watched) =>
         pipe(
-          // Start/stop based on current watched status observed at emit time
           this._maybeSetEmitting(watched),
           Effect.andThen(
             Effect.sync(() => {
@@ -126,17 +117,8 @@ export class ExternalComputed<T = unknown>
     );
   }
 
-  private _reconcileEmitting(): Effect.Effect<void, never, never> {
-    return pipe(
-      getDependentsUpdateOrder(this),
-      Effect.map((dependents) =>
-        dependents.some((d) => !isDependencySignal(d)),
-      ),
-      Effect.flatMap((watched) => this._maybeSetEmitting(watched)),
-      Observable.withSpan(this, "ExternalComputed._reconcileEmitting", {
-        captureStackTrace: true,
-      }),
-    );
+  requestStart(): Effect.Effect<void, never, never> {
+    return this._maybeSetEmitting(true);
   }
 
   private _maybeSetEmitting(
@@ -171,6 +153,7 @@ export const make = <T>(
     Effect.map(
       (initial) => new ExternalComputed(initial, source, options ?? {}),
     ),
+    Effect.tap((signal) => source.emit((value) => signal.handleEmit(value))),
     Observable.withSpan(
       { [Observable.ObservableSymbol]: options ?? {} },
       "ExternalComputed.make",
