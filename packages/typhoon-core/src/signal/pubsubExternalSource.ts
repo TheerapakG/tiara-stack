@@ -24,56 +24,42 @@ export const make = <T>(
   initial: T,
 ): Effect.Effect<ExternalSource<T>, never, Scope.Scope> =>
   pipe(
-    Effect.all([
-      Ref.make(initial), // Current value from PubSub
-      Ref.make(false), // started flag
-      Ref.make<Option.Option<(value: T) => Effect.Effect<void, never, never>>>(
-        Option.none(),
-      ), // onEmit callback
-    ]),
-    Effect.flatMap(([valueRef, startedRef, onEmitRef]) =>
+    Effect.all({
+      valueRef: Ref.make(initial),
+      startedRef: Ref.make(false),
+      onEmitRef: Ref.make<
+        Option.Option<(value: T) => Effect.Effect<void, never, never>>
+      >(Option.none()),
+    }),
+    Effect.tap(({ valueRef, startedRef, onEmitRef }) =>
       pipe(
         PubSub.subscribe(pubsub),
-        Effect.flatMap((queue) => {
+        Effect.tap((queue) =>
           // Spawn a single fiber that both stores and emits values
           // This fiber runs regardless of start/stop state to keep values fresh
-          // When the queue is closed/unsubscribed, Queue.take will fail and Effect.forever will stop
           pipe(
-            Effect.forever(
+            Queue.take(queue),
+            Effect.tap((value) => Ref.set(valueRef, value)),
+            Effect.tap((value) =>
               pipe(
-                Queue.take(queue),
-                Effect.tap((value) => Ref.set(valueRef, value)),
-                Effect.flatMap((value) =>
-                  pipe(
-                    Ref.get(startedRef),
-                    Effect.flatMap((started) =>
-                      started
-                        ? pipe(
-                            Ref.get(onEmitRef),
-                            Effect.flatMap((onEmitOption) =>
-                              Option.match(onEmitOption, {
-                                onNone: () => Effect.void,
-                                onSome: (onEmit) => onEmit(value),
-                              }),
-                            ),
-                          )
-                        : Effect.void,
-                    ),
-                  ),
+                Ref.get(onEmitRef),
+                Effect.flatMap(
+                  Effect.transposeMapOption((onEmit) => onEmit(value)),
                 ),
+                Effect.whenEffect(Ref.get(startedRef)),
               ),
             ),
-            Effect.forkDaemon,
-          );
-
-          return Effect.succeed({
-            poll: Ref.get(valueRef),
-            emit: (onEmit: (value: T) => Effect.Effect<void, never, never>) =>
-              pipe(Ref.set(onEmitRef, Option.some(onEmit)), Effect.asVoid),
-            start: pipe(Ref.set(startedRef, true), Effect.asVoid),
-            stop: pipe(Ref.set(startedRef, false), Effect.asVoid),
-          });
-        }),
+            Effect.forever,
+            Effect.forkScoped,
+          ),
+        ),
       ),
     ),
+    Effect.map(({ valueRef, startedRef, onEmitRef }) => ({
+      poll: Ref.get(valueRef),
+      emit: (onEmit: (value: T) => Effect.Effect<void, never, never>) =>
+        pipe(Ref.set(onEmitRef, Option.some(onEmit)), Effect.asVoid),
+      start: pipe(Ref.set(startedRef, true), Effect.asVoid),
+      stop: pipe(Ref.set(startedRef, false), Effect.asVoid),
+    })),
   );
