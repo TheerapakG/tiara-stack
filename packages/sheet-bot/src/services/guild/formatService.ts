@@ -12,6 +12,7 @@ import {
   Order,
   pipe,
   String,
+  flow,
 } from "effect";
 import { ConverterService, HourWindow } from "./converterService";
 import { Schema } from "sheet-apis";
@@ -74,9 +75,8 @@ export class FormatService extends Effect.Service<FormatService>()(
                         converterService.convertHourToHourWindow,
                       ),
                       Effect.map(Option.map(formatHourWindow)),
-                      Effect.map((range) =>
-                        pipe(
-                          range,
+                      Effect.map(
+                        flow(
                           Option.map(
                             ({ start, end }) =>
                               `${time(start, TimestampStyles.ShortTime)}-${time(end, TimestampStyles.ShortTime)}`,
@@ -128,9 +128,8 @@ export class FormatService extends Effect.Service<FormatService>()(
                         converterService.convertHourToHourWindow,
                       ),
                       Effect.map(Option.map(formatHourWindow)),
-                      Effect.map((range) =>
-                        pipe(
-                          range,
+                      Effect.map(
+                        flow(
                           Option.map(
                             ({ start, end }) =>
                               `${time(start, TimestampStyles.ShortTime)}-${time(end, TimestampStyles.ShortTime)}`,
@@ -336,12 +335,8 @@ export class FormatService extends Effect.Service<FormatService>()(
                   ),
                 ),
                 Array.getSomes,
-                Option.liftPredicate((partialPlayers) =>
-                  pipe(
-                    partialPlayers,
-                    Array.length,
-                    Order.greaterThan(Number.Order)(0),
-                  ),
+                Option.liftPredicate(
+                  flow(Array.length, Order.greaterThan(Number.Order)(0)),
                 ),
                 Option.map(
                   (partialPlayers) =>

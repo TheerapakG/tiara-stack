@@ -1,4 +1,13 @@
-import { Data, DateTime, Duration, Effect, Number, pipe } from "effect";
+import {
+  Data,
+  DateTime,
+  Duration,
+  Either,
+  Effect,
+  Number,
+  pipe,
+  flow,
+} from "effect";
 import { SheetService } from "./sheetService";
 
 export class HourWindow extends Data.TaggedClass("HourWindow")<{
@@ -36,16 +45,20 @@ export class ConverterService extends Effect.Service<ConverterService>()(
         convertDateTimeToHour: (dateTime: DateTime.DateTime) =>
           pipe(
             sheetService.eventConfig,
-            Effect.map((eventConfig) =>
-              pipe(
-                dateTime,
-                DateTime.startOf("hour"),
-                DateTime.distanceDuration(eventConfig.startTime),
-                Duration.toHours,
-                Math.floor,
-                Number.increment,
+            Effect.map((eventConfig) => eventConfig.startTime),
+            Effect.map(
+              DateTime.distanceDurationEither(
+                pipe(dateTime, DateTime.startOf("hour")),
               ),
             ),
+            Effect.map(
+              Either.match({
+                onRight: Duration.toHours,
+                onLeft: flow(Duration.toHours, Number.negate),
+              }),
+            ),
+            Effect.map(Math.floor),
+            Effect.map(Number.increment),
             Effect.withSpan("ConverterService.convertHourToHourWindow", {
               captureStackTrace: true,
             }),
