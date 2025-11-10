@@ -1,4 +1,4 @@
-import { HashSet, Order, Schema } from "effect";
+import { HashSet, Order, Schema, Function } from "effect";
 import { Team } from "./team";
 import { Option, pipe, String } from "effect";
 
@@ -41,18 +41,12 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
   }
 
   static fromTeam(cc: boolean, team: Team) {
-    const talent = cc
-      ? team.talent
-      : pipe(
-          team.talent,
-          Option.orElseSome(() => 0),
-        );
-    if (
-      Option.isNone(team.teamName) ||
-      Option.isNone(team.lead) ||
-      Option.isNone(team.backline) ||
-      Option.isNone(talent)
-    )
+    const talent = pipe(
+      team.talent,
+      cc ? Function.identity : Option.orElseSome(() => 0),
+    );
+
+    if (Option.isNone(team.teamName) || Option.isNone(talent))
       return Option.none();
 
     return Option.some(
@@ -60,8 +54,8 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
         type: team.type,
         playerName: team.playerName,
         teamName: team.teamName.value,
-        lead: team.lead.value,
-        backline: team.backline.value,
+        lead: team.lead,
+        backline: team.backline,
         talent: talent.value,
         tags: HashSet.fromIterable(team.tags.filter(Boolean)),
       }),
