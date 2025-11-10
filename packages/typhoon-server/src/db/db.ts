@@ -11,7 +11,6 @@ import {
   Schema,
   SynchronizedRef,
   Array,
-  Scope,
 } from "effect";
 import { DBQueryError, makeDBQueryError } from "typhoon-core/error";
 import {
@@ -258,7 +257,6 @@ export const subscribe = <A, E>(
             pipe(
               TransactionContext.tables(),
               Effect.flatMap(BaseDBSubscriptionContext.subscribeTables),
-              Effect.flatMap((aggregatedSource) => aggregatedSource.value),
             ),
           ),
           Effect.provideServiceEffect(
