@@ -23,7 +23,7 @@ Evaluate what changes has been done within the repository, and commit them. The 
    For each of the changes group:
 
    - Stage all the relevant files using `git add -v -- [<pathspec>...]`.
-   - Commit the changes, conforming to "Git Commit Guidelines" in the "References" section.
+   - Commit the changes, conforming to the "Guidelines on Git Commit Messages For This Project".
 
 ## References
 
@@ -66,20 +66,3 @@ C = copied (if config option status.renames is set to "copies")
 | ' '           | C         | copied in work tree                   |
 | ?             | ?         | untracked                             |
 | !             | !         | ignored                               |
-
-### Git Commit Guidelines
-
-The following guidelines are to be followed for `git commit` command.
-
-- Use conventional commit message. If the work is done insside a package, use the name of the package (or a shortened version if it is not ambiguated) of the changes as the scope of the commit. Optionally, you could also append the area where the work was done inside the package e.g. `feat(example-package/utils): implement new utility x`
-- There is no need to list functions or symbols affected by the changes seperately from the main commit message body.
-- Use -m for new line in the commit message, and do not use \n anywhere.
-
-  GOOD: `git commit -m "subject" -m "line1" -m "line2"  ...`
-
-  BAD:
-
-  - `git commit -m "subject\nline1\nline2\n..."`
-  - `git commit -m "subject" -m "line1\nline2\n..."`.
-
-- DO NOT include the `--no-gpg-sign` flag.
