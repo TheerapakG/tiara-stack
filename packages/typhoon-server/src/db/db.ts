@@ -258,6 +258,7 @@ export const subscribe = <A, E>(
             pipe(
               TransactionContext.tables(),
               Effect.flatMap(BaseDBSubscriptionContext.subscribeTables),
+              Effect.flatMap((aggregatedSource) => aggregatedSource.value),
             ),
           ),
           Effect.provideServiceEffect(
