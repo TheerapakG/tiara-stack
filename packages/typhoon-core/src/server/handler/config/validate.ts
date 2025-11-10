@@ -1,4 +1,4 @@
-import { Effect, Either, Schema, pipe, ParseResult } from "effect";
+import { Effect, Either, Schema, pipe, ParseResult, flow } from "effect";
 import { RequestParamsConfig } from "./shared/requestParams";
 import { ResponseConfig } from "./shared/response";
 import { ResponseErrorConfig } from "./shared/responseError";
@@ -197,19 +197,15 @@ export const decodeResponseUnknown =
     pipe(
       either,
       Either.match({
-        onRight: (v) =>
-          pipe(
-            v,
-            Validate.validate(resolveResponseValidator(response(config))),
-            Effect.map(Either.right),
+        onRight: flow(
+          Validate.validate(resolveResponseValidator(response(config))),
+          Effect.map(Either.right),
+        ),
+        onLeft: flow(
+          Validate.validate(
+            resolveResponseErrorValidator(responseError(config)),
           ),
-        onLeft: (v) =>
-          pipe(
-            v,
-            Validate.validate(
-              resolveResponseErrorValidator(responseError(config)),
-            ),
-            Effect.map(Either.left),
-          ),
+          Effect.map(Either.left),
+        ),
       }),
     );

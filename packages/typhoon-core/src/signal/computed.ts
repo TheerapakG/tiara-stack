@@ -174,15 +174,7 @@ export class Computed<A = never, E = never, R = never>
           Effect.tap(() => {
             this._fiber = Option.none();
           }),
-          Effect.flatMap((fiber) =>
-            pipe(
-              fiber,
-              Option.match({
-                onSome: (fiber) => Fiber.interrupt(fiber),
-                onNone: () => Effect.void,
-              }),
-            ),
-          ),
+          Effect.flatMap(Effect.transposeMapOption(Fiber.interrupt)),
         ),
       ]),
       Observable.withSpan(this, "Computed.reset", {
