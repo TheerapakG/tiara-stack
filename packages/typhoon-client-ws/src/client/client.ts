@@ -586,12 +586,52 @@ export class WebSocketClient<
       ),
       Effect.map(
         ({ id, maskedSignal }) =>
-          [
-            pipe(maskedSignal, DependencySignal.mask),
-            WebSocketClient.unsubscribe(client, id, handler),
-          ] as const,
+          ({
+            requestId: id,
+            signal: pipe(maskedSignal, DependencySignal.mask),
+          }) as const,
       ),
       Effect.withSpan("WebSocketClient.subscribe", {
+        attributes: {
+          handler,
+        },
+        captureStackTrace: true,
+      }),
+    );
+  }
+
+  static subscribeScoped<
+    SubscriptionHandlerConfigs extends Record<
+      string,
+      Handler.Config.Subscription.SubscriptionHandlerConfig
+    >,
+    Handler extends keyof SubscriptionHandlerConfigs & string,
+  >(
+    client: WebSocketClient<
+      SubscriptionHandlerConfigs,
+      Record<string, Handler.Config.Mutation.MutationHandlerConfig>
+    >,
+    handler: Handler,
+    // TODO: make this conditionally optional
+    data?: Validator.Input<
+      Handler.Config.ResolvedRequestParamsValidator<
+        Handler.Config.RequestParamsOrUndefined<
+          SubscriptionHandlerConfigs[Handler]
+        >
+      >
+    >,
+  ) {
+    return pipe(
+      Effect.acquireRelease(
+        WebSocketClient.subscribe(client, handler, data),
+        ({ requestId }) =>
+          pipe(
+            WebSocketClient.unsubscribe(client, requestId, handler),
+            Effect.catchAll(() => Effect.void),
+          ),
+      ),
+      Effect.map(({ signal }) => signal),
+      Effect.withSpan("WebSocketClient.subscribeScoped", {
         attributes: {
           handler,
         },
