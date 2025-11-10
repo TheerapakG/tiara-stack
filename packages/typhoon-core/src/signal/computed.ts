@@ -11,6 +11,7 @@ import {
   Option,
   pipe,
   Cause,
+  Types,
 } from "effect";
 import { Observable } from "../observability";
 import {
@@ -436,3 +437,105 @@ export const annotateSpans =
     signal: Effect.Effect<DependencySignal<A, E2, R2>, E3, R3>,
   ) =>
     pipe(signal, mapEffect(Effect.annotateSpans(key, value), options));
+
+export const makeAll = <
+  const Arg extends
+    | Iterable<DependencySignal<any, any, any>>
+    | Record<string, DependencySignal<any, any, any>>,
+  O extends Types.NoExcessProperties<
+    {
+      readonly concurrency?: Types.Concurrency | undefined;
+      readonly batching?: boolean | "inherit" | undefined;
+      readonly discard?: boolean | undefined;
+      readonly mode?: "default" | "validate" | "either" | undefined;
+      readonly concurrentFinalizers?: boolean | undefined;
+    },
+    O
+  >,
+>(
+  arg: Arg,
+  allOptions?: O,
+  options?: Observable.ObservableOptions,
+) =>
+  make(
+    Effect.all(arg, allOptions) as unknown as Effect.Effect<
+      Effect.Effect.Success<Effect.All.Return<Arg, O>>,
+      Effect.Effect.Error<Effect.All.Return<Arg, O>>,
+      Effect.Effect.Context<Effect.All.Return<Arg, O>>
+    >,
+    options,
+  );
+
+export const all = <
+  const Arg extends
+    | Iterable<DependencySignal<any, any, any>>
+    | Record<string, DependencySignal<any, any, any>>,
+  O extends Types.NoExcessProperties<
+    {
+      readonly concurrency?: Types.Concurrency | undefined;
+      readonly batching?: boolean | "inherit" | undefined;
+      readonly discard?: boolean | undefined;
+      readonly mode?: "default" | "validate" | "either" | undefined;
+      readonly concurrentFinalizers?: boolean | undefined;
+    },
+    O
+  >,
+  E = never,
+  R = never,
+>(
+  arg: Effect.Effect<Arg, E, R>,
+  allOptions?: O,
+  options?: Observable.ObservableOptions,
+) => Effect.flatMap(arg, (arg) => makeAll(arg, allOptions, options));
+
+export const makeAllWith =
+  <
+    O extends Types.NoExcessProperties<
+      {
+        readonly concurrency?: Types.Concurrency | undefined;
+        readonly batching?: boolean | "inherit" | undefined;
+        readonly discard?: boolean | undefined;
+        readonly mode?: "default" | "validate" | "either" | undefined;
+        readonly concurrentFinalizers?: boolean | undefined;
+      },
+      O
+    >,
+  >(
+    allOptions?: O,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <
+    const Arg extends
+      | Iterable<DependencySignal<any, any, any>>
+      | Record<string, DependencySignal<any, any, any>>,
+  >(
+    arg: Arg,
+  ) =>
+    makeAll(arg, allOptions, options);
+
+export const allWith =
+  <
+    O extends Types.NoExcessProperties<
+      {
+        readonly concurrency?: Types.Concurrency | undefined;
+        readonly batching?: boolean | "inherit" | undefined;
+        readonly discard?: boolean | undefined;
+        readonly mode?: "default" | "validate" | "either" | undefined;
+        readonly concurrentFinalizers?: boolean | undefined;
+      },
+      O
+    >,
+  >(
+    allOptions?: O,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <
+    const Arg extends
+      | Iterable<DependencySignal<any, any, any>>
+      | Record<string, DependencySignal<any, any, any>>,
+    E = never,
+    R = never,
+  >(
+    arg: Effect.Effect<Arg, E, R>,
+  ) =>
+    all(arg, allOptions, options);
