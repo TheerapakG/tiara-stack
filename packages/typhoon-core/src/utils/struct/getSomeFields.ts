@@ -1,4 +1,4 @@
-import { Array, Function, Option, Struct, Types } from "effect";
+import { Array, Function, Option, pipe, Struct, Types } from "effect";
 
 type OptionFields<A> = {
   [K in keyof A as A[K] extends Option.Option<any>
@@ -15,26 +15,27 @@ type OptionFieldValues<A> = {
 };
 
 export type GetSomeFields<A, F extends keyof OptionFields<A>> = Option.Option<
-  Types.Simplify<Pick<OptionFieldValues<A>, F>>
+  Types.Simplify<Omit<A, F> & Pick<OptionFieldValues<A>, F>>
 >;
 
 export const getSomeFields = Function.dual<
   <const A extends object, const F extends keyof OptionFields<A>>(
     fields: Array.NonEmptyReadonlyArray<F>,
-  ) => (a: A) => Option.Option<Types.Simplify<Pick<OptionFieldValues<A>, F>>>,
+  ) => (a: A) => GetSomeFields<A, F>,
   <const A extends object, const F extends keyof OptionFields<A>>(
     a: A,
     fields: Array.NonEmptyReadonlyArray<F>,
-  ) => Option.Option<Types.Simplify<Pick<OptionFieldValues<A>, F>>>
+  ) => GetSomeFields<A, F>
 >(
   2,
   <A extends object, const F extends keyof OptionFields<A>>(
     a: A,
     fields: Array.NonEmptyReadonlyArray<F>,
   ) =>
-    Option.all(
-      Struct.pick(a, ...fields) as Pick<OptionFields<A>, F>,
-    ) as unknown as Option.Option<
-      Types.Simplify<Pick<OptionFieldValues<A>, F>>
-    >,
+    pipe(
+      Option.all(
+        Struct.pick(a, ...fields) as Pick<OptionFields<A>, F>,
+      ) as Option.Option<Pick<OptionFieldValues<A>, F>>,
+      Option.map((v) => ({ ...a, ...v })),
+    ) as GetSomeFields<A, F>,
 );
