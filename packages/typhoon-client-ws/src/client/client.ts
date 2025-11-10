@@ -600,7 +600,7 @@ export class WebSocketClient<
     );
   }
 
-  static subscriptionScoped<
+  static subscribeScoped<
     SubscriptionHandlerConfigs extends Record<
       string,
       Handler.Config.Subscription.SubscriptionHandlerConfig
@@ -632,7 +632,7 @@ export class WebSocketClient<
         ),
       ),
       Effect.map(({ signal }) => signal),
-      Effect.withSpan("WebSocketClient.subscriptionScoped", {
+      Effect.withSpan("WebSocketClient.subscribeScoped", {
         attributes: {
           handler,
         },
