@@ -130,15 +130,8 @@ export class WithScopeComputed<A = never, E = never, R = never>
 
   get value(): Effect.Effect<A, E, R | SignalContext> {
     return pipe(
-      Ref.get(this._isScopeClosed),
-      Effect.flatMap((isClosed) =>
-        isClosed
-          ? this.peek()
-          : pipe(
-              bindScopeDependency(this),
-              Effect.flatMap(() => this.peek()),
-            ),
-      ),
+      bindScopeDependency(this),
+      Effect.flatMap(() => this.peek()),
       Observable.withSpan(this, "WithScopeComputed.value", {
         captureStackTrace: true,
       }),
@@ -189,36 +182,30 @@ export class WithScopeComputed<A = never, E = never, R = never>
 
   reset(): Effect.Effect<void, never, never> {
     return pipe(
-      Ref.get(this._isScopeClosed),
-      Effect.flatMap((isClosed) =>
-        isClosed
-          ? Effect.void
-          : pipe(
-              Effect.all([
-                pipe(
-                  Deferred.make<A, E>(),
-                  Effect.map((value) => {
-                    this._value = value;
-                  }),
-                ),
-                pipe(
-                  Effect.succeed(this._fiber),
-                  Effect.tap(() => {
-                    this._fiber = Option.none();
-                  }),
-                  Effect.flatMap((fiber) =>
-                    pipe(
-                      fiber,
-                      Option.match({
-                        onSome: (fiber) => Fiber.interrupt(fiber),
-                        onNone: () => Effect.void,
-                      }),
-                    ),
-                  ),
-                ),
-              ]),
+      Effect.all([
+        pipe(
+          Deferred.make<A, E>(),
+          Effect.map((value) => {
+            this._value = value;
+          }),
+        ),
+        pipe(
+          Effect.succeed(this._fiber),
+          Effect.tap(() => {
+            this._fiber = Option.none();
+          }),
+          Effect.flatMap((fiber) =>
+            pipe(
+              fiber,
+              Option.match({
+                onSome: (fiber) => Fiber.interrupt(fiber),
+                onNone: () => Effect.void,
+              }),
             ),
-      ),
+          ),
+        ),
+      ]),
+      Effect.unlessEffect(Ref.get(this._isScopeClosed)),
       Observable.withSpan(this, "WithScopeComputed.reset", {
         captureStackTrace: true,
       }),
@@ -235,12 +222,9 @@ export class WithScopeComputed<A = never, E = never, R = never>
 
   notify(): Effect.Effect<unknown, never, never> {
     return pipe(
-      Ref.get(this._isScopeClosed),
-      Effect.flatMap((isClosed) =>
-        isClosed
-          ? Effect.void
-          : pipe(this.clearDependencies(), Effect.andThen(this.reset())),
-      ),
+      this.clearDependencies(),
+      Effect.andThen(this.reset()),
+      Effect.unlessEffect(Ref.get(this._isScopeClosed)),
       Observable.withSpan(this, "WithScopeComputed.notify", {
         captureStackTrace: true,
       }),
@@ -249,15 +233,9 @@ export class WithScopeComputed<A = never, E = never, R = never>
 
   recompute(): Effect.Effect<void, never, never> {
     return pipe(
-      Ref.get(this._isScopeClosed),
-      Effect.flatMap((isClosed) =>
-        isClosed
-          ? Effect.void
-          : pipe(
-              this,
-              notifyAllDependents(() => this.reset()),
-            ),
-      ),
+      this,
+      notifyAllDependents(() => this.reset()),
+      Effect.unlessEffect(Ref.get(this._isScopeClosed)),
       Observable.withSpan(this, "WithScopeComputed.recompute", {
         captureStackTrace: true,
       }),
@@ -270,16 +248,10 @@ export class WithScopeComputed<A = never, E = never, R = never>
 
   cleanup(): Effect.Effect<void, never, never> {
     return pipe(
-      Effect.all([
-        pipe(
-          this._fiber,
-          Option.match({
-            onSome: (fiber) => Fiber.interrupt(fiber),
-            onNone: () => Effect.void,
-          }),
-        ),
-        this.clearDependencies(),
-      ]),
+      this._fiber,
+      Effect.transposeMapOption((fiber) => Fiber.interrupt(fiber)),
+      Effect.andThen(() => this.clearDependencies()),
+      Effect.andThen(() => Deferred.interrupt(this._value)),
       Effect.ignore,
       Observable.withSpan(this, "WithScopeComputed.cleanup", {
         captureStackTrace: true,
@@ -306,9 +278,10 @@ export const make = <A = never, E = never, R = never>(
   Scope.Scope
 > =>
   pipe(
-    Effect.Do,
-    Effect.bind("isScopeClosed", () => Ref.make(false)),
-    Effect.bind("value", () => Deferred.make<A, E>()),
+    Effect.all({
+      isScopeClosed: Ref.make(false),
+      value: Deferred.make<A, E>(),
+    }),
     Effect.let(
       "computed",
       ({ isScopeClosed, value }) =>
@@ -323,7 +296,6 @@ export const make = <A = never, E = never, R = never>(
           options ?? {},
         ),
     ),
-    Effect.tap(({ computed }) => computed.peek()),
     Effect.flatMap(({ computed, isScopeClosed }) =>
       Effect.acquireRelease(Effect.succeed(computed), () =>
         pipe(Ref.set(isScopeClosed, true), Effect.andThen(computed.cleanup())),
@@ -348,13 +320,5 @@ export const wrap = <A = never, E1 = never, R1 = never, E2 = never, R2 = never>(
 > =>
   pipe(
     signal,
-    Effect.flatMap((signal) =>
-      make(
-        pipe(
-          signal,
-          Effect.flatMap((s) => s.value),
-        ),
-        options,
-      ),
-    ),
+    Effect.flatMap((signal) => make(signal, options)),
   );
