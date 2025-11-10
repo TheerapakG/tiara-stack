@@ -515,6 +515,12 @@ const teamParser = (
         ),
         Effect.map(ArrayUtils.WithDefault.toArray),
         Effect.map(
+          Array.map(
+            StructUtils.GetSomeFields.getSomeFields(["lead", "backline"]),
+          ),
+        ),
+        Effect.map(Array.getSomes),
+        Effect.map(
           Array.map((config) =>
             Team.make({
               type: teamConfig.name,

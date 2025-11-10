@@ -106,24 +106,13 @@ const handleList =
                   Option.map((teamName) => ({
                     ...team,
                     teamNameFormatted: teamName,
-                    leadFormatted: pipe(
-                      team.lead,
-                      Option.getOrElse(() => "?"),
-                    ),
-                    backlineFormatted: pipe(
-                      team.backline,
-                      Option.getOrElse(() => "?"),
-                    ),
+                    leadFormatted: Option.some(`${team.lead}`),
+                    backlineFormatted: Option.some(`${team.backline}`),
                     talentFormatted: pipe(
                       team.talent,
-                      Option.map((talent) => `/${talent}k`),
-                      Option.getOrElse(() => ""),
+                      Option.map((talent) => `${talent}k`),
                     ),
-                    effectValueFormatted: pipe(
-                      team.effectValue,
-                      Option.map((effectValue) => ` (+${effectValue}%)`),
-                      Option.getOrElse(() => ""),
-                    ),
+                    effectValueFormatted: `(+${team.effectValue}%)`,
                   })),
                 ),
               ),
@@ -150,7 +139,7 @@ const handleList =
                               ? "None"
                               : escapeMarkdown(team.tags.join(", "))
                           }`,
-                          `ISV: ${team.leadFormatted}/${team.backlineFormatted}${team.talentFormatted}${team.effectValueFormatted}`,
+                          `ISV: ${pipe([team.leadFormatted, team.backlineFormatted, team.talentFormatted], Array.getSomes, Array.join("/"))} ${team.effectValueFormatted}`,
                         ].join("\n"),
                       })),
                     ),
