@@ -8,3 +8,4 @@ export * as SignalContext from "./signalContext";
 export * as ExternalComputed from "./externalComputed";
 export * as PubSubExternalSource from "./externalSources/pubsubExternalSource";
 export * as ManualEmitExternalSource from "./externalSources/manualEmitExternalSource";
+export * as WithScopeComputed from "./withScopeComputed";
