@@ -13,7 +13,13 @@ import {
   Array,
 } from "effect";
 import { DBQueryError, makeDBQueryError } from "typhoon-core/error";
-import { Computed, SignalContext } from "typhoon-core/signal";
+import {
+  Computed,
+  SignalContext,
+  ExternalComputed,
+  ManualEmitExternalSource,
+  WithScopeComputed,
+} from "typhoon-core/signal";
 
 class TransactionSubscription extends Schema.TaggedClass<TransactionSubscription>()(
   "TransactionSubscription",
@@ -73,15 +79,18 @@ export class TransactionContext extends Context.Tag("TransactionContext")<
   }
 }
 
+type TableSubscription = {
+  source: ExternalComputed.ExternalComputed<void>;
+  emitter: ManualEmitExternalSource.ManualEmitter<void>;
+};
+
 export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscriptionContext>()(
   "BaseDBSubscriptionContext",
   {
     effect: pipe(
       Effect.Do,
       Effect.bind("subscriptions", () =>
-        SynchronizedRef.make(
-          HashMap.empty<string, Computed.Computed<void, never>>(),
-        ),
+        SynchronizedRef.make(HashMap.empty<string, TableSubscription>()),
       ),
       Effect.map(({ subscriptions }) => ({
         subscriptions,
@@ -91,27 +100,40 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
             SynchronizedRef.updateAndGetEffect((subscriptions) =>
               Effect.reduce(tables, subscriptions, (subscriptions, table) =>
                 pipe(
-                  Computed.make(Effect.void),
-                  Effect.map((newComputed) =>
-                    pipe(
-                      subscriptions,
-                      HashMap.modifyAt(table, (signal) =>
-                        pipe(
-                          signal,
-                          Option.match({
-                            onNone: () => Option.some(newComputed),
-                            onSome: (signal) => Option.some(signal),
-                          }),
+                  subscriptions,
+                  HashMap.get(table),
+                  Option.match({
+                    onNone: () =>
+                      pipe(
+                        ManualEmitExternalSource.make<void>(undefined),
+                        Effect.flatMap(({ source, emitter }) =>
+                          pipe(
+                            ExternalComputed.make(source),
+                            Effect.map((externalComputed) => ({
+                              source: externalComputed,
+                              emitter,
+                            })),
+                          ),
+                        ),
+                        Effect.map((subscription) =>
+                          HashMap.set(subscriptions, table, subscription),
                         ),
                       ),
-                    ),
-                  ),
-                  Effect.tap((newSubscriptions) =>
-                    SignalContext.bindScopeDependency(
-                      HashMap.unsafeGet(newSubscriptions, table),
-                    ),
-                  ),
-                  Effect.map((newSubscriptions) => newSubscriptions),
+                    onSome: () => Effect.succeed(subscriptions),
+                  }),
+                ),
+              ),
+            ),
+            Effect.flatMap((subscriptions) =>
+              pipe(
+                tables,
+                Array.fromIterable,
+                Array.map((table) => HashMap.get(subscriptions, table)),
+                Array.getSomes,
+                Array.map((subscription) => subscription.source),
+                Computed.makeAll,
+                Effect.tap((aggregatedSource) =>
+                  SignalContext.bindScopeDependency(aggregatedSource),
                 ),
               ),
             ),
@@ -125,7 +147,9 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
                 Array.fromIterable,
                 Array.map((table) => HashMap.get(subscriptions, table)),
                 Array.getSomes,
-                Array.map((signal) => signal.recompute()),
+                Array.map((subscription) =>
+                  subscription.emitter.emit(undefined),
+                ),
                 Effect.all,
               ),
             ),
@@ -226,7 +250,7 @@ export const subscribe = <A, E>(
   pipe(
     BaseDBSubscriptionContext,
     Effect.flatMap((baseDBSubscriptionContext) =>
-      Computed.make(
+      WithScopeComputed.make(
         pipe(
           query,
           Effect.tap(() =>
