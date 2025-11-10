@@ -1,21 +1,16 @@
-import { Option, Number, Order, pipe, Schema, String } from "effect";
+import { Option, Number, Order, Schema, String } from "effect";
 
 export class Team extends Schema.TaggedClass<Team>()("Team", {
   type: Schema.String,
   playerName: Schema.OptionFromNullishOr(Schema.String, undefined),
   teamName: Schema.OptionFromNullishOr(Schema.String, undefined),
   tags: Schema.Array(Schema.String),
-  lead: Schema.OptionFromNullishOr(Schema.Number, undefined),
-  backline: Schema.OptionFromNullishOr(Schema.Number, undefined),
+  lead: Schema.Number,
+  backline: Schema.Number,
   talent: Schema.OptionFromNullishOr(Schema.Number, undefined),
 }) {
-  static getEffectValue = (team: Team) =>
-    pipe(
-      Option.Do,
-      Option.bind("lead", () => team.lead),
-      Option.bind("backline", () => team.backline),
-      Option.map(({ lead, backline }) => lead + (backline - lead) / 5),
-    );
+  static getEffectValue = ({ lead, backline }: Team) =>
+    lead + (backline - lead) / 5;
 
   static byPlayerName = Order.mapInput(
     Option.getOrder(String.Order),
@@ -25,8 +20,5 @@ export class Team extends Schema.TaggedClass<Team>()("Team", {
     Option.getOrder(Number.Order),
     ({ talent }: Team) => talent,
   );
-  static byEffectValue = Order.mapInput(
-    Option.getOrder(Number.Order),
-    Team.getEffectValue,
-  );
+  static byEffectValue = Order.mapInput(Number.Order, Team.getEffectValue);
 }
