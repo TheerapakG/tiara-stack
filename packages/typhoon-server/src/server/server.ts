@@ -8,6 +8,7 @@ import {
   Data,
   DateTime,
   Effect,
+  flow,
   Exit,
   Function,
   HashMap,
@@ -474,21 +475,20 @@ const cleanupPeer =
       Effect.map(HashMap.get(peer.id)),
       Effect.flatMap(
         Option.match({
-          onSome: (peerState) =>
-            pipe(
-              peerState.subscriptionStateMap,
-              HashMap.values,
-              Effect.forEach(({ event, scope }) =>
-                Effect.forkDaemon(
-                  pipe(
-                    closeEvent(),
-                    Effect.provideService(Event, event),
-                    Effect.andThen(() => Scope.close(scope, Exit.void)),
-                  ),
+          onSome: flow(
+            (peerState) => peerState.subscriptionStateMap,
+            HashMap.values,
+            Effect.forEach(({ event, scope }) =>
+              Effect.forkDaemon(
+                pipe(
+                  closeEvent(),
+                  Effect.provideService(Event, event),
+                  Effect.andThen(() => Scope.close(scope, Exit.void)),
                 ),
               ),
-              Effect.map(Fiber.joinAll),
             ),
+            Effect.map(Fiber.joinAll),
+          ),
           onNone: () => Effect.succeed(Effect.succeed([])),
         }),
       ),

@@ -15,6 +15,7 @@ import {
   SynchronizedRef,
   Tracer,
   Function,
+  flow,
 } from "effect";
 import {
   makeRpcError,
@@ -167,29 +168,24 @@ export class WebSocketClient<
         SynchronizedRef.get,
         Effect.map(HashMap.get(header.id)),
         // TODO: validate message
-        Effect.tap((updaterState) =>
-          pipe(
-            updaterState,
-            Option.match({
-              onSome: ({ updater }) =>
-                pipe(
-                  Match.value(header),
-                  Match.when({ action: "server:update" }, (header) =>
-                    updater(
-                      header,
-                      pipe(
-                        decodedResponse,
-                        Either.liftPredicate(
-                          () => header.payload.success,
-                          Function.identity,
-                        ),
-                      ),
+        Effect.flatMap(
+          Effect.transposeMapOption(({ updater }) =>
+            pipe(
+              Match.value(header),
+              Match.when({ action: "server:update" }, (header) =>
+                updater(
+                  header,
+                  pipe(
+                    decodedResponse,
+                    Either.liftPredicate(
+                      () => header.payload.success,
+                      Function.identity,
                     ),
                   ),
-                  Match.orElse(() => Effect.void),
                 ),
-              onNone: () => Effect.void,
-            }),
+              ),
+              Match.orElse(() => Effect.void),
+            ),
           ),
         ),
       );
@@ -353,9 +349,9 @@ export class WebSocketClient<
       SynchronizedRef.update(client.status, () => "disconnecting" as const),
       Effect.tap(() => Effect.log("disconnecting from websocket")),
       Effect.andThen(
-        SynchronizedRef.updateEffect(client.ws, (ws) =>
-          pipe(
-            ws,
+        SynchronizedRef.updateEffect(
+          client.ws,
+          flow(
             Effect.transposeMapOption((ws) =>
               pipe(
                 Effect.makeLatch(),
