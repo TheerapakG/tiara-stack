@@ -622,14 +622,13 @@ export class WebSocketClient<
     >,
   ) {
     return pipe(
-      WebSocketClient.subscribe(client, handler, data),
-      Effect.tap(({ requestId, signal }) =>
-        Effect.addFinalizer(() =>
+      Effect.acquireRelease(
+        WebSocketClient.subscribe(client, handler, data),
+        ({ requestId }) =>
           pipe(
             WebSocketClient.unsubscribe(client, requestId, handler),
             Effect.catchAll(() => Effect.void),
           ),
-        ),
       ),
       Effect.map(({ signal }) => signal),
       Effect.withSpan("WebSocketClient.subscribeScoped", {
