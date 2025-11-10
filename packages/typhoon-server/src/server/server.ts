@@ -673,37 +673,27 @@ const handleSubscribe =
               pipe(
                 eventPullEffect(),
                 Effect.flatMap(OnceObserver.observeOnce),
-                Effect.flatMap((pullEffect) =>
-                  pipe(
-                    replacePullStream(pullEffect),
-                    Effect.map((event) =>
-                      Option.some(
-                        new SubscriptionState({
-                          event,
-                          scope,
-                        }),
-                      ),
-                    ),
-                    Effect.provideService(Event, event),
+                Effect.flatMap(replacePullStream),
+                Effect.map((event) =>
+                  Option.some(
+                    new SubscriptionState({
+                      event,
+                      scope,
+                    }),
                   ),
                 ),
+                Effect.provideService(Event, event),
               ),
             onNone: () =>
               pipe(
                 Effect.Do,
                 Effect.bind("scope", () => Scope.make()),
                 Effect.bind("event", () => Event),
-                Effect.bind("computedBuffer", ({ scope }) =>
+                Effect.bind("sideEffect", ({ event, scope }) =>
                   pipe(
                     serverWithRuntime,
                     getComputedSubscriptionResult(header, span),
                     Computed.flatMap(encodeServerUpdateResult),
-                    Scope.extend(scope),
-                  ),
-                ),
-                Effect.bind("sideEffect", ({ event, computedBuffer, scope }) =>
-                  pipe(
-                    Effect.succeed(computedBuffer),
                     SideEffect.tapWithContext(
                       (buffer) =>
                         peer.send(buffer, {
@@ -788,24 +778,17 @@ const handleOnce =
       Effect.tap(() =>
         serverWithRuntime.server.onceTotal(Effect.succeed(BigInt(1))),
       ),
-      Effect.bind("returnValue", () =>
-        OnceObserver.observeOnce(
+      Effect.andThen(() =>
+        OnceObserver.observeOnceScoped(
           pipe(
             serverWithRuntime,
             getComputedSubscriptionResult(header, span),
             Computed.flatMap(encodeServerUpdateResult),
-            Effect.flatMap((computedBuffer) =>
-              pipe(
-                computedBuffer,
-                Effect.flatMap((buffer) => callback(buffer)),
-                Effect.tap(() => closeEvent()),
-              ),
-            ),
-            Effect.scoped,
+            Computed.flatMap((buffer) => callback(buffer)),
+            Computed.tap(() => closeEvent()),
           ),
         ),
       ),
-      Effect.map(({ returnValue }) => returnValue),
       Effect.withSpan("Server.handleOnce", {
         captureStackTrace: true,
         attributes: {
@@ -831,22 +814,15 @@ const handleMutate =
       Effect.tap(() =>
         serverWithRuntime.server.mutationTotal(Effect.succeed(BigInt(1))),
       ),
-      Effect.bind("buffer", () =>
+      Effect.andThen(() =>
         pipe(
           serverWithRuntime,
           getMutationResult(header, span),
           Effect.flatMap(encodeServerUpdateResult),
+          Effect.flatMap((buffer) => callback(buffer)),
+          Effect.tap(() => closeEvent()),
         ),
       ),
-      Effect.bind("returnValue", ({ buffer }) =>
-        OnceObserver.observeOnce(
-          pipe(
-            callback(buffer),
-            Effect.tap(() => closeEvent()),
-          ),
-        ),
-      ),
-      Effect.map(({ returnValue }) => returnValue),
       Effect.withSpan("Server.handleMutate", {
         captureStackTrace: true,
         attributes: {
