@@ -11,9 +11,16 @@ import {
   Schema,
   SynchronizedRef,
   Array,
+  Scope,
 } from "effect";
 import { DBQueryError, makeDBQueryError } from "typhoon-core/error";
-import { Computed, SignalContext } from "typhoon-core/signal";
+import {
+  Computed,
+  SignalContext,
+  ExternalComputed,
+  ManualEmitExternalSource,
+  WithScopeComputed,
+} from "typhoon-core/signal";
 
 class TransactionSubscription extends Schema.TaggedClass<TransactionSubscription>()(
   "TransactionSubscription",
@@ -73,15 +80,18 @@ export class TransactionContext extends Context.Tag("TransactionContext")<
   }
 }
 
+type TableSubscription = {
+  source: ExternalComputed.ExternalComputed<void>;
+  emitter: ManualEmitExternalSource.ManualEmitter<void>;
+};
+
 export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscriptionContext>()(
   "BaseDBSubscriptionContext",
   {
     effect: pipe(
       Effect.Do,
       Effect.bind("subscriptions", () =>
-        SynchronizedRef.make(
-          HashMap.empty<string, Computed.Computed<void, never>>(),
-        ),
+        SynchronizedRef.make(HashMap.empty<string, TableSubscription>()),
       ),
       Effect.map(({ subscriptions }) => ({
         subscriptions,
@@ -91,27 +101,27 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
             SynchronizedRef.updateAndGetEffect((subscriptions) =>
               Effect.reduce(tables, subscriptions, (subscriptions, table) =>
                 pipe(
-                  Computed.make(Effect.void),
-                  Effect.map((newComputed) =>
-                    pipe(
-                      subscriptions,
-                      HashMap.modifyAt(table, (signal) =>
-                        pipe(
-                          signal,
-                          Option.match({
-                            onNone: () => Option.some(newComputed),
-                            onSome: (signal) => Option.some(signal),
-                          }),
+                  subscriptions,
+                  HashMap.get(table),
+                  Option.match({
+                    onNone: () =>
+                      pipe(
+                        ManualEmitExternalSource.make<void>(undefined),
+                        Effect.flatMap(({ source, emitter }) =>
+                          pipe(
+                            ExternalComputed.make(source),
+                            Effect.map((externalComputed) => ({
+                              source: externalComputed,
+                              emitter,
+                            })),
+                          ),
+                        ),
+                        Effect.map((subscription) =>
+                          HashMap.set(subscriptions, table, subscription),
                         ),
                       ),
-                    ),
-                  ),
-                  Effect.tap((newSubscriptions) =>
-                    SignalContext.bindScopeDependency(
-                      HashMap.unsafeGet(newSubscriptions, table),
-                    ),
-                  ),
-                  Effect.map((newSubscriptions) => newSubscriptions),
+                    onSome: () => Effect.succeed(subscriptions),
+                  }),
                 ),
               ),
             ),
@@ -125,7 +135,9 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
                 Array.fromIterable,
                 Array.map((table) => HashMap.get(subscriptions, table)),
                 Array.getSomes,
-                Array.map((signal) => signal.recompute()),
+                Array.map((subscription) =>
+                  subscription.emitter.emit(undefined),
+                ),
                 Effect.all,
               ),
             ),
@@ -222,26 +234,87 @@ export const subscribe = <A, E>(
     E,
     TransactionContext | BaseDBSubscriptionContext | SignalContext.SignalContext
   >,
-) =>
+): Effect.Effect<
+  WithScopeComputed.WithScopeComputed<
+    A,
+    E,
+    Exclude<
+      Exclude<
+        Exclude<Effect.Effect.Context<typeof query>, TransactionContext>,
+        BaseDBSubscriptionContext
+      >,
+      SignalContext.SignalContext
+    >
+  >,
+  never,
+  Scope.Scope | BaseDBSubscriptionContext
+> =>
   pipe(
     BaseDBSubscriptionContext,
     Effect.flatMap((baseDBSubscriptionContext) =>
-      Computed.make(
-        pipe(
-          query,
-          Effect.tap(() =>
-            pipe(
-              TransactionContext.tables(),
-              Effect.flatMap(BaseDBSubscriptionContext.subscribeTables),
+      pipe(
+        Effect.Do,
+        Effect.bind("tables", () =>
+          pipe(
+            query,
+            Effect.tap(() => Effect.void),
+            Effect.provideServiceEffect(
+              TransactionContext,
+              TransactionContext.subscription(),
             ),
+            Effect.provideService(
+              BaseDBSubscriptionContext,
+              baseDBSubscriptionContext,
+            ),
+            Effect.provideServiceEffect(
+              SignalContext.SignalContext,
+              pipe(
+                Computed.make(Effect.void),
+                Effect.map(SignalContext.fromDependent),
+              ),
+            ),
+            Effect.flatMap(() => TransactionContext.tables()),
           ),
-          Effect.provideServiceEffect(
-            TransactionContext,
-            TransactionContext.subscription(),
+        ),
+        Effect.bind("subscriptions", ({ tables }) =>
+          BaseDBSubscriptionContext.subscribeTables(tables),
+        ),
+        Effect.bind("externalSources", ({ subscriptions }) =>
+          pipe(
+            subscriptions,
+            HashMap.values,
+            Array.fromIterable,
+            Array.map((subscription) => subscription.source),
+            Effect.succeed,
           ),
-          Effect.provideService(
-            BaseDBSubscriptionContext,
-            baseDBSubscriptionContext,
+        ),
+        Effect.flatMap(({ externalSources }) =>
+          WithScopeComputed.make(
+            pipe(
+              externalSources,
+              Computed.makeAll,
+              Effect.flatMap((allSources) =>
+                pipe(
+                  allSources.value,
+                  Effect.flatMap(() => query),
+                ),
+              ),
+              Effect.provideServiceEffect(
+                TransactionContext,
+                TransactionContext.subscription(),
+              ),
+              Effect.provideService(
+                BaseDBSubscriptionContext,
+                baseDBSubscriptionContext,
+              ),
+              Effect.provideServiceEffect(
+                SignalContext.SignalContext,
+                pipe(
+                  Computed.make(Effect.void),
+                  Effect.map(SignalContext.fromDependent),
+                ),
+              ),
+            ),
           ),
         ),
       ),
