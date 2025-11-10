@@ -16,6 +16,7 @@ import { type sheets_v4 } from "@googleapis/sheets";
 import {
   Array,
   Effect,
+  flow,
   HashMap,
   Number,
   Option,
@@ -144,16 +145,14 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
             teamNameRange,
             isvConfig: pipe(
               isvType,
-              Option.flatMap((t) =>
-                pipe(
-                  t,
+              Option.flatMap(
+                flow(
                   Match.value,
                   Match.when("split", () =>
                     pipe(
                       isvRanges,
-                      Option.flatMap((v) =>
-                        pipe(
-                          v,
+                      Option.flatMap(
+                        flow(
                           String.split(","),
                           Array.map(String.trim),
                           (array) =>
@@ -221,16 +220,14 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
 
 const hourRangeParser = (range: string): HourRange =>
   pipe(
-    pipe(
-      range,
-      String.split("-"),
-      Array.map(String.trim),
-      ([start, end]) =>
-        new HourRange({
-          start: parseInt(start, 10),
-          end: parseInt(end, 10),
-        }),
-    ),
+    range,
+    String.split("-"),
+    Array.map(String.trim),
+    ([start, end]) =>
+      new HourRange({
+        start: parseInt(start, 10),
+        end: parseInt(end, 10),
+      }),
   );
 
 const runnerConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>

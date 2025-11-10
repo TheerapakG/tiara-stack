@@ -7,6 +7,7 @@ import {
   Array,
   Effect,
   Either,
+  flow,
   Function,
   HashMap,
   Option,
@@ -114,13 +115,11 @@ const toNumberSchema = pipe(
   Schema.String,
   Schema.transform(Schema.String, {
     strict: true,
-    decode: (str) =>
-      pipe(
-        str,
-        matchAll(regex("\\d+", "g")),
-        Array.map((match) => match[0]),
-        Array.join(""),
-      ),
+    decode: flow(
+      matchAll(regex("\\d+", "g")),
+      Array.map((match) => match[0]),
+      Array.join(""),
+    ),
     encode: Function.identity,
   }),
   Schema.compose(Schema.NumberFromString),
