@@ -21,6 +21,7 @@ import {
 import {
   Array,
   Effect,
+  flow,
   Match,
   Number,
   Option,
@@ -125,9 +126,9 @@ const handleList =
           Effect.let("fillHours", ({ schedulesWithPlayers, user }) =>
             pipe(
               schedulesWithPlayers,
-              Array.filter((schedule) =>
-                pipe(
-                  schedule.fills,
+              Array.filter(
+                flow(
+                  (schedule) => schedule.fills,
                   Array.getSomes,
                   Array.some((fill) =>
                     pipe(
@@ -148,9 +149,9 @@ const handleList =
           Effect.let("overfillHours", ({ schedulesWithPlayers, user }) =>
             pipe(
               schedulesWithPlayers,
-              Array.filter((schedule) =>
-                pipe(
-                  schedule.overfills,
+              Array.filter(
+                flow(
+                  (schedule) => schedule.overfills,
                   Array.some((overfill) =>
                     pipe(
                       Match.value(overfill.player),
@@ -170,9 +171,9 @@ const handleList =
           Effect.let("standbyHours", ({ schedulesWithPlayers, user }) =>
             pipe(
               schedulesWithPlayers,
-              Array.filter((schedule) =>
-                pipe(
-                  schedule.standbys,
+              Array.filter(
+                flow(
+                  (schedule) => schedule.standbys,
                   Array.some((standby) =>
                     pipe(
                       Match.value(standby.player),
