@@ -2,6 +2,7 @@ import {
   Array,
   Chunk,
   Effect,
+  flow,
   ParseResult,
   pipe,
   Schema,
@@ -65,15 +66,13 @@ export const BaseHeaderSchema = KeyOrderLookupSchema(
         strict: true,
         decode: (value) =>
           `${value.slice(0, 4).join("")}-${value.slice(4, 6).join("")}-${value.slice(6, 8).join("")}-${value.slice(8, 10).join("")}-${value.slice(10).join("")}`,
-        encode: (value) =>
-          pipe(
-            value,
-            String.replaceAll("-", ""),
-            Chunk.fromIterable,
-            Chunk.chunksOf(2),
-            Chunk.map(Chunk.join("")),
-            Chunk.toReadonlyArray,
-          ),
+        encode: flow(
+          String.replaceAll("-", ""),
+          Chunk.fromIterable,
+          Chunk.chunksOf(2),
+          Chunk.map(Chunk.join("")),
+          Chunk.toReadonlyArray,
+        ),
       }),
     ),
     action: HeaderActionSchema,

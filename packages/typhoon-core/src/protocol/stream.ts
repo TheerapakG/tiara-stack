@@ -1,4 +1,13 @@
-import { Chunk, Effect, Function, Option, pipe, Scope, Stream } from "effect";
+import {
+  Chunk,
+  Effect,
+  Function,
+  Option,
+  pipe,
+  Scope,
+  Stream,
+  flow,
+} from "effect";
 import { StreamExhaustedError, makeStreamExhaustedError } from "~/error";
 
 export const toPullEffect = <A, E, R>(
@@ -12,9 +21,8 @@ export const toPullEffect = <A, E, R>(
     stream,
     Stream.rechunk(1),
     Stream.toPull,
-    Effect.map((pullEffect) =>
-      pipe(
-        pullEffect,
+    Effect.map(
+      flow(
         Effect.map(Chunk.get(0)),
         Effect.flatMap(
           Option.match({
