@@ -2,6 +2,7 @@ import {
   Deferred,
   Effect,
   Effectable,
+  Exit,
   Fiber,
   HashSet,
   pipe,
@@ -140,14 +141,16 @@ export const observeOnceScoped = <
   E2 = never,
   R2 = never,
 >(
-  effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2 | Scope.Scope>,
+  effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2>,
   options?: Observable.ObservableOptions,
-): Effect.Effect<A, E | E2, Exclude<R2, Scope.Scope>> =>
+): Effect.Effect<A, E | E2, Exclude<R | R2, Scope.Scope>> =>
   pipe(
-    Effect.scoped(
+    Scope.make(),
+    Effect.flatMap((scope) =>
       pipe(
-        effect,
+        pipe(effect, Scope.extend(scope)),
         Effect.flatMap((signal) => observeOnce(signal.value, options)),
+        Effect.ensuring(Scope.close(scope, Exit.void)),
       ),
     ),
     Observable.withSpan(
