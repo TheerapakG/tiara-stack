@@ -2,7 +2,6 @@ import {
   Deferred,
   Effect,
   Effectable,
-  Exit,
   Fiber,
   HashSet,
   pipe,
@@ -145,14 +144,9 @@ export const observeOnceScoped = <
   options?: Observable.ObservableOptions,
 ): Effect.Effect<A, E | E2, Exclude<R | R2, Scope.Scope>> =>
   pipe(
-    Scope.make(),
-    Effect.flatMap((scope) =>
-      pipe(
-        pipe(effect, Scope.extend(scope)),
-        Effect.flatMap((signal) => observeOnce(signal.value, options)),
-        Effect.ensuring(Scope.close(scope, Exit.void)),
-      ),
-    ),
+    effect,
+    Effect.flatMap((signal) => observeOnce(signal, options)),
+    Effect.scoped,
     Observable.withSpan(
       { [Observable.ObservableSymbol]: options ?? {} },
       "observeOnceScoped",
