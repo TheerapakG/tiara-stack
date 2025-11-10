@@ -281,7 +281,11 @@ export const tap =
     pipe(signal, mapEffect(Effect.tap(mapper), options)) as [X] extends [
       Effect.Effect<infer _A3, infer E3, infer R3>,
     ]
-      ? Effect.Effect<Computed<A, E3 | E1, R3 | R1>, E2, R2>
+      ? Effect.Effect<
+          Computed<A, E3 | E1, Exclude<R3, SignalContext> | R1>,
+          E2,
+          R2
+        >
       : [X] extends [PromiseLike<infer _A3>]
         ? Effect.Effect<Computed<A, E1 | Cause.UnknownException, R1>, E2, R2>
         : Effect.Effect<Computed<A, E1, R1>, E2, R2>;
