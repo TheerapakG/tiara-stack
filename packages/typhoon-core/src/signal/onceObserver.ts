@@ -1,4 +1,12 @@
-import { Deferred, Effect, Effectable, Fiber, HashSet, pipe } from "effect";
+import {
+  Deferred,
+  Effect,
+  Effectable,
+  Fiber,
+  HashSet,
+  pipe,
+  Scope,
+} from "effect";
 import { Observable } from "../observability";
 import { DependencySignal } from "./dependencySignal";
 import { DependentSignal, DependentSymbol } from "./dependentSignal";
@@ -119,6 +127,32 @@ export const observeOnce = <A = never, E = never, R = never>(
     Observable.withSpan(
       { [Observable.ObservableSymbol]: options ?? {} },
       "observeOnce",
+      {
+        captureStackTrace: true,
+      },
+    ),
+  );
+
+export const observeOnceScoped = <
+  A = never,
+  E = never,
+  R = never,
+  E2 = never,
+  R2 = never,
+>(
+  effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2 | Scope.Scope>,
+  options?: Observable.ObservableOptions,
+): Effect.Effect<A, E | E2, Exclude<R2, Scope.Scope>> =>
+  pipe(
+    Effect.scoped(
+      pipe(
+        effect,
+        Effect.flatMap((signal) => observeOnce(signal.value, options)),
+      ),
+    ),
+    Observable.withSpan(
+      { [Observable.ObservableSymbol]: options ?? {} },
+      "observeOnceScoped",
       {
         captureStackTrace: true,
       },
