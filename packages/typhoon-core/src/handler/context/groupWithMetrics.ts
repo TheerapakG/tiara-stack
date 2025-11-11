@@ -82,31 +82,4 @@ export class HandlerContextGroupWithMetrics<
           captureStackTrace: true,
         }),
       );
-
-  static executeAndReplyError =
-    <HandlerT extends BaseHandlerT>(
-      key: HandlerDataKey<HandlerT, HandlerData<HandlerT>>,
-    ) =>
-    <R>(
-      groupWithMetrics: HandlerContextGroupWithMetrics<HandlerT, R>,
-    ): Effect.Effect<void, unknown, R> =>
-      pipe(
-        groupWithMetrics,
-        HandlerContextGroupWithMetrics.execute(key),
-        Effect.sandbox,
-        Effect.tapBoth({
-          onSuccess: () => Effect.void,
-          onFailure: (cause) =>
-            pipe(
-              Effect.logError(
-                `Handler execution failed: ${String(key)}`,
-                cause,
-              ),
-            ),
-        }),
-        Effect.unsandbox,
-        Effect.withSpan("HandlerContextGroupWithMetrics.executeAndReplyError", {
-          captureStackTrace: true,
-        }),
-      );
 }
