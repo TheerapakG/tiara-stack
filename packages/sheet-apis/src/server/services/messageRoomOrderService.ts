@@ -118,7 +118,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                     deletedAt: null,
                     hour: sql`excluded.hour`,
                     previousFills: sql`excluded.previous_fills`,
-                    fills: sql`excluded.new_fills`,
+                    fills: sql`excluded.fills`,
                     rank: sql`excluded.rank`,
                     monitor: sql`excluded.monitor`,
                   },

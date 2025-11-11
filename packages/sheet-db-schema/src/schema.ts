@@ -159,7 +159,7 @@ export const messageRoomOrder = pgTable(
     id: serial("id").primaryKey(),
     messageId: varchar("message_id").notNull(),
     previousFills: varchar("previous_fills").array().notNull(),
-    fills: varchar("new_fills").array().notNull(),
+    fills: varchar("fills").array().notNull(),
     hour: integer("hour").notNull(),
     rank: integer("rank").notNull(),
     monitor: varchar("monitor"),
