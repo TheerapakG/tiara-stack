@@ -17,12 +17,19 @@ type HandlerContextGroupWithMetricsObject<
   handlerCount: Metric.Metric.Counter<bigint>;
 };
 
+const HandlerContextGroupWithMetricsTaggedClass: new <
+  HandlerT extends BaseHandlerT,
+  R = never,
+>(
+  args: Readonly<HandlerContextGroupWithMetricsObject<HandlerT, R>>,
+) => Readonly<HandlerContextGroupWithMetricsObject<HandlerT, R>> & {
+  readonly _tag: "HandlerContextGroupWithMetrics";
+} = Data.TaggedClass("HandlerContextGroupWithMetrics");
+
 export class HandlerContextGroupWithMetrics<
   HandlerT extends BaseHandlerT,
   R = never,
-> extends Data.TaggedClass("HandlerContextGroupWithMetrics")<
-  HandlerContextGroupWithMetricsObject<HandlerT, R>
-> {
+> extends HandlerContextGroupWithMetricsTaggedClass<HandlerT, R> {
   static make = <HandlerT extends BaseHandlerT, R = never>(
     handlerType: string,
     group: HandlerContextGroup<HandlerT, R>,
