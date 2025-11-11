@@ -616,6 +616,16 @@ const scheduleRange = (scheduleConfigValue: FilteredScheduleConfigValue) => ({
       ),
     ),
   },
+  monitor: {
+    field: makeScheduleConfigField(scheduleConfigValue, "monitor"),
+    range: pipe(
+      scheduleConfigValue.monitorRange,
+      Option.fromNullable,
+      Option.map(
+        (monitorRange) => `'${scheduleConfigValue.sheet}'!${monitorRange}`,
+      ),
+    ),
+  },
   visible: {
     field: makeScheduleConfigField(scheduleConfigValue, "visibleCell"),
     range: Option.some(
@@ -638,6 +648,7 @@ const scheduleRanges = (scheduleConfigValues: FilteredScheduleConfigValue[]) =>
           HashMap.set(range.overfills.field, range.overfills.range),
           HashMap.set(range.standbys.field, range.standbys.range),
           HashMap.set(range.breaks.field, range.breaks.range),
+          HashMap.set(range.monitor.field, range.monitor.range),
           HashMap.set(range.visible.field, range.visible.range),
         );
       },
@@ -670,6 +681,75 @@ const runnersInFills =
       ),
       Array.map(({ player }) => player),
     );
+
+const scheduleMonitorParser = (
+  scheduleConfigValue: FilteredScheduleConfigValue,
+  sheet: HashMap.HashMap<ScheduleConfigField, sheets_v4.Schema$ValueRange>,
+) =>
+  pipe(
+    scheduleConfigValue.monitorRange,
+    Option.fromNullable,
+    Option.match({
+      onNone: () =>
+        Effect.succeed(
+          pipe(
+            [],
+            ArrayUtils.WithDefault.wrap<{ monitor: Option.Option<string> }[]>({
+              default: () => ({ monitor: Option.none<string>() }),
+            }),
+          ),
+        ),
+      onSome: () => {
+        const range = scheduleRange(scheduleConfigValue);
+        return pipe(
+          range.monitor.range,
+          Option.match({
+            onNone: () =>
+              Effect.succeed(
+                pipe(
+                  [],
+                  ArrayUtils.WithDefault.wrap<
+                    {
+                      monitor: Option.Option<string>;
+                    }[]
+                  >({
+                    default: () => ({ monitor: Option.none<string>() }),
+                  }),
+                ),
+              ),
+            onSome: () =>
+              pipe(
+                sheet,
+                getConfigFieldValueRange(range.monitor.field),
+                Effect.flatMap((valueRange) =>
+                  GoogleSheets.parseValueRanges(
+                    [valueRange],
+                    pipe(
+                      TupleToStructValueSchema(
+                        ["monitor"],
+                        GoogleSheets.rowToCellSchema,
+                      ),
+                      Schema.compose(
+                        Schema.Struct({
+                          monitor: GoogleSheets.cellToStringSchema,
+                        }),
+                      ),
+                    ),
+                  ),
+                ),
+                Effect.map(
+                  ArrayUtils.WithDefault.wrapEither({
+                    default: () => ({
+                      monitor: Option.none<string>(),
+                    }),
+                  }),
+                ),
+              ),
+          }),
+        );
+      },
+    }),
+  );
 
 const scheduleParser = (
   scheduleConfigValues: FilteredScheduleConfigValue[],
@@ -760,10 +840,26 @@ const scheduleParser = (
               }),
             }),
           ),
+          Effect.flatMap((base) =>
+            pipe(
+              scheduleMonitorParser(scheduleConfig, sheet),
+              Effect.map((monitor) =>
+                pipe(base, ArrayUtils.WithDefault.zip(monitor)),
+              ),
+            ),
+          ),
           Effect.map(ArrayUtils.WithDefault.replaceKeysFromHead("visible")),
           Effect.map(
             ArrayUtils.WithDefault.map(
-              ({ hour, fills, overfills, standbys, breakHour, visible }) => ({
+              ({
+                hour,
+                fills,
+                overfills,
+                standbys,
+                breakHour,
+                visible,
+                monitor,
+              }) => ({
                 hour,
                 fills: Array.makeBy(5, (i) =>
                   pipe(
@@ -814,6 +910,7 @@ const scheduleParser = (
                   visible,
                   Option.getOrElse(() => true),
                 ),
+                monitor,
               }),
             ),
           ),
