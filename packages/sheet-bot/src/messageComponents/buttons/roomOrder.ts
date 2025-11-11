@@ -101,6 +101,13 @@ export const roomOrderInteractionGetReply = (
       }) => ({
         content: [
           `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
+          ...pipe(
+            messageRoomOrder.monitor,
+            Option.match({
+              onNone: () => [],
+              onSome: (monitor) => [`${inlineCode("Monitor:")} ${monitor}`],
+            }),
+          ),
           "",
           ...pipe(
             messageRoomOrderEntry,
