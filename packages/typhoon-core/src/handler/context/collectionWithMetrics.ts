@@ -1,4 +1,4 @@
-import { Data, Effect, HashMap, Metric, pipe, Struct } from "effect";
+import { Data, Effect, pipe, Struct } from "effect";
 import type {
   BaseHandlerT,
   Handler,
@@ -246,25 +246,7 @@ export class HandlerContextCollectionWithMetrics<
         HandlerContextGroupWithMetricsType<BaseHandlerT, unknown>
       >,
       Effect.forEach((groupWithMetrics) =>
-        pipe(
-          HashMap.keys(groupWithMetrics.group.map),
-          Effect.forEach((handlerKey) =>
-            pipe(
-              ["success", "failure"],
-              Effect.forEach((handlerStatus) =>
-                pipe(
-                  groupWithMetrics.handlerCount,
-                  Metric.update(BigInt(0)),
-                  Effect.tagMetrics({
-                    handler_type: groupWithMetrics.handlerType,
-                    handler_key: String(handlerKey),
-                    handler_status: handlerStatus,
-                  }),
-                ),
-              ),
-            ),
-          ),
-        ),
+        HandlerContextGroupWithMetrics.initialize(groupWithMetrics),
       ),
       Effect.asVoid,
       Effect.withSpan("HandlerContextCollectionWithMetrics.initialize", {
