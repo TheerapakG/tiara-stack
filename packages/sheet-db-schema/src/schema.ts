@@ -162,6 +162,7 @@ export const messageRoomOrder = pgTable(
     fills: varchar("new_fills").array().notNull(),
     hour: integer("hour").notNull(),
     rank: integer("rank").notNull(),
+    monitor: varchar("monitor"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull(),
