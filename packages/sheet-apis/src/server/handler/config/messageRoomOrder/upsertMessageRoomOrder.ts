@@ -14,6 +14,7 @@ export const upsertMessageRoomOrderHandlerConfig = pipe(
         previousFills: Schema.Array(Schema.String),
         fills: Schema.Array(Schema.String),
         rank: Schema.Number,
+        monitor: Schema.optional(Schema.NullishOr(Schema.String)),
       }),
       Schema.standardSchemaV1,
     ),

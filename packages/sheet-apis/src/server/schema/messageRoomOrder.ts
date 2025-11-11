@@ -9,6 +9,7 @@ export class MessageRoomOrder extends Schema.TaggedClass<MessageRoomOrder>()(
     previousFills: Schema.Array(Schema.String),
     fills: Schema.Array(Schema.String),
     rank: Schema.Number,
+    monitor: Schema.OptionFromNullishOr(Schema.String, undefined),
     createdAt: Schema.DateTimeUtcFromDate,
     updatedAt: Schema.DateTimeUtcFromDate,
     deletedAt: Schema.OptionFromNullishOr(
