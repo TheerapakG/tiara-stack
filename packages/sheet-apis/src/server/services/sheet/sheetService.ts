@@ -546,7 +546,6 @@ const scheduleConfigFields = [
   "sheet",
   "hourRange",
   "breakRange",
-  "monitorRange",
   "encType",
   "fillRange",
   "overfillRange",
@@ -793,30 +792,71 @@ const scheduleParser = (
   scheduleConfigValues: FilteredScheduleConfigValue[],
   sheet: HashMap.HashMap<ScheduleConfigField, sheets_v4.Schema$ValueRange>,
   runnerConfigs: RunnerConfig[],
+  originalScheduleConfigs: ScheduleConfig[],
 ) =>
   pipe(
     Effect.Do,
     Effect.let("runnerConfigMap", () =>
       pipe(runnerConfigs, ArrayUtils.Collect.toHashMapByKey("name")),
     ),
-    Effect.flatMap(({ runnerConfigMap }) =>
-      Effect.forEach(scheduleConfigValues, (scheduleConfig) =>
-        pipe(
+    Effect.flatMap(({ runnerConfigMap }) => {
+      const originalConfigMap = pipe(
+        originalScheduleConfigs,
+        Array.reduce(
+          HashMap.empty<string, ScheduleConfig>(),
+          (acc, config) =>
+            pipe(
+              config.channel,
+              Option.flatMap((channel) =>
+                pipe(
+                  config.day,
+                  Option.map((day) => `${channel}-${day}`),
+                ),
+              ),
+              Option.match({
+                onNone: () => acc,
+                onSome: (key) => HashMap.set(acc, key, config),
+              }),
+            ),
+        ),
+      );
+      return Effect.forEach(scheduleConfigValues, (scheduleConfig) => {
+        const originalConfig = pipe(
+          originalConfigMap,
+          HashMap.get(`${scheduleConfig.channel}-${scheduleConfig.day}`),
+          Option.getOrElse(() => {
+            // Fallback: if not found, create a config with monitorRange as none
+            return ScheduleConfig.make({
+              channel: Option.some(scheduleConfig.channel),
+              day: Option.some(scheduleConfig.day),
+              sheet: Option.some(scheduleConfig.sheet),
+              hourRange: Option.some(scheduleConfig.hourRange),
+              breakRange: Option.some(scheduleConfig.breakRange),
+              monitorRange: Option.none(),
+              encType: Option.some(scheduleConfig.encType),
+              fillRange: Option.some(scheduleConfig.fillRange),
+              overfillRange: Option.some(scheduleConfig.overfillRange),
+              standbyRange: Option.some(scheduleConfig.standbyRange),
+              screenshotRange: Option.none(),
+              visibleCell: Option.some(scheduleConfig.visibleCell),
+              draft: Option.none(),
+            });
+          }),
+        );
+        return pipe(
           Effect.all({
             base: baseScheduleParser(scheduleConfig, sheet),
             monitor: pipe(
-              scheduleConfig.monitorRange,
+              originalConfig.monitorRange,
               Option.fromNullable,
               Option.match({
                 onNone: () =>
                   Effect.succeed(
                     pipe(
                       [],
-                      ArrayUtils.WithDefault.wrap<
-                        {
-                          monitor: Option.Option<string>;
-                        }[]
-                      >({
+                      ArrayUtils.WithDefault.wrap<{
+                        monitor: Option.Option<string>;
+                      }[]>({
                         default: () => ({ monitor: Option.none<string>() }),
                       }),
                     ),
@@ -933,9 +973,9 @@ const scheduleParser = (
               }),
             ),
           ),
-        ),
-      ),
-    ),
+        );
+      });
+    }),
     Effect.map(Array.flatten),
     Effect.withSpan("scheduleParser", { captureStackTrace: true }),
   );
@@ -1128,8 +1168,13 @@ export class SheetService extends Effect.Service<SheetService>()(
               ),
               Effect.bind(
                 "schedules",
-                ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
-                  scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
+                ({ scheduleConfigs, filteredScheduleConfigs, sheet, runnerConfig }) =>
+                  scheduleParser(
+                    filteredScheduleConfigs,
+                    sheet,
+                    runnerConfig,
+                    scheduleConfigs,
+                  ),
               ),
               Effect.map(({ schedules }) => schedules),
               Effect.provideService(GoogleSheets, sheet),
@@ -1240,11 +1285,12 @@ export class SheetService extends Effect.Service<SheetService>()(
                 ),
                 Effect.bind(
                   "schedules",
-                  ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
+                  ({ scheduleConfigs, filteredScheduleConfigs, sheet, runnerConfig }) =>
                     scheduleParser(
                       filteredScheduleConfigs,
                       sheet,
                       runnerConfig,
+                      scheduleConfigs,
                     ),
                 ),
                 Effect.map(({ schedules }) => schedules),
@@ -1275,11 +1321,12 @@ export class SheetService extends Effect.Service<SheetService>()(
                 ),
                 Effect.bind(
                   "schedules",
-                  ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
+                  ({ scheduleConfigs, filteredScheduleConfigs, sheet, runnerConfig }) =>
                     scheduleParser(
                       filteredScheduleConfigs,
                       sheet,
                       runnerConfig,
+                      scheduleConfigs,
                     ),
                 ),
                 Effect.map(({ schedules }) => schedules),
