@@ -213,6 +213,20 @@ const handleManual =
               Array.getSomes,
               Effect.succeed,
             ),
+            monitor: pipe(
+              schedule.schedule,
+              Option.map((schedule) =>
+                pipe(
+                  Match.value(schedule),
+                  Match.tagsExhaustive({
+                    BreakSchedule: () => Option.none<string>(),
+                    ScheduleWithPlayers: (schedule) => schedule.monitor,
+                  }),
+                ),
+              ),
+              Option.getOrElse(() => Option.none<string>()),
+              Effect.succeed,
+            ),
           })),
           Effect.bindAll(({ previousFills, fills, runners }) => ({
             previousFillNames: pipe(
@@ -291,9 +305,19 @@ const handleManual =
               fillNames,
               formattedHourWindow: { start, end },
               roomOrders,
+              monitor,
             }) => ({
               content: [
                 `${bold(`Hour ${hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
+                ...pipe(
+                  monitor,
+                  Option.match({
+                    onNone: () => [],
+                    onSome: (monitor) => [
+                      `${inlineCode("Monitor:")} ${monitor}`,
+                    ],
+                  }),
+                ),
                 "",
                 ...pipe(
                   Array.headNonEmpty(roomOrders).room,
@@ -343,13 +367,21 @@ const handleManual =
             }),
           ),
           Effect.tap(
-            ({ hour, previousFillNames, fillNames, message, roomOrders }) =>
+            ({
+              hour,
+              previousFillNames,
+              fillNames,
+              message,
+              roomOrders,
+              monitor,
+            }) =>
               Effect.all([
                 MessageRoomOrderService.upsertMessageRoomOrder(message.id, {
                   hour,
                   previousFills: previousFillNames,
                   fills: fillNames,
                   rank: 0,
+                  monitor: Option.getOrUndefined(monitor),
                 }),
                 MessageRoomOrderService.upsertMessageRoomOrderEntry(
                   message.id,
