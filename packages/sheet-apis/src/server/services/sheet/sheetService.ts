@@ -761,71 +761,33 @@ const baseScheduleParser = (
 const scheduleMonitorParser = (
   scheduleConfigValue: FilteredScheduleConfigValue,
   sheet: HashMap.HashMap<ScheduleConfigField, sheets_v4.Schema$ValueRange>,
-) =>
-  pipe(
-    scheduleConfigValue.monitorRange,
-    Option.fromNullable,
-    Option.match({
-      onNone: () =>
-        Effect.succeed(
-          pipe(
-            [],
-            ArrayUtils.WithDefault.wrap<{ monitor: Option.Option<string> }[]>({
-              default: () => ({ monitor: Option.none<string>() }),
+) => {
+  const range = scheduleRange(scheduleConfigValue);
+  return pipe(
+    sheet,
+    getConfigFieldValueRange(range.monitor.field),
+    Effect.flatMap((valueRange) =>
+      GoogleSheets.parseValueRanges(
+        [valueRange],
+        pipe(
+          TupleToStructValueSchema(["monitor"], GoogleSheets.rowToCellSchema),
+          Schema.compose(
+            Schema.Struct({
+              monitor: GoogleSheets.cellToStringSchema,
             }),
           ),
         ),
-      onSome: () => {
-        const range = scheduleRange(scheduleConfigValue);
-        return pipe(
-          range.monitor.range,
-          Option.match({
-            onNone: () =>
-              Effect.succeed(
-                pipe(
-                  [],
-                  ArrayUtils.WithDefault.wrap<
-                    {
-                      monitor: Option.Option<string>;
-                    }[]
-                  >({
-                    default: () => ({ monitor: Option.none<string>() }),
-                  }),
-                ),
-              ),
-            onSome: () =>
-              pipe(
-                sheet,
-                getConfigFieldValueRange(range.monitor.field),
-                Effect.flatMap((valueRange) =>
-                  GoogleSheets.parseValueRanges(
-                    [valueRange],
-                    pipe(
-                      TupleToStructValueSchema(
-                        ["monitor"],
-                        GoogleSheets.rowToCellSchema,
-                      ),
-                      Schema.compose(
-                        Schema.Struct({
-                          monitor: GoogleSheets.cellToStringSchema,
-                        }),
-                      ),
-                    ),
-                  ),
-                ),
-                Effect.map(
-                  ArrayUtils.WithDefault.wrapEither({
-                    default: () => ({
-                      monitor: Option.none<string>(),
-                    }),
-                  }),
-                ),
-              ),
-          }),
-        );
-      },
-    }),
+      ),
+    ),
+    Effect.map(
+      ArrayUtils.WithDefault.wrapEither({
+        default: () => ({
+          monitor: Option.none<string>(),
+        }),
+      }),
+    ),
   );
+};
 
 const scheduleParser = (
   scheduleConfigValues: FilteredScheduleConfigValue[],
@@ -842,7 +804,26 @@ const scheduleParser = (
         pipe(
           Effect.all({
             base: baseScheduleParser(scheduleConfig, sheet),
-            monitor: scheduleMonitorParser(scheduleConfig, sheet),
+            monitor: pipe(
+              scheduleConfig.monitorRange,
+              Option.fromNullable,
+              Option.match({
+                onNone: () =>
+                  Effect.succeed(
+                    pipe(
+                      [],
+                      ArrayUtils.WithDefault.wrap<
+                        {
+                          monitor: Option.Option<string>;
+                        }[]
+                      >({
+                        default: () => ({ monitor: Option.none<string>() }),
+                      }),
+                    ),
+                  ),
+                onSome: () => scheduleMonitorParser(scheduleConfig, sheet),
+              }),
+            ),
           }),
           Effect.map(({ base, monitor }) =>
             pipe(base, ArrayUtils.WithDefault.zip(monitor)),
