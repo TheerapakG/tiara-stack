@@ -546,7 +546,6 @@ const scheduleConfigFields = [
   "sheet",
   "hourRange",
   "breakRange",
-  "monitorRange",
   "encType",
   "fillRange",
   "overfillRange",
@@ -616,6 +615,15 @@ const scheduleRange = (scheduleConfigValue: FilteredScheduleConfigValue) => ({
       ),
     ),
   },
+  monitor: {
+    field: makeScheduleConfigField(scheduleConfigValue, "monitor"),
+    range: pipe(
+      scheduleConfigValue.monitorRange,
+      Option.map(
+        (monitorRange) => `'${scheduleConfigValue.sheet}'!${monitorRange}`,
+      ),
+    ),
+  },
   visible: {
     field: makeScheduleConfigField(scheduleConfigValue, "visibleCell"),
     range: Option.some(
@@ -638,6 +646,7 @@ const scheduleRanges = (scheduleConfigValues: FilteredScheduleConfigValue[]) =>
           HashMap.set(range.overfills.field, range.overfills.range),
           HashMap.set(range.standbys.field, range.standbys.range),
           HashMap.set(range.breaks.field, range.breaks.range),
+          HashMap.set(range.monitor.field, range.monitor.range),
           HashMap.set(range.visible.field, range.visible.range),
         );
       },
@@ -671,6 +680,113 @@ const runnersInFills =
       Array.map(({ player }) => player),
     );
 
+const baseScheduleParser = (
+  scheduleConfigValue: FilteredScheduleConfigValue,
+  sheet: HashMap.HashMap<ScheduleConfigField, sheets_v4.Schema$ValueRange>,
+) =>
+  pipe(
+    Effect.Do,
+    Effect.let("range", () => scheduleRange(scheduleConfigValue)),
+    Effect.flatMap(({ range }) =>
+      Effect.all(
+        [
+          pipe(sheet, getConfigFieldValueRange(range.hours.field)),
+          pipe(sheet, getConfigFieldValueRange(range.fills.field)),
+          pipe(sheet, getConfigFieldValueRange(range.overfills.field)),
+          pipe(sheet, getConfigFieldValueRange(range.standbys.field)),
+          pipe(
+            Match.value(scheduleConfigValue.breakRange),
+            Match.when("auto", () => Effect.succeed({ values: [] })),
+            Match.orElse(() =>
+              pipe(sheet, getConfigFieldValueRange(range.breaks.field)),
+            ),
+          ),
+          pipe(sheet, getConfigFieldValueRange(range.visible.field)),
+        ],
+        { concurrency: "unbounded" },
+      ),
+    ),
+    Effect.flatMap((valueRanges) =>
+      GoogleSheets.parseValueRanges(
+        valueRanges,
+        pipe(
+          TupleToStructValueSchema(
+            ["hour", "fills", "overfills", "standbys", "breakHour", "visible"],
+            GoogleSheets.rowSchema,
+          ),
+          Schema.compose(
+            Schema.Struct({
+              hour: pipe(
+                GoogleSheets.rowToCellSchema,
+                Schema.compose(GoogleSheets.cellToNumberSchema),
+              ),
+              fills: GoogleSheets.rowSchema,
+              overfills: pipe(
+                GoogleSheets.rowToCellSchema,
+                Schema.compose(GoogleSheets.cellToStringArraySchema),
+              ),
+              standbys: pipe(
+                GoogleSheets.rowToCellSchema,
+                Schema.compose(GoogleSheets.cellToStringArraySchema),
+              ),
+              breakHour: pipe(
+                GoogleSheets.rowToCellSchema,
+                Schema.compose(GoogleSheets.cellToBooleanSchema),
+              ),
+              visible: pipe(
+                GoogleSheets.rowToCellSchema,
+                Schema.compose(GoogleSheets.cellToBooleanSchema),
+              ),
+            }),
+          ),
+        ),
+      ),
+    ),
+    Effect.map(
+      ArrayUtils.WithDefault.wrapEither({
+        default: () => ({
+          hour: Option.none<number>(),
+          fills: [],
+          overfills: Option.none<string[]>(),
+          standbys: Option.none<string[]>(),
+          breakHour: Option.none<boolean>(),
+          visible: Option.none<boolean>(),
+        }),
+      }),
+    ),
+  );
+
+const scheduleMonitorParser = (
+  scheduleConfigValue: FilteredScheduleConfigValue,
+  sheet: HashMap.HashMap<ScheduleConfigField, sheets_v4.Schema$ValueRange>,
+) => {
+  const monitorField = makeScheduleConfigField(scheduleConfigValue, "monitor");
+  return pipe(
+    sheet,
+    getConfigFieldValueRange(monitorField),
+    Effect.flatMap((valueRange) =>
+      GoogleSheets.parseValueRanges(
+        [valueRange],
+        pipe(
+          TupleToStructValueSchema(["monitor"], GoogleSheets.rowToCellSchema),
+          Schema.compose(
+            Schema.Struct({
+              monitor: GoogleSheets.cellToStringSchema,
+            }),
+          ),
+        ),
+      ),
+    ),
+    Effect.map(
+      ArrayUtils.WithDefault.wrapEither({
+        default: () => ({
+          monitor: Option.none<string>(),
+        }),
+      }),
+    ),
+  );
+};
+
 const scheduleParser = (
   scheduleConfigValues: FilteredScheduleConfigValue[],
   sheet: HashMap.HashMap<ScheduleConfigField, sheets_v4.Schema$ValueRange>,
@@ -684,86 +800,43 @@ const scheduleParser = (
     Effect.flatMap(({ runnerConfigMap }) =>
       Effect.forEach(scheduleConfigValues, (scheduleConfig) =>
         pipe(
-          Effect.Do,
-          Effect.let("range", () => scheduleRange(scheduleConfig)),
-          Effect.flatMap(({ range }) =>
-            Effect.all(
-              [
-                pipe(sheet, getConfigFieldValueRange(range.hours.field)),
-                pipe(sheet, getConfigFieldValueRange(range.fills.field)),
-                pipe(sheet, getConfigFieldValueRange(range.overfills.field)),
-                pipe(sheet, getConfigFieldValueRange(range.standbys.field)),
-                pipe(
-                  Match.value(scheduleConfig.breakRange),
-                  Match.when("auto", () => Effect.succeed({ values: [] })),
-                  Match.orElse(() =>
-                    pipe(sheet, getConfigFieldValueRange(range.breaks.field)),
+          Effect.all({
+            base: baseScheduleParser(scheduleConfig, sheet),
+            monitor: pipe(
+              scheduleConfig.monitorRange,
+              Option.match({
+                onNone: () =>
+                  Effect.succeed(
+                    pipe(
+                      [],
+                      ArrayUtils.WithDefault.wrap<
+                        {
+                          monitor: Option.Option<string>;
+                        }[]
+                      >({
+                        default: () => ({ monitor: Option.none<string>() }),
+                      }),
+                    ),
                   ),
-                ),
-                pipe(sheet, getConfigFieldValueRange(range.visible.field)),
-              ],
-              { concurrency: "unbounded" },
-            ),
-          ),
-          Effect.flatMap((valueRanges) =>
-            GoogleSheets.parseValueRanges(
-              valueRanges,
-              pipe(
-                TupleToStructValueSchema(
-                  [
-                    "hour",
-                    "fills",
-                    "overfills",
-                    "standbys",
-                    "breakHour",
-                    "visible",
-                  ],
-                  GoogleSheets.rowSchema,
-                ),
-                Schema.compose(
-                  Schema.Struct({
-                    hour: pipe(
-                      GoogleSheets.rowToCellSchema,
-                      Schema.compose(GoogleSheets.cellToNumberSchema),
-                    ),
-                    fills: GoogleSheets.rowSchema,
-                    overfills: pipe(
-                      GoogleSheets.rowToCellSchema,
-                      Schema.compose(GoogleSheets.cellToStringArraySchema),
-                    ),
-                    standbys: pipe(
-                      GoogleSheets.rowToCellSchema,
-                      Schema.compose(GoogleSheets.cellToStringArraySchema),
-                    ),
-                    breakHour: pipe(
-                      GoogleSheets.rowToCellSchema,
-                      Schema.compose(GoogleSheets.cellToBooleanSchema),
-                    ),
-                    visible: pipe(
-                      GoogleSheets.rowToCellSchema,
-                      Schema.compose(GoogleSheets.cellToBooleanSchema),
-                    ),
-                  }),
-                ),
-              ),
-            ),
-          ),
-          Effect.map(
-            ArrayUtils.WithDefault.wrapEither({
-              default: () => ({
-                hour: Option.none<number>(),
-                fills: [],
-                overfills: Option.none<string[]>(),
-                standbys: Option.none<string[]>(),
-                breakHour: Option.none<boolean>(),
-                visible: Option.none<boolean>(),
+                onSome: () => scheduleMonitorParser(scheduleConfig, sheet),
               }),
-            }),
+            ),
+          }),
+          Effect.map(({ base, monitor }) =>
+            pipe(base, ArrayUtils.WithDefault.zip(monitor)),
           ),
           Effect.map(ArrayUtils.WithDefault.replaceKeysFromHead("visible")),
           Effect.map(
             ArrayUtils.WithDefault.map(
-              ({ hour, fills, overfills, standbys, breakHour, visible }) => ({
+              ({
+                hour,
+                fills,
+                overfills,
+                standbys,
+                breakHour,
+                visible,
+                monitor,
+              }) => ({
                 hour,
                 fills: Array.makeBy(5, (i) =>
                   pipe(
@@ -814,6 +887,7 @@ const scheduleParser = (
                   visible,
                   Option.getOrElse(() => true),
                 ),
+                monitor,
               }),
             ),
           ),
