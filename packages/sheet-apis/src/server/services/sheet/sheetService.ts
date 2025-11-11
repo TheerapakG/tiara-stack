@@ -633,13 +633,23 @@ const scheduleRange = (scheduleConfigValue: FilteredScheduleConfigValue) => ({
   },
 });
 
-const scheduleRanges = (scheduleConfigValues: FilteredScheduleConfigValue[]) =>
+const scheduleRanges = (
+  scheduleConfigValues: FilteredScheduleConfigValue[],
+  originalScheduleConfigs: ScheduleConfig[],
+) =>
   pipe(
     scheduleConfigValues,
     Array.reduce(
       HashMap.empty<ScheduleConfigField, Option.Option<string>>(),
-      (acc, a) => {
+      (acc, a, index) => {
         const range = scheduleRange(a);
+        const originalConfig = originalScheduleConfigs[index];
+        const monitorRange = pipe(
+          originalConfig.monitorRange,
+          Option.map(
+            (monitorRange) => `'${a.sheet}'!${monitorRange}`,
+          ),
+        );
         return pipe(
           acc,
           HashMap.set(range.hours.field, range.hours.range),
@@ -647,7 +657,7 @@ const scheduleRanges = (scheduleConfigValues: FilteredScheduleConfigValue[]) =>
           HashMap.set(range.overfills.field, range.overfills.range),
           HashMap.set(range.standbys.field, range.standbys.range),
           HashMap.set(range.breaks.field, range.breaks.range),
-          HashMap.set(range.monitor.field, range.monitor.range),
+          HashMap.set(range.monitor.field, monitorRange),
           HashMap.set(range.visible.field, range.visible.range),
         );
       },
@@ -761,10 +771,10 @@ const scheduleMonitorParser = (
   scheduleConfigValue: FilteredScheduleConfigValue,
   sheet: HashMap.HashMap<ScheduleConfigField, sheets_v4.Schema$ValueRange>,
 ) => {
-  const range = scheduleRange(scheduleConfigValue);
+  const monitorField = makeScheduleConfigField(scheduleConfigValue, "monitor");
   return pipe(
     sheet,
-    getConfigFieldValueRange(range.monitor.field),
+    getConfigFieldValueRange(monitorField),
     Effect.flatMap((valueRange) =>
       GoogleSheets.parseValueRanges(
         [valueRange],
@@ -799,56 +809,14 @@ const scheduleParser = (
     Effect.let("runnerConfigMap", () =>
       pipe(runnerConfigs, ArrayUtils.Collect.toHashMapByKey("name")),
     ),
-    Effect.flatMap(({ runnerConfigMap }) => {
-      const originalConfigMap = pipe(
-        originalScheduleConfigs,
-        Array.reduce(
-          HashMap.empty<string, ScheduleConfig>(),
-          (acc, config) =>
-            pipe(
-              config.channel,
-              Option.flatMap((channel) =>
-                pipe(
-                  config.day,
-                  Option.map((day) => `${channel}-${day}`),
-                ),
-              ),
-              Option.match({
-                onNone: () => acc,
-                onSome: (key) => HashMap.set(acc, key, config),
-              }),
-            ),
-        ),
-      );
-      return Effect.forEach(scheduleConfigValues, (scheduleConfig) => {
-        const originalConfig = pipe(
-          originalConfigMap,
-          HashMap.get(`${scheduleConfig.channel}-${scheduleConfig.day}`),
-          Option.getOrElse(() => {
-            // Fallback: if not found, create a config with monitorRange as none
-            return ScheduleConfig.make({
-              channel: Option.some(scheduleConfig.channel),
-              day: Option.some(scheduleConfig.day),
-              sheet: Option.some(scheduleConfig.sheet),
-              hourRange: Option.some(scheduleConfig.hourRange),
-              breakRange: Option.some(scheduleConfig.breakRange),
-              monitorRange: Option.none(),
-              encType: Option.some(scheduleConfig.encType),
-              fillRange: Option.some(scheduleConfig.fillRange),
-              overfillRange: Option.some(scheduleConfig.overfillRange),
-              standbyRange: Option.some(scheduleConfig.standbyRange),
-              screenshotRange: Option.none(),
-              visibleCell: Option.some(scheduleConfig.visibleCell),
-              draft: Option.none(),
-            });
-          }),
-        );
+    Effect.flatMap(({ runnerConfigMap }) =>
+      Effect.forEach(scheduleConfigValues, (scheduleConfig, index) => {
+        const originalConfig = originalScheduleConfigs[index];
         return pipe(
           Effect.all({
             base: baseScheduleParser(scheduleConfig, sheet),
             monitor: pipe(
               originalConfig.monitorRange,
-              Option.fromNullable,
               Option.match({
                 onNone: () =>
                   Effect.succeed(
@@ -974,8 +942,8 @@ const scheduleParser = (
             ),
           ),
         );
-      });
-    }),
+      }),
+    ),
     Effect.map(Array.flatten),
     Effect.withSpan("scheduleParser", { captureStackTrace: true }),
   );
@@ -1163,8 +1131,8 @@ export class SheetService extends Effect.Service<SheetService>()(
               Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
                 filterScheduleConfigValues(scheduleConfigs),
               ),
-              Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
-                sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
+              Effect.bind("sheet", ({ scheduleConfigs, filteredScheduleConfigs }) =>
+                sheetGetHashMap(scheduleRanges(filteredScheduleConfigs, scheduleConfigs)),
               ),
               Effect.bind(
                 "schedules",
@@ -1280,8 +1248,8 @@ export class SheetService extends Effect.Service<SheetService>()(
                     Array.filter((a) => Number.Equivalence(a.day, day)),
                   ),
                 ),
-                Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
-                  sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
+                Effect.bind("sheet", ({ scheduleConfigs, filteredScheduleConfigs }) =>
+                  sheetGetHashMap(scheduleRanges(filteredScheduleConfigs, scheduleConfigs)),
                 ),
                 Effect.bind(
                   "schedules",
@@ -1316,8 +1284,8 @@ export class SheetService extends Effect.Service<SheetService>()(
                     Array.filter((a) => String.Equivalence(a.channel, channel)),
                   ),
                 ),
-                Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
-                  sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
+                Effect.bind("sheet", ({ scheduleConfigs, filteredScheduleConfigs }) =>
+                  sheetGetHashMap(scheduleRanges(filteredScheduleConfigs, scheduleConfigs)),
                 ),
                 Effect.bind(
                   "schedules",
