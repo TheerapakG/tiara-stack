@@ -48,14 +48,28 @@ type HandlerContextTypeTransformer<HandlerT extends BaseHandlerT> = (
     : never,
 ) => HandlerType<HandlerT>;
 
-export class HandlerContextCollectionWithMetrics<
+type HandlerContextCollectionWithMetricsObject<
   HandlerT extends BaseHandlerT,
   R = never,
-> extends Data.TaggedClass("HandlerContextCollectionWithMetrics")<{
+> = {
   collection: HandlerContextCollection<HandlerT, R>;
   struct: HandlerContextGroupWithMetricsStruct<HandlerT, R>;
   handlerContextTypeTransformer: HandlerContextTypeTransformer<HandlerT>;
-}> {
+};
+
+const HandlerContextCollectionWithMetricsTaggedClass: new <
+  HandlerT extends BaseHandlerT,
+  R = never,
+>(
+  args: Readonly<HandlerContextCollectionWithMetricsObject<HandlerT, R>>,
+) => Readonly<HandlerContextCollectionWithMetricsObject<HandlerT, R>> & {
+  readonly _tag: "HandlerContextCollectionWithMetrics";
+} = Data.TaggedClass("HandlerContextCollectionWithMetrics");
+
+export class HandlerContextCollectionWithMetrics<
+  HandlerT extends BaseHandlerT,
+  R = never,
+> extends HandlerContextCollectionWithMetricsTaggedClass<HandlerT, R> {
   static make = <HandlerT extends BaseHandlerT, R = never>(
     _dataKeyTransformers: HandlerDataKeyTransformerStruct<HandlerT>,
     handlerContextTypeTransformer: HandlerContextTypeTransformer<HandlerT>,
