@@ -809,9 +809,11 @@ const scheduleParser = (
                   Effect.succeed(
                     pipe(
                       [],
-                      ArrayUtils.WithDefault.wrap<{
-                        monitor: Option.Option<string>;
-                      }[]>({
+                      ArrayUtils.WithDefault.wrap<
+                        {
+                          monitor: Option.Option<string>;
+                        }[]
+                      >({
                         default: () => ({ monitor: Option.none<string>() }),
                       }),
                     ),
@@ -1236,7 +1238,11 @@ export class SheetService extends Effect.Service<SheetService>()(
                 Effect.bind(
                   "schedules",
                   ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
-                    scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
+                    scheduleParser(
+                      filteredScheduleConfigs,
+                      sheet,
+                      runnerConfig,
+                    ),
                 ),
                 Effect.map(({ schedules }) => schedules),
                 Effect.provideService(GoogleSheets, sheet),
@@ -1267,7 +1273,11 @@ export class SheetService extends Effect.Service<SheetService>()(
                 Effect.bind(
                   "schedules",
                   ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
-                    scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
+                    scheduleParser(
+                      filteredScheduleConfigs,
+                      sheet,
+                      runnerConfig,
+                    ),
                 ),
                 Effect.map(({ schedules }) => schedules),
                 Effect.provideService(GoogleSheets, sheet),

@@ -7,8 +7,8 @@ import {
   PartialNamePlayer,
   Schedule,
   BreakSchedule,
-  ScheduleWithPlayers,
   SchedulePlayer,
+  makeScheduleWithPlayers,
 } from "@/server/schema";
 
 export class PlayerService extends Effect.Service<PlayerService>()(
@@ -191,16 +191,18 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                     ),
                   })),
                   Effect.map(({ fills, overfills, standbys, runners }) =>
-                    ScheduleWithPlayers.make({
-                      channel: schedule.channel,
-                      day: schedule.day,
-                      visible: schedule.visible,
-                      hour: schedule.hour,
+                    makeScheduleWithPlayers(
+                      schedule.channel,
+                      schedule.day,
+                      schedule.visible,
+                      schedule.hour,
+                      false,
                       fills,
                       overfills,
                       standbys,
                       runners,
-                    }),
+                      schedule.monitor,
+                    ),
                   ),
                 ),
               BreakSchedule: (schedule) => Effect.succeed(schedule),
