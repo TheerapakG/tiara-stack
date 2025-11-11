@@ -147,7 +147,8 @@ export class HandlerContextCollectionWithMetrics<
               },
             }) as unknown as HandlerContextGroupWithMetricsStruct<
               CollectionHandlerT,
-              HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
+              HandlerOrUndefined<Config> extends infer H extends
+                Handler<HandlerT>
                 ?
                     | HandlerContextCollectionContext<C["collection"]>
                     | HandlerEffectContext<HandlerT, H>
@@ -218,27 +219,6 @@ export class HandlerContextCollectionWithMetrics<
         Effect.withSpan("HandlerContextCollectionWithMetrics.execute", {
           captureStackTrace: true,
         }),
-      );
-
-  static executeAndReplyError =
-    <HandlerT extends BaseHandlerT>(
-      type: HandlerType<HandlerT>,
-      key: HandlerDataKey<HandlerT, HandlerData<HandlerT>>,
-    ) =>
-    <R>(
-      collectionWithMetrics: HandlerContextCollectionWithMetrics<HandlerT, R>,
-    ): Effect.Effect<void, unknown, R> =>
-      pipe(
-        collectionWithMetrics.struct[
-          type
-        ] as HandlerContextGroupWithMetricsType<HandlerT, R>,
-        HandlerContextGroupWithMetrics.executeAndReplyError(key),
-        Effect.withSpan(
-          "HandlerContextCollectionWithMetrics.executeAndReplyError",
-          {
-            captureStackTrace: true,
-          },
-        ),
       );
 
   static initialize = (
