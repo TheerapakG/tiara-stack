@@ -1,4 +1,4 @@
-import { Data, Effect, Metric, Option, pipe } from "effect";
+import { Data, Effect, HashMap, Metric, Option, pipe } from "effect";
 import type {
   BaseHandlerT,
   Handler,
@@ -89,4 +89,31 @@ export class HandlerContextGroupWithMetrics<
           captureStackTrace: true,
         }),
       );
+
+  static initialize = <HandlerT extends BaseHandlerT, R = never>(
+    groupWithMetrics: HandlerContextGroupWithMetrics<HandlerT, R>,
+  ): Effect.Effect<void, never, never> =>
+    pipe(
+      HashMap.keys(groupWithMetrics.group.map),
+      Effect.forEach((handlerKey) =>
+        pipe(
+          ["success", "failure"],
+          Effect.forEach((handlerStatus) =>
+            pipe(
+              groupWithMetrics.handlerCount,
+              Metric.update(BigInt(0)),
+              Effect.tagMetrics({
+                handler_type: groupWithMetrics.handlerType,
+                handler_key: String(handlerKey),
+                handler_status: handlerStatus,
+              }),
+            ),
+          ),
+        ),
+      ),
+      Effect.asVoid,
+      Effect.withSpan("HandlerContextGroupWithMetrics.initialize", {
+        captureStackTrace: true,
+      }),
+    );
 }
