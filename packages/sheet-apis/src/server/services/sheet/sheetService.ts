@@ -619,7 +619,6 @@ const scheduleRange = (scheduleConfigValue: FilteredScheduleConfigValue) => ({
     field: makeScheduleConfigField(scheduleConfigValue, "monitor"),
     range: pipe(
       scheduleConfigValue.monitorRange,
-      Option.fromNullable,
       Option.map(
         (monitorRange) => `'${scheduleConfigValue.sheet}'!${monitorRange}`,
       ),
@@ -633,23 +632,13 @@ const scheduleRange = (scheduleConfigValue: FilteredScheduleConfigValue) => ({
   },
 });
 
-const scheduleRanges = (
-  scheduleConfigValues: FilteredScheduleConfigValue[],
-  originalScheduleConfigs: ScheduleConfig[],
-) =>
+const scheduleRanges = (scheduleConfigValues: FilteredScheduleConfigValue[]) =>
   pipe(
     scheduleConfigValues,
     Array.reduce(
       HashMap.empty<ScheduleConfigField, Option.Option<string>>(),
-      (acc, a, index) => {
+      (acc, a) => {
         const range = scheduleRange(a);
-        const originalConfig = originalScheduleConfigs[index];
-        const monitorRange = pipe(
-          originalConfig.monitorRange,
-          Option.map(
-            (monitorRange) => `'${a.sheet}'!${monitorRange}`,
-          ),
-        );
         return pipe(
           acc,
           HashMap.set(range.hours.field, range.hours.range),
@@ -657,7 +646,7 @@ const scheduleRanges = (
           HashMap.set(range.overfills.field, range.overfills.range),
           HashMap.set(range.standbys.field, range.standbys.range),
           HashMap.set(range.breaks.field, range.breaks.range),
-          HashMap.set(range.monitor.field, monitorRange),
+          HashMap.set(range.monitor.field, range.monitor.range),
           HashMap.set(range.visible.field, range.visible.range),
         );
       },
@@ -802,7 +791,6 @@ const scheduleParser = (
   scheduleConfigValues: FilteredScheduleConfigValue[],
   sheet: HashMap.HashMap<ScheduleConfigField, sheets_v4.Schema$ValueRange>,
   runnerConfigs: RunnerConfig[],
-  originalScheduleConfigs: ScheduleConfig[],
 ) =>
   pipe(
     Effect.Do,
@@ -810,13 +798,12 @@ const scheduleParser = (
       pipe(runnerConfigs, ArrayUtils.Collect.toHashMapByKey("name")),
     ),
     Effect.flatMap(({ runnerConfigMap }) =>
-      Effect.forEach(scheduleConfigValues, (scheduleConfig, index) => {
-        const originalConfig = originalScheduleConfigs[index];
-        return pipe(
+      Effect.forEach(scheduleConfigValues, (scheduleConfig) =>
+        pipe(
           Effect.all({
             base: baseScheduleParser(scheduleConfig, sheet),
             monitor: pipe(
-              originalConfig.monitorRange,
+              scheduleConfig.monitorRange,
               Option.match({
                 onNone: () =>
                   Effect.succeed(
@@ -941,8 +928,8 @@ const scheduleParser = (
               }),
             ),
           ),
-        );
-      }),
+        ),
+      ),
     ),
     Effect.map(Array.flatten),
     Effect.withSpan("scheduleParser", { captureStackTrace: true }),
@@ -1131,18 +1118,13 @@ export class SheetService extends Effect.Service<SheetService>()(
               Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
                 filterScheduleConfigValues(scheduleConfigs),
               ),
-              Effect.bind("sheet", ({ scheduleConfigs, filteredScheduleConfigs }) =>
-                sheetGetHashMap(scheduleRanges(filteredScheduleConfigs, scheduleConfigs)),
+              Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
+                sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
               ),
               Effect.bind(
                 "schedules",
-                ({ scheduleConfigs, filteredScheduleConfigs, sheet, runnerConfig }) =>
-                  scheduleParser(
-                    filteredScheduleConfigs,
-                    sheet,
-                    runnerConfig,
-                    scheduleConfigs,
-                  ),
+                ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
+                  scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
               ),
               Effect.map(({ schedules }) => schedules),
               Effect.provideService(GoogleSheets, sheet),
@@ -1248,18 +1230,13 @@ export class SheetService extends Effect.Service<SheetService>()(
                     Array.filter((a) => Number.Equivalence(a.day, day)),
                   ),
                 ),
-                Effect.bind("sheet", ({ scheduleConfigs, filteredScheduleConfigs }) =>
-                  sheetGetHashMap(scheduleRanges(filteredScheduleConfigs, scheduleConfigs)),
+                Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
+                  sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
                 ),
                 Effect.bind(
                   "schedules",
-                  ({ scheduleConfigs, filteredScheduleConfigs, sheet, runnerConfig }) =>
-                    scheduleParser(
-                      filteredScheduleConfigs,
-                      sheet,
-                      runnerConfig,
-                      scheduleConfigs,
-                    ),
+                  ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
+                    scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
                 ),
                 Effect.map(({ schedules }) => schedules),
                 Effect.provideService(GoogleSheets, sheet),
@@ -1284,18 +1261,13 @@ export class SheetService extends Effect.Service<SheetService>()(
                     Array.filter((a) => String.Equivalence(a.channel, channel)),
                   ),
                 ),
-                Effect.bind("sheet", ({ scheduleConfigs, filteredScheduleConfigs }) =>
-                  sheetGetHashMap(scheduleRanges(filteredScheduleConfigs, scheduleConfigs)),
+                Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
+                  sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
                 ),
                 Effect.bind(
                   "schedules",
-                  ({ scheduleConfigs, filteredScheduleConfigs, sheet, runnerConfig }) =>
-                    scheduleParser(
-                      filteredScheduleConfigs,
-                      sheet,
-                      runnerConfig,
-                      scheduleConfigs,
-                    ),
+                  ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
+                    scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
                 ),
                 Effect.map(({ schedules }) => schedules),
                 Effect.provideService(GoogleSheets, sheet),
