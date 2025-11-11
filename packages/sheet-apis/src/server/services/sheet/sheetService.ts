@@ -1128,12 +1128,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               ),
               Effect.bind(
                 "schedules",
-                ({
-                  scheduleConfigs,
-                  filteredScheduleConfigs,
-                  sheet,
-                  runnerConfig,
-                }) =>
+                ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
                   scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
               ),
               Effect.map(({ schedules }) => schedules),
@@ -1245,12 +1240,7 @@ export class SheetService extends Effect.Service<SheetService>()(
                 ),
                 Effect.bind(
                   "schedules",
-                  ({
-                    scheduleConfigs,
-                    filteredScheduleConfigs,
-                    sheet,
-                    runnerConfig,
-                  }) =>
+                  ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
                     scheduleParser(
                       filteredScheduleConfigs,
                       sheet,
@@ -1285,12 +1275,7 @@ export class SheetService extends Effect.Service<SheetService>()(
                 ),
                 Effect.bind(
                   "schedules",
-                  ({
-                    scheduleConfigs,
-                    filteredScheduleConfigs,
-                    sheet,
-                    runnerConfig,
-                  }) =>
+                  ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
                     scheduleParser(
                       filteredScheduleConfigs,
                       sheet,
