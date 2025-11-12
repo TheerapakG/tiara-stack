@@ -105,6 +105,11 @@ const makeServeEffect =
         "serverWithRuntime",
         () => new ServerWithRuntime({ server, runtime }),
       ),
+      Effect.tap(() =>
+        HandlerContextCore.CollectionWithMetrics.initialize(
+          server.handlerContextCollection,
+        ),
+      ),
       Effect.flatMap(({ serverWithRuntime }) =>
         Effect.try(() =>
           serveFn({
