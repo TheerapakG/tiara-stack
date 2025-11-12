@@ -1,4 +1,4 @@
-import { Data, Effect, Either, HashMap, Metric, Option, pipe } from "effect";
+import { Data, Effect, Either, Function, HashMap, Metric, Option, pipe, Types } from "effect";
 import type {
   BaseHandlerT,
   Handler,
@@ -33,6 +33,27 @@ type HandlerContextGroupWithMetricsObject<
   handlerCount: Metric.Metric.Counter<bigint>;
 };
 
+const HandlerContextGroupWithMetricsTypeId = Symbol(
+  "Typhoon/Handler/HandlerContextGroupWithMetricsTypeId",
+);
+export type HandlerContextGroupWithMetricsTypeId =
+  typeof HandlerContextGroupWithMetricsTypeId;
+
+interface Variance<in out HandlerT extends BaseHandlerT, out R> {
+  [HandlerContextGroupWithMetricsTypeId]: {
+    _HandlerT: Types.Invariant<HandlerT>;
+    _R: Types.Covariant<R>;
+  };
+}
+
+const handlerContextGroupWithMetricsVariance: <
+  HandlerT extends BaseHandlerT,
+  R,
+>() => Variance<HandlerT, R>[HandlerContextGroupWithMetricsTypeId] = () => ({
+  _HandlerT: Function.identity,
+  _R: Function.identity,
+});
+
 const HandlerContextGroupWithMetricsTaggedClass = Data.TaggedClass(
   "HandlerContextGroupWithMetrics",
 ) as unknown as new <HandlerT extends BaseHandlerT, R = never>(
@@ -44,7 +65,21 @@ const HandlerContextGroupWithMetricsTaggedClass = Data.TaggedClass(
 export class HandlerContextGroupWithMetrics<
   HandlerT extends BaseHandlerT,
   R = never,
-> extends HandlerContextGroupWithMetricsTaggedClass<HandlerT, R> {}
+> extends HandlerContextGroupWithMetricsTaggedClass<HandlerT, R>
+  implements Variance<HandlerT, R>
+{
+  [HandlerContextGroupWithMetricsTypeId] =
+    handlerContextGroupWithMetricsVariance<HandlerT, R>();
+}
+
+export type HandlerContextGroupWithMetricsHandlerT<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  G extends HandlerContextGroupWithMetrics<any, any>,
+> = Types.Invariant.Type<G[HandlerContextGroupWithMetricsTypeId]["_HandlerT"]>;
+export type HandlerContextGroupWithMetricsContext<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  G extends HandlerContextGroupWithMetrics<any, any>,
+> = Types.Covariant.Type<G[HandlerContextGroupWithMetricsTypeId]["_R"]>;
 
 export const make = <HandlerT extends BaseHandlerT, R = never>(
   handlerType: HandlerType<HandlerT>,
