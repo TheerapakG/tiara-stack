@@ -23,12 +23,18 @@ type HandlerContextGroupWithMetricsObject<
   handlerCount: Metric.Metric.Counter<bigint>;
 };
 
+const HandlerContextGroupWithMetricsTaggedClass = Data.TaggedClass(
+  "HandlerContextGroupWithMetrics",
+) as unknown as new <HandlerT extends BaseHandlerT, R = never>(
+  args: Readonly<HandlerContextGroupWithMetricsObject<HandlerT, R>>,
+) => Readonly<HandlerContextGroupWithMetricsObject<HandlerT, R>> & {
+  readonly _tag: "HandlerContextGroupWithMetrics";
+};
+
 export class HandlerContextGroupWithMetrics<
   HandlerT extends BaseHandlerT,
   R = never,
-> extends Data.TaggedClass("HandlerContextGroupWithMetrics")<
-  HandlerContextGroupWithMetricsObject<HandlerT, R>
-> {}
+> extends HandlerContextGroupWithMetricsTaggedClass<HandlerT, R> {}
 
 export const make = <HandlerT extends BaseHandlerT, R = never>(
   handlerType: HandlerType<HandlerT>,
@@ -59,8 +65,8 @@ export const execute =
     >,
     never,
     R
-  > =>
-    pipe(
+  > => {
+    const handlerEffectOption = pipe(
       getHandlerContext(key)(groupWithMetrics.group),
       Option.map(
         (
@@ -108,17 +114,27 @@ export const execute =
             R
           >,
       ),
-      Effect.transposeMapOption(Effect.either) as Effect.Effect<
-        Option.Option<
-          Either.Either<
-            HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-            HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>
-          >
-        >,
-        never,
+    ) as Option.Option<
+      Effect.Effect<
+        HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+        HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
         R
+      >
+    >;
+    return pipe(
+      handlerEffectOption,
+      Effect.transposeMapOption(Effect.either),
+    ) as Effect.Effect<
+      Option.Option<
+        Either.Either<
+          HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+          HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>
+        >
       >,
-    );
+      never,
+      R
+    >;
+  };
 
 export const initialize = <HandlerT extends BaseHandlerT, R = never>(
   groupWithMetrics: HandlerContextGroupWithMetrics<HandlerT, R>,

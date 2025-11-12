@@ -61,12 +61,18 @@ type HandlerContextCollectionWithMetricsObject<
   handlerContextTypeTransformer: HandlerContextTypeTransformer<HandlerT>;
 };
 
+const HandlerContextCollectionWithMetricsTaggedClass = Data.TaggedClass(
+  "HandlerContextCollectionWithMetrics",
+) as unknown as new <HandlerT extends BaseHandlerT, R = never>(
+  args: Readonly<HandlerContextCollectionWithMetricsObject<HandlerT, R>>,
+) => Readonly<HandlerContextCollectionWithMetricsObject<HandlerT, R>> & {
+  readonly _tag: "HandlerContextCollectionWithMetrics";
+};
+
 export class HandlerContextCollectionWithMetrics<
   HandlerT extends BaseHandlerT,
   R = never,
-> extends Data.TaggedClass("HandlerContextCollectionWithMetrics")<
-  HandlerContextCollectionWithMetricsObject<HandlerT, R>
-> {}
+> extends HandlerContextCollectionWithMetricsTaggedClass<HandlerT, R> {}
 
 export const make = <HandlerT extends BaseHandlerT, R = never>(
   _dataKeyTransformers: HandlerDataKeyTransformerStruct<HandlerT>,
