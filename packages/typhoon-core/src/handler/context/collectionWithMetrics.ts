@@ -279,15 +279,12 @@ export const execute =
       executeHandlerContextGroupWithMetrics(key),
     );
 
-export const initialize = (
-  collectionWithMetrics: HandlerContextCollectionWithMetrics<
-    BaseHandlerT,
-    unknown
-  >,
+export const initialize = <HandlerT extends BaseHandlerT, R = never>(
+  collectionWithMetrics: HandlerContextCollectionWithMetrics<HandlerT, R>,
 ): Effect.Effect<void, never, never> =>
   pipe(
     Object.values(collectionWithMetrics.record) as Array<
-      HandlerContextGroupWithMetricsType<BaseHandlerT, unknown>
+      HandlerContextGroupWithMetricsType<HandlerT, R>
     >,
     Effect.forEach((groupWithMetrics) =>
       initializeHandlerContextGroupWithMetrics(groupWithMetrics),
