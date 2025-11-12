@@ -224,12 +224,16 @@ export const execute =
   ) =>
   <R>(
     collectionWithMetrics: HandlerContextCollectionWithMetrics<HandlerT, R>,
-  ): Option.Option<
-    Effect.Effect<
-      HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-      HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-      R
-    >
+  ): Effect.Effect<
+    Option.Option<
+      Effect.Effect<
+        HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+        HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+        R
+      >
+    >,
+    never,
+    R
   > =>
     pipe(
       collectionWithMetrics.struct[type] as HandlerContextGroupWithMetricsType<
