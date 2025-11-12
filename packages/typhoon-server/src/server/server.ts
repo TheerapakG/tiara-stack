@@ -27,7 +27,11 @@ import {
   Fiber,
   Tracer,
 } from "effect";
-import { Context as HandlerContext, type Type } from "typhoon-core/handler";
+import {
+  Context as HandlerContext,
+  type Type,
+  type Type as HandlerTypeModule,
+} from "typhoon-core/handler";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { RunState } from "typhoon-core/runtime";
 import { Handler } from "typhoon-core/server";
@@ -542,6 +546,93 @@ class ServerUpdateResult extends Data.TaggedClass("ServerUpdateResult")<{
   header: Header.Header<"server:update">;
   message: unknown;
 }> {}
+
+const runHandler =
+  <HandlerT extends HandlerTypeModule.BaseHandlerT>(
+    handlerType: HandlerTypeModule.HandlerType<HandlerT>,
+    id: string,
+    handler: HandlerTypeModule.HandlerDataKey<
+      HandlerT,
+      HandlerTypeModule.HandlerData<HandlerT>
+    >,
+    span: Tracer.Span,
+  ) =>
+  <R = never>(serverWithRuntime: ServerWithRuntime<R>) =>
+    pipe(
+      HandlerContextCore.CollectionWithMetrics.execute(
+        handlerType,
+        handler,
+      )(serverWithRuntime.server.handlerContextCollection),
+      Effect.flatMap(
+        Option.match({
+          onSome: (result: Either.Either<unknown, unknown>) =>
+            pipe(
+              Effect.Do,
+              Effect.bind("timestamp", () => DateTime.now),
+              Effect.flatMap(({ timestamp }) =>
+                pipe(
+                  result,
+                  Either.match({
+                    onLeft: (error) =>
+                      Effect.succeed(
+                        new ServerUpdateResult({
+                          header: {
+                            protocol: "typh",
+                            version: 1,
+                            id,
+                            action: "server:update",
+                            payload: {
+                              success: false,
+                              timestamp: DateTime.toDate(timestamp),
+                            },
+                            span: {
+                              traceId: span.traceId,
+                              spanId: span.spanId,
+                            },
+                          } as const,
+                          message: error,
+                        }),
+                      ),
+                    onRight: (success) =>
+                      Effect.succeed(
+                        new ServerUpdateResult({
+                          header: {
+                            protocol: "typh",
+                            version: 1,
+                            id,
+                            action: "server:update",
+                            payload: {
+                              success: true,
+                              timestamp: DateTime.toDate(timestamp),
+                            },
+                            span: {
+                              traceId: span.traceId,
+                              spanId: span.spanId,
+                            },
+                          } as const,
+                          message: success,
+                        }),
+                      ),
+                  }),
+                ),
+              ),
+            ),
+          onNone: () => Effect.fail(`handler not found`),
+        }),
+      ),
+      Effect.provide(serverWithRuntime.runtime),
+      Effect.withSpan("handler", {
+        captureStackTrace: true,
+        attributes: {
+          id,
+          handler,
+        },
+      }),
+      Effect.annotateLogs({
+        id,
+        handler,
+      }),
+    );
 
 const getComputedSubscriptionResult =
   (
