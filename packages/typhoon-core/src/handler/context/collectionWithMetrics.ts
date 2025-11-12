@@ -18,7 +18,6 @@ import {
   type HandlerContextCollectionHandlerT,
 } from "./collection";
 import {
-  type HandlerContextGroupWithMetrics as HandlerContextGroupWithMetricsType,
   make as makeHandlerContextGroupWithMetrics,
   execute as executeHandlerContextGroupWithMetrics,
   initialize as initializeHandlerContextGroupWithMetrics,
