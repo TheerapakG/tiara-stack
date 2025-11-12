@@ -1,4 +1,4 @@
-import { Data, Effect, HashMap, Metric, Option, pipe } from "effect";
+import { Data, Effect, Either, HashMap, Metric, Option, pipe } from "effect";
 import type {
   BaseHandlerT,
   Handler,
@@ -52,10 +52,9 @@ export const execute =
     groupWithMetrics: HandlerContextGroupWithMetrics<HandlerT, R>,
   ): Effect.Effect<
     Option.Option<
-      Effect.Effect<
-        HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+      Either.Either<
         HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-        R
+        HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>
       >
     >,
     never,
@@ -67,26 +66,35 @@ export const execute =
         onNone: () =>
           Effect.succeed(
             Option.none() as Option.Option<
-              Effect.Effect<
-                HandlerSuccess<
-                  HandlerT,
-                  Handler<HandlerT, unknown, unknown, R>
-                >,
+              Either.Either<
                 HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-                R
+                HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>
               >
             >,
-          ),
+          ) as Effect.Effect<
+            Option.Option<
+              Either.Either<
+                HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+                HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>
+              >
+            >,
+            never,
+            R
+          >,
         onSome: (
           context: HandlerContext<
             HandlerT,
             HandlerData<HandlerT>,
             Handler<HandlerT, unknown, unknown, R>
           >,
-        ) => {
-          const handler = getHandlerFromContext(context);
-          const handlerEffect = pipe(
-            handler as Handler<HandlerT, unknown, unknown, R>,
+        ) =>
+          pipe(
+            getHandlerFromContext(context) as Handler<
+              HandlerT,
+              unknown,
+              unknown,
+              R
+            >,
             Effect.tapBoth({
               onSuccess: () =>
                 pipe(
@@ -112,26 +120,34 @@ export const execute =
             Effect.withSpan("HandlerContextGroupWithMetrics.execute", {
               captureStackTrace: true,
             }),
-          ) as Effect.Effect<
-            HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-            HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-            R
-          >;
-          return Effect.succeed(
-            Option.some(handlerEffect) as Option.Option<
-              Effect.Effect<
-                HandlerSuccess<
-                  HandlerT,
-                  Handler<HandlerT, unknown, unknown, R>
+            Effect.either,
+            Effect.map(
+              (either) =>
+                Option.some(either) as Option.Option<
+                  Either.Either<
+                    HandlerError<
+                      HandlerT,
+                      Handler<HandlerT, unknown, unknown, R>
+                    >,
+                    HandlerSuccess<
+                      HandlerT,
+                      Handler<HandlerT, unknown, unknown, R>
+                    >
+                  >
                 >,
-                HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-                R
-              >
-            >,
-          );
-        },
+            ),
+          ),
       }),
-    );
+    ) as Effect.Effect<
+      Option.Option<
+        Either.Either<
+          HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+          HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>
+        >
+      >,
+      never,
+      R
+    >;
 
 export const initialize = <HandlerT extends BaseHandlerT, R = never>(
   groupWithMetrics: HandlerContextGroupWithMetrics<HandlerT, R>,
