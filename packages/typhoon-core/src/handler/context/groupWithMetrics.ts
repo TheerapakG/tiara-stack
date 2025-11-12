@@ -16,9 +16,8 @@ import type {
   HandlerData,
   HandlerDataKey,
   HandlerType,
-  HandlerSuccess,
-  HandlerError,
   HandlerContext as HandlerEffectContext,
+  HandlerDefaultContext,
 } from "../type";
 import {
   handler,
@@ -111,17 +110,30 @@ export const execute =
   <HandlerT extends BaseHandlerT>(
     key: HandlerDataKey<HandlerT, HandlerData<HandlerT>>,
   ) =>
-  <R>(
+  <
+    R,
+    HandlerEffect extends Handler<
+      HandlerT,
+      unknown,
+      unknown,
+      R
+    > extends infer E extends Effect.Effect<unknown, unknown, unknown>
+      ? E
+      : never = Handler<HandlerT, unknown, unknown, R> extends infer E extends
+      Effect.Effect<unknown, unknown, unknown>
+      ? E
+      : never,
+  >(
     groupWithMetrics: HandlerContextGroupWithMetrics<HandlerT, R>,
   ): Effect.Effect<
     Option.Option<
       Either.Either<
-        HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-        HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>
+        Effect.Effect.Success<HandlerEffect>,
+        Effect.Effect.Error<HandlerEffect>
       >
     >,
     never,
-    R
+    R | HandlerDefaultContext<HandlerT>
   > =>
     pipe(
       groupWithMetrics.group,
@@ -129,8 +141,8 @@ export const execute =
       Option.map((context) =>
         pipe(
           handler(context) as Effect.Effect<
-            HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-            HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+            Effect.Effect.Success<HandlerEffect>,
+            Effect.Effect.Error<HandlerEffect>,
             R
           >,
           Effect.tapBoth({
