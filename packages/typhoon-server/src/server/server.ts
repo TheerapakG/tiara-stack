@@ -41,19 +41,11 @@ import {
   pullEffect as eventPullEffect,
   replacePullStream,
 } from "../event/event";
+import { type HandlerContextCollection } from "../handler/context/collection";
 import {
-  type HandlerContextCollection,
-  add as addHandlerContextCollection,
-  addCollection as addCollectionHandlerContextCollection,
-} from "../handler/context/collection";
-import {
-  type HandlerContextCollectionWithMetrics,
-  make as makeHandlerContextCollectionWithMetrics,
-  add as addHandlerContextCollectionWithMetrics,
-  addCollection as addCollectionHandlerContextCollectionWithMetrics,
-  execute as executeHandlerContextCollectionWithMetrics,
-  initialize as initializeHandlerContextCollectionWithMetrics,
-} from "typhoon-core/handler/context/collectionWithMetrics";
+  Context as HandlerContextCore,
+  type Context as HandlerContextCoreType,
+} from "typhoon-core/handler";
 import { type MutationHandlerT } from "../handler/context/mutation/type";
 import { type SubscriptionHandlerT } from "../handler/context/subscription/type";
 import invalidHeaderErrorHtml from "./invalidHeaderError.html";
@@ -83,7 +75,7 @@ type ServerContext<S extends Server<any>> =
 
 export class Server<R = never> extends Data.TaggedClass("Server")<{
   traceProvider: Layer.Layer<never>;
-  handlerContextCollection: HandlerContextCollectionWithMetrics<
+  handlerContextCollection: HandlerContextCoreType.CollectionWithMetrics.HandlerContextCollectionWithMetrics<
     MutationHandlerT | SubscriptionHandlerT,
     R
   >;
@@ -213,17 +205,21 @@ export const create = <R = never>(serveFn: typeof crosswsServe) =>
       () => ({
         traceProvider: Effect.succeed(Layer.empty),
         handlerContextCollection: Effect.succeed(
-          makeHandlerContextCollectionWithMetrics(
-            (context) =>
+          HandlerContextCore.CollectionWithMetrics.make(
+            (
+              context: HandlerContextCore.HandlerContext<
+                MutationHandlerT | SubscriptionHandlerT
+              >,
+            ) =>
               pipe(
-                Match.value(HandlerContext.data(context)),
+                Match.value(HandlerContextCore.data(context)),
                 Match.tagsExhaustive({
                   PartialMutationHandlerConfig: () => "mutation" as const,
                   PartialSubscriptionHandlerConfig: () =>
                     "subscription" as const,
                 }),
               ),
-            HandlerContext.Collection.empty<
+            HandlerContextCore.Collection.empty<
               MutationHandlerT | SubscriptionHandlerT,
               R
             >(
@@ -234,7 +230,7 @@ export const create = <R = never>(serveFn: typeof crosswsServe) =>
               },
               (context) =>
                 pipe(
-                  Match.value(HandlerContext.data(context)),
+                  Match.value(HandlerContextCore.data(context)),
                   Match.tagsExhaustive({
                     PartialMutationHandlerConfig: () => "mutation" as const,
                     PartialSubscriptionHandlerConfig: () =>
@@ -317,7 +313,7 @@ export const add =
     new Server(
       Struct.evolve(server, {
         handlerContextCollection: (collection) =>
-          addHandlerContextCollectionWithMetrics(
+          HandlerContextCore.CollectionWithMetrics.add(
             handlerContext as
               | HandlerContext.HandlerContext<MutationHandlerT>
               | HandlerContext.HandlerContext<SubscriptionHandlerT>,
@@ -352,7 +348,7 @@ export const addCollection =
     >(
       Struct.evolve(server, {
         handlerContextCollection: (collection) =>
-          addCollectionHandlerContextCollectionWithMetrics(
+          HandlerContextCore.CollectionWithMetrics.addCollection(
             handlerContextCollection as HandlerContextCollection<
               HandlerContext.Collection.HandlerContextCollectionContext<C>
             >,
@@ -547,52 +543,6 @@ class ServerUpdateResult extends Data.TaggedClass("ServerUpdateResult")<{
   message: unknown;
 }> {}
 
-const runHandler =
-  (id: string, span: Tracer.Span) =>
-  <R = never>(handler: Effect.Effect<unknown, unknown, R>) =>
-    pipe(
-      Effect.Do,
-      Effect.bind("value", () =>
-        Effect.exit(
-          pipe(
-            handler,
-            Effect.withSpan("handler", { captureStackTrace: true }),
-          ),
-        ),
-      ),
-      Effect.bind("timestamp", () => DateTime.now),
-      Effect.map(
-        ({ value, timestamp }) =>
-          new ServerUpdateResult({
-            header: {
-              protocol: "typh",
-              version: 1,
-              id,
-              action: "server:update",
-              payload: {
-                success: Exit.isSuccess(value),
-                timestamp: DateTime.toDate(timestamp),
-              },
-              span: {
-                traceId: span.traceId,
-                spanId: span.spanId,
-              },
-            } as const,
-            message: pipe(
-              value,
-              Exit.match({
-                onSuccess: Function.identity,
-                onFailure: Cause.squash,
-              }),
-            ),
-          }),
-      ),
-      Effect.scoped,
-      Effect.withSpan("Server.runHandler", {
-        captureStackTrace: true,
-      }),
-    );
-
 const getComputedSubscriptionResult =
   (
     header: Header.Header<"client:subscribe" | "client:once">,
@@ -609,14 +559,13 @@ const getComputedSubscriptionResult =
       Effect.succeed(
         Computed.make(
           pipe(
-            serverWithRuntime.server.handlerContextCollection,
-            executeHandlerContextCollectionWithMetrics(
+            HandlerContextCore.CollectionWithMetrics.execute(
               "subscription" as const,
               header.payload.handler,
-            ),
+            )(serverWithRuntime.server.handlerContextCollection),
             Effect.flatMap(
               Option.match({
-                onSome: (result) =>
+                onSome: (result: Either.Either<unknown, unknown>) =>
                   pipe(
                     Effect.Do,
                     Effect.bind("timestamp", () => DateTime.now),
@@ -696,16 +645,15 @@ const getMutationResult =
   (header: Header.Header<"client:mutate">, span: Tracer.Span) =>
   <R = never>(
     serverWithRuntime: ServerWithRuntime<R>,
-  ): Effect.Effect<ServerUpdateResult, unknown, Event> =>
+  ): Effect.Effect<ServerUpdateResult, unknown, R> =>
     pipe(
-      serverWithRuntime.server.handlerContextCollection,
-      executeHandlerContextCollectionWithMetrics(
+      HandlerContextCore.CollectionWithMetrics.execute(
         "mutation" as const,
         header.payload.handler,
-      ),
+      )(serverWithRuntime.server.handlerContextCollection),
       Effect.flatMap(
         Option.match({
-          onSome: (result) =>
+          onSome: (result: Either.Either<unknown, unknown>) =>
             pipe(
               Effect.Do,
               Effect.bind("timestamp", () => DateTime.now),

@@ -7,7 +7,11 @@ import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { serve as crosswsServe } from "crossws/server/node";
 import { Effect, Layer, Logger, pipe } from "effect";
 import { Context } from "typhoon-server/handler";
-import { CollectionWithMetrics } from "typhoon-core/handler";
+import {
+  Context as HandlerContext,
+  type Context as HandlerContextType,
+  type Type,
+} from "typhoon-core/handler";
 import { DB } from "typhoon-server/db";
 import { Server } from "typhoon-server/server";
 import { Config } from "./config";
@@ -91,7 +95,12 @@ const serveEffect = pipe(
   Effect.bind("server", () => server),
   Effect.bind("runtime", () => Layer.toRuntime(layer)),
   Effect.tap(({ server }) =>
-    CollectionWithMetrics.initialize(server.handlerContextCollection),
+    HandlerContext.CollectionWithMetrics.initialize(
+      server.handlerContextCollection as unknown as HandlerContextType.CollectionWithMetrics.HandlerContextCollectionWithMetrics<
+        Type.BaseHandlerT,
+        unknown
+      >,
+    ),
   ),
   Effect.flatMap(({ server, runtime }) => Server.start(server, runtime)),
   Effect.sandbox,
