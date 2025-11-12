@@ -8,10 +8,9 @@ import {
   Data,
   DateTime,
   Effect,
-  Either,
+  Function,
   flow,
   Exit,
-  Function,
   HashMap,
   Layer,
   Match,
@@ -27,11 +26,7 @@ import {
   Fiber,
   Tracer,
 } from "effect";
-import {
-  Context as HandlerContext,
-  type Type,
-  type Type as HandlerTypeModule,
-} from "typhoon-core/handler";
+import { Context as HandlerContext, type Type } from "typhoon-core/handler";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { RunState } from "typhoon-core/runtime";
 import { Handler } from "typhoon-core/server";
@@ -211,9 +206,9 @@ export const create = <R = never>(serveFn: typeof crosswsServe) =>
         handlerContextCollection: Effect.succeed(
           HandlerContextCore.CollectionWithMetrics.make(
             (
-              context: HandlerContextCore.HandlerContext<
-                MutationHandlerT | SubscriptionHandlerT
-              >,
+              context:
+                | HandlerContextCore.HandlerContext<MutationHandlerT>
+                | HandlerContextCore.HandlerContext<SubscriptionHandlerT>,
             ) =>
               pipe(
                 Match.value(HandlerContextCore.data(context)),
@@ -321,7 +316,12 @@ export const add =
             handlerContext as
               | HandlerContext.HandlerContext<MutationHandlerT>
               | HandlerContext.HandlerContext<SubscriptionHandlerT>,
-          )(collection),
+          )(
+            collection as HandlerContextCoreType.CollectionWithMetrics.HandlerContextCollectionWithMetrics<
+              MutationHandlerT | SubscriptionHandlerT,
+              ServerContext<S>
+            >,
+          ),
       }),
     ) as HandlerContext.HandlerOrUndefined<C> extends infer H extends
       Type.Handler<HandlerContext.PartialHandlerContextHandlerT<C>>
@@ -548,89 +548,48 @@ class ServerUpdateResult extends Data.TaggedClass("ServerUpdateResult")<{
 }> {}
 
 const runHandler =
-  <HandlerT extends HandlerTypeModule.BaseHandlerT>(
-    handlerType: HandlerTypeModule.HandlerType<HandlerT>,
-    id: string,
-    handler: HandlerTypeModule.HandlerDataKey<
-      HandlerT,
-      HandlerTypeModule.HandlerData<HandlerT>
-    >,
-    span: Tracer.Span,
-  ) =>
-  <R = never>(serverWithRuntime: ServerWithRuntime<R>) =>
+  (id: string, span: Tracer.Span) =>
+  <R = never>(handler: Effect.Effect<unknown, unknown, R>) =>
     pipe(
-      HandlerContextCore.CollectionWithMetrics.execute(
-        handlerType,
-        handler,
-      )(serverWithRuntime.server.handlerContextCollection),
-      Effect.flatMap(
-        Option.match({
-          onSome: (result: Either.Either<unknown, unknown>) =>
-            pipe(
-              Effect.Do,
-              Effect.bind("timestamp", () => DateTime.now),
-              Effect.flatMap(({ timestamp }) =>
-                pipe(
-                  result,
-                  Either.match({
-                    onLeft: (error) =>
-                      Effect.succeed(
-                        new ServerUpdateResult({
-                          header: {
-                            protocol: "typh",
-                            version: 1,
-                            id,
-                            action: "server:update",
-                            payload: {
-                              success: false,
-                              timestamp: DateTime.toDate(timestamp),
-                            },
-                            span: {
-                              traceId: span.traceId,
-                              spanId: span.spanId,
-                            },
-                          } as const,
-                          message: error,
-                        }),
-                      ),
-                    onRight: (success) =>
-                      Effect.succeed(
-                        new ServerUpdateResult({
-                          header: {
-                            protocol: "typh",
-                            version: 1,
-                            id,
-                            action: "server:update",
-                            payload: {
-                              success: true,
-                              timestamp: DateTime.toDate(timestamp),
-                            },
-                            span: {
-                              traceId: span.traceId,
-                              spanId: span.spanId,
-                            },
-                          } as const,
-                          message: success,
-                        }),
-                      ),
-                  }),
-                ),
-              ),
-            ),
-          onNone: () => Effect.fail(`handler not found`),
-        }),
+      Effect.Do,
+      Effect.bind("value", () =>
+        Effect.exit(
+          pipe(
+            handler,
+            Effect.withSpan("handler", { captureStackTrace: true }),
+          ),
+        ),
       ),
-      Effect.provide(serverWithRuntime.runtime),
-      Effect.withSpan("handler", {
+      Effect.bind("timestamp", () => DateTime.now),
+      Effect.map(
+        ({ value, timestamp }) =>
+          new ServerUpdateResult({
+            header: {
+              protocol: "typh",
+              version: 1,
+              id,
+              action: "server:update",
+              payload: {
+                success: Exit.isSuccess(value),
+                timestamp: DateTime.toDate(timestamp),
+              },
+              span: {
+                traceId: span.traceId,
+                spanId: span.spanId,
+              },
+            } as const,
+            message: pipe(
+              value,
+              Exit.match({
+                onSuccess: Function.identity,
+                onFailure: Cause.squash,
+              }),
+            ),
+          }),
+      ),
+      Effect.scoped,
+      Effect.withSpan("Server.runHandler", {
         captureStackTrace: true,
-        attributes: {
-          id,
-          handler,
-        },
-      }),
-      Effect.annotateLogs({
-        id,
-        handler,
       }),
     );
 
@@ -647,70 +606,16 @@ const getComputedSubscriptionResult =
     Event | Scope.Scope
   > =>
     pipe(
-      Effect.succeed(
+      serverWithRuntime.server.handlerContextCollection,
+      HandlerContextCore.CollectionWithMetrics.execute<
+        MutationHandlerT | SubscriptionHandlerT,
+        SubscriptionHandlerT
+      >("subscription", header.payload.handler),
+      Effect.flatMap(Option.getOrElse(() => Effect.fail(`handler not found`))),
+      Effect.flatMap((innerHandler) =>
         Computed.make(
           pipe(
-            HandlerContextCore.CollectionWithMetrics.execute(
-              "subscription" as const,
-              header.payload.handler,
-            )(serverWithRuntime.server.handlerContextCollection),
-            Effect.flatMap(
-              Option.match({
-                onSome: (result: Either.Either<unknown, unknown>) =>
-                  pipe(
-                    Effect.Do,
-                    Effect.bind("timestamp", () => DateTime.now),
-                    Effect.flatMap(({ timestamp }) =>
-                      pipe(
-                        result,
-                        Either.match({
-                          onLeft: (error) =>
-                            Effect.succeed(
-                              new ServerUpdateResult({
-                                header: {
-                                  protocol: "typh",
-                                  version: 1,
-                                  id: header.id,
-                                  action: "server:update",
-                                  payload: {
-                                    success: false,
-                                    timestamp: DateTime.toDate(timestamp),
-                                  },
-                                  span: {
-                                    traceId: span.traceId,
-                                    spanId: span.spanId,
-                                  },
-                                } as const,
-                                message: error,
-                              }),
-                            ),
-                          onRight: (success) =>
-                            Effect.succeed(
-                              new ServerUpdateResult({
-                                header: {
-                                  protocol: "typh",
-                                  version: 1,
-                                  id: header.id,
-                                  action: "server:update",
-                                  payload: {
-                                    success: true,
-                                    timestamp: DateTime.toDate(timestamp),
-                                  },
-                                  span: {
-                                    traceId: span.traceId,
-                                    spanId: span.spanId,
-                                  },
-                                } as const,
-                                message: success,
-                              }),
-                            ),
-                        }),
-                      ),
-                    ),
-                  ),
-                onNone: () => Effect.fail(`handler not found`),
-              }),
-            ),
+            runHandler(header.id, span)(innerHandler),
             Effect.provide(serverWithRuntime.runtime),
             Effect.withSpan("subscriptionHandler", {
               captureStackTrace: true,
@@ -736,68 +641,22 @@ const getMutationResult =
   (header: Header.Header<"client:mutate">, span: Tracer.Span) =>
   <R = never>(
     serverWithRuntime: ServerWithRuntime<R>,
-  ): Effect.Effect<ServerUpdateResult, unknown, R> =>
+  ): Effect.Effect<ServerUpdateResult, unknown, Event> =>
     pipe(
-      HandlerContextCore.CollectionWithMetrics.execute(
-        "mutation" as const,
-        header.payload.handler,
-      )(serverWithRuntime.server.handlerContextCollection),
-      Effect.flatMap(
-        Option.match({
-          onSome: (result: Either.Either<unknown, unknown>) =>
-            pipe(
-              Effect.Do,
-              Effect.bind("timestamp", () => DateTime.now),
-              Effect.flatMap(({ timestamp }) =>
-                pipe(
-                  result,
-                  Either.match({
-                    onLeft: (error) =>
-                      Effect.succeed(
-                        new ServerUpdateResult({
-                          header: {
-                            protocol: "typh",
-                            version: 1,
-                            id: header.id,
-                            action: "server:update",
-                            payload: {
-                              success: false,
-                              timestamp: DateTime.toDate(timestamp),
-                            },
-                            span: {
-                              traceId: span.traceId,
-                              spanId: span.spanId,
-                            },
-                          } as const,
-                          message: error,
-                        }),
-                      ),
-                    onRight: (success) =>
-                      Effect.succeed(
-                        new ServerUpdateResult({
-                          header: {
-                            protocol: "typh",
-                            version: 1,
-                            id: header.id,
-                            action: "server:update",
-                            payload: {
-                              success: true,
-                              timestamp: DateTime.toDate(timestamp),
-                            },
-                            span: {
-                              traceId: span.traceId,
-                              spanId: span.spanId,
-                            },
-                          } as const,
-                          message: success,
-                        }),
-                      ),
-                  }),
-                ),
-              ),
-            ),
-          onNone: () => Effect.fail(`handler not found`),
-        }),
+      runHandler(
+        header.id,
+        span,
+      )(
+        pipe(
+          serverWithRuntime.server.handlerContextCollection,
+          HandlerContextCore.CollectionWithMetrics.execute<
+            MutationHandlerT | SubscriptionHandlerT,
+            MutationHandlerT
+          >("mutation", header.payload.handler),
+          Effect.flatMap(
+            Option.getOrElse(() => Effect.fail(`handler not found`)),
+          ),
+        ),
       ),
       Effect.provide(serverWithRuntime.runtime),
       Effect.withSpan("Server.getMutationResult", {
