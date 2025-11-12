@@ -62,26 +62,8 @@ export const execute =
   > =>
     pipe(
       getHandlerContext(key)(groupWithMetrics.group),
-      Option.match({
-        onNone: () =>
-          Effect.succeed(
-            Option.none() as Option.Option<
-              Either.Either<
-                HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-                HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>
-              >
-            >,
-          ) as Effect.Effect<
-            Option.Option<
-              Either.Either<
-                HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-                HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>
-              >
-            >,
-            never,
-            R
-          >,
-        onSome: (
+      Option.map(
+        (
           context: HandlerContext<
             HandlerT,
             HandlerData<HandlerT>,
@@ -120,34 +102,23 @@ export const execute =
             Effect.withSpan("HandlerContextGroupWithMetrics.execute", {
               captureStackTrace: true,
             }),
-            Effect.either,
-            Effect.map(
-              (either) =>
-                Option.some(either) as Option.Option<
-                  Either.Either<
-                    HandlerError<
-                      HandlerT,
-                      Handler<HandlerT, unknown, unknown, R>
-                    >,
-                    HandlerSuccess<
-                      HandlerT,
-                      Handler<HandlerT, unknown, unknown, R>
-                    >
-                  >
-                >,
-            ),
-          ),
-      }),
-    ) as Effect.Effect<
-      Option.Option<
-        Either.Either<
-          HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-          HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>
-        >
+          ) as Effect.Effect<
+            HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+            HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+            R
+          >,
+      ),
+      Effect.transposeMapOption(Effect.either) as Effect.Effect<
+        Option.Option<
+          Either.Either<
+            HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+            HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>
+          >
+        >,
+        never,
+        R
       >,
-      never,
-      R
-    >;
+    );
 
 export const initialize = <HandlerT extends BaseHandlerT, R = never>(
   groupWithMetrics: HandlerContextGroupWithMetrics<HandlerT, R>,
