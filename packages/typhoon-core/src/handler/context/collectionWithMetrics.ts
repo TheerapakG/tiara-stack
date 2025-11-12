@@ -18,6 +18,7 @@ import {
   type HandlerContextCollectionHandlerT,
 } from "./collection";
 import {
+  type HandlerContextGroupWithMetrics as HandlerContextGroupWithMetricsType,
   make as makeHandlerContextGroupWithMetrics,
   execute as executeHandlerContextGroupWithMetrics,
   initialize as initializeHandlerContextGroupWithMetrics,
@@ -28,6 +29,16 @@ import type {
   HandlerOrUndefined,
   PartialHandlerContextHandlerT,
 } from "./context";
+
+type HandlerContextGroupWithMetricsStruct<
+  HandlerT extends BaseHandlerT,
+  R = never,
+> = {
+  [HT in HandlerT as HandlerType<HT>]: HandlerContextGroupWithMetricsType<
+    HT,
+    R
+  >;
+};
 
 type HandlerDataKeyTransformerStruct<HandlerT extends BaseHandlerT> = {
   [HT in HandlerT as HandlerType<HT>]: (
@@ -46,6 +57,7 @@ type HandlerContextCollectionWithMetricsObject<
   R = never,
 > = {
   collection: HandlerContextCollection<HandlerT, R>;
+  struct: HandlerContextGroupWithMetricsStruct<HandlerT, R>;
   handlerContextTypeTransformer: HandlerContextTypeTransformer<HandlerT>;
 };
 
@@ -63,12 +75,20 @@ export class HandlerContextCollectionWithMetrics<
 > extends HandlerContextCollectionWithMetricsTaggedClass<HandlerT, R> {}
 
 export const make = <HandlerT extends BaseHandlerT, R = never>(
-  _dataKeyTransformers: HandlerDataKeyTransformerStruct<HandlerT>,
   handlerContextTypeTransformer: HandlerContextTypeTransformer<HandlerT>,
   collection: HandlerContextCollection<HandlerT, R>,
 ): HandlerContextCollectionWithMetrics<HandlerT, R> =>
   new HandlerContextCollectionWithMetrics({
     collection,
+    struct: Object.fromEntries(
+      Object.entries(collection.struct).map(([type, group]) => [
+        type,
+        makeHandlerContextGroupWithMetrics(
+          type as HandlerType<HandlerT>,
+          group as HandlerContextGroup<HandlerT, R>,
+        ),
+      ]),
+    ) as unknown as HandlerContextGroupWithMetricsStruct<HandlerT, R>,
     handlerContextTypeTransformer,
   });
 
@@ -77,7 +97,6 @@ export const empty = <HandlerT extends BaseHandlerT>(
   handlerContextTypeTransformer: HandlerContextTypeTransformer<HandlerT>,
 ): HandlerContextCollectionWithMetrics<HandlerT, never> =>
   make(
-    dataKeyTransformers,
     handlerContextTypeTransformer,
     emptyHandlerContextCollection(
       dataKeyTransformers,
@@ -101,8 +120,13 @@ export const add =
     > = HandlerContextCollectionHandlerT<C["collection"]>,
   >(
     collectionWithMetrics: C,
-  ) =>
-    new HandlerContextCollectionWithMetrics<
+  ) => {
+    const updatedCollection = addHandlerContextCollection(handlerContextConfig)(
+      collectionWithMetrics.collection,
+    );
+    const handlerType =
+      collectionWithMetrics.handlerContextTypeTransformer(handlerContextConfig);
+    return new HandlerContextCollectionWithMetrics<
       HandlerT extends CollectionHandlerT ? CollectionHandlerT : never,
       HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
         ?
@@ -110,12 +134,30 @@ export const add =
             | HandlerEffectContext<HandlerT, H>
         : never
     >({
-      collection: addHandlerContextCollection(handlerContextConfig)(
-        collectionWithMetrics.collection,
-      ),
+      collection: updatedCollection,
+      struct: {
+        ...collectionWithMetrics.struct,
+        [handlerType]: makeHandlerContextGroupWithMetrics(
+          handlerType as HandlerType<HandlerT>,
+          updatedCollection.struct[
+            handlerType as HandlerType<HandlerT>
+          ] as HandlerContextGroup<
+            HandlerT,
+            HandlerContextCollectionContext<C["collection"]>
+          >,
+        ),
+      } as unknown as HandlerContextGroupWithMetricsStruct<
+        CollectionHandlerT,
+        HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
+          ?
+              | HandlerContextCollectionContext<C["collection"]>
+              | HandlerEffectContext<HandlerT, H>
+          : never
+      >,
       handlerContextTypeTransformer:
         collectionWithMetrics.handlerContextTypeTransformer,
     });
+  };
 
 export const addCollection =
   <
@@ -130,18 +172,37 @@ export const addCollection =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   <const ThisC extends HandlerContextCollectionWithMetrics<HandlerT, any>>(
     thisCollectionWithMetrics: ThisC,
-  ) =>
-    new HandlerContextCollectionWithMetrics<
+  ) => {
+    const updatedCollection = addCollectionHandlerContextCollection(
+      otherCollectionWithMetrics.collection,
+    )(thisCollectionWithMetrics.collection);
+    return new HandlerContextCollectionWithMetrics<
       HandlerT,
       | HandlerContextCollectionContext<ThisC["collection"]>
       | HandlerContextCollectionContext<OtherC["collection"]>
     >({
-      collection: addCollectionHandlerContextCollection(
-        otherCollectionWithMetrics.collection,
-      )(thisCollectionWithMetrics.collection),
+      collection: updatedCollection,
+      struct: Object.fromEntries(
+        Object.keys(updatedCollection.struct).map((type) => [
+          type,
+          makeHandlerContextGroupWithMetrics(
+            type as HandlerType<HandlerT>,
+            updatedCollection.struct[type] as HandlerContextGroup<
+              HandlerT,
+              | HandlerContextCollectionContext<ThisC["collection"]>
+              | HandlerContextCollectionContext<OtherC["collection"]>
+            >,
+          ),
+        ]),
+      ) as unknown as HandlerContextGroupWithMetricsStruct<
+        HandlerT,
+        | HandlerContextCollectionContext<ThisC["collection"]>
+        | HandlerContextCollectionContext<OtherC["collection"]>
+      >,
       handlerContextTypeTransformer:
         thisCollectionWithMetrics.handlerContextTypeTransformer,
     });
+  };
 
 export const execute =
   <HandlerT extends BaseHandlerT>(
@@ -159,13 +220,14 @@ export const execute =
     >,
     never,
     R
-  > => {
-    const group = collectionWithMetrics.collection.struct[
-      type
-    ] as HandlerContextGroup<HandlerT, R>;
-    const groupWithMetrics = makeHandlerContextGroupWithMetrics(type, group);
-    return executeHandlerContextGroupWithMetrics(key)(groupWithMetrics);
-  };
+  > =>
+    pipe(
+      collectionWithMetrics.struct[type] as HandlerContextGroupWithMetricsType<
+        HandlerT,
+        R
+      >,
+      executeHandlerContextGroupWithMetrics(key),
+    );
 
 export const initialize = (
   collectionWithMetrics: HandlerContextCollectionWithMetrics<
@@ -174,16 +236,12 @@ export const initialize = (
   >,
 ): Effect.Effect<void, never, never> =>
   pipe(
-    Object.entries(collectionWithMetrics.collection.struct) as Array<
-      [string, HandlerContextGroup<BaseHandlerT, unknown>]
+    Object.values(collectionWithMetrics.struct) as Array<
+      HandlerContextGroupWithMetricsType<BaseHandlerT, unknown>
     >,
-    Effect.forEach(([type, group]) => {
-      const groupWithMetrics = makeHandlerContextGroupWithMetrics(
-        type as HandlerType<BaseHandlerT>,
-        group,
-      );
-      return initializeHandlerContextGroupWithMetrics(groupWithMetrics);
-    }),
+    Effect.forEach((groupWithMetrics) =>
+      initializeHandlerContextGroupWithMetrics(groupWithMetrics),
+    ),
     Effect.asVoid,
     Effect.withSpan("HandlerContextCollectionWithMetrics.initialize", {
       captureStackTrace: true,
