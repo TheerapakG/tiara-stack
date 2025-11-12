@@ -5,8 +5,10 @@ import {
   Function,
   Option,
   pipe,
+  Record,
   Struct,
   Types,
+  Array,
 } from "effect";
 import type {
   BaseHandlerT,
@@ -32,16 +34,14 @@ import {
   add as addHandlerContextGroupWithMetrics,
   addGroup as addGroupHandlerContextGroupWithMetrics,
 } from "./groupWithMetrics";
-import {
-  HandlerContextGroup,
-} from "./group";
+import { HandlerContextGroup } from "./group";
 import type {
   HandlerContext,
   PartialHandlerContextHandlerT,
   HandlerOrUndefined,
 } from "./context";
 
-type HandlerContextGroupWithMetricsStruct<
+type HandlerContextGroupWithMetricsRecord<
   HandlerT extends BaseHandlerT,
   R = never,
 > = {
@@ -67,7 +67,7 @@ type HandlerContextCollectionWithMetricsObject<
   HandlerT extends BaseHandlerT,
   R = never,
 > = {
-  struct: HandlerContextGroupWithMetricsStruct<HandlerT, R>;
+  record: HandlerContextGroupWithMetricsRecord<HandlerT, R>;
   handlerContextTypeTransformer: HandlerContextTypeTransformer<HandlerT>;
 };
 
@@ -130,15 +130,13 @@ export const make = <HandlerT extends BaseHandlerT, R = never>(
   collection: HandlerContextCollection<HandlerT, R>,
 ): HandlerContextCollectionWithMetrics<HandlerT, R> =>
   new HandlerContextCollectionWithMetrics({
-    struct: Object.fromEntries(
-      Object.entries(collection.struct).map(([type, group]) => [
-        type,
-        makeHandlerContextGroupWithMetrics(
-          type as HandlerType<HandlerT>,
-          group as HandlerContextGroup<HandlerT, R>,
-        ),
-      ]),
-    ) as unknown as HandlerContextGroupWithMetricsStruct<HandlerT, R>,
+    record: Record.mapEntries(collection.record, (group, type) => [
+      type,
+      makeHandlerContextGroupWithMetrics(
+        type as HandlerType<HandlerT>,
+        group as unknown as HandlerContextGroup<HandlerT, R>,
+      ),
+    ]) as unknown as HandlerContextGroupWithMetricsRecord<HandlerT, R>,
     handlerContextTypeTransformer,
   });
 
@@ -179,11 +177,13 @@ export const add =
         : never
     >(
       Struct.evolve(collectionWithMetrics, {
-        struct: (struct) =>
-          Struct.evolve(struct, {
-            [collectionWithMetrics.handlerContextTypeTransformer(
+        record: (record) =>
+          Record.modify(
+            record,
+            collectionWithMetrics.handlerContextTypeTransformer(
               handlerContextConfig,
-            )]: (
+            ),
+            (
               groupWithMetrics: HandlerContextGroupWithMetricsType<
                 HandlerT,
                 HandlerContextCollectionWithMetricsContext<C>
@@ -192,7 +192,7 @@ export const add =
               addHandlerContextGroupWithMetrics(handlerContextConfig)(
                 groupWithMetrics,
               ),
-          }) as unknown as HandlerContextGroupWithMetricsStruct<
+          ) as HandlerContextGroupWithMetricsRecord<
             CollectionHandlerT,
             HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
               ?
@@ -222,23 +222,13 @@ export const addCollection =
       | HandlerContextCollectionContext<OtherC>
     >(
       Struct.evolve(thisCollectionWithMetrics, {
-        struct: (struct) =>
-          Object.fromEntries(
-            Object.entries(struct).map(([type, groupWithMetrics]) => [
-              type,
-              addGroupHandlerContextGroupWithMetrics(
-                otherCollection.struct[type] as HandlerContextGroup<
-                  HandlerT,
-                  HandlerContextCollectionContext<OtherC>
-                >,
-              )(
-                groupWithMetrics as HandlerContextGroupWithMetricsType<
-                  HandlerT,
-                  HandlerContextCollectionWithMetricsContext<ThisC>
-                >,
-              ),
-            ]),
-          ) as unknown as HandlerContextGroupWithMetricsStruct<
+        record: (record) =>
+          Record.mapEntries(record, (groupWithMetrics, type) => [
+            type,
+            addGroupHandlerContextGroupWithMetrics(
+              otherCollection.record[type],
+            )(groupWithMetrics),
+          ]) as unknown as HandlerContextGroupWithMetricsRecord<
             HandlerT,
             | HandlerContextCollectionWithMetricsContext<ThisC>
             | HandlerContextCollectionContext<OtherC>
@@ -264,7 +254,7 @@ export const execute =
     R
   > =>
     pipe(
-      collectionWithMetrics.struct[type] as HandlerContextGroupWithMetricsType<
+      collectionWithMetrics.record[type] as HandlerContextGroupWithMetricsType<
         HandlerT,
         R
       >,
@@ -278,7 +268,7 @@ export const initialize = (
   >,
 ): Effect.Effect<void, never, never> =>
   pipe(
-    Object.values(collectionWithMetrics.struct) as Array<
+    Object.values(collectionWithMetrics.record) as Array<
       HandlerContextGroupWithMetricsType<BaseHandlerT, unknown>
     >,
     Effect.forEach((groupWithMetrics) =>
