@@ -39,7 +39,3 @@ volume.yaml
 
 .nx/cache
 .nx/workspace-data
-
-# Core dumps
-core
-packages/*/core
