@@ -7,9 +7,22 @@ import type {
   HandlerType,
   HandlerSuccess,
   HandlerError,
+  HandlerContext as HandlerEffectContext,
 } from "../type";
-import { handler } from "./context";
-import { HandlerContextGroup, getHandlerContext } from "./group";
+import {
+  handler,
+  type HandlerContext,
+  type HandlerOrUndefined,
+  type PartialHandlerContextHandlerT,
+} from "./context";
+import {
+  HandlerContextGroup,
+  getHandlerContext,
+  add as addHandlerContextGroup,
+  addGroup as addGroupHandlerContextGroup,
+  type HandlerContextGroupHandlerT,
+  type HandlerContextGroupContext,
+} from "./group";
 
 type HandlerContextGroupWithMetricsObject<
   HandlerT extends BaseHandlerT,
@@ -102,6 +115,59 @@ export const execute =
       ),
       Effect.transposeMapOption(Effect.either),
     );
+
+export const add =
+  <
+    const Config extends HandlerContext<any>,
+    HandlerT extends
+      PartialHandlerContextHandlerT<Config> = PartialHandlerContextHandlerT<Config>,
+  >(
+    handlerContextConfig: Config,
+  ) =>
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const G extends HandlerContextGroupWithMetrics<HandlerT, any>,
+  >(
+    groupWithMetrics: G,
+  ) => {
+    const updatedGroup = addHandlerContextGroup(handlerContextConfig)(
+      groupWithMetrics.group,
+    );
+    return new HandlerContextGroupWithMetrics<
+      HandlerT,
+      HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
+        ? HandlerContextGroupContext<typeof updatedGroup> | HandlerEffectContext<HandlerT, H>
+        : never
+    >({
+      ...groupWithMetrics,
+      group: updatedGroup,
+    });
+  };
+
+export const addGroup =
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const OtherG extends HandlerContextGroup<any, any>,
+    HandlerT extends
+      HandlerContextGroupHandlerT<OtherG> = HandlerContextGroupHandlerT<OtherG>,
+  >(
+    otherGroup: OtherG,
+  ) =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  <const ThisG extends HandlerContextGroupWithMetrics<HandlerT, any>>(
+    thisGroupWithMetrics: ThisG,
+  ) => {
+    const updatedGroup = addGroupHandlerContextGroup(otherGroup)(
+      thisGroupWithMetrics.group,
+    );
+    return new HandlerContextGroupWithMetrics<
+      HandlerT,
+      HandlerContextGroupContext<typeof updatedGroup> | HandlerContextGroupContext<OtherG>
+    >({
+      ...thisGroupWithMetrics,
+      group: updatedGroup,
+    });
+  };
 
 export const initialize = <HandlerT extends BaseHandlerT, R = never>(
   groupWithMetrics: HandlerContextGroupWithMetrics<HandlerT, R>,

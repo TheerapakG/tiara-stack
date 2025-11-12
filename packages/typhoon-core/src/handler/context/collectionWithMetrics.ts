@@ -25,16 +25,15 @@ import {
   type HandlerContextCollectionContext,
 } from "./collection";
 import {
-  HandlerContextGroupWithMetrics,
   type HandlerContextGroupWithMetrics as HandlerContextGroupWithMetricsType,
   make as makeHandlerContextGroupWithMetrics,
   execute as executeHandlerContextGroupWithMetrics,
   initialize as initializeHandlerContextGroupWithMetrics,
+  add as addHandlerContextGroupWithMetrics,
+  addGroup as addGroupHandlerContextGroupWithMetrics,
 } from "./groupWithMetrics";
 import {
   HandlerContextGroup,
-  add as addHandlerContextGroup,
-  addGroup as addGroupHandlerContextGroup,
 } from "./group";
 import type {
   HandlerContext,
@@ -190,12 +189,9 @@ export const add =
                 HandlerContextCollectionWithMetricsContext<C>
               >,
             ) =>
-              new HandlerContextGroupWithMetrics({
-                ...groupWithMetrics,
-                group: addHandlerContextGroup(handlerContextConfig)(
-                  groupWithMetrics.group,
-                ),
-              }),
+              addHandlerContextGroupWithMetrics(handlerContextConfig)(
+                groupWithMetrics,
+              ),
           }) as unknown as HandlerContextGroupWithMetricsStruct<
             CollectionHandlerT,
             HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
@@ -230,25 +226,17 @@ export const addCollection =
           Object.fromEntries(
             Object.entries(struct).map(([type, groupWithMetrics]) => [
               type,
-              new HandlerContextGroupWithMetrics({
-                ...(groupWithMetrics as HandlerContextGroupWithMetricsType<
+              addGroupHandlerContextGroupWithMetrics(
+                otherCollection.struct[type] as HandlerContextGroup<
+                  HandlerT,
+                  HandlerContextCollectionContext<OtherC>
+                >,
+              )(
+                groupWithMetrics as HandlerContextGroupWithMetricsType<
                   HandlerT,
                   HandlerContextCollectionWithMetricsContext<ThisC>
-                >),
-                group: addGroupHandlerContextGroup(
-                  otherCollection.struct[type] as HandlerContextGroup<
-                    HandlerT,
-                    HandlerContextCollectionContext<OtherC>
-                  >,
-                )(
-                  (
-                    groupWithMetrics as HandlerContextGroupWithMetricsType<
-                      HandlerT,
-                      HandlerContextCollectionWithMetricsContext<ThisC>
-                    >
-                  ).group,
-                ),
-              }),
+                >,
+              ),
             ]),
           ) as unknown as HandlerContextGroupWithMetricsStruct<
             HandlerT,
