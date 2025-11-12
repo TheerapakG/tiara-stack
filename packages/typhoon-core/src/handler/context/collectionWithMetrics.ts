@@ -241,10 +241,12 @@ export const addCollection =
                     HandlerContextCollectionContext<OtherC>
                   >,
                 )(
-                  (groupWithMetrics as HandlerContextGroupWithMetricsType<
-                    HandlerT,
-                    HandlerContextCollectionWithMetricsContext<ThisC>
-                  >).group,
+                  (
+                    groupWithMetrics as HandlerContextGroupWithMetricsType<
+                      HandlerT,
+                      HandlerContextCollectionWithMetricsContext<ThisC>
+                    >
+                  ).group,
                 ),
               }),
             ]),
