@@ -21,6 +21,8 @@ import type {
 import {
   HandlerContextCollection,
   empty as emptyHandlerContextCollection,
+  type HandlerContextCollectionHandlerT,
+  type HandlerContextCollectionContext,
 } from "./collection";
 import {
   HandlerContextGroupWithMetrics,
@@ -208,11 +210,11 @@ export const add =
 export const addCollection =
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const OtherC extends HandlerContextCollectionWithMetrics<any, any>,
+    const OtherC extends HandlerContextCollection<any, any>,
     HandlerT extends
-      HandlerContextCollectionWithMetricsHandlerT<OtherC> = HandlerContextCollectionWithMetricsHandlerT<OtherC>,
+      HandlerContextCollectionHandlerT<OtherC> = HandlerContextCollectionHandlerT<OtherC>,
   >(
-    otherCollectionWithMetrics: OtherC,
+    otherCollection: OtherC,
   ) =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   <const ThisC extends HandlerContextCollectionWithMetrics<HandlerT, any>>(
@@ -221,7 +223,7 @@ export const addCollection =
     new HandlerContextCollectionWithMetrics<
       HandlerT,
       | HandlerContextCollectionWithMetricsContext<ThisC>
-      | HandlerContextCollectionWithMetricsContext<OtherC>
+      | HandlerContextCollectionContext<OtherC>
     >(
       Struct.evolve(thisCollectionWithMetrics, {
         struct: (struct) =>
@@ -234,28 +236,22 @@ export const addCollection =
                   HandlerContextCollectionWithMetricsContext<ThisC>
                 >),
                 group: addGroupHandlerContextGroup(
-                  (
-                    otherCollectionWithMetrics.struct[
-                      type
-                    ] as HandlerContextGroupWithMetricsType<
-                      HandlerT,
-                      HandlerContextCollectionWithMetricsContext<OtherC>
-                    >
-                  ).group,
+                  otherCollection.struct[type] as HandlerContextGroup<
+                    HandlerT,
+                    HandlerContextCollectionContext<OtherC>
+                  >,
                 )(
-                  (
-                    groupWithMetrics as HandlerContextGroupWithMetricsType<
-                      HandlerT,
-                      HandlerContextCollectionWithMetricsContext<ThisC>
-                    >
-                  ).group,
+                  (groupWithMetrics as HandlerContextGroupWithMetricsType<
+                    HandlerT,
+                    HandlerContextCollectionWithMetricsContext<ThisC>
+                  >).group,
                 ),
               }),
             ]),
           ) as unknown as HandlerContextGroupWithMetricsStruct<
             HandlerT,
             | HandlerContextCollectionWithMetricsContext<ThisC>
-            | HandlerContextCollectionWithMetricsContext<OtherC>
+            | HandlerContextCollectionContext<OtherC>
           >,
       }),
     );
