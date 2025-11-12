@@ -50,17 +50,34 @@ export const execute =
   ) =>
   <R>(
     groupWithMetrics: HandlerContextGroupWithMetrics<HandlerT, R>,
-  ): Option.Option<
-    Effect.Effect<
-      HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-      HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-      R
-    >
+  ): Effect.Effect<
+    Option.Option<
+      Effect.Effect<
+        HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+        HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+        R
+      >
+    >,
+    never,
+    R
   > =>
     pipe(
       getHandlerContext(key)(groupWithMetrics.group),
-      Option.map(
-        (
+      Option.match({
+        onNone: () =>
+          Effect.succeed(
+            Option.none() as Option.Option<
+              Effect.Effect<
+                HandlerSuccess<
+                  HandlerT,
+                  Handler<HandlerT, unknown, unknown, R>
+                >,
+                HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+                R
+              >
+            >,
+          ),
+        onSome: (
           context: HandlerContext<
             HandlerT,
             HandlerData<HandlerT>,
@@ -68,7 +85,7 @@ export const execute =
           >,
         ) => {
           const handler = getHandlerFromContext(context);
-          return pipe(
+          const handlerEffect = pipe(
             handler as Handler<HandlerT, unknown, unknown, R>,
             Effect.tapBoth({
               onSuccess: () =>
@@ -100,8 +117,20 @@ export const execute =
             HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
             R
           >;
+          return Effect.succeed(
+            Option.some(handlerEffect) as Option.Option<
+              Effect.Effect<
+                HandlerSuccess<
+                  HandlerT,
+                  Handler<HandlerT, unknown, unknown, R>
+                >,
+                HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+                R
+              >
+            >,
+          );
         },
-      ),
+      }),
     );
 
 export const initialize = <HandlerT extends BaseHandlerT, R = never>(
