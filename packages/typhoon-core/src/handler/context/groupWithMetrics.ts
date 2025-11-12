@@ -5,8 +5,13 @@ import type {
   HandlerData,
   HandlerDataKey,
   HandlerType,
+  HandlerSuccess,
+  HandlerError,
 } from "../type";
-import { handler as getHandlerFromContext } from "./context";
+import {
+  handler as getHandlerFromContext,
+  type HandlerContext,
+} from "./context";
 import { HandlerContextGroup, getHandlerContext } from "./group";
 
 type HandlerContextGroupWithMetricsObject<
@@ -45,19 +50,37 @@ export const execute =
   ) =>
   <R>(
     groupWithMetrics: HandlerContextGroupWithMetrics<HandlerT, R>,
-  ): Effect.Effect<void, unknown, R> =>
+  ): Effect.Effect<
+    HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+    HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+    R
+  > =>
     pipe(
       getHandlerContext(key)(groupWithMetrics.group),
       Option.map(
-        (context) =>
-          getHandlerFromContext(context) as Handler<
+        (
+          context: HandlerContext<
             HandlerT,
-            unknown,
-            unknown,
+            HandlerData<HandlerT>,
+            Handler<HandlerT, unknown, unknown, R>
+          >,
+        ) => {
+          const handler = getHandlerFromContext(context);
+          return handler as Handler<HandlerT, unknown, unknown, R>;
+        },
+      ),
+      Option.getOrElse(
+        (): Effect.Effect<
+          HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+          HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+          R
+        > =>
+          Effect.void as unknown as Effect.Effect<
+            HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+            HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
             R
           >,
       ),
-      Option.getOrElse(() => Effect.void as Effect.Effect<void, unknown, R>),
       Effect.tapBoth({
         onSuccess: () =>
           pipe(

@@ -6,6 +6,8 @@ import type {
   HandlerData,
   HandlerDataKey,
   HandlerType,
+  HandlerSuccess,
+  HandlerError,
 } from "../type";
 import {
   HandlerContextCollection,
@@ -222,7 +224,11 @@ export const execute =
   ) =>
   <R>(
     collectionWithMetrics: HandlerContextCollectionWithMetrics<HandlerT, R>,
-  ): Effect.Effect<void, unknown, R> =>
+  ): Effect.Effect<
+    HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+    HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+    R
+  > =>
     pipe(
       collectionWithMetrics.struct[type] as HandlerContextGroupWithMetricsType<
         HandlerT,
