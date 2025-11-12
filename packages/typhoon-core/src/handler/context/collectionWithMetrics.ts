@@ -16,9 +16,8 @@ import type {
   HandlerData,
   HandlerDataKey,
   HandlerType,
-  HandlerSuccess,
-  HandlerError,
   HandlerContext as HandlerEffectContext,
+  HandlerDefaultContext,
 } from "../type";
 import {
   HandlerContextCollection,
@@ -237,21 +236,40 @@ export const addCollection =
     );
 
 export const execute =
-  <HandlerT extends BaseHandlerT>(
+  <
+    CollectionHandlerT extends BaseHandlerT,
+    HandlerT extends CollectionHandlerT,
+  >(
     type: HandlerType<HandlerT>,
     key: HandlerDataKey<HandlerT, HandlerData<HandlerT>>,
   ) =>
-  <R>(
-    collectionWithMetrics: HandlerContextCollectionWithMetrics<HandlerT, R>,
+  <
+    R,
+    HandlerEffect extends Handler<
+      HandlerT,
+      unknown,
+      unknown,
+      R
+    > extends infer E extends Effect.Effect<unknown, unknown, unknown>
+      ? E
+      : never = Handler<HandlerT, unknown, unknown, R> extends infer E extends
+      Effect.Effect<unknown, unknown, unknown>
+      ? E
+      : never,
+  >(
+    collectionWithMetrics: HandlerContextCollectionWithMetrics<
+      CollectionHandlerT,
+      R
+    >,
   ): Effect.Effect<
     Option.Option<
       Either.Either<
-        HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-        HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>
+        Effect.Effect.Success<HandlerEffect>,
+        Effect.Effect.Error<HandlerEffect>
       >
     >,
     never,
-    R
+    R | HandlerDefaultContext<HandlerT>
   > =>
     pipe(
       collectionWithMetrics.record[type] as HandlerContextGroupWithMetricsType<
@@ -261,15 +279,12 @@ export const execute =
       executeHandlerContextGroupWithMetrics(key),
     );
 
-export const initialize = (
-  collectionWithMetrics: HandlerContextCollectionWithMetrics<
-    BaseHandlerT,
-    unknown
-  >,
+export const initialize = <HandlerT extends BaseHandlerT, R = never>(
+  collectionWithMetrics: HandlerContextCollectionWithMetrics<HandlerT, R>,
 ): Effect.Effect<void, never, never> =>
   pipe(
     Object.values(collectionWithMetrics.record) as Array<
-      HandlerContextGroupWithMetricsType<BaseHandlerT, unknown>
+      HandlerContextGroupWithMetricsType<HandlerT, R>
     >,
     Effect.forEach((groupWithMetrics) =>
       initializeHandlerContextGroupWithMetrics(groupWithMetrics),
