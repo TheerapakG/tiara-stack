@@ -56,7 +56,6 @@ type HandlerContextCollectionWithMetricsObject<
   HandlerT extends BaseHandlerT,
   R = never,
 > = {
-  collection: HandlerContextCollection<HandlerT, R>;
   struct: HandlerContextGroupWithMetricsStruct<HandlerT, R>;
   handlerContextTypeTransformer: HandlerContextTypeTransformer<HandlerT>;
 };
@@ -79,7 +78,6 @@ export const make = <HandlerT extends BaseHandlerT, R = never>(
   collection: HandlerContextCollection<HandlerT, R>,
 ): HandlerContextCollectionWithMetrics<HandlerT, R> =>
   new HandlerContextCollectionWithMetrics({
-    collection,
     struct: Object.fromEntries(
       Object.entries(collection.struct).map(([type, group]) => [
         type,
@@ -115,45 +113,38 @@ export const add =
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const C extends HandlerContextCollectionWithMetrics<any, any>,
-    CollectionHandlerT extends HandlerContextCollectionHandlerT<
-      C["collection"]
-    > = HandlerContextCollectionHandlerT<C["collection"]>,
   >(
     collectionWithMetrics: C,
   ) => {
+    // Reconstruct collection from struct to use addHandlerContextCollection
+    const collection = new HandlerContextCollection({
+      struct: Object.fromEntries(
+        Object.entries(collectionWithMetrics.struct).map(([type, groupWithMetrics]) => [
+          type,
+          (groupWithMetrics as HandlerContextGroupWithMetricsType<
+            BaseHandlerT,
+            unknown
+          >).group,
+        ]),
+      ) as any,
+      handlerContextTypeTransformer:
+        collectionWithMetrics.handlerContextTypeTransformer,
+    });
     const updatedCollection = addHandlerContextCollection(handlerContextConfig)(
-      collectionWithMetrics.collection,
+      collection,
     );
     const handlerType =
       collectionWithMetrics.handlerContextTypeTransformer(handlerContextConfig);
-    return new HandlerContextCollectionWithMetrics<
-      HandlerT extends CollectionHandlerT ? CollectionHandlerT : never,
-      HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
-        ?
-            | HandlerContextCollectionContext<C["collection"]>
-            | HandlerEffectContext<HandlerT, H>
-        : never
-    >({
-      collection: updatedCollection,
+    return new HandlerContextCollectionWithMetrics({
       struct: {
         ...collectionWithMetrics.struct,
         [handlerType]: makeHandlerContextGroupWithMetrics(
           handlerType as HandlerType<HandlerT>,
           updatedCollection.struct[
             handlerType as HandlerType<HandlerT>
-          ] as HandlerContextGroup<
-            HandlerT,
-            HandlerContextCollectionContext<C["collection"]>
-          >,
+          ] as HandlerContextGroup<HandlerT, unknown>,
         ),
-      } as unknown as HandlerContextGroupWithMetricsStruct<
-        CollectionHandlerT,
-        HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
-          ?
-              | HandlerContextCollectionContext<C["collection"]>
-              | HandlerEffectContext<HandlerT, H>
-          : never
-      >,
+      } as any,
       handlerContextTypeTransformer:
         collectionWithMetrics.handlerContextTypeTransformer,
     });
@@ -163,42 +154,60 @@ export const addCollection =
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const OtherC extends HandlerContextCollectionWithMetrics<any, any>,
-    HandlerT extends HandlerContextCollectionHandlerT<
-      OtherC["collection"]
-    > = HandlerContextCollectionHandlerT<OtherC["collection"]>,
   >(
     otherCollectionWithMetrics: OtherC,
   ) =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  <const ThisC extends HandlerContextCollectionWithMetrics<HandlerT, any>>(
+  <const ThisC extends HandlerContextCollectionWithMetrics<any, any>>(
     thisCollectionWithMetrics: ThisC,
   ) => {
+    // Reconstruct collections from structs to use addCollectionHandlerContextCollection
+    const thisCollection = new HandlerContextCollection({
+      struct: Object.fromEntries(
+        Object.entries(thisCollectionWithMetrics.struct).map(
+          ([type, groupWithMetrics]) => [
+            type,
+            (groupWithMetrics as HandlerContextGroupWithMetricsType<
+              BaseHandlerT,
+              unknown
+            >).group,
+          ],
+        ),
+      ) as any,
+      handlerContextTypeTransformer:
+        thisCollectionWithMetrics.handlerContextTypeTransformer,
+    });
+    const otherCollection = new HandlerContextCollection({
+      struct: Object.fromEntries(
+        Object.entries(otherCollectionWithMetrics.struct).map(
+          ([type, groupWithMetrics]) => [
+            type,
+            (groupWithMetrics as HandlerContextGroupWithMetricsType<
+              BaseHandlerT,
+              unknown
+            >).group,
+          ],
+        ),
+      ) as any,
+      handlerContextTypeTransformer:
+        otherCollectionWithMetrics.handlerContextTypeTransformer,
+    });
     const updatedCollection = addCollectionHandlerContextCollection(
-      otherCollectionWithMetrics.collection,
-    )(thisCollectionWithMetrics.collection);
-    return new HandlerContextCollectionWithMetrics<
-      HandlerT,
-      | HandlerContextCollectionContext<ThisC["collection"]>
-      | HandlerContextCollectionContext<OtherC["collection"]>
-    >({
-      collection: updatedCollection,
+      otherCollection,
+    )(thisCollection);
+    return new HandlerContextCollectionWithMetrics({
       struct: Object.fromEntries(
         Object.keys(updatedCollection.struct).map((type) => [
           type,
           makeHandlerContextGroupWithMetrics(
-            type as HandlerType<HandlerT>,
+            type as HandlerType<BaseHandlerT>,
             updatedCollection.struct[type] as HandlerContextGroup<
-              HandlerT,
-              | HandlerContextCollectionContext<ThisC["collection"]>
-              | HandlerContextCollectionContext<OtherC["collection"]>
+              BaseHandlerT,
+              unknown
             >,
           ),
         ]),
-      ) as unknown as HandlerContextGroupWithMetricsStruct<
-        HandlerT,
-        | HandlerContextCollectionContext<ThisC["collection"]>
-        | HandlerContextCollectionContext<OtherC["collection"]>
-      >,
+      ) as any,
       handlerContextTypeTransformer:
         thisCollectionWithMetrics.handlerContextTypeTransformer,
     });
