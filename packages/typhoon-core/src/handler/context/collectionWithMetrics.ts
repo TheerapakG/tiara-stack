@@ -2,7 +2,6 @@ import { Data, Effect, Either, Option, pipe, Struct } from "effect";
 import type {
   BaseHandlerT,
   Handler,
-  HandlerContext as HandlerEffectContext,
   HandlerData,
   HandlerDataKey,
   HandlerType,
@@ -12,10 +11,6 @@ import type {
 import {
   HandlerContextCollection,
   empty as emptyHandlerContextCollection,
-  add as addHandlerContextCollection,
-  addCollection as addCollectionHandlerContextCollection,
-  type HandlerContextCollectionContext,
-  type HandlerContextCollectionHandlerT,
 } from "./collection";
 import {
   HandlerContextGroupWithMetrics,
@@ -29,11 +24,7 @@ import {
   add as addHandlerContextGroup,
   addGroup as addGroupHandlerContextGroup,
 } from "./group";
-import type {
-  HandlerContext,
-  HandlerOrUndefined,
-  PartialHandlerContextHandlerT,
-} from "./context";
+import type { HandlerContext, PartialHandlerContextHandlerT } from "./context";
 
 type HandlerContextGroupWithMetricsStruct<
   HandlerT extends BaseHandlerT,
