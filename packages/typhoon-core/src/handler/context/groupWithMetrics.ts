@@ -1,4 +1,15 @@
-import { Data, Effect, Either, Function, HashMap, Metric, Option, pipe, Types } from "effect";
+import {
+  Data,
+  Effect,
+  Either,
+  Function,
+  HashMap,
+  Metric,
+  Option,
+  pipe,
+  Types,
+  Struct,
+} from "effect";
 import type {
   BaseHandlerT,
   Handler,
@@ -63,9 +74,10 @@ const HandlerContextGroupWithMetricsTaggedClass = Data.TaggedClass(
 };
 
 export class HandlerContextGroupWithMetrics<
-  HandlerT extends BaseHandlerT,
-  R = never,
-> extends HandlerContextGroupWithMetricsTaggedClass<HandlerT, R>
+    HandlerT extends BaseHandlerT,
+    R = never,
+  >
+  extends HandlerContextGroupWithMetricsTaggedClass<HandlerT, R>
   implements Variance<HandlerT, R>
 {
   [HandlerContextGroupWithMetricsTypeId] =
@@ -164,20 +176,19 @@ export const add =
     const G extends HandlerContextGroupWithMetrics<HandlerT, any>,
   >(
     groupWithMetrics: G,
-  ) => {
-    const updatedGroup = addHandlerContextGroup(handlerContextConfig)(
-      groupWithMetrics.group,
-    );
-    return new HandlerContextGroupWithMetrics<
+  ) =>
+    new HandlerContextGroupWithMetrics<
       HandlerT,
       HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
-        ? HandlerContextGroupContext<typeof updatedGroup> | HandlerEffectContext<HandlerT, H>
+        ?
+            | HandlerContextGroupWithMetricsContext<G>
+            | HandlerEffectContext<HandlerT, H>
         : never
-    >({
-      ...groupWithMetrics,
-      group: updatedGroup,
-    });
-  };
+    >(
+      Struct.evolve(groupWithMetrics, {
+        group: addHandlerContextGroup(handlerContextConfig),
+      }),
+    );
 
 export const addGroup =
   <
@@ -191,18 +202,16 @@ export const addGroup =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   <const ThisG extends HandlerContextGroupWithMetrics<HandlerT, any>>(
     thisGroupWithMetrics: ThisG,
-  ) => {
-    const updatedGroup = addGroupHandlerContextGroup(otherGroup)(
-      thisGroupWithMetrics.group,
-    );
-    return new HandlerContextGroupWithMetrics<
+  ) =>
+    new HandlerContextGroupWithMetrics<
       HandlerT,
-      HandlerContextGroupContext<typeof updatedGroup> | HandlerContextGroupContext<OtherG>
-    >({
-      ...thisGroupWithMetrics,
-      group: updatedGroup,
-    });
-  };
+      | HandlerContextGroupWithMetricsContext<ThisG>
+      | HandlerContextGroupContext<OtherG>
+    >(
+      Struct.evolve(thisGroupWithMetrics, {
+        group: addGroupHandlerContextGroup(otherGroup),
+      }),
+    );
 
 export const initialize = <HandlerT extends BaseHandlerT, R = never>(
   groupWithMetrics: HandlerContextGroupWithMetrics<HandlerT, R>,
