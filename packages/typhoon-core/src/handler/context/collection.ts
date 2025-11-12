@@ -1,4 +1,13 @@
-import { Data, Function, Struct, Types, Option } from "effect";
+import {
+  Data,
+  Function,
+  Record,
+  Struct,
+  Types,
+  Option,
+  pipe,
+  Array,
+} from "effect";
 import {
   HandlerContextGroup,
   empty as emptyHandlerContextGroup,
@@ -20,7 +29,7 @@ import {
   type HandlerContext as HandlerEffectContext,
 } from "../type";
 
-type HandlerContextGroupStruct<HandlerT extends BaseHandlerT, R> = {
+type HandlerContextGroupRecord<HandlerT extends BaseHandlerT, R> = {
   [HT in HandlerT as HandlerType<HT>]: HandlerContextGroup<HT, R>;
 };
 type HandlerContextTypeTransformer<HandlerT extends BaseHandlerT> = (
@@ -52,7 +61,7 @@ const handlerContextCollectionVariance: <
 
 export class HandlerContextCollection<HandlerT extends BaseHandlerT, R = never>
   extends Data.TaggedClass("HandlerContextCollection")<{
-    struct: HandlerContextGroupStruct<HandlerT, R>;
+    record: HandlerContextGroupRecord<HandlerT, R>;
     handlerContextTypeTransformer: HandlerContextTypeTransformer<HandlerT>;
   }>
   implements Variance<HandlerT, R>
@@ -82,16 +91,15 @@ export const empty = <HandlerT extends BaseHandlerT, R = never>(
   handlerContextTypeTransformer: HandlerContextTypeTransformer<HandlerT>,
 ) =>
   new HandlerContextCollection<HandlerT, R>({
-    struct: Object.fromEntries(
-      Object.entries(dataKeyTransformers).map(([type, transformer]) => [
-        type,
-        emptyHandlerContextGroup<HandlerT, R>(
-          transformer as (
-            data: HandlerData<HandlerT>,
-          ) => HandlerDataKey<HandlerT, HandlerData<HandlerT>>,
-        ),
-      ]),
-    ) as unknown as HandlerContextGroupStruct<HandlerT, R>,
+    record: Record.fromEntries(
+      pipe(
+        Record.toEntries(dataKeyTransformers),
+        Array.map(([type, transformer]) => [
+          type as HandlerType<HandlerT>,
+          emptyHandlerContextGroup<HandlerT, R>(transformer),
+        ]),
+      ),
+    ) as unknown as HandlerContextGroupRecord<HandlerT, R>,
     handlerContextTypeTransformer,
   });
 
@@ -118,17 +126,19 @@ export const add =
         : never
     >(
       Struct.evolve(handlerContextCollection, {
-        struct: (struct) =>
-          Struct.evolve(struct, {
-            [handlerContextCollection.handlerContextTypeTransformer(
+        record: (record) =>
+          Record.modify(
+            record,
+            handlerContextCollection.handlerContextTypeTransformer(
               handlerContextConfig,
-            )]: (
+            ),
+            (
               group: HandlerContextGroup<
                 HandlerT,
                 HandlerContextCollectionContext<C>
               >,
             ) => addHandlerContextGroup(handlerContextConfig)(group),
-          }) as unknown as HandlerContextGroupStruct<
+          ) as HandlerContextGroupRecord<
             CollectionHandlerT,
             HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
               ?
@@ -158,18 +168,11 @@ export const addCollection =
       | HandlerContextCollectionContext<OtherC>
     >(
       Struct.evolve(thisCollection, {
-        struct: (struct) =>
-          Object.fromEntries(
-            Object.entries(struct).map(([type, group]) => [
-              type,
-              addGroupHandlerContextGroup(otherCollection.struct[type])(
-                group as HandlerContextGroup<
-                  HandlerT,
-                  HandlerContextCollectionContext<OtherC>
-                >,
-              ),
-            ]),
-          ) as HandlerContextGroupStruct<
+        record: (record) =>
+          Record.mapEntries(record, (group, type) => [
+            type,
+            addGroupHandlerContextGroup(otherCollection.record[type])(group),
+          ]) as unknown as HandlerContextGroupRecord<
             HandlerT,
             | HandlerContextCollectionContext<ThisC>
             | HandlerContextCollectionContext<OtherC>
@@ -193,7 +196,7 @@ export const getHandlerContext =
     >
   > =>
     getGroupHandlerContext(key)(
-      handlerContextCollection.struct[
+      handlerContextCollection.record[
         type
       ] as HandlerT extends HandlerContextCollectionHandlerT<C>
         ? HandlerContextGroup<HandlerT, HandlerContextCollectionContext<C>>
