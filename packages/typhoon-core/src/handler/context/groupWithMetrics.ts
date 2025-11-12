@@ -50,10 +50,12 @@ export const execute =
   ) =>
   <R>(
     groupWithMetrics: HandlerContextGroupWithMetrics<HandlerT, R>,
-  ): Effect.Effect<
-    HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-    HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-    R
+  ): Option.Option<
+    Effect.Effect<
+      HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+      HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+      R
+    >
   > =>
     pipe(
       getHandlerContext(key)(groupWithMetrics.group),
@@ -66,46 +68,40 @@ export const execute =
           >,
         ) => {
           const handler = getHandlerFromContext(context);
-          return handler as Handler<HandlerT, unknown, unknown, R>;
-        },
-      ),
-      Option.getOrElse(
-        (): Effect.Effect<
-          HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-          HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-          R
-        > =>
-          Effect.void as unknown as Effect.Effect<
+          return pipe(
+            handler as Handler<HandlerT, unknown, unknown, R>,
+            Effect.tapBoth({
+              onSuccess: () =>
+                pipe(
+                  groupWithMetrics.handlerCount,
+                  Metric.update(BigInt(1)),
+                  Effect.tagMetrics({
+                    handler_type: String(groupWithMetrics.handlerType),
+                    handler_key: String(key),
+                    handler_status: "success",
+                  }),
+                ),
+              onFailure: () =>
+                pipe(
+                  groupWithMetrics.handlerCount,
+                  Metric.update(BigInt(1)),
+                  Effect.tagMetrics({
+                    handler_type: String(groupWithMetrics.handlerType),
+                    handler_key: String(key),
+                    handler_status: "failure",
+                  }),
+                ),
+            }),
+            Effect.withSpan("HandlerContextGroupWithMetrics.execute", {
+              captureStackTrace: true,
+            }),
+          ) as Effect.Effect<
             HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
             HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
             R
-          >,
+          >;
+        },
       ),
-      Effect.tapBoth({
-        onSuccess: () =>
-          pipe(
-            groupWithMetrics.handlerCount,
-            Metric.update(BigInt(1)),
-            Effect.tagMetrics({
-              handler_type: String(groupWithMetrics.handlerType),
-              handler_key: String(key),
-              handler_status: "success",
-            }),
-          ),
-        onFailure: () =>
-          pipe(
-            groupWithMetrics.handlerCount,
-            Metric.update(BigInt(1)),
-            Effect.tagMetrics({
-              handler_type: String(groupWithMetrics.handlerType),
-              handler_key: String(key),
-              handler_status: "failure",
-            }),
-          ),
-      }),
-      Effect.withSpan("HandlerContextGroupWithMetrics.execute", {
-        captureStackTrace: true,
-      }),
     );
 
 export const initialize = <HandlerT extends BaseHandlerT, R = never>(

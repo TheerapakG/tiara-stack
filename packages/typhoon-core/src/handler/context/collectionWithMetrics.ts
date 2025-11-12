@@ -1,4 +1,4 @@
-import { Data, Effect, pipe, Struct } from "effect";
+import { Data, Effect, Option, pipe, Struct } from "effect";
 import type {
   BaseHandlerT,
   Handler,
@@ -224,10 +224,12 @@ export const execute =
   ) =>
   <R>(
     collectionWithMetrics: HandlerContextCollectionWithMetrics<HandlerT, R>,
-  ): Effect.Effect<
-    HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-    HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-    R
+  ): Option.Option<
+    Effect.Effect<
+      HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+      HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+      R
+    >
   > =>
     pipe(
       collectionWithMetrics.struct[type] as HandlerContextGroupWithMetricsType<
@@ -235,9 +237,6 @@ export const execute =
         R
       >,
       executeHandlerContextGroupWithMetrics(key),
-      Effect.withSpan("HandlerContextCollectionWithMetrics.execute", {
-        captureStackTrace: true,
-      }),
     );
 
 export const initialize = (
