@@ -1,4 +1,4 @@
-import { Data, Effect, Option, pipe, Struct } from "effect";
+import { Data, Effect, Either, Option, pipe, Struct } from "effect";
 import type {
   BaseHandlerT,
   Handler,
@@ -226,10 +226,9 @@ export const execute =
     collectionWithMetrics: HandlerContextCollectionWithMetrics<HandlerT, R>,
   ): Effect.Effect<
     Option.Option<
-      Effect.Effect<
-        HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
+      Either.Either<
         HandlerError<HandlerT, Handler<HandlerT, unknown, unknown, R>>,
-        R
+        HandlerSuccess<HandlerT, Handler<HandlerT, unknown, unknown, R>>
       >
     >,
     never,
