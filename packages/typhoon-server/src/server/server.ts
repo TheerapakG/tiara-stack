@@ -23,7 +23,6 @@ import {
   String,
   Struct,
   SynchronizedRef,
-  Fiber,
   Tracer,
 } from "effect";
 import { Context as HandlerContext, type Type } from "typhoon-core/handler";
@@ -77,7 +76,7 @@ interface ServerRunStateContextTypeLambda
   readonly type: Server<this["R"]>;
 }
 
-export class Server<R = never> extends Data.TaggedClass("Server")<{
+type ServerData<R = never> = {
   traceProvider: Layer.Layer<never>;
   handlerContextCollection: HandlerContextCoreType.CollectionWithMetrics.HandlerContextCollectionWithMetrics<
     MutationHandlerT | SubscriptionHandlerT,
@@ -90,13 +89,16 @@ export class Server<R = never> extends Data.TaggedClass("Server")<{
   unsubscribeTotal: Metric.Metric.Counter<bigint>;
   onceTotal: Metric.Metric.Counter<bigint>;
   mutationTotal: Metric.Metric.Counter<bigint>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   runState: RunState.RunState<
     ServerRunStateContextTypeLambda,
     void,
     Cause.UnknownException
   >;
-}> {}
+};
+
+export class Server<R = never> extends Data.TaggedClass("Server")<
+  ServerData<R>
+> {}
 
 export class ServerWithRuntime<R = never> extends Data.TaggedClass(
   "ServerWithRuntime",
@@ -323,7 +325,13 @@ export const add =
   ) =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   <S extends Server<any>>(server: S) =>
-    new Server(
+    new Server<
+      | ServerContext<S>
+      | Type.HandlerContext<
+          HandlerContext.PartialHandlerContextHandlerT<C>,
+          HandlerContext.HandlerOrUndefined<C>
+        >
+    >(
       Struct.evolve(server, {
         handlerContextCollection: (collection) =>
           HandlerContextCore.CollectionWithMetrics.add(
@@ -336,17 +344,14 @@ export const add =
               ServerContext<S>
             >,
           ),
-      }),
-    ) as HandlerContext.HandlerOrUndefined<C> extends infer H extends
-      Type.Handler<HandlerContext.PartialHandlerContextHandlerT<C>>
-      ? Server<
-          | ServerContext<S>
-          | Type.HandlerContext<
-              HandlerContext.PartialHandlerContextHandlerT<C>,
-              H
-            >
-        >
-      : never;
+      }) as ServerData<
+        | ServerContext<S>
+        | Type.HandlerContext<
+            HandlerContext.PartialHandlerContextHandlerT<C>,
+            HandlerContext.HandlerOrUndefined<C>
+          >
+      >,
+    );
 
 export const addCollection =
   <
@@ -398,12 +403,9 @@ const updatePeerMetrics =
 const updatePeerState =
   <R = never>(
     peer: Peer,
-    updaterOptions: {
-      onSome: (
-        state: PeerState,
-      ) => Effect.Effect<Option.Option<PeerState>, unknown, R>;
-      onNone: () => Effect.Effect<Option.Option<PeerState>, unknown, R>;
-    },
+    updaterEffect: (
+      state: Option.Option<PeerState>,
+    ) => Effect.Effect<Option.Option<PeerState>, unknown, R>,
   ) =>
   <R = never>(serverWithRuntime: ServerWithRuntime<R>) =>
     pipe(
@@ -412,7 +414,7 @@ const updatePeerState =
         pipe(
           peerStateMap,
           HashMap.get(peer.id),
-          Option.match(updaterOptions),
+          updaterEffect,
           Effect.map((newPeerState) =>
             pipe(
               peerStateMap,
@@ -470,14 +472,20 @@ const updatePeerSubscriptionState =
   <R = never>(serverWithRuntime: ServerWithRuntime<R>) =>
     pipe(
       serverWithRuntime,
-      updatePeerState(peer, {
-        onSome: transformPeerSubscriptionState(subscriptionId, updaterOptions),
-        onNone: () =>
-          pipe(
-            emptyPeerState(peer),
-            transformPeerSubscriptionState(subscriptionId, updaterOptions),
+      updatePeerState(
+        peer,
+        Option.match({
+          onSome: transformPeerSubscriptionState(
+            subscriptionId,
+            updaterOptions,
           ),
-      }),
+          onNone: () =>
+            pipe(
+              emptyPeerState(peer),
+              transformPeerSubscriptionState(subscriptionId, updaterOptions),
+            ),
+        }),
+      ),
       Effect.withSpan("Server.updatePeerSubscriptionState", {
         captureStackTrace: true,
       }),
@@ -488,10 +496,7 @@ const open =
   <R = never>(serverWithRuntime: ServerWithRuntime<R>) =>
     pipe(
       serverWithRuntime,
-      updatePeerState(peer, {
-        onSome: () => Effect.succeedSome(emptyPeerState(peer)),
-        onNone: () => Effect.succeedSome(emptyPeerState(peer)),
-      }),
+      updatePeerState(peer, () => Effect.succeedSome(emptyPeerState(peer))),
       Effect.tap((peerStateMap) =>
         pipe(serverWithRuntime, updatePeerMetrics(peerStateMap, true)),
       ),
@@ -501,14 +506,13 @@ const open =
       }),
     );
 
-const cleanupPeer =
+const close =
   (peer: Peer) =>
   <R = never>(serverWithRuntime: ServerWithRuntime<R>) =>
     pipe(
-      serverWithRuntime.server.peerStateMapRef,
-      SynchronizedRef.get,
-      Effect.map(HashMap.get(peer.id)),
-      Effect.flatMap(
+      serverWithRuntime,
+      updatePeerState(
+        peer,
         Option.match({
           onSome: flow(
             (peerState) => peerState.subscriptionStateMap,
@@ -522,30 +526,10 @@ const cleanupPeer =
                 ),
               ),
             ),
-            Effect.map(Fiber.joinAll),
+            Effect.as(Option.none()),
           ),
-          onNone: () => Effect.succeed(Effect.succeed([])),
+          onNone: () => Effect.succeedNone,
         }),
-      ),
-      Effect.withSpan("Server.cleanupPeer", {
-        captureStackTrace: true,
-      }),
-    );
-
-const close =
-  (peer: Peer) =>
-  <R = never>(serverWithRuntime: ServerWithRuntime<R>) =>
-    pipe(
-      serverWithRuntime,
-      cleanupPeer(peer),
-      Effect.andThen(
-        pipe(
-          serverWithRuntime,
-          updatePeerState(peer, {
-            onSome: () => Effect.succeedNone,
-            onNone: () => Effect.succeedNone,
-          }),
-        ),
       ),
       Effect.tap((peerStateMap) =>
         pipe(serverWithRuntime, updatePeerMetrics(peerStateMap, false)),
