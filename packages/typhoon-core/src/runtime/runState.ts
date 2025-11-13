@@ -11,6 +11,21 @@ import {
   Scope,
 } from "effect";
 
+export interface RunStateContextTypeLambda {
+  readonly R: unknown;
+}
+
+export type RunStateContextKind<
+  F extends RunStateContextTypeLambda,
+  R,
+> = F extends {
+  readonly type: unknown;
+}
+  ? (F & {
+      readonly R: R;
+    })["type"]
+  : never;
+
 type UnsafeRunStateData<A, E> = {
   status: "stopped" | "pending" | "ready";
   runFiber: Option.Option<Fiber.Fiber<A, E>>;
@@ -21,30 +36,38 @@ const UnsafeRunStateTaggedClass: new <A, E>(
   Data.TaggedClass("UnsafeRunState");
 class UnsafeRunState<A, E> extends UnsafeRunStateTaggedClass<A, E> {}
 
-type RunStateData<Context, A, E, R> = {
+type RunStateData<F extends RunStateContextTypeLambda, A, E> = {
   semaphore: Effect.Semaphore;
-  effect: (ctx: Context, runtime: Runtime.Runtime<R>) => Effect.Effect<A, E, R>;
-  finalizer: (
-    ctx: Context,
+  effect: <R>(
+    ctx: RunStateContextKind<F, R>,
+    runtime: Runtime.Runtime<R>,
+  ) => Effect.Effect<A, E, R>;
+  finalizer: <R>(
+    ctx: RunStateContextKind<F, R>,
     runtime: Runtime.Runtime<R>,
   ) => Effect.Effect<unknown, never, never>;
   state: SynchronizedRef.SynchronizedRef<UnsafeRunState<A, E>>;
 };
-const RunStateTaggedClass: new <Context, A, E, R>(
-  args: Readonly<RunStateData<Context, A, E, R>>,
-) => Readonly<RunStateData<Context, A, E, R>> & { readonly _tag: "RunState" } =
+const RunStateTaggedClass: new <F extends RunStateContextTypeLambda, A, E>(
+  args: Readonly<RunStateData<F, A, E>>,
+) => Readonly<RunStateData<F, A, E>> & { readonly _tag: "RunState" } =
   Data.TaggedClass("RunState");
 export class RunState<
-  Context = never,
+  F extends RunStateContextTypeLambda,
   A = never,
   E = never,
-  R = never,
-> extends RunStateTaggedClass<Context, A, E, R> {}
+> extends RunStateTaggedClass<F, A, E> {}
 
-export const make = <Context = never, A = never, E = never, R = never>(
-  effect: (ctx: Context, runtime: Runtime.Runtime<R>) => Effect.Effect<A, E, R>,
-  finalizer: (ctx: Context) => Effect.Effect<unknown, never, never>,
-): Effect.Effect<RunState<Context, A, E, R>, never, never> =>
+export const make = <F extends RunStateContextTypeLambda, A = never, E = never>(
+  effect: <R>(
+    ctx: RunStateContextKind<F, R>,
+    runtime: Runtime.Runtime<R>,
+  ) => Effect.Effect<A, E, R>,
+  finalizer: <R>(
+    ctx: RunStateContextKind<F, R>,
+    runtime: Runtime.Runtime<R>,
+  ) => Effect.Effect<unknown, never, never>,
+): Effect.Effect<RunState<F, A, E>, never, never> =>
   pipe(
     Effect.Do,
     Effect.bind("semaphore", () => Effect.makeSemaphore(1)),
@@ -63,9 +86,12 @@ export const make = <Context = never, A = never, E = never, R = never>(
   );
 
 export const start =
-  <Context, R>(ctx: Context, runtime: Runtime.Runtime<R>) =>
+  <F extends RunStateContextTypeLambda, R>(
+    ctx: RunStateContextKind<F, R>,
+    runtime: Runtime.Runtime<R>,
+  ) =>
   <A, E>(
-    runState: RunState<Context, A, E, R>,
+    runState: RunState<F, A, E>,
   ): Effect.Effect<Option.Option<A>, E, Scope.Scope> =>
     Effect.whenEffect(
       runState.semaphore.withPermits(1)(
@@ -116,9 +142,12 @@ export const start =
     );
 
 export const stop =
-  <Context, R>(ctx: Context, runtime: Runtime.Runtime<R>) =>
+  <F extends RunStateContextTypeLambda, R>(
+    ctx: RunStateContextKind<F, R>,
+    runtime: Runtime.Runtime<R>,
+  ) =>
   <A, E>(
-    runState: RunState<Context, A, E, R>,
+    runState: RunState<F, A, E>,
   ): Effect.Effect<Option.Option<void>, never, never> =>
     Effect.whenEffect(
       runState.semaphore.withPermits(1)(
@@ -159,8 +188,8 @@ export const stop =
       ),
     );
 
-export const status = <Context, A, E, R>(
-  runState: RunState<Context, A, E, R>,
+export const status = <F extends RunStateContextTypeLambda, A, E>(
+  runState: RunState<F, A, E>,
 ): Effect.Effect<"stopped" | "pending" | "ready", never, never> =>
   pipe(
     SynchronizedRef.get(runState.state),
