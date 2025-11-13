@@ -44,6 +44,10 @@ import {
 } from "effect";
 import { RunState } from "typhoon-core/runtime";
 
+interface BotRunStateContextTypeLambda
+  extends RunState.RunStateContextTypeLambda {
+  readonly type: Bot<any, any, this["R"]>;
+}
 export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   "Bot",
 )<{
@@ -57,10 +61,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   >;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly runState: RunState.RunState<
-    Bot<any, any, any>,
+    BotRunStateContextTypeLambda,
     void,
-    Cause.UnknownException,
-    R
+    Cause.UnknownException
   >;
 }> {
   static onChatInputCommandInteraction = (
@@ -226,8 +229,8 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   };
 
   static makeStartEffect =
-    <A = never, E = never, R = never>(discordToken: string) =>
-    (bot: Bot<A, E, R>, runtime: Runtime.Runtime<R>) =>
+    <A = never, E = never>(discordToken: string) =>
+    <R = never>(bot: Bot<A, E, R>, runtime: Runtime.Runtime<R>) =>
       pipe(
         Effect.try(() =>
           bot.client
@@ -323,7 +326,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
           ),
           traceProvider: Effect.succeed(Layer.empty),
           runState: RunState.make(
-            Bot.makeStartEffect<A, E, R>(discordToken),
+            Bot.makeStartEffect<A, E>(discordToken),
             Bot.makeFinalizer<A, E, R>(),
           ),
         }),
