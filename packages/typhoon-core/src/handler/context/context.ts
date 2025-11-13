@@ -98,7 +98,12 @@ export type HandlerOption<
 export type HandlerOrUndefined<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Config extends PartialHandlerContext<any>,
-> = GetOrUndefined<HandlerOption<Config>>;
+> =
+  GetOrUndefined<HandlerOption<Config>> extends infer H extends Handler<
+    PartialHandlerContextHandlerT<Config>
+  >
+    ? H
+    : never;
 
 export const handler = <
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

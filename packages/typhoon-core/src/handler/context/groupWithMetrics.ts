@@ -191,11 +191,8 @@ export const add =
   ) =>
     new HandlerContextGroupWithMetrics<
       HandlerT,
-      HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
-        ?
-            | HandlerContextGroupWithMetricsContext<G>
-            | HandlerEffectContext<HandlerT, H>
-        : never
+      | HandlerContextGroupWithMetricsContext<G>
+      | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>
     >(
       Struct.evolve(groupWithMetrics, {
         group: addHandlerContextGroup(handlerContextConfig),

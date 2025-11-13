@@ -169,11 +169,8 @@ export const add =
   ) =>
     new HandlerContextCollectionWithMetrics<
       HandlerT extends CollectionHandlerT ? CollectionHandlerT : never,
-      HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
-        ?
-            | HandlerContextCollectionWithMetricsContext<C>
-            | HandlerEffectContext<HandlerT, H>
-        : never
+      | HandlerContextCollectionWithMetricsContext<C>
+      | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>
     >(
       Struct.evolve(collectionWithMetrics, {
         record: (record) =>

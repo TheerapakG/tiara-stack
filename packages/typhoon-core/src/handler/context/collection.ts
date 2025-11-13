@@ -121,9 +121,8 @@ export const add =
   ) =>
     new HandlerContextCollection<
       HandlerT extends CollectionHandlerT ? CollectionHandlerT : never,
-      HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
-        ? HandlerContextCollectionContext<C> | HandlerEffectContext<HandlerT, H>
-        : never
+      | HandlerContextCollectionContext<C>
+      | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>
     >(
       Struct.evolve(handlerContextCollection, {
         record: (record) =>
@@ -140,11 +139,8 @@ export const add =
             ) => addHandlerContextGroup(handlerContextConfig)(group),
           ) as HandlerContextGroupRecord<
             CollectionHandlerT,
-            HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
-              ?
-                  | HandlerContextCollectionContext<C>
-                  | HandlerEffectContext<HandlerT, H>
-              : never
+            | HandlerContextCollectionContext<C>
+            | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>
           >,
       }),
     );

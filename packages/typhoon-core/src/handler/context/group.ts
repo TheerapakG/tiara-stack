@@ -89,9 +89,8 @@ export const add =
   ) =>
     new HandlerContextGroup<
       HandlerT,
-      HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
-        ? HandlerContextGroupContext<G> | HandlerEffectContext<HandlerT, H>
-        : never
+      | HandlerContextGroupContext<G>
+      | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>
     >(
       Struct.evolve(handlerContextGroup, {
         map: (map) =>
