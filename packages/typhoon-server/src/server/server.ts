@@ -72,6 +72,11 @@ type PeerStateMap = HashMap.HashMap<string, PeerState>;
 type ServerContext<S extends Server<any>> =
   S extends Server<infer R> ? R : never;
 
+interface ServerRunStateContextTypeLambda
+  extends RunState.RunStateContextTypeLambda {
+  readonly type: Server<this["R"]>;
+}
+
 export class Server<R = never> extends Data.TaggedClass("Server")<{
   traceProvider: Layer.Layer<never>;
   handlerContextCollection: HandlerContextCoreType.CollectionWithMetrics.HandlerContextCollectionWithMetrics<
@@ -86,7 +91,11 @@ export class Server<R = never> extends Data.TaggedClass("Server")<{
   onceTotal: Metric.Metric.Counter<bigint>;
   mutationTotal: Metric.Metric.Counter<bigint>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  runState: RunState.RunState<Server<any>, void, Cause.UnknownException, R>;
+  runState: RunState.RunState<
+    ServerRunStateContextTypeLambda,
+    void,
+    Cause.UnknownException
+  >;
 }> {}
 
 export class ServerWithRuntime<R = never> extends Data.TaggedClass(
@@ -97,8 +106,8 @@ export class ServerWithRuntime<R = never> extends Data.TaggedClass(
 }> {}
 
 const makeServeEffect =
-  <R = never>(serveFn: typeof crosswsServe) =>
-  (server: Server<R>, runtime: Runtime.Runtime<R>) =>
+  (serveFn: typeof crosswsServe) =>
+  <R = never>(server: Server<R>, runtime: Runtime.Runtime<R>) =>
     pipe(
       Effect.Do,
       Effect.let(
@@ -289,7 +298,7 @@ export const create = <R = never>(serveFn: typeof crosswsServe) =>
             incremental: true,
           }),
         ),
-        runState: RunState.make(makeServeEffect<R>(serveFn), () => Effect.void),
+        runState: RunState.make(makeServeEffect(serveFn), () => Effect.void),
       }),
       { concurrency: "unbounded" },
     ),
