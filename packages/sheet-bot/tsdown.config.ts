@@ -1,5 +1,5 @@
 import { lightFormat } from "date-fns";
-import path from "pathe";
+import { fileURLToPath } from "url";
 import simpleGit from "simple-git";
 import { defineConfig } from "tsdown";
 
@@ -9,8 +9,8 @@ const hash = (await git.revparse("HEAD")).substring(0, 7);
 
 export default defineConfig({
   entry: {
-    index: path.resolve(__dirname, "src/index.ts"),
-    register: path.resolve(__dirname, "src/register.ts"),
+    index: fileURLToPath(new URL("src/index.ts", import.meta.url)),
+    register: fileURLToPath(new URL("src/register.ts", import.meta.url)),
   },
   sourcemap: true,
   env: {
