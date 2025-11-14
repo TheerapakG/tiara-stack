@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zero-cache
+  labels:
+    app: zero-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zero-cache
+  template:
+    metadata:
+      labels:
+        app: zero-cache
+    spec:
+      containers:
+        - name: zero-cache
+          image: rocicorp/zero:latest
+          ports:
+            - containerPort: 4848
+              name: zero-cache-svc
+          env:
+            - name: ZERO_REPLICA_FILE
+              valueFrom:
+                secretKeyRef:
+                  name: zero-secret
+                  key: zeroReplicaFile
+            - name: ZERO_UPSTREAM_DB
+              valueFrom:
+                secretKeyRef:
+                  name: zero-secret
+                  key: zeroUpstreamDb
+            - name: ZERO_CVR_DB
+              valueFrom:
+                secretKeyRef:
+                  name: zero-secret
+                  key: zeroCvrDb
+            - name: ZERO_CHANGE_DB
+              valueFrom:
+                secretKeyRef:
+                  name: zero-secret
+                  key: zeroChangeDb
+            - name: ZERO_APP_PUBLICATIONS
+              valueFrom:
+                secretKeyRef:
+                  name: zero-secret
+                  key: zeroAppPublications
+            - name: ZERO_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: zero-secret
+                  key: zeroAdminPassword
+            - name: ZERO_AUTH_JWKS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: zero-secret
+                  key: zeroAuthJwksUrl
+          volumeMounts:
+            - name: zero-cache-pvc
+              mountPath: /data
+      serviceAccountName: zero-cache
+  volumeClaimTemplates:
+    - metadata:
+        name: zero-cache-pvc
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi
+        storageClassName: do-block-storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zero-cache-service
+  labels:
+    app: zero-cache
+spec:
+  ports:
+    - name: zero-cache-svc
+      protocol: TCP
+      port: 4848
+      targetPort: zero-cache-svc
+  selector:
+    app: zero-cache
