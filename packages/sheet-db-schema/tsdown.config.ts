@@ -1,10 +1,10 @@
-import path from "pathe";
+import { fileURLToPath } from "url";
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
   entry: {
-    index: path.resolve(__dirname, "src/schema.ts"),
-    zero: path.resolve(__dirname, "src/zero/index.ts"),
+    index: fileURLToPath(new URL("src/schema.ts", import.meta.url)),
+    zero: fileURLToPath(new URL("src/zero/index.ts", import.meta.url)),
   },
   sourcemap: true,
 });
