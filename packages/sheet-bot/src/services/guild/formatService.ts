@@ -270,7 +270,7 @@ export class FormatService extends Effect.Service<FormatService>()(
                   Option.map((mentionsString) => {
                     const render = Handlebars.compile(
                       template ??
-                        "{{mentionsString}} React to this message to check in, and {{channelString}} {{hourString}} {{timeStampString}}",
+                        "{{mentionsString}} Press the button below to check in, and {{channelString}} {{hourString}} {{timeStampString}}",
                       {
                         noEscape: true,
                       },
