@@ -1,16 +1,16 @@
-import path from "pathe";
+import { fileURLToPath } from "url";
 import { defineConfig } from "tsdown";
 
 export default defineConfig([
   {
     entry: {
-      index: path.resolve(__dirname, "src/index.ts"),
+      index: fileURLToPath(new URL("src/index.ts", import.meta.url)),
     },
     sourcemap: true,
   },
   {
     entry: {
-      runServer: path.resolve(__dirname, "src/runServer.ts"),
+      runServer: fileURLToPath(new URL("src/runServer.ts", import.meta.url)),
     },
     sourcemap: true,
     external: ["playwright", "playwright-core"],
