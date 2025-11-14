@@ -9,12 +9,12 @@
   "sideEffects": [],
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "module": "./dist/index.js"
+      "types": "./dist/index.d.mts",
+      "module": "./dist/index.mjs"
     },
     "./*": {
-      "types": "./dist/*/index.d.ts",
-      "module": "./dist/*/index.js"
+      "types": "./dist/*/index.d.mts",
+      "module": "./dist/*/index.mjs"
     },
     "./package.json": "./package.json"
   },
@@ -41,7 +41,7 @@
     "oxlint": "^1.16.0",
     "pathe": "^2.0.3",
     "prettier": "^3.5.3",
-    "tsdown": "^0.15.6",
+    "tsdown": "^0.16.4",
     "typescript": "^5.9.3"
   }
 }

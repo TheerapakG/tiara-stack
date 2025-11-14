@@ -8,4 +8,4 @@ RUN update-ca-certificates
 
 COPY ./dist.tar.zst ./dist.tar.zst
 
-CMD tar -axf ./dist.tar.zst && node --use-openssl-ca ./dist/index.js
+CMD tar -axf ./dist.tar.zst && node --use-openssl-ca ./dist/index.mjs
