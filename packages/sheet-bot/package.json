@@ -5,8 +5,8 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.mts",
-      "module": "./dist/index.mjs"
+      "types": "./dist/index.d.ts",
+      "module": "./dist/index.js"
     },
     "./package.json": "./package.json"
   },
