@@ -15,4 +15,4 @@ RUN npx playwright install --with-deps chromium
 
 COPY ./dist.tar.zst ./dist.tar.zst
 
-CMD tar -axf ./dist.tar.zst && NODE_EXTRA_CA_CERTS=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt node --use-openssl-ca --enable-source-maps ./dist/runServer.js
+CMD tar -axf ./dist.tar.zst && NODE_EXTRA_CA_CERTS=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt node --use-openssl-ca --enable-source-maps ./dist/runServer.mjs

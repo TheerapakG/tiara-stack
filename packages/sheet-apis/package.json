@@ -12,8 +12,8 @@
       "module": "./dist/index.mjs"
     },
     "./runServer": {
-      "types": "./dist/runServer.d.ts",
-      "module": "./dist/runServer.js"
+      "types": "./dist/runServer.d.mts",
+      "module": "./dist/runServer.mjs"
     },
     "./package.json": "./package.json"
   },
