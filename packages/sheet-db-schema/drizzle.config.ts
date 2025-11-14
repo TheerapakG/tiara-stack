@@ -3,9 +3,11 @@ import "dotenv/config";
 import { defineConfig } from "drizzle-kit";
 
 const env = Effect.runSync(
-  Schema.decodeUnknown(Schema.Struct({ POSTGRES_URL: Schema.String }))(
-    process.env,
-  ),
+  Schema.decodeUnknown(
+    Schema.Struct({
+      POSTGRES_URL: Schema.optionalWith(Schema.String, { default: () => "" }),
+    }),
+  )(process.env),
 );
 
 export default defineConfig({
