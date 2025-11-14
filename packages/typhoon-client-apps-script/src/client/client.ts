@@ -42,22 +42,18 @@ export class AppsScriptClient<
   ) {}
 
   static create<
-    SubscriptionHandlerConfigs extends Record<
-      string,
-      Handler.Config.Subscription.SubscriptionHandlerConfig
-    >,
-    MutationHandlerConfigs extends Record<
-      string,
-      Handler.Config.Mutation.MutationHandlerConfig
+    const Collection extends Handler.Config.Collection.HandlerConfigCollection<
+      any,
+      any
     >,
   >(
-    configCollection: Handler.Config.Collection.HandlerConfigCollection<
-      SubscriptionHandlerConfigs,
-      MutationHandlerConfigs
-    >,
+    configCollection: Collection,
     url: string,
   ): Effect.Effect<
-    AppsScriptClient<SubscriptionHandlerConfigs, MutationHandlerConfigs>,
+    AppsScriptClient<
+      Handler.Config.Collection.HandlerConfigCollectionSubscriptionHandlerConfigs<Collection>,
+      Handler.Config.Collection.HandlerConfigCollectionMutationHandlerConfigs<Collection>
+    >,
     never,
     never
   > {
@@ -67,8 +63,8 @@ export class AppsScriptClient<
       Effect.map(
         ({ token }) =>
           new AppsScriptClient<
-            SubscriptionHandlerConfigs,
-            MutationHandlerConfigs
+            Handler.Config.Collection.HandlerConfigCollectionSubscriptionHandlerConfigs<Collection>,
+            Handler.Config.Collection.HandlerConfigCollectionMutationHandlerConfigs<Collection>
           >(url, configCollection, token),
       ),
       Effect.withSpan("AppsScriptClient.create", {
@@ -97,19 +93,17 @@ export class AppsScriptClient<
       string,
       Handler.Config.Subscription.SubscriptionHandlerConfig
     >,
-    Handler extends keyof SubscriptionHandlerConfigs & string,
+    H extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: AppsScriptClient<
       SubscriptionHandlerConfigs,
       Record<string, Handler.Config.Mutation.MutationHandlerConfig>
     >,
-    handler: Handler,
+    handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
       Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<
-          SubscriptionHandlerConfigs[Handler]
-        >
+        Handler.Config.RequestParamsOrUndefined<SubscriptionHandlerConfigs[H]>
       >
     >,
   ) {
@@ -228,14 +222,14 @@ export class AppsScriptClient<
                     Validator.Output<
                       Handler.Config.ResolvedResponseErrorValidator<
                         Handler.Config.ResponseErrorOrUndefined<
-                          SubscriptionHandlerConfigs[Handler]
+                          SubscriptionHandlerConfigs[H]
                         >
                       >
                     >,
                     Validator.Input<
                       Handler.Config.ResolvedResponseErrorValidator<
                         Handler.Config.ResponseErrorOrUndefined<
-                          SubscriptionHandlerConfigs[Handler]
+                          SubscriptionHandlerConfigs[H]
                         >
                       >
                     >

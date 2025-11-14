@@ -37,22 +37,18 @@ export class HttpClient<
   ) {}
 
   static create<
-    SubscriptionHandlerConfigs extends Record<
-      string,
-      Handler.Config.Subscription.SubscriptionHandlerConfig
-    >,
-    MutationHandlerConfigs extends Record<
-      string,
-      Handler.Config.Mutation.MutationHandlerConfig
+    const Collection extends Handler.Config.Collection.HandlerConfigCollection<
+      any,
+      any
     >,
   >(
-    configCollection: Handler.Config.Collection.HandlerConfigCollection<
-      SubscriptionHandlerConfigs,
-      MutationHandlerConfigs
-    >,
+    configCollection: Collection,
     url: string,
   ): Effect.Effect<
-    HttpClient<SubscriptionHandlerConfigs, MutationHandlerConfigs>,
+    HttpClient<
+      Handler.Config.Collection.HandlerConfigCollectionSubscriptionHandlerConfigs<Collection>,
+      Handler.Config.Collection.HandlerConfigCollectionMutationHandlerConfigs<Collection>
+    >,
     never,
     never
   > {
@@ -61,11 +57,10 @@ export class HttpClient<
       Effect.bind("token", () => SynchronizedRef.make(Option.none<string>())),
       Effect.map(
         ({ token }) =>
-          new HttpClient<SubscriptionHandlerConfigs, MutationHandlerConfigs>(
-            url,
-            configCollection,
-            token,
-          ),
+          new HttpClient<
+            Handler.Config.Collection.HandlerConfigCollectionSubscriptionHandlerConfigs<Collection>,
+            Handler.Config.Collection.HandlerConfigCollectionMutationHandlerConfigs<Collection>
+          >(url, configCollection, token),
       ),
       Effect.withSpan("HttpClient.create", {
         captureStackTrace: true,
@@ -93,19 +88,17 @@ export class HttpClient<
       string,
       Handler.Config.Subscription.SubscriptionHandlerConfig
     >,
-    Handler extends keyof SubscriptionHandlerConfigs & string,
+    H extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: HttpClient<
       SubscriptionHandlerConfigs,
       Record<string, Handler.Config.Mutation.MutationHandlerConfig>
     >,
-    handler: Handler,
+    handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
       Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<
-          SubscriptionHandlerConfigs[Handler]
-        >
+        Handler.Config.RequestParamsOrUndefined<SubscriptionHandlerConfigs[H]>
       >
     >,
   ) {
@@ -224,14 +217,14 @@ export class HttpClient<
                     Validator.Output<
                       Handler.Config.ResolvedResponseErrorValidator<
                         Handler.Config.ResponseErrorOrUndefined<
-                          SubscriptionHandlerConfigs[Handler]
+                          SubscriptionHandlerConfigs[H]
                         >
                       >
                     >,
                     Validator.Input<
                       Handler.Config.ResolvedResponseErrorValidator<
                         Handler.Config.ResponseErrorOrUndefined<
-                          SubscriptionHandlerConfigs[Handler]
+                          SubscriptionHandlerConfigs[H]
                         >
                       >
                     >

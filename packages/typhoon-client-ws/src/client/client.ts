@@ -88,22 +88,18 @@ export class WebSocketClient<
   ) {}
 
   static create<
-    SubscriptionHandlerConfigs extends Record<
-      string,
-      Handler.Config.Subscription.SubscriptionHandlerConfig
-    >,
-    MutationHandlerConfigs extends Record<
-      string,
-      Handler.Config.Mutation.MutationHandlerConfig
+    const Collection extends Handler.Config.Collection.HandlerConfigCollection<
+      any,
+      any
     >,
   >(
-    configCollection: Handler.Config.Collection.HandlerConfigCollection<
-      SubscriptionHandlerConfigs,
-      MutationHandlerConfigs
-    >,
+    configCollection: Collection,
     url: string,
   ): Effect.Effect<
-    WebSocketClient<SubscriptionHandlerConfigs, MutationHandlerConfigs>,
+    WebSocketClient<
+      Handler.Config.Collection.HandlerConfigCollectionSubscriptionHandlerConfigs<Collection>,
+      Handler.Config.Collection.HandlerConfigCollectionMutationHandlerConfigs<Collection>
+    >,
     never,
     never
   > {
@@ -122,8 +118,8 @@ export class WebSocketClient<
       Effect.map(
         ({ ws, updaterStateMapRef, token, status }) =>
           new WebSocketClient<
-            SubscriptionHandlerConfigs,
-            MutationHandlerConfigs
+            Handler.Config.Collection.HandlerConfigCollectionSubscriptionHandlerConfigs<Collection>,
+            Handler.Config.Collection.HandlerConfigCollectionMutationHandlerConfigs<Collection>
           >(url, ws, updaterStateMapRef, configCollection, token, status),
       ),
       Effect.withSpan("WebSocketClient.create", {
@@ -397,19 +393,17 @@ export class WebSocketClient<
       string,
       Handler.Config.Subscription.SubscriptionHandlerConfig
     >,
-    Handler extends keyof SubscriptionHandlerConfigs & string,
+    H extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: WebSocketClient<
       SubscriptionHandlerConfigs,
       Record<string, Handler.Config.Mutation.MutationHandlerConfig>
     >,
-    handler: Handler,
+    handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
       Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<
-          SubscriptionHandlerConfigs[Handler]
-        >
+        Handler.Config.RequestParamsOrUndefined<SubscriptionHandlerConfigs[H]>
       >
     >,
   ) {
@@ -442,14 +436,14 @@ export class WebSocketClient<
             Validator.Output<
               Handler.Config.ResolvedResponseValidator<
                 Handler.Config.ResponseOrUndefined<
-                  SubscriptionHandlerConfigs[Handler]
+                  SubscriptionHandlerConfigs[H]
                 >
               >
             >,
             Validator.Output<
               Handler.Config.ResolvedResponseErrorValidator<
                 Handler.Config.ResponseErrorOrUndefined<
-                  SubscriptionHandlerConfigs[Handler]
+                  SubscriptionHandlerConfigs[H]
                 >
               >
             >
@@ -480,14 +474,14 @@ export class WebSocketClient<
                             Validator.Output<
                               Handler.Config.ResolvedResponseErrorValidator<
                                 Handler.Config.ResponseErrorOrUndefined<
-                                  SubscriptionHandlerConfigs[Handler]
+                                  SubscriptionHandlerConfigs[H]
                                 >
                               >
                             >,
                             Validator.Input<
                               Handler.Config.ResolvedResponseErrorValidator<
                                 Handler.Config.ResponseErrorOrUndefined<
-                                  SubscriptionHandlerConfigs[Handler]
+                                  SubscriptionHandlerConfigs[H]
                                 >
                               >
                             >
@@ -601,19 +595,17 @@ export class WebSocketClient<
       string,
       Handler.Config.Subscription.SubscriptionHandlerConfig
     >,
-    Handler extends keyof SubscriptionHandlerConfigs & string,
+    H extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: WebSocketClient<
       SubscriptionHandlerConfigs,
       Record<string, Handler.Config.Mutation.MutationHandlerConfig>
     >,
-    handler: Handler,
+    handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
       Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<
-          SubscriptionHandlerConfigs[Handler]
-        >
+        Handler.Config.RequestParamsOrUndefined<SubscriptionHandlerConfigs[H]>
       >
     >,
   ) {
@@ -641,14 +633,14 @@ export class WebSocketClient<
       string,
       Handler.Config.Subscription.SubscriptionHandlerConfig
     >,
-    Handler extends keyof SubscriptionHandlerConfigs & string,
+    H extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: WebSocketClient<
       SubscriptionHandlerConfigs,
       Record<string, Handler.Config.Mutation.MutationHandlerConfig>
     >,
     id: string,
-    handler: Handler,
+    handler: H,
   ) {
     return pipe(
       Effect.Do,
@@ -704,19 +696,17 @@ export class WebSocketClient<
       string,
       Handler.Config.Subscription.SubscriptionHandlerConfig
     >,
-    Handler extends keyof SubscriptionHandlerConfigs & string,
+    H extends keyof SubscriptionHandlerConfigs & string,
   >(
     client: WebSocketClient<
       SubscriptionHandlerConfigs,
       Record<string, Handler.Config.Mutation.MutationHandlerConfig>
     >,
-    handler: Handler,
+    handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
       Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<
-          SubscriptionHandlerConfigs[Handler]
-        >
+        Handler.Config.RequestParamsOrUndefined<SubscriptionHandlerConfigs[H]>
       >
     >,
   ) {
@@ -750,7 +740,7 @@ export class WebSocketClient<
               Validator.Output<
                 Handler.Config.ResolvedResponseValidator<
                   Handler.Config.ResponseOrUndefined<
-                    SubscriptionHandlerConfigs[Handler]
+                    SubscriptionHandlerConfigs[H]
                   >
                 >
               >,
@@ -758,7 +748,7 @@ export class WebSocketClient<
                   Validator.Output<
                     Handler.Config.ResolvedResponseErrorValidator<
                       Handler.Config.ResponseErrorOrUndefined<
-                        SubscriptionHandlerConfigs[Handler]
+                        SubscriptionHandlerConfigs[H]
                       >
                     >
                   >
@@ -791,14 +781,14 @@ export class WebSocketClient<
                           Validator.Output<
                             Handler.Config.ResolvedResponseErrorValidator<
                               Handler.Config.ResponseErrorOrUndefined<
-                                SubscriptionHandlerConfigs[Handler]
+                                SubscriptionHandlerConfigs[H]
                               >
                             >
                           >,
                           Validator.Input<
                             Handler.Config.ResolvedResponseErrorValidator<
                               Handler.Config.ResponseErrorOrUndefined<
-                                SubscriptionHandlerConfigs[Handler]
+                                SubscriptionHandlerConfigs[H]
                               >
                             >
                           >
@@ -892,17 +882,17 @@ export class WebSocketClient<
       string,
       Handler.Config.Mutation.MutationHandlerConfig
     >,
-    Handler extends keyof MutationHandlerConfigs & string,
+    H extends keyof MutationHandlerConfigs & string,
   >(
     client: WebSocketClient<
       Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
       MutationHandlerConfigs
     >,
-    handler: Handler,
+    handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
       Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<MutationHandlerConfigs[Handler]>
+        Handler.Config.RequestParamsOrUndefined<MutationHandlerConfigs[H]>
       >
     >,
   ) {
@@ -935,16 +925,14 @@ export class WebSocketClient<
             result: Either.Either<
               Validator.Output<
                 Handler.Config.ResolvedResponseValidator<
-                  Handler.Config.ResponseOrUndefined<
-                    MutationHandlerConfigs[Handler]
-                  >
+                  Handler.Config.ResponseOrUndefined<MutationHandlerConfigs[H]>
                 >
               >,
               | RpcError<
                   Validator.Output<
                     Handler.Config.ResolvedResponseErrorValidator<
                       Handler.Config.ResponseErrorOrUndefined<
-                        MutationHandlerConfigs[Handler]
+                        MutationHandlerConfigs[H]
                       >
                     >
                   >
@@ -977,14 +965,14 @@ export class WebSocketClient<
                           Validator.Output<
                             Handler.Config.ResolvedResponseErrorValidator<
                               Handler.Config.ResponseErrorOrUndefined<
-                                MutationHandlerConfigs[Handler]
+                                MutationHandlerConfigs[H]
                               >
                             >
                           >,
                           Validator.Input<
                             Handler.Config.ResolvedResponseErrorValidator<
                               Handler.Config.ResponseErrorOrUndefined<
-                                MutationHandlerConfigs[Handler]
+                                MutationHandlerConfigs[H]
                               >
                             >
                           >
