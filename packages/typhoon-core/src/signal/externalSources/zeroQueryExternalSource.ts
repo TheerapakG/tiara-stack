@@ -1,5 +1,5 @@
 import type { Query, Zero } from "@rocicorp/zero";
-import { Effect, Option, pipe, Queue, Ref, Runtime, Scope } from "effect";
+import { Effect, Option, pipe, Ref, Runtime, Scope } from "effect";
 import type { ExternalSource } from "../externalComputed";
 import { ZeroService } from "../../services/zeroService";
 
@@ -72,80 +72,68 @@ export const make = <T>(
     ),
     Effect.tap(({ zero, valueRef, startedRef, onEmitRef }) =>
       pipe(
-        Queue.unbounded<ZeroQueryResult<T>>(),
-        Effect.tap((queue) =>
-          pipe(
-            Effect.sync(() => {
-              const runtime = Runtime.defaultRuntime;
-              // Materialize the query to get a TypedView (without factory to access view directly)
-              const typedView = zero.materialize(query, options as any);
+        Effect.sync(() => {
+          const runtime = Runtime.defaultRuntime;
+          // Materialize the query to get a TypedView (without factory to access view directly)
+          const typedView = zero.materialize(query, options as any);
 
-              // Apply viewFactory to get the transformed value
-              const getValue = () => viewFactory(zero);
+          // Apply viewFactory to get the transformed value
+          const getValue = () => viewFactory(zero);
 
-              // Store initial value synchronously if available (optimistically resolved)
-              const initialData = typedView.data;
-              if (initialData !== undefined) {
-                const initialValue = getValue();
-                const initialResult: ZeroQueryResult<T> = {
-                  _tag: "Optimistic",
-                  value: initialValue,
-                };
-                Runtime.runSync(runtime)(
-                  Ref.set(valueRef, Option.some(initialResult)),
-                );
-                Runtime.runSync(runtime)(Queue.offer(queue, initialResult));
-              }
-
-              // Subscribe to view changes
-              const unsubscribe = typedView.addListener(
-                (
-                  data: unknown,
-                  resultType: "unknown" | "complete" | "error",
-                ) => {
-                  // Get the current value using the factory
-                  const currentValue = getValue();
-                  // Map resultType to our result types
-                  // 'unknown' indicates optimistic/local cache value
-                  // 'complete' indicates server-updated value
-                  const result: ZeroQueryResult<T> =
-                    resultType === "complete"
-                      ? { _tag: "Complete", value: currentValue }
-                      : { _tag: "Optimistic", value: currentValue };
-
-                  // Enqueue the result (will be processed by the fiber)
-                  Runtime.runSync(runtime)(Queue.offer(queue, result));
-                },
-              );
-
-              return () => {
-                unsubscribe();
-                typedView.destroy();
-              };
-            }),
-            Effect.flatMap((cleanup) =>
-              Effect.addFinalizer(() => Effect.sync(() => cleanup())),
-            ),
-          ),
-        ),
-        Effect.tap((queue) =>
-          // Spawn a single fiber that both stores and emits values
-          // This fiber runs regardless of start/stop state to keep values fresh
-          pipe(
-            Queue.take(queue),
-            Effect.tap((result) => Ref.set(valueRef, Option.some(result))),
-            Effect.tap((result) =>
+          // Helper to emit a value (stores and conditionally emits)
+          const emitValue = (result: ZeroQueryResult<T>) => {
+            Runtime.runSync(runtime)(
               pipe(
-                Ref.get(onEmitRef),
-                Effect.flatMap(
-                  Effect.transposeMapOption((onEmit) => onEmit(result)),
+                Ref.set(valueRef, Option.some(result)),
+                Effect.tap(() =>
+                  pipe(
+                    Ref.get(onEmitRef),
+                    Effect.flatMap(
+                      Effect.transposeMapOption((onEmit) => onEmit(result)),
+                    ),
+                    Effect.whenEffect(Ref.get(startedRef)),
+                  ),
                 ),
-                Effect.whenEffect(Ref.get(startedRef)),
               ),
-            ),
-            Effect.forever,
-            Effect.forkScoped,
-          ),
+            );
+          };
+
+          // Store initial value synchronously if available (optimistically resolved)
+          const initialData = typedView.data;
+          if (initialData !== undefined) {
+            const initialValue = getValue();
+            const initialResult: ZeroQueryResult<T> = {
+              _tag: "Optimistic",
+              value: initialValue,
+            };
+            emitValue(initialResult);
+          }
+
+          // Subscribe to view changes
+          const unsubscribe = typedView.addListener(
+            (data: unknown, resultType: "unknown" | "complete" | "error") => {
+              // Get the current value using the factory
+              const currentValue = getValue();
+              // Map resultType to our result types
+              // 'unknown' indicates optimistic/local cache value
+              // 'complete' indicates server-updated value
+              const result: ZeroQueryResult<T> =
+                resultType === "complete"
+                  ? { _tag: "Complete", value: currentValue }
+                  : { _tag: "Optimistic", value: currentValue };
+
+              // Store and conditionally emit the result
+              emitValue(result);
+            },
+          );
+
+          return () => {
+            unsubscribe();
+            typedView.destroy();
+          };
+        }),
+        Effect.flatMap((cleanup) =>
+          Effect.addFinalizer(() => Effect.sync(() => cleanup())),
         ),
       ),
     ),
