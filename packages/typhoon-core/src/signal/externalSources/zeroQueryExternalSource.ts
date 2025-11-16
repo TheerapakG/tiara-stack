@@ -79,12 +79,15 @@ export const make = <T>(
     ),
     Effect.flatMap(({ zero, valueRef, startedRef, onEmitRef }) =>
       pipe(
-        Effect.makeLatch(),
-        Effect.flatMap((firstValueLatch) =>
+        Effect.all({
+          firstValueLatch: Effect.makeLatch(),
+          destroyCallbackRef: Ref.make<Option.Option<() => void>>(
+            Option.none(),
+          ),
+        }),
+        Effect.flatMap(({ firstValueLatch, destroyCallbackRef }) =>
           pipe(
             Effect.sync(() => {
-              let destroyCallback: (() => void) | undefined;
-
               // Create a ViewFactory that directly pipes values into the valueRef
               const viewFactory: ViewFactory<any, any, any, T> = (
                 query,
@@ -95,9 +98,6 @@ export const make = <T>(
                 queryComplete,
                 updateTTL,
               ) => {
-                // Store the onDestroy callback to be called when scope closes
-                destroyCallback = onDestroy;
-
                 // Determine if this is optimistic or complete based on queryComplete
                 const isComplete =
                   queryComplete === true ||
@@ -112,28 +112,38 @@ export const make = <T>(
                   ? new Complete({ value })
                   : new Optimistic({ value });
 
-                // Helper to emit a value (stores and conditionally emits)
-                const emitValue = pipe(
-                  Ref.set(valueRef, result),
-                  Effect.tap(() =>
-                    pipe(
-                      Ref.get(onEmitRef),
-                      Effect.flatMap(
-                        Effect.transposeMapOption((onEmit) => onEmit(result)),
-                      ),
-                      Effect.whenEffect(Ref.get(startedRef)),
-                    ),
-                  ),
-                );
-
-                // Run the emit effect and signal latch opening
-                Effect.runSync(
+                // Wrap the entire viewFactory logic in Effect.runFork
+                Effect.runFork(
                   pipe(
-                    emitValue,
-                    Effect.tap(() => firstValueLatch.open),
+                    // Store the onDestroy callback to be called when scope closes
+                    Ref.set(destroyCallbackRef, Option.some(onDestroy)),
+                    Effect.flatMap(() => {
+                      // Helper to emit a value (stores and conditionally emits)
+                      const emitValue = pipe(
+                        Ref.set(valueRef, result),
+                        Effect.tap(() =>
+                          pipe(
+                            Ref.get(onEmitRef),
+                            Effect.flatMap(
+                              Effect.transposeMapOption((onEmit) =>
+                                onEmit(result),
+                              ),
+                            ),
+                            Effect.whenEffect(Ref.get(startedRef)),
+                          ),
+                        ),
+                      );
+
+                      // Run the emit effect and signal latch opening
+                      return pipe(
+                        emitValue,
+                        Effect.tap(() => firstValueLatch.open),
+                      );
+                    }),
                   ),
                 );
 
+                // Return the value synchronously (viewFactory must return synchronously)
                 return value;
               };
 
@@ -142,9 +152,16 @@ export const make = <T>(
 
               // Return cleanup function that calls onDestroy when scope closes
               return () => {
-                if (destroyCallback) {
-                  destroyCallback();
-                }
+                Effect.runFork(
+                  pipe(
+                    Ref.get(destroyCallbackRef),
+                    Effect.flatMap(
+                      Effect.transposeMapOption((destroyCallback) =>
+                        Effect.sync(() => destroyCallback()),
+                      ),
+                    ),
+                  ),
+                );
               };
             }),
             Effect.flatMap((cleanup) =>
