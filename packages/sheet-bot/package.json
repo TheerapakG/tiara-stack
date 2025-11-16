@@ -5,8 +5,12 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "module": "./dist/index.js"
+      "types": "./dist/index.d.mts",
+      "module": "./dist/index.mjs"
+    },
+    "./register": {
+      "types": "./dist/register.d.mts",
+      "module": "./dist/register.mjs"
     },
     "./package.json": "./package.json"
   },
@@ -52,7 +56,7 @@
     "pathe": "^2.0.3",
     "prettier": "^3.6.2",
     "simple-git": "^3.30.0",
-    "tsdown": "^0.15.12",
+    "tsdown": "^0.16.4",
     "typescript": "^5.9.3"
   }
 }
