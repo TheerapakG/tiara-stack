@@ -1,4 +1,4 @@
-import type { Query, ViewFactory, Zero } from "@rocicorp/zero";
+import type { Query, Zero } from "@rocicorp/zero";
 import { Effect, Option, pipe, Ref, Runtime, Scope } from "effect";
 import type { ExternalSource } from "../externalComputed";
 import { ZeroService } from "../../services/zeroService";
@@ -41,13 +41,11 @@ export type ZeroQueryResult<T> = Optimistic<T> | Complete<T>;
  *   ('unknown' → Optimistic, 'complete' → Complete)
  *
  * @param query - The Zero query to materialize
- * @param viewFactory - The view factory function for the query
  * @param options - Optional options for materialize
  * @returns An ExternalSource that requires ZeroService and Scope during creation
  */
 export const make = <T>(
   query: Query<any, any, any>,
-  viewFactory: (zero: Zero<any>) => T,
   options?: unknown,
 ): Effect.Effect<
   ExternalSource<ZeroQueryResult<T>>,
@@ -74,7 +72,6 @@ export const make = <T>(
       pipe(
         Effect.sync(() => {
           const runtime = Runtime.defaultRuntime;
-          let destroyCallback: (() => void) | undefined;
 
           // Helper to emit a value (stores and conditionally emits)
           const emitValue = (result: ZeroQueryResult<T>) => {
@@ -94,47 +91,39 @@ export const make = <T>(
             );
           };
 
-          // Create a ViewFactory that wraps the user's factory and updates the valueRef
-          const wrappedViewFactory: ViewFactory<any, any, any, T> = (
-            query,
-            input,
-            format,
-            onDestroy,
-            onTransactionCommit,
-            queryComplete,
-            updateTTL,
-          ) => {
-            // Store the onDestroy callback to be called when scope closes
-            destroyCallback = onDestroy;
+          // Materialize the query to get a TypedView
+          const typedView = zero.materialize(query, options as any);
 
-            // Get the value using the user's factory
-            const value = viewFactory(zero);
+          // Store initial value synchronously if available (optimistically resolved)
+          const initialData = typedView.data;
+          if (initialData !== undefined) {
+            const initialResult: ZeroQueryResult<T> = {
+              _tag: "Optimistic",
+              value: initialData as T,
+            };
+            emitValue(initialResult);
+          }
 
-            // Determine if this is optimistic or complete based on queryComplete
-            const isComplete =
-              queryComplete === true ||
-              (typeof queryComplete === "object" &&
-                queryComplete !== null &&
-                "error" in queryComplete === false);
+          // Subscribe to view changes
+          const unsubscribe = typedView.addListener(
+            (data: unknown, resultType: "unknown" | "complete" | "error") => {
+              // Map resultType to our result types
+              // 'complete' indicates server-updated value
+              // 'unknown' or 'error' indicates optimistic/local cache value
+              const result: ZeroQueryResult<T> =
+                resultType === "complete"
+                  ? { _tag: "Complete", value: data as T }
+                  : { _tag: "Optimistic", value: data as T };
 
-            const result: ZeroQueryResult<T> = isComplete
-              ? { _tag: "Complete", value }
-              : { _tag: "Optimistic", value };
+              // Store and conditionally emit the result
+              emitValue(result);
+            },
+          );
 
-            // Store the value directly in the ref
-            emitValue(result);
-
-            return value;
-          };
-
-          // Materialize with the wrapped factory
-          zero.materialize(query, wrappedViewFactory, options as any);
-
-          // Return cleanup function that calls onDestroy when scope closes
+          // Return cleanup function that destroys the view when scope closes
           return () => {
-            if (destroyCallback) {
-              destroyCallback();
-            }
+            unsubscribe();
+            typedView.destroy();
           };
         }),
         Effect.flatMap((cleanup) =>
