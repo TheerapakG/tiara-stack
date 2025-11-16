@@ -1,5 +1,5 @@
 import type { Query, ViewFactory, Zero } from "@rocicorp/zero";
-import { Effect, Option, pipe, Ref, Runtime, Scope } from "effect";
+import { Effect, Option, pipe, Ref, Scope } from "effect";
 import {
   Complete,
   Optimistic,
@@ -83,26 +83,6 @@ export const make = <T>(
         Effect.flatMap((firstValueLatch) =>
           pipe(
             Effect.sync(() => {
-              const runtime = Runtime.defaultRuntime;
-
-              // Helper to emit a value (stores and conditionally emits)
-              const emitValue = (result: Result<T>) => {
-                Runtime.runSync(runtime)(
-                  pipe(
-                    Ref.set(valueRef, result),
-                    Effect.tap(() =>
-                      pipe(
-                        Ref.get(onEmitRef),
-                        Effect.flatMap(
-                          Effect.transposeMapOption((onEmit) => onEmit(result)),
-                        ),
-                        Effect.whenEffect(Ref.get(startedRef)),
-                      ),
-                    ),
-                  ),
-                );
-              };
-
               let destroyCallback: (() => void) | undefined;
 
               // Create a ViewFactory that directly pipes values into the valueRef
@@ -132,11 +112,27 @@ export const make = <T>(
                   ? new Complete({ value })
                   : new Optimistic({ value });
 
-                // Store the value directly in the ref
-                emitValue(result);
+                // Helper to emit a value (stores and conditionally emits)
+                const emitValue = pipe(
+                  Ref.set(valueRef, result),
+                  Effect.tap(() =>
+                    pipe(
+                      Ref.get(onEmitRef),
+                      Effect.flatMap(
+                        Effect.transposeMapOption((onEmit) => onEmit(result)),
+                      ),
+                      Effect.whenEffect(Ref.get(startedRef)),
+                    ),
+                  ),
+                );
 
-                // Signal that a value has been received (idempotent - subsequent opens are no-ops)
-                Runtime.runSync(runtime)(firstValueLatch.open);
+                // Run the emit effect and signal latch opening
+                Effect.runSync(
+                  pipe(
+                    emitValue,
+                    Effect.tap(() => firstValueLatch.open),
+                  ),
+                );
 
                 return value;
               };
