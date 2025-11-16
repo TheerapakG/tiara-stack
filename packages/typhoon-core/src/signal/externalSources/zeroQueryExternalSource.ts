@@ -98,7 +98,6 @@ export const make = <T>(
               };
 
               let destroyCallback: (() => void) | undefined;
-              let firstValueReceived = false;
 
               // Create a ViewFactory that directly pipes values into the valueRef
               const viewFactory: ViewFactory<any, any, any, T> = (
@@ -130,11 +129,8 @@ export const make = <T>(
                 // Store the value directly in the ref
                 emitValue(result);
 
-                // Signal that the first value has been received
-                if (!firstValueReceived) {
-                  firstValueReceived = true;
-                  Runtime.runSync(runtime)(firstValueLatch.release);
-                }
+                // Signal that a value has been received (idempotent - subsequent releases are no-ops)
+                Runtime.runSync(runtime)(firstValueLatch.release);
 
                 return value;
               };
