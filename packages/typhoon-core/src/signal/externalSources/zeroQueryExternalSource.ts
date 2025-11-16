@@ -1,5 +1,5 @@
 import type { Query, ViewFactory, Zero } from "@rocicorp/zero";
-import { Effect, Option, pipe, Ref, Runtime, Scope } from "effect";
+import { Deferred, Effect, Option, pipe, Ref, Runtime, Scope } from "effect";
 import type { ExternalSource } from "../externalComputed";
 import { ZeroService } from "../../services/zeroService";
 
@@ -70,76 +70,96 @@ export const make = <T>(
     ),
     Effect.flatMap(({ zero, valueRef, startedRef, onEmitRef }) =>
       pipe(
-        Effect.sync(() => {
-          const runtime = Runtime.defaultRuntime;
+        Deferred.make<void>(),
+        Effect.flatMap((firstValueDeferred) =>
+          pipe(
+            Effect.sync(() => {
+              const runtime = Runtime.defaultRuntime;
 
-          // Helper to emit a value (stores and conditionally emits)
-          const emitValue = (result: ZeroQueryResult<T>) => {
-            Runtime.runSync(runtime)(
-              pipe(
-                Ref.set(valueRef, Option.some(result)),
-                Effect.tap(() =>
+              // Helper to emit a value (stores and conditionally emits)
+              const emitValue = (result: ZeroQueryResult<T>) => {
+                Runtime.runSync(runtime)(
                   pipe(
-                    Ref.get(onEmitRef),
-                    Effect.flatMap(
-                      Effect.transposeMapOption((onEmit) => onEmit(result)),
+                    Ref.set(valueRef, Option.some(result)),
+                    Effect.tap(() =>
+                      pipe(
+                        Ref.get(onEmitRef),
+                        Effect.flatMap(
+                          Effect.transposeMapOption((onEmit) => onEmit(result)),
+                        ),
+                        Effect.whenEffect(Ref.get(startedRef)),
+                      ),
                     ),
-                    Effect.whenEffect(Ref.get(startedRef)),
                   ),
+                );
+              };
+
+              let destroyCallback: (() => void) | undefined;
+              let firstValueReceived = false;
+
+              // Create a ViewFactory that directly pipes values into the valueRef
+              const viewFactory: ViewFactory<any, any, any, T> = (
+                query,
+                input,
+                format,
+                onDestroy,
+                onTransactionCommit,
+                queryComplete,
+                updateTTL,
+              ) => {
+                // Store the onDestroy callback to be called when scope closes
+                destroyCallback = onDestroy;
+
+                // Determine if this is optimistic or complete based on queryComplete
+                const isComplete =
+                  queryComplete === true ||
+                  (typeof queryComplete === "object" &&
+                    queryComplete !== null &&
+                    "error" in queryComplete === false);
+
+                // The input is the view data, use it directly
+                const value = input as T;
+
+                const result: ZeroQueryResult<T> = isComplete
+                  ? { _tag: "Complete", value }
+                  : { _tag: "Optimistic", value };
+
+                // Store the value directly in the ref
+                emitValue(result);
+
+                // Signal that the first value has been received
+                if (!firstValueReceived) {
+                  firstValueReceived = true;
+                  Runtime.runSync(runtime)(
+                    Deferred.succeed(firstValueDeferred, undefined),
+                  );
+                }
+
+                return value;
+              };
+
+              // Materialize with the factory
+              zero.materialize(query, viewFactory, options as any);
+
+              // Return cleanup function that calls onDestroy when scope closes
+              return () => {
+                if (destroyCallback) {
+                  destroyCallback();
+                }
+              };
+            }),
+            Effect.flatMap((cleanup) =>
+              pipe(
+                // Wait for the first value before proceeding
+                Deferred.await(firstValueDeferred),
+                Effect.flatMap(() =>
+                  Effect.addFinalizer(() => Effect.sync(() => cleanup())),
                 ),
               ),
-            );
-          };
-
-          let destroyCallback: (() => void) | undefined;
-
-          // Create a ViewFactory that directly pipes values into the valueRef
-          const viewFactory: ViewFactory<any, any, any, T> = (
-            query,
-            input,
-            format,
-            onDestroy,
-            onTransactionCommit,
-            queryComplete,
-            updateTTL,
-          ) => {
-            // Store the onDestroy callback to be called when scope closes
-            destroyCallback = onDestroy;
-
-            // Determine if this is optimistic or complete based on queryComplete
-            const isComplete =
-              queryComplete === true ||
-              (typeof queryComplete === "object" &&
-                queryComplete !== null &&
-                "error" in queryComplete === false);
-
-            // The input is the view data, use it directly
-            const value = input as T;
-
-            const result: ZeroQueryResult<T> = isComplete
-              ? { _tag: "Complete", value }
-              : { _tag: "Optimistic", value };
-
-            // Store the value directly in the ref
-            emitValue(result);
-
-            return value;
-          };
-
-          // Materialize with the factory
-          zero.materialize(query, viewFactory, options as any);
-
-          // Return cleanup function that calls onDestroy when scope closes
-          return () => {
-            if (destroyCallback) {
-              destroyCallback();
-            }
-          };
-        }),
-        Effect.flatMap((cleanup) =>
-          Effect.addFinalizer(() => Effect.sync(() => cleanup())),
+            ),
+            Effect.as({ zero, valueRef, startedRef, onEmitRef }),
+          ),
         ),
-        Effect.as({ zero, valueRef, startedRef, onEmitRef }),
       ),
     ),
     Effect.map(({ valueRef, startedRef, onEmitRef }) => ({
