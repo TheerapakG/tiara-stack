@@ -46,7 +46,7 @@ export type ZeroQueryResult<T> = Optimistic<T> | Complete<T>;
  */
 export const make = <T>(
   query: Query<any, any, any>,
-  options?: unknown,
+  options?: Parameters<Zero<any>["materialize"]>[2],
 ): Effect.Effect<
   ExternalSource<ZeroQueryResult<T>>,
   never,
@@ -129,14 +129,14 @@ export const make = <T>(
                 // Store the value directly in the ref
                 emitValue(result);
 
-                // Signal that a value has been received (idempotent - subsequent releases are no-ops)
-                Runtime.runSync(runtime)(firstValueLatch.release);
+                // Signal that a value has been received (idempotent - subsequent opens are no-ops)
+                Runtime.runSync(runtime)(firstValueLatch.open);
 
                 return value;
               };
 
               // Materialize with the factory
-              zero.materialize(query, viewFactory, options as any);
+              zero.materialize(query, viewFactory, options);
 
               // Return cleanup function that calls onDestroy when scope closes
               return () => {
