@@ -44,9 +44,36 @@ export type ZeroQueryResult<T> = Optimistic<T> | Complete<T>;
  * @param options - Optional options for materialize
  * @returns An ExternalSource that requires ZeroService and Scope during creation
  */
+type TimeUnit = "s" | "m" | "h" | "d" | "y";
+
+/**
+ * Time To Live. This is used for query expiration.
+ * - `forever` means the query will never expire.
+ * - `none` means the query will expire immediately.
+ * - A number means the query will expire after that many milliseconds.
+ * - A negative number means the query will never expire, this is same as 'forever'.
+ * - A string like `1s` means the query will expire after that many seconds.
+ * - A string like `1m` means the query will expire after that many minutes.
+ * - A string like `1h` means the query will expire after that many hours.
+ * - A string like `1d` means the query will expire after that many days.
+ * - A string like `1y` means the query will expire after that many years.
+ */
+type TTL = `${number}${TimeUnit}` | "forever" | "none" | number;
+
+/**
+ * Options for materializing a Zero query.
+ */
+export type ZeroMaterializeOptions = {
+  /**
+   * Time To Live. This is the amount of time to keep the rows associated with
+   * this query after cleanup has been called.
+   */
+  ttl?: TTL | undefined;
+};
+
 export const make = <T>(
   query: Query<any, any, any>,
-  options?: Parameters<Zero<any>["materialize"]>[2],
+  options?: ZeroMaterializeOptions,
 ): Effect.Effect<
   ExternalSource<ZeroQueryResult<T>>,
   never,
