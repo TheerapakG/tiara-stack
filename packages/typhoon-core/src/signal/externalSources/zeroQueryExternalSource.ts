@@ -1,5 +1,5 @@
 import type { Query, ViewFactory, Zero } from "@rocicorp/zero";
-import { Deferred, Effect, Option, pipe, Ref, Runtime, Scope } from "effect";
+import { Effect, Option, pipe, Ref, Runtime, Scope } from "effect";
 import type { ExternalSource } from "../externalComputed";
 import { ZeroService } from "../../services/zeroService";
 
@@ -70,8 +70,8 @@ export const make = <T>(
     ),
     Effect.flatMap(({ zero, valueRef, startedRef, onEmitRef }) =>
       pipe(
-        Deferred.make<void>(),
-        Effect.flatMap((firstValueDeferred) =>
+        Effect.makeLatch(),
+        Effect.flatMap((firstValueLatch) =>
           pipe(
             Effect.sync(() => {
               const runtime = Runtime.defaultRuntime;
@@ -130,9 +130,7 @@ export const make = <T>(
                 // Signal that the first value has been received
                 if (!firstValueReceived) {
                   firstValueReceived = true;
-                  Runtime.runSync(runtime)(
-                    Deferred.succeed(firstValueDeferred, undefined),
-                  );
+                  Runtime.runSync(runtime)(firstValueLatch.release);
                 }
 
                 return value;
@@ -151,7 +149,7 @@ export const make = <T>(
             Effect.flatMap((cleanup) =>
               pipe(
                 // Wait for the first value before proceeding
-                Deferred.await(firstValueDeferred),
+                firstValueLatch.await,
                 Effect.flatMap(() =>
                   Effect.addFinalizer(() => Effect.sync(() => cleanup())),
                 ),
