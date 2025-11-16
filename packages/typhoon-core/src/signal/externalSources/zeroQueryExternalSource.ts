@@ -57,7 +57,10 @@ export const make = <T>(
     Effect.flatMap((zero: Zero<any>) =>
       pipe(
         Effect.all({
-          valueRef: Ref.make<Option.Option<ZeroQueryResult<T>>>(Option.none()),
+          valueRef: Ref.make<ZeroQueryResult<T>>({
+            _tag: "Optimistic",
+            value: undefined as unknown as T,
+          }),
           startedRef: Ref.make(false),
           onEmitRef: Ref.make<
             Option.Option<
@@ -80,7 +83,7 @@ export const make = <T>(
               const emitValue = (result: ZeroQueryResult<T>) => {
                 Runtime.runSync(runtime)(
                   pipe(
-                    Ref.set(valueRef, Option.some(result)),
+                    Ref.set(valueRef, result),
                     Effect.tap(() =>
                       pipe(
                         Ref.get(onEmitRef),
@@ -161,19 +164,7 @@ export const make = <T>(
       ),
     ),
     Effect.map(({ valueRef, startedRef, onEmitRef }) => ({
-      poll: pipe(
-        Ref.get(valueRef),
-        Effect.flatMap(
-          Option.match({
-            onNone: () =>
-              Effect.succeed({
-                _tag: "Optimistic" as const,
-                value: undefined as unknown as T,
-              }),
-            onSome: Effect.succeed,
-          }),
-        ),
-      ),
+      poll: Ref.get(valueRef),
       emit: (
         onEmit: (
           value: ZeroQueryResult<T>,
