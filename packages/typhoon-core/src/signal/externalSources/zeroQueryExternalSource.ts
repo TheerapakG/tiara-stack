@@ -1,28 +1,12 @@
 import type { Query, ViewFactory, Zero } from "@rocicorp/zero";
 import { Effect, Option, pipe, Ref, Runtime, Scope } from "effect";
+import type {
+  Complete,
+  Optimistic,
+  ZeroQueryResult,
+} from "../../schema/zeroQueryResult";
 import type { ExternalSource } from "../externalComputed";
 import { ZeroService } from "../../services/zeroService";
-
-/**
- * Result type indicating the query value was optimistically resolved from local cache.
- */
-export type Optimistic<T> = {
-  readonly _tag: "Optimistic";
-  readonly value: T;
-};
-
-/**
- * Result type indicating the query value was updated from the server.
- */
-export type Complete<T> = {
-  readonly _tag: "Complete";
-  readonly value: T;
-};
-
-/**
- * Result type for Zero query values, either Optimistic or Complete.
- */
-export type ZeroQueryResult<T> = Optimistic<T> | Complete<T>;
 
 /**
  * Creates an ExternalSource adapter for Zero queries.
