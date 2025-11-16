@@ -1,4 +1,4 @@
-import type { Query, Zero } from "@rocicorp/zero";
+import type { Query, ViewFactory, Zero } from "@rocicorp/zero";
 import { Effect, Option, pipe, Ref, Runtime, Scope } from "effect";
 import type { ExternalSource } from "../externalComputed";
 import { ZeroService } from "../../services/zeroService";
@@ -70,15 +70,11 @@ export const make = <T>(
         Effect.map((refs) => ({ zero, ...refs })),
       ),
     ),
-    Effect.tap(({ zero, valueRef, startedRef, onEmitRef }) =>
+    Effect.flatMap(({ zero, valueRef, startedRef, onEmitRef }) =>
       pipe(
         Effect.sync(() => {
           const runtime = Runtime.defaultRuntime;
-          // Materialize the query to get a TypedView (without factory to access view directly)
-          const typedView = zero.materialize(query, options as any);
-
-          // Apply viewFactory to get the transformed value
-          const getValue = () => viewFactory(zero);
+          let destroyCallback: (() => void) | undefined;
 
           // Helper to emit a value (stores and conditionally emits)
           const emitValue = (result: ZeroQueryResult<T>) => {
@@ -98,43 +94,53 @@ export const make = <T>(
             );
           };
 
-          // Store initial value synchronously if available (optimistically resolved)
-          const initialData = typedView.data;
-          if (initialData !== undefined) {
-            const initialValue = getValue();
-            const initialResult: ZeroQueryResult<T> = {
-              _tag: "Optimistic",
-              value: initialValue,
-            };
-            emitValue(initialResult);
-          }
+          // Create a ViewFactory that wraps the user's factory and updates the valueRef
+          const wrappedViewFactory: ViewFactory<any, any, any, T> = (
+            query,
+            input,
+            format,
+            onDestroy,
+            onTransactionCommit,
+            queryComplete,
+            updateTTL,
+          ) => {
+            // Store the onDestroy callback to be called when scope closes
+            destroyCallback = onDestroy;
 
-          // Subscribe to view changes
-          const unsubscribe = typedView.addListener(
-            (data: unknown, resultType: "unknown" | "complete" | "error") => {
-              // Get the current value using the factory
-              const currentValue = getValue();
-              // Map resultType to our result types
-              // 'unknown' indicates optimistic/local cache value
-              // 'complete' indicates server-updated value
-              const result: ZeroQueryResult<T> =
-                resultType === "complete"
-                  ? { _tag: "Complete", value: currentValue }
-                  : { _tag: "Optimistic", value: currentValue };
+            // Get the value using the user's factory
+            const value = viewFactory(zero);
 
-              // Store and conditionally emit the result
-              emitValue(result);
-            },
-          );
+            // Determine if this is optimistic or complete based on queryComplete
+            const isComplete =
+              queryComplete === true ||
+              (typeof queryComplete === "object" &&
+                queryComplete !== null &&
+                "error" in queryComplete === false);
 
+            const result: ZeroQueryResult<T> = isComplete
+              ? { _tag: "Complete", value }
+              : { _tag: "Optimistic", value };
+
+            // Store the value directly in the ref
+            emitValue(result);
+
+            return value;
+          };
+
+          // Materialize with the wrapped factory
+          zero.materialize(query, wrappedViewFactory, options as any);
+
+          // Return cleanup function that calls onDestroy when scope closes
           return () => {
-            unsubscribe();
-            typedView.destroy();
+            if (destroyCallback) {
+              destroyCallback();
+            }
           };
         }),
         Effect.flatMap((cleanup) =>
           Effect.addFinalizer(() => Effect.sync(() => cleanup())),
         ),
+        Effect.as({ zero, valueRef, startedRef, onEmitRef }),
       ),
     ),
     Effect.map(({ valueRef, startedRef, onEmitRef }) => ({
