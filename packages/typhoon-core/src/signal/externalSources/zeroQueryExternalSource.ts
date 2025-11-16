@@ -1,4 +1,4 @@
-import type { Query, Zero } from "@rocicorp/zero";
+import type { Query, ViewFactory, Zero } from "@rocicorp/zero";
 import { Effect, Option, pipe, Ref, Runtime, Scope } from "effect";
 import type { ExternalSource } from "../externalComputed";
 import { ZeroService } from "../../services/zeroService";
@@ -91,39 +91,49 @@ export const make = <T>(
             );
           };
 
-          // Materialize the query to get a TypedView
-          const typedView = zero.materialize(query, options as any);
+          let destroyCallback: (() => void) | undefined;
 
-          // Store initial value synchronously if available (optimistically resolved)
-          const initialData = typedView.data;
-          if (initialData !== undefined) {
-            const initialResult: ZeroQueryResult<T> = {
-              _tag: "Optimistic",
-              value: initialData as T,
-            };
-            emitValue(initialResult);
-          }
+          // Create a ViewFactory that directly pipes values into the valueRef
+          const viewFactory: ViewFactory<any, any, any, T> = (
+            query,
+            input,
+            format,
+            onDestroy,
+            onTransactionCommit,
+            queryComplete,
+            updateTTL,
+          ) => {
+            // Store the onDestroy callback to be called when scope closes
+            destroyCallback = onDestroy;
 
-          // Subscribe to view changes
-          const unsubscribe = typedView.addListener(
-            (data: unknown, resultType: "unknown" | "complete" | "error") => {
-              // Map resultType to our result types
-              // 'complete' indicates server-updated value
-              // 'unknown' or 'error' indicates optimistic/local cache value
-              const result: ZeroQueryResult<T> =
-                resultType === "complete"
-                  ? { _tag: "Complete", value: data as T }
-                  : { _tag: "Optimistic", value: data as T };
+            // Determine if this is optimistic or complete based on queryComplete
+            const isComplete =
+              queryComplete === true ||
+              (typeof queryComplete === "object" &&
+                queryComplete !== null &&
+                "error" in queryComplete === false);
 
-              // Store and conditionally emit the result
-              emitValue(result);
-            },
-          );
+            // The input is the view data, use it directly
+            const value = input as T;
 
-          // Return cleanup function that destroys the view when scope closes
+            const result: ZeroQueryResult<T> = isComplete
+              ? { _tag: "Complete", value }
+              : { _tag: "Optimistic", value };
+
+            // Store the value directly in the ref
+            emitValue(result);
+
+            return value;
+          };
+
+          // Materialize with the factory
+          zero.materialize(query, viewFactory, options as any);
+
+          // Return cleanup function that calls onDestroy when scope closes
           return () => {
-            unsubscribe();
-            typedView.destroy();
+            if (destroyCallback) {
+              destroyCallback();
+            }
           };
         }),
         Effect.flatMap((cleanup) =>
