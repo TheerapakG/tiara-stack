@@ -1,9 +1,9 @@
 import type { Query, ViewFactory, Zero } from "@rocicorp/zero";
 import { Effect, Option, pipe, Ref, Runtime, Scope } from "effect";
-import type {
+import {
   Complete,
   Optimistic,
-  ZeroQueryResult,
+  type Result,
 } from "../../schema/zeroQueryResult";
 import type { ExternalSource } from "../externalComputed";
 import { ZeroService } from "../../services/zeroService";
@@ -58,24 +58,19 @@ export type ZeroMaterializeOptions = {
 export const make = <T>(
   query: Query<any, any, any>,
   options?: ZeroMaterializeOptions,
-): Effect.Effect<
-  ExternalSource<ZeroQueryResult<T>>,
-  never,
-  ZeroService | Scope.Scope
-> =>
+): Effect.Effect<ExternalSource<Result<T>>, never, ZeroService | Scope.Scope> =>
   pipe(
     ZeroService,
     Effect.flatMap((zero: Zero<any>) =>
       pipe(
         Effect.all({
-          valueRef: Ref.make<ZeroQueryResult<T>>({
-            _tag: "Optimistic",
-            value: undefined as unknown as T,
-          }),
+          valueRef: Ref.make<Result<T>>(
+            new Optimistic({ value: undefined as unknown as T }),
+          ),
           startedRef: Ref.make(false),
           onEmitRef: Ref.make<
             Option.Option<
-              (value: ZeroQueryResult<T>) => Effect.Effect<void, never, never>
+              (value: Result<T>) => Effect.Effect<void, never, never>
             >
           >(Option.none()),
         }),
@@ -91,7 +86,7 @@ export const make = <T>(
               const runtime = Runtime.defaultRuntime;
 
               // Helper to emit a value (stores and conditionally emits)
-              const emitValue = (result: ZeroQueryResult<T>) => {
+              const emitValue = (result: Result<T>) => {
                 Runtime.runSync(runtime)(
                   pipe(
                     Ref.set(valueRef, result),
@@ -133,9 +128,9 @@ export const make = <T>(
                 // The input is the view data, use it directly
                 const value = input as T;
 
-                const result: ZeroQueryResult<T> = isComplete
-                  ? { _tag: "Complete", value }
-                  : { _tag: "Optimistic", value };
+                const result: Result<T> = isComplete
+                  ? new Complete({ value })
+                  : new Optimistic({ value });
 
                 // Store the value directly in the ref
                 emitValue(result);
@@ -172,11 +167,8 @@ export const make = <T>(
     ),
     Effect.map(({ valueRef, startedRef, onEmitRef }) => ({
       poll: Ref.get(valueRef),
-      emit: (
-        onEmit: (
-          value: ZeroQueryResult<T>,
-        ) => Effect.Effect<void, never, never>,
-      ) => pipe(Ref.set(onEmitRef, Option.some(onEmit)), Effect.asVoid),
+      emit: (onEmit: (value: Result<T>) => Effect.Effect<void, never, never>) =>
+        pipe(Ref.set(onEmitRef, Option.some(onEmit)), Effect.asVoid),
       start: pipe(Ref.set(startedRef, true), Effect.asVoid),
       stop: pipe(Ref.set(startedRef, false), Effect.asVoid),
     })),
