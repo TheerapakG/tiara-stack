@@ -271,24 +271,11 @@ export const make = <
                 Match.when(Predicate.hasProperty("error"), (error) =>
                   SynchronizedRef.set(resultTypeRef, Either.left(error)),
                 ),
-                Match.orElse((queryComplete) =>
-                  Effect.forkDaemon(
-                    pipe(
-                      Effect.tryPromise({
-                        try: () => queryComplete,
-                        catch: (error) => error as ErroredQuery,
-                      }),
-                      Effect.map(() => "complete" as const),
-                      Effect.either,
-                      Effect.tap((result) =>
-                        SynchronizedRef.set(resultTypeRef, result),
-                      ),
-                    ),
-                  ),
-                ),
+                Match.orElse(() => Effect.void),
               ),
             ),
-            Effect.map(
+            Effect.let(
+              "source",
               (refs) =>
                 new ZeroQueryExternalSource<T>(
                   input,
@@ -300,12 +287,35 @@ export const make = <
                   refs.onEmitRef,
                 ),
             ),
-            Effect.tap((source) =>
+            Effect.tap(({ resultTypeRef, source }) =>
+              pipe(
+                Match.value(queryComplete),
+                Match.when(Predicate.isPromiseLike, (queryComplete) =>
+                  Effect.forkDaemon(
+                    pipe(
+                      Effect.tryPromise({
+                        try: () => queryComplete,
+                        catch: (error) => error as ErroredQuery,
+                      }),
+                      Effect.map(() => "complete" as const),
+                      Effect.either,
+                      Effect.tap((result) =>
+                        SynchronizedRef.set(resultTypeRef, result),
+                      ),
+                      Effect.tap(() => Effect.runFork(source.doEmit())),
+                    ),
+                  ),
+                ),
+                Match.orElse(() => Effect.void),
+              ),
+            ),
+            Effect.tap(({ source }) =>
               onTransactionCommit(() => Effect.runFork(source.flush())),
             ),
             Effect.tap(() =>
               Effect.addFinalizer(() => Effect.sync(() => onDestroy())),
             ),
+            Effect.map(({ source }) => source),
           ),
         options,
       ),

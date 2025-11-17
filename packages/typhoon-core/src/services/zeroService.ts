@@ -29,3 +29,10 @@ export const ZeroService = <
   S extends Schema,
   MD extends CustomMutatorDefs | undefined,
 >() => Context.GenericTag<ZeroService<S, MD>, Zero<S, MD>>("ZeroService");
+
+export const make = <
+  S extends Schema,
+  MD extends CustomMutatorDefs | undefined,
+>(
+  zero: Zero<S, MD>,
+) => Context.make(ZeroService<S, MD>(), zero);
