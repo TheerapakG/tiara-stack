@@ -10,11 +10,11 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
-      "module": "./dist/index.mjs"
+      "default": "./dist/index.mjs"
     },
     "./*": {
       "types": "./dist/*/index.d.mts",
-      "module": "./dist/*/index.mjs"
+      "default": "./dist/*/index.mjs"
     },
     "./package.json": "./package.json"
   },
