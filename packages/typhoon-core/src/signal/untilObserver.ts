@@ -2,7 +2,6 @@ import {
   Deferred,
   Effect,
   Effectable,
-  Exit,
   Fiber,
   HashSet,
   Match,
@@ -25,33 +24,33 @@ class UntilObserver<
     E = never,
     P extends Match.Types.PatternPrimitive<A> = Match.Types.PatternPrimitive<A>,
   >
-  extends Effectable.Class<Match.Types.WhenMatch<A, P>, E, never>
+  extends Effectable.Class<Match.Types.WhenMatch<A, P>, never, never>
   implements DependentSignal
 {
   readonly [DependentSymbol]: DependentSignal = this;
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
   private _dependencies: HashSet.HashSet<DependencySignal>;
-  private _fiber: Deferred.Deferred<Fiber.Fiber<A, E>, never>;
   private _effect: Effect.Effect<A, E, SignalContext>;
-  private _pattern: P;
-  private _valueDeferred: Ref.Ref<
-    Deferred.Deferred<Match.Types.WhenMatch<A, P>, E>
+  private _value: Ref.Ref<
+    Deferred.Deferred<Match.Types.WhenMatch<A, P>, never>
   >;
+  private _fiber: Ref.Ref<Deferred.Deferred<Fiber.Fiber<A, E>>>;
+  private _pattern: P;
 
   constructor(
-    fiber: Deferred.Deferred<Fiber.Fiber<A, E>, never>,
     effect: Effect.Effect<A, E, SignalContext>,
+    value: Ref.Ref<Deferred.Deferred<Match.Types.WhenMatch<A, P>, never>>,
+    fiber: Ref.Ref<Deferred.Deferred<Fiber.Fiber<A, E>>>,
     pattern: P,
-    valueDeferred: Ref.Ref<Deferred.Deferred<Match.Types.WhenMatch<A, P>, E>>,
     options: Observable.ObservableOptions,
   ) {
     super();
     this._dependencies = HashSet.empty();
-    this._fiber = fiber;
     this._effect = effect;
+    this._value = value;
+    this._fiber = fiber;
     this._pattern = pattern;
-    this._valueDeferred = valueDeferred;
     this[Observable.ObservableSymbol] = options;
   }
 
@@ -67,34 +66,37 @@ class UntilObserver<
   ) {
     return pipe(
       Effect.Do,
-      Effect.bind("deferred", () => Deferred.make<Fiber.Fiber<A, E>, never>()),
+      Effect.bind("fiberDeferred", () =>
+        Deferred.make<Fiber.Fiber<A, E>, never>(),
+      ),
+      Effect.bind("fiberDeferredRef", ({ fiberDeferred }) =>
+        Ref.make(fiberDeferred),
+      ),
       Effect.bind("valueDeferred", () =>
-        Deferred.make<Match.Types.WhenMatch<A, P>, E>(),
+        Deferred.make<Match.Types.WhenMatch<A, P>, never>(),
       ),
       Effect.bind("valueDeferredRef", ({ valueDeferred }) =>
         Ref.make(valueDeferred),
       ),
       Effect.let(
         "observer",
-        ({ deferred, valueDeferredRef }) =>
+        ({ fiberDeferredRef, valueDeferredRef }) =>
           new UntilObserver(
-            deferred,
             effect as Effect.Effect<A, E, SignalContext>,
-            pattern,
             valueDeferredRef,
+            fiberDeferredRef,
+            pattern,
             options,
           ),
       ),
-      Effect.tap(({ deferred, observer }) =>
+      Effect.tap(({ fiberDeferredRef, observer }) =>
         pipe(
-          fromDependent(observer),
-          runAndTrackEffect(observer._effect),
-          Effect.forkDaemon,
-          Effect.flatMap((fiber) =>
+          UntilObserver.makeFiber(observer),
+          Effect.tap((fiber) =>
             pipe(
-              Deferred.succeed(deferred, fiber),
-              Effect.tap(() =>
-                pipe(observer.checkAndResolve(fiber), Effect.forkDaemon),
+              Ref.get(fiberDeferredRef),
+              Effect.tap((fiberDeferred) =>
+                Deferred.succeed(fiberDeferred, fiber),
               ),
             ),
           ),
@@ -104,39 +106,31 @@ class UntilObserver<
     );
   }
 
-  private checkAndResolve(
-    fiber: Fiber.Fiber<A, E>,
-  ): Effect.Effect<void, never, never> {
-    return pipe(
-      Fiber.join(fiber),
-      Effect.flatMap((result) => {
-        const matchResult = pipe(
-          Match.value(result),
-          Match.when(this._pattern, (matched) => Option.some(matched)),
-          Match.orElse(() => Option.none()),
-        ) as Option.Option<Match.Types.WhenMatch<A, P>>;
-
-        if (Option.isSome(matchResult)) {
-          const resolvedValue = matchResult.value;
-          return pipe(
-            Ref.get(this._valueDeferred),
-            Effect.flatMap((valueDef) =>
+  static makeFiber = <
+    A = never,
+    E = never,
+    P extends Match.Types.PatternPrimitive<A> = Match.Types.PatternPrimitive<A>,
+  >(
+    observer: UntilObserver<A, E, P>,
+  ): Effect.Effect<Fiber.Fiber<A, E>, never, never> =>
+    pipe(
+      fromDependent(observer),
+      runAndTrackEffect(observer._effect),
+      Effect.tap(
+        (value) =>
+          pipe(
+            Match.value(value),
+            Match.when(observer._pattern, (matched) =>
               pipe(
-                Deferred.poll(valueDef),
-                Effect.flatMap((poll) =>
-                  poll._tag === "Some"
-                    ? Effect.void
-                    : Deferred.succeed(valueDef, resolvedValue),
-                ),
+                Ref.get(observer._value),
+                Effect.tap(Deferred.succeed(matched)),
               ),
             ),
-          );
-        }
-        return Effect.void;
-      }),
-      Effect.catchAll(() => Effect.void),
+            Match.orElse(() => Effect.void),
+          ) as Effect.Effect<void, never, never>,
+      ),
+      Effect.forkDaemon,
     );
-  }
 
   addDependency(dependency: DependencySignal) {
     return Effect.sync(() => {
@@ -163,13 +157,13 @@ class UntilObserver<
     return Effect.sync(() => HashSet.toValues(this._dependencies));
   }
 
-  commit(): Effect.Effect<Match.Types.WhenMatch<A, P>, E, never> {
+  commit(): Effect.Effect<Match.Types.WhenMatch<A, P>, never, never> {
     return this.value;
   }
 
-  get value(): Effect.Effect<Match.Types.WhenMatch<A, P>, E, never> {
+  get value(): Effect.Effect<Match.Types.WhenMatch<A, P>, never, never> {
     return pipe(
-      Ref.get(this._valueDeferred),
+      Ref.get(this._value),
       Effect.flatMap((valueDef) => Deferred.await(valueDef)),
       Observable.withSpan(this, "UntilObserver.value", {
         captureStackTrace: true,
@@ -187,55 +181,39 @@ class UntilObserver<
 
   notify(): Effect.Effect<unknown, never, never> {
     return pipe(
-      Effect.Do,
-      Effect.bind("valueDef", () => Ref.get(this._valueDeferred)),
-      Effect.bind("isResolved", ({ valueDef }) => Deferred.poll(valueDef)),
-      Effect.flatMap(({ isResolved }) =>
-        isResolved._tag === "Some"
-          ? this.clearDependencies()
-          : pipe(
-              Effect.all([
-                this.clearDependencies(),
+      Ref.get(this._value),
+      Effect.flatMap(Deferred.poll),
+      Effect.flatMap(
+        Option.match({
+          onSome: () => this.clearDependencies(),
+          onNone: () =>
+            pipe(
+              this.clearDependencies(),
+              Effect.andThen(() =>
                 pipe(
-                  Effect.Do,
-                  Effect.bind("oldFiberPoll", () => Deferred.poll(this._fiber)),
-                  Effect.tap(() =>
+                  Deferred.make<Fiber.Fiber<A, E>, never>(),
+                  Effect.flatMap((fiberDeferred) =>
+                    Ref.getAndSet(this._fiber, fiberDeferred),
+                  ),
+                  Effect.flatMap(Deferred.await),
+                  Effect.flatMap(Fiber.interrupt),
+                ),
+              ),
+              Effect.andThen(() =>
+                pipe(
+                  UntilObserver.makeFiber(this),
+                  Effect.tap((fiber) =>
                     pipe(
-                      fromDependent(this),
-                      runAndTrackEffect(this._effect),
-                      Effect.forkDaemon,
-                      Effect.flatMap((newFiber) =>
-                        pipe(
-                          Deferred.succeed(this._fiber, newFiber),
-                          Effect.tap(() => this.checkAndResolve(newFiber)),
-                        ),
+                      Ref.get(this._fiber),
+                      Effect.tap((fiberDeferred) =>
+                        Deferred.succeed(fiberDeferred, fiber),
                       ),
                     ),
                   ),
-                  Effect.flatMap(({ oldFiberPoll }) =>
-                    pipe(
-                      oldFiberPoll,
-                      Option.match({
-                        onSome: (exit) => {
-                          const exitTyped = exit as Exit.Exit<
-                            Fiber.Fiber<A, E>,
-                            never
-                          >;
-                          return pipe(
-                            exitTyped,
-                            Exit.match({
-                              onFailure: () => Effect.void,
-                              onSuccess: (fiber) => Fiber.interrupt(fiber),
-                            }),
-                          );
-                        },
-                        onNone: () => Effect.void,
-                      }),
-                    ),
-                  ),
                 ),
-              ]),
+              ),
             ),
+        }),
       ),
       Observable.withSpan(this, "UntilObserver.notify", {
         captureStackTrace: true,
