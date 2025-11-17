@@ -1,5 +1,26 @@
-import type { Query, ViewFactory, Zero } from "@rocicorp/zero";
-import { Effect, Option, pipe, Ref, Scope } from "effect";
+import type {
+  QueryRowType,
+  Output,
+  Change,
+  Input,
+  Format,
+  ReadonlyJSONValue,
+  View,
+  HumanReadable,
+} from "@rocicorp/zero";
+import { applyChange } from "@rocicorp/zero";
+import {
+  Effect,
+  Either,
+  Option,
+  pipe,
+  Scope,
+  SynchronizedRef,
+  Match,
+  flow,
+  Array,
+  Predicate,
+} from "effect";
 import {
   Complete,
   Optimistic,
@@ -55,134 +76,238 @@ export type ZeroMaterializeOptions = {
   ttl?: TTL | undefined;
 };
 
-export const make = <T>(
-  query: Query<any, any, any>,
-  options?: ZeroMaterializeOptions,
-): Effect.Effect<ExternalSource<Result<T>>, never, ZeroService | Scope.Scope> =>
-  pipe(
-    ZeroService,
-    Effect.flatMap((zero: Zero<any>) =>
+export type ErroredQuery =
+  | {
+      error: "app";
+      id: string;
+      name: string;
+      details: ReadonlyJSONValue;
+    }
+  | {
+      error: "http";
+      id: string;
+      name: string;
+      status: number;
+      details: ReadonlyJSONValue;
+    }
+  | {
+      error: "zero";
+      id: string;
+      name: string;
+      details: ReadonlyJSONValue;
+    };
+
+class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View>
+  implements ExternalSource<Either.Either<Result<T>, ErroredQuery>>, Output
+{
+  constructor(
+    private readonly input: Input,
+    private readonly format: Format,
+    private readonly resultTypeRef: SynchronizedRef.SynchronizedRef<
+      Either.Either<"unknown" | "complete", ErroredQuery>
+    >,
+    private readonly dirtyRef: SynchronizedRef.SynchronizedRef<boolean>,
+    private readonly valueRef: SynchronizedRef.SynchronizedRef<{ "": T }>,
+    private readonly startedRef: SynchronizedRef.SynchronizedRef<boolean>,
+    private readonly onEmitRef: SynchronizedRef.SynchronizedRef<
+      Option.Option<
+        (
+          value: Either.Either<Result<T>, ErroredQuery>,
+        ) => Effect.Effect<void, never, never>
+      >
+    >,
+  ) {
+    this.input.setOutput(this);
+  }
+
+  hydrate() {
+    return SynchronizedRef.updateEffect(this.dirtyRef, () =>
       pipe(
-        Effect.all({
-          valueRef: Ref.make<Result<T>>(
-            new Optimistic({ value: undefined as unknown as T }),
-          ),
-          startedRef: Ref.make(false),
-          onEmitRef: Ref.make<
-            Option.Option<
-              (value: Result<T>) => Effect.Effect<void, never, never>
-            >
-          >(Option.none()),
-        }),
-        Effect.map((refs) => ({ zero, ...refs })),
-      ),
-    ),
-    Effect.flatMap(({ zero, valueRef, startedRef, onEmitRef }) =>
-      pipe(
-        Effect.all({
-          firstValueLatch: Effect.makeLatch(),
-          destroyCallbackRef: Ref.make<Option.Option<() => void>>(
-            Option.none(),
-          ),
-        }),
-        Effect.flatMap(({ firstValueLatch, destroyCallbackRef }) =>
+        SynchronizedRef.get(this.valueRef),
+        Effect.tap((value) =>
           pipe(
-            Effect.sync(() => {
-              // Create a ViewFactory that directly pipes values into the valueRef
-              const viewFactory: ViewFactory<any, any, any, T> = (
-                query,
-                input,
-                format,
-                onDestroy,
-                onTransactionCommit,
-                queryComplete,
-                updateTTL,
-              ) => {
-                // Determine if this is optimistic or complete based on queryComplete
-                const isComplete =
-                  queryComplete === true ||
-                  (typeof queryComplete === "object" &&
-                    queryComplete !== null &&
-                    "error" in queryComplete === false);
-
-                // The input is the view data, use it directly
-                const value = input as T;
-
-                const result: Result<T> = isComplete
-                  ? new Complete({ value })
-                  : new Optimistic({ value });
-
-                // Wrap the entire viewFactory logic in Effect.runFork
-                Effect.runFork(
-                  pipe(
-                    // Store the onDestroy callback to be called when scope closes
-                    Ref.set(destroyCallbackRef, Option.some(onDestroy)),
-                    Effect.flatMap(() => {
-                      // Helper to emit a value (stores and conditionally emits)
-                      const emitValue = pipe(
-                        Ref.set(valueRef, result),
-                        Effect.tap(() =>
-                          pipe(
-                            Ref.get(onEmitRef),
-                            Effect.flatMap(
-                              Effect.transposeMapOption((onEmit) =>
-                                onEmit(result),
-                              ),
-                            ),
-                            Effect.whenEffect(Ref.get(startedRef)),
-                          ),
-                        ),
-                      );
-
-                      // Run the emit effect and signal latch opening
-                      return pipe(
-                        emitValue,
-                        Effect.tap(() => firstValueLatch.open),
-                      );
-                    }),
-                  ),
-                );
-
-                // Return the value synchronously (viewFactory must return synchronously)
-                return value;
-              };
-
-              // Materialize with the factory
-              zero.materialize(query, viewFactory, options);
-
-              // Return cleanup function that calls onDestroy when scope closes
-              return () => {
-                Effect.runFork(
-                  pipe(
-                    Ref.get(destroyCallbackRef),
-                    Effect.flatMap(
-                      Effect.transposeMapOption((destroyCallback) =>
-                        Effect.sync(() => destroyCallback()),
-                      ),
-                    ),
-                  ),
-                );
-              };
-            }),
-            Effect.flatMap((cleanup) =>
-              pipe(
-                // Wait for the first value before proceeding
-                firstValueLatch.await,
-                Effect.flatMap(() =>
-                  Effect.addFinalizer(() => Effect.sync(() => cleanup())),
-                ),
+            this.input.fetch({}),
+            Array.forEach((node) =>
+              applyChange(
+                value,
+                { type: "add", node },
+                this.input.getSchema(),
+                "",
+                this.format,
               ),
             ),
-            Effect.as({ zero, valueRef, startedRef, onEmitRef }),
+          ),
+        ),
+        Effect.as(true),
+      ),
+    );
+  }
+
+  flush() {
+    return SynchronizedRef.updateEffect(this.dirtyRef, (dirty) =>
+      pipe(dirty ? this.doEmit() : Effect.void, Effect.as(false)),
+    );
+  }
+
+  push(change: Change) {
+    Effect.runFork(
+      SynchronizedRef.updateEffect(this.dirtyRef, () =>
+        pipe(
+          SynchronizedRef.get(this.valueRef),
+          Effect.tap((value) =>
+            applyChange(value, change, this.input.getSchema(), "", this.format),
+          ),
+          Effect.as(true),
+        ),
+      ),
+    );
+  }
+
+  get poll() {
+    return pipe(
+      Effect.all({
+        value: SynchronizedRef.get(this.valueRef),
+        resultType: SynchronizedRef.get(this.resultTypeRef),
+      }),
+      Effect.map(({ value, resultType }) =>
+        pipe(
+          resultType,
+          Either.map(
+            flow(
+              Match.value,
+              Match.when("complete", () => new Complete({ value: value[""] })),
+              Match.when("unknown", () => new Optimistic({ value: value[""] })),
+              Match.exhaustive,
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  emit(
+    onEmit: (
+      value: Either.Either<Result<T>, ErroredQuery>,
+    ) => Effect.Effect<void, never, never>,
+  ) {
+    return SynchronizedRef.set(this.onEmitRef, Option.some(onEmit));
+  }
+
+  doEmit() {
+    return pipe(
+      this.poll,
+      Effect.tap((result) =>
+        pipe(
+          SynchronizedRef.get(this.onEmitRef),
+          Effect.flatMap(Effect.transposeMapOption((onEmit) => onEmit(result))),
+        ),
+      ),
+      Effect.whenEffect(SynchronizedRef.get(this.startedRef)),
+    );
+  }
+
+  get start() {
+    return SynchronizedRef.set(this.startedRef, true);
+  }
+
+  get stop() {
+    return SynchronizedRef.set(this.startedRef, false);
+  }
+}
+
+export const make = <
+  Q,
+  T extends ReadonlyJSONValue | View = HumanReadable<
+    QueryRowType<Q>
+  > extends infer T extends ReadonlyJSONValue | View
+    ? T
+    : never,
+>(
+  query: Q,
+  options?: ZeroMaterializeOptions,
+): Effect.Effect<
+  ZeroQueryExternalSource<T>,
+  never,
+  ZeroService<any, any> | Scope.Scope
+> =>
+  pipe(
+    ZeroService<any, any>(),
+    Effect.flatMap((zero) =>
+      zero.materialize(
+        query,
+        (
+          _query,
+          input,
+          format,
+          onDestroy,
+          onTransactionCommit,
+          queryComplete,
+          _updateTTL,
+        ) =>
+          pipe(
+            Effect.all({
+              resultTypeRef: SynchronizedRef.make<
+                Either.Either<"unknown" | "complete", ErroredQuery>
+              >(Either.right("unknown")),
+              dirtyRef: SynchronizedRef.make(false),
+              valueRef: SynchronizedRef.make<{ "": T }>({
+                "": (format.singular ? undefined : []) as T,
+              }),
+              startedRef: SynchronizedRef.make(false),
+              onEmitRef: SynchronizedRef.make<
+                Option.Option<
+                  (
+                    value: Either.Either<Result<T>, ErroredQuery>,
+                  ) => Effect.Effect<void, never, never>
+                >
+              >(Option.none()),
+            }),
+            Effect.tap(({ resultTypeRef }) =>
+              pipe(
+                Match.value(queryComplete),
+                Match.when(true, () =>
+                  SynchronizedRef.set(resultTypeRef, Either.right("complete")),
+                ),
+                Match.when(Predicate.hasProperty("error"), (error) =>
+                  SynchronizedRef.set(resultTypeRef, Either.left(error)),
+                ),
+                Match.orElse((queryComplete) =>
+                  Effect.forkDaemon(
+                    pipe(
+                      Effect.tryPromise({
+                        try: () => queryComplete,
+                        catch: (error) => error as ErroredQuery,
+                      }),
+                      Effect.map(() => "complete" as const),
+                      Effect.either,
+                      Effect.tap((result) =>
+                        SynchronizedRef.set(resultTypeRef, result),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Effect.map(
+              (refs) =>
+                new ZeroQueryExternalSource<T>(
+                  input,
+                  format,
+                  refs.resultTypeRef,
+                  refs.dirtyRef,
+                  refs.valueRef,
+                  refs.startedRef,
+                  refs.onEmitRef,
+                ),
+            ),
+            Effect.tap((source) =>
+              onTransactionCommit(() => Effect.runFork(source.flush())),
+            ),
+            Effect.tap(() =>
+              Effect.addFinalizer(() => Effect.sync(() => onDestroy())),
+            ),
+          ),
+        options,
+      ),
     ),
-    Effect.map(({ valueRef, startedRef, onEmitRef }) => ({
-      poll: Ref.get(valueRef),
-      emit: (onEmit: (value: Result<T>) => Effect.Effect<void, never, never>) =>
-        pipe(Ref.set(onEmitRef, Option.some(onEmit)), Effect.asVoid),
-      start: pipe(Ref.set(startedRef, true), Effect.asVoid),
-      stop: pipe(Ref.set(startedRef, false), Effect.asVoid),
-    })),
   );
