@@ -7,7 +7,6 @@ import {
   Match,
   Option,
   pipe,
-  Predicate,
   Ref,
   Scope,
 } from "effect";
@@ -20,41 +19,13 @@ import {
   SignalContext,
 } from "./signalContext";
 
-type PatternType<A, P> =
-  Match.Types.PatternPrimitive<A> extends infer MP
-    ? MP extends never
-      ? P extends Predicate.Predicate<A> | Predicate.Refinement<A, any>
-        ? P extends Predicate.Refinement<infer _R, infer RP>
-          ? [Extract<A, RP>] extends [infer X]
-            ? [X] extends [never]
-              ? RP
-              : X
-            : never
-          : A
-        : never
-      : MP
-    : P extends Predicate.Predicate<A> | Predicate.Refinement<A, any>
-      ? P extends Predicate.Refinement<infer _R, infer RP>
-        ? [Extract<A, RP>] extends [infer X]
-          ? [X] extends [never]
-            ? RP
-            : X
-          : never
-        : A
-      : never;
+type PatternType<A, P extends Match.Types.PatternPrimitive<A>> =
+  P extends Match.Types.PatternPrimitive<infer R> ? R : A;
 
 class UntilObserver<
     A = never,
     E = never,
-    P extends
-      | Match.Types.PatternPrimitive<A>
-      | Predicate.Predicate<A>
-      | Predicate.Refinement<
-          A,
-          any
-        > = Match.Types.PatternPrimitive<A> extends never
-      ? Predicate.Predicate<A> | Predicate.Refinement<A, any>
-      : Match.Types.PatternPrimitive<A>,
+    P extends Match.Types.PatternPrimitive<A> = Match.Types.PatternPrimitive<A>,
   >
   extends Effectable.Class<PatternType<A, P>, E, never>
   implements DependentSignal
@@ -98,15 +69,7 @@ class UntilObserver<
     A = never,
     E = never,
     R = never,
-    P extends
-      | Match.Types.PatternPrimitive<A>
-      | Predicate.Predicate<A>
-      | Predicate.Refinement<
-          A,
-          any
-        > = Match.Types.PatternPrimitive<A> extends never
-      ? Predicate.Predicate<A> | Predicate.Refinement<A, any>
-      : Match.Types.PatternPrimitive<A>,
+    P extends Match.Types.PatternPrimitive<A> = Match.Types.PatternPrimitive<A>,
   >(
     effect: Effect.Effect<A, E, R | SignalContext>,
     pattern: P,
@@ -163,37 +126,14 @@ class UntilObserver<
     return pipe(
       Fiber.join(fiber),
       Effect.flatMap((result) => {
-        let patternMatches: boolean;
-        let resolvedValue: PatternType<A, P>;
+        const matchResult = pipe(
+          Match.value(result),
+          Match.when(this._pattern, (matched) => matched),
+          Match.orElse(() => null),
+        );
 
-        if (typeof this._pattern === "function") {
-          // Handle Predicate.Predicate or Predicate.Refinement
-          const predicate = this._pattern as (value: A) => boolean;
-          if (predicate(result)) {
-            patternMatches = true;
-            resolvedValue = result as PatternType<A, P>;
-          } else {
-            patternMatches = false;
-          }
-        } else {
-          // Handle Match.Types.PatternPrimitive
-          const matchResult = pipe(
-            Match.value(result),
-            Match.when(
-              this._pattern as Match.Types.PatternPrimitive<A>,
-              (matched) => matched,
-            ),
-            Match.orElse(() => null),
-          );
-          if (matchResult !== null) {
-            patternMatches = true;
-            resolvedValue = matchResult as PatternType<A, P>;
-          } else {
-            patternMatches = false;
-          }
-        }
-
-        if (patternMatches) {
+        if (matchResult !== null) {
+          const resolvedValue = matchResult as PatternType<A, P>;
           return pipe(
             Ref.get(this._resolved),
             Effect.flatMap((resolved) =>
@@ -372,15 +312,7 @@ export const observeUntil = <
   A = never,
   E = never,
   R = never,
-  P extends
-    | Match.Types.PatternPrimitive<A>
-    | Predicate.Predicate<A>
-    | Predicate.Refinement<
-        A,
-        any
-      > = Match.Types.PatternPrimitive<A> extends never
-    ? Predicate.Predicate<A> | Predicate.Refinement<A, any>
-    : Match.Types.PatternPrimitive<A>,
+  P extends Match.Types.PatternPrimitive<A> = Match.Types.PatternPrimitive<A>,
 >(
   effect: Effect.Effect<A, E, R>,
   pattern: P,
@@ -404,15 +336,7 @@ export const observeUntilScoped = <
   R = never,
   E2 = never,
   R2 = never,
-  P extends
-    | Match.Types.PatternPrimitive<A>
-    | Predicate.Predicate<A>
-    | Predicate.Refinement<
-        A,
-        any
-      > = Match.Types.PatternPrimitive<A> extends never
-    ? Predicate.Predicate<A> | Predicate.Refinement<A, any>
-    : Match.Types.PatternPrimitive<A>,
+  P extends Match.Types.PatternPrimitive<A> = Match.Types.PatternPrimitive<A>,
 >(
   effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2>,
   pattern: P,
