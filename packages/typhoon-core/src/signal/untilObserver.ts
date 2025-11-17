@@ -20,15 +20,12 @@ import {
   SignalContext,
 } from "./signalContext";
 
-type PatternType<A, P extends Match.Types.PatternPrimitive<A>> =
-  P extends Match.Types.PatternPrimitive<infer R> ? R : A;
-
 class UntilObserver<
     A = never,
     E = never,
     P extends Match.Types.PatternPrimitive<A> = Match.Types.PatternPrimitive<A>,
   >
-  extends Effectable.Class<PatternType<A, P>, E, never>
+  extends Effectable.Class<Match.Types.WhenMatch<A, P>, E, never>
   implements DependentSignal
 {
   readonly [DependentSymbol]: DependentSignal = this;
@@ -38,13 +35,15 @@ class UntilObserver<
   private _fiber: Deferred.Deferred<Fiber.Fiber<A, E>, never>;
   private _effect: Effect.Effect<A, E, SignalContext>;
   private _pattern: P;
-  private _valueDeferred: Ref.Ref<Deferred.Deferred<PatternType<A, P>, E>>;
+  private _valueDeferred: Ref.Ref<
+    Deferred.Deferred<Match.Types.WhenMatch<A, P>, E>
+  >;
 
   constructor(
     fiber: Deferred.Deferred<Fiber.Fiber<A, E>, never>,
     effect: Effect.Effect<A, E, SignalContext>,
     pattern: P,
-    valueDeferred: Ref.Ref<Deferred.Deferred<PatternType<A, P>, E>>,
+    valueDeferred: Ref.Ref<Deferred.Deferred<Match.Types.WhenMatch<A, P>, E>>,
     options: Observable.ObservableOptions,
   ) {
     super();
@@ -69,7 +68,9 @@ class UntilObserver<
     return pipe(
       Effect.Do,
       Effect.bind("deferred", () => Deferred.make<Fiber.Fiber<A, E>, never>()),
-      Effect.bind("valueDeferred", () => Deferred.make<PatternType<A, P>, E>()),
+      Effect.bind("valueDeferred", () =>
+        Deferred.make<Match.Types.WhenMatch<A, P>, E>(),
+      ),
       Effect.bind("valueDeferredRef", ({ valueDeferred }) =>
         Ref.make(valueDeferred),
       ),
@@ -111,12 +112,12 @@ class UntilObserver<
       Effect.flatMap((result) => {
         const matchResult = pipe(
           Match.value(result),
-          Match.when(this._pattern, (matched) => matched),
-          Match.orElse(() => null),
-        );
+          Match.when(this._pattern, (matched) => Option.some(matched)),
+          Match.orElse(() => Option.none()),
+        ) as Option.Option<Match.Types.WhenMatch<A, P>>;
 
-        if (matchResult !== null) {
-          const resolvedValue = matchResult as PatternType<A, P>;
+        if (Option.isSome(matchResult)) {
+          const resolvedValue = matchResult.value;
           return pipe(
             Ref.get(this._valueDeferred),
             Effect.flatMap((valueDef) =>
@@ -162,11 +163,11 @@ class UntilObserver<
     return Effect.sync(() => HashSet.toValues(this._dependencies));
   }
 
-  commit(): Effect.Effect<PatternType<A, P>, E, never> {
+  commit(): Effect.Effect<Match.Types.WhenMatch<A, P>, E, never> {
     return this.value;
   }
 
-  get value(): Effect.Effect<PatternType<A, P>, E, never> {
+  get value(): Effect.Effect<Match.Types.WhenMatch<A, P>, E, never> {
     return pipe(
       Ref.get(this._valueDeferred),
       Effect.flatMap((valueDef) => Deferred.await(valueDef)),
@@ -252,7 +253,7 @@ export const observeUntil = <
   effect: Effect.Effect<A, E, R>,
   pattern: P,
   options?: Observable.ObservableOptions,
-): Effect.Effect<PatternType<A, P>, E, Exclude<R, SignalContext>> =>
+): Effect.Effect<Match.Types.WhenMatch<A, P>, E, Exclude<R, SignalContext>> =>
   pipe(
     UntilObserver.make(effect, pattern, options ?? {}),
     Effect.flatMap((observer) => observer.value),
@@ -276,7 +277,11 @@ export const observeUntilScoped = <
   effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2>,
   pattern: P,
   options?: Observable.ObservableOptions,
-): Effect.Effect<PatternType<A, P>, E | E2, Exclude<R | R2, Scope.Scope>> =>
+): Effect.Effect<
+  Match.Types.WhenMatch<A, P>,
+  E | E2,
+  Exclude<R | R2, Scope.Scope>
+> =>
   pipe(
     effect,
     Effect.flatMap((signal) => observeUntil(signal, pattern, options)),
