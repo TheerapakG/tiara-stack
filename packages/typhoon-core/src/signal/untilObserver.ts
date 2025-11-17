@@ -2,6 +2,7 @@ import {
   Deferred,
   Effect,
   Effectable,
+  Exit,
   Fiber,
   HashSet,
   Match,
@@ -37,21 +38,13 @@ class UntilObserver<
   private _fiber: Deferred.Deferred<Fiber.Fiber<A, E>, never>;
   private _effect: Effect.Effect<A, E, SignalContext>;
   private _pattern: P;
-  private _resolved: Ref.Ref<boolean>;
-  private _currentFiber: Ref.Ref<Option.Option<Fiber.Fiber<A, E>>>;
-  private _valueDeferred: Ref.Ref<
-    Option.Option<Deferred.Deferred<PatternType<A, P>, E>>
-  >;
+  private _valueDeferred: Ref.Ref<Deferred.Deferred<PatternType<A, P>, E>>;
 
   constructor(
     fiber: Deferred.Deferred<Fiber.Fiber<A, E>, never>,
     effect: Effect.Effect<A, E, SignalContext>,
     pattern: P,
-    resolved: Ref.Ref<boolean>,
-    currentFiber: Ref.Ref<Option.Option<Fiber.Fiber<A, E>>>,
-    valueDeferred: Ref.Ref<
-      Option.Option<Deferred.Deferred<PatternType<A, P>, E>>
-    >,
+    valueDeferred: Ref.Ref<Deferred.Deferred<PatternType<A, P>, E>>,
     options: Observable.ObservableOptions,
   ) {
     super();
@@ -59,8 +52,6 @@ class UntilObserver<
     this._fiber = fiber;
     this._effect = effect;
     this._pattern = pattern;
-    this._resolved = resolved;
-    this._currentFiber = currentFiber;
     this._valueDeferred = valueDeferred;
     this[Observable.ObservableSymbol] = options;
   }
@@ -78,42 +69,34 @@ class UntilObserver<
     return pipe(
       Effect.Do,
       Effect.bind("deferred", () => Deferred.make<Fiber.Fiber<A, E>, never>()),
-      Effect.bind("resolved", () => Ref.make(false)),
-      Effect.bind("currentFiber", () =>
-        Ref.make<Option.Option<Fiber.Fiber<A, E>>>(Option.none()),
-      ),
-      Effect.bind("valueDeferred", () =>
-        Ref.make<Option.Option<Deferred.Deferred<PatternType<A, P>, E>>>(
-          Option.none(),
-        ),
+      Effect.bind("valueDeferred", () => Deferred.make<PatternType<A, P>, E>()),
+      Effect.bind("valueDeferredRef", ({ valueDeferred }) =>
+        Ref.make(valueDeferred),
       ),
       Effect.let(
         "observer",
-        ({ deferred, resolved, currentFiber, valueDeferred }) =>
+        ({ deferred, valueDeferredRef }) =>
           new UntilObserver(
             deferred,
             effect as Effect.Effect<A, E, SignalContext>,
             pattern,
-            resolved,
-            currentFiber,
-            valueDeferred,
+            valueDeferredRef,
             options,
           ),
       ),
-      Effect.tap(({ deferred, observer, currentFiber }) =>
+      Effect.tap(({ deferred, observer }) =>
         pipe(
           fromDependent(observer),
           runAndTrackEffect(observer._effect),
           Effect.forkDaemon,
-          Effect.flatMap((fiber) => {
-            Ref.set(currentFiber, Option.some(fiber));
-            return pipe(
+          Effect.flatMap((fiber) =>
+            pipe(
               Deferred.succeed(deferred, fiber),
               Effect.tap(() =>
                 pipe(observer.checkAndResolve(fiber), Effect.forkDaemon),
               ),
-            );
-          }),
+            ),
+          ),
         ),
       ),
       Effect.map(({ observer }) => observer),
@@ -135,28 +118,16 @@ class UntilObserver<
         if (matchResult !== null) {
           const resolvedValue = matchResult as PatternType<A, P>;
           return pipe(
-            Ref.get(this._resolved),
-            Effect.flatMap((resolved) =>
-              resolved
-                ? Effect.void
-                : pipe(
-                    Ref.set(this._resolved, true),
-                    Effect.flatMap(() =>
-                      pipe(
-                        Ref.get(this._valueDeferred),
-                        Effect.flatMap((valueDef) =>
-                          pipe(
-                            valueDef,
-                            Option.match({
-                              onSome: (def) =>
-                                Deferred.succeed(def, resolvedValue),
-                              onNone: () => Effect.void,
-                            }),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+            Ref.get(this._valueDeferred),
+            Effect.flatMap((valueDef) =>
+              pipe(
+                Deferred.poll(valueDef),
+                Effect.flatMap((poll) =>
+                  poll._tag === "Some"
+                    ? Effect.void
+                    : Deferred.succeed(valueDef, resolvedValue),
+                ),
+              ),
             ),
           );
         }
@@ -197,54 +168,8 @@ class UntilObserver<
 
   get value(): Effect.Effect<PatternType<A, P>, E, never> {
     return pipe(
-      Effect.Do,
-      Effect.bind("resolved", () => Ref.get(this._resolved)),
-      Effect.flatMap(({ resolved }) =>
-        resolved
-          ? pipe(
-              Effect.Do,
-              Effect.bind("fiber", () => Deferred.await(this._fiber)),
-              Effect.flatMap(({ fiber }) =>
-                Fiber.join(fiber).pipe(
-                  Effect.map((result) => result as PatternType<A, P>),
-                ),
-              ),
-            )
-          : pipe(
-              Effect.Do,
-              Effect.bind("valueDef", () =>
-                pipe(
-                  Ref.get(this._valueDeferred),
-                  Effect.flatMap((valueDef) =>
-                    pipe(
-                      valueDef,
-                      Option.match({
-                        onSome: (def) => Effect.succeed(def),
-                        onNone: () =>
-                          pipe(
-                            Deferred.make<PatternType<A, P>, E>(),
-                            Effect.flatMap((def) =>
-                              pipe(
-                                Ref.set(this._valueDeferred, Option.some(def)),
-                                Effect.map(() => def),
-                              ),
-                            ),
-                          ),
-                      }),
-                    ),
-                  ),
-                ),
-              ),
-              Effect.flatMap(
-                ({ valueDef }) =>
-                  Deferred.await(valueDef) as Effect.Effect<
-                    PatternType<A, P>,
-                    E,
-                    never
-                  >,
-              ),
-            ),
-      ),
+      Ref.get(this._valueDeferred),
+      Effect.flatMap((valueDef) => Deferred.await(valueDef)),
       Observable.withSpan(this, "UntilObserver.value", {
         captureStackTrace: true,
       }),
@@ -262,16 +187,17 @@ class UntilObserver<
   notify(): Effect.Effect<unknown, never, never> {
     return pipe(
       Effect.Do,
-      Effect.bind("isResolved", () => Ref.get(this._resolved)),
+      Effect.bind("valueDef", () => Ref.get(this._valueDeferred)),
+      Effect.bind("isResolved", ({ valueDef }) => Deferred.poll(valueDef)),
       Effect.flatMap(({ isResolved }) =>
-        isResolved
+        isResolved._tag === "Some"
           ? this.clearDependencies()
           : pipe(
               Effect.all([
                 this.clearDependencies(),
                 pipe(
                   Effect.Do,
-                  Effect.bind("oldFiber", () => Ref.get(this._currentFiber)),
+                  Effect.bind("oldFiberPoll", () => Deferred.poll(this._fiber)),
                   Effect.tap(() =>
                     pipe(
                       fromDependent(this),
@@ -279,20 +205,29 @@ class UntilObserver<
                       Effect.forkDaemon,
                       Effect.flatMap((newFiber) =>
                         pipe(
-                          Ref.set(this._currentFiber, Option.some(newFiber)),
-                          Effect.flatMap(() =>
-                            Deferred.succeed(this._fiber, newFiber),
-                          ),
+                          Deferred.succeed(this._fiber, newFiber),
                           Effect.tap(() => this.checkAndResolve(newFiber)),
                         ),
                       ),
                     ),
                   ),
-                  Effect.flatMap(({ oldFiber }) =>
+                  Effect.flatMap(({ oldFiberPoll }) =>
                     pipe(
-                      oldFiber,
+                      oldFiberPoll,
                       Option.match({
-                        onSome: (fiber) => Fiber.interrupt(fiber),
+                        onSome: (exit) => {
+                          const exitTyped = exit as Exit.Exit<
+                            Fiber.Fiber<A, E>,
+                            never
+                          >;
+                          return pipe(
+                            exitTyped,
+                            Exit.match({
+                              onFailure: () => Effect.void,
+                              onSuccess: (fiber) => Fiber.interrupt(fiber),
+                            }),
+                          );
+                        },
                         onNone: () => Effect.void,
                       }),
                     ),
