@@ -4,8 +4,10 @@ import {
   Effectable,
   Fiber,
   HashSet,
+  Match,
   Option,
   pipe,
+  Predicate,
   Ref,
   Scope,
 } from "effect";
@@ -18,8 +20,43 @@ import {
   SignalContext,
 } from "./signalContext";
 
-class UntilObserver<A = never, E = never>
-  extends Effectable.Class<A, E, never>
+type PatternType<A, P> =
+  Match.Types.PatternPrimitive<A> extends infer MP
+    ? MP extends never
+      ? P extends Predicate.Predicate<A> | Predicate.Refinement<A, any>
+        ? P extends Predicate.Refinement<infer _R, infer RP>
+          ? [Extract<A, RP>] extends [infer X]
+            ? [X] extends [never]
+              ? RP
+              : X
+            : never
+          : A
+        : never
+      : MP
+    : P extends Predicate.Predicate<A> | Predicate.Refinement<A, any>
+      ? P extends Predicate.Refinement<infer _R, infer RP>
+        ? [Extract<A, RP>] extends [infer X]
+          ? [X] extends [never]
+            ? RP
+            : X
+          : never
+        : A
+      : never;
+
+class UntilObserver<
+    A = never,
+    E = never,
+    P extends
+      | Match.Types.PatternPrimitive<A>
+      | Predicate.Predicate<A>
+      | Predicate.Refinement<
+          A,
+          any
+        > = Match.Types.PatternPrimitive<A> extends never
+      ? Predicate.Predicate<A> | Predicate.Refinement<A, any>
+      : Match.Types.PatternPrimitive<A>,
+  >
+  extends Effectable.Class<PatternType<A, P>, E, never>
   implements DependentSignal
 {
   readonly [DependentSymbol]: DependentSignal = this;
@@ -28,18 +65,22 @@ class UntilObserver<A = never, E = never>
   private _dependencies: HashSet.HashSet<DependencySignal>;
   private _fiber: Deferred.Deferred<Fiber.Fiber<A, E>, never>;
   private _effect: Effect.Effect<A, E, SignalContext>;
-  private _pattern: (value: A) => boolean;
+  private _pattern: P;
   private _resolved: Ref.Ref<boolean>;
   private _currentFiber: Ref.Ref<Option.Option<Fiber.Fiber<A, E>>>;
-  private _valueDeferred: Ref.Ref<Option.Option<Deferred.Deferred<A, E>>>;
+  private _valueDeferred: Ref.Ref<
+    Option.Option<Deferred.Deferred<PatternType<A, P>, E>>
+  >;
 
   constructor(
     fiber: Deferred.Deferred<Fiber.Fiber<A, E>, never>,
     effect: Effect.Effect<A, E, SignalContext>,
-    pattern: (value: A) => boolean,
+    pattern: P,
     resolved: Ref.Ref<boolean>,
     currentFiber: Ref.Ref<Option.Option<Fiber.Fiber<A, E>>>,
-    valueDeferred: Ref.Ref<Option.Option<Deferred.Deferred<A, E>>>,
+    valueDeferred: Ref.Ref<
+      Option.Option<Deferred.Deferred<PatternType<A, P>, E>>
+    >,
     options: Observable.ObservableOptions,
   ) {
     super();
@@ -53,9 +94,22 @@ class UntilObserver<A = never, E = never>
     this[Observable.ObservableSymbol] = options;
   }
 
-  static make<A = never, E = never, R = never>(
+  static make<
+    A = never,
+    E = never,
+    R = never,
+    P extends
+      | Match.Types.PatternPrimitive<A>
+      | Predicate.Predicate<A>
+      | Predicate.Refinement<
+          A,
+          any
+        > = Match.Types.PatternPrimitive<A> extends never
+      ? Predicate.Predicate<A> | Predicate.Refinement<A, any>
+      : Match.Types.PatternPrimitive<A>,
+  >(
     effect: Effect.Effect<A, E, R | SignalContext>,
-    pattern: (value: A) => boolean,
+    pattern: P,
     options: Observable.ObservableOptions,
   ) {
     return pipe(
@@ -66,7 +120,9 @@ class UntilObserver<A = never, E = never>
         Ref.make<Option.Option<Fiber.Fiber<A, E>>>(Option.none()),
       ),
       Effect.bind("valueDeferred", () =>
-        Ref.make<Option.Option<Deferred.Deferred<A, E>>>(Option.none()),
+        Ref.make<Option.Option<Deferred.Deferred<PatternType<A, P>, E>>>(
+          Option.none(),
+        ),
       ),
       Effect.let(
         "observer",
@@ -107,7 +163,37 @@ class UntilObserver<A = never, E = never>
     return pipe(
       Fiber.join(fiber),
       Effect.flatMap((result) => {
-        if (this._pattern(result)) {
+        let patternMatches: boolean;
+        let resolvedValue: PatternType<A, P>;
+
+        if (typeof this._pattern === "function") {
+          // Handle Predicate.Predicate or Predicate.Refinement
+          const predicate = this._pattern as (value: A) => boolean;
+          if (predicate(result)) {
+            patternMatches = true;
+            resolvedValue = result as PatternType<A, P>;
+          } else {
+            patternMatches = false;
+          }
+        } else {
+          // Handle Match.Types.PatternPrimitive
+          const matchResult = pipe(
+            Match.value(result),
+            Match.when(
+              this._pattern as Match.Types.PatternPrimitive<A>,
+              (matched) => matched,
+            ),
+            Match.orElse(() => null),
+          );
+          if (matchResult !== null) {
+            patternMatches = true;
+            resolvedValue = matchResult as PatternType<A, P>;
+          } else {
+            patternMatches = false;
+          }
+        }
+
+        if (patternMatches) {
           return pipe(
             Ref.get(this._resolved),
             Effect.flatMap((resolved) =>
@@ -122,7 +208,8 @@ class UntilObserver<A = never, E = never>
                           pipe(
                             valueDef,
                             Option.match({
-                              onSome: (def) => Deferred.succeed(def, result),
+                              onSome: (def) =>
+                                Deferred.succeed(def, resolvedValue),
                               onNone: () => Effect.void,
                             }),
                           ),
@@ -164,11 +251,11 @@ class UntilObserver<A = never, E = never>
     return Effect.sync(() => HashSet.toValues(this._dependencies));
   }
 
-  commit(): Effect.Effect<A, E, never> {
+  commit(): Effect.Effect<PatternType<A, P>, E, never> {
     return this.value;
   }
 
-  get value(): Effect.Effect<A, E, never> {
+  get value(): Effect.Effect<PatternType<A, P>, E, never> {
     return pipe(
       Effect.Do,
       Effect.bind("resolved", () => Ref.get(this._resolved)),
@@ -177,7 +264,11 @@ class UntilObserver<A = never, E = never>
           ? pipe(
               Effect.Do,
               Effect.bind("fiber", () => Deferred.await(this._fiber)),
-              Effect.flatMap(({ fiber }) => Fiber.join(fiber)),
+              Effect.flatMap(({ fiber }) =>
+                Fiber.join(fiber).pipe(
+                  Effect.map((result) => result as PatternType<A, P>),
+                ),
+              ),
             )
           : pipe(
               Effect.Do,
@@ -191,7 +282,7 @@ class UntilObserver<A = never, E = never>
                         onSome: (def) => Effect.succeed(def),
                         onNone: () =>
                           pipe(
-                            Deferred.make<A, E>(),
+                            Deferred.make<PatternType<A, P>, E>(),
                             Effect.flatMap((def) =>
                               pipe(
                                 Ref.set(this._valueDeferred, Option.some(def)),
@@ -206,7 +297,11 @@ class UntilObserver<A = never, E = never>
               ),
               Effect.flatMap(
                 ({ valueDef }) =>
-                  Deferred.await(valueDef) as Effect.Effect<A, E, never>,
+                  Deferred.await(valueDef) as Effect.Effect<
+                    PatternType<A, P>,
+                    E,
+                    never
+                  >,
               ),
             ),
       ),
@@ -273,11 +368,24 @@ class UntilObserver<A = never, E = never>
   }
 }
 
-export const observeUntil = <A = never, E = never, R = never>(
+export const observeUntil = <
+  A = never,
+  E = never,
+  R = never,
+  P extends
+    | Match.Types.PatternPrimitive<A>
+    | Predicate.Predicate<A>
+    | Predicate.Refinement<
+        A,
+        any
+      > = Match.Types.PatternPrimitive<A> extends never
+    ? Predicate.Predicate<A> | Predicate.Refinement<A, any>
+    : Match.Types.PatternPrimitive<A>,
+>(
   effect: Effect.Effect<A, E, R>,
-  pattern: (value: A) => boolean,
+  pattern: P,
   options?: Observable.ObservableOptions,
-): Effect.Effect<A, E, Exclude<R, SignalContext>> =>
+): Effect.Effect<PatternType<A, P>, E, Exclude<R, SignalContext>> =>
   pipe(
     UntilObserver.make(effect, pattern, options ?? {}),
     Effect.flatMap((observer) => observer.value),
@@ -296,11 +404,20 @@ export const observeUntilScoped = <
   R = never,
   E2 = never,
   R2 = never,
+  P extends
+    | Match.Types.PatternPrimitive<A>
+    | Predicate.Predicate<A>
+    | Predicate.Refinement<
+        A,
+        any
+      > = Match.Types.PatternPrimitive<A> extends never
+    ? Predicate.Predicate<A> | Predicate.Refinement<A, any>
+    : Match.Types.PatternPrimitive<A>,
 >(
   effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2>,
-  pattern: (value: A) => boolean,
+  pattern: P,
   options?: Observable.ObservableOptions,
-): Effect.Effect<A, E | E2, Exclude<R | R2, Scope.Scope>> =>
+): Effect.Effect<PatternType<A, P>, E | E2, Exclude<R | R2, Scope.Scope>> =>
   pipe(
     effect,
     Effect.flatMap((signal) => observeUntil(signal, pattern, options)),
