@@ -9,11 +9,11 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
-      "module": "./dist/index.mjs"
+      "default": "./dist/index.mjs"
     },
     "./runServer": {
       "types": "./dist/runServer.d.mts",
-      "module": "./dist/runServer.mjs"
+      "default": "./dist/runServer.mjs"
     },
     "./package.json": "./package.json"
   },

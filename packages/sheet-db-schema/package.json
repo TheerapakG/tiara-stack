@@ -9,11 +9,11 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
-      "module": "./dist/index.mjs"
+      "default": "./dist/index.mjs"
     },
     "./*": {
       "types": "./dist/*/index.d.mts",
-      "module": "./dist/*/index.mjs"
+      "default": "./dist/*/index.mjs"
     },
     "./package.json": "./package.json"
   },
@@ -31,7 +31,8 @@
     "drizzle-orm": "^0.44.0",
     "drizzle-zero": "^0.16.1",
     "effect": "^3.18.4",
-    "postgres": "^3.4.7"
+    "postgres": "^3.4.7",
+    "typhoon-core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",

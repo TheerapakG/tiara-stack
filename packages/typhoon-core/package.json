@@ -10,11 +10,11 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
-      "module": "./dist/index.mjs"
+      "default": "./dist/index.mjs"
     },
     "./*": {
       "types": "./dist/*/index.d.mts",
-      "module": "./dist/*/index.mjs"
+      "default": "./dist/*/index.mjs"
     },
     "./package.json": "./package.json"
   },
@@ -29,6 +29,7 @@
   "author": "",
   "dependencies": {
     "@msgpack/msgpack": "^3.1.2",
+    "@rocicorp/zero": "^0.24.3000000000",
     "@standard-schema/spec": "^1.0.0"
   },
   "peerDependencies": {

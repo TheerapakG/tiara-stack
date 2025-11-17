@@ -6,11 +6,11 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
-      "module": "./dist/index.mjs"
+      "default": "./dist/index.mjs"
     },
     "./register": {
       "types": "./dist/register.d.mts",
-      "module": "./dist/register.mjs"
+      "default": "./dist/register.mjs"
     },
     "./package.json": "./package.json"
   },
