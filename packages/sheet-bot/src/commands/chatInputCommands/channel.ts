@@ -21,10 +21,15 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Effect, Option, pipe } from "effect";
+import { Effect, Option, pipe, Either } from "effect";
 import { Schema } from "sheet-apis";
+import { SignalState } from "typhoon-client-ws/client";
+import { Complete, Optimistic } from "typhoon-core/schema";
+import { Computed, UntilObserver } from "typhoon-core/signal";
 
-const configFields = (config: Schema.GuildChannelConfig) => [
+const configFields = (
+  config: Schema.GuildChannelConfig | Schema.ZeroGuildChannelConfig,
+) => [
   {
     name: "Name",
     value: pipe(
@@ -54,6 +59,61 @@ const configFields = (config: Schema.GuildChannelConfig) => [
     ),
   },
 ];
+
+const handleListConfig =
+  handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
+    .data(
+      new SlashCommandSubcommandBuilder()
+        .setName("list_config")
+        .setDescription("List the config for the channel"),
+    )
+    .handler(
+      Effect.provide(guildServicesFromInteractionOption("server_id"))(
+        pipe(
+          Effect.all({
+            channel: InteractionContext.channel(true).sync(),
+          }),
+          InteractionContext.deferReply.tap(),
+          PermissionService.checkPermissions.tap(() => ({
+            permissions: PermissionFlagsBits.ManageGuild,
+          })),
+          Effect.bind("config", ({ channel }) =>
+            pipe(
+              GuildConfigService.getZeroGuildRunningChannelById(channel.id),
+              Computed.flatMap(
+                SignalState.match({
+                  onLoading: () =>
+                    Either.right(
+                      new Optimistic({ value: Either.right(Option.none()) }),
+                    ),
+                  onResolved: (value) => value,
+                }),
+              ),
+              UntilObserver.observeUntilScoped(
+                (result) => result instanceof Complete,
+              ),
+              Effect.flatMap((v) => v.value),
+            ),
+          ),
+          Effect.map(({ config }) => ({
+            embeds: [
+              pipe(
+                ClientService.makeEmbedBuilder(),
+                Effect.map((embed) =>
+                  embed
+                    .setTitle(`Config for this channel`)
+                    .addFields(...configFields(config)),
+                ),
+              ),
+            ],
+          })),
+          Effect.withSpan("handleListConfig", {
+            captureStackTrace: true,
+          }),
+        ),
+      ),
+    )
+    .build();
 
 const handleSet =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
@@ -225,6 +285,7 @@ export const command = chatInputCommandSubcommandHandlerContextBuilder()
         InteractionContextType.PrivateChannel,
       ),
   )
+  .addSubcommandHandler(handleListConfig)
   .addSubcommandHandler(handleSet)
   .addSubcommandHandler(handleUnset)
   .build();
