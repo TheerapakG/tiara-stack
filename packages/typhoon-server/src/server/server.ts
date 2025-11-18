@@ -809,14 +809,13 @@ const handleOnce =
         serverWithRuntime.server.onceTotal(Effect.succeed(BigInt(1))),
       ),
       Effect.andThen(() =>
-        UntilObserver.observeOnceScoped(
-          pipe(
-            serverWithRuntime,
-            getComputedSubscriptionResult(header, span),
-            Computed.flatMap(encodeServerUpdateResult),
-            Computed.flatMap((buffer) => callback(buffer)),
-            Computed.tap(() => closeEvent()),
-          ),
+        pipe(
+          serverWithRuntime,
+          getComputedSubscriptionResult(header, span),
+          Computed.flatMap(encodeServerUpdateResult),
+          Computed.flatMap((buffer) => callback(buffer)),
+          Computed.tap(() => closeEvent()),
+          UntilObserver.observeOnceScoped(),
         ),
       ),
       Effect.withSpan("Server.handleOnce", {
