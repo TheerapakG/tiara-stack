@@ -21,11 +21,14 @@ import {
   Array,
   Predicate,
 } from "effect";
+import { Complete, Optimistic, type Result } from "../../schema/queryResult";
 import {
-  Complete,
-  Optimistic,
-  type Result,
-} from "../../schema/zeroQueryResult";
+  ZeroQueryAppError,
+  ZeroQueryHttpError,
+  ZeroQueryZeroError,
+  type ZeroQueryError,
+  type RawZeroQueryError,
+} from "../../error/zero";
 import type { ExternalSource } from "../externalComputed";
 import { ZeroService } from "../../services/zeroService";
 
@@ -76,35 +79,14 @@ export type ZeroMaterializeOptions = {
   ttl?: TTL | undefined;
 };
 
-export type ErroredQuery =
-  | {
-      error: "app";
-      id: string;
-      name: string;
-      details: ReadonlyJSONValue;
-    }
-  | {
-      error: "http";
-      id: string;
-      name: string;
-      status: number;
-      details: ReadonlyJSONValue;
-    }
-  | {
-      error: "zero";
-      id: string;
-      name: string;
-      details: ReadonlyJSONValue;
-    };
-
 class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View>
-  implements ExternalSource<Either.Either<Result<T>, ErroredQuery>>, Output
+  implements ExternalSource<Either.Either<Result<T>, ZeroQueryError>>, Output
 {
   constructor(
     private readonly input: Input,
     private readonly format: Format,
     private readonly resultTypeRef: SynchronizedRef.SynchronizedRef<
-      Either.Either<"unknown" | "complete", ErroredQuery>
+      Either.Either<"unknown" | "complete", ZeroQueryError>
     >,
     private readonly dirtyRef: SynchronizedRef.SynchronizedRef<boolean>,
     private readonly valueRef: SynchronizedRef.SynchronizedRef<{ "": T }>,
@@ -112,7 +94,7 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View>
     private readonly onEmitRef: SynchronizedRef.SynchronizedRef<
       Option.Option<
         (
-          value: Either.Either<Result<T>, ErroredQuery>,
+          value: Either.Either<Result<T>, ZeroQueryError>,
         ) => Effect.Effect<void, never, never>
       >
     >,
@@ -187,7 +169,7 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View>
 
   emit(
     onEmit: (
-      value: Either.Either<Result<T>, ErroredQuery>,
+      value: Either.Either<Result<T>, ZeroQueryError>,
     ) => Effect.Effect<void, never, never>,
   ) {
     return SynchronizedRef.set(this.onEmitRef, Option.some(onEmit));
@@ -247,7 +229,7 @@ export const make = <
           pipe(
             Effect.all({
               resultTypeRef: SynchronizedRef.make<
-                Either.Either<"unknown" | "complete", ErroredQuery>
+                Either.Either<"unknown" | "complete", ZeroQueryError>
               >(Either.right("unknown")),
               dirtyRef: SynchronizedRef.make(false),
               valueRef: SynchronizedRef.make<{ "": T }>({
@@ -257,7 +239,7 @@ export const make = <
               onEmitRef: SynchronizedRef.make<
                 Option.Option<
                   (
-                    value: Either.Either<Result<T>, ErroredQuery>,
+                    value: Either.Either<Result<T>, ZeroQueryError>,
                   ) => Effect.Effect<void, never, never>
                 >
               >(Option.none()),
@@ -269,7 +251,35 @@ export const make = <
                   SynchronizedRef.set(resultTypeRef, Either.right("complete")),
                 ),
                 Match.when(Predicate.hasProperty("error"), (error) =>
-                  SynchronizedRef.set(resultTypeRef, Either.left(error)),
+                  SynchronizedRef.set(
+                    resultTypeRef,
+                    Either.left(
+                      pipe(
+                        Match.value(error),
+                        Match.discriminatorsExhaustive("error")({
+                          app: (error) =>
+                            new ZeroQueryAppError({
+                              id: error.id,
+                              name: error.name,
+                              details: error.details,
+                            }),
+                          http: (error) =>
+                            new ZeroQueryHttpError({
+                              id: error.id,
+                              name: error.name,
+                              status: error.status,
+                              details: error.details,
+                            }),
+                          zero: (error) =>
+                            new ZeroQueryZeroError({
+                              id: error.id,
+                              name: error.name,
+                              details: error.details,
+                            }),
+                        }),
+                      ),
+                    ),
+                  ),
                 ),
                 Match.orElse(() => Effect.void),
               ),
@@ -295,7 +305,31 @@ export const make = <
                     pipe(
                       Effect.tryPromise({
                         try: () => queryComplete,
-                        catch: (error) => error as ErroredQuery,
+                        catch: (error) =>
+                          pipe(
+                            Match.value(error as RawZeroQueryError),
+                            Match.discriminatorsExhaustive("error")({
+                              app: (error) =>
+                                new ZeroQueryAppError({
+                                  id: error.id,
+                                  name: error.name,
+                                  details: error.details,
+                                }),
+                              http: (error) =>
+                                new ZeroQueryHttpError({
+                                  id: error.id,
+                                  name: error.name,
+                                  status: error.status,
+                                  details: error.details,
+                                }),
+                              zero: (error) =>
+                                new ZeroQueryZeroError({
+                                  id: error.id,
+                                  name: error.name,
+                                  details: error.details,
+                                }),
+                            }),
+                          ),
                       }),
                       Effect.map(() => "complete" as const),
                       Effect.either,
