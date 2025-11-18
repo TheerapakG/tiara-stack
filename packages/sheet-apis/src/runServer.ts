@@ -10,7 +10,7 @@ import { Context } from "typhoon-server/handler";
 import { DB } from "typhoon-server/db";
 import { Server } from "typhoon-server/server";
 import { Config } from "./config";
-import { DBService } from "./db";
+import { DBService, ZeroServiceLayer } from "./db";
 import {
   calcHandlerCollection,
   guildConfigHandlerCollection,
@@ -54,7 +54,9 @@ const layer = pipe(
     MessageSlotService.DefaultWithoutDependencies,
     SheetConfigService.DefaultWithoutDependencies,
   ),
-  Layer.provideMerge(DBService.DefaultWithoutDependencies),
+  Layer.provideMerge(
+    Layer.mergeAll(DBService.DefaultWithoutDependencies, ZeroServiceLayer),
+  ),
   Layer.provideMerge(
     Layer.mergeAll(
       DB.DBSubscriptionContext.Default,

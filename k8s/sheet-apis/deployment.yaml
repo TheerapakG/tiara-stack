@@ -28,6 +28,10 @@ spec:
             - containerPort: 9464
               name: sheet-apis-met
           env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
             - name: POSTGRES_URL
               valueFrom:
                 secretKeyRef:
@@ -38,6 +42,13 @@ spec:
                 secretKeyRef:
                   name: sheet-apis-secret
                   key: otelExporterOtlpEndpoint
+            - name: ZERO_CACHE_SERVER
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-apis-secret
+                  key: zeroCacheServer
+            - name: ZERO_CACHE_USER_ID
+              value: "system:serviceaccount:$(POD_NAMESPACE):sheet-apis"
           livenessProbe:
             httpGet:
               path: /live
@@ -66,11 +77,21 @@ spec:
             - name: sheet-apis-secret-path
               readOnly: true
               mountPath: "/.secret"
+            - name: sheet-apis-tokens
+              readOnly: true
+              mountPath: "/var/run/secrets/tokens"
       serviceAccountName: sheet-apis
       volumes:
         - name: sheet-apis-secret-path
           secret:
             secretName: sheet-apis-secret-path
+        - name: sheet-apis-tokens
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: zero-cache-token
+                  expirationSeconds: 3600
+                  audience: zero-cache
 ---
 apiVersion: v1
 kind: Service
