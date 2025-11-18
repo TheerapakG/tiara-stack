@@ -14,6 +14,7 @@ import {
   String,
   SynchronizedRef,
   Tracer,
+  Unify,
   Function,
   flow,
 } from "effect";
@@ -50,6 +51,24 @@ type ResolvedState<A = unknown, E = unknown> = {
 };
 
 type SignalState<A = unknown, E = unknown> = LoadingState | ResolvedState<A, E>;
+
+const matchSignalState =
+  <A, E, B, C>(f: {
+    onLoading: () => B;
+    onResolved: (value: Either.Either<A, RpcError<E> | ValidationError>) => C;
+  }) =>
+  (state: SignalState<A, E>): Unify.Unify<B | C> =>
+    pipe(
+      Match.value(state),
+      Match.discriminatorsExhaustive("state")({
+        loading: () => f.onLoading(),
+        resolved: ({ value }) => f.onResolved(value),
+      }),
+    );
+
+export const SignalState = {
+  match: matchSignalState,
+};
 
 type UpdaterState = {
   updater: (

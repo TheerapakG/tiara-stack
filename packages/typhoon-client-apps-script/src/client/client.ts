@@ -172,11 +172,24 @@ export class AppsScriptClient<
         requestBuffer.set(dataEncoded, requestHeaderEncoded.length);
         return requestBuffer;
       }),
-      Effect.let("response", ({ requestBuffer }) =>
-        UrlFetchApp.fetch(client.url, {
-          method: "post",
-          contentType: "application/octet-stream",
-          payload: requestBuffer,
+      Effect.bind("response", ({ requestBuffer }) =>
+        Effect.try({
+          try: () =>
+            UrlFetchApp.fetch(client.url, {
+              method: "post",
+              contentType: "application/octet-stream",
+              payload: requestBuffer,
+            }),
+          catch: (error) =>
+            makeRpcError(Schema.Unknown)(
+              typeof error === "object" &&
+                error !== null &&
+                "message" in error &&
+                typeof error.message === "string"
+                ? `Failed to fetch from ${client.url}: ${error.message}`
+                : `Failed to fetch from ${client.url}: An unknown error occurred`,
+              error,
+            ),
         }),
       ),
       Effect.let(
