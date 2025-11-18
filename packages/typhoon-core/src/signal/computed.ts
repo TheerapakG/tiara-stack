@@ -315,6 +315,17 @@ export const flatMapComputed =
       ),
     );
 
+export const flatten =
+  (options?: Observable.ObservableOptions) =>
+  <A, E, R, E2, R2, E3, R3>(
+    signal: Effect.Effect<
+      DependencySignal<Effect.Effect<A, E, R>, E3, R3>,
+      E2,
+      R2
+    >,
+  ) =>
+    pipe(signal, mapEffect(Effect.flatten, options));
+
 export const provideLayer =
   <Rout, E3, RIn>(
     layer: Layer.Layer<Rout, E3, RIn>,

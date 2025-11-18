@@ -244,34 +244,33 @@ export const observeUntil = <
     ),
   );
 
-export const observeUntilScoped = <
-  A = never,
-  E = never,
-  R = never,
-  E2 = never,
-  R2 = never,
-  P extends Match.Types.PatternPrimitive<A> = Match.Types.PatternPrimitive<A>,
->(
-  effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2>,
-  pattern: P,
-  options?: Observable.ObservableOptions,
-): Effect.Effect<
-  Match.Types.WhenMatch<A, P>,
-  E | E2,
-  Exclude<R | R2, Scope.Scope>
-> =>
-  pipe(
-    effect,
-    Effect.flatMap((signal) => observeUntil(signal, pattern, options)),
-    Effect.scoped,
-    Observable.withSpan(
-      { [Observable.ObservableSymbol]: options ?? {} },
-      "observeUntilScoped",
-      {
-        captureStackTrace: true,
-      },
-    ),
-  );
+export const observeUntilScoped =
+  <
+    A = never,
+    P extends Match.Types.PatternPrimitive<A> = Match.Types.PatternPrimitive<A>,
+  >(
+    pattern: P,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <E = never, R = never, E2 = never, R2 = never>(
+    effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2>,
+  ): Effect.Effect<
+    Match.Types.WhenMatch<A, P>,
+    E | E2,
+    Exclude<R | R2, Scope.Scope>
+  > =>
+    pipe(
+      effect,
+      Effect.flatMap((signal) => observeUntil(signal, pattern, options)),
+      Effect.scoped,
+      Observable.withSpan(
+        { [Observable.ObservableSymbol]: options ?? {} },
+        "observeUntilScoped",
+        {
+          captureStackTrace: true,
+        },
+      ),
+    );
 
 export const observeOnce = <A = never, E = never, R = never>(
   effect: Effect.Effect<A, E, R>,
@@ -289,25 +288,20 @@ export const observeOnce = <A = never, E = never, R = never>(
     ),
   );
 
-export const observeOnceScoped = <
-  A = never,
-  E = never,
-  R = never,
-  E2 = never,
-  R2 = never,
->(
-  effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2>,
-  options?: Observable.ObservableOptions,
-): Effect.Effect<A, E | E2, Exclude<R | R2, Scope.Scope>> =>
-  pipe(
-    effect,
-    Effect.flatMap((signal) => observeOnce(signal, options)),
-    Effect.scoped,
-    Observable.withSpan(
-      { [Observable.ObservableSymbol]: options ?? {} },
-      "observeOnceScoped",
-      {
-        captureStackTrace: true,
-      },
-    ),
-  );
+export const observeOnceScoped =
+  (options?: Observable.ObservableOptions) =>
+  <A = never, E = never, R = never, E2 = never, R2 = never>(
+    effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2>,
+  ): Effect.Effect<A, E | E2, Exclude<R | R2, Scope.Scope>> =>
+    pipe(
+      effect,
+      Effect.flatMap((signal) => observeOnce(signal, options)),
+      Effect.scoped,
+      Observable.withSpan(
+        { [Observable.ObservableSymbol]: options ?? {} },
+        "observeOnceScoped",
+        {
+          captureStackTrace: true,
+        },
+      ),
+    );
