@@ -29,7 +29,7 @@ import { Context as HandlerContext, type Type } from "typhoon-core/handler";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { RunState } from "typhoon-core/runtime";
 import { Handler } from "typhoon-core/server";
-import { Computed, OnceObserver, SideEffect } from "typhoon-core/signal";
+import { Computed, UntilObserver, SideEffect } from "typhoon-core/signal";
 import { parseURL, withoutTrailingSlash } from "ufo";
 import {
   close as closeEvent,
@@ -702,7 +702,7 @@ const handleSubscribe =
             onSome: ({ event, scope }) =>
               pipe(
                 eventPullEffect(),
-                Effect.flatMap(OnceObserver.observeOnce),
+                Effect.flatMap(UntilObserver.observeOnce),
                 Effect.flatMap(replacePullStream),
                 Effect.map((event) =>
                   Option.some(
@@ -809,7 +809,7 @@ const handleOnce =
         serverWithRuntime.server.onceTotal(Effect.succeed(BigInt(1))),
       ),
       Effect.andThen(() =>
-        OnceObserver.observeOnceScoped(
+        UntilObserver.observeOnceScoped(
           pipe(
             serverWithRuntime,
             getComputedSubscriptionResult(header, span),

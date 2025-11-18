@@ -3,7 +3,7 @@ import { Error } from "@/server/schema";
 import { AuthService, MessageRoomOrderService } from "@/server/services";
 import { Array, Effect, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
-import { OnceObserver } from "typhoon-core/signal";
+import { UntilObserver } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
 
@@ -19,7 +19,7 @@ export const upsertMessageRoomOrderHandler = pipe(
       Effect.flatMap(() =>
         pipe(
           Event.request.parsed(upsertMessageRoomOrderHandlerConfig),
-          Effect.flatMap(OnceObserver.observeOnce),
+          Effect.flatMap(UntilObserver.observeOnce),
         ),
       ),
       Effect.flatMap(({ messageId, ...data }) =>
