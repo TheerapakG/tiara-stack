@@ -1,4 +1,4 @@
-import { Data, Schema } from "effect";
+import { Data, Match, Predicate, Schema, pipe, Unify } from "effect";
 
 type OptimisticData<T> = {
   readonly value: T;
@@ -60,3 +60,47 @@ export const ResultSchema = <A, I = A, R = never>(
   value: Schema.Schema<A, I, R>,
 ): Schema.Schema<Result<A>, Result<I>, R> =>
   Schema.Union(OptimisticSchema(value), CompleteSchema(value));
+
+const mapResult =
+  <A, B>(f: (a: A) => B) =>
+  (result: Result<A>): Result<B> =>
+    pipe(
+      Match.value(result),
+      Match.tagsExhaustive({
+        Optimistic: ({ value }) => new Optimistic({ value: f(value) }),
+        Complete: ({ value }) => new Complete({ value: f(value) }),
+      }),
+    );
+
+const matchResult =
+  <A, B, C>(f: {
+    onOptimistic: (value: A) => B;
+    onComplete: (value: A) => C;
+  }) =>
+  (result: Result<A>): Unify.Unify<B | C> =>
+    pipe(
+      Match.value(result),
+      Match.tagsExhaustive({
+        Optimistic: ({ value }) => f.onOptimistic(value),
+        Complete: ({ value }) => f.onComplete(value),
+      }),
+    );
+
+const predicateResult =
+  <A>(predicate: Predicate.Predicate<A>): Predicate.Predicate<Result<A>> =>
+  (v: Result<A>): boolean =>
+    predicate(v.value);
+
+const refinementResult =
+  <A, B extends A>(
+    refinement: Predicate.Refinement<A, B>,
+  ): Predicate.Refinement<Result<A>, Result<B>> =>
+  (v: Result<A>): v is Result<B> =>
+    refinement(v.value);
+
+export const Result = {
+  map: mapResult,
+  match: matchResult,
+  predicate: predicateResult,
+  refinement: refinementResult,
+};
