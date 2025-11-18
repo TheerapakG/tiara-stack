@@ -272,3 +272,42 @@ export const observeUntilScoped = <
       },
     ),
   );
+
+export const observeOnce = <A = never, E = never, R = never>(
+  effect: Effect.Effect<A, E, R>,
+  options?: Observable.ObservableOptions,
+): Effect.Effect<A, E, Exclude<R, SignalContext>> =>
+  pipe(
+    observeUntil(effect, Match.any as Match.Types.PatternPrimitive<A>, options),
+    Effect.map((value) => value as A),
+    Observable.withSpan(
+      { [Observable.ObservableSymbol]: options ?? {} },
+      "observeOnce",
+      {
+        captureStackTrace: true,
+      },
+    ),
+  );
+
+export const observeOnceScoped = <
+  A = never,
+  E = never,
+  R = never,
+  E2 = never,
+  R2 = never,
+>(
+  effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2>,
+  options?: Observable.ObservableOptions,
+): Effect.Effect<A, E | E2, Exclude<R | R2, Scope.Scope>> =>
+  pipe(
+    effect,
+    Effect.flatMap((signal) => observeOnce(signal, options)),
+    Effect.scoped,
+    Observable.withSpan(
+      { [Observable.ObservableSymbol]: options ?? {} },
+      "observeOnceScoped",
+      {
+        captureStackTrace: true,
+      },
+    ),
+  );

@@ -3,7 +3,7 @@ import { Error } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
 import { Effect, Option, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
-import { OnceObserver } from "typhoon-core/signal";
+import { UntilObserver } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
 
@@ -18,7 +18,7 @@ export const removeGuildManagerRoleHandler = pipe(
       Effect.flatMap(() =>
         pipe(
           Event.request.parsed(removeGuildManagerRoleHandlerConfig),
-          Effect.flatMap(OnceObserver.observeOnce),
+          Effect.flatMap(UntilObserver.observeOnce),
         ),
       ),
       Effect.flatMap(({ guildId, roleId }) =>
