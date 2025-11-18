@@ -5,3 +5,4 @@ export * from "./stream";
 export * from "./rpc";
 export * from "./msgpack";
 export * from "./validation";
+export * from "./zero";
