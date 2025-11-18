@@ -3,18 +3,24 @@ import {
   GuildChannelConfig,
   GuildConfig,
   GuildConfigManagerRole,
+  ZeroGuildChannelConfig,
 } from "@/server/schema";
 import { and, eq, isNull } from "drizzle-orm";
-import { Array, DateTime, Effect, pipe, Schema } from "effect";
+import { Array, DateTime, Effect, Option, pipe, Schema } from "effect";
 import {
   configGuild,
   configGuildChannel,
   configGuildManagerRole,
 } from "sheet-db-schema";
 import { makeDBQueryError } from "typhoon-core/error";
-import { DefaultTaggedClass } from "typhoon-core/schema";
-import { Computed } from "typhoon-core/signal";
+import { DefaultTaggedClass, ResultSchema, Result } from "typhoon-core/schema";
+import {
+  Computed,
+  ZeroQueryExternalSource,
+  ExternalComputed,
+} from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
+import { ZeroServiceTag } from "@/db/zeroService";
 
 type GuildConfigInsert = typeof configGuild.$inferInsert;
 type GuildChannelConfigInsert = typeof configGuildChannel.$inferInsert;
@@ -230,7 +236,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             dbSubscriptionContext.mutateQuery(
               db
                 .insert(configGuildChannel)
-                .values({ guildId, channelId, ...config })
+                .values([{ guildId, channelId, running: false, ...config }])
                 .onConflictDoUpdate({
                   target: [
                     configGuildChannel.guildId,
@@ -282,6 +288,37 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               captureStackTrace: true,
             }),
           ),
+        getZeroGuildRunningChannelById: (guildId: string, channelId: string) =>
+          pipe(
+            ZeroServiceTag,
+            Effect.flatMap((zero) =>
+              ZeroQueryExternalSource.make(
+                zero.query.configGuildChannel
+                  .where("guildId", "=", guildId)
+                  .where("channelId", "=", channelId)
+                  .where("deletedAt", "IS", null)
+                  .one(),
+              ),
+            ),
+            Effect.flatMap(ExternalComputed.make),
+            Computed.flatten(),
+            Computed.map(Result.map(Option.fromNullable)),
+            Computed.flatMap(
+              Schema.decode(
+                ResultSchema(
+                  Schema.OptionFromSelf(
+                    DefaultTaggedClass(ZeroGuildChannelConfig),
+                  ),
+                ),
+              ),
+            ),
+            Effect.withSpan(
+              "GuildConfigService.getZeroGuildRunningChannelById",
+              {
+                captureStackTrace: true,
+              },
+            ),
+          ),
         getGuildRunningChannelByName: (guildId: string, channelName: string) =>
           pipe(
             dbSubscriptionContext.subscribeQuery(
@@ -305,6 +342,40 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Effect.withSpan("GuildConfigService.getGuildRunningChannelByName", {
               captureStackTrace: true,
             }),
+          ),
+        getZeroGuildRunningChannelByName: (
+          guildId: string,
+          channelName: string,
+        ) =>
+          pipe(
+            ZeroServiceTag,
+            Effect.flatMap((zero) =>
+              ZeroQueryExternalSource.make(
+                zero.query.configGuildChannel
+                  .where("guildId", "=", guildId)
+                  .where("name", "=", channelName)
+                  .where("deletedAt", "IS", null)
+                  .one(),
+              ),
+            ),
+            Effect.flatMap(ExternalComputed.make),
+            Computed.flatten(),
+            Computed.map(Result.map(Option.fromNullable)),
+            Computed.flatMap(
+              Schema.decode(
+                ResultSchema(
+                  Schema.OptionFromSelf(
+                    DefaultTaggedClass(ZeroGuildChannelConfig),
+                  ),
+                ),
+              ),
+            ),
+            Effect.withSpan(
+              "GuildConfigService.getZeroGuildRunningChannelByName",
+              {
+                captureStackTrace: true,
+              },
+            ),
           ),
       })),
     ),

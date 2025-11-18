@@ -143,6 +143,23 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               captureStackTrace: true,
             }),
           ),
+        getZeroGuildRunningChannelById: (channelId: string) =>
+          pipe(
+            guildService.getId(),
+            Effect.flatMap((guildId) =>
+              WebSocketClient.subscribeScoped(
+                sheetApisClient.get(),
+                "guildConfig.getZeroGuildRunningChannelById",
+                { guildId, channelId },
+              ),
+            ),
+            Effect.withSpan(
+              "GuildConfigService.getZeroGuildRunningChannelById",
+              {
+                captureStackTrace: true,
+              },
+            ),
+          ),
         getGuildRunningChannelByName: (channelName: string) =>
           pipe(
             guildService.getId(),
@@ -156,6 +173,23 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Effect.withSpan("GuildConfigService.getGuildRunningChannelByName", {
               captureStackTrace: true,
             }),
+          ),
+        getZeroGuildRunningChannelByName: (channelName: string) =>
+          pipe(
+            guildService.getId(),
+            Effect.flatMap((guildId) =>
+              WebSocketClient.subscribeScoped(
+                sheetApisClient.get(),
+                "guildConfig.getZeroGuildRunningChannelByName",
+                { guildId, channelName },
+              ),
+            ),
+            Effect.withSpan(
+              "GuildConfigService.getZeroGuildRunningChannelByName",
+              {
+                captureStackTrace: true,
+              },
+            ),
           ),
       })),
     ),
