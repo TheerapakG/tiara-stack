@@ -29,7 +29,7 @@ export class Complete<T> extends CompleteTaggedClass<T> {}
 /**
  * Result type for optimistic updates, either Optimistic or Complete.
  */
-export type Result<T> = Optimistic<T> | Complete<T>;
+export type Result<O, C = O> = Optimistic<O> | Complete<C>;
 
 /**
  * Schema for Optimistic result type.
@@ -56,14 +56,18 @@ export const CompleteSchema = <A, I = A, R = never>(
 /**
  * Schema for Result union type.
  */
-export const ResultSchema = <A, I = A, R = never>(
-  value: Schema.Schema<A, I, R>,
-): Schema.Schema<Result<A>, Result<I>, R> =>
-  Schema.Union(OptimisticSchema(value), CompleteSchema(value));
+export const ResultSchema = <OA, CA, OI, CI, OR, CR>({
+  optimistic,
+  complete,
+}: {
+  readonly optimistic: Schema.Schema<OA, OI, OR>;
+  readonly complete: Schema.Schema<CA, CI, CR>;
+}): Schema.Schema<Result<OA, CA>, Result<OI, CI>, OR | CR> =>
+  Schema.Union(OptimisticSchema(optimistic), CompleteSchema(complete));
 
 const mapResult =
-  <A, B>(f: (a: A) => B) =>
-  (result: Result<A>): Result<B> =>
+  <OA, CA, B>(f: (a: OA | CA) => B) =>
+  (result: Result<OA, CA>): Result<B> =>
     pipe(
       Match.value(result),
       Match.tagsExhaustive({
@@ -72,12 +76,34 @@ const mapResult =
       }),
     );
 
+const flatmapResult =
+  <OA, CA, OB, CB>(f: (value: OA | CA) => Result<OB, CB>) =>
+  (result: Result<OA, CA>): Result<OB | CB, CB> =>
+    pipe(
+      Match.value(result),
+      Match.tagsExhaustive({
+        Optimistic: ({ value }) => new Optimistic({ value: f(value).value }),
+        Complete: ({ value }) => f(value),
+      }),
+    );
+
+const flatenResult = <OO, OC, CO, CC>(
+  result: Result<Result<OO, OC>, Result<CO, CC>>,
+): Result<OO | OC | CO, CC> =>
+  pipe(
+    Match.value(result),
+    Match.tagsExhaustive({
+      Optimistic: ({ value }) => new Optimistic({ value: value.value }),
+      Complete: ({ value }) => value,
+    }),
+  );
+
 const matchResult =
-  <A, B, C>(f: {
-    onOptimistic: (value: A) => B;
-    onComplete: (value: A) => C;
+  <OA, OB, CA, CB>(f: {
+    onOptimistic: (value: OA) => OB;
+    onComplete: (value: CA) => CB;
   }) =>
-  (result: Result<A>): Unify.Unify<B | C> =>
+  (result: Result<OA, CA>): Unify.Unify<OB | CB> =>
     pipe(
       Match.value(result),
       Match.tagsExhaustive({
@@ -87,19 +113,27 @@ const matchResult =
     );
 
 const predicateResult =
-  <A>(predicate: Predicate.Predicate<A>): Predicate.Predicate<Result<A>> =>
-  (v: Result<A>): boolean =>
+  <O, C>(
+    predicate: Predicate.Predicate<O | C>,
+  ): Predicate.Predicate<Result<O, C>> =>
+  (v: Result<O, C>): boolean =>
     predicate(v.value);
 
+type RefinementResult<O, C, B extends O | C> =
+  | (B extends O ? Optimistic<B> : never)
+  | (B extends C ? Complete<B> : never);
+
 const refinementResult =
-  <A, B extends A>(
-    refinement: Predicate.Refinement<A, B>,
-  ): Predicate.Refinement<Result<A>, Result<B>> =>
-  (v: Result<A>): v is Result<B> =>
+  <O, C, B extends O | C>(
+    refinement: Predicate.Refinement<O | C, B>,
+  ): Predicate.Refinement<Result<O, C>, RefinementResult<O, C, B>> =>
+  (v: Result<O, C>): v is RefinementResult<O, C, B> =>
     refinement(v.value);
 
 export const Result = {
   map: mapResult,
+  flatmap: flatmapResult,
+  flaten: flatenResult,
   match: matchResult,
   predicate: predicateResult,
   refinement: refinementResult,
