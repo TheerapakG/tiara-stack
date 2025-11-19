@@ -305,11 +305,14 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Computed.map(Result.map(Option.fromNullable)),
             Computed.flatMap(
               Schema.decode(
-                ResultSchema(
-                  Schema.OptionFromSelf(
+                ResultSchema({
+                  optimistic: Schema.OptionFromSelf(
                     DefaultTaggedClass(ZeroGuildChannelConfig),
                   ),
-                ),
+                  complete: Schema.OptionFromSelf(
+                    DefaultTaggedClass(ZeroGuildChannelConfig),
+                  ),
+                }),
               ),
             ),
             Effect.withSpan(
@@ -363,11 +366,14 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Computed.map(Result.map(Option.fromNullable)),
             Computed.flatMap(
               Schema.decode(
-                ResultSchema(
-                  Schema.OptionFromSelf(
+                ResultSchema({
+                  optimistic: Schema.OptionFromSelf(
                     DefaultTaggedClass(ZeroGuildChannelConfig),
                   ),
-                ),
+                  complete: Schema.OptionFromSelf(
+                    DefaultTaggedClass(ZeroGuildChannelConfig),
+                  ),
+                }),
               ),
             ),
             Effect.withSpan(

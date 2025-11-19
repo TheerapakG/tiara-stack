@@ -1,6 +1,7 @@
-import { Core, Error, ZeroGuildChannelConfig } from "@/server/schema";
+import { Error, ZeroGuildChannelConfig } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
+import { ResultSchema } from "typhoon-core/schema";
 
 export const getZeroGuildRunningChannelByIdHandlerConfig = pipe(
   Handler.Config.empty(),
@@ -17,12 +18,16 @@ export const getZeroGuildRunningChannelByIdHandlerConfig = pipe(
   }),
   Handler.Config.Builder.response({
     validator: pipe(
-      Core.ResultSchema(
-        Schema.Either({
+      ResultSchema({
+        optimistic: Schema.Either({
           right: ZeroGuildChannelConfig,
           left: Error.Core.ArgumentError,
         }),
-      ),
+        complete: Schema.Either({
+          right: ZeroGuildChannelConfig,
+          left: Error.Core.ArgumentError,
+        }),
+      }),
       Schema.standardSchemaV1,
     ),
   }),
