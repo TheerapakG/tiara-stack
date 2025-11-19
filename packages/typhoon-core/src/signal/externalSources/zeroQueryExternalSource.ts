@@ -21,7 +21,7 @@ import {
   Array,
   Predicate,
 } from "effect";
-import { Complete, Optimistic, type Result } from "../../schema/queryResult";
+import { Complete, Optimistic, type Result } from "../../schema/result";
 import {
   ZeroQueryAppError,
   ZeroQueryHttpError,

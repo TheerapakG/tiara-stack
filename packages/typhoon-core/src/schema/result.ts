@@ -1,4 +1,6 @@
-import { Data, Match, Predicate, Schema, pipe, Unify } from "effect";
+import { Data, Match, Predicate, Schema, pipe, Unify, Either } from "effect";
+import { RpcResult } from "./rpc";
+import { type RpcError, ValidationError } from "../error";
 
 type OptimisticData<T> = {
   readonly value: T;
@@ -130,6 +132,19 @@ const refinementResult =
   (v: Result<O, C>): v is RefinementResult<O, C, B> =>
     refinement(v.value);
 
+const fromRpcResult =
+  <O>(optimistic: O) =>
+  <A, E>(
+    result: RpcResult<A, E>,
+  ): Result<O, Either.Either<A, RpcError<E> | ValidationError>> =>
+    pipe(
+      result,
+      RpcResult.match({
+        onLoading: () => new Optimistic({ value: optimistic }),
+        onResolved: (value) => new Complete({ value: value.value }),
+      }),
+    );
+
 export const Result = {
   map: mapResult,
   flatmap: flatmapResult,
@@ -137,4 +152,5 @@ export const Result = {
   match: matchResult,
   predicate: predicateResult,
   refinement: refinementResult,
+  fromRpcResult: fromRpcResult,
 };
