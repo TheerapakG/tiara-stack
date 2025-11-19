@@ -96,18 +96,17 @@ export function THEECALC(
   ];
 }
 
-export function THEECALC2(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
+export function theeCalc(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
   return Effect.runSync(
     pipe(
-      Effect.Do,
-      Effect.bindAll(
-        () => ({
+      Effect.all(
+        {
           settingSheet: Option.fromNullable(
             SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
               SETTING_SHEET_NAME,
             ),
           ),
-        }),
+        },
         { concurrency: "unbounded" },
       ),
       Effect.bind("hour", () =>
