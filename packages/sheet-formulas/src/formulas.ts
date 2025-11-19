@@ -240,6 +240,40 @@ export function theeCalc(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
   );
 }
 
+export function copyRange({
+  sourceSheet,
+  targetSheet,
+  rows,
+  sourceRowStart,
+  sourceColumnStart,
+  sourceColumnEnd,
+  targetRowStart,
+  targetColumnStart,
+  targetColumnEnd,
+}: {
+  sourceSheet: GoogleAppsScript.Spreadsheet.Sheet;
+  targetSheet: GoogleAppsScript.Spreadsheet.Sheet;
+  rows: number;
+  sourceRowStart: number;
+  sourceColumnStart: string;
+  sourceColumnEnd: string;
+  targetRowStart: number;
+  targetColumnStart: string;
+  targetColumnEnd: string;
+}) {
+  targetSheet
+    .getRange(
+      `${targetColumnStart}${targetRowStart}:${targetColumnEnd}${targetRowStart + rows}`,
+    )
+    .setValues(
+      sourceSheet
+        .getRange(
+          `${sourceColumnStart}${sourceRowStart}:${sourceColumnEnd}${sourceRowStart + rows}`,
+        )
+        .getValues(),
+    );
+}
+
 export function TZSHORTSTAMPS(
   start: CellValue,
   tzs: CellValue[][],
