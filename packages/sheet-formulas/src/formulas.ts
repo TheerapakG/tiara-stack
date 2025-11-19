@@ -445,6 +445,167 @@ export function TZLONGSTAMPS(
   );
 }
 
+export function tzLongStamps({
+  sheet,
+  tzsRow,
+  tzsColumnStart,
+  tzsColumnEnd,
+  hoursColumn,
+  hoursRowStart,
+  hoursRowEnd,
+}: {
+  sheet: GoogleAppsScript.Spreadsheet.Sheet;
+  tzsRow: number;
+  tzsColumnStart: string;
+  tzsColumnEnd: string;
+  hoursColumn: string;
+  hoursRowStart: number;
+  hoursRowEnd: number;
+}) {
+  return Effect.runSync(
+    pipe(
+      Effect.all(
+        {
+          settingSheet: Option.fromNullable(
+            SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
+              SETTING_SHEET_NAME,
+            ),
+          ),
+        },
+        { concurrency: "unbounded" },
+      ),
+      Effect.bind("start", ({ settingSheet }) =>
+        pipe(
+          settingSheet.getRange("O8").getValue(),
+          Schema.decodeUnknown(
+            pipe(
+              Schema.Number,
+              Schema.transform(Schema.Number, {
+                strict: true,
+                decode: Number.multiply(1000),
+                encode: Number.unsafeDivide(1000),
+              }),
+              Schema.compose(Schema.DateTimeUtcFromNumber),
+            ),
+          ),
+        ),
+      ),
+      Effect.bind("tzsLookup", ({ settingSheet }) =>
+        pipe(
+          settingSheet.getRange("AJ8:AK").getValues(),
+          Schema.decodeUnknown(
+            Schema.Array(Schema.Tuple(Schema.String, Schema.String)),
+          ),
+          Effect.map(HashMap.fromIterable),
+        ),
+      ),
+      Effect.bind("tzs", ({ tzsLookup }) =>
+        pipe(
+          sheet
+            .getRange(`${tzsColumnStart}${tzsRow}:${tzsColumnEnd}${tzsRow}`)
+            .getValues(),
+          Array.flatten,
+          Schema.decodeUnknown(Schema.Array(Schema.String)),
+          Effect.map(
+            Array.map((tz) =>
+              pipe(
+                HashMap.get(tzsLookup, tz),
+                Option.getOrElse(() => tz),
+              ),
+            ),
+          ),
+        ),
+      ),
+      Effect.bind("hours", () =>
+        pipe(
+          sheet
+            .getRange(
+              `${hoursColumn}${hoursRowStart}:${hoursColumn}${hoursRowEnd}`,
+            )
+            .getValues(),
+          Array.flatten,
+          Schema.decodeUnknown(Schema.Array(Schema.Number)),
+        ),
+      ),
+      Effect.andThen(({ start, tzs, hours }) =>
+        Effect.forEach(hours, (hour) =>
+          pipe(
+            Effect.Do,
+            Effect.let("startTime", () =>
+              pipe(start, DateTime.addDuration(Duration.hours(hour - 1))),
+            ),
+            Effect.let("endTime", () =>
+              pipe(start, DateTime.addDuration(Duration.hours(hour))),
+            ),
+            Effect.map(({ startTime, endTime }) =>
+              Array.map(tzs, (tz) =>
+                pipe(
+                  Option.Do,
+                  Option.bind("startTimeTz", () =>
+                    DateTime.makeZoned(startTime, { timeZone: tz }),
+                  ),
+                  Option.bind("endTimeTz", () =>
+                    DateTime.makeZoned(endTime, { timeZone: tz }),
+                  ),
+                  Option.let("startTimeTzHours", ({ startTimeTz }) =>
+                    pipe(
+                      startTimeTz,
+                      DateTime.getPart("hours"),
+                      (n) => n.toString(),
+                      String.padStart(2, "0"),
+                    ),
+                  ),
+                  Option.let("startTimeTzMinutes", ({ startTimeTz }) =>
+                    pipe(
+                      startTimeTz,
+                      DateTime.getPart("minutes"),
+                      (n) => n.toString(),
+                      String.padStart(2, "0"),
+                    ),
+                  ),
+                  Option.let("endTimeTzHours", ({ endTimeTz }) =>
+                    pipe(
+                      endTimeTz,
+                      DateTime.getPart("hours"),
+                      (n) => n.toString(),
+                      String.padStart(2, "0"),
+                    ),
+                  ),
+                  Option.let("endTimeTzMinutes", ({ endTimeTz }) =>
+                    pipe(
+                      endTimeTz,
+                      DateTime.getPart("minutes"),
+                      (n) => n.toString(),
+                      String.padStart(2, "0"),
+                    ),
+                  ),
+                  Option.map(
+                    ({
+                      startTimeTzHours,
+                      startTimeTzMinutes,
+                      endTimeTzHours,
+                      endTimeTzMinutes,
+                    }) =>
+                      `${startTimeTzHours}:${startTimeTzMinutes} - ${endTimeTzHours}:${endTimeTzMinutes}`,
+                  ),
+                  Option.getOrElse(() => ""),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      Effect.andThen((result) =>
+        sheet
+          .getRange(
+            `${tzsColumnStart}${hoursRowStart}:${tzsColumnEnd}${hoursRowEnd}`,
+          )
+          .setValues(result),
+      ),
+    ),
+  );
+}
+
 export function onEditInstallable(e: GoogleAppsScript.Events.SheetsOnEdit) {
   pipe(
     Match.value({
