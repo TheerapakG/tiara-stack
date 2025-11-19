@@ -647,13 +647,17 @@ export function onEditInstallable(e: GoogleAppsScript.Events.SheetsOnEdit) {
       name: e.range.getSheet().getName(),
       cell: e.range.getA1Notation(),
     }),
-    Match.when(
+    Match.whenOr(
       {
-        template: "Template: UniversalTeamCalc v1.16 on TheeCalc v7.0",
+        template: "Template: UniversalTeamCalc v1.17 on TheeCalc v8.0",
+        cell: "B27",
+      },
+      {
+        template: "Template: UniversalTeamCalc v1.17 on TheeCalc v8.0",
         cell: "B27",
       },
       () => {
-        THEECALC2(e.range.getSheet());
+        theeCalc(e.range.getSheet());
       },
     ),
     Match.when(
@@ -662,18 +666,83 @@ export function onEditInstallable(e: GoogleAppsScript.Events.SheetsOnEdit) {
         cell: "S13",
       },
       () => {
-        const sheet = e.range.getSheet();
+        const drafterSheet = e.range.getSheet();
         const rows =
-          sheet.getRange("C13").getValue() -
-          sheet.getRange("C12").getValue() +
+          drafterSheet.getRange("C13").getValue() -
+          drafterSheet.getRange("C12").getValue() +
           1;
-        const targetSheet =
+        const scheduleSheet =
           SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
-            sheet.getRange("S12").getValue(),
+            drafterSheet.getRange("S12").getValue(),
           );
-        targetSheet
-          ?.getRange(`D11:X${rows + 11}`)
-          .setValues(sheet.getRange(`P16:AJ${rows + 16}`).getValues());
+
+        if (scheduleSheet) {
+          copyRange({
+            sourceSheet: drafterSheet,
+            targetSheet: scheduleSheet,
+            rows,
+            sourceRowStart: 16,
+            sourceColumnStart: "P",
+            sourceColumnEnd: "AJ",
+            targetRowStart: 11,
+            targetColumnStart: "D",
+            targetColumnEnd: "X",
+          });
+        }
+      },
+    ),
+    Match.when(
+      {
+        template: "Template: Drafter v1.1",
+        cell: "S13",
+      },
+      () => {
+        const drafterSheet = e.range.getSheet();
+        const rows =
+          drafterSheet.getRange("C13").getValue() -
+          drafterSheet.getRange("C12").getValue() +
+          1;
+        const scheduleSheet =
+          SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
+            drafterSheet.getRange("S12").getValue(),
+          );
+
+        if (scheduleSheet) {
+          copyRange({
+            sourceSheet: drafterSheet,
+            targetSheet: scheduleSheet,
+            rows,
+            sourceRowStart: 18,
+            sourceColumnStart: "P",
+            sourceColumnEnd: "AJ",
+            targetRowStart: 13,
+            targetColumnStart: "D",
+            targetColumnEnd: "X",
+          });
+        }
+      },
+    ),
+    Match.when(
+      {
+        template: "Template: Drafter v1.1",
+        cell: "S15",
+      },
+      () => {
+        const drafterSheet = e.range.getSheet();
+        const rows =
+          drafterSheet.getRange("C13").getValue() -
+          drafterSheet.getRange("C12").getValue() +
+          1;
+
+        tzLongStamps({
+          sheet: drafterSheet,
+          tzsRow: 18,
+          tzsColumnStart: "P",
+          tzsColumnEnd: "T",
+          hoursColumn: "U",
+          hoursRowStart: 19,
+          hoursRowEnd: 19 + rows - 1,
+        });
       },
     ),
     Match.orElse(() => {}),
