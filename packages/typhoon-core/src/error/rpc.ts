@@ -1,47 +1,67 @@
-import { Schema } from "effect";
+import { Schema, Data, ParseResult, pipe, Effect } from "effect";
 
-type BaseRpcErrorFields = {
-  readonly _tag: Schema.tag<"RpcError">;
-  readonly message: typeof Schema.String;
+type RpcErrorData<CauseType> = {
+  readonly message: string;
+  readonly cause: CauseType;
 };
-type RpcErrorFields<CauseType, CauseEncoded, CauseContext> =
-  BaseRpcErrorFields & {
-    readonly cause: Schema.Schema<CauseType, CauseEncoded, CauseContext>;
-  } extends infer B
-    ? B
-    : never;
+const RpcErrorTaggedError = Data.TaggedError("RpcError") as new <CauseType>(
+  args: Readonly<RpcErrorData<CauseType>>,
+) => Readonly<RpcErrorData<CauseType>> & {
+  readonly _tag: "RpcError";
+};
 
-interface RpcErrorClass<CauseType, CauseEncoded, CauseContext>
-  extends Schema.TaggedErrorClass<
-    RpcError<CauseType>,
+type RpcErrorStructSchema<CauseType, CauseEncoded, CauseContext> =
+  Schema.TaggedStruct<
     "RpcError",
-    RpcErrorFields<CauseType, CauseEncoded, CauseContext>
-  > {}
-
-export interface RpcError<Cause>
-  extends Schema.Struct.Type<BaseRpcErrorFields> {
-  readonly cause: Cause;
+    {
+      readonly message: typeof Schema.String;
+      readonly cause: Schema.Schema<CauseType, CauseEncoded, CauseContext>;
+    }
+  >;
+interface RpcErrorSchema<CauseType, CauseEncoded, CauseContext>
+  extends Schema.declare<
+    Schema.Schema.Type<
+      RpcErrorStructSchema<CauseType, CauseEncoded, CauseContext>
+    >,
+    Schema.Schema.Encoded<
+      RpcErrorStructSchema<CauseType, CauseEncoded, CauseContext>
+    >,
+    [RpcErrorStructSchema<CauseType, CauseEncoded, CauseContext>]
+  > {
+  readonly _tag: "RpcError";
+  readonly fields: RpcErrorStructSchema<
+    CauseType,
+    CauseEncoded,
+    CauseContext
+  >["fields"];
 }
 
-const RpcErrorClass = <CauseType, CauseEncoded, CauseContext>(
-  causeSchema: Schema.Schema<CauseType, CauseEncoded, CauseContext>,
-) => {
-  return class extends Schema.TaggedError<RpcError<CauseType>>()("RpcError", {
-    message: Schema.String,
-    cause: causeSchema as Schema.Schema.Any,
-  }) {} as RpcErrorClass<CauseType, CauseEncoded, CauseContext>;
-};
+export class RpcError<CauseType> extends RpcErrorTaggedError<CauseType> {
+  static schema = <CauseType, CauseEncoded = CauseType, CauseContext = never>(
+    schema: Schema.Schema<CauseType, CauseEncoded, CauseContext>,
+  ) => {
+    const structSchema = Schema.TaggedStruct("RpcError", {
+      message: Schema.String,
+      cause: schema,
+    });
 
-export const makeRpcError: <CauseType, CauseEncoded, CauseContext>(
-  causeSchema: Schema.Schema<CauseType, CauseEncoded, CauseContext>,
-) => (message: string, cause: CauseType) => RpcError<CauseType> =
-  <CauseType, CauseEncoded, CauseContext>(
-    causeSchema: Schema.Schema<CauseType, CauseEncoded, CauseContext>,
-  ) =>
-  (message: string, cause: CauseType) => {
-    const constructor = RpcErrorClass(causeSchema);
-    return new constructor({ message, cause });
+    return class extends Schema.declare([structSchema], {
+      decode: (structSchema) => (struct, options) => {
+        return pipe(
+          struct,
+          ParseResult.decodeUnknown(structSchema, options),
+          Effect.map((struct) => new RpcError(struct)),
+        );
+      },
+      encode: (structSchema) => (error, options) => {
+        return pipe(error, ParseResult.encodeUnknown(structSchema, options));
+      },
+    }) {
+      static readonly _tag = "RpcError";
+      static readonly fields = structSchema.fields;
+    } as RpcErrorSchema<CauseType, CauseEncoded, CauseContext>;
   };
+}
 
 const MissingRpcConfigErrorData = Schema.Struct({
   message: Schema.String,
@@ -58,6 +78,3 @@ const MissingRpcConfigTaggedError: Schema.TaggedErrorClass<
   MissingRpcConfigErrorData,
 );
 export class MissingRpcConfigError extends MissingRpcConfigTaggedError {}
-
-export const makeMissingRpcConfigError = (message: string, cause?: unknown) =>
-  new MissingRpcConfigError({ message, cause });

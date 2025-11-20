@@ -43,15 +43,15 @@ export class ZeroQueryZeroError extends Schema.TaggedError<ZeroQueryZeroError>()
   ZeroQueryErrorData,
 ) {}
 
-export const ZeroQueryErrorSchema = Schema.Union(
+export const ZeroQueryError = Schema.Union(
   ZeroQueryAppError,
   ZeroQueryHttpError,
   ZeroQueryZeroError,
 );
 
-export type ZeroQueryError = Schema.Schema.Type<typeof ZeroQueryErrorSchema>;
+export type ZeroQueryError = Schema.Schema.Type<typeof ZeroQueryError>;
 
-export const RawZeroQueryErrorSchema = Schema.Union(
+export const RawZeroQueryError = Schema.Union(
   Schema.Struct({
     error: Schema.Literal("app"),
     ...ZeroQueryErrorData.fields,
@@ -66,6 +66,4 @@ export const RawZeroQueryErrorSchema = Schema.Union(
   }),
 );
 
-export type RawZeroQueryError = Schema.Schema.Type<
-  typeof RawZeroQueryErrorSchema
->;
+export type RawZeroQueryError = Schema.Schema.Type<typeof RawZeroQueryError>;

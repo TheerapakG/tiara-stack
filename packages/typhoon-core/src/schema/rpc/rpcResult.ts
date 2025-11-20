@@ -3,14 +3,13 @@ import {
   Option,
   DateTime,
   Either,
-  Schema,
   pipe,
   Match,
   flow,
   Function,
   Unify,
 } from "effect";
-import { makeRpcError, type RpcError, ValidationError } from "../error";
+import { RpcError, ValidationError } from "../../error";
 
 const LoadingTaggedClass: new () => { readonly _tag: "Loading" } =
   Data.TaggedClass("Loading")<{}>;
@@ -19,6 +18,11 @@ const LoadingTaggedClass: new () => { readonly _tag: "Loading" } =
  * RPC result type indicating the RPC is loading.
  */
 export class Loading extends LoadingTaggedClass {}
+
+/**
+ * Create a new Loading RPC result.
+ */
+export const loading = () => new Loading();
 
 type ResolvedData<A, E> = {
   readonly timestamp: Option.Option<DateTime.DateTime>;
@@ -39,50 +43,62 @@ const ResolvedTaggedClass: new <A, E>(
 export class Resolved<A, E> extends ResolvedTaggedClass<A, E> {}
 
 /**
+ * Create a new Resolved RPC result.
+ */
+export const resolved = <A, E>(
+  timestamp: Option.Option<DateTime.DateTime>,
+  value: Either.Either<A, RpcError<E> | ValidationError>,
+  span?: { traceId: string; spanId: string },
+) => new Resolved({ timestamp, value, span });
+
+/**
  * RPC result type, either Loading or Resolved.
  */
 export type RpcResult<A, E> = Loading | Resolved<A, E>;
 
-const mapRpcResult =
+export const map =
   <A, B>(f: (a: A) => B) =>
   <E>(result: RpcResult<A, E>): RpcResult<B, E> =>
     pipe(
       Match.value(result),
       Match.tagsExhaustive({
-        Loading: () => new Loading(),
+        Loading: () => loading(),
         Resolved: ({ timestamp, value, span }) =>
-          new Resolved({ timestamp, value: Either.map(value, f), span }),
+          resolved(timestamp, Either.map(value, f), span),
       }),
     );
 
-const mapLeftRpcResult =
-  <E, F>(schema: Schema.Schema<F, any, any>, f: (e: E) => F) =>
+export const mapLeft =
+  <E, F>(f: (e: E) => F) =>
   <A>(result: RpcResult<A, E>): RpcResult<A, F> =>
     pipe(
       Match.value(result),
       Match.tagsExhaustive({
-        Loading: () => new Loading(),
+        Loading: () => loading(),
         Resolved: ({ timestamp, value, span }) =>
-          new Resolved({
+          resolved(
             timestamp,
-            value: Either.mapLeft(
+            Either.mapLeft(
               value,
               flow(
                 Match.value,
                 Match.tagsExhaustive({
                   RpcError: (error) =>
-                    makeRpcError(schema)(error.message, f(error.cause)),
+                    new RpcError({
+                      message: error.message,
+                      cause: f(error.cause),
+                    }),
                   ValidationError: Function.identity<ValidationError>,
                 }),
                 (v) => v,
               ),
             ),
             span,
-          }),
+          ),
       }),
     );
 
-const matchRpcResult =
+export const match =
   <A, E, LB, RB>(f: {
     onLoading: () => LB;
     onResolved: (value: Resolved<A, E>) => RB;
@@ -96,8 +112,9 @@ const matchRpcResult =
       }),
     );
 
-export const RpcResult = {
-  map: mapRpcResult,
-  mapLeft: mapLeftRpcResult,
-  match: matchRpcResult,
-};
+export const isLoading = (result: unknown): result is Loading =>
+  result instanceof Loading;
+
+export const isResolved = (
+  result: unknown,
+): result is Resolved<unknown, unknown> => result instanceof Resolved;

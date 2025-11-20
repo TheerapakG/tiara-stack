@@ -5,7 +5,7 @@ export * from "./fromStandardSchemaV1";
 export * from "./keyOrderLookup";
 export * from "./optionArrayToOptionStruct";
 export * from "./optionArrayToOptionTuple";
-export * from "./result";
+export * as Result from "./result";
 export * from "./rpc";
 export * from "./structToTuple";
 export * from "./tupleToStruct";

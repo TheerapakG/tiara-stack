@@ -21,7 +21,7 @@ import {
   Array,
   Predicate,
 } from "effect";
-import { Complete, Optimistic, type Result } from "../../schema/result";
+import { complete, optimistic, type Result } from "../../schema/result";
 import {
   ZeroQueryAppError,
   ZeroQueryHttpError,
@@ -157,8 +157,8 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View>
           Either.map(
             flow(
               Match.value,
-              Match.when("complete", () => new Complete({ value: value[""] })),
-              Match.when("unknown", () => new Optimistic({ value: value[""] })),
+              Match.when("complete", () => complete(value[""])),
+              Match.when("unknown", () => optimistic(value[""])),
               Match.exhaustive,
             ),
           ),
