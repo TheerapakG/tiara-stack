@@ -13,7 +13,7 @@ import {
   configGuildManagerRole,
 } from "sheet-db-schema";
 import { makeDBQueryError } from "typhoon-core/error";
-import { DefaultTaggedClass, ResultSchema, Result } from "typhoon-core/schema";
+import { DefaultTaggedClass, Result } from "typhoon-core/schema";
 import {
   Computed,
   ZeroQueryExternalSource,
@@ -305,7 +305,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Computed.map(Result.map(Option.fromNullable)),
             Computed.flatMap(
               Schema.decode(
-                ResultSchema({
+                Result.ResultSchema({
                   optimistic: Schema.OptionFromSelf(
                     DefaultTaggedClass(ZeroGuildChannelConfig),
                   ),
@@ -366,7 +366,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Computed.map(Result.map(Option.fromNullable)),
             Computed.flatMap(
               Schema.decode(
-                ResultSchema({
+                Result.ResultSchema({
                   optimistic: Schema.OptionFromSelf(
                     DefaultTaggedClass(ZeroGuildChannelConfig),
                   ),
