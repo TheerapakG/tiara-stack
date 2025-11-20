@@ -9,8 +9,7 @@ import {
   Tracer,
   Function,
 } from "effect";
-import { makeMissingRpcConfigError, makeRpcError } from "typhoon-core/error";
-import { FromStandardSchemaV1 } from "typhoon-core/schema";
+import { MissingRpcConfigError, RpcError } from "typhoon-core/error";
 import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { Validate, Validator } from "typhoon-core/validator";
@@ -111,9 +110,9 @@ export class HttpClient<
             handler,
           )(client.configCollection),
           Option.getOrThrowWith(() =>
-            makeMissingRpcConfigError(
-              `Failed to get handler config for ${handler}`,
-            ),
+            MissingRpcConfigError.make({
+              message: `Failed to get handler config for ${handler}`,
+            }),
           ),
         ),
       ),
@@ -197,51 +196,31 @@ export class HttpClient<
           : Effect.void,
       ),
       Effect.bind("decodedResponse", ({ pullEffect }) => pullEffect),
-      Effect.flatMap(
-        ({ header, decodedResponse, config, responseErrorValidator }) =>
-          pipe(
-            decodedResponse,
-            Either.liftPredicate(
-              () => header.action === "server:update" && header.payload.success,
-              Function.identity,
-            ),
-            Handler.Config.decodeResponseUnknown(config),
-            Effect.map(
-              Either.mapLeft((error) =>
-                makeRpcError(
-                  (responseErrorValidator === undefined
-                    ? Schema.Unknown
-                    : FromStandardSchemaV1(
-                        responseErrorValidator,
-                      )) as Schema.Schema<
-                    Validator.Output<
-                      Handler.Config.ResolvedResponseErrorValidator<
-                        Handler.Config.ResponseErrorOrUndefined<
-                          SubscriptionHandlerConfigs[H]
-                        >
-                      >
-                    >,
-                    Validator.Input<
-                      Handler.Config.ResolvedResponseErrorValidator<
-                        Handler.Config.ResponseErrorOrUndefined<
-                          SubscriptionHandlerConfigs[H]
-                        >
-                      >
-                    >
-                  >,
-                )(
-                  typeof error === "object" &&
+      Effect.flatMap(({ header, decodedResponse, config }) =>
+        pipe(
+          decodedResponse,
+          Either.liftPredicate(
+            () => header.action === "server:update" && header.payload.success,
+            Function.identity,
+          ),
+          Handler.Config.decodeResponseUnknown(config),
+          Effect.map(
+            Either.mapLeft(
+              (error) =>
+                new RpcError({
+                  message:
+                    typeof error === "object" &&
                     error !== null &&
                     "message" in error &&
                     typeof error.message === "string"
-                    ? error.message
-                    : "An unknown error occurred",
-                  error,
-                ),
-              ),
+                      ? error.message
+                      : "An unknown error occurred",
+                  cause: error,
+                }),
             ),
-            Effect.flatten,
           ),
+          Effect.flatten,
+        ),
       ),
       Effect.scoped,
       Effect.withSpan("HttpClient.once", {
