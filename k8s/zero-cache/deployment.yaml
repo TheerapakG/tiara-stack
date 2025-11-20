@@ -56,10 +56,27 @@ spec:
                 secretKeyRef:
                   name: zero-secret
                   key: zeroAuthJwksUrl
+            - name: NODE_EXTRA_CA_CERTS
+              value: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
           volumeMounts:
             - name: zero-cache-pvc
               mountPath: /data
+
+        - name: envoy
+          image: envoyproxy/envoy:v1.34-latest
+          args: ["-c", "/etc/envoy/envoy.yaml"]
+          ports:
+            - containerPort: 15010
+          volumeMounts:
+            - name: zero-cache-envoy-config-volume
+              mountPath: /etc/envoy
+
       serviceAccountName: zero-cache
+      volumes:
+        - name: zero-cache-envoy-config-volume
+          configMap:
+            name: zero-cache-envoy-config
+
   volumeClaimTemplates:
     - metadata:
         name: zero-cache-pvc

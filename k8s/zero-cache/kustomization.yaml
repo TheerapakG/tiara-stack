@@ -5,6 +5,9 @@ secretGenerator:
     envs:
       - .env.secret
 configMapGenerator:
+  - name: zero-cache-envoy-config
+    files:
+      - envoy.yaml
 generatorOptions:
   disableNameSuffixHash: true
 resources:
