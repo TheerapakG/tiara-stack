@@ -23,7 +23,7 @@ import {
 } from "discord.js";
 import { Effect, Option, pipe, Either } from "effect";
 import { Schema } from "sheet-apis";
-import { Result, RpcResult } from "typhoon-core/schema";
+import { Result } from "typhoon-core/schema";
 import { Computed, UntilObserver } from "typhoon-core/signal";
 
 const configFields = (
@@ -79,21 +79,16 @@ const handleListConfig =
           Effect.bind("config", ({ channel }) =>
             pipe(
               GuildConfigService.getZeroGuildRunningChannelById(channel.id),
-              Computed.flatMap(
-                RpcResult.match({
-                  onLoading: () =>
-                    Either.right(
-                      new Result.Optimistic({
-                        value: Either.right(Option.none()),
-                      }),
-                    ),
-                  onResolved: (value) => value.value,
-                }),
+              Computed.map(
+                Result.fromRpcReturningResult(Either.right(Option.none())),
               ),
-              Computed.tap((v) => Effect.log("computed", v)),
+              Computed.tap((v) =>
+                Effect.log("computed", v, v instanceof Result.Complete),
+              ),
               UntilObserver.observeUntilScoped(Result.isComplete),
               Effect.tap((v) => Effect.log("observed", v)),
               Effect.flatMap((v) => v.value),
+              Effect.flatten,
             ),
           ),
           Effect.map(({ config }) => ({
