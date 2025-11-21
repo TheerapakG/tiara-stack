@@ -175,11 +175,35 @@ export const request = {
       pullEffect(),
       Computed.map((pullEffect) => pullEffect.effect),
     ),
+  rawWithScope: () =>
+    pullEffect() as Effect.Effect<
+      Signal.Signal<{
+        effect: MsgpackPullEffect;
+        scope: Scope.Scope;
+      }>,
+      never,
+      Event
+    >,
   parsed: <Config extends Handler.Config.TypedHandlerConfig>(config: Config) =>
     pipe(
       request.raw(),
       Computed.flatMap(
         pullEffectToParsed(Handler.Config.requestParams(config)),
+      ),
+    ),
+  parsedWithScope: <Config extends Handler.Config.TypedHandlerConfig>(
+    config: Config,
+  ) =>
+    pipe(
+      request.rawWithScope(),
+      Computed.flatMap(({ effect, scope }) =>
+        Effect.all({
+          parsed: pipe(
+            effect,
+            pullEffectToParsed(Handler.Config.requestParams(config)),
+          ),
+          scope: Effect.succeed(scope),
+        }),
       ),
     ),
 };
