@@ -18,6 +18,7 @@ import {
   Computed,
   ZeroQueryExternalSource,
   ExternalComputed,
+  UntilObserver,
 } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
 import { ZeroServiceTag } from "@/db/zeroService";
@@ -303,6 +304,27 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Effect.flatMap(ExternalComputed.make),
             Computed.flatten(),
             Computed.map(Result.map(Option.fromNullable)),
+            Computed.tap((v) => Effect.log("zero", v)),
+            Computed.tap(() =>
+              pipe(
+                dbSubscriptionContext.subscribeQuery(
+                  db
+                    .select()
+                    .from(configGuildChannel)
+                    .where(
+                      and(
+                        eq(configGuildChannel.guildId, guildId),
+                        eq(configGuildChannel.channelId, channelId),
+                        isNull(configGuildChannel.deletedAt),
+                      ),
+                    ),
+                ),
+                Computed.map(Array.head),
+                Computed.tap((v) => Effect.log("db", v)),
+                UntilObserver.observeOnceScoped(),
+                Effect.catchAll(() => Effect.void),
+              ),
+            ),
             Computed.flatMap(
               Schema.decode(
                 Result.ResultSchema({
