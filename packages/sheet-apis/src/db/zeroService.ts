@@ -17,9 +17,15 @@ export const ZeroServiceLayer = pipe(
             userID: config.zeroCacheUserId,
             auth: () =>
               Effect.runPromise(
-                fs.readFileString(
-                  "/var/run/secrets/tokens/zero-cache-token",
-                  "utf-8",
+                pipe(
+                  fs.readFileString(
+                    "/var/run/secrets/tokens/zero-cache-token",
+                    "utf-8",
+                  ),
+                  Effect.tap(() =>
+                    Effect.log("zero user id", config.zeroCacheUserId),
+                  ),
+                  Effect.tap((v) => Effect.log("zero token", v)),
                 ),
               ),
             schema: schema,
