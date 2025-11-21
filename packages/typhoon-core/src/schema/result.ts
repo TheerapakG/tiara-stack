@@ -155,6 +155,29 @@ export const fromRpc =
       }),
     );
 
+export const fromRpcReturningResult =
+  <OV>(optimisticValue: OV) =>
+  <O, C, E>(
+    result: RpcResult.RpcResult<Result<O, C>, E>,
+  ): Result<OV | O, Either.Either<C, RpcError<E> | ValidationError>> =>
+    pipe(
+      result,
+      RpcResult.match({
+        onLoading: () => optimistic(optimisticValue),
+        onResolved: (value) =>
+          pipe(
+            value.value,
+            Either.match({
+              onLeft: (value) => complete(Either.left(value)),
+              onRight: match({
+                onOptimistic: optimistic,
+                onComplete: (value) => complete(Either.right(value)),
+              }),
+            }),
+          ),
+      }),
+    );
+
 export const isOptimistic = (result: unknown): result is Optimistic<unknown> =>
   result instanceof Optimistic;
 
