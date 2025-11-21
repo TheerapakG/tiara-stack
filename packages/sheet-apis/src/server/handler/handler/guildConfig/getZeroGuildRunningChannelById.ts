@@ -1,7 +1,7 @@
 import { getZeroGuildRunningChannelByIdHandlerConfig } from "@/server/handler/config";
 import { Error } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
-import { Effect, pipe, Either } from "effect";
+import { Effect, pipe, Either, Scope } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -17,10 +17,15 @@ export const getZeroGuildRunningChannelByIdHandler = pipe(
       Computed.make(Event.someToken()),
       Computed.flatMap(AuthService.verify),
       Computed.flatMapComputed(() =>
-        Event.request.parsed(getZeroGuildRunningChannelByIdHandlerConfig),
+        Event.request.parsedWithScope(
+          getZeroGuildRunningChannelByIdHandlerConfig,
+        ),
       ),
-      Computed.flatMapComputed(({ guildId, channelId }) =>
-        GuildConfigService.getZeroGuildRunningChannelById(guildId, channelId),
+      Computed.flatMapComputed(({ parsed: { guildId, channelId }, scope }) =>
+        pipe(
+          GuildConfigService.getZeroGuildRunningChannelById(guildId, channelId),
+          Scope.extend(scope),
+        ),
       ),
       Computed.map(
         Result.map(
@@ -37,6 +42,9 @@ export const getZeroGuildRunningChannelByIdHandler = pipe(
         Handler.Config.encodeResponseEffect(
           getZeroGuildRunningChannelByIdHandlerConfig,
         ),
+      ),
+      Effect.tap(() =>
+        Effect.addFinalizer((exit) => Effect.log("finalizer", exit)),
       ),
       Effect.withSpan("getZeroGuildRunningChannelByIdHandler", {
         captureStackTrace: true,
