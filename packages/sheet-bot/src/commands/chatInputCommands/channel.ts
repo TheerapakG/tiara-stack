@@ -90,6 +90,7 @@ const handleListConfig =
                   onResolved: (value) => value.value,
                 }),
               ),
+              Computed.tap((v) => Effect.log(v)),
               UntilObserver.observeUntilScoped(Result.isComplete),
               Effect.flatMap((v) => v.value),
             ),

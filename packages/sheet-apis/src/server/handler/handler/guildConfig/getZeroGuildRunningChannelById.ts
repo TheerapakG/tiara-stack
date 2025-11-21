@@ -31,6 +31,7 @@ export const getZeroGuildRunningChannelByIdHandler = pipe(
           ),
         ),
       ),
+      Computed.tap(Effect.log),
       Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
       Computed.mapEffect(
         Handler.Config.encodeResponseEffect(
