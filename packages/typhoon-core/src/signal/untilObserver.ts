@@ -244,6 +244,29 @@ export const observeUntil = <
     ),
   );
 
+export const observeUntilSignal =
+  <
+    A = never,
+    P extends Match.Types.PatternPrimitive<A> = Match.Types.PatternPrimitive<A>,
+  >(
+    pattern: P,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <E = never, R = never, E2 = never, R2 = never>(
+    effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2>,
+  ): Effect.Effect<Match.Types.WhenMatch<A, P>, E | E2, R | R2> =>
+    pipe(
+      effect,
+      Effect.flatMap((signal) => observeUntil(signal, pattern, options)),
+      Observable.withSpan(
+        { [Observable.ObservableSymbol]: options ?? {} },
+        "observeUntilSignal",
+        {
+          captureStackTrace: true,
+        },
+      ),
+    );
+
 export const observeUntilScoped =
   <
     A = never,
@@ -261,7 +284,7 @@ export const observeUntilScoped =
   > =>
     pipe(
       effect,
-      Effect.flatMap((signal) => observeUntil(signal, pattern, options)),
+      observeUntilSignal(pattern, options),
       Effect.scoped,
       Observable.withSpan(
         { [Observable.ObservableSymbol]: options ?? {} },
@@ -288,6 +311,23 @@ export const observeOnce = <A = never, E = never, R = never>(
     ),
   );
 
+export const observeOnceSignal =
+  (options?: Observable.ObservableOptions) =>
+  <A = never, E = never, R = never, E2 = never, R2 = never>(
+    effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2>,
+  ): Effect.Effect<A, E | E2, R | R2> =>
+    pipe(
+      effect,
+      Effect.flatMap((signal) => observeOnce(signal, options)),
+      Observable.withSpan(
+        { [Observable.ObservableSymbol]: options ?? {} },
+        "observeOnceSignal",
+        {
+          captureStackTrace: true,
+        },
+      ),
+    );
+
 export const observeOnceScoped =
   (options?: Observable.ObservableOptions) =>
   <A = never, E = never, R = never, E2 = never, R2 = never>(
@@ -295,7 +335,7 @@ export const observeOnceScoped =
   ): Effect.Effect<A, E | E2, Exclude<R | R2, Scope.Scope>> =>
     pipe(
       effect,
-      Effect.flatMap((signal) => observeOnce(signal, options)),
+      observeOnceSignal(options),
       Effect.scoped,
       Observable.withSpan(
         { [Observable.ObservableSymbol]: options ?? {} },
