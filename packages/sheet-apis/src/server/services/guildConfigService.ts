@@ -18,7 +18,6 @@ import {
   Computed,
   ZeroQueryExternalSource,
   ExternalComputed,
-  UntilObserver,
 } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
 import { ZeroServiceTag } from "@/db/zeroService";
@@ -289,6 +288,34 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               captureStackTrace: true,
             }),
           ),
+        getZeroGuildRunningChannel: () =>
+          pipe(
+            ZeroServiceTag,
+            Effect.flatMap((zero) =>
+              ZeroQueryExternalSource.make(zero.query.configGuildChannel),
+            ),
+            Effect.flatMap(ExternalComputed.make),
+            Computed.flatten(),
+            Computed.tap((v) => Effect.log("zero", v)),
+            Computed.flatMap(
+              Schema.decode(
+                Result.ResultSchema({
+                  optimistic: Schema.Array(
+                    DefaultTaggedClass(ZeroGuildChannelConfig),
+                  ),
+                  complete: Schema.Array(
+                    DefaultTaggedClass(ZeroGuildChannelConfig),
+                  ),
+                }),
+              ),
+            ),
+            Effect.withSpan(
+              "GuildConfigService.getZeroGuildRunningChannelById",
+              {
+                captureStackTrace: true,
+              },
+            ),
+          ),
         getZeroGuildRunningChannelById: (guildId: string, channelId: string) =>
           pipe(
             ZeroServiceTag,
@@ -304,27 +331,6 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Effect.flatMap(ExternalComputed.make),
             Computed.flatten(),
             Computed.map(Result.map(Option.fromNullable)),
-            Computed.tap((v) => Effect.log("zero", v)),
-            Computed.tap(() =>
-              pipe(
-                dbSubscriptionContext.subscribeQuery(
-                  db
-                    .select()
-                    .from(configGuildChannel)
-                    .where(
-                      and(
-                        eq(configGuildChannel.guildId, guildId),
-                        eq(configGuildChannel.channelId, channelId),
-                        isNull(configGuildChannel.deletedAt),
-                      ),
-                    ),
-                ),
-                Computed.map(Array.head),
-                Computed.tap((v) => Effect.log("db", v)),
-                UntilObserver.observeOnceScoped(),
-                Effect.catchAll(() => Effect.void),
-              ),
-            ),
             Computed.flatMap(
               Schema.decode(
                 Result.ResultSchema({
