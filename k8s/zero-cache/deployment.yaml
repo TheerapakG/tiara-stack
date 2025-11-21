@@ -52,10 +52,7 @@ spec:
                   name: zero-secret
                   key: zeroAdminPassword
             - name: ZERO_AUTH_JWKS_URL
-              valueFrom:
-                secretKeyRef:
-                  name: zero-secret
-                  key: zeroAuthJwksUrl
+              value: http://localhost:15010/openid/v1/jwks
             - name: NODE_EXTRA_CA_CERTS
               value: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
           volumeMounts:
