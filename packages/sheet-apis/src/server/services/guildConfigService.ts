@@ -292,15 +292,6 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           pipe(
             ZeroServiceTag,
             Effect.tap(() => Effect.log(guildId, channelId)),
-            Effect.tap((zero) =>
-              zero.query.configGuildChannel
-                .where("guildId", "=", guildId)
-                .where("channelId", "=", channelId)
-                .where("deletedAt", "IS", null)
-                .one()
-                .materialize()
-                .addListener((v) => Effect.runSync(Effect.log(v))),
-            ),
             Effect.flatMap((zero) =>
               ZeroQueryExternalSource.make(
                 zero.query.configGuildChannel
