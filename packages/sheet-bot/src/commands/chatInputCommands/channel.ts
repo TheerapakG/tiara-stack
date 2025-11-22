@@ -21,7 +21,7 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Effect, Option, pipe, Either } from "effect";
+import { Effect, Option, pipe, Either, Function } from "effect";
 import { Schema } from "sheet-apis";
 import { Result } from "typhoon-core/schema";
 import { Computed, UntilObserver } from "typhoon-core/signal";
@@ -82,27 +82,24 @@ const handleListConfig =
               Computed.map(
                 Result.fromRpcReturningResult(Either.right(Option.none())),
               ),
-              Computed.tap((v) =>
-                Effect.log("computed", v, v instanceof Result.Complete),
-              ),
               UntilObserver.observeUntilScoped(Result.isComplete),
-              Effect.tap((v) => Effect.log("observed", v)),
-              Effect.flatMap((v) => v.value),
-              Effect.flatten,
+              Effect.flatMap((v) =>
+                pipe(v.value, Either.flatMap(Function.identity)),
+              ),
             ),
           ),
-          Effect.map(({ config }) => ({
-            embeds: [
-              pipe(
-                ClientService.makeEmbedBuilder(),
-                Effect.map((embed) =>
+          InteractionContext.editReply.tapEffect(({ config }) =>
+            pipe(
+              ClientService.makeEmbedBuilder(),
+              Effect.map((embed) => ({
+                embeds: [
                   embed
                     .setTitle(`Config for this channel`)
                     .addFields(...configFields(config)),
-                ),
-              ),
-            ],
-          })),
+                ],
+              })),
+            ),
+          ),
           Effect.withSpan("handleListConfig", {
             captureStackTrace: true,
           }),
