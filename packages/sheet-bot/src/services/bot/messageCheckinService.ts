@@ -1,9 +1,30 @@
 import { SheetApisClient } from "@/client/sheetApis";
-import { Effect, Either, pipe } from "effect";
+import { Effect, pipe, Either, Scope } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import type { messageCheckin } from "sheet-db-schema";
 import { Schema } from "sheet-apis";
-import { Result } from "typhoon-core/schema";
+import { DependencySignal } from "typhoon-core/signal";
+import { Result, RpcResult } from "typhoon-core/schema";
+
+type RpcSignal<Response> = Effect.Effect<
+  DependencySignal.DependencySignal<
+    RpcResult.RpcResult<Response, unknown>,
+    never,
+    never
+  >,
+  never,
+  Scope.Scope
+>;
+
+type MessageCheckinDataResponse = Result.Result<
+  Either.Either<Schema.MessageCheckin, Schema.Error.Core.ArgumentError>,
+  Either.Either<Schema.MessageCheckin, Schema.Error.Core.ArgumentError>
+>;
+
+type MessageCheckinMembersResponse = Result.Result<
+  ReadonlyArray<Schema.MessageCheckinMember>,
+  ReadonlyArray<Schema.MessageCheckinMember>
+>;
 
 export class MessageCheckinService extends Effect.Service<MessageCheckinService>()(
   "MessageCheckinService",
@@ -12,43 +33,19 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
       Effect.Do,
       Effect.bind("client", () => SheetApisClient.get()),
       Effect.map(({ client }) => {
-        const decodeResult = <Req, A>(
+        const subscribe = <Response>(
           handler: string,
-          request: Req,
-        ): Effect.Effect<A> =>
+          request: unknown,
+        ): RpcSignal<Response> =>
           pipe(
-            WebSocketClient.once(
-              client,
-              handler as any,
-              request,
-            ) as Effect.Effect<Result.Result<A>, never, never>,
+            WebSocketClient.subscribeScoped(client, handler as any, request),
             Effect.orDie,
-            Effect.flatMap((result) =>
-              Result.match({
-                onOptimistic: Effect.succeed,
-                onComplete: Effect.succeed,
-              })(result),
-            ),
-          );
-
-        const decodeEither = <Req, A>(
-          handler: string,
-          request: Req,
-        ): Effect.Effect<A> =>
-          pipe(
-            decodeResult<Req, Either.Either<A, unknown>>(handler, request),
-            Effect.flatMap(
-              Either.match({
-                onLeft: Effect.die,
-                onRight: Effect.succeed,
-              }),
-            ),
-          );
+          ) as RpcSignal<Response>;
 
         return {
           getMessageCheckinData: (messageId: string) =>
             pipe(
-              decodeEither<string, Schema.MessageCheckin>(
+              subscribe<MessageCheckinDataResponse>(
                 "messageCheckin.getMessageCheckinData",
                 messageId,
               ),
@@ -78,7 +75,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
             ),
           getMessageCheckinMembers: (messageId: string) =>
             pipe(
-              decodeResult<string, ReadonlyArray<Schema.MessageCheckinMember>>(
+              subscribe<MessageCheckinMembersResponse>(
                 "messageCheckin.getMessageCheckinMembers",
                 messageId,
               ),

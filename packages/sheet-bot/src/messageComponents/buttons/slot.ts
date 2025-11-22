@@ -15,12 +15,16 @@ import {
   Array,
   Chunk,
   Effect,
+  Either,
   Number,
   Order,
   Option,
   pipe,
   String,
 } from "effect";
+import { Schema } from "sheet-apis";
+import { Result } from "typhoon-core/schema";
+import { Computed, UntilObserver } from "typhoon-core/signal";
 
 const getSlotMessage = (day: number) =>
   pipe(
@@ -98,8 +102,39 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
           flags: MessageFlags.Ephemeral,
         })),
         CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
-        Effect.bind("messageSlotData", ({ message }) =>
-          MessageSlotService.getMessageSlotData(message.id),
+        Effect.bind(
+          "messageSlotData",
+          ({ message }) =>
+            pipe(
+              MessageSlotService.getMessageSlotData(message.id),
+              Effect.flatMap((signal) =>
+                pipe(
+                  Effect.succeed(signal),
+                  Computed.map(
+                    Result.fromRpcReturningResult<
+                      Either.Either<
+                        Schema.MessageSlot,
+                        Schema.Error.Core.ArgumentError
+                      >
+                    >(
+                      Either.left(
+                        Schema.Error.Core.makeArgumentError(
+                          "Loading message slot",
+                        ),
+                      ),
+                    ),
+                  ),
+                  UntilObserver.observeUntilScoped(Result.isComplete),
+                  Effect.map((result) => result.value),
+                  Effect.flatMap(
+                    Either.match({
+                      onLeft: Effect.die,
+                      onRight: Effect.succeed,
+                    }),
+                  ),
+                ),
+              ),
+            ) as unknown as Effect.Effect<Schema.MessageSlot>,
         ),
         Effect.bind("slotMessage", ({ messageSlotData }) =>
           getSlotMessage(messageSlotData.day),

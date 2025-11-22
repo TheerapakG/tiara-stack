@@ -1,9 +1,35 @@
 import { SheetApisClient } from "@/client/sheetApis";
-import { Effect, Either, pipe } from "effect";
+import { Effect, pipe, Either, Option, Scope } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import type { messageRoomOrder, messageRoomOrderEntry } from "sheet-db-schema";
 import { Schema } from "sheet-apis";
-import { Result } from "typhoon-core/schema";
+import { DependencySignal } from "typhoon-core/signal";
+import { Result, RpcResult } from "typhoon-core/schema";
+
+type RpcSignal<Response> = Effect.Effect<
+  DependencySignal.DependencySignal<
+    RpcResult.RpcResult<Response, unknown>,
+    never,
+    never
+  >,
+  never,
+  Scope.Scope
+>;
+
+type MessageRoomOrderResponse = Result.Result<
+  Either.Either<Schema.MessageRoomOrder, Schema.Error.Core.ArgumentError>,
+  Either.Either<Schema.MessageRoomOrder, Schema.Error.Core.ArgumentError>
+>;
+
+type MessageRoomOrderEntryResponse = Result.Result<
+  ReadonlyArray<Schema.MessageRoomOrderEntry>,
+  ReadonlyArray<Schema.MessageRoomOrderEntry>
+>;
+
+type MessageRoomOrderRangeResponse = Result.Result<
+  Option.Option<Schema.MessageRoomOrderRange>,
+  Option.Option<Schema.MessageRoomOrderRange>
+>;
 
 export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderService>()(
   "MessageRoomOrderService",
@@ -12,43 +38,19 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
       Effect.Do,
       Effect.bind("client", () => SheetApisClient.get()),
       Effect.map(({ client }) => {
-        const decodeResult = <Req, A>(
+        const subscribe = <Response>(
           handler: string,
-          request: Req,
-        ): Effect.Effect<A> =>
+          request: unknown,
+        ): RpcSignal<Response> =>
           pipe(
-            WebSocketClient.once(
-              client,
-              handler as any,
-              request,
-            ) as Effect.Effect<Result.Result<A>, never, never>,
+            WebSocketClient.subscribeScoped(client, handler as any, request),
             Effect.orDie,
-            Effect.flatMap((result) =>
-              Result.match({
-                onOptimistic: Effect.succeed,
-                onComplete: Effect.succeed,
-              })(result),
-            ),
-          );
-
-        const decodeEither = <Req, A>(
-          handler: string,
-          request: Req,
-        ): Effect.Effect<A> =>
-          pipe(
-            decodeResult<Req, Either.Either<A, unknown>>(handler, request),
-            Effect.flatMap(
-              Either.match({
-                onLeft: Effect.die,
-                onRight: Effect.succeed,
-              }),
-            ),
-          );
+          ) as RpcSignal<Response>;
 
         return {
           getMessageRoomOrder: (messageId: string) =>
             pipe(
-              decodeEither<string, Schema.MessageRoomOrder>(
+              subscribe<MessageRoomOrderResponse>(
                 "messageRoomOrder.getMessageRoomOrder",
                 messageId,
               ),
@@ -106,13 +108,10 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ),
           getMessageRoomOrderEntry: (messageId: string, rank: number) =>
             pipe(
-              decodeResult<
-                { messageId: string; rank: number },
-                ReadonlyArray<Schema.MessageRoomOrderEntry>
-              >("messageRoomOrder.getMessageRoomOrderEntry", {
-                messageId,
-                rank,
-              }),
+              subscribe<MessageRoomOrderEntryResponse>(
+                "messageRoomOrder.getMessageRoomOrderEntry",
+                { messageId, rank },
+              ),
               Effect.withSpan(
                 "MessageRoomOrderService.getMessageRoomOrderEntry",
                 {
@@ -122,7 +121,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ),
           getMessageRoomOrderRange: (messageId: string) =>
             pipe(
-              decodeEither<string, Schema.MessageRoomOrderRange>(
+              subscribe<MessageRoomOrderRangeResponse>(
                 "messageRoomOrder.getMessageRoomOrderRange",
                 messageId,
               ),

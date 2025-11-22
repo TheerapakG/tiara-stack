@@ -22,7 +22,10 @@ import {
   MessageFlags,
   userMention,
 } from "discord.js";
-import { Array, Effect, Number, Option, Order, pipe } from "effect";
+import { Array, Effect, Either, Number, Option, Order, pipe } from "effect";
+import { Schema } from "sheet-apis";
+import { Result } from "typhoon-core/schema";
+import { Computed, UntilObserver } from "typhoon-core/signal";
 
 const buttonData = {
   type: ComponentType.Button,
@@ -43,8 +46,39 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         })),
         InteractionContext.user.bind("user"),
         CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
-        Effect.bind("messageCheckinData", ({ message }) =>
-          MessageCheckinService.getMessageCheckinData(message.id),
+        Effect.bind(
+          "messageCheckinData",
+          ({ message }) =>
+            pipe(
+              MessageCheckinService.getMessageCheckinData(message.id),
+              Effect.flatMap((signal) =>
+                pipe(
+                  Effect.succeed(signal),
+                  Computed.map(
+                    Result.fromRpcReturningResult<
+                      Either.Either<
+                        Schema.MessageCheckin,
+                        Schema.Error.Core.ArgumentError
+                      >
+                    >(
+                      Either.left(
+                        Schema.Error.Core.makeArgumentError(
+                          "Loading message checkin",
+                        ),
+                      ),
+                    ),
+                  ),
+                  UntilObserver.observeUntilScoped(Result.isComplete),
+                  Effect.map((result) => result.value),
+                  Effect.flatMap(
+                    Either.match({
+                      onLeft: Effect.die,
+                      onRight: Effect.succeed,
+                    }),
+                  ),
+                ),
+              ),
+            ) as unknown as Effect.Effect<Schema.MessageCheckin>,
         ),
         Effect.tap(({ message, user }) =>
           MessageCheckinService.setMessageCheckinMemberCheckinAt(
@@ -58,7 +92,30 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         Effect.bind("checkedInMentions", ({ message }) =>
           pipe(
             MessageCheckinService.getMessageCheckinMembers(message.id),
-            Effect.map(Array.filter((m) => Option.isSome(m.checkinAt))),
+            Effect.flatMap((signal) =>
+              pipe(
+                Effect.succeed(signal),
+                Computed.map(
+                  Result.fromRpcReturningResult<
+                    ReadonlyArray<Schema.MessageCheckinMember>
+                  >([] as ReadonlyArray<Schema.MessageCheckinMember>),
+                ),
+                UntilObserver.observeUntilScoped(Result.isComplete),
+                Effect.map((result) => result.value),
+              ),
+            ),
+            Effect.flatMap(
+              Either.match({
+                onLeft: Effect.die,
+                onRight: (value) => Effect.succeed(value),
+              }),
+            ),
+            Effect.map((members) =>
+              pipe(
+                members,
+                Array.filter((m) => Option.isSome(m.checkinAt)),
+              ),
+            ),
             Effect.flatMap((members) =>
               pipe(
                 members,

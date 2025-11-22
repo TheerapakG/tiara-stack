@@ -24,8 +24,19 @@ import {
   time,
   TimestampStyles,
 } from "discord.js";
-import { Array, Effect, HashSet, Layer, Number, Option, pipe } from "effect";
-import type { Schema } from "sheet-apis";
+import {
+  Array,
+  Effect,
+  Either,
+  HashSet,
+  Layer,
+  Number,
+  Option,
+  pipe,
+} from "effect";
+import { Schema } from "sheet-apis";
+import { Result } from "typhoon-core/schema";
+import { Computed, UntilObserver } from "typhoon-core/signal";
 
 const formatEffectValue = (effectValue: number): string => {
   const rounded = Math.round(effectValue * 10) / 10;
@@ -79,12 +90,61 @@ export const roomOrderInteractionGetReply = (
     CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
     Effect.bindAll(
       ({ message }) => ({
-        messageRoomOrderRange: MessageRoomOrderService.getMessageRoomOrderRange(
-          message.id,
+        messageRoomOrderRange: pipe(
+          MessageRoomOrderService.getMessageRoomOrderRange(message.id),
+          Effect.flatMap((signal) =>
+            pipe(
+              Effect.succeed(signal),
+              Computed.map(
+                Result.fromRpcReturningResult<
+                  Option.Option<Schema.MessageRoomOrderRange>
+                >(Option.none<Schema.MessageRoomOrderRange>()),
+              ),
+              UntilObserver.observeUntilScoped(Result.isComplete),
+              Effect.map((result) => result.value),
+              Effect.flatMap(
+                Either.match({
+                  onLeft: Effect.die,
+                  onRight: (value) => Effect.succeed(value),
+                }),
+              ),
+              Effect.flatMap(
+                Option.match({
+                  onNone: () =>
+                    Effect.die(
+                      Schema.Error.Core.makeArgumentError(
+                        "Missing room order range",
+                      ),
+                    ),
+                  onSome: Effect.succeed,
+                }),
+              ),
+            ),
+          ),
         ),
-        messageRoomOrderEntry: MessageRoomOrderService.getMessageRoomOrderEntry(
-          message.id,
-          messageRoomOrder.rank,
+        messageRoomOrderEntry: pipe(
+          MessageRoomOrderService.getMessageRoomOrderEntry(
+            message.id,
+            messageRoomOrder.rank,
+          ),
+          Effect.flatMap((signal) =>
+            pipe(
+              Effect.succeed(signal),
+              Computed.map(
+                Result.fromRpcReturningResult<
+                  ReadonlyArray<Schema.MessageRoomOrderEntry>
+                >([] as ReadonlyArray<Schema.MessageRoomOrderEntry>),
+              ),
+              UntilObserver.observeUntilScoped(Result.isComplete),
+              Effect.map((result) => result.value),
+              Effect.flatMap(
+                Either.match({
+                  onLeft: Effect.die,
+                  onRight: (value) => Effect.succeed(value),
+                }),
+              ),
+            ),
+          ),
         ),
         formattedHourWindow: pipe(
           ConverterService.convertHourToHourWindow(messageRoomOrder.hour),
@@ -239,8 +299,39 @@ export const roomOrderSendButton =
           bindObject({
             eventConfig: SheetService.eventConfig,
           }),
-          Effect.bind("messageRoomOrder", ({ message }) =>
-            MessageRoomOrderService.getMessageRoomOrder(message.id),
+          Effect.bind(
+            "messageRoomOrder",
+            ({ message }) =>
+              pipe(
+                MessageRoomOrderService.getMessageRoomOrder(message.id),
+                Effect.flatMap((signal) =>
+                  pipe(
+                    Effect.succeed(signal),
+                    Computed.map(
+                      Result.fromRpcReturningResult<
+                        Either.Either<
+                          Schema.MessageRoomOrder,
+                          Schema.Error.Core.ArgumentError
+                        >
+                      >(
+                        Either.left(
+                          Schema.Error.Core.makeArgumentError(
+                            "Loading room order",
+                          ),
+                        ),
+                      ),
+                    ),
+                    UntilObserver.observeUntilScoped(Result.isComplete),
+                    Effect.map((result) => result.value),
+                    Effect.flatMap(
+                      Either.match({
+                        onLeft: Effect.die,
+                        onRight: Effect.succeed,
+                      }),
+                    ),
+                  ),
+                ),
+              ) as unknown as Effect.Effect<Schema.MessageRoomOrder>,
           ),
           Effect.bind("messageRoomOrderReply", ({ messageRoomOrder }) =>
             roomOrderInteractionGetReply(messageRoomOrder),
