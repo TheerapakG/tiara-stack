@@ -297,6 +297,7 @@ export const make = <
                   refs.onEmitRef,
                 ),
             ),
+            Effect.tap(({ source }) => source.hydrate()),
             Effect.tap(({ resultTypeRef, source }) =>
               pipe(
                 Match.value(queryComplete),
