@@ -3,7 +3,6 @@ import { Effect, Either, pipe } from "effect";
 import { configGuild, configGuildChannel } from "sheet-db-schema";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { Result } from "typhoon-core/schema";
-import { UntilObserver } from "typhoon-core/signal";
 import { SheetApisClient } from "~~/src/client/sheetApis";
 import { GuildService } from "./guildService";
 
@@ -20,26 +19,35 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
         sheetApisClient: SheetApisClient,
       }),
       Effect.map(({ guildService, sheetApisClient }) => {
-        const waitForComplete = <Req, A>(
-          name: string,
+        const withGuildId = <A>(
+          f: (guildId: string) => Effect.Effect<A>,
+        ): Effect.Effect<A> => pipe(guildService.getId(), Effect.flatMap(f));
+
+        const decodeResult = <Req, A>(
+          handler: string,
           request: Req,
         ): Effect.Effect<A> =>
           pipe(
-            WebSocketClient.subscribeScoped(
+            WebSocketClient.once(
               sheetApisClient.get(),
-              name as any,
+              handler as any,
               request,
             ),
-            UntilObserver.observeUntilScoped(Result.isComplete),
-            Effect.map((result) => result.value as A),
+            Effect.orDie,
+            Effect.flatMap((result) =>
+              Result.match(result, {
+                onOptimistic: Effect.succeed,
+                onComplete: Effect.succeed,
+              }),
+            ),
           );
 
-        const fetchEither = <Req, A>(
-          name: string,
+        const decodeEither = <Req, A>(
+          handler: string,
           request: Req,
         ): Effect.Effect<A> =>
           pipe(
-            waitForComplete<Req, Either.Either<A, unknown>>(name, request),
+            decodeResult<Req, Either.Either<A, unknown>>(handler, request),
             Effect.flatMap(
               Either.match({
                 onLeft: Effect.fail,
@@ -48,14 +56,20 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             ),
           );
 
-        const withGuildId = <A>(
-          f: (guildId: string) => Effect.Effect<A>,
-        ): Effect.Effect<A> => pipe(guildService.getId(), Effect.flatMap(f));
+        const subscribe = <Req>(handler: string, request: Req) =>
+          pipe(
+            WebSocketClient.subscribeScoped(
+              sheetApisClient.get(),
+              handler as any,
+              request,
+            ),
+            Effect.orDie,
+          );
 
         return {
           getAutoCheckinGuilds: () =>
             pipe(
-              waitForComplete("guildConfig.getAutoCheckinGuilds", {}),
+              decodeResult("guildConfig.getAutoCheckinGuilds", {}),
               Effect.withSpan("GuildConfigService.getAutoCheckinGuilds", {
                 captureStackTrace: true,
               }),
@@ -63,7 +77,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           getGuildConfigByGuildId: () =>
             pipe(
               withGuildId((guildId) =>
-                fetchEither("guildConfig.getGuildConfigByGuildId", guildId),
+                decodeEither("guildConfig.getGuildConfigByGuildId", guildId),
               ),
               Effect.withSpan("GuildConfigService.getGuildConfigByGuildId", {
                 captureStackTrace: true,
@@ -91,7 +105,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           getGuildManagerRoles: () =>
             pipe(
               withGuildId((guildId) =>
-                waitForComplete("guildConfig.getGuildManagerRoles", guildId),
+                decodeResult("guildConfig.getGuildManagerRoles", guildId),
               ),
               Effect.withSpan("GuildConfigService.getGuildManagerRoles", {
                 captureStackTrace: true,
@@ -153,7 +167,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           getGuildRunningChannelById: (channelId: string) =>
             pipe(
               withGuildId((guildId) =>
-                fetchEither("guildConfig.getGuildRunningChannelById", {
+                decodeEither("guildConfig.getGuildRunningChannelById", {
                   guildId,
                   channelId,
                 }),
@@ -164,13 +178,11 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             ),
           observeGuildRunningChannelById: (channelId: string) =>
             pipe(
-              guildService.getId(),
-              Effect.flatMap((guildId) =>
-                WebSocketClient.subscribeScoped(
-                  sheetApisClient.get(),
-                  "guildConfig.getGuildRunningChannelById",
-                  { guildId, channelId },
-                ),
+              withGuildId((guildId) =>
+                subscribe("guildConfig.getGuildRunningChannelById", {
+                  guildId,
+                  channelId,
+                }),
               ),
               Effect.withSpan(
                 "GuildConfigService.observeGuildRunningChannelById",
@@ -182,7 +194,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           getGuildRunningChannelByName: (channelName: string) =>
             pipe(
               withGuildId((guildId) =>
-                fetchEither("guildConfig.getGuildRunningChannelByName", {
+                decodeEither("guildConfig.getGuildRunningChannelByName", {
                   guildId,
                   channelName,
                 }),
@@ -196,13 +208,11 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             ),
           observeGuildRunningChannelByName: (channelName: string) =>
             pipe(
-              guildService.getId(),
-              Effect.flatMap((guildId) =>
-                WebSocketClient.subscribeScoped(
-                  sheetApisClient.get(),
-                  "guildConfig.getGuildRunningChannelByName",
-                  { guildId, channelName },
-                ),
+              withGuildId((guildId) =>
+                subscribe("guildConfig.getGuildRunningChannelByName", {
+                  guildId,
+                  channelName,
+                }),
               ),
               Effect.withSpan(
                 "GuildConfigService.observeGuildRunningChannelByName",

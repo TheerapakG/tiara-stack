@@ -77,12 +77,17 @@ const handleListConfig =
           Effect.bind("config", ({ channel }) =>
             pipe(
               GuildConfigService.observeGuildRunningChannelById(channel.id),
-              Computed.map(
-                Result.fromRpcReturningResult(Either.right(Option.none())),
-              ),
-              UntilObserver.observeUntilScoped(Result.isComplete),
-              Effect.flatMap((v) =>
-                pipe(v.value, Either.flatMap(Function.identity)),
+              Effect.flatMap((signal) =>
+                pipe(
+                  signal,
+                  Computed.map(
+                    Result.fromRpcReturningResult(Either.right(Option.none())),
+                  ),
+                  UntilObserver.observeUntilScoped(Result.isComplete),
+                  Effect.flatMap((v) =>
+                    pipe(v.value, Either.flatMap(Function.identity)),
+                  ),
+                ),
               ),
             ),
           ),
