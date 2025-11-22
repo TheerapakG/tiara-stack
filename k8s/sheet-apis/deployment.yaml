@@ -49,6 +49,12 @@ spec:
                   key: zeroCacheServer
             - name: ZERO_CACHE_USER_ID
               value: "system:serviceaccount:$(POD_NAMESPACE):sheet-apis"
+            - name: ZERO_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-apis-secret
+                  key: zeroAdminPassword
+                  optional: true
           livenessProbe:
             httpGet:
               path: /live
