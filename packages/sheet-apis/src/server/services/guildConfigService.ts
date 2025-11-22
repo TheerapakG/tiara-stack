@@ -288,52 +288,18 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               captureStackTrace: true,
             }),
           ),
-        getZeroGuildRunningChannel: () =>
-          pipe(
-            ZeroServiceTag,
-            Effect.flatMap((zero) =>
-              ZeroQueryExternalSource.make(zero.query.configGuildChannel),
-            ),
-            Effect.flatMap(ExternalComputed.make),
-            Computed.flatten(),
-            Computed.tap((v) => Effect.log("zero", v)),
-            Computed.flatMap(
-              Schema.decode(
-                Result.ResultSchema({
-                  optimistic: Schema.Array(
-                    DefaultTaggedClass(ZeroGuildChannelConfig),
-                  ),
-                  complete: Schema.Array(
-                    DefaultTaggedClass(ZeroGuildChannelConfig),
-                  ),
-                }),
-              ),
-            ),
-            Effect.withSpan(
-              "GuildConfigService.getZeroGuildRunningChannelById",
-              {
-                captureStackTrace: true,
-              },
-            ),
-          ),
         getZeroGuildRunningChannelById: (guildId: string, channelId: string) =>
           pipe(
             ZeroServiceTag,
             Effect.tap(() => Effect.log(guildId, channelId)),
             Effect.tap((zero) =>
-              pipe(
-                Effect.tryPromise(() =>
-                  zero.inspector.analyzeQuery(
-                    zero.query.configGuildChannel
-                      .where("guildId", "=", guildId)
-                      .where("channelId", "=", channelId)
-                      .where("deletedAt", "IS", null)
-                      .one(),
-                  ),
-                ),
-                Effect.tap(Effect.log),
-                Effect.catchAll((error) => Effect.log(error)),
-              ),
+              zero.query.configGuildChannel
+                .where("guildId", "=", guildId)
+                .where("channelId", "=", channelId)
+                .where("deletedAt", "IS", null)
+                .one()
+                .materialize()
+                .addListener((v) => Effect.runSync(Effect.log(v))),
             ),
             Effect.flatMap((zero) =>
               ZeroQueryExternalSource.make(

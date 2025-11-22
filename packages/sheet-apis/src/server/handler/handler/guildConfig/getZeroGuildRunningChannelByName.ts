@@ -39,15 +39,11 @@ export const getZeroGuildRunningChannelByNameHandler = pipe(
           ),
         ),
       ),
-      Computed.tap(Effect.log),
       Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
       Computed.mapEffect(
         Handler.Config.encodeResponseEffect(
           getZeroGuildRunningChannelByNameHandlerConfig,
         ),
-      ),
-      Effect.tap(() =>
-        Effect.addFinalizer((exit) => Effect.log("finalizer", exit)),
       ),
       Effect.withSpan("getZeroGuildRunningChannelByNameHandler", {
         captureStackTrace: true,
