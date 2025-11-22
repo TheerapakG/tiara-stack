@@ -332,6 +332,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                   ),
                 ),
                 Effect.tap(Effect.log),
+                Effect.catchAll((error) => Effect.log(error)),
               ),
             ),
             Effect.flatMap((zero) =>
