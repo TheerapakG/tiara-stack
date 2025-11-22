@@ -2,6 +2,7 @@ import { SheetApisClient } from "@/client/sheetApis";
 import { Effect, Either, pipe } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import type { messageSlot } from "sheet-db-schema";
+import { Schema } from "sheet-apis";
 import { Result } from "typhoon-core/schema";
 
 export class MessageSlotService extends Effect.Service<MessageSlotService>()(
@@ -16,13 +17,17 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
           request: Req,
         ): Effect.Effect<A> =>
           pipe(
-            WebSocketClient.once(client, handler as any, request),
+            WebSocketClient.once(
+              client,
+              handler as any,
+              request,
+            ) as Effect.Effect<Result.Result<A>, never, never>,
             Effect.orDie,
             Effect.flatMap((result) =>
-              Result.match(result, {
+              Result.match({
                 onOptimistic: Effect.succeed,
                 onComplete: Effect.succeed,
-              }),
+              })(result),
             ),
           );
 
@@ -34,7 +39,7 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
             decodeResult<Req, Either.Either<A, unknown>>(handler, request),
             Effect.flatMap(
               Either.match({
-                onLeft: Effect.fail,
+                onLeft: Effect.die,
                 onRight: Effect.succeed,
               }),
             ),
@@ -43,7 +48,10 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
         return {
           getMessageSlotData: (messageId: string) =>
             pipe(
-              decodeEither("messageSlot.getMessageSlotData", messageId),
+              decodeEither<string, Schema.MessageSlot>(
+                "messageSlot.getMessageSlotData",
+                messageId,
+              ),
               Effect.withSpan("MessageSlotService.getMessageSlotData", {
                 captureStackTrace: true,
               }),

@@ -2,6 +2,7 @@ import { SheetApisClient } from "@/client/sheetApis";
 import { Effect, Either, pipe } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import type { messageRoomOrder, messageRoomOrderEntry } from "sheet-db-schema";
+import { Schema } from "sheet-apis";
 import { Result } from "typhoon-core/schema";
 
 export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderService>()(
@@ -16,13 +17,17 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
           request: Req,
         ): Effect.Effect<A> =>
           pipe(
-            WebSocketClient.once(client, handler as any, request),
+            WebSocketClient.once(
+              client,
+              handler as any,
+              request,
+            ) as Effect.Effect<Result.Result<A>, never, never>,
             Effect.orDie,
             Effect.flatMap((result) =>
-              Result.match(result, {
+              Result.match({
                 onOptimistic: Effect.succeed,
                 onComplete: Effect.succeed,
-              }),
+              })(result),
             ),
           );
 
@@ -34,7 +39,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             decodeResult<Req, Either.Either<A, unknown>>(handler, request),
             Effect.flatMap(
               Either.match({
-                onLeft: Effect.fail,
+                onLeft: Effect.die,
                 onRight: Effect.succeed,
               }),
             ),
@@ -43,7 +48,10 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
         return {
           getMessageRoomOrder: (messageId: string) =>
             pipe(
-              decodeEither("messageRoomOrder.getMessageRoomOrder", messageId),
+              decodeEither<string, Schema.MessageRoomOrder>(
+                "messageRoomOrder.getMessageRoomOrder",
+                messageId,
+              ),
               Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder", {
                 captureStackTrace: true,
               }),
@@ -98,7 +106,10 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ),
           getMessageRoomOrderEntry: (messageId: string, rank: number) =>
             pipe(
-              decodeResult("messageRoomOrder.getMessageRoomOrderEntry", {
+              decodeResult<
+                { messageId: string; rank: number },
+                ReadonlyArray<Schema.MessageRoomOrderEntry>
+              >("messageRoomOrder.getMessageRoomOrderEntry", {
                 messageId,
                 rank,
               }),
@@ -111,7 +122,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ),
           getMessageRoomOrderRange: (messageId: string) =>
             pipe(
-              decodeEither(
+              decodeEither<string, Schema.MessageRoomOrderRange>(
                 "messageRoomOrder.getMessageRoomOrderRange",
                 messageId,
               ),

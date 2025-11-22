@@ -1,6 +1,7 @@
 import { bindObject } from "@/utils";
 import { Effect, Either, pipe } from "effect";
 import { configGuild, configGuildChannel } from "sheet-db-schema";
+import { Schema } from "sheet-apis";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { Result } from "typhoon-core/schema";
 import { SheetApisClient } from "~~/src/client/sheetApis";
@@ -32,13 +33,13 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               sheetApisClient.get(),
               handler as any,
               request,
-            ),
+            ) as Effect.Effect<Result.Result<A>, never, never>,
             Effect.orDie,
             Effect.flatMap((result) =>
-              Result.match(result, {
+              Result.match({
                 onOptimistic: Effect.succeed,
                 onComplete: Effect.succeed,
-              }),
+              })(result),
             ),
           );
 
@@ -50,26 +51,19 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             decodeResult<Req, Either.Either<A, unknown>>(handler, request),
             Effect.flatMap(
               Either.match({
-                onLeft: Effect.fail,
+                onLeft: Effect.die,
                 onRight: Effect.succeed,
               }),
             ),
           );
 
-        const subscribe = <Req>(handler: string, request: Req) =>
-          pipe(
-            WebSocketClient.subscribeScoped(
-              sheetApisClient.get(),
-              handler as any,
-              request,
-            ),
-            Effect.orDie,
-          );
-
         return {
           getAutoCheckinGuilds: () =>
             pipe(
-              decodeResult("guildConfig.getAutoCheckinGuilds", {}),
+              decodeResult<
+                Record<string, never>,
+                ReadonlyArray<Schema.GuildConfig>
+              >("guildConfig.getAutoCheckinGuilds", {}),
               Effect.withSpan("GuildConfigService.getAutoCheckinGuilds", {
                 captureStackTrace: true,
               }),
@@ -77,7 +71,10 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           getGuildConfigByGuildId: () =>
             pipe(
               withGuildId((guildId) =>
-                decodeEither("guildConfig.getGuildConfigByGuildId", guildId),
+                decodeEither<string, Schema.GuildConfig>(
+                  "guildConfig.getGuildConfigByGuildId",
+                  guildId,
+                ),
               ),
               Effect.withSpan("GuildConfigService.getGuildConfigByGuildId", {
                 captureStackTrace: true,
@@ -105,7 +102,10 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           getGuildManagerRoles: () =>
             pipe(
               withGuildId((guildId) =>
-                decodeResult("guildConfig.getGuildManagerRoles", guildId),
+                decodeResult<
+                  string,
+                  ReadonlyArray<Schema.GuildConfigManagerRole>
+                >("guildConfig.getGuildManagerRoles", guildId),
               ),
               Effect.withSpan("GuildConfigService.getGuildManagerRoles", {
                 captureStackTrace: true,
@@ -164,10 +164,23 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 captureStackTrace: true,
               }),
             ),
+          getGuildConfigByScriptId: (scriptId: string) =>
+            pipe(
+              decodeEither<string, Schema.GuildConfig>(
+                "guildConfig.getGuildConfigByScriptId",
+                scriptId,
+              ),
+              Effect.withSpan("GuildConfigService.getGuildConfigByScriptId", {
+                captureStackTrace: true,
+              }),
+            ),
           getGuildRunningChannelById: (channelId: string) =>
             pipe(
               withGuildId((guildId) =>
-                decodeEither("guildConfig.getGuildRunningChannelById", {
+                decodeEither<
+                  { guildId: string; channelId: string },
+                  Schema.GuildChannelConfig
+                >("guildConfig.getGuildRunningChannelById", {
                   guildId,
                   channelId,
                 }),
@@ -176,46 +189,19 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 captureStackTrace: true,
               }),
             ),
-          observeGuildRunningChannelById: (channelId: string) =>
-            pipe(
-              withGuildId((guildId) =>
-                subscribe("guildConfig.getGuildRunningChannelById", {
-                  guildId,
-                  channelId,
-                }),
-              ),
-              Effect.withSpan(
-                "GuildConfigService.observeGuildRunningChannelById",
-                {
-                  captureStackTrace: true,
-                },
-              ),
-            ),
           getGuildRunningChannelByName: (channelName: string) =>
             pipe(
               withGuildId((guildId) =>
-                decodeEither("guildConfig.getGuildRunningChannelByName", {
+                decodeEither<
+                  { guildId: string; channelName: string },
+                  Schema.GuildChannelConfig
+                >("guildConfig.getGuildRunningChannelByName", {
                   guildId,
                   channelName,
                 }),
               ),
               Effect.withSpan(
                 "GuildConfigService.getGuildRunningChannelByName",
-                {
-                  captureStackTrace: true,
-                },
-              ),
-            ),
-          observeGuildRunningChannelByName: (channelName: string) =>
-            pipe(
-              withGuildId((guildId) =>
-                subscribe("guildConfig.getGuildRunningChannelByName", {
-                  guildId,
-                  channelName,
-                }),
-              ),
-              Effect.withSpan(
-                "GuildConfigService.observeGuildRunningChannelByName",
                 {
                   captureStackTrace: true,
                 },

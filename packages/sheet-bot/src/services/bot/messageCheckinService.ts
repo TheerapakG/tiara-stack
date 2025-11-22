@@ -2,6 +2,7 @@ import { SheetApisClient } from "@/client/sheetApis";
 import { Effect, Either, pipe } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import type { messageCheckin } from "sheet-db-schema";
+import { Schema } from "sheet-apis";
 import { Result } from "typhoon-core/schema";
 
 export class MessageCheckinService extends Effect.Service<MessageCheckinService>()(
@@ -16,13 +17,17 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
           request: Req,
         ): Effect.Effect<A> =>
           pipe(
-            WebSocketClient.once(client, handler as any, request),
+            WebSocketClient.once(
+              client,
+              handler as any,
+              request,
+            ) as Effect.Effect<Result.Result<A>, never, never>,
             Effect.orDie,
             Effect.flatMap((result) =>
-              Result.match(result, {
+              Result.match({
                 onOptimistic: Effect.succeed,
                 onComplete: Effect.succeed,
-              }),
+              })(result),
             ),
           );
 
@@ -34,7 +39,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
             decodeResult<Req, Either.Either<A, unknown>>(handler, request),
             Effect.flatMap(
               Either.match({
-                onLeft: Effect.fail,
+                onLeft: Effect.die,
                 onRight: Effect.succeed,
               }),
             ),
@@ -43,7 +48,10 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
         return {
           getMessageCheckinData: (messageId: string) =>
             pipe(
-              decodeEither("messageCheckin.getMessageCheckinData", messageId),
+              decodeEither<string, Schema.MessageCheckin>(
+                "messageCheckin.getMessageCheckinData",
+                messageId,
+              ),
               Effect.withSpan("MessageCheckinService.getMessageCheckinData", {
                 captureStackTrace: true,
               }),
@@ -70,7 +78,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
             ),
           getMessageCheckinMembers: (messageId: string) =>
             pipe(
-              decodeResult(
+              decodeResult<string, ReadonlyArray<Schema.MessageCheckinMember>>(
                 "messageCheckin.getMessageCheckinMembers",
                 messageId,
               ),
