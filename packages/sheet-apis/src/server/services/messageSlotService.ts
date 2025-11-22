@@ -1,12 +1,17 @@
 import { DBService } from "@/db";
 import { MessageSlot } from "@/server/schema";
 import { and, eq, isNull } from "drizzle-orm";
-import { Array, Effect, pipe, Schema } from "effect";
+import { Array, Effect, Option, pipe, Schema } from "effect";
 import { messageSlot } from "sheet-db-schema";
 import { makeDBQueryError } from "typhoon-core/error";
-import { DefaultTaggedClass } from "typhoon-core/schema";
-import { Computed } from "typhoon-core/signal";
+import { DefaultTaggedClass, Result } from "typhoon-core/schema";
+import {
+  Computed,
+  ExternalComputed,
+  ZeroQueryExternalSource,
+} from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
+import { ZeroServiceTag } from "@/db/zeroService";
 
 type MessageSlotInsert = typeof messageSlot.$inferInsert;
 
@@ -20,23 +25,32 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
       Effect.map(({ db, dbSubscriptionContext }) => ({
         getMessageSlotData: (messageId: string) =>
           pipe(
-            dbSubscriptionContext.subscribeQuery(
-              db
-                .select()
-                .from(messageSlot)
-                .where(
-                  and(
-                    eq(messageSlot.messageId, messageId),
-                    isNull(messageSlot.deletedAt),
-                  ),
-                ),
-            ),
-            Computed.map(Array.head),
-            Computed.flatMap(
-              Schema.decode(
-                Schema.OptionFromSelf(DefaultTaggedClass(MessageSlot)),
+            ZeroServiceTag,
+            Effect.flatMap((zero) =>
+              ZeroQueryExternalSource.make(
+                zero.query.messageSlot
+                  .where("messageId", "=", messageId)
+                  .where("deletedAt", "IS", null)
+                  .one(),
               ),
             ),
+            Effect.flatMap(ExternalComputed.make),
+            Computed.flatten(),
+            Computed.flatMap(
+              Schema.decode(
+                Result.ResultSchema({
+                  optimistic: Schema.Union(
+                    DefaultTaggedClass(MessageSlot),
+                    Schema.Undefined,
+                  ),
+                  complete: Schema.Union(
+                    DefaultTaggedClass(MessageSlot),
+                    Schema.Undefined,
+                  ),
+                }),
+              ),
+            ),
+            Computed.map(Result.map(Option.fromNullable)),
             Effect.withSpan("MessageSlotService.getMessageSlotData", {
               captureStackTrace: true,
             }),

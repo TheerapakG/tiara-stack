@@ -1,7 +1,9 @@
 import { SheetApisClient } from "@/client/sheetApis";
-import { Effect, pipe } from "effect";
+import { Effect, Either, pipe } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import type { messageCheckin } from "sheet-db-schema";
+import { Result } from "typhoon-core/schema";
+import { UntilObserver } from "typhoon-core/signal";
 
 export class MessageCheckinService extends Effect.Service<MessageCheckinService>()(
   "MessageCheckinService",
@@ -9,85 +11,115 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
     effect: pipe(
       Effect.Do,
       Effect.bind("client", () => SheetApisClient.get()),
-      Effect.map(({ client }) => ({
-        getMessageCheckinData: (messageId: string) =>
+      Effect.map(({ client }) => {
+        const waitForComplete = <Req, A>(
+          name: string,
+          request: Req,
+        ): Effect.Effect<A> =>
           pipe(
-            WebSocketClient.once(
-              client,
-              "messageCheckin.getMessageCheckinData",
-              messageId,
-            ),
-            Effect.withSpan("MessageCheckinService.getMessageCheckinData", {
-              captureStackTrace: true,
-            }),
-          ),
-        upsertMessageCheckinData: (
-          messageId: string,
-          data: Omit<
-            typeof messageCheckin.$inferInsert,
-            "id" | "createdAt" | "updatedAt" | "deletedAt" | "messageId"
-          >,
-        ) =>
+            WebSocketClient.subscribeScoped(client, name as any, request),
+            UntilObserver.observeUntilScoped(Result.isComplete),
+            Effect.map((result) => result.value as A),
+          );
+
+        const fetchEither = <Req, A>(
+          name: string,
+          request: Req,
+        ): Effect.Effect<A> =>
           pipe(
-            WebSocketClient.mutate(
-              client,
-              "messageCheckin.upsertMessageCheckinData",
-              { messageId, ...data },
+            waitForComplete<Req, Either.Either<A, unknown>>(name, request),
+            Effect.flatMap(
+              Either.match({
+                onLeft: Effect.fail,
+                onRight: Effect.succeed,
+              }),
             ),
-            Effect.withSpan("MessageCheckinService.upsertMessageCheckinData", {
-              captureStackTrace: true,
-            }),
-          ),
-        getMessageCheckinMembers: (messageId: string) =>
-          pipe(
-            WebSocketClient.once(
-              client,
-              "messageCheckin.getMessageCheckinMembers",
-              messageId,
+          );
+
+        return {
+          getMessageCheckinData: (messageId: string) =>
+            pipe(
+              fetchEither("messageCheckin.getMessageCheckinData", messageId),
+              Effect.withSpan("MessageCheckinService.getMessageCheckinData", {
+                captureStackTrace: true,
+              }),
             ),
-            Effect.withSpan("MessageCheckinService.getMessageCheckinMembers", {
-              captureStackTrace: true,
-            }),
-          ),
-        addMessageCheckinMembers: (messageId: string, memberIds: string[]) =>
-          pipe(
-            WebSocketClient.mutate(
-              client,
-              "messageCheckin.addMessageCheckinMembers",
-              { messageId, memberIds },
+          upsertMessageCheckinData: (
+            messageId: string,
+            data: Omit<
+              typeof messageCheckin.$inferInsert,
+              "id" | "createdAt" | "updatedAt" | "deletedAt" | "messageId"
+            >,
+          ) =>
+            pipe(
+              WebSocketClient.mutate(
+                client,
+                "messageCheckin.upsertMessageCheckinData",
+                { messageId, ...data },
+              ),
+              Effect.withSpan(
+                "MessageCheckinService.upsertMessageCheckinData",
+                {
+                  captureStackTrace: true,
+                },
+              ),
             ),
-            Effect.withSpan("MessageCheckinService.addMessageCheckinMembers", {
-              captureStackTrace: true,
-            }),
-          ),
-        setMessageCheckinMemberCheckinAt: (
-          messageId: string,
-          memberId: string,
-        ) =>
-          pipe(
-            WebSocketClient.mutate(
-              client,
-              "messageCheckin.setMessageCheckinMemberCheckinAt",
-              { messageId, memberId },
+          getMessageCheckinMembers: (messageId: string) =>
+            pipe(
+              waitForComplete(
+                "messageCheckin.getMessageCheckinMembers",
+                messageId,
+              ),
+              Effect.withSpan(
+                "MessageCheckinService.getMessageCheckinMembers",
+                {
+                  captureStackTrace: true,
+                },
+              ),
             ),
-            Effect.withSpan(
-              "MessageCheckinService.setMessageCheckinMemberCheckinAt",
-              { captureStackTrace: true },
+          addMessageCheckinMembers: (messageId: string, memberIds: string[]) =>
+            pipe(
+              WebSocketClient.mutate(
+                client,
+                "messageCheckin.addMessageCheckinMembers",
+                { messageId, memberIds },
+              ),
+              Effect.withSpan(
+                "MessageCheckinService.addMessageCheckinMembers",
+                {
+                  captureStackTrace: true,
+                },
+              ),
             ),
-          ),
-        removeMessageCheckinMember: (messageId: string, memberId: string) =>
-          pipe(
-            WebSocketClient.mutate(
-              client,
-              "messageCheckin.removeMessageCheckinMember",
-              { messageId, memberId },
+          setMessageCheckinMemberCheckinAt: (
+            messageId: string,
+            memberId: string,
+          ) =>
+            pipe(
+              WebSocketClient.mutate(
+                client,
+                "messageCheckin.setMessageCheckinMemberCheckinAt",
+                { messageId, memberId },
+              ),
+              Effect.withSpan(
+                "MessageCheckinService.setMessageCheckinMemberCheckinAt",
+                { captureStackTrace: true },
+              ),
             ),
-            Effect.withSpan(
-              "MessageCheckinService.removeMessageCheckinMember",
-              { captureStackTrace: true },
+          removeMessageCheckinMember: (messageId: string, memberId: string) =>
+            pipe(
+              WebSocketClient.mutate(
+                client,
+                "messageCheckin.removeMessageCheckinMember",
+                { messageId, memberId },
+              ),
+              Effect.withSpan(
+                "MessageCheckinService.removeMessageCheckinMember",
+                { captureStackTrace: true },
+              ),
             ),
-          ),
-      })),
+        };
+      }),
     ),
     dependencies: [SheetApisClient.Default],
     accessors: true,

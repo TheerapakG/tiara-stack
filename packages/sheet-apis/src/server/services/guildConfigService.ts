@@ -3,7 +3,6 @@ import {
   GuildChannelConfig,
   GuildConfig,
   GuildConfigManagerRole,
-  ZeroGuildChannelConfig,
 } from "@/server/schema";
 import { and, eq, isNull } from "drizzle-orm";
 import { Array, DateTime, Effect, Option, pipe, Schema } from "effect";
@@ -35,19 +34,23 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
       Effect.map(({ db, dbSubscriptionContext }) => ({
         getAutoCheckinGuilds: () =>
           pipe(
-            dbSubscriptionContext.subscribeQuery(
-              db
-                .select()
-                .from(configGuild)
-                .where(
-                  and(
-                    eq(configGuild.autoCheckin, true),
-                    isNull(configGuild.deletedAt),
-                  ),
-                ),
+            ZeroServiceTag,
+            Effect.flatMap((zero) =>
+              ZeroQueryExternalSource.make(
+                zero.query.configGuild
+                  .where("autoCheckin", "=", true)
+                  .where("deletedAt", "IS", null),
+              ),
             ),
+            Effect.flatMap(ExternalComputed.make),
+            Computed.flatten(),
             Computed.flatMap(
-              Schema.decode(Schema.Array(DefaultTaggedClass(GuildConfig))),
+              Schema.decode(
+                Result.ResultSchema({
+                  optimistic: Schema.Array(DefaultTaggedClass(GuildConfig)),
+                  complete: Schema.Array(DefaultTaggedClass(GuildConfig)),
+                }),
+              ),
             ),
             Effect.withSpan("GuildConfigService.getAutoCheckinGuilds", {
               captureStackTrace: true,
@@ -55,46 +58,64 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           ),
         getGuildConfigByGuildId: (guildId: string) =>
           pipe(
-            dbSubscriptionContext.subscribeQuery(
-              db
-                .select()
-                .from(configGuild)
-                .where(
-                  and(
-                    eq(configGuild.guildId, guildId),
-                    isNull(configGuild.deletedAt),
-                  ),
-                ),
-            ),
-            Computed.map(Array.head),
-            Computed.flatMap(
-              Schema.decode(
-                Schema.OptionFromSelf(DefaultTaggedClass(GuildConfig)),
+            ZeroServiceTag,
+            Effect.flatMap((zero) =>
+              ZeroQueryExternalSource.make(
+                zero.query.configGuild
+                  .where("guildId", "=", guildId)
+                  .where("deletedAt", "IS", null)
+                  .one(),
               ),
             ),
-            Effect.withSpan("GuildConfigService.getConfig", {
+            Effect.flatMap(ExternalComputed.make),
+            Computed.flatten(),
+            Computed.flatMap(
+              Schema.decode(
+                Result.ResultSchema({
+                  optimistic: Schema.Union(
+                    DefaultTaggedClass(GuildConfig),
+                    Schema.Undefined,
+                  ),
+                  complete: Schema.Union(
+                    DefaultTaggedClass(GuildConfig),
+                    Schema.Undefined,
+                  ),
+                }),
+              ),
+            ),
+            Computed.map(Result.map(Option.fromNullable)),
+            Effect.withSpan("GuildConfigService.getGuildConfigByGuildId", {
               captureStackTrace: true,
             }),
           ),
         getGuildConfigByScriptId: (scriptId: string) =>
           pipe(
-            dbSubscriptionContext.subscribeQuery(
-              db
-                .select()
-                .from(configGuild)
-                .where(
-                  and(
-                    eq(configGuild.scriptId, scriptId),
-                    isNull(configGuild.deletedAt),
-                  ),
-                ),
-            ),
-            Computed.map(Array.head),
-            Computed.flatMap(
-              Schema.decode(
-                Schema.OptionFromSelf(DefaultTaggedClass(GuildConfig)),
+            ZeroServiceTag,
+            Effect.flatMap((zero) =>
+              ZeroQueryExternalSource.make(
+                zero.query.configGuild
+                  .where("scriptId", "=", scriptId)
+                  .where("deletedAt", "IS", null)
+                  .one(),
               ),
             ),
+            Effect.flatMap(ExternalComputed.make),
+            Computed.flatten(),
+            Computed.flatMap(
+              Schema.decode(
+                Result.ResultSchema({
+                  optimistic: Schema.Union(
+                    DefaultTaggedClass(GuildConfig),
+                    Schema.Undefined,
+                  ),
+                  complete: Schema.Union(
+                    DefaultTaggedClass(GuildConfig),
+                    Schema.Undefined,
+                  ),
+                }),
+              ),
+            ),
+            Computed.map(Result.map(Option.fromNullable)),
             Effect.withSpan("GuildConfigService.getGuildConfigByScriptId", {
               captureStackTrace: true,
             }),
@@ -137,20 +158,26 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           ),
         getGuildManagerRoles: (guildId: string) =>
           pipe(
-            dbSubscriptionContext.subscribeQuery(
-              db
-                .select()
-                .from(configGuildManagerRole)
-                .where(
-                  and(
-                    eq(configGuildManagerRole.guildId, guildId),
-                    isNull(configGuildManagerRole.deletedAt),
-                  ),
-                ),
+            ZeroServiceTag,
+            Effect.flatMap((zero) =>
+              ZeroQueryExternalSource.make(
+                zero.query.configGuildManagerRole
+                  .where("guildId", "=", guildId)
+                  .where("deletedAt", "IS", null),
+              ),
             ),
+            Effect.flatMap(ExternalComputed.make),
+            Computed.flatten(),
             Computed.flatMap(
               Schema.decode(
-                Schema.Array(DefaultTaggedClass(GuildConfigManagerRole)),
+                Result.ResultSchema({
+                  optimistic: Schema.Array(
+                    DefaultTaggedClass(GuildConfigManagerRole),
+                  ),
+                  complete: Schema.Array(
+                    DefaultTaggedClass(GuildConfigManagerRole),
+                  ),
+                }),
               ),
             ),
             Effect.withSpan("GuildConfigService.getGuildManagerRoles", {
@@ -266,32 +293,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           ),
         getGuildRunningChannelById: (guildId: string, channelId: string) =>
           pipe(
-            dbSubscriptionContext.subscribeQuery(
-              db
-                .select()
-                .from(configGuildChannel)
-                .where(
-                  and(
-                    eq(configGuildChannel.guildId, guildId),
-                    eq(configGuildChannel.channelId, channelId),
-                    isNull(configGuildChannel.deletedAt),
-                  ),
-                ),
-            ),
-            Computed.map(Array.head),
-            Computed.flatMap(
-              Schema.decode(
-                Schema.OptionFromSelf(DefaultTaggedClass(GuildChannelConfig)),
-              ),
-            ),
-            Effect.withSpan("GuildConfigService.getGuildRunningChannelById", {
-              captureStackTrace: true,
-            }),
-          ),
-        getZeroGuildRunningChannelById: (guildId: string, channelId: string) =>
-          pipe(
             ZeroServiceTag,
-            Effect.tap(() => Effect.log(guildId, channelId)),
             Effect.flatMap((zero) =>
               ZeroQueryExternalSource.make(
                 zero.query.configGuildChannel
@@ -307,50 +309,22 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Computed.flatMap(
               Schema.decode(
                 Result.ResultSchema({
-                  optimistic: Schema.OptionFromSelf(
-                    DefaultTaggedClass(ZeroGuildChannelConfig),
+                  optimistic: Schema.Union(
+                    DefaultTaggedClass(GuildChannelConfig),
+                    Schema.Undefined,
                   ),
-                  complete: Schema.OptionFromSelf(
-                    DefaultTaggedClass(ZeroGuildChannelConfig),
+                  complete: Schema.Union(
+                    DefaultTaggedClass(GuildChannelConfig),
+                    Schema.Undefined,
                   ),
                 }),
               ),
             ),
-            Effect.withSpan(
-              "GuildConfigService.getZeroGuildRunningChannelById",
-              {
-                captureStackTrace: true,
-              },
-            ),
-          ),
-        getGuildRunningChannelByName: (guildId: string, channelName: string) =>
-          pipe(
-            dbSubscriptionContext.subscribeQuery(
-              db
-                .select()
-                .from(configGuildChannel)
-                .where(
-                  and(
-                    eq(configGuildChannel.guildId, guildId),
-                    eq(configGuildChannel.name, channelName),
-                    isNull(configGuildChannel.deletedAt),
-                  ),
-                ),
-            ),
-            Computed.map(Array.head),
-            Computed.flatMap(
-              Schema.decode(
-                Schema.OptionFromSelf(DefaultTaggedClass(GuildChannelConfig)),
-              ),
-            ),
-            Effect.withSpan("GuildConfigService.getGuildRunningChannelByName", {
+            Effect.withSpan("GuildConfigService.getGuildRunningChannelById", {
               captureStackTrace: true,
             }),
           ),
-        getZeroGuildRunningChannelByName: (
-          guildId: string,
-          channelName: string,
-        ) =>
+        getGuildRunningChannelByName: (guildId: string, channelName: string) =>
           pipe(
             ZeroServiceTag,
             Effect.flatMap((zero) =>
@@ -368,21 +342,20 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Computed.flatMap(
               Schema.decode(
                 Result.ResultSchema({
-                  optimistic: Schema.OptionFromSelf(
-                    DefaultTaggedClass(ZeroGuildChannelConfig),
+                  optimistic: Schema.Union(
+                    DefaultTaggedClass(GuildChannelConfig),
+                    Schema.Undefined,
                   ),
-                  complete: Schema.OptionFromSelf(
-                    DefaultTaggedClass(ZeroGuildChannelConfig),
+                  complete: Schema.Union(
+                    DefaultTaggedClass(GuildChannelConfig),
+                    Schema.Undefined,
                   ),
                 }),
               ),
             ),
-            Effect.withSpan(
-              "GuildConfigService.getZeroGuildRunningChannelByName",
-              {
-                captureStackTrace: true,
-              },
-            ),
+            Effect.withSpan("GuildConfigService.getGuildRunningChannelByName", {
+              captureStackTrace: true,
+            }),
           ),
       })),
     ),

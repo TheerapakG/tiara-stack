@@ -26,9 +26,7 @@ import { Schema } from "sheet-apis";
 import { Result } from "typhoon-core/schema";
 import { Computed, UntilObserver } from "typhoon-core/signal";
 
-const configFields = (
-  config: Schema.GuildChannelConfig | Schema.ZeroGuildChannelConfig,
-) => [
+const configFields = (config: Schema.GuildChannelConfig) => [
   {
     name: "Name",
     value: pipe(
@@ -78,7 +76,7 @@ const handleListConfig =
           })),
           Effect.bind("config", ({ channel }) =>
             pipe(
-              GuildConfigService.getZeroGuildRunningChannelById(channel.id),
+              GuildConfigService.observeGuildRunningChannelById(channel.id),
               Computed.map(
                 Result.fromRpcReturningResult(Either.right(Option.none())),
               ),

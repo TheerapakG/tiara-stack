@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { DateFromUnknown } from "./dateSchemas";
 
 export class GuildConfigManagerRole extends Schema.TaggedClass<GuildConfigManagerRole>()(
   "GuildConfigManagerRole",
@@ -6,8 +7,8 @@ export class GuildConfigManagerRole extends Schema.TaggedClass<GuildConfigManage
     id: Schema.Number,
     guildId: Schema.String,
     roleId: Schema.String,
-    createdAt: Schema.DateFromSelf,
-    updatedAt: Schema.DateFromSelf,
-    deletedAt: Schema.OptionFromNullishOr(Schema.DateFromSelf, undefined),
+    createdAt: Schema.OptionFromNullishOr(DateFromUnknown, undefined),
+    updatedAt: Schema.OptionFromNullishOr(DateFromUnknown, undefined),
+    deletedAt: Schema.OptionFromNullishOr(DateFromUnknown, undefined),
   },
 ) {}
