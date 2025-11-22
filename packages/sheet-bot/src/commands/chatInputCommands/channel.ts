@@ -21,8 +21,10 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Effect, Option, pipe } from "effect";
+import { Effect, Option, pipe, Either } from "effect";
 import { Schema } from "sheet-apis";
+import { Result } from "typhoon-core/schema";
+import { Computed, UntilObserver } from "typhoon-core/signal";
 
 const configFields = (config: Schema.GuildChannelConfig) => [
   {
@@ -73,7 +75,32 @@ const handleListConfig =
             permissions: PermissionFlagsBits.ManageGuild,
           })),
           Effect.bind("config", ({ channel }) =>
-            GuildConfigService.getGuildRunningChannelById(channel.id),
+            pipe(
+              GuildConfigService.observeGuildRunningChannelById(channel.id),
+              Effect.flatMap((signal) =>
+                pipe(
+                  Effect.succeed(signal as any),
+                  Computed.map(
+                    Result.fromRpcReturningResult(
+                      Either.right(Option.none<Schema.GuildChannelConfig>()),
+                    ) as any,
+                  ),
+                  UntilObserver.observeUntilScoped(Result.isComplete),
+                  Effect.flatMap((value) =>
+                    pipe(
+                      value.value as Either.Either<
+                        Schema.GuildChannelConfig,
+                        Schema.Error.Core.ArgumentError
+                      >,
+                      Either.match({
+                        onLeft: Effect.die,
+                        onRight: Effect.succeed,
+                      }),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
           InteractionContext.editReply.tapEffect(({ config }) =>
             pipe(

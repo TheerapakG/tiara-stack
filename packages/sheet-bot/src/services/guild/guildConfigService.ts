@@ -57,6 +57,16 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             ),
           );
 
+        const subscribe = <Req>(handler: string, request: Req) =>
+          pipe(
+            WebSocketClient.subscribeScoped(
+              sheetApisClient.get(),
+              handler as any,
+              request,
+            ),
+            Effect.orDie,
+          );
+
         return {
           getAutoCheckinGuilds: () =>
             pipe(
@@ -202,6 +212,40 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
               Effect.withSpan(
                 "GuildConfigService.getGuildRunningChannelByName",
+                {
+                  captureStackTrace: true,
+                },
+              ),
+            ),
+          observeGuildRunningChannelById: (channelId: string) =>
+            pipe(
+              withGuildId((guildId) =>
+                Effect.scoped(
+                  subscribe("guildConfig.getGuildRunningChannelById", {
+                    guildId,
+                    channelId,
+                  }),
+                ),
+              ),
+              Effect.withSpan(
+                "GuildConfigService.observeGuildRunningChannelById",
+                {
+                  captureStackTrace: true,
+                },
+              ),
+            ),
+          observeGuildRunningChannelByName: (channelName: string) =>
+            pipe(
+              withGuildId((guildId) =>
+                Effect.scoped(
+                  subscribe("guildConfig.getGuildRunningChannelByName", {
+                    guildId,
+                    channelName,
+                  }),
+                ),
+              ),
+              Effect.withSpan(
+                "GuildConfigService.observeGuildRunningChannelByName",
                 {
                   captureStackTrace: true,
                 },
