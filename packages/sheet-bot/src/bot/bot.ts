@@ -41,6 +41,7 @@ import {
   pipe,
   Runtime,
   SynchronizedRef,
+  Scope,
 } from "effect";
 import { RunState } from "typhoon-core/runtime";
 
@@ -403,7 +404,12 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
             bot as Bot<
               A | BA,
               E | BE,
-              Exclude<R, InteractionServices<ChatInputCommandInteractionT>> | BR
+              | Exclude<
+                  R,
+                  | InteractionServices<ChatInputCommandInteractionT>
+                  | Scope.Scope
+                >
+              | BR
             >,
         ),
         Effect.tap(({ bot }) =>
@@ -414,7 +420,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 ChatInputHandlerVariantT,
                 A,
                 E,
-                Exclude<R, InteractionServices<ChatInputCommandInteractionT>>
+                Exclude<
+                  R,
+                  | InteractionServices<ChatInputCommandInteractionT>
+                  | Scope.Scope
+                >
               >,
             ),
           ),
@@ -435,7 +445,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
             bot as Bot<
               A | BA,
               E | BE,
-              Exclude<R, InteractionServices<ButtonInteractionT>> | BR
+              | Exclude<
+                  R,
+                  InteractionServices<ButtonInteractionT> | Scope.Scope
+                >
+              | BR
             >,
         ),
         Effect.tap(({ bot }) =>
@@ -446,7 +460,10 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 ButtonHandlerVariantT,
                 A,
                 E,
-                Exclude<R, InteractionServices<ButtonInteractionT>>
+                Exclude<
+                  R,
+                  InteractionServices<ButtonInteractionT> | Scope.Scope
+                >
               >,
             ),
           ),
@@ -467,7 +484,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
             bot as Bot<
               A | BA,
               E | BE,
-              Exclude<R, InteractionServices<ButtonInteractionT>> | BR
+              | Exclude<
+                  R,
+                  InteractionServices<ButtonInteractionT> | Scope.Scope
+                >
+              | BR
             >,
         ),
         Effect.tap(({ bot }) =>
@@ -478,7 +499,10 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 ButtonHandlerVariantT,
                 A,
                 E,
-                Exclude<R, InteractionServices<ButtonInteractionT>>
+                Exclude<
+                  R,
+                  InteractionServices<ButtonInteractionT> | Scope.Scope
+                >
               >,
             ),
           ),
@@ -504,7 +528,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
             bot as Bot<
               A | BA,
               E | BE,
-              Exclude<R, InteractionServices<UserSelectMenuInteractionT>> | BR
+              | Exclude<
+                  R,
+                  InteractionServices<UserSelectMenuInteractionT> | Scope.Scope
+                >
+              | BR
             >,
         ),
         Effect.tap(({ bot }) =>
@@ -515,7 +543,10 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 UserSelectMenuHandlerVariantT,
                 A,
                 E,
-                Exclude<R, InteractionServices<UserSelectMenuInteractionT>>
+                Exclude<
+                  R,
+                  InteractionServices<UserSelectMenuInteractionT> | Scope.Scope
+                >
               >,
             ),
           ),
@@ -540,7 +571,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
             bot as Bot<
               A | BA,
               E | BE,
-              Exclude<R, InteractionServices<UserSelectMenuInteractionT>> | BR
+              | Exclude<
+                  R,
+                  InteractionServices<UserSelectMenuInteractionT> | Scope.Scope
+                >
+              | BR
             >,
         ),
         Effect.tap(({ bot }) =>
@@ -551,7 +586,10 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 UserSelectMenuHandlerVariantT,
                 A,
                 E,
-                Exclude<R, InteractionServices<UserSelectMenuInteractionT>>
+                Exclude<
+                  R,
+                  InteractionServices<UserSelectMenuInteractionT> | Scope.Scope
+                >
               >,
             ),
           ),

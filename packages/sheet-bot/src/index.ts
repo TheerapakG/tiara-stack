@@ -39,7 +39,7 @@ NodeRuntime.runMain(
       ),
     ),
     Effect.bind("runtime", () => Layer.toRuntime(botServices)),
-    Effect.flatMap(({ bot, runtime }) => Bot.start(bot, runtime as any)),
+    Effect.flatMap(({ bot, runtime }) => Bot.start(bot, runtime)),
     Effect.sandbox,
     Effect.catchAll((error) => Effect.logError(error)),
     Effect.provide(baseLayer),
