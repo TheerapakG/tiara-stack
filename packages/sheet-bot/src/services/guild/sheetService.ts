@@ -1,5 +1,5 @@
 import { bindObject } from "@/utils";
-import { Effect, Number, pipe, String } from "effect";
+import { Effect, pipe, ScopedCache, Duration } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { SheetApisClient } from "@/client/sheetApis";
 import { GuildService } from "./guildService";
@@ -13,9 +13,9 @@ export class SheetService extends Effect.Service<SheetService>()(
         guildService: GuildService,
         sheetApisClient: SheetApisClient,
       }),
-      Effect.bindAll(
-        ({ guildService, sheetApisClient }) => ({
-          rangesConfig: Effect.cached(
+      Effect.bindAll(({ guildService, sheetApisClient }) => ({
+        rangesConfig: ScopedCache.make({
+          lookup: () =>
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
@@ -29,8 +29,11 @@ export class SheetService extends Effect.Service<SheetService>()(
                 captureStackTrace: true,
               }),
             ),
-          ),
-          teamConfig: Effect.cached(
+          capacity: 1,
+          timeToLive: Duration.infinity,
+        }),
+        teamConfig: ScopedCache.make({
+          lookup: () =>
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
@@ -44,8 +47,11 @@ export class SheetService extends Effect.Service<SheetService>()(
                 captureStackTrace: true,
               }),
             ),
-          ),
-          eventConfig: Effect.cached(
+          capacity: 1,
+          timeToLive: Duration.infinity,
+        }),
+        eventConfig: ScopedCache.make({
+          lookup: () =>
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
@@ -59,8 +65,11 @@ export class SheetService extends Effect.Service<SheetService>()(
                 captureStackTrace: true,
               }),
             ),
-          ),
-          scheduleConfig: Effect.cached(
+          capacity: 1,
+          timeToLive: Duration.infinity,
+        }),
+        scheduleConfig: ScopedCache.make({
+          lookup: () =>
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
@@ -74,8 +83,11 @@ export class SheetService extends Effect.Service<SheetService>()(
                 captureStackTrace: true,
               }),
             ),
-          ),
-          runnerConfig: Effect.cached(
+          capacity: 1,
+          timeToLive: Duration.infinity,
+        }),
+        runnerConfig: ScopedCache.make({
+          lookup: () =>
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
@@ -89,8 +101,11 @@ export class SheetService extends Effect.Service<SheetService>()(
                 captureStackTrace: true,
               }),
             ),
-          ),
-          players: Effect.cached(
+          capacity: 1,
+          timeToLive: Duration.infinity,
+        }),
+        players: ScopedCache.make({
+          lookup: () =>
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
@@ -100,23 +115,33 @@ export class SheetService extends Effect.Service<SheetService>()(
                   { guildId },
                 ),
               ),
+              Effect.withSpan("SheetService.players", {
+                captureStackTrace: true,
+              }),
             ),
-          ),
-          teams: Effect.cached(
+          capacity: 1,
+          timeToLive: Duration.infinity,
+        }),
+        teams: ScopedCache.make({
+          lookup: () =>
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
                 WebSocketClient.subscribeScoped(
                   sheetApisClient.get(),
                   "sheet.getTeams",
-                  {
-                    guildId,
-                  },
+                  { guildId },
                 ),
               ),
+              Effect.withSpan("SheetService.teams", {
+                captureStackTrace: true,
+              }),
             ),
-          ),
-          allSchedules: Effect.cached(
+          capacity: 1,
+          timeToLive: Duration.infinity,
+        }),
+        allSchedules: ScopedCache.make({
+          lookup: () =>
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
@@ -126,38 +151,71 @@ export class SheetService extends Effect.Service<SheetService>()(
                   { guildId },
                 ),
               ),
+              Effect.withSpan("SheetService.allSchedules", {
+                captureStackTrace: true,
+              }),
             ),
-          ),
-          daySchedules: Effect.cachedFunction(
-            (day: number) =>
-              pipe(
-                guildService.getId(),
-                Effect.flatMap((guildId) =>
-                  WebSocketClient.subscribeScoped(
-                    sheetApisClient.get(),
-                    "sheet.getDaySchedules",
-                    { guildId, day },
-                  ),
-                ),
-              ),
-            Number.Equivalence,
-          ),
-          channelSchedules: Effect.cachedFunction(
-            (channel: string) =>
-              pipe(
-                guildService.getId(),
-                Effect.flatMap((guildId) =>
-                  WebSocketClient.subscribeScoped(
-                    sheetApisClient.get(),
-                    "sheet.getChannelSchedules",
-                    { guildId, channel },
-                  ),
-                ),
-              ),
-            String.Equivalence,
-          ),
+          capacity: 1,
+          timeToLive: Duration.infinity,
         }),
-        { concurrency: "unbounded" },
+        daySchedules: ScopedCache.make({
+          lookup: (day: number) =>
+            pipe(
+              guildService.getId(),
+              Effect.flatMap((guildId) =>
+                WebSocketClient.subscribeScoped(
+                  sheetApisClient.get(),
+                  "sheet.getDaySchedules",
+                  { guildId, day },
+                ),
+              ),
+              Effect.withSpan("SheetService.daySchedules", {
+                captureStackTrace: true,
+              }),
+            ),
+          capacity: 16,
+          timeToLive: Duration.infinity,
+        }),
+        channelSchedules: ScopedCache.make({
+          lookup: (channel: string) =>
+            pipe(
+              guildService.getId(),
+              Effect.flatMap((guildId) =>
+                WebSocketClient.subscribeScoped(
+                  sheetApisClient.get(),
+                  "sheet.getChannelSchedules",
+                  { guildId, channel },
+                ),
+              ),
+            ),
+          capacity: 16,
+          timeToLive: Duration.infinity,
+        }),
+      })),
+      Effect.map(
+        ({
+          rangesConfig,
+          teamConfig,
+          eventConfig,
+          scheduleConfig,
+          runnerConfig,
+          players,
+          teams,
+          allSchedules,
+          daySchedules,
+          channelSchedules,
+        }) => ({
+          rangesConfig: rangesConfig.get(undefined),
+          teamConfig: teamConfig.get(undefined),
+          eventConfig: eventConfig.get(undefined),
+          scheduleConfig: scheduleConfig.get(undefined),
+          runnerConfig: runnerConfig.get(undefined),
+          players: players.get(undefined),
+          teams: teams.get(undefined),
+          allSchedules: allSchedules.get(undefined),
+          daySchedules: (day: number) => daySchedules.get(day),
+          channelSchedules: (channel: string) => channelSchedules.get(channel),
+        }),
       ),
     ),
     dependencies: [SheetApisClient.Default],
