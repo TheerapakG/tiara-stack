@@ -626,9 +626,7 @@ export class WebSocketClient<
           version: 1,
           id,
           action: "client:unsubscribe",
-          payload: {
-            handler: handler,
-          },
+          payload: {},
           span: pipe(
             span,
             Option.map((span) => ({
