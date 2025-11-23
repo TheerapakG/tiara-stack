@@ -21,10 +21,10 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Effect, Option, pipe, Either } from "effect";
+import { Effect, Option, pipe, Either, Function } from "effect";
 import { Schema } from "sheet-apis";
-import { Result } from "typhoon-core/schema";
-import { Computed, UntilObserver } from "typhoon-core/signal";
+import { Result, RpcResult } from "typhoon-core/schema";
+import { Computed, DependencySignal, UntilObserver } from "typhoon-core/signal";
 
 const configFields = (config: Schema.GuildChannelConfig) => [
   {
@@ -57,6 +57,18 @@ const configFields = (config: Schema.GuildChannelConfig) => [
   },
 ];
 
+type GuildRunningChannelSignal = DependencySignal.DependencySignal<
+  RpcResult.RpcResult<
+    Result.Result<
+      Either.Either<Schema.GuildChannelConfig, Schema.Error.Core.ArgumentError>,
+      Either.Either<Schema.GuildChannelConfig, Schema.Error.Core.ArgumentError>
+    >,
+    unknown
+  >,
+  never,
+  never
+>;
+
 const handleListConfig =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
     .data(
@@ -76,25 +88,32 @@ const handleListConfig =
           })),
           Effect.bind("config", ({ channel }) =>
             pipe(
-              GuildConfigService.observeGuildRunningChannelById(channel.id),
+              GuildConfigService.getGuildRunningChannelById(channel.id),
               Effect.flatMap((signal) =>
                 pipe(
-                  Effect.succeed(signal as any),
+                  Effect.succeed(signal as GuildRunningChannelSignal),
                   Computed.map(
-                    Result.fromRpcReturningResult(
-                      Either.right(Option.none<Schema.GuildChannelConfig>()),
-                    ) as any,
-                  ),
-                  UntilObserver.observeUntilScoped(Result.isComplete),
-                  Effect.flatMap((value) =>
-                    pipe(
-                      value.value as Either.Either<
+                    Result.fromRpcReturningResult<
+                      Either.Either<
                         Schema.GuildChannelConfig,
                         Schema.Error.Core.ArgumentError
-                      >,
+                      >
+                    >(
+                      Either.left(
+                        Schema.Error.Core.makeArgumentError(
+                          "Loading channel configuration",
+                        ),
+                      ),
+                    ),
+                  ),
+                  UntilObserver.observeUntilScoped(Result.isComplete),
+                  Effect.flatMap((result) =>
+                    pipe(
+                      result.value,
+                      Either.flatMap(Function.identity),
                       Either.match({
-                        onLeft: Effect.die,
-                        onRight: Effect.succeed,
+                        onLeft: (error) => Effect.fail(error),
+                        onRight: (value) => Effect.succeed(value),
                       }),
                     ),
                   ),

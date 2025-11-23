@@ -33,6 +33,7 @@ import {
   Cause,
   DateTime,
   Effect,
+  Either,
   Function,
   HashSet,
   Match,
@@ -43,7 +44,72 @@ import {
 } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { Schema as SheetSchema } from "sheet-apis";
+import { Result, RpcResult } from "typhoon-core/schema";
+import { Computed, DependencySignal, UntilObserver } from "typhoon-core/signal";
 import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
+
+type GuildRunningChannelSignal = DependencySignal.DependencySignal<
+  RpcResult.RpcResult<
+    Result.Result<
+      Either.Either<
+        SheetSchema.GuildChannelConfig,
+        SheetSchema.Error.Core.ArgumentError
+      >,
+      Either.Either<
+        SheetSchema.GuildChannelConfig,
+        SheetSchema.Error.Core.ArgumentError
+      >
+    >,
+    unknown
+  >,
+  never,
+  never
+>;
+
+const waitForRunningChannel = <E, R>(
+  signalEffect: Effect.Effect<
+    DependencySignal.DependencySignal<
+      RpcResult.RpcResult<unknown, unknown>,
+      never,
+      never
+    >,
+    E,
+    R
+  >,
+) =>
+  pipe(
+    signalEffect,
+    Effect.flatMap((signal) =>
+      pipe(
+        Effect.succeed(signal as GuildRunningChannelSignal),
+        Computed.map(
+          Result.fromRpcReturningResult<
+            Either.Either<
+              SheetSchema.GuildChannelConfig,
+              SheetSchema.Error.Core.ArgumentError
+            >
+          >(
+            Either.left(
+              SheetSchema.Error.Core.makeArgumentError(
+                "Loading running channel",
+              ),
+            ),
+          ),
+        ),
+        UntilObserver.observeUntilScoped(Result.isComplete),
+        Effect.flatMap((result) =>
+          pipe(
+            result.value,
+            Either.flatMap(Function.identity),
+            Either.match({
+              onLeft: (error) => Effect.fail(error),
+              onRight: (value) => Effect.succeed(value),
+            }),
+          ),
+        ),
+      ),
+    ),
+  );
 
 const formatEffectValue = (effectValue: number): string => {
   const rounded = Math.round(effectValue * 10) / 10;
@@ -120,12 +186,20 @@ const handleManual =
               channelNameOption,
               Option.match({
                 onSome: (channelName) =>
-                  GuildConfigService.getGuildRunningChannelByName(channelName),
+                  waitForRunningChannel(
+                    GuildConfigService.getGuildRunningChannelByName(
+                      channelName,
+                    ),
+                  ),
                 onNone: () =>
                   pipe(
                     InteractionContext.channel(true).sync(),
                     Effect.flatMap((channel) =>
-                      GuildConfigService.getGuildRunningChannelById(channel.id),
+                      waitForRunningChannel(
+                        GuildConfigService.getGuildRunningChannelById(
+                          channel.id,
+                        ),
+                      ),
                     ),
                   ),
               }),

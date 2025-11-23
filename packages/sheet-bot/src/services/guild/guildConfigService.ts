@@ -20,9 +20,10 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
         sheetApisClient: SheetApisClient,
       }),
       Effect.map(({ guildService, sheetApisClient }) => {
-        const withGuildId = <A>(
-          f: (guildId: string) => Effect.Effect<A>,
-        ): Effect.Effect<A> => pipe(guildService.getId(), Effect.flatMap(f));
+        const withGuildId = <A, E, R>(
+          f: (guildId: string) => Effect.Effect<A, E, R>,
+        ): Effect.Effect<A, E, R> =>
+          pipe(guildService.getId(), Effect.flatMap(f));
 
         const decodeResult = <Req, A>(
           handler: string,
@@ -64,7 +65,6 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               handler as any,
               request,
             ),
-            Effect.orDie,
           );
 
         return {
@@ -187,10 +187,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           getGuildRunningChannelById: (channelId: string) =>
             pipe(
               withGuildId((guildId) =>
-                decodeEither<
-                  { guildId: string; channelId: string },
-                  Schema.GuildChannelConfig
-                >("guildConfig.getGuildRunningChannelById", {
+                subscribe("guildConfig.getGuildRunningChannelById", {
                   guildId,
                   channelId,
                 }),
@@ -202,50 +199,13 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           getGuildRunningChannelByName: (channelName: string) =>
             pipe(
               withGuildId((guildId) =>
-                decodeEither<
-                  { guildId: string; channelName: string },
-                  Schema.GuildChannelConfig
-                >("guildConfig.getGuildRunningChannelByName", {
+                subscribe("guildConfig.getGuildRunningChannelByName", {
                   guildId,
                   channelName,
                 }),
               ),
               Effect.withSpan(
                 "GuildConfigService.getGuildRunningChannelByName",
-                {
-                  captureStackTrace: true,
-                },
-              ),
-            ),
-          observeGuildRunningChannelById: (channelId: string) =>
-            pipe(
-              withGuildId((guildId) =>
-                Effect.scoped(
-                  subscribe("guildConfig.getGuildRunningChannelById", {
-                    guildId,
-                    channelId,
-                  }),
-                ),
-              ),
-              Effect.withSpan(
-                "GuildConfigService.observeGuildRunningChannelById",
-                {
-                  captureStackTrace: true,
-                },
-              ),
-            ),
-          observeGuildRunningChannelByName: (channelName: string) =>
-            pipe(
-              withGuildId((guildId) =>
-                Effect.scoped(
-                  subscribe("guildConfig.getGuildRunningChannelByName", {
-                    guildId,
-                    channelName,
-                  }),
-                ),
-              ),
-              Effect.withSpan(
-                "GuildConfigService.observeGuildRunningChannelByName",
                 {
                   captureStackTrace: true,
                 },
