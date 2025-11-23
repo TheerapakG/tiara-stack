@@ -1,7 +1,7 @@
 import { DBService } from "@/db";
 import { MessageSlot } from "@/server/schema";
 import { and, eq, isNull } from "drizzle-orm";
-import { Array, Effect, Option, pipe, Schema } from "effect";
+import { Array, Effect, pipe, Schema } from "effect";
 import { messageSlot } from "sheet-db-schema";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass, Result } from "typhoon-core/schema";
@@ -39,18 +39,17 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
             Computed.flatMap(
               Schema.decode(
                 Result.ResultSchema({
-                  optimistic: Schema.Union(
+                  optimistic: Schema.OptionFromNullishOr(
                     DefaultTaggedClass(MessageSlot),
-                    Schema.Undefined,
+                    undefined,
                   ),
-                  complete: Schema.Union(
+                  complete: Schema.OptionFromNullishOr(
                     DefaultTaggedClass(MessageSlot),
-                    Schema.Undefined,
+                    undefined,
                   ),
                 }),
               ),
             ),
-            Computed.map(Result.map(Option.fromNullable)),
             Effect.withSpan("MessageSlotService.getMessageSlotData", {
               captureStackTrace: true,
             }),

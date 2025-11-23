@@ -1,7 +1,7 @@
 import { DBService } from "@/db";
 import { MessageCheckin, MessageCheckinMember } from "@/server/schema";
 import { and, eq, gte, isNull } from "drizzle-orm";
-import { Array, DateTime, Effect, Option, pipe, Schema } from "effect";
+import { Array, DateTime, Effect, pipe, Schema } from "effect";
 import { messageCheckin, messageCheckinMember } from "sheet-db-schema";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass, Result } from "typhoon-core/schema";
@@ -39,18 +39,17 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
             Computed.flatMap(
               Schema.decode(
                 Result.ResultSchema({
-                  optimistic: Schema.Union(
+                  optimistic: Schema.OptionFromNullishOr(
                     DefaultTaggedClass(MessageCheckin),
-                    Schema.Undefined,
+                    undefined,
                   ),
-                  complete: Schema.Union(
+                  complete: Schema.OptionFromNullishOr(
                     DefaultTaggedClass(MessageCheckin),
-                    Schema.Undefined,
+                    undefined,
                   ),
                 }),
               ),
             ),
-            Computed.map(Result.map(Option.fromNullable)),
             Effect.withSpan("MessageCheckinService.getMessageCheckinData", {
               captureStackTrace: true,
             }),

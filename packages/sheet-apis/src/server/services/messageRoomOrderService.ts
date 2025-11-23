@@ -44,18 +44,17 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             Computed.flatMap(
               Schema.decode(
                 Result.ResultSchema({
-                  optimistic: Schema.Union(
+                  optimistic: Schema.OptionFromNullishOr(
                     DefaultTaggedClass(MessageRoomOrder),
-                    Schema.Undefined,
+                    undefined,
                   ),
-                  complete: Schema.Union(
+                  complete: Schema.OptionFromNullishOr(
                     DefaultTaggedClass(MessageRoomOrder),
-                    Schema.Undefined,
+                    undefined,
                   ),
                 }),
               ),
             ),
-            Computed.map(Result.map(Option.fromNullable)),
             Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder", {
               captureStackTrace: true,
             }),

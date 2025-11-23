@@ -72,18 +72,17 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Computed.flatMap(
               Schema.decode(
                 Result.ResultSchema({
-                  optimistic: Schema.Union(
+                  optimistic: Schema.OptionFromNullishOr(
                     DefaultTaggedClass(GuildConfig),
-                    Schema.Undefined,
+                    undefined,
                   ),
-                  complete: Schema.Union(
+                  complete: Schema.OptionFromNullishOr(
                     DefaultTaggedClass(GuildConfig),
-                    Schema.Undefined,
+                    undefined,
                   ),
                 }),
               ),
             ),
-            Computed.map(Result.map(Option.fromNullable)),
             Effect.withSpan("GuildConfigService.getGuildConfigByGuildId", {
               captureStackTrace: true,
             }),
@@ -104,59 +103,58 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             Computed.flatMap(
               Schema.decode(
                 Result.ResultSchema({
-                  optimistic: Schema.Union(
+                  optimistic: Schema.OptionFromNullishOr(
                     DefaultTaggedClass(GuildConfig),
-                    Schema.Undefined,
+                    undefined,
                   ),
-                  complete: Schema.Union(
+                  complete: Schema.OptionFromNullishOr(
                     DefaultTaggedClass(GuildConfig),
-                    Schema.Undefined,
+                    undefined,
                   ),
                 }),
               ),
             ),
-            Computed.map(Result.map(Option.fromNullable)),
             Effect.withSpan("GuildConfigService.getGuildConfigByScriptId", {
               captureStackTrace: true,
             }),
           ),
-          upsertGuildConfig: (
-            guildId: string,
-            config: Omit<
-              Partial<GuildConfigInsert>,
-              "id" | "createdAt" | "updatedAt" | "deletedAt" | "guildId"
-            >,
-          ) =>
-            pipe(
-              dbSubscriptionContext.mutateQuery(
-                db
-                  .insert(configGuild)
-                  .values({
-                    guildId,
-                    autoCheckin: false,
+        upsertGuildConfig: (
+          guildId: string,
+          config: Omit<
+            Partial<GuildConfigInsert>,
+            "id" | "createdAt" | "updatedAt" | "deletedAt" | "guildId"
+          >,
+        ) =>
+          pipe(
+            dbSubscriptionContext.mutateQuery(
+              db
+                .insert(configGuild)
+                .values({
+                  guildId,
+                  autoCheckin: false,
+                  ...config,
+                })
+                .onConflictDoUpdate({
+                  target: [configGuild.guildId],
+                  set: {
                     ...config,
-                  })
-                  .onConflictDoUpdate({
-                    target: [configGuild.guildId],
-                    set: {
-                      ...config,
-                    },
-                  })
-                  .returning(),
-              ),
-              Effect.flatMap(
-                Array.match({
-                  onNonEmpty: Effect.succeed,
-                  onEmpty: () =>
-                    Effect.die(makeDBQueryError("Failed to upsert guild config")),
-                }),
-              ),
-              Effect.map(Array.headNonEmpty),
-              Effect.flatMap(Schema.decode(DefaultTaggedClass(GuildConfig))),
-              Effect.withSpan("GuildConfigService.upsertGuildConfig", {
-                captureStackTrace: true,
+                  },
+                })
+                .returning(),
+            ),
+            Effect.flatMap(
+              Array.match({
+                onNonEmpty: Effect.succeed,
+                onEmpty: () =>
+                  Effect.die(makeDBQueryError("Failed to upsert guild config")),
               }),
             ),
+            Effect.map(Array.headNonEmpty),
+            Effect.flatMap(Schema.decode(DefaultTaggedClass(GuildConfig))),
+            Effect.withSpan("GuildConfigService.upsertGuildConfig", {
+              captureStackTrace: true,
+            }),
+          ),
         getGuildManagerRoles: (guildId: string) =>
           pipe(
             ZeroServiceTag,
@@ -306,17 +304,16 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             ),
             Effect.flatMap(ExternalComputed.make),
             Computed.flatten(),
-            Computed.map(Result.map(Option.fromNullable)),
             Computed.flatMap(
               Schema.decode(
                 Result.ResultSchema({
-                  optimistic: Schema.Union(
+                  optimistic: Schema.OptionFromNullishOr(
                     DefaultTaggedClass(GuildChannelConfig),
-                    Schema.Undefined,
+                    undefined,
                   ),
-                  complete: Schema.Union(
+                  complete: Schema.OptionFromNullishOr(
                     DefaultTaggedClass(GuildChannelConfig),
-                    Schema.Undefined,
+                    undefined,
                   ),
                 }),
               ),
@@ -339,17 +336,16 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             ),
             Effect.flatMap(ExternalComputed.make),
             Computed.flatten(),
-            Computed.map(Result.map(Option.fromNullable)),
             Computed.flatMap(
               Schema.decode(
                 Result.ResultSchema({
-                  optimistic: Schema.Union(
+                  optimistic: Schema.OptionFromNullishOr(
                     DefaultTaggedClass(GuildChannelConfig),
-                    Schema.Undefined,
+                    undefined,
                   ),
-                  complete: Schema.Union(
+                  complete: Schema.OptionFromNullishOr(
                     DefaultTaggedClass(GuildChannelConfig),
-                    Schema.Undefined,
+                    undefined,
                   ),
                 }),
               ),
