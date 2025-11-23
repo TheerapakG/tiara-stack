@@ -10,7 +10,9 @@ import {
   Ref,
   Scope,
 } from "effect";
+import { RpcError, ValidationError } from "../error";
 import { Observable } from "../observability";
+import { map } from "./computed";
 import { DependencySignal } from "./dependencySignal";
 import { DependentSignal, DependentSymbol } from "./dependentSignal";
 import {
@@ -18,6 +20,7 @@ import {
   runAndTrackEffect,
   SignalContext,
 } from "./signalContext";
+import { RpcResult, Result } from "../schema";
 
 class UntilObserver<
     A = never,
@@ -252,9 +255,9 @@ export const observeUntilSignal =
     pattern: P,
     options?: Observable.ObservableOptions,
   ) =>
-  <E = never, R = never, E2 = never, R2 = never>(
-    effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2>,
-  ): Effect.Effect<Match.Types.WhenMatch<A, P>, E | E2, R | R2> =>
+  <E = never, R = never, E1 = never, R1 = never>(
+    effect: Effect.Effect<DependencySignal<A, E, R>, E1, R1>,
+  ): Effect.Effect<Match.Types.WhenMatch<A, P>, E | E1, R | R1> =>
     pipe(
       effect,
       Effect.flatMap((signal) => observeUntil(signal, pattern, options)),
@@ -275,12 +278,12 @@ export const observeUntilScoped =
     pattern: P,
     options?: Observable.ObservableOptions,
   ) =>
-  <E = never, R = never, E2 = never, R2 = never>(
-    effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2>,
+  <E = never, R = never, E1 = never, R1 = never>(
+    effect: Effect.Effect<DependencySignal<A, E, R>, E1, R1>,
   ): Effect.Effect<
     Match.Types.WhenMatch<A, P>,
-    E | E2,
-    Exclude<R | R2, Scope.Scope>
+    E | E1,
+    Exclude<R | R1, Scope.Scope>
   > =>
     pipe(
       effect,
@@ -289,6 +292,63 @@ export const observeUntilScoped =
       Observable.withSpan(
         { [Observable.ObservableSymbol]: options ?? {} },
         "observeUntilScoped",
+        {
+          captureStackTrace: true,
+        },
+      ),
+    );
+
+export const observeUntilRpcResolved =
+  (options?: Observable.ObservableOptions) =>
+  <A = never, E = never, E1 = never, R1 = never, E2 = never, R2 = never>(
+    effect: Effect.Effect<
+      DependencySignal<RpcResult.RpcResult<A, E>, E1, R1>,
+      E2,
+      R2
+    >,
+  ): Effect.Effect<
+    A,
+    RpcError<E> | ValidationError | E1 | E2,
+    Exclude<R1 | R2, Scope.Scope>
+  > =>
+    pipe(
+      effect,
+      observeUntilScoped(RpcResult.isResolved, options),
+      Effect.flatMap((result) => result.value),
+      Observable.withSpan(
+        { [Observable.ObservableSymbol]: options ?? {} },
+        "observeUntilRpcResolved",
+        {
+          captureStackTrace: true,
+        },
+      ),
+    );
+
+export const observeUntilRpcResultResolved =
+  (options?: Observable.ObservableOptions) =>
+  <A = never, E = never, E1 = never, R1 = never, E2 = never, R2 = never>(
+    effect: Effect.Effect<
+      DependencySignal<
+        RpcResult.RpcResult<Result.Result<unknown, A>, E>,
+        E1,
+        R1
+      >,
+      E2,
+      R2
+    >,
+  ): Effect.Effect<
+    A,
+    RpcError<E> | ValidationError | E1 | E2,
+    Exclude<R1 | R2, Scope.Scope>
+  > =>
+    pipe(
+      effect,
+      map(Result.fromRpcReturningResult(undefined)),
+      observeUntilScoped(Result.isComplete, options),
+      Effect.flatMap((result) => result.value),
+      Observable.withSpan(
+        { [Observable.ObservableSymbol]: options ?? {} },
+        "observeUntilRpcResolved",
         {
           captureStackTrace: true,
         },

@@ -9,6 +9,7 @@ import {
   flow,
 } from "effect";
 import { SheetService } from "./sheetService";
+import { UntilObserver } from "typhoon-core/signal";
 
 export class HourWindow extends Data.TaggedClass("HourWindow")<{
   start: DateTime.DateTime;
@@ -25,6 +26,7 @@ export class ConverterService extends Effect.Service<ConverterService>()(
         convertHourToHourWindow: (hour: number) =>
           pipe(
             sheetService.eventConfig,
+            UntilObserver.observeUntilRpcResultResolved(),
             Effect.map(
               (eventConfig) =>
                 new HourWindow({
@@ -45,6 +47,7 @@ export class ConverterService extends Effect.Service<ConverterService>()(
         convertDateTimeToHour: (dateTime: DateTime.DateTime) =>
           pipe(
             sheetService.eventConfig,
+            UntilObserver.observeUntilRpcResultResolved(),
             Effect.map((eventConfig) => eventConfig.startTime),
             Effect.map(
               DateTime.distanceDurationEither(

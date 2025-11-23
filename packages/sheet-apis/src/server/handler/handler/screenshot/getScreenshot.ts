@@ -1,6 +1,6 @@
 import { getScreenshotHandlerConfig } from "@/server/handler/config";
 import { AuthService, Sheet } from "@/server/services";
-import { Effect, pipe, Schema } from "effect";
+import { Effect, pipe, Schema, Scope } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -15,18 +15,19 @@ export const getScreenshotHandler = pipe(
       Computed.make(Event.someToken()),
       Computed.flatMap(AuthService.verify),
       Computed.flatMapComputed(() =>
-        Event.request.parsed(getScreenshotHandlerConfig),
+        Event.request.parsedWithScope(getScreenshotHandlerConfig),
       ),
-      Computed.flatMapComputed(({ guildId, channel, day }) =>
+      Computed.flatMapComputed(({ parsed: { guildId, channel, day }, scope }) =>
         pipe(
           Sheet.layerOfGuildId(guildId),
           Effect.flatMap((layer) =>
             pipe(
               Sheet.ScreenshotService.getScreenshot(channel, day),
               Computed.make,
-              Computed.provideLayerComputed(layer),
+              Computed.provideLayerComputedResult(layer),
             ),
           ),
+          Scope.extend(scope),
         ),
       ),
       Computed.flatMap(

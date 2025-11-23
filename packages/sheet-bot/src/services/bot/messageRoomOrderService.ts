@@ -12,7 +12,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
       Effect.map(({ client }) => ({
         getMessageRoomOrder: (messageId: string) =>
           pipe(
-            WebSocketClient.once(
+            WebSocketClient.subscribeScoped(
               client,
               "messageRoomOrder.getMessageRoomOrder",
               messageId,
@@ -68,10 +68,13 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
           ),
         getMessageRoomOrderEntry: (messageId: string, rank: number) =>
           pipe(
-            WebSocketClient.once(
+            WebSocketClient.subscribeScoped(
               client,
               "messageRoomOrder.getMessageRoomOrderEntry",
-              { messageId, rank },
+              {
+                messageId,
+                rank,
+              },
             ),
             Effect.withSpan(
               "MessageRoomOrderService.getMessageRoomOrderEntry",
@@ -82,7 +85,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
           ),
         getMessageRoomOrderRange: (messageId: string) =>
           pipe(
-            WebSocketClient.once(
+            WebSocketClient.subscribeScoped(
               client,
               "messageRoomOrder.getMessageRoomOrderRange",
               messageId,

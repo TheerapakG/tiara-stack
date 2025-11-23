@@ -22,7 +22,8 @@ import {
   MessageFlags,
   userMention,
 } from "discord.js";
-import { Array, Effect, Number, Option, Order, pipe } from "effect";
+import { Array, Effect, Function, Number, Option, Order, pipe } from "effect";
+import { UntilObserver } from "typhoon-core/signal";
 
 const buttonData = {
   type: ComponentType.Button,
@@ -44,7 +45,11 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         InteractionContext.user.bind("user"),
         CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
         Effect.bind("messageCheckinData", ({ message }) =>
-          MessageCheckinService.getMessageCheckinData(message.id),
+          pipe(
+            MessageCheckinService.getMessageCheckinData(message.id),
+            UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatMap(Function.identity),
+          ),
         ),
         Effect.tap(({ message, user }) =>
           MessageCheckinService.setMessageCheckinMemberCheckinAt(
@@ -58,7 +63,13 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         Effect.bind("checkedInMentions", ({ message }) =>
           pipe(
             MessageCheckinService.getMessageCheckinMembers(message.id),
-            Effect.map(Array.filter((m) => Option.isSome(m.checkinAt))),
+            UntilObserver.observeUntilRpcResultResolved(),
+            Effect.map((members) =>
+              pipe(
+                members,
+                Array.filter((m) => Option.isSome(m.checkinAt)),
+              ),
+            ),
             Effect.flatMap((members) =>
               pipe(
                 members,

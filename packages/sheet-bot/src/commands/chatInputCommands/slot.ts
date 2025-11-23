@@ -41,6 +41,7 @@ import {
   Schema,
   String,
 } from "effect";
+import { UntilObserver } from "typhoon-core/signal";
 
 const getSlotMessage = (day: number) =>
   pipe(
@@ -48,6 +49,7 @@ const getSlotMessage = (day: number) =>
     bindObject({
       daySchedule: pipe(
         SheetService.daySchedules(day),
+        UntilObserver.observeUntilRpcResultResolved(),
         Effect.map(
           Array.map((s) =>
             pipe(
@@ -162,6 +164,7 @@ const handleList =
               PermissionService.checkRoles.effect(
                 pipe(
                   GuildConfigService.getGuildManagerRoles(),
+                  UntilObserver.observeUntilRpcResultResolved(),
                   Effect.map(Array.map((role) => role.roleId)),
                   Effect.map((roles) => ({
                     roles,
@@ -230,6 +233,7 @@ const handleButton =
           PermissionService.checkRoles.tapEffect(() =>
             pipe(
               GuildConfigService.getGuildManagerRoles(),
+              UntilObserver.observeUntilRpcResultResolved(),
               Effect.map(Array.map((role) => role.roleId)),
               Effect.map((roles) => ({
                 roles,

@@ -40,9 +40,11 @@ import {
   Option,
   pipe,
   Schema,
+  flow,
 } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { Schema as SheetSchema } from "sheet-apis";
+import { UntilObserver } from "typhoon-core/signal";
 import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 
 const formatEffectValue = (effectValue: number): string => {
@@ -85,6 +87,7 @@ const handleManual =
           PermissionService.checkRoles.tapEffect(() =>
             pipe(
               GuildConfigService.getGuildManagerRoles(),
+              UntilObserver.observeUntilRpcResultResolved(),
               Effect.map(Array.map((role) => role.roleId)),
               Effect.map((roles) => ({
                 roles,
@@ -120,12 +123,24 @@ const handleManual =
               channelNameOption,
               Option.match({
                 onSome: (channelName) =>
-                  GuildConfigService.getGuildRunningChannelByName(channelName),
+                  pipe(
+                    GuildConfigService.getGuildRunningChannelByName(
+                      channelName,
+                    ),
+                    UntilObserver.observeUntilRpcResultResolved(),
+                    Effect.flatMap(Function.identity),
+                  ),
                 onNone: () =>
                   pipe(
                     InteractionContext.channel(true).sync(),
                     Effect.flatMap((channel) =>
-                      GuildConfigService.getGuildRunningChannelById(channel.id),
+                      pipe(
+                        GuildConfigService.getGuildRunningChannelById(
+                          channel.id,
+                        ),
+                        UntilObserver.observeUntilRpcResultResolved(),
+                        Effect.flatMap(Function.identity),
+                      ),
                     ),
                   ),
               }),
@@ -141,6 +156,7 @@ const handleManual =
             pipe(
               runningChannel.name,
               Effect.flatMap(SheetService.channelSchedules),
+              UntilObserver.observeUntilRpcResultResolved(),
               Effect.map(
                 Array.map((s) =>
                   pipe(
@@ -162,7 +178,10 @@ const handleManual =
               },
               Utils.mapPositional(
                 Utils.arraySomesPositional(
-                  PlayerService.mapScheduleWithPlayers,
+                  flow(
+                    PlayerService.mapScheduleWithPlayers,
+                    UntilObserver.observeUntilRpcResultResolved(),
+                  ),
                 ),
               ),
             ),
@@ -248,6 +267,7 @@ const handleManual =
           Effect.bind("teams", ({ fills, fillNames, runnerNames }) =>
             pipe(
               PlayerService.getTeamsByName(fillNames),
+              UntilObserver.observeUntilRpcResultResolved(),
               Effect.flatMap((teams) =>
                 Effect.forEach(Array.zip(fills, teams), ([fill, teams]) =>
                   Effect.forEach(teams, (team) =>

@@ -1,6 +1,7 @@
 import { Player, PartialNamePlayer } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
+import { Result } from "typhoon-core/schema";
 
 export const getByNameHandlerConfig = pipe(
   Handler.Config.empty(),
@@ -17,7 +18,14 @@ export const getByNameHandlerConfig = pipe(
   }),
   Handler.Config.Builder.response({
     validator: pipe(
-      Schema.Array(Schema.Array(Schema.Union(Player, PartialNamePlayer))),
+      Result.ResultSchema({
+        optimistic: Schema.Array(
+          Schema.Array(Schema.Union(Player, PartialNamePlayer)),
+        ),
+        complete: Schema.Array(
+          Schema.Array(Schema.Union(Player, PartialNamePlayer)),
+        ),
+      }),
       Schema.standardSchemaV1,
     ),
   }),

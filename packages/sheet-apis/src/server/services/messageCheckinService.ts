@@ -4,9 +4,14 @@ import { and, eq, gte, isNull } from "drizzle-orm";
 import { Array, DateTime, Effect, pipe, Schema } from "effect";
 import { messageCheckin, messageCheckinMember } from "sheet-db-schema";
 import { makeDBQueryError } from "typhoon-core/error";
-import { DefaultTaggedClass } from "typhoon-core/schema";
-import { Computed } from "typhoon-core/signal";
+import { DefaultTaggedClass, Result } from "typhoon-core/schema";
+import {
+  Computed,
+  ExternalComputed,
+  ZeroQueryExternalSource,
+} from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
+import { ZeroServiceTag } from "@/db/zeroService";
 
 type MessageCheckinInsert = typeof messageCheckin.$inferInsert;
 
@@ -20,21 +25,29 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
       Effect.map(({ db, dbSubscriptionContext }) => ({
         getMessageCheckinData: (messageId: string) =>
           pipe(
-            dbSubscriptionContext.subscribeQuery(
-              db
-                .select()
-                .from(messageCheckin)
-                .where(
-                  and(
-                    eq(messageCheckin.messageId, messageId),
-                    isNull(messageCheckin.deletedAt),
-                  ),
-                ),
+            ZeroServiceTag,
+            Effect.flatMap((zero) =>
+              ZeroQueryExternalSource.make(
+                zero.query.messageCheckin
+                  .where("messageId", "=", messageId)
+                  .where("deletedAt", "IS", null)
+                  .one(),
+              ),
             ),
-            Computed.map(Array.head),
+            Effect.flatMap(ExternalComputed.make),
+            Computed.flatten(),
             Computed.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(DefaultTaggedClass(MessageCheckin)),
+                Result.ResultSchema({
+                  optimistic: Schema.OptionFromNullishOr(
+                    DefaultTaggedClass(MessageCheckin),
+                    undefined,
+                  ),
+                  complete: Schema.OptionFromNullishOr(
+                    DefaultTaggedClass(MessageCheckin),
+                    undefined,
+                  ),
+                }),
               ),
             ),
             Effect.withSpan("MessageCheckinService.getMessageCheckinData", {
@@ -82,20 +95,26 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
           ),
         getMessageCheckinMembers: (messageId: string) =>
           pipe(
-            dbSubscriptionContext.subscribeQuery(
-              db
-                .select()
-                .from(messageCheckinMember)
-                .where(
-                  and(
-                    eq(messageCheckinMember.messageId, messageId),
-                    isNull(messageCheckinMember.deletedAt),
-                  ),
-                ),
+            ZeroServiceTag,
+            Effect.flatMap((zero) =>
+              ZeroQueryExternalSource.make(
+                zero.query.messageCheckinMember
+                  .where("messageId", "=", messageId)
+                  .where("deletedAt", "IS", null),
+              ),
             ),
+            Effect.flatMap(ExternalComputed.make),
+            Computed.flatten(),
             Computed.flatMap(
               Schema.decode(
-                Schema.Array(DefaultTaggedClass(MessageCheckinMember)),
+                Result.ResultSchema({
+                  optimistic: Schema.Array(
+                    DefaultTaggedClass(MessageCheckinMember),
+                  ),
+                  complete: Schema.Array(
+                    DefaultTaggedClass(MessageCheckinMember),
+                  ),
+                }),
               ),
             ),
             Effect.withSpan("MessageCheckinService.getMessageCheckinMembers", {

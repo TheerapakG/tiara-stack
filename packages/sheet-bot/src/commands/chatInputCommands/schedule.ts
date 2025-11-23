@@ -29,6 +29,7 @@ import {
   pipe,
   String,
 } from "effect";
+import { UntilObserver } from "typhoon-core/signal";
 
 const formatHourRanges = (hours: readonly number[]): string => {
   if (Array.isEmptyReadonlyArray(hours)) return "None";
@@ -80,6 +81,7 @@ const handleList =
           Effect.bind("daySchedules", ({ day }) =>
             pipe(
               SheetService.daySchedules(day),
+              UntilObserver.observeUntilRpcResultResolved(),
               Effect.map(
                 Array.map((s) =>
                   pipe(
@@ -95,6 +97,7 @@ const handleList =
             pipe(
               daySchedules,
               PlayerService.mapScheduleWithPlayers,
+              UntilObserver.observeUntilRpcResultResolved(),
               Effect.map(
                 Array.sortBy(
                   Order.mapInput(

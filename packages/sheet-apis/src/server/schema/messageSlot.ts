@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { DateTimeUtcFromUnknown } from "./dateSchemas";
 
 export class MessageSlot extends Schema.TaggedClass<MessageSlot>()(
   "MessageSlot",
@@ -6,11 +7,8 @@ export class MessageSlot extends Schema.TaggedClass<MessageSlot>()(
     id: Schema.Number,
     messageId: Schema.String,
     day: Schema.Number,
-    createdAt: Schema.DateTimeUtcFromDate,
-    updatedAt: Schema.DateTimeUtcFromDate,
-    deletedAt: Schema.OptionFromNullishOr(
-      Schema.DateTimeUtcFromDate,
-      undefined,
-    ),
+    createdAt: Schema.OptionFromNullishOr(DateTimeUtcFromUnknown, undefined),
+    updatedAt: Schema.OptionFromNullishOr(DateTimeUtcFromUnknown, undefined),
+    deletedAt: Schema.OptionFromNullishOr(DateTimeUtcFromUnknown, undefined),
   },
 ) {}

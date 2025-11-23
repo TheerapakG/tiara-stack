@@ -1,6 +1,7 @@
 import { Player, PartialIdPlayer, PartialNamePlayer } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
+import { Result } from "typhoon-core/schema";
 
 const getPlayerMapsResponseSchema = Schema.Struct({
   nameToPlayer: Schema.HashMap({
@@ -29,6 +30,12 @@ export const getPlayerMapsHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(getPlayerMapsResponseSchema, Schema.standardSchemaV1),
+    validator: pipe(
+      Result.ResultSchema({
+        optimistic: getPlayerMapsResponseSchema,
+        complete: getPlayerMapsResponseSchema,
+      }),
+      Schema.standardSchemaV1,
+    ),
   }),
 );

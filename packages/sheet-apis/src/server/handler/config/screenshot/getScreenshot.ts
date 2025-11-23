@@ -1,5 +1,6 @@
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
+import { Result } from "typhoon-core/schema";
 
 export const getScreenshotHandlerConfig = pipe(
   Handler.Config.empty(),
@@ -16,6 +17,12 @@ export const getScreenshotHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(Schema.Uint8Array, Schema.standardSchemaV1),
+    validator: pipe(
+      Result.ResultSchema({
+        optimistic: Schema.Uint8Array,
+        complete: Schema.Uint8Array,
+      }),
+      Schema.standardSchemaV1,
+    ),
   }),
 );

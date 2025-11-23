@@ -33,13 +33,16 @@ import {
   Array,
   DateTime,
   Effect,
+  Function,
   HashMap,
   Match,
   Option,
   pipe,
   HashSet,
+  flow,
 } from "effect";
 import { Schema } from "sheet-apis";
+import { UntilObserver } from "typhoon-core/signal";
 import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 
 const getCheckinData = ({
@@ -57,6 +60,7 @@ const getCheckinData = ({
     Effect.bind("schedules", ({ channelName }) =>
       pipe(
         SheetService.channelSchedules(channelName),
+        UntilObserver.observeUntilRpcResultResolved(),
         Effect.map(
           Array.map((s) =>
             pipe(
@@ -77,7 +81,12 @@ const getCheckinData = ({
           schedule: HashMap.get(schedules, hour),
         },
         Utils.mapPositional(
-          Utils.arraySomesPositional(PlayerService.mapScheduleWithPlayers),
+          Utils.arraySomesPositional(
+            flow(
+              PlayerService.mapScheduleWithPlayers,
+              UntilObserver.observeUntilRpcResultResolved(),
+            ),
+          ),
         ),
       ),
     ),
@@ -159,6 +168,7 @@ const handleManual =
           PermissionService.checkRoles.tapEffect(() =>
             pipe(
               GuildConfigService.getGuildManagerRoles(),
+              UntilObserver.observeUntilRpcResultResolved(),
               Effect.map((roles) => ({
                 roles: pipe(
                   roles,
@@ -193,12 +203,24 @@ const handleManual =
               channelNameOption,
               Option.match({
                 onSome: (channelName) =>
-                  GuildConfigService.getGuildRunningChannelByName(channelName),
+                  pipe(
+                    GuildConfigService.getGuildRunningChannelByName(
+                      channelName,
+                    ),
+                    UntilObserver.observeUntilRpcResultResolved(),
+                    Effect.flatMap(Function.identity),
+                  ),
                 onNone: () =>
                   pipe(
                     InteractionContext.channel(true).sync(),
                     Effect.flatMap((channel) =>
-                      GuildConfigService.getGuildRunningChannelById(channel.id),
+                      pipe(
+                        GuildConfigService.getGuildRunningChannelById(
+                          channel.id,
+                        ),
+                        UntilObserver.observeUntilRpcResultResolved(),
+                        Effect.flatMap(Function.identity),
+                      ),
                     ),
                   ),
               }),

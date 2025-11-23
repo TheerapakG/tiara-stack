@@ -12,7 +12,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
       Effect.map(({ client }) => ({
         getMessageCheckinData: (messageId: string) =>
           pipe(
-            WebSocketClient.once(
+            WebSocketClient.subscribeScoped(
               client,
               "messageCheckin.getMessageCheckinData",
               messageId,
@@ -40,7 +40,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
           ),
         getMessageCheckinMembers: (messageId: string) =>
           pipe(
-            WebSocketClient.once(
+            WebSocketClient.subscribeScoped(
               client,
               "messageCheckin.getMessageCheckinMembers",
               messageId,

@@ -12,7 +12,7 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
       Effect.map(({ client }) => ({
         getMessageSlotData: (messageId: string) =>
           pipe(
-            WebSocketClient.once(
+            WebSocketClient.subscribeScoped(
               client,
               "messageSlot.getMessageSlotData",
               messageId,

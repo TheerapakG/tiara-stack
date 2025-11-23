@@ -15,12 +15,14 @@ import {
   Array,
   Chunk,
   Effect,
+  Function,
   Number,
   Order,
   Option,
   pipe,
   String,
 } from "effect";
+import { UntilObserver } from "typhoon-core/signal";
 
 const getSlotMessage = (day: number) =>
   pipe(
@@ -28,6 +30,7 @@ const getSlotMessage = (day: number) =>
     bindObject({
       daySchedule: pipe(
         SheetService.daySchedules(day),
+        UntilObserver.observeUntilRpcResultResolved(),
         Effect.map(
           Array.map((s) =>
             pipe(
@@ -99,7 +102,11 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         })),
         CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
         Effect.bind("messageSlotData", ({ message }) =>
-          MessageSlotService.getMessageSlotData(message.id),
+          pipe(
+            MessageSlotService.getMessageSlotData(message.id),
+            UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatMap(Function.identity),
+          ),
         ),
         Effect.bind("slotMessage", ({ messageSlotData }) =>
           getSlotMessage(messageSlotData.day),

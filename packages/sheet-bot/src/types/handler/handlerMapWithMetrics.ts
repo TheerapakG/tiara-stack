@@ -27,6 +27,7 @@ import {
   Option,
   pipe,
   Struct,
+  Scope,
 } from "effect";
 import {
   InteractionHandler,
@@ -118,6 +119,7 @@ export class InteractionHandlerMapWithMetrics<
           (context) => context.handler as InteractionHandler<A | void, E, R>,
         ),
         Option.getOrElse(() => Effect.void as Effect.Effect<A | void, E, R>),
+        Effect.scoped,
         Effect.tapBoth({
           onSuccess: () =>
             pipe(
@@ -237,19 +239,19 @@ export class InteractionHandlerMapWithMetricsGroup<
     SharedSlashCommand | SlashCommandSubcommandsOnlyBuilder,
     A,
     E,
-    R | InteractionContext<ChatInputCommandInteractionT>
+    R | InteractionContext<ChatInputCommandInteractionT> | Scope.Scope
   >;
   readonly buttonsMap: InteractionHandlerMapWithMetrics<
     InteractionButtonComponentData,
     A,
     E,
-    R | InteractionContext<ButtonInteractionT>
+    R | InteractionContext<ButtonInteractionT> | Scope.Scope
   >;
   readonly userSelectMenuMap: InteractionHandlerMapWithMetrics<
     UserSelectMenuComponentData,
     A,
     E,
-    R | InteractionContext<UserSelectMenuInteractionT>
+    R | InteractionContext<UserSelectMenuInteractionT> | Scope.Scope
   >;
 }> {
   static empty = <A = never, E = never, R = never>() =>
@@ -277,7 +279,11 @@ export class InteractionHandlerMapWithMetricsGroup<
       new InteractionHandlerMapWithMetricsGroup<
         A | BA,
         E | BE,
-        Exclude<R, InteractionContext<ChatInputCommandInteractionT>> | BR
+        | Exclude<
+            R,
+            InteractionContext<ChatInputCommandInteractionT> | Scope.Scope
+          >
+        | BR
       >(
         pipe(
           group,
@@ -292,7 +298,8 @@ export class InteractionHandlerMapWithMetricsGroup<
                     E,
                     | Exclude<
                         R,
-                        InteractionContext<ChatInputCommandInteractionT>
+                        | InteractionContext<ChatInputCommandInteractionT>
+                        | Scope.Scope
                       >
                     | InteractionContext<ChatInputCommandInteractionT>
                   >,
@@ -312,7 +319,11 @@ export class InteractionHandlerMapWithMetricsGroup<
       new InteractionHandlerMapWithMetricsGroup<
         A | BA,
         E | BE,
-        Exclude<R, InteractionContext<ChatInputCommandInteractionT>> | BR
+        | Exclude<
+            R,
+            InteractionContext<ChatInputCommandInteractionT> | Scope.Scope
+          >
+        | BR
       >(
         pipe(
           group,
@@ -327,7 +338,8 @@ export class InteractionHandlerMapWithMetricsGroup<
                     E,
                     | Exclude<
                         R,
-                        InteractionContext<ChatInputCommandInteractionT>
+                        | InteractionContext<ChatInputCommandInteractionT>
+                        | Scope.Scope
                       >
                     | InteractionContext<ChatInputCommandInteractionT>
                   >,
@@ -347,7 +359,7 @@ export class InteractionHandlerMapWithMetricsGroup<
       new InteractionHandlerMapWithMetricsGroup<
         A | BA,
         E | BE,
-        Exclude<R, InteractionContext<ButtonInteractionT>> | BR
+        Exclude<R, InteractionContext<ButtonInteractionT> | Scope.Scope> | BR
       >(
         pipe(
           group,
@@ -360,7 +372,10 @@ export class InteractionHandlerMapWithMetricsGroup<
                     ButtonHandlerVariantT,
                     A,
                     E,
-                    | Exclude<R, InteractionContext<ButtonInteractionT>>
+                    | Exclude<
+                        R,
+                        InteractionContext<ButtonInteractionT> | Scope.Scope
+                      >
                     | InteractionContext<ButtonInteractionT>
                   >,
                 ),
@@ -379,7 +394,7 @@ export class InteractionHandlerMapWithMetricsGroup<
       new InteractionHandlerMapWithMetricsGroup<
         A | BA,
         E | BE,
-        Exclude<R, InteractionContext<ButtonInteractionT>> | BR
+        Exclude<R, InteractionContext<ButtonInteractionT> | Scope.Scope> | BR
       >(
         pipe(
           group,
@@ -392,7 +407,10 @@ export class InteractionHandlerMapWithMetricsGroup<
                     ButtonHandlerVariantT,
                     A,
                     E,
-                    | Exclude<R, InteractionContext<ButtonInteractionT>>
+                    | Exclude<
+                        R,
+                        InteractionContext<ButtonInteractionT> | Scope.Scope
+                      >
                     | InteractionContext<ButtonInteractionT>
                   >,
                 ),
@@ -416,7 +434,11 @@ export class InteractionHandlerMapWithMetricsGroup<
       new InteractionHandlerMapWithMetricsGroup<
         A | BA,
         E | BE,
-        Exclude<R, InteractionContext<UserSelectMenuInteractionT>> | BR
+        | Exclude<
+            R,
+            InteractionContext<UserSelectMenuInteractionT> | Scope.Scope
+          >
+        | BR
       >(
         pipe(
           group,
@@ -429,7 +451,11 @@ export class InteractionHandlerMapWithMetricsGroup<
                     UserSelectMenuHandlerVariantT,
                     A,
                     E,
-                    | Exclude<R, InteractionContext<UserSelectMenuInteractionT>>
+                    | Exclude<
+                        R,
+                        | InteractionContext<UserSelectMenuInteractionT>
+                        | Scope.Scope
+                      >
                     | InteractionContext<UserSelectMenuInteractionT>
                   >,
                 ),
@@ -452,7 +478,11 @@ export class InteractionHandlerMapWithMetricsGroup<
       new InteractionHandlerMapWithMetricsGroup<
         A | BA,
         E | BE,
-        Exclude<R, InteractionContext<UserSelectMenuInteractionT>> | BR
+        | Exclude<
+            R,
+            InteractionContext<UserSelectMenuInteractionT> | Scope.Scope
+          >
+        | BR
       >(
         pipe(
           group,
@@ -465,7 +495,11 @@ export class InteractionHandlerMapWithMetricsGroup<
                     UserSelectMenuHandlerVariantT,
                     A,
                     E,
-                    | Exclude<R, InteractionContext<UserSelectMenuInteractionT>>
+                    | Exclude<
+                        R,
+                        | InteractionContext<UserSelectMenuInteractionT>
+                        | Scope.Scope
+                      >
                     | InteractionContext<UserSelectMenuInteractionT>
                   >,
                 ),

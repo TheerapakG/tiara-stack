@@ -1,12 +1,16 @@
 import { DBService } from "@/db";
 import { MessageSlot } from "@/server/schema";
-import { and, eq, isNull } from "drizzle-orm";
 import { Array, Effect, pipe, Schema } from "effect";
 import { messageSlot } from "sheet-db-schema";
 import { makeDBQueryError } from "typhoon-core/error";
-import { DefaultTaggedClass } from "typhoon-core/schema";
-import { Computed } from "typhoon-core/signal";
+import { DefaultTaggedClass, Result } from "typhoon-core/schema";
+import {
+  Computed,
+  ExternalComputed,
+  ZeroQueryExternalSource,
+} from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
+import { ZeroServiceTag } from "@/db/zeroService";
 
 type MessageSlotInsert = typeof messageSlot.$inferInsert;
 
@@ -20,21 +24,29 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
       Effect.map(({ db, dbSubscriptionContext }) => ({
         getMessageSlotData: (messageId: string) =>
           pipe(
-            dbSubscriptionContext.subscribeQuery(
-              db
-                .select()
-                .from(messageSlot)
-                .where(
-                  and(
-                    eq(messageSlot.messageId, messageId),
-                    isNull(messageSlot.deletedAt),
-                  ),
-                ),
+            ZeroServiceTag,
+            Effect.flatMap((zero) =>
+              ZeroQueryExternalSource.make(
+                zero.query.messageSlot
+                  .where("messageId", "=", messageId)
+                  .where("deletedAt", "IS", null)
+                  .one(),
+              ),
             ),
-            Computed.map(Array.head),
+            Effect.flatMap(ExternalComputed.make),
+            Computed.flatten(),
             Computed.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(DefaultTaggedClass(MessageSlot)),
+                Result.ResultSchema({
+                  optimistic: Schema.OptionFromNullishOr(
+                    DefaultTaggedClass(MessageSlot),
+                    undefined,
+                  ),
+                  complete: Schema.OptionFromNullishOr(
+                    DefaultTaggedClass(MessageSlot),
+                    undefined,
+                  ),
+                }),
               ),
             ),
             Effect.withSpan("MessageSlotService.getMessageSlotData", {

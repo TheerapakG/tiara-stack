@@ -24,8 +24,18 @@ import {
   time,
   TimestampStyles,
 } from "discord.js";
-import { Array, Effect, HashSet, Layer, Number, Option, pipe } from "effect";
-import type { Schema } from "sheet-apis";
+import {
+  Array,
+  Effect,
+  Function,
+  HashSet,
+  Layer,
+  Number,
+  Option,
+  pipe,
+} from "effect";
+import { Schema } from "sheet-apis";
+import { UntilObserver } from "typhoon-core/signal";
 
 const formatEffectValue = (effectValue: number): string => {
   const rounded = Math.round(effectValue * 10) / 10;
@@ -77,21 +87,27 @@ export const roomOrderInteractionGetReply = (
   pipe(
     Effect.Do,
     CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
-    Effect.bindAll(
-      ({ message }) => ({
-        messageRoomOrderRange: MessageRoomOrderService.getMessageRoomOrderRange(
-          message.id,
-        ),
-        messageRoomOrderEntry: MessageRoomOrderService.getMessageRoomOrderEntry(
+    Effect.bind("messageRoomOrderRange", ({ message }) =>
+      pipe(
+        MessageRoomOrderService.getMessageRoomOrderRange(message.id),
+        UntilObserver.observeUntilRpcResultResolved(),
+        Effect.flatMap(Function.identity),
+      ),
+    ),
+    Effect.bind("messageRoomOrderEntry", ({ message }) =>
+      pipe(
+        MessageRoomOrderService.getMessageRoomOrderEntry(
           message.id,
           messageRoomOrder.rank,
         ),
-        formattedHourWindow: pipe(
-          ConverterService.convertHourToHourWindow(messageRoomOrder.hour),
-          Effect.flatMap(FormatService.formatHourWindow),
-        ),
-      }),
-      { concurrency: "unbounded" },
+        UntilObserver.observeUntilRpcResultResolved(),
+      ),
+    ),
+    Effect.bind("formattedHourWindow", () =>
+      pipe(
+        ConverterService.convertHourToHourWindow(messageRoomOrder.hour),
+        Effect.flatMap(FormatService.formatHourWindow),
+      ),
     ),
     Effect.map(
       ({
@@ -240,7 +256,11 @@ export const roomOrderSendButton =
             eventConfig: SheetService.eventConfig,
           }),
           Effect.bind("messageRoomOrder", ({ message }) =>
-            MessageRoomOrderService.getMessageRoomOrder(message.id),
+            pipe(
+              MessageRoomOrderService.getMessageRoomOrder(message.id),
+              UntilObserver.observeUntilRpcResultResolved(),
+              Effect.flatMap(Function.identity),
+            ),
           ),
           Effect.bind("messageRoomOrderReply", ({ messageRoomOrder }) =>
             roomOrderInteractionGetReply(messageRoomOrder),

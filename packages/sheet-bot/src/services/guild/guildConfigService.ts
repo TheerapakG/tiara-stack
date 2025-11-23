@@ -20,7 +20,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
       Effect.map(({ guildService, sheetApisClient }) => ({
         getAutoCheckinGuilds: () =>
           pipe(
-            WebSocketClient.once(
+            WebSocketClient.subscribeScoped(
               sheetApisClient.get(),
               "guildConfig.getAutoCheckinGuilds",
               {},
@@ -33,7 +33,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           pipe(
             guildService.getId(),
             Effect.flatMap((guildId) =>
-              WebSocketClient.once(
+              WebSocketClient.subscribeScoped(
                 sheetApisClient.get(),
                 "guildConfig.getGuildConfigByGuildId",
                 guildId,
@@ -66,7 +66,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
           pipe(
             guildService.getId(),
             Effect.flatMap((guildId) =>
-              WebSocketClient.once(
+              WebSocketClient.subscribeScoped(
                 sheetApisClient.get(),
                 "guildConfig.getGuildManagerRoles",
                 guildId,
@@ -129,67 +129,50 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               captureStackTrace: true,
             }),
           ),
+        getGuildConfigByScriptId: (scriptId: string) =>
+          pipe(
+            WebSocketClient.subscribeScoped(
+              sheetApisClient.get(),
+              "guildConfig.getGuildConfigByScriptId",
+              scriptId,
+            ),
+            Effect.withSpan("GuildConfigService.getGuildConfigByScriptId", {
+              captureStackTrace: true,
+            }),
+          ),
         getGuildRunningChannelById: (channelId: string) =>
           pipe(
             guildService.getId(),
             Effect.flatMap((guildId) =>
-              WebSocketClient.once(
+              WebSocketClient.subscribeScoped(
                 sheetApisClient.get(),
                 "guildConfig.getGuildRunningChannelById",
-                { guildId, channelId },
+                {
+                  guildId,
+                  channelId,
+                },
               ),
             ),
             Effect.withSpan("GuildConfigService.getGuildRunningChannelById", {
               captureStackTrace: true,
             }),
           ),
-        getZeroGuildRunningChannelById: (channelId: string) =>
+        getGuildRunningChannelByName: (channelName: string) =>
           pipe(
             guildService.getId(),
             Effect.flatMap((guildId) =>
               WebSocketClient.subscribeScoped(
                 sheetApisClient.get(),
-                "guildConfig.getZeroGuildRunningChannelById",
-                { guildId, channelId },
-              ),
-            ),
-            Effect.withSpan(
-              "GuildConfigService.getZeroGuildRunningChannelById",
-              {
-                captureStackTrace: true,
-              },
-            ),
-          ),
-        getGuildRunningChannelByName: (channelName: string) =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              WebSocketClient.once(
-                sheetApisClient.get(),
                 "guildConfig.getGuildRunningChannelByName",
-                { guildId, channelName },
+                {
+                  guildId,
+                  channelName,
+                },
               ),
             ),
             Effect.withSpan("GuildConfigService.getGuildRunningChannelByName", {
               captureStackTrace: true,
             }),
-          ),
-        getZeroGuildRunningChannelByName: (channelName: string) =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              WebSocketClient.subscribeScoped(
-                sheetApisClient.get(),
-                "guildConfig.getZeroGuildRunningChannelByName",
-                { guildId, channelName },
-              ),
-            ),
-            Effect.withSpan(
-              "GuildConfigService.getZeroGuildRunningChannelByName",
-              {
-                captureStackTrace: true,
-              },
-            ),
           ),
       })),
     ),

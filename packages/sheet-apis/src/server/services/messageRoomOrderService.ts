@@ -4,13 +4,18 @@ import {
   MessageRoomOrderRange,
   MessageRoomOrderEntry,
 } from "@/server/schema";
-import { and, asc, eq, isNull, max, min, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Option, pipe, Schema } from "effect";
 import { messageRoomOrder, messageRoomOrderEntry } from "sheet-db-schema";
 import { makeDBQueryError } from "typhoon-core/error";
-import { DefaultTaggedClass } from "typhoon-core/schema";
-import { Computed } from "typhoon-core/signal";
+import { DefaultTaggedClass, Result } from "typhoon-core/schema";
+import {
+  Computed,
+  ExternalComputed,
+  ZeroQueryExternalSource,
+} from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
+import { ZeroServiceTag } from "@/db/zeroService";
 
 type MessageRoomOrderInsert = typeof messageRoomOrder.$inferInsert;
 type MessageRoomOrderEntryInsert = typeof messageRoomOrderEntry.$inferInsert;
@@ -25,21 +30,29 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
       Effect.map(({ db, dbSubscriptionContext }) => ({
         getMessageRoomOrder: (messageId: string) =>
           pipe(
-            dbSubscriptionContext.subscribeQuery(
-              db
-                .select()
-                .from(messageRoomOrder)
-                .where(
-                  and(
-                    eq(messageRoomOrder.messageId, messageId),
-                    isNull(messageRoomOrder.deletedAt),
-                  ),
-                ),
+            ZeroServiceTag,
+            Effect.flatMap((zero) =>
+              ZeroQueryExternalSource.make(
+                zero.query.messageRoomOrder
+                  .where("messageId", "=", messageId)
+                  .where("deletedAt", "IS", null)
+                  .one(),
+              ),
             ),
-            Computed.map(Array.head),
+            Effect.flatMap(ExternalComputed.make),
+            Computed.flatten(),
             Computed.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(DefaultTaggedClass(MessageRoomOrder)),
+                Result.ResultSchema({
+                  optimistic: Schema.OptionFromNullishOr(
+                    DefaultTaggedClass(MessageRoomOrder),
+                    undefined,
+                  ),
+                  complete: Schema.OptionFromNullishOr(
+                    DefaultTaggedClass(MessageRoomOrder),
+                    undefined,
+                  ),
+                }),
               ),
             ),
             Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder", {
@@ -142,22 +155,28 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
           ),
         getMessageRoomOrderEntry: (messageId: string, rank: number) =>
           pipe(
-            dbSubscriptionContext.subscribeQuery(
-              db
-                .select()
-                .from(messageRoomOrderEntry)
-                .where(
-                  and(
-                    eq(messageRoomOrderEntry.messageId, messageId),
-                    eq(messageRoomOrderEntry.rank, rank),
-                    isNull(messageRoomOrderEntry.deletedAt),
-                  ),
-                )
-                .orderBy(asc(messageRoomOrderEntry.position)),
+            ZeroServiceTag,
+            Effect.flatMap((zero) =>
+              ZeroQueryExternalSource.make(
+                zero.query.messageRoomOrderEntry
+                  .where("messageId", "=", messageId)
+                  .where("rank", "=", rank)
+                  .where("deletedAt", "IS", null)
+                  .orderBy("position", "asc"),
+              ),
             ),
+            Effect.flatMap(ExternalComputed.make),
+            Computed.flatten(),
             Computed.flatMap(
               Schema.decode(
-                Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)),
+                Result.ResultSchema({
+                  optimistic: Schema.Array(
+                    DefaultTaggedClass(MessageRoomOrderEntry),
+                  ),
+                  complete: Schema.Array(
+                    DefaultTaggedClass(MessageRoomOrderEntry),
+                  ),
+                }),
               ),
             ),
             Effect.withSpan(
@@ -169,34 +188,53 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
           ),
         getMessageRoomOrderRange: (messageId: string) =>
           pipe(
-            dbSubscriptionContext.subscribeQuery(
-              db
-                .select({
-                  minRank: min(messageRoomOrder.rank),
-                  maxRank: max(messageRoomOrder.rank),
-                })
-                .from(messageRoomOrderEntry)
-                .where(
-                  and(
-                    eq(messageRoomOrderEntry.messageId, messageId),
-                    isNull(messageRoomOrderEntry.deletedAt),
-                  ),
-                ),
-            ),
-            Computed.map(Array.head),
-            Computed.map(
-              Option.flatMap(({ minRank, maxRank }) =>
-                pipe(
-                  Option.Do,
-                  Option.bind("minRank", () => Option.fromNullable(minRank)),
-                  Option.bind("maxRank", () => Option.fromNullable(maxRank)),
-                ),
+            ZeroServiceTag,
+            Effect.flatMap((zero) =>
+              ZeroQueryExternalSource.make(
+                zero.query.messageRoomOrderEntry
+                  .where("messageId", "=", messageId)
+                  .where("deletedAt", "IS", null),
               ),
             ),
+            Effect.flatMap(ExternalComputed.make),
+            Computed.flatten(),
             Computed.flatMap(
               Schema.decode(
-                Schema.OptionFromSelf(
-                  DefaultTaggedClass(MessageRoomOrderRange),
+                Result.ResultSchema({
+                  optimistic: Schema.Array(
+                    DefaultTaggedClass(MessageRoomOrderEntry),
+                  ),
+                  complete: Schema.Array(
+                    DefaultTaggedClass(MessageRoomOrderEntry),
+                  ),
+                }),
+              ),
+            ),
+            Computed.map(
+              Result.map((entries) =>
+                pipe(
+                  entries,
+                  Array.match({
+                    onEmpty: () => Option.none<MessageRoomOrderRange>(),
+                    onNonEmpty: ([head, ...tail]) => {
+                      const { minRank, maxRank } = pipe(
+                        tail,
+                        Array.reduce(
+                          {
+                            minRank: head.rank,
+                            maxRank: head.rank,
+                          },
+                          (acc, entry) => ({
+                            minRank: Math.min(acc.minRank, entry.rank),
+                            maxRank: Math.max(acc.maxRank, entry.rank),
+                          }),
+                        ),
+                      );
+                      return Option.some(
+                        new MessageRoomOrderRange({ minRank, maxRank }),
+                      );
+                    },
+                  }),
                 ),
               ),
             ),

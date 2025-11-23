@@ -1,11 +1,12 @@
 import { getMessageCheckinDataHandlerConfig } from "@/server/handler/config";
 import { Error } from "@/server/schema";
 import { AuthService, MessageCheckinService } from "@/server/services";
-import { Effect, Option, pipe } from "effect";
+import { Effect, Either, Scope, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
+import { Result } from "typhoon-core/schema";
 
 const builders = Context.Subscription.Builder.builders();
 
@@ -17,19 +18,22 @@ export const getMessageCheckinDataHandler = pipe(
       Computed.make(Event.someToken()),
       Computed.flatMap(AuthService.verify),
       Computed.flatMapComputed(() =>
-        Event.request.parsed(getMessageCheckinDataHandlerConfig),
+        Event.request.parsedWithScope(getMessageCheckinDataHandlerConfig),
       ),
-      Computed.flatMapComputed(MessageCheckinService.getMessageCheckinData),
-      Computed.flatMap(
-        Option.match({
-          onSome: Effect.succeed,
-          onNone: () =>
-            Effect.fail(
-              Error.Core.makeArgumentError(
-                "Cannot get chesckin data, the message might not be registered",
-              ),
+      Computed.flatMapComputed(({ parsed, scope }) =>
+        pipe(
+          MessageCheckinService.getMessageCheckinData(parsed),
+          Scope.extend(scope),
+        ),
+      ),
+      Computed.map(
+        Result.map(
+          Either.fromOption(() =>
+            Error.Core.makeArgumentError(
+              "Cannot get chesckin data, the message might not be registered",
             ),
-        }),
+          ),
+        ),
       ),
       Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
       Computed.mapEffect(

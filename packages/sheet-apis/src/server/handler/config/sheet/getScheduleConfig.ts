@@ -1,6 +1,7 @@
 import { ScheduleConfig } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
+import { Result } from "typhoon-core/schema";
 
 export const getScheduleConfigHandlerConfig = pipe(
   Handler.Config.empty(),
@@ -15,6 +16,12 @@ export const getScheduleConfigHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(Schema.Array(ScheduleConfig), Schema.standardSchemaV1),
+    validator: pipe(
+      Result.ResultSchema({
+        optimistic: Schema.Array(ScheduleConfig),
+        complete: Schema.Array(ScheduleConfig),
+      }),
+      Schema.standardSchemaV1,
+    ),
   }),
 );

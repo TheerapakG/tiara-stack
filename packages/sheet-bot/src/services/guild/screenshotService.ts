@@ -18,7 +18,7 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()(
           pipe(
             guildService.getId(),
             Effect.flatMap((guildId) =>
-              WebSocketClient.once(
+              WebSocketClient.subscribeScoped(
                 sheetApisClient.get(),
                 "screenshot.getScreenshot",
                 {

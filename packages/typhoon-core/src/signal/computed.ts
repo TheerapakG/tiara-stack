@@ -13,6 +13,7 @@ import {
   Cause,
   Types,
 } from "effect";
+import { Result } from "../schema";
 import { Observable } from "../observability";
 import {
   DependencySignal,
@@ -336,6 +337,39 @@ export const provideLayer =
   ) =>
     pipe(signal, mapEffect(Effect.provide(layer), options));
 
+export const provideLayerResult =
+  <Rout, E3, RIn>(
+    layer: Result.Result<Layer.Layer<Rout, E3, RIn>>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <A, E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    pipe(
+      signal,
+      mapEffect(
+        (effect) =>
+          pipe(
+            layer,
+            Result.match({
+              onOptimistic: (layer) =>
+                pipe(
+                  effect,
+                  Effect.map(Result.optimistic),
+                  Effect.provide(layer),
+                ),
+              onComplete: (layer) =>
+                pipe(
+                  effect,
+                  Effect.map(Result.complete),
+                  Effect.provide(layer),
+                ),
+            }),
+          ),
+        options,
+      ),
+    );
+
 export const provideLayerComputed =
   <Rout, E3, RIn, E4, R4>(
     layer: DependencySignal<Layer.Layer<Rout, E3, RIn>, E4, R4>,
@@ -351,6 +385,40 @@ export const provideLayerComputed =
       ),
     );
 
+export const provideLayerComputedResult =
+  <Rout, E3, RIn, E4, R4>(
+    layer: DependencySignal<Result.Result<Layer.Layer<Rout, E3, RIn>>, E4, R4>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <A, E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    pipe(
+      Effect.all({ signal, layer }),
+      Effect.flatMap(({ signal, layer }) =>
+        make(
+          pipe(
+            layer,
+            Result.match({
+              onOptimistic: (layer) =>
+                pipe(
+                  signal,
+                  Effect.map(Result.optimistic),
+                  Effect.provide(layer),
+                ),
+              onComplete: (layer) =>
+                pipe(
+                  signal,
+                  Effect.map(Result.complete),
+                  Effect.provide(layer),
+                ),
+            }),
+          ),
+          options,
+        ),
+      ),
+    );
+
 export const provideContext =
   <R3>(
     context: EffectContext.Context<R3>,
@@ -360,6 +428,39 @@ export const provideContext =
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
     pipe(signal, mapEffect(Effect.provide(context), options));
+
+export const provideContextResult =
+  <R3>(
+    context: Result.Result<EffectContext.Context<R3>>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <A, E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    pipe(
+      signal,
+      mapEffect(
+        (effect) =>
+          pipe(
+            context,
+            Result.match({
+              onOptimistic: (context) =>
+                pipe(
+                  effect,
+                  Effect.map(Result.optimistic),
+                  Effect.provide(context),
+                ),
+              onComplete: (context) =>
+                pipe(
+                  effect,
+                  Effect.map(Result.complete),
+                  Effect.provide(context),
+                ),
+            }),
+          ),
+        options,
+      ),
+    );
 
 export const provideContextComputed =
   <R3, E4, R4>(
@@ -376,12 +477,79 @@ export const provideContextComputed =
       ),
     );
 
+export const provideContextComputedResult =
+  <R3, E4, R4>(
+    context: DependencySignal<Result.Result<EffectContext.Context<R3>>, E4, R4>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <A, E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    pipe(
+      Effect.all({ signal, context }),
+      Effect.flatMap(({ signal, context }) =>
+        make(
+          pipe(
+            context,
+            Result.match({
+              onOptimistic: (context) =>
+                pipe(
+                  signal,
+                  Effect.map(Result.optimistic),
+                  Effect.provide(context),
+                ),
+              onComplete: (context) =>
+                pipe(
+                  signal,
+                  Effect.map(Result.complete),
+                  Effect.provide(context),
+                ),
+            }),
+          ),
+          options,
+        ),
+      ),
+    );
+
 export const provideRuntime =
   <R3>(runtime: Runtime.Runtime<R3>, options?: Observable.ObservableOptions) =>
   <A, E1, R1, E2, R2>(
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
     pipe(signal, mapEffect(Effect.provide(runtime), options));
+
+export const provideRuntimeResult =
+  <R3>(
+    runtime: Result.Result<Runtime.Runtime<R3>>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <A, E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    pipe(
+      signal,
+      mapEffect(
+        (effect) =>
+          pipe(
+            runtime,
+            Result.match({
+              onOptimistic: (runtime) =>
+                pipe(
+                  effect,
+                  Effect.map(Result.optimistic),
+                  Effect.provide(runtime),
+                ),
+              onComplete: (runtime) =>
+                pipe(
+                  effect,
+                  Effect.map(Result.complete),
+                  Effect.provide(runtime),
+                ),
+            }),
+          ),
+        options,
+      ),
+    );
 
 export const provideRuntimeComputed =
   <R3, E4, R4>(
@@ -398,6 +566,40 @@ export const provideRuntimeComputed =
       ),
     );
 
+export const provideRuntimeComputedResult =
+  <R3, E4, R4>(
+    runtime: DependencySignal<Result.Result<Runtime.Runtime<R3>>, E4, R4>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <A, E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    pipe(
+      Effect.all({ signal, runtime }),
+      Effect.flatMap(({ signal, runtime }) =>
+        make(
+          pipe(
+            runtime,
+            Result.match({
+              onOptimistic: (runtime) =>
+                pipe(
+                  signal,
+                  Effect.map(Result.optimistic),
+                  Effect.provide(runtime),
+                ),
+              onComplete: (runtime) =>
+                pipe(
+                  signal,
+                  Effect.map(Result.complete),
+                  Effect.provide(runtime),
+                ),
+            }),
+          ),
+          options,
+        ),
+      ),
+    );
+
 export const provideManagedRuntime =
   <R3, E3>(
     runtime: ManagedRuntime.ManagedRuntime<R3, E3>,
@@ -407,6 +609,39 @@ export const provideManagedRuntime =
     signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
   ) =>
     pipe(signal, mapEffect(Effect.provide(runtime), options));
+
+export const provideManagedRuntimeResult =
+  <R3, E3>(
+    runtime: Result.Result<ManagedRuntime.ManagedRuntime<R3, E3>>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <A, E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    pipe(
+      signal,
+      mapEffect(
+        (effect) =>
+          pipe(
+            runtime,
+            Result.match({
+              onOptimistic: (runtime) =>
+                pipe(
+                  effect,
+                  Effect.map(Result.optimistic),
+                  Effect.provide(runtime),
+                ),
+              onComplete: (runtime) =>
+                pipe(
+                  effect,
+                  Effect.map(Result.complete),
+                  Effect.provide(runtime),
+                ),
+            }),
+          ),
+        options,
+      ),
+    );
 
 export const provideManagedRuntimeComputed =
   <R3, E3, E4, R4>(
@@ -420,6 +655,44 @@ export const provideManagedRuntimeComputed =
       Effect.all({ signal, runtime }),
       Effect.flatMap(({ signal, runtime }) =>
         make(pipe(signal, Effect.provide(runtime)), options),
+      ),
+    );
+
+export const provideManagedRuntimeComputedResult =
+  <R3, E3, E4, R4>(
+    runtime: DependencySignal<
+      Result.Result<ManagedRuntime.ManagedRuntime<R3, E3>>,
+      E4,
+      R4
+    >,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <A, E1, R1, E2, R2>(
+    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  ) =>
+    pipe(
+      Effect.all({ signal, runtime }),
+      Effect.flatMap(({ signal, runtime }) =>
+        make(
+          pipe(
+            runtime,
+            Result.match({
+              onOptimistic: (runtime) =>
+                pipe(
+                  signal,
+                  Effect.map(Result.optimistic),
+                  Effect.provide(runtime),
+                ),
+              onComplete: (runtime) =>
+                pipe(
+                  signal,
+                  Effect.map(Result.complete),
+                  Effect.provide(runtime),
+                ),
+            }),
+          ),
+          options,
+        ),
       ),
     );
 
