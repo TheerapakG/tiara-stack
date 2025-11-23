@@ -120,42 +120,43 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               captureStackTrace: true,
             }),
           ),
-        upsertGuildConfig: (
-          guildId: string,
-          config: Omit<
-            Partial<GuildConfigInsert>,
-            "id" | "createdAt" | "updatedAt" | "deletedAt" | "guildId"
-          >,
-        ) =>
-          pipe(
-            dbSubscriptionContext.mutateQuery(
-              db
-                .insert(configGuild)
-                .values({
-                  guildId,
-                  ...config,
-                })
-                .onConflictDoUpdate({
-                  target: [configGuild.guildId],
-                  set: {
+          upsertGuildConfig: (
+            guildId: string,
+            config: Omit<
+              Partial<GuildConfigInsert>,
+              "id" | "createdAt" | "updatedAt" | "deletedAt" | "guildId"
+            >,
+          ) =>
+            pipe(
+              dbSubscriptionContext.mutateQuery(
+                db
+                  .insert(configGuild)
+                  .values({
+                    guildId,
+                    autoCheckin: false,
                     ...config,
-                  },
-                })
-                .returning(),
-            ),
-            Effect.flatMap(
-              Array.match({
-                onNonEmpty: Effect.succeed,
-                onEmpty: () =>
-                  Effect.die(makeDBQueryError("Failed to upsert guild config")),
+                  })
+                  .onConflictDoUpdate({
+                    target: [configGuild.guildId],
+                    set: {
+                      ...config,
+                    },
+                  })
+                  .returning(),
+              ),
+              Effect.flatMap(
+                Array.match({
+                  onNonEmpty: Effect.succeed,
+                  onEmpty: () =>
+                    Effect.die(makeDBQueryError("Failed to upsert guild config")),
+                }),
+              ),
+              Effect.map(Array.headNonEmpty),
+              Effect.flatMap(Schema.decode(DefaultTaggedClass(GuildConfig))),
+              Effect.withSpan("GuildConfigService.upsertGuildConfig", {
+                captureStackTrace: true,
               }),
             ),
-            Effect.map(Array.headNonEmpty),
-            Effect.flatMap(Schema.decode(DefaultTaggedClass(GuildConfig))),
-            Effect.withSpan("GuildConfigService.upsertGuildConfig", {
-              captureStackTrace: true,
-            }),
-          ),
         getGuildManagerRoles: (guildId: string) =>
           pipe(
             ZeroServiceTag,
