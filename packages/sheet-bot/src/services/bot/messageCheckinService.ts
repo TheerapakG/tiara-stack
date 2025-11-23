@@ -2,7 +2,6 @@ import { SheetApisClient } from "@/client/sheetApis";
 import { Effect, pipe } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import type { messageCheckin } from "sheet-db-schema";
-import { Schema } from "sheet-apis";
 
 export class MessageCheckinService extends Effect.Service<MessageCheckinService>()(
   "MessageCheckinService",

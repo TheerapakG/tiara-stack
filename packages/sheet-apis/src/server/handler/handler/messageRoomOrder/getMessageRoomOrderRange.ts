@@ -6,7 +6,6 @@ import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
-import { Result } from "typhoon-core/schema";
 
 const builders = Context.Subscription.Builder.builders();
 

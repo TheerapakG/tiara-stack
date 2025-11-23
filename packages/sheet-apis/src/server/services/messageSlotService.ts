@@ -1,6 +1,5 @@
 import { DBService } from "@/db";
 import { MessageSlot } from "@/server/schema";
-import { and, eq, isNull } from "drizzle-orm";
 import { Array, Effect, pipe, Schema } from "effect";
 import { messageSlot } from "sheet-db-schema";
 import { makeDBQueryError } from "typhoon-core/error";

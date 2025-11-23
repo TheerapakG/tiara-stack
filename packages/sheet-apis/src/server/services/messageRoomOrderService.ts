@@ -4,7 +4,7 @@ import {
   MessageRoomOrderRange,
   MessageRoomOrderEntry,
 } from "@/server/schema";
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Option, pipe, Schema } from "effect";
 import { messageRoomOrder, messageRoomOrderEntry } from "sheet-db-schema";
 import { makeDBQueryError } from "typhoon-core/error";
