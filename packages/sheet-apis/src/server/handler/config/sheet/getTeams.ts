@@ -1,6 +1,7 @@
 import { Team } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
+import { Result } from "typhoon-core/schema";
 
 export const getTeamsHandlerConfig = pipe(
   Handler.Config.empty(),
@@ -15,6 +16,12 @@ export const getTeamsHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(Schema.Array(Team), Schema.standardSchemaV1),
+    validator: pipe(
+      Result.ResultSchema({
+        optimistic: Schema.Array(Team),
+        complete: Schema.Array(Team),
+      }),
+      Schema.standardSchemaV1,
+    ),
   }),
 );

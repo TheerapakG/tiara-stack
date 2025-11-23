@@ -13,8 +13,14 @@ export const getMessageRoomOrderRangeHandlerConfig = pipe(
   Handler.Config.Builder.response({
     validator: pipe(
       Result.ResultSchema({
-        optimistic: Schema.OptionFromSelf(MessageRoomOrderRange),
-        complete: Schema.OptionFromSelf(MessageRoomOrderRange),
+        optimistic: Schema.Either({
+          right: MessageRoomOrderRange,
+          left: Error.Core.ArgumentError,
+        }),
+        complete: Schema.Either({
+          right: MessageRoomOrderRange,
+          left: Error.Core.ArgumentError,
+        }),
       }),
       Schema.standardSchemaV1,
     ),

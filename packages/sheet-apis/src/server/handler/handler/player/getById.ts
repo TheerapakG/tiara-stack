@@ -1,6 +1,6 @@
 import { getByIdHandlerConfig } from "@/server/handler/config";
 import { AuthService, Sheet } from "@/server/services";
-import { Effect, pipe, Schema } from "effect";
+import { Effect, pipe, Schema, Scope } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -15,9 +15,9 @@ export const getByIdHandler = pipe(
       Computed.make(Event.someToken()),
       Computed.flatMap(AuthService.verify),
       Computed.flatMapComputed(() =>
-        Event.request.parsed(getByIdHandlerConfig),
+        Event.request.parsedWithScope(getByIdHandlerConfig),
       ),
-      Computed.flatMapComputed(({ guildId, ids }) =>
+      Computed.flatMapComputed(({ parsed: { guildId, ids }, scope }) =>
         pipe(
           Sheet.layerOfGuildId(guildId),
           Effect.flatMap((layer) =>
@@ -25,9 +25,10 @@ export const getByIdHandler = pipe(
               ids,
               Sheet.PlayerService.getByIds,
               Computed.make,
-              Computed.provideLayerComputed(layer),
+              Computed.provideLayerComputedResult(layer),
             ),
           ),
+          Scope.extend(scope),
         ),
       ),
       Computed.flatMap(

@@ -1,6 +1,7 @@
 import { EventConfig } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
+import { Result } from "typhoon-core/schema";
 
 export const getEventConfigHandlerConfig = pipe(
   Handler.Config.empty(),
@@ -15,6 +16,12 @@ export const getEventConfigHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(EventConfig, Schema.standardSchemaV1),
+    validator: pipe(
+      Result.ResultSchema({
+        optimistic: EventConfig,
+        complete: EventConfig,
+      }),
+      Schema.standardSchemaV1,
+    ),
   }),
 );

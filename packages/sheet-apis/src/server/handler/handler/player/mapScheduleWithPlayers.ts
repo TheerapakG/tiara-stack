@@ -1,6 +1,6 @@
 import { mapScheduleWithPlayersHandlerConfig } from "@/server/handler/config";
 import { AuthService, Sheet } from "@/server/services";
-import { Effect, pipe, Schema } from "effect";
+import { Effect, pipe, Schema, Scope } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -15,9 +15,9 @@ export const mapScheduleWithPlayersHandler = pipe(
       Computed.make(Event.someToken()),
       Computed.flatMap(AuthService.verify),
       Computed.flatMapComputed(() =>
-        Event.request.parsed(mapScheduleWithPlayersHandlerConfig),
+        Event.request.parsedWithScope(mapScheduleWithPlayersHandlerConfig),
       ),
-      Computed.flatMapComputed(({ guildId, schedules }) =>
+      Computed.flatMapComputed(({ parsed: { guildId, schedules }, scope }) =>
         pipe(
           Sheet.layerOfGuildId(guildId),
           Effect.flatMap((layer) =>
@@ -30,9 +30,10 @@ export const mapScheduleWithPlayersHandler = pipe(
                 },
               ),
               Computed.make,
-              Computed.provideLayerComputed(layer),
+              Computed.provideLayerComputedResult(layer),
             ),
           ),
+          Scope.extend(scope),
         ),
       ),
       Computed.flatMap(
