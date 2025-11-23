@@ -7,6 +7,10 @@ import {
   PermissionService,
 } from "@/services";
 import {
+  waitForGuildConfig,
+  waitForGuildManagerRoles,
+} from "@/services/guild/guildConfigSignals";
+import {
   chatInputCommandSubcommandHandlerContextBuilder,
   chatInputSubcommandGroupSubcommandHandlerContextBuilder,
   ChatInputSubcommandHandlerVariantT,
@@ -45,11 +49,13 @@ const handleListConfig =
           PermissionService.checkPermissions.tap(() => ({
             permissions: PermissionFlagsBits.ManageGuild,
           })),
-          bindObject({
-            guildName: GuildService.getName(),
-            guildConfig: GuildConfigService.getGuildConfigByGuildId(),
-            managerRoles: GuildConfigService.getGuildManagerRoles(),
-          }),
+          Effect.bind("guildName", () => GuildService.getName()),
+          Effect.bind("guildConfig", () =>
+            waitForGuildConfig(GuildConfigService.getGuildConfigByGuildId()),
+          ),
+          Effect.bind("managerRoles", () =>
+            waitForGuildManagerRoles(GuildConfigService.getGuildManagerRoles()),
+          ),
           Effect.bindAll(({ guildConfig }) => ({
             sheetId: pipe(
               guildConfig.sheetId,

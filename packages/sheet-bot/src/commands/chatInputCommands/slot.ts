@@ -11,6 +11,7 @@ import {
   SendableChannelContext,
   SheetService,
 } from "@/services";
+import { waitForGuildManagerRoles } from "@/services/guild/guildConfigSignals";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
   ChatInputSubcommandHandlerVariantT,
@@ -161,7 +162,9 @@ const handleList =
             pipe(
               PermissionService.checkRoles.effect(
                 pipe(
-                  GuildConfigService.getGuildManagerRoles(),
+                  waitForGuildManagerRoles(
+                    GuildConfigService.getGuildManagerRoles(),
+                  ),
                   Effect.map(Array.map((role) => role.roleId)),
                   Effect.map((roles) => ({
                     roles,
@@ -229,7 +232,9 @@ const handleButton =
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
           PermissionService.checkRoles.tapEffect(() =>
             pipe(
-              GuildConfigService.getGuildManagerRoles(),
+              waitForGuildManagerRoles(
+                GuildConfigService.getGuildManagerRoles(),
+              ),
               Effect.map(Array.map((role) => role.roleId)),
               Effect.map((roles) => ({
                 roles,

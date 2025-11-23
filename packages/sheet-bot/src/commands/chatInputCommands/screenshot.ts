@@ -5,6 +5,7 @@ import {
   PermissionService,
   ScreenshotService,
 } from "@/services";
+import { waitForGuildManagerRoles } from "@/services/guild/guildConfigSignals";
 import {
   ChatInputHandlerVariantT,
   handlerVariantContextBuilder,
@@ -57,7 +58,7 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
         PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
         PermissionService.checkRoles.tapEffect(() =>
           pipe(
-            GuildConfigService.getGuildManagerRoles(),
+            waitForGuildManagerRoles(GuildConfigService.getGuildManagerRoles()),
             Effect.map(Array.map((role) => role.roleId)),
             Effect.map((roles) => ({
               roles,

@@ -7,6 +7,7 @@ import {
   SendableChannelContext,
   SheetService,
 } from "@/services";
+import { waitForAutoCheckinGuilds } from "@/services/guild/guildConfigSignals";
 import { guildServices } from "@/services/collection/guildServices";
 import { MessageCheckinService } from "@/services/bot";
 import {
@@ -165,7 +166,9 @@ const getCheckinMessages = (data: {
 
 const runOnce = pipe(
   Effect.Do,
-  Effect.bind("guilds", () => GuildConfigService.getAutoCheckinGuilds()),
+  Effect.bind("guilds", () =>
+    waitForAutoCheckinGuilds(GuildConfigService.getAutoCheckinGuilds()),
+  ),
   Effect.bind("guildCounts", ({ guilds }) =>
     pipe(
       Effect.forEach(guilds, (guild) =>

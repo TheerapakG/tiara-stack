@@ -6,6 +6,7 @@ import {
   PermissionService,
   PlayerService,
 } from "@/services";
+import { waitForGuildManagerRoles } from "@/services/guild/guildConfigSignals";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
   ChatInputSubcommandHandlerVariantT,
@@ -56,7 +57,9 @@ const handleList =
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
           InteractionContext.user.bind("interactionUser"),
           Effect.bindAll(({ interactionUser }) => ({
-            managerRoles: GuildConfigService.getGuildManagerRoles(),
+            managerRoles: waitForGuildManagerRoles(
+              GuildConfigService.getGuildManagerRoles(),
+            ),
             user: pipe(
               InteractionContext.getUser("user"),
               Effect.map(Option.getOrElse(() => interactionUser)),
