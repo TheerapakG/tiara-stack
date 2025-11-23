@@ -191,25 +191,25 @@ const runOnce = pipe(
                                 ),
                               ),
                           ),
-                          Effect.tap(({ checkinData, message }) =>
-                            pipe(
-                              message,
-                              Effect.transposeMapOption(
-                                ({ initialMessage, message }) =>
-                                  MessageCheckinService.upsertMessageCheckinData(
-                                    message.id,
-                                    {
-                                      initialMessage,
-                                      hour,
-                                      channelId:
-                                        checkinData.runningChannel.channelId,
-                                      roleId: Option.getOrNull(
-                                        checkinData.runningChannel.roleId,
-                                      ),
-                                    },
-                                  ),
+                          Effect.tap(
+                            ({ checkinData, checkinChannelId, message }) =>
+                              pipe(
+                                message,
+                                Effect.transposeMapOption(
+                                  ({ initialMessage, message }) =>
+                                    MessageCheckinService.upsertMessageCheckinData(
+                                      message.id,
+                                      {
+                                        initialMessage,
+                                        hour,
+                                        channelId: checkinChannelId,
+                                        roleId: Option.getOrNull(
+                                          checkinData.runningChannel.roleId,
+                                        ),
+                                      },
+                                    ),
+                                ),
                               ),
-                            ),
                           ),
                           Effect.map(({ message }) =>
                             Option.isSome(message) ? 1 : 0,
