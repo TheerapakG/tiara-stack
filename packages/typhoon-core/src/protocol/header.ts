@@ -27,8 +27,10 @@ export const HeaderActionSchema: ArrayLookupSchema<
   "server:update",
 ]);
 
-export const EmptyPayloadSchema: KeyOrderLookupSchema<[], {}> =
-  KeyOrderLookupSchema([], {});
+export const EmptyPayloadSchema: KeyOrderLookupSchema<
+  [],
+  Record<string, never>
+> = KeyOrderLookupSchema([], {});
 
 export const HandlerPayloadSchema = KeyOrderLookupSchema(["handler", "token"], {
   handler: Schema.String,
