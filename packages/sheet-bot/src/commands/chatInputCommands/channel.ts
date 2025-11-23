@@ -21,10 +21,9 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Effect, Option, pipe, Either, Function } from "effect";
+import { Effect, Option, pipe, Function } from "effect";
 import { Schema } from "sheet-apis";
-import { Result, RpcResult } from "typhoon-core/schema";
-import { Computed, DependencySignal, UntilObserver } from "typhoon-core/signal";
+import { UntilObserver } from "typhoon-core/signal";
 
 const configFields = (config: Schema.GuildChannelConfig) => [
   {
@@ -57,18 +56,6 @@ const configFields = (config: Schema.GuildChannelConfig) => [
   },
 ];
 
-type GuildRunningChannelSignal = DependencySignal.DependencySignal<
-  RpcResult.RpcResult<
-    Result.Result<
-      Either.Either<Schema.GuildChannelConfig, Schema.Error.Core.ArgumentError>,
-      Either.Either<Schema.GuildChannelConfig, Schema.Error.Core.ArgumentError>
-    >,
-    unknown
-  >,
-  never,
-  never
->;
-
 const handleListConfig =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
     .data(
@@ -89,36 +76,8 @@ const handleListConfig =
           Effect.bind("config", ({ channel }) =>
             pipe(
               GuildConfigService.getGuildRunningChannelById(channel.id),
-              Effect.flatMap((signal) =>
-                pipe(
-                  Effect.succeed(signal as GuildRunningChannelSignal),
-                  Computed.map(
-                    Result.fromRpcReturningResult<
-                      Either.Either<
-                        Schema.GuildChannelConfig,
-                        Schema.Error.Core.ArgumentError
-                      >
-                    >(
-                      Either.left(
-                        Schema.Error.Core.makeArgumentError(
-                          "Loading channel configuration",
-                        ),
-                      ),
-                    ),
-                  ),
-                  UntilObserver.observeUntilScoped(Result.isComplete),
-                  Effect.flatMap((result) =>
-                    pipe(
-                      result.value,
-                      Either.flatMap(Function.identity),
-                      Either.match({
-                        onLeft: (error) => Effect.fail(error),
-                        onRight: (value) => Effect.succeed(value),
-                      }),
-                    ),
-                  ),
-                ),
-              ),
+              UntilObserver.observeUntilRpcResultResolved(),
+              Effect.flatMap(Function.identity),
             ),
           ),
           InteractionContext.editReply.tapEffect(({ config }) =>

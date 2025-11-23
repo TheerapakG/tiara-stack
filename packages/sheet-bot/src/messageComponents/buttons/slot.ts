@@ -15,7 +15,6 @@ import {
   Array,
   Chunk,
   Effect,
-  Either,
   Function,
   Number,
   Order,
@@ -23,21 +22,7 @@ import {
   pipe,
   String,
 } from "effect";
-import { Schema } from "sheet-apis";
-import { Result, RpcResult } from "typhoon-core/schema";
-import { Computed, DependencySignal, UntilObserver } from "typhoon-core/signal";
-
-type MessageSlotSignal = DependencySignal.DependencySignal<
-  RpcResult.RpcResult<
-    Result.Result<
-      Either.Either<Schema.MessageSlot, Schema.Error.Core.ArgumentError>,
-      Either.Either<Schema.MessageSlot, Schema.Error.Core.ArgumentError>
-    >,
-    unknown
-  >,
-  never,
-  never
->;
+import { UntilObserver } from "typhoon-core/signal";
 
 const getSlotMessage = (day: number) =>
   pipe(
@@ -45,6 +30,7 @@ const getSlotMessage = (day: number) =>
     bindObject({
       daySchedule: pipe(
         SheetService.daySchedules(day),
+        UntilObserver.observeUntilRpcResultResolved(),
         Effect.map(
           Array.map((s) =>
             pipe(
@@ -118,36 +104,8 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         Effect.bind("messageSlotData", ({ message }) =>
           pipe(
             MessageSlotService.getMessageSlotData(message.id),
-            Effect.flatMap((signal) =>
-              pipe(
-                Effect.succeed(signal as MessageSlotSignal),
-                Computed.map(
-                  Result.fromRpcReturningResult<
-                    Either.Either<
-                      Schema.MessageSlot,
-                      Schema.Error.Core.ArgumentError
-                    >
-                  >(
-                    Either.left(
-                      Schema.Error.Core.makeArgumentError(
-                        "Loading message slot",
-                      ),
-                    ),
-                  ),
-                ),
-                UntilObserver.observeUntilScoped(Result.isComplete),
-                Effect.flatMap((result) =>
-                  pipe(
-                    result.value,
-                    Either.flatMap(Function.identity),
-                    Either.match({
-                      onLeft: (error) => Effect.fail(error),
-                      onRight: (value) => Effect.succeed(value),
-                    }),
-                  ),
-                ),
-              ),
-            ),
+            UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatMap(Function.identity),
           ),
         ),
         Effect.bind("slotMessage", ({ messageSlotData }) =>

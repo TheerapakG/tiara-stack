@@ -7,7 +7,6 @@ import {
   SendableChannelContext,
   SheetService,
 } from "@/services";
-import { waitForAutoCheckinGuilds } from "@/services/guild/guildConfigSignals";
 import { guildServices } from "@/services/collection/guildServices";
 import { MessageCheckinService } from "@/services/bot";
 import {
@@ -19,7 +18,6 @@ import {
   Array,
   DateTime,
   Effect,
-  Either,
   Function,
   HashSet,
   Option,
@@ -27,64 +25,7 @@ import {
   Cron,
   pipe,
 } from "effect";
-import { Schema } from "sheet-apis";
-import { Result, RpcResult } from "typhoon-core/schema";
-import { Computed, DependencySignal, UntilObserver } from "typhoon-core/signal";
-
-type GuildRunningChannelSignal = DependencySignal.DependencySignal<
-  RpcResult.RpcResult<
-    Result.Result<
-      Either.Either<Schema.GuildChannelConfig, Schema.Error.Core.ArgumentError>,
-      Either.Either<Schema.GuildChannelConfig, Schema.Error.Core.ArgumentError>
-    >,
-    unknown
-  >,
-  never,
-  never
->;
-
-const waitForRunningChannel = <E, R>(
-  signalEffect: Effect.Effect<
-    DependencySignal.DependencySignal<
-      RpcResult.RpcResult<unknown, unknown>,
-      never,
-      never
-    >,
-    E,
-    R
-  >,
-) =>
-  pipe(
-    signalEffect,
-    Effect.flatMap((signal) =>
-      pipe(
-        Effect.succeed(signal as GuildRunningChannelSignal),
-        Computed.map(
-          Result.fromRpcReturningResult<
-            Either.Either<
-              Schema.GuildChannelConfig,
-              Schema.Error.Core.ArgumentError
-            >
-          >(
-            Either.left(
-              Schema.Error.Core.makeArgumentError("Loading running channel"),
-            ),
-          ),
-        ),
-        UntilObserver.observeUntilScoped(Result.isComplete),
-        Effect.flatMap((result) =>
-          pipe(
-            result.value,
-            Either.flatMap(Function.identity),
-            Either.match({
-              onLeft: (error) => Effect.fail(error),
-              onRight: (value) => Effect.succeed(value),
-            }),
-          ),
-        ),
-      ),
-    ),
-  );
+import { UntilObserver } from "typhoon-core/signal";
 
 const computeHour = pipe(
   Effect.Do,
@@ -111,7 +52,11 @@ const getCheckinData = ({
       pipe(
         channelName,
         Option.match({
-          onSome: (name) => SheetService.channelSchedules(name),
+          onSome: (name) =>
+            pipe(
+              SheetService.channelSchedules(name),
+              UntilObserver.observeUntilRpcResultResolved(),
+            ),
           onNone: () => Effect.succeed([] as readonly unknown[]),
         }),
       ),
@@ -167,131 +112,137 @@ const getCheckinMessages = (data: {
 const runOnce = pipe(
   Effect.Do,
   Effect.bind("guilds", () =>
-    waitForAutoCheckinGuilds(GuildConfigService.getAutoCheckinGuilds()),
+    pipe(
+      GuildConfigService.getAutoCheckinGuilds(),
+      UntilObserver.observeUntilRpcResultResolved(),
+    ),
   ),
   Effect.bind("guildCounts", ({ guilds }) =>
-    pipe(
-      Effect.forEach(guilds, (guild) =>
-        Effect.provide(guildServices(guild.guildId))(
-          pipe(
-            Effect.Do,
-            Effect.bind("hour", () => computeHour),
-            Effect.bind("allSchedules", () => SheetService.allSchedules),
-            Effect.let("channels", ({ allSchedules }) =>
-              pipe(
-                allSchedules as ReadonlyArray<unknown>,
-                Array.map((s) => (s as any).channel as string),
-                (names) => HashSet.fromIterable(names as Iterable<string>),
-                HashSet.toValues,
-              ),
+    Effect.forEach(guilds, (guild) =>
+      Effect.provide(guildServices(guild.guildId))(
+        pipe(
+          Effect.Do,
+          Effect.bind("hour", () => computeHour),
+          Effect.bind("allSchedules", () =>
+            pipe(
+              SheetService.allSchedules,
+              UntilObserver.observeUntilRpcResultResolved(),
             ),
-            Effect.flatMap(({ hour, channels }) =>
-              pipe(
-                Effect.forEach(
-                  channels,
-                  (channelName) =>
-                    pipe(
-                      waitForRunningChannel(
-                        GuildConfigService.getGuildRunningChannelByName(
-                          channelName,
-                        ),
-                      ),
-                      Effect.flatMap((runningChannel) =>
-                        pipe(
-                          Effect.Do,
-                          Effect.bind("checkinChannelId", () =>
-                            pipe(
-                              runningChannel.checkinChannelId,
-                              Option.match({
-                                onSome: Effect.succeed,
-                                onNone: () =>
-                                  Effect.succeed(runningChannel.channelId),
-                              }),
-                            ),
-                          ),
-                          Effect.bind("checkinData", () =>
-                            getCheckinData({ hour, runningChannel }),
-                          ),
-                          Effect.bind("checkinMessages", ({ checkinData }) =>
-                            getCheckinMessages(checkinData),
-                          ),
-                          Effect.bind(
-                            "message",
-                            ({
-                              checkinData,
-                              checkinMessages,
-                              checkinChannelId,
-                            }) =>
-                              pipe(
-                                checkinMessages.checkinMessage,
-                                Effect.transposeMapOption((checkinMessage) =>
-                                  pipe(
-                                    Effect.Do,
-                                    Effect.let(
-                                      "initialMessage",
-                                      () => checkinMessage,
-                                    ),
-                                    SendableChannelContext.send().bind(
-                                      "message",
-                                      () => ({
-                                        content: checkinMessage,
-                                        components: checkinData.runningChannel
-                                          .roleId
-                                          ? [
-                                              new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                                                new ButtonBuilder(
-                                                  checkinButton.data,
-                                                ),
-                                              ),
-                                            ]
-                                          : [],
-                                      }),
-                                    ),
-                                  ),
-                                ),
-                                Effect.provide(
-                                  channelServicesFromGuildChannelId(
-                                    checkinChannelId,
-                                  ),
-                                ),
-                              ),
-                          ),
-                          Effect.tap(
-                            ({ checkinData, checkinChannelId, message }) =>
-                              pipe(
-                                message,
-                                Effect.transposeMapOption(
-                                  ({ initialMessage, message }) =>
-                                    MessageCheckinService.upsertMessageCheckinData(
-                                      message.id,
-                                      {
-                                        initialMessage,
-                                        hour,
-                                        channelId: checkinChannelId,
-                                        roleId: Option.getOrNull(
-                                          checkinData.runningChannel.roleId,
-                                        ),
-                                      },
-                                    ),
-                                ),
-                              ),
-                          ),
-                          Effect.map(({ message }) =>
-                            Option.isSome(message) ? 1 : 0,
-                          ),
-                        ),
-                      ),
-                      Effect.catchAll(() => Effect.succeed(0)),
+          ),
+          Effect.let("channels", ({ allSchedules }) =>
+            pipe(
+              allSchedules,
+              Array.map((s) => s.channel),
+              (names) => HashSet.fromIterable(names),
+              HashSet.toValues,
+            ),
+          ),
+          Effect.flatMap(({ hour, channels }) =>
+            pipe(
+              Effect.forEach(
+                channels,
+                (channelName) =>
+                  pipe(
+                    GuildConfigService.getGuildRunningChannelByName(
+                      channelName,
                     ),
-                  { concurrency: "unbounded" },
-                ),
-                Effect.map((counts) =>
-                  counts.reduce((acc: number, n: number) => acc + n, 0),
-                ),
-                Effect.tap((sent) =>
-                  Effect.log(
-                    `autoCheckin: sent ${sent} check-in message(s) for guild ${guild.guildId}`,
+                    UntilObserver.observeUntilRpcResultResolved(),
+                    Effect.flatMap(Function.identity),
+                    Effect.flatMap((runningChannel) =>
+                      pipe(
+                        Effect.Do,
+                        Effect.bind("checkinChannelId", () =>
+                          pipe(
+                            runningChannel.checkinChannelId,
+                            Option.match({
+                              onSome: Effect.succeed,
+                              onNone: () =>
+                                Effect.succeed(runningChannel.channelId),
+                            }),
+                          ),
+                        ),
+                        Effect.bind("checkinData", () =>
+                          getCheckinData({ hour, runningChannel }),
+                        ),
+                        Effect.bind("checkinMessages", ({ checkinData }) =>
+                          getCheckinMessages(checkinData),
+                        ),
+                        Effect.bind(
+                          "message",
+                          ({
+                            checkinData,
+                            checkinMessages,
+                            checkinChannelId,
+                          }) =>
+                            pipe(
+                              checkinMessages.checkinMessage,
+                              Effect.transposeMapOption((checkinMessage) =>
+                                pipe(
+                                  Effect.Do,
+                                  Effect.let(
+                                    "initialMessage",
+                                    () => checkinMessage,
+                                  ),
+                                  SendableChannelContext.send().bind(
+                                    "message",
+                                    () => ({
+                                      content: checkinMessage,
+                                      components: checkinData.runningChannel
+                                        .roleId
+                                        ? [
+                                            new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                                              new ButtonBuilder(
+                                                checkinButton.data,
+                                              ),
+                                            ),
+                                          ]
+                                        : [],
+                                    }),
+                                  ),
+                                ),
+                              ),
+                              Effect.provide(
+                                channelServicesFromGuildChannelId(
+                                  checkinChannelId,
+                                ),
+                              ),
+                            ),
+                        ),
+                        Effect.tap(
+                          ({ checkinData, checkinChannelId, message }) =>
+                            pipe(
+                              message,
+                              Effect.transposeMapOption(
+                                ({ initialMessage, message }) =>
+                                  MessageCheckinService.upsertMessageCheckinData(
+                                    message.id,
+                                    {
+                                      initialMessage,
+                                      hour,
+                                      channelId: checkinChannelId,
+                                      roleId: Option.getOrNull(
+                                        checkinData.runningChannel.roleId,
+                                      ),
+                                    },
+                                  ),
+                              ),
+                            ),
+                        ),
+                        Effect.map(({ message }) =>
+                          Option.isSome(message) ? 1 : 0,
+                        ),
+                      ),
+                    ),
+                    Effect.catchAll(() => Effect.succeed(0)),
                   ),
+                { concurrency: "unbounded" },
+              ),
+              Effect.map((counts) =>
+                counts.reduce((acc: number, n: number) => acc + n, 0),
+              ),
+              Effect.tap((sent) =>
+                Effect.log(
+                  `autoCheckin: sent ${sent} check-in message(s) for guild ${guild.guildId}`,
                 ),
               ),
             ),

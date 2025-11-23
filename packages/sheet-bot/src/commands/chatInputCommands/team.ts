@@ -6,7 +6,6 @@ import {
   PermissionService,
   PlayerService,
 } from "@/services";
-import { waitForGuildManagerRoles } from "@/services/guild/guildConfigSignals";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
   ChatInputSubcommandHandlerVariantT,
@@ -26,11 +25,13 @@ import {
   Number,
   Option,
   Order,
+  flow,
   pipe,
   String,
 } from "effect";
 import { Schema } from "sheet-apis";
 import { Utils } from "typhoon-core/utils";
+import { UntilObserver } from "typhoon-core/signal";
 
 const handleList =
   handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
@@ -57,8 +58,9 @@ const handleList =
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
           InteractionContext.user.bind("interactionUser"),
           Effect.bindAll(({ interactionUser }) => ({
-            managerRoles: waitForGuildManagerRoles(
+            managerRoles: pipe(
               GuildConfigService.getGuildManagerRoles(),
+              UntilObserver.observeUntilRpcResultResolved(),
             ),
             user: pipe(
               InteractionContext.getUser("user"),
@@ -81,7 +83,12 @@ const handleList =
               {
                 user: user.id,
               },
-              Utils.mapPositional(PlayerService.getTeamsById),
+              Utils.mapPositional(
+                flow(
+                  PlayerService.getTeamsById,
+                  UntilObserver.observeUntilRpcResultResolved(),
+                ),
+              ),
             ),
           ),
           Effect.let("formattedTeams", ({ teams }) =>

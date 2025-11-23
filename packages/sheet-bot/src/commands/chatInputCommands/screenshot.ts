@@ -5,7 +5,6 @@ import {
   PermissionService,
   ScreenshotService,
 } from "@/services";
-import { waitForGuildManagerRoles } from "@/services/guild/guildConfigSignals";
 import {
   ChatInputHandlerVariantT,
   handlerVariantContextBuilder,
@@ -18,6 +17,7 @@ import {
   SlashCommandBuilder,
 } from "discord.js";
 import { Array, Effect, pipe } from "effect";
+import { UntilObserver } from "typhoon-core/signal";
 
 export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
   .data(
@@ -58,7 +58,8 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
         PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
         PermissionService.checkRoles.tapEffect(() =>
           pipe(
-            waitForGuildManagerRoles(GuildConfigService.getGuildManagerRoles()),
+            GuildConfigService.getGuildManagerRoles(),
+            UntilObserver.observeUntilRpcResultResolved(),
             Effect.map(Array.map((role) => role.roleId)),
             Effect.map((roles) => ({
               roles,
@@ -72,7 +73,10 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
         }),
         InteractionContext.deferReply.tap(),
         Effect.bind("screenshot", ({ channelName, day }) =>
-          ScreenshotService.getScreenshot(channelName, day),
+          pipe(
+            ScreenshotService.getScreenshot(channelName, day),
+            UntilObserver.observeUntilRpcResultResolved(),
+          ),
         ),
         InteractionContext.editReply.tap(({ screenshot }) => ({
           files: [

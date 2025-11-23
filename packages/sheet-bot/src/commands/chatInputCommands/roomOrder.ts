@@ -11,7 +11,6 @@ import {
   PlayerService,
   SheetService,
 } from "@/services";
-import { waitForGuildManagerRoles } from "@/services/guild/guildConfigSignals";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
   ChatInputSubcommandHandlerVariantT,
@@ -34,7 +33,6 @@ import {
   Cause,
   DateTime,
   Effect,
-  Either,
   Function,
   HashSet,
   Match,
@@ -42,75 +40,12 @@ import {
   Option,
   pipe,
   Schema,
+  flow,
 } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { Schema as SheetSchema } from "sheet-apis";
-import { Result, RpcResult } from "typhoon-core/schema";
-import { Computed, DependencySignal, UntilObserver } from "typhoon-core/signal";
+import { UntilObserver } from "typhoon-core/signal";
 import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
-
-type GuildRunningChannelSignal = DependencySignal.DependencySignal<
-  RpcResult.RpcResult<
-    Result.Result<
-      Either.Either<
-        SheetSchema.GuildChannelConfig,
-        SheetSchema.Error.Core.ArgumentError
-      >,
-      Either.Either<
-        SheetSchema.GuildChannelConfig,
-        SheetSchema.Error.Core.ArgumentError
-      >
-    >,
-    unknown
-  >,
-  never,
-  never
->;
-
-const waitForRunningChannel = <E, R>(
-  signalEffect: Effect.Effect<
-    DependencySignal.DependencySignal<
-      RpcResult.RpcResult<unknown, unknown>,
-      never,
-      never
-    >,
-    E,
-    R
-  >,
-) =>
-  pipe(
-    signalEffect,
-    Effect.flatMap((signal) =>
-      pipe(
-        Effect.succeed(signal as GuildRunningChannelSignal),
-        Computed.map(
-          Result.fromRpcReturningResult<
-            Either.Either<
-              SheetSchema.GuildChannelConfig,
-              SheetSchema.Error.Core.ArgumentError
-            >
-          >(
-            Either.left(
-              SheetSchema.Error.Core.makeArgumentError(
-                "Loading running channel",
-              ),
-            ),
-          ),
-        ),
-        UntilObserver.observeUntilScoped(Result.isComplete),
-        Effect.flatMap((result) =>
-          pipe(
-            result.value,
-            Either.flatMap(Function.identity),
-            Either.match({
-              onLeft: (error) => Effect.fail(error),
-              onRight: (value) => Effect.succeed(value),
-            }),
-          ),
-        ),
-      ),
-    ),
-  );
 
 const formatEffectValue = (effectValue: number): string => {
   const rounded = Math.round(effectValue * 10) / 10;
@@ -151,9 +86,8 @@ const handleManual =
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
           PermissionService.checkRoles.tapEffect(() =>
             pipe(
-              waitForGuildManagerRoles(
-                GuildConfigService.getGuildManagerRoles(),
-              ),
+              GuildConfigService.getGuildManagerRoles(),
+              UntilObserver.observeUntilRpcResultResolved(),
               Effect.map(Array.map((role) => role.roleId)),
               Effect.map((roles) => ({
                 roles,
@@ -189,19 +123,23 @@ const handleManual =
               channelNameOption,
               Option.match({
                 onSome: (channelName) =>
-                  waitForRunningChannel(
+                  pipe(
                     GuildConfigService.getGuildRunningChannelByName(
                       channelName,
                     ),
+                    UntilObserver.observeUntilRpcResultResolved(),
+                    Effect.flatMap(Function.identity),
                   ),
                 onNone: () =>
                   pipe(
                     InteractionContext.channel(true).sync(),
                     Effect.flatMap((channel) =>
-                      waitForRunningChannel(
+                      pipe(
                         GuildConfigService.getGuildRunningChannelById(
                           channel.id,
                         ),
+                        UntilObserver.observeUntilRpcResultResolved(),
+                        Effect.flatMap(Function.identity),
                       ),
                     ),
                   ),
@@ -218,6 +156,7 @@ const handleManual =
             pipe(
               runningChannel.name,
               Effect.flatMap(SheetService.channelSchedules),
+              UntilObserver.observeUntilRpcResultResolved(),
               Effect.map(
                 Array.map((s) =>
                   pipe(
@@ -239,7 +178,10 @@ const handleManual =
               },
               Utils.mapPositional(
                 Utils.arraySomesPositional(
-                  PlayerService.mapScheduleWithPlayers,
+                  flow(
+                    PlayerService.mapScheduleWithPlayers,
+                    UntilObserver.observeUntilRpcResultResolved(),
+                  ),
                 ),
               ),
             ),
@@ -325,6 +267,7 @@ const handleManual =
           Effect.bind("teams", ({ fills, fillNames, runnerNames }) =>
             pipe(
               PlayerService.getTeamsByName(fillNames),
+              UntilObserver.observeUntilRpcResultResolved(),
               Effect.flatMap((teams) =>
                 Effect.forEach(Array.zip(fills, teams), ([fill, teams]) =>
                   Effect.forEach(teams, (team) =>

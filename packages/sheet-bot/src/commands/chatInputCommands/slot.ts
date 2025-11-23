@@ -11,7 +11,6 @@ import {
   SendableChannelContext,
   SheetService,
 } from "@/services";
-import { waitForGuildManagerRoles } from "@/services/guild/guildConfigSignals";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
   ChatInputSubcommandHandlerVariantT,
@@ -42,6 +41,7 @@ import {
   Schema,
   String,
 } from "effect";
+import { UntilObserver } from "typhoon-core/signal";
 
 const getSlotMessage = (day: number) =>
   pipe(
@@ -49,6 +49,7 @@ const getSlotMessage = (day: number) =>
     bindObject({
       daySchedule: pipe(
         SheetService.daySchedules(day),
+        UntilObserver.observeUntilRpcResultResolved(),
         Effect.map(
           Array.map((s) =>
             pipe(
@@ -162,9 +163,8 @@ const handleList =
             pipe(
               PermissionService.checkRoles.effect(
                 pipe(
-                  waitForGuildManagerRoles(
-                    GuildConfigService.getGuildManagerRoles(),
-                  ),
+                  GuildConfigService.getGuildManagerRoles(),
+                  UntilObserver.observeUntilRpcResultResolved(),
                   Effect.map(Array.map((role) => role.roleId)),
                   Effect.map((roles) => ({
                     roles,
@@ -232,9 +232,8 @@ const handleButton =
           PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
           PermissionService.checkRoles.tapEffect(() =>
             pipe(
-              waitForGuildManagerRoles(
-                GuildConfigService.getGuildManagerRoles(),
-              ),
+              GuildConfigService.getGuildManagerRoles(),
+              UntilObserver.observeUntilRpcResultResolved(),
               Effect.map(Array.map((role) => role.roleId)),
               Effect.map((roles) => ({
                 roles,

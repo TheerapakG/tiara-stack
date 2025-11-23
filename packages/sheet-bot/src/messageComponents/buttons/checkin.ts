@@ -22,43 +22,8 @@ import {
   MessageFlags,
   userMention,
 } from "discord.js";
-import {
-  Array,
-  Effect,
-  Either,
-  Function,
-  Number,
-  Option,
-  Order,
-  pipe,
-} from "effect";
-import { Schema } from "sheet-apis";
-import { Result, RpcResult } from "typhoon-core/schema";
-import { Computed, DependencySignal, UntilObserver } from "typhoon-core/signal";
-
-type MessageCheckinSignal = DependencySignal.DependencySignal<
-  RpcResult.RpcResult<
-    Result.Result<
-      Either.Either<Schema.MessageCheckin, Schema.Error.Core.ArgumentError>,
-      Either.Either<Schema.MessageCheckin, Schema.Error.Core.ArgumentError>
-    >,
-    unknown
-  >,
-  never,
-  never
->;
-
-type MessageCheckinMembersSignal = DependencySignal.DependencySignal<
-  RpcResult.RpcResult<
-    Result.Result<
-      ReadonlyArray<Schema.MessageCheckinMember>,
-      ReadonlyArray<Schema.MessageCheckinMember>
-    >,
-    unknown
-  >,
-  never,
-  never
->;
+import { Array, Effect, Function, Number, Option, Order, pipe } from "effect";
+import { UntilObserver } from "typhoon-core/signal";
 
 const buttonData = {
   type: ComponentType.Button,
@@ -82,36 +47,8 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         Effect.bind("messageCheckinData", ({ message }) =>
           pipe(
             MessageCheckinService.getMessageCheckinData(message.id),
-            Effect.flatMap((signal) =>
-              pipe(
-                Effect.succeed(signal as MessageCheckinSignal),
-                Computed.map(
-                  Result.fromRpcReturningResult<
-                    Either.Either<
-                      Schema.MessageCheckin,
-                      Schema.Error.Core.ArgumentError
-                    >
-                  >(
-                    Either.left(
-                      Schema.Error.Core.makeArgumentError(
-                        "Loading message checkin",
-                      ),
-                    ),
-                  ),
-                ),
-                UntilObserver.observeUntilScoped(Result.isComplete),
-                Effect.flatMap((result) =>
-                  pipe(
-                    result.value,
-                    Either.flatMap(Function.identity),
-                    Either.match({
-                      onLeft: (error) => Effect.fail(error),
-                      onRight: (value) => Effect.succeed(value),
-                    }),
-                  ),
-                ),
-              ),
-            ),
+            UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatMap(Function.identity),
           ),
         ),
         Effect.tap(({ message, user }) =>
@@ -126,28 +63,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         Effect.bind("checkedInMentions", ({ message }) =>
           pipe(
             MessageCheckinService.getMessageCheckinMembers(message.id),
-            Effect.flatMap((signal) =>
-              pipe(
-                Effect.succeed(signal as MessageCheckinMembersSignal),
-                Computed.map(
-                  Result.fromRpcReturningResult<
-                    ReadonlyArray<Schema.MessageCheckinMember>
-                  >([] as ReadonlyArray<Schema.MessageCheckinMember>),
-                ),
-                UntilObserver.observeUntilScoped(Result.isComplete),
-                Effect.flatMap((result) => {
-                  const either = result.value as Either.Either<
-                    ReadonlyArray<Schema.MessageCheckinMember>,
-                    unknown
-                  >;
-                  return Either.isRight(either)
-                    ? Effect.succeed<
-                        ReadonlyArray<Schema.MessageCheckinMember>
-                      >(either.right)
-                    : Effect.fail(either.left);
-                }),
-              ),
-            ),
+            UntilObserver.observeUntilRpcResultResolved(),
             Effect.map((members) =>
               pipe(
                 members,
