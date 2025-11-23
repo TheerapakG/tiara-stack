@@ -1295,9 +1295,26 @@ export class SheetService extends Effect.Service<SheetService>()(
   static ofGuild = (guildId: string) =>
     pipe(
       GuildConfigService.getGuildConfigByGuildId(guildId),
-      Computed.flatMap(Option.flatMap((guildConfig) => guildConfig.sheetId)),
-      Computed.map((sheetId) =>
-        SheetService.DefaultWithoutDependencies(sheetId),
+      Computed.map((result) => result.value),
+      Computed.mapEffect(
+        Effect.flatMap((maybeGuildConfig) =>
+          pipe(
+            maybeGuildConfig,
+            Option.flatMap((guildConfig) => guildConfig.sheetId),
+            Option.match({
+              onSome: (sheetId) =>
+                Effect.succeed(
+                  SheetService.DefaultWithoutDependencies(sheetId),
+                ),
+              onNone: () =>
+                Effect.fail(
+                  Error.Core.makeArgumentError(
+                    `Guild ${guildId} does not have a sheet configured`,
+                  ),
+                ),
+            }),
+          ),
+        ),
       ),
     );
 }

@@ -1,7 +1,7 @@
 import { getMessageRoomOrderRangeHandlerConfig } from "@/server/handler/config";
 import { Error } from "@/server/schema";
 import { AuthService, MessageRoomOrderService } from "@/server/services";
-import { Effect, Either, Scope, pipe } from "effect";
+import { Effect, Scope, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -24,15 +24,6 @@ export const getMessageRoomOrderRangeHandler = pipe(
         pipe(
           MessageRoomOrderService.getMessageRoomOrderRange(parsed),
           Scope.extend(scope),
-        ),
-      ),
-      Computed.map(
-        Result.map(
-          Either.fromOption(() =>
-            Error.Core.makeArgumentError(
-              "Cannot get message room order range, the message might not be registered",
-            ),
-          ),
         ),
       ),
       Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
