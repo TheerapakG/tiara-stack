@@ -5,7 +5,7 @@ import {
   GuildConfigManagerRole,
 } from "@/server/schema";
 import { and, eq, isNull } from "drizzle-orm";
-import { Array, DateTime, Effect, Option, pipe, Schema } from "effect";
+import { Array, DateTime, Effect, pipe, Schema } from "effect";
 import {
   configGuild,
   configGuildChannel,
