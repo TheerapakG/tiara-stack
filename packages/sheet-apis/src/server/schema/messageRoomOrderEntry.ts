@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { DateTimeUtcFromUnknown } from "./dateSchemas";
 
 export class MessageRoomOrderEntry extends Schema.TaggedClass<MessageRoomOrderEntry>()(
   "MessageRoomOrderEntry",
@@ -10,11 +11,8 @@ export class MessageRoomOrderEntry extends Schema.TaggedClass<MessageRoomOrderEn
     team: Schema.String,
     tags: Schema.Array(Schema.String),
     effectValue: Schema.Number,
-    createdAt: Schema.DateTimeUtcFromDate,
-    updatedAt: Schema.DateTimeUtcFromDate,
-    deletedAt: Schema.OptionFromNullishOr(
-      Schema.DateTimeUtcFromDate,
-      undefined,
-    ),
+    createdAt: Schema.OptionFromNullishOr(DateTimeUtcFromUnknown, undefined),
+    updatedAt: Schema.OptionFromNullishOr(DateTimeUtcFromUnknown, undefined),
+    deletedAt: Schema.OptionFromNullishOr(DateTimeUtcFromUnknown, undefined),
   },
 ) {}

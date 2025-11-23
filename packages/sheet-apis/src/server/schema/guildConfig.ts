@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { DateFromUnknown } from "./dateSchemas";
 
 export class GuildConfig extends Schema.TaggedClass<GuildConfig>()(
   "GuildConfig",
@@ -8,8 +9,8 @@ export class GuildConfig extends Schema.TaggedClass<GuildConfig>()(
     scriptId: Schema.OptionFromNullishOr(Schema.String, undefined),
     sheetId: Schema.OptionFromNullishOr(Schema.String, undefined),
     autoCheckin: Schema.Boolean,
-    createdAt: Schema.DateFromSelf,
-    updatedAt: Schema.DateFromSelf,
-    deletedAt: Schema.OptionFromNullishOr(Schema.DateFromSelf, undefined),
+    createdAt: Schema.OptionFromNullishOr(DateFromUnknown, undefined),
+    updatedAt: Schema.OptionFromNullishOr(DateFromUnknown, undefined),
+    deletedAt: Schema.OptionFromNullishOr(DateFromUnknown, undefined),
   },
 ) {}

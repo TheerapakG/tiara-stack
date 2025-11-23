@@ -1,7 +1,9 @@
 import { bindObject } from "@/utils";
-import { Effect, pipe } from "effect";
+import { Effect, Either, pipe } from "effect";
 import { configGuild, configGuildChannel } from "sheet-db-schema";
+import { Schema } from "sheet-apis";
 import { WebSocketClient } from "typhoon-client-ws/client";
+import { Result } from "typhoon-core/schema";
 import { SheetApisClient } from "~~/src/client/sheetApis";
 import { GuildService } from "./guildService";
 
@@ -17,181 +19,240 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
         guildService: GuildService,
         sheetApisClient: SheetApisClient,
       }),
-      Effect.map(({ guildService, sheetApisClient }) => ({
-        getAutoCheckinGuilds: () =>
+      Effect.map(({ guildService, sheetApisClient }) => {
+        const withGuildId = <A>(
+          f: (guildId: string) => Effect.Effect<A>,
+        ): Effect.Effect<A> => pipe(guildService.getId(), Effect.flatMap(f));
+
+        const decodeResult = <Req, A>(
+          handler: string,
+          request: Req,
+        ): Effect.Effect<A> =>
           pipe(
             WebSocketClient.once(
               sheetApisClient.get(),
-              "guildConfig.getAutoCheckinGuilds",
-              {},
+              handler as any,
+              request,
+            ) as Effect.Effect<Result.Result<A>, never, never>,
+            Effect.orDie,
+            Effect.flatMap((result) =>
+              Result.match({
+                onOptimistic: Effect.succeed,
+                onComplete: Effect.succeed,
+              })(result),
             ),
-            Effect.withSpan("GuildConfigService.getAutoCheckinGuilds", {
-              captureStackTrace: true,
-            }),
-          ),
-        getGuildConfigByGuildId: () =>
+          );
+
+        const decodeEither = <Req, A>(
+          handler: string,
+          request: Req,
+        ): Effect.Effect<A> =>
           pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              WebSocketClient.once(
-                sheetApisClient.get(),
-                "guildConfig.getGuildConfigByGuildId",
-                guildId,
-              ),
+            decodeResult<Req, Either.Either<A, unknown>>(handler, request),
+            Effect.flatMap(
+              Either.match({
+                onLeft: Effect.die,
+                onRight: Effect.succeed,
+              }),
             ),
-            Effect.withSpan("GuildConfigService.getGuildConfigByGuildId", {
-              captureStackTrace: true,
-            }),
-          ),
-        upsertGuildConfig: (
-          config: Omit<
-            Partial<GuildConfigInsert>,
-            "id" | "createdAt" | "updatedAt" | "deletedAt" | "guildId"
-          >,
-        ) =>
+          );
+
+        const subscribe = <Req>(handler: string, request: Req) =>
           pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              WebSocketClient.mutate(
-                sheetApisClient.get(),
-                "guildConfig.upsertGuildConfig",
-                { guildId, ...config },
-              ),
+            WebSocketClient.subscribeScoped(
+              sheetApisClient.get(),
+              handler as any,
+              request,
             ),
-            Effect.withSpan("GuildConfigService.upsertGuildConfig", {
-              captureStackTrace: true,
-            }),
-          ),
-        getGuildManagerRoles: () =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              WebSocketClient.once(
-                sheetApisClient.get(),
-                "guildConfig.getGuildManagerRoles",
-                guildId,
-              ),
-            ),
-            Effect.withSpan("GuildConfigService.getGuildManagerRoles", {
-              captureStackTrace: true,
-            }),
-          ),
-        addGuildManagerRole: (roleId: string) =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              WebSocketClient.mutate(
-                sheetApisClient.get(),
-                "guildConfig.addGuildManagerRole",
-                { guildId, roleId },
-              ),
-            ),
-            Effect.withSpan("GuildConfigService.addGuildManagerRole", {
-              captureStackTrace: true,
-            }),
-          ),
-        removeGuildManagerRole: (roleId: string) =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              WebSocketClient.mutate(
-                sheetApisClient.get(),
-                "guildConfig.removeGuildManagerRole",
-                { guildId, roleId },
-              ),
-            ),
-            Effect.withSpan("GuildConfigService.removeGuildManagerRole", {
-              captureStackTrace: true,
-            }),
-          ),
-        upsertGuildChannelConfig: (
-          channelId: string,
-          config: Omit<
-            Partial<GuildChannelConfigInsert>,
-            | "id"
-            | "createdAt"
-            | "updatedAt"
-            | "deletedAt"
-            | "guildId"
-            | "channelId"
-          >,
-        ) =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              WebSocketClient.mutate(
-                sheetApisClient.get(),
-                "guildConfig.upsertGuildChannelConfig",
-                { guildId, channelId, ...config },
-              ),
-            ),
-            Effect.withSpan("GuildConfigService.upsertGuildChannelConfig", {
-              captureStackTrace: true,
-            }),
-          ),
-        getGuildRunningChannelById: (channelId: string) =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              WebSocketClient.once(
-                sheetApisClient.get(),
-                "guildConfig.getGuildRunningChannelById",
-                { guildId, channelId },
-              ),
-            ),
-            Effect.withSpan("GuildConfigService.getGuildRunningChannelById", {
-              captureStackTrace: true,
-            }),
-          ),
-        getZeroGuildRunningChannelById: (channelId: string) =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              WebSocketClient.subscribeScoped(
-                sheetApisClient.get(),
-                "guildConfig.getZeroGuildRunningChannelById",
-                { guildId, channelId },
-              ),
-            ),
-            Effect.withSpan(
-              "GuildConfigService.getZeroGuildRunningChannelById",
-              {
+            Effect.orDie,
+          );
+
+        return {
+          getAutoCheckinGuilds: () =>
+            pipe(
+              decodeResult<
+                Record<string, never>,
+                ReadonlyArray<Schema.GuildConfig>
+              >("guildConfig.getAutoCheckinGuilds", {}),
+              Effect.withSpan("GuildConfigService.getAutoCheckinGuilds", {
                 captureStackTrace: true,
-              },
+              }),
             ),
-          ),
-        getGuildRunningChannelByName: (channelName: string) =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              WebSocketClient.once(
-                sheetApisClient.get(),
-                "guildConfig.getGuildRunningChannelByName",
-                { guildId, channelName },
+          getGuildConfigByGuildId: () =>
+            pipe(
+              withGuildId((guildId) =>
+                decodeEither<string, Schema.GuildConfig>(
+                  "guildConfig.getGuildConfigByGuildId",
+                  guildId,
+                ),
               ),
-            ),
-            Effect.withSpan("GuildConfigService.getGuildRunningChannelByName", {
-              captureStackTrace: true,
-            }),
-          ),
-        getZeroGuildRunningChannelByName: (channelName: string) =>
-          pipe(
-            guildService.getId(),
-            Effect.flatMap((guildId) =>
-              WebSocketClient.subscribeScoped(
-                sheetApisClient.get(),
-                "guildConfig.getZeroGuildRunningChannelByName",
-                { guildId, channelName },
-              ),
-            ),
-            Effect.withSpan(
-              "GuildConfigService.getZeroGuildRunningChannelByName",
-              {
+              Effect.withSpan("GuildConfigService.getGuildConfigByGuildId", {
                 captureStackTrace: true,
-              },
+              }),
             ),
-          ),
-      })),
+          upsertGuildConfig: (
+            config: Omit<
+              Partial<GuildConfigInsert>,
+              "id" | "createdAt" | "updatedAt" | "deletedAt" | "guildId"
+            >,
+          ) =>
+            pipe(
+              guildService.getId(),
+              Effect.flatMap((guildId) =>
+                WebSocketClient.mutate(
+                  sheetApisClient.get(),
+                  "guildConfig.upsertGuildConfig",
+                  { guildId, ...config },
+                ),
+              ),
+              Effect.withSpan("GuildConfigService.upsertGuildConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          getGuildManagerRoles: () =>
+            pipe(
+              withGuildId((guildId) =>
+                decodeResult<
+                  string,
+                  ReadonlyArray<Schema.GuildConfigManagerRole>
+                >("guildConfig.getGuildManagerRoles", guildId),
+              ),
+              Effect.withSpan("GuildConfigService.getGuildManagerRoles", {
+                captureStackTrace: true,
+              }),
+            ),
+          addGuildManagerRole: (roleId: string) =>
+            pipe(
+              guildService.getId(),
+              Effect.flatMap((guildId) =>
+                WebSocketClient.mutate(
+                  sheetApisClient.get(),
+                  "guildConfig.addGuildManagerRole",
+                  { guildId, roleId },
+                ),
+              ),
+              Effect.withSpan("GuildConfigService.addGuildManagerRole", {
+                captureStackTrace: true,
+              }),
+            ),
+          removeGuildManagerRole: (roleId: string) =>
+            pipe(
+              guildService.getId(),
+              Effect.flatMap((guildId) =>
+                WebSocketClient.mutate(
+                  sheetApisClient.get(),
+                  "guildConfig.removeGuildManagerRole",
+                  { guildId, roleId },
+                ),
+              ),
+              Effect.withSpan("GuildConfigService.removeGuildManagerRole", {
+                captureStackTrace: true,
+              }),
+            ),
+          upsertGuildChannelConfig: (
+            channelId: string,
+            config: Omit<
+              Partial<GuildChannelConfigInsert>,
+              | "id"
+              | "createdAt"
+              | "updatedAt"
+              | "deletedAt"
+              | "guildId"
+              | "channelId"
+            >,
+          ) =>
+            pipe(
+              guildService.getId(),
+              Effect.flatMap((guildId) =>
+                WebSocketClient.mutate(
+                  sheetApisClient.get(),
+                  "guildConfig.upsertGuildChannelConfig",
+                  { guildId, channelId, ...config },
+                ),
+              ),
+              Effect.withSpan("GuildConfigService.upsertGuildChannelConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          getGuildConfigByScriptId: (scriptId: string) =>
+            pipe(
+              decodeEither<string, Schema.GuildConfig>(
+                "guildConfig.getGuildConfigByScriptId",
+                scriptId,
+              ),
+              Effect.withSpan("GuildConfigService.getGuildConfigByScriptId", {
+                captureStackTrace: true,
+              }),
+            ),
+          getGuildRunningChannelById: (channelId: string) =>
+            pipe(
+              withGuildId((guildId) =>
+                decodeEither<
+                  { guildId: string; channelId: string },
+                  Schema.GuildChannelConfig
+                >("guildConfig.getGuildRunningChannelById", {
+                  guildId,
+                  channelId,
+                }),
+              ),
+              Effect.withSpan("GuildConfigService.getGuildRunningChannelById", {
+                captureStackTrace: true,
+              }),
+            ),
+          getGuildRunningChannelByName: (channelName: string) =>
+            pipe(
+              withGuildId((guildId) =>
+                decodeEither<
+                  { guildId: string; channelName: string },
+                  Schema.GuildChannelConfig
+                >("guildConfig.getGuildRunningChannelByName", {
+                  guildId,
+                  channelName,
+                }),
+              ),
+              Effect.withSpan(
+                "GuildConfigService.getGuildRunningChannelByName",
+                {
+                  captureStackTrace: true,
+                },
+              ),
+            ),
+          observeGuildRunningChannelById: (channelId: string) =>
+            pipe(
+              withGuildId((guildId) =>
+                Effect.scoped(
+                  subscribe("guildConfig.getGuildRunningChannelById", {
+                    guildId,
+                    channelId,
+                  }),
+                ),
+              ),
+              Effect.withSpan(
+                "GuildConfigService.observeGuildRunningChannelById",
+                {
+                  captureStackTrace: true,
+                },
+              ),
+            ),
+          observeGuildRunningChannelByName: (channelName: string) =>
+            pipe(
+              withGuildId((guildId) =>
+                Effect.scoped(
+                  subscribe("guildConfig.getGuildRunningChannelByName", {
+                    guildId,
+                    channelName,
+                  }),
+                ),
+              ),
+              Effect.withSpan(
+                "GuildConfigService.observeGuildRunningChannelByName",
+                {
+                  captureStackTrace: true,
+                },
+              ),
+            ),
+        };
+      }),
     ),
     dependencies: [SheetApisClient.Default],
     accessors: true,

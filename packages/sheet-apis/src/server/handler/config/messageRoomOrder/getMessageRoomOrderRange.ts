@@ -1,6 +1,7 @@
 import { Error, MessageRoomOrderRange } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
+import { Result } from "typhoon-core/schema";
 
 export const getMessageRoomOrderRangeHandlerConfig = pipe(
   Handler.Config.empty(),
@@ -10,17 +11,22 @@ export const getMessageRoomOrderRangeHandlerConfig = pipe(
     validator: pipe(Schema.String, Schema.standardSchemaV1),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(MessageRoomOrderRange, Schema.standardSchemaV1),
+    validator: pipe(
+      Result.ResultSchema({
+        optimistic: Schema.OptionFromSelf(MessageRoomOrderRange),
+        complete: Schema.OptionFromSelf(MessageRoomOrderRange),
+      }),
+      Schema.standardSchemaV1,
+    ),
   }),
   Handler.Config.Builder.responseError({
     validator: pipe(
       Schema.Union(
-        Error.Core.ArgumentError,
         Error.Core.AuthorizationError,
-        Error.Core.DBQueryError,
         Error.Core.MsgpackDecodeError,
         Error.Core.StreamExhaustedError,
         Error.Core.ValidationError,
+        Error.Core.ZeroQueryError,
       ),
       Schema.standardSchemaV1,
     ),

@@ -1,6 +1,7 @@
 import { Error, MessageRoomOrderEntry } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
+import { Result } from "typhoon-core/schema";
 
 export const getMessageRoomOrderEntryHandlerConfig = pipe(
   Handler.Config.empty(),
@@ -17,7 +18,10 @@ export const getMessageRoomOrderEntryHandlerConfig = pipe(
   }),
   Handler.Config.Builder.response({
     validator: pipe(
-      Schema.Array(MessageRoomOrderEntry),
+      Result.ResultSchema({
+        optimistic: Schema.Array(MessageRoomOrderEntry),
+        complete: Schema.Array(MessageRoomOrderEntry),
+      }),
       Schema.standardSchemaV1,
     ),
   }),
@@ -25,10 +29,10 @@ export const getMessageRoomOrderEntryHandlerConfig = pipe(
     validator: pipe(
       Schema.Union(
         Error.Core.AuthorizationError,
-        Error.Core.DBQueryError,
         Error.Core.MsgpackDecodeError,
         Error.Core.StreamExhaustedError,
         Error.Core.ValidationError,
+        Error.Core.ZeroQueryError,
       ),
       Schema.standardSchemaV1,
     ),

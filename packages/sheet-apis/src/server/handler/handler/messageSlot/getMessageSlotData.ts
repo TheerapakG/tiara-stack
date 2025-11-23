@@ -1,11 +1,12 @@
 import { getMessageSlotDataHandlerConfig } from "@/server/handler/config";
 import { Error } from "@/server/schema";
 import { AuthService, MessageSlotService } from "@/server/services";
-import { Effect, Option, pipe } from "effect";
+import { Effect, Either, Scope, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
+import { Result } from "typhoon-core/schema";
 
 const builders = Context.Subscription.Builder.builders();
 
@@ -17,19 +18,22 @@ export const getMessageSlotDataHandler = pipe(
       Computed.make(Event.someToken()),
       Computed.flatMap(AuthService.verify),
       Computed.flatMapComputed(() =>
-        Event.request.parsed(getMessageSlotDataHandlerConfig),
+        Event.request.parsedWithScope(getMessageSlotDataHandlerConfig),
       ),
-      Computed.flatMapComputed(MessageSlotService.getMessageSlotData),
-      Computed.flatMap(
-        Option.match({
-          onSome: Effect.succeed,
-          onNone: () =>
-            Effect.fail(
-              Error.Core.makeArgumentError(
-                "Cannot get message slot data, the message might not be registered",
-              ),
+      Computed.flatMapComputed(({ parsed, scope }) =>
+        pipe(
+          MessageSlotService.getMessageSlotData(parsed),
+          Scope.extend(scope),
+        ),
+      ),
+      Computed.map(
+        Result.map(
+          Either.fromOption(() =>
+            Error.Core.makeArgumentError(
+              "Cannot get message slot data, the message might not be registered",
             ),
-        }),
+          ),
+        ),
       ),
       Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
       Computed.mapEffect(

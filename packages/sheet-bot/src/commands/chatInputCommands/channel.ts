@@ -21,14 +21,12 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Effect, Option, pipe, Either, Function } from "effect";
+import { Effect, Option, pipe, Either } from "effect";
 import { Schema } from "sheet-apis";
 import { Result } from "typhoon-core/schema";
 import { Computed, UntilObserver } from "typhoon-core/signal";
 
-const configFields = (
-  config: Schema.GuildChannelConfig | Schema.ZeroGuildChannelConfig,
-) => [
+const configFields = (config: Schema.GuildChannelConfig) => [
   {
     name: "Name",
     value: pipe(
@@ -78,13 +76,29 @@ const handleListConfig =
           })),
           Effect.bind("config", ({ channel }) =>
             pipe(
-              GuildConfigService.getZeroGuildRunningChannelById(channel.id),
-              Computed.map(
-                Result.fromRpcReturningResult(Either.right(Option.none())),
-              ),
-              UntilObserver.observeUntilScoped(Result.isComplete),
-              Effect.flatMap((v) =>
-                pipe(v.value, Either.flatMap(Function.identity)),
+              GuildConfigService.observeGuildRunningChannelById(channel.id),
+              Effect.flatMap((signal) =>
+                pipe(
+                  Effect.succeed(signal as any),
+                  Computed.map(
+                    Result.fromRpcReturningResult(
+                      Either.right(Option.none<Schema.GuildChannelConfig>()),
+                    ) as any,
+                  ),
+                  UntilObserver.observeUntilScoped(Result.isComplete),
+                  Effect.flatMap((value) =>
+                    pipe(
+                      value.value as Either.Either<
+                        Schema.GuildChannelConfig,
+                        Schema.Error.Core.ArgumentError
+                      >,
+                      Either.match({
+                        onLeft: Effect.die,
+                        onRight: Effect.succeed,
+                      }),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

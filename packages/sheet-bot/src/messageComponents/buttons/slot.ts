@@ -15,12 +15,29 @@ import {
   Array,
   Chunk,
   Effect,
+  Either,
+  Function,
   Number,
   Order,
   Option,
   pipe,
   String,
 } from "effect";
+import { Schema } from "sheet-apis";
+import { Result, RpcResult } from "typhoon-core/schema";
+import { Computed, DependencySignal, UntilObserver } from "typhoon-core/signal";
+
+type MessageSlotSignal = DependencySignal.DependencySignal<
+  RpcResult.RpcResult<
+    Result.Result<
+      Either.Either<Schema.MessageSlot, Schema.Error.Core.ArgumentError>,
+      Either.Either<Schema.MessageSlot, Schema.Error.Core.ArgumentError>
+    >,
+    unknown
+  >,
+  never,
+  never
+>;
 
 const getSlotMessage = (day: number) =>
   pipe(
@@ -99,7 +116,39 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         })),
         CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
         Effect.bind("messageSlotData", ({ message }) =>
-          MessageSlotService.getMessageSlotData(message.id),
+          pipe(
+            MessageSlotService.getMessageSlotData(message.id),
+            Effect.flatMap((signal) =>
+              pipe(
+                Effect.succeed(signal as MessageSlotSignal),
+                Computed.map(
+                  Result.fromRpcReturningResult<
+                    Either.Either<
+                      Schema.MessageSlot,
+                      Schema.Error.Core.ArgumentError
+                    >
+                  >(
+                    Either.left(
+                      Schema.Error.Core.makeArgumentError(
+                        "Loading message slot",
+                      ),
+                    ),
+                  ),
+                ),
+                UntilObserver.observeUntilScoped(Result.isComplete),
+                Effect.flatMap((result) =>
+                  pipe(
+                    result.value,
+                    Either.flatMap(Function.identity),
+                    Either.match({
+                      onLeft: (error) => Effect.fail(error),
+                      onRight: (value) => Effect.succeed(value),
+                    }),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
         Effect.bind("slotMessage", ({ messageSlotData }) =>
           getSlotMessage(messageSlotData.day),

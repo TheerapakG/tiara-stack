@@ -1,12 +1,17 @@
 import { DBService } from "@/db";
 import { MessageCheckin, MessageCheckinMember } from "@/server/schema";
 import { and, eq, gte, isNull } from "drizzle-orm";
-import { Array, DateTime, Effect, pipe, Schema } from "effect";
+import { Array, DateTime, Effect, Option, pipe, Schema } from "effect";
 import { messageCheckin, messageCheckinMember } from "sheet-db-schema";
 import { makeDBQueryError } from "typhoon-core/error";
-import { DefaultTaggedClass } from "typhoon-core/schema";
-import { Computed } from "typhoon-core/signal";
+import { DefaultTaggedClass, Result } from "typhoon-core/schema";
+import {
+  Computed,
+  ExternalComputed,
+  ZeroQueryExternalSource,
+} from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
+import { ZeroServiceTag } from "@/db/zeroService";
 
 type MessageCheckinInsert = typeof messageCheckin.$inferInsert;
 
@@ -20,23 +25,32 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
       Effect.map(({ db, dbSubscriptionContext }) => ({
         getMessageCheckinData: (messageId: string) =>
           pipe(
-            dbSubscriptionContext.subscribeQuery(
-              db
-                .select()
-                .from(messageCheckin)
-                .where(
-                  and(
-                    eq(messageCheckin.messageId, messageId),
-                    isNull(messageCheckin.deletedAt),
-                  ),
-                ),
-            ),
-            Computed.map(Array.head),
-            Computed.flatMap(
-              Schema.decode(
-                Schema.OptionFromSelf(DefaultTaggedClass(MessageCheckin)),
+            ZeroServiceTag,
+            Effect.flatMap((zero) =>
+              ZeroQueryExternalSource.make(
+                zero.query.messageCheckin
+                  .where("messageId", "=", messageId)
+                  .where("deletedAt", "IS", null)
+                  .one(),
               ),
             ),
+            Effect.flatMap(ExternalComputed.make),
+            Computed.flatten(),
+            Computed.flatMap(
+              Schema.decode(
+                Result.ResultSchema({
+                  optimistic: Schema.Union(
+                    DefaultTaggedClass(MessageCheckin),
+                    Schema.Undefined,
+                  ),
+                  complete: Schema.Union(
+                    DefaultTaggedClass(MessageCheckin),
+                    Schema.Undefined,
+                  ),
+                }),
+              ),
+            ),
+            Computed.map(Result.map(Option.fromNullable)),
             Effect.withSpan("MessageCheckinService.getMessageCheckinData", {
               captureStackTrace: true,
             }),
@@ -82,20 +96,26 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
           ),
         getMessageCheckinMembers: (messageId: string) =>
           pipe(
-            dbSubscriptionContext.subscribeQuery(
-              db
-                .select()
-                .from(messageCheckinMember)
-                .where(
-                  and(
-                    eq(messageCheckinMember.messageId, messageId),
-                    isNull(messageCheckinMember.deletedAt),
-                  ),
-                ),
+            ZeroServiceTag,
+            Effect.flatMap((zero) =>
+              ZeroQueryExternalSource.make(
+                zero.query.messageCheckinMember
+                  .where("messageId", "=", messageId)
+                  .where("deletedAt", "IS", null),
+              ),
             ),
+            Effect.flatMap(ExternalComputed.make),
+            Computed.flatten(),
             Computed.flatMap(
               Schema.decode(
-                Schema.Array(DefaultTaggedClass(MessageCheckinMember)),
+                Result.ResultSchema({
+                  optimistic: Schema.Array(
+                    DefaultTaggedClass(MessageCheckinMember),
+                  ),
+                  complete: Schema.Array(
+                    DefaultTaggedClass(MessageCheckinMember),
+                  ),
+                }),
               ),
             ),
             Effect.withSpan("MessageCheckinService.getMessageCheckinMembers", {

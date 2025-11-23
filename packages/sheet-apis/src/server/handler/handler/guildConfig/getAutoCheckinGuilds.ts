@@ -1,7 +1,7 @@
 import { getAutoCheckinGuildsHandlerConfig } from "@/server/handler/config";
 import { Error } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
-import { Effect, pipe } from "effect";
+import { Effect, Scope, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
@@ -15,7 +15,12 @@ export const getAutoCheckinGuildsHandler = pipe(
     pipe(
       Computed.make(Event.someToken()),
       Computed.flatMap(AuthService.verify),
-      Computed.flatMapComputed(() => GuildConfigService.getAutoCheckinGuilds()),
+      Computed.flatMapComputed(() =>
+        Event.request.parsedWithScope(getAutoCheckinGuildsHandlerConfig),
+      ),
+      Computed.flatMapComputed(({ scope }) =>
+        pipe(GuildConfigService.getAutoCheckinGuilds(), Scope.extend(scope)),
+      ),
       Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
       Computed.mapEffect(
         Handler.Config.encodeResponseEffect(getAutoCheckinGuildsHandlerConfig),
