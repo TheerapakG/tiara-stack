@@ -21,7 +21,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
-                WebSocketClient.once(
+                WebSocketClient.subscribeScoped(
                   sheetApisClient.get(),
                   "player.getPlayerMaps",
                   { guildId },
@@ -41,10 +41,14 @@ export class PlayerService extends Effect.Service<PlayerService>()(
           pipe(
             guildService.getId(),
             Effect.flatMap((guildId) =>
-              WebSocketClient.once(sheetApisClient.get(), "player.getById", {
-                guildId,
-                ids,
-              }),
+              WebSocketClient.subscribeScoped(
+                sheetApisClient.get(),
+                "player.getById",
+                {
+                  guildId,
+                  ids,
+                },
+              ),
             ),
             Effect.withSpan("PlayerService.getPlayerById", {
               captureStackTrace: true,
@@ -54,10 +58,14 @@ export class PlayerService extends Effect.Service<PlayerService>()(
           pipe(
             guildService.getId(),
             Effect.flatMap((guildId) =>
-              WebSocketClient.once(sheetApisClient.get(), "player.getByName", {
-                guildId,
-                names,
-              }),
+              WebSocketClient.subscribeScoped(
+                sheetApisClient.get(),
+                "player.getByName",
+                {
+                  guildId,
+                  names,
+                },
+              ),
             ),
             Effect.withSpan("PlayerService.getPlayerByName", {
               captureStackTrace: true,
@@ -67,7 +75,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
           pipe(
             guildService.getId(),
             Effect.flatMap((guildId) =>
-              WebSocketClient.once(
+              WebSocketClient.subscribeScoped(
                 sheetApisClient.get(),
                 "player.getTeamsById",
                 {
@@ -84,7 +92,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
           pipe(
             guildService.getId(),
             Effect.flatMap((guildId) =>
-              WebSocketClient.once(
+              WebSocketClient.subscribeScoped(
                 sheetApisClient.get(),
                 "player.getTeamsByName",
                 { guildId, names },
@@ -119,7 +127,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
               { concurrency: "unbounded" },
             ),
             Effect.flatMap(({ guildId, schedules }) =>
-              WebSocketClient.once(
+              WebSocketClient.subscribeScoped(
                 sheetApisClient.get(),
                 "player.mapScheduleWithPlayers",
                 { guildId, schedules },

@@ -19,7 +19,7 @@ export class SheetService extends Effect.Service<SheetService>()(
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
-                WebSocketClient.once(
+                WebSocketClient.subscribeScoped(
                   sheetApisClient.get(),
                   "sheetConfig.getRangesConfig",
                   { guildId },
@@ -34,7 +34,7 @@ export class SheetService extends Effect.Service<SheetService>()(
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
-                WebSocketClient.once(
+                WebSocketClient.subscribeScoped(
                   sheetApisClient.get(),
                   "sheetConfig.getTeamConfig",
                   { guildId },
@@ -49,7 +49,7 @@ export class SheetService extends Effect.Service<SheetService>()(
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
-                WebSocketClient.once(
+                WebSocketClient.subscribeScoped(
                   sheetApisClient.get(),
                   "sheetConfig.getEventConfig",
                   { guildId },
@@ -64,7 +64,7 @@ export class SheetService extends Effect.Service<SheetService>()(
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
-                WebSocketClient.once(
+                WebSocketClient.subscribeScoped(
                   sheetApisClient.get(),
                   "sheetConfig.getScheduleConfig",
                   { guildId },
@@ -79,7 +79,7 @@ export class SheetService extends Effect.Service<SheetService>()(
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
-                WebSocketClient.once(
+                WebSocketClient.subscribeScoped(
                   sheetApisClient.get(),
                   "sheetConfig.getRunnerConfig",
                   { guildId },
@@ -94,7 +94,7 @@ export class SheetService extends Effect.Service<SheetService>()(
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
-                WebSocketClient.once(
+                WebSocketClient.subscribeScoped(
                   sheetApisClient.get(),
                   "sheet.getPlayers",
                   { guildId },
@@ -106,9 +106,13 @@ export class SheetService extends Effect.Service<SheetService>()(
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
-                WebSocketClient.once(sheetApisClient.get(), "sheet.getTeams", {
-                  guildId,
-                }),
+                WebSocketClient.subscribeScoped(
+                  sheetApisClient.get(),
+                  "sheet.getTeams",
+                  {
+                    guildId,
+                  },
+                ),
               ),
             ),
           ),
@@ -116,7 +120,7 @@ export class SheetService extends Effect.Service<SheetService>()(
             pipe(
               guildService.getId(),
               Effect.flatMap((guildId) =>
-                WebSocketClient.once(
+                WebSocketClient.subscribeScoped(
                   sheetApisClient.get(),
                   "sheet.getAllSchedules",
                   { guildId },
@@ -129,7 +133,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               pipe(
                 guildService.getId(),
                 Effect.flatMap((guildId) =>
-                  WebSocketClient.once(
+                  WebSocketClient.subscribeScoped(
                     sheetApisClient.get(),
                     "sheet.getDaySchedules",
                     { guildId, day },
@@ -143,7 +147,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               pipe(
                 guildService.getId(),
                 Effect.flatMap((guildId) =>
-                  WebSocketClient.once(
+                  WebSocketClient.subscribeScoped(
                     sheetApisClient.get(),
                     "sheet.getChannelSchedules",
                     { guildId, channel },

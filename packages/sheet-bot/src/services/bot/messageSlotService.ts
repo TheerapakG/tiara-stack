@@ -9,39 +9,36 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
     effect: pipe(
       Effect.Do,
       Effect.bind("client", () => SheetApisClient.get()),
-      Effect.map(({ client }) => {
-        const subscribe = (handler: string, request: unknown) =>
+      Effect.map(({ client }) => ({
+        getMessageSlotData: (messageId: string) =>
           pipe(
-            WebSocketClient.subscribeScoped(client, handler as any, request),
-          );
-
-        return {
-          getMessageSlotData: (messageId: string) =>
-            pipe(
-              subscribe("messageSlot.getMessageSlotData", messageId),
-              Effect.withSpan("MessageSlotService.getMessageSlotData", {
-                captureStackTrace: true,
-              }),
+            WebSocketClient.subscribeScoped(
+              client,
+              "messageSlot.getMessageSlotData",
+              messageId,
             ),
-          upsertMessageSlotData: (
-            messageId: string,
-            data: Omit<
-              typeof messageSlot.$inferInsert,
-              "id" | "createdAt" | "updatedAt" | "deletedAt" | "messageId"
-            >,
-          ) =>
-            pipe(
-              WebSocketClient.mutate(
-                client,
-                "messageSlot.upsertMessageSlotData",
-                { messageId, ...data },
-              ),
-              Effect.withSpan("MessageSlotService.upsertMessageSlotData", {
-                captureStackTrace: true,
-              }),
+            Effect.withSpan("MessageSlotService.getMessageSlotData", {
+              captureStackTrace: true,
+            }),
+          ),
+        upsertMessageSlotData: (
+          messageId: string,
+          data: Omit<
+            typeof messageSlot.$inferInsert,
+            "id" | "createdAt" | "updatedAt" | "deletedAt" | "messageId"
+          >,
+        ) =>
+          pipe(
+            WebSocketClient.mutate(
+              client,
+              "messageSlot.upsertMessageSlotData",
+              { messageId, ...data },
             ),
-        };
-      }),
+            Effect.withSpan("MessageSlotService.upsertMessageSlotData", {
+              captureStackTrace: true,
+            }),
+          ),
+      })),
     ),
     dependencies: [SheetApisClient.Default],
     accessors: true,
