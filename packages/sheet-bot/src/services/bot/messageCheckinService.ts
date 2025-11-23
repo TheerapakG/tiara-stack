@@ -1,30 +1,8 @@
 import { SheetApisClient } from "@/client/sheetApis";
-import { Effect, pipe, Either, Scope } from "effect";
+import { Effect, pipe } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import type { messageCheckin } from "sheet-db-schema";
 import { Schema } from "sheet-apis";
-import { DependencySignal } from "typhoon-core/signal";
-import { Result, RpcResult } from "typhoon-core/schema";
-
-type RpcSignal<Response> = Effect.Effect<
-  DependencySignal.DependencySignal<
-    RpcResult.RpcResult<Response, unknown>,
-    never,
-    never
-  >,
-  never,
-  Scope.Scope
->;
-
-type MessageCheckinDataResponse = Result.Result<
-  Either.Either<Schema.MessageCheckin, Schema.Error.Core.ArgumentError>,
-  Either.Either<Schema.MessageCheckin, Schema.Error.Core.ArgumentError>
->;
-
-type MessageCheckinMembersResponse = Result.Result<
-  ReadonlyArray<Schema.MessageCheckinMember>,
-  ReadonlyArray<Schema.MessageCheckinMember>
->;
 
 export class MessageCheckinService extends Effect.Service<MessageCheckinService>()(
   "MessageCheckinService",
@@ -33,22 +11,15 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
       Effect.Do,
       Effect.bind("client", () => SheetApisClient.get()),
       Effect.map(({ client }) => {
-        const subscribe = <Response>(
-          handler: string,
-          request: unknown,
-        ): RpcSignal<Response> =>
+        const subscribe = (handler: string, request: unknown) =>
           pipe(
             WebSocketClient.subscribeScoped(client, handler as any, request),
-            Effect.orDie,
-          ) as RpcSignal<Response>;
+          );
 
         return {
           getMessageCheckinData: (messageId: string) =>
             pipe(
-              subscribe<MessageCheckinDataResponse>(
-                "messageCheckin.getMessageCheckinData",
-                messageId,
-              ),
+              subscribe("messageCheckin.getMessageCheckinData", messageId),
               Effect.withSpan("MessageCheckinService.getMessageCheckinData", {
                 captureStackTrace: true,
               }),
@@ -75,10 +46,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
             ),
           getMessageCheckinMembers: (messageId: string) =>
             pipe(
-              subscribe<MessageCheckinMembersResponse>(
-                "messageCheckin.getMessageCheckinMembers",
-                messageId,
-              ),
+              subscribe("messageCheckin.getMessageCheckinMembers", messageId),
               Effect.withSpan(
                 "MessageCheckinService.getMessageCheckinMembers",
                 {

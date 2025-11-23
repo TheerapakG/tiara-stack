@@ -1,35 +1,7 @@
 import { SheetApisClient } from "@/client/sheetApis";
-import { Effect, pipe, Either, Option, Scope } from "effect";
+import { Effect, pipe } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import type { messageRoomOrder, messageRoomOrderEntry } from "sheet-db-schema";
-import { Schema } from "sheet-apis";
-import { DependencySignal } from "typhoon-core/signal";
-import { Result, RpcResult } from "typhoon-core/schema";
-
-type RpcSignal<Response> = Effect.Effect<
-  DependencySignal.DependencySignal<
-    RpcResult.RpcResult<Response, unknown>,
-    never,
-    never
-  >,
-  never,
-  Scope.Scope
->;
-
-type MessageRoomOrderResponse = Result.Result<
-  Either.Either<Schema.MessageRoomOrder, Schema.Error.Core.ArgumentError>,
-  Either.Either<Schema.MessageRoomOrder, Schema.Error.Core.ArgumentError>
->;
-
-type MessageRoomOrderEntryResponse = Result.Result<
-  ReadonlyArray<Schema.MessageRoomOrderEntry>,
-  ReadonlyArray<Schema.MessageRoomOrderEntry>
->;
-
-type MessageRoomOrderRangeResponse = Result.Result<
-  Option.Option<Schema.MessageRoomOrderRange>,
-  Option.Option<Schema.MessageRoomOrderRange>
->;
 
 export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderService>()(
   "MessageRoomOrderService",
@@ -38,22 +10,15 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
       Effect.Do,
       Effect.bind("client", () => SheetApisClient.get()),
       Effect.map(({ client }) => {
-        const subscribe = <Response>(
-          handler: string,
-          request: unknown,
-        ): RpcSignal<Response> =>
+        const subscribe = (handler: string, request: unknown) =>
           pipe(
             WebSocketClient.subscribeScoped(client, handler as any, request),
-            Effect.orDie,
-          ) as RpcSignal<Response>;
+          );
 
         return {
           getMessageRoomOrder: (messageId: string) =>
             pipe(
-              subscribe<MessageRoomOrderResponse>(
-                "messageRoomOrder.getMessageRoomOrder",
-                messageId,
-              ),
+              subscribe("messageRoomOrder.getMessageRoomOrder", messageId),
               Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder", {
                 captureStackTrace: true,
               }),
@@ -108,10 +73,10 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ),
           getMessageRoomOrderEntry: (messageId: string, rank: number) =>
             pipe(
-              subscribe<MessageRoomOrderEntryResponse>(
-                "messageRoomOrder.getMessageRoomOrderEntry",
-                { messageId, rank },
-              ),
+              subscribe("messageRoomOrder.getMessageRoomOrderEntry", {
+                messageId,
+                rank,
+              }),
               Effect.withSpan(
                 "MessageRoomOrderService.getMessageRoomOrderEntry",
                 {
@@ -121,10 +86,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ),
           getMessageRoomOrderRange: (messageId: string) =>
             pipe(
-              subscribe<MessageRoomOrderRangeResponse>(
-                "messageRoomOrder.getMessageRoomOrderRange",
-                messageId,
-              ),
+              subscribe("messageRoomOrder.getMessageRoomOrderRange", messageId),
               Effect.withSpan(
                 "MessageRoomOrderService.getMessageRoomOrderRange",
                 {
