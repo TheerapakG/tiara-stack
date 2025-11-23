@@ -61,6 +61,9 @@ export class SheetService extends Effect.Service<SheetService>()(
                   { guildId },
                 ),
               ),
+              Effect.tap(() =>
+                Effect.addFinalizer(() => Effect.log("finalizing eventConfig")),
+              ),
               Effect.withSpan("SheetService.eventConfig", {
                 captureStackTrace: true,
               }),
