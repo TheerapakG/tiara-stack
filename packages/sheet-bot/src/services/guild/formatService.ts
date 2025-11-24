@@ -239,7 +239,7 @@ export class FormatService extends Effect.Service<FormatService>()(
             Effect.let("mentionsString", ({ fills, prevFills }) =>
               pipe(
                 HashSet.fromIterable(fills),
-                HashSet.difference(pipe(HashSet.fromIterable(prevFills))),
+                HashSet.difference(HashSet.fromIterable(prevFills)),
                 HashSet.toValues,
                 Option.some,
                 Option.filter(Array.isNonEmptyArray),
