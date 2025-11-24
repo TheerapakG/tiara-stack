@@ -610,25 +610,8 @@ const getComputedSubscriptionResult =
         SubscriptionHandlerT
       >("subscription", header.payload.handler),
       Effect.flatMap(Option.getOrElse(() => Effect.fail(`handler not found`))),
-      Effect.flatMap((innerHandler) =>
-        Computed.make(
-          pipe(
-            runHandler(header.id, span)(innerHandler),
-            Effect.provide(serverWithRuntime.runtime),
-            Effect.withSpan("subscriptionHandler", {
-              captureStackTrace: true,
-              attributes: {
-                id: header.id,
-                handler: header.payload.handler,
-              },
-            }),
-            Effect.annotateLogs({
-              id: header.id,
-              handler: header.payload.handler,
-            }),
-          ),
-        ),
-      ),
+      Computed.mapEffect(runHandler(header.id, span)),
+      Computed.provideRuntime(serverWithRuntime.runtime),
       Effect.provide(serverWithRuntime.runtime),
       Effect.withSpan("Server.getComputedSubscriptionResult", {
         captureStackTrace: true,
