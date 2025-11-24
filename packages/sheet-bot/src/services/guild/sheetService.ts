@@ -3,6 +3,7 @@ import { Effect, pipe, ScopedCache, Duration } from "effect";
 import { WebSocketClient } from "typhoon-client-ws/client";
 import { SheetApisClient } from "@/client/sheetApis";
 import { GuildService } from "./guildService";
+import { Computed } from "typhoon-core/signal";
 
 export class SheetService extends Effect.Service<SheetService>()(
   "SheetService",
@@ -54,6 +55,7 @@ export class SheetService extends Effect.Service<SheetService>()(
           lookup: () =>
             pipe(
               guildService.getId(),
+              Effect.tap(() => Effect.log("getting event config")),
               Effect.flatMap((guildId) =>
                 WebSocketClient.subscribeScoped(
                   sheetApisClient.get(),
@@ -61,6 +63,7 @@ export class SheetService extends Effect.Service<SheetService>()(
                   { guildId },
                 ),
               ),
+              Computed.tap((eventConfig) => Effect.log(eventConfig)),
               Effect.tap(() =>
                 Effect.addFinalizer(() => Effect.log("finalizing eventConfig")),
               ),
