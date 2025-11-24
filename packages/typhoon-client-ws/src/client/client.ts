@@ -25,7 +25,7 @@ import {
 import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { DependencySignal, Signal, Computed } from "typhoon-core/signal";
-import { Validate, Validator } from "typhoon-core/validator";
+import { Validator } from "typhoon-core/validator";
 import { RpcResult } from "typhoon-core/schema";
 
 const WebSocketCtor = globalThis.WebSocket;
@@ -205,11 +205,7 @@ export class WebSocketClient<
                   Effect.bind("header", ({ pullEffect }) =>
                     pipe(
                       pullEffect,
-                      Effect.flatMap(
-                        Validate.validate(
-                          pipe(Header.HeaderSchema, Schema.standardSchemaV1),
-                        ),
-                      ),
+                      Effect.flatMap(Schema.decodeUnknown(Header.HeaderSchema)),
                     ),
                   ),
                   Effect.bind(
