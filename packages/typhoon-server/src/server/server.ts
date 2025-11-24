@@ -723,12 +723,20 @@ const handleSubscribe =
                   pipe(
                     serverWithRuntime,
                     getComputedSubscriptionResult(header, span),
+                    Computed.tap((result) =>
+                      Effect.log("result", header.id, result),
+                    ),
                     Computed.flatMap(encodeServerUpdateResult),
                     SideEffect.tapWithContext(
                       (buffer) =>
-                        peer.send(buffer, {
-                          compress: true,
-                        }),
+                        pipe(
+                          Effect.log("sending buffer to peer", header.id),
+                          Effect.andThen(() =>
+                            peer.send(buffer, {
+                              compress: true,
+                            }),
+                          ),
+                        ),
                       Context.make(Event, event),
                     ),
                     Scope.extend(scope),
