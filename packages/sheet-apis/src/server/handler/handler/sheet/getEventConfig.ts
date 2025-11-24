@@ -29,13 +29,13 @@ export const getEventConfigHandler = pipe(
               Computed.provideLayerComputedResult(layer),
             ),
           ),
-          Computed.tap((eventConfig) => Effect.log(eventConfig)),
           Effect.tap(() =>
             Effect.addFinalizer(() => Effect.log("finalizing event config")),
           ),
           Scope.extend(scope),
         ),
       ),
+      Computed.tap((eventConfig) => Effect.log(eventConfig)),
       Computed.flatMap(
         Schema.encodeEither(
           Handler.Config.resolveResponseValidator(
