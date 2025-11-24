@@ -122,10 +122,8 @@ export class AppsScriptClient<
         ),
       ),
       Effect.let("responseErrorValidator", ({ config }) =>
-        pipe(
-          Handler.Config.resolveResponseErrorValidator(
-            Handler.Config.responseError(config),
-          ),
+        Handler.Config.resolveResponseErrorValidator(
+          Handler.Config.responseError(config),
         ),
       ),
       Effect.let("id", () => Utilities.getUuid() as string),

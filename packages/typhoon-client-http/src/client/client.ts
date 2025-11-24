@@ -117,10 +117,8 @@ export class HttpClient<
         ),
       ),
       Effect.let("responseErrorValidator", ({ config }) =>
-        pipe(
-          Handler.Config.resolveResponseErrorValidator(
-            Handler.Config.responseError(config),
-          ),
+        Handler.Config.resolveResponseErrorValidator(
+          Handler.Config.responseError(config),
         ),
       ),
       Effect.let("id", () => crypto.randomUUID() as string),
