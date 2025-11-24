@@ -81,7 +81,6 @@ const handleList =
           Effect.bind("daySchedules", ({ day }) =>
             pipe(
               SheetService.daySchedules(day),
-              UntilObserver.observeUntilRpcResultResolved(),
               Effect.map(
                 Array.map((s) =>
                   pipe(

@@ -184,7 +184,7 @@ export const roomOrderPreviousButton =
             "message",
           ),
           bindObject({
-            eventConfig: SheetService.eventConfig,
+            eventConfig: SheetService.eventConfig(),
           }),
           Effect.bind("messageRoomOrder", ({ message }) =>
             MessageRoomOrderService.decrementMessageRoomOrderRank(message.id),
@@ -216,7 +216,7 @@ export const roomOrderNextButton =
             "message",
           ),
           bindObject({
-            eventConfig: SheetService.eventConfig,
+            eventConfig: SheetService.eventConfig(),
           }),
           Effect.bind("messageRoomOrder", ({ message }) =>
             MessageRoomOrderService.incrementMessageRoomOrderRank(message.id),
@@ -253,7 +253,7 @@ export const roomOrderSendButton =
             "message",
           ),
           bindObject({
-            eventConfig: SheetService.eventConfig,
+            eventConfig: SheetService.eventConfig(),
           }),
           Effect.bind("messageRoomOrder", ({ message }) =>
             pipe(

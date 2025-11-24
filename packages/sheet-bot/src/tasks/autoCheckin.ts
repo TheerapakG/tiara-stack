@@ -52,11 +52,7 @@ const getCheckinData = ({
       pipe(
         channelName,
         Option.match({
-          onSome: (name) =>
-            pipe(
-              SheetService.channelSchedules(name),
-              UntilObserver.observeUntilRpcResultResolved(),
-            ),
+          onSome: (name) => SheetService.channelSchedules(name),
           onNone: () => Effect.succeed([] as readonly unknown[]),
         }),
       ),
@@ -123,12 +119,7 @@ const runOnce = pipe(
         pipe(
           Effect.Do,
           Effect.bind("hour", () => computeHour),
-          Effect.bind("allSchedules", () =>
-            pipe(
-              SheetService.allSchedules,
-              UntilObserver.observeUntilRpcResultResolved(),
-            ),
-          ),
+          Effect.bind("allSchedules", () => SheetService.allSchedules()),
           Effect.let("channels", ({ allSchedules }) =>
             pipe(
               allSchedules,

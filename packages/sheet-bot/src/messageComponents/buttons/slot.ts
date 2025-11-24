@@ -30,7 +30,6 @@ const getSlotMessage = (day: number) =>
     bindObject({
       daySchedule: pipe(
         SheetService.daySchedules(day),
-        UntilObserver.observeUntilRpcResultResolved(),
         Effect.map(
           Array.map((s) =>
             pipe(

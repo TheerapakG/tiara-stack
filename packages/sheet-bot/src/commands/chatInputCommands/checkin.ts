@@ -60,7 +60,6 @@ const getCheckinData = ({
     Effect.bind("schedules", ({ channelName }) =>
       pipe(
         SheetService.channelSchedules(channelName),
-        UntilObserver.observeUntilRpcResultResolved(),
         Effect.map(
           Array.map((s) =>
             pipe(

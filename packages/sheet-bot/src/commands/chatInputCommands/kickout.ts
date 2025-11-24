@@ -62,7 +62,6 @@ const getKickoutData = ({
       pipe(
         runningChannel.name,
         Effect.flatMap(SheetService.channelSchedules),
-        UntilObserver.observeUntilRpcResultResolved(),
         Effect.map(
           Array.map((s) =>
             pipe(
