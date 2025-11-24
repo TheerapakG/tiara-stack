@@ -19,7 +19,8 @@ export const getEventConfigHandler = pipe(
       ),
       Computed.flatMapComputed(({ parsed: { guildId }, scope }) =>
         pipe(
-          Sheet.layerOfGuildId(guildId),
+          Effect.log("getting layer of guild id"),
+          Effect.andThen(Sheet.layerOfGuildId(guildId)),
           Computed.tap(() => Effect.log("getting event config")),
           Effect.flatMap((layer) =>
             pipe(
