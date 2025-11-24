@@ -578,8 +578,14 @@ export class WebSocketClient<
         ({ requestId }) =>
           pipe(
             WebSocketClient.unsubscribe(client, requestId, handler),
+            Effect.tap(() =>
+              Effect.log("unsubscribing from requestId", requestId),
+            ),
             Effect.catchAll(() => Effect.void),
           ),
+      ),
+      Effect.tap(({ requestId }) =>
+        Effect.log("subscribed to requestId", requestId),
       ),
       Effect.map(({ signal }) => signal),
       Effect.withSpan("WebSocketClient.subscribeScoped", {
