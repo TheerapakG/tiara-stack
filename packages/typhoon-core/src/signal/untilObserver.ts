@@ -12,7 +12,6 @@ import {
 } from "effect";
 import { RpcError, ValidationError } from "../error";
 import { Observable } from "../observability";
-import { map } from "./computed";
 import { DependencySignal } from "./dependencySignal";
 import { DependentSignal, DependentSymbol } from "./dependentSignal";
 import {
@@ -256,8 +255,12 @@ export const observeUntilSignal =
     options?: Observable.ObservableOptions,
   ) =>
   <E = never, R = never, E1 = never, R1 = never>(
-    effect: Effect.Effect<DependencySignal<A, E, R>, E1, R1>,
-  ): Effect.Effect<Match.Types.WhenMatch<A, P>, E | E1, R | R1> =>
+    effect: Effect.Effect<Effect.Effect<A, E, R>, E1, R1>,
+  ): Effect.Effect<
+    Match.Types.WhenMatch<A, P>,
+    E | E1,
+    Exclude<R, SignalContext> | R1
+  > =>
     pipe(
       effect,
       Effect.flatMap((signal) => observeUntil(signal, pattern, options)),
@@ -279,11 +282,11 @@ export const observeUntilScoped =
     options?: Observable.ObservableOptions,
   ) =>
   <E = never, R = never, E1 = never, R1 = never>(
-    effect: Effect.Effect<DependencySignal<A, E, R>, E1, R1>,
+    effect: Effect.Effect<Effect.Effect<A, E, R>, E1, R1>,
   ): Effect.Effect<
     Match.Types.WhenMatch<A, P>,
     E | E1,
-    Exclude<R | R1, Scope.Scope>
+    Exclude<Exclude<R, SignalContext> | R1, Scope.Scope>
   > =>
     pipe(
       effect,
@@ -302,14 +305,14 @@ export const observeUntilRpcResolved =
   (options?: Observable.ObservableOptions) =>
   <A = never, E = never, E1 = never, R1 = never, E2 = never, R2 = never>(
     effect: Effect.Effect<
-      DependencySignal<RpcResult.RpcResult<A, E>, E1, R1>,
+      Effect.Effect<RpcResult.RpcResult<A, E>, E1, R1>,
       E2,
       R2
     >,
   ): Effect.Effect<
     A,
     RpcError<E> | ValidationError | E1 | E2,
-    Exclude<R1 | R2, Scope.Scope>
+    Exclude<Exclude<R1, SignalContext> | R2, Scope.Scope>
   > =>
     pipe(
       effect,
@@ -328,22 +331,18 @@ export const observeUntilRpcResultResolved =
   (options?: Observable.ObservableOptions) =>
   <A = never, E = never, E1 = never, R1 = never, E2 = never, R2 = never>(
     effect: Effect.Effect<
-      DependencySignal<
-        RpcResult.RpcResult<Result.Result<unknown, A>, E>,
-        E1,
-        R1
-      >,
+      Effect.Effect<RpcResult.RpcResult<Result.Result<unknown, A>, E>, E1, R1>,
       E2,
       R2
     >,
   ): Effect.Effect<
     A,
     RpcError<E> | ValidationError | E1 | E2,
-    Exclude<R1 | R2, Scope.Scope>
+    Exclude<Exclude<R1, SignalContext> | R2, Scope.Scope>
   > =>
     pipe(
       effect,
-      map(Result.fromRpcReturningResult(undefined)),
+      Effect.map(Effect.map(Result.fromRpcReturningResult(undefined))),
       observeUntilScoped(Result.isComplete, options),
       Effect.flatMap((result) => result.value),
       Observable.withSpan(
@@ -374,11 +373,11 @@ export const observeOnce = <A = never, E = never, R = never>(
 export const observeOnceSignal =
   (options?: Observable.ObservableOptions) =>
   <A = never, E = never, R = never, E2 = never, R2 = never>(
-    effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2>,
-  ): Effect.Effect<A, E | E2, R | R2> =>
+    effect: Effect.Effect<Effect.Effect<A, E, R>, E2, R2>,
+  ): Effect.Effect<A, E | E2, Exclude<R, SignalContext> | R2> =>
     pipe(
       effect,
-      Effect.flatMap((signal) => observeOnce(signal, options)),
+      Effect.flatMap((innerEffect) => observeOnce(innerEffect, options)),
       Observable.withSpan(
         { [Observable.ObservableSymbol]: options ?? {} },
         "observeOnceSignal",
@@ -391,8 +390,12 @@ export const observeOnceSignal =
 export const observeOnceScoped =
   (options?: Observable.ObservableOptions) =>
   <A = never, E = never, R = never, E2 = never, R2 = never>(
-    effect: Effect.Effect<DependencySignal<A, E, R>, E2, R2>,
-  ): Effect.Effect<A, E | E2, Exclude<R | R2, Scope.Scope>> =>
+    effect: Effect.Effect<Effect.Effect<A, E, R>, E2, R2>,
+  ): Effect.Effect<
+    A,
+    E | E2,
+    Exclude<Exclude<R, SignalContext> | R2, Scope.Scope>
+  > =>
     pipe(
       effect,
       observeOnceSignal(options),
