@@ -1,4 +1,4 @@
-import { Match, pipe } from "effect";
+import { Match, Option, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Context, type Type } from "typhoon-core/handler";
 import { type MutationHandlerT } from "./mutation/type";
@@ -47,7 +47,15 @@ export const getHandlerContext =
     type: Type.HandlerType<HandlerT>,
     key: Type.HandlerDataKey<HandlerT, Type.HandlerData<HandlerT>>,
   ) =>
-  <R = never>(handlerContextCollection: HandlerContextCollection<R>) =>
+  <R = never>(
+    handlerContextCollection: HandlerContextCollection<R>,
+  ): Option.Option<
+    Context.HandlerContext<
+      HandlerT,
+      Type.HandlerData<HandlerT>,
+      Type.Handler<HandlerT, unknown, unknown, R>
+    >
+  > =>
     Context.Collection.getHandlerContext<HandlerT>(
       type,
       key,
@@ -55,7 +63,15 @@ export const getHandlerContext =
 
 export const getMutationHandlerContext =
   (key: string) =>
-  <R = never>(handlerContextCollection: HandlerContextCollection<R>) =>
+  <R = never>(
+    handlerContextCollection: HandlerContextCollection<R>,
+  ): Option.Option<
+    Context.HandlerContext<
+      MutationHandlerT,
+      Type.HandlerData<MutationHandlerT>,
+      Type.Handler<MutationHandlerT, unknown, unknown, R>
+    >
+  > =>
     getHandlerContext<MutationHandlerT>(
       "mutation",
       key,
@@ -63,7 +79,15 @@ export const getMutationHandlerContext =
 
 export const getSubscriptionHandlerContext =
   (key: string) =>
-  <R = never>(handlerContextCollection: HandlerContextCollection<R>) =>
+  <R = never>(
+    handlerContextCollection: HandlerContextCollection<R>,
+  ): Option.Option<
+    Context.HandlerContext<
+      SubscriptionHandlerT,
+      Type.HandlerData<SubscriptionHandlerT>,
+      Type.Handler<SubscriptionHandlerT, unknown, unknown, R>
+    >
+  > =>
     getHandlerContext<SubscriptionHandlerT>(
       "subscription",
       key,

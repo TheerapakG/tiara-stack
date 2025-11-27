@@ -29,7 +29,7 @@ import { Context as HandlerContext, type Type } from "typhoon-core/handler";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { RunState } from "typhoon-core/runtime";
 import { Handler } from "typhoon-core/server";
-import { Computed, UntilObserver, SideEffect } from "typhoon-core/signal";
+import { UntilObserver, SideEffect, SignalContext } from "typhoon-core/signal";
 import { parseURL, withoutTrailingSlash } from "ufo";
 import {
   close as closeEvent,
@@ -599,7 +599,11 @@ const getComputedSubscriptionResult =
   <R = never>(
     serverWithRuntime: ServerWithRuntime<R>,
   ): Effect.Effect<
-    Computed.Computed<ServerUpdateResult, never, Event>,
+    Effect.Effect<
+      ServerUpdateResult,
+      never,
+      Event | SignalContext.SignalContext
+    >,
     unknown,
     Event | Scope.Scope
   > =>
@@ -610,8 +614,13 @@ const getComputedSubscriptionResult =
         SubscriptionHandlerT
       >("subscription", header.payload.handler),
       Effect.flatMap(Option.getOrElse(() => Effect.fail(`handler not found`))),
-      Computed.mapEffect(runHandler(header.id, span)),
-      Computed.provideRuntime(serverWithRuntime.runtime),
+      Effect.map((innerHandler) =>
+        pipe(
+          innerHandler,
+          runHandler(header.id, span),
+          Effect.provide(serverWithRuntime.runtime),
+        ),
+      ),
       Effect.provide(serverWithRuntime.runtime),
       Effect.withSpan("Server.getComputedSubscriptionResult", {
         captureStackTrace: true,
@@ -706,20 +715,15 @@ const handleSubscribe =
                   pipe(
                     serverWithRuntime,
                     getComputedSubscriptionResult(header, span),
-                    Computed.tap((result) =>
-                      Effect.log("result", header.id, result),
-                    ),
-                    Computed.flatMap(encodeServerUpdateResult),
                     SideEffect.tapWithContext(
-                      (buffer) =>
-                        pipe(
-                          Effect.log("sending buffer to peer", header.id),
-                          Effect.andThen(() =>
-                            peer.send(buffer, {
-                              compress: true,
-                            }),
-                          ),
+                      flow(
+                        encodeServerUpdateResult,
+                        Effect.andThen((buffer) =>
+                          peer.send(buffer, {
+                            compress: true,
+                          }),
                         ),
+                      ),
                       Context.make(Event, event),
                     ),
                     Scope.extend(scope),
@@ -803,9 +807,14 @@ const handleOnce =
         pipe(
           serverWithRuntime,
           getComputedSubscriptionResult(header, span),
-          Computed.flatMap(encodeServerUpdateResult),
-          Computed.flatMap((buffer) => callback(buffer)),
-          Computed.tap(() => closeEvent()),
+          Effect.map((computed) =>
+            pipe(
+              computed,
+              Effect.flatMap(encodeServerUpdateResult),
+              Effect.flatMap(callback),
+              Effect.tap(() => closeEvent()),
+            ),
+          ),
           UntilObserver.observeOnceScoped(),
         ),
       ),

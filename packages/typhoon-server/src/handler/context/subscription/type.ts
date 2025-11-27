@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { Effect, HKT, Option, Scope } from "effect";
 import type { Type } from "typhoon-core/handler";
 import { Handler } from "typhoon-core/server";
-import { Computed } from "typhoon-core/signal";
+import { SignalContext } from "typhoon-core/signal";
 import { Validator } from "typhoon-core/validator";
 import { Event } from "../../../event/event";
 
@@ -11,7 +11,7 @@ type InnerSubscriptionHandler<
   A = unknown,
   E = unknown,
   R = unknown,
-> = Computed.Computed<A, E, R>;
+> = Effect.Effect<A, E, R | SignalContext.SignalContext>;
 type SubscriptionHandler<A = unknown, E = unknown, R = unknown> = Effect.Effect<
   InnerSubscriptionHandler<A, E, R>,
   E,
@@ -86,7 +86,7 @@ interface TransformDataErrorOut extends HKT.TypeLambda {
 interface TransformHandlerSuccess extends HKT.TypeLambda {
   readonly type: this["In"] extends infer H extends SubscriptionHandler
     ? Effect.Effect.Success<H> extends infer IH extends InnerSubscriptionHandler
-      ? Computed.Success<IH>
+      ? Effect.Effect.Success<IH>
       : never
     : never;
 }
@@ -94,7 +94,7 @@ interface TransformHandlerSuccess extends HKT.TypeLambda {
 interface TransformHandlerError extends HKT.TypeLambda {
   readonly type: this["In"] extends infer H extends SubscriptionHandler
     ? Effect.Effect.Success<H> extends infer IH extends InnerSubscriptionHandler
-      ? Effect.Effect.Error<H> | Computed.Error<IH>
+      ? Effect.Effect.Error<H> | Effect.Effect.Error<IH>
       : never
     : never;
 }
@@ -102,7 +102,9 @@ interface TransformHandlerError extends HKT.TypeLambda {
 interface TransformHandlerContext extends HKT.TypeLambda {
   readonly type: this["In"] extends infer H extends SubscriptionHandler
     ? Effect.Effect.Success<H> extends infer IH extends InnerSubscriptionHandler
-      ? Effect.Effect.Context<H> | Computed.Context<IH>
+      ?
+          | Effect.Effect.Context<H>
+          | Exclude<Effect.Effect.Context<IH>, SignalContext.SignalContext>
       : never
     : never;
 }
