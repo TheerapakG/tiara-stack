@@ -12,6 +12,7 @@ import {
   pipe,
   Cause,
   Types,
+  flow,
 } from "effect";
 import { Result } from "../schema";
 import { Observable } from "../observability";
@@ -260,7 +261,7 @@ export const mapEffect =
     ) => Effect.Effect<B, E2, R2>,
     options?: Observable.ObservableOptions,
   ) =>
-  <E2, R2>(signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>) =>
+  <E2, R2>(signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>) =>
     pipe(
       signal,
       Effect.flatMap((signal) => make(pipe(signal, mapper), options)),
@@ -268,26 +269,30 @@ export const mapEffect =
 
 export const tap =
   <A, X>(mapper: (value: A) => X, options?: Observable.ObservableOptions) =>
-  <E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
-  ) =>
+  <E1, R1, E2, R2>(signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>) =>
     pipe(signal, mapEffect(Effect.tap(mapper), options)) as [X] extends [
       Effect.Effect<infer _A3, infer E3, infer R3>,
     ]
       ? Effect.Effect<
-          Computed<A, E3 | E1, Exclude<R3, SignalContext> | R1>,
+          Computed<A, E3 | E1, Exclude<R3 | R1, SignalContext>>,
           E2,
           R2
         >
       : [X] extends [PromiseLike<infer _A3>]
-        ? Effect.Effect<Computed<A, E1 | Cause.UnknownException, R1>, E2, R2>
-        : Effect.Effect<Computed<A, E1, R1>, E2, R2>;
+        ? Effect.Effect<
+            Computed<
+              A,
+              E1 | Cause.UnknownException,
+              Exclude<R1, SignalContext>
+            >,
+            E2,
+            R2
+          >
+        : Effect.Effect<Computed<A, E1, Exclude<R1, SignalContext>>, E2, R2>;
 
 export const map =
   <A, B>(mapper: (value: A) => B, options?: Observable.ObservableOptions) =>
-  <E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
-  ) =>
+  <E1, R1, E2, R2>(signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>) =>
     pipe(signal, mapEffect(Effect.map(mapper), options));
 
 export const flatMap =
@@ -295,32 +300,25 @@ export const flatMap =
     mapper: (value: A) => Effect.Effect<B, E3, R3>,
     options?: Observable.ObservableOptions,
   ) =>
-  <E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
-  ) =>
+  <E1, R1, E2, R2>(signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>) =>
     pipe(signal, mapEffect(Effect.flatMap(mapper), options));
 
 export const flatMapComputed =
   <A, B, E3, R3, E4, R4>(
-    mapper: (value: A) => Effect.Effect<DependencySignal<B, E3, R3>, E4, R4>,
+    mapper: (value: A) => Effect.Effect<Effect.Effect<B, E3, R3>, E4, R4>,
     options?: Observable.ObservableOptions,
   ) =>
-  <E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
-  ) =>
+  <E1, R1, E2, R2>(signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>) =>
     pipe(
       signal,
-      mapEffect(
-        (signal) => pipe(Effect.flatMap(signal, mapper), Effect.flatten),
-        options,
-      ),
+      mapEffect(flow(Effect.flatMap(mapper), Effect.flatten), options),
     );
 
 export const flatten =
   (options?: Observable.ObservableOptions) =>
   <A, E, R, E2, R2, E3, R3>(
     signal: Effect.Effect<
-      DependencySignal<Effect.Effect<A, E, R>, E3, R3>,
+      Effect.Effect<Effect.Effect<A, E, R>, E3, R3>,
       E2,
       R2
     >,
@@ -333,7 +331,7 @@ export const provideLayer =
     options?: Observable.ObservableOptions,
   ) =>
   <A, E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>,
   ) =>
     pipe(signal, mapEffect(Effect.provide(layer), options));
 
@@ -343,7 +341,7 @@ export const provideLayerResult =
     options?: Observable.ObservableOptions,
   ) =>
   <A, E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>,
   ) =>
     pipe(
       signal,
@@ -372,11 +370,11 @@ export const provideLayerResult =
 
 export const provideLayerComputed =
   <Rout, E3, RIn, E4, R4>(
-    layer: DependencySignal<Layer.Layer<Rout, E3, RIn>, E4, R4>,
+    layer: Effect.Effect<Layer.Layer<Rout, E3, RIn>, E4, R4>,
     options?: Observable.ObservableOptions,
   ) =>
   <A, E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>,
   ) =>
     pipe(
       Effect.all({ signal, layer }),
@@ -387,11 +385,11 @@ export const provideLayerComputed =
 
 export const provideLayerComputedResult =
   <Rout, E3, RIn, E4, R4>(
-    layer: DependencySignal<Result.Result<Layer.Layer<Rout, E3, RIn>>, E4, R4>,
+    layer: Effect.Effect<Result.Result<Layer.Layer<Rout, E3, RIn>>, E4, R4>,
     options?: Observable.ObservableOptions,
   ) =>
   <A, E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>,
   ) =>
     pipe(
       Effect.all({ signal, layer }),
@@ -425,7 +423,7 @@ export const provideContext =
     options?: Observable.ObservableOptions,
   ) =>
   <A, E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>,
   ) =>
     pipe(signal, mapEffect(Effect.provide(context), options));
 
@@ -435,7 +433,7 @@ export const provideContextResult =
     options?: Observable.ObservableOptions,
   ) =>
   <A, E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>,
   ) =>
     pipe(
       signal,
@@ -479,11 +477,11 @@ export const provideContextComputed =
 
 export const provideContextComputedResult =
   <R3, E4, R4>(
-    context: DependencySignal<Result.Result<EffectContext.Context<R3>>, E4, R4>,
+    context: Effect.Effect<Result.Result<EffectContext.Context<R3>>, E4, R4>,
     options?: Observable.ObservableOptions,
   ) =>
   <A, E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>,
   ) =>
     pipe(
       Effect.all({ signal, context }),
@@ -514,7 +512,7 @@ export const provideContextComputedResult =
 export const provideRuntime =
   <R3>(runtime: Runtime.Runtime<R3>, options?: Observable.ObservableOptions) =>
   <A, E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>,
   ) =>
     pipe(signal, mapEffect(Effect.provide(runtime), options));
 
@@ -524,7 +522,7 @@ export const provideRuntimeResult =
     options?: Observable.ObservableOptions,
   ) =>
   <A, E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>,
   ) =>
     pipe(
       signal,
@@ -553,11 +551,11 @@ export const provideRuntimeResult =
 
 export const provideRuntimeComputed =
   <R3, E4, R4>(
-    runtime: DependencySignal<Runtime.Runtime<R3>, E4, R4>,
+    runtime: Effect.Effect<Runtime.Runtime<R3>, E4, R4>,
     options?: Observable.ObservableOptions,
   ) =>
   <A, E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>,
   ) =>
     pipe(
       Effect.all({ signal, runtime }),
@@ -568,11 +566,11 @@ export const provideRuntimeComputed =
 
 export const provideRuntimeComputedResult =
   <R3, E4, R4>(
-    runtime: DependencySignal<Result.Result<Runtime.Runtime<R3>>, E4, R4>,
+    runtime: Effect.Effect<Result.Result<Runtime.Runtime<R3>>, E4, R4>,
     options?: Observable.ObservableOptions,
   ) =>
   <A, E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>,
   ) =>
     pipe(
       Effect.all({ signal, runtime }),
@@ -606,7 +604,7 @@ export const provideManagedRuntime =
     options?: Observable.ObservableOptions,
   ) =>
   <A, E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>,
   ) =>
     pipe(signal, mapEffect(Effect.provide(runtime), options));
 
@@ -616,7 +614,7 @@ export const provideManagedRuntimeResult =
     options?: Observable.ObservableOptions,
   ) =>
   <A, E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>,
   ) =>
     pipe(
       signal,
@@ -645,7 +643,7 @@ export const provideManagedRuntimeResult =
 
 export const provideManagedRuntimeComputed =
   <R3, E3, E4, R4>(
-    runtime: DependencySignal<ManagedRuntime.ManagedRuntime<R3, E3>, E4, R4>,
+    runtime: Effect.Effect<ManagedRuntime.ManagedRuntime<R3, E3>, E4, R4>,
     options?: Observable.ObservableOptions,
   ) =>
   <A, E1, R1, E2, R2>(
@@ -668,7 +666,7 @@ export const provideManagedRuntimeComputedResult =
     options?: Observable.ObservableOptions,
   ) =>
   <A, E1, R1, E2, R2>(
-    signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+    signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>,
   ) =>
     pipe(
       Effect.all({ signal, runtime }),
@@ -699,29 +697,29 @@ export const provideManagedRuntimeComputedResult =
 export const annotateLogs =
   <E1 = never, R1 = never>(
     key: string,
-    value: DependencySignal<unknown, E1, R1>,
+    value: Effect.Effect<unknown, E1, R1>,
     options?: Observable.ObservableOptions,
   ) =>
   <A = never, E2 = never, R2 = never, E3 = never, R3 = never>(
-    signal: Effect.Effect<DependencySignal<A, E2, R2>, E3, R3>,
+    signal: Effect.Effect<Effect.Effect<A, E2, R2>, E3, R3>,
   ) =>
     pipe(signal, mapEffect(Effect.annotateLogs(key, value), options));
 
 export const annotateSpans =
   <E1 = never, R1 = never>(
     key: string,
-    value: DependencySignal<unknown, E1, R1>,
+    value: Effect.Effect<unknown, E1, R1>,
     options?: Observable.ObservableOptions,
   ) =>
   <A = never, E2 = never, R2 = never, E3 = never, R3 = never>(
-    signal: Effect.Effect<DependencySignal<A, E2, R2>, E3, R3>,
+    signal: Effect.Effect<Effect.Effect<A, E2, R2>, E3, R3>,
   ) =>
     pipe(signal, mapEffect(Effect.annotateSpans(key, value), options));
 
 export const makeAll = <
   const Arg extends
-    | Iterable<DependencySignal<any, any, any>>
-    | Record<string, DependencySignal<any, any, any>>,
+    | Iterable<Effect.Effect<any, any, any>>
+    | Record<string, Effect.Effect<any, any, any>>,
   O extends Types.NoExcessProperties<
     {
       readonly concurrency?: Types.Concurrency | undefined;
@@ -748,8 +746,8 @@ export const makeAll = <
 
 export const all = <
   const Arg extends
-    | Iterable<DependencySignal<any, any, any>>
-    | Record<string, DependencySignal<any, any, any>>,
+    | Iterable<Effect.Effect<any, any, any>>
+    | Record<string, Effect.Effect<any, any, any>>,
   O extends Types.NoExcessProperties<
     {
       readonly concurrency?: Types.Concurrency | undefined;
@@ -811,8 +809,8 @@ export const allWith =
   ) =>
   <
     const Arg extends
-      | Iterable<DependencySignal<any, any, any>>
-      | Record<string, DependencySignal<any, any, any>>,
+      | Iterable<Effect.Effect<any, any, any>>
+      | Record<string, Effect.Effect<any, any, any>>,
     E = never,
     R = never,
   >(
