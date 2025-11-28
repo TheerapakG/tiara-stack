@@ -8,7 +8,7 @@ import {
   SynchronizedRef,
 } from "effect";
 import { Handler } from "typhoon-core/server";
-import { Computed, Signal } from "typhoon-core/signal";
+import { Signal, SignalContext } from "typhoon-core/signal";
 import { Validate, Validator } from "typhoon-core/validator";
 import {
   AuthorizationError,
@@ -170,25 +170,38 @@ export const pullEffect = (): Effect.Effect<
   );
 
 export const request = {
-  raw: () =>
+  raw: (): Effect.Effect<
+    Effect.Effect<MsgpackPullEffect, never, SignalContext.SignalContext>,
+    never,
+    Event
+  > =>
     pipe(
       pullEffect(),
-      Computed.map((pullEffect) => pullEffect.effect),
+      Effect.map(Effect.map((pullEffect) => pullEffect.effect)),
     ),
-  rawWithScope: () =>
-    pullEffect() as Effect.Effect<
-      Signal.Signal<{
+  rawWithScope: (): Effect.Effect<
+    Effect.Effect<
+      {
         effect: MsgpackPullEffect;
-        scope: Scope.Scope;
-      }>,
+        scope: Scope.CloseableScope;
+      },
       never,
-      Event
+      SignalContext.SignalContext
     >,
+    never,
+    Event
+  > =>
+    pipe(
+      pullEffect(),
+      Effect.map((signal) => signal.value),
+    ),
   parsed: <Config extends Handler.Config.TypedHandlerConfig>(config: Config) =>
     pipe(
       request.raw(),
-      Computed.flatMap(
-        pullEffectToParsed(Handler.Config.requestParams(config)),
+      Effect.map(
+        Effect.flatMap(
+          pullEffectToParsed(Handler.Config.requestParams(config)),
+        ),
       ),
     ),
   parsedWithScope: <Config extends Handler.Config.TypedHandlerConfig>(
@@ -196,14 +209,16 @@ export const request = {
   ) =>
     pipe(
       request.rawWithScope(),
-      Computed.flatMap(({ effect, scope }) =>
-        Effect.all({
-          parsed: pipe(
-            effect,
-            pullEffectToParsed(Handler.Config.requestParams(config)),
-          ),
-          scope: Effect.succeed(scope),
-        }),
+      Effect.map(
+        Effect.flatMap(({ effect, scope }) =>
+          Effect.all({
+            parsed: pipe(
+              effect,
+              pullEffectToParsed(Handler.Config.requestParams(config)),
+            ),
+            scope: Effect.succeed(scope),
+          }),
+        ),
       ),
     ),
 };

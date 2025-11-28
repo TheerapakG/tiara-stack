@@ -1,10 +1,10 @@
 import { mapScheduleWithPlayersHandlerConfig } from "@/server/handler/config";
 import { AuthService, Sheet } from "@/server/services";
-import { Effect, pipe, Schema, Scope } from "effect";
+import { Effect, flow, pipe, Schema, Scope } from "effect";
 import { Handler } from "typhoon-core/server";
-import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
+import { Result } from "typhoon-core/schema";
 
 const builders = Context.Subscription.Builder.builders();
 export const mapScheduleWithPlayersHandler = pipe(
@@ -12,34 +12,68 @@ export const mapScheduleWithPlayersHandler = pipe(
   builders.data(mapScheduleWithPlayersHandlerConfig),
   builders.handler(
     pipe(
-      Computed.make(Event.someToken()),
-      Computed.flatMap(AuthService.verify),
-      Computed.flatMapComputed(() =>
-        Event.request.parsedWithScope(mapScheduleWithPlayersHandlerConfig),
-      ),
-      Computed.flatMapComputed(({ parsed: { guildId, schedules }, scope }) =>
-        pipe(
-          Sheet.layerOfGuildId(guildId),
-          Effect.flatMap((layer) =>
-            pipe(
-              Effect.forEach(
-                schedules,
-                Sheet.PlayerService.mapScheduleWithPlayers,
-                {
-                  concurrency: "unbounded",
-                },
-              ),
-              Computed.make,
-              Computed.provideLayerComputedResult(layer),
-            ),
+      Effect.succeed(Event.someToken()),
+      Effect.map(Effect.flatMap(AuthService.verify)),
+      Effect.map(
+        flow(
+          Effect.flatMap(() =>
+            Event.request.parsedWithScope(mapScheduleWithPlayersHandlerConfig),
           ),
-          Scope.extend(scope),
+          Effect.flatten,
         ),
       ),
-      Computed.flatMap(
-        Schema.encodeEither(
-          Handler.Config.resolveResponseValidator(
-            Handler.Config.response(mapScheduleWithPlayersHandlerConfig),
+      Effect.map(
+        flow(
+          Effect.flatMap(({ parsed: { guildId, schedules }, scope }) =>
+            pipe(
+              Sheet.layerOfGuildId(guildId),
+              Effect.flatMap((layer) =>
+                pipe(
+                  Effect.all({
+                    signal: Effect.succeed(
+                      Effect.forEach(
+                        schedules,
+                        Sheet.PlayerService.mapScheduleWithPlayers,
+                        {
+                          concurrency: "unbounded",
+                        },
+                      ),
+                    ),
+                    layer,
+                  }),
+                  Effect.map(({ signal, layer }) =>
+                    pipe(
+                      layer,
+                      Result.match({
+                        onOptimistic: (l) =>
+                          pipe(
+                            signal,
+                            Effect.map(Result.optimistic),
+                            Effect.provide(l),
+                          ),
+                        onComplete: (l) =>
+                          pipe(
+                            signal,
+                            Effect.map(Result.complete),
+                            Effect.provide(l),
+                          ),
+                      }),
+                    ),
+                  ),
+                ),
+              ),
+              Scope.extend(scope),
+            ),
+          ),
+          Effect.flatten,
+        ),
+      ),
+      Effect.map(
+        Effect.flatMap(
+          Schema.encodeEither(
+            Handler.Config.resolveResponseValidator(
+              Handler.Config.response(mapScheduleWithPlayersHandlerConfig),
+            ),
           ),
         ),
       ),

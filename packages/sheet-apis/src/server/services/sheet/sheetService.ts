@@ -28,7 +28,6 @@ import {
   String,
 } from "effect";
 import { Result, TupleToStructValueSchema } from "typhoon-core/schema";
-import { Computed } from "typhoon-core/signal";
 import { Array as ArrayUtils, Struct as StructUtils } from "typhoon-core/utils";
 import { GuildConfigService } from "../guildConfigService";
 import { SheetConfigService } from "../sheetConfigService";
@@ -1295,25 +1294,29 @@ export class SheetService extends Effect.Service<SheetService>()(
   static ofGuild = (guildId: string) =>
     pipe(
       GuildConfigService.getGuildConfigByGuildId(guildId),
-      Computed.flatMap(
-        Result.match({
-          onOptimistic: (guildConfig) =>
-            pipe(
-              guildConfig,
-              Option.flatMap((guildConfig) => guildConfig.sheetId),
-              Option.map(Result.optimistic),
-            ),
-          onComplete: (guildConfig) =>
-            pipe(
-              guildConfig,
-              Option.flatMap((guildConfig) => guildConfig.sheetId),
-              Option.map(Result.complete),
-            ),
-        }),
+      Effect.map(
+        Effect.flatMap(
+          Result.match({
+            onOptimistic: (guildConfig) =>
+              pipe(
+                guildConfig,
+                Option.flatMap((guildConfig) => guildConfig.sheetId),
+                Option.map(Result.optimistic),
+              ),
+            onComplete: (guildConfig) =>
+              pipe(
+                guildConfig,
+                Option.flatMap((guildConfig) => guildConfig.sheetId),
+                Option.map(Result.complete),
+              ),
+          }),
+        ),
       ),
-      Computed.map(
-        Result.map((sheetId) =>
-          SheetService.DefaultWithoutDependencies(sheetId),
+      Effect.map(
+        Effect.map(
+          Result.map((sheetId) =>
+            SheetService.DefaultWithoutDependencies(sheetId),
+          ),
         ),
       ),
     );

@@ -13,11 +13,7 @@ import {
 } from "sheet-db-schema";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass, Result } from "typhoon-core/schema";
-import {
-  Computed,
-  ZeroQueryExternalSource,
-  ExternalComputed,
-} from "typhoon-core/signal";
+import { ZeroQueryExternalSource, ExternalComputed } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
 import { ZeroServiceTag } from "@/db/zeroService";
 
@@ -43,13 +39,15 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Computed.flatten(),
-            Computed.flatMap(
-              Schema.decode(
-                Result.ResultSchema({
-                  optimistic: Schema.Array(DefaultTaggedClass(GuildConfig)),
-                  complete: Schema.Array(DefaultTaggedClass(GuildConfig)),
-                }),
+            Effect.map(Effect.flatten),
+            Effect.map(
+              Effect.flatMap(
+                Schema.decode(
+                  Result.ResultSchema({
+                    optimistic: Schema.Array(DefaultTaggedClass(GuildConfig)),
+                    complete: Schema.Array(DefaultTaggedClass(GuildConfig)),
+                  }),
+                ),
               ),
             ),
             Effect.withSpan("GuildConfigService.getAutoCheckinGuilds", {
@@ -68,19 +66,21 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Computed.flatten(),
-            Computed.flatMap(
-              Schema.decode(
-                Result.ResultSchema({
-                  optimistic: Schema.OptionFromNullishOr(
-                    DefaultTaggedClass(GuildConfig),
-                    undefined,
-                  ),
-                  complete: Schema.OptionFromNullishOr(
-                    DefaultTaggedClass(GuildConfig),
-                    undefined,
-                  ),
-                }),
+            Effect.map(Effect.flatten),
+            Effect.map(
+              Effect.flatMap(
+                Schema.decode(
+                  Result.ResultSchema({
+                    optimistic: Schema.OptionFromNullishOr(
+                      DefaultTaggedClass(GuildConfig),
+                      undefined,
+                    ),
+                    complete: Schema.OptionFromNullishOr(
+                      DefaultTaggedClass(GuildConfig),
+                      undefined,
+                    ),
+                  }),
+                ),
               ),
             ),
             Effect.withSpan("GuildConfigService.getGuildConfigByGuildId", {
@@ -99,19 +99,21 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Computed.flatten(),
-            Computed.flatMap(
-              Schema.decode(
-                Result.ResultSchema({
-                  optimistic: Schema.OptionFromNullishOr(
-                    DefaultTaggedClass(GuildConfig),
-                    undefined,
-                  ),
-                  complete: Schema.OptionFromNullishOr(
-                    DefaultTaggedClass(GuildConfig),
-                    undefined,
-                  ),
-                }),
+            Effect.map(Effect.flatten),
+            Effect.map(
+              Effect.flatMap(
+                Schema.decode(
+                  Result.ResultSchema({
+                    optimistic: Schema.OptionFromNullishOr(
+                      DefaultTaggedClass(GuildConfig),
+                      undefined,
+                    ),
+                    complete: Schema.OptionFromNullishOr(
+                      DefaultTaggedClass(GuildConfig),
+                      undefined,
+                    ),
+                  }),
+                ),
               ),
             ),
             Effect.withSpan("GuildConfigService.getGuildConfigByScriptId", {
@@ -166,17 +168,19 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Computed.flatten(),
-            Computed.flatMap(
-              Schema.decode(
-                Result.ResultSchema({
-                  optimistic: Schema.Array(
-                    DefaultTaggedClass(GuildConfigManagerRole),
-                  ),
-                  complete: Schema.Array(
-                    DefaultTaggedClass(GuildConfigManagerRole),
-                  ),
-                }),
+            Effect.map(Effect.flatten),
+            Effect.map(
+              Effect.flatMap(
+                Schema.decode(
+                  Result.ResultSchema({
+                    optimistic: Schema.Array(
+                      DefaultTaggedClass(GuildConfigManagerRole),
+                    ),
+                    complete: Schema.Array(
+                      DefaultTaggedClass(GuildConfigManagerRole),
+                    ),
+                  }),
+                ),
               ),
             ),
             Effect.withSpan("GuildConfigService.getGuildManagerRoles", {
@@ -303,19 +307,21 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Computed.flatten(),
-            Computed.flatMap(
-              Schema.decode(
-                Result.ResultSchema({
-                  optimistic: Schema.OptionFromNullishOr(
-                    DefaultTaggedClass(GuildChannelConfig),
-                    undefined,
-                  ),
-                  complete: Schema.OptionFromNullishOr(
-                    DefaultTaggedClass(GuildChannelConfig),
-                    undefined,
-                  ),
-                }),
+            Effect.map(Effect.flatten),
+            Effect.map(
+              Effect.flatMap(
+                Schema.decode(
+                  Result.ResultSchema({
+                    optimistic: Schema.OptionFromNullishOr(
+                      DefaultTaggedClass(GuildChannelConfig),
+                      undefined,
+                    ),
+                    complete: Schema.OptionFromNullishOr(
+                      DefaultTaggedClass(GuildChannelConfig),
+                      undefined,
+                    ),
+                  }),
+                ),
               ),
             ),
             Effect.withSpan("GuildConfigService.getGuildRunningChannelById", {
@@ -335,19 +341,21 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Computed.flatten(),
-            Computed.flatMap(
-              Schema.decode(
-                Result.ResultSchema({
-                  optimistic: Schema.OptionFromNullishOr(
-                    DefaultTaggedClass(GuildChannelConfig),
-                    undefined,
-                  ),
-                  complete: Schema.OptionFromNullishOr(
-                    DefaultTaggedClass(GuildChannelConfig),
-                    undefined,
-                  ),
-                }),
+            Effect.map(Effect.flatten),
+            Effect.map(
+              Effect.flatMap(
+                Schema.decode(
+                  Result.ResultSchema({
+                    optimistic: Schema.OptionFromNullishOr(
+                      DefaultTaggedClass(GuildChannelConfig),
+                      undefined,
+                    ),
+                    complete: Schema.OptionFromNullishOr(
+                      DefaultTaggedClass(GuildChannelConfig),
+                      undefined,
+                    ),
+                  }),
+                ),
               ),
             ),
             Effect.withSpan("GuildConfigService.getGuildRunningChannelByName", {

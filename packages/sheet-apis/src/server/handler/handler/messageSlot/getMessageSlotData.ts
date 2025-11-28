@@ -1,9 +1,8 @@
 import { getMessageSlotDataHandlerConfig } from "@/server/handler/config";
 import { Error } from "@/server/schema";
 import { AuthService, MessageSlotService } from "@/server/services";
-import { Effect, Either, Scope, pipe } from "effect";
+import { Effect, Either, flow, Scope, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
-import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
 import { Result } from "typhoon-core/schema";
@@ -15,28 +14,40 @@ export const getMessageSlotDataHandler = pipe(
   builders.data(getMessageSlotDataHandlerConfig),
   builders.handler(
     pipe(
-      Computed.make(Event.someToken()),
-      Computed.flatMap(AuthService.verify),
-      Computed.flatMapComputed(() =>
-        Event.request.parsedWithScope(getMessageSlotDataHandlerConfig),
-      ),
-      Computed.flatMapComputed(({ parsed, scope }) =>
-        pipe(
-          MessageSlotService.getMessageSlotData(parsed),
-          Scope.extend(scope),
+      Effect.succeed(Event.someToken()),
+      Effect.map(Effect.flatMap(AuthService.verify)),
+      Effect.map(
+        flow(
+          Effect.flatMap(() =>
+            Event.request.parsedWithScope(getMessageSlotDataHandlerConfig),
+          ),
+          Effect.flatten,
         ),
       ),
-      Computed.map(
-        Result.map(
-          Either.fromOption(() =>
-            Error.Core.makeArgumentError(
-              "Cannot get message slot data, the message might not be registered",
+      Effect.map(
+        flow(
+          Effect.flatMap(({ parsed, scope }) =>
+            pipe(
+              MessageSlotService.getMessageSlotData(parsed),
+              Scope.extend(scope),
+            ),
+          ),
+          Effect.flatten,
+        ),
+      ),
+      Effect.map(
+        Effect.map(
+          Result.map(
+            Either.fromOption(() =>
+              Error.Core.makeArgumentError(
+                "Cannot get message slot data, the message might not be registered",
+              ),
             ),
           ),
         ),
       ),
-      Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
-      Computed.mapEffect(
+      Effect.map(Error.Core.catchParseErrorAsValidationError),
+      Effect.map(
         Handler.Config.encodeResponseEffect(getMessageSlotDataHandlerConfig),
       ),
       Effect.withSpan("getMessageSlotDataHandler", {

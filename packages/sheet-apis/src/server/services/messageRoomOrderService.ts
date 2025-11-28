@@ -9,11 +9,7 @@ import { Array, DateTime, Effect, Option, pipe, Schema } from "effect";
 import { messageRoomOrder, messageRoomOrderEntry } from "sheet-db-schema";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass, Result } from "typhoon-core/schema";
-import {
-  Computed,
-  ExternalComputed,
-  ZeroQueryExternalSource,
-} from "typhoon-core/signal";
+import { ExternalComputed, ZeroQueryExternalSource } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
 import { ZeroServiceTag } from "@/db/zeroService";
 
@@ -40,19 +36,21 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Computed.flatten(),
-            Computed.flatMap(
-              Schema.decode(
-                Result.ResultSchema({
-                  optimistic: Schema.OptionFromNullishOr(
-                    DefaultTaggedClass(MessageRoomOrder),
-                    undefined,
-                  ),
-                  complete: Schema.OptionFromNullishOr(
-                    DefaultTaggedClass(MessageRoomOrder),
-                    undefined,
-                  ),
-                }),
+            Effect.map(Effect.flatten),
+            Effect.map(
+              Effect.flatMap(
+                Schema.decode(
+                  Result.ResultSchema({
+                    optimistic: Schema.OptionFromNullishOr(
+                      DefaultTaggedClass(MessageRoomOrder),
+                      undefined,
+                    ),
+                    complete: Schema.OptionFromNullishOr(
+                      DefaultTaggedClass(MessageRoomOrder),
+                      undefined,
+                    ),
+                  }),
+                ),
               ),
             ),
             Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder", {
@@ -166,17 +164,19 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Computed.flatten(),
-            Computed.flatMap(
-              Schema.decode(
-                Result.ResultSchema({
-                  optimistic: Schema.Array(
-                    DefaultTaggedClass(MessageRoomOrderEntry),
-                  ),
-                  complete: Schema.Array(
-                    DefaultTaggedClass(MessageRoomOrderEntry),
-                  ),
-                }),
+            Effect.map(Effect.flatten),
+            Effect.map(
+              Effect.flatMap(
+                Schema.decode(
+                  Result.ResultSchema({
+                    optimistic: Schema.Array(
+                      DefaultTaggedClass(MessageRoomOrderEntry),
+                    ),
+                    complete: Schema.Array(
+                      DefaultTaggedClass(MessageRoomOrderEntry),
+                    ),
+                  }),
+                ),
               ),
             ),
             Effect.withSpan(
@@ -197,44 +197,48 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Computed.flatten(),
-            Computed.flatMap(
-              Schema.decode(
-                Result.ResultSchema({
-                  optimistic: Schema.Array(
-                    DefaultTaggedClass(MessageRoomOrderEntry),
-                  ),
-                  complete: Schema.Array(
-                    DefaultTaggedClass(MessageRoomOrderEntry),
-                  ),
-                }),
+            Effect.map(Effect.flatten),
+            Effect.map(
+              Effect.flatMap(
+                Schema.decode(
+                  Result.ResultSchema({
+                    optimistic: Schema.Array(
+                      DefaultTaggedClass(MessageRoomOrderEntry),
+                    ),
+                    complete: Schema.Array(
+                      DefaultTaggedClass(MessageRoomOrderEntry),
+                    ),
+                  }),
+                ),
               ),
             ),
-            Computed.map(
-              Result.map((entries) =>
-                pipe(
-                  entries,
-                  Array.match({
-                    onEmpty: () => Option.none<MessageRoomOrderRange>(),
-                    onNonEmpty: ([head, ...tail]) => {
-                      const { minRank, maxRank } = pipe(
-                        tail,
-                        Array.reduce(
-                          {
-                            minRank: head.rank,
-                            maxRank: head.rank,
-                          },
-                          (acc, entry) => ({
-                            minRank: Math.min(acc.minRank, entry.rank),
-                            maxRank: Math.max(acc.maxRank, entry.rank),
-                          }),
-                        ),
-                      );
-                      return Option.some(
-                        new MessageRoomOrderRange({ minRank, maxRank }),
-                      );
-                    },
-                  }),
+            Effect.map(
+              Effect.map(
+                Result.map((entries) =>
+                  pipe(
+                    entries,
+                    Array.match({
+                      onEmpty: () => Option.none<MessageRoomOrderRange>(),
+                      onNonEmpty: ([head, ...tail]) => {
+                        const { minRank, maxRank } = pipe(
+                          tail,
+                          Array.reduce(
+                            {
+                              minRank: head.rank,
+                              maxRank: head.rank,
+                            },
+                            (acc, entry) => ({
+                              minRank: Math.min(acc.minRank, entry.rank),
+                              maxRank: Math.max(acc.maxRank, entry.rank),
+                            }),
+                          ),
+                        );
+                        return Option.some(
+                          new MessageRoomOrderRange({ minRank, maxRank }),
+                        );
+                      },
+                    }),
+                  ),
                 ),
               ),
             ),

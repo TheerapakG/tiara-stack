@@ -1,9 +1,8 @@
 import { getMessageRoomOrderEntryHandlerConfig } from "@/server/handler/config";
 import { Error } from "@/server/schema";
 import { AuthService, MessageRoomOrderService } from "@/server/services";
-import { Effect, Scope, pipe } from "effect";
+import { Effect, flow, Scope, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
-import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
 
@@ -14,19 +13,31 @@ export const getMessageRoomOrderEntryHandler = pipe(
   builders.data(getMessageRoomOrderEntryHandlerConfig),
   builders.handler(
     pipe(
-      Computed.make(Event.someToken()),
-      Computed.flatMap(AuthService.verify),
-      Computed.flatMapComputed(() =>
-        Event.request.parsedWithScope(getMessageRoomOrderEntryHandlerConfig),
-      ),
-      Computed.flatMapComputed(({ parsed: { messageId, rank }, scope }) =>
-        pipe(
-          MessageRoomOrderService.getMessageRoomOrderEntry(messageId, rank),
-          Scope.extend(scope),
+      Effect.succeed(Event.someToken()),
+      Effect.map(Effect.flatMap(AuthService.verify)),
+      Effect.map(
+        flow(
+          Effect.flatMap(() =>
+            Event.request.parsedWithScope(
+              getMessageRoomOrderEntryHandlerConfig,
+            ),
+          ),
+          Effect.flatten,
         ),
       ),
-      Computed.mapEffect(Error.Core.catchParseErrorAsValidationError),
-      Computed.mapEffect(
+      Effect.map(
+        flow(
+          Effect.flatMap(({ parsed: { messageId, rank }, scope }) =>
+            pipe(
+              MessageRoomOrderService.getMessageRoomOrderEntry(messageId, rank),
+              Scope.extend(scope),
+            ),
+          ),
+          Effect.flatten,
+        ),
+      ),
+      Effect.map(Error.Core.catchParseErrorAsValidationError),
+      Effect.map(
         Handler.Config.encodeResponseEffect(
           getMessageRoomOrderEntryHandlerConfig,
         ),

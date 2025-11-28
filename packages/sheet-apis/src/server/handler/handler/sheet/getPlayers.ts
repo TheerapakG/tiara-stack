@@ -1,10 +1,10 @@
 import { getPlayersHandlerConfig } from "@/server/handler/config";
 import { AuthService, Sheet } from "@/server/services";
-import { Effect, pipe, Schema, Scope } from "effect";
+import { Effect, flow, pipe, Schema, Scope } from "effect";
 import { Handler } from "typhoon-core/server";
-import { Computed } from "typhoon-core/signal";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
+import { Result } from "typhoon-core/schema";
 
 const builders = Context.Subscription.Builder.builders();
 export const getPlayersHandler = pipe(
@@ -12,28 +12,60 @@ export const getPlayersHandler = pipe(
   builders.data(getPlayersHandlerConfig),
   builders.handler(
     pipe(
-      Computed.make(Event.someToken()),
-      Computed.flatMap(AuthService.verify),
-      Computed.flatMapComputed(() =>
-        Event.request.parsedWithScope(getPlayersHandlerConfig),
-      ),
-      Computed.flatMapComputed(({ parsed: { guildId }, scope }) =>
-        pipe(
-          Sheet.layerOfGuildId(guildId),
-          Effect.flatMap((layer) =>
-            pipe(
-              Sheet.SheetService.getPlayers(),
-              Computed.make,
-              Computed.provideLayerComputedResult(layer),
-            ),
+      Effect.succeed(Event.someToken()),
+      Effect.map(Effect.flatMap(AuthService.verify)),
+      Effect.map(
+        flow(
+          Effect.flatMap(() =>
+            Event.request.parsedWithScope(getPlayersHandlerConfig),
           ),
-          Scope.extend(scope),
+          Effect.flatten,
         ),
       ),
-      Computed.flatMap(
-        Schema.encodeEither(
-          Handler.Config.resolveResponseValidator(
-            Handler.Config.response(getPlayersHandlerConfig),
+      Effect.map(
+        flow(
+          Effect.flatMap(({ parsed: { guildId }, scope }) =>
+            pipe(
+              Sheet.layerOfGuildId(guildId),
+              Effect.flatMap((layer) =>
+                pipe(
+                  Effect.all({
+                    signal: Effect.succeed(Sheet.SheetService.getPlayers()),
+                    layer,
+                  }),
+                  Effect.map(({ signal, layer }) =>
+                    pipe(
+                      layer,
+                      Result.match({
+                        onOptimistic: (l) =>
+                          pipe(
+                            signal,
+                            Effect.map(Result.optimistic),
+                            Effect.provide(l),
+                          ),
+                        onComplete: (l) =>
+                          pipe(
+                            signal,
+                            Effect.map(Result.complete),
+                            Effect.provide(l),
+                          ),
+                      }),
+                    ),
+                  ),
+                ),
+              ),
+              Scope.extend(scope),
+            ),
+          ),
+          Effect.flatten,
+        ),
+      ),
+      Effect.map(
+        Effect.flatMap(
+          Schema.encodeEither(
+            Handler.Config.resolveResponseValidator(
+              Handler.Config.response(getPlayersHandlerConfig),
+            ),
           ),
         ),
       ),

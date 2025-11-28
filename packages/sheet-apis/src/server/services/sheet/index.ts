@@ -1,8 +1,7 @@
 import { PlayerService } from "./playerService";
 import { SheetService } from "./sheetService";
-import { Layer, pipe } from "effect";
+import { Effect, Layer, pipe } from "effect";
 import { Result } from "typhoon-core/schema";
-import { Computed } from "typhoon-core/signal";
 import { ScreenshotService } from "./screenshotService";
 
 export * from "./playerService";
@@ -23,11 +22,13 @@ export const layerOfSheetId = (sheetId: string) =>
 export const layerOfGuildId = (guildId: string) =>
   pipe(
     SheetService.ofGuild(guildId),
-    Computed.map((sheetService) =>
-      pipe(
-        sheetService,
-        Result.map((sheetService) =>
-          pipe(sheetServiceDependendents, Layer.provideMerge(sheetService)),
+    Effect.map(
+      Effect.map((sheetService) =>
+        pipe(
+          sheetService,
+          Result.map((sheetService) =>
+            pipe(sheetServiceDependendents, Layer.provideMerge(sheetService)),
+          ),
         ),
       ),
     ),

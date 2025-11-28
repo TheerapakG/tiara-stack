@@ -5,11 +5,7 @@ import { Array, DateTime, Effect, pipe, Schema } from "effect";
 import { messageCheckin, messageCheckinMember } from "sheet-db-schema";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass, Result } from "typhoon-core/schema";
-import {
-  Computed,
-  ExternalComputed,
-  ZeroQueryExternalSource,
-} from "typhoon-core/signal";
+import { ExternalComputed, ZeroQueryExternalSource } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
 import { ZeroServiceTag } from "@/db/zeroService";
 
@@ -35,19 +31,21 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Computed.flatten(),
-            Computed.flatMap(
-              Schema.decode(
-                Result.ResultSchema({
-                  optimistic: Schema.OptionFromNullishOr(
-                    DefaultTaggedClass(MessageCheckin),
-                    undefined,
-                  ),
-                  complete: Schema.OptionFromNullishOr(
-                    DefaultTaggedClass(MessageCheckin),
-                    undefined,
-                  ),
-                }),
+            Effect.map(Effect.flatten),
+            Effect.map(
+              Effect.flatMap(
+                Schema.decode(
+                  Result.ResultSchema({
+                    optimistic: Schema.OptionFromNullishOr(
+                      DefaultTaggedClass(MessageCheckin),
+                      undefined,
+                    ),
+                    complete: Schema.OptionFromNullishOr(
+                      DefaultTaggedClass(MessageCheckin),
+                      undefined,
+                    ),
+                  }),
+                ),
               ),
             ),
             Effect.withSpan("MessageCheckinService.getMessageCheckinData", {
@@ -104,17 +102,19 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Computed.flatten(),
-            Computed.flatMap(
-              Schema.decode(
-                Result.ResultSchema({
-                  optimistic: Schema.Array(
-                    DefaultTaggedClass(MessageCheckinMember),
-                  ),
-                  complete: Schema.Array(
-                    DefaultTaggedClass(MessageCheckinMember),
-                  ),
-                }),
+            Effect.map(Effect.flatten),
+            Effect.map(
+              Effect.flatMap(
+                Schema.decode(
+                  Result.ResultSchema({
+                    optimistic: Schema.Array(
+                      DefaultTaggedClass(MessageCheckinMember),
+                    ),
+                    complete: Schema.Array(
+                      DefaultTaggedClass(MessageCheckinMember),
+                    ),
+                  }),
+                ),
               ),
             ),
             Effect.withSpan("MessageCheckinService.getMessageCheckinMembers", {
