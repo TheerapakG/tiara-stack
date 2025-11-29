@@ -110,69 +110,9 @@ export class SideEffect<R = never> implements DependentSignal {
   }
 }
 
-export const make = (
-  effect: Effect.Effect<unknown, unknown, SignalContext>,
-  options?: Observable.ObservableOptions,
-): Effect.Effect<SideEffect<never>, never, Scope.Scope> =>
-  pipe(
-    Effect.acquireRelease(
-      pipe(
-        Effect.succeed(
-          new SideEffect<never>(effect, Context.empty(), options ?? {}),
-        ),
-        Effect.tap((sideEffect) => sideEffect.notify()),
-      ),
-      (sideEffect) => sideEffect.cleanup(),
-    ),
-    Observable.withSpan(
-      { [Observable.ObservableSymbol]: options ?? {} },
-      "SideEffect.make",
-      {
-        captureStackTrace: true,
-      },
-    ),
-  );
-
-export const mapEffect =
-  <A, E1, R1, B, E2>(
-    mapper: (
-      effect: Effect.Effect<A, E1, R1 | SignalContext>,
-    ) => Effect.Effect<B, E2, SignalContext>,
-    options?: Observable.ObservableOptions,
-  ) =>
-  <E3, R3>(signal: Effect.Effect<Effect.Effect<A, E1, R1>, E3, R3>) =>
-    pipe(
-      signal,
-      Effect.flatMap((signal) => make(pipe(signal, mapper), options)),
-    );
-
-export const tap =
-  <A, X>(
-    mapper: (
-      value: A,
-    ) => [X] extends [Effect.Effect<infer _A3, infer _E3, infer R3>]
-      ? [R3] extends [never]
-        ? X
-        : never
-      : X,
-    options?: Observable.ObservableOptions,
-  ) =>
-  <E1, E2, R2>(
-    signal: Effect.Effect<Effect.Effect<A, E1, SignalContext>, E2, R2>,
-  ) =>
-    pipe(
-      signal,
-      mapEffect(
-        Effect.tap(mapper) as (
-          effect: Effect.Effect<A, E1, SignalContext>,
-        ) => Effect.Effect<A, unknown, SignalContext>,
-        options,
-      ),
-    );
-
 export const makeWithContext = <R = never>(
   effect: Effect.Effect<unknown, unknown, R>,
-  context: Context.Context<Exclude<R, SignalContext>>,
+  context: Context.Context<NoInfer<Exclude<R, SignalContext>>>,
   options?: Observable.ObservableOptions,
 ): Effect.Effect<SideEffect<Exclude<R, SignalContext>>, never, Scope.Scope> =>
   pipe(
@@ -207,7 +147,7 @@ export const mapEffectWithContext =
     mapper: (
       effect: Effect.Effect<A, E1, R1 | SignalContext>,
     ) => Effect.Effect<B, E2, R2>,
-    context: Context.Context<Exclude<R2, SignalContext>>,
+    context: Context.Context<NoInfer<Exclude<R2, SignalContext>>>,
     options?: Observable.ObservableOptions,
   ) =>
   <E3, R3>(signal: Effect.Effect<Effect.Effect<A, E1, R1>, E3, R3>) =>
@@ -250,6 +190,45 @@ export const tapWithContext =
           | SignalContext
         >,
         context,
+        options,
+      ),
+    );
+
+export const make = (
+  effect: Effect.Effect<unknown, unknown, SignalContext>,
+  options?: Observable.ObservableOptions,
+): Effect.Effect<SideEffect<never>, never, Scope.Scope> =>
+  makeWithContext(effect, Context.empty(), options);
+
+export const mapEffect =
+  <A, E1, R1, B, E2>(
+    mapper: (
+      effect: Effect.Effect<A, E1, R1 | SignalContext>,
+    ) => Effect.Effect<B, E2, SignalContext>,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <E3, R3>(signal: Effect.Effect<Effect.Effect<A, E1, R1>, E3, R3>) =>
+    pipe(signal, mapEffectWithContext(mapper, Context.empty(), options));
+
+export const tap =
+  <A, X>(
+    mapper: (
+      value: A,
+    ) => [X] extends [Effect.Effect<infer _A3, infer _E3, infer R3>]
+      ? [R3] extends [never]
+        ? X
+        : never
+      : X,
+    options?: Observable.ObservableOptions,
+  ) =>
+  <E1, E2, R2>(
+    signal: Effect.Effect<Effect.Effect<A, E1, SignalContext>, E2, R2>,
+  ) =>
+    pipe(
+      signal,
+      tapWithContext<A, X, SignalContext>(
+        mapper,
+        Context.empty() as Context.Context<unknown>,
         options,
       ),
     );
