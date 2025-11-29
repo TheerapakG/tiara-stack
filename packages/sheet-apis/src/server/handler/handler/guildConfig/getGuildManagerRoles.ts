@@ -23,9 +23,11 @@ export const getGuildManagerRolesHandler = pipe(
         GuildConfigService.getGuildManagerRoles(parsed),
       ),
       Effect.map(Error.Core.catchParseErrorAsValidationError),
+      Effect.map(Effect.tap((result) => Effect.log("1", result))),
       Effect.map(
         Handler.Config.encodeResponseEffect(getGuildManagerRolesHandlerConfig),
       ),
+      Effect.map(Effect.tap((result) => Effect.log("2", result))),
       Effect.withSpan("getGuildManagerRolesHandler", {
         captureStackTrace: true,
       }),
