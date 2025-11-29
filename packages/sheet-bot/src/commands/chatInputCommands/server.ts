@@ -23,7 +23,7 @@ import {
   SlashCommandSubcommandBuilder,
   SlashCommandSubcommandGroupBuilder,
 } from "discord.js";
-import { Array, Effect, Function, Number, Option, Order, pipe } from "effect";
+import { Array, Effect, Number, Option, Order, pipe } from "effect";
 import { UntilObserver } from "typhoon-core/signal";
 
 const handleListConfig =
@@ -51,13 +51,14 @@ const handleListConfig =
             pipe(
               GuildConfigService.getGuildConfigByGuildId(),
               UntilObserver.observeUntilRpcResultResolved(),
-              Effect.flatMap(Function.identity),
+              Effect.flatten,
             ),
           ),
           Effect.bind("managerRoles", () =>
             pipe(
               GuildConfigService.getGuildManagerRoles(),
               UntilObserver.observeUntilRpcResultResolved(),
+              Effect.flatten,
             ),
           ),
           Effect.bindAll(({ guildConfig }) => ({

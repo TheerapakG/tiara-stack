@@ -21,7 +21,7 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Effect, Option, pipe, Function } from "effect";
+import { Effect, Option, pipe } from "effect";
 import { Schema } from "sheet-apis";
 import { UntilObserver } from "typhoon-core/signal";
 
@@ -77,7 +77,7 @@ const handleListConfig =
             pipe(
               GuildConfigService.getGuildRunningChannelById(channel.id),
               UntilObserver.observeUntilRpcResultResolved(),
-              Effect.flatMap(Function.identity),
+              Effect.flatten,
             ),
           ),
           InteractionContext.editReply.tapEffect(({ config }) =>

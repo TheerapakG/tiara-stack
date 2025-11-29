@@ -33,7 +33,6 @@ import {
   Array,
   DateTime,
   Effect,
-  Function,
   HashMap,
   Match,
   Option,
@@ -84,6 +83,7 @@ const getCheckinData = ({
             flow(
               PlayerService.mapScheduleWithPlayers,
               UntilObserver.observeUntilRpcResultResolved(),
+              Effect.flatten,
             ),
           ),
         ),
@@ -168,6 +168,7 @@ const handleManual =
             pipe(
               GuildConfigService.getGuildManagerRoles(),
               UntilObserver.observeUntilRpcResultResolved(),
+              Effect.flatten,
               Effect.map((roles) => ({
                 roles: pipe(
                   roles,
@@ -207,7 +208,7 @@ const handleManual =
                       channelName,
                     ),
                     UntilObserver.observeUntilRpcResultResolved(),
-                    Effect.flatMap(Function.identity),
+                    Effect.flatten,
                   ),
                 onNone: () =>
                   pipe(
@@ -218,7 +219,7 @@ const handleManual =
                           channel.id,
                         ),
                         UntilObserver.observeUntilRpcResultResolved(),
-                        Effect.flatMap(Function.identity),
+                        Effect.flatten,
                       ),
                     ),
                   ),

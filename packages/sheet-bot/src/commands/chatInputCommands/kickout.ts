@@ -28,7 +28,6 @@ import {
   Data,
   DateTime,
   Effect,
-  Function,
   HashMap,
   Match,
   Number,
@@ -85,6 +84,7 @@ const getKickoutData = ({
             flow(
               PlayerService.mapScheduleWithPlayers,
               UntilObserver.observeUntilRpcResultResolved(),
+              Effect.flatten,
             ),
           ),
         ),
@@ -123,6 +123,7 @@ const handleManual =
             pipe(
               GuildConfigService.getGuildManagerRoles(),
               UntilObserver.observeUntilRpcResultResolved(),
+              Effect.flatten,
               Effect.map(Array.map((role) => role.roleId)),
               Effect.map((roles) => ({
                 roles,
@@ -168,7 +169,7 @@ const handleManual =
                       channelName,
                     ),
                     UntilObserver.observeUntilRpcResultResolved(),
-                    Effect.flatMap(Function.identity),
+                    Effect.flatten,
                   ),
                 onNone: () =>
                   pipe(
@@ -179,7 +180,7 @@ const handleManual =
                           channel.id,
                         ),
                         UntilObserver.observeUntilRpcResultResolved(),
-                        Effect.flatMap(Function.identity),
+                        Effect.flatten,
                       ),
                     ),
                   ),
@@ -194,7 +195,7 @@ const handleManual =
               kickoutData.runningChannel.roleId,
               Effect.tap(() => GuildService.fetchMembers()),
               Effect.flatMap((roleId) => GuildService.fetchRole(roleId)),
-              Effect.flatMap(Function.identity),
+              Effect.flatten,
             ),
           ),
           Effect.let("fillIds", ({ kickoutData }) =>

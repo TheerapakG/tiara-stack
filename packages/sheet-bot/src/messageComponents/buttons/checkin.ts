@@ -22,7 +22,7 @@ import {
   MessageFlags,
   userMention,
 } from "discord.js";
-import { Array, Effect, Function, Number, Option, Order, pipe } from "effect";
+import { Array, Effect, Number, Option, Order, pipe } from "effect";
 import { UntilObserver } from "typhoon-core/signal";
 
 const buttonData = {
@@ -48,7 +48,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
           pipe(
             MessageCheckinService.getMessageCheckinData(message.id),
             UntilObserver.observeUntilRpcResultResolved(),
-            Effect.flatMap(Function.identity),
+            Effect.flatten,
           ),
         ),
         Effect.tap(({ message, user }) =>
@@ -64,6 +64,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
           pipe(
             MessageCheckinService.getMessageCheckinMembers(message.id),
             UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatten,
             Effect.map((members) =>
               pipe(
                 members,

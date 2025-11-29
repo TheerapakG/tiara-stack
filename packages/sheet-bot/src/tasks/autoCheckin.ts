@@ -18,7 +18,6 @@ import {
   Array,
   DateTime,
   Effect,
-  Function,
   HashSet,
   Option,
   Schedule,
@@ -111,6 +110,7 @@ const runOnce = pipe(
     pipe(
       GuildConfigService.getAutoCheckinGuilds(),
       UntilObserver.observeUntilRpcResultResolved(),
+      Effect.flatten,
     ),
   ),
   Effect.bind("guildCounts", ({ guilds }) =>
@@ -138,7 +138,7 @@ const runOnce = pipe(
                       channelName,
                     ),
                     UntilObserver.observeUntilRpcResultResolved(),
-                    Effect.flatMap(Function.identity),
+                    Effect.flatten,
                     Effect.flatMap((runningChannel) =>
                       pipe(
                         Effect.Do,

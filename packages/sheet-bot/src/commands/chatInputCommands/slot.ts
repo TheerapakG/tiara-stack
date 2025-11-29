@@ -164,6 +164,7 @@ const handleList =
                 pipe(
                   GuildConfigService.getGuildManagerRoles(),
                   UntilObserver.observeUntilRpcResultResolved(),
+                  Effect.flatten,
                   Effect.map(Array.map((role) => role.roleId)),
                   Effect.map((roles) => ({
                     roles,
@@ -233,6 +234,7 @@ const handleButton =
             pipe(
               GuildConfigService.getGuildManagerRoles(),
               UntilObserver.observeUntilRpcResultResolved(),
+              Effect.flatten,
               Effect.map(Array.map((role) => role.roleId)),
               Effect.map((roles) => ({
                 roles,

@@ -60,6 +60,7 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
           pipe(
             GuildConfigService.getGuildManagerRoles(),
             UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatten,
             Effect.map(Array.map((role) => role.roleId)),
             Effect.map((roles) => ({
               roles,
@@ -76,6 +77,7 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
           pipe(
             ScreenshotService.getScreenshot(channelName, day),
             UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatten,
           ),
         ),
         InteractionContext.editReply.tap(({ screenshot }) => ({

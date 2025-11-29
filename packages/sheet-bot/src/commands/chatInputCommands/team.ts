@@ -61,6 +61,7 @@ const handleList =
             managerRoles: pipe(
               GuildConfigService.getGuildManagerRoles(),
               UntilObserver.observeUntilRpcResultResolved(),
+              Effect.flatten,
             ),
             user: pipe(
               InteractionContext.getUser("user"),
@@ -87,6 +88,7 @@ const handleList =
                 flow(
                   PlayerService.getTeamsById,
                   UntilObserver.observeUntilRpcResultResolved(),
+                  Effect.flatten,
                 ),
               ),
             ),

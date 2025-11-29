@@ -97,6 +97,7 @@ const handleList =
               daySchedules,
               PlayerService.mapScheduleWithPlayers,
               UntilObserver.observeUntilRpcResultResolved(),
+              Effect.flatten,
               Effect.map(
                 Array.sortBy(
                   Order.mapInput(

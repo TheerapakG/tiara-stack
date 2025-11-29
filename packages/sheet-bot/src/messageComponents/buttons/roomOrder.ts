@@ -91,7 +91,7 @@ export const roomOrderInteractionGetReply = (
       pipe(
         MessageRoomOrderService.getMessageRoomOrderRange(message.id),
         UntilObserver.observeUntilRpcResultResolved(),
-        Effect.flatMap(Function.identity),
+        Effect.flatten,
       ),
     ),
     Effect.bind("messageRoomOrderEntry", ({ message }) =>
@@ -101,6 +101,7 @@ export const roomOrderInteractionGetReply = (
           messageRoomOrder.rank,
         ),
         UntilObserver.observeUntilRpcResultResolved(),
+        Effect.flatten,
       ),
     ),
     Effect.bind("formattedHourWindow", () =>

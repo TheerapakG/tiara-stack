@@ -26,6 +26,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               ),
             ),
             UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatten,
             Effect.withSpan("SheetService.rangesConfig", {
               captureStackTrace: true,
             }),
@@ -42,6 +43,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               ),
             ),
             UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatten,
             Effect.withSpan("SheetService.teamConfig", {
               captureStackTrace: true,
             }),
@@ -58,6 +60,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               ),
             ),
             UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatten,
             Effect.withSpan("SheetService.eventConfig", {
               captureStackTrace: true,
             }),
@@ -74,6 +77,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               ),
             ),
             UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatten,
             Effect.withSpan("SheetService.scheduleConfig", {
               captureStackTrace: true,
             }),
@@ -90,6 +94,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               ),
             ),
             UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatten,
             Effect.withSpan("SheetService.runnerConfig", {
               captureStackTrace: true,
             }),
@@ -106,6 +111,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               ),
             ),
             UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatten,
             Effect.withSpan("SheetService.players", {
               captureStackTrace: true,
             }),
@@ -137,6 +143,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               ),
             ),
             UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatten,
             Effect.withSpan("SheetService.allSchedules", {
               captureStackTrace: true,
             }),
@@ -153,6 +160,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               ),
             ),
             UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatten,
             Effect.withSpan("SheetService.daySchedules", {
               captureStackTrace: true,
             }),
@@ -169,6 +177,7 @@ export class SheetService extends Effect.Service<SheetService>()(
               ),
             ),
             UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatten,
             Effect.withSpan("SheetService.channelSchedules", {
               captureStackTrace: true,
             }),

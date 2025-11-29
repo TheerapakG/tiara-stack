@@ -15,7 +15,6 @@ import {
   Array,
   Chunk,
   Effect,
-  Function,
   Number,
   Order,
   Option,
@@ -104,7 +103,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
           pipe(
             MessageSlotService.getMessageSlotData(message.id),
             UntilObserver.observeUntilRpcResultResolved(),
-            Effect.flatMap(Function.identity),
+            Effect.flatten,
           ),
         ),
         Effect.bind("slotMessage", ({ messageSlotData }) =>
