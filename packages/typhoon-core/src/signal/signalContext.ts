@@ -64,3 +64,20 @@ export const runAndTrackEffect =
       }),
     );
   };
+
+export type MaybeSignalEffect<A = never, E = never, R = never> =
+  | A
+  | Effect.Effect<A, E, R | SignalContext>;
+
+export type MaybeSignalEffectValue<X> = [X] extends [
+  Effect.Effect<infer A1, infer E1, infer R1>,
+]
+  ? Effect.Effect<A1, E1, R1>
+  : Effect.Effect<X, never, never>;
+
+export const getMaybeSignalEffectValue = <X>(
+  value: X,
+): MaybeSignalEffectValue<X> =>
+  (Effect.isEffect(value)
+    ? value
+    : Effect.succeed(value)) as MaybeSignalEffectValue<X>;
