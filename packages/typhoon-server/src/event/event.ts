@@ -178,6 +178,9 @@ export const request = {
     pipe(
       pullEffect(),
       Effect.map(Effect.map((pullEffect) => pullEffect.effect)),
+      Effect.map(
+        Effect.withSpan("Event.request.raw", { captureStackTrace: true }),
+      ),
     ),
   rawWithScope: (): Effect.Effect<
     Effect.Effect<
@@ -193,7 +196,11 @@ export const request = {
   > =>
     pipe(
       pullEffect(),
-      Effect.map((signal) => signal.value),
+      Effect.map(
+        Effect.withSpan("Event.request.rawWithScope", {
+          captureStackTrace: true,
+        }),
+      ),
     ),
   parsed: <Config extends Handler.Config.TypedHandlerConfig>(config: Config) =>
     pipe(
@@ -202,6 +209,9 @@ export const request = {
         Effect.flatMap(
           pullEffectToParsed(Handler.Config.requestParams(config)),
         ),
+      ),
+      Effect.map(
+        Effect.withSpan("Event.request.parsed", { captureStackTrace: true }),
       ),
     ),
   parsedWithScope: <Config extends Handler.Config.TypedHandlerConfig>(
@@ -219,6 +229,11 @@ export const request = {
             scope: Effect.succeed(scope),
           }),
         ),
+      ),
+      Effect.map(
+        Effect.withSpan("Event.request.parsedWithScope", {
+          captureStackTrace: true,
+        }),
       ),
     ),
 };
