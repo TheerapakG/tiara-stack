@@ -10,6 +10,7 @@ import type {
 } from "@rocicorp/zero";
 import { applyChange } from "@rocicorp/zero";
 import {
+  Context,
   Effect,
   Either,
   Option,
@@ -20,8 +21,14 @@ import {
   flow,
   Array,
   Predicate,
+  Fiber,
 } from "effect";
-import { complete, optimistic, type Result } from "../../schema/result";
+import {
+  complete,
+  optimistic,
+  isComplete as isResultComplete,
+  type Result,
+} from "../../schema/result";
 import {
   ZeroQueryAppError,
   ZeroQueryHttpError,
@@ -31,6 +38,12 @@ import {
 } from "../../error/zero";
 import type { ExternalSource } from "../externalComputed";
 import { ZeroService } from "../../services/zeroService";
+import {
+  SignalContext,
+  getMaybeSignalEffectValue,
+  type MaybeSignalEffectValue,
+} from "../signalContext";
+import * as SideEffect from "../sideEffect";
 
 /**
  * Creates an ExternalSource adapter for Zero queries.
@@ -45,10 +58,17 @@ import { ZeroService } from "../../services/zeroService";
  * - Subscribes to view changes via addListener
  * - Stores every value in a Ref for polling (regardless of start/stop state)
  * - Emits every value via the onEmit callback when started
- * - Wraps values in Optimistic or Complete result types based on resultType
- *   ('unknown' → Optimistic, 'complete' → Complete)
+ * - Wraps values in Result<Either<T, Error>> combining input and Zero sync status:
+ *   - Optimistic: when input is optimistic OR Zero sync is incomplete
+ *   - Complete: when BOTH input is complete AND Zero sync is complete
  *
- * @param query - The Zero query to materialize
+ * When used with MaybeSignalEffect queries:
+ * - Uses SideEffect internally to track input signal changes
+ * - Automatically replaces materialized views when input changes
+ * - Keeps old view's data visible until new view hydrates
+ * - Propagates input signal errors inside Either.left
+ *
+ * @param query - The Zero query to materialize (can be MaybeSignalEffect)
  * @param options - Optional options for materialize
  * @returns An ExternalSource that requires ZeroService and Scope during creation
  */
@@ -79,13 +99,69 @@ export type ZeroMaterializeOptions = {
   ttl?: TTL | undefined;
 };
 
-class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View>
-  implements ExternalSource<Either.Either<Result<T>, ZeroQueryError>>, Output
+/**
+ * Converts a raw Zero query error to a typed ZeroQueryError
+ */
+const rawZeroQueryErrorToZeroQueryError = (
+  error: RawZeroQueryError,
+): ZeroQueryError =>
+  pipe(
+    Match.value(error),
+    Match.discriminatorsExhaustive("error")({
+      app: (error) =>
+        new ZeroQueryAppError({
+          id: error.id,
+          name: error.name,
+          details: error.details,
+        }),
+      http: (error) =>
+        new ZeroQueryHttpError({
+          id: error.id,
+          name: error.name,
+          status: error.status,
+          details: error.details,
+        }),
+      zero: (error) =>
+        new ZeroQueryZeroError({
+          id: error.id,
+          name: error.name,
+          details: error.details,
+        }),
+    }),
+  );
+
+/**
+ * Represents the current materialized view state
+ */
+type ViewState = {
+  readonly input: Input;
+  readonly format: Format;
+  readonly onDestroy: () => void;
+};
+
+/**
+ * External source for Zero queries with unified output type.
+ * Output: Result<Either<T, ZeroQueryError | E>>
+ *
+ * The outer Result status combines input Result status (if applicable) with Zero sync status:
+ * - Complete only when BOTH input is Complete AND Zero sync is complete
+ * - Optimistic in all other cases
+ *
+ * The inner Either handles:
+ * - Either.right<T>: successful data
+ * - Either.left<ZeroQueryError | E>: errors from input signal or Zero sync
+ */
+class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
+  implements
+    ExternalSource<Result<Either.Either<T, ZeroQueryError | E>>>,
+    Output
 {
   constructor(
-    private readonly input: Input,
-    private readonly format: Format,
-    private readonly resultTypeRef: SynchronizedRef.SynchronizedRef<
+    private readonly viewRef: SynchronizedRef.SynchronizedRef<
+      Option.Option<ViewState>
+    >,
+    private readonly inputResultCompleteRef: SynchronizedRef.SynchronizedRef<boolean>,
+    private readonly zeroResultTypeRef: SynchronizedRef.SynchronizedRef<
       Either.Either<"unknown" | "complete", ZeroQueryError>
     >,
     private readonly dirtyRef: SynchronizedRef.SynchronizedRef<boolean>,
@@ -94,30 +170,41 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View>
     private readonly onEmitRef: SynchronizedRef.SynchronizedRef<
       Option.Option<
         (
-          value: Either.Either<Result<T>, ZeroQueryError>,
+          value: Result<Either.Either<T, ZeroQueryError | E>>,
         ) => Effect.Effect<void, never, never>
       >
     >,
-  ) {
-    this.input.setOutput(this);
-  }
+    private readonly inputErrorRef: SynchronizedRef.SynchronizedRef<
+      Option.Option<E>
+    >,
+  ) {}
 
   hydrate() {
     return SynchronizedRef.updateEffect(this.dirtyRef, () =>
       pipe(
-        SynchronizedRef.get(this.valueRef),
-        Effect.tap((value) =>
+        Effect.all({
+          value: SynchronizedRef.get(this.valueRef),
+          viewOption: SynchronizedRef.get(this.viewRef),
+        }),
+        Effect.tap(({ value, viewOption }) =>
           pipe(
-            this.input.fetch({}),
-            Array.forEach((node) =>
-              applyChange(
-                value,
-                { type: "add", node },
-                this.input.getSchema(),
-                "",
-                this.format,
-              ),
-            ),
+            viewOption,
+            Option.match({
+              onSome: ({ input, format }) =>
+                pipe(
+                  input.fetch({}),
+                  Array.forEach((node) =>
+                    applyChange(
+                      value,
+                      { type: "add", node },
+                      input.getSchema(),
+                      "",
+                      format,
+                    ),
+                  ),
+                ),
+              onNone: () => {},
+            }),
           ),
         ),
         Effect.as(true),
@@ -135,9 +222,19 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View>
     Effect.runFork(
       SynchronizedRef.updateEffect(this.dirtyRef, () =>
         pipe(
-          SynchronizedRef.get(this.valueRef),
-          Effect.tap((value) =>
-            applyChange(value, change, this.input.getSchema(), "", this.format),
+          Effect.all({
+            value: SynchronizedRef.get(this.valueRef),
+            viewOption: SynchronizedRef.get(this.viewRef),
+          }),
+          Effect.tap(({ value, viewOption }) =>
+            pipe(
+              viewOption,
+              Option.match({
+                onSome: ({ input, format }) =>
+                  applyChange(value, change, input.getSchema(), "", format),
+                onNone: () => {},
+              }),
+            ),
           ),
           Effect.as(true),
         ),
@@ -149,19 +246,50 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View>
     return pipe(
       Effect.all({
         value: SynchronizedRef.get(this.valueRef),
-        resultType: SynchronizedRef.get(this.resultTypeRef),
+        inputResultComplete: SynchronizedRef.get(this.inputResultCompleteRef),
+        zeroResultType: SynchronizedRef.get(this.zeroResultTypeRef),
+        inputError: SynchronizedRef.get(this.inputErrorRef),
       }),
-      Effect.map(({ value, resultType }) =>
+      Effect.map(({ value, inputResultComplete, zeroResultType, inputError }) =>
         pipe(
-          resultType,
-          Either.map(
-            flow(
-              Match.value,
-              Match.when("complete", () => complete(value[""])),
-              Match.when("unknown", () => optimistic(value[""])),
-              Match.exhaustive,
-            ),
-          ),
+          inputError,
+          Option.match({
+            onSome: (error) =>
+              // Input signal errored - wrap in Result based on input status
+              inputResultComplete
+                ? complete(Either.left<ZeroQueryError | E>(error))
+                : optimistic(Either.left<ZeroQueryError | E>(error)),
+            onNone: () =>
+              pipe(
+                zeroResultType,
+                Either.match({
+                  onLeft: (zeroError) =>
+                    // Zero sync errored - wrap in Result based on combined status
+                    inputResultComplete
+                      ? complete(
+                          Either.left<ZeroQueryError | E>(
+                            zeroError as ZeroQueryError | E,
+                          ),
+                        )
+                      : optimistic(
+                          Either.left<ZeroQueryError | E>(
+                            zeroError as ZeroQueryError | E,
+                          ),
+                        ),
+                  onRight: (zeroStatus) => {
+                    // Both input complete AND zero complete -> Complete
+                    // Otherwise -> Optimistic
+                    const isComplete =
+                      inputResultComplete && zeroStatus === "complete";
+                    const eitherValue: Either.Either<T, ZeroQueryError | E> =
+                      Either.right(value[""]);
+                    return isComplete
+                      ? complete(eitherValue)
+                      : optimistic(eitherValue);
+                  },
+                }),
+              ),
+          }),
         ),
       ),
     );
@@ -169,7 +297,7 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View>
 
   emit(
     onEmit: (
-      value: Either.Either<Result<T>, ZeroQueryError>,
+      value: Result<Either.Either<T, ZeroQueryError | E>>,
     ) => Effect.Effect<void, never, never>,
   ) {
     return SynchronizedRef.set(this.onEmitRef, Option.some(onEmit));
@@ -197,162 +325,435 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View>
   }
 }
 
+/**
+ * Destroys the current view and clears the view ref
+ */
+const destroyView = (
+  viewRef: SynchronizedRef.SynchronizedRef<Option.Option<ViewState>>,
+) =>
+  SynchronizedRef.updateEffect(
+    viewRef,
+    flow(
+      Effect.transposeMapOption(({ onDestroy }) =>
+        Effect.sync(() => onDestroy()),
+      ),
+      Effect.as(Option.none()),
+    ),
+  );
+
+/**
+ * Creates the shared refs and source for both make variants
+ */
+const createSourceWithRefs = <
+  T extends ReadonlyJSONValue | View,
+  E = never,
+>() =>
+  pipe(
+    Effect.all({
+      viewRef: SynchronizedRef.make<Option.Option<ViewState>>(Option.none()),
+      inputResultCompleteRef: SynchronizedRef.make(true), // Default true for non-Result inputs
+      zeroResultTypeRef: SynchronizedRef.make<
+        Either.Either<"unknown" | "complete", ZeroQueryError>
+      >(Either.right("unknown")),
+      dirtyRef: SynchronizedRef.make(false),
+      valueRef: SynchronizedRef.make<{ "": T }>({
+        "": undefined as T,
+      }),
+      startedRef: SynchronizedRef.make(false),
+      onEmitRef: SynchronizedRef.make<
+        Option.Option<
+          (
+            value: Result<Either.Either<T, ZeroQueryError | E>>,
+          ) => Effect.Effect<void, never, never>
+        >
+      >(Option.none()),
+      inputErrorRef: SynchronizedRef.make<Option.Option<E>>(Option.none()),
+      queryCompletePromiseFiberRef: SynchronizedRef.make<
+        Option.Option<Fiber.Fiber<void, never>>
+      >(Option.none()),
+    }),
+    Effect.let(
+      "source",
+      ({
+        viewRef,
+        inputResultCompleteRef,
+        zeroResultTypeRef,
+        dirtyRef,
+        valueRef,
+        startedRef,
+        onEmitRef,
+        inputErrorRef,
+      }) =>
+        new ZeroQueryExternalSource<T, E>(
+          viewRef,
+          inputResultCompleteRef,
+          zeroResultTypeRef,
+          dirtyRef,
+          valueRef,
+          startedRef,
+          onEmitRef,
+          inputErrorRef,
+        ),
+    ),
+  );
+
+/**
+ * Creates the materialize callback for Zero queries
+ */
+const createMaterializeCallback =
+  <T extends ReadonlyJSONValue | View, E = never>(
+    source: ZeroQueryExternalSource<T, E>,
+    viewRef: SynchronizedRef.SynchronizedRef<Option.Option<ViewState>>,
+    zeroResultTypeRef: SynchronizedRef.SynchronizedRef<
+      Either.Either<"unknown" | "complete", ZeroQueryError>
+    >,
+    valueRef: SynchronizedRef.SynchronizedRef<{ "": T }>,
+    queryCompletePromiseFiberRef: SynchronizedRef.SynchronizedRef<
+      Option.Option<Fiber.Fiber<void, never>>
+    >,
+  ) =>
+  (
+    _query: unknown,
+    input: Input,
+    format: Format,
+    onDestroy: () => void,
+    onTransactionCommit: (cb: () => void) => void,
+    queryComplete: boolean | Promise<true> | RawZeroQueryError,
+    _updateTTL: unknown,
+  ) =>
+    pipe(
+      Effect.Do,
+      Effect.andThen(() => destroyView(viewRef)),
+      Effect.andThen(() =>
+        SynchronizedRef.updateEffect(
+          queryCompletePromiseFiberRef,
+          flow(
+            Effect.transposeMapOption((fiber) => Fiber.interrupt(fiber)),
+            Effect.as(Option.none()),
+          ),
+        ),
+      ),
+      Effect.andThen(() =>
+        SynchronizedRef.set(viewRef, Option.some({ input, format, onDestroy })),
+      ),
+      Effect.andThen(() =>
+        SynchronizedRef.set(valueRef, {
+          "": (format.singular ? undefined : []) as T,
+        }),
+      ),
+      Effect.andThen(() =>
+        pipe(
+          Match.value(queryComplete),
+          Match.when(true, () =>
+            SynchronizedRef.set(zeroResultTypeRef, Either.right("complete")),
+          ),
+          Match.when(Predicate.hasProperty("error"), (error) =>
+            SynchronizedRef.set(
+              zeroResultTypeRef,
+              Either.left(
+                rawZeroQueryErrorToZeroQueryError(error as RawZeroQueryError),
+              ),
+            ),
+          ),
+          Match.orElse(() =>
+            SynchronizedRef.set(zeroResultTypeRef, Either.right("unknown")),
+          ),
+        ),
+      ),
+      Effect.andThen(() => input.setOutput(source)),
+      Effect.andThen(() => source.hydrate()),
+      Effect.andThen(() =>
+        pipe(
+          Match.value(queryComplete),
+          Match.when(Predicate.isPromiseLike, (queryComplete) =>
+            pipe(
+              Effect.tryPromise({
+                try: () => queryComplete,
+                catch: (error) =>
+                  rawZeroQueryErrorToZeroQueryError(error as RawZeroQueryError),
+              }),
+              Effect.map(() => "complete" as const),
+              Effect.either,
+              Effect.tap((result) =>
+                SynchronizedRef.set(zeroResultTypeRef, result),
+              ),
+              Effect.andThen(Effect.runFork(source.doEmit())),
+              Effect.asVoid,
+
+              Effect.forkDaemon,
+              Effect.andThen((fiber) =>
+                SynchronizedRef.set(
+                  queryCompletePromiseFiberRef,
+                  Option.some(fiber),
+                ),
+              ),
+            ),
+          ),
+          Match.orElse(() => Effect.void),
+        ),
+      ),
+      Effect.andThen(() =>
+        onTransactionCommit(() => Effect.runFork(source.flush())),
+      ),
+      Effect.andThen(() => source.doEmit()),
+    );
+
+export const makeWithContext = <
+  M,
+  Q = Effect.Effect.Success<MaybeSignalEffectValue<M>>,
+  T extends ReadonlyJSONValue | View = HumanReadable<
+    QueryRowType<Q>
+  > extends infer T extends ReadonlyJSONValue | View
+    ? T
+    : never,
+  E = Effect.Effect.Error<MaybeSignalEffectValue<M>>,
+  R = Effect.Effect.Context<MaybeSignalEffectValue<M>>,
+>(
+  maybeSignalQuery: M,
+  context: Context.Context<Exclude<R, SignalContext>>,
+  options?: ZeroMaterializeOptions,
+): Effect.Effect<
+  ZeroQueryExternalSource<T, E>,
+  never,
+  ZeroService<any, any> | Scope.Scope
+> =>
+  pipe(
+    ZeroService<any, any>(),
+    Effect.andThen((zero) =>
+      pipe(
+        createSourceWithRefs<T, E>(),
+        Effect.tap(
+          ({
+            source,
+            viewRef,
+            inputResultCompleteRef,
+            zeroResultTypeRef,
+            valueRef,
+            inputErrorRef,
+            queryCompletePromiseFiberRef,
+          }) =>
+            SideEffect.makeWithContext(
+              pipe(
+                getMaybeSignalEffectValue(maybeSignalQuery) as Effect.Effect<
+                  Q,
+                  E,
+                  R | SignalContext
+                >,
+                Effect.either,
+                Effect.flatMap((queryResult) =>
+                  pipe(
+                    queryResult,
+                    Either.match({
+                      onLeft: (error) =>
+                        pipe(
+                          SynchronizedRef.set(
+                            inputErrorRef,
+                            Option.some(error),
+                          ),
+                          // Input errors with non-Result input are considered complete
+                          Effect.andThen(
+                            SynchronizedRef.set(inputResultCompleteRef, true),
+                          ),
+                          Effect.andThen(destroyView(viewRef)),
+                          Effect.andThen(source.doEmit()),
+                        ),
+                      onRight: (query) =>
+                        pipe(
+                          // Clear any previous input error
+                          SynchronizedRef.set(inputErrorRef, Option.none()),
+                          // Non-Result input is always considered complete
+                          Effect.andThen(
+                            SynchronizedRef.set(inputResultCompleteRef, true),
+                          ),
+                          Effect.andThen(
+                            zero.materialize(
+                              query,
+                              createMaterializeCallback(
+                                source,
+                                viewRef,
+                                zeroResultTypeRef,
+                                valueRef,
+                                queryCompletePromiseFiberRef,
+                              ),
+                              options,
+                            ),
+                          ),
+                        ),
+                    }),
+                  ),
+                ),
+              ),
+              context,
+            ),
+        ),
+        Effect.tap(({ viewRef }) =>
+          Effect.addFinalizer(() => destroyView(viewRef)),
+        ),
+        Effect.map(({ source }) => source),
+      ),
+    ),
+  );
+
 export const make = <
-  Q,
+  M,
+  Q = Effect.Effect.Success<MaybeSignalEffectValue<M>>,
   T extends ReadonlyJSONValue | View = HumanReadable<
     QueryRowType<Q>
   > extends infer T extends ReadonlyJSONValue | View
     ? T
     : never,
 >(
-  query: Q,
+  maybeSignalQuery: M,
   options?: ZeroMaterializeOptions,
 ): Effect.Effect<
-  ZeroQueryExternalSource<T>,
+  ZeroQueryExternalSource<T, never>,
+  never,
+  ZeroService<any, any> | Scope.Scope
+> =>
+  makeWithContext<M, Q, T, never, never>(
+    maybeSignalQuery,
+    Context.empty(),
+    options,
+  );
+
+/**
+ * Creates an ExternalSource for Zero queries where the input is wrapped in a Result type.
+ *
+ * The output type is Result<Either<T, Error>> where:
+ * - The outer Result combines input Result status AND Zero sync status
+ * - Complete only when BOTH input is Complete AND Zero sync is complete
+ * - The inner Either handles success data vs errors
+ */
+export const makeFromResultWithContext = <
+  M,
+  Q = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends Result<
+    infer Q,
+    infer _C
+  >
+    ? Q
+    : never,
+  T extends ReadonlyJSONValue | View = HumanReadable<
+    QueryRowType<Q>
+  > extends infer T extends ReadonlyJSONValue | View
+    ? T
+    : never,
+  E = Effect.Effect.Error<MaybeSignalEffectValue<M>>,
+  R = Effect.Effect.Context<MaybeSignalEffectValue<M>>,
+>(
+  maybeSignalQuery: M,
+  context: Context.Context<Exclude<R, SignalContext>>,
+  options?: ZeroMaterializeOptions,
+): Effect.Effect<
+  ZeroQueryExternalSource<T, E>,
   never,
   ZeroService<any, any> | Scope.Scope
 > =>
   pipe(
     ZeroService<any, any>(),
-    Effect.flatMap((zero) =>
-      zero.materialize(
-        query,
-        (
-          _query,
-          input,
-          format,
-          onDestroy,
-          onTransactionCommit,
-          queryComplete,
-          _updateTTL,
-        ) =>
-          pipe(
-            Effect.all({
-              resultTypeRef: SynchronizedRef.make<
-                Either.Either<"unknown" | "complete", ZeroQueryError>
-              >(Either.right("unknown")),
-              dirtyRef: SynchronizedRef.make(false),
-              valueRef: SynchronizedRef.make<{ "": T }>({
-                "": (format.singular ? undefined : []) as T,
-              }),
-              startedRef: SynchronizedRef.make(false),
-              onEmitRef: SynchronizedRef.make<
-                Option.Option<
-                  (
-                    value: Either.Either<Result<T>, ZeroQueryError>,
-                  ) => Effect.Effect<void, never, never>
-                >
-              >(Option.none()),
-            }),
-            Effect.tap(({ resultTypeRef }) =>
+    Effect.andThen((zero) =>
+      pipe(
+        createSourceWithRefs<T, E>(),
+        // Set inputResultCompleteRef to false initially for Result inputs
+        Effect.tap(({ inputResultCompleteRef }) =>
+          SynchronizedRef.set(inputResultCompleteRef, false),
+        ),
+        Effect.tap(
+          ({
+            source,
+            viewRef,
+            inputResultCompleteRef,
+            zeroResultTypeRef,
+            valueRef,
+            inputErrorRef,
+            queryCompletePromiseFiberRef,
+          }) =>
+            SideEffect.makeWithContext(
               pipe(
-                Match.value(queryComplete),
-                Match.when(true, () =>
-                  SynchronizedRef.set(resultTypeRef, Either.right("complete")),
-                ),
-                Match.when(Predicate.hasProperty("error"), (error) =>
-                  SynchronizedRef.set(
-                    resultTypeRef,
-                    Either.left(
-                      pipe(
-                        Match.value(error),
-                        Match.discriminatorsExhaustive("error")({
-                          app: (error) =>
-                            new ZeroQueryAppError({
-                              id: error.id,
-                              name: error.name,
-                              details: error.details,
-                            }),
-                          http: (error) =>
-                            new ZeroQueryHttpError({
-                              id: error.id,
-                              name: error.name,
-                              status: error.status,
-                              details: error.details,
-                            }),
-                          zero: (error) =>
-                            new ZeroQueryZeroError({
-                              id: error.id,
-                              name: error.name,
-                              details: error.details,
-                            }),
-                        }),
-                      ),
-                    ),
-                  ),
-                ),
-                Match.orElse(() => Effect.void),
-              ),
-            ),
-            Effect.let(
-              "source",
-              (refs) =>
-                new ZeroQueryExternalSource<T>(
-                  input,
-                  format,
-                  refs.resultTypeRef,
-                  refs.dirtyRef,
-                  refs.valueRef,
-                  refs.startedRef,
-                  refs.onEmitRef,
-                ),
-            ),
-            Effect.tap(({ source }) => source.hydrate()),
-            Effect.tap(({ resultTypeRef, source }) =>
-              pipe(
-                Match.value(queryComplete),
-                Match.when(Predicate.isPromiseLike, (queryComplete) =>
-                  Effect.forkDaemon(
-                    pipe(
-                      Effect.tryPromise({
-                        try: () => queryComplete,
-                        catch: (error) =>
-                          pipe(
-                            Match.value(error as RawZeroQueryError),
-                            Match.discriminatorsExhaustive("error")({
-                              app: (error) =>
-                                new ZeroQueryAppError({
-                                  id: error.id,
-                                  name: error.name,
-                                  details: error.details,
-                                }),
-                              http: (error) =>
-                                new ZeroQueryHttpError({
-                                  id: error.id,
-                                  name: error.name,
-                                  status: error.status,
-                                  details: error.details,
-                                }),
-                              zero: (error) =>
-                                new ZeroQueryZeroError({
-                                  id: error.id,
-                                  name: error.name,
-                                  details: error.details,
-                                }),
-                            }),
+                getMaybeSignalEffectValue(maybeSignalQuery) as Effect.Effect<
+                  Result<Q>,
+                  E,
+                  R | SignalContext
+                >,
+                Effect.either,
+                Effect.flatMap((queryResultEither) =>
+                  pipe(
+                    queryResultEither,
+                    Either.match({
+                      onLeft: (error) =>
+                        pipe(
+                          SynchronizedRef.set(
+                            inputErrorRef,
+                            Option.some(error),
                           ),
-                      }),
-                      Effect.map(() => "complete" as const),
-                      Effect.either,
-                      Effect.tap((result) =>
-                        SynchronizedRef.set(resultTypeRef, result),
-                      ),
-                      Effect.tap(() => Effect.runFork(source.doEmit())),
-                    ),
+                          // For errors, we don't know if input was complete or not
+                          // Keep the current status (likely false/optimistic)
+                          Effect.andThen(destroyView(viewRef)),
+                          Effect.andThen(source.doEmit()),
+                        ),
+                      onRight: (queryResult) =>
+                        pipe(
+                          // Clear any previous input error
+                          SynchronizedRef.set(inputErrorRef, Option.none()),
+                          // Track if input Result is Complete
+                          Effect.andThen(
+                            SynchronizedRef.set(
+                              inputResultCompleteRef,
+                              isResultComplete(queryResult),
+                            ),
+                          ),
+                          // Extract the query from the Result and materialize
+                          Effect.andThen(
+                            zero.materialize(
+                              queryResult.value as Q,
+                              createMaterializeCallback(
+                                source,
+                                viewRef,
+                                zeroResultTypeRef,
+                                valueRef,
+                                queryCompletePromiseFiberRef,
+                              ),
+                              options,
+                            ),
+                          ),
+                        ),
+                    }),
                   ),
                 ),
-                Match.orElse(() => Effect.void),
               ),
+              context,
             ),
-            Effect.tap(({ source }) =>
-              onTransactionCommit(() => Effect.runFork(source.flush())),
-            ),
-            Effect.tap(() =>
-              Effect.addFinalizer(() => Effect.sync(() => onDestroy())),
-            ),
-            Effect.map(({ source }) => source),
-          ),
-        options,
+        ),
+        Effect.tap(({ viewRef }) =>
+          Effect.addFinalizer(() => destroyView(viewRef)),
+        ),
+        Effect.map(({ source }) => source),
       ),
     ),
+  );
+
+export const makeFromResult = <
+  M,
+  Q = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends Result<
+    infer Q,
+    infer _C
+  >
+    ? Q
+    : never,
+  T extends ReadonlyJSONValue | View = HumanReadable<
+    QueryRowType<Q>
+  > extends infer T extends ReadonlyJSONValue | View
+    ? T
+    : never,
+>(
+  maybeSignalQuery: M,
+  options?: ZeroMaterializeOptions,
+): Effect.Effect<
+  ZeroQueryExternalSource<T, never>,
+  never,
+  ZeroService<any, any> | Scope.Scope
+> =>
+  makeFromResultWithContext<M, Q, T, never, never>(
+    maybeSignalQuery,
+    Context.empty(),
+    options,
   );
