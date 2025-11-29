@@ -1,4 +1,15 @@
-import { Data, Match, Predicate, Schema, pipe, Unify, Either } from "effect";
+import {
+  Data,
+  Effect,
+  Match,
+  Predicate,
+  Schema,
+  pipe,
+  Unify,
+  Either,
+  Option,
+  Layer,
+} from "effect";
 import { RpcResult } from "./rpc";
 import { type RpcError, ValidationError } from "../error";
 
@@ -99,7 +110,7 @@ export const flatmap =
       }),
     );
 
-export const flaten = <OO, OC, CO, CC>(
+export const flatten = <OO, OC, CO, CC>(
   result: Result<Result<OO, OC>, Result<CO, CC>>,
 ): Result<OO | OC | CO, CC> =>
   pipe(
@@ -183,3 +194,60 @@ export const isOptimistic = (result: unknown): result is Optimistic<unknown> =>
 
 export const isComplete = (result: unknown): result is Complete<unknown> =>
   result instanceof Complete;
+
+export const transposeEffect = <A, E, R>(
+  result: Result<Effect.Effect<A, E, R>>,
+): Effect.Effect<Result<A>, E, R> =>
+  pipe(
+    result,
+    match({
+      onOptimistic: Effect.map(optimistic),
+      onComplete: Effect.map(complete),
+    }),
+  );
+
+export const mapEitherOption =
+  <T, B>(f: (value: T) => B) =>
+  <E>(
+    result: Result<Either.Either<Option.Option<T>, E>>,
+  ): Result<Either.Either<Option.Option<B>, E>> =>
+    pipe(result, map(Either.map(Option.map(f))));
+
+export const someOrLeft =
+  <E>(onNone: () => E) =>
+  <T>(result: Result<Option.Option<T>>): Result<Either.Either<T, E>> =>
+    pipe(
+      result,
+      map(Either.liftPredicate(Option.isSome, onNone)),
+      map(Either.map((option) => option.value)),
+    );
+
+export const eitherSomeOrLeft =
+  <E1>(onNone: () => E1) =>
+  <T, E2>(
+    result: Result<Either.Either<Option.Option<T>, E2>>,
+  ): Result<Either.Either<T, E1 | E2>> =>
+    pipe(
+      result,
+      map(Either.filterOrLeft(Option.isSome, onNone)),
+      map(Either.map((option) => option.value)),
+    );
+
+export const provideEitherLayer =
+  <ROut, E1, RIn, E2>(
+    layer: Result<Either.Either<Layer.Layer<ROut, E1, RIn>, E2>>,
+  ) =>
+  <A, E, R>(
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<
+    Result<Either.Either<A, E | E1 | E2>>,
+    never,
+    Exclude<R, ROut> | RIn
+  > =>
+    pipe(
+      layer,
+      map(Either.map((layer) => pipe(effect, Effect.provide(layer)))),
+      map(Effect.flatten),
+      map(Effect.either),
+      transposeEffect,
+    );
