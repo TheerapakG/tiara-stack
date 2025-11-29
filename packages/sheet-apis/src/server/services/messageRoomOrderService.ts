@@ -71,9 +71,11 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                 ),
               ),
             ),
-            Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder", {
-              captureStackTrace: true,
-            }),
+            Effect.map(
+              Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder", {
+                captureStackTrace: true,
+              }),
+            ),
           ),
         decrementMessageRoomOrderRank: (messageId: string) =>
           pipe(
@@ -213,11 +215,13 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                 ),
               ),
             ),
-            Effect.withSpan(
-              "MessageRoomOrderService.getMessageRoomOrderEntry",
-              {
-                captureStackTrace: true,
-              },
+            Effect.map(
+              Effect.withSpan(
+                "MessageRoomOrderService.getMessageRoomOrderEntry",
+                {
+                  captureStackTrace: true,
+                },
+              ),
             ),
           ),
         _getMessageRoomOrderRange: <E = never>(
@@ -291,11 +295,13 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                 ),
               ),
             ),
-            Effect.withSpan(
-              "MessageRoomOrderService.getMessageRoomOrderRange",
-              {
-                captureStackTrace: true,
-              },
+            Effect.map(
+              Effect.withSpan(
+                "MessageRoomOrderService.getMessageRoomOrderRange",
+                {
+                  captureStackTrace: true,
+                },
+              ),
             ),
           ),
         upsertMessageRoomOrderEntry: (
