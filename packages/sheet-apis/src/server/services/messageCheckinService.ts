@@ -1,11 +1,15 @@
 import { DBService } from "@/db";
-import { MessageCheckin, MessageCheckinMember } from "@/server/schema";
+import { Error, MessageCheckin, MessageCheckinMember } from "@/server/schema";
 import { and, eq, gte, isNull } from "drizzle-orm";
 import { Array, DateTime, Effect, pipe, Schema } from "effect";
 import { messageCheckin, messageCheckinMember } from "sheet-db-schema";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass, Result } from "typhoon-core/schema";
-import { ExternalComputed, ZeroQueryExternalSource } from "typhoon-core/signal";
+import {
+  ExternalComputed,
+  SignalContext,
+  ZeroQueryExternalSource,
+} from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
 import { ZeroServiceTag } from "@/db/zeroService";
 
@@ -19,31 +23,44 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
       Effect.bind("db", () => DBService),
       Effect.bind("dbSubscriptionContext", () => DB.DBSubscriptionContext),
       Effect.map(({ db, dbSubscriptionContext }) => ({
-        getMessageCheckinData: (messageId: string) =>
+        _getMessageCheckinData: <E = never>(
+          messageId: SignalContext.MaybeSignalEffect<string, E>,
+        ) =>
           pipe(
             ZeroServiceTag,
             Effect.flatMap((zero) =>
               ZeroQueryExternalSource.make(
-                zero.query.messageCheckin
-                  .where("messageId", "=", messageId)
-                  .where("deletedAt", "IS", null)
-                  .one(),
+                pipe(
+                  messageId,
+                  SignalContext.getMaybeSignalEffectValue,
+                  Effect.map((messageId) =>
+                    zero.query.messageCheckin
+                      .where("messageId", "=", messageId)
+                      .where("deletedAt", "IS", null)
+                      .one(),
+                  ),
+                ),
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Effect.map(Effect.flatten),
             Effect.map(
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.OptionFromNullishOr(
-                      DefaultTaggedClass(MessageCheckin),
-                      undefined,
-                    ),
-                    complete: Schema.OptionFromNullishOr(
-                      DefaultTaggedClass(MessageCheckin),
-                      undefined,
-                    ),
+                    optimistic: Schema.Either({
+                      right: Schema.OptionFromNullishOr(
+                        DefaultTaggedClass(MessageCheckin),
+                        undefined,
+                      ),
+                      left: Error.Core.ZeroQueryError,
+                    }),
+                    complete: Schema.Either({
+                      right: Schema.OptionFromNullishOr(
+                        DefaultTaggedClass(MessageCheckin),
+                        undefined,
+                      ),
+                      left: Error.Core.ZeroQueryError,
+                    }),
                   }),
                 ),
               ),
@@ -91,28 +108,41 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
               captureStackTrace: true,
             }),
           ),
-        getMessageCheckinMembers: (messageId: string) =>
+        _getMessageCheckinMembers: <E = never>(
+          messageId: SignalContext.MaybeSignalEffect<string, E>,
+        ) =>
           pipe(
             ZeroServiceTag,
             Effect.flatMap((zero) =>
               ZeroQueryExternalSource.make(
-                zero.query.messageCheckinMember
-                  .where("messageId", "=", messageId)
-                  .where("deletedAt", "IS", null),
+                pipe(
+                  messageId,
+                  SignalContext.getMaybeSignalEffectValue,
+                  Effect.map((messageId) =>
+                    zero.query.messageCheckinMember
+                      .where("messageId", "=", messageId)
+                      .where("deletedAt", "IS", null),
+                  ),
+                ),
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Effect.map(Effect.flatten),
             Effect.map(
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.Array(
-                      DefaultTaggedClass(MessageCheckinMember),
-                    ),
-                    complete: Schema.Array(
-                      DefaultTaggedClass(MessageCheckinMember),
-                    ),
+                    optimistic: Schema.Either({
+                      right: Schema.Array(
+                        DefaultTaggedClass(MessageCheckinMember),
+                      ),
+                      left: Error.Core.ZeroQueryError,
+                    }),
+                    complete: Schema.Either({
+                      right: Schema.Array(
+                        DefaultTaggedClass(MessageCheckinMember),
+                      ),
+                      left: Error.Core.ZeroQueryError,
+                    }),
                   }),
                 ),
               ),
@@ -234,4 +264,18 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
     dependencies: [DBService.Default, DB.DBSubscriptionContext.Default],
     accessors: true,
   },
-) {}
+) {
+  static getMessageCheckinData = <E = never>(
+    messageId: SignalContext.MaybeSignalEffect<string, E>,
+  ) =>
+    MessageCheckinService.use((messageCheckinService) =>
+      messageCheckinService._getMessageCheckinData(messageId),
+    );
+
+  static getMessageCheckinMembers = <E = never>(
+    messageId: SignalContext.MaybeSignalEffect<string, E>,
+  ) =>
+    MessageCheckinService.use((messageCheckinService) =>
+      messageCheckinService._getMessageCheckinMembers(messageId),
+    );
+}

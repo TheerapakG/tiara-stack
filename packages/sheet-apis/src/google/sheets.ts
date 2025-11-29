@@ -313,7 +313,9 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
             Effect.map(Array.map(Option.fromNullable)),
             Effect.map(Array.getSomes),
             Effect.map(ArrayUtils.Collect.toHashMapByKey("title")),
-            Effect.map(HashMap.map(({ sheetId }) => sheetId)),
+            Effect.map(
+              HashMap.map(({ sheetId }) => Option.fromNullable(sheetId)),
+            ),
             Effect.withSpan("GoogleSheets.getSheetGids", {
               captureStackTrace: true,
             }),

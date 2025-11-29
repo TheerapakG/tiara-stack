@@ -13,8 +13,14 @@ export const getAutoCheckinGuildsHandlerConfig = pipe(
   Handler.Config.Builder.response({
     validator: pipe(
       Result.ResultSchema({
-        optimistic: Schema.Array(GuildConfig),
-        complete: Schema.Array(GuildConfig),
+        optimistic: Schema.Either({
+          right: Schema.Array(GuildConfig),
+          left: Schema.Union(Error.Core.ZeroQueryError),
+        }),
+        complete: Schema.Either({
+          right: Schema.Array(GuildConfig),
+          left: Error.Core.ZeroQueryError,
+        }),
       }),
       Schema.standardSchemaV1,
     ),

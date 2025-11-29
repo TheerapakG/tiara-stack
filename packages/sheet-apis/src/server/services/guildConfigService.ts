@@ -1,5 +1,6 @@
 import { DBService } from "@/db";
 import {
+  Error,
   GuildChannelConfig,
   GuildConfig,
   GuildConfigManagerRole,
@@ -16,6 +17,7 @@ import { DefaultTaggedClass, Result } from "typhoon-core/schema";
 import { ZeroQueryExternalSource, ExternalComputed } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
 import { ZeroServiceTag } from "@/db/zeroService";
+import { SignalContext } from "typhoon-core/signal";
 
 type GuildConfigInsert = typeof configGuild.$inferInsert;
 type GuildChannelConfigInsert = typeof configGuildChannel.$inferInsert;
@@ -39,13 +41,18 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Effect.map(Effect.flatten),
             Effect.map(
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.Array(DefaultTaggedClass(GuildConfig)),
-                    complete: Schema.Array(DefaultTaggedClass(GuildConfig)),
+                    optimistic: Schema.Either({
+                      right: Schema.Array(DefaultTaggedClass(GuildConfig)),
+                      left: Error.Core.ZeroQueryError,
+                    }),
+                    complete: Schema.Either({
+                      right: Schema.Array(DefaultTaggedClass(GuildConfig)),
+                      left: Error.Core.ZeroQueryError,
+                    }),
                   }),
                 ),
               ),
@@ -54,31 +61,44 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               captureStackTrace: true,
             }),
           ),
-        getGuildConfigByGuildId: (guildId: string) =>
+        _getGuildConfigByGuildId: <E = never>(
+          guildId: SignalContext.MaybeSignalEffect<string, E>,
+        ) =>
           pipe(
             ZeroServiceTag,
             Effect.flatMap((zero) =>
               ZeroQueryExternalSource.make(
-                zero.query.configGuild
-                  .where("guildId", "=", guildId)
-                  .where("deletedAt", "IS", null)
-                  .one(),
+                pipe(
+                  guildId,
+                  SignalContext.getMaybeSignalEffectValue,
+                  Effect.map((guildId) =>
+                    zero.query.configGuild
+                      .where("guildId", "=", guildId)
+                      .where("deletedAt", "IS", null)
+                      .one(),
+                  ),
+                ),
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Effect.map(Effect.flatten),
             Effect.map(
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.OptionFromNullishOr(
-                      DefaultTaggedClass(GuildConfig),
-                      undefined,
-                    ),
-                    complete: Schema.OptionFromNullishOr(
-                      DefaultTaggedClass(GuildConfig),
-                      undefined,
-                    ),
+                    optimistic: Schema.Either({
+                      right: Schema.OptionFromNullishOr(
+                        DefaultTaggedClass(GuildConfig),
+                        undefined,
+                      ),
+                      left: Error.Core.ZeroQueryError,
+                    }),
+                    complete: Schema.Either({
+                      right: Schema.OptionFromNullishOr(
+                        DefaultTaggedClass(GuildConfig),
+                        undefined,
+                      ),
+                      left: Error.Core.ZeroQueryError,
+                    }),
                   }),
                 ),
               ),
@@ -87,31 +107,44 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               captureStackTrace: true,
             }),
           ),
-        getGuildConfigByScriptId: (scriptId: string) =>
+        _getGuildConfigByScriptId: <E = never>(
+          scriptId: SignalContext.MaybeSignalEffect<string, E>,
+        ) =>
           pipe(
             ZeroServiceTag,
             Effect.flatMap((zero) =>
               ZeroQueryExternalSource.make(
-                zero.query.configGuild
-                  .where("scriptId", "=", scriptId)
-                  .where("deletedAt", "IS", null)
-                  .one(),
+                pipe(
+                  scriptId,
+                  SignalContext.getMaybeSignalEffectValue,
+                  Effect.map((scriptId) =>
+                    zero.query.configGuild
+                      .where("scriptId", "=", scriptId)
+                      .where("deletedAt", "IS", null)
+                      .one(),
+                  ),
+                ),
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Effect.map(Effect.flatten),
             Effect.map(
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.OptionFromNullishOr(
-                      DefaultTaggedClass(GuildConfig),
-                      undefined,
-                    ),
-                    complete: Schema.OptionFromNullishOr(
-                      DefaultTaggedClass(GuildConfig),
-                      undefined,
-                    ),
+                    optimistic: Schema.Either({
+                      right: Schema.OptionFromNullishOr(
+                        DefaultTaggedClass(GuildConfig),
+                        undefined,
+                      ),
+                      left: Error.Core.ZeroQueryError,
+                    }),
+                    complete: Schema.Either({
+                      right: Schema.OptionFromNullishOr(
+                        DefaultTaggedClass(GuildConfig),
+                        undefined,
+                      ),
+                      left: Error.Core.ZeroQueryError,
+                    }),
                   }),
                 ),
               ),
@@ -157,28 +190,41 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               captureStackTrace: true,
             }),
           ),
-        getGuildManagerRoles: (guildId: string) =>
+        _getGuildManagerRoles: <E = never>(
+          guildId: SignalContext.MaybeSignalEffect<string, E>,
+        ) =>
           pipe(
             ZeroServiceTag,
             Effect.flatMap((zero) =>
               ZeroQueryExternalSource.make(
-                zero.query.configGuildManagerRole
-                  .where("guildId", "=", guildId)
-                  .where("deletedAt", "IS", null),
+                pipe(
+                  guildId,
+                  SignalContext.getMaybeSignalEffectValue,
+                  Effect.map((guildId) =>
+                    zero.query.configGuildManagerRole
+                      .where("guildId", "=", guildId)
+                      .where("deletedAt", "IS", null),
+                  ),
+                ),
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Effect.map(Effect.flatten),
             Effect.map(
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.Array(
-                      DefaultTaggedClass(GuildConfigManagerRole),
-                    ),
-                    complete: Schema.Array(
-                      DefaultTaggedClass(GuildConfigManagerRole),
-                    ),
+                    optimistic: Schema.Either({
+                      right: Schema.Array(
+                        DefaultTaggedClass(GuildConfigManagerRole),
+                      ),
+                      left: Error.Core.ZeroQueryError,
+                    }),
+                    complete: Schema.Either({
+                      right: Schema.Array(
+                        DefaultTaggedClass(GuildConfigManagerRole),
+                      ),
+                      left: Error.Core.ZeroQueryError,
+                    }),
                   }),
                 ),
               ),
@@ -294,32 +340,48 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               captureStackTrace: true,
             }),
           ),
-        getGuildRunningChannelById: (guildId: string, channelId: string) =>
+        _getGuildRunningChannelById: <E = never>(
+          params: SignalContext.MaybeSignalEffect<
+            { guildId: string; channelId: string },
+            E
+          >,
+        ) =>
           pipe(
             ZeroServiceTag,
             Effect.flatMap((zero) =>
               ZeroQueryExternalSource.make(
-                zero.query.configGuildChannel
-                  .where("guildId", "=", guildId)
-                  .where("channelId", "=", channelId)
-                  .where("deletedAt", "IS", null)
-                  .one(),
+                pipe(
+                  params,
+                  SignalContext.getMaybeSignalEffectValue,
+                  Effect.map(({ guildId, channelId }) =>
+                    zero.query.configGuildChannel
+                      .where("guildId", "=", guildId)
+                      .where("channelId", "=", channelId)
+                      .where("deletedAt", "IS", null)
+                      .one(),
+                  ),
+                ),
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Effect.map(Effect.flatten),
             Effect.map(
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.OptionFromNullishOr(
-                      DefaultTaggedClass(GuildChannelConfig),
-                      undefined,
-                    ),
-                    complete: Schema.OptionFromNullishOr(
-                      DefaultTaggedClass(GuildChannelConfig),
-                      undefined,
-                    ),
+                    optimistic: Schema.Either({
+                      right: Schema.OptionFromNullishOr(
+                        DefaultTaggedClass(GuildChannelConfig),
+                        undefined,
+                      ),
+                      left: Error.Core.ZeroQueryError,
+                    }),
+                    complete: Schema.Either({
+                      right: Schema.OptionFromNullishOr(
+                        DefaultTaggedClass(GuildChannelConfig),
+                        undefined,
+                      ),
+                      left: Error.Core.ZeroQueryError,
+                    }),
                   }),
                 ),
               ),
@@ -328,32 +390,48 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               captureStackTrace: true,
             }),
           ),
-        getGuildRunningChannelByName: (guildId: string, channelName: string) =>
+        _getGuildRunningChannelByName: <E = never>(
+          params: SignalContext.MaybeSignalEffect<
+            { guildId: string; channelName: string },
+            E
+          >,
+        ) =>
           pipe(
             ZeroServiceTag,
             Effect.flatMap((zero) =>
               ZeroQueryExternalSource.make(
-                zero.query.configGuildChannel
-                  .where("guildId", "=", guildId)
-                  .where("name", "=", channelName)
-                  .where("deletedAt", "IS", null)
-                  .one(),
+                pipe(
+                  params,
+                  SignalContext.getMaybeSignalEffectValue,
+                  Effect.map(({ guildId, channelName }) =>
+                    zero.query.configGuildChannel
+                      .where("guildId", "=", guildId)
+                      .where("name", "=", channelName)
+                      .where("deletedAt", "IS", null)
+                      .one(),
+                  ),
+                ),
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
-            Effect.map(Effect.flatten),
             Effect.map(
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.OptionFromNullishOr(
-                      DefaultTaggedClass(GuildChannelConfig),
-                      undefined,
-                    ),
-                    complete: Schema.OptionFromNullishOr(
-                      DefaultTaggedClass(GuildChannelConfig),
-                      undefined,
-                    ),
+                    optimistic: Schema.Either({
+                      right: Schema.OptionFromNullishOr(
+                        DefaultTaggedClass(GuildChannelConfig),
+                        undefined,
+                      ),
+                      left: Error.Core.ZeroQueryError,
+                    }),
+                    complete: Schema.Either({
+                      right: Schema.OptionFromNullishOr(
+                        DefaultTaggedClass(GuildChannelConfig),
+                        undefined,
+                      ),
+                      left: Error.Core.ZeroQueryError,
+                    }),
                   }),
                 ),
               ),
@@ -367,4 +445,45 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
     dependencies: [DBService.Default, DB.DBSubscriptionContext.Default],
     accessors: true,
   },
-) {}
+) {
+  static getGuildConfigByGuildId = <E = never>(
+    guildId: SignalContext.MaybeSignalEffect<string, E>,
+  ) =>
+    GuildConfigService.use((guildConfigService) =>
+      guildConfigService._getGuildConfigByGuildId(guildId),
+    );
+
+  static getGuildConfigByScriptId = <E = never>(
+    scriptId: SignalContext.MaybeSignalEffect<string, E>,
+  ) =>
+    GuildConfigService.use((guildConfigService) =>
+      guildConfigService._getGuildConfigByScriptId(scriptId),
+    );
+
+  static getGuildManagerRoles = <E = never>(
+    guildId: SignalContext.MaybeSignalEffect<string, E>,
+  ) =>
+    GuildConfigService.use((guildConfigService) =>
+      guildConfigService._getGuildManagerRoles(guildId),
+    );
+
+  static getGuildRunningChannelById = <E = never>(
+    params: SignalContext.MaybeSignalEffect<
+      { guildId: string; channelId: string },
+      E
+    >,
+  ) =>
+    GuildConfigService.use((guildConfigService) =>
+      guildConfigService._getGuildRunningChannelById(params),
+    );
+
+  static getGuildRunningChannelByName = <E = never>(
+    params: SignalContext.MaybeSignalEffect<
+      { guildId: string; channelName: string },
+      E
+    >,
+  ) =>
+    GuildConfigService.use((guildConfigService) =>
+      guildConfigService._getGuildRunningChannelByName(params),
+    );
+}

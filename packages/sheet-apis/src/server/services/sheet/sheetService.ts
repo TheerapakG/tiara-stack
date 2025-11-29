@@ -19,6 +19,7 @@ import {
   Array,
   Data,
   Effect,
+  Either,
   HashMap,
   Match,
   Number,
@@ -29,6 +30,7 @@ import {
 } from "effect";
 import { Result, TupleToStructValueSchema } from "typhoon-core/schema";
 import { Array as ArrayUtils, Struct as StructUtils } from "typhoon-core/utils";
+import { SignalContext } from "typhoon-core/signal";
 import { GuildConfigService } from "../guildConfigService";
 import { SheetConfigService } from "../sheetConfigService";
 
@@ -1291,31 +1293,24 @@ export class SheetService extends Effect.Service<SheetService>()(
     accessors: true,
   },
 ) {
-  static ofGuild = (guildId: string) =>
+  static ofGuild = <E = never>(
+    guildId: SignalContext.MaybeSignalEffect<string, E>,
+  ) =>
     pipe(
       GuildConfigService.getGuildConfigByGuildId(guildId),
       Effect.map(
-        Effect.flatMap(
-          Result.match({
-            onOptimistic: (guildConfig) =>
-              pipe(
-                guildConfig,
-                Option.flatMap((guildConfig) => guildConfig.sheetId),
-                Option.map(Result.optimistic),
-              ),
-            onComplete: (guildConfig) =>
-              pipe(
-                guildConfig,
-                Option.flatMap((guildConfig) => guildConfig.sheetId),
-                Option.map(Result.complete),
-              ),
-          }),
+        Effect.map(
+          Result.map(Either.map(Option.flatMap((config) => config.sheetId))),
         ),
       ),
       Effect.map(
         Effect.map(
-          Result.map((sheetId) =>
-            SheetService.DefaultWithoutDependencies(sheetId),
+          Result.map(
+            Either.map(
+              Option.map((sheetId) =>
+                SheetService.DefaultWithoutDependencies(sheetId),
+              ),
+            ),
           ),
         ),
       ),

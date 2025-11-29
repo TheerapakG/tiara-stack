@@ -15,11 +15,17 @@ export const getMessageRoomOrderRangeHandlerConfig = pipe(
       Result.ResultSchema({
         optimistic: Schema.Either({
           right: MessageRoomOrderRange,
-          left: Error.Core.ArgumentError,
+          left: Schema.Union(
+            Error.Core.ArgumentError,
+            Error.Core.ZeroQueryError,
+          ),
         }),
         complete: Schema.Either({
           right: MessageRoomOrderRange,
-          left: Error.Core.ArgumentError,
+          left: Schema.Union(
+            Error.Core.ArgumentError,
+            Error.Core.ZeroQueryError,
+          ),
         }),
       }),
       Schema.standardSchemaV1,
@@ -32,7 +38,6 @@ export const getMessageRoomOrderRangeHandlerConfig = pipe(
         Error.Core.MsgpackDecodeError,
         Error.Core.StreamExhaustedError,
         Error.Core.ValidationError,
-        Error.Core.ZeroQueryError,
       ),
       Schema.standardSchemaV1,
     ),

@@ -1,6 +1,7 @@
 import { mapScheduleWithPlayersHandlerConfig } from "@/server/handler/config";
+import { Error } from "@/server/schema";
 import { AuthService, Sheet } from "@/server/services";
-import { Effect, flow, pipe, Schema, Scope } from "effect";
+import { Effect, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
@@ -12,68 +13,58 @@ export const mapScheduleWithPlayersHandler = pipe(
   builders.data(mapScheduleWithPlayersHandlerConfig),
   builders.handler(
     pipe(
-      Effect.succeed(Event.someToken()),
-      Effect.map(Effect.flatMap(AuthService.verify)),
-      Effect.map(
-        flow(
-          Effect.flatMap(() =>
-            Event.request.parsedWithScope(mapScheduleWithPlayersHandlerConfig),
-          ),
-          Effect.flatten,
-        ),
+      Effect.Do,
+      Effect.tap(() =>
+        pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
       ),
-      Effect.map(
-        flow(
-          Effect.flatMap(({ parsed: { guildId, schedules }, scope }) =>
+      Effect.bind("parsed", () =>
+        Event.request.parsed(mapScheduleWithPlayersHandlerConfig),
+      ),
+      Effect.bind("layerOfGuildId", ({ parsed }) =>
+        pipe(
+          Sheet.layerOfGuildId(
             pipe(
-              Sheet.layerOfGuildId(guildId),
-              Effect.flatMap((layer) =>
-                pipe(
-                  Effect.all({
-                    signal: Effect.succeed(
-                      Effect.forEach(
-                        schedules,
-                        Sheet.PlayerService.mapScheduleWithPlayers,
-                        {
-                          concurrency: "unbounded",
-                        },
-                      ),
-                    ),
-                    layer,
-                  }),
-                  Effect.map(({ signal, layer }) =>
-                    pipe(
-                      layer,
-                      Result.match({
-                        onOptimistic: (l) =>
-                          pipe(
-                            signal,
-                            Effect.map(Result.optimistic),
-                            Effect.provide(l),
-                          ),
-                        onComplete: (l) =>
-                          pipe(
-                            signal,
-                            Effect.map(Result.complete),
-                            Effect.provide(l),
-                          ),
-                      }),
-                    ),
-                  ),
+              parsed,
+              Effect.map(({ guildId }) => guildId),
+            ),
+          ),
+          Effect.map(
+            Effect.map(
+              Result.someOrLeft(() =>
+                Error.Core.makeArgumentError(
+                  "Cannot get sheet by guild id, the guild might not be registered",
                 ),
               ),
-              Scope.extend(scope),
             ),
           ),
-          Effect.flatten,
         ),
       ),
-      Effect.map(
-        Effect.flatMap(
-          Schema.encodeEither(
-            Handler.Config.resolveResponseValidator(
-              Handler.Config.response(mapScheduleWithPlayersHandlerConfig),
+      Effect.map(({ parsed, layerOfGuildId }) =>
+        pipe(
+          layerOfGuildId,
+          Effect.flatMap((layerOfGuildId) =>
+            pipe(
+              parsed,
+              Effect.flatMap(({ schedules }) =>
+                Effect.forEach(
+                  schedules,
+                  Sheet.PlayerService.mapScheduleWithPlayers,
+                  {
+                    concurrency: "unbounded",
+                  },
+                ),
+              ),
+              Result.provideEitherLayer(layerOfGuildId),
             ),
+          ),
+        ),
+      ),
+      Effect.map(Error.Core.catchParseErrorAsValidationError),
+      Effect.map((result) =>
+        pipe(
+          result,
+          Handler.Config.encodeResponseEffect(
+            mapScheduleWithPlayersHandlerConfig,
           ),
         ),
       ),

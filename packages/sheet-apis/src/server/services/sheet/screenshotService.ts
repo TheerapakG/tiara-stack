@@ -1,10 +1,11 @@
 import { GoogleSheets } from "@/google/sheets";
-import { Array, Effect, HashMap, Number, pipe, String } from "effect";
+import { Array, Effect, HashMap, Number, Option, pipe, String } from "effect";
 import { HttpClient } from "@effect/platform";
 import { chromium } from "playwright";
 import { SheetService } from "./sheetService";
 import { joinURL, withQuery } from "ufo";
 import { Struct as StructUtils } from "typhoon-core/utils";
+import { makeUnknownError } from "typhoon-core/error";
 
 export class ScreenshotService extends Effect.Service<ScreenshotService>()(
   "ScreenshotService",
@@ -48,7 +49,7 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()(
               }),
               { concurrency: "unbounded" },
             ),
-            Effect.bind("filteredScheduleConfig", ({ scheduleConfigs }) =>
+            Effect.let("filteredScheduleConfig", ({ scheduleConfigs }) =>
               pipe(
                 scheduleConfigs,
                 Array.map(
@@ -70,21 +71,33 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()(
             ),
             Effect.bind("sheetGid", ({ filteredScheduleConfig }) =>
               pipe(
-                sheetGids,
-                Effect.flatMap(HashMap.get(filteredScheduleConfig.sheet)),
+                filteredScheduleConfig,
+                Effect.transposeMapOption((filteredScheduleConfig) =>
+                  pipe(
+                    sheetGids,
+                    Effect.map(HashMap.get(filteredScheduleConfig.sheet)),
+                    Effect.map(Option.flatten),
+                  ),
+                ),
+                Effect.map(Option.flatten),
               ),
             ),
             Effect.let("url", ({ sheetGid, filteredScheduleConfig }) =>
-              withQuery(
-                joinURL(
-                  "https://docs.google.com/spreadsheets/d",
-                  `/${sheetService.sheetId}`,
-                  `/htmlembed/sheet`,
+              pipe(
+                Option.all({ sheetGid, filteredScheduleConfig }),
+                Option.map(({ sheetGid, filteredScheduleConfig }) =>
+                  withQuery(
+                    joinURL(
+                      "https://docs.google.com/spreadsheets/d",
+                      `/${sheetService.sheetId}`,
+                      `/htmlembed/sheet`,
+                    ),
+                    {
+                      gid: sheetGid,
+                      range: filteredScheduleConfig.screenshotRange,
+                    },
+                  ),
                 ),
-                {
-                  gid: sheetGid,
-                  range: filteredScheduleConfig.screenshotRange,
-                },
               ),
             ),
             Effect.bind("css", () =>
@@ -96,6 +109,9 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()(
                   }),
                 ),
                 Effect.flatMap((response) => response.text),
+                Effect.catchAll((error) =>
+                  Effect.fail(makeUnknownError("Error getting CSS", error)),
+                ),
                 Effect.map((css) =>
                   css.replace(
                     /font-family: '([^']+)';/g,
@@ -105,28 +121,39 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()(
               ),
             ),
             Effect.flatMap(({ url, css }) =>
-              Effect.tryPromise(async () => {
-                const browser = await chromium.launch();
-                const context = await browser.newContext({
-                  permissions: ["local-fonts"],
-                });
-                const page = await context.newPage();
-                await page.goto(url);
-                await page.addStyleTag({ content: css });
-                const boundingBox = await page.locator("table").boundingBox();
-                if (!boundingBox) {
-                  throw new Error("Table not found");
-                }
-                await page.setViewportSize({
-                  width: boundingBox.width,
-                  height: boundingBox.height,
-                });
-                const buffer = await page
-                  .locator("table")
-                  .screenshot({ type: "png" });
-                await browser.close();
-                return new Uint8Array(buffer);
-              }),
+              pipe(
+                url,
+                Effect.transposeMapOption((url) =>
+                  Effect.tryPromise({
+                    try: async () => {
+                      const browser = await chromium.launch();
+                      const context = await browser.newContext({
+                        permissions: ["local-fonts"],
+                      });
+                      const page = await context.newPage();
+                      await page.goto(url);
+                      await page.addStyleTag({ content: css });
+                      const boundingBox = await page
+                        .locator("table")
+                        .boundingBox();
+                      if (!boundingBox) {
+                        throw new Error("Table not found");
+                      }
+                      await page.setViewportSize({
+                        width: boundingBox.width,
+                        height: boundingBox.height,
+                      });
+                      const buffer = await page
+                        .locator("table")
+                        .screenshot({ type: "png" });
+                      await browser.close();
+                      return new Uint8Array(buffer);
+                    },
+                    catch: (error) =>
+                      makeUnknownError("Error getting screenshot", error),
+                  }),
+                ),
+              ),
             ),
             Effect.withSpan("ScreenshotService.getScreenshot", {
               captureStackTrace: true,

@@ -1,6 +1,7 @@
 import { getEventConfigHandlerConfig } from "@/server/handler/config";
+import { Error } from "@/server/schema";
 import { AuthService, Sheet } from "@/server/services";
-import { Effect, flow, pipe, Schema, Scope } from "effect";
+import { Effect, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
@@ -12,70 +13,46 @@ export const getEventConfigHandler = pipe(
   builders.data(getEventConfigHandlerConfig),
   builders.handler(
     pipe(
-      Effect.succeed(Event.someToken()),
-      Effect.map(Effect.flatMap(AuthService.verify)),
-      Effect.map(
-        flow(
-          Effect.flatMap(() =>
-            Event.request.parsedWithScope(getEventConfigHandlerConfig),
-          ),
-          Effect.flatten,
-        ),
+      Effect.Do,
+      Effect.tap(() =>
+        pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
       ),
-      Effect.map(
-        flow(
-          Effect.flatMap(({ parsed: { guildId }, scope }) =>
+      Effect.bind("parsed", () =>
+        Event.request.parsed(getEventConfigHandlerConfig),
+      ),
+      Effect.bind("layerOfGuildId", ({ parsed }) =>
+        pipe(
+          Sheet.layerOfGuildId(
             pipe(
-              Effect.log("getting layer of guild id"),
-              Effect.andThen(Sheet.layerOfGuildId(guildId)),
-              Effect.map(Effect.tap(() => Effect.log("getting event config"))),
-              Effect.flatMap((layer) =>
-                pipe(
-                  Effect.all({
-                    signal: Effect.succeed(Sheet.SheetService.getEventConfig()),
-                    layer,
-                  }),
-                  Effect.map(({ signal, layer }) =>
-                    pipe(
-                      layer,
-                      Result.match({
-                        onOptimistic: (l) =>
-                          pipe(
-                            signal,
-                            Effect.map(Result.optimistic),
-                            Effect.provide(l),
-                          ),
-                        onComplete: (l) =>
-                          pipe(
-                            signal,
-                            Effect.map(Result.complete),
-                            Effect.provide(l),
-                          ),
-                      }),
-                    ),
-                  ),
-                ),
-              ),
-              Effect.tap(() =>
-                Effect.addFinalizer(() =>
-                  Effect.log("finalizing event config"),
-                ),
-              ),
-              Scope.extend(scope),
+              parsed,
+              Effect.map(({ guildId }) => guildId),
             ),
           ),
-          Effect.flatten,
+          Effect.map(
+            Effect.map(
+              Result.someOrLeft(() =>
+                Error.Core.makeArgumentError(
+                  "Cannot get sheet by guild id, the guild might not be registered",
+                ),
+              ),
+            ),
+          ),
         ),
       ),
-      Effect.map(Effect.tap((eventConfig) => Effect.log(eventConfig))),
-      Effect.map(
-        Effect.flatMap(
-          Schema.encodeEither(
-            Handler.Config.resolveResponseValidator(
-              Handler.Config.response(getEventConfigHandlerConfig),
+      Effect.map(({ layerOfGuildId }) =>
+        pipe(
+          layerOfGuildId,
+          Effect.flatMap((layerOfGuildId) =>
+            pipe(
+              Sheet.SheetService.getEventConfig(),
+              Result.provideEitherLayer(layerOfGuildId),
             ),
           ),
         ),
+      ),
+      Effect.map(Error.Core.catchParseErrorAsValidationError),
+      Effect.map(
+        Handler.Config.encodeResponseEffect(getEventConfigHandlerConfig),
       ),
       Effect.withSpan("getEventConfigHandler", {
         captureStackTrace: true,

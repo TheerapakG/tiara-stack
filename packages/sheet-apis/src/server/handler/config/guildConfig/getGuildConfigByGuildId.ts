@@ -15,11 +15,17 @@ export const getGuildConfigByGuildIdHandlerConfig = pipe(
       Result.ResultSchema({
         optimistic: Schema.Either({
           right: GuildConfig,
-          left: Error.Core.ArgumentError,
+          left: Schema.Union(
+            Error.Core.ArgumentError,
+            Error.Core.ZeroQueryError,
+          ),
         }),
         complete: Schema.Either({
           right: GuildConfig,
-          left: Error.Core.ArgumentError,
+          left: Schema.Union(
+            Error.Core.ArgumentError,
+            Error.Core.ZeroQueryError,
+          ),
         }),
       }),
       Schema.standardSchemaV1,
@@ -32,7 +38,6 @@ export const getGuildConfigByGuildIdHandlerConfig = pipe(
         Error.Core.MsgpackDecodeError,
         Error.Core.StreamExhaustedError,
         Error.Core.ValidationError,
-        Error.Core.ZeroQueryError,
       ),
       Schema.standardSchemaV1,
     ),

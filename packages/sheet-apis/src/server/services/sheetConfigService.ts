@@ -313,6 +313,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 ),
               ),
             ),
+            Error.Core.catchParseErrorAsValidationError,
             Effect.withSpan("SheetConfigService.getRangesConfig", {
               captureStackTrace: true,
             }),
@@ -388,6 +389,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
                 ),
               ),
             ),
+            Error.Core.catchParseErrorAsValidationError,
             Effect.withSpan("SheetConfigService.getEventConfig", {
               captureStackTrace: true,
             }),

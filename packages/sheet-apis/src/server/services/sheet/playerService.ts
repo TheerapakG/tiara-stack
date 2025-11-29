@@ -10,6 +10,7 @@ import {
   SchedulePlayer,
   makeScheduleWithPlayers,
 } from "@/server/schema";
+import { SignalContext } from "typhoon-core/signal";
 
 export class PlayerService extends Effect.Service<PlayerService>()(
   "PlayerService",
@@ -76,10 +77,15 @@ export class PlayerService extends Effect.Service<PlayerService>()(
               captureStackTrace: true,
             }),
           ),
-        getByNames: (names: readonly string[]) =>
+        _getByNames: <E = never>(
+          names: SignalContext.MaybeSignalEffect<readonly string[], E>,
+        ) =>
           pipe(
-            playerMaps,
-            Effect.map(({ nameToPlayer }) =>
+            Effect.all({
+              names: SignalContext.getMaybeSignalEffectValue(names),
+              playerMaps,
+            }),
+            Effect.map(({ names, playerMaps: { nameToPlayer } }) =>
               Array.map(names, (name) =>
                 pipe(
                   nameToPlayer,
@@ -102,10 +108,15 @@ export class PlayerService extends Effect.Service<PlayerService>()(
               captureStackTrace: true,
             }),
           ),
-        getByIds: (ids: readonly string[]) =>
+        _getByIds: <E = never>(
+          ids: SignalContext.MaybeSignalEffect<readonly string[], E>,
+        ) =>
           pipe(
-            playerMaps,
-            Effect.map(({ idToPlayer }) =>
+            Effect.all({
+              ids: SignalContext.getMaybeSignalEffectValue(ids),
+              playerMaps,
+            }),
+            Effect.map(({ ids, playerMaps: { idToPlayer } }) =>
               Array.map(ids, (id) =>
                 pipe(
                   idToPlayer,
@@ -122,10 +133,10 @@ export class PlayerService extends Effect.Service<PlayerService>()(
             }),
           ),
       })),
-      Effect.map(({ sheetService, getPlayerMaps, getByIds, getByNames }) => ({
+      Effect.map(({ sheetService, getPlayerMaps, _getByIds, _getByNames }) => ({
         getPlayerMaps,
-        getByIds,
-        getByNames,
+        _getByIds,
+        _getByNames,
         mapScheduleWithPlayers: (schedule: Schedule | BreakSchedule) =>
           pipe(
             Match.value(schedule),
@@ -137,7 +148,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                     fills: pipe(
                       schedule.fills,
                       Array.getSomes,
-                      Utils.keyPositional("player", getByNames),
+                      Utils.keyPositional("player", _getByNames),
                       Effect.map((fills) =>
                         Array.makeBy(5, (i) =>
                           pipe(
@@ -155,7 +166,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                     ),
                     overfills: pipe(
                       schedule.overfills,
-                      Utils.keyPositional("player", getByNames),
+                      Utils.keyPositional("player", _getByNames),
                       Effect.map(
                         Array.map((overfill) =>
                           SchedulePlayer.make({
@@ -167,7 +178,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                     ),
                     standbys: pipe(
                       schedule.standbys,
-                      Utils.keyPositional("player", getByNames),
+                      Utils.keyPositional("player", _getByNames),
                       Effect.map(
                         Array.map((standby) =>
                           SchedulePlayer.make({
@@ -179,7 +190,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                     ),
                     runners: pipe(
                       schedule.runners,
-                      Utils.keyPositional("player", getByNames),
+                      Utils.keyPositional("player", _getByNames),
                       Effect.map(
                         Array.map((runner) =>
                           SchedulePlayer.make({
@@ -211,7 +222,9 @@ export class PlayerService extends Effect.Service<PlayerService>()(
               captureStackTrace: true,
             }),
           ),
-        getTeamsByNames: (names: readonly string[]) =>
+        _getTeamsByNames: <E = never>(
+          names: SignalContext.MaybeSignalEffect<readonly string[], E>,
+        ) =>
           pipe(
             Effect.Do,
             Effect.bindAll(() => ({
@@ -221,7 +234,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                   ArrayUtils.Collect.toArrayHashMapByKey("playerName"),
                 ),
               ),
-              players: getByNames(names),
+              players: _getByNames(names),
             })),
             Effect.map(({ players, teams }) =>
               pipe(
@@ -239,7 +252,9 @@ export class PlayerService extends Effect.Service<PlayerService>()(
               captureStackTrace: true,
             }),
           ),
-        getTeamsByIds: (ids: readonly string[]) =>
+        _getTeamsByIds: <E = never>(
+          ids: SignalContext.MaybeSignalEffect<readonly string[], E>,
+        ) =>
           pipe(
             Effect.Do,
             Effect.bindAll(() => ({
@@ -249,7 +264,7 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                   ArrayUtils.Collect.toArrayHashMapByKey("playerName"),
                 ),
               ),
-              players: getByIds(ids),
+              players: _getByIds(ids),
             })),
             Effect.map(({ players, teams }) =>
               pipe(
@@ -283,4 +298,20 @@ export class PlayerService extends Effect.Service<PlayerService>()(
     ),
     accessors: true,
   },
-) {}
+) {
+  static getByIds = <E = never>(
+    ids: SignalContext.MaybeSignalEffect<readonly string[], E>,
+  ) => PlayerService.use(({ _getByIds }) => _getByIds(ids));
+
+  static getByNames = <E = never>(
+    names: SignalContext.MaybeSignalEffect<readonly string[], E>,
+  ) => PlayerService.use(({ _getByNames }) => _getByNames(names));
+
+  static getTeamsByNames = <E = never>(
+    names: SignalContext.MaybeSignalEffect<readonly string[], E>,
+  ) => PlayerService.use(({ _getTeamsByNames }) => _getTeamsByNames(names));
+
+  static getTeamsByIds = <E = never>(
+    ids: SignalContext.MaybeSignalEffect<readonly string[], E>,
+  ) => PlayerService.use(({ _getTeamsByIds }) => _getTeamsByIds(ids));
+}

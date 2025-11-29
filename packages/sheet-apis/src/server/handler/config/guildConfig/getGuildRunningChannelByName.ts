@@ -21,11 +21,17 @@ export const getGuildRunningChannelByNameHandlerConfig = pipe(
       Result.ResultSchema({
         optimistic: Schema.Either({
           right: GuildChannelConfig,
-          left: Error.Core.ArgumentError,
+          left: Schema.Union(
+            Error.Core.ArgumentError,
+            Error.Core.ZeroQueryError,
+          ),
         }),
         complete: Schema.Either({
           right: GuildChannelConfig,
-          left: Error.Core.ArgumentError,
+          left: Schema.Union(
+            Error.Core.ArgumentError,
+            Error.Core.ZeroQueryError,
+          ),
         }),
       }),
       Schema.standardSchemaV1,
@@ -38,7 +44,6 @@ export const getGuildRunningChannelByNameHandlerConfig = pipe(
         Error.Core.MsgpackDecodeError,
         Error.Core.StreamExhaustedError,
         Error.Core.ValidationError,
-        Error.Core.ZeroQueryError,
       ),
       Schema.standardSchemaV1,
     ),

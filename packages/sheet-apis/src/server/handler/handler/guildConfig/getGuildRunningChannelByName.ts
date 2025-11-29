@@ -1,7 +1,7 @@
 import { getGuildRunningChannelByNameHandlerConfig } from "@/server/handler/config";
 import { Error } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
-import { Effect, Either, flow, Scope, pipe } from "effect";
+import { Effect, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
@@ -13,39 +13,21 @@ export const getGuildRunningChannelByNameHandler = pipe(
   builders.data(getGuildRunningChannelByNameHandlerConfig),
   builders.handler(
     pipe(
-      Effect.succeed(Event.someToken()),
-      Effect.map(Effect.flatMap(AuthService.verify)),
-      Effect.map(
-        flow(
-          Effect.flatMap(() =>
-            Event.request.parsedWithScope(
-              getGuildRunningChannelByNameHandlerConfig,
-            ),
-          ),
-          Effect.flatten,
-        ),
+      Effect.Do,
+      Effect.tap(() =>
+        pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
       ),
-      Effect.map(
-        flow(
-          Effect.flatMap(({ parsed: { guildId, channelName }, scope }) =>
-            pipe(
-              GuildConfigService.getGuildRunningChannelByName(
-                guildId,
-                channelName,
-              ),
-              Scope.extend(scope),
-            ),
-          ),
-          Effect.flatten,
-        ),
+      Effect.bind("parsed", () =>
+        Event.request.parsed(getGuildRunningChannelByNameHandlerConfig),
+      ),
+      Effect.flatMap(({ parsed }) =>
+        GuildConfigService.getGuildRunningChannelByName(parsed),
       ),
       Effect.map(
         Effect.map(
-          Result.map(
-            Either.fromOption(() =>
-              Error.Core.makeArgumentError(
-                "Cannot get running channel by name, the guild  or the channel name might not be registered",
-              ),
+          Result.eitherSomeOrLeft(() =>
+            Error.Core.makeArgumentError(
+              "Cannot get running channel by name, the guild or the channel name might not be registered",
             ),
           ),
         ),

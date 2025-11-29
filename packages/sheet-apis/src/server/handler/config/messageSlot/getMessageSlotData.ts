@@ -15,11 +15,17 @@ export const getMessageSlotDataHandlerConfig = pipe(
       Result.ResultSchema({
         optimistic: Schema.Either({
           right: MessageSlot,
-          left: Error.Core.ArgumentError,
+          left: Schema.Union(
+            Error.Core.ArgumentError,
+            Error.Core.ZeroQueryError,
+          ),
         }),
         complete: Schema.Either({
           right: MessageSlot,
-          left: Error.Core.ArgumentError,
+          left: Schema.Union(
+            Error.Core.ArgumentError,
+            Error.Core.ZeroQueryError,
+          ),
         }),
       }),
       Schema.standardSchemaV1,

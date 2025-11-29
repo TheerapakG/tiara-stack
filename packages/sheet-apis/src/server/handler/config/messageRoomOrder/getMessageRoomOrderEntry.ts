@@ -19,8 +19,14 @@ export const getMessageRoomOrderEntryHandlerConfig = pipe(
   Handler.Config.Builder.response({
     validator: pipe(
       Result.ResultSchema({
-        optimistic: Schema.Array(MessageRoomOrderEntry),
-        complete: Schema.Array(MessageRoomOrderEntry),
+        optimistic: Schema.Either({
+          right: Schema.Array(MessageRoomOrderEntry),
+          left: Error.Core.ZeroQueryError,
+        }),
+        complete: Schema.Either({
+          right: Schema.Array(MessageRoomOrderEntry),
+          left: Error.Core.ZeroQueryError,
+        }),
       }),
       Schema.standardSchemaV1,
     ),

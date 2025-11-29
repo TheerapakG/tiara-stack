@@ -13,8 +13,14 @@ export const getMessageCheckinMembersHandlerConfig = pipe(
   Handler.Config.Builder.response({
     validator: pipe(
       Result.ResultSchema({
-        optimistic: Schema.Array(MessageCheckinMember),
-        complete: Schema.Array(MessageCheckinMember),
+        optimistic: Schema.Either({
+          right: Schema.Array(MessageCheckinMember),
+          left: Error.Core.ZeroQueryError,
+        }),
+        complete: Schema.Either({
+          right: Schema.Array(MessageCheckinMember),
+          left: Error.Core.ZeroQueryError,
+        }),
       }),
       Schema.standardSchemaV1,
     ),
