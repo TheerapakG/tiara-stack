@@ -595,6 +595,9 @@ export const makeWithContext = <
           Effect.addFinalizer(() => destroyView(viewRef)),
         ),
         Effect.tap(({ materializedLatch }) => materializedLatch.await),
+        Effect.tap(({ source }) =>
+          pipe(source.poll, Effect.andThen(Effect.log)),
+        ),
         Effect.map(({ source }) => source),
       ),
     ),
