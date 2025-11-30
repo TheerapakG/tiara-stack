@@ -9,6 +9,9 @@ import {
   Either,
   Option,
   Layer,
+  Pretty,
+  ParseResult,
+  Equivalence,
 } from "effect";
 import { RpcResult } from "./rpc";
 import { type RpcError, ValidationError } from "../error";
@@ -22,6 +25,11 @@ const OptimisticTaggedClass: new <T>(
   Data.TaggedClass("Optimistic");
 
 /**
+ * Encoded Optimistic result type.
+ */
+export type OptimisticEncoded<T> = { readonly _tag: "Optimistic"; value: T };
+
+/**
  * Result type indicating the query value was optimistically resolved from local cache.
  */
 export class Optimistic<T> extends OptimisticTaggedClass<T> {}
@@ -31,6 +39,19 @@ export class Optimistic<T> extends OptimisticTaggedClass<T> {}
  */
 export const optimistic = <T>(value: T) => new Optimistic({ value });
 
+export const getEquivalence = <O, C>({
+  optimistic,
+  complete,
+}: {
+  optimistic: Equivalence.Equivalence<O>;
+  complete: Equivalence.Equivalence<C>;
+}): Equivalence.Equivalence<Result<O, C>> =>
+  Equivalence.make((x, y) =>
+    isOptimistic(x)
+      ? isOptimistic(y) && optimistic(x.value, y.value)
+      : isComplete(y) && complete(x.value, y.value),
+  );
+
 type CompleteData<T> = {
   readonly value: T;
 };
@@ -38,6 +59,11 @@ const CompleteTaggedClass: new <T>(
   args: Readonly<CompleteData<T>>,
 ) => Readonly<CompleteData<T>> & { readonly _tag: "Complete" } =
   Data.TaggedClass("Complete");
+
+/**
+ * Encoded Complete result type.
+ */
+export type CompleteEncoded<T> = { readonly _tag: "Complete"; value: T };
 
 /**
  * Result type indicating the query value was updated from the server.
@@ -50,43 +76,175 @@ export class Complete<T> extends CompleteTaggedClass<T> {}
 export const complete = <T>(value: T) => new Complete({ value });
 
 /**
+ * Encoded Result type.
+ */
+export type ResultEncoded<O, C> = OptimisticEncoded<O> | CompleteEncoded<C>;
+
+/**
  * Result type for optimistic updates, either Optimistic or Complete.
  */
 export type Result<O, C = O> = Optimistic<O> | Complete<C>;
 
 /**
- * Schema for Optimistic result type.
+ * Schema for Optimistic Encoded result type.
  */
-export const OptimisticSchema = <A, I = A, R = never>(
-  value: Schema.Schema<A, I, R>,
-): Schema.Schema<Optimistic<A>, Optimistic<I>, R> =>
+export const OptimisticEncodedSchema = <O extends Schema.Schema.All>(
+  value: O,
+) =>
   Schema.Struct({
     _tag: Schema.Literal("Optimistic"),
     value,
   });
 
+const makeOptimisticEncoded = <O>(value: O) =>
+  ({ _tag: "Optimistic", value }) as OptimisticEncoded<O>;
+
 /**
- * Schema for Complete result type.
+ * Schema for Complete Encoded result type.
  */
-export const CompleteSchema = <A, I = A, R = never>(
-  value: Schema.Schema<A, I, R>,
-): Schema.Schema<Complete<A>, Complete<I>, R> =>
+export const CompleteEncodedSchema = <C extends Schema.Schema.All>(value: C) =>
   Schema.Struct({
     _tag: Schema.Literal("Complete"),
     value,
   });
 
+const makeCompleteEncoded = <C>(value: C) =>
+  ({ _tag: "Complete", value }) as CompleteEncoded<C>;
+
 /**
- * Schema for Result union type.
+ * Schema for Result Encoded union type.
  */
-export const ResultSchema = <OA, CA, OI, CI, OR, CR>({
+export const ResultEncodedSchema = <
+  O extends Schema.Schema.All,
+  C extends Schema.Schema.All,
+>({
   optimistic,
   complete,
 }: {
-  readonly optimistic: Schema.Schema<OA, OI, OR>;
-  readonly complete: Schema.Schema<CA, CI, CR>;
-}): Schema.Schema<Result<OA, CA>, Result<OI, CI>, OR | CR> =>
-  Schema.Union(OptimisticSchema(optimistic), CompleteSchema(complete));
+  readonly optimistic: O;
+  readonly complete: C;
+}) =>
+  Schema.Union(
+    OptimisticEncodedSchema(optimistic),
+    CompleteEncodedSchema(complete),
+  );
+
+const ResultDecode = <O, C>(input: ResultEncoded<O, C>): Result<O, C> =>
+  pipe(
+    Match.value(input),
+    Match.tagsExhaustive({
+      Optimistic: ({ value }) => optimistic(value),
+      Complete: ({ value }) => complete(value),
+    }),
+  );
+
+const ResultPretty =
+  <O, C>(optimistic: Pretty.Pretty<O>, complete: Pretty.Pretty<C>) =>
+  (input: Result<O, C>): string =>
+    pipe(
+      input,
+      match({
+        onOptimistic: (value) => `optimistic(${optimistic(value)})`,
+        onComplete: (value) => `complete(${complete(value)})`,
+      }),
+    );
+
+const ResultParse =
+  <OR, O, CR, C>(
+    decodeUnknownOptimistic: ParseResult.DecodeUnknown<O, OR>,
+    decodeUnknownComplete: ParseResult.DecodeUnknown<C, CR>,
+  ): ParseResult.DeclarationDecodeUnknown<Result<O, C>, CR | OR> =>
+  (u, options, ast) =>
+    u instanceof Optimistic || u instanceof Complete
+      ? pipe(
+          u,
+          match({
+            onOptimistic: (value) =>
+              pipe(
+                decodeUnknownOptimistic(value, options),
+                ParseResult.mapBoth({
+                  onFailure: (e) => new ParseResult.Composite(ast, u, e),
+                  onSuccess: optimistic,
+                }),
+              ),
+            onComplete: (value) =>
+              pipe(
+                decodeUnknownComplete(value, options),
+                ParseResult.mapBoth({
+                  onFailure: (e) => new ParseResult.Composite(ast, u, e),
+                  onSuccess: complete,
+                }),
+              ),
+          }),
+        )
+      : ParseResult.fail(new ParseResult.Type(ast, u));
+
+export const ResultFromSelfSchema = <
+  O extends Schema.Schema.All,
+  C extends Schema.Schema.All,
+>({
+  optimistic,
+  complete,
+}: {
+  optimistic: O;
+  complete: C;
+}) =>
+  Schema.declare(
+    [optimistic, complete],
+    {
+      decode: (optimistic, complete) =>
+        ResultParse(
+          ParseResult.decodeUnknown(optimistic),
+          ParseResult.decodeUnknown(complete),
+        ),
+      encode: (optimistic, complete) =>
+        ResultParse(
+          ParseResult.encodeUnknown(optimistic),
+          ParseResult.encodeUnknown(complete),
+        ),
+    },
+    {
+      description: `Result<${Schema.format(optimistic)}, ${Schema.format(complete)}>`,
+      pretty: ResultPretty,
+      equivalence: (optimistic, complete) =>
+        getEquivalence({ optimistic, complete }),
+    },
+  );
+
+export const ResultSchema = <
+  O extends Schema.Schema.All,
+  C extends Schema.Schema.All,
+>({
+  optimistic,
+  complete,
+}: {
+  optimistic: O;
+  complete: C;
+}) => {
+  const optimisticSchema = Schema.asSchema(optimistic);
+  const completeSchema = Schema.asSchema(complete);
+
+  return pipe(
+    ResultEncodedSchema({
+      optimistic: optimisticSchema,
+      complete: completeSchema,
+    }),
+    Schema.transform(
+      ResultFromSelfSchema({
+        optimistic: Schema.typeSchema(optimisticSchema),
+        complete: Schema.typeSchema(completeSchema),
+      }),
+      {
+        strict: true,
+        decode: ResultDecode<Schema.Schema.Type<O>, Schema.Schema.Type<C>>,
+        encode: match({
+          onOptimistic: makeOptimisticEncoded,
+          onComplete: makeCompleteEncoded,
+        }),
+      },
+    ),
+  );
+};
 
 export const map =
   <OA, CA, B>(f: (a: OA | CA) => B) =>
