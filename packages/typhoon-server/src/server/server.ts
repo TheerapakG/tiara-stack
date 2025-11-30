@@ -657,6 +657,7 @@ const getMutationResult =
 const encodeServerUpdateResult = (result: ServerUpdateResult) =>
   pipe(
     Effect.Do,
+    Effect.tap(() => Effect.log(result)),
     Effect.bindAll(
       () => ({
         headerEncoded: pipe(
