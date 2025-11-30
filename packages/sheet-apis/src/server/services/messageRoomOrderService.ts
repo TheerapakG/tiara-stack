@@ -53,14 +53,14 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.Either({
+                    optimistic: Schema.EitherFromSelf({
                       right: Schema.OptionFromNullishOr(
                         DefaultTaggedClass(MessageRoomOrder),
                         undefined,
                       ),
                       left: Error.Core.ZeroQueryError,
                     }),
-                    complete: Schema.Either({
+                    complete: Schema.EitherFromSelf({
                       right: Schema.OptionFromNullishOr(
                         DefaultTaggedClass(MessageRoomOrder),
                         undefined,
@@ -199,13 +199,13 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.Either({
+                    optimistic: Schema.EitherFromSelf({
                       right: Schema.Array(
                         DefaultTaggedClass(MessageRoomOrderEntry),
                       ),
                       left: Error.Core.ZeroQueryError,
                     }),
-                    complete: Schema.Either({
+                    complete: Schema.EitherFromSelf({
                       right: Schema.Array(
                         DefaultTaggedClass(MessageRoomOrderEntry),
                       ),
@@ -247,13 +247,13 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.Either({
+                    optimistic: Schema.EitherFromSelf({
                       right: Schema.Array(
                         DefaultTaggedClass(MessageRoomOrderEntry),
                       ),
                       left: Error.Core.ZeroQueryError,
                     }),
-                    complete: Schema.Either({
+                    complete: Schema.EitherFromSelf({
                       right: Schema.Array(
                         DefaultTaggedClass(MessageRoomOrderEntry),
                       ),

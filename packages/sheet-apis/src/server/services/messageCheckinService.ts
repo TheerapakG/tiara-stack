@@ -47,14 +47,14 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.Either({
+                    optimistic: Schema.EitherFromSelf({
                       right: Schema.OptionFromNullishOr(
                         DefaultTaggedClass(MessageCheckin),
                         undefined,
                       ),
                       left: Error.Core.ZeroQueryError,
                     }),
-                    complete: Schema.Either({
+                    complete: Schema.EitherFromSelf({
                       right: Schema.OptionFromNullishOr(
                         DefaultTaggedClass(MessageCheckin),
                         undefined,
@@ -133,13 +133,13 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.Either({
+                    optimistic: Schema.EitherFromSelf({
                       right: Schema.Array(
                         DefaultTaggedClass(MessageCheckinMember),
                       ),
                       left: Error.Core.ZeroQueryError,
                     }),
-                    complete: Schema.Either({
+                    complete: Schema.EitherFromSelf({
                       right: Schema.Array(
                         DefaultTaggedClass(MessageCheckinMember),
                       ),

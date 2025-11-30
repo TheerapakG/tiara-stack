@@ -46,14 +46,14 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.Either({
+                    optimistic: Schema.EitherFromSelf({
                       right: Schema.OptionFromNullishOr(
                         DefaultTaggedClass(MessageSlot),
                         undefined,
                       ),
                       left: Error.Core.ZeroQueryError,
                     }),
-                    complete: Schema.Either({
+                    complete: Schema.EitherFromSelf({
                       right: Schema.OptionFromNullishOr(
                         DefaultTaggedClass(MessageSlot),
                         undefined,

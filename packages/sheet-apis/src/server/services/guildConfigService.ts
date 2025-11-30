@@ -45,11 +45,11 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.Either({
+                    optimistic: Schema.EitherFromSelf({
                       right: Schema.Array(DefaultTaggedClass(GuildConfig)),
                       left: Error.Core.ZeroQueryError,
                     }),
-                    complete: Schema.Either({
+                    complete: Schema.EitherFromSelf({
                       right: Schema.Array(DefaultTaggedClass(GuildConfig)),
                       left: Error.Core.ZeroQueryError,
                     }),
@@ -87,14 +87,14 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.Either({
+                    optimistic: Schema.EitherFromSelf({
                       right: Schema.OptionFromNullishOr(
                         DefaultTaggedClass(GuildConfig),
                         undefined,
                       ),
                       left: Error.Core.ZeroQueryError,
                     }),
-                    complete: Schema.Either({
+                    complete: Schema.EitherFromSelf({
                       right: Schema.OptionFromNullishOr(
                         DefaultTaggedClass(GuildConfig),
                         undefined,
@@ -135,14 +135,14 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.Either({
+                    optimistic: Schema.EitherFromSelf({
                       right: Schema.OptionFromNullishOr(
                         DefaultTaggedClass(GuildConfig),
                         undefined,
                       ),
                       left: Error.Core.ZeroQueryError,
                     }),
-                    complete: Schema.Either({
+                    complete: Schema.EitherFromSelf({
                       right: Schema.OptionFromNullishOr(
                         DefaultTaggedClass(GuildConfig),
                         undefined,
@@ -219,13 +219,13 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.Either({
+                    optimistic: Schema.EitherFromSelf({
                       right: Schema.Array(
                         DefaultTaggedClass(GuildConfigManagerRole),
                       ),
                       left: Error.Core.ZeroQueryError,
                     }),
-                    complete: Schema.Either({
+                    complete: Schema.EitherFromSelf({
                       right: Schema.Array(
                         DefaultTaggedClass(GuildConfigManagerRole),
                       ),
@@ -376,14 +376,14 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.Either({
+                    optimistic: Schema.EitherFromSelf({
                       right: Schema.OptionFromNullishOr(
                         DefaultTaggedClass(GuildChannelConfig),
                         undefined,
                       ),
                       left: Error.Core.ZeroQueryError,
                     }),
-                    complete: Schema.Either({
+                    complete: Schema.EitherFromSelf({
                       right: Schema.OptionFromNullishOr(
                         DefaultTaggedClass(GuildChannelConfig),
                         undefined,
@@ -428,14 +428,14 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               Effect.flatMap(
                 Schema.decode(
                   Result.ResultSchema({
-                    optimistic: Schema.Either({
+                    optimistic: Schema.EitherFromSelf({
                       right: Schema.OptionFromNullishOr(
                         DefaultTaggedClass(GuildChannelConfig),
                         undefined,
                       ),
                       left: Error.Core.ZeroQueryError,
                     }),
-                    complete: Schema.Either({
+                    complete: Schema.EitherFromSelf({
                       right: Schema.OptionFromNullishOr(
                         DefaultTaggedClass(GuildChannelConfig),
                         undefined,
