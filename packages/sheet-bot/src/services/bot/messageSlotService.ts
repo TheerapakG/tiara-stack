@@ -17,9 +17,11 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()(
               "messageSlot.getMessageSlotData",
               messageId,
             ),
-            Effect.withSpan("MessageSlotService.getMessageSlotData", {
-              captureStackTrace: true,
-            }),
+            Effect.map(
+              Effect.withSpan("MessageSlotService.getMessageSlotData", {
+                captureStackTrace: true,
+              }),
+            ),
           ),
         upsertMessageSlotData: (
           messageId: string,
