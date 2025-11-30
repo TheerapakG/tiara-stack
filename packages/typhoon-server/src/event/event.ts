@@ -170,27 +170,6 @@ export const pullEffect = (): Effect.Effect<
   );
 
 export const request = {
-  raw: (): Effect.Effect<
-    Effect.Effect<MsgpackPullEffect, never, SignalContext.SignalContext>,
-    never,
-    Event
-  > =>
-    pipe(
-      Effect.Do,
-      Effect.bind("pullEffect", () => pullEffect()),
-      Effect.bind("computed", ({ pullEffect }) =>
-        Computed.make(
-          pipe(
-            pullEffect,
-            Effect.map(({ effect }) => effect),
-          ),
-        ),
-      ),
-      Effect.map(({ computed }) => computed),
-      Effect.map(
-        Effect.withSpan("Event.request.raw", { captureStackTrace: true }),
-      ),
-    ),
   rawWithScope: (): Effect.Effect<
     Effect.Effect<
       {
@@ -204,23 +183,43 @@ export const request = {
     Event
   > =>
     pipe(
-      pullEffect(),
+      Effect.Do,
+      Effect.bind("pullEffect", () => pullEffect()),
+      Effect.bind("computed", ({ pullEffect }) =>
+        Computed.make(
+          pipe(
+            pullEffect,
+            Effect.flatMap(({ effect, scope }) =>
+              Effect.all({
+                effect: Effect.cached(effect),
+                scope: Effect.succeed(scope),
+              }),
+            ),
+          ),
+        ),
+      ),
+      Effect.map(({ computed }) => computed),
       Effect.map(
         Effect.withSpan("Event.request.rawWithScope", {
           captureStackTrace: true,
         }),
       ),
     ),
-  parsed: <Config extends Handler.Config.TypedHandlerConfig>(config: Config) =>
+  raw: (): Effect.Effect<
+    Effect.Effect<MsgpackPullEffect, never, SignalContext.SignalContext>,
+    never,
+    Event
+  > =>
     pipe(
-      request.raw(),
+      request.rawWithScope(),
+      Effect.map(Effect.map(({ effect }) => effect)),
       Effect.map(
-        Effect.flatMap(
-          pullEffectToParsed(Handler.Config.requestParams(config)),
-        ),
+        Effect.withSpan("Event.request.raw subscription", {
+          captureStackTrace: true,
+        }),
       ),
       Effect.map(
-        Effect.withSpan("Event.request.parsed", { captureStackTrace: true }),
+        Effect.withSpan("Event.request.raw", { captureStackTrace: true }),
       ),
     ),
   parsedWithScope: <Config extends Handler.Config.TypedHandlerConfig>(
@@ -240,9 +239,31 @@ export const request = {
         ),
       ),
       Effect.map(
+        Effect.withSpan("Event.request.parsedWithScope subscription", {
+          captureStackTrace: true,
+        }),
+      ),
+      Effect.map(
         Effect.withSpan("Event.request.parsedWithScope", {
           captureStackTrace: true,
         }),
+      ),
+    ),
+  parsed: <Config extends Handler.Config.TypedHandlerConfig>(config: Config) =>
+    pipe(
+      request.raw(),
+      Effect.map(
+        Effect.flatMap(
+          pullEffectToParsed(Handler.Config.requestParams(config)),
+        ),
+      ),
+      Effect.map(
+        Effect.withSpan("Event.request.parsed subscription", {
+          captureStackTrace: true,
+        }),
+      ),
+      Effect.map(
+        Effect.withSpan("Event.request.parsed", { captureStackTrace: true }),
       ),
     ),
 };
