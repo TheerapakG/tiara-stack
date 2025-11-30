@@ -371,6 +371,7 @@ const createSourceWithRefs = <
       queryCompletePromiseFiberRef: SynchronizedRef.make<
         Option.Option<Fiber.Fiber<void, never>>
       >(Option.none()),
+      materializedLatch: Effect.makeLatch(false),
     }),
     Effect.let(
       "source",
@@ -411,6 +412,7 @@ const createMaterializeCallback =
     queryCompletePromiseFiberRef: SynchronizedRef.SynchronizedRef<
       Option.Option<Fiber.Fiber<void, never>>
     >,
+    materializedLatch: Effect.Latch,
   ) =>
   (
     _query: unknown,
@@ -496,6 +498,7 @@ const createMaterializeCallback =
         onTransactionCommit(() => Effect.runFork(source.flush())),
       ),
       Effect.andThen(() => source.doEmit()),
+      Effect.andThen(() => materializedLatch.open),
     );
 
 export const makeWithContext = <
@@ -531,6 +534,7 @@ export const makeWithContext = <
             valueRef,
             inputErrorRef,
             queryCompletePromiseFiberRef,
+            materializedLatch,
           }) =>
             SideEffect.makeWithContext(
               pipe(
@@ -574,6 +578,7 @@ export const makeWithContext = <
                                 zeroResultTypeRef,
                                 valueRef,
                                 queryCompletePromiseFiberRef,
+                                materializedLatch,
                               ),
                               options,
                             ),
@@ -589,6 +594,7 @@ export const makeWithContext = <
         Effect.tap(({ viewRef }) =>
           Effect.addFinalizer(() => destroyView(viewRef)),
         ),
+        Effect.tap(({ materializedLatch }) => materializedLatch.await),
         Effect.map(({ source }) => source),
       ),
     ),
@@ -666,6 +672,7 @@ export const makeFromResultWithContext = <
             valueRef,
             inputErrorRef,
             queryCompletePromiseFiberRef,
+            materializedLatch,
           }) =>
             SideEffect.makeWithContext(
               pipe(
@@ -711,6 +718,7 @@ export const makeFromResultWithContext = <
                                 zeroResultTypeRef,
                                 valueRef,
                                 queryCompletePromiseFiberRef,
+                                materializedLatch,
                               ),
                               options,
                             ),
