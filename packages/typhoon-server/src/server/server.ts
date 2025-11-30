@@ -718,11 +718,7 @@ const handleSubscribe =
                     SideEffect.tapWithContext(
                       flow(
                         encodeServerUpdateResult,
-                        Effect.andThen((buffer) =>
-                          peer.send(buffer, {
-                            compress: true,
-                          }),
-                        ),
+                        Effect.andThen(sendPeerBuffer(peer)),
                       ),
                       Context.make(Event, event),
                     ),
