@@ -8,7 +8,7 @@ import {
   SynchronizedRef,
 } from "effect";
 import { Handler } from "typhoon-core/server";
-import { Signal, SignalContext } from "typhoon-core/signal";
+import { Signal, SignalContext, Computed } from "typhoon-core/signal";
 import { Validate, Validator } from "typhoon-core/validator";
 import {
   AuthorizationError,
@@ -178,6 +178,7 @@ export const request = {
     pipe(
       pullEffect(),
       Effect.map(Effect.map((pullEffect) => pullEffect.effect)),
+      Effect.flatMap(Computed.make),
       Effect.map(
         Effect.withSpan("Event.request.raw", { captureStackTrace: true }),
       ),
