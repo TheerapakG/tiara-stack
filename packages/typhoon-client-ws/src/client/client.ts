@@ -209,18 +209,19 @@ export class WebSocketClient<
                       Effect.flatMap(Schema.decodeUnknown(Header.HeaderSchema)),
                     ),
                   ),
-                  Effect.bind(
-                    "decodedResponse",
-                    ({ pullEffect }) => pullEffect,
-                  ),
-                  Effect.tap(({ header, decodedResponse }) =>
+                  Effect.tap(({ header, pullEffect }) =>
                     pipe(
                       Match.value(header),
                       Match.when({ action: "server:update" }, (header) =>
-                        WebSocketClient.handleUpdate(
-                          header,
-                          decodedResponse,
-                        )(client),
+                        pipe(
+                          pullEffect,
+                          Effect.andThen((decodedResponse) =>
+                            WebSocketClient.handleUpdate(
+                              header,
+                              decodedResponse,
+                            )(client),
+                          ),
+                        ),
                       ),
                       Match.orElse(() => Effect.void),
                     ),
