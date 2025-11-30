@@ -215,6 +215,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
             ),
             Effect.flatMap(ExternalComputed.make),
+            Effect.map(Effect.tap(Effect.log)),
             Effect.map(
               Effect.flatMap(
                 Schema.decode(
