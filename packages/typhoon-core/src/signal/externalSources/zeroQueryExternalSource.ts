@@ -634,10 +634,10 @@ export const make = <
 export const makeFromResultWithContext = <
   M,
   Q = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends Result<
-    infer Q,
-    infer _C
+    infer QO,
+    infer QC
   >
-    ? Q
+    ? QO | QC
     : never,
   T extends ReadonlyJSONValue | View = HumanReadable<
     QueryRowType<Q>
@@ -713,7 +713,7 @@ export const makeFromResultWithContext = <
                           // Extract the query from the Result and materialize
                           Effect.andThen(
                             zero.materialize(
-                              queryResult.value as Q,
+                              queryResult.value,
                               createMaterializeCallback(
                                 source,
                                 viewRef,
