@@ -176,9 +176,17 @@ export const request = {
     Event
   > =>
     pipe(
-      pullEffect(),
-      Effect.map(Effect.map((pullEffect) => pullEffect.effect)),
-      Effect.flatMap(Computed.make),
+      Effect.Do,
+      Effect.bind("pullEffect", () => pullEffect()),
+      Effect.bind("computed", ({ pullEffect }) =>
+        Computed.make(
+          pipe(
+            pullEffect,
+            Effect.map(({ effect }) => effect),
+          ),
+        ),
+      ),
+      Effect.map(({ computed }) => computed),
       Effect.map(
         Effect.withSpan("Event.request.raw", { captureStackTrace: true }),
       ),
