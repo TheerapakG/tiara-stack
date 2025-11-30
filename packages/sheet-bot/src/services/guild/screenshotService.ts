@@ -28,9 +28,11 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()(
                 },
               ),
             ),
-            Effect.withSpan("ScreenshotService.getScreenshot", {
-              captureStackTrace: true,
-            }),
+            Effect.map(
+              Effect.withSpan("ScreenshotService.getScreenshot", {
+                captureStackTrace: true,
+              }),
+            ),
           ),
       })),
     ),

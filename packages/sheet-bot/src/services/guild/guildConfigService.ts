@@ -25,9 +25,11 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               "guildConfig.getAutoCheckinGuilds",
               {},
             ),
-            Effect.withSpan("GuildConfigService.getAutoCheckinGuilds", {
-              captureStackTrace: true,
-            }),
+            Effect.map(
+              Effect.withSpan("GuildConfigService.getAutoCheckinGuilds", {
+                captureStackTrace: true,
+              }),
+            ),
           ),
         getGuildConfigByGuildId: () =>
           pipe(
@@ -39,9 +41,11 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 guildId,
               ),
             ),
-            Effect.withSpan("GuildConfigService.getGuildConfigByGuildId", {
-              captureStackTrace: true,
-            }),
+            Effect.map(
+              Effect.withSpan("GuildConfigService.getGuildConfigByGuildId", {
+                captureStackTrace: true,
+              }),
+            ),
           ),
         upsertGuildConfig: (
           config: Omit<
@@ -72,9 +76,11 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 guildId,
               ),
             ),
-            Effect.withSpan("GuildConfigService.getGuildManagerRoles", {
-              captureStackTrace: true,
-            }),
+            Effect.map(
+              Effect.withSpan("GuildConfigService.getGuildManagerRoles", {
+                captureStackTrace: true,
+              }),
+            ),
           ),
         addGuildManagerRole: (roleId: string) =>
           pipe(
@@ -136,9 +142,11 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               "guildConfig.getGuildConfigByScriptId",
               scriptId,
             ),
-            Effect.withSpan("GuildConfigService.getGuildConfigByScriptId", {
-              captureStackTrace: true,
-            }),
+            Effect.map(
+              Effect.withSpan("GuildConfigService.getGuildConfigByScriptId", {
+                captureStackTrace: true,
+              }),
+            ),
           ),
         getGuildRunningChannelById: (channelId: string) =>
           pipe(
@@ -153,9 +161,11 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 },
               ),
             ),
-            Effect.withSpan("GuildConfigService.getGuildRunningChannelById", {
-              captureStackTrace: true,
-            }),
+            Effect.map(
+              Effect.withSpan("GuildConfigService.getGuildRunningChannelById", {
+                captureStackTrace: true,
+              }),
+            ),
           ),
         getGuildRunningChannelByName: (channelName: string) =>
           pipe(
@@ -170,9 +180,14 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
                 },
               ),
             ),
-            Effect.withSpan("GuildConfigService.getGuildRunningChannelByName", {
-              captureStackTrace: true,
-            }),
+            Effect.map(
+              Effect.withSpan(
+                "GuildConfigService.getGuildRunningChannelByName",
+                {
+                  captureStackTrace: true,
+                },
+              ),
+            ),
           ),
       })),
     ),

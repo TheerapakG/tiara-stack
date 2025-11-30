@@ -27,9 +27,11 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                   { guildId },
                 ),
               ),
-              Effect.withSpan("PlayerService.getPlayerMaps", {
-                captureStackTrace: true,
-              }),
+              Effect.map(
+                Effect.withSpan("PlayerService.getPlayerMaps", {
+                  captureStackTrace: true,
+                }),
+              ),
             ),
           ),
         }),
@@ -50,9 +52,11 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                 },
               ),
             ),
-            Effect.withSpan("PlayerService.getPlayerById", {
-              captureStackTrace: true,
-            }),
+            Effect.map(
+              Effect.withSpan("PlayerService.getPlayerById", {
+                captureStackTrace: true,
+              }),
+            ),
           ),
         getPlayerByName: (names: ReadonlyArray<string>) =>
           pipe(
@@ -67,9 +71,11 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                 },
               ),
             ),
-            Effect.withSpan("PlayerService.getPlayerByName", {
-              captureStackTrace: true,
-            }),
+            Effect.map(
+              Effect.withSpan("PlayerService.getPlayerByName", {
+                captureStackTrace: true,
+              }),
+            ),
           ),
         getTeamsById: (ids: ReadonlyArray<string>) =>
           pipe(
@@ -84,9 +90,11 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                 },
               ),
             ),
-            Effect.withSpan("PlayerService.getTeamsById", {
-              captureStackTrace: true,
-            }),
+            Effect.map(
+              Effect.withSpan("PlayerService.getTeamsById", {
+                captureStackTrace: true,
+              }),
+            ),
           ),
         getTeamsByName: (names: ReadonlyArray<string>) =>
           pipe(
@@ -98,9 +106,11 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                 { guildId, names },
               ),
             ),
-            Effect.withSpan("PlayerService.getTeamsByName", {
-              captureStackTrace: true,
-            }),
+            Effect.map(
+              Effect.withSpan("PlayerService.getTeamsByName", {
+                captureStackTrace: true,
+              }),
+            ),
           ),
         mapScheduleWithPlayers: (
           schedules: ReadonlyArray<
@@ -133,9 +143,11 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                 { guildId, schedules },
               ),
             ),
-            Effect.withSpan("PlayerService.mapScheduleWithPlayers", {
-              captureStackTrace: true,
-            }),
+            Effect.map(
+              Effect.withSpan("PlayerService.mapScheduleWithPlayers", {
+                captureStackTrace: true,
+              }),
+            ),
           ),
       })),
     ),
