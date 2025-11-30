@@ -35,6 +35,31 @@ export const tapify = <In, Out, E1, R1>(
       ),
   );
 
+export const tapErrorify = <In, Out, E1, R1>(
+  f: (_: In) => Effect.Effect<Out, E1, R1>,
+) =>
+  Function.dual<
+    <O>(
+      transform: (object: NoInfer<O>) => NoInfer<In>,
+    ) => <A2, R2>(
+      self: Effect.Effect<A2, O, R2>,
+    ) => Effect.Effect<A2, E1 | O, R1 | R2>,
+    <O, A2, R2>(
+      self: Effect.Effect<A2, O, R2>,
+      transform: (object: NoInfer<O>) => NoInfer<In>,
+    ) => Effect.Effect<A2, E1 | O, R1 | R2>
+  >(
+    2,
+    <O, A2, R2>(
+      self: Effect.Effect<A2, O, R2>,
+      transform: (object: NoInfer<O>) => NoInfer<In>,
+    ) =>
+      pipe(
+        self,
+        Effect.tapError((a) => f(transform(a))),
+      ),
+  );
+
 export const tapifyOptional = <In, Out, E1, R1>(
   f: (_?: In) => Effect.Effect<Out, E1, R1>,
 ) =>
@@ -57,6 +82,31 @@ export const tapifyOptional = <In, Out, E1, R1>(
       pipe(
         self,
         Effect.tap((a) => f(transform?.(a))),
+      ),
+  );
+
+export const tapErrorifyOptional = <In, Out, E1, R1>(
+  f: (_?: In) => Effect.Effect<Out, E1, R1>,
+) =>
+  Function.dual<
+    <O>(
+      transform?: (object: NoInfer<O>) => NoInfer<In>,
+    ) => <A2, R2>(
+      self: Effect.Effect<A2, O, R2>,
+    ) => Effect.Effect<A2, E1 | O, R1 | R2>,
+    <O, A2, R2>(
+      self: Effect.Effect<A2, O, R2>,
+      transform?: (object: NoInfer<O>) => NoInfer<In>,
+    ) => Effect.Effect<A2, E1 | O, R1 | R2>
+  >(
+    (args) => Effect.isEffect(args[0]),
+    <O, A2, R2>(
+      self: Effect.Effect<A2, O, R2>,
+      transform?: (object: NoInfer<O>) => NoInfer<In>,
+    ) =>
+      pipe(
+        self,
+        Effect.tapError((a) => f(transform?.(a))),
       ),
   );
 
@@ -107,6 +157,58 @@ export const tapEffectifyOptional = <In, Out, E1, R1>(
       pipe(
         self,
         Effect.tap((a) =>
+          pipe(transform?.(a) ?? Effect.succeed(undefined), Effect.flatMap(f)),
+        ),
+      ),
+  );
+
+export const tapErrorEffectify = <In, Out, E1, R1>(
+  f: (_: In) => Effect.Effect<Out, E1, R1>,
+) =>
+  Function.dual<
+    <O, E2, R2>(
+      transform: (object: NoInfer<O>) => Effect.Effect<NoInfer<In>, E2, R2>,
+    ) => <A3, R3>(
+      self: Effect.Effect<A3, O, R3>,
+    ) => Effect.Effect<A3, E1 | E2 | O, R1 | R2 | R3>,
+    <O, E2, R2, A3, R3>(
+      self: Effect.Effect<A3, O, R3>,
+      transform: (object: NoInfer<O>) => Effect.Effect<NoInfer<In>, E2, R2>,
+    ) => Effect.Effect<A3, E1 | E2 | O, R1 | R2 | R3>
+  >(
+    2,
+    <O, E2, R2, A3, R3>(
+      self: Effect.Effect<A3, O, R3>,
+      transform: (object: NoInfer<O>) => Effect.Effect<NoInfer<In>, E2, R2>,
+    ) =>
+      pipe(
+        self,
+        Effect.tapError((a) => pipe(transform(a), Effect.flatMap(f))),
+      ),
+  );
+
+export const tapErrorEffectifyOptional = <In, Out, E1, R1>(
+  f: (_?: In) => Effect.Effect<Out, E1, R1>,
+) =>
+  Function.dual<
+    <O, E2, R2>(
+      transform?: (object: NoInfer<O>) => Effect.Effect<NoInfer<In>, E2, R2>,
+    ) => <A3, R3>(
+      self: Effect.Effect<A3, O, R3>,
+    ) => Effect.Effect<A3, E1 | E2 | O, R1 | R2 | R3>,
+    <O, E2, R2, A3, R3>(
+      self: Effect.Effect<A3, O, R3>,
+      transform?: (object: NoInfer<O>) => Effect.Effect<NoInfer<In>, E2, R2>,
+    ) => Effect.Effect<A3, E1 | E2 | O, R1 | R2 | R3>
+  >(
+    (args) => Effect.isEffect(args[0]),
+    <O, E2, R2, A3, R3>(
+      self: Effect.Effect<A3, O, R3>,
+      transform?: (object: NoInfer<O>) => Effect.Effect<NoInfer<In>, E2, R2>,
+    ) =>
+      pipe(
+        self,
+        Effect.tapError((a) =>
           pipe(transform?.(a) ?? Effect.succeed(undefined), Effect.flatMap(f)),
         ),
       ),
@@ -375,8 +477,16 @@ class Wrap<In, Out, E1, R1> extends Data.TaggedClass("Wrap")<{
     return tapify(this.f);
   }
 
+  get tapError() {
+    return tapErrorify(this.f);
+  }
+
   get tapEffect() {
     return tapEffectify(this.f);
+  }
+
+  get tapErrorEffect() {
+    return tapErrorEffectify(this.f);
   }
 
   get map() {
@@ -411,8 +521,16 @@ class WrapOptional<In, Out, E1, R1> extends Data.TaggedClass("WrapOptional")<{
     return tapifyOptional(this.f);
   }
 
+  get tapError() {
+    return tapErrorifyOptional(this.f);
+  }
+
   get tapEffect() {
     return tapEffectifyOptional(this.f);
+  }
+
+  get tapErrorEffect() {
+    return tapErrorEffectifyOptional(this.f);
   }
 
   get map() {
