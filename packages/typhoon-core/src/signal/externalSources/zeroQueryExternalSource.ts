@@ -269,16 +269,8 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
                   onLeft: (zeroError) =>
                     // Zero sync errored - wrap in Result based on combined status
                     inputResultComplete
-                      ? complete(
-                          Either.left<ZeroQueryError | E>(
-                            zeroError as ZeroQueryError | E,
-                          ),
-                        )
-                      : optimistic(
-                          Either.left<ZeroQueryError | E>(
-                            zeroError as ZeroQueryError | E,
-                          ),
-                        ),
+                      ? complete(Either.left<ZeroQueryError | E>(zeroError))
+                      : optimistic(Either.left<ZeroQueryError | E>(zeroError)),
                   onRight: (zeroStatus) => {
                     // Both input complete AND zero complete -> Complete
                     // Otherwise -> Optimistic
@@ -482,7 +474,7 @@ const createMaterializeCallback =
               Effect.tap((result) =>
                 SynchronizedRef.set(zeroResultTypeRef, result),
               ),
-              Effect.andThen(Effect.runFork(source.doEmit())),
+              Effect.andThen(source.doEmit()),
               Effect.asVoid,
 
               Effect.forkDaemon,
