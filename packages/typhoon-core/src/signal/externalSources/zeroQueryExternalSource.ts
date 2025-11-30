@@ -499,6 +499,7 @@ const createMaterializeCallback =
       ),
       Effect.andThen(() => source.doEmit()),
       Effect.andThen(() => materializedLatch.open),
+      Effect.asVoid,
     );
 
 export const makeWithContext = <
@@ -692,8 +693,9 @@ export const makeFromResultWithContext = <
                             inputErrorRef,
                             Option.some(error),
                           ),
-                          // For errors, we don't know if input was complete or not
-                          // Keep the current status (likely false/optimistic)
+                          Effect.andThen(
+                            SynchronizedRef.set(inputResultCompleteRef, true),
+                          ),
                           Effect.andThen(destroyView(viewRef)),
                           Effect.andThen(source.doEmit()),
                         ),
@@ -734,6 +736,7 @@ export const makeFromResultWithContext = <
         Effect.tap(({ viewRef }) =>
           Effect.addFinalizer(() => destroyView(viewRef)),
         ),
+        Effect.tap(({ materializedLatch }) => materializedLatch.await),
         Effect.map(({ source }) => source),
       ),
     ),
