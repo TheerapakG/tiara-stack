@@ -68,6 +68,9 @@ const handleList =
               Effect.map(Option.getOrElse(() => interactionUser)),
             ),
           })),
+          InteractionContext.editReply.tapError((error) => ({
+            content: `At 1: ${error.message}`,
+          })),
           Effect.tap(({ user, interactionUser, managerRoles }) =>
             pipe(
               PermissionService.checkRoles.sync({
@@ -79,6 +82,9 @@ const handleList =
               ),
             ),
           ),
+          InteractionContext.editReply.tapError((error) => ({
+            content: `At 2: ${error.message}`,
+          })),
           Effect.bind("teams", ({ user }) =>
             pipe(
               {
@@ -93,6 +99,9 @@ const handleList =
               ),
             ),
           ),
+          InteractionContext.editReply.tapError((error) => ({
+            content: `At 3: ${error.message}`,
+          })),
           Effect.let("formattedTeams", ({ teams }) =>
             pipe(
               teams.user,
@@ -130,6 +139,9 @@ const handleList =
               ),
             ),
           ),
+          InteractionContext.editReply.tapError((error) => ({
+            content: `At 4: ${error.message}`,
+          })),
           InteractionContext.editReply.tapEffect(({ user, formattedTeams }) =>
             pipe(
               ClientService.makeEmbedBuilder(),
