@@ -18,10 +18,16 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
               messageId,
             ),
             Effect.map(
-              Effect.withSpan("MessageCheckinService.getMessageCheckinData", {
-                captureStackTrace: true,
-              }),
+              Effect.withSpan(
+                "MessageCheckinService.getMessageCheckinData subscription",
+                {
+                  captureStackTrace: true,
+                },
+              ),
             ),
+            Effect.withSpan("MessageCheckinService.getMessageCheckinData", {
+              captureStackTrace: true,
+            }),
           ),
         upsertMessageCheckinData: (
           messageId: string,
@@ -49,12 +55,15 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
             ),
             Effect.map(
               Effect.withSpan(
-                "MessageCheckinService.getMessageCheckinMembers",
+                "MessageCheckinService.getMessageCheckinMembers subscription",
                 {
                   captureStackTrace: true,
                 },
               ),
             ),
+            Effect.withSpan("MessageCheckinService.getMessageCheckinMembers", {
+              captureStackTrace: true,
+            }),
           ),
         addMessageCheckinMembers: (messageId: string, memberIds: string[]) =>
           pipe(

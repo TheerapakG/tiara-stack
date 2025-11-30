@@ -26,10 +26,16 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               {},
             ),
             Effect.map(
-              Effect.withSpan("GuildConfigService.getAutoCheckinGuilds", {
-                captureStackTrace: true,
-              }),
+              Effect.withSpan(
+                "GuildConfigService.getAutoCheckinGuilds subscription",
+                {
+                  captureStackTrace: true,
+                },
+              ),
             ),
+            Effect.withSpan("GuildConfigService.getAutoCheckinGuilds", {
+              captureStackTrace: true,
+            }),
           ),
         getGuildConfigByGuildId: () =>
           pipe(
@@ -42,10 +48,16 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
             ),
             Effect.map(
-              Effect.withSpan("GuildConfigService.getGuildConfigByGuildId", {
-                captureStackTrace: true,
-              }),
+              Effect.withSpan(
+                "GuildConfigService.getGuildConfigByGuildId subscription",
+                {
+                  captureStackTrace: true,
+                },
+              ),
             ),
+            Effect.withSpan("GuildConfigService.getGuildConfigByGuildId", {
+              captureStackTrace: true,
+            }),
           ),
         upsertGuildConfig: (
           config: Omit<
@@ -77,10 +89,16 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
             ),
             Effect.map(
-              Effect.withSpan("GuildConfigService.getGuildManagerRoles", {
-                captureStackTrace: true,
-              }),
+              Effect.withSpan(
+                "GuildConfigService.getGuildManagerRoles subscription",
+                {
+                  captureStackTrace: true,
+                },
+              ),
             ),
+            Effect.withSpan("GuildConfigService.getGuildManagerRoles", {
+              captureStackTrace: true,
+            }),
           ),
         addGuildManagerRole: (roleId: string) =>
           pipe(
@@ -143,10 +161,16 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               scriptId,
             ),
             Effect.map(
-              Effect.withSpan("GuildConfigService.getGuildConfigByScriptId", {
-                captureStackTrace: true,
-              }),
+              Effect.withSpan(
+                "GuildConfigService.getGuildConfigByScriptId subscription",
+                {
+                  captureStackTrace: true,
+                },
+              ),
             ),
+            Effect.withSpan("GuildConfigService.getGuildConfigByScriptId", {
+              captureStackTrace: true,
+            }),
           ),
         getGuildRunningChannelById: (channelId: string) =>
           pipe(
@@ -162,10 +186,16 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
               ),
             ),
             Effect.map(
-              Effect.withSpan("GuildConfigService.getGuildRunningChannelById", {
-                captureStackTrace: true,
-              }),
+              Effect.withSpan(
+                "GuildConfigService.getGuildRunningChannelById subscription",
+                {
+                  captureStackTrace: true,
+                },
+              ),
             ),
+            Effect.withSpan("GuildConfigService.getGuildRunningChannelById", {
+              captureStackTrace: true,
+            }),
           ),
         getGuildRunningChannelByName: (channelName: string) =>
           pipe(
@@ -182,12 +212,15 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()(
             ),
             Effect.map(
               Effect.withSpan(
-                "GuildConfigService.getGuildRunningChannelByName",
+                "GuildConfigService.getGuildRunningChannelByName subscription",
                 {
                   captureStackTrace: true,
                 },
               ),
             ),
+            Effect.withSpan("GuildConfigService.getGuildRunningChannelByName", {
+              captureStackTrace: true,
+            }),
           ),
       })),
     ),

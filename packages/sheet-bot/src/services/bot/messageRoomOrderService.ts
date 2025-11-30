@@ -18,10 +18,16 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
               messageId,
             ),
             Effect.map(
-              Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder", {
-                captureStackTrace: true,
-              }),
+              Effect.withSpan(
+                "MessageRoomOrderService.getMessageRoomOrder subscription",
+                {
+                  captureStackTrace: true,
+                },
+              ),
             ),
+            Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder", {
+              captureStackTrace: true,
+            }),
           ),
         decrementMessageRoomOrderRank: (messageId: string) =>
           pipe(
@@ -80,11 +86,17 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ),
             Effect.map(
               Effect.withSpan(
-                "MessageRoomOrderService.getMessageRoomOrderEntry",
+                "MessageRoomOrderService.getMessageRoomOrderEntry subscription",
                 {
                   captureStackTrace: true,
                 },
               ),
+            ),
+            Effect.withSpan(
+              "MessageRoomOrderService.getMessageRoomOrderEntry",
+              {
+                captureStackTrace: true,
+              },
             ),
           ),
         getMessageRoomOrderRange: (messageId: string) =>
@@ -96,11 +108,17 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ),
             Effect.map(
               Effect.withSpan(
-                "MessageRoomOrderService.getMessageRoomOrderRange",
+                "MessageRoomOrderService.getMessageRoomOrderRange subscription",
                 {
                   captureStackTrace: true,
                 },
               ),
+            ),
+            Effect.withSpan(
+              "MessageRoomOrderService.getMessageRoomOrderRange",
+              {
+                captureStackTrace: true,
+              },
             ),
           ),
         upsertMessageRoomOrderEntry: (

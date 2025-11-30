@@ -28,10 +28,13 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                 ),
               ),
               Effect.map(
-                Effect.withSpan("PlayerService.getPlayerMaps", {
+                Effect.withSpan("PlayerService.getPlayerMaps subscription", {
                   captureStackTrace: true,
                 }),
               ),
+              Effect.withSpan("PlayerService.getPlayerMaps", {
+                captureStackTrace: true,
+              }),
             ),
           ),
         }),
@@ -53,10 +56,13 @@ export class PlayerService extends Effect.Service<PlayerService>()(
               ),
             ),
             Effect.map(
-              Effect.withSpan("PlayerService.getPlayerById", {
+              Effect.withSpan("PlayerService.getPlayerById subscription", {
                 captureStackTrace: true,
               }),
             ),
+            Effect.withSpan("PlayerService.getPlayerById", {
+              captureStackTrace: true,
+            }),
           ),
         getPlayerByName: (names: ReadonlyArray<string>) =>
           pipe(
@@ -72,10 +78,13 @@ export class PlayerService extends Effect.Service<PlayerService>()(
               ),
             ),
             Effect.map(
-              Effect.withSpan("PlayerService.getPlayerByName", {
+              Effect.withSpan("PlayerService.getPlayerByName subscription", {
                 captureStackTrace: true,
               }),
             ),
+            Effect.withSpan("PlayerService.getPlayerByName", {
+              captureStackTrace: true,
+            }),
           ),
         getTeamsById: (ids: ReadonlyArray<string>) =>
           pipe(
@@ -91,10 +100,13 @@ export class PlayerService extends Effect.Service<PlayerService>()(
               ),
             ),
             Effect.map(
-              Effect.withSpan("PlayerService.getTeamsById", {
+              Effect.withSpan("PlayerService.getTeamsById subscription", {
                 captureStackTrace: true,
               }),
             ),
+            Effect.withSpan("PlayerService.getTeamsById", {
+              captureStackTrace: true,
+            }),
           ),
         getTeamsByName: (names: ReadonlyArray<string>) =>
           pipe(
@@ -107,10 +119,13 @@ export class PlayerService extends Effect.Service<PlayerService>()(
               ),
             ),
             Effect.map(
-              Effect.withSpan("PlayerService.getTeamsByName", {
+              Effect.withSpan("PlayerService.getTeamsByName subscription", {
                 captureStackTrace: true,
               }),
             ),
+            Effect.withSpan("PlayerService.getTeamsByName", {
+              captureStackTrace: true,
+            }),
           ),
         mapScheduleWithPlayers: (
           schedules: ReadonlyArray<
@@ -144,10 +159,16 @@ export class PlayerService extends Effect.Service<PlayerService>()(
               ),
             ),
             Effect.map(
-              Effect.withSpan("PlayerService.mapScheduleWithPlayers", {
-                captureStackTrace: true,
-              }),
+              Effect.withSpan(
+                "PlayerService.mapScheduleWithPlayers subscription",
+                {
+                  captureStackTrace: true,
+                },
+              ),
             ),
+            Effect.withSpan("PlayerService.mapScheduleWithPlayers", {
+              captureStackTrace: true,
+            }),
           ),
       })),
     ),
