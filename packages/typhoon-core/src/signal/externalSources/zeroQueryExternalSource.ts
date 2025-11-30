@@ -564,7 +564,6 @@ export const makeWithContext = <
                         ),
                       onRight: (query) =>
                         pipe(
-                          // Clear any previous input error
                           SynchronizedRef.set(inputErrorRef, Option.none()),
                           // Non-Result input is always considered complete
                           Effect.andThen(
@@ -701,9 +700,7 @@ export const makeFromResultWithContext = <
                         ),
                       onRight: (queryResult) =>
                         pipe(
-                          // Clear any previous input error
                           SynchronizedRef.set(inputErrorRef, Option.none()),
-                          // Track if input Result is Complete
                           Effect.andThen(
                             SynchronizedRef.set(
                               inputResultCompleteRef,
