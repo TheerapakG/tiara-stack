@@ -250,9 +250,6 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
         zeroResultType: SynchronizedRef.get(this.zeroResultTypeRef),
         inputError: SynchronizedRef.get(this.inputErrorRef),
       }),
-      Effect.tap(({ value, inputResultComplete, zeroResultType, inputError }) =>
-        Effect.log(value, inputResultComplete, zeroResultType, inputError),
-      ),
       Effect.map(({ value, inputResultComplete, zeroResultType, inputError }) =>
         pipe(
           inputError,
