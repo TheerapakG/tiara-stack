@@ -146,7 +146,6 @@ export class WebSocketClient<
         client.updaterStateMapRef,
         SynchronizedRef.get,
         Effect.map(HashMap.get(header.id)),
-        Effect.tap(() => Effect.log(header, decodedResponse)),
         // TODO: validate message
         Effect.flatMap(
           Effect.transposeMapOption(({ updater }) =>
