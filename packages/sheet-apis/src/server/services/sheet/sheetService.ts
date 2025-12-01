@@ -268,6 +268,7 @@ const teamSplitIsvParser = (
         ),
       ),
     ),
+    Effect.tap((valueRanges) => Effect.log(valueRanges)),
     Effect.map(
       ArrayUtils.WithDefault.wrapEither({
         default: () => ({
