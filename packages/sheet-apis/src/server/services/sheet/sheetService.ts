@@ -250,6 +250,7 @@ const teamSplitIsvParser = (
         { concurrency: "unbounded" },
       ),
     ),
+    Effect.tap((valueRanges) => Effect.log(valueRanges)),
     Effect.flatMap((valueRanges) =>
       GoogleSheets.parseValueRanges(
         valueRanges,
