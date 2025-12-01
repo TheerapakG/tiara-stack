@@ -250,7 +250,6 @@ const teamSplitIsvParser = (
         { concurrency: "unbounded" },
       ),
     ),
-    Effect.tap((valueRanges) => Effect.log(valueRanges)),
     Effect.flatMap((valueRanges) =>
       GoogleSheets.parseValueRanges(
         valueRanges,
@@ -269,7 +268,6 @@ const teamSplitIsvParser = (
         ),
       ),
     ),
-    Effect.tap((valueRanges) => Effect.log(valueRanges)),
     Effect.map(
       ArrayUtils.WithDefault.wrapEither({
         default: () => ({
