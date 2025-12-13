@@ -99,7 +99,6 @@ export class PlayerService extends Effect.Service<PlayerService>()(
                 },
               ),
             ),
-            Effect.map(Effect.tap((teams) => Effect.log(teams))),
             Effect.map(
               Effect.withSpan("PlayerService.getTeamsById subscription", {
                 captureStackTrace: true,
