@@ -235,7 +235,7 @@ const runOnce = Effect.suspend(() =>
                 ),
                 Effect.tap((sent) =>
                   Effect.log(
-                    `autoCheckin: sent ${sent} check-in message(s) for guild ${guild.guildId}`,
+                    `sent ${sent} check-in message(s) for guild ${guild.guildId}`,
                   ),
                 ),
               ),
