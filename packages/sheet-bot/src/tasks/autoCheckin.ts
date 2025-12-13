@@ -111,9 +111,9 @@ const runOnce = Effect.suspend(() =>
     Effect.bind("guilds", () =>
       pipe(
         BotGuildConfigService.getAutoCheckinGuilds(),
-        Effect.map(Effect.tap((guilds) => Effect.log(guilds))),
         UntilObserver.observeUntilRpcResultResolved(),
         Effect.flatten,
+        Effect.tap((guilds) => Effect.log(guilds)),
       ),
     ),
     Effect.bind("guildCounts", ({ guilds }) =>
