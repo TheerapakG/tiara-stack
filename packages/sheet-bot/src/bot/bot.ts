@@ -279,7 +279,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                         ),
                       ),
                       Effect.andThen((tasks) =>
-                        Effect.log(`${HashSet.size(tasks)} asks initialized`),
+                        Effect.log(`${HashSet.size(tasks)} tasks initialized`),
                       ),
                     ),
                   ),
