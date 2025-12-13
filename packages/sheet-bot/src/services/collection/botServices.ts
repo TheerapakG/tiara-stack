@@ -1,5 +1,6 @@
 import { SheetApisClient } from "@/client";
 import {
+  BotGuildConfigService,
   MessageCheckinService,
   MessageRoomOrderService,
   MessageSlotService,
@@ -9,6 +10,7 @@ import { Effect, Layer, pipe } from "effect";
 
 export const botServices = pipe(
   Layer.mergeAll(
+    BotGuildConfigService.DefaultWithoutDependencies,
     MessageCheckinService.DefaultWithoutDependencies,
     MessageRoomOrderService.DefaultWithoutDependencies,
     MessageSlotService.DefaultWithoutDependencies,

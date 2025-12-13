@@ -8,7 +8,7 @@ import {
   SheetService,
 } from "@/services";
 import { guildServices } from "@/services/collection/guildServices";
-import { MessageCheckinService } from "@/services/bot";
+import { BotGuildConfigService, MessageCheckinService } from "@/services/bot";
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -108,7 +108,7 @@ const runOnce = pipe(
   Effect.Do,
   Effect.bind("guilds", () =>
     pipe(
-      GuildConfigService.getAutoCheckinGuilds(),
+      BotGuildConfigService.getAutoCheckinGuilds(),
       UntilObserver.observeUntilRpcResultResolved(),
       Effect.flatten,
     ),
