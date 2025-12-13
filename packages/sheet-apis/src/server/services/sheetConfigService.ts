@@ -425,7 +425,7 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()(
           pipe(
             sheet.get({
               spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!AD8:AE"],
+              ranges: ["'Thee's Sheet Settings'!AE8:AF"],
             }),
             Effect.flatMap((response) =>
               pipe(
