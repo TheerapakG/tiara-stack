@@ -529,7 +529,6 @@ const teamParser = (
             }),
           ),
         ),
-        Effect.tap((teams) => Effect.log(teams)),
       ),
     ),
     Effect.map(Array.flatten),
