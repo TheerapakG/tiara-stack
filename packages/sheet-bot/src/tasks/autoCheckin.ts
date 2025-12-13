@@ -142,6 +142,9 @@ const runOnce = Effect.suspend(() =>
                       ),
                       UntilObserver.observeUntilRpcResultResolved(),
                       Effect.flatten,
+                      Effect.tap((runningChannel) =>
+                        Effect.log(runningChannel),
+                      ),
                       Effect.flatMap((runningChannel) =>
                         pipe(
                           Effect.Do,
