@@ -121,8 +121,19 @@ const runOnce = Effect.suspend(() =>
         Effect.provide(guildServices(guild.guildId))(
           pipe(
             Effect.Do,
+            Effect.tap(() =>
+              Effect.log(
+                `running auto check-in task for guild ${guild.guildId}...`,
+              ),
+            ),
             Effect.bind("hour", () => computeHour),
+            Effect.tap((hour) =>
+              Effect.log(`computed hour for guild ${guild.guildId}: ${hour}`),
+            ),
             Effect.bind("allSchedules", () => SheetService.allSchedules()),
+            Effect.tap(() =>
+              Effect.log(`fetched all schedules for guild ${guild.guildId}`),
+            ),
             Effect.let("channels", ({ allSchedules }) =>
               pipe(
                 allSchedules,
