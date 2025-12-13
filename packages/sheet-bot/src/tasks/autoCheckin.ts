@@ -137,8 +137,13 @@ const runOnce = Effect.suspend(() =>
                   channels,
                   (channelName) =>
                     pipe(
-                      GuildConfigService.getGuildRunningChannelByName(
-                        channelName,
+                      Effect.log(
+                        `getting running channel by name: ${channelName}`,
+                      ),
+                      Effect.andThen(
+                        GuildConfigService.getGuildRunningChannelByName(
+                          channelName,
+                        ),
                       ),
                       UntilObserver.observeUntilRpcResultResolved(),
                       Effect.flatten,
