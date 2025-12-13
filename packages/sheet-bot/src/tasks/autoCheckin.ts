@@ -107,6 +107,7 @@ const getCheckinMessages = (data: {
 const runOnce = Effect.suspend(() =>
   pipe(
     Effect.Do,
+    Effect.tap(() => Effect.log(`running auto check-in task...`)),
     Effect.bind("guilds", () =>
       pipe(
         BotGuildConfigService.getAutoCheckinGuilds(),
