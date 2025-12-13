@@ -649,7 +649,7 @@ export function onEditInstallable(e: GoogleAppsScript.Events.SheetsOnEdit) {
     }),
     Match.whenOr(
       {
-        template: "Template: UniversalTeamCalc v1.17 on TheeCalc v8.0",
+        template: "Template: UniversalTeamCalc v1.17 on TheeCalc v7.0",
         cell: "B27",
       },
       {
