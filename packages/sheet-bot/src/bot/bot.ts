@@ -54,11 +54,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
 )<{
   readonly client: Client;
   readonly interactionHandlerMapWithMetricsGroup: SynchronizedRef.SynchronizedRef<
-    InteractionHandlerMapWithMetricsGroup<A, E, R>
+    InteractionHandlerMapWithMetricsGroup<A, E, R | ClientService>
   >;
   readonly traceProvider: Layer.Layer<never>;
   readonly tasks: SynchronizedRef.SynchronizedRef<
-    HashSet.HashSet<Effect.Effect<unknown, unknown, R>>
+    HashSet.HashSet<Effect.Effect<unknown, unknown, R | ClientService>>
   >;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly runState: RunState.RunState<
@@ -257,13 +257,11 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                       ),
                     ),
                   ),
-                  Effect.tap(() => Effect.log("Bot is ready")),
-                  // Fork all predefined tasks using the provided runtime
-                  Effect.tap(() =>
+                  Effect.andThen(
                     pipe(
                       bot.tasks,
                       SynchronizedRef.get,
-                      Effect.flatMap((tasks) =>
+                      Effect.tap((tasks) =>
                         Effect.forEach(HashSet.toValues(tasks), (task) =>
                           Effect.sync(() =>
                             Runtime.runFork(
@@ -272,14 +270,20 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                                 task,
                                 Effect.provide(bot.traceProvider),
                                 Effect.provide(ClientService.Default(client)),
-                                Effect.catchAll(() => Effect.void),
+                                Effect.catchAll((error) =>
+                                  Effect.logError(error),
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
+                      Effect.andThen((tasks) =>
+                        Effect.log(`${HashSet.size(tasks)} asks initialized`),
+                      ),
                     ),
                   ),
+                  Effect.tap(() => Effect.log("Bot is ready")),
                   Effect.provide(ClientService.Default(client)),
                 ),
               ),
@@ -320,10 +324,14 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
             }),
           ),
           interactionHandlerMapWithMetricsGroup: SynchronizedRef.make(
-            InteractionHandlerMapWithMetricsGroup.empty<A, E, R>(),
+            InteractionHandlerMapWithMetricsGroup.empty<
+              A,
+              E,
+              R | ClientService
+            >(),
           ),
           tasks: SynchronizedRef.make(
-            HashSet.empty<Effect.Effect<unknown, unknown, R>>(),
+            HashSet.empty<Effect.Effect<unknown, unknown, R | ClientService>>(),
           ),
           traceProvider: Effect.succeed(Layer.empty),
           runState: RunState.make(
@@ -372,7 +380,13 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
             bot as Bot<
               A | BA,
               E | BE,
-              Exclude<R, InteractionServices<ChatInputCommandInteractionT>> | BR
+              | Exclude<
+                  R,
+                  | InteractionServices<ChatInputCommandInteractionT>
+                  | ClientService
+                  | Scope.Scope
+                >
+              | BR
             >,
         ),
         Effect.tap(({ bot }) =>
@@ -383,7 +397,12 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 ChatInputHandlerVariantT,
                 A,
                 E,
-                Exclude<R, InteractionServices<ChatInputCommandInteractionT>>
+                Exclude<
+                  R,
+                  | InteractionServices<ChatInputCommandInteractionT>
+                  | ClientService
+                  | Scope.Scope
+                >
               >,
             ),
           ),
@@ -407,6 +426,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
               | Exclude<
                   R,
                   | InteractionServices<ChatInputCommandInteractionT>
+                  | ClientService
                   | Scope.Scope
                 >
               | BR
@@ -423,6 +443,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 Exclude<
                   R,
                   | InteractionServices<ChatInputCommandInteractionT>
+                  | ClientService
                   | Scope.Scope
                 >
               >,
@@ -447,7 +468,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
               E | BE,
               | Exclude<
                   R,
-                  InteractionServices<ButtonInteractionT> | Scope.Scope
+                  | InteractionServices<ButtonInteractionT>
+                  | ClientService
+                  | Scope.Scope
                 >
               | BR
             >,
@@ -462,7 +485,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 E,
                 Exclude<
                   R,
-                  InteractionServices<ButtonInteractionT> | Scope.Scope
+                  | InteractionServices<ButtonInteractionT>
+                  | ClientService
+                  | Scope.Scope
                 >
               >,
             ),
@@ -486,7 +511,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
               E | BE,
               | Exclude<
                   R,
-                  InteractionServices<ButtonInteractionT> | Scope.Scope
+                  | InteractionServices<ButtonInteractionT>
+                  | ClientService
+                  | Scope.Scope
                 >
               | BR
             >,
@@ -501,7 +528,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 E,
                 Exclude<
                   R,
-                  InteractionServices<ButtonInteractionT> | Scope.Scope
+                  | InteractionServices<ButtonInteractionT>
+                  | ClientService
+                  | Scope.Scope
                 >
               >,
             ),
@@ -530,7 +559,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
               E | BE,
               | Exclude<
                   R,
-                  InteractionServices<UserSelectMenuInteractionT> | Scope.Scope
+                  | InteractionServices<UserSelectMenuInteractionT>
+                  | ClientService
+                  | Scope.Scope
                 >
               | BR
             >,
@@ -545,7 +576,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 E,
                 Exclude<
                   R,
-                  InteractionServices<UserSelectMenuInteractionT> | Scope.Scope
+                  | InteractionServices<UserSelectMenuInteractionT>
+                  | ClientService
+                  | Scope.Scope
                 >
               >,
             ),
@@ -573,7 +606,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
               E | BE,
               | Exclude<
                   R,
-                  InteractionServices<UserSelectMenuInteractionT> | Scope.Scope
+                  | InteractionServices<UserSelectMenuInteractionT>
+                  | ClientService
+                  | Scope.Scope
                 >
               | BR
             >,
@@ -588,7 +623,9 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 E,
                 Exclude<
                   R,
-                  InteractionServices<UserSelectMenuInteractionT> | Scope.Scope
+                  | InteractionServices<UserSelectMenuInteractionT>
+                  | ClientService
+                  | Scope.Scope
                 >
               >,
             ),
@@ -598,19 +635,25 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       );
   };
 
-  // Predefined tasks registration
-  static addTask = <R1 = never>(task: Effect.Effect<unknown, unknown, R1>) => {
+  static addTask = <R = never>(task: Effect.Effect<unknown, unknown, R>) => {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
         Effect.Do,
-        Effect.let("bot", () => bot as Bot<BA, BE, BR | R1>),
+        Effect.let(
+          "bot",
+          () => bot as Bot<BA, BE, Exclude<R, ClientService> | BR>,
+        ),
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(bot.tasks, (tasks) =>
             HashSet.add(
               tasks as HashSet.HashSet<
-                Effect.Effect<unknown, unknown, BR | R1>
+                Effect.Effect<unknown, unknown, Exclude<R, ClientService> | BR>
               >,
-              task as Effect.Effect<unknown, unknown, BR | R1>,
+              task as Effect.Effect<
+                unknown,
+                unknown,
+                Exclude<R, ClientService> | BR
+              >,
             ),
           ),
         ),
@@ -618,21 +661,30 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       );
   };
 
-  static addTasks = <R1 = never>(
-    tasks: Iterable<Effect.Effect<unknown, unknown, R1>>,
+  static addTasks = <R = never>(
+    tasks: Iterable<Effect.Effect<unknown, unknown, R>>,
   ) => {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
         Effect.Do,
-        Effect.let("bot", () => bot as Bot<BA, BE, BR | R1>),
+        Effect.let(
+          "bot",
+          () => bot as Bot<BA, BE, Exclude<R, ClientService> | BR>,
+        ),
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(bot.tasks, (existing) =>
             HashSet.union(
               existing as HashSet.HashSet<
-                Effect.Effect<unknown, unknown, BR | R1>
+                Effect.Effect<unknown, unknown, Exclude<R, ClientService> | BR>
               >,
               HashSet.fromIterable(
-                tasks as Iterable<Effect.Effect<unknown, unknown, BR | R1>>,
+                tasks as Iterable<
+                  Effect.Effect<
+                    unknown,
+                    unknown,
+                    Exclude<R, ClientService> | BR
+                  >
+                >,
               ),
             ),
           ),
