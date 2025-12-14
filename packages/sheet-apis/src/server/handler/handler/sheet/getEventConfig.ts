@@ -53,6 +53,7 @@ export const getEventConfigHandler = pipe(
           ),
         ),
       ),
+      Effect.tap(() => Effect.addFinalizer(() => Effect.log("finalizer"))),
       Effect.map(Error.Core.catchParseErrorAsValidationError),
       Effect.map(
         Handler.Config.encodeResponseEffect(getEventConfigHandlerConfig),
