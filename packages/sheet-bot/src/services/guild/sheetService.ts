@@ -59,8 +59,15 @@ export class SheetService extends Effect.Service<SheetService>()(
                 { guildId },
               ),
             ),
-            Effect.map(Effect.tap((eventConfig) => Effect.log(eventConfig))),
+            Effect.map(
+              Effect.tap((eventConfig) =>
+                Effect.log("subscribeScoped", eventConfig),
+              ),
+            ),
             UntilObserver.observeUntilRpcResultResolved(),
+            Effect.tap((eventConfig) =>
+              Effect.log("observeUntilRpcResultResolved", eventConfig),
+            ),
             Effect.flatten,
             Effect.withSpan("SheetService.eventConfig", {
               captureStackTrace: true,
