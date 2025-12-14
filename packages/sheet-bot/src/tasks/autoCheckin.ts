@@ -177,8 +177,14 @@ const runOnce = Effect.suspend(() =>
                           Effect.bind("checkinData", () =>
                             getCheckinData({ hour, runningChannel }),
                           ),
+                          Effect.tap(({ checkinData }) =>
+                            Effect.log(checkinData),
+                          ),
                           Effect.bind("checkinMessages", ({ checkinData }) =>
                             getCheckinMessages(checkinData),
+                          ),
+                          Effect.tap(({ checkinMessages }) =>
+                            Effect.log(checkinMessages),
                           ),
                           Effect.bind(
                             "message",
