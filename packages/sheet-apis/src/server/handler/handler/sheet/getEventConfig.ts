@@ -46,6 +46,9 @@ export const getEventConfigHandler = pipe(
             pipe(
               Sheet.SheetService.getEventConfig(),
               Result.provideEitherLayer(layerOfGuildId),
+              Effect.tap((eventConfig) =>
+                Effect.log(layerOfGuildId, eventConfig),
+              ),
             ),
           ),
         ),
