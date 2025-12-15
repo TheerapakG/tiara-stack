@@ -644,6 +644,7 @@ export function onEditInstallable(e: GoogleAppsScript.Events.SheetsOnEdit) {
   pipe(
     Match.value({
       template: e.range.getSheet().getRange("A2").getValue(),
+      toyaTemplate: e.range.getSheet().getRange("A1").getValue(),
       name: e.range.getSheet().getName(),
       cell: e.range.getA1Notation(),
     }),
@@ -658,6 +659,25 @@ export function onEditInstallable(e: GoogleAppsScript.Events.SheetsOnEdit) {
       },
       () => {
         theeCalc(e.range.getSheet());
+      },
+    ),
+    Match.when(
+      {
+        toyaTemplate: "Template: Toya Schedule v1.0",
+        cell: "D28",
+      },
+      () => {
+        const scheduleSheet = e.range.getSheet();
+
+        tzLongStamps({
+          sheet: scheduleSheet,
+          tzsRow: 2,
+          tzsColumnStart: "D",
+          tzsColumnEnd: "H",
+          hoursColumn: "J",
+          hoursRowStart: 3,
+          hoursRowEnd: 26,
+        });
       },
     ),
     Match.when(
