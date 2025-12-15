@@ -1299,6 +1299,9 @@ export class SheetService extends Effect.Service<SheetService>()(
     pipe(
       GuildConfigService.getGuildConfigByGuildId(guildId),
       Effect.map(
+        Effect.tap((guildConfig) => Effect.log("guildConfig", guildConfig)),
+      ),
+      Effect.map(
         Effect.map(
           Result.map(Either.map(Option.flatMap((config) => config.sheetId))),
         ),
