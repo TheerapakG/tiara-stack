@@ -172,7 +172,7 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
       Option.Option<
         (
           value: Result<Either.Either<T, ZeroQueryError | E>>,
-        ) => Effect.Effect<void, never, SignalService.Service>
+        ) => Effect.Effect<void, never, SignalService.SignalService>
       >
     >,
     private readonly inputErrorRef: SynchronizedRef.SynchronizedRef<
@@ -291,7 +291,7 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
   emit(
     onEmit: (
       value: Result<Either.Either<T, ZeroQueryError | E>>,
-    ) => Effect.Effect<void, never, SignalService.Service>,
+    ) => Effect.Effect<void, never, SignalService.SignalService>,
   ) {
     return SynchronizedRef.set(this.onEmitRef, Option.some(onEmit));
   }
@@ -357,7 +357,7 @@ const createSourceWithRefs = <
         Option.Option<
           (
             value: Result<Either.Either<T, ZeroQueryError | E>>,
-          ) => Effect.Effect<void, never, SignalService.Service>
+          ) => Effect.Effect<void, never, SignalService.SignalService>
         >
       >(Option.none()),
       inputErrorRef: SynchronizedRef.make<Option.Option<E>>(Option.none()),
@@ -530,7 +530,7 @@ export const makeWithContext = <
 ): Effect.Effect<
   ZeroQueryExternalSource<T, E>,
   never,
-  ZeroService<any, any> | Scope.Scope | SignalService.Service
+  ZeroService<any, any> | Scope.Scope | SignalService.SignalService
 > =>
   pipe(
     ZeroService<any, any>(),
@@ -635,7 +635,7 @@ export const make = <
 ): Effect.Effect<
   ZeroQueryExternalSource<T, never>,
   never,
-  ZeroService<any, any> | Scope.Scope | SignalService.Service
+  ZeroService<any, any> | Scope.Scope | SignalService.SignalService
 > =>
   makeWithContext<M, Q, T, never, never>(
     maybeSignalQuery,
@@ -673,7 +673,7 @@ export const makeFromResultWithContext = <
 ): Effect.Effect<
   ZeroQueryExternalSource<T, E>,
   never,
-  ZeroService<any, any> | Scope.Scope | SignalService.Service
+  ZeroService<any, any> | Scope.Scope | SignalService.SignalService
 > =>
   pipe(
     ZeroService<any, any>(),
@@ -786,7 +786,7 @@ export const makeFromResult = <
 ): Effect.Effect<
   ZeroQueryExternalSource<T, never>,
   never,
-  ZeroService<any, any> | Scope.Scope | SignalService.Service
+  ZeroService<any, any> | Scope.Scope | SignalService.SignalService
 > =>
   makeFromResultWithContext<M, Q, T, never, never>(
     maybeSignalQuery,

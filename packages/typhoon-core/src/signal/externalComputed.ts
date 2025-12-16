@@ -12,7 +12,9 @@ import * as SignalService from "./signalService";
 export interface ExternalSource<T> {
   poll: Effect.Effect<T, never, never>;
   emit: (
-    onEmit: (value: T) => Effect.Effect<void, never, SignalService.Service>,
+    onEmit: (
+      value: T,
+    ) => Effect.Effect<void, never, SignalService.SignalService>,
   ) => Effect.Effect<void, never, never>;
   start: Effect.Effect<void, never, never>;
   stop: Effect.Effect<void, never, never>;
@@ -99,9 +101,11 @@ export class ExternalComputed<T = unknown>
     );
   }
 
-  handleEmit(value: T): Effect.Effect<void, never, SignalService.Service> {
+  handleEmit(
+    value: T,
+  ): Effect.Effect<void, never, SignalService.SignalService> {
     return pipe(
-      SignalService.enqueue({
+      SignalService.SignalService.enqueue({
         signal: this,
         beforeNotify: (watched) =>
           pipe(

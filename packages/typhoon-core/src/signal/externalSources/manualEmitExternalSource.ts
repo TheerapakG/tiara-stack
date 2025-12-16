@@ -9,7 +9,7 @@ export interface ManualEmitter<T> {
   /**
    * Manually emit a value.
    */
-  emit: (value: T) => Effect.Effect<void, never, SignalService.Service>;
+  emit: (value: T) => Effect.Effect<void, never, SignalService.SignalService>;
 }
 
 /**
@@ -31,7 +31,7 @@ export const make = <T>(
 ): Effect.Effect<
   { source: ExternalSource<T>; emitter: ManualEmitter<T> },
   never,
-  SignalService.Service
+  SignalService.SignalService
 > =>
   pipe(
     Effect.all({
@@ -39,7 +39,7 @@ export const make = <T>(
       startedRef: Ref.make(false),
       onEmitRef: Ref.make<
         Option.Option<
-          (value: T) => Effect.Effect<void, never, SignalService.Service>
+          (value: T) => Effect.Effect<void, never, SignalService.SignalService>
         >
       >(Option.none()),
     }),
@@ -49,7 +49,7 @@ export const make = <T>(
         emit: (
           onEmit: (
             value: T,
-          ) => Effect.Effect<void, never, SignalService.Service>,
+          ) => Effect.Effect<void, never, SignalService.SignalService>,
         ) => pipe(Ref.set(onEmitRef, Option.some(onEmit)), Effect.asVoid),
         start: pipe(Ref.set(startedRef, true), Effect.asVoid),
         stop: pipe(Ref.set(startedRef, false), Effect.asVoid),

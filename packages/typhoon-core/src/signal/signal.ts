@@ -78,9 +78,9 @@ export class Signal<T = unknown>
     );
   }
 
-  setValue(value: T): Effect.Effect<void, never, SignalService.Service> {
+  setValue(value: T): Effect.Effect<void, never, SignalService.SignalService> {
     return pipe(
-      SignalService.enqueue({
+      SignalService.SignalService.enqueue({
         signal: this,
         beforeNotify: () =>
           Effect.suspend(() =>
@@ -97,9 +97,9 @@ export class Signal<T = unknown>
 
   updateValue(
     updater: (value: T) => Effect.Effect<T>,
-  ): Effect.Effect<void, never, SignalService.Service> {
+  ): Effect.Effect<void, never, SignalService.SignalService> {
     return pipe(
-      SignalService.enqueue({
+      SignalService.SignalService.enqueue({
         signal: this,
         beforeNotify: () =>
           Effect.suspend(() =>

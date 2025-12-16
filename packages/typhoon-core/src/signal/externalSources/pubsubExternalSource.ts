@@ -26,7 +26,7 @@ export const make = <T>(
 ): Effect.Effect<
   ExternalSource<T>,
   never,
-  Scope.Scope | SignalService.Service
+  Scope.Scope | SignalService.SignalService
 > =>
   pipe(
     Effect.all({
@@ -34,7 +34,7 @@ export const make = <T>(
       startedRef: Ref.make(false),
       onEmitRef: Ref.make<
         Option.Option<
-          (value: T) => Effect.Effect<void, never, SignalService.Service>
+          (value: T) => Effect.Effect<void, never, SignalService.SignalService>
         >
       >(Option.none()),
     }),
@@ -65,7 +65,9 @@ export const make = <T>(
     Effect.map(({ valueRef, startedRef, onEmitRef }) => ({
       poll: Ref.get(valueRef),
       emit: (
-        onEmit: (value: T) => Effect.Effect<void, never, SignalService.Service>,
+        onEmit: (
+          value: T,
+        ) => Effect.Effect<void, never, SignalService.SignalService>,
       ) => pipe(Ref.set(onEmitRef, Option.some(onEmit)), Effect.asVoid),
       start: pipe(Ref.set(startedRef, true), Effect.asVoid),
       stop: pipe(Ref.set(startedRef, false), Effect.asVoid),
