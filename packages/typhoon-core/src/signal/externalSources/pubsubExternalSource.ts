@@ -1,5 +1,6 @@
 import { Effect, Option, pipe, PubSub, Queue, Ref, Scope } from "effect";
 import type { ExternalSource } from "../externalComputed";
+import * as SignalService from "../signalService";
 
 /**
  * Creates an ExternalSource adapter for Effect PubSub.
@@ -22,13 +23,19 @@ import type { ExternalSource } from "../externalComputed";
 export const make = <T>(
   pubsub: PubSub.PubSub<T>,
   initial: T,
-): Effect.Effect<ExternalSource<T>, never, Scope.Scope> =>
+): Effect.Effect<
+  ExternalSource<T>,
+  never,
+  Scope.Scope | SignalService.Service
+> =>
   pipe(
     Effect.all({
       valueRef: Ref.make(initial),
       startedRef: Ref.make(false),
       onEmitRef: Ref.make<
-        Option.Option<(value: T) => Effect.Effect<void, never, never>>
+        Option.Option<
+          (value: T) => Effect.Effect<void, never, SignalService.Service>
+        >
       >(Option.none()),
     }),
     Effect.tap(({ valueRef, startedRef, onEmitRef }) =>
@@ -57,8 +64,9 @@ export const make = <T>(
     ),
     Effect.map(({ valueRef, startedRef, onEmitRef }) => ({
       poll: Ref.get(valueRef),
-      emit: (onEmit: (value: T) => Effect.Effect<void, never, never>) =>
-        pipe(Ref.set(onEmitRef, Option.some(onEmit)), Effect.asVoid),
+      emit: (
+        onEmit: (value: T) => Effect.Effect<void, never, SignalService.Service>,
+      ) => pipe(Ref.set(onEmitRef, Option.some(onEmit)), Effect.asVoid),
       start: pipe(Ref.set(startedRef, true), Effect.asVoid),
       stop: pipe(Ref.set(startedRef, false), Effect.asVoid),
     })),

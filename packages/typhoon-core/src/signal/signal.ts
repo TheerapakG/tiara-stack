@@ -1,11 +1,8 @@
 import { Effect, Effectable, HashSet, pipe } from "effect";
 import { Observable } from "../observability";
-import {
-  DependencySignal,
-  DependencySymbol,
-  notifyAllDependents,
-} from "./dependencySignal";
+import { DependencySignal, DependencySymbol } from "./dependencySignal";
 import { DependentSignal } from "./dependentSignal";
+import * as SignalService from "./signalService";
 import { bindScopeDependency, SignalContext } from "./signalContext";
 
 export class Signal<T = unknown>
@@ -81,16 +78,17 @@ export class Signal<T = unknown>
     );
   }
 
-  setValue(value: T): Effect.Effect<void, never, never> {
+  setValue(value: T): Effect.Effect<void, never, SignalService.Service> {
     return pipe(
-      this,
-      notifyAllDependents(() =>
-        Effect.suspend(() =>
-          Effect.sync(() => {
-            this._value = value;
-          }),
-        ),
-      ),
+      SignalService.enqueue({
+        signal: this,
+        beforeNotify: () =>
+          Effect.suspend(() =>
+            Effect.sync(() => {
+              this._value = value;
+            }),
+          ),
+      }),
       Observable.withSpan(this, "Signal.setValue", {
         captureStackTrace: true,
       }),
@@ -99,21 +97,22 @@ export class Signal<T = unknown>
 
   updateValue(
     updater: (value: T) => Effect.Effect<T>,
-  ): Effect.Effect<void, never, never> {
+  ): Effect.Effect<void, never, SignalService.Service> {
     return pipe(
-      this,
-      notifyAllDependents(() =>
-        Effect.suspend(() =>
-          pipe(
-            updater(this._value),
-            Effect.tap((value) =>
-              Effect.sync(() => {
-                this._value = value;
-              }),
+      SignalService.enqueue({
+        signal: this,
+        beforeNotify: () =>
+          Effect.suspend(() =>
+            pipe(
+              updater(this._value),
+              Effect.tap((value) =>
+                Effect.sync(() => {
+                  this._value = value;
+                }),
+              ),
             ),
           ),
-        ),
-      ),
+      }),
       Observable.withSpan(this, "Signal.updateValue", {
         captureStackTrace: true,
       }),

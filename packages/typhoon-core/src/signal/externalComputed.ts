@@ -3,16 +3,16 @@ import { Observable } from "../observability";
 import {
   DependencySignal,
   DependencySymbol,
-  notifyAllDependents,
   getDependentsUpdateOrder,
 } from "./dependencySignal";
 import { DependentSignal } from "./dependentSignal";
 import { bindScopeDependency, SignalContext } from "./signalContext";
+import * as SignalService from "./signalService";
 
 export interface ExternalSource<T> {
   poll: Effect.Effect<T, never, never>;
   emit: (
-    onEmit: (value: T) => Effect.Effect<void, never, never>,
+    onEmit: (value: T) => Effect.Effect<void, never, SignalService.Service>,
   ) => Effect.Effect<void, never, never>;
   start: Effect.Effect<void, never, never>;
   stop: Effect.Effect<void, never, never>;
@@ -99,19 +99,20 @@ export class ExternalComputed<T = unknown>
     );
   }
 
-  handleEmit(value: T): Effect.Effect<void, never, never> {
+  handleEmit(value: T): Effect.Effect<void, never, SignalService.Service> {
     return pipe(
-      this,
-      notifyAllDependents((watched) =>
-        pipe(
-          this._maybeSetEmitting(watched),
-          Effect.andThen(
-            Effect.sync(() => {
-              this._value = value;
-            }),
+      SignalService.enqueue({
+        signal: this,
+        beforeNotify: (watched) =>
+          pipe(
+            this._maybeSetEmitting(watched),
+            Effect.andThen(
+              Effect.sync(() => {
+                this._value = value;
+              }),
+            ),
           ),
-        ),
-      ),
+      }),
       Observable.withSpan(this, "ExternalComputed.emit", {
         captureStackTrace: true,
       }),

@@ -1,4 +1,5 @@
 import { Effect, Option, pipe, Ref } from "effect";
+import * as SignalService from "../signalService";
 import type { ExternalSource } from "../externalComputed";
 
 /**
@@ -8,7 +9,7 @@ export interface ManualEmitter<T> {
   /**
    * Manually emit a value.
    */
-  emit: (value: T) => Effect.Effect<void, never, never>;
+  emit: (value: T) => Effect.Effect<void, never, SignalService.Service>;
 }
 
 /**
@@ -30,21 +31,26 @@ export const make = <T>(
 ): Effect.Effect<
   { source: ExternalSource<T>; emitter: ManualEmitter<T> },
   never,
-  never
+  SignalService.Service
 > =>
   pipe(
     Effect.all({
       valueRef: Ref.make(initial),
       startedRef: Ref.make(false),
       onEmitRef: Ref.make<
-        Option.Option<(value: T) => Effect.Effect<void, never, never>>
+        Option.Option<
+          (value: T) => Effect.Effect<void, never, SignalService.Service>
+        >
       >(Option.none()),
     }),
     Effect.map(({ valueRef, startedRef, onEmitRef }) => ({
       source: {
         poll: Ref.get(valueRef),
-        emit: (onEmit: (value: T) => Effect.Effect<void, never, never>) =>
-          pipe(Ref.set(onEmitRef, Option.some(onEmit)), Effect.asVoid),
+        emit: (
+          onEmit: (
+            value: T,
+          ) => Effect.Effect<void, never, SignalService.Service>,
+        ) => pipe(Ref.set(onEmitRef, Option.some(onEmit)), Effect.asVoid),
         start: pipe(Ref.set(startedRef, true), Effect.asVoid),
         stop: pipe(Ref.set(startedRef, false), Effect.asVoid),
       },
