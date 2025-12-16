@@ -232,6 +232,9 @@ export class WebSocketClient<
                 ),
                 Effect.asVoid,
                 Effect.scoped,
+                Effect.catchAllCause((cause) =>
+                  Effect.logError("Error handling websocket message", cause),
+                ),
                 Runtime.runPromise(runtime),
               ),
             );
