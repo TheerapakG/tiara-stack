@@ -1,4 +1,4 @@
-import { Effect, pipe, Queue } from "effect";
+import { Effect, pipe, Queue, Scope } from "effect";
 import { Observable } from "../observability";
 import { DependencySignal, notifyAllDependents } from "./dependencySignal";
 
@@ -9,27 +9,31 @@ type EnqueueRequest = {
   ) => Effect.Effect<void, never, never>;
 };
 
-export interface Service {
+type SignalServiceInterface = {
   enqueue: (request: EnqueueRequest) => Effect.Effect<void, never, never>;
-}
+};
 
-const make = pipe(
-  Queue.unbounded<EnqueueRequest>(),
-  Effect.tap((queue) =>
-    pipe(
-      Queue.take(queue),
-      Effect.flatMap(({ signal, beforeNotify }) =>
-        notifyAllDependents(beforeNotify)(signal),
+const signalServiceDefinition: {
+  scoped: Effect.Effect<SignalServiceInterface, never, Scope.Scope>;
+  accessors: true;
+  dependencies: [];
+} = {
+  scoped: pipe(
+    Queue.unbounded<EnqueueRequest>(),
+    Effect.tap((queue) =>
+      pipe(
+        Queue.take(queue),
+        Effect.flatMap(({ signal, beforeNotify }) =>
+          notifyAllDependents(beforeNotify)(signal),
+        ),
+        Effect.forever,
+        Effect.withSpan("SignalService.worker", {
+          captureStackTrace: true,
+        }),
+        Effect.forkScoped,
       ),
-      Effect.forever,
-      Effect.withSpan("SignalService.worker", {
-        captureStackTrace: true,
-      }),
-      Effect.forkDaemon,
     ),
-  ),
-  Effect.map(
-    (queue): Service => ({
+    Effect.map((queue) => ({
       enqueue: (request: EnqueueRequest): Effect.Effect<void, never, never> =>
         pipe(
           Queue.offer(queue, request),
@@ -38,18 +42,15 @@ const make = pipe(
             captureStackTrace: true,
           }),
         ),
-    }),
+    })),
   ),
-);
-
-export class SignalService extends Effect.Service<Service>()("SignalService", {
-  effect: make,
   accessors: true,
   dependencies: [],
-}) {}
+};
 
-export const enqueue = (request: EnqueueRequest) =>
-  pipe(
-    SignalService,
-    Effect.flatMap((service) => service.enqueue(request)),
-  );
+const BaseSignalServiceClass: Effect.Service.Class<
+  SignalService,
+  "SignalService",
+  typeof signalServiceDefinition
+> = Effect.Service<SignalService>()("SignalService", signalServiceDefinition);
+export class SignalService extends BaseSignalServiceClass {}
