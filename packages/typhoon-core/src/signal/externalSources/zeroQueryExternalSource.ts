@@ -23,6 +23,7 @@ import {
   Predicate,
   Fiber,
 } from "effect";
+import * as SignalService from "../signalService";
 import {
   complete,
   optimistic,
@@ -171,7 +172,7 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
       Option.Option<
         (
           value: Result<Either.Either<T, ZeroQueryError | E>>,
-        ) => Effect.Effect<void, never, never>
+        ) => Effect.Effect<void, never, SignalService.SignalService>
       >
     >,
     private readonly inputErrorRef: SynchronizedRef.SynchronizedRef<
@@ -242,7 +243,7 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
     );
   }
 
-  get poll() {
+  poll() {
     return pipe(
       Effect.all({
         value: SynchronizedRef.get(this.valueRef),
@@ -290,14 +291,14 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
   emit(
     onEmit: (
       value: Result<Either.Either<T, ZeroQueryError | E>>,
-    ) => Effect.Effect<void, never, never>,
+    ) => Effect.Effect<void, never, SignalService.SignalService>,
   ) {
     return SynchronizedRef.set(this.onEmitRef, Option.some(onEmit));
   }
 
   doEmit() {
     return pipe(
-      this.poll,
+      this.poll(),
       Effect.tap((result) =>
         pipe(
           SynchronizedRef.get(this.onEmitRef),
@@ -308,11 +309,11 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
     );
   }
 
-  get start() {
+  start() {
     return SynchronizedRef.set(this.startedRef, true);
   }
 
-  get stop() {
+  stop() {
     return SynchronizedRef.set(this.startedRef, false);
   }
 }
@@ -356,7 +357,7 @@ const createSourceWithRefs = <
         Option.Option<
           (
             value: Result<Either.Either<T, ZeroQueryError | E>>,
-          ) => Effect.Effect<void, never, never>
+          ) => Effect.Effect<void, never, SignalService.SignalService>
         >
       >(Option.none()),
       inputErrorRef: SynchronizedRef.make<Option.Option<E>>(Option.none()),
@@ -492,7 +493,21 @@ const createMaterializeCallback =
         ),
       ),
       Effect.andThen(() =>
-        onTransactionCommit(() => Effect.runFork(source.flush())),
+        pipe(
+          SignalService.SignalService,
+          Effect.tap((service) =>
+            Effect.sync(() =>
+              onTransactionCommit(() =>
+                Effect.runFork(
+                  pipe(
+                    source.flush(),
+                    Effect.provideService(SignalService.SignalService, service),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
       Effect.andThen(() => materializedLatch.open),
       Effect.asVoid,
@@ -515,7 +530,7 @@ export const makeWithContext = <
 ): Effect.Effect<
   ZeroQueryExternalSource<T, E>,
   never,
-  ZeroService<any, any> | Scope.Scope
+  ZeroService<any, any> | Scope.Scope | SignalService.SignalService
 > =>
   pipe(
     ZeroService<any, any>(),
@@ -533,58 +548,68 @@ export const makeWithContext = <
             queryCompletePromiseFiberRef,
             materializedLatch,
           }) =>
-            SideEffect.makeWithContext(
-              pipe(
-                getMaybeSignalEffectValue(maybeSignalQuery) as Effect.Effect<
-                  Q,
-                  E,
-                  R | SignalContext
-                >,
-                Effect.either,
-                Effect.flatMap((queryResult) =>
+            pipe(
+              SignalService.SignalService,
+              Effect.flatMap((service) =>
+                SideEffect.makeWithContext(
                   pipe(
-                    queryResult,
-                    Either.match({
-                      onLeft: (error) =>
-                        pipe(
-                          SynchronizedRef.set(
-                            inputErrorRef,
-                            Option.some(error),
-                          ),
-                          // Input errors with non-Result input are considered complete
-                          Effect.andThen(
-                            SynchronizedRef.set(inputResultCompleteRef, true),
-                          ),
-                          Effect.andThen(destroyView(viewRef)),
-                          Effect.andThen(source.doEmit()),
-                        ),
-                      onRight: (query) =>
-                        pipe(
-                          SynchronizedRef.set(inputErrorRef, Option.none()),
-                          // Non-Result input is always considered complete
-                          Effect.andThen(
-                            SynchronizedRef.set(inputResultCompleteRef, true),
-                          ),
-                          Effect.andThen(
-                            zero.materialize(
-                              query,
-                              createMaterializeCallback(
-                                source,
-                                viewRef,
-                                zeroResultTypeRef,
-                                valueRef,
-                                queryCompletePromiseFiberRef,
-                                materializedLatch,
+                    getMaybeSignalEffectValue(
+                      maybeSignalQuery,
+                    ) as Effect.Effect<Q, E, R | SignalContext>,
+                    Effect.either,
+                    Effect.flatMap((queryResult) =>
+                      pipe(
+                        queryResult,
+                        Either.match({
+                          onLeft: (error) =>
+                            pipe(
+                              SynchronizedRef.set(
+                                inputErrorRef,
+                                Option.some(error),
                               ),
-                              options,
+                              // Input errors with non-Result input are considered complete
+                              Effect.andThen(
+                                SynchronizedRef.set(
+                                  inputResultCompleteRef,
+                                  true,
+                                ),
+                              ),
+                              Effect.andThen(destroyView(viewRef)),
+                              Effect.andThen(source.doEmit()),
                             ),
-                          ),
-                        ),
-                    }),
+                          onRight: (query) =>
+                            pipe(
+                              SynchronizedRef.set(inputErrorRef, Option.none()),
+                              // Non-Result input is always considered complete
+                              Effect.andThen(
+                                SynchronizedRef.set(
+                                  inputResultCompleteRef,
+                                  true,
+                                ),
+                              ),
+                              Effect.andThen(
+                                zero.materialize(
+                                  query,
+                                  createMaterializeCallback(
+                                    source,
+                                    viewRef,
+                                    zeroResultTypeRef,
+                                    valueRef,
+                                    queryCompletePromiseFiberRef,
+                                    materializedLatch,
+                                  ),
+                                  options,
+                                ),
+                              ),
+                            ),
+                        }),
+                      ),
+                    ),
+                    Effect.provideService(SignalService.SignalService, service),
                   ),
+                  context,
                 ),
               ),
-              context,
             ),
         ),
         Effect.tap(({ viewRef }) =>
@@ -610,7 +635,7 @@ export const make = <
 ): Effect.Effect<
   ZeroQueryExternalSource<T, never>,
   never,
-  ZeroService<any, any> | Scope.Scope
+  ZeroService<any, any> | Scope.Scope | SignalService.SignalService
 > =>
   makeWithContext<M, Q, T, never, never>(
     maybeSignalQuery,
@@ -648,7 +673,7 @@ export const makeFromResultWithContext = <
 ): Effect.Effect<
   ZeroQueryExternalSource<T, E>,
   never,
-  ZeroService<any, any> | Scope.Scope
+  ZeroService<any, any> | Scope.Scope | SignalService.SignalService
 > =>
   pipe(
     ZeroService<any, any>(),
@@ -670,60 +695,67 @@ export const makeFromResultWithContext = <
             queryCompletePromiseFiberRef,
             materializedLatch,
           }) =>
-            SideEffect.makeWithContext(
-              pipe(
-                getMaybeSignalEffectValue(maybeSignalQuery) as Effect.Effect<
-                  Result<Q>,
-                  E,
-                  R | SignalContext
-                >,
-                Effect.either,
-                Effect.flatMap((queryResultEither) =>
+            pipe(
+              SignalService.SignalService,
+              Effect.flatMap((service) =>
+                SideEffect.makeWithContext(
                   pipe(
-                    queryResultEither,
-                    Either.match({
-                      onLeft: (error) =>
-                        pipe(
-                          SynchronizedRef.set(
-                            inputErrorRef,
-                            Option.some(error),
-                          ),
-                          Effect.andThen(
-                            SynchronizedRef.set(inputResultCompleteRef, true),
-                          ),
-                          Effect.andThen(destroyView(viewRef)),
-                          Effect.andThen(source.doEmit()),
-                        ),
-                      onRight: (queryResult) =>
-                        pipe(
-                          SynchronizedRef.set(inputErrorRef, Option.none()),
-                          Effect.andThen(
-                            SynchronizedRef.set(
-                              inputResultCompleteRef,
-                              isResultComplete(queryResult),
-                            ),
-                          ),
-                          // Extract the query from the Result and materialize
-                          Effect.andThen(
-                            zero.materialize(
-                              queryResult.value,
-                              createMaterializeCallback(
-                                source,
-                                viewRef,
-                                zeroResultTypeRef,
-                                valueRef,
-                                queryCompletePromiseFiberRef,
-                                materializedLatch,
+                    getMaybeSignalEffectValue(
+                      maybeSignalQuery,
+                    ) as Effect.Effect<Result<Q>, E, R | SignalContext>,
+                    Effect.either,
+                    Effect.flatMap((queryResultEither) =>
+                      pipe(
+                        queryResultEither,
+                        Either.match({
+                          onLeft: (error) =>
+                            pipe(
+                              SynchronizedRef.set(
+                                inputErrorRef,
+                                Option.some(error),
                               ),
-                              options,
+                              Effect.andThen(
+                                SynchronizedRef.set(
+                                  inputResultCompleteRef,
+                                  true,
+                                ),
+                              ),
+                              Effect.andThen(destroyView(viewRef)),
+                              Effect.andThen(source.doEmit()),
                             ),
-                          ),
-                        ),
-                    }),
+                          onRight: (queryResult) =>
+                            pipe(
+                              SynchronizedRef.set(inputErrorRef, Option.none()),
+                              Effect.andThen(
+                                SynchronizedRef.set(
+                                  inputResultCompleteRef,
+                                  isResultComplete(queryResult),
+                                ),
+                              ),
+                              // Extract the query from the Result and materialize
+                              Effect.andThen(
+                                zero.materialize(
+                                  queryResult.value,
+                                  createMaterializeCallback(
+                                    source,
+                                    viewRef,
+                                    zeroResultTypeRef,
+                                    valueRef,
+                                    queryCompletePromiseFiberRef,
+                                    materializedLatch,
+                                  ),
+                                  options,
+                                ),
+                              ),
+                            ),
+                        }),
+                      ),
+                    ),
+                    Effect.provideService(SignalService.SignalService, service),
                   ),
+                  context,
                 ),
               ),
-              context,
             ),
         ),
         Effect.tap(({ viewRef }) =>
@@ -754,7 +786,7 @@ export const makeFromResult = <
 ): Effect.Effect<
   ZeroQueryExternalSource<T, never>,
   never,
-  ZeroService<any, any> | Scope.Scope
+  ZeroService<any, any> | Scope.Scope | SignalService.SignalService
 > =>
   makeFromResultWithContext<M, Q, T, never, never>(
     maybeSignalQuery,

@@ -10,3 +10,4 @@ export * as PubSubExternalSource from "./externalSources/pubsubExternalSource";
 export * as ManualEmitExternalSource from "./externalSources/manualEmitExternalSource";
 export * as ZeroQueryExternalSource from "./externalSources/zeroQueryExternalSource";
 export * as WithScopeComputed from "./withScopeComputed";
+export * as SignalService from "./signalService";

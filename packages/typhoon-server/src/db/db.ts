@@ -11,6 +11,8 @@ import {
   Schema,
   SynchronizedRef,
   Array,
+  Runtime,
+  Scope,
 } from "effect";
 import { DBQueryError, makeDBQueryError } from "typhoon-core/error";
 import {
@@ -19,6 +21,7 @@ import {
   ExternalComputed,
   ManualEmitExternalSource,
   WithScopeComputed,
+  SignalService,
 } from "typhoon-core/signal";
 
 class TransactionSubscription extends Schema.TaggedClass<TransactionSubscription>()(
@@ -94,7 +97,13 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
       ),
       Effect.map(({ subscriptions }) => ({
         subscriptions,
-        subscribeTables: (tables: Iterable<string>) =>
+        subscribeTables: (
+          tables: Iterable<string>,
+        ): Effect.Effect<
+          Computed.Computed<void[], never, never>,
+          never,
+          SignalContext.SignalContext | SignalService.SignalService
+        > =>
           pipe(
             subscriptions,
             SynchronizedRef.updateAndGetEffect((subscriptions) =>
@@ -138,7 +147,9 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
               ),
             ),
           ),
-        notifyTables: (tables: Iterable<string>) =>
+        notifyTables: (
+          tables: Iterable<string>,
+        ): Effect.Effect<void, never, SignalService.SignalService> =>
           pipe(
             SynchronizedRef.get(subscriptions),
             Effect.flatMap((subscriptions) =>
@@ -246,7 +257,11 @@ export const subscribe = <A, E>(
     E,
     TransactionContext | BaseDBSubscriptionContext | SignalContext.SignalContext
   >,
-) =>
+): Effect.Effect<
+  WithScopeComputed.WithScopeComputed<A, E, SignalService.SignalService>,
+  never,
+  BaseDBSubscriptionContext | Scope.Scope
+> =>
   pipe(
     BaseDBSubscriptionContext,
     Effect.flatMap((baseDBSubscriptionContext) =>
@@ -282,7 +297,11 @@ export const mutate = <A, E>(
     E,
     TransactionContext | BaseDBSubscriptionContext | SignalContext.SignalContext
   >,
-) =>
+): Effect.Effect<
+  A,
+  E,
+  BaseDBSubscriptionContext | SignalService.SignalService
+> =>
   pipe(
     query,
     Effect.tap(() =>
@@ -320,29 +339,31 @@ export const wrapTransaction =
       | TransactionContext
       | BaseDBSubscriptionContext
       | SignalContext.SignalContext
+      | SignalService.SignalService
     >,
     config?: Config,
   ) => Effect.Effect<
     T,
     unknown,
-    TransactionContext | BaseDBSubscriptionContext | SignalContext.SignalContext
+    | TransactionContext
+    | BaseDBSubscriptionContext
+    | SignalContext.SignalContext
+    | SignalService.SignalService
   >) =>
   (fn, config) =>
     pipe(
       Effect.Do,
-      Effect.bind("context", () =>
-        Effect.context<
+      Effect.bind("runtime", () =>
+        Effect.runtime<
           | TransactionContext
           | BaseDBSubscriptionContext
           | SignalContext.SignalContext
+          | SignalService.SignalService
         >(),
       ),
-      Effect.bind("result", ({ context }) =>
+      Effect.bind("result", ({ runtime }) =>
         Effect.tryPromise(() =>
-          transactionFn(
-            (tx) => Effect.runPromise(pipe(fn(tx), Effect.provide(context))),
-            config,
-          ),
+          transactionFn((tx) => Runtime.runPromise(runtime, fn(tx)), config),
         ),
       ),
       Effect.map(({ result }) => result),

@@ -3,19 +3,21 @@ import { Observable } from "../observability";
 import {
   DependencySignal,
   DependencySymbol,
-  notifyAllDependents,
   getDependentsUpdateOrder,
 } from "./dependencySignal";
 import { DependentSignal } from "./dependentSignal";
 import { bindScopeDependency, SignalContext } from "./signalContext";
+import * as SignalService from "./signalService";
 
 export interface ExternalSource<T> {
-  poll: Effect.Effect<T, never, never>;
+  poll: () => Effect.Effect<T, never, never>;
   emit: (
-    onEmit: (value: T) => Effect.Effect<void, never, never>,
+    onEmit: (
+      value: T,
+    ) => Effect.Effect<void, never, SignalService.SignalService>,
   ) => Effect.Effect<void, never, never>;
-  start: Effect.Effect<void, never, never>;
-  stop: Effect.Effect<void, never, never>;
+  start: () => Effect.Effect<void, never, never>;
+  stop: () => Effect.Effect<void, never, never>;
 }
 
 export class ExternalComputed<T = unknown>
@@ -76,7 +78,7 @@ export class ExternalComputed<T = unknown>
     return Effect.sync(() => HashSet.toValues(this._dependents));
   }
 
-  get value(): Effect.Effect<T, never, SignalContext> {
+  value(): Effect.Effect<T, never, SignalContext> {
     return pipe(
       bindScopeDependency(this),
       Effect.flatMap(() => this.peek()),
@@ -87,7 +89,7 @@ export class ExternalComputed<T = unknown>
   }
 
   commit(): Effect.Effect<T, never, SignalContext> {
-    return this.value;
+    return this.value();
   }
 
   peek(): Effect.Effect<T, never, never> {
@@ -99,19 +101,22 @@ export class ExternalComputed<T = unknown>
     );
   }
 
-  handleEmit(value: T): Effect.Effect<void, never, never> {
+  handleEmit(
+    value: T,
+  ): Effect.Effect<void, never, SignalService.SignalService> {
     return pipe(
-      this,
-      notifyAllDependents((watched) =>
-        pipe(
-          this._maybeSetEmitting(watched),
-          Effect.andThen(
-            Effect.sync(() => {
-              this._value = value;
-            }),
+      SignalService.SignalService.enqueue({
+        signal: this,
+        beforeNotify: (watched) =>
+          pipe(
+            this._maybeSetEmitting(watched),
+            Effect.andThen(
+              Effect.sync(() => {
+                this._value = value;
+              }),
+            ),
           ),
-        ),
-      ),
+      }),
       Observable.withSpan(this, "ExternalComputed.emit", {
         captureStackTrace: true,
       }),
@@ -138,13 +143,13 @@ export class ExternalComputed<T = unknown>
       Effect.suspend(() => {
         if (watched && !this._emitting) {
           return pipe(
-            this._source.start,
+            this._source.start(),
             Effect.tap(() => Effect.sync(() => (this._emitting = true))),
           );
         }
         if (!watched && this._emitting) {
           return pipe(
-            this._source.stop,
+            this._source.stop(),
             Effect.tap(() => Effect.sync(() => (this._emitting = false))),
           );
         }
@@ -159,7 +164,7 @@ export const make = <T>(
   options?: Observable.ObservableOptions,
 ) =>
   pipe(
-    source.poll,
+    source.poll(),
     Effect.map(
       (initial) => new ExternalComputed(initial, source, options ?? {}),
     ),

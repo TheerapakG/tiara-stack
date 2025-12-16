@@ -7,6 +7,7 @@ import {
 } from "@/services/bot";
 import { NodeContext } from "@effect/platform-node";
 import { Effect, Layer, pipe } from "effect";
+import { SignalService } from "typhoon-core/signal";
 
 export const botServices = pipe(
   Layer.mergeAll(
@@ -16,7 +17,9 @@ export const botServices = pipe(
     MessageSlotService.DefaultWithoutDependencies,
   ),
   Layer.provideMerge(SheetApisClient.DefaultWithoutDependencies),
-  Layer.provideMerge(NodeContext.layer),
+  Layer.provideMerge(
+    Layer.mergeAll(NodeContext.layer, SignalService.SignalService.Default),
+  ),
   Effect.succeed,
   Effect.withSpan("botServices", {
     captureStackTrace: true,

@@ -36,38 +36,54 @@ const UnsafeRunStateTaggedClass: new <A, E>(
   Data.TaggedClass("UnsafeRunState");
 class UnsafeRunState<A, E> extends UnsafeRunStateTaggedClass<A, E> {}
 
-type RunStateData<F extends RunStateContextTypeLambda, A, E> = {
+type RunStateData<
+  F extends RunStateContextTypeLambda,
+  A,
+  E,
+  DefaultR = never,
+> = {
   semaphore: Effect.Semaphore;
   effect: <R>(
     ctx: RunStateContextKind<F, R>,
-    runtime: Runtime.Runtime<R>,
+    runtime: Runtime.Runtime<R | DefaultR>,
   ) => Effect.Effect<A, E, R>;
   finalizer: <R>(
     ctx: RunStateContextKind<F, R>,
-    runtime: Runtime.Runtime<R>,
+    runtime: Runtime.Runtime<R | DefaultR>,
   ) => Effect.Effect<unknown, never, never>;
   state: SynchronizedRef.SynchronizedRef<UnsafeRunState<A, E>>;
 };
-const RunStateTaggedClass: new <F extends RunStateContextTypeLambda, A, E>(
-  args: Readonly<RunStateData<F, A, E>>,
-) => Readonly<RunStateData<F, A, E>> & { readonly _tag: "RunState" } =
+const RunStateTaggedClass: new <
+  F extends RunStateContextTypeLambda,
+  A,
+  E,
+  DefaultR = never,
+>(
+  args: Readonly<RunStateData<F, A, E, DefaultR>>,
+) => Readonly<RunStateData<F, A, E, DefaultR>> & { readonly _tag: "RunState" } =
   Data.TaggedClass("RunState");
 export class RunState<
   F extends RunStateContextTypeLambda,
   A = never,
   E = never,
-> extends RunStateTaggedClass<F, A, E> {}
+  DefaultR = never,
+> extends RunStateTaggedClass<F, A, E, DefaultR> {}
 
-export const make = <F extends RunStateContextTypeLambda, A = never, E = never>(
+export const make = <
+  F extends RunStateContextTypeLambda,
+  A = never,
+  E = never,
+  DefaultR = never,
+>(
   effect: <R>(
     ctx: RunStateContextKind<F, R>,
-    runtime: Runtime.Runtime<R>,
+    runtime: Runtime.Runtime<R | DefaultR>,
   ) => Effect.Effect<A, E, R>,
   finalizer: <R>(
     ctx: RunStateContextKind<F, R>,
-    runtime: Runtime.Runtime<R>,
+    runtime: Runtime.Runtime<R | DefaultR>,
   ) => Effect.Effect<unknown, never, never>,
-): Effect.Effect<RunState<F, A, E>, never, never> =>
+): Effect.Effect<RunState<F, A, E, DefaultR>, never, never> =>
   pipe(
     Effect.Do,
     Effect.bind("semaphore", () => Effect.makeSemaphore(1)),
@@ -86,12 +102,12 @@ export const make = <F extends RunStateContextTypeLambda, A = never, E = never>(
   );
 
 export const start =
-  <F extends RunStateContextTypeLambda, R>(
+  <F extends RunStateContextTypeLambda, R, DefaultR = never>(
     ctx: RunStateContextKind<F, R>,
-    runtime: Runtime.Runtime<R>,
+    runtime: Runtime.Runtime<R | DefaultR>,
   ) =>
   <A, E>(
-    runState: RunState<F, A, E>,
+    runState: RunState<F, A, E, DefaultR>,
   ): Effect.Effect<Option.Option<A>, E, Scope.Scope> =>
     Effect.whenEffect(
       runState.semaphore.withPermits(1)(
@@ -142,12 +158,12 @@ export const start =
     );
 
 export const stop =
-  <F extends RunStateContextTypeLambda, R>(
+  <F extends RunStateContextTypeLambda, R, DefaultR = never>(
     ctx: RunStateContextKind<F, R>,
-    runtime: Runtime.Runtime<R>,
+    runtime: Runtime.Runtime<R | DefaultR>,
   ) =>
   <A, E>(
-    runState: RunState<F, A, E>,
+    runState: RunState<F, A, E, DefaultR>,
   ): Effect.Effect<Option.Option<void>, never, never> =>
     Effect.whenEffect(
       runState.semaphore.withPermits(1)(
@@ -188,8 +204,13 @@ export const stop =
       ),
     );
 
-export const status = <F extends RunStateContextTypeLambda, A, E>(
-  runState: RunState<F, A, E>,
+export const status = <
+  F extends RunStateContextTypeLambda,
+  A,
+  E,
+  DefaultR = never,
+>(
+  runState: RunState<F, A, E, DefaultR>,
 ): Effect.Effect<"stopped" | "pending" | "ready", never, never> =>
   pipe(
     SynchronizedRef.get(runState.state),

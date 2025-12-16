@@ -110,7 +110,7 @@ export class Computed<A = never, E = never, R = never>
     return Effect.sync(() => HashSet.toValues(this._dependents));
   }
 
-  get value(): Effect.Effect<A, E, R | SignalContext> {
+  value(): Effect.Effect<A, E, R | SignalContext> {
     return pipe(
       bindScopeDependency(this),
       Effect.flatMap(() => this.peek()),
@@ -121,7 +121,7 @@ export class Computed<A = never, E = never, R = never>
   }
 
   commit(): Effect.Effect<A, E, R | SignalContext> {
-    return this.value;
+    return this.value();
   }
 
   peek(): Effect.Effect<A, E, R> {

@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { Effect, HKT, Option, Scope } from "effect";
 import type { Type } from "typhoon-core/handler";
 import { Handler } from "typhoon-core/server";
-import { SignalContext } from "typhoon-core/signal";
+import { SignalContext, SignalService } from "typhoon-core/signal";
 import { Validator } from "typhoon-core/validator";
 import { Event } from "../../../event/event";
 
@@ -11,11 +11,15 @@ type InnerSubscriptionHandler<
   A = unknown,
   E = unknown,
   R = unknown,
-> = Effect.Effect<A, E, R | SignalContext.SignalContext>;
+> = Effect.Effect<
+  A,
+  E,
+  R | SignalContext.SignalContext | SignalService.SignalService
+>;
 type SubscriptionHandler<A = unknown, E = unknown, R = unknown> = Effect.Effect<
   InnerSubscriptionHandler<A, E, R>,
   E,
-  R
+  R | SignalService.SignalService
 >;
 interface SubscriptionHandlerTypeLambda extends Type.HandlerTypeLambda {
   readonly type: SubscriptionHandler<
@@ -103,8 +107,11 @@ interface TransformHandlerContext extends HKT.TypeLambda {
   readonly type: this["In"] extends infer H extends SubscriptionHandler
     ? Effect.Effect.Success<H> extends infer IH extends InnerSubscriptionHandler
       ?
-          | Effect.Effect.Context<H>
-          | Exclude<Effect.Effect.Context<IH>, SignalContext.SignalContext>
+          | Exclude<Effect.Effect.Context<H>, SignalService.SignalService>
+          | Exclude<
+              Effect.Effect.Context<IH>,
+              SignalContext.SignalContext | SignalService.SignalService
+            >
       : never
     : never;
 }
@@ -113,7 +120,10 @@ export interface SubscriptionHandlerT extends Type.BaseHandlerT {
   readonly Type: "subscription";
   readonly Data: SubscriptionData;
   readonly Handler: SubscriptionHandlerTypeLambda;
-  readonly DefaultHandlerContext: Event | Scope.Scope;
+  readonly DefaultHandlerContext:
+    | Event
+    | Scope.Scope
+    | SignalService.SignalService;
   readonly TransformDataKey: TransformDataKey;
   readonly TransformDataSuccessIn: TransformDataSuccessIn;
   readonly TransformDataSuccessOut: TransformDataSuccessOut;
