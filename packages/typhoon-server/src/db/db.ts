@@ -12,6 +12,7 @@ import {
   SynchronizedRef,
   Array,
   Runtime,
+  Scope,
 } from "effect";
 import { DBQueryError, makeDBQueryError } from "typhoon-core/error";
 import {
@@ -256,7 +257,11 @@ export const subscribe = <A, E>(
     E,
     TransactionContext | BaseDBSubscriptionContext | SignalContext.SignalContext
   >,
-) =>
+): Effect.Effect<
+  WithScopeComputed.WithScopeComputed<A, E, SignalService.SignalService>,
+  never,
+  BaseDBSubscriptionContext | Scope.Scope
+> =>
   pipe(
     BaseDBSubscriptionContext,
     Effect.flatMap((baseDBSubscriptionContext) =>
@@ -292,7 +297,11 @@ export const mutate = <A, E>(
     E,
     TransactionContext | BaseDBSubscriptionContext | SignalContext.SignalContext
   >,
-) =>
+): Effect.Effect<
+  A,
+  E,
+  BaseDBSubscriptionContext | SignalService.SignalService
+> =>
   pipe(
     query,
     Effect.tap(() =>
