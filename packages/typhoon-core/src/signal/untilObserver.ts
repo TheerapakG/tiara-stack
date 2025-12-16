@@ -160,10 +160,10 @@ class UntilObserver<
   }
 
   commit(): Effect.Effect<Match.Types.WhenMatch<A, P>, never, never> {
-    return this.value;
+    return this.value();
   }
 
-  get value(): Effect.Effect<Match.Types.WhenMatch<A, P>, never, never> {
+  value(): Effect.Effect<Match.Types.WhenMatch<A, P>, never, never> {
     return pipe(
       Ref.get(this._value),
       Effect.flatMap((valueDef) => Deferred.await(valueDef)),
@@ -236,7 +236,7 @@ export const observeUntil = <
 ): Effect.Effect<Match.Types.WhenMatch<A, P>, E, Exclude<R, SignalContext>> =>
   pipe(
     UntilObserver.make(effect, pattern, options ?? {}),
-    Effect.flatMap((observer) => observer.value),
+    Effect.flatMap((observer) => observer.value()),
     Observable.withSpan(
       { [Observable.ObservableSymbol]: options ?? {} },
       "observeUntil",

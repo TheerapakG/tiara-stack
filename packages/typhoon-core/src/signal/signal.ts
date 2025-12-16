@@ -55,7 +55,7 @@ export class Signal<T = unknown>
     return Effect.sync(() => HashSet.toValues(this._dependents));
   }
 
-  get value(): Effect.Effect<T, never, SignalContext> {
+  value(): Effect.Effect<T, never, SignalContext> {
     return pipe(
       bindScopeDependency(this),
       Effect.flatMap(() => this.peek()),
@@ -66,7 +66,7 @@ export class Signal<T = unknown>
   }
 
   commit(): Effect.Effect<T, never, SignalContext> {
-    return this.value;
+    return this.value();
   }
 
   peek(): Effect.Effect<T, never, never> {

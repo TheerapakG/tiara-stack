@@ -35,7 +35,7 @@ export abstract class DependencySignal<A = never, E = never, R = never>
     never
   >;
 
-  abstract get value(): Effect.Effect<A, E, R | SignalContext>;
+  abstract value(): Effect.Effect<A, E, R | SignalContext>;
   abstract peek(): Effect.Effect<A, E, R>;
 
   abstract reconcile(): Effect.Effect<void, never, never>;
