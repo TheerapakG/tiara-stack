@@ -9,6 +9,7 @@ import {
   Option,
   Order,
   pipe,
+  Runtime,
   Schedule,
   Schema,
   String,
@@ -24,7 +25,12 @@ import {
 } from "typhoon-core/error";
 import { Handler } from "typhoon-core/server";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
-import { DependencySignal, Signal, Computed } from "typhoon-core/signal";
+import {
+  DependencySignal,
+  Signal,
+  Computed,
+  SignalService,
+} from "typhoon-core/signal";
 import { Validator } from "typhoon-core/validator";
 import { RpcResult } from "typhoon-core/schema";
 
@@ -38,7 +44,7 @@ type UpdaterState = {
   updater: (
     header: Header.Header<"server:update">,
     result: Either.Either<unknown, unknown>,
-  ) => Effect.Effect<void, never, never>;
+  ) => Effect.Effect<void, never, SignalService.Service>;
 };
 type UpdaterStateMap = HashMap.HashMap<string, UpdaterState>;
 
@@ -116,7 +122,7 @@ export class WebSocketClient<
     updater: (
       header: Header.Header<"server:update">,
       result: Either.Either<unknown, unknown>,
-    ) => Effect.Effect<void, never, never>,
+    ) => Effect.Effect<void, never, SignalService.Service>,
   ) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (client: WebSocketClient<any, any>) =>
@@ -185,101 +191,95 @@ export class WebSocketClient<
       Effect.bind("deferred", () =>
         Deferred.make<Option.Option<WebSocket>, WebSocketError>(),
       ),
-      Effect.tap(({ deferred }) =>
+      Effect.bind("runtime", () => Effect.runtime<SignalService.Service>()),
+      Effect.tap(({ deferred, runtime }) =>
         pipe(
           client.ws,
           SynchronizedRef.updateEffect(() => {
             const ws = new WebSocketCtor(client.url);
             ws.binaryType = "blob";
             ws.addEventListener("message", (event) =>
-              Effect.runPromise(
-                pipe(
-                  Effect.Do,
-                  Effect.let("data", () => event.data as Blob),
-                  Effect.bind("pullEffect", ({ data }) =>
-                    pipe(
-                      Msgpack.Decoder.blobToStream(data),
-                      Stream.toPullEffect,
-                    ),
+              pipe(
+                Effect.Do,
+                Effect.let("data", () => event.data as Blob),
+                Effect.bind("pullEffect", ({ data }) =>
+                  pipe(Msgpack.Decoder.blobToStream(data), Stream.toPullEffect),
+                ),
+                Effect.bind("header", ({ pullEffect }) =>
+                  pipe(
+                    pullEffect,
+                    Effect.flatMap(Schema.decodeUnknown(Header.HeaderSchema)),
                   ),
-                  Effect.bind("header", ({ pullEffect }) =>
-                    pipe(
-                      pullEffect,
-                      Effect.flatMap(Schema.decodeUnknown(Header.HeaderSchema)),
-                    ),
-                  ),
-                  Effect.tap(({ header, pullEffect }) =>
-                    pipe(
-                      Match.value(header),
-                      Match.when({ action: "server:update" }, (header) =>
-                        pipe(
-                          pullEffect,
-                          Effect.andThen((decodedResponse) =>
-                            WebSocketClient.handleUpdate(
-                              header,
-                              decodedResponse,
-                            )(client),
-                          ),
+                ),
+                Effect.tap(({ header, pullEffect }) =>
+                  pipe(
+                    Match.value(header),
+                    Match.when({ action: "server:update" }, (header) =>
+                      pipe(
+                        pullEffect,
+                        Effect.andThen((decodedResponse) =>
+                          WebSocketClient.handleUpdate(
+                            header,
+                            decodedResponse,
+                          )(client),
                         ),
                       ),
-                      Match.orElse(() => Effect.void),
                     ),
+                    Match.orElse(() => Effect.void),
                   ),
-                  Effect.asVoid,
-                  Effect.scoped,
                 ),
+                Effect.asVoid,
+                Effect.scoped,
+                Runtime.runPromise(runtime),
               ),
             );
             ws.addEventListener("open", () =>
-              Effect.runPromise(
-                pipe(
-                  Effect.log("websocket opened"),
-                  Effect.andThen(() =>
-                    pipe(deferred, Deferred.succeed(Option.some(ws))),
-                  ),
+              pipe(
+                Effect.log("websocket opened"),
+                Effect.andThen(() =>
+                  pipe(deferred, Deferred.succeed(Option.some(ws))),
                 ),
+                Runtime.runPromise(runtime),
               ),
             );
             ws.addEventListener("error", (errorEvent) =>
-              Effect.runPromise(
-                pipe(
-                  Effect.log("websocket errored"),
-                  Effect.andThen(() =>
-                    pipe(
-                      WebSocketClient.connect(client),
-                      Effect.unlessEffect(
-                        pipe(
-                          deferred,
-                          Deferred.fail(
-                            new WebSocketError({ cause: errorEvent }),
-                          ),
+              pipe(
+                Effect.log("websocket errored"),
+                Effect.andThen(() =>
+                  pipe(
+                    WebSocketClient.connect(client),
+                    Effect.unlessEffect(
+                      pipe(
+                        deferred,
+                        Deferred.fail(
+                          new WebSocketError({ cause: errorEvent }),
                         ),
                       ),
                     ),
                   ),
                 ),
+                Runtime.runPromise(runtime),
               ),
             );
             ws.addEventListener("close", (closeEvent) =>
-              Effect.runPromise(
-                pipe(
-                  Effect.log("websocket closed"),
-                  Effect.andThen(() =>
-                    pipe(
-                      WebSocketClient.connect(client),
-                      Effect.unlessEffect(
+              pipe(
+                Effect.log("websocket closed"),
+                Effect.andThen(() =>
+                  pipe(
+                    WebSocketClient.connect(client),
+                    Effect.unlessEffect(
+                      pipe(
                         pipe(
-                          pipe(
-                            deferred,
-                            Deferred.fail(
-                              new WebSocketError({ cause: closeEvent }),
-                            ),
+                          deferred,
+                          Deferred.fail(
+                            new WebSocketError({ cause: closeEvent }),
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
+                Runtime.runPromise(runtime),
               ),
             );
             return Deferred.await(deferred);
