@@ -494,7 +494,6 @@ const createMaterializeCallback =
       Effect.andThen(() =>
         onTransactionCommit(() => Effect.runFork(source.flush())),
       ),
-      Effect.andThen(() => source.doEmit()),
       Effect.andThen(() => materializedLatch.open),
       Effect.asVoid,
     );
