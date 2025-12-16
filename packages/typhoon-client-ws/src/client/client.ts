@@ -267,7 +267,10 @@ export class WebSocketClient<
                   ),
                 ),
                 Effect.catchAllCause((cause) =>
-                  Effect.logError("Error closing websocket", cause),
+                  Effect.logError(
+                    "Error handling websocket error event",
+                    cause,
+                  ),
                 ),
                 Runtime.runPromise(runtime),
               ),
