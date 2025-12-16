@@ -466,7 +466,12 @@ const createMaterializeCallback =
                 catch: (error) =>
                   rawZeroQueryErrorToZeroQueryError(error as RawZeroQueryError),
               }),
-              Effect.map(() => "complete" as const),
+              Effect.tapBoth({
+                onSuccess: () => Effect.log("queryComplete is complete"),
+                onFailure: (error) =>
+                  Effect.log("queryComplete is error", error),
+              }),
+              Effect.as("complete" as const),
               Effect.either,
               Effect.tap((result) =>
                 SynchronizedRef.set(zeroResultTypeRef, result),
