@@ -244,6 +244,9 @@ export class WebSocketClient<
                 Effect.andThen(() =>
                   pipe(deferred, Deferred.succeed(Option.some(ws))),
                 ),
+                Effect.catchAllCause((cause) =>
+                  Effect.logError("Error opening websocket", cause),
+                ),
                 Runtime.runPromise(runtime),
               ),
             );
@@ -262,6 +265,9 @@ export class WebSocketClient<
                       ),
                     ),
                   ),
+                ),
+                Effect.catchAllCause((cause) =>
+                  Effect.logError("Error closing websocket", cause),
                 ),
                 Runtime.runPromise(runtime),
               ),
@@ -283,6 +289,9 @@ export class WebSocketClient<
                       ),
                     ),
                   ),
+                ),
+                Effect.catchAllCause((cause) =>
+                  Effect.logError("Error closing websocket", cause),
                 ),
                 Runtime.runPromise(runtime),
               ),
