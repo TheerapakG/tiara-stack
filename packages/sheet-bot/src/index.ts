@@ -4,6 +4,7 @@ import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { Effect, Layer, Logger, pipe } from "effect";
+import { SignalService } from "typhoon-core/signal";
 import { Bot } from "./bot";
 import { commands } from "./commands";
 import { Config } from "./config";
@@ -42,6 +43,7 @@ NodeRuntime.runMain(
     Effect.flatMap(({ bot, runtime }) => Bot.start(bot, runtime)),
     Effect.sandbox,
     Effect.catchAll((error) => Effect.logError(error)),
+    Effect.provide(SignalService.SignalService.Default),
     Effect.provide(baseLayer),
     Effect.scoped,
   ),

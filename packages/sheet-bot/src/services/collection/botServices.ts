@@ -7,9 +7,11 @@ import {
 } from "@/services/bot";
 import { NodeContext } from "@effect/platform-node";
 import { Effect, Layer, pipe } from "effect";
+import { SignalService } from "typhoon-core/signal";
 
 export const botServices = pipe(
   Layer.mergeAll(
+    SignalService.SignalService.Default,
     BotGuildConfigService.DefaultWithoutDependencies,
     MessageCheckinService.DefaultWithoutDependencies,
     MessageRoomOrderService.DefaultWithoutDependencies,

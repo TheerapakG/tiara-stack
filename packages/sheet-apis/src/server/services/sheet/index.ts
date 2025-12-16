@@ -14,7 +14,7 @@ import {
 } from "effect";
 import { Result } from "typhoon-core/schema";
 import { ScreenshotService } from "./screenshotService";
-import { SignalContext } from "typhoon-core/signal";
+import { SignalContext, SignalService } from "typhoon-core/signal";
 import {
   ZeroQueryAppError,
   ZeroQueryHttpError,
@@ -53,10 +53,13 @@ export const layerOfGuildId = <E = never>(
       >
     >,
     ParseResult.ParseError,
-    SignalContext.SignalContext
+    SignalContext.SignalContext | SignalService.Service
   >,
   never,
-  GuildConfigService | Scope.Scope | ZeroService.ZeroService<Schema, undefined>
+  | GuildConfigService
+  | Scope.Scope
+  | ZeroService.ZeroService<Schema, undefined>
+  | SignalService.Service
 > =>
   pipe(
     SheetService.ofGuild(guildId),

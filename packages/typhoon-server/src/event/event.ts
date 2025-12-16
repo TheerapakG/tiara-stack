@@ -8,7 +8,12 @@ import {
   SynchronizedRef,
 } from "effect";
 import { Handler } from "typhoon-core/server";
-import { Signal, SignalContext, Computed } from "typhoon-core/signal";
+import {
+  Signal,
+  SignalContext,
+  Computed,
+  SignalService,
+} from "typhoon-core/signal";
 import { Validate, Validator } from "typhoon-core/validator";
 import {
   AuthorizationError,
@@ -16,7 +21,6 @@ import {
   MsgpackDecodeError,
   StreamExhaustedError,
 } from "typhoon-core/error";
-
 export type { Validator };
 
 export type MsgpackPullEffect = Effect.Effect<
@@ -68,7 +72,7 @@ export class Event extends Context.Tag("Event")<
 
 export const makeEventService = (
   ctx: EventContext,
-): Effect.Effect<Context.Tag.Service<Event>> =>
+): Effect.Effect<Context.Tag.Service<Event>, never, SignalService.Service> =>
   SynchronizedRef.make({
     request: ctx.request,
     token: ctx.token,
@@ -97,7 +101,11 @@ export const replacePullStream = ({
 }: {
   effect: MsgpackPullEffect;
   scope: Scope.CloseableScope;
-}): Effect.Effect<Context.Tag.Service<Event>, never, Event> =>
+}): Effect.Effect<
+  Context.Tag.Service<Event>,
+  never,
+  Event | SignalService.Service
+> =>
   pipe(
     Effect.Do,
     Effect.bind("ref", () => Event),

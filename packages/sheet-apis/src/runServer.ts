@@ -9,6 +9,7 @@ import { Effect, Layer, Logger, pipe } from "effect";
 import { Context } from "typhoon-server/handler";
 import { DB } from "typhoon-server/db";
 import { Server } from "typhoon-server/server";
+import { SignalService } from "typhoon-core/signal";
 import { Config } from "./config";
 import { DBService, ZeroServiceLayer } from "./db";
 import {
@@ -46,6 +47,7 @@ const baseLayer = Layer.mergeAll(MetricsLive, Logger.logFmt);
 
 const layer = pipe(
   Layer.mergeAll(
+    SignalService.SignalService.Default,
     AuthService.DefaultWithoutDependencies,
     CalcService.Default,
     GuildConfigService.DefaultWithoutDependencies,

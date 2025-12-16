@@ -29,7 +29,12 @@ import { Context as HandlerContext, type Type } from "typhoon-core/handler";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { RunState } from "typhoon-core/runtime";
 import { Handler } from "typhoon-core/server";
-import { UntilObserver, SideEffect, SignalContext } from "typhoon-core/signal";
+import {
+  UntilObserver,
+  SideEffect,
+  SignalContext,
+  SignalService,
+} from "typhoon-core/signal";
 import { parseURL, withoutTrailingSlash } from "ufo";
 import {
   close as closeEvent,
@@ -73,7 +78,7 @@ type ServerContext<S extends Server<any>> =
 
 interface ServerRunStateContextTypeLambda
   extends RunState.RunStateContextTypeLambda {
-  readonly type: Server<this["R"]>;
+  readonly type: Server<Exclude<this["R"], SignalService.Service>>;
 }
 
 type ServerData<R = never> = {
@@ -92,7 +97,8 @@ type ServerData<R = never> = {
   runState: RunState.RunState<
     ServerRunStateContextTypeLambda,
     void,
-    Cause.UnknownException
+    Cause.UnknownException,
+    SignalService.Service
   >;
 };
 
@@ -104,12 +110,15 @@ export class ServerWithRuntime<R = never> extends Data.TaggedClass(
   "ServerWithRuntime",
 )<{
   server: Server<R>;
-  runtime: Runtime.Runtime<R>;
+  runtime: Runtime.Runtime<R | SignalService.Service>;
 }> {}
 
 const makeServeEffect =
   (serveFn: typeof crosswsServe) =>
-  <R = never>(server: Server<R>, runtime: Runtime.Runtime<R>) =>
+  <R = never>(
+    server: Server<R>,
+    runtime: Runtime.Runtime<R | SignalService.Service>,
+  ) =>
     pipe(
       Effect.Do,
       Effect.let(
@@ -126,84 +135,104 @@ const makeServeEffect =
           serveFn({
             websocket: {
               open: (peer) => {
-                return Effect.runPromise(
-                  pipe(
-                    serverWithRuntime,
-                    open(peer),
-                    transformErrorResult(() => Effect.void),
-                    Effect.withSpan("serve.websocket.open", {
-                      captureStackTrace: true,
-                    }),
-                    Effect.provide(server.traceProvider),
+                return pipe(
+                  serverWithRuntime,
+                  open(peer),
+                  transformErrorResult(() => Effect.void),
+                  Effect.withSpan("serve.websocket.open", {
+                    captureStackTrace: true,
+                  }),
+                  Effect.provide(
+                    Layer.merge(
+                      server.traceProvider,
+                      SignalService.SignalService.Default,
+                    ),
                   ),
+                  Runtime.runPromise(runtime),
                 );
               },
 
               message: (peer, message) => {
-                return Effect.runPromise(
-                  pipe(
-                    Effect.currentSpan,
-                    Effect.flatMap((span) =>
-                      pipe(
-                        serverWithRuntime,
-                        handleProtocolWebSocketMessage(peer, message, span),
-                        transformErrorResult(() => Effect.void),
-                      ),
-                    ),
-                    Effect.withSpan("serve.websocket.message", {
-                      captureStackTrace: true,
-                    }),
-                    Effect.provide(server.traceProvider),
-                  ),
-                );
-              },
-
-              close: (peer, _event) => {
-                return Effect.runPromise(
-                  pipe(
-                    serverWithRuntime,
-                    close(peer),
-                    transformErrorResult(() => Effect.void),
-                    Effect.withSpan("serve.websocket.close", {
-                      captureStackTrace: true,
-                    }),
-                    Effect.provide(server.traceProvider),
-                  ),
-                );
-              },
-
-              error: (peer) => {
-                return Effect.runPromise(
-                  pipe(
-                    serverWithRuntime,
-                    close(peer),
-                    transformErrorResult(() => Effect.void),
-                    Effect.withSpan("serve.websocket.error", {
-                      captureStackTrace: true,
-                    }),
-                    Effect.provide(server.traceProvider),
-                  ),
-                );
-              },
-            },
-            fetch: (request) => {
-              return Effect.runPromise(
-                pipe(
+                return pipe(
                   Effect.currentSpan,
                   Effect.flatMap((span) =>
                     pipe(
                       serverWithRuntime,
-                      handleWebRequest(request, span),
-                      transformErrorResult(() =>
-                        Effect.succeed(new Response("", { status: 500 })),
-                      ),
+                      handleProtocolWebSocketMessage(peer, message, span),
+                      transformErrorResult(() => Effect.void),
                     ),
                   ),
-                  Effect.withSpan("serve.fetch", {
+                  Effect.withSpan("serve.websocket.message", {
                     captureStackTrace: true,
                   }),
-                  Effect.provide(server.traceProvider),
+                  Effect.provide(
+                    Layer.merge(
+                      server.traceProvider,
+                      SignalService.SignalService.Default,
+                    ),
+                  ),
+                  Runtime.runPromise(runtime),
+                );
+              },
+
+              close: (peer, _event) => {
+                return pipe(
+                  serverWithRuntime,
+                  close(peer),
+                  transformErrorResult(() => Effect.void),
+                  Effect.withSpan("serve.websocket.close", {
+                    captureStackTrace: true,
+                  }),
+                  Effect.provide(
+                    Layer.merge(
+                      server.traceProvider,
+                      SignalService.SignalService.Default,
+                    ),
+                  ),
+                  Runtime.runPromise(runtime),
+                );
+              },
+
+              error: (peer) => {
+                return pipe(
+                  serverWithRuntime,
+                  close(peer),
+                  transformErrorResult(() => Effect.void),
+                  Effect.withSpan("serve.websocket.error", {
+                    captureStackTrace: true,
+                  }),
+                  Effect.provide(
+                    Layer.merge(
+                      server.traceProvider,
+                      SignalService.SignalService.Default,
+                    ),
+                  ),
+                  Runtime.runPromise(runtime),
+                );
+              },
+            },
+            fetch: (request) => {
+              return pipe(
+                Effect.currentSpan,
+                Effect.flatMap((span) =>
+                  pipe(
+                    serverWithRuntime,
+                    handleWebRequest(request, span),
+                    transformErrorResult(() =>
+                      Effect.succeed(new Response("", { status: 500 })),
+                    ),
+                  ),
                 ),
+                Effect.withSpan("serve.fetch", {
+                  captureStackTrace: true,
+                }),
+                Effect.provide(
+                  Layer.merge(
+                    server.traceProvider,
+                    SignalService.SignalService.Default,
+                  ),
+                ),
+                Runtime.runPromise(runtime),
               );
             },
           }),
@@ -212,7 +241,6 @@ const makeServeEffect =
       Effect.andThen(Effect.makeLatch()),
       Effect.andThen((latch) => latch.await),
     );
-
 export const create = <R = never>(serveFn: typeof crosswsServe) =>
   pipe(
     Effect.Do,
@@ -300,7 +328,12 @@ export const create = <R = never>(serveFn: typeof crosswsServe) =>
             incremental: true,
           }),
         ),
-        runState: RunState.make(makeServeEffect(serveFn), () => Effect.void),
+        runState: RunState.make<
+          ServerRunStateContextTypeLambda,
+          void,
+          Cause.UnknownException,
+          SignalService.Service
+        >(makeServeEffect(serveFn), () => Effect.void),
       }),
       { concurrency: "unbounded" },
     ),
@@ -602,10 +635,10 @@ const getComputedSubscriptionResult =
     Effect.Effect<
       ServerUpdateResult,
       never,
-      Event | SignalContext.SignalContext
+      Event | SignalContext.SignalContext | SignalService.Service
     >,
     unknown,
-    Event | Scope.Scope
+    Event | Scope.Scope | SignalService.Service
   > =>
     pipe(
       serverWithRuntime.server.handlerContextCollection,
@@ -631,7 +664,11 @@ const getMutationResult =
   (header: Header.Header<"client:mutate">, span: Tracer.Span) =>
   <R = never>(
     serverWithRuntime: ServerWithRuntime<R>,
-  ): Effect.Effect<ServerUpdateResult, unknown, Event> =>
+  ): Effect.Effect<
+    ServerUpdateResult,
+    unknown,
+    Event | SignalService.Service
+  > =>
     pipe(
       runHandler(
         header.id,
@@ -711,10 +748,17 @@ const handleSubscribe =
                 Effect.Do,
                 Effect.bind("scope", () => Scope.make()),
                 Effect.bind("event", () => Event),
-                Effect.bind("sideEffect", ({ event, scope }) =>
+                Effect.bind("signalService", () => SignalService.SignalService),
+                Effect.bind("sideEffect", ({ event, scope, signalService }) =>
                   pipe(
                     serverWithRuntime,
                     getComputedSubscriptionResult(header, span),
+                    Effect.map(
+                      Effect.provideService(
+                        SignalService.SignalService,
+                        signalService,
+                      ),
+                    ),
                     SideEffect.tapWithContext(
                       flow(
                         encodeServerUpdateResult,
@@ -1197,8 +1241,8 @@ const transformErrorResult = <A = never, E = never, R = never>(
 };
 
 export const start = <R = never>(
-  server: Server<R>,
-  runtime: Runtime.Runtime<R>,
+  server: Server<Exclude<R, SignalService.Service>>,
+  runtime: Runtime.Runtime<R | SignalService.Service>,
 ) =>
   pipe(
     server.runState,
@@ -1208,8 +1252,8 @@ export const start = <R = never>(
   );
 
 export const stop = <R = never>(
-  server: Server<R>,
-  runtime: Runtime.Runtime<R>,
+  server: Server<Exclude<R, SignalService.Service>>,
+  runtime: Runtime.Runtime<R | SignalService.Service>,
 ) =>
   pipe(
     server.runState,

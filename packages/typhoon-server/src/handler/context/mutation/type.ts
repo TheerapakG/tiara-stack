@@ -2,6 +2,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { Effect, HKT, Option, Scope } from "effect";
 import type { Type } from "typhoon-core/handler";
 import { Handler } from "typhoon-core/server";
+import { SignalService } from "typhoon-core/signal";
 import { Validator } from "typhoon-core/validator";
 import { Event } from "../../../event/event";
 
@@ -9,7 +10,7 @@ type MutationData = Handler.Config.Mutation.MutationHandlerConfig;
 type MutationHandler<A = unknown, E = unknown, R = unknown> = Effect.Effect<
   A,
   E,
-  R
+  R | SignalService.Service
 >;
 interface MutationHandlerTypeLambda extends Type.HandlerTypeLambda {
   readonly type: MutationHandler<
@@ -91,7 +92,7 @@ interface TransformHandlerError extends HKT.TypeLambda {
 
 interface TransformHandlerContext extends HKT.TypeLambda {
   readonly type: this["In"] extends infer H extends MutationHandler
-    ? Effect.Effect.Context<H>
+    ? Exclude<Effect.Effect.Context<H>, SignalService.Service>
     : never;
 }
 
@@ -99,7 +100,7 @@ export interface MutationHandlerT extends Type.BaseHandlerT {
   readonly Type: "mutation";
   readonly Data: MutationData;
   readonly Handler: MutationHandlerTypeLambda;
-  readonly DefaultHandlerContext: Event | Scope.Scope;
+  readonly DefaultHandlerContext: Event | Scope.Scope | SignalService.Service;
   readonly TransformDataKey: TransformDataKey;
   readonly TransformDataSuccessIn: TransformDataSuccessIn;
   readonly TransformDataSuccessOut: TransformDataSuccessOut;
