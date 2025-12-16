@@ -63,13 +63,13 @@ export const make = <T>(
       ),
     ),
     Effect.map(({ valueRef, startedRef, onEmitRef }) => ({
-      poll: Ref.get(valueRef),
+      poll: () => Ref.get(valueRef),
       emit: (
         onEmit: (
           value: T,
         ) => Effect.Effect<void, never, SignalService.SignalService>,
       ) => pipe(Ref.set(onEmitRef, Option.some(onEmit)), Effect.asVoid),
-      start: pipe(Ref.set(startedRef, true), Effect.asVoid),
-      stop: pipe(Ref.set(startedRef, false), Effect.asVoid),
+      start: () => pipe(Ref.set(startedRef, true), Effect.asVoid),
+      stop: () => pipe(Ref.set(startedRef, false), Effect.asVoid),
     })),
   );

@@ -243,7 +243,7 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
     );
   }
 
-  get poll() {
+  poll() {
     return pipe(
       Effect.all({
         value: SynchronizedRef.get(this.valueRef),
@@ -298,7 +298,7 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
 
   doEmit() {
     return pipe(
-      this.poll,
+      this.poll(),
       Effect.tap((result) =>
         pipe(
           SynchronizedRef.get(this.onEmitRef),
@@ -309,11 +309,11 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
     );
   }
 
-  get start() {
+  start() {
     return SynchronizedRef.set(this.startedRef, true);
   }
 
-  get stop() {
+  stop() {
     return SynchronizedRef.set(this.startedRef, false);
   }
 }
