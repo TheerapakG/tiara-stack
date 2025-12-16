@@ -142,12 +142,7 @@ const makeServeEffect =
                   Effect.withSpan("serve.websocket.open", {
                     captureStackTrace: true,
                   }),
-                  Effect.provide(
-                    Layer.merge(
-                      server.traceProvider,
-                      SignalService.SignalService.Default,
-                    ),
-                  ),
+                  Effect.provide(server.traceProvider),
                   Runtime.runPromise(runtime),
                 );
               },
@@ -165,12 +160,7 @@ const makeServeEffect =
                   Effect.withSpan("serve.websocket.message", {
                     captureStackTrace: true,
                   }),
-                  Effect.provide(
-                    Layer.merge(
-                      server.traceProvider,
-                      SignalService.SignalService.Default,
-                    ),
-                  ),
+                  Effect.provide(server.traceProvider),
                   Runtime.runPromise(runtime),
                 );
               },
@@ -183,12 +173,6 @@ const makeServeEffect =
                   Effect.withSpan("serve.websocket.close", {
                     captureStackTrace: true,
                   }),
-                  Effect.provide(
-                    Layer.merge(
-                      server.traceProvider,
-                      SignalService.SignalService.Default,
-                    ),
-                  ),
                   Runtime.runPromise(runtime),
                 );
               },
@@ -201,12 +185,7 @@ const makeServeEffect =
                   Effect.withSpan("serve.websocket.error", {
                     captureStackTrace: true,
                   }),
-                  Effect.provide(
-                    Layer.merge(
-                      server.traceProvider,
-                      SignalService.SignalService.Default,
-                    ),
-                  ),
+                  Effect.provide(server.traceProvider),
                   Runtime.runPromise(runtime),
                 );
               },
@@ -226,12 +205,7 @@ const makeServeEffect =
                 Effect.withSpan("serve.fetch", {
                   captureStackTrace: true,
                 }),
-                Effect.provide(
-                  Layer.merge(
-                    server.traceProvider,
-                    SignalService.SignalService.Default,
-                  ),
-                ),
+                Effect.provide(server.traceProvider),
                 Runtime.runPromise(runtime),
               );
             },
