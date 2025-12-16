@@ -330,12 +330,16 @@ export const wrapTransaction =
       | TransactionContext
       | BaseDBSubscriptionContext
       | SignalContext.SignalContext
+      | SignalService.SignalService
     >,
     config?: Config,
   ) => Effect.Effect<
     T,
     unknown,
-    TransactionContext | BaseDBSubscriptionContext | SignalContext.SignalContext
+    | TransactionContext
+    | BaseDBSubscriptionContext
+    | SignalContext.SignalContext
+    | SignalService.SignalService
   >) =>
   (fn, config) =>
     pipe(
@@ -345,6 +349,7 @@ export const wrapTransaction =
           | TransactionContext
           | BaseDBSubscriptionContext
           | SignalContext.SignalContext
+          | SignalService.SignalService
         >(),
       ),
       Effect.bind("result", ({ runtime }) =>
