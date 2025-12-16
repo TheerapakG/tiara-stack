@@ -78,7 +78,7 @@ type ServerContext<S extends Server<any>> =
 
 interface ServerRunStateContextTypeLambda
   extends RunState.RunStateContextTypeLambda {
-  readonly type: Server<Exclude<this["R"], SignalService.Service>>;
+  readonly type: Server<Exclude<this["R"], SignalService.SignalService>>;
 }
 
 type ServerData<R = never> = {
@@ -98,7 +98,7 @@ type ServerData<R = never> = {
     ServerRunStateContextTypeLambda,
     void,
     Cause.UnknownException,
-    SignalService.Service
+    SignalService.SignalService
   >;
 };
 
@@ -110,14 +110,14 @@ export class ServerWithRuntime<R = never> extends Data.TaggedClass(
   "ServerWithRuntime",
 )<{
   server: Server<R>;
-  runtime: Runtime.Runtime<R | SignalService.Service>;
+  runtime: Runtime.Runtime<R | SignalService.SignalService>;
 }> {}
 
 const makeServeEffect =
   (serveFn: typeof crosswsServe) =>
   <R = never>(
     server: Server<R>,
-    runtime: Runtime.Runtime<R | SignalService.Service>,
+    runtime: Runtime.Runtime<R | SignalService.SignalService>,
   ) =>
     pipe(
       Effect.Do,
@@ -306,7 +306,7 @@ export const create = <R = never>(serveFn: typeof crosswsServe) =>
           ServerRunStateContextTypeLambda,
           void,
           Cause.UnknownException,
-          SignalService.Service
+          SignalService.SignalService
         >(makeServeEffect(serveFn), () => Effect.void),
       }),
       { concurrency: "unbounded" },
@@ -609,10 +609,10 @@ const getComputedSubscriptionResult =
     Effect.Effect<
       ServerUpdateResult,
       never,
-      Event | SignalContext.SignalContext | SignalService.Service
+      Event | SignalContext.SignalContext | SignalService.SignalService
     >,
     unknown,
-    Event | Scope.Scope | SignalService.Service
+    Event | Scope.Scope | SignalService.SignalService
   > =>
     pipe(
       serverWithRuntime.server.handlerContextCollection,
@@ -641,7 +641,7 @@ const getMutationResult =
   ): Effect.Effect<
     ServerUpdateResult,
     unknown,
-    Event | SignalService.Service
+    Event | SignalService.SignalService
   > =>
     pipe(
       runHandler(
@@ -1215,8 +1215,8 @@ const transformErrorResult = <A = never, E = never, R = never>(
 };
 
 export const start = <R = never>(
-  server: Server<Exclude<R, SignalService.Service>>,
-  runtime: Runtime.Runtime<R | SignalService.Service>,
+  server: Server<Exclude<R, SignalService.SignalService>>,
+  runtime: Runtime.Runtime<R | SignalService.SignalService>,
 ) =>
   pipe(
     server.runState,
@@ -1226,8 +1226,8 @@ export const start = <R = never>(
   );
 
 export const stop = <R = never>(
-  server: Server<Exclude<R, SignalService.Service>>,
-  runtime: Runtime.Runtime<R | SignalService.Service>,
+  server: Server<Exclude<R, SignalService.SignalService>>,
+  runtime: Runtime.Runtime<R | SignalService.SignalService>,
 ) =>
   pipe(
     server.runState,

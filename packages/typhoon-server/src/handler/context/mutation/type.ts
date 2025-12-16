@@ -10,7 +10,7 @@ type MutationData = Handler.Config.Mutation.MutationHandlerConfig;
 type MutationHandler<A = unknown, E = unknown, R = unknown> = Effect.Effect<
   A,
   E,
-  R | SignalService.Service
+  R | SignalService.SignalService
 >;
 interface MutationHandlerTypeLambda extends Type.HandlerTypeLambda {
   readonly type: MutationHandler<
@@ -92,7 +92,7 @@ interface TransformHandlerError extends HKT.TypeLambda {
 
 interface TransformHandlerContext extends HKT.TypeLambda {
   readonly type: this["In"] extends infer H extends MutationHandler
-    ? Exclude<Effect.Effect.Context<H>, SignalService.Service>
+    ? Exclude<Effect.Effect.Context<H>, SignalService.SignalService>
     : never;
 }
 
@@ -100,7 +100,10 @@ export interface MutationHandlerT extends Type.BaseHandlerT {
   readonly Type: "mutation";
   readonly Data: MutationData;
   readonly Handler: MutationHandlerTypeLambda;
-  readonly DefaultHandlerContext: Event | Scope.Scope | SignalService.Service;
+  readonly DefaultHandlerContext:
+    | Event
+    | Scope.Scope
+    | SignalService.SignalService;
   readonly TransformDataKey: TransformDataKey;
   readonly TransformDataSuccessIn: TransformDataSuccessIn;
   readonly TransformDataSuccessOut: TransformDataSuccessOut;

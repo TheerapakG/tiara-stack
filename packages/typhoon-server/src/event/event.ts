@@ -72,7 +72,11 @@ export class Event extends Context.Tag("Event")<
 
 export const makeEventService = (
   ctx: EventContext,
-): Effect.Effect<Context.Tag.Service<Event>, never, SignalService.Service> =>
+): Effect.Effect<
+  Context.Tag.Service<Event>,
+  never,
+  SignalService.SignalService
+> =>
   SynchronizedRef.make({
     request: ctx.request,
     token: ctx.token,
@@ -104,7 +108,7 @@ export const replacePullStream = ({
 }): Effect.Effect<
   Context.Tag.Service<Event>,
   never,
-  Event | SignalService.Service
+  Event | SignalService.SignalService
 > =>
   pipe(
     Effect.Do,

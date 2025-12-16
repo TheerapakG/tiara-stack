@@ -248,7 +248,7 @@ export const subscribe = <A, E>(
     | TransactionContext
     | BaseDBSubscriptionContext
     | SignalContext.SignalContext
-    | SignalService.Service
+    | SignalService.SignalService
   >,
 ) =>
   pipe(
@@ -287,7 +287,7 @@ export const mutate = <A, E>(
     | TransactionContext
     | BaseDBSubscriptionContext
     | SignalContext.SignalContext
-    | SignalService.Service
+    | SignalService.SignalService
   >,
 ) =>
   pipe(
@@ -327,7 +327,7 @@ export const wrapTransaction =
       | TransactionContext
       | BaseDBSubscriptionContext
       | SignalContext.SignalContext
-      | SignalService.Service
+      | SignalService.SignalService
     >,
     config?: Config,
   ) => Effect.Effect<
@@ -336,7 +336,7 @@ export const wrapTransaction =
     | TransactionContext
     | BaseDBSubscriptionContext
     | SignalContext.SignalContext
-    | SignalService.Service
+    | SignalService.SignalService
   >) =>
   (fn, config) =>
     pipe(
@@ -346,7 +346,7 @@ export const wrapTransaction =
           | TransactionContext
           | BaseDBSubscriptionContext
           | SignalContext.SignalContext
-          | SignalService.Service
+          | SignalService.SignalService
         >(),
       ),
       Effect.bind("result", ({ context }) =>

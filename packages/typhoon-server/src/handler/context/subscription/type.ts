@@ -14,12 +14,12 @@ type InnerSubscriptionHandler<
 > = Effect.Effect<
   A,
   E,
-  R | SignalContext.SignalContext | SignalService.Service
+  R | SignalContext.SignalContext | SignalService.SignalService
 >;
 type SubscriptionHandler<A = unknown, E = unknown, R = unknown> = Effect.Effect<
   InnerSubscriptionHandler<A, E, R>,
   E,
-  R | SignalService.Service
+  R | SignalService.SignalService
 >;
 interface SubscriptionHandlerTypeLambda extends Type.HandlerTypeLambda {
   readonly type: SubscriptionHandler<
@@ -107,10 +107,10 @@ interface TransformHandlerContext extends HKT.TypeLambda {
   readonly type: this["In"] extends infer H extends SubscriptionHandler
     ? Effect.Effect.Success<H> extends infer IH extends InnerSubscriptionHandler
       ?
-          | Exclude<Effect.Effect.Context<H>, SignalService.Service>
+          | Exclude<Effect.Effect.Context<H>, SignalService.SignalService>
           | Exclude<
               Effect.Effect.Context<IH>,
-              SignalContext.SignalContext | SignalService.Service
+              SignalContext.SignalContext | SignalService.SignalService
             >
       : never
     : never;
@@ -120,7 +120,10 @@ export interface SubscriptionHandlerT extends Type.BaseHandlerT {
   readonly Type: "subscription";
   readonly Data: SubscriptionData;
   readonly Handler: SubscriptionHandlerTypeLambda;
-  readonly DefaultHandlerContext: Event | Scope.Scope | SignalService.Service;
+  readonly DefaultHandlerContext:
+    | Event
+    | Scope.Scope
+    | SignalService.SignalService;
   readonly TransformDataKey: TransformDataKey;
   readonly TransformDataSuccessIn: TransformDataSuccessIn;
   readonly TransformDataSuccessOut: TransformDataSuccessOut;
