@@ -44,7 +44,7 @@ type UpdaterState = {
   updater: (
     header: Header.Header<"server:update">,
     result: Either.Either<unknown, unknown>,
-  ) => Effect.Effect<void, never, SignalService.Service>;
+  ) => Effect.Effect<void, never, SignalService.SignalService>;
 };
 type UpdaterStateMap = HashMap.HashMap<string, UpdaterState>;
 
@@ -122,7 +122,7 @@ export class WebSocketClient<
     updater: (
       header: Header.Header<"server:update">,
       result: Either.Either<unknown, unknown>,
-    ) => Effect.Effect<void, never, SignalService.Service>,
+    ) => Effect.Effect<void, never, SignalService.SignalService>,
   ) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (client: WebSocketClient<any, any>) =>
@@ -191,7 +191,9 @@ export class WebSocketClient<
       Effect.bind("deferred", () =>
         Deferred.make<Option.Option<WebSocket>, WebSocketError>(),
       ),
-      Effect.bind("runtime", () => Effect.runtime<SignalService.Service>()),
+      Effect.bind("runtime", () =>
+        Effect.runtime<SignalService.SignalService>(),
+      ),
       Effect.tap(({ deferred, runtime }) =>
         pipe(
           client.ws,

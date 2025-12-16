@@ -48,7 +48,7 @@ import { SignalService } from "typhoon-core/signal";
 
 interface BotRunStateContextTypeLambda
   extends RunState.RunStateContextTypeLambda {
-  readonly type: Bot<any, any, Exclude<this["R"], SignalService.Service>>;
+  readonly type: Bot<any, any, Exclude<this["R"], SignalService.SignalService>>;
 }
 export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   "Bot",
@@ -58,13 +58,17 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
     InteractionHandlerMapWithMetricsGroup<
       A,
       E,
-      R | ClientService | SignalService.Service
+      R | ClientService | SignalService.SignalService
     >
   >;
   readonly traceProvider: Layer.Layer<never>;
   readonly tasks: SynchronizedRef.SynchronizedRef<
     HashSet.HashSet<
-      Effect.Effect<unknown, unknown, R | ClientService | SignalService.Service>
+      Effect.Effect<
+        unknown,
+        unknown,
+        R | ClientService | SignalService.SignalService
+      >
     >
   >;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -72,7 +76,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
     BotRunStateContextTypeLambda,
     void,
     Cause.UnknownException,
-    SignalService.Service
+    SignalService.SignalService
   >;
 }> {
   static onChatInputCommandInteraction = (
@@ -80,7 +84,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   ) => {
     return <A = never, E = never, R = never>(
       bot: Bot<A, E, R>,
-      runtime: Runtime.Runtime<R | SignalService.Service>,
+      runtime: Runtime.Runtime<R | SignalService.SignalService>,
     ) =>
       pipe(
         Effect.Do,
@@ -114,7 +118,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   static onCommandInteraction = (interaction: CommandInteraction) => {
     return <A = never, E = never, R = never>(
       bot: Bot<A, E, R>,
-      runtime: Runtime.Runtime<R | SignalService.Service>,
+      runtime: Runtime.Runtime<R | SignalService.SignalService>,
     ) =>
       pipe(
         Match.value(interaction),
@@ -130,7 +134,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   static onButtonInteraction = (interaction: ButtonInteraction) => {
     return <A = never, E = never, R = never>(
       bot: Bot<A, E, R>,
-      runtime: Runtime.Runtime<R | SignalService.Service>,
+      runtime: Runtime.Runtime<R | SignalService.SignalService>,
     ) =>
       pipe(
         Effect.Do,
@@ -163,7 +167,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   ) => {
     return <A = never, E = never, R = never>(
       bot: Bot<A, E, R>,
-      runtime: Runtime.Runtime<R | SignalService.Service>,
+      runtime: Runtime.Runtime<R | SignalService.SignalService>,
     ) =>
       pipe(
         Effect.Do,
@@ -196,7 +200,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   ) => {
     return <A = never, E = never, R = never>(
       bot: Bot<A, E, R>,
-      runtime: Runtime.Runtime<R | SignalService.Service>,
+      runtime: Runtime.Runtime<R | SignalService.SignalService>,
     ) =>
       pipe(
         Match.value(interaction),
@@ -218,7 +222,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   static onInteraction = (interaction: Interaction) => {
     return <A = never, E = never, R = never>(
       bot: Bot<A, E, R>,
-      runtime: Runtime.Runtime<R | SignalService.Service>,
+      runtime: Runtime.Runtime<R | SignalService.SignalService>,
     ) =>
       pipe(
         Match.value(interaction),
@@ -241,7 +245,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
     <A = never, E = never>(discordToken: string) =>
     <R = never>(
       bot: Bot<A, E, R>,
-      runtime: Runtime.Runtime<R | SignalService.Service>,
+      runtime: Runtime.Runtime<R | SignalService.SignalService>,
     ) =>
       pipe(
         Effect.try(() =>
@@ -318,7 +322,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   static makeFinalizer =
     () =>
     <A = never, E = never, R = never>(
-      bot: Bot<A, E, Exclude<R, SignalService.Service>>,
+      bot: Bot<A, E, Exclude<R, SignalService.SignalService>>,
     ) =>
       Effect.promise(() => bot.client.destroy());
 
@@ -339,7 +343,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
             InteractionHandlerMapWithMetricsGroup.empty<
               A,
               E,
-              R | ClientService | SignalService.Service
+              R | ClientService | SignalService.SignalService
             >(),
           ),
           tasks: SynchronizedRef.make(
@@ -347,7 +351,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
               Effect.Effect<
                 unknown,
                 unknown,
-                R | ClientService | SignalService.Service
+                R | ClientService | SignalService.SignalService
               >
             >(),
           ),
@@ -356,7 +360,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
             BotRunStateContextTypeLambda,
             void,
             Cause.UnknownException,
-            SignalService.Service
+            SignalService.SignalService
           >(Bot.makeStartEffect<A, E>(discordToken), Bot.makeFinalizer()),
         }),
         Effect.map((params) => new Bot<A, E, R>(params)),
@@ -372,13 +376,13 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   };
 
   static start = <A = never, E = never, R = never>(
-    bot: Bot<A, E, Exclude<R, SignalService.Service>>,
-    runtime: NoInfer<Runtime.Runtime<R | SignalService.Service>>,
+    bot: Bot<A, E, Exclude<R, SignalService.SignalService>>,
+    runtime: NoInfer<Runtime.Runtime<R | SignalService.SignalService>>,
   ) => pipe(bot.runState, RunState.start(bot, runtime), Effect.as(bot));
 
   static stop = <A = never, E = never, R = never>(
-    bot: Bot<A, E, Exclude<R, SignalService.Service>>,
-    runtime: NoInfer<Runtime.Runtime<R | SignalService.Service>>,
+    bot: Bot<A, E, Exclude<R, SignalService.SignalService>>,
+    runtime: NoInfer<Runtime.Runtime<R | SignalService.SignalService>>,
   ) => {
     return pipe(
       bot.runState,
@@ -404,7 +408,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                   R,
                   | InteractionServices<ChatInputCommandInteractionT>
                   | ClientService
-                  | SignalService.Service
+                  | SignalService.SignalService
                   | Scope.Scope
                 >
               | BR
@@ -422,7 +426,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                   R,
                   | InteractionServices<ChatInputCommandInteractionT>
                   | ClientService
-                  | SignalService.Service
+                  | SignalService.SignalService
                   | Scope.Scope
                 >
               >,
@@ -449,7 +453,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                   R,
                   | InteractionServices<ChatInputCommandInteractionT>
                   | ClientService
-                  | SignalService.Service
+                  | SignalService.SignalService
                   | Scope.Scope
                 >
               | BR
@@ -467,7 +471,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                   R,
                   | InteractionServices<ChatInputCommandInteractionT>
                   | ClientService
-                  | SignalService.Service
+                  | SignalService.SignalService
                   | Scope.Scope
                 >
               >,
@@ -494,7 +498,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                   R,
                   | InteractionServices<ButtonInteractionT>
                   | ClientService
-                  | SignalService.Service
+                  | SignalService.SignalService
                   | Scope.Scope
                 >
               | BR
@@ -512,7 +516,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                   R,
                   | InteractionServices<ButtonInteractionT>
                   | ClientService
-                  | SignalService.Service
+                  | SignalService.SignalService
                   | Scope.Scope
                 >
               >,
@@ -539,7 +543,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                   R,
                   | InteractionServices<ButtonInteractionT>
                   | ClientService
-                  | SignalService.Service
+                  | SignalService.SignalService
                   | Scope.Scope
                 >
               | BR
@@ -557,7 +561,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                   R,
                   | InteractionServices<ButtonInteractionT>
                   | ClientService
-                  | SignalService.Service
+                  | SignalService.SignalService
                   | Scope.Scope
                 >
               >,
@@ -589,7 +593,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                   R,
                   | InteractionServices<UserSelectMenuInteractionT>
                   | ClientService
-                  | SignalService.Service
+                  | SignalService.SignalService
                   | Scope.Scope
                 >
               | BR
@@ -607,7 +611,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                   R,
                   | InteractionServices<UserSelectMenuInteractionT>
                   | ClientService
-                  | SignalService.Service
+                  | SignalService.SignalService
                   | Scope.Scope
                 >
               >,
@@ -638,7 +642,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                   R,
                   | InteractionServices<UserSelectMenuInteractionT>
                   | ClientService
-                  | SignalService.Service
+                  | SignalService.SignalService
                   | Scope.Scope
                 >
               | BR
@@ -656,7 +660,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                   R,
                   | InteractionServices<UserSelectMenuInteractionT>
                   | ClientService
-                  | SignalService.Service
+                  | SignalService.SignalService
                   | Scope.Scope
                 >
               >,
@@ -677,7 +681,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
             bot as Bot<
               BA,
               BE,
-              Exclude<R, ClientService | SignalService.Service> | BR
+              Exclude<R, ClientService | SignalService.SignalService> | BR
             >,
         ),
         Effect.tap(({ bot }) =>
@@ -687,13 +691,13 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 Effect.Effect<
                   unknown,
                   unknown,
-                  Exclude<R, ClientService | SignalService.Service> | BR
+                  Exclude<R, ClientService | SignalService.SignalService> | BR
                 >
               >,
               task as Effect.Effect<
                 unknown,
                 unknown,
-                Exclude<R, ClientService | SignalService.Service> | BR
+                Exclude<R, ClientService | SignalService.SignalService> | BR
               >,
             ),
           ),
@@ -714,7 +718,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
             bot as Bot<
               BA,
               BE,
-              Exclude<R, ClientService | SignalService.Service> | BR
+              Exclude<R, ClientService | SignalService.SignalService> | BR
             >,
         ),
         Effect.tap(({ bot }) =>
@@ -724,7 +728,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                 Effect.Effect<
                   unknown,
                   unknown,
-                  Exclude<R, ClientService | SignalService.Service> | BR
+                  Exclude<R, ClientService | SignalService.SignalService> | BR
                 >
               >,
               HashSet.fromIterable(
@@ -732,7 +736,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                   Effect.Effect<
                     unknown,
                     unknown,
-                    Exclude<R, ClientService | SignalService.Service> | BR
+                    Exclude<R, ClientService | SignalService.SignalService> | BR
                   >
                 >,
               ),
