@@ -117,6 +117,7 @@ export class ExternalComputed<T = unknown>
             ),
           ),
       }),
+      Effect.tap(() => Effect.log("handled emit")),
       Observable.withSpan(this, "ExternalComputed.emit", {
         captureStackTrace: true,
       }),
