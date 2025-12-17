@@ -130,6 +130,7 @@ export class ExternalComputed<T = unknown>
         dependents.some((d) => !(d instanceof WeakRef)),
       ),
       Effect.flatMap((watched) => this._maybeSetEmitting(watched)),
+      Effect.tap(() => Effect.log("reconciled")),
       Observable.withSpan(this, "ExternalComputed.reconcile", {
         captureStackTrace: true,
       }),
@@ -155,6 +156,7 @@ export class ExternalComputed<T = unknown>
         }
         return Effect.void;
       }),
+      Effect.tap(() => Effect.log("maybeSetEmitting", watched)),
     );
   }
 }
