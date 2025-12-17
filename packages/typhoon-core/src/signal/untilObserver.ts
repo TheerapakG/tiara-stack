@@ -68,7 +68,7 @@ class UntilObserver<
     return pipe(
       Effect.all({
         valueDeferred: TDeferred.make<Match.Types.WhenMatch<A, P>>(),
-        runLatch: Effect.makeLatch(),
+        runLatch: Effect.makeLatch(true),
       }),
       Effect.map(
         ({ valueDeferred, runLatch }) =>
@@ -109,6 +109,7 @@ class UntilObserver<
   private run(): Effect.Effect<void, never, R | Scope.Scope> {
     return pipe(
       this._runLatch.await,
+      Effect.andThen(this._runLatch.close),
       Effect.andThen(this.runOnce()),
       Effect.schedule(
         Schedule.recurWhileEffect(() =>
@@ -177,10 +178,7 @@ class UntilObserver<
         Option.match({
           onSome: () => this.clearDependencies(),
           onNone: () =>
-            pipe(
-              this.clearDependencies(),
-              Effect.andThen(this._runLatch.release),
-            ),
+            pipe(this.clearDependencies(), Effect.andThen(this._runLatch.open)),
         }),
       ),
       Observable.withSpan(this, "UntilObserver.notify", {
