@@ -106,7 +106,7 @@ class UntilObserver<
     );
   }
 
-  private run(): Effect.Effect<void, never, R> {
+  private run(): Effect.Effect<void, never, R | Scope.Scope> {
     return pipe(
       this._runLatch.await,
       Effect.andThen(this.runOnce()),
@@ -115,7 +115,7 @@ class UntilObserver<
           pipe(TDeferred.poll(this._value), STM.map(Option.isNone), STM.commit),
         ),
       ),
-      Effect.forkDaemon,
+      Effect.forkScoped,
       Observable.withSpan(this, "UntilObserver.run", {
         captureStackTrace: true,
       }),
@@ -203,6 +203,7 @@ export const observeUntil = <
   pipe(
     UntilObserver.make(effect, pattern, options ?? {}),
     Effect.flatMap((observer) => observer.value()),
+    Effect.scoped,
     Observable.withSpan(
       { [Observable.ObservableSymbol]: options ?? {} },
       "observeUntil",
