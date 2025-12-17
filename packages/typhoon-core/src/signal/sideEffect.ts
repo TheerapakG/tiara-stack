@@ -1,4 +1,4 @@
-import { Context, Effect, Fiber, HashSet, Option, pipe, Scope } from "effect";
+import { Context, Effect, HashSet, pipe, Scope } from "effect";
 import { Observable } from "../observability";
 import { DependencySignal } from "./dependencySignal";
 import { DependentSignal, DependentSymbol } from "./dependentSignal";
@@ -14,7 +14,6 @@ export class SideEffect<R = never> implements DependentSignal {
 
   private _effect: Effect.Effect<unknown, unknown, R | SignalContext>;
   private _context: Context.Context<R>;
-  private _fiber: Option.Option<Fiber.Fiber<unknown, unknown>>;
   private _dependencies: HashSet.HashSet<DependencySignal>;
 
   constructor(
@@ -24,7 +23,6 @@ export class SideEffect<R = never> implements DependentSignal {
   ) {
     this._effect = effect;
     this._context = context;
-    this._fiber = Option.none();
     this._dependencies = HashSet.empty();
     this[Observable.ObservableSymbol] = options;
   }
@@ -67,27 +65,9 @@ export class SideEffect<R = never> implements DependentSignal {
       Effect.all([
         this.clearDependencies(),
         pipe(
-          Effect.Do,
-          Effect.let("fiber", () => this._fiber),
-          Effect.bind("newFiber", () =>
-            pipe(
-              fromDependent(this),
-              runAndTrackEffect(this._effect),
-              Effect.forkDaemon,
-            ),
-          ),
-          Effect.tap(({ newFiber }) => {
-            this._fiber = Option.some(newFiber);
-          }),
-          Effect.flatMap(({ fiber }) =>
-            pipe(
-              fiber,
-              Option.match({
-                onSome: (fiber) => Fiber.interrupt(fiber),
-                onNone: () => Effect.void,
-              }),
-            ),
-          ),
+          fromDependent(this),
+          runAndTrackEffect(this._effect),
+          Effect.catchAll(() => Effect.void),
         ),
       ]),
       Effect.provide(this._context),

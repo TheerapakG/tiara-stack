@@ -1,10 +1,12 @@
 import {
-  Deferred,
   Effect,
   Effectable,
-  Fiber,
+  Exit,
   HashSet,
   Option,
+  TQueue,
+  TSemaphore,
+  STM,
   pipe,
   Types,
 } from "effect";
@@ -31,26 +33,27 @@ export class Computed<A = never, E = never, R = never>
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
   private _effect: Effect.Effect<A, E, R | SignalContext>;
-  private _value: Deferred.Deferred<A, E>;
-  private _fiber: Option.Option<Fiber.Fiber<boolean, never>>;
   private _dependents: HashSet.HashSet<
     WeakRef<DependentSignal> | DependentSignal
   >;
   private _dependencies: HashSet.HashSet<DependencySignal>;
   private _reference: WeakRef<Computed<A, E, R>>;
+  private _queue: TQueue.TQueue<Exit.Exit<A, E>>;
+  private _semaphore: TSemaphore.TSemaphore;
 
   constructor(
     effect: Effect.Effect<A, E, R | SignalContext>,
-    value: Deferred.Deferred<A, E>,
+    queue: TQueue.TQueue<Exit.Exit<A, E>>,
+    semaphore: TSemaphore.TSemaphore,
     options: Observable.ObservableOptions,
   ) {
     super();
     this._effect = effect;
-    this._value = value;
-    this._fiber = Option.none();
     this._dependents = HashSet.empty();
     this._dependencies = HashSet.empty();
     this._reference = new WeakRef(this);
+    this._queue = queue;
+    this._semaphore = semaphore;
     this[Observable.ObservableSymbol] = options;
   }
 
@@ -126,29 +129,25 @@ export class Computed<A = never, E = never, R = never>
 
   peek(): Effect.Effect<A, E, R> {
     return pipe(
-      Effect.Do,
-      Effect.bind("fiber", () =>
-        pipe(
-          this._fiber,
-          Option.match({
-            onSome: (fiber) => Effect.succeed(fiber),
-            onNone: () =>
+      TQueue.peekOption(this._queue),
+      STM.commit,
+      Effect.flatMap(
+        Option.match({
+          onSome: Effect.succeed,
+          onNone: () =>
+            TSemaphore.withPermit(this._semaphore)(
               pipe(
                 fromDependent(this),
                 runAndTrackEffect(this._effect),
                 Effect.exit,
-                Effect.flatMap((value) =>
-                  Deferred.complete(this._value, value),
+                Effect.tap((exit) =>
+                  pipe(TQueue.offer(this._queue, exit), STM.commit),
                 ),
-                Effect.forkDaemon,
               ),
-          }),
-        ),
+            ),
+        }),
       ),
-      Effect.tap(({ fiber }) => {
-        this._fiber = Option.some(fiber);
-      }),
-      Effect.flatMap(() => Deferred.await(this._value)),
+      Effect.flatten,
       Observable.withSpan(this, "Computed.peek", {
         captureStackTrace: true,
       }),
@@ -157,21 +156,9 @@ export class Computed<A = never, E = never, R = never>
 
   reset(): Effect.Effect<void, never, never> {
     return pipe(
-      Effect.all([
-        pipe(
-          Deferred.make<A, E>(),
-          Effect.map((value) => {
-            this._value = value;
-          }),
-        ),
-        pipe(
-          Effect.succeed(this._fiber),
-          Effect.tap(() => {
-            this._fiber = Option.none();
-          }),
-          Effect.flatMap(Effect.transposeMapOption(Fiber.interrupt)),
-        ),
-      ]),
+      TQueue.takeAll(this._queue),
+      STM.commit,
+      Effect.asVoid,
       Observable.withSpan(this, "Computed.reset", {
         captureStackTrace: true,
       }),
@@ -225,19 +212,20 @@ export const make = <A = never, E = never, R = never>(
   options?: Observable.ObservableOptions,
 ) =>
   pipe(
-    Deferred.make<A, E>(),
-    Effect.map(
-      (value) =>
+    STM.all({
+      queue: TQueue.sliding<Exit.Exit<A, E>>(1),
+      semaphore: TSemaphore.make(1),
+    }),
+    STM.map(
+      ({ queue, semaphore }) =>
         new Computed<A, E, Exclude<R, SignalContext>>(
-          effect as Effect.Effect<
-            A,
-            E,
-            SignalContext | Exclude<R, SignalContext>
-          >,
-          value,
+          effect as Effect.Effect<A, E, Exclude<R, SignalContext>>,
+          queue,
+          semaphore,
           options ?? {},
         ),
     ),
+    STM.commit,
     Observable.withSpan(
       { [Observable.ObservableSymbol]: options ?? {} },
       "Computed.make",
