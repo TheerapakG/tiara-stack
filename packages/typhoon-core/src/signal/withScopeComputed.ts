@@ -1,13 +1,17 @@
 import {
-  Deferred,
   Effect,
   Effectable,
-  Fiber,
+  Exit,
+  flow,
   HashSet,
+  Match,
   Option,
-  pipe,
-  Ref,
+  TRef,
+  TQueue,
+  TSemaphore,
+  STM,
   Scope,
+  pipe,
 } from "effect";
 import { Observable } from "../observability";
 import {
@@ -32,29 +36,30 @@ export class WithScopeComputed<A = never, E = never, R = never>
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
   private _effect: Effect.Effect<A, E, R | SignalContext>;
-  private _value: Deferred.Deferred<A, E>;
-  private _fiber: Option.Option<Fiber.Fiber<boolean, never>>;
   private _dependents: HashSet.HashSet<
     WeakRef<DependentSignal> | DependentSignal
   >;
   private _dependencies: HashSet.HashSet<DependencySignal>;
   private _reference: WeakRef<WithScopeComputed<A, E, R>>;
-  private _isScopeClosed: Ref.Ref<boolean>;
+  private _isScopeClosed: TRef.TRef<boolean>;
+  private _queue: TQueue.TQueue<Exit.Exit<A, E>>;
+  private _semaphore: TSemaphore.TSemaphore;
 
   constructor(
     effect: Effect.Effect<A, E, R | SignalContext>,
-    value: Deferred.Deferred<A, E>,
-    isScopeClosed: Ref.Ref<boolean>,
+    isScopeClosed: TRef.TRef<boolean>,
+    queue: TQueue.TQueue<Exit.Exit<A, E>>,
+    semaphore: TSemaphore.TSemaphore,
     options: Observable.ObservableOptions,
   ) {
     super();
     this._effect = effect;
-    this._value = value;
-    this._fiber = Option.none();
     this._dependents = HashSet.empty();
     this._dependencies = HashSet.empty();
     this._reference = new WeakRef(this);
     this._isScopeClosed = isScopeClosed;
+    this._queue = queue;
+    this._semaphore = semaphore;
     this[Observable.ObservableSymbol] = options;
   }
 
@@ -83,14 +88,15 @@ export class WithScopeComputed<A = never, E = never, R = never>
 
   addDependency(dependency: DependencySignal) {
     return pipe(
-      Ref.get(this._isScopeClosed),
-      Effect.flatMap((isClosed) =>
+      TRef.get(this._isScopeClosed),
+      STM.flatMap((isClosed) =>
         isClosed
-          ? Effect.void
-          : Effect.sync(() => {
+          ? STM.void
+          : STM.sync(() => {
               this._dependencies = HashSet.add(this._dependencies, dependency);
             }),
       ),
+      STM.commit,
     );
   }
 
@@ -111,12 +117,13 @@ export class WithScopeComputed<A = never, E = never, R = never>
 
   getDependencies(): Effect.Effect<DependencySignal[], never, never> {
     return pipe(
-      Ref.get(this._isScopeClosed),
-      Effect.flatMap((isClosed) =>
+      TRef.get(this._isScopeClosed),
+      STM.flatMap((isClosed) =>
         isClosed
-          ? Effect.succeed([])
-          : Effect.sync(() => HashSet.toValues(this._dependencies)),
+          ? STM.succeed([])
+          : STM.sync(() => HashSet.toValues(this._dependencies)),
       ),
+      STM.commit,
     );
   }
 
@@ -144,35 +151,39 @@ export class WithScopeComputed<A = never, E = never, R = never>
 
   peek(): Effect.Effect<A, E, R> {
     return pipe(
-      Ref.get(this._isScopeClosed),
-      Effect.flatMap((isClosed) =>
-        isClosed
-          ? Deferred.await(this._value)
-          : pipe(
-              Effect.Do,
-              Effect.bind("fiber", () =>
-                pipe(
-                  this._fiber,
-                  Option.match({
-                    onSome: (fiber) => Effect.succeed(fiber),
-                    onNone: () =>
+      TRef.get(this._isScopeClosed),
+      STM.commit,
+      Effect.flatMap(
+        flow(
+          Match.value,
+          Match.when(true, () =>
+            pipe(TQueue.peek(this._queue), STM.commit, Effect.flatten),
+          ),
+          Match.when(false, () =>
+            pipe(
+              TQueue.peekOption(this._queue),
+              STM.commit,
+              Effect.flatMap(
+                Option.match({
+                  onSome: Effect.succeed,
+                  onNone: () =>
+                    TSemaphore.withPermit(this._semaphore)(
                       pipe(
                         fromDependent(this),
                         runAndTrackEffect(this._effect),
                         Effect.exit,
-                        Effect.flatMap((value) =>
-                          Deferred.complete(this._value, value),
+                        Effect.tap((exit) =>
+                          pipe(TQueue.offer(this._queue, exit), STM.commit),
                         ),
-                        Effect.forkDaemon,
                       ),
-                  }),
-                ),
+                    ),
+                }),
               ),
-              Effect.tap(({ fiber }) => {
-                this._fiber = Option.some(fiber);
-              }),
-              Effect.flatMap(() => Deferred.await(this._value)),
+              Effect.flatten,
             ),
+          ),
+          Match.exhaustive,
+        ),
       ),
       Observable.withSpan(this, "WithScopeComputed.peek", {
         captureStackTrace: true,
@@ -182,22 +193,10 @@ export class WithScopeComputed<A = never, E = never, R = never>
 
   reset(): Effect.Effect<void, never, never> {
     return pipe(
-      Effect.all([
-        pipe(
-          Deferred.make<A, E>(),
-          Effect.map((value) => {
-            this._value = value;
-          }),
-        ),
-        pipe(
-          Effect.succeed(this._fiber),
-          Effect.tap(() => {
-            this._fiber = Option.none();
-          }),
-          Effect.flatMap(Effect.transposeMapOption(Fiber.interrupt)),
-        ),
-      ]),
-      Effect.unlessEffect(Ref.get(this._isScopeClosed)),
+      TQueue.takeAll(this._queue),
+      STM.asVoid,
+      STM.unlessSTM(TRef.get(this._isScopeClosed)),
+      STM.commit,
       Observable.withSpan(this, "WithScopeComputed.reset", {
         captureStackTrace: true,
       }),
@@ -216,7 +215,7 @@ export class WithScopeComputed<A = never, E = never, R = never>
     return pipe(
       this.clearDependencies(),
       Effect.andThen(this.reset()),
-      Effect.unlessEffect(Ref.get(this._isScopeClosed)),
+      Effect.unlessEffect(pipe(TRef.get(this._isScopeClosed), STM.commit)),
       Observable.withSpan(this, "WithScopeComputed.notify", {
         captureStackTrace: true,
       }),
@@ -227,7 +226,7 @@ export class WithScopeComputed<A = never, E = never, R = never>
     return pipe(
       this,
       notifyAllDependents(() => this.reset()),
-      Effect.unlessEffect(Ref.get(this._isScopeClosed)),
+      Effect.unlessEffect(pipe(TRef.get(this._isScopeClosed), STM.commit)),
       Observable.withSpan(this, "WithScopeComputed.recompute", {
         captureStackTrace: true,
       }),
@@ -240,11 +239,8 @@ export class WithScopeComputed<A = never, E = never, R = never>
 
   cleanup(): Effect.Effect<void, never, never> {
     return pipe(
-      this._fiber,
-      Effect.transposeMapOption((fiber) => Fiber.interrupt(fiber)),
-      Effect.andThen(() => this.clearDependencies()),
-      Effect.andThen(() => Deferred.interrupt(this._value)),
-      Effect.ignore,
+      this.clearDependencies(),
+      Effect.andThen(pipe(TQueue.takeAll(this._queue), STM.commit)),
       Observable.withSpan(this, "WithScopeComputed.cleanup", {
         captureStackTrace: true,
       }),
@@ -270,27 +266,30 @@ export const make = <A = never, E = never, R = never>(
   Scope.Scope
 > =>
   pipe(
-    Effect.all({
-      isScopeClosed: Ref.make(false),
-      value: Deferred.make<A, E>(),
+    STM.all({
+      isScopeClosed: TRef.make(false),
+      queue: TQueue.sliding<Exit.Exit<A, E>>(1),
+      semaphore: TSemaphore.make(1),
     }),
-    Effect.let(
+    STM.let(
       "computed",
-      ({ isScopeClosed, value }) =>
+      ({ isScopeClosed, queue, semaphore }) =>
         new WithScopeComputed<A, E, Exclude<R, SignalContext>>(
-          effect as Effect.Effect<
-            A,
-            E,
-            SignalContext | Exclude<R, SignalContext>
-          >,
-          value,
+          effect as Effect.Effect<A, E, Exclude<R, SignalContext>>,
           isScopeClosed,
+          queue,
+          semaphore,
           options ?? {},
         ),
     ),
+    STM.commit,
     Effect.flatMap(({ computed, isScopeClosed }) =>
       Effect.acquireRelease(Effect.succeed(computed), () =>
-        pipe(Ref.set(isScopeClosed, true), Effect.andThen(computed.cleanup())),
+        pipe(
+          TRef.set(isScopeClosed, true),
+          STM.commit,
+          Effect.andThen(computed.cleanup()),
+        ),
       ),
     ),
     Observable.withSpan(
