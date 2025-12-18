@@ -39,6 +39,9 @@ export const layerOfSheetId = (sheetId: string) =>
     Layer.provideMerge(SheetService.DefaultWithoutDependencies(sheetId)),
   );
 
+export const contextOfGuildId = (sheetId: string) =>
+  pipe(layerOfSheetId(sheetId), Layer.build);
+
 export const layerOfGuildId = <E = never>(
   guildId: SignalContext.MaybeSignalEffect<string, E>,
 ): Effect.Effect<

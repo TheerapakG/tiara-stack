@@ -41,19 +41,11 @@ export const getEventConfigHandler = pipe(
       ),
       Effect.map(({ layerOfGuildId }) =>
         pipe(
-          layerOfGuildId,
-          Effect.flatMap((layerOfGuildId) =>
-            pipe(
-              Sheet.SheetService.getEventConfig(),
-              Result.provideEitherLayer(layerOfGuildId),
-              Effect.tap((eventConfig) =>
-                Effect.log(layerOfGuildId, eventConfig),
-              ),
-            ),
-          ),
+          Sheet.SheetService.getEventConfig(),
+          Effect.tap((eventConfig) => Effect.log(eventConfig)),
+          Result.provideEitherLayerEffect(layerOfGuildId),
         ),
       ),
-      Effect.tap(() => Effect.addFinalizer(() => Effect.log("finalizer"))),
       Effect.map(Error.Core.catchParseErrorAsValidationError),
       Effect.map(
         Handler.Config.encodeResponseEffect(getEventConfigHandlerConfig),
