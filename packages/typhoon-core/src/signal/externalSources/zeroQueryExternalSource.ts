@@ -310,11 +310,17 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
   }
 
   start() {
-    return SynchronizedRef.set(this.startedRef, true);
+    return pipe(
+      SynchronizedRef.set(this.startedRef, true),
+      Effect.andThen(Effect.log("started")),
+    );
   }
 
   stop() {
-    return SynchronizedRef.set(this.startedRef, false);
+    return pipe(
+      SynchronizedRef.set(this.startedRef, false),
+      Effect.andThen(Effect.log("stopped")),
+    );
   }
 }
 
