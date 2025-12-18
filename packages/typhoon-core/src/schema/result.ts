@@ -404,8 +404,39 @@ export const provideEitherLayer =
   > =>
     pipe(
       layer,
-      map(Either.map((layer) => pipe(effect, Effect.provide(layer)))),
+      map(
+        Either.map((layer) => pipe(effect, Effect.provide(Layer.fresh(layer)))),
+      ),
       map(Effect.flatten),
       map(Effect.either),
       transposeEffect,
+    );
+
+export const provideEitherLayerEffect =
+  <ROut, E1, RIn, E2, E3, R3>(
+    layer: Effect.Effect<
+      Result<Either.Either<Layer.Layer<ROut, E1, RIn>, E2>>,
+      E3,
+      R3
+    >,
+  ) =>
+  <A, E, R>(
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<
+    Result<Either.Either<A, E | E1 | E2>>,
+    E3,
+    Exclude<R, ROut> | RIn | R3
+  > =>
+    pipe(
+      layer,
+      Effect.map(
+        map(
+          Either.map((layer) =>
+            pipe(effect, Effect.provide(Layer.fresh(layer))),
+          ),
+        ),
+      ),
+      Effect.map(map(Effect.flatten)),
+      Effect.map(map(Effect.either)),
+      Effect.flatMap(transposeEffect),
     );
