@@ -2,6 +2,7 @@ import { Context, Effect, pipe } from "effect";
 import { Observable } from "../observability";
 import type * as DependencySignal from "./dependencySignal";
 import * as DependentSignal from "./dependentSignal";
+import * as SignalService from "./signalService";
 
 type SignalContextShape = {
   readonly signal: DependentSignal.DependentSignal;
@@ -67,7 +68,7 @@ export const runAndTrackEffect =
 
 export type MaybeSignalEffect<A = never, E = never, R = never> =
   | A
-  | Effect.Effect<A, E, R | SignalContext>;
+  | Effect.Effect<A, E, R | SignalContext | SignalService.SignalService>;
 
 export type MaybeSignalEffectValue<X> =
   X extends Effect.Effect<any, any, any>

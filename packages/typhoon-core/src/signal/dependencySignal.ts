@@ -1,14 +1,19 @@
 import { Array, Effect, Effectable, pipe } from "effect";
 import { Observable } from "../observability";
 import type * as DependentSignal from "./dependentSignal";
-import type { SignalContext } from "./signalContext";
+import { SignalContext } from "./signalContext";
+import * as SignalService from "./signalService";
 
 export const DependencySymbol: unique symbol = Symbol(
   "Typhoon/Signal/Dependency",
 );
 
 export abstract class DependencySignal<A = never, E = never, R = never>
-  extends Effectable.Class<A, E, R | SignalContext>
+  extends Effectable.Class<
+    A,
+    E,
+    R | SignalContext | SignalService.SignalService
+  >
   implements Observable.Observable
 {
   abstract readonly [DependencySymbol]: DependencySignal<A, E, R>;
@@ -35,7 +40,12 @@ export abstract class DependencySignal<A = never, E = never, R = never>
     never
   >;
 
-  abstract value(): Effect.Effect<A, E, R | SignalContext>;
+  abstract valueLocal(): Effect.Effect<A, E, R | SignalContext>;
+  abstract value(): Effect.Effect<
+    A,
+    E,
+    R | SignalContext | SignalService.SignalService
+  >;
   abstract peek(): Effect.Effect<A, E, R>;
 
   abstract reconcile(): Effect.Effect<void, never, never>;

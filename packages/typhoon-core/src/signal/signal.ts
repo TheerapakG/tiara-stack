@@ -6,7 +6,11 @@ import * as SignalService from "./signalService";
 import { bindScopeDependency, SignalContext } from "./signalContext";
 
 export class Signal<T = unknown>
-  extends Effectable.Class<T, never, SignalContext>
+  extends Effectable.Class<
+    T,
+    never,
+    SignalContext | SignalService.SignalService
+  >
   implements DependencySignal<T, never, never>
 {
   readonly [DependencySymbol]: DependencySignal<T, never, never> = this;
@@ -55,17 +59,40 @@ export class Signal<T = unknown>
     return Effect.sync(() => HashSet.toValues(this._dependents));
   }
 
-  value(): Effect.Effect<T, never, SignalContext> {
+  valueLocal(): Effect.Effect<T, never, SignalContext> {
     return pipe(
       bindScopeDependency(this),
       Effect.flatMap(() => this.peek()),
+      Observable.withSpan(this, "Signal.valueLocal", {
+        captureStackTrace: true,
+      }),
+    );
+  }
+
+  value(): Effect.Effect<
+    T,
+    never,
+    SignalContext | SignalService.SignalService
+  > {
+    return pipe(
+      SignalContext,
+      Effect.flatMap((signalContext) =>
+        SignalService.SignalService.enqueueRunTracked({
+          effect: this.valueLocal(),
+          ctx: signalContext,
+        }),
+      ),
       Observable.withSpan(this, "Signal.value", {
         captureStackTrace: true,
       }),
     );
   }
 
-  commit(): Effect.Effect<T, never, SignalContext> {
+  commit(): Effect.Effect<
+    T,
+    never,
+    SignalContext | SignalService.SignalService
+  > {
     return this.value();
   }
 
@@ -80,7 +107,7 @@ export class Signal<T = unknown>
 
   setValue(value: T): Effect.Effect<void, never, SignalService.SignalService> {
     return pipe(
-      SignalService.SignalService.enqueue({
+      SignalService.SignalService.enqueueNotify({
         signal: this,
         beforeNotify: () =>
           Effect.suspend(() =>
@@ -99,7 +126,7 @@ export class Signal<T = unknown>
     updater: (value: T) => Effect.Effect<T>,
   ): Effect.Effect<void, never, SignalService.SignalService> {
     return pipe(
-      SignalService.SignalService.enqueue({
+      SignalService.SignalService.enqueueNotify({
         signal: this,
         beforeNotify: () =>
           Effect.suspend(() =>

@@ -23,9 +23,14 @@ import {
   runAndTrackEffect,
   SignalContext,
 } from "./signalContext";
+import * as SignalService from "./signalService";
 
 export class Computed<A = never, E = never, R = never>
-  extends Effectable.Class<A, E, R | SignalContext>
+  extends Effectable.Class<
+    A,
+    E,
+    R | SignalContext | SignalService.SignalService
+  >
   implements DependentSignal, DependencySignal<A, E, R>
 {
   readonly [DependencySymbol]: DependencySignal<A, E, R> = this;
@@ -113,17 +118,43 @@ export class Computed<A = never, E = never, R = never>
     return Effect.sync(() => HashSet.toValues(this._dependents));
   }
 
-  value(): Effect.Effect<A, E, R | SignalContext> {
+  valueLocal(): Effect.Effect<A, E, R | SignalContext> {
     return pipe(
       bindScopeDependency(this),
       Effect.flatMap(() => this.peek()),
+      Observable.withSpan(this, "Computed.valueLocal", {
+        captureStackTrace: true,
+      }),
+    );
+  }
+
+  value(): Effect.Effect<
+    A,
+    E,
+    R | SignalContext | SignalService.SignalService
+  > {
+    return pipe(
+      Effect.all({
+        context: Effect.context<R>(),
+        signalContext: SignalContext,
+      }),
+      Effect.flatMap(({ context, signalContext }) =>
+        SignalService.SignalService.enqueueRunTracked({
+          effect: pipe(this.valueLocal(), Effect.provide(context)),
+          ctx: signalContext,
+        }),
+      ),
       Observable.withSpan(this, "Computed.value", {
         captureStackTrace: true,
       }),
     );
   }
 
-  commit(): Effect.Effect<A, E, R | SignalContext> {
+  commit(): Effect.Effect<
+    A,
+    E,
+    R | SignalContext | SignalService.SignalService
+  > {
     return this.value();
   }
 

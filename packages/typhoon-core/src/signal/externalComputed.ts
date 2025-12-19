@@ -21,7 +21,11 @@ export interface ExternalSource<T> {
 }
 
 export class ExternalComputed<T = unknown>
-  extends Effectable.Class<T, never, SignalContext>
+  extends Effectable.Class<
+    T,
+    never,
+    SignalContext | SignalService.SignalService
+  >
   implements DependencySignal<T, never, never>
 {
   readonly [DependencySymbol]: DependencySignal<T, never, never> = this;
@@ -78,17 +82,40 @@ export class ExternalComputed<T = unknown>
     return Effect.sync(() => HashSet.toValues(this._dependents));
   }
 
-  value(): Effect.Effect<T, never, SignalContext> {
+  valueLocal(): Effect.Effect<T, never, SignalContext> {
     return pipe(
       bindScopeDependency(this),
       Effect.flatMap(() => this.peek()),
+      Observable.withSpan(this, "ExternalComputed.valueLocal", {
+        captureStackTrace: true,
+      }),
+    );
+  }
+
+  value(): Effect.Effect<
+    T,
+    never,
+    SignalContext | SignalService.SignalService
+  > {
+    return pipe(
+      SignalContext,
+      Effect.flatMap((signalContext) =>
+        SignalService.SignalService.enqueueRunTracked({
+          effect: this.valueLocal(),
+          ctx: signalContext,
+        }),
+      ),
       Observable.withSpan(this, "ExternalComputed.value", {
         captureStackTrace: true,
       }),
     );
   }
 
-  commit(): Effect.Effect<T, never, SignalContext> {
+  commit(): Effect.Effect<
+    T,
+    never,
+    SignalContext | SignalService.SignalService
+  > {
     return this.value();
   }
 
@@ -105,7 +132,7 @@ export class ExternalComputed<T = unknown>
     value: T,
   ): Effect.Effect<void, never, SignalService.SignalService> {
     return pipe(
-      SignalService.SignalService.enqueue({
+      SignalService.SignalService.enqueueNotify({
         signal: this,
         beforeNotify: (watched) =>
           pipe(
