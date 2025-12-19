@@ -98,10 +98,8 @@ export class ExternalComputed<T = unknown>
     SignalContext | SignalService.SignalService
   > {
     return pipe(
-      Effect.all({
-        signalContext: SignalContext,
-      }),
-      Effect.flatMap(({ signalContext }) =>
+      SignalContext,
+      Effect.flatMap((signalContext) =>
         SignalService.SignalService.enqueueRunTracked({
           effect: this.valueLocal(),
           ctx: signalContext,
