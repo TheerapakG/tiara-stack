@@ -100,10 +100,12 @@ export class ExternalComputed<T = unknown>
     return pipe(
       SignalContext,
       Effect.flatMap((signalContext) =>
-        SignalService.SignalService.enqueueRunTracked({
-          effect: this.valueLocal(),
-          ctx: signalContext,
-        }),
+        SignalService.SignalService.enqueueRunTracked(
+          new SignalService.RunTrackedRequest({
+            effect: this.valueLocal(),
+            ctx: signalContext,
+          }),
+        ),
       ),
       Observable.withSpan(this, "ExternalComputed.value", {
         captureStackTrace: true,
@@ -132,18 +134,20 @@ export class ExternalComputed<T = unknown>
     value: T,
   ): Effect.Effect<void, never, SignalService.SignalService> {
     return pipe(
-      SignalService.SignalService.enqueueNotify({
-        signal: this,
-        beforeNotify: (watched) =>
-          pipe(
-            this._maybeSetEmitting(watched),
-            Effect.andThen(
-              Effect.sync(() => {
-                this._value = value;
-              }),
+      SignalService.SignalService.enqueueNotify(
+        new SignalService.NotifyRequest({
+          signal: this,
+          beforeNotify: (watched) =>
+            pipe(
+              this._maybeSetEmitting(watched),
+              Effect.andThen(
+                Effect.sync(() => {
+                  this._value = value;
+                }),
+              ),
             ),
-          ),
-      }),
+        }),
+      ),
       Observable.withSpan(this, "ExternalComputed.emit", {
         captureStackTrace: true,
       }),

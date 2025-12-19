@@ -161,10 +161,12 @@ export class WithScopeComputed<A = never, E = never, R = never>
         signalContext: SignalContext,
       }),
       Effect.flatMap(({ context, signalContext }) =>
-        SignalService.SignalService.enqueueRunTracked({
-          effect: pipe(this.valueLocal(), Effect.provide(context)),
-          ctx: signalContext,
-        }),
+        SignalService.SignalService.enqueueRunTracked(
+          new SignalService.RunTrackedRequest({
+            effect: pipe(this.valueLocal(), Effect.provide(context)),
+            ctx: signalContext,
+          }),
+        ),
       ),
       Observable.withSpan(this, "WithScopeComputed.value", {
         captureStackTrace: true,

@@ -77,10 +77,12 @@ export class Signal<T = unknown>
     return pipe(
       SignalContext,
       Effect.flatMap((signalContext) =>
-        SignalService.SignalService.enqueueRunTracked({
-          effect: this.valueLocal(),
-          ctx: signalContext,
-        }),
+        SignalService.SignalService.enqueueRunTracked(
+          new SignalService.RunTrackedRequest({
+            effect: this.valueLocal(),
+            ctx: signalContext,
+          }),
+        ),
       ),
       Observable.withSpan(this, "Signal.value", {
         captureStackTrace: true,
@@ -107,15 +109,17 @@ export class Signal<T = unknown>
 
   setValue(value: T): Effect.Effect<void, never, SignalService.SignalService> {
     return pipe(
-      SignalService.SignalService.enqueueNotify({
-        signal: this,
-        beforeNotify: () =>
-          Effect.suspend(() =>
-            Effect.sync(() => {
-              this._value = value;
-            }),
-          ),
-      }),
+      SignalService.SignalService.enqueueNotify(
+        new SignalService.NotifyRequest({
+          signal: this,
+          beforeNotify: () =>
+            Effect.suspend(() =>
+              Effect.sync(() => {
+                this._value = value;
+              }),
+            ),
+        }),
+      ),
       Observable.withSpan(this, "Signal.setValue", {
         captureStackTrace: true,
       }),
@@ -126,20 +130,22 @@ export class Signal<T = unknown>
     updater: (value: T) => Effect.Effect<T>,
   ): Effect.Effect<void, never, SignalService.SignalService> {
     return pipe(
-      SignalService.SignalService.enqueueNotify({
-        signal: this,
-        beforeNotify: () =>
-          Effect.suspend(() =>
-            pipe(
-              updater(this._value),
-              Effect.tap((value) =>
-                Effect.sync(() => {
-                  this._value = value;
-                }),
+      SignalService.SignalService.enqueueNotify(
+        new SignalService.NotifyRequest({
+          signal: this,
+          beforeNotify: () =>
+            Effect.suspend(() =>
+              pipe(
+                updater(this._value),
+                Effect.tap((value) =>
+                  Effect.sync(() => {
+                    this._value = value;
+                  }),
+                ),
               ),
             ),
-          ),
-      }),
+        }),
+      ),
       Observable.withSpan(this, "Signal.updateValue", {
         captureStackTrace: true,
       }),
