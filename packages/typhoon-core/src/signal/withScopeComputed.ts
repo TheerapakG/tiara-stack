@@ -26,9 +26,14 @@ import {
   runAndTrackEffect,
   SignalContext,
 } from "./signalContext";
+import * as SignalService from "./signalService";
 
 export class WithScopeComputed<A = never, E = never, R = never>
-  extends Effectable.Class<A, E, R | SignalContext>
+  extends Effectable.Class<
+    A,
+    E,
+    R | SignalContext | SignalService.SignalService
+  >
   implements DependentSignal, DependencySignal<A, E, R>
 {
   readonly [DependencySymbol]: DependencySignal<A, E, R> = this;
@@ -135,7 +140,7 @@ export class WithScopeComputed<A = never, E = never, R = never>
     return Effect.sync(() => HashSet.toValues(this._dependents));
   }
 
-  value(): Effect.Effect<A, E, R | SignalContext> {
+  valueLocal(): Effect.Effect<A, E, R | SignalContext> {
     return pipe(
       bindScopeDependency(this),
       Effect.flatMap(() => this.peek()),
@@ -145,7 +150,33 @@ export class WithScopeComputed<A = never, E = never, R = never>
     );
   }
 
-  commit(): Effect.Effect<A, E, R | SignalContext> {
+  value(): Effect.Effect<
+    A,
+    E,
+    R | SignalContext | SignalService.SignalService
+  > {
+    return pipe(
+      Effect.all({
+        context: Effect.context<R>(),
+        signalContext: SignalContext,
+      }),
+      Effect.flatMap(({ context, signalContext }) =>
+        SignalService.SignalService.enqueueRunTracked({
+          effect: pipe(this.valueLocal(), Effect.provide(context)),
+          ctx: signalContext,
+        }),
+      ),
+      Observable.withSpan(this, "WithScopeComputed.value", {
+        captureStackTrace: true,
+      }),
+    );
+  }
+
+  commit(): Effect.Effect<
+    A,
+    E,
+    R | SignalContext | SignalService.SignalService
+  > {
     return this.value();
   }
 
@@ -302,7 +333,7 @@ export const make = <A = never, E = never, R = never>(
   );
 
 export const wrap = <A = never, E1 = never, R1 = never, E2 = never, R2 = never>(
-  signal: Effect.Effect<DependencySignal<A, E1, R1>, E2, R2>,
+  signal: Effect.Effect<Effect.Effect<A, E1, R1>, E2, R2>,
   options?: Observable.ObservableOptions,
 ): Effect.Effect<
   WithScopeComputed<A, E1, Exclude<R1, SignalContext>>,
