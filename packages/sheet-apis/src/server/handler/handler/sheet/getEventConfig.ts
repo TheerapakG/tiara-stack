@@ -42,7 +42,6 @@ export const getEventConfigHandler = pipe(
       Effect.map(({ layerOfGuildId }) =>
         pipe(
           Sheet.SheetService.getEventConfig(),
-          Effect.tap((eventConfig) => Effect.log(eventConfig)),
           Result.provideEitherLayerEffect(layerOfGuildId),
         ),
       ),
