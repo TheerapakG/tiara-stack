@@ -57,15 +57,16 @@ const signalServiceDefinition: {
             true,
           )(
             item._tag === "notify"
-              ? notifyAllDependents(item.request.beforeNotify)(
-                  item.request.signal,
+              ? pipe(
+                  notifyAllDependents(item.request.beforeNotify)(
+                    item.request.signal,
+                  ),
+                  Effect.catchAllCause((cause) => Effect.logError(cause)),
                 )
               : pipe(
                   runAndTrackEffect(item.request.effect)(item.request.ctx),
-                  Effect.exit,
-                  Effect.flatMap((exit) =>
-                    pipe(Deferred.complete(item.deferred, exit), Effect.asVoid),
-                  ),
+                  Effect.intoDeferred(item.deferred),
+                  Effect.catchAllCause((cause) => Effect.logError(cause)),
                 ),
           ),
         ),
