@@ -100,7 +100,7 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
         subscribeTables: (
           tables: Iterable<string>,
         ): Effect.Effect<
-          Computed.Computed<void[], never, never>,
+          Computed.Computed<void[], never, SignalService.SignalService>,
           never,
           SignalContext.SignalContext | SignalService.SignalService
         > =>

@@ -189,7 +189,7 @@ export const request = {
         scope: Scope.CloseableScope;
       },
       never,
-      SignalContext.SignalContext
+      SignalContext.SignalContext | SignalService.SignalService
     >,
     never,
     Event
@@ -218,7 +218,11 @@ export const request = {
       ),
     ),
   raw: (): Effect.Effect<
-    Effect.Effect<MsgpackPullEffect, never, SignalContext.SignalContext>,
+    Effect.Effect<
+      MsgpackPullEffect,
+      never,
+      SignalContext.SignalContext | SignalService.SignalService
+    >,
     never,
     Event
   > =>
