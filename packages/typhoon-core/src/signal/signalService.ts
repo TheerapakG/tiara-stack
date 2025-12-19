@@ -1,8 +1,10 @@
 import {
   Context,
+  Data,
   Deferred,
   Effect,
   FiberRef,
+  Match,
   pipe,
   Queue,
   Scope,
@@ -11,25 +13,42 @@ import { Observable } from "../observability";
 import { DependencySignal, notifyAllDependents } from "./dependencySignal";
 import { SignalContext, runAndTrackEffect } from "./signalContext";
 
-type NotifyRequest = {
+type NotifyRequestData = {
   readonly signal: DependencySignal<unknown, unknown, unknown>;
   readonly beforeNotify: (
     watched: boolean,
   ) => Effect.Effect<void, never, never>;
 };
+const NotifyRequestTaggedClass: new (
+  args: Readonly<NotifyRequestData>,
+) => Readonly<NotifyRequestData> & { readonly _tag: "NotifyRequest" } =
+  Data.TaggedClass("NotifyRequest");
+export class NotifyRequest extends NotifyRequestTaggedClass {}
 
-type RunTrackedRequest<A, E> = {
+class NotifyWorkItem extends Data.TaggedClass("NotifyWorkItem")<{
+  readonly request: NotifyRequest;
+}> {}
+
+type RunTrackedRequestData<A, E> = {
   readonly effect: Effect.Effect<A, E, SignalContext>;
   readonly ctx: Context.Tag.Service<SignalContext>;
 };
+const RunTrackedRequestTaggedClass: new <A, E>(
+  args: Readonly<RunTrackedRequestData<A, E>>,
+) => Readonly<RunTrackedRequestData<A, E>> & {
+  readonly _tag: "RunTrackedRequest";
+} = Data.TaggedClass("RunTrackedRequest");
+export class RunTrackedRequest<A, E> extends RunTrackedRequestTaggedClass<
+  A,
+  E
+> {}
 
-type WorkItem =
-  | { readonly _tag: "notify"; readonly request: NotifyRequest }
-  | {
-      readonly _tag: "runTracked";
-      readonly deferred: Deferred.Deferred<unknown, unknown>;
-      readonly request: RunTrackedRequest<unknown, unknown>;
-    };
+class RunTrackedWorkItem extends Data.TaggedClass("RunTrackedWorkItem")<{
+  readonly deferred: Deferred.Deferred<unknown, unknown>;
+  readonly request: RunTrackedRequest<unknown, unknown>;
+}> {}
+
+type WorkItem = NotifyWorkItem | RunTrackedWorkItem;
 
 type SignalServiceInterface = {
   enqueueNotify: (request: NotifyRequest) => Effect.Effect<void, never, never>;
@@ -56,18 +75,22 @@ const signalServiceDefinition: {
             workerFiberRef,
             true,
           )(
-            item._tag === "notify"
-              ? pipe(
-                  notifyAllDependents(item.request.beforeNotify)(
-                    item.request.signal,
+            pipe(
+              Match.value(item),
+              Match.tagsExhaustive({
+                NotifyWorkItem: ({ request }) =>
+                  pipe(
+                    notifyAllDependents(request.beforeNotify)(request.signal),
+                    Effect.catchAllCause((cause) => Effect.logError(cause)),
                   ),
-                  Effect.catchAllCause((cause) => Effect.logError(cause)),
-                )
-              : pipe(
-                  runAndTrackEffect(item.request.effect)(item.request.ctx),
-                  Effect.intoDeferred(item.deferred),
-                  Effect.catchAllCause((cause) => Effect.logError(cause)),
-                ),
+                RunTrackedWorkItem: ({ deferred, request }) =>
+                  pipe(
+                    runAndTrackEffect(request.effect)(request.ctx),
+                    Effect.intoDeferred(deferred),
+                    Effect.catchAllCause((cause) => Effect.logError(cause)),
+                  ),
+              }),
+            ),
           ),
         ),
         Effect.forever,
@@ -82,7 +105,7 @@ const signalServiceDefinition: {
         request: NotifyRequest,
       ): Effect.Effect<void, never, never> =>
         pipe(
-          Queue.offer(queue, { _tag: "notify", request }),
+          Queue.offer(queue, new NotifyWorkItem({ request })),
           Effect.asVoid,
           Observable.withSpan(request.signal, "SignalService.enqueueNotify", {
             captureStackTrace: true,
@@ -100,11 +123,16 @@ const signalServiceDefinition: {
               : pipe(
                   Deferred.make<A, E>(),
                   Effect.tap((deferred) =>
-                    Queue.offer(queue, {
-                      _tag: "runTracked",
-                      deferred: deferred as Deferred.Deferred<unknown, unknown>,
-                      request,
-                    }),
+                    Queue.offer(
+                      queue,
+                      new RunTrackedWorkItem({
+                        deferred: deferred as Deferred.Deferred<
+                          unknown,
+                          unknown
+                        >,
+                        request,
+                      }),
+                    ),
                   ),
                   Effect.flatMap((deferred) => Deferred.await(deferred)),
                 ),
