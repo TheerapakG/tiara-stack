@@ -27,8 +27,8 @@ type WorkItem =
   | { readonly _tag: "notify"; readonly request: NotifyRequest }
   | {
       readonly _tag: "runTracked";
-      readonly deferred: Deferred.Deferred<any, any>;
-      readonly request: RunTrackedRequest<any, any>;
+      readonly deferred: Deferred.Deferred<unknown, unknown>;
+      readonly request: RunTrackedRequest<unknown, unknown>;
     };
 
 type SignalServiceInterface = {
@@ -84,7 +84,7 @@ const signalServiceDefinition: {
         pipe(
           Queue.offer(queue, { _tag: "notify", request }),
           Effect.asVoid,
-          Observable.withSpan(request.signal, "SignalService.enqueue", {
+          Observable.withSpan(request.signal, "SignalService.enqueueNotify", {
             captureStackTrace: true,
           }),
         ),
@@ -102,12 +102,19 @@ const signalServiceDefinition: {
                   Effect.tap((deferred) =>
                     Queue.offer(queue, {
                       _tag: "runTracked",
-                      deferred,
+                      deferred: deferred as Deferred.Deferred<unknown, unknown>,
                       request,
                     }),
                   ),
                   Effect.flatMap((deferred) => Deferred.await(deferred)),
                 ),
+          ),
+          Observable.withSpan(
+            request.ctx.signal,
+            "SignalService.enqueueRunTracked",
+            {
+              captureStackTrace: true,
+            },
           ),
         ),
     })),
