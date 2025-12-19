@@ -1,16 +1,41 @@
-import { Effect, pipe, Queue, Scope } from "effect";
+import {
+  Context,
+  Deferred,
+  Effect,
+  FiberRef,
+  pipe,
+  Queue,
+  Scope,
+} from "effect";
 import { Observable } from "../observability";
 import { DependencySignal, notifyAllDependents } from "./dependencySignal";
+import { SignalContext, runAndTrackEffect } from "./signalContext";
 
-type EnqueueRequest = {
+type NotifyRequest = {
   readonly signal: DependencySignal<unknown, unknown, unknown>;
   readonly beforeNotify: (
     watched: boolean,
   ) => Effect.Effect<void, never, never>;
 };
 
+type RunTrackedRequest<A, E> = {
+  readonly effect: Effect.Effect<A, E, SignalContext>;
+  readonly ctx: Context.Tag.Service<SignalContext>;
+};
+
+type WorkItem =
+  | { readonly _tag: "notify"; readonly request: NotifyRequest }
+  | {
+      readonly _tag: "runTracked";
+      readonly deferred: Deferred.Deferred<any, any>;
+      readonly request: RunTrackedRequest<any, any>;
+    };
+
 type SignalServiceInterface = {
-  enqueue: (request: EnqueueRequest) => Effect.Effect<void, never, never>;
+  enqueueNotify: (request: NotifyRequest) => Effect.Effect<void, never, never>;
+  _enqueueRunTracked: <A, E>(
+    request: RunTrackedRequest<A, E>,
+  ) => Effect.Effect<A, E, never>;
 };
 
 const signalServiceDefinition: {
@@ -19,12 +44,30 @@ const signalServiceDefinition: {
   dependencies: [];
 } = {
   scoped: pipe(
-    Queue.unbounded<EnqueueRequest>(),
-    Effect.tap((queue) =>
+    Effect.all({
+      queue: Queue.unbounded<WorkItem>(),
+      workerFiberRef: FiberRef.make(false),
+    }),
+    Effect.tap(({ queue, workerFiberRef }) =>
       pipe(
         Queue.take(queue),
-        Effect.flatMap(({ signal, beforeNotify }) =>
-          notifyAllDependents(beforeNotify)(signal),
+        Effect.flatMap((item) =>
+          Effect.locally(
+            workerFiberRef,
+            true,
+          )(
+            item._tag === "notify"
+              ? notifyAllDependents(item.request.beforeNotify)(
+                  item.request.signal,
+                )
+              : pipe(
+                  runAndTrackEffect(item.request.effect)(item.request.ctx),
+                  Effect.exit,
+                  Effect.flatMap((exit) =>
+                    pipe(Deferred.complete(item.deferred, exit), Effect.asVoid),
+                  ),
+                ),
+          ),
         ),
         Effect.forever,
         Effect.withSpan("SignalService.worker", {
@@ -33,14 +76,38 @@ const signalServiceDefinition: {
         Effect.forkScoped,
       ),
     ),
-    Effect.map((queue) => ({
-      enqueue: (request: EnqueueRequest): Effect.Effect<void, never, never> =>
+    Effect.map(({ queue, workerFiberRef }) => ({
+      enqueueNotify: (
+        request: NotifyRequest,
+      ): Effect.Effect<void, never, never> =>
         pipe(
-          Queue.offer(queue, request),
+          Queue.offer(queue, { _tag: "notify", request }),
           Effect.asVoid,
           Observable.withSpan(request.signal, "SignalService.enqueue", {
             captureStackTrace: true,
           }),
+        ),
+      _enqueueRunTracked: <A, E>(
+        request: RunTrackedRequest<A, E>,
+      ): Effect.Effect<A, E, never> =>
+        pipe(
+          workerFiberRef,
+          FiberRef.get,
+          Effect.flatMap((isWorkerFiber) =>
+            isWorkerFiber
+              ? runAndTrackEffect(request.effect)(request.ctx)
+              : pipe(
+                  Deferred.make<A, E>(),
+                  Effect.tap((deferred) =>
+                    Queue.offer(queue, {
+                      _tag: "runTracked",
+                      deferred,
+                      request,
+                    }),
+                  ),
+                  Effect.flatMap((deferred) => Deferred.await(deferred)),
+                ),
+          ),
         ),
     })),
   ),
@@ -53,4 +120,7 @@ const BaseSignalServiceClass: Effect.Service.Class<
   "SignalService",
   typeof signalServiceDefinition
 > = Effect.Service<SignalService>()("SignalService", signalServiceDefinition);
-export class SignalService extends BaseSignalServiceClass {}
+export class SignalService extends BaseSignalServiceClass {
+  static enqueueRunTracked = <A, E>(request: RunTrackedRequest<A, E>) =>
+    SignalService.use((service) => service._enqueueRunTracked(request));
+}
