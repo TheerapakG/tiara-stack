@@ -310,17 +310,11 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
   }
 
   start() {
-    return pipe(
-      SynchronizedRef.set(this.startedRef, true),
-      Effect.andThen(Effect.log("started")),
-    );
+    return SynchronizedRef.set(this.startedRef, true);
   }
 
   stop() {
-    return pipe(
-      SynchronizedRef.set(this.startedRef, false),
-      Effect.andThen(Effect.log("stopped")),
-    );
+    return SynchronizedRef.set(this.startedRef, false);
   }
 }
 
@@ -472,11 +466,6 @@ const createMaterializeCallback =
                 try: () => queryComplete,
                 catch: (error) =>
                   rawZeroQueryErrorToZeroQueryError(error as RawZeroQueryError),
-              }),
-              Effect.tapBoth({
-                onSuccess: () => Effect.log("queryComplete is complete"),
-                onFailure: (error) =>
-                  Effect.log("queryComplete is error", error),
               }),
               Effect.as("complete" as const),
               Effect.either,
