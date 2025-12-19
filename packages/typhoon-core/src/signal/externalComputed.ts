@@ -86,7 +86,7 @@ export class ExternalComputed<T = unknown>
     return pipe(
       bindScopeDependency(this),
       Effect.flatMap(() => this.peek()),
-      Observable.withSpan(this, "ExternalComputed.value", {
+      Observable.withSpan(this, "ExternalComputed.valueLocal", {
         captureStackTrace: true,
       }),
     );

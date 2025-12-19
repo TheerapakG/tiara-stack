@@ -144,7 +144,7 @@ export class WithScopeComputed<A = never, E = never, R = never>
     return pipe(
       bindScopeDependency(this),
       Effect.flatMap(() => this.peek()),
-      Observable.withSpan(this, "WithScopeComputed.value", {
+      Observable.withSpan(this, "WithScopeComputed.valueLocal", {
         captureStackTrace: true,
       }),
     );

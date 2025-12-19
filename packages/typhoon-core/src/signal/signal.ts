@@ -63,7 +63,7 @@ export class Signal<T = unknown>
     return pipe(
       bindScopeDependency(this),
       Effect.flatMap(() => this.peek()),
-      Observable.withSpan(this, "Signal.value", {
+      Observable.withSpan(this, "Signal.valueLocal", {
         captureStackTrace: true,
       }),
     );
