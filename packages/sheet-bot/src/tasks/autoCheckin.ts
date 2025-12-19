@@ -113,7 +113,6 @@ const runOnce = Effect.suspend(() =>
         BotGuildConfigService.getAutoCheckinGuilds(),
         UntilObserver.observeUntilRpcResultResolved(),
         Effect.flatten,
-        Effect.tap((guilds) => Effect.log(guilds)),
       ),
     ),
     Effect.bind("guildCounts", ({ guilds }) =>
@@ -121,19 +120,8 @@ const runOnce = Effect.suspend(() =>
         Effect.provide(guildServices(guild.guildId))(
           pipe(
             Effect.Do,
-            Effect.tap(() =>
-              Effect.log(
-                `running auto check-in task for guild ${guild.guildId}...`,
-              ),
-            ),
             Effect.bind("hour", () => computeHour),
-            Effect.tap((hour) =>
-              Effect.log(`computed hour for guild ${guild.guildId}: ${hour}`),
-            ),
             Effect.bind("allSchedules", () => SheetService.allSchedules()),
-            Effect.tap(() =>
-              Effect.log(`fetched all schedules for guild ${guild.guildId}`),
-            ),
             Effect.let("channels", ({ allSchedules }) =>
               pipe(
                 allSchedules,
@@ -148,19 +136,11 @@ const runOnce = Effect.suspend(() =>
                   channels,
                   (channelName) =>
                     pipe(
-                      Effect.log(
-                        `getting running channel by name: ${channelName}`,
-                      ),
-                      Effect.andThen(
-                        GuildConfigService.getGuildRunningChannelByName(
-                          channelName,
-                        ),
+                      GuildConfigService.getGuildRunningChannelByName(
+                        channelName,
                       ),
                       UntilObserver.observeUntilRpcResultResolved(),
                       Effect.flatten,
-                      Effect.tap((runningChannel) =>
-                        Effect.log(runningChannel),
-                      ),
                       Effect.flatMap((runningChannel) =>
                         pipe(
                           Effect.Do,
@@ -177,14 +157,8 @@ const runOnce = Effect.suspend(() =>
                           Effect.bind("checkinData", () =>
                             getCheckinData({ hour, runningChannel }),
                           ),
-                          Effect.tap(({ checkinData }) =>
-                            Effect.log(checkinData),
-                          ),
                           Effect.bind("checkinMessages", ({ checkinData }) =>
                             getCheckinMessages(checkinData),
-                          ),
-                          Effect.tap(({ checkinMessages }) =>
-                            Effect.log(checkinMessages),
                           ),
                           Effect.bind(
                             "message",

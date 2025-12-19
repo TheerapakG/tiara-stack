@@ -44,12 +44,7 @@ export class ConverterService extends Effect.Service<ConverterService>()(
           ),
         convertDateTimeToHour: (dateTime: DateTime.DateTime) =>
           pipe(
-            Effect.log("eventConfig before"),
-            Effect.andThen(() => sheetService.eventConfig()),
-            Effect.tapBoth({
-              onSuccess: () => Effect.log("eventConfig after"),
-              onFailure: () => Effect.log("eventConfig error"),
-            }),
+            sheetService.eventConfig(),
             Effect.map((eventConfig) => eventConfig.startTime),
             Effect.map(
               DateTime.distanceDurationEither(
