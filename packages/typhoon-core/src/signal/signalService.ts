@@ -9,6 +9,7 @@ import {
   Option,
   pipe,
   TQueue,
+  STM,
 } from "effect";
 import { Observable } from "../observability";
 import { DependencySignal, notifyAllDependents } from "./dependencySignal";
@@ -75,6 +76,7 @@ export const layer: Layer.Layer<SignalService, never, never> = pipe(
   Effect.tap(({ queue, workerFiberRef }) =>
     pipe(
       TQueue.take(queue),
+      STM.commit,
       Effect.flatMap((item) =>
         Effect.locally(
           workerFiberRef,

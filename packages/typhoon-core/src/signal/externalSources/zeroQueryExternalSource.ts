@@ -614,7 +614,9 @@ export const makeWithContext = <
         Effect.tap(({ viewRef }) =>
           Effect.addFinalizer(() => destroyView(viewRef)),
         ),
-        Effect.tap(({ materializedQueue }) => TQueue.take(materializedQueue)),
+        Effect.tap(({ materializedQueue }) =>
+          pipe(TQueue.take(materializedQueue), STM.commit),
+        ),
         Effect.map(({ source }) => source),
       ),
     ),
@@ -761,7 +763,9 @@ export const makeFromResultWithContext = <
         Effect.tap(({ viewRef }) =>
           Effect.addFinalizer(() => destroyView(viewRef)),
         ),
-        Effect.tap(({ materializedQueue }) => TQueue.take(materializedQueue)),
+        Effect.tap(({ materializedQueue }) =>
+          pipe(TQueue.take(materializedQueue), STM.commit),
+        ),
         Effect.map(({ source }) => source),
       ),
     ),
