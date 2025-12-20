@@ -10,12 +10,12 @@ import { bindDependency, SignalContext } from "./signalContext";
 import * as SignalService from "./signalService";
 
 export interface ExternalSource<T> {
-  poll: () => Effect.Effect<T, never, never>;
+  poll: () => STM.STM<T, never, never>;
   emit: (
     onEmit: (
       value: T,
     ) => Effect.Effect<void, never, SignalService.SignalService>,
-  ) => Effect.Effect<void, never, never>;
+  ) => STM.STM<void, never, never>;
   start: () => STM.STM<void, never, never>;
   stop: () => STM.STM<void, never, never>;
 }
@@ -31,13 +31,13 @@ export class ExternalComputed<T = unknown>
   readonly [DependencySymbol]: DependencySignal<T, never, never> = this;
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
-  private _value: T;
+  private _value: TRef.TRef<T>;
   private _dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>;
   private _emitting: TRef.TRef<boolean>;
   private _source: ExternalSource<T>;
 
   constructor(
-    initial: T,
+    initial: TRef.TRef<T>,
     source: ExternalSource<T>,
     emitting: TRef.TRef<boolean>,
     dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>,
@@ -102,7 +102,8 @@ export class ExternalComputed<T = unknown>
 
   peek(): Effect.Effect<T, never, never> {
     return pipe(
-      Effect.suspend(() => Effect.succeed(this._value)),
+      TRef.get(this._value),
+      STM.commit,
       Observable.withSpan(this, "ExternalComputed.peek", {
         captureStackTrace: true,
       }),
@@ -118,11 +119,8 @@ export class ExternalComputed<T = unknown>
         beforeNotify: (watched) =>
           pipe(
             this._maybeSetEmitting(watched),
-            Effect.andThen(
-              Effect.sync(() => {
-                this._value = value;
-              }),
-            ),
+            STM.zipRight(TRef.set(this._value, value)),
+            STM.commit,
           ),
       }),
     );
@@ -158,17 +156,17 @@ export class ExternalComputed<T = unknown>
   }
 }
 
-export const make = <T>(
+export const makeSTM = <T>(
   source: ExternalSource<T>,
   options?: Observable.ObservableOptions,
 ) =>
   pipe(
-    Effect.all({
-      initial: source.poll(),
+    STM.all({
+      initial: pipe(source.poll(), STM.flatMap(TRef.make)),
       emitting: TRef.make(false),
       dependents: TSet.empty<WeakRef<DependentSignal> | DependentSignal>(),
     }),
-    Effect.map(
+    STM.map(
       ({ initial, emitting, dependents }) =>
         new ExternalComputed(
           initial,
@@ -178,7 +176,16 @@ export const make = <T>(
           options ?? {},
         ),
     ),
-    Effect.tap((signal) => source.emit((value) => signal.handleEmit(value))),
+    STM.tap((signal) => source.emit((value) => signal.handleEmit(value))),
+  );
+
+export const make = <T>(
+  source: ExternalSource<T>,
+  options?: Observable.ObservableOptions,
+) =>
+  pipe(
+    makeSTM(source, options),
+    STM.commit,
     Observable.withSpan(
       { [Observable.ObservableSymbol]: options ?? {} },
       "ExternalComputed.make",

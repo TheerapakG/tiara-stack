@@ -72,13 +72,12 @@ export const make = <T>(
       ),
     ),
     Effect.map(({ valueRef, startedRef, onEmitRef }) => ({
-      poll: () => pipe(TRef.get(valueRef), STM.commit),
+      poll: () => TRef.get(valueRef),
       emit: (
         onEmit: (
           value: T,
         ) => Effect.Effect<void, never, SignalService.SignalService>,
-      ) =>
-        pipe(TRef.set(onEmitRef, Option.some(onEmit)), STM.asVoid, STM.commit),
+      ) => TRef.set(onEmitRef, Option.some(onEmit)),
       start: () => TRef.set(startedRef, true),
       stop: () => TRef.set(startedRef, false),
     })),
