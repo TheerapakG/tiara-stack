@@ -5,7 +5,6 @@ import {
   Exit,
   Option,
   TQueue,
-  TSemaphore,
   TSet,
   STM,
   pipe,
@@ -38,14 +37,12 @@ export class Computed<A = never, E = never, R = never>
   private _dependencies: TSet.TSet<DependencySignal>;
   private _reference: WeakRef<Computed<A, E, R>>;
   private _queue: TQueue.TQueue<Exit.Exit<A, E>>;
-  private _semaphore: TSemaphore.TSemaphore;
 
   constructor(
     effect: Effect.Effect<A, E, R | SignalContext.SignalContext>,
     dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>,
     dependencies: TSet.TSet<DependencySignal>,
     queue: TQueue.TQueue<Exit.Exit<A, E>>,
-    semaphore: TSemaphore.TSemaphore,
     options: Observable.ObservableOptions,
   ) {
     super();
@@ -54,7 +51,6 @@ export class Computed<A = never, E = never, R = never>
     this._dependencies = dependencies;
     this._reference = new WeakRef(this);
     this._queue = queue;
-    this._semaphore = semaphore;
     this[Observable.ObservableSymbol] = options;
   }
 
@@ -212,7 +208,7 @@ export type Error<S extends Computed<unknown, unknown, unknown>> =
 export type Context<S extends Computed<unknown, unknown, unknown>> =
   Effect.Effect.Context<ReturnType<S["peek"]>>;
 
-export const make = <A = never, E = never, R = never>(
+export const makeSTM = <A = never, E = never, R = never>(
   effect: Effect.Effect<A, E, R>,
   options?: Observable.ObservableOptions,
 ) =>
@@ -221,10 +217,9 @@ export const make = <A = never, E = never, R = never>(
       dependents: TSet.empty<WeakRef<DependentSignal> | DependentSignal>(),
       dependencies: TSet.empty<DependencySignal>(),
       queue: TQueue.sliding<Exit.Exit<A, E>>(1),
-      semaphore: TSemaphore.make(1),
     }),
     STM.map(
-      ({ dependents, dependencies, queue, semaphore }) =>
+      ({ dependents, dependencies, queue }) =>
         new Computed<A, E, Exclude<R, SignalContext.SignalContext>>(
           effect as Effect.Effect<
             A,
@@ -234,10 +229,17 @@ export const make = <A = never, E = never, R = never>(
           dependents,
           dependencies,
           queue,
-          semaphore,
           options ?? {},
         ),
     ),
+  );
+
+export const make = <A = never, E = never, R = never>(
+  effect: Effect.Effect<A, E, R>,
+  options?: Observable.ObservableOptions,
+) =>
+  pipe(
+    makeSTM(effect, options),
     STM.commit,
     Observable.withSpan(
       { [Observable.ObservableSymbol]: options ?? {} },

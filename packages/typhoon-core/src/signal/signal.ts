@@ -132,8 +132,21 @@ export type Value<S extends Signal<unknown>> = Effect.Effect.Success<
   ReturnType<S["peek"]>
 >;
 
-export const make = <T>(value: T, options?: Observable.ObservableOptions) =>
+export const makeSTM = <T>(value: T, options?: Observable.ObservableOptions) =>
   pipe(
     TSet.empty<WeakRef<DependentSignal> | DependentSignal>(),
     STM.map((dependents) => new Signal(value, dependents, options ?? {})),
+  );
+
+export const make = <T>(value: T, options?: Observable.ObservableOptions) =>
+  pipe(
+    makeSTM(value, options),
+    STM.commit,
+    Observable.withSpan(
+      { [Observable.ObservableSymbol]: options ?? {} },
+      "Signal.make",
+      {
+        captureStackTrace: true,
+      },
+    ),
   );
