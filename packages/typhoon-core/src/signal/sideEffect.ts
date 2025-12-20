@@ -70,6 +70,7 @@ export class SideEffect<R = never> implements DependentSignal {
   notify(): Effect.Effect<unknown, never, SignalService.SignalService> {
     return pipe(
       this.clearDependencies(),
+      STM.commit,
       Effect.andThen(this.runOnce()),
       Observable.withSpan(this, "SideEffect.notify", {
         captureStackTrace: true,

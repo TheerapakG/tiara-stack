@@ -731,6 +731,7 @@ export const makeFromResultWithContext = <
                                   isResultComplete(queryResult),
                                 ),
                               ),
+                              STM.commit,
                               // Extract the query from the Result and materialize
                               Effect.andThen(
                                 zero.materialize(

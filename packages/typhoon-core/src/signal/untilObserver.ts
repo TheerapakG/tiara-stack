@@ -123,6 +123,7 @@ class UntilObserver<
     return pipe(
       TDeferred.poll(this._value),
       STM.zipLeft(this.clearDependencies()),
+      STM.commit,
       Effect.andThen(
         Option.match({
           onSome: () => Effect.void,

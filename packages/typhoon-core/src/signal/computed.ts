@@ -178,6 +178,7 @@ export class Computed<A = never, E = never, R = never>
     return pipe(
       this.clearDependencies(),
       STM.zipRight(this.reset()),
+      STM.commit,
       Observable.withSpan(this, "Computed.notify", {
         captureStackTrace: true,
       }),

@@ -217,6 +217,10 @@ export class WithScopeComputed<A = never, E = never, R = never>
       this.clearDependencies(),
       STM.zipRight(this.reset()),
       STM.unlessSTM(TRef.get(this._isScopeClosed)),
+      STM.commit,
+      Observable.withSpan(this, "WithScopeComputed.notify", {
+        captureStackTrace: true,
+      }),
     );
   }
 
@@ -238,7 +242,8 @@ export class WithScopeComputed<A = never, E = never, R = never>
   cleanup(): Effect.Effect<void, never, never> {
     return pipe(
       this.clearDependencies(),
-      Effect.andThen(pipe(TQueue.takeAll(this._queue), STM.commit)),
+      STM.zipRight(TQueue.takeAll(this._queue)),
+      STM.commit,
       Observable.withSpan(this, "WithScopeComputed.cleanup", {
         captureStackTrace: true,
       }),
