@@ -17,6 +17,7 @@ import {
   pipe,
   Scope,
   SynchronizedRef,
+  TRef,
   Match,
   flow,
   Array,
@@ -167,7 +168,7 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
     >,
     private readonly dirtyRef: SynchronizedRef.SynchronizedRef<boolean>,
     private readonly valueRef: SynchronizedRef.SynchronizedRef<{ "": T }>,
-    private readonly startedRef: SynchronizedRef.SynchronizedRef<boolean>,
+    private readonly startedRef: TRef.TRef<boolean>,
     private readonly onEmitRef: SynchronizedRef.SynchronizedRef<
       Option.Option<
         (
@@ -305,16 +306,16 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
           Effect.flatMap(Effect.transposeMapOption((onEmit) => onEmit(result))),
         ),
       ),
-      Effect.whenEffect(SynchronizedRef.get(this.startedRef)),
+      Effect.whenEffect(TRef.get(this.startedRef)),
     );
   }
 
   start() {
-    return SynchronizedRef.set(this.startedRef, true);
+    return TRef.set(this.startedRef, true);
   }
 
   stop() {
-    return SynchronizedRef.set(this.startedRef, false);
+    return TRef.set(this.startedRef, false);
   }
 }
 
@@ -352,7 +353,7 @@ const createSourceWithRefs = <
       valueRef: SynchronizedRef.make<{ "": T }>({
         "": undefined as T,
       }),
-      startedRef: SynchronizedRef.make(false),
+      startedRef: TRef.make(false),
       onEmitRef: SynchronizedRef.make<
         Option.Option<
           (

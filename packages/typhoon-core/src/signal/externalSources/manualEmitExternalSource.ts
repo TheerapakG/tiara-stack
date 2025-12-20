@@ -1,4 +1,4 @@
-import { Effect, Option, pipe, Ref } from "effect";
+import { Effect, Option, pipe, Ref, TRef } from "effect";
 import * as SignalService from "../signalService";
 import type { ExternalSource } from "../externalComputed";
 
@@ -36,7 +36,7 @@ export const make = <T>(
   pipe(
     Effect.all({
       valueRef: Ref.make(initial),
-      startedRef: Ref.make(false),
+      startedRef: TRef.make(false),
       onEmitRef: Ref.make<
         Option.Option<
           (value: T) => Effect.Effect<void, never, SignalService.SignalService>
@@ -51,8 +51,8 @@ export const make = <T>(
             value: T,
           ) => Effect.Effect<void, never, SignalService.SignalService>,
         ) => pipe(Ref.set(onEmitRef, Option.some(onEmit)), Effect.asVoid),
-        start: () => pipe(Ref.set(startedRef, true), Effect.asVoid),
-        stop: () => pipe(Ref.set(startedRef, false), Effect.asVoid),
+        start: () => TRef.set(startedRef, true),
+        stop: () => TRef.set(startedRef, false),
       },
       emitter: {
         emit: (value: T) =>
@@ -64,7 +64,7 @@ export const make = <T>(
                 Effect.flatMap(
                   Effect.transposeMapOption((onEmit) => onEmit(value)),
                 ),
-                Effect.whenEffect(Ref.get(startedRef)),
+                Effect.whenEffect(TRef.get(startedRef)),
               ),
             ),
           ),

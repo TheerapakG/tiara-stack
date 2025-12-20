@@ -1,11 +1,11 @@
-import { Context, Effect, pipe } from "effect";
+import { Context, Effect, Option, pipe, STM } from "effect";
 import { Observable } from "../observability";
 import type * as DependencySignal from "./dependencySignal";
 import * as DependentSignal from "./dependentSignal";
 import * as SignalService from "./signalService";
 
 type SignalContextShape = {
-  readonly signal: DependentSignal.DependentSignal;
+  readonly signal: Option.Option<DependentSignal.DependentSignal>;
 };
 const SignalContextTag: Context.TagClass<
   SignalContext,
@@ -14,41 +14,38 @@ const SignalContextTag: Context.TagClass<
 > = Context.Tag("SignalContext")<SignalContext, SignalContextShape>();
 export class SignalContext extends SignalContextTag {}
 
+export const empty = {
+  signal: Option.none(),
+};
+
 export const fromDependent = (
   dependent: DependentSignal.DependentSignal,
 ): Context.Tag.Service<SignalContext> => ({
-  signal: dependent,
+  signal: Option.some(dependent),
 });
 
-export const getSignal = (
+export const bindDependency = (
   dependency: DependencySignal.DependencySignal<unknown, unknown, unknown>,
-): Effect.Effect<DependentSignal.DependentSignal, never, SignalContext> =>
+): STM.STM<void, never, SignalContext> =>
   pipe(
     SignalContext,
-    Effect.map(({ signal }) => signal),
-    Observable.withSpan(dependency, "SignalContext.getSignal", {
-      captureStackTrace: true,
-    }),
-  );
-
-export const bindScopeDependency = (
-  dependency: DependencySignal.DependencySignal<unknown, unknown, unknown>,
-): Effect.Effect<void, never, SignalContext> =>
-  pipe(
-    getSignal(dependency),
-    Effect.flatMap((signal) =>
-      Effect.all([
-        pipe(
-          signal.getReferenceForDependency(),
-          Effect.andThen((reference) => dependency.addDependent(reference)),
-        ),
-        signal.addDependency(dependency),
-      ]),
+    STM.flatMap(({ signal }) =>
+      pipe(
+        signal,
+        Option.match({
+          onSome: (signal) =>
+            STM.all([
+              pipe(
+                signal.getReferenceForDependency(),
+                STM.flatMap((reference) => dependency.addDependent(reference)),
+              ),
+              signal.addDependency(dependency),
+            ]),
+          onNone: () => STM.void,
+        }),
+      ),
     ),
-    Observable.withSpan(dependency, "SignalContext.bindScopeDependency", {
-      captureStackTrace: true,
-    }),
-    Effect.ignore,
+    STM.asVoid,
   );
 
 export const runAndTrackEffect =
@@ -59,10 +56,25 @@ export const runAndTrackEffect =
     return pipe(
       effect,
       Effect.provideService(SignalContext, ctx),
-      Effect.tap(() => DependentSignal.reconcileAllDependencies(ctx.signal)),
-      Observable.withSpan(ctx.signal, "SignalContext.runAndTrackEffect", {
-        captureStackTrace: true,
-      }),
+      Effect.tap(() =>
+        pipe(
+          ctx.signal,
+          Option.match({
+            onSome: (signal) =>
+              DependentSignal.reconcileAllDependencies(signal),
+            onNone: () => Effect.void,
+          }),
+        ),
+      ),
+      Observable.withSpan(
+        Option.getOrElse(ctx.signal, () => ({
+          [Observable.ObservableSymbol]: {},
+        })),
+        "SignalContext.runAndTrackEffect",
+        {
+          captureStackTrace: true,
+        },
+      ),
     );
   };
 

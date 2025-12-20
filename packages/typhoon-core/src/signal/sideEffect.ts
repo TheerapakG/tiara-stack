@@ -1,12 +1,9 @@
-import { Context, Effect, HashSet, pipe, Scope } from "effect";
+import { Context, Effect, pipe, Scope, STM, TSet } from "effect";
 import { Observable } from "../observability";
 import { DependencySignal } from "./dependencySignal";
 import { DependentSignal, DependentSymbol } from "./dependentSignal";
-import {
-  fromDependent,
-  runAndTrackEffect,
-  SignalContext,
-} from "./signalContext";
+import { fromDependent, SignalContext } from "./signalContext";
+import * as SignalService from "./signalService";
 
 export class SideEffect<R = never> implements DependentSignal {
   readonly [DependentSymbol]: DependentSignal = this;
@@ -14,63 +11,66 @@ export class SideEffect<R = never> implements DependentSignal {
 
   private _effect: Effect.Effect<unknown, unknown, R | SignalContext>;
   private _context: Context.Context<R>;
-  private _dependencies: HashSet.HashSet<DependencySignal>;
+  private _dependencies: TSet.TSet<DependencySignal>;
 
   constructor(
     effect: Effect.Effect<unknown, unknown, R | SignalContext>,
     context: Context.Context<R>,
+    dependencies: TSet.TSet<DependencySignal>,
     options: Observable.ObservableOptions,
   ) {
     this._effect = effect;
     this._context = context;
-    this._dependencies = HashSet.empty();
+    this._dependencies = dependencies;
     this[Observable.ObservableSymbol] = options;
   }
 
+  runOnce(): Effect.Effect<void, never, SignalService.SignalService> {
+    return SignalService.enqueueRunTracked(
+      new SignalService.RunTrackedRequest({
+        effect: pipe(
+          this._effect,
+          Effect.catchAll(() => Effect.void),
+          Effect.provide(this._context),
+        ),
+        ctx: fromDependent(this),
+      }),
+    );
+  }
+
   addDependency(dependency: DependencySignal) {
-    return Effect.sync(() => {
-      this._dependencies = HashSet.add(this._dependencies, dependency);
-    });
+    return TSet.add(this._dependencies, dependency);
   }
 
   removeDependency(dependency: DependencySignal) {
-    return Effect.sync(() => {
-      this._dependencies = HashSet.remove(this._dependencies, dependency);
-    });
+    return TSet.remove(this._dependencies, dependency);
   }
 
   clearDependencies() {
-    return Effect.sync(() => {
-      HashSet.forEach(this._dependencies, (dependency) =>
+    return pipe(
+      TSet.forEach(this._dependencies, (dependency) =>
         dependency.removeDependent(this),
-      );
-      this._dependencies = HashSet.empty();
-    });
+      ),
+      STM.zipRight(TSet.removeIf(this._dependencies, () => true)),
+    );
   }
 
   getDependencies() {
-    return Effect.sync(() => HashSet.toValues(this._dependencies));
+    return TSet.toArray(this._dependencies);
   }
 
-  getReferenceForDependency(): Effect.Effect<
+  getReferenceForDependency(): STM.STM<
     WeakRef<DependentSignal> | DependentSignal,
     never,
     never
   > {
-    return Effect.sync(() => this);
+    return STM.succeed(this);
   }
 
-  notify(): Effect.Effect<unknown, never, never> {
+  notify(): Effect.Effect<unknown, never, SignalService.SignalService> {
     return pipe(
-      Effect.all([
-        this.clearDependencies(),
-        pipe(
-          fromDependent(this),
-          runAndTrackEffect(this._effect),
-          Effect.catchAll(() => Effect.void),
-        ),
-      ]),
-      Effect.provide(this._context),
+      this.clearDependencies(),
+      Effect.andThen(this.runOnce()),
       Observable.withSpan(this, "SideEffect.notify", {
         captureStackTrace: true,
       }),
@@ -94,22 +94,29 @@ export const makeWithContext = <R = never>(
   effect: Effect.Effect<unknown, unknown, R>,
   context: Context.Context<NoInfer<Exclude<R, SignalContext>>>,
   options?: Observable.ObservableOptions,
-): Effect.Effect<SideEffect<Exclude<R, SignalContext>>, never, Scope.Scope> =>
+): Effect.Effect<
+  SideEffect<Exclude<R, SignalContext>>,
+  never,
+  Scope.Scope | SignalService.SignalService
+> =>
   pipe(
     Effect.acquireRelease(
       pipe(
-        Effect.succeed(
-          new SideEffect<Exclude<R, SignalContext>>(
-            effect as Effect.Effect<
-              unknown,
-              unknown,
-              SignalContext | Exclude<R, SignalContext>
-            >,
-            context,
-            options ?? {},
-          ),
+        TSet.empty<DependencySignal>(),
+        Effect.map(
+          (dependencies) =>
+            new SideEffect<Exclude<R, SignalContext>>(
+              effect as Effect.Effect<
+                unknown,
+                unknown,
+                SignalContext | Exclude<R, SignalContext>
+              >,
+              context,
+              dependencies,
+              options ?? {},
+            ),
         ),
-        Effect.tap((sideEffect) => sideEffect.notify()),
+        Effect.tap((sideEffect) => sideEffect.runOnce()),
       ),
       (sideEffect) => sideEffect.cleanup(),
     ),
@@ -177,8 +184,11 @@ export const tapWithContext =
 export const make = (
   effect: Effect.Effect<unknown, unknown, SignalContext>,
   options?: Observable.ObservableOptions,
-): Effect.Effect<SideEffect<never>, never, Scope.Scope> =>
-  makeWithContext(effect, Context.empty(), options);
+): Effect.Effect<
+  SideEffect<never>,
+  never,
+  Scope.Scope | SignalService.SignalService
+> => makeWithContext(effect, Context.empty(), options);
 
 export const mapEffect =
   <A, E1, R1, B, E2>(

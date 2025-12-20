@@ -1,4 +1,4 @@
-import { Effect, Effectable, HashSet, pipe } from "effect";
+import { Effect, Effectable, pipe, STM, TSet, TRef } from "effect";
 import { Observable } from "../observability";
 import {
   DependencySignal,
@@ -6,7 +6,7 @@ import {
   getDependentsUpdateOrder,
 } from "./dependencySignal";
 import { DependentSignal } from "./dependentSignal";
-import { bindScopeDependency, SignalContext } from "./signalContext";
+import { bindDependency, SignalContext } from "./signalContext";
 import * as SignalService from "./signalService";
 
 export interface ExternalSource<T> {
@@ -16,8 +16,8 @@ export interface ExternalSource<T> {
       value: T,
     ) => Effect.Effect<void, never, SignalService.SignalService>,
   ) => Effect.Effect<void, never, never>;
-  start: () => Effect.Effect<void, never, never>;
-  stop: () => Effect.Effect<void, never, never>;
+  start: () => STM.STM<void, never, never>;
+  stop: () => STM.STM<void, never, never>;
 }
 
 export class ExternalComputed<T = unknown>
@@ -32,64 +32,50 @@ export class ExternalComputed<T = unknown>
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
   private _value: T;
-  private _dependents: HashSet.HashSet<
-    WeakRef<DependentSignal> | DependentSignal
-  >;
-  private _emitting: boolean;
+  private _dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>;
+  private _emitting: TRef.TRef<boolean>;
   private _source: ExternalSource<T>;
 
   constructor(
     initial: T,
     source: ExternalSource<T>,
+    emitting: TRef.TRef<boolean>,
+    dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>,
     options: Observable.ObservableOptions,
   ) {
     super();
     this._value = initial;
     this._source = source;
-    this._dependents = HashSet.empty();
-    this._emitting = false;
+    this._dependents = dependents;
+    this._emitting = emitting;
     this[Observable.ObservableSymbol] = options;
   }
 
   addDependent(dependent: WeakRef<DependentSignal> | DependentSignal) {
-    return Effect.sync(() => {
-      this._dependents = HashSet.add(this._dependents, dependent);
-    });
+    return TSet.add(this._dependents, dependent);
   }
 
   removeDependent(dependent: WeakRef<DependentSignal> | DependentSignal) {
-    return Effect.sync(() => {
-      this._dependents = HashSet.remove(this._dependents, dependent);
-    });
+    return TSet.remove(this._dependents, dependent);
   }
 
   clearDependents() {
-    return Effect.sync(() => {
-      HashSet.forEach(this._dependents, (dependent) =>
+    return pipe(
+      TSet.forEach(this._dependents, (dependent) =>
         dependent instanceof WeakRef
-          ? dependent.deref()?.removeDependency(this)
+          ? (dependent.deref()?.removeDependency(this) ?? STM.void)
           : dependent.removeDependency(this),
-      );
-      this._dependents = HashSet.empty();
-    });
+      ),
+      STM.zipRight(TSet.removeIf(this._dependents, () => true)),
+    );
   }
 
-  getDependents(): Effect.Effect<
+  getDependents(): STM.STM<
     (WeakRef<DependentSignal> | DependentSignal)[],
     never,
     never
   > {
-    return Effect.sync(() => HashSet.toValues(this._dependents));
-  }
-
-  valueLocal(): Effect.Effect<T, never, SignalContext> {
-    return pipe(
-      bindScopeDependency(this),
-      Effect.flatMap(() => this.peek()),
-      Observable.withSpan(this, "ExternalComputed.valueLocal", {
-        captureStackTrace: true,
-      }),
-    );
+    return TSet.toArray(this._dependents);
   }
 
   value(): Effect.Effect<
@@ -98,15 +84,8 @@ export class ExternalComputed<T = unknown>
     SignalContext | SignalService.SignalService
   > {
     return pipe(
-      SignalContext,
-      Effect.flatMap((signalContext) =>
-        SignalService.SignalService.enqueueRunTracked(
-          new SignalService.RunTrackedRequest({
-            effect: this.valueLocal(),
-            ctx: signalContext,
-          }),
-        ),
-      ),
+      bindDependency(this),
+      Effect.flatMap(() => this.peek()),
       Observable.withSpan(this, "ExternalComputed.value", {
         captureStackTrace: true,
       }),
@@ -133,58 +112,47 @@ export class ExternalComputed<T = unknown>
   handleEmit(
     value: T,
   ): Effect.Effect<void, never, SignalService.SignalService> {
-    return pipe(
-      SignalService.SignalService.enqueueNotify(
-        new SignalService.NotifyRequest({
-          signal: this,
-          beforeNotify: (watched) =>
-            pipe(
-              this._maybeSetEmitting(watched),
-              Effect.andThen(
-                Effect.sync(() => {
-                  this._value = value;
-                }),
-              ),
+    return SignalService.enqueueNotify(
+      new SignalService.NotifyRequest({
+        signal: this,
+        beforeNotify: (watched) =>
+          pipe(
+            this._maybeSetEmitting(watched),
+            Effect.andThen(
+              Effect.sync(() => {
+                this._value = value;
+              }),
             ),
-        }),
-      ),
-      Observable.withSpan(this, "ExternalComputed.emit", {
-        captureStackTrace: true,
+          ),
       }),
     );
   }
 
-  reconcile(): Effect.Effect<void, never, never> {
+  reconcile(): STM.STM<void, never, never> {
     return pipe(
       getDependentsUpdateOrder(this),
-      Effect.map((dependents) =>
-        dependents.some((d) => !(d instanceof WeakRef)),
-      ),
-      Effect.flatMap((watched) => this._maybeSetEmitting(watched)),
-      Observable.withSpan(this, "ExternalComputed.reconcile", {
-        captureStackTrace: true,
-      }),
+      STM.map((dependents) => dependents.some((d) => !(d instanceof WeakRef))),
+      STM.flatMap((watched) => this._maybeSetEmitting(watched)),
     );
   }
 
-  private _maybeSetEmitting(
-    watched: boolean,
-  ): Effect.Effect<void, never, never> {
+  private _maybeSetEmitting(watched: boolean): STM.STM<void, never, never> {
     return pipe(
-      Effect.suspend(() => {
-        if (watched && !this._emitting) {
+      TRef.get(this._emitting),
+      STM.flatMap((emitting) => {
+        if (watched && !emitting) {
           return pipe(
             this._source.start(),
-            Effect.tap(() => Effect.sync(() => (this._emitting = true))),
+            STM.tap(() => TRef.set(this._emitting, true)),
           );
         }
-        if (!watched && this._emitting) {
+        if (!watched && emitting) {
           return pipe(
             this._source.stop(),
-            Effect.tap(() => Effect.sync(() => (this._emitting = false))),
+            STM.tap(() => TRef.set(this._emitting, false)),
           );
         }
-        return Effect.void;
+        return STM.void;
       }),
     );
   }
@@ -195,9 +163,20 @@ export const make = <T>(
   options?: Observable.ObservableOptions,
 ) =>
   pipe(
-    source.poll(),
+    Effect.all({
+      initial: source.poll(),
+      emitting: TRef.make(false),
+      dependents: TSet.empty<WeakRef<DependentSignal> | DependentSignal>(),
+    }),
     Effect.map(
-      (initial) => new ExternalComputed(initial, source, options ?? {}),
+      ({ initial, emitting, dependents }) =>
+        new ExternalComputed(
+          initial,
+          source,
+          emitting,
+          dependents,
+          options ?? {},
+        ),
     ),
     Effect.tap((signal) => source.emit((value) => signal.handleEmit(value))),
     Observable.withSpan(

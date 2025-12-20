@@ -1,11 +1,12 @@
 import {
   Effect,
   Effectable,
+  Function,
   Exit,
-  HashSet,
   Option,
   TQueue,
   TSemaphore,
+  TSet,
   STM,
   pipe,
   Types,
@@ -17,19 +18,14 @@ import {
   notifyAllDependents,
 } from "./dependencySignal";
 import { DependentSignal, DependentSymbol } from "./dependentSignal";
-import {
-  bindScopeDependency,
-  fromDependent,
-  runAndTrackEffect,
-  SignalContext,
-} from "./signalContext";
+import * as SignalContext from "./signalContext";
 import * as SignalService from "./signalService";
 
 export class Computed<A = never, E = never, R = never>
   extends Effectable.Class<
     A,
     E,
-    R | SignalContext | SignalService.SignalService
+    R | SignalContext.SignalContext | SignalService.SignalService
   >
   implements DependentSignal, DependencySignal<A, E, R>
 {
@@ -37,25 +33,25 @@ export class Computed<A = never, E = never, R = never>
   readonly [DependentSymbol]: DependentSignal = this;
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
-  private _effect: Effect.Effect<A, E, R | SignalContext>;
-  private _dependents: HashSet.HashSet<
-    WeakRef<DependentSignal> | DependentSignal
-  >;
-  private _dependencies: HashSet.HashSet<DependencySignal>;
+  private _effect: Effect.Effect<A, E, R | SignalContext.SignalContext>;
+  private _dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>;
+  private _dependencies: TSet.TSet<DependencySignal>;
   private _reference: WeakRef<Computed<A, E, R>>;
   private _queue: TQueue.TQueue<Exit.Exit<A, E>>;
   private _semaphore: TSemaphore.TSemaphore;
 
   constructor(
-    effect: Effect.Effect<A, E, R | SignalContext>,
+    effect: Effect.Effect<A, E, R | SignalContext.SignalContext>,
+    dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>,
+    dependencies: TSet.TSet<DependencySignal>,
     queue: TQueue.TQueue<Exit.Exit<A, E>>,
     semaphore: TSemaphore.TSemaphore,
     options: Observable.ObservableOptions,
   ) {
     super();
     this._effect = effect;
-    this._dependents = HashSet.empty();
-    this._dependencies = HashSet.empty();
+    this._dependents = dependents;
+    this._dependencies = dependencies;
     this._reference = new WeakRef(this);
     this._queue = queue;
     this._semaphore = semaphore;
@@ -63,89 +59,61 @@ export class Computed<A = never, E = never, R = never>
   }
 
   addDependent(dependent: WeakRef<DependentSignal> | DependentSignal) {
-    return Effect.sync(() => {
-      this._dependents = HashSet.add(this._dependents, dependent);
-    });
+    return TSet.add(this._dependents, dependent);
   }
 
   removeDependent(dependent: WeakRef<DependentSignal> | DependentSignal) {
-    return Effect.sync(() => {
-      this._dependents = HashSet.remove(this._dependents, dependent);
-    });
+    return TSet.remove(this._dependents, dependent);
   }
 
   clearDependents() {
-    return Effect.sync(() => {
-      HashSet.forEach(this._dependents, (dependent) =>
+    return pipe(
+      TSet.forEach(this._dependents, (dependent) =>
         dependent instanceof WeakRef
-          ? dependent.deref()?.removeDependency(this)
+          ? (dependent.deref()?.removeDependency(this) ?? STM.void)
           : dependent.removeDependency(this),
-      );
-      this._dependents = HashSet.empty();
-    });
+      ),
+      STM.zipRight(TSet.removeIf(this._dependents, () => true)),
+    );
   }
 
   addDependency(dependency: DependencySignal) {
-    return Effect.sync(() => {
-      this._dependencies = HashSet.add(this._dependencies, dependency);
-    });
+    return TSet.add(this._dependencies, dependency);
   }
 
   removeDependency(dependency: DependencySignal) {
-    return Effect.sync(() => {
-      this._dependencies = HashSet.remove(this._dependencies, dependency);
-    });
+    return TSet.remove(this._dependencies, dependency);
   }
 
   clearDependencies() {
-    return Effect.sync(() => {
-      HashSet.forEach(this._dependencies, (dependency) =>
+    return pipe(
+      TSet.forEach(this._dependencies, (dependency) =>
         dependency.removeDependent(this),
-      );
-      this._dependencies = HashSet.empty();
-    });
+      ),
+      STM.zipRight(TSet.removeIf(this._dependencies, () => true)),
+    );
   }
 
-  getDependencies(): Effect.Effect<DependencySignal[], never, never> {
-    return Effect.sync(() => HashSet.toValues(this._dependencies));
+  getDependencies(): STM.STM<DependencySignal[], never, never> {
+    return TSet.toArray(this._dependencies);
   }
 
-  getDependents(): Effect.Effect<
+  getDependents(): STM.STM<
     (WeakRef<DependentSignal> | DependentSignal)[],
     never,
     never
   > {
-    return Effect.sync(() => HashSet.toValues(this._dependents));
-  }
-
-  valueLocal(): Effect.Effect<A, E, R | SignalContext> {
-    return pipe(
-      bindScopeDependency(this),
-      Effect.flatMap(() => this.peek()),
-      Observable.withSpan(this, "Computed.valueLocal", {
-        captureStackTrace: true,
-      }),
-    );
+    return TSet.toArray(this._dependents);
   }
 
   value(): Effect.Effect<
     A,
     E,
-    R | SignalContext | SignalService.SignalService
+    R | SignalContext.SignalContext | SignalService.SignalService
   > {
     return pipe(
-      Effect.all({
-        context: Effect.context<R>(),
-        signalContext: SignalContext,
-      }),
-      Effect.flatMap(({ context, signalContext }) =>
-        SignalService.SignalService.enqueueRunTracked(
-          new SignalService.RunTrackedRequest({
-            effect: pipe(this.valueLocal(), Effect.provide(context)),
-            ctx: signalContext,
-          }),
-        ),
-      ),
+      SignalContext.bindDependency(this),
+      Effect.flatMap(() => this.peek()),
       Observable.withSpan(this, "Computed.value", {
         captureStackTrace: true,
       }),
@@ -155,68 +123,72 @@ export class Computed<A = never, E = never, R = never>
   commit(): Effect.Effect<
     A,
     E,
-    R | SignalContext | SignalService.SignalService
+    R | SignalContext.SignalContext | SignalService.SignalService
   > {
     return this.value();
   }
 
-  peek(): Effect.Effect<A, E, R> {
+  peek(): Effect.Effect<A, E, R | SignalService.SignalService> {
     return pipe(
-      TQueue.peekOption(this._queue),
+      STM.all({
+        queue: TQueue.peekOption(this._queue),
+        context: STM.context<R>(),
+      }),
       STM.commit,
-      Effect.flatMap(
-        Option.match({
-          onSome: Effect.succeed,
-          onNone: () =>
-            TSemaphore.withPermit(this._semaphore)(
+      Effect.flatMap(({ queue, context }) =>
+        pipe(
+          queue,
+          Option.match({
+            onSome: Function.identity,
+            onNone: () =>
               pipe(
-                fromDependent(this),
-                runAndTrackEffect(this._effect),
-                Effect.exit,
-                Effect.tap((exit) =>
-                  pipe(TQueue.offer(this._queue, exit), STM.commit),
+                SignalService.enqueueRunTracked(
+                  new SignalService.RunTrackedRequest({
+                    effect: pipe(
+                      this._effect,
+                      Effect.exit,
+                      Effect.tap((exit) =>
+                        pipe(TQueue.offer(this._queue, exit), STM.commit),
+                      ),
+                      Effect.flatten,
+                      Effect.provide(context),
+                    ),
+                    ctx: SignalContext.fromDependent(this),
+                  }),
                 ),
               ),
-            ),
-        }),
+          }),
+        ),
       ),
-      Effect.flatten,
       Observable.withSpan(this, "Computed.peek", {
         captureStackTrace: true,
       }),
     );
   }
 
-  reset(): Effect.Effect<void, never, never> {
-    return pipe(
-      TQueue.takeAll(this._queue),
-      STM.commit,
-      Effect.asVoid,
-      Observable.withSpan(this, "Computed.reset", {
-        captureStackTrace: true,
-      }),
-    );
+  reset(): STM.STM<void, never, never> {
+    return pipe(TQueue.takeAll(this._queue), STM.asVoid);
   }
 
-  getReferenceForDependency(): Effect.Effect<
+  getReferenceForDependency(): STM.STM<
     WeakRef<DependentSignal> | DependentSignal,
     never,
     never
   > {
-    return Effect.sync(() => this._reference);
+    return STM.succeed(this._reference);
   }
 
   notify(): Effect.Effect<unknown, never, never> {
     return pipe(
       this.clearDependencies(),
-      Effect.andThen(this.reset()),
+      STM.zipRight(this.reset()),
       Observable.withSpan(this, "Computed.notify", {
         captureStackTrace: true,
       }),
     );
   }
 
-  recompute(): Effect.Effect<void, never, never> {
+  recompute(): Effect.Effect<void, never, SignalService.SignalService> {
     return pipe(
       this,
       notifyAllDependents(() => this.reset()),
@@ -226,8 +198,8 @@ export class Computed<A = never, E = never, R = never>
     );
   }
 
-  reconcile(): Effect.Effect<void, never, never> {
-    return Effect.void;
+  reconcile(): STM.STM<void, never, never> {
+    return STM.void;
   }
 }
 
@@ -246,13 +218,21 @@ export const make = <A = never, E = never, R = never>(
 ) =>
   pipe(
     STM.all({
+      dependents: TSet.empty<WeakRef<DependentSignal> | DependentSignal>(),
+      dependencies: TSet.empty<DependencySignal>(),
       queue: TQueue.sliding<Exit.Exit<A, E>>(1),
       semaphore: TSemaphore.make(1),
     }),
     STM.map(
-      ({ queue, semaphore }) =>
-        new Computed<A, E, Exclude<R, SignalContext>>(
-          effect as Effect.Effect<A, E, Exclude<R, SignalContext>>,
+      ({ dependents, dependencies, queue, semaphore }) =>
+        new Computed<A, E, Exclude<R, SignalContext.SignalContext>>(
+          effect as Effect.Effect<
+            A,
+            E,
+            Exclude<R, SignalContext.SignalContext>
+          >,
+          dependents,
+          dependencies,
           queue,
           semaphore,
           options ?? {},
