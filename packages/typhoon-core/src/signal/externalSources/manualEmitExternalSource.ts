@@ -1,4 +1,4 @@
-import { Effect, Option, pipe, Ref } from "effect";
+import { Effect, Option, pipe, STM, TRef } from "effect";
 import * as SignalService from "../signalService";
 import type { ExternalSource } from "../externalComputed";
 
@@ -35,9 +35,9 @@ export const make = <T>(
 > =>
   pipe(
     Effect.all({
-      valueRef: Ref.make(initial),
-      startedRef: Ref.make(false),
-      onEmitRef: Ref.make<
+      valueRef: TRef.make(initial),
+      startedRef: TRef.make(false),
+      onEmitRef: TRef.make<
         Option.Option<
           (value: T) => Effect.Effect<void, never, SignalService.SignalService>
         >
@@ -45,26 +45,28 @@ export const make = <T>(
     }),
     Effect.map(({ valueRef, startedRef, onEmitRef }) => ({
       source: {
-        poll: () => Ref.get(valueRef),
+        poll: () => TRef.get(valueRef),
         emit: (
           onEmit: (
             value: T,
           ) => Effect.Effect<void, never, SignalService.SignalService>,
-        ) => pipe(Ref.set(onEmitRef, Option.some(onEmit)), Effect.asVoid),
-        start: () => pipe(Ref.set(startedRef, true), Effect.asVoid),
-        stop: () => pipe(Ref.set(startedRef, false), Effect.asVoid),
+        ) => TRef.set(onEmitRef, Option.some(onEmit)),
+        start: () => TRef.set(startedRef, true),
+        stop: () => TRef.set(startedRef, false),
       },
       emitter: {
         emit: (value: T) =>
           pipe(
-            Ref.set(valueRef, value),
+            TRef.set(valueRef, value),
+            STM.commit,
             Effect.tap(() =>
               pipe(
-                Ref.get(onEmitRef),
+                TRef.get(onEmitRef),
+                STM.commit,
                 Effect.flatMap(
                   Effect.transposeMapOption((onEmit) => onEmit(value)),
                 ),
-                Effect.whenEffect(Ref.get(startedRef)),
+                Effect.whenEffect(pipe(TRef.get(startedRef), STM.commit)),
               ),
             ),
           ),

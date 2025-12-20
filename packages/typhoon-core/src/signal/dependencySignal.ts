@@ -1,4 +1,4 @@
-import { Array, Effect, Effectable, pipe } from "effect";
+import { Array, Effect, Effectable, pipe, STM } from "effect";
 import { Observable } from "../observability";
 import type * as DependentSignal from "./dependentSignal";
 import { SignalContext } from "./signalContext";
@@ -23,15 +23,15 @@ export abstract class DependencySignal<A = never, E = never, R = never>
     dependent:
       | WeakRef<DependentSignal.DependentSignal>
       | DependentSignal.DependentSignal,
-  ): Effect.Effect<void, never, never>;
+  ): STM.STM<void, never, never>;
   abstract removeDependent(
     dependent:
       | WeakRef<DependentSignal.DependentSignal>
       | DependentSignal.DependentSignal,
-  ): Effect.Effect<void, never, never>;
-  abstract clearDependents(): Effect.Effect<void, never, never>;
+  ): STM.STM<void, never, never>;
+  abstract clearDependents(): STM.STM<void, never, never>;
 
-  abstract getDependents(): Effect.Effect<
+  abstract getDependents(): STM.STM<
     (
       | WeakRef<DependentSignal.DependentSignal>
       | DependentSignal.DependentSignal
@@ -40,15 +40,14 @@ export abstract class DependencySignal<A = never, E = never, R = never>
     never
   >;
 
-  abstract valueLocal(): Effect.Effect<A, E, R | SignalContext>;
   abstract value(): Effect.Effect<
     A,
     E,
     R | SignalContext | SignalService.SignalService
   >;
-  abstract peek(): Effect.Effect<A, E, R>;
+  abstract peek(): Effect.Effect<A, E, R | SignalService.SignalService>;
 
-  abstract reconcile(): Effect.Effect<void, never, never>;
+  abstract reconcile(): STM.STM<void, never, never>;
 }
 
 export const isDependencySignal = (
@@ -63,36 +62,36 @@ export const isDependencySignal = (
 
 export const getDependentsUpdateOrder = (
   dependency: DependencySignal<unknown, unknown, unknown>,
-): Effect.Effect<DependentSignal.DependentSignal[], never, never> =>
+): STM.STM<DependentSignal.DependentSignal[], never, never> =>
   pipe(
-    Effect.Do,
-    Effect.bind("thisDependents", () =>
+    STM.Do,
+    STM.bind("thisDependents", () =>
       pipe(
         dependency.getDependents(),
-        Effect.andThen(
+        STM.map(
           Array.map((dependent) =>
             dependent instanceof WeakRef ? dependent.deref() : dependent,
           ),
         ),
-        Effect.andThen(Array.filter((dependent) => dependent !== undefined)),
+        STM.map(Array.filter((dependent) => dependent !== undefined)),
       ),
     ),
-    Effect.bind("nestedDependents", ({ thisDependents }) =>
+    STM.bind("nestedDependents", ({ thisDependents }) =>
       pipe(
-        Effect.all(
+        STM.all(
           pipe(
             thisDependents,
             Array.filter((dependency) => isDependencySignal(dependency)),
             Array.map(getDependentsUpdateOrder),
           ),
         ),
-        Effect.map(Array.flatten),
+        STM.map(Array.flatten),
       ),
     ),
-    Effect.let("dependents", ({ thisDependents, nestedDependents }) =>
+    STM.let("dependents", ({ thisDependents, nestedDependents }) =>
       Array.appendAll(thisDependents, nestedDependents),
     ),
-    Effect.map(({ dependents }) => {
+    STM.map(({ dependents }) => {
       const seen = new Set();
       return dependents
         .reverse()
@@ -103,25 +102,18 @@ export const getDependentsUpdateOrder = (
         })
         .reverse();
     }),
-    Observable.withSpan(
-      dependency,
-      "DependencySignal.getDependentsUpdateOrder",
-      {
-        captureStackTrace: true,
-      },
-    ),
   );
 
 export const notifyAllDependents =
   (beforeNotify: (watched: boolean) => Effect.Effect<void, never, never>) =>
   (signal: DependencySignal<unknown, unknown, unknown>) =>
     pipe(
-      Effect.Do,
-      Effect.bind("dependents", () => getDependentsUpdateOrder(signal)),
-      Effect.let("watched", ({ dependents }) =>
+      STM.Do,
+      STM.bind("dependents", () => getDependentsUpdateOrder(signal)),
+      STM.let("watched", ({ dependents }) =>
         dependents.some((dependent) => !isDependencySignal(dependent)),
       ),
-      Effect.tap(signal.clearDependents()),
+      STM.tap(() => signal.clearDependents()),
       Effect.tap(({ watched }) => beforeNotify(watched)),
       Effect.flatMap(({ dependents }) =>
         Effect.all(dependents.map((dependent) => dependent.notify())),

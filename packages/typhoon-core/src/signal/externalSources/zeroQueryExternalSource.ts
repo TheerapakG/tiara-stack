@@ -16,12 +16,13 @@ import {
   Option,
   pipe,
   Scope,
-  SynchronizedRef,
+  TRef,
   Match,
-  flow,
   Array,
   Predicate,
   Fiber,
+  STM,
+  TQueue,
 } from "effect";
 import * as SignalService from "../signalService";
 import {
@@ -158,100 +159,98 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
     Output
 {
   constructor(
-    private readonly viewRef: SynchronizedRef.SynchronizedRef<
-      Option.Option<ViewState>
-    >,
-    private readonly inputResultCompleteRef: SynchronizedRef.SynchronizedRef<boolean>,
-    private readonly zeroResultTypeRef: SynchronizedRef.SynchronizedRef<
+    private readonly viewRef: TRef.TRef<Option.Option<ViewState>>,
+    private readonly inputResultCompleteRef: TRef.TRef<boolean>,
+    private readonly zeroResultTypeRef: TRef.TRef<
       Either.Either<"unknown" | "complete", ZeroQueryError>
     >,
-    private readonly dirtyRef: SynchronizedRef.SynchronizedRef<boolean>,
-    private readonly valueRef: SynchronizedRef.SynchronizedRef<{ "": T }>,
-    private readonly startedRef: SynchronizedRef.SynchronizedRef<boolean>,
-    private readonly onEmitRef: SynchronizedRef.SynchronizedRef<
+    private readonly dirtyRef: TRef.TRef<boolean>,
+    private readonly valueRef: TRef.TRef<{ "": T }>,
+    private readonly startedRef: TRef.TRef<boolean>,
+    private readonly onEmitRef: TRef.TRef<
       Option.Option<
         (
           value: Result<Either.Either<T, ZeroQueryError | E>>,
         ) => Effect.Effect<void, never, SignalService.SignalService>
       >
     >,
-    private readonly inputErrorRef: SynchronizedRef.SynchronizedRef<
-      Option.Option<E>
-    >,
+    private readonly inputErrorRef: TRef.TRef<Option.Option<E>>,
   ) {}
 
   hydrate() {
-    return SynchronizedRef.updateEffect(this.dirtyRef, () =>
-      pipe(
-        Effect.all({
-          value: SynchronizedRef.get(this.valueRef),
-          viewOption: SynchronizedRef.get(this.viewRef),
-        }),
-        Effect.tap(({ value, viewOption }) =>
-          pipe(
-            viewOption,
-            Option.match({
-              onSome: ({ input, format }) =>
-                pipe(
-                  input.fetch({}),
-                  Array.forEach((node) =>
-                    applyChange(
-                      value,
-                      { type: "add", node },
-                      input.getSchema(),
-                      "",
-                      format,
-                    ),
+    return pipe(
+      STM.all({
+        value: TRef.get(this.valueRef),
+        viewOption: TRef.get(this.viewRef),
+      }),
+      STM.commit,
+      Effect.tap(({ value, viewOption }) =>
+        pipe(
+          viewOption,
+          Option.match({
+            onSome: ({ input, format }) =>
+              pipe(
+                input.fetch({}),
+                Array.forEach((node) =>
+                  applyChange(
+                    value,
+                    { type: "add", node },
+                    input.getSchema(),
+                    "",
+                    format,
                   ),
                 ),
-              onNone: () => {},
-            }),
-          ),
+              ),
+            onNone: () => Effect.void,
+          }),
         ),
-        Effect.as(true),
       ),
+      Effect.andThen(pipe(TRef.set(this.dirtyRef, true), STM.commit)),
     );
   }
 
   flush() {
-    return SynchronizedRef.updateEffect(this.dirtyRef, (dirty) =>
-      pipe(dirty ? this.doEmit() : Effect.void, Effect.as(false)),
+    return pipe(
+      TRef.getAndSet(this.dirtyRef, false),
+      STM.commit,
+      Effect.flatMap((dirty) =>
+        pipe(dirty ? this.doEmit() : Effect.void, Effect.as(false)),
+      ),
     );
   }
 
   push(change: Change) {
     Effect.runFork(
-      SynchronizedRef.updateEffect(this.dirtyRef, () =>
-        pipe(
-          Effect.all({
-            value: SynchronizedRef.get(this.valueRef),
-            viewOption: SynchronizedRef.get(this.viewRef),
-          }),
-          Effect.tap(({ value, viewOption }) =>
-            pipe(
-              viewOption,
-              Option.match({
-                onSome: ({ input, format }) =>
-                  applyChange(value, change, input.getSchema(), "", format),
-                onNone: () => {},
-              }),
-            ),
+      pipe(
+        STM.all({
+          value: TRef.get(this.valueRef),
+          viewOption: TRef.get(this.viewRef),
+        }),
+        STM.commit,
+        Effect.tap(({ value, viewOption }) =>
+          pipe(
+            viewOption,
+            Option.match({
+              onSome: ({ input, format }) =>
+                applyChange(value, change, input.getSchema(), "", format),
+              onNone: () => Effect.void,
+            }),
           ),
-          Effect.as(true),
         ),
+        Effect.andThen(pipe(TRef.set(this.dirtyRef, true), STM.commit)),
       ),
     );
   }
 
   poll() {
     return pipe(
-      Effect.all({
-        value: SynchronizedRef.get(this.valueRef),
-        inputResultComplete: SynchronizedRef.get(this.inputResultCompleteRef),
-        zeroResultType: SynchronizedRef.get(this.zeroResultTypeRef),
-        inputError: SynchronizedRef.get(this.inputErrorRef),
+      STM.all({
+        value: TRef.get(this.valueRef),
+        inputResultComplete: TRef.get(this.inputResultCompleteRef),
+        zeroResultType: TRef.get(this.zeroResultTypeRef),
+        inputError: TRef.get(this.inputErrorRef),
       }),
-      Effect.map(({ value, inputResultComplete, zeroResultType, inputError }) =>
+      STM.map(({ value, inputResultComplete, zeroResultType, inputError }) =>
         pipe(
           inputError,
           Option.match({
@@ -293,44 +292,45 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
       value: Result<Either.Either<T, ZeroQueryError | E>>,
     ) => Effect.Effect<void, never, SignalService.SignalService>,
   ) {
-    return SynchronizedRef.set(this.onEmitRef, Option.some(onEmit));
+    return TRef.set(this.onEmitRef, Option.some(onEmit));
   }
 
   doEmit() {
     return pipe(
       this.poll(),
+      STM.commit,
       Effect.tap((result) =>
         pipe(
-          SynchronizedRef.get(this.onEmitRef),
+          TRef.get(this.onEmitRef),
+          STM.commit,
           Effect.flatMap(Effect.transposeMapOption((onEmit) => onEmit(result))),
         ),
       ),
-      Effect.whenEffect(SynchronizedRef.get(this.startedRef)),
+      Effect.whenEffect(pipe(TRef.get(this.startedRef), STM.commit)),
     );
   }
 
   start() {
-    return SynchronizedRef.set(this.startedRef, true);
+    return TRef.set(this.startedRef, true);
   }
 
   stop() {
-    return SynchronizedRef.set(this.startedRef, false);
+    return TRef.set(this.startedRef, false);
   }
 }
 
 /**
  * Destroys the current view and clears the view ref
  */
-const destroyView = (
-  viewRef: SynchronizedRef.SynchronizedRef<Option.Option<ViewState>>,
-) =>
-  SynchronizedRef.updateEffect(
-    viewRef,
-    flow(
-      Effect.transposeMapOption(({ onDestroy }) =>
-        Effect.sync(() => onDestroy()),
-      ),
-      Effect.as(Option.none()),
+const destroyView = (viewRef: TRef.TRef<Option.Option<ViewState>>) =>
+  pipe(
+    TRef.getAndSet(viewRef, Option.none()),
+    STM.commit,
+    Effect.tap(
+      Option.match({
+        onSome: ({ onDestroy }) => pipe(Effect.sync(() => onDestroy())),
+        onNone: () => Effect.void,
+      }),
     ),
   );
 
@@ -342,31 +342,31 @@ const createSourceWithRefs = <
   E = never,
 >() =>
   pipe(
-    Effect.all({
-      viewRef: SynchronizedRef.make<Option.Option<ViewState>>(Option.none()),
-      inputResultCompleteRef: SynchronizedRef.make(true), // Default true for non-Result inputs
-      zeroResultTypeRef: SynchronizedRef.make<
+    STM.all({
+      viewRef: TRef.make<Option.Option<ViewState>>(Option.none()),
+      inputResultCompleteRef: TRef.make(true), // Default true for non-Result inputs
+      zeroResultTypeRef: TRef.make<
         Either.Either<"unknown" | "complete", ZeroQueryError>
       >(Either.right("unknown")),
-      dirtyRef: SynchronizedRef.make(false),
-      valueRef: SynchronizedRef.make<{ "": T }>({
+      dirtyRef: TRef.make(false),
+      valueRef: TRef.make<{ "": T }>({
         "": undefined as T,
       }),
-      startedRef: SynchronizedRef.make(false),
-      onEmitRef: SynchronizedRef.make<
+      startedRef: TRef.make(false),
+      onEmitRef: TRef.make<
         Option.Option<
           (
             value: Result<Either.Either<T, ZeroQueryError | E>>,
           ) => Effect.Effect<void, never, SignalService.SignalService>
         >
       >(Option.none()),
-      inputErrorRef: SynchronizedRef.make<Option.Option<E>>(Option.none()),
-      queryCompletePromiseFiberRef: SynchronizedRef.make<
+      inputErrorRef: TRef.make<Option.Option<E>>(Option.none()),
+      queryCompletePromiseFiberRef: TRef.make<
         Option.Option<Fiber.Fiber<void, never>>
       >(Option.none()),
-      materializedLatch: Effect.makeLatch(false),
+      materializedQueue: TQueue.sliding<void>(1),
     }),
-    Effect.let(
+    STM.let(
       "source",
       ({
         viewRef,
@@ -397,15 +397,15 @@ const createSourceWithRefs = <
 const createMaterializeCallback =
   <T extends ReadonlyJSONValue | View, E = never>(
     source: ZeroQueryExternalSource<T, E>,
-    viewRef: SynchronizedRef.SynchronizedRef<Option.Option<ViewState>>,
-    zeroResultTypeRef: SynchronizedRef.SynchronizedRef<
+    viewRef: TRef.TRef<Option.Option<ViewState>>,
+    zeroResultTypeRef: TRef.TRef<
       Either.Either<"unknown" | "complete", ZeroQueryError>
     >,
-    valueRef: SynchronizedRef.SynchronizedRef<{ "": T }>,
-    queryCompletePromiseFiberRef: SynchronizedRef.SynchronizedRef<
+    valueRef: TRef.TRef<{ "": T }>,
+    queryCompletePromiseFiberRef: TRef.TRef<
       Option.Option<Fiber.Fiber<void, never>>
     >,
-    materializedLatch: Effect.Latch,
+    materializedQueue: TQueue.TQueue<void>,
   ) =>
   (
     _query: unknown,
@@ -418,46 +418,8 @@ const createMaterializeCallback =
   ) =>
     pipe(
       Effect.Do,
-      Effect.andThen(() => destroyView(viewRef)),
-      Effect.andThen(() =>
-        SynchronizedRef.updateEffect(
-          queryCompletePromiseFiberRef,
-          flow(
-            Effect.transposeMapOption((fiber) => Fiber.interrupt(fiber)),
-            Effect.as(Option.none()),
-          ),
-        ),
-      ),
-      Effect.andThen(() =>
-        SynchronizedRef.set(viewRef, Option.some({ input, format, onDestroy })),
-      ),
-      Effect.andThen(() =>
-        SynchronizedRef.set(valueRef, {
-          "": (format.singular ? undefined : []) as T,
-        }),
-      ),
-      Effect.andThen(() =>
-        pipe(
-          Match.value(queryComplete),
-          Match.when(true, () =>
-            SynchronizedRef.set(zeroResultTypeRef, Either.right("complete")),
-          ),
-          Match.when(Predicate.hasProperty("error"), (error) =>
-            SynchronizedRef.set(
-              zeroResultTypeRef,
-              Either.left(
-                rawZeroQueryErrorToZeroQueryError(error as RawZeroQueryError),
-              ),
-            ),
-          ),
-          Match.orElse(() =>
-            SynchronizedRef.set(zeroResultTypeRef, Either.right("unknown")),
-          ),
-        ),
-      ),
-      Effect.andThen(() => input.setOutput(source)),
-      Effect.andThen(() => source.hydrate()),
-      Effect.andThen(() =>
+      Effect.tap(() => destroyView(viewRef)),
+      Effect.bind("newQueryCompletePromiseFiber", () =>
         pipe(
           Match.value(queryComplete),
           Match.when(Predicate.isPromiseLike, (queryComplete) =>
@@ -470,23 +432,66 @@ const createMaterializeCallback =
               Effect.as("complete" as const),
               Effect.either,
               Effect.tap((result) =>
-                SynchronizedRef.set(zeroResultTypeRef, result),
+                pipe(TRef.set(zeroResultTypeRef, result), STM.commit),
               ),
               Effect.andThen(source.doEmit()),
               Effect.asVoid,
 
               Effect.forkDaemon,
-              Effect.andThen((fiber) =>
-                SynchronizedRef.set(
-                  queryCompletePromiseFiberRef,
-                  Option.some(fiber),
+              Effect.map(Option.some),
+            ),
+          ),
+          Match.orElse(() => Effect.succeedNone),
+        ),
+      ),
+      Effect.bind(
+        "oldQueryCompletePromiseFiber",
+        ({ newQueryCompletePromiseFiber }) =>
+          pipe(
+            TRef.set(viewRef, Option.some({ input, format, onDestroy })),
+            STM.zipRight(
+              TRef.set(valueRef, {
+                "": (format.singular ? undefined : []) as T,
+              }),
+            ),
+            STM.zipRight(
+              pipe(
+                Match.value(queryComplete),
+                Match.when(true, () =>
+                  TRef.set(zeroResultTypeRef, Either.right("complete")),
+                ),
+                Match.when(Predicate.hasProperty("error"), (error) =>
+                  TRef.set(
+                    zeroResultTypeRef,
+                    Either.left(
+                      rawZeroQueryErrorToZeroQueryError(
+                        error as RawZeroQueryError,
+                      ),
+                    ),
+                  ),
+                ),
+                Match.orElse(() =>
+                  TRef.set(zeroResultTypeRef, Either.right("unknown")),
                 ),
               ),
             ),
+            STM.zipRight(
+              TRef.getAndSet(
+                queryCompletePromiseFiberRef,
+                newQueryCompletePromiseFiber,
+              ),
+            ),
+            STM.commit,
           ),
-          Match.orElse(() => Effect.void),
+      ),
+      Effect.andThen(({ oldQueryCompletePromiseFiber }) =>
+        pipe(
+          oldQueryCompletePromiseFiber,
+          Effect.transposeMapOption((fiber) => Fiber.interrupt(fiber)),
         ),
       ),
+      Effect.andThen(() => input.setOutput(source)),
+      Effect.andThen(() => source.hydrate()),
       Effect.andThen(() =>
         pipe(
           SignalService.SignalService,
@@ -504,7 +509,9 @@ const createMaterializeCallback =
           ),
         ),
       ),
-      Effect.andThen(() => materializedLatch.open),
+      Effect.andThen(() =>
+        pipe(TQueue.offer(materializedQueue, undefined), STM.commit),
+      ),
       Effect.asVoid,
     );
 
@@ -532,6 +539,7 @@ export const makeWithContext = <
     Effect.andThen((zero) =>
       pipe(
         createSourceWithRefs<T, E>(),
+        STM.commit,
         Effect.tap(
           ({
             source,
@@ -541,7 +549,7 @@ export const makeWithContext = <
             valueRef,
             inputErrorRef,
             queryCompletePromiseFiberRef,
-            materializedLatch,
+            materializedQueue,
           }) =>
             pipe(
               SignalService.SignalService,
@@ -558,30 +566,26 @@ export const makeWithContext = <
                         Either.match({
                           onLeft: (error) =>
                             pipe(
-                              SynchronizedRef.set(
-                                inputErrorRef,
-                                Option.some(error),
-                              ),
-                              // Input errors with non-Result input are considered complete
+                              destroyView(viewRef),
                               Effect.andThen(
-                                SynchronizedRef.set(
-                                  inputResultCompleteRef,
-                                  true,
+                                pipe(
+                                  TRef.set(inputErrorRef, Option.some(error)), // Input errors with non-Result input are considered complete
+                                  STM.zipRight(
+                                    TRef.set(inputResultCompleteRef, true),
+                                  ),
+                                  STM.commit,
                                 ),
                               ),
-                              Effect.andThen(destroyView(viewRef)),
                               Effect.andThen(source.doEmit()),
                             ),
                           onRight: (query) =>
                             pipe(
-                              SynchronizedRef.set(inputErrorRef, Option.none()),
+                              TRef.set(inputErrorRef, Option.none()),
                               // Non-Result input is always considered complete
-                              Effect.andThen(
-                                SynchronizedRef.set(
-                                  inputResultCompleteRef,
-                                  true,
-                                ),
+                              STM.zipRight(
+                                TRef.set(inputResultCompleteRef, true),
                               ),
+                              STM.commit,
                               Effect.andThen(
                                 zero.materialize(
                                   query,
@@ -591,7 +595,7 @@ export const makeWithContext = <
                                     zeroResultTypeRef,
                                     valueRef,
                                     queryCompletePromiseFiberRef,
-                                    materializedLatch,
+                                    materializedQueue,
                                   ),
                                   options,
                                 ),
@@ -610,7 +614,9 @@ export const makeWithContext = <
         Effect.tap(({ viewRef }) =>
           Effect.addFinalizer(() => destroyView(viewRef)),
         ),
-        Effect.tap(({ materializedLatch }) => materializedLatch.await),
+        Effect.tap(({ materializedQueue }) =>
+          pipe(TQueue.take(materializedQueue), STM.commit),
+        ),
         Effect.map(({ source }) => source),
       ),
     ),
@@ -676,9 +682,10 @@ export const makeFromResultWithContext = <
       pipe(
         createSourceWithRefs<T, E>(),
         // Set inputResultCompleteRef to false initially for Result inputs
-        Effect.tap(({ inputResultCompleteRef }) =>
-          SynchronizedRef.set(inputResultCompleteRef, false),
+        STM.tap(({ inputResultCompleteRef }) =>
+          TRef.set(inputResultCompleteRef, false),
         ),
+        STM.commit,
         Effect.tap(
           ({
             source,
@@ -688,7 +695,7 @@ export const makeFromResultWithContext = <
             valueRef,
             inputErrorRef,
             queryCompletePromiseFiberRef,
-            materializedLatch,
+            materializedQueue,
           }) =>
             pipe(
               SignalService.SignalService,
@@ -705,28 +712,28 @@ export const makeFromResultWithContext = <
                         Either.match({
                           onLeft: (error) =>
                             pipe(
-                              SynchronizedRef.set(
-                                inputErrorRef,
-                                Option.some(error),
-                              ),
+                              destroyView(viewRef),
                               Effect.andThen(
-                                SynchronizedRef.set(
-                                  inputResultCompleteRef,
-                                  true,
+                                pipe(
+                                  TRef.set(inputErrorRef, Option.some(error)),
+                                  STM.zipRight(
+                                    TRef.set(inputResultCompleteRef, true),
+                                  ),
+                                  STM.commit,
                                 ),
                               ),
-                              Effect.andThen(destroyView(viewRef)),
                               Effect.andThen(source.doEmit()),
                             ),
                           onRight: (queryResult) =>
                             pipe(
-                              SynchronizedRef.set(inputErrorRef, Option.none()),
-                              Effect.andThen(
-                                SynchronizedRef.set(
+                              TRef.set(inputErrorRef, Option.none()),
+                              STM.zipRight(
+                                TRef.set(
                                   inputResultCompleteRef,
                                   isResultComplete(queryResult),
                                 ),
                               ),
+                              STM.commit,
                               // Extract the query from the Result and materialize
                               Effect.andThen(
                                 zero.materialize(
@@ -737,7 +744,7 @@ export const makeFromResultWithContext = <
                                     zeroResultTypeRef,
                                     valueRef,
                                     queryCompletePromiseFiberRef,
-                                    materializedLatch,
+                                    materializedQueue,
                                   ),
                                   options,
                                 ),
@@ -756,7 +763,9 @@ export const makeFromResultWithContext = <
         Effect.tap(({ viewRef }) =>
           Effect.addFinalizer(() => destroyView(viewRef)),
         ),
-        Effect.tap(({ materializedLatch }) => materializedLatch.await),
+        Effect.tap(({ materializedQueue }) =>
+          pipe(TQueue.take(materializedQueue), STM.commit),
+        ),
         Effect.map(({ source }) => source),
       ),
     ),

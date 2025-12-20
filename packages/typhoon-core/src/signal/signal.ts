@@ -1,9 +1,9 @@
-import { Effect, Effectable, HashSet, pipe } from "effect";
+import { Effect, Effectable, pipe, STM, TSet } from "effect";
 import { Observable } from "../observability";
 import { DependencySignal, DependencySymbol } from "./dependencySignal";
 import { DependentSignal } from "./dependentSignal";
 import * as SignalService from "./signalService";
-import { bindScopeDependency, SignalContext } from "./signalContext";
+import { bindDependency, SignalContext } from "./signalContext";
 
 export class Signal<T = unknown>
   extends Effectable.Class<
@@ -17,56 +17,44 @@ export class Signal<T = unknown>
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
   private _value: T;
-  private _dependents: HashSet.HashSet<
-    WeakRef<DependentSignal> | DependentSignal
-  >;
+  private _dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>;
 
-  constructor(value: T, options: Observable.ObservableOptions) {
+  constructor(
+    value: T,
+    dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>,
+    options: Observable.ObservableOptions,
+  ) {
     super();
     this._value = value;
-    this._dependents = HashSet.empty();
+    this._dependents = dependents;
     this[Observable.ObservableSymbol] = options;
   }
 
   addDependent(dependent: WeakRef<DependentSignal> | DependentSignal) {
-    return Effect.sync(() => {
-      this._dependents = HashSet.add(this._dependents, dependent);
-    });
+    return TSet.add(this._dependents, dependent);
   }
 
   removeDependent(dependent: WeakRef<DependentSignal> | DependentSignal) {
-    return Effect.sync(() => {
-      this._dependents = HashSet.remove(this._dependents, dependent);
-    });
+    return TSet.remove(this._dependents, dependent);
   }
 
   clearDependents() {
-    return Effect.sync(() => {
-      HashSet.forEach(this._dependents, (dependent) =>
+    return pipe(
+      TSet.forEach(this._dependents, (dependent) =>
         dependent instanceof WeakRef
-          ? dependent.deref()?.removeDependency(this)
+          ? (dependent.deref()?.removeDependency(this) ?? STM.void)
           : dependent.removeDependency(this),
-      );
-      this._dependents = HashSet.empty();
-    });
+      ),
+      STM.zipRight(TSet.removeIf(this._dependents, () => true)),
+    );
   }
 
-  getDependents(): Effect.Effect<
+  getDependents(): STM.STM<
     (WeakRef<DependentSignal> | DependentSignal)[],
     never,
     never
   > {
-    return Effect.sync(() => HashSet.toValues(this._dependents));
-  }
-
-  valueLocal(): Effect.Effect<T, never, SignalContext> {
-    return pipe(
-      bindScopeDependency(this),
-      Effect.flatMap(() => this.peek()),
-      Observable.withSpan(this, "Signal.valueLocal", {
-        captureStackTrace: true,
-      }),
-    );
+    return TSet.toArray(this._dependents);
   }
 
   value(): Effect.Effect<
@@ -75,15 +63,8 @@ export class Signal<T = unknown>
     SignalContext | SignalService.SignalService
   > {
     return pipe(
-      SignalContext,
-      Effect.flatMap((signalContext) =>
-        SignalService.SignalService.enqueueRunTracked(
-          new SignalService.RunTrackedRequest({
-            effect: this.valueLocal(),
-            ctx: signalContext,
-          }),
-        ),
-      ),
+      bindDependency(this),
+      Effect.flatMap(() => this.peek()),
       Observable.withSpan(this, "Signal.value", {
         captureStackTrace: true,
       }),
@@ -108,20 +89,15 @@ export class Signal<T = unknown>
   }
 
   setValue(value: T): Effect.Effect<void, never, SignalService.SignalService> {
-    return pipe(
-      SignalService.SignalService.enqueueNotify(
-        new SignalService.NotifyRequest({
-          signal: this,
-          beforeNotify: () =>
-            Effect.suspend(() =>
-              Effect.sync(() => {
-                this._value = value;
-              }),
-            ),
-        }),
-      ),
-      Observable.withSpan(this, "Signal.setValue", {
-        captureStackTrace: true,
+    return SignalService.enqueueNotify(
+      new SignalService.NotifyRequest({
+        signal: this,
+        beforeNotify: () =>
+          Effect.suspend(() =>
+            Effect.sync(() => {
+              this._value = value;
+            }),
+          ),
       }),
     );
   }
@@ -129,31 +105,26 @@ export class Signal<T = unknown>
   updateValue(
     updater: (value: T) => Effect.Effect<T>,
   ): Effect.Effect<void, never, SignalService.SignalService> {
-    return pipe(
-      SignalService.SignalService.enqueueNotify(
-        new SignalService.NotifyRequest({
-          signal: this,
-          beforeNotify: () =>
-            Effect.suspend(() =>
-              pipe(
-                updater(this._value),
-                Effect.tap((value) =>
-                  Effect.sync(() => {
-                    this._value = value;
-                  }),
-                ),
+    return SignalService.enqueueNotify(
+      new SignalService.NotifyRequest({
+        signal: this,
+        beforeNotify: () =>
+          Effect.suspend(() =>
+            pipe(
+              updater(this._value),
+              Effect.tap((value) =>
+                Effect.sync(() => {
+                  this._value = value;
+                }),
               ),
             ),
-        }),
-      ),
-      Observable.withSpan(this, "Signal.updateValue", {
-        captureStackTrace: true,
+          ),
       }),
     );
   }
 
-  reconcile(): Effect.Effect<void, never, never> {
-    return Effect.void;
+  reconcile(): STM.STM<void, never, never> {
+    return STM.void;
   }
 }
 
@@ -161,5 +132,21 @@ export type Value<S extends Signal<unknown>> = Effect.Effect.Success<
   ReturnType<S["peek"]>
 >;
 
+export const makeSTM = <T>(value: T, options?: Observable.ObservableOptions) =>
+  pipe(
+    TSet.empty<WeakRef<DependentSignal> | DependentSignal>(),
+    STM.map((dependents) => new Signal(value, dependents, options ?? {})),
+  );
+
 export const make = <T>(value: T, options?: Observable.ObservableOptions) =>
-  new Signal(value, options ?? {});
+  pipe(
+    makeSTM(value, options),
+    STM.commit,
+    Observable.withSpan(
+      { [Observable.ObservableSymbol]: options ?? {} },
+      "Signal.make",
+      {
+        captureStackTrace: true,
+      },
+    ),
+  );

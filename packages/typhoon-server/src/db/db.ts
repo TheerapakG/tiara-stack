@@ -142,7 +142,7 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
                 Array.map((subscription) => subscription.source),
                 Computed.makeAll,
                 Effect.tap((aggregatedSource) =>
-                  SignalContext.bindScopeDependency(aggregatedSource),
+                  SignalContext.bindDependency(aggregatedSource),
                 ),
               ),
             ),

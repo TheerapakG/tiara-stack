@@ -1,6 +1,7 @@
-import { Array, Effect, pipe } from "effect";
+import { Array, Effect, pipe, STM } from "effect";
 import { Observable } from "../observability";
 import type * as DependencySignal from "./dependencySignal";
+import type * as SignalService from "./signalService";
 
 export const DependentSymbol: unique symbol = Symbol(
   "Typhoon/Signal/Dependent",
@@ -12,24 +13,24 @@ export abstract class DependentSignal implements Observable.Observable {
 
   abstract addDependency(
     dependency: DependencySignal.DependencySignal<unknown, unknown, unknown>,
-  ): Effect.Effect<void, never, never>;
+  ): STM.STM<void, never, never>;
   abstract removeDependency(
     dependency: DependencySignal.DependencySignal<unknown, unknown, unknown>,
-  ): Effect.Effect<void, never, never>;
-  abstract clearDependencies(): Effect.Effect<void, never, never>;
+  ): STM.STM<void, never, never>;
+  abstract clearDependencies(): STM.STM<void, never, never>;
 
-  abstract getDependencies(): Effect.Effect<
+  abstract getDependencies(): STM.STM<
     DependencySignal.DependencySignal<unknown, unknown, unknown>[],
     never,
     never
   >;
 
-  abstract getReferenceForDependency(): Effect.Effect<
+  abstract getReferenceForDependency(): STM.STM<
     WeakRef<DependentSignal> | DependentSignal,
     never,
     never
   >;
-  abstract notify(): Effect.Effect<unknown, never, never>;
+  abstract notify(): Effect.Effect<unknown, never, SignalService.SignalService>;
 }
 
 export const isDependentSignal = (signal: unknown): signal is DependentSignal =>
@@ -44,32 +45,32 @@ export const mask = (signal: DependentSignal) => signal;
 
 export const getDependencyUpdateOrder = (
   dependent: DependentSignal,
-): Effect.Effect<
+): STM.STM<
   DependencySignal.DependencySignal<unknown, unknown, unknown>[],
   never,
   never
 > =>
   pipe(
-    Effect.Do,
-    Effect.bind("thisDependencies", () => dependent.getDependencies()),
-    Effect.bind("nestedDependencies", ({ thisDependencies }) =>
+    STM.Do,
+    STM.bind("thisDependencies", () => dependent.getDependencies()),
+    STM.bind("nestedDependencies", ({ thisDependencies }) =>
       pipe(
-        Effect.all(
+        STM.all(
           thisDependencies.map((dependency) =>
             isDependentSignal(dependency as any)
               ? getDependencyUpdateOrder(
                   dependency as unknown as DependentSignal,
                 )
-              : Effect.succeed([]),
+              : STM.succeed([]),
           ),
         ),
-        Effect.map(Array.flatten),
+        STM.map(Array.flatten),
       ),
     ),
-    Effect.let("dependencies", ({ thisDependencies, nestedDependencies }) =>
+    STM.let("dependencies", ({ thisDependencies, nestedDependencies }) =>
       Array.appendAll(thisDependencies, nestedDependencies),
     ),
-    Effect.map(({ dependencies }) => {
+    STM.map(({ dependencies }) => {
       const seen = new Set();
       return dependencies
         .reverse()
@@ -80,20 +81,14 @@ export const getDependencyUpdateOrder = (
         })
         .reverse();
     }),
-    Observable.withSpan(dependent, "DependentSignal.getDependencyUpdateOrder", {
-      captureStackTrace: true,
-    }),
   );
 
 export const reconcileAllDependencies = (
   dependent: DependentSignal,
-): Effect.Effect<void, never, never> =>
+): STM.STM<void, never, never> =>
   pipe(
     getDependencyUpdateOrder(dependent),
-    Effect.flatMap((deps) =>
-      Effect.forEach(deps, (dep) => dep.reconcile(), { discard: true }),
+    STM.flatMap((deps) =>
+      STM.forEach(deps, (dep) => dep.reconcile(), { discard: true }),
     ),
-    Observable.withSpan(dependent, "DependentSignal.reconcileAllDependencies", {
-      captureStackTrace: true,
-    }),
   );

@@ -1,4 +1,13 @@
-import { Effect, Option, pipe, PubSub, Queue, Ref, Scope } from "effect";
+import {
+  Effect,
+  Option,
+  pipe,
+  TQueue,
+  TPubSub,
+  Scope,
+  STM,
+  TRef,
+} from "effect";
 import type { ExternalSource } from "../externalComputed";
 import * as SignalService from "../signalService";
 
@@ -16,12 +25,12 @@ import * as SignalService from "../signalService";
  * - Emits every value via the onEmit callback when started (no change detection)
  * - Handles interruption gracefully when the queue unsubscribes
  *
- * @param pubsub - The PubSub instance to subscribe to
+ * @param pubsub - The TPubSub instance to subscribe to
  * @param initial - The initial value to use as the polling result
  * @returns An ExternalSource that requires Scope during creation
  */
 export const make = <T>(
-  pubsub: PubSub.PubSub<T>,
+  pubsub: TPubSub.TPubSub<T>,
   initial: T,
 ): Effect.Effect<
   ExternalSource<T>,
@@ -29,10 +38,10 @@ export const make = <T>(
   Scope.Scope | SignalService.SignalService
 > =>
   pipe(
-    Effect.all({
-      valueRef: Ref.make(initial),
-      startedRef: Ref.make(false),
-      onEmitRef: Ref.make<
+    STM.all({
+      valueRef: TRef.make(initial),
+      startedRef: TRef.make(false),
+      onEmitRef: TRef.make<
         Option.Option<
           (value: T) => Effect.Effect<void, never, SignalService.SignalService>
         >
@@ -40,20 +49,20 @@ export const make = <T>(
     }),
     Effect.tap(({ valueRef, startedRef, onEmitRef }) =>
       pipe(
-        PubSub.subscribe(pubsub),
+        TPubSub.subscribe(pubsub),
         Effect.tap((queue) =>
-          // Spawn a single fiber that both stores and emits values
-          // This fiber runs regardless of start/stop state to keep values fresh
           pipe(
-            Queue.take(queue),
-            Effect.tap((value) => Ref.set(valueRef, value)),
+            TQueue.take(queue),
+            STM.tap((value) => TRef.set(valueRef, value)),
+            STM.commit,
             Effect.tap((value) =>
               pipe(
-                Ref.get(onEmitRef),
+                TRef.get(onEmitRef),
+                STM.commit,
                 Effect.flatMap(
                   Effect.transposeMapOption((onEmit) => onEmit(value)),
                 ),
-                Effect.whenEffect(Ref.get(startedRef)),
+                Effect.whenEffect(pipe(TRef.get(startedRef), STM.commit)),
               ),
             ),
             Effect.forever,
@@ -63,13 +72,13 @@ export const make = <T>(
       ),
     ),
     Effect.map(({ valueRef, startedRef, onEmitRef }) => ({
-      poll: () => Ref.get(valueRef),
+      poll: () => TRef.get(valueRef),
       emit: (
         onEmit: (
           value: T,
         ) => Effect.Effect<void, never, SignalService.SignalService>,
-      ) => pipe(Ref.set(onEmitRef, Option.some(onEmit)), Effect.asVoid),
-      start: () => pipe(Ref.set(startedRef, true), Effect.asVoid),
-      stop: () => pipe(Ref.set(startedRef, false), Effect.asVoid),
+      ) => TRef.set(onEmitRef, Option.some(onEmit)),
+      start: () => TRef.set(startedRef, true),
+      stop: () => TRef.set(startedRef, false),
     })),
   );

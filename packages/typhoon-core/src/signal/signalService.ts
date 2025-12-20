@@ -4,10 +4,12 @@ import {
   Deferred,
   Effect,
   FiberRef,
+  Layer,
   Match,
+  Option,
   pipe,
-  Queue,
-  Scope,
+  TQueue,
+  STM,
 } from "effect";
 import { Observable } from "../observability";
 import { DependencySignal, notifyAllDependents } from "./dependencySignal";
@@ -26,6 +28,7 @@ const NotifyRequestTaggedClass: new (
 export class NotifyRequest extends NotifyRequestTaggedClass {}
 
 class NotifyWorkItem extends Data.TaggedClass("NotifyWorkItem")<{
+  readonly service: Context.Tag.Service<SignalService>;
   readonly request: NotifyRequest;
 }> {}
 
@@ -50,113 +53,121 @@ class RunTrackedWorkItem extends Data.TaggedClass("RunTrackedWorkItem")<{
 
 type WorkItem = NotifyWorkItem | RunTrackedWorkItem;
 
-type SignalServiceInterface = {
-  enqueueNotify: (request: NotifyRequest) => Effect.Effect<void, never, never>;
-  _enqueueRunTracked: <A, E>(
+type SignalServiceShape = {
+  readonly enqueueNotify: (
+    request: NotifyRequest,
+  ) => Effect.Effect<void, never, SignalService>;
+  readonly enqueueRunTracked: <A, E>(
     request: RunTrackedRequest<A, E>,
-  ) => Effect.Effect<A, E, never>;
+  ) => Effect.Effect<A, E, SignalService>;
 };
-
-const signalServiceDefinition: {
-  scoped: Effect.Effect<SignalServiceInterface, never, Scope.Scope>;
-  accessors: true;
-  dependencies: [];
-} = {
-  scoped: pipe(
-    Effect.all({
-      queue: Queue.unbounded<WorkItem>(),
-      workerFiberRef: FiberRef.make(false),
-    }),
-    Effect.tap(({ queue, workerFiberRef }) =>
-      pipe(
-        Queue.take(queue),
-        Effect.flatMap((item) =>
-          Effect.locally(
-            workerFiberRef,
-            true,
-          )(
-            pipe(
-              Match.value(item),
-              Match.tagsExhaustive({
-                NotifyWorkItem: ({ request }) =>
-                  pipe(
-                    notifyAllDependents(request.beforeNotify)(request.signal),
-                    Effect.catchAllCause((cause) => Effect.logError(cause)),
-                  ),
-                RunTrackedWorkItem: ({ deferred, request }) =>
-                  pipe(
-                    runAndTrackEffect(request.effect)(request.ctx),
-                    Effect.intoDeferred(deferred),
-                    Effect.catchAllCause((cause) => Effect.logError(cause)),
-                  ),
-              }),
-            ),
-          ),
-        ),
-        Effect.forever,
-        Effect.withSpan("SignalService.worker", {
-          captureStackTrace: true,
-        }),
-        Effect.forkScoped,
-      ),
-    ),
-    Effect.map(({ queue, workerFiberRef }) => ({
-      enqueueNotify: (
-        request: NotifyRequest,
-      ): Effect.Effect<void, never, never> =>
-        pipe(
-          Queue.offer(queue, new NotifyWorkItem({ request })),
-          Effect.asVoid,
-          Observable.withSpan(request.signal, "SignalService.enqueueNotify", {
-            captureStackTrace: true,
-          }),
-        ),
-      _enqueueRunTracked: <A, E>(
-        request: RunTrackedRequest<A, E>,
-      ): Effect.Effect<A, E, never> =>
-        pipe(
-          workerFiberRef,
-          FiberRef.get,
-          Effect.flatMap((isWorkerFiber) =>
-            isWorkerFiber
-              ? runAndTrackEffect(request.effect)(request.ctx)
-              : pipe(
-                  Deferred.make<A, E>(),
-                  Effect.tap((deferred) =>
-                    Queue.offer(
-                      queue,
-                      new RunTrackedWorkItem({
-                        deferred: deferred as Deferred.Deferred<
-                          unknown,
-                          unknown
-                        >,
-                        request,
-                      }),
-                    ),
-                  ),
-                  Effect.flatMap((deferred) => Deferred.await(deferred)),
-                ),
-          ),
-          Observable.withSpan(
-            request.ctx.signal,
-            "SignalService.enqueueRunTracked",
-            {
-              captureStackTrace: true,
-            },
-          ),
-        ),
-    })),
-  ),
-  accessors: true,
-  dependencies: [],
-};
-
-const BaseSignalServiceClass: Effect.Service.Class<
+const SignalServiceTag: Context.TagClass<
   SignalService,
   "SignalService",
-  typeof signalServiceDefinition
-> = Effect.Service<SignalService>()("SignalService", signalServiceDefinition);
-export class SignalService extends BaseSignalServiceClass {
-  static enqueueRunTracked = <A, E>(request: RunTrackedRequest<A, E>) =>
-    SignalService.use((service) => service._enqueueRunTracked(request));
-}
+  SignalServiceShape
+> = Context.Tag("SignalService")<SignalService, SignalServiceShape>();
+export class SignalService extends SignalServiceTag {}
+
+export const layer: Layer.Layer<SignalService, never, never> = pipe(
+  Effect.all({
+    queue: TQueue.unbounded<WorkItem>(),
+    workerFiberRef: FiberRef.make(false),
+  }),
+  Effect.tap(({ queue, workerFiberRef }) =>
+    pipe(
+      TQueue.take(queue),
+      STM.commit,
+      Effect.flatMap((item) =>
+        Effect.locally(
+          workerFiberRef,
+          true,
+        )(
+          pipe(
+            Match.value(item),
+            Match.tagsExhaustive({
+              NotifyWorkItem: ({ request, service }) =>
+                pipe(
+                  notifyAllDependents(request.beforeNotify)(request.signal),
+                  Effect.provideService(SignalService, service),
+                  Effect.catchAllCause((cause) => Effect.logError(cause)),
+                ),
+              RunTrackedWorkItem: ({ deferred, request }) =>
+                pipe(
+                  runAndTrackEffect(request.effect)(request.ctx),
+                  Effect.intoDeferred(deferred),
+                  Effect.catchAllCause((cause) => Effect.logError(cause)),
+                ),
+            }),
+          ),
+        ),
+      ),
+      Effect.forever,
+      Effect.withSpan("SignalService.worker", {
+        captureStackTrace: true,
+      }),
+      Effect.forkScoped,
+    ),
+  ),
+  Effect.map(({ queue, workerFiberRef }) => ({
+    enqueueNotify: (request: NotifyRequest) =>
+      pipe(
+        Effect.all({
+          isWorkerFiber: FiberRef.get(workerFiberRef),
+          service: SignalService,
+        }),
+        Effect.flatMap(({ isWorkerFiber, service }) =>
+          isWorkerFiber
+            ? notifyAllDependents(request.beforeNotify)(request.signal)
+            : TQueue.offer(queue, new NotifyWorkItem({ request, service })),
+        ),
+        Effect.asVoid,
+      ),
+    enqueueRunTracked: <A, E>(request: RunTrackedRequest<A, E>) =>
+      pipe(
+        FiberRef.get(workerFiberRef),
+        Effect.flatMap((isWorkerFiber) =>
+          isWorkerFiber
+            ? runAndTrackEffect(request.effect)(request.ctx)
+            : pipe(
+                Deferred.make<A, E>(),
+                Effect.tap((deferred) =>
+                  TQueue.offer(
+                    queue,
+                    new RunTrackedWorkItem({
+                      deferred: deferred as Deferred.Deferred<unknown, unknown>,
+                      request,
+                    }),
+                  ),
+                ),
+                Effect.flatMap((deferred) => Deferred.await(deferred)),
+              ),
+        ),
+        Observable.withSpan(
+          Option.getOrElse(request.ctx.signal, () => ({
+            [Observable.ObservableSymbol]: {},
+          })),
+          "SignalService.enqueueRunTracked",
+          {
+            captureStackTrace: true,
+          },
+        ),
+      ),
+  })),
+  Layer.scoped(SignalService),
+);
+
+export const enqueueNotify = (
+  request: NotifyRequest,
+): Effect.Effect<void, never, SignalService> =>
+  pipe(
+    SignalService,
+    Effect.flatMap((service) => service.enqueueNotify(request)),
+  );
+
+export const enqueueRunTracked = <A, E>(
+  request: RunTrackedRequest<A, E>,
+): Effect.Effect<A, E, SignalService> =>
+  pipe(
+    SignalService,
+    Effect.flatMap((service) => service.enqueueRunTracked(request)),
+  );

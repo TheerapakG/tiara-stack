@@ -17,9 +17,7 @@ export const botServices = pipe(
     MessageSlotService.DefaultWithoutDependencies,
   ),
   Layer.provideMerge(SheetApisClient.DefaultWithoutDependencies),
-  Layer.provideMerge(
-    Layer.mergeAll(NodeContext.layer, SignalService.SignalService.Default),
-  ),
+  Layer.provideMerge(Layer.mergeAll(NodeContext.layer, SignalService.layer)),
   Effect.succeed,
   Effect.withSpan("botServices", {
     captureStackTrace: true,

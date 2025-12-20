@@ -425,7 +425,7 @@ export class WebSocketClient<
         ),
       ),
       Effect.let("id", () => crypto.randomUUID() as string),
-      Effect.let("signal", () =>
+      Effect.bind("signal", () =>
         Signal.make<
           RpcResult.RpcResult<
             Validator.Output<
