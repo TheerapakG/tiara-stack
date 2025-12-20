@@ -8,7 +8,6 @@ import {
   Option,
   TRef,
   TQueue,
-  TSemaphore,
   TSet,
   STM,
   Scope,
@@ -40,7 +39,6 @@ export class WithScopeComputed<A = never, E = never, R = never>
   private _reference: WeakRef<WithScopeComputed<A, E, R>>;
   private _isScopeClosed: TRef.TRef<boolean>;
   private _queue: TQueue.TQueue<Exit.Exit<A, E>>;
-  private _semaphore: TSemaphore.TSemaphore;
   private _dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>;
   private _dependencies: TSet.TSet<DependencySignal>;
 
@@ -48,7 +46,6 @@ export class WithScopeComputed<A = never, E = never, R = never>
     effect: Effect.Effect<A, E, R | SignalContext.SignalContext>,
     isScopeClosed: TRef.TRef<boolean>,
     queue: TQueue.TQueue<Exit.Exit<A, E>>,
-    semaphore: TSemaphore.TSemaphore,
     dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>,
     dependencies: TSet.TSet<DependencySignal>,
     options: Observable.ObservableOptions,
@@ -58,7 +55,6 @@ export class WithScopeComputed<A = never, E = never, R = never>
     this._reference = new WeakRef(this);
     this._isScopeClosed = isScopeClosed;
     this._queue = queue;
-    this._semaphore = semaphore;
     this._dependents = dependents;
     this._dependencies = dependencies;
     this[Observable.ObservableSymbol] = options;
@@ -271,13 +267,12 @@ export const make = <A = never, E = never, R = never>(
     STM.all({
       isScopeClosed: TRef.make(false),
       queue: TQueue.sliding<Exit.Exit<A, E>>(1),
-      semaphore: TSemaphore.make(1),
       dependents: TSet.empty<WeakRef<DependentSignal> | DependentSignal>(),
       dependencies: TSet.empty<DependencySignal>(),
     }),
     STM.let(
       "computed",
-      ({ isScopeClosed, queue, semaphore, dependents, dependencies }) =>
+      ({ isScopeClosed, queue, dependents, dependencies }) =>
         new WithScopeComputed<A, E, Exclude<R, SignalContext.SignalContext>>(
           effect as Effect.Effect<
             A,
@@ -286,7 +281,6 @@ export const make = <A = never, E = never, R = never>(
           >,
           isScopeClosed,
           queue,
-          semaphore,
           dependents,
           dependencies,
           options ?? {},
