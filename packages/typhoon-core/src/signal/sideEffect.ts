@@ -1,4 +1,4 @@
-import { Context, Effect, pipe, Scope, STM, TSet } from "effect";
+import { Context, Effect, pipe, Scope, STM, TSet, TRef } from "effect";
 import { Observable } from "../observability";
 import { DependencySignal } from "./dependencySignal";
 import { DependentSignal, DependentSymbol } from "./dependentSignal";
@@ -9,12 +9,14 @@ export class SideEffect<R = never> implements DependentSignal {
   readonly [DependentSymbol]: DependentSignal = this;
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
-  private _effect: Effect.Effect<unknown, unknown, R | SignalContext>;
+  private _effect: TRef.TRef<
+    Effect.Effect<unknown, unknown, R | SignalContext>
+  >;
   private _context: Context.Context<R>;
   private _dependencies: TSet.TSet<DependencySignal>;
 
   constructor(
-    effect: Effect.Effect<unknown, unknown, R | SignalContext>,
+    effect: TRef.TRef<Effect.Effect<unknown, unknown, R | SignalContext>>,
     context: Context.Context<R>,
     dependencies: TSet.TSet<DependencySignal>,
     options: Observable.ObservableOptions,
@@ -29,7 +31,9 @@ export class SideEffect<R = never> implements DependentSignal {
     return SignalService.enqueueRunTracked(
       new SignalService.RunTrackedRequest({
         effect: pipe(
-          this._effect,
+          TRef.get(this._effect),
+          STM.commit,
+          Effect.flatten,
           Effect.catchAll(() => Effect.void),
           Effect.provide(this._context),
         ),
@@ -80,10 +84,9 @@ export class SideEffect<R = never> implements DependentSignal {
 
   cleanup() {
     return pipe(
-      Effect.sync(() => {
-        this._effect = Effect.void;
-      }),
-      Effect.andThen(this.clearDependencies()),
+      TRef.set(this._effect, Effect.void),
+      STM.zipRight(this.clearDependencies()),
+      STM.commit,
       Observable.withSpan(this, "SideEffect.cleanup", {
         captureStackTrace: true,
       }),
@@ -103,15 +106,20 @@ export const makeWithContext = <R = never>(
   pipe(
     Effect.acquireRelease(
       pipe(
-        TSet.empty<DependencySignal>(),
+        STM.all({
+          effect: TRef.make(
+            effect as Effect.Effect<
+              unknown,
+              unknown,
+              SignalContext | Exclude<R, SignalContext>
+            >,
+          ),
+          dependencies: TSet.empty<DependencySignal>(),
+        }),
         Effect.map(
-          (dependencies) =>
+          ({ effect, dependencies }) =>
             new SideEffect<Exclude<R, SignalContext>>(
-              effect as Effect.Effect<
-                unknown,
-                unknown,
-                SignalContext | Exclude<R, SignalContext>
-              >,
+              effect,
               context,
               dependencies,
               options ?? {},
