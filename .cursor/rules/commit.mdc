@@ -1,19 +1,17 @@
 ---
-description: Guidelines on Git Commit Messages For This Project
+description: Guidelines on Graphite Commit Messages For This Project
 alwaysApply: true
 ---
 
-The following guidelines are to be followed for `git commit` command.
+We use Graphite for managing stacked pull requests. The following guidelines are to be followed for `gt create` command.
 
 - Use conventional commit message. If the work is done inside a package, use the name of the package (or a shortened version if it is not ambiguated) of the changes as the scope of the commit. Optionally, you could also append the area where the work was done inside the package e.g. `feat(example-package/utils): implement new utility x`
 - There is no need to list functions or symbols affected by the changes seperately from the main commit message body.
 - Use -m for new line in the commit message, and do not use \n anywhere.
 
-  GOOD: `git commit -m "subject" -m "line1" -m "line2"  ...`
+  GOOD: `gt create -m "subject" -m "line1" -m "line2"  ...`
 
   BAD:
 
-  - `git commit -m "subject\nline1\nline2\n..."`
-  - `git commit -m "subject" -m "line1\nline2\n..."`.
-
-- DO NOT include the `--no-gpg-sign` flag.
+  - `gt create -m "subject\nline1\nline2\n..."`
+  - `gt create -m "subject" -m "line1\nline2\n..."`.

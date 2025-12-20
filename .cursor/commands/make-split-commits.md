@@ -22,8 +22,12 @@ Evaluate what changes has been done within the repository, and commit them. The 
 
    For each of the changes group:
 
-   - Stage all the relevant files using `git add -v -- [<pathspec>...]`.
-   - Commit the changes, conforming to the "Guidelines on Git Commit Messages For This Project".
+   - Stage all the relevant files using `gt add -v -- [<pathspec>...]`.
+   - Commit the changes, conforming to the "Guidelines on Graphite Commit Messages For This Project".
+
+4. **Submitting Changes**
+
+   Use `gt submit --no-interactive` to submit all changes.
 
 ## References
 
