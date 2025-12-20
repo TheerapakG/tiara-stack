@@ -77,14 +77,19 @@ export const makeEventService = (
   never,
   SignalService.SignalService
 > =>
-  SynchronizedRef.make({
-    request: ctx.request,
-    token: ctx.token,
-    pullEffect: Signal.make({
+  pipe(
+    Signal.make({
       effect: ctx.pullEffect.effect,
       scope: ctx.pullEffect.scope,
     }),
-  });
+    Effect.flatMap((pullEffect) =>
+      SynchronizedRef.make({
+        request: ctx.request,
+        token: ctx.token,
+        pullEffect,
+      }),
+    ),
+  );
 
 export const replaceToken = (
   token: Option.Option<string>,

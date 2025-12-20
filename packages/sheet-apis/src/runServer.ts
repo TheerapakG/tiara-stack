@@ -47,7 +47,7 @@ const baseLayer = Layer.mergeAll(MetricsLive, Logger.logFmt);
 
 const layer = pipe(
   Layer.mergeAll(
-    SignalService.SignalService.Default,
+    SignalService.layer,
     AuthService.DefaultWithoutDependencies,
     CalcService.Default,
     GuildConfigService.DefaultWithoutDependencies,
