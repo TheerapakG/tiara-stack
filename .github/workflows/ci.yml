@@ -2,21 +2,28 @@ name: CI
 
 on:
   push:
-    paths:
-      - ".github/workflows/ci.yml"
-      - "k8s/**"
-      - "packages/**"
     branches: ["master"]
   pull_request:
-    paths:
-      - ".github/workflows/ci.yml"
-      - "k8s/**"
-      - "packages/**"
-    branches: ["master"]
+    types: [opened, reopened, synchronize]
+    branches-ignore:
+      - "*graphite-base*"
   workflow_dispatch:
 
 jobs:
+  optimize_ci:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    outputs:
+      skip: ${{ steps.check_skip.outputs.skip }}
+    steps:
+      - name: Optimize CI
+        id: check_skip
+        uses: withgraphite/graphite-ci-action@main
+        with:
+          graphite_token: ${{ secrets.GRAPHITE_TOKEN }}
   ci:
+    needs: optimize_ci
+    if: needs.optimize_ci.outputs.skip != 'true' || needs.optimize_ci.result != 'success'
     strategy:
       matrix:
         package: [sheet-apis, sheet-bot]
