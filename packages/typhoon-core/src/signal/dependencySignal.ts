@@ -1,7 +1,18 @@
-import { Array, Effect, Effectable, pipe, STM } from "effect";
+import {
+  Array,
+  Effect,
+  Effectable,
+  Number,
+  pipe,
+  Option,
+  STM,
+  TRef,
+  TSet,
+  HashSet,
+} from "effect";
 import { Observable } from "../observability";
 import type * as DependentSignal from "./dependentSignal";
-import { SignalContext } from "./signalContext";
+import * as SignalContext from "./signalContext";
 import * as SignalService from "./signalService";
 
 export const DependencySymbol: unique symbol = Symbol(
@@ -12,7 +23,7 @@ export abstract class DependencySignal<A = never, E = never, R = never>
   extends Effectable.Class<
     A,
     E,
-    R | SignalContext | SignalService.SignalService
+    R | SignalContext.SignalContext | SignalService.SignalService
   >
   implements Observable.Observable
 {
@@ -32,10 +43,9 @@ export abstract class DependencySignal<A = never, E = never, R = never>
   abstract clearDependents(): STM.STM<void, never, never>;
 
   abstract getDependents(): STM.STM<
-    (
-      | WeakRef<DependentSignal.DependentSignal>
-      | DependentSignal.DependentSignal
-    )[],
+    TSet.TSet<
+      WeakRef<DependentSignal.DependentSignal> | DependentSignal.DependentSignal
+    >,
     never,
     never
   >;
@@ -43,7 +53,7 @@ export abstract class DependencySignal<A = never, E = never, R = never>
   abstract value(): Effect.Effect<
     A,
     E,
-    R | SignalContext | SignalService.SignalService
+    R | SignalContext.SignalContext | SignalService.SignalService
   >;
   abstract peek(): Effect.Effect<A, E, R | SignalService.SignalService>;
 
@@ -68,6 +78,7 @@ export const getDependentsUpdateOrder = (
     STM.bind("thisDependents", () =>
       pipe(
         dependency.getDependents(),
+        STM.flatMap(TSet.toArray),
         STM.map(
           Array.map((dependent) =>
             dependent instanceof WeakRef ? dependent.deref() : dependent,
@@ -104,24 +115,81 @@ export const getDependentsUpdateOrder = (
     }),
   );
 
+const computeChanged = (
+  changed: TSet.TSet<DependencySignal<unknown, unknown, unknown>>,
+  dependent: DependentSignal.DependentSignal,
+) =>
+  pipe(
+    TSet.toHashSet(changed),
+    STM.flatMap((changed) =>
+      pipe(
+        SignalContext.SignalContext,
+        STM.flatMap((context) =>
+          pipe(
+            context.unchanged,
+            Option.match({
+              onSome: (unchanged) => TRef.get(unchanged),
+              onNone: () =>
+                TSet.empty<DependencySignal<unknown, unknown, unknown>>(),
+            }),
+          ),
+        ),
+        STM.flatMap(TSet.toHashSet),
+        STM.map((unchanged) => HashSet.difference(changed, unchanged)),
+      ),
+    ),
+    STM.flatMap((changed) =>
+      pipe(
+        dependent.getDependencies(),
+        STM.flatMap(TSet.toHashSet),
+        STM.map((dependencies) => HashSet.intersection(dependencies, changed)),
+      ),
+    ),
+  );
+
 export const notifyAllDependents =
-  (beforeNotify: (watched: boolean) => Effect.Effect<void, never, never>) =>
-  (signal: DependencySignal<unknown, unknown, unknown>) =>
+  (
+    beforeNotify: (watched: boolean) => Effect.Effect<void, never, never>,
+  ): ((
+    signal: DependencySignal<unknown, unknown, unknown>,
+  ) => Effect.Effect<void, never, SignalService.SignalService>) =>
+  (signal) =>
     pipe(
-      STM.Do,
-      STM.bind("dependents", () => getDependentsUpdateOrder(signal)),
+      STM.all({
+        dependents: getDependentsUpdateOrder(signal),
+        context: SignalContext.makeWithEmptyUnchanged,
+        changed: TSet.make(signal),
+      }),
       STM.let("watched", ({ dependents }) =>
         dependents.some((dependent) => !isDependencySignal(dependent)),
       ),
       STM.tap(() => signal.clearDependents()),
+      STM.commit,
       Effect.tap(({ watched }) => beforeNotify(watched)),
-      Effect.flatMap(({ dependents }) =>
-        Effect.all(dependents.map((dependent) => dependent.notify())),
+      Effect.andThen(({ dependents, context, changed }) =>
+        Effect.forEach(
+          dependents,
+          (dependent) =>
+            pipe(
+              Effect.unlessEffect(
+                pipe(
+                  computeChanged(changed, dependent),
+                  STM.map(HashSet.size),
+                  STM.map((size) => Number.Equivalence(size, 0)),
+                  STM.commit,
+                ),
+              )(dependent.notify()),
+              Effect.provideService(
+                SignalContext.SignalContext,
+                context.context,
+              ),
+            ),
+          { discard: true },
+        ),
       ),
       Observable.withSpan(signal, "DependencySignal.notifyAllDependents", {
         captureStackTrace: true,
       }),
-      Effect.ignore,
     );
 
 export const mask = <A, E, R>(signal: DependencySignal<A, E, R>) => signal;

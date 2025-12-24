@@ -30,7 +30,7 @@ class UntilObserver<
   readonly [DependentSymbol]: DependentSignal = this;
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
-  private _dependencies: TSet.TSet<DependencySignal>;
+  private _dependencies: TSet.TSet<DependencySignal<unknown, unknown, unknown>>;
   private _effect: Effect.Effect<A, E, R | SignalContext>;
   private _context: Context.Context<R>;
   private _value: TDeferred.TDeferred<Match.Types.WhenMatch<A, P>>;
@@ -41,7 +41,7 @@ class UntilObserver<
     context: Context.Context<R>,
     value: TDeferred.TDeferred<Match.Types.WhenMatch<A, P>>,
     pattern: P,
-    dependencies: TSet.TSet<DependencySignal>,
+    dependencies: TSet.TSet<DependencySignal<unknown, unknown, unknown>>,
     options: Observable.ObservableOptions,
   ) {
     super();
@@ -88,15 +88,15 @@ class UntilObserver<
     );
   }
 
-  addDependency(dependency: DependencySignal) {
+  addDependency(dependency: DependencySignal<unknown, unknown, unknown>) {
     return TSet.add(this._dependencies, dependency);
   }
 
-  removeDependency(dependency: DependencySignal) {
+  removeDependency(dependency: DependencySignal<unknown, unknown, unknown>) {
     return TSet.remove(this._dependencies, dependency);
   }
 
-  clearDependencies() {
+  clearDependencies(): STM.STM<void, never, never> {
     return pipe(
       TSet.forEach(this._dependencies, (dependency) =>
         dependency.removeDependent(this),
@@ -105,8 +105,12 @@ class UntilObserver<
     );
   }
 
-  getDependencies() {
-    return TSet.toArray(this._dependencies);
+  getDependencies(): STM.STM<
+    TSet.TSet<DependencySignal<unknown, unknown, unknown>>,
+    never,
+    never
+  > {
+    return STM.succeed(this._dependencies);
   }
 
   commit(): Effect.Effect<Match.Types.WhenMatch<A, P>, never, never> {
@@ -131,7 +135,11 @@ class UntilObserver<
     return STM.succeed(this);
   }
 
-  notify(): Effect.Effect<unknown, never, SignalService.SignalService> {
+  notify(): Effect.Effect<
+    unknown,
+    never,
+    SignalService.SignalService | SignalContext
+  > {
     return pipe(
       TDeferred.poll(this._value),
       STM.zipLeft(this.clearDependencies()),
@@ -163,7 +171,7 @@ const make = <
     Effect.all({
       context: Effect.context<Exclude<R, SignalContext>>(),
       value: TDeferred.make<Match.Types.WhenMatch<A, P>>(),
-      dependencies: TSet.empty<DependencySignal>(),
+      dependencies: TSet.empty<DependencySignal<unknown, unknown, unknown>>(),
     }),
     Effect.map(
       ({ context, value, dependencies }) =>

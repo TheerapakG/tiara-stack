@@ -1,7 +1,8 @@
-import { Array, Effect, pipe, STM } from "effect";
+import { Array, Effect, pipe, STM, TSet } from "effect";
 import { Observable } from "../observability";
 import type * as DependencySignal from "./dependencySignal";
 import type * as SignalService from "./signalService";
+import type * as SignalContext from "./signalContext";
 
 export const DependentSymbol: unique symbol = Symbol(
   "Typhoon/Signal/Dependent",
@@ -20,7 +21,7 @@ export abstract class DependentSignal implements Observable.Observable {
   abstract clearDependencies(): STM.STM<void, never, never>;
 
   abstract getDependencies(): STM.STM<
-    DependencySignal.DependencySignal<unknown, unknown, unknown>[],
+    TSet.TSet<DependencySignal.DependencySignal<unknown, unknown, unknown>>,
     never,
     never
   >;
@@ -30,7 +31,11 @@ export abstract class DependentSignal implements Observable.Observable {
     never,
     never
   >;
-  abstract notify(): Effect.Effect<unknown, never, SignalService.SignalService>;
+  abstract notify(): Effect.Effect<
+    unknown,
+    never,
+    SignalService.SignalService | SignalContext.SignalContext
+  >;
 }
 
 export const isDependentSignal = (signal: unknown): signal is DependentSignal =>
@@ -52,7 +57,9 @@ export const getDependencyUpdateOrder = (
 > =>
   pipe(
     STM.Do,
-    STM.bind("thisDependencies", () => dependent.getDependencies()),
+    STM.bind("thisDependencies", () =>
+      pipe(dependent.getDependencies(), STM.flatMap(TSet.toArray)),
+    ),
     STM.bind("nestedDependencies", ({ thisDependencies }) =>
       pipe(
         STM.all(

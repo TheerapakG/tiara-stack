@@ -7,7 +7,9 @@ import * as SignalService from "./signalService";
 type SignalContextShape = {
   readonly signal: Option.Option<DependentSignal.DependentSignal>;
   readonly unchanged: Option.Option<
-    TRef.TRef<TSet.TSet<DependencySignal.DependencySignal>>
+    TRef.TRef<
+      TSet.TSet<DependencySignal.DependencySignal<unknown, unknown, unknown>>
+    >
   >;
 };
 const SignalContextTag: Context.TagClass<
@@ -18,7 +20,11 @@ const SignalContextTag: Context.TagClass<
 export class SignalContext extends SignalContextTag {}
 
 const inheritUnchanged: STM.STM<
-  Option.Option<TRef.TRef<TSet.TSet<DependencySignal.DependencySignal>>>,
+  Option.Option<
+    TRef.TRef<
+      TSet.TSet<DependencySignal.DependencySignal<unknown, unknown, unknown>>
+    >
+  >,
   never,
   never
 > = pipe(
@@ -38,6 +44,41 @@ export const empty: STM.STM<
     unchanged,
   })),
 );
+
+export const makeWithEmptyUnchanged = pipe(
+  TSet.empty<DependencySignal.DependencySignal<unknown, unknown, unknown>>(),
+  STM.flatMap((set) => TRef.make(set)),
+  STM.map((unchangedRef) => ({
+    context: {
+      signal: Option.none(),
+      unchanged: Option.some(unchangedRef),
+    },
+    unchanged: unchangedRef,
+  })),
+);
+
+export const markUnchanged = (
+  dependency: DependencySignal.DependencySignal<unknown, unknown, unknown>,
+) =>
+  pipe(
+    STM.context<never>(),
+    STM.map(Context.getOption(SignalContext)),
+    STM.map(Option.flatMap((ctx) => ctx.unchanged)),
+    STM.flatMap((unchanged) =>
+      pipe(
+        unchanged,
+        Option.match({
+          onSome: (ref) =>
+            pipe(
+              TRef.get(ref),
+              STM.flatMap((set) => TSet.add(set, dependency)),
+              STM.asVoid,
+            ),
+          onNone: () => STM.void,
+        }),
+      ),
+    ),
+  );
 
 export const fromDependent = (
   dependent: DependentSignal.DependentSignal,

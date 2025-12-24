@@ -13,7 +13,7 @@ import {
 } from "effect";
 import { Observable } from "../observability";
 import { DependencySignal, notifyAllDependents } from "./dependencySignal";
-import { SignalContext, runAndTrackEffect } from "./signalContext";
+import * as SignalContext from "./signalContext";
 
 type NotifyRequestData = {
   readonly signal: DependencySignal<unknown, unknown, unknown>;
@@ -33,8 +33,8 @@ class NotifyWorkItem extends Data.TaggedClass("NotifyWorkItem")<{
 }> {}
 
 type RunTrackedRequestData<A, E> = {
-  readonly effect: Effect.Effect<A, E, SignalContext>;
-  readonly ctx: Context.Tag.Service<SignalContext>;
+  readonly effect: Effect.Effect<A, E, SignalContext.SignalContext>;
+  readonly ctx: Context.Tag.Service<SignalContext.SignalContext>;
 };
 const RunTrackedRequestTaggedClass: new <A, E>(
   args: Readonly<RunTrackedRequestData<A, E>>,
@@ -93,7 +93,7 @@ export const layer: Layer.Layer<SignalService, never, never> = pipe(
                 ),
               RunTrackedWorkItem: ({ deferred, request }) =>
                 pipe(
-                  runAndTrackEffect(request.effect)(request.ctx),
+                  SignalContext.runAndTrackEffect(request.effect)(request.ctx),
                   Effect.intoDeferred(deferred),
                   Effect.catchAllCause((cause) => Effect.logError(cause)),
                 ),
@@ -127,7 +127,7 @@ export const layer: Layer.Layer<SignalService, never, never> = pipe(
         FiberRef.get(workerFiberRef),
         Effect.flatMap((isWorkerFiber) =>
           isWorkerFiber
-            ? runAndTrackEffect(request.effect)(request.ctx)
+            ? SignalContext.runAndTrackEffect(request.effect)(request.ctx)
             : pipe(
                 Deferred.make<A, E>(),
                 Effect.tap((deferred) =>

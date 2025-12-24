@@ -1,4 +1,4 @@
-import { Effect, Effectable, pipe, STM, TSet, TRef } from "effect";
+import { Effect, Effectable, Equal, pipe, STM, TSet, TRef } from "effect";
 import { Observable } from "../observability";
 import {
   DependencySignal,
@@ -6,8 +6,8 @@ import {
   getDependentsUpdateOrder,
 } from "./dependencySignal";
 import { DependentSignal } from "./dependentSignal";
-import { bindDependency, SignalContext } from "./signalContext";
 import * as SignalService from "./signalService";
+import * as SignalContext from "./signalContext";
 
 export interface ExternalSource<T> {
   poll: () => STM.STM<T, never, never>;
@@ -24,7 +24,7 @@ export class ExternalComputed<T = unknown>
   extends Effectable.Class<
     T,
     never,
-    SignalContext | SignalService.SignalService
+    SignalContext.SignalContext | SignalService.SignalService
   >
   implements DependencySignal<T, never, never>
 {
@@ -35,6 +35,7 @@ export class ExternalComputed<T = unknown>
   private _dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>;
   private _emitting: TRef.TRef<boolean>;
   private _source: ExternalSource<T>;
+  private _lastValue: TRef.TRef<T>;
 
   constructor(
     initial: TRef.TRef<T>,
@@ -42,12 +43,14 @@ export class ExternalComputed<T = unknown>
     emitting: TRef.TRef<boolean>,
     dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>,
     options: Observable.ObservableOptions,
+    lastValue: TRef.TRef<T>,
   ) {
     super();
     this._value = initial;
     this._source = source;
     this._dependents = dependents;
     this._emitting = emitting;
+    this._lastValue = lastValue;
     this[Observable.ObservableSymbol] = options;
   }
 
@@ -71,20 +74,20 @@ export class ExternalComputed<T = unknown>
   }
 
   getDependents(): STM.STM<
-    (WeakRef<DependentSignal> | DependentSignal)[],
+    TSet.TSet<WeakRef<DependentSignal> | DependentSignal>,
     never,
     never
   > {
-    return TSet.toArray(this._dependents);
+    return STM.succeed(this._dependents);
   }
 
   value(): Effect.Effect<
     T,
     never,
-    SignalContext | SignalService.SignalService
+    SignalContext.SignalContext | SignalService.SignalService
   > {
     return pipe(
-      bindDependency(this),
+      SignalContext.bindDependency(this),
       Effect.flatMap(() => this.peek()),
       Observable.withSpan(this, "ExternalComputed.value", {
         captureStackTrace: true,
@@ -95,14 +98,22 @@ export class ExternalComputed<T = unknown>
   commit(): Effect.Effect<
     T,
     never,
-    SignalContext | SignalService.SignalService
+    SignalContext.SignalContext | SignalService.SignalService
   > {
     return this.value();
   }
 
   peek(): Effect.Effect<T, never, never> {
     return pipe(
-      TRef.get(this._value),
+      STM.Do,
+      STM.bind("value", () => TRef.get(this._value)),
+      STM.bind("last", ({ value }) => TRef.getAndSet(this._lastValue, value)),
+      STM.tap(({ value, last }) =>
+        STM.when(() => Equal.equals(last, value))(
+          SignalContext.markUnchanged(this),
+        ),
+      ),
+      STM.map(({ value }) => value),
       STM.commit,
       Observable.withSpan(this, "ExternalComputed.peek", {
         captureStackTrace: true,
@@ -161,19 +172,23 @@ export const makeSTM = <T>(
   options?: Observable.ObservableOptions,
 ) =>
   pipe(
-    STM.all({
-      initial: pipe(source.poll(), STM.flatMap(TRef.make)),
-      emitting: TRef.make(false),
-      dependents: TSet.empty<WeakRef<DependentSignal> | DependentSignal>(),
-    }),
+    STM.Do,
+    STM.bind("initialValue", () => source.poll()),
+    STM.bind("initial", ({ initialValue }) => TRef.make(initialValue)),
+    STM.bind("lastValue", ({ initialValue }) => TRef.make(initialValue)),
+    STM.bind("emitting", () => TRef.make(false)),
+    STM.bind("dependents", () =>
+      TSet.empty<WeakRef<DependentSignal> | DependentSignal>(),
+    ),
     STM.map(
-      ({ initial, emitting, dependents }) =>
+      ({ initial, lastValue, emitting, dependents }) =>
         new ExternalComputed(
           initial,
           source,
           emitting,
           dependents,
           options ?? {},
+          lastValue,
         ),
     ),
     STM.tap((signal) => source.emit((value) => signal.handleEmit(value))),

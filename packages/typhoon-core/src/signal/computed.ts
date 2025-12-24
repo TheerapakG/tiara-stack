@@ -1,9 +1,12 @@
 import {
+  Context,
   Effect,
   Effectable,
+  Equal,
   Function,
   Exit,
   Option,
+  TRef,
   TQueue,
   TSet,
   STM,
@@ -34,15 +37,17 @@ export class Computed<A = never, E = never, R = never>
 
   private _effect: Effect.Effect<A, E, R | SignalContext.SignalContext>;
   private _dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>;
-  private _dependencies: TSet.TSet<DependencySignal>;
+  private _dependencies: TSet.TSet<DependencySignal<unknown, unknown, unknown>>;
   private _reference: WeakRef<Computed<A, E, R>>;
   private _queue: TQueue.TQueue<Exit.Exit<A, E>>;
+  private _lastExit: TRef.TRef<Option.Option<Exit.Exit<A, E>>>;
 
   constructor(
     effect: Effect.Effect<A, E, R | SignalContext.SignalContext>,
     dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>,
-    dependencies: TSet.TSet<DependencySignal>,
+    dependencies: TSet.TSet<DependencySignal<unknown, unknown, unknown>>,
     queue: TQueue.TQueue<Exit.Exit<A, E>>,
+    lastExit: TRef.TRef<Option.Option<Exit.Exit<A, E>>>,
     options: Observable.ObservableOptions,
   ) {
     super();
@@ -51,6 +56,7 @@ export class Computed<A = never, E = never, R = never>
     this._dependencies = dependencies;
     this._reference = new WeakRef(this);
     this._queue = queue;
+    this._lastExit = lastExit;
     this[Observable.ObservableSymbol] = options;
   }
 
@@ -73,11 +79,11 @@ export class Computed<A = never, E = never, R = never>
     );
   }
 
-  addDependency(dependency: DependencySignal) {
+  addDependency(dependency: DependencySignal<unknown, unknown, unknown>) {
     return TSet.add(this._dependencies, dependency);
   }
 
-  removeDependency(dependency: DependencySignal) {
+  removeDependency(dependency: DependencySignal<unknown, unknown, unknown>) {
     return TSet.remove(this._dependencies, dependency);
   }
 
@@ -90,16 +96,20 @@ export class Computed<A = never, E = never, R = never>
     );
   }
 
-  getDependencies(): STM.STM<DependencySignal[], never, never> {
-    return TSet.toArray(this._dependencies);
-  }
-
-  getDependents(): STM.STM<
-    (WeakRef<DependentSignal> | DependentSignal)[],
+  getDependencies(): STM.STM<
+    TSet.TSet<DependencySignal<unknown, unknown, unknown>>,
     never,
     never
   > {
-    return TSet.toArray(this._dependents);
+    return STM.succeed(this._dependencies);
+  }
+
+  getDependents(): STM.STM<
+    TSet.TSet<WeakRef<DependentSignal> | DependentSignal>,
+    never,
+    never
+  > {
+    return STM.succeed(this._dependents);
   }
 
   value(): Effect.Effect<
@@ -138,24 +148,11 @@ export class Computed<A = never, E = never, R = never>
             onSome: Function.identity,
             onNone: () =>
               pipe(
-                pipe(
-                  SignalContext.fromDependent(this),
-                  STM.commit,
-                  Effect.flatMap((ctx) =>
-                    SignalService.enqueueRunTracked(
-                      new SignalService.RunTrackedRequest({
-                        effect: pipe(
-                          this._effect,
-                          Effect.exit,
-                          Effect.tap((exit) =>
-                            pipe(TQueue.offer(this._queue, exit), STM.commit),
-                          ),
-                          Effect.flatten,
-                          Effect.provide(context),
-                        ),
-                        ctx,
-                      }),
-                    ),
+                SignalContext.fromDependent(this),
+                STM.commit,
+                Effect.flatMap((ctx) =>
+                  SignalService.enqueueRunTracked(
+                    this._makeRunTrackedRequest(context, ctx),
                   ),
                 ),
               ),
@@ -180,7 +177,11 @@ export class Computed<A = never, E = never, R = never>
     return STM.succeed(this._reference);
   }
 
-  notify(): Effect.Effect<unknown, never, never> {
+  notify(): Effect.Effect<
+    unknown,
+    never,
+    SignalContext.SignalContext | SignalService.SignalService
+  > {
     return pipe(
       this.clearDependencies(),
       STM.zipRight(this.reset()),
@@ -204,6 +205,33 @@ export class Computed<A = never, E = never, R = never>
   reconcile(): STM.STM<void, never, never> {
     return STM.void;
   }
+
+  private _makeRunTrackedRequest(
+    context: Context.Context<R>,
+    ctx: Context.Tag.Service<SignalContext.SignalContext>,
+  ) {
+    return new SignalService.RunTrackedRequest({
+      effect: pipe(
+        this._effect,
+        Effect.exit,
+        Effect.tap((exit) =>
+          pipe(
+            TQueue.offer(this._queue, exit),
+            STM.zipRight(TRef.getAndSet(this._lastExit, Option.some(exit))),
+            STM.flatMap((lastExit) =>
+              STM.when(() => Equal.equals(lastExit, Option.some(exit)))(
+                SignalContext.markUnchanged(this),
+              ),
+            ),
+            STM.commit,
+          ),
+        ),
+        Effect.flatten,
+        Effect.provide(context),
+      ),
+      ctx,
+    });
+  }
 }
 
 export type Success<S extends Computed<unknown, unknown, unknown>> =
@@ -222,11 +250,12 @@ export const makeSTM = <A = never, E = never, R = never>(
   pipe(
     STM.all({
       dependents: TSet.empty<WeakRef<DependentSignal> | DependentSignal>(),
-      dependencies: TSet.empty<DependencySignal>(),
+      dependencies: TSet.empty<DependencySignal<unknown, unknown, unknown>>(),
       queue: TQueue.sliding<Exit.Exit<A, E>>(1),
+      lastExit: TRef.make(Option.none<Exit.Exit<A, E>>()),
     }),
     STM.map(
-      ({ dependents, dependencies, queue }) =>
+      ({ dependents, dependencies, queue, lastExit }) =>
         new Computed<A, E, Exclude<R, SignalContext.SignalContext>>(
           effect as Effect.Effect<
             A,
@@ -236,6 +265,7 @@ export const makeSTM = <A = never, E = never, R = never>(
           dependents,
           dependencies,
           queue,
+          lastExit,
           options ?? {},
         ),
     ),

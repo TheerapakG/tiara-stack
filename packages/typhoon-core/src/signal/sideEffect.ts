@@ -13,12 +13,12 @@ export class SideEffect<R = never> implements DependentSignal {
     Effect.Effect<unknown, unknown, R | SignalContext>
   >;
   private _context: Context.Context<R>;
-  private _dependencies: TSet.TSet<DependencySignal>;
+  private _dependencies: TSet.TSet<DependencySignal<unknown, unknown, unknown>>;
 
   constructor(
     effect: TRef.TRef<Effect.Effect<unknown, unknown, R | SignalContext>>,
     context: Context.Context<R>,
-    dependencies: TSet.TSet<DependencySignal>,
+    dependencies: TSet.TSet<DependencySignal<unknown, unknown, unknown>>,
     options: Observable.ObservableOptions,
   ) {
     this._effect = effect;
@@ -51,15 +51,15 @@ export class SideEffect<R = never> implements DependentSignal {
     );
   }
 
-  addDependency(dependency: DependencySignal) {
+  addDependency(dependency: DependencySignal<unknown, unknown, unknown>) {
     return TSet.add(this._dependencies, dependency);
   }
 
-  removeDependency(dependency: DependencySignal) {
+  removeDependency(dependency: DependencySignal<unknown, unknown, unknown>) {
     return TSet.remove(this._dependencies, dependency);
   }
 
-  clearDependencies() {
+  clearDependencies(): STM.STM<void, never, never> {
     return pipe(
       TSet.forEach(this._dependencies, (dependency) =>
         dependency.removeDependent(this),
@@ -68,8 +68,12 @@ export class SideEffect<R = never> implements DependentSignal {
     );
   }
 
-  getDependencies() {
-    return TSet.toArray(this._dependencies);
+  getDependencies(): STM.STM<
+    TSet.TSet<DependencySignal<unknown, unknown, unknown>>,
+    never,
+    never
+  > {
+    return STM.succeed(this._dependencies);
   }
 
   getReferenceForDependency(): STM.STM<
@@ -80,7 +84,11 @@ export class SideEffect<R = never> implements DependentSignal {
     return STM.succeed(this);
   }
 
-  notify(): Effect.Effect<unknown, never, SignalService.SignalService> {
+  notify(): Effect.Effect<
+    unknown,
+    never,
+    SignalService.SignalService | SignalContext
+  > {
     return pipe(
       this.clearDependencies(),
       STM.commit,
@@ -123,7 +131,8 @@ export const makeWithContext = <R = never>(
               SignalContext | Exclude<R, SignalContext>
             >,
           ),
-          dependencies: TSet.empty<DependencySignal>(),
+          dependencies:
+            TSet.empty<DependencySignal<unknown, unknown, unknown>>(),
         }),
         Effect.map(
           ({ effect, dependencies }) =>
