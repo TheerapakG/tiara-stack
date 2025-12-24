@@ -138,19 +138,25 @@ export class Computed<A = never, E = never, R = never>
             onSome: Function.identity,
             onNone: () =>
               pipe(
-                SignalService.enqueueRunTracked(
-                  new SignalService.RunTrackedRequest({
-                    effect: pipe(
-                      this._effect,
-                      Effect.exit,
-                      Effect.tap((exit) =>
-                        pipe(TQueue.offer(this._queue, exit), STM.commit),
-                      ),
-                      Effect.flatten,
-                      Effect.provide(context),
+                pipe(
+                  SignalContext.fromDependent(this),
+                  STM.commit,
+                  Effect.flatMap((ctx) =>
+                    SignalService.enqueueRunTracked(
+                      new SignalService.RunTrackedRequest({
+                        effect: pipe(
+                          this._effect,
+                          Effect.exit,
+                          Effect.tap((exit) =>
+                            pipe(TQueue.offer(this._queue, exit), STM.commit),
+                          ),
+                          Effect.flatten,
+                          Effect.provide(context),
+                        ),
+                        ctx,
+                      }),
                     ),
-                    ctx: SignalContext.fromDependent(this),
-                  }),
+                  ),
                 ),
               ),
           }),

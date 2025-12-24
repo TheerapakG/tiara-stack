@@ -54,25 +54,37 @@ class UntilObserver<
   }
 
   runOnce(): Effect.Effect<void, never, SignalService.SignalService> {
-    return SignalService.enqueueRunTracked(
-      new SignalService.RunTrackedRequest({
-        effect: pipe(
-          this._effect,
-          Effect.flatMap(
-            (value) =>
-              pipe(
-                Match.value(value),
-                Match.when(this._pattern, (matched) =>
-                  pipe(TDeferred.succeed(this._value, matched), STM.commit),
+    return pipe(
+      fromDependent(this),
+      STM.commit,
+      Effect.flatMap((ctx) =>
+        pipe(
+          SignalService.enqueueRunTracked(
+            new SignalService.RunTrackedRequest({
+              effect: pipe(
+                this._effect,
+                Effect.flatMap(
+                  (value) =>
+                    pipe(
+                      Match.value(value),
+                      Match.when(this._pattern, (matched) =>
+                        pipe(
+                          TDeferred.succeed(this._value, matched),
+                          STM.commit,
+                        ),
+                      ),
+                      Match.orElse(() => Effect.void),
+                    ) as Effect.Effect<void, never, never>,
                 ),
-                Match.orElse(() => Effect.void),
-              ) as Effect.Effect<void, never, never>,
+                Effect.catchAll(() => Effect.void),
+                Effect.provide(this._context),
+              ),
+              ctx,
+            }),
           ),
-          Effect.catchAll(() => Effect.void),
-          Effect.provide(this._context),
+          Effect.asVoid,
         ),
-        ctx: fromDependent(this),
-      }),
+      ),
     );
   }
 

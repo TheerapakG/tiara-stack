@@ -13,6 +13,7 @@ import {
   Array,
   Runtime,
   Scope,
+  STM,
 } from "effect";
 import { DBQueryError, makeDBQueryError } from "typhoon-core/error";
 import {
@@ -312,7 +313,11 @@ export const mutate = <A, E>(
     ),
     Effect.provideServiceEffect(
       SignalContext.SignalContext,
-      pipe(Computed.make(Effect.void), Effect.map(SignalContext.fromDependent)),
+      pipe(
+        Computed.makeSTM(Effect.void),
+        STM.flatMap((signal) => SignalContext.fromDependent(signal)),
+        STM.commit,
+      ),
     ),
     Effect.provideServiceEffect(
       TransactionContext,

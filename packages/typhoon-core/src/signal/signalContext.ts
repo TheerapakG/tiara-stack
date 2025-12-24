@@ -1,4 +1,4 @@
-import { Context, Effect, Option, pipe, STM } from "effect";
+import { Context, Effect, Option, pipe, STM, TRef, TSet } from "effect";
 import { Observable } from "../observability";
 import type * as DependencySignal from "./dependencySignal";
 import * as DependentSignal from "./dependentSignal";
@@ -6,6 +6,9 @@ import * as SignalService from "./signalService";
 
 type SignalContextShape = {
   readonly signal: Option.Option<DependentSignal.DependentSignal>;
+  readonly unchanged: Option.Option<
+    TRef.TRef<TSet.TSet<DependencySignal.DependencySignal>>
+  >;
 };
 const SignalContextTag: Context.TagClass<
   SignalContext,
@@ -14,15 +17,38 @@ const SignalContextTag: Context.TagClass<
 > = Context.Tag("SignalContext")<SignalContext, SignalContextShape>();
 export class SignalContext extends SignalContextTag {}
 
-export const empty = {
-  signal: Option.none(),
-};
+const inheritUnchanged: STM.STM<
+  Option.Option<TRef.TRef<TSet.TSet<DependencySignal.DependencySignal>>>,
+  never,
+  never
+> = pipe(
+  STM.context<never>(),
+  STM.map(Context.getOption(SignalContext)),
+  STM.map(Option.flatMap((ctx) => ctx.unchanged)),
+);
+
+export const empty: STM.STM<
+  Context.Tag.Service<SignalContext>,
+  never,
+  never
+> = pipe(
+  inheritUnchanged,
+  STM.map((unchanged) => ({
+    signal: Option.none(),
+    unchanged,
+  })),
+);
 
 export const fromDependent = (
   dependent: DependentSignal.DependentSignal,
-): Context.Tag.Service<SignalContext> => ({
-  signal: Option.some(dependent),
-});
+): STM.STM<Context.Tag.Service<SignalContext>, never, never> =>
+  pipe(
+    inheritUnchanged,
+    STM.map((unchanged) => ({
+      signal: Option.some(dependent),
+      unchanged,
+    })),
+  );
 
 export const bindDependency = (
   dependency: DependencySignal.DependencySignal<unknown, unknown, unknown>,

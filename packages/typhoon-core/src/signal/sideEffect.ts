@@ -28,17 +28,26 @@ export class SideEffect<R = never> implements DependentSignal {
   }
 
   runOnce(): Effect.Effect<void, never, SignalService.SignalService> {
-    return SignalService.enqueueRunTracked(
-      new SignalService.RunTrackedRequest({
-        effect: pipe(
-          TRef.get(this._effect),
-          STM.commit,
-          Effect.flatten,
-          Effect.catchAll(() => Effect.void),
-          Effect.provide(this._context),
+    return pipe(
+      fromDependent(this),
+      STM.commit,
+      Effect.flatMap((ctx) =>
+        pipe(
+          SignalService.enqueueRunTracked(
+            new SignalService.RunTrackedRequest({
+              effect: pipe(
+                TRef.get(this._effect),
+                STM.commit,
+                Effect.flatten,
+                Effect.catchAll(() => Effect.void),
+                Effect.provide(this._context),
+              ),
+              ctx,
+            }),
+          ),
+          Effect.asVoid,
         ),
-        ctx: fromDependent(this),
-      }),
+      ),
     );
   }
 
