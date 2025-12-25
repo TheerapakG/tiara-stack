@@ -13,6 +13,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   MessageActionRowComponentBuilder,
+  subtext,
 } from "discord.js";
 import {
   Array,
@@ -25,6 +26,9 @@ import {
   pipe,
 } from "effect";
 import { UntilObserver } from "typhoon-core/signal";
+
+const autoCheckinPreviewNotice =
+  "Sent automatically via auto check-in (preview; may have bugs).";
 
 const computeHour = pipe(
   Effect.Do,
@@ -172,14 +176,16 @@ const runOnce = Effect.suspend(() =>
                                 Effect.transposeMapOption((checkinMessage) =>
                                   pipe(
                                     Effect.Do,
-                                    Effect.let(
-                                      "initialMessage",
-                                      () => checkinMessage,
+                                    Effect.let("initialMessage", () =>
+                                      [
+                                        checkinMessage,
+                                        subtext(autoCheckinPreviewNotice),
+                                      ].join("\n"),
                                     ),
                                     SendableChannelContext.send().bind(
                                       "message",
-                                      () => ({
-                                        content: checkinMessage,
+                                      ({ initialMessage }) => ({
+                                        content: initialMessage,
                                         components: checkinData.runningChannel
                                           .roleId
                                           ? [
