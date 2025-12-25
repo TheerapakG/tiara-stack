@@ -62,7 +62,7 @@ export abstract class DependencySignal<A = never, E = never, R = never>
 
 export const isDependencySignal = (
   signal: unknown,
-): signal is DependencySignal =>
+): signal is DependencySignal<unknown, unknown, unknown> =>
   Boolean(
     signal &&
       typeof signal === "object" &&
@@ -171,14 +171,26 @@ export const notifyAllDependents =
           dependents,
           (dependent) =>
             pipe(
-              Effect.unlessEffect(
-                pipe(
-                  computeChanged(changed, dependent),
-                  STM.map(HashSet.size),
-                  STM.map((size) => Number.Equivalence(size, 0)),
-                  STM.commit,
-                ),
-              )(dependent.notify()),
+              computeChanged(changed, dependent),
+              STM.map(HashSet.size),
+              STM.map((size) => !Number.Equivalence(size, 0)),
+              STM.commit,
+              Effect.tap((changed) =>
+                changed
+                  ? dependent.notify()
+                  : isDependencySignal(dependent)
+                    ? pipe(
+                        TRef.get(context.unchanged),
+                        STM.flatMap(
+                          TSet.add<DependencySignal<unknown, unknown, unknown>>(
+                            dependent,
+                          ),
+                        ),
+                        STM.asVoid,
+                        STM.commit,
+                      )
+                    : Effect.void,
+              ),
               Effect.provideService(
                 SignalContext.SignalContext,
                 context.context,
