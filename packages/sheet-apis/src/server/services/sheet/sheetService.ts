@@ -19,7 +19,6 @@ import {
   Array,
   Data,
   Effect,
-  Either,
   HashMap,
   Match,
   Number,
@@ -28,11 +27,10 @@ import {
   Schema,
   String,
 } from "effect";
-import { Result, TupleToStructValueSchema } from "typhoon-core/schema";
+import { TupleToStructValueSchema } from "typhoon-core/schema";
 import { Array as ArrayUtils, Struct as StructUtils } from "typhoon-core/utils";
-import { SignalContext } from "typhoon-core/signal";
-import { GuildConfigService } from "../guildConfigService";
 import { SheetConfigService } from "../sheetConfigService";
+import { SheetContext } from "./sheetContext";
 
 class ConfigField<Range> extends Data.TaggedClass("ConfigField")<{
   range: Range;
@@ -941,175 +939,290 @@ const scheduleParser = (
 export class SheetService extends Effect.Service<SheetService>()(
   "SheetService",
   {
-    effect: (sheetId: string) =>
-      pipe(
-        Effect.Do,
-        Effect.bindAll(
-          () => ({
-            sheet: GoogleSheets,
-            sheetConfigService: SheetConfigService,
-          }),
-          { concurrency: "unbounded" },
-        ),
-        Effect.bindAll(
-          ({ sheetConfigService }) => ({
-            rangesConfig: Effect.cached(
-              pipe(
-                sheetConfigService.getRangesConfig(sheetId),
-                Effect.withSpan("SheetService.rangesConfig", {
-                  captureStackTrace: true,
-                }),
-              ),
-            ),
-            teamConfig: Effect.cached(
-              pipe(
-                sheetConfigService.getTeamConfig(sheetId),
-                Effect.withSpan("SheetService.teamConfig", {
-                  captureStackTrace: true,
-                }),
-              ),
-            ),
-            eventConfig: Effect.cached(
-              pipe(
-                sheetConfigService.getEventConfig(sheetId),
-                Effect.withSpan("SheetService.eventConfig", {
-                  captureStackTrace: true,
-                }),
-              ),
-            ),
-            scheduleConfig: Effect.cached(
-              pipe(
-                sheetConfigService.getScheduleConfig(sheetId),
-                Effect.withSpan("SheetService.scheduleConfig", {
-                  captureStackTrace: true,
-                }),
-              ),
-            ),
-            runnerConfig: Effect.cached(
-              pipe(
-                sheetConfigService.getRunnerConfig(sheetId),
-                Effect.withSpan("SheetService.runnerConfig", {
-                  captureStackTrace: true,
-                }),
-              ),
-            ),
-          }),
-          { concurrency: "unbounded" },
-        ),
-        Effect.let(
-          "sheetGet",
-          ({ sheet }) =>
-            (
-              params?: Omit<
-                sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
-                "spreadsheetId"
-              >,
-              options?: MethodOptions,
-            ) =>
-              pipe(
-                sheet.get({ spreadsheetId: sheetId, ...params }, options),
-                Effect.withSpan("SheetService.get", {
-                  captureStackTrace: true,
-                }),
-              ),
-        ),
-        Effect.let(
-          "sheetGetHashMap",
-          ({ sheet }) =>
-            <K>(
-              ranges: HashMap.HashMap<K, string>,
-              params?: Omit<
-                sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
-                "spreadsheetId"
-              >,
-              options?: MethodOptions,
-            ) =>
-              pipe(
-                sheet.getHashMap(
-                  ranges,
-                  { spreadsheetId: sheetId, ...params },
-                  options,
-                ),
-                Effect.withSpan("SheetService.getHashMap", {
-                  captureStackTrace: true,
-                }),
-              ),
-        ),
-        Effect.let(
-          "sheetUpdate",
-          ({ sheet }) =>
-            (
-              params?: Omit<
-                sheets_v4.Params$Resource$Spreadsheets$Values$Batchupdate,
-                "spreadsheetId"
-              >,
-              options?: MethodOptions,
-            ) =>
-              pipe(
-                sheet.update({ spreadsheetId: sheetId, ...params }, options),
-                Effect.withSpan("SheetService.update", {
-                  captureStackTrace: true,
-                }),
-              ),
-        ),
-        Effect.let(
-          "sheetGetSheetGids",
-          ({ sheet }) =>
-            () =>
-              pipe(
-                sheet.getSheetGids(sheetId),
-                Effect.withSpan("SheetService.getSheetGids", {
-                  captureStackTrace: true,
-                }),
-              ),
-        ),
-        Effect.bindAll(
-          ({
-            sheet,
-            sheetGet,
-            sheetGetHashMap,
-            rangesConfig,
-            scheduleConfig,
-            teamConfig,
-            runnerConfig,
-          }) => ({
-            players: pipe(
-              Effect.Do,
-              Effect.bind("rangesConfig", () => rangesConfig),
-              Effect.bind("sheet", ({ rangesConfig }) =>
-                sheetGet({
-                  ranges: [rangesConfig.userIds, rangesConfig.userSheetNames],
-                }),
-              ),
-              Effect.flatMap(({ sheet }) =>
-                playerParser(sheet.data.valueRanges ?? []),
-              ),
-              Effect.provideService(GoogleSheets, sheet),
-              Effect.withSpan("SheetService.players", {
+    effect: pipe(
+      Effect.Do,
+      Effect.bindAll(
+        () => ({
+          sheet: GoogleSheets,
+          sheetContext: SheetContext,
+          sheetConfigService: SheetConfigService,
+        }),
+        { concurrency: "unbounded" },
+      ),
+      Effect.bindAll(
+        ({ sheetContext, sheetConfigService }) => ({
+          rangesConfig: Effect.cached(
+            pipe(
+              sheetConfigService.getRangesConfig(sheetContext.sheetId),
+              Effect.withSpan("SheetService.rangesConfig", {
                 captureStackTrace: true,
               }),
-              Effect.cached,
             ),
-            teams: pipe(
-              Effect.Do,
-              Effect.bind("teamConfigs", () => teamConfig),
-              Effect.let("filteredTeamConfigValues", ({ teamConfigs }) =>
-                filterTeamConfigValues(teamConfigs),
-              ),
-              Effect.let("ranges", ({ filteredTeamConfigValues }) =>
-                teamRanges(filteredTeamConfigValues),
-              ),
-              Effect.bind("sheet", ({ ranges }) => sheetGetHashMap(ranges)),
-              Effect.flatMap(({ filteredTeamConfigValues, sheet }) =>
-                teamParser(filteredTeamConfigValues, sheet),
-              ),
-              Effect.provideService(GoogleSheets, sheet),
-              Effect.withSpan("SheetService.teams", {
+          ),
+          teamConfig: Effect.cached(
+            pipe(
+              sheetConfigService.getTeamConfig(sheetContext.sheetId),
+              Effect.withSpan("SheetService.teamConfig", {
                 captureStackTrace: true,
               }),
-              Effect.cached,
             ),
-            allSchedules: pipe(
+          ),
+          eventConfig: Effect.cached(
+            pipe(
+              sheetConfigService.getEventConfig(sheetContext.sheetId),
+              Effect.withSpan("SheetService.eventConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          ),
+          scheduleConfig: Effect.cached(
+            pipe(
+              sheetConfigService.getScheduleConfig(sheetContext.sheetId),
+              Effect.withSpan("SheetService.scheduleConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          ),
+          runnerConfig: Effect.cached(
+            pipe(
+              sheetConfigService.getRunnerConfig(sheetContext.sheetId),
+              Effect.withSpan("SheetService.runnerConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          ),
+        }),
+        { concurrency: "unbounded" },
+      ),
+      Effect.let(
+        "sheetGet",
+        ({ sheet, sheetContext }) =>
+          (
+            params?: Omit<
+              sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
+              "spreadsheetId"
+            >,
+            options?: MethodOptions,
+          ) =>
+            pipe(
+              sheet.get(
+                { spreadsheetId: sheetContext.sheetId, ...params },
+                options,
+              ),
+              Effect.withSpan("SheetService.get", {
+                captureStackTrace: true,
+              }),
+            ),
+      ),
+      Effect.let(
+        "sheetGetHashMap",
+        ({ sheet, sheetContext }) =>
+          <K>(
+            ranges: HashMap.HashMap<K, string>,
+            params?: Omit<
+              sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
+              "spreadsheetId"
+            >,
+            options?: MethodOptions,
+          ) =>
+            pipe(
+              sheet.getHashMap(
+                ranges,
+                { spreadsheetId: sheetContext.sheetId, ...params },
+                options,
+              ),
+              Effect.withSpan("SheetService.getHashMap", {
+                captureStackTrace: true,
+              }),
+            ),
+      ),
+      Effect.let(
+        "sheetUpdate",
+        ({ sheet, sheetContext }) =>
+          (
+            params?: Omit<
+              sheets_v4.Params$Resource$Spreadsheets$Values$Batchupdate,
+              "spreadsheetId"
+            >,
+            options?: MethodOptions,
+          ) =>
+            pipe(
+              sheet.update(
+                { spreadsheetId: sheetContext.sheetId, ...params },
+                options,
+              ),
+              Effect.withSpan("SheetService.update", {
+                captureStackTrace: true,
+              }),
+            ),
+      ),
+      Effect.let(
+        "sheetGetSheetGids",
+        ({ sheet, sheetContext }) =>
+          () =>
+            pipe(
+              sheet.getSheetGids(sheetContext.sheetId),
+              Effect.withSpan("SheetService.getSheetGids", {
+                captureStackTrace: true,
+              }),
+            ),
+      ),
+      Effect.bindAll(
+        ({
+          sheet,
+          sheetGet,
+          sheetGetHashMap,
+          rangesConfig,
+          scheduleConfig,
+          teamConfig,
+          runnerConfig,
+        }) => ({
+          players: pipe(
+            Effect.Do,
+            Effect.bind("rangesConfig", () => rangesConfig),
+            Effect.bind("sheet", ({ rangesConfig }) =>
+              sheetGet({
+                ranges: [rangesConfig.userIds, rangesConfig.userSheetNames],
+              }),
+            ),
+            Effect.flatMap(({ sheet }) =>
+              playerParser(sheet.data.valueRanges ?? []),
+            ),
+            Effect.provideService(GoogleSheets, sheet),
+            Effect.withSpan("SheetService.players", {
+              captureStackTrace: true,
+            }),
+            Effect.cached,
+          ),
+          teams: pipe(
+            Effect.Do,
+            Effect.bind("teamConfigs", () => teamConfig),
+            Effect.let("filteredTeamConfigValues", ({ teamConfigs }) =>
+              filterTeamConfigValues(teamConfigs),
+            ),
+            Effect.let("ranges", ({ filteredTeamConfigValues }) =>
+              teamRanges(filteredTeamConfigValues),
+            ),
+            Effect.bind("sheet", ({ ranges }) => sheetGetHashMap(ranges)),
+            Effect.flatMap(({ filteredTeamConfigValues, sheet }) =>
+              teamParser(filteredTeamConfigValues, sheet),
+            ),
+            Effect.provideService(GoogleSheets, sheet),
+            Effect.withSpan("SheetService.teams", {
+              captureStackTrace: true,
+            }),
+            Effect.cached,
+          ),
+          allSchedules: pipe(
+            Effect.Do,
+            Effect.bindAll(
+              () => ({
+                scheduleConfigs: scheduleConfig,
+                runnerConfig,
+              }),
+              { concurrency: "unbounded" },
+            ),
+            Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
+              filterScheduleConfigValues(scheduleConfigs),
+            ),
+            Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
+              sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
+            ),
+            Effect.bind(
+              "schedules",
+              ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
+                scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
+            ),
+            Effect.map(({ schedules }) => schedules),
+            Effect.provideService(GoogleSheets, sheet),
+            Effect.withSpan("SheetService.allSchedules", {
+              captureStackTrace: true,
+            }),
+            Effect.cached,
+          ),
+        }),
+        { concurrency: "unbounded" },
+      ),
+      Effect.map(
+        ({
+          sheet,
+          sheetContext,
+          sheetGet,
+          sheetGetHashMap,
+          sheetUpdate,
+          sheetGetSheetGids,
+          rangesConfig,
+          teamConfig,
+          eventConfig,
+          scheduleConfig,
+          players,
+          teams,
+          allSchedules,
+          runnerConfig,
+        }) => ({
+          sheetId: sheetContext.sheetId,
+          get: sheetGet,
+          getHashMap: () => sheetGetHashMap,
+          update: sheetUpdate,
+          getSheetGids: sheetGetSheetGids,
+          getRangesConfig: () =>
+            pipe(
+              rangesConfig,
+              Effect.withSpan("SheetService.getRangesConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          getTeamConfig: () =>
+            pipe(
+              teamConfig,
+              Effect.withSpan("SheetService.getTeamConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          getEventConfig: () =>
+            pipe(
+              eventConfig,
+              Effect.withSpan("SheetService.getEventConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          getScheduleConfig: () =>
+            pipe(
+              scheduleConfig,
+              Effect.withSpan("SheetService.getScheduleConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          getRunnerConfig: () =>
+            pipe(
+              runnerConfig,
+              Effect.withSpan("SheetService.getRunnerConfig", {
+                captureStackTrace: true,
+              }),
+            ),
+          getPlayers: () =>
+            pipe(
+              players,
+              Effect.withSpan("SheetService.getPlayers", {
+                captureStackTrace: true,
+              }),
+            ),
+          getTeams: () =>
+            pipe(
+              teams,
+              Effect.withSpan("SheetService.getTeams", {
+                captureStackTrace: true,
+              }),
+            ),
+          getAllSchedules: () =>
+            pipe(
+              allSchedules,
+              Effect.withSpan("SheetService.getAllSchedules", {
+                captureStackTrace: true,
+              }),
+            ),
+          getDaySchedules: (day: number) =>
+            pipe(
               Effect.Do,
               Effect.bindAll(
                 () => ({
@@ -1119,7 +1232,11 @@ export class SheetService extends Effect.Service<SheetService>()(
                 { concurrency: "unbounded" },
               ),
               Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
-                filterScheduleConfigValues(scheduleConfigs),
+                pipe(
+                  scheduleConfigs,
+                  filterScheduleConfigValues,
+                  Array.filter((a) => Number.Equivalence(a.day, day)),
+                ),
               ),
               Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
                 sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
@@ -1131,188 +1248,45 @@ export class SheetService extends Effect.Service<SheetService>()(
               ),
               Effect.map(({ schedules }) => schedules),
               Effect.provideService(GoogleSheets, sheet),
-              Effect.withSpan("SheetService.allSchedules", {
+              Effect.withSpan("SheetService.daySchedules", {
                 captureStackTrace: true,
               }),
-              Effect.cached,
             ),
-          }),
-          { concurrency: "unbounded" },
-        ),
-        Effect.map(
-          ({
-            sheet,
-            sheetGet,
-            sheetGetHashMap,
-            sheetUpdate,
-            sheetGetSheetGids,
-            rangesConfig,
-            teamConfig,
-            eventConfig,
-            scheduleConfig,
-            players,
-            teams,
-            allSchedules,
-            runnerConfig,
-          }) => ({
-            sheetId: sheetId,
-            get: sheetGet,
-            getHashMap: () => sheetGetHashMap,
-            update: sheetUpdate,
-            getSheetGids: sheetGetSheetGids,
-            getRangesConfig: () =>
-              pipe(
-                rangesConfig,
-                Effect.withSpan("SheetService.getRangesConfig", {
-                  captureStackTrace: true,
+          getChannelSchedules: (channel: string) =>
+            pipe(
+              Effect.Do,
+              Effect.bindAll(
+                () => ({
+                  scheduleConfigs: scheduleConfig,
+                  runnerConfig,
                 }),
+                { concurrency: "unbounded" },
               ),
-            getTeamConfig: () =>
-              pipe(
-                teamConfig,
-                Effect.withSpan("SheetService.getTeamConfig", {
-                  captureStackTrace: true,
-                }),
-              ),
-            getEventConfig: () =>
-              pipe(
-                eventConfig,
-                Effect.withSpan("SheetService.getEventConfig", {
-                  captureStackTrace: true,
-                }),
-              ),
-            getScheduleConfig: () =>
-              pipe(
-                scheduleConfig,
-                Effect.withSpan("SheetService.getScheduleConfig", {
-                  captureStackTrace: true,
-                }),
-              ),
-            getRunnerConfig: () =>
-              pipe(
-                runnerConfig,
-                Effect.withSpan("SheetService.getRunnerConfig", {
-                  captureStackTrace: true,
-                }),
-              ),
-            getPlayers: () =>
-              pipe(
-                players,
-                Effect.withSpan("SheetService.getPlayers", {
-                  captureStackTrace: true,
-                }),
-              ),
-            getTeams: () =>
-              pipe(
-                teams,
-                Effect.withSpan("SheetService.getTeams", {
-                  captureStackTrace: true,
-                }),
-              ),
-            getAllSchedules: () =>
-              pipe(
-                allSchedules,
-                Effect.withSpan("SheetService.getAllSchedules", {
-                  captureStackTrace: true,
-                }),
-              ),
-            getDaySchedules: (day: number) =>
-              pipe(
-                Effect.Do,
-                Effect.bindAll(
-                  () => ({
-                    scheduleConfigs: scheduleConfig,
-                    runnerConfig,
-                  }),
-                  { concurrency: "unbounded" },
+              Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
+                pipe(
+                  scheduleConfigs,
+                  filterScheduleConfigValues,
+                  Array.filter((a) => String.Equivalence(a.channel, channel)),
                 ),
-                Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
-                  pipe(
-                    scheduleConfigs,
-                    filterScheduleConfigValues,
-                    Array.filter((a) => Number.Equivalence(a.day, day)),
-                  ),
-                ),
-                Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
-                  sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
-                ),
-                Effect.bind(
-                  "schedules",
-                  ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
-                    scheduleParser(
-                      filteredScheduleConfigs,
-                      sheet,
-                      runnerConfig,
-                    ),
-                ),
-                Effect.map(({ schedules }) => schedules),
-                Effect.provideService(GoogleSheets, sheet),
-                Effect.withSpan("SheetService.daySchedules", {
-                  captureStackTrace: true,
-                }),
               ),
-            getChannelSchedules: (channel: string) =>
-              pipe(
-                Effect.Do,
-                Effect.bindAll(
-                  () => ({
-                    scheduleConfigs: scheduleConfig,
-                    runnerConfig,
-                  }),
-                  { concurrency: "unbounded" },
-                ),
-                Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
-                  pipe(
-                    scheduleConfigs,
-                    filterScheduleConfigValues,
-                    Array.filter((a) => String.Equivalence(a.channel, channel)),
-                  ),
-                ),
-                Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
-                  sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
-                ),
-                Effect.bind(
-                  "schedules",
-                  ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
-                    scheduleParser(
-                      filteredScheduleConfigs,
-                      sheet,
-                      runnerConfig,
-                    ),
-                ),
-                Effect.map(({ schedules }) => schedules),
-                Effect.provideService(GoogleSheets, sheet),
-                Effect.withSpan("SheetService.channelSchedules", {
-                  captureStackTrace: true,
-                }),
+              Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
+                sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
               ),
-          }),
-        ),
+              Effect.bind(
+                "schedules",
+                ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
+                  scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
+              ),
+              Effect.map(({ schedules }) => schedules),
+              Effect.provideService(GoogleSheets, sheet),
+              Effect.withSpan("SheetService.channelSchedules", {
+                captureStackTrace: true,
+              }),
+            ),
+        }),
       ),
+    ),
     dependencies: [GoogleSheets.Default, SheetConfigService.Default],
     accessors: true,
   },
-) {
-  static ofGuild = <E = never>(
-    guildId: SignalContext.MaybeSignalEffect<string, E>,
-  ) =>
-    pipe(
-      GuildConfigService.getGuildConfigByGuildId(guildId),
-      Effect.map(
-        Effect.map(
-          Result.map(Either.map(Option.flatMap((config) => config.sheetId))),
-        ),
-      ),
-      Effect.map(
-        Effect.map(
-          Result.map(
-            Either.map(
-              Option.map((sheetId) =>
-                SheetService.DefaultWithoutDependencies(sheetId),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-}
+) {}

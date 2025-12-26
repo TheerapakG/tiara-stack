@@ -1,8 +1,5 @@
-import { PlayerService } from "./playerService";
-import { SheetService } from "./sheetService";
-import { GuildConfigService } from "../guildConfigService";
-import { SheetConfigService } from "../sheetConfigService";
 import {
+  Context,
   Effect,
   Layer,
   pipe,
@@ -13,7 +10,6 @@ import {
   Scope,
 } from "effect";
 import { Result } from "typhoon-core/schema";
-import { ScreenshotService } from "./screenshotService";
 import { SignalContext, SignalService } from "typhoon-core/signal";
 import {
   ZeroQueryAppError,
@@ -24,22 +20,35 @@ import { GoogleSheets } from "@/google";
 import { ZeroService } from "typhoon-core/services";
 import { Schema } from "sheet-db-schema/zero";
 
-export * from "./playerService";
-export * from "./sheetService";
-export * from "./screenshotService";
+import { PlayerService } from "./playerService";
+import { ScreenshotService } from "./screenshotService";
+import { SheetContext } from "./sheetContext";
+import { SheetService } from "./sheetService";
+import { GuildConfigService } from "../guildConfigService";
+import { SheetConfigService } from "../sheetConfigService";
 
-const sheetServiceDependendents = Layer.mergeAll(
-  PlayerService.Default,
-  ScreenshotService.DefaultWithoutDependencies,
+export * from "./playerService";
+export * from "./screenshotService";
+export * from "./sheetContext";
+export * from "./sheetService";
+
+const sheetContextDependendents = pipe(
+  Layer.mergeAll(
+    PlayerService.Default,
+    ScreenshotService.DefaultWithoutDependencies,
+  ),
+  Layer.provideMerge(SheetService.DefaultWithoutDependencies),
 );
 
 export const layerOfSheetId = (sheetId: string) =>
   pipe(
-    sheetServiceDependendents,
-    Layer.provideMerge(SheetService.DefaultWithoutDependencies(sheetId)),
+    sheetContextDependendents,
+    Layer.provideMerge(
+      Layer.syncContext(() => Context.make(SheetContext, { sheetId })),
+    ),
   );
 
-export const contextOfGuildId = (sheetId: string) =>
+export const contextOfSheetId = (sheetId: string) =>
   pipe(layerOfSheetId(sheetId), Layer.build);
 
 export const layerOfGuildId = <E = never>(
@@ -49,7 +58,7 @@ export const layerOfGuildId = <E = never>(
     Result.Result<
       Option.Option<
         Layer.Layer<
-          PlayerService | ScreenshotService | SheetService,
+          PlayerService | ScreenshotService | SheetService | SheetContext,
           ZeroQueryAppError | ZeroQueryHttpError | ZeroQueryZeroError,
           GoogleSheets | SheetConfigService
         >
@@ -65,17 +74,17 @@ export const layerOfGuildId = <E = never>(
   | SignalService.SignalService
 > =>
   pipe(
-    SheetService.ofGuild(guildId),
+    SheetContext.ofGuild(guildId),
     Effect.map(
       Effect.map(
         Result.map(
           flow(
             Either.match({
               onLeft: (err) => Option.some(Layer.fail(err)),
-              onRight: Option.map((sheetService) =>
+              onRight: Option.map((sheetContext) =>
                 pipe(
-                  sheetServiceDependendents,
-                  Layer.provideMerge(sheetService),
+                  sheetContextDependendents,
+                  Layer.provideMerge(Layer.syncContext(() => sheetContext)),
                 ),
               ),
             }),
