@@ -9,9 +9,10 @@ import {
   TRef,
   TSet,
   HashSet,
+  TMap,
 } from "effect";
 import { Observable } from "../observability";
-import type * as DependentSignal from "./dependentSignal";
+import * as DependentSignal from "./dependentSignal";
 import * as SignalContext from "./signalContext";
 import * as SignalService from "./signalService";
 
@@ -70,21 +71,82 @@ export const isDependencySignal = (
       signal[DependencySymbol] === signal,
   );
 
+export const buildDependentsSnapshot = (
+  dependency:
+    | DependencySignal<unknown, unknown, unknown>
+    | DependentSignal.DependentSignal,
+): STM.STM<
+  TMap.TMap<
+    | DependencySignal<unknown, unknown, unknown>
+    | DependentSignal.DependentSignal,
+    {
+      dependencies: DependencySignal<unknown, unknown, unknown>[];
+      dependents: DependentSignal.DependentSignal[];
+    }
+  >,
+  never,
+  never
+> =>
+  pipe(
+    STM.Do,
+    STM.bind("dependencies", () =>
+      DependentSignal.isDependentSignal(dependency)
+        ? pipe(dependency.getDependencies(), STM.flatMap(TSet.toArray))
+        : STM.succeed([]),
+    ),
+    STM.bind("dependents", () =>
+      isDependencySignal(dependency)
+        ? pipe(dependency.getDependents(), STM.flatMap(TSet.toArray))
+        : STM.succeed([]),
+    ),
+    STM.let("derefDependents", ({ dependents }) =>
+      pipe(
+        dependents,
+        Array.map((dependent) =>
+          dependent instanceof WeakRef ? dependent.deref() : dependent,
+        ),
+        Array.filter((dependent) => dependent !== undefined),
+      ),
+    ),
+    STM.bind("dependentsMap", ({ dependencies, derefDependents }) =>
+      TMap.make([dependency, { dependencies, dependents: derefDependents }]),
+    ),
+    STM.tap(({ derefDependents, dependentsMap }) =>
+      STM.forEach(derefDependents, (dependent) =>
+        pipe(
+          buildDependentsSnapshot(dependent),
+          STM.flatMap(TMap.toArray),
+          STM.flatMap(
+            STM.forEach(([key, value]) =>
+              TMap.setIfAbsent(dependentsMap, key, value),
+            ),
+          ),
+        ),
+      ),
+    ),
+    STM.map(({ dependentsMap }) => dependentsMap),
+  );
+
 export const getDependentsUpdateOrder = (
+  dependentsSnapshot: TMap.TMap<
+    | DependencySignal<unknown, unknown, unknown>
+    | DependentSignal.DependentSignal,
+    {
+      dependencies: DependencySignal<unknown, unknown, unknown>[];
+      dependents: DependentSignal.DependentSignal[];
+    }
+  >,
   dependency: DependencySignal<unknown, unknown, unknown>,
 ): STM.STM<DependentSignal.DependentSignal[], never, never> =>
   pipe(
     STM.Do,
     STM.bind("thisDependents", () =>
       pipe(
-        dependency.getDependents(),
-        STM.flatMap(TSet.toArray),
+        TMap.get(dependentsSnapshot, dependency),
+        STM.map(Option.map(({ dependents }) => dependents)),
         STM.map(
-          Array.map((dependent) =>
-            dependent instanceof WeakRef ? dependent.deref() : dependent,
-          ),
+          Option.getOrElse(() => [] as DependentSignal.DependentSignal[]),
         ),
-        STM.map(Array.filter((dependent) => dependent !== undefined)),
       ),
     ),
     STM.bind("nestedDependents", ({ thisDependents }) =>
@@ -93,7 +155,9 @@ export const getDependentsUpdateOrder = (
           pipe(
             thisDependents,
             Array.filter((dependency) => isDependencySignal(dependency)),
-            Array.map(getDependentsUpdateOrder),
+            Array.map((dependency) =>
+              getDependentsUpdateOrder(dependentsSnapshot, dependency),
+            ),
           ),
         ),
         STM.map(Array.flatten),
@@ -117,6 +181,14 @@ export const getDependentsUpdateOrder = (
 
 const computeChanged = (
   changed: TSet.TSet<DependencySignal<unknown, unknown, unknown>>,
+  dependentsSnapshot: TMap.TMap<
+    | DependencySignal<unknown, unknown, unknown>
+    | DependentSignal.DependentSignal,
+    {
+      dependencies: DependencySignal<unknown, unknown, unknown>[];
+      dependents: DependentSignal.DependentSignal[];
+    }
+  >,
   dependent: DependentSignal.DependentSignal,
 ) =>
   pipe(
@@ -140,8 +212,14 @@ const computeChanged = (
     ),
     STM.flatMap((changed) =>
       pipe(
-        dependent.getDependencies(),
-        STM.flatMap(TSet.toHashSet),
+        TMap.get(dependentsSnapshot, dependent),
+        STM.map(
+          Option.match({
+            onSome: ({ dependencies }) => dependencies,
+            onNone: () => [],
+          }),
+        ),
+        STM.map(HashSet.fromIterable),
         STM.map((dependencies) => HashSet.intersection(dependencies, changed)),
       ),
     ),
@@ -156,47 +234,49 @@ export const notifyAllDependents =
   (signal) =>
     pipe(
       STM.all({
-        dependents: getDependentsUpdateOrder(signal),
+        dependentsSnapshot: buildDependentsSnapshot(signal),
         context: SignalContext.makeWithEmptyUnchanged,
         changed: TSet.make(signal),
       }),
+      STM.bind("dependents", ({ dependentsSnapshot }) =>
+        getDependentsUpdateOrder(dependentsSnapshot, signal),
+      ),
       STM.let("watched", ({ dependents }) =>
         dependents.some((dependent) => !isDependencySignal(dependent)),
       ),
       STM.tap(() => signal.clearDependents()),
       STM.commit,
       Effect.tap(({ watched }) => beforeNotify(watched)),
-      Effect.andThen(({ dependents, context, changed }) =>
-        Effect.forEach(
-          dependents,
-          (dependent) =>
-            pipe(
-              computeChanged(changed, dependent),
-              STM.map(HashSet.size),
-              STM.map((size) => !Number.Equivalence(size, 0)),
-              STM.commit,
-              Effect.tap((changed) =>
-                changed
-                  ? dependent.notify()
-                  : isDependencySignal(dependent)
-                    ? pipe(
-                        TRef.get(context.unchanged),
-                        STM.flatMap(
-                          TSet.add<DependencySignal<unknown, unknown, unknown>>(
-                            dependent,
-                          ),
-                        ),
-                        STM.asVoid,
-                        STM.commit,
-                      )
-                    : Effect.void,
-              ),
-              Effect.provideService(
-                SignalContext.SignalContext,
-                context.context,
-              ),
+      Effect.andThen(({ dependentsSnapshot, dependents, context, changed }) =>
+        Effect.forEach(dependents, (dependent) =>
+          pipe(
+            computeChanged(changed, dependentsSnapshot, dependent),
+            STM.map(HashSet.size),
+            STM.map((size) => !Number.Equivalence(size, 0)),
+            STM.tap(() =>
+              isDependencySignal(dependent)
+                ? TSet.add(changed, dependent)
+                : STM.void,
             ),
-          { discard: true },
+            STM.commit,
+            Effect.tap((changed) =>
+              changed
+                ? dependent.notify()
+                : isDependencySignal(dependent)
+                  ? pipe(
+                      TRef.get(context.unchanged),
+                      STM.flatMap(
+                        TSet.add<DependencySignal<unknown, unknown, unknown>>(
+                          dependent,
+                        ),
+                      ),
+                      STM.asVoid,
+                      STM.commit,
+                    )
+                  : Effect.void,
+            ),
+            Effect.provideService(SignalContext.SignalContext, context.context),
+          ),
         ),
       ),
       Observable.withSpan(signal, "DependencySignal.notifyAllDependents", {

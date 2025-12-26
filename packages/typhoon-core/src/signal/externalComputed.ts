@@ -3,6 +3,7 @@ import { Observable } from "../observability";
 import {
   DependencySignal,
   DependencySymbol,
+  buildDependentsSnapshot,
   getDependentsUpdateOrder,
 } from "./dependencySignal";
 import { DependentSignal } from "./dependentSignal";
@@ -88,6 +89,7 @@ export class ExternalComputed<T = unknown>
   > {
     return pipe(
       SignalContext.bindDependency(this),
+      STM.commit,
       Effect.flatMap(() => this.peek()),
       Observable.withSpan(this, "ExternalComputed.value", {
         captureStackTrace: true,
@@ -139,7 +141,10 @@ export class ExternalComputed<T = unknown>
 
   reconcile(): STM.STM<void, never, never> {
     return pipe(
-      getDependentsUpdateOrder(this),
+      buildDependentsSnapshot(this),
+      STM.flatMap((dependentsSnapshot) =>
+        getDependentsUpdateOrder(dependentsSnapshot, this),
+      ),
       STM.map((dependents) => dependents.some((d) => !(d instanceof WeakRef))),
       STM.flatMap((watched) => this._maybeSetEmitting(watched)),
     );

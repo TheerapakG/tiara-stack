@@ -129,6 +129,7 @@ export class WithScopeComputed<A = never, E = never, R = never>
   > {
     return pipe(
       SignalContext.bindDependency(this),
+      STM.commit,
       Effect.flatMap(() => this.peek()),
       Observable.withSpan(this, "WithScopeComputed.value", {
         captureStackTrace: true,
@@ -158,7 +159,10 @@ export class WithScopeComputed<A = never, E = never, R = never>
             pipe(
               STM.all({
                 queue: TQueue.peekOption(this._queue),
-                context: STM.context<R>(),
+                context: pipe(
+                  STM.context<R>(),
+                  STM.map(Context.omit(SignalContext.SignalContext)),
+                ),
               }),
               STM.commit,
               Effect.flatMap(({ queue, context }) =>
@@ -246,7 +250,7 @@ export class WithScopeComputed<A = never, E = never, R = never>
   }
 
   private _makeRunTrackedRequest(
-    context: Context.Context<R>,
+    context: Context.Context<Exclude<R, SignalContext.SignalContext>>,
     ctx: Context.Tag.Service<SignalContext.SignalContext>,
   ) {
     return new SignalService.RunTrackedRequest({
@@ -267,7 +271,7 @@ export class WithScopeComputed<A = never, E = never, R = never>
         ),
         Effect.flatten,
         Effect.provide(context),
-      ),
+      ) as Effect.Effect<A, E, SignalContext.SignalContext>,
       ctx,
     });
   }

@@ -67,6 +67,7 @@ export class Signal<T = unknown>
   > {
     return pipe(
       SignalContext.bindDependency(this),
+      STM.commit,
       Effect.flatMap(() => this.peek()),
       Observable.withSpan(this, "Signal.value", {
         captureStackTrace: true,
