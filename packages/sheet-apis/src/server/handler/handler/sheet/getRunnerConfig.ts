@@ -54,7 +54,12 @@ export const getRunnerConfigHandler = pipe(
       Effect.map(
         Handler.Config.encodeResponseEffect(getRunnerConfigHandlerConfig),
       ),
-      Effect.withSpan("getRunnerConfigHandler", {
+      Effect.map(
+        Effect.withSpan("getRunnerConfigHandler", {
+          captureStackTrace: true,
+        }),
+      ),
+      Effect.withSpan("getRunnerConfigHandler subscription", {
         captureStackTrace: true,
       }),
     ),

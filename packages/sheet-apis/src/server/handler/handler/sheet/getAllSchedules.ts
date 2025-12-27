@@ -54,7 +54,12 @@ export const getAllSchedulesHandler = pipe(
       Effect.map(
         Handler.Config.encodeResponseEffect(getAllSchedulesHandlerConfig),
       ),
-      Effect.withSpan("getAllSchedulesHandler", {
+      Effect.map(
+        Effect.withSpan("getAllSchedulesHandler", {
+          captureStackTrace: true,
+        }),
+      ),
+      Effect.withSpan("getAllSchedulesHandler subscription", {
         captureStackTrace: true,
       }),
     ),

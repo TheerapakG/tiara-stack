@@ -52,7 +52,12 @@ export const getPlayersHandler = pipe(
       ),
       Effect.map(Error.Core.catchParseErrorAsValidationError),
       Effect.map(Handler.Config.encodeResponseEffect(getPlayersHandlerConfig)),
-      Effect.withSpan("getPlayersHandler", {
+      Effect.map(
+        Effect.withSpan("getPlayersHandler", {
+          captureStackTrace: true,
+        }),
+      ),
+      Effect.withSpan("getPlayersHandler subscription", {
         captureStackTrace: true,
       }),
     ),

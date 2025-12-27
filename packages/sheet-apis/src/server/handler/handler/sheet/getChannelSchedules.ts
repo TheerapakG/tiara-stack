@@ -57,7 +57,12 @@ export const getChannelSchedulesHandler = pipe(
       Effect.map(
         Handler.Config.encodeResponseEffect(getChannelSchedulesHandlerConfig),
       ),
-      Effect.withSpan("getChannelSchedulesHandler", {
+      Effect.map(
+        Effect.withSpan("getChannelSchedulesHandler", {
+          captureStackTrace: true,
+        }),
+      ),
+      Effect.withSpan("getChannelSchedulesHandler subscription", {
         captureStackTrace: true,
       }),
     ),

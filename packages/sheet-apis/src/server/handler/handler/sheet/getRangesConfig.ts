@@ -54,7 +54,12 @@ export const getRangesConfigHandler = pipe(
       Effect.map(
         Handler.Config.encodeResponseEffect(getRangesConfigHandlerConfig),
       ),
-      Effect.withSpan("getRangesConfigHandler", {
+      Effect.map(
+        Effect.withSpan("getRangesConfigHandler", {
+          captureStackTrace: true,
+        }),
+      ),
+      Effect.withSpan("getRangesConfigHandler subscription", {
         captureStackTrace: true,
       }),
     ),

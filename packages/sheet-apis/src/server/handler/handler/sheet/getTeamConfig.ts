@@ -54,7 +54,12 @@ export const getTeamConfigHandler = pipe(
       Effect.map(
         Handler.Config.encodeResponseEffect(getTeamConfigHandlerConfig),
       ),
-      Effect.withSpan("getTeamConfigHandler", {
+      Effect.map(
+        Effect.withSpan("getTeamConfigHandler", {
+          captureStackTrace: true,
+        }),
+      ),
+      Effect.withSpan("getTeamConfigHandler subscription", {
         captureStackTrace: true,
       }),
     ),

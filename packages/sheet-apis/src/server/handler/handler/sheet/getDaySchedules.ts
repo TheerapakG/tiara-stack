@@ -57,7 +57,12 @@ export const getDaySchedulesHandler = pipe(
       Effect.map(
         Handler.Config.encodeResponseEffect(getDaySchedulesHandlerConfig),
       ),
-      Effect.withSpan("getDaySchedulesHandler", {
+      Effect.map(
+        Effect.withSpan("getDaySchedulesHandler", {
+          captureStackTrace: true,
+        }),
+      ),
+      Effect.withSpan("getDaySchedulesHandler subscription", {
         captureStackTrace: true,
       }),
     ),

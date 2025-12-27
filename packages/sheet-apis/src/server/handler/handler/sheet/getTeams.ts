@@ -50,7 +50,12 @@ export const getTeamsHandler = pipe(
       ),
       Effect.map(Error.Core.catchParseErrorAsValidationError),
       Effect.map(Handler.Config.encodeResponseEffect(getTeamsHandlerConfig)),
-      Effect.withSpan("getTeamsHandler", {
+      Effect.map(
+        Effect.withSpan("getTeamsHandler", {
+          captureStackTrace: true,
+        }),
+      ),
+      Effect.withSpan("getTeamsHandler subscription", {
         captureStackTrace: true,
       }),
     ),

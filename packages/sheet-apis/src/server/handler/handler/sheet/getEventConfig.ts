@@ -49,7 +49,12 @@ export const getEventConfigHandler = pipe(
       Effect.map(
         Handler.Config.encodeResponseEffect(getEventConfigHandlerConfig),
       ),
-      Effect.withSpan("getEventConfigHandler", {
+      Effect.map(
+        Effect.withSpan("getEventConfigHandler", {
+          captureStackTrace: true,
+        }),
+      ),
+      Effect.withSpan("getEventConfigHandler subscription", {
         captureStackTrace: true,
       }),
     ),
