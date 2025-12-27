@@ -297,16 +297,22 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
 
   doEmit() {
     return pipe(
-      this.poll(),
+      STM.all({
+        result: this.poll(),
+        onEmit: TRef.get(this.onEmitRef),
+        started: TRef.get(this.startedRef),
+      }),
       STM.commit,
-      Effect.tap((result) =>
+      Effect.tap(({ result, onEmit, started }) =>
         pipe(
-          TRef.get(this.onEmitRef),
-          STM.commit,
-          Effect.flatMap(Effect.transposeMapOption((onEmit) => onEmit(result))),
+          onEmit,
+          Effect.transposeMapOption((onEmit) => onEmit(result)),
+          Effect.when(() => started),
         ),
       ),
-      Effect.whenEffect(pipe(TRef.get(this.startedRef), STM.commit)),
+      Effect.tap(({ result, started }) =>
+        Effect.log("emitted", result, started),
+      ),
     );
   }
 
