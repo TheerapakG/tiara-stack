@@ -620,7 +620,11 @@ const getComputedSubscriptionResult =
         MutationHandlerT | SubscriptionHandlerT,
         SubscriptionHandlerT
       >("subscription", header.payload.handler),
-      Effect.flatMap(Option.getOrElse(() => Effect.fail(`handler not found`))),
+      Effect.flatMap(
+        Option.getOrElse(() =>
+          Effect.fail(`handler ${header.payload.handler} not found`),
+        ),
+      ),
       Effect.map((innerHandler) =>
         pipe(
           innerHandler,
@@ -655,7 +659,9 @@ const getMutationResult =
             MutationHandlerT
           >("mutation", header.payload.handler),
           Effect.flatMap(
-            Option.getOrElse(() => Effect.fail(`handler not found`)),
+            Option.getOrElse(() =>
+              Effect.fail(`handler ${header.payload.handler} not found`),
+            ),
           ),
         ),
       ),
