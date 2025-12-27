@@ -43,6 +43,7 @@ export const getEventConfigHandler = pipe(
         pipe(
           Sheet.SheetService.getEventConfig(),
           Result.provideEitherLayerEffect(layerOfGuildId),
+          Effect.tap((config) => Effect.log(config)),
         ),
       ),
       Effect.map(Error.Core.catchParseErrorAsValidationError),

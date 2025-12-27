@@ -30,11 +30,13 @@ import { UntilObserver } from "typhoon-core/signal";
 const autoCheckinPreviewNotice =
   "Sent automatically via auto check-in (preview; may have bugs).";
 
-const computeHour = pipe(
-  Effect.Do,
-  Effect.bind("now", () => DateTime.now),
-  Effect.map(({ now }) => DateTime.addDuration("20 minutes")(now)),
-  Effect.flatMap((dt) => ConverterService.convertDateTimeToHour(dt)),
+const computeHour = Effect.suspend(() =>
+  pipe(
+    Effect.Do,
+    Effect.bind("now", () => DateTime.now),
+    Effect.map(({ now }) => DateTime.addDuration("20 minutes")(now)),
+    Effect.flatMap((dt) => ConverterService.convertDateTimeToHour(dt)),
+  ),
 );
 
 const getCheckinData = ({
@@ -124,6 +126,11 @@ const runOnce = Effect.suspend(() =>
         Effect.provide(guildServices(guild.guildId))(
           pipe(
             Effect.Do,
+            Effect.tap(() =>
+              Effect.log(
+                `running auto check-in task for guild ${guild.guildId}`,
+              ),
+            ),
             Effect.bind("hour", () => computeHour),
             Effect.bind("allSchedules", () => SheetService.allSchedules()),
             Effect.let("channels", ({ allSchedules }) =>
