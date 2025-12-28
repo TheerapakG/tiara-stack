@@ -1,11 +1,6 @@
 import { Effect, Effectable, Equal, pipe, STM, TSet, TRef } from "effect";
 import { Observable } from "../observability";
-import {
-  DependencySignal,
-  DependencySymbol,
-  buildDependentsSnapshot,
-  getDependentsUpdateOrder,
-} from "./dependencySignal";
+import { DependencySignal, DependencySymbol } from "./dependencySignal";
 import { DependentSignal } from "./dependentSignal";
 import * as SignalService from "./signalService";
 import * as SignalContext from "./signalContext";
@@ -17,8 +12,6 @@ export interface ExternalSource<T> {
       value: T,
     ) => Effect.Effect<void, never, SignalService.SignalService>,
   ) => STM.STM<void, never, never>;
-  start: () => STM.STM<void, never, never>;
-  stop: () => STM.STM<void, never, never>;
 }
 
 export class ExternalComputed<T = unknown>
@@ -35,14 +28,12 @@ export class ExternalComputed<T = unknown>
 
   private _value: TRef.TRef<T>;
   private _dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>;
-  private _emitting: TRef.TRef<boolean>;
   private _source: ExternalSource<T>;
   private _lastValue: TRef.TRef<T>;
 
   constructor(
     initial: TRef.TRef<T>,
     source: ExternalSource<T>,
-    emitting: TRef.TRef<boolean>,
     dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>,
     options: Observable.ObservableOptions,
     lastValue: TRef.TRef<T>,
@@ -51,7 +42,6 @@ export class ExternalComputed<T = unknown>
     this._value = initial;
     this._source = source;
     this._dependents = dependents;
-    this._emitting = emitting;
     this._lastValue = lastValue;
     this[Observable.ObservableSymbol] = options;
   }
@@ -133,10 +123,9 @@ export class ExternalComputed<T = unknown>
         SignalService.enqueueNotify(
           new SignalService.NotifyRequest({
             signal: this,
-            beforeNotify: (watched) =>
+            beforeNotify: () =>
               pipe(
-                this._maybeSetEmitting(watched),
-                STM.zipRight(TRef.set(this._value, value)),
+                TRef.set(this._value, value),
                 STM.commit,
                 Effect.andThen(Effect.log("notified", value)),
               ),
@@ -147,35 +136,7 @@ export class ExternalComputed<T = unknown>
   }
 
   reconcile(): STM.STM<void, never, never> {
-    return pipe(
-      buildDependentsSnapshot(this),
-      STM.flatMap((dependentsSnapshot) =>
-        getDependentsUpdateOrder(dependentsSnapshot, this),
-      ),
-      STM.map((dependents) => dependents.some((d) => !(d instanceof WeakRef))),
-      STM.flatMap((watched) => this._maybeSetEmitting(watched)),
-    );
-  }
-
-  private _maybeSetEmitting(watched: boolean): STM.STM<void, never, never> {
-    return pipe(
-      TRef.get(this._emitting),
-      STM.flatMap((emitting) => {
-        if (watched && !emitting) {
-          return pipe(
-            this._source.start(),
-            STM.tap(() => TRef.set(this._emitting, true)),
-          );
-        }
-        if (!watched && emitting) {
-          return pipe(
-            this._source.stop(),
-            STM.tap(() => TRef.set(this._emitting, false)),
-          );
-        }
-        return STM.void;
-      }),
-    );
+    return STM.void;
   }
 }
 
@@ -188,16 +149,14 @@ export const makeSTM = <T>(
     STM.bind("initialValue", () => source.poll()),
     STM.bind("initial", ({ initialValue }) => TRef.make(initialValue)),
     STM.bind("lastValue", ({ initialValue }) => TRef.make(initialValue)),
-    STM.bind("emitting", () => TRef.make(false)),
     STM.bind("dependents", () =>
       TSet.empty<WeakRef<DependentSignal> | DependentSignal>(),
     ),
     STM.map(
-      ({ initial, lastValue, emitting, dependents }) =>
+      ({ initial, lastValue, dependents }) =>
         new ExternalComputed(
           initial,
           source,
-          emitting,
           dependents,
           options ?? {},
           lastValue,

@@ -14,15 +14,15 @@ import * as SignalService from "../signalService";
 /**
  * Creates an ExternalSource adapter for Effect PubSub.
  *
- * This adapter subscribes to the PubSub immediately upon creation (before start/after stop)
- * to capture values, but only emits them when started. The subscription requires a Scope
- * which is bubbled up to the creation effect.
+ * This adapter subscribes to the PubSub immediately upon creation to capture
+ * values. The subscription requires a Scope which is bubbled up to the
+ * creation effect.
  *
  * The implementation:
  * - Subscribes to PubSub at creation time (requires Scope)
  * - A single fiber continuously takes values from the queue
- * - Stores every value in a Ref for polling (regardless of start/stop state)
- * - Emits every value via the onEmit callback when started (no change detection)
+ * - Stores every value in a Ref for polling
+ * - Emits every value via the onEmit callback
  * - Handles interruption gracefully when the queue unsubscribes
  *
  * @param pubsub - The TPubSub instance to subscribe to
@@ -40,14 +40,13 @@ export const make = <T>(
   pipe(
     STM.all({
       valueRef: TRef.make(initial),
-      startedRef: TRef.make(false),
       onEmitRef: TRef.make<
         Option.Option<
           (value: T) => Effect.Effect<void, never, SignalService.SignalService>
         >
       >(Option.none()),
     }),
-    Effect.tap(({ valueRef, startedRef, onEmitRef }) =>
+    Effect.tap(({ valueRef, onEmitRef }) =>
       pipe(
         TPubSub.subscribe(pubsub),
         Effect.tap((queue) =>
@@ -62,7 +61,6 @@ export const make = <T>(
                 Effect.flatMap(
                   Effect.transposeMapOption((onEmit) => onEmit(value)),
                 ),
-                Effect.whenEffect(pipe(TRef.get(startedRef), STM.commit)),
               ),
             ),
             Effect.forever,
@@ -71,14 +69,12 @@ export const make = <T>(
         ),
       ),
     ),
-    Effect.map(({ valueRef, startedRef, onEmitRef }) => ({
+    Effect.map(({ valueRef, onEmitRef }) => ({
       poll: () => TRef.get(valueRef),
       emit: (
         onEmit: (
           value: T,
         ) => Effect.Effect<void, never, SignalService.SignalService>,
       ) => TRef.set(onEmitRef, Option.some(onEmit)),
-      start: () => TRef.set(startedRef, true),
-      stop: () => TRef.set(startedRef, false),
     })),
   );

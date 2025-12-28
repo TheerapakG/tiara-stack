@@ -15,12 +15,11 @@ export interface ManualEmitter<T> {
 /**
  * Creates an ExternalSource adapter for manual emitting.
  *
- * This adapter stores values immediately upon emission (before start/after stop)
- * to capture values, but only emits them when started.
+ * This adapter stores values immediately upon emission to capture values.
  *
  * The implementation:
- * - Stores every value in a Ref for polling (regardless of start/stop state)
- * - Emits every value via the onEmit callback when started (no change detection)
+ * - Stores every value in a Ref for polling
+ * - Emits every value via the onEmit callback
  * - The emit method handles both storing and forwarding
  *
  * @param initial - The initial value to use as the polling result
@@ -36,14 +35,13 @@ export const make = <T>(
   pipe(
     Effect.all({
       valueRef: TRef.make(initial),
-      startedRef: TRef.make(false),
       onEmitRef: TRef.make<
         Option.Option<
           (value: T) => Effect.Effect<void, never, SignalService.SignalService>
         >
       >(Option.none()),
     }),
-    Effect.map(({ valueRef, startedRef, onEmitRef }) => ({
+    Effect.map(({ valueRef, onEmitRef }) => ({
       source: {
         poll: () => TRef.get(valueRef),
         emit: (
@@ -51,8 +49,6 @@ export const make = <T>(
             value: T,
           ) => Effect.Effect<void, never, SignalService.SignalService>,
         ) => TRef.set(onEmitRef, Option.some(onEmit)),
-        start: () => TRef.set(startedRef, true),
-        stop: () => TRef.set(startedRef, false),
       },
       emitter: {
         emit: (value: T) =>
@@ -66,7 +62,6 @@ export const make = <T>(
                 Effect.flatMap(
                   Effect.transposeMapOption((onEmit) => onEmit(value)),
                 ),
-                Effect.whenEffect(pipe(TRef.get(startedRef), STM.commit)),
               ),
             ),
           ),

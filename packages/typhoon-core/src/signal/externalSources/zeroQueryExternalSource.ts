@@ -51,16 +51,17 @@ import * as SideEffect from "../sideEffect";
  * Creates an ExternalSource adapter for Zero queries.
  *
  * This adapter uses Zero.materialize to subscribe to query changes.
- * Values are optimistically resolved from local cache, so no initial value is needed.
- * The adapter stores values immediately upon emission (before start/after stop)
- * to capture values, but only emits them when started.
+ * Values are optimistically resolved from local cache, so no initial value is
+ * needed. The adapter stores values immediately upon emission to capture
+ * values.
  *
  * The implementation:
  * - Uses Zero.materialize to create a TypedView
  * - Subscribes to view changes via addListener
- * - Stores every value in a Ref for polling (regardless of start/stop state)
- * - Emits every value via the onEmit callback when started
- * - Wraps values in Result<Either<T, Error>> combining input and Zero sync status:
+ * - Stores every value in a Ref for polling
+ * - Emits every value via the onEmit callback
+ * - Wraps values in Result<Either<T, Error>> combining input and Zero sync
+ *   status:
  *   - Optimistic: when input is optimistic OR Zero sync is incomplete
  *   - Complete: when BOTH input is complete AND Zero sync is complete
  *
@@ -72,7 +73,8 @@ import * as SideEffect from "../sideEffect";
  *
  * @param query - The Zero query to materialize (can be MaybeSignalEffect)
  * @param options - Optional options for materialize
- * @returns An ExternalSource that requires ZeroService and Scope during creation
+ * @returns An ExternalSource that requires ZeroService and Scope during
+ *   creation
  */
 type TimeUnit = "s" | "m" | "h" | "d" | "y";
 
@@ -81,7 +83,8 @@ type TimeUnit = "s" | "m" | "h" | "d" | "y";
  * - `forever` means the query will never expire.
  * - `none` means the query will expire immediately.
  * - A number means the query will expire after that many milliseconds.
- * - A negative number means the query will never expire, this is same as 'forever'.
+ * - A negative number means the query will never expire, this is same as
+ *   'forever'.
  * - A string like `1s` means the query will expire after that many seconds.
  * - A string like `1m` means the query will expire after that many minutes.
  * - A string like `1h` means the query will expire after that many hours.
@@ -145,7 +148,8 @@ type ViewState = {
  * External source for Zero queries with unified output type.
  * Output: Result<Either<T, ZeroQueryError | E>>
  *
- * The outer Result status combines input Result status (if applicable) with Zero sync status:
+ * The outer Result status combines input Result status (if applicable) with
+ * Zero sync status:
  * - Complete only when BOTH input is Complete AND Zero sync is complete
  * - Optimistic in all other cases
  *
@@ -166,7 +170,6 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
     >,
     private readonly dirtyRef: TRef.TRef<boolean>,
     private readonly valueRef: TRef.TRef<{ "": T }>,
-    private readonly startedRef: TRef.TRef<boolean>,
     private readonly onEmitRef: TRef.TRef<
       Option.Option<
         (
@@ -300,28 +303,16 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
       STM.all({
         result: this.poll(),
         onEmit: TRef.get(this.onEmitRef),
-        started: TRef.get(this.startedRef),
       }),
       STM.commit,
-      Effect.tap(({ result, onEmit, started }) =>
+      Effect.tap(({ result, onEmit }) =>
         pipe(
           onEmit,
           Effect.transposeMapOption((onEmit) => onEmit(result)),
-          Effect.when(() => started),
         ),
       ),
-      Effect.tap(({ result, started }) =>
-        Effect.log("emitted", result, started),
-      ),
+      Effect.tap(({ result }) => Effect.log("emitted", result)),
     );
-  }
-
-  start() {
-    return TRef.set(this.startedRef, true);
-  }
-
-  stop() {
-    return TRef.set(this.startedRef, false);
   }
 }
 
@@ -358,7 +349,6 @@ const createSourceWithRefs = <
       valueRef: TRef.make<{ "": T }>({
         "": undefined as T,
       }),
-      startedRef: TRef.make(false),
       onEmitRef: TRef.make<
         Option.Option<
           (
@@ -380,7 +370,6 @@ const createSourceWithRefs = <
         zeroResultTypeRef,
         dirtyRef,
         valueRef,
-        startedRef,
         onEmitRef,
         inputErrorRef,
       }) =>
@@ -390,7 +379,6 @@ const createSourceWithRefs = <
           zeroResultTypeRef,
           dirtyRef,
           valueRef,
-          startedRef,
           onEmitRef,
           inputErrorRef,
         ),
