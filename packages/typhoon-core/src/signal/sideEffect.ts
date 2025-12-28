@@ -6,6 +6,7 @@ import { fromDependent, SignalContext } from "./signalContext";
 import * as SignalService from "./signalService";
 
 export class SideEffect<R = never> implements DependentSignal {
+  readonly _tag = "SideEffect" as const;
   readonly [DependentSymbol]: DependentSignal = this;
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
@@ -148,7 +149,10 @@ export const makeWithContext = <R = never>(
       (sideEffect) => sideEffect.cleanup(),
     ),
     Observable.withSpan(
-      { [Observable.ObservableSymbol]: options ?? {} },
+      {
+        _tag: "SideEffect" as const,
+        [Observable.ObservableSymbol]: options ?? {},
+      },
       "SideEffect.makeWithContext",
       {
         captureStackTrace: true,

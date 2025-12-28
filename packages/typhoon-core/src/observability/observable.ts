@@ -10,6 +10,7 @@ export type ObservableOptions = {
 
 export abstract class Observable {
   abstract readonly [ObservableSymbol]: ObservableOptions;
+  abstract readonly _tag: string;
 }
 
 export const withSpan =

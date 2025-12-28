@@ -123,6 +123,7 @@ export const runAndTrackEffect =
     return pipe(
       effect,
       Effect.provideService(SignalContext, ctx),
+      Effect.tap(() => Effect.log("tracked effect for signal", ctx.signal)),
       Effect.tap(() =>
         pipe(
           ctx.signal,
@@ -135,6 +136,7 @@ export const runAndTrackEffect =
       ),
       Observable.withSpan(
         Option.getOrElse(ctx.signal, () => ({
+          _tag: "UnknownSignal" as const,
           [Observable.ObservableSymbol]: {},
         })),
         "SignalContext.runAndTrackEffect",

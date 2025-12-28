@@ -28,6 +28,7 @@ export abstract class DependencySignal<A = never, E = never, R = never>
   >
   implements Observable.Observable
 {
+  abstract readonly _tag: string;
   abstract readonly [DependencySymbol]: DependencySignal<A, E, R>;
   abstract readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
@@ -261,7 +262,10 @@ export const notifyAllDependents =
             STM.commit,
             Effect.tap((changed) =>
               changed
-                ? dependent.notify()
+                ? pipe(
+                    dependent.notify(),
+                    Effect.tap(() => Effect.log("notified", dependent._tag)),
+                  )
                 : isDependencySignal(dependent)
                   ? pipe(
                       TRef.get(context.unchanged),

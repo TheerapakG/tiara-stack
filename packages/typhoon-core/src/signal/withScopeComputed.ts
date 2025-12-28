@@ -33,6 +33,7 @@ export class WithScopeComputed<A = never, E = never, R = never>
   >
   implements DependentSignal, DependencySignal<A, E, R>
 {
+  readonly _tag = "WithScopeComputed" as const;
   readonly [DependencySymbol]: DependencySignal<A, E, R> = this;
   readonly [DependentSymbol]: DependentSignal = this;
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
@@ -330,7 +331,10 @@ export const make = <A = never, E = never, R = never>(
       ),
     ),
     Observable.withSpan(
-      { [Observable.ObservableSymbol]: options ?? {} },
+      {
+        _tag: "WithScopeComputed" as const,
+        [Observable.ObservableSymbol]: options ?? {},
+      },
       "WithScopeComputed.make",
       {
         captureStackTrace: true,

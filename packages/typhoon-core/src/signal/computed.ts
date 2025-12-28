@@ -31,6 +31,7 @@ export class Computed<A = never, E = never, R = never>
   >
   implements DependentSignal, DependencySignal<A, E, R>
 {
+  readonly _tag = "Computed" as const;
   readonly [DependencySymbol]: DependencySignal<A, E, R> = this;
   readonly [DependentSymbol]: DependentSignal = this;
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
@@ -283,7 +284,10 @@ export const make = <A = never, E = never, R = never>(
     makeSTM(effect, options),
     STM.commit,
     Observable.withSpan(
-      { [Observable.ObservableSymbol]: options ?? {} },
+      {
+        _tag: "Computed" as const,
+        [Observable.ObservableSymbol]: options ?? {},
+      },
       "Computed.make",
       {
         captureStackTrace: true,

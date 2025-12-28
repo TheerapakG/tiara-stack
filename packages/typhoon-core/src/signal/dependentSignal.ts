@@ -9,6 +9,7 @@ export const DependentSymbol: unique symbol = Symbol(
 );
 
 export abstract class DependentSignal implements Observable.Observable {
+  abstract readonly _tag: string;
   abstract readonly [DependentSymbol]: DependentSignal;
   abstract readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 

@@ -27,6 +27,7 @@ class UntilObserver<
   extends Effectable.Class<Match.Types.WhenMatch<A, P>, never, never>
   implements DependentSignal
 {
+  readonly _tag = "UntilObserver" as const;
   readonly [DependentSymbol]: DependentSignal = this;
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
@@ -210,7 +211,10 @@ export const observeUntil = <
     Effect.flatMap((observer) => observer.value()),
     Effect.scoped,
     Observable.withSpan(
-      { [Observable.ObservableSymbol]: options ?? {} },
+      {
+        _tag: "UntilObserver" as const,
+        [Observable.ObservableSymbol]: options ?? {},
+      },
       "observeUntil",
       {
         captureStackTrace: true,
@@ -237,7 +241,10 @@ export const observeUntilSignal =
       effect,
       Effect.flatMap((signal) => observeUntil(signal, pattern, options)),
       Observable.withSpan(
-        { [Observable.ObservableSymbol]: options ?? {} },
+        {
+          _tag: "UntilObserver" as const,
+          [Observable.ObservableSymbol]: options ?? {},
+        },
         "observeUntilSignal",
         {
           captureStackTrace: true,
@@ -266,7 +273,10 @@ export const observeUntilScoped =
       observeUntilSignal(pattern, options),
       Effect.scoped,
       Observable.withSpan(
-        { [Observable.ObservableSymbol]: options ?? {} },
+        {
+          _tag: "UntilObserver" as const,
+          [Observable.ObservableSymbol]: options ?? {},
+        },
         "observeUntilScoped",
         {
           captureStackTrace: true,
@@ -293,7 +303,10 @@ export const observeUntilRpcResolved =
       observeUntilScoped(RpcResult.isResolved, options),
       Effect.flatMap((result) => result.value),
       Observable.withSpan(
-        { [Observable.ObservableSymbol]: options ?? {} },
+        {
+          _tag: "UntilObserver" as const,
+          [Observable.ObservableSymbol]: options ?? {},
+        },
         "observeUntilRpcResolved",
         {
           captureStackTrace: true,
@@ -325,7 +338,10 @@ export const observeUntilRpcResultResolved =
       observeUntilScoped(Result.isComplete, options),
       Effect.flatMap((result) => result.value),
       Observable.withSpan(
-        { [Observable.ObservableSymbol]: options ?? {} },
+        {
+          _tag: "UntilObserver" as const,
+          [Observable.ObservableSymbol]: options ?? {},
+        },
         "observeUntilRpcResolved",
         {
           captureStackTrace: true,
@@ -345,7 +361,10 @@ export const observeOnce = <A = never, E = never, R = never>(
     observeUntil(effect, Match.any as Match.Types.PatternPrimitive<A>, options),
     Effect.map((value) => value as A),
     Observable.withSpan(
-      { [Observable.ObservableSymbol]: options ?? {} },
+      {
+        _tag: "UntilObserver" as const,
+        [Observable.ObservableSymbol]: options ?? {},
+      },
       "observeOnce",
       {
         captureStackTrace: true,
@@ -366,7 +385,10 @@ export const observeOnceSignal =
       effect,
       Effect.flatMap((innerEffect) => observeOnce(innerEffect, options)),
       Observable.withSpan(
-        { [Observable.ObservableSymbol]: options ?? {} },
+        {
+          _tag: "UntilObserver" as const,
+          [Observable.ObservableSymbol]: options ?? {},
+        },
         "observeOnceSignal",
         {
           captureStackTrace: true,
@@ -389,7 +411,10 @@ export const observeOnceScoped =
       observeOnceSignal(options),
       Effect.scoped,
       Observable.withSpan(
-        { [Observable.ObservableSymbol]: options ?? {} },
+        {
+          _tag: "UntilObserver" as const,
+          [Observable.ObservableSymbol]: options ?? {},
+        },
         "observeOnceScoped",
         {
           captureStackTrace: true,

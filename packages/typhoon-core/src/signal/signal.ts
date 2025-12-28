@@ -13,6 +13,7 @@ export class Signal<T = unknown>
   >
   implements DependencySignal<T, never, never>
 {
+  readonly _tag = "Signal" as const;
   readonly [DependencySymbol]: DependencySignal<T, never, never> = this;
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
@@ -158,7 +159,10 @@ export const make = <T>(value: T, options?: Observable.ObservableOptions) =>
     makeSTM(value, options),
     STM.commit,
     Observable.withSpan(
-      { [Observable.ObservableSymbol]: options ?? {} },
+      {
+        _tag: "Signal" as const,
+        [Observable.ObservableSymbol]: options ?? {},
+      },
       "Signal.make",
       {
         captureStackTrace: true,

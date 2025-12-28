@@ -29,6 +29,7 @@ export class ExternalComputed<T = unknown>
   >
   implements DependencySignal<T, never, never>
 {
+  readonly _tag = "ExternalComputed" as const;
   readonly [DependencySymbol]: DependencySignal<T, never, never> = this;
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
@@ -213,7 +214,10 @@ export const make = <T>(
     makeSTM(source, options),
     STM.commit,
     Observable.withSpan(
-      { [Observable.ObservableSymbol]: options ?? {} },
+      {
+        _tag: "ExternalComputed" as const,
+        [Observable.ObservableSymbol]: options ?? {},
+      },
       "ExternalComputed.make",
       {
         captureStackTrace: true,

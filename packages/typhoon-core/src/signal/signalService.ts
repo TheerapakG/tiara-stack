@@ -144,6 +144,7 @@ export const layer: Layer.Layer<SignalService, never, never> = pipe(
         ),
         Observable.withSpan(
           Option.getOrElse(request.ctx.signal, () => ({
+            _tag: "UnknownSignal" as const,
             [Observable.ObservableSymbol]: {},
           })),
           "SignalService.enqueueRunTracked",
