@@ -262,10 +262,7 @@ export const notifyAllDependents =
             STM.commit,
             Effect.tap((changed) =>
               changed
-                ? pipe(
-                    dependent.notify(),
-                    Effect.tap(() => Effect.log("notified", dependent._tag)),
-                  )
+                ? dependent.notify()
                 : isDependencySignal(dependent)
                   ? pipe(
                       TRef.get(context.unchanged),

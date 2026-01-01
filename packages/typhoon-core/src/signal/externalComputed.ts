@@ -117,21 +117,11 @@ export class ExternalComputed<T = unknown>
   handleEmit(
     value: T,
   ): Effect.Effect<void, never, SignalService.SignalService> {
-    return pipe(
-      Effect.log("enqueueing notify", value),
-      Effect.andThen(
-        SignalService.enqueueNotify(
-          new SignalService.NotifyRequest({
-            signal: this,
-            beforeNotify: () =>
-              pipe(
-                TRef.set(this._value, value),
-                STM.commit,
-                Effect.andThen(Effect.log("notified", value)),
-              ),
-          }),
-        ),
-      ),
+    return SignalService.enqueueNotify(
+      new SignalService.NotifyRequest({
+        signal: this,
+        beforeNotify: () => pipe(TRef.set(this._value, value), STM.commit),
+      }),
     );
   }
 

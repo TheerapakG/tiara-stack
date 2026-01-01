@@ -124,15 +124,6 @@ export const runAndTrackEffect =
       effect,
       Effect.provideService(SignalContext, ctx),
       Effect.tap(() =>
-        Effect.log(
-          "tracked effect for signal",
-          pipe(
-            ctx.signal,
-            Option.map((signal) => signal._tag),
-          ),
-        ),
-      ),
-      Effect.tap(() =>
         pipe(
           ctx.signal,
           Option.match({

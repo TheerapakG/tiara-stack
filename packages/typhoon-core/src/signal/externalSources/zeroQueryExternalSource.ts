@@ -311,7 +311,6 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
           Effect.transposeMapOption((onEmit) => onEmit(result)),
         ),
       ),
-      Effect.tap(({ result }) => Effect.log("emitted", result)),
     );
   }
 }
