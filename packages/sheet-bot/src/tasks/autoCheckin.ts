@@ -152,24 +152,33 @@ const runOnce = Effect.suspend(() =>
                       ),
                       UntilObserver.observeUntilRpcResultResolved(),
                       Effect.flatten,
+                      Effect.tap((runningChannel) =>
+                        Effect.log(runningChannel),
+                      ),
                       Effect.flatMap((runningChannel) =>
                         pipe(
                           Effect.Do,
-                          Effect.bind("checkinChannelId", () =>
+                          Effect.let("checkinChannelId", () =>
                             pipe(
                               runningChannel.checkinChannelId,
-                              Option.match({
-                                onSome: Effect.succeed,
-                                onNone: () =>
-                                  Effect.succeed(runningChannel.channelId),
-                              }),
+                              Option.getOrElse(() => runningChannel.channelId),
                             ),
                           ),
                           Effect.bind("checkinData", () =>
-                            getCheckinData({ hour, runningChannel }),
+                            pipe(
+                              getCheckinData({ hour, runningChannel }),
+                              Effect.tap((checkinData) =>
+                                Effect.log(checkinData),
+                              ),
+                            ),
                           ),
                           Effect.bind("checkinMessages", ({ checkinData }) =>
-                            getCheckinMessages(checkinData),
+                            pipe(
+                              getCheckinMessages(checkinData),
+                              Effect.tap((checkinMessages) =>
+                                Effect.log(checkinMessages),
+                              ),
+                            ),
                           ),
                           Effect.bind(
                             "message",
@@ -239,7 +248,9 @@ const runOnce = Effect.suspend(() =>
                           ),
                         ),
                       ),
-                      Effect.catchAll(() => Effect.succeed(0)),
+                      Effect.catchAll((error) =>
+                        pipe(Effect.logError(error), Effect.as(0)),
+                      ),
                     ),
                   { concurrency: "unbounded" },
                 ),
