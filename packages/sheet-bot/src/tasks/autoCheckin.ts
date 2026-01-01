@@ -4,6 +4,7 @@ import {
   ConverterService,
   FormatService,
   GuildConfigService,
+  PlayerService,
   SendableChannelContext,
   SheetService,
 } from "@/services";
@@ -12,6 +13,7 @@ import { BotGuildConfigService, MessageCheckinService } from "@/services/bot";
 import {
   ActionRowBuilder,
   ButtonBuilder,
+  channelMention,
   MessageActionRowComponentBuilder,
   subtext,
 } from "discord.js";
@@ -19,6 +21,8 @@ import {
   Array,
   DateTime,
   Effect,
+  HashMap,
+  flow,
   HashSet,
   Option,
   Schedule,
@@ -26,6 +30,9 @@ import {
   pipe,
 } from "effect";
 import { UntilObserver } from "typhoon-core/signal";
+import { Schema } from "sheet-apis";
+import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
+import { bindObject } from "@/utils";
 
 const autoCheckinPreviewNotice =
   "Sent automatically via auto check-in (preview; may have bugs).";
@@ -44,38 +51,46 @@ const getCheckinData = ({
   runningChannel,
 }: {
   hour: number;
-  runningChannel: {
-    channelId: string;
-    name: Option.Option<string>;
-    roleId: Option.Option<string>;
-  };
+  runningChannel: Schema.GuildChannelConfig;
 }) =>
   pipe(
     Effect.Do,
-    Effect.bind("channelName", () => Effect.succeed(runningChannel.name)),
-    Effect.bind("schedulesRaw", ({ channelName }) =>
+    bindObject({
+      channelName: runningChannel.name,
+    }),
+    Effect.bind("schedules", ({ channelName }) =>
       pipe(
-        channelName,
-        Option.match({
-          onSome: (name) => SheetService.channelSchedules(name),
-          onNone: () => Effect.succeed([]),
-        }),
+        SheetService.channelSchedules(channelName),
+        Effect.map(
+          Array.map((s) =>
+            pipe(
+              s.hour,
+              Option.map((hour) => ({ hour, schedule: s })),
+            ),
+          ),
+        ),
+        Effect.map(Array.getSomes),
+        Effect.map(ArrayUtils.Collect.toHashMapByKey("hour")),
+        Effect.map(HashMap.map(({ schedule }) => schedule)),
       ),
     ),
-    Effect.map(({ schedulesRaw }) => {
-      const prevSchedule = Array.findFirst(
-        schedulesRaw,
-        (s) => Option.getOrNull(s.hour) === hour - 1,
-      );
-      const schedule = Array.findFirst(
-        schedulesRaw,
-        (s) => Option.getOrNull(s.hour) === hour,
-      );
-      return {
-        prevSchedule,
-        schedule,
-      };
-    }),
+    Effect.flatMap(({ schedules }) =>
+      pipe(
+        {
+          prevSchedule: HashMap.get(schedules, hour - 1),
+          schedule: HashMap.get(schedules, hour),
+        },
+        Utils.mapPositional(
+          Utils.arraySomesPositional(
+            flow(
+              PlayerService.mapScheduleWithPlayers,
+              UntilObserver.observeUntilRpcResultResolved(),
+              Effect.flatten,
+            ),
+          ),
+        ),
+      ),
+    ),
     Effect.map(({ prevSchedule, schedule }) => ({
       prevSchedule,
       schedule,
@@ -84,21 +99,25 @@ const getCheckinData = ({
     })),
   );
 
-const getCheckinMessages = (data: {
-  prevSchedule: Option.Option<any>;
-  schedule: Option.Option<any>;
-  runningChannel: {
-    channelId: string;
-    name: Option.Option<string>;
-    roleId: Option.Option<string>;
-  };
-  showChannelMention: boolean;
-}) =>
+const getCheckinMessages = (
+  data: {
+    prevSchedule: Option.Option<
+      Schema.ScheduleWithPlayers | Schema.BreakSchedule
+    >;
+    schedule: Option.Option<Schema.ScheduleWithPlayers | Schema.BreakSchedule>;
+    runningChannel: {
+      channelId: string;
+      name: Option.Option<string>;
+    };
+    showChannelMention: boolean;
+  },
+  template: Option.Option<string>,
+) =>
   FormatService.formatCheckIn({
     prevSchedule: data.prevSchedule,
     schedule: data.schedule,
     channelString: data.showChannelMention
-      ? `<#${data.runningChannel.channelId}>`
+      ? `head to ${channelMention(data.runningChannel.channelId)}`
       : pipe(
           data.runningChannel.name,
           Option.map((name) => `head to ${name}`),
@@ -107,7 +126,7 @@ const getCheckinMessages = (data: {
               "await further instructions from the manager on where the running channel is",
           ),
         ),
-    template: undefined,
+    template: pipe(template, Option.getOrUndefined),
   });
 
 const runOnce = Effect.suspend(() =>
@@ -174,7 +193,7 @@ const runOnce = Effect.suspend(() =>
                           ),
                           Effect.bind("checkinMessages", ({ checkinData }) =>
                             pipe(
-                              getCheckinMessages(checkinData),
+                              getCheckinMessages(checkinData, Option.none()),
                               Effect.tap((checkinMessages) =>
                                 Effect.log(checkinMessages),
                               ),
