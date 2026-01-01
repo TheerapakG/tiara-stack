@@ -58,18 +58,18 @@ const getCheckinData = ({
         channelName,
         Option.match({
           onSome: (name) => SheetService.channelSchedules(name),
-          onNone: () => Effect.succeed([] as readonly unknown[]),
+          onNone: () => Effect.succeed([]),
         }),
       ),
     ),
     Effect.map(({ schedulesRaw }) => {
       const prevSchedule = Array.findFirst(
-        schedulesRaw as ReadonlyArray<any>,
-        (s) => Option.getOrNull(s.hour as Option.Option<number>) === hour - 1,
+        schedulesRaw,
+        (s) => Option.getOrNull(s.hour) === hour - 1,
       );
       const schedule = Array.findFirst(
-        schedulesRaw as ReadonlyArray<any>,
-        (s) => Option.getOrNull(s.hour as Option.Option<number>) === hour,
+        schedulesRaw,
+        (s) => Option.getOrNull(s.hour) === hour,
       );
       return {
         prevSchedule,
