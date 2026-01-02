@@ -110,13 +110,11 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
                     onNone: () => messageCheckinData.initialMessage,
                   }),
                 ),
-                components: messageCheckinData.roleId
-                  ? [
-                      new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                        new ButtonBuilder(buttonData),
-                      ),
-                    ]
-                  : [],
+                components: [
+                  new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                    new ButtonBuilder(buttonData),
+                  ),
+                ],
               }),
             ),
             pipe(
