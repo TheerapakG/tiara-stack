@@ -24,6 +24,7 @@ import {
   HashMap,
   flow,
   HashSet,
+  Match,
   Option,
   Schedule,
   Cron,
@@ -191,6 +192,35 @@ const runOnce = Effect.suspend(() =>
                               ),
                             ),
                           ),
+                          Effect.let("fillIds", ({ checkinData }) =>
+                            pipe(
+                              checkinData.schedule,
+                              Option.map((schedule) =>
+                                pipe(
+                                  Match.value(schedule),
+                                  Match.tagsExhaustive({
+                                    BreakSchedule: () => [],
+                                    ScheduleWithPlayers: (schedule) =>
+                                      schedule.fills,
+                                  }),
+                                ),
+                              ),
+                              Option.getOrElse(() => []),
+                              Array.getSomes,
+                              Array.map((player) =>
+                                pipe(
+                                  Match.value(player.player),
+                                  Match.tagsExhaustive({
+                                    Player: (player) => Option.some(player.id),
+                                    PartialNamePlayer: () => Option.none(),
+                                  }),
+                                ),
+                              ),
+                              Array.getSomes,
+                              HashSet.fromIterable,
+                              HashSet.toValues,
+                            ),
+                          ),
                           Effect.bind("checkinMessages", ({ checkinData }) =>
                             pipe(
                               getCheckinMessages(checkinData, Option.none()),
@@ -201,11 +231,7 @@ const runOnce = Effect.suspend(() =>
                           ),
                           Effect.bind(
                             "message",
-                            ({
-                              checkinData,
-                              checkinMessages,
-                              checkinChannelId,
-                            }) =>
+                            ({ checkinMessages, checkinChannelId }) =>
                               pipe(
                                 checkinMessages.checkinMessage,
                                 Effect.transposeMapOption((checkinMessage) =>
@@ -221,16 +247,13 @@ const runOnce = Effect.suspend(() =>
                                       "message",
                                       ({ initialMessage }) => ({
                                         content: initialMessage,
-                                        components: checkinData.runningChannel
-                                          .roleId
-                                          ? [
-                                              new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                                                new ButtonBuilder(
-                                                  checkinButton.data,
-                                                ),
-                                              ),
-                                            ]
-                                          : [],
+                                        components: [
+                                          new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                                            new ButtonBuilder(
+                                              checkinButton.data,
+                                            ),
+                                          ),
+                                        ],
                                       }),
                                     ),
                                   ),
@@ -242,25 +265,40 @@ const runOnce = Effect.suspend(() =>
                                 ),
                               ),
                           ),
-                          Effect.tap(
-                            ({ checkinData, checkinChannelId, message }) =>
-                              pipe(
-                                message,
-                                Effect.transposeMapOption(
-                                  ({ initialMessage, message }) =>
-                                    MessageCheckinService.upsertMessageCheckinData(
-                                      message.id,
-                                      {
-                                        initialMessage,
-                                        hour,
-                                        channelId: checkinChannelId,
-                                        roleId: Option.getOrNull(
-                                          checkinData.runningChannel.roleId,
+                          Effect.tap(({ checkinData, message, fillIds }) =>
+                            pipe(
+                              message,
+                              Effect.transposeMapOption(
+                                ({ initialMessage, message }) =>
+                                  Effect.all(
+                                    [
+                                      MessageCheckinService.upsertMessageCheckinData(
+                                        message.id,
+                                        {
+                                          initialMessage,
+                                          hour,
+                                          channelId:
+                                            checkinData.runningChannel
+                                              .channelId,
+                                          roleId: Option.getOrNull(
+                                            checkinData.runningChannel.roleId,
+                                          ),
+                                        },
+                                      ),
+                                      pipe(
+                                        MessageCheckinService.addMessageCheckinMembers(
+                                          message.id,
+                                          fillIds,
                                         ),
-                                      },
-                                    ),
-                                ),
+                                        Effect.unless(() =>
+                                          Array.isEmptyArray(fillIds),
+                                        ),
+                                      ),
+                                    ],
+                                    { concurrency: "unbounded" },
+                                  ),
                               ),
+                            ),
                           ),
                           Effect.map(({ message }) =>
                             Option.isSome(message) ? 1 : 0,

@@ -269,31 +269,27 @@ const handleManual =
           Effect.bind("checkinMessages", ({ checkinData, templateOption }) =>
             getCheckinMessages(checkinData, templateOption),
           ),
-          Effect.bind(
-            "message",
-            ({ checkinData, checkinMessages, checkinChannelId }) =>
-              pipe(
-                checkinMessages.checkinMessage,
-                Effect.transposeMapOption((checkinMessage) =>
-                  pipe(
-                    Effect.Do,
-                    Effect.let("initialMessage", () => checkinMessage),
-                    SendableChannelContext.send().bind("message", () => ({
-                      content: checkinMessage,
-                      components: checkinData.runningChannel.roleId
-                        ? [
-                            new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                              new ButtonBuilder(checkinButton.data),
-                            ),
-                          ]
-                        : [],
-                    })),
-                  ),
-                ),
-                Effect.provide(
-                  channelServicesFromGuildChannelId(checkinChannelId),
+          Effect.bind("message", ({ checkinMessages, checkinChannelId }) =>
+            pipe(
+              checkinMessages.checkinMessage,
+              Effect.transposeMapOption((checkinMessage) =>
+                pipe(
+                  Effect.Do,
+                  Effect.let("initialMessage", () => checkinMessage),
+                  SendableChannelContext.send().bind("message", () => ({
+                    content: checkinMessage,
+                    components: [
+                      new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                        new ButtonBuilder(checkinButton.data),
+                      ),
+                    ],
+                  })),
                 ),
               ),
+              Effect.provide(
+                channelServicesFromGuildChannelId(checkinChannelId),
+              ),
+            ),
           ),
           Effect.tap(({ checkinData, message, fillIds, hour }) =>
             pipe(
