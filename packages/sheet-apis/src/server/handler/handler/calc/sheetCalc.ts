@@ -8,7 +8,7 @@ import { Handler } from "typhoon-core/server";
 import { Array as ArrayUtils } from "typhoon-core/utils";
 import { stripHandler } from "typhoon-core/bundler";
 
-const builders = Context.Subscription.Builder.builders();
+const builders = Context.Builder.Subscription.builders();
 export const sheetCalcHandler = pipe(
   builders.empty(),
   builders.data(sheetCalcHandlerConfig),

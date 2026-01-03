@@ -331,6 +331,9 @@ importers:
       typhoon-core:
         specifier: workspace:*
         version: link:../typhoon-core
+      typhoon-server:
+        specifier: workspace:*
+        version: link:../typhoon-server
     devDependencies:
       '@types/google-apps-script':
         specifier: ^1.0.99
@@ -371,6 +374,9 @@ importers:
       typhoon-core:
         specifier: workspace:*
         version: link:../typhoon-core
+      typhoon-server:
+        specifier: workspace:*
+        version: link:../typhoon-server
     devDependencies:
       '@typescript/native-preview':
         specifier: latest
@@ -405,6 +411,9 @@ importers:
       typhoon-core:
         specifier: workspace:*
         version: link:../typhoon-core
+      typhoon-server:
+        specifier: workspace:*
+        version: link:../typhoon-server
     devDependencies:
       '@typescript/native-preview':
         specifier: latest

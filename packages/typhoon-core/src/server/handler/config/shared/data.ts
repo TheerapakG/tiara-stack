@@ -54,7 +54,11 @@ export const name = <const Config extends BasePartialHandlerConfig>(
 ) => pipe(config.name, getOrUndefined) as NameOrUndefined<Config>;
 
 export type RequestParamsOption<Config extends BasePartialHandlerConfig> =
-  Config["requestParams"];
+  Config["requestParams"] extends infer RequestParams extends Option.Option<
+    RequestParamsConfig<StandardSchemaV1, boolean>
+  >
+    ? RequestParams
+    : never;
 export type RequestParamsOrUndefined<Config extends BasePartialHandlerConfig> =
   GetOrUndefined<RequestParamsOption<Config>>;
 
@@ -67,7 +71,11 @@ export const requestParams = <const Config extends BasePartialHandlerConfig>(
   ) as RequestParamsOrUndefined<Config>;
 
 export type ResponseOption<Config extends BasePartialHandlerConfig> =
-  Config["response"];
+  Config["response"] extends infer Response extends Option.Option<
+    ResponseConfig<StandardSchemaV1>
+  >
+    ? Response
+    : never;
 export type ResponseOrUndefined<Config extends BasePartialHandlerConfig> =
   GetOrUndefined<ResponseOption<Config>>;
 
@@ -76,7 +84,11 @@ export const response = <const Config extends BasePartialHandlerConfig>(
 ) => pipe(config.response, getOrUndefined) as ResponseOrUndefined<Config>;
 
 export type ResponseErrorOption<Config extends BasePartialHandlerConfig> =
-  Config["responseError"];
+  Config["responseError"] extends infer ResponseError extends Option.Option<
+    ResponseErrorConfig<StandardSchemaV1>
+  >
+    ? ResponseError
+    : never;
 export type ResponseErrorOrUndefined<Config extends BasePartialHandlerConfig> =
   GetOrUndefined<ResponseErrorOption<Config>>;
 

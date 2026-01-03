@@ -4,9 +4,10 @@ import type { Type } from "typhoon-core/handler";
 import { Handler } from "typhoon-core/server";
 import { SignalContext, SignalService } from "typhoon-core/signal";
 import { Validator } from "typhoon-core/validator";
-import { Event } from "../../../event/event";
+import { Event } from "@/event/event";
 
-type SubscriptionData = Handler.Config.Subscription.SubscriptionHandlerConfig;
+export type SubscriptionData =
+  Handler.Config.Subscription.SubscriptionHandlerConfig;
 type InnerSubscriptionHandler<
   A = unknown,
   E = unknown,

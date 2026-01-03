@@ -1,8 +1,8 @@
 import { Match, Option, pipe } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Context, type Type } from "typhoon-core/handler";
-import { type MutationHandlerT } from "./mutation/type";
-import { type SubscriptionHandlerT } from "./subscription/type";
+import { type MutationHandlerT } from "../mutation/type";
+import { type SubscriptionHandlerT } from "../subscription/type";
 
 export type HandlerContextCollection<R = never> =
   Context.Collection.HandlerContextCollection<

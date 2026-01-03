@@ -1,1 +1,2 @@
-export * from "typhoon-core/schema";
+import * as Core from "typhoon-core/schema";
+export { Core };

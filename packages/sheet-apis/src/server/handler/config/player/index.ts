@@ -1,5 +1,5 @@
 import { pipe } from "effect";
-import { Handler } from "typhoon-core/server";
+import { Data as HandlerData } from "typhoon-server/handler";
 
 import { getPlayerMapsHandlerConfig } from "./getPlayerMaps";
 import { getByNameHandlerConfig } from "./getByName";
@@ -17,12 +17,12 @@ export {
   mapScheduleWithPlayersHandlerConfig,
 };
 
-export const playerHandlerConfigCollection = pipe(
-  Handler.Config.Collection.empty(),
-  Handler.Config.Collection.add(getPlayerMapsHandlerConfig),
-  Handler.Config.Collection.add(getByNameHandlerConfig),
-  Handler.Config.Collection.add(getByIdHandlerConfig),
-  Handler.Config.Collection.add(getTeamsByNameHandlerConfig),
-  Handler.Config.Collection.add(getTeamsByIdHandlerConfig),
-  Handler.Config.Collection.add(mapScheduleWithPlayersHandlerConfig),
+export const playerHandlerDataCollection = pipe(
+  HandlerData.Collection.empty(),
+  HandlerData.Collection.addSubscription(getPlayerMapsHandlerConfig),
+  HandlerData.Collection.addSubscription(getByNameHandlerConfig),
+  HandlerData.Collection.addSubscription(getByIdHandlerConfig),
+  HandlerData.Collection.addSubscription(getTeamsByNameHandlerConfig),
+  HandlerData.Collection.addSubscription(getTeamsByIdHandlerConfig),
+  HandlerData.Collection.addSubscription(mapScheduleWithPlayersHandlerConfig),
 );

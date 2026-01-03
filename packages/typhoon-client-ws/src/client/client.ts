@@ -24,6 +24,7 @@ import {
   ValidationError,
 } from "typhoon-core/error";
 import { Handler } from "typhoon-core/server";
+import { Data as HandlerData } from "typhoon-server/handler";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import {
   DependencySignal,
@@ -49,14 +50,8 @@ type UpdaterState = {
 type UpdaterStateMap = HashMap.HashMap<string, UpdaterState>;
 
 export class WebSocketClient<
-  SubscriptionHandlerConfigs extends Record<
-    string,
-    Handler.Config.Subscription.SubscriptionHandlerConfig
-  > = Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
-  MutationHandlerConfigs extends Record<
-    string,
-    Handler.Config.Mutation.MutationHandlerConfig
-  > = Record<string, Handler.Config.Mutation.MutationHandlerConfig>,
+  HandlerDataCollection extends
+    HandlerData.Collection.HandlerDataCollection<HandlerData.Collection.BaseHandlerDataCollectionRecord>,
 > {
   constructor(
     private readonly url: string,
@@ -64,10 +59,7 @@ export class WebSocketClient<
       Option.Option<WebSocket>
     >,
     private readonly updaterStateMapRef: SynchronizedRef.SynchronizedRef<UpdaterStateMap>,
-    private readonly configCollection: Handler.Config.Collection.HandlerConfigCollection<
-      SubscriptionHandlerConfigs,
-      MutationHandlerConfigs
-    >,
+    private readonly handlerDataCollection: HandlerDataCollection,
     private readonly token: SynchronizedRef.SynchronizedRef<
       Option.Option<string>
     >,
@@ -77,21 +69,11 @@ export class WebSocketClient<
   ) {}
 
   static create<
-    const Collection extends Handler.Config.Collection.HandlerConfigCollection<
-      any,
-      any
-    >,
+    const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
   >(
-    configCollection: Collection,
+    handlerDataCollection: Collection,
     url: string,
-  ): Effect.Effect<
-    WebSocketClient<
-      Handler.Config.Collection.HandlerConfigCollectionSubscriptionHandlerConfigs<Collection>,
-      Handler.Config.Collection.HandlerConfigCollectionMutationHandlerConfigs<Collection>
-    >,
-    never,
-    never
-  > {
+  ): Effect.Effect<WebSocketClient<Collection>, never, never> {
     return pipe(
       Effect.Do,
       Effect.bind("ws", () => SynchronizedRef.make(Option.none<WebSocket>())),
@@ -106,10 +88,14 @@ export class WebSocketClient<
       ),
       Effect.map(
         ({ ws, updaterStateMapRef, token, status }) =>
-          new WebSocketClient<
-            Handler.Config.Collection.HandlerConfigCollectionSubscriptionHandlerConfigs<Collection>,
-            Handler.Config.Collection.HandlerConfigCollectionMutationHandlerConfigs<Collection>
-          >(url, ws, updaterStateMapRef, configCollection, token, status),
+          new WebSocketClient<Collection>(
+            url,
+            ws,
+            updaterStateMapRef,
+            handlerDataCollection,
+            token,
+            status,
+          ),
       ),
       Effect.withSpan("WebSocketClient.create", {
         captureStackTrace: true,
@@ -125,7 +111,7 @@ export class WebSocketClient<
     ) => Effect.Effect<void, never, SignalService.SignalService>,
   ) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (client: WebSocketClient<any, any>) =>
+    return (client: WebSocketClient<any>) =>
       pipe(
         client.updaterStateMapRef,
         SynchronizedRef.update(HashMap.set(id, { updater })),
@@ -134,7 +120,7 @@ export class WebSocketClient<
 
   static removeUpdater(id: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (client: WebSocketClient<any, any>) =>
+    return (client: WebSocketClient<any>) =>
       pipe(
         client.updaterStateMapRef,
         SynchronizedRef.update(HashMap.remove(id)),
@@ -142,12 +128,7 @@ export class WebSocketClient<
   }
 
   static handleUpdate(header: Header.Header, decodedResponse: unknown) {
-    return (
-      client: WebSocketClient<
-        Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
-        Record<string, Handler.Config.Mutation.MutationHandlerConfig>
-      >,
-    ) =>
+    return (client: WebSocketClient<any>) =>
       pipe(
         client.updaterStateMapRef,
         SynchronizedRef.get,
@@ -176,12 +157,7 @@ export class WebSocketClient<
       );
   }
 
-  static connectOnce = (
-    client: WebSocketClient<
-      Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
-      Record<string, Handler.Config.Mutation.MutationHandlerConfig>
-    >,
-  ) =>
+  static connectOnce = (client: WebSocketClient<any>) =>
     pipe(
       Effect.Do,
       Effect.tap(() =>
@@ -311,12 +287,7 @@ export class WebSocketClient<
       }),
     );
 
-  static connect(
-    client: WebSocketClient<
-      Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
-      Record<string, Handler.Config.Mutation.MutationHandlerConfig>
-    >,
-  ) {
+  static connect(client: WebSocketClient<any>) {
     return pipe(
       WebSocketClient.connectOnce(client),
       Effect.unlessEffect(
@@ -332,12 +303,7 @@ export class WebSocketClient<
     );
   }
 
-  static close(
-    client: WebSocketClient<
-      Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
-      Record<string, Handler.Config.Mutation.MutationHandlerConfig>
-    >,
-  ) {
+  static close(client: WebSocketClient<any>) {
     return pipe(
       SynchronizedRef.update(client.status, () => "disconnecting" as const),
       Effect.tap(() => Effect.log("disconnecting from websocket")),
@@ -371,13 +337,7 @@ export class WebSocketClient<
   }
 
   static token =
-    (token: Option.Option<string>) =>
-    (
-      client: WebSocketClient<
-        Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
-        Record<string, Handler.Config.Mutation.MutationHandlerConfig>
-      >,
-    ) =>
+    (token: Option.Option<string>) => (client: WebSocketClient<any>) =>
       pipe(
         SynchronizedRef.update(client.token, () => token),
         Effect.withSpan("WebSocketClient.token", {
@@ -386,21 +346,26 @@ export class WebSocketClient<
       );
 
   static subscribe<
-    SubscriptionHandlerConfigs extends Record<
-      string,
-      Handler.Config.Subscription.SubscriptionHandlerConfig
+    const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
+    const H extends
+      keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
+        HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">
+      > &
+        string,
+    HData extends HandlerData.Group.Subscription.GetHandlerData<
+      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">,
+      H
+    > = HandlerData.Group.Subscription.GetHandlerData<
+      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">,
+      H
     >,
-    H extends keyof SubscriptionHandlerConfigs & string,
   >(
-    client: WebSocketClient<
-      SubscriptionHandlerConfigs,
-      Record<string, Handler.Config.Mutation.MutationHandlerConfig>
-    >,
+    client: WebSocketClient<Collection>,
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
       Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<SubscriptionHandlerConfigs[H]>
+        Handler.Config.RequestParamsOrUndefined<HData>
       >
     >,
   ) {
@@ -408,10 +373,14 @@ export class WebSocketClient<
       Effect.Do,
       Effect.let("config", () =>
         pipe(
-          Handler.Config.Collection.getHandlerConfig(
-            "subscription",
-            handler,
-          )(client.configCollection),
+          client.handlerDataCollection,
+          HandlerData.Collection.getHandlerDataGroup("subscription"),
+          Option.getOrThrowWith(() =>
+            MissingRpcConfigError.make({
+              message: `Failed to get handler config for ${handler}`,
+            }),
+          ),
+          HandlerData.Group.Subscription.getHandlerData(handler),
           Option.getOrThrowWith(() =>
             MissingRpcConfigError.make({
               message: `Failed to get handler config for ${handler}`,
@@ -430,16 +399,12 @@ export class WebSocketClient<
           RpcResult.RpcResult<
             Validator.Output<
               Handler.Config.ResolvedResponseValidator<
-                Handler.Config.ResponseOrUndefined<
-                  SubscriptionHandlerConfigs[H]
-                >
+                Handler.Config.ResponseOrUndefined<HData>
               >
             >,
             Validator.Output<
               Handler.Config.ResolvedResponseErrorValidator<
-                Handler.Config.ResponseErrorOrUndefined<
-                  SubscriptionHandlerConfigs[H]
-                >
+                Handler.Config.ResponseErrorOrUndefined<HData>
               >
             >
           >
@@ -569,21 +534,26 @@ export class WebSocketClient<
   }
 
   static subscribeScoped<
-    SubscriptionHandlerConfigs extends Record<
-      string,
-      Handler.Config.Subscription.SubscriptionHandlerConfig
+    const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
+    const H extends
+      keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
+        HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">
+      > &
+        string,
+    HData extends HandlerData.Group.Subscription.GetHandlerData<
+      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">,
+      H
+    > = HandlerData.Group.Subscription.GetHandlerData<
+      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">,
+      H
     >,
-    H extends keyof SubscriptionHandlerConfigs & string,
   >(
-    client: WebSocketClient<
-      SubscriptionHandlerConfigs,
-      Record<string, Handler.Config.Mutation.MutationHandlerConfig>
-    >,
+    client: WebSocketClient<Collection>,
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
       Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<SubscriptionHandlerConfigs[H]>
+        Handler.Config.RequestParamsOrUndefined<HData>
       >
     >,
   ) {
@@ -607,19 +577,13 @@ export class WebSocketClient<
   }
 
   static unsubscribe<
-    SubscriptionHandlerConfigs extends Record<
-      string,
-      Handler.Config.Subscription.SubscriptionHandlerConfig
-    >,
-    H extends keyof SubscriptionHandlerConfigs & string,
-  >(
-    client: WebSocketClient<
-      SubscriptionHandlerConfigs,
-      Record<string, Handler.Config.Mutation.MutationHandlerConfig>
-    >,
-    id: string,
-    handler: H,
-  ) {
+    const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
+    const H extends
+      keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
+        HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">
+      > &
+        string,
+  >(client: WebSocketClient<Collection>, id: string, handler: H) {
     return pipe(
       Effect.Do,
       Effect.tap(() => pipe(client, WebSocketClient.removeUpdater(id))),
@@ -668,21 +632,26 @@ export class WebSocketClient<
   }
 
   static once<
-    SubscriptionHandlerConfigs extends Record<
-      string,
-      Handler.Config.Subscription.SubscriptionHandlerConfig
+    const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
+    const H extends
+      keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
+        HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">
+      > &
+        string,
+    HData extends HandlerData.Group.Subscription.GetHandlerData<
+      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">,
+      H
+    > = HandlerData.Group.Subscription.GetHandlerData<
+      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">,
+      H
     >,
-    H extends keyof SubscriptionHandlerConfigs & string,
   >(
-    client: WebSocketClient<
-      SubscriptionHandlerConfigs,
-      Record<string, Handler.Config.Mutation.MutationHandlerConfig>
-    >,
+    client: WebSocketClient<Collection>,
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
       Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<SubscriptionHandlerConfigs[H]>
+        Handler.Config.RequestParamsOrUndefined<HData>
       >
     >,
   ) {
@@ -690,10 +659,14 @@ export class WebSocketClient<
       Effect.Do,
       Effect.let("config", () =>
         pipe(
-          Handler.Config.Collection.getHandlerConfig(
-            "subscription",
-            handler,
-          )(client.configCollection),
+          client.handlerDataCollection,
+          HandlerData.Collection.getHandlerDataGroup("subscription"),
+          Option.getOrThrowWith(() =>
+            MissingRpcConfigError.make({
+              message: `Failed to get handler config for ${handler}`,
+            }),
+          ),
+          HandlerData.Group.Subscription.getHandlerData(handler),
           Option.getOrThrowWith(() =>
             MissingRpcConfigError.make({
               message: `Failed to get handler config for ${handler}`,
@@ -713,17 +686,13 @@ export class WebSocketClient<
             result: Either.Either<
               Validator.Output<
                 Handler.Config.ResolvedResponseValidator<
-                  Handler.Config.ResponseOrUndefined<
-                    SubscriptionHandlerConfigs[H]
-                  >
+                  Handler.Config.ResponseOrUndefined<HData>
                 >
               >,
               | RpcError<
                   Validator.Output<
                     Handler.Config.ResolvedResponseErrorValidator<
-                      Handler.Config.ResponseErrorOrUndefined<
-                        SubscriptionHandlerConfigs[H]
-                      >
+                      Handler.Config.ResponseErrorOrUndefined<HData>
                     >
                   >
                 >
@@ -833,21 +802,25 @@ export class WebSocketClient<
   }
 
   static mutate<
-    MutationHandlerConfigs extends Record<
+    const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
+    const H extends keyof HandlerData.Group.Mutation.GetHandlerDataGroupRecord<
+      HandlerData.Collection.GetHandlerDataGroup<Collection, "mutation">
+    > &
       string,
-      Handler.Config.Mutation.MutationHandlerConfig
+    HData extends HandlerData.Group.Mutation.GetHandlerData<
+      HandlerData.Collection.GetHandlerDataGroup<Collection, "mutation">,
+      H
+    > = HandlerData.Group.Mutation.GetHandlerData<
+      HandlerData.Collection.GetHandlerDataGroup<Collection, "mutation">,
+      H
     >,
-    H extends keyof MutationHandlerConfigs & string,
   >(
-    client: WebSocketClient<
-      Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
-      MutationHandlerConfigs
-    >,
+    client: WebSocketClient<Collection>,
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
       Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<MutationHandlerConfigs[H]>
+        Handler.Config.RequestParamsOrUndefined<HData>
       >
     >,
   ) {
@@ -855,10 +828,14 @@ export class WebSocketClient<
       Effect.Do,
       Effect.let("config", () =>
         pipe(
-          Handler.Config.Collection.getHandlerConfig(
-            "mutation",
-            handler,
-          )(client.configCollection),
+          client.handlerDataCollection,
+          HandlerData.Collection.getHandlerDataGroup("mutation"),
+          Option.getOrThrowWith(() =>
+            MissingRpcConfigError.make({
+              message: `Failed to get handler config for ${handler}`,
+            }),
+          ),
+          HandlerData.Group.Mutation.getHandlerData(handler),
           Option.getOrThrowWith(() =>
             MissingRpcConfigError.make({
               message: `Failed to get handler config for ${handler}`,
@@ -878,15 +855,13 @@ export class WebSocketClient<
             result: Either.Either<
               Validator.Output<
                 Handler.Config.ResolvedResponseValidator<
-                  Handler.Config.ResponseOrUndefined<MutationHandlerConfigs[H]>
+                  Handler.Config.ResponseOrUndefined<HData>
                 >
               >,
               | RpcError<
                   Validator.Output<
                     Handler.Config.ResolvedResponseErrorValidator<
-                      Handler.Config.ResponseErrorOrUndefined<
-                        MutationHandlerConfigs[H]
-                      >
+                      Handler.Config.ResponseErrorOrUndefined<HData>
                     >
                   >
                 >

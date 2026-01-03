@@ -12,16 +12,13 @@ import {
   Duration,
   String,
 } from "effect";
-import {
-  serverHandlerConfigCollection,
-  Schema as SheetSchema,
-} from "sheet-apis";
+import { serverHandlerDataCollection, Schema as SheetSchema } from "sheet-apis";
 import { AppsScriptClient } from "typhoon-client-apps-script/client";
 
 const SETTING_SHEET_NAME = "Thee's Sheet Settings";
 
 function getClient(url: string) {
-  return AppsScriptClient.create(serverHandlerConfigCollection, url);
+  return AppsScriptClient.create(serverHandlerDataCollection, url);
 }
 
 const cellValueValidator = Schema.Union(

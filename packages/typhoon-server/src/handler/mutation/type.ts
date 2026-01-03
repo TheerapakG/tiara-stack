@@ -4,9 +4,9 @@ import type { Type } from "typhoon-core/handler";
 import { Handler } from "typhoon-core/server";
 import { SignalService } from "typhoon-core/signal";
 import { Validator } from "typhoon-core/validator";
-import { Event } from "../../../event/event";
+import { Event } from "@/event/event";
 
-type MutationData = Handler.Config.Mutation.MutationHandlerConfig;
+export type MutationData = Handler.Config.Mutation.MutationHandlerConfig;
 type MutationHandler<A = unknown, E = unknown, R = unknown> = Effect.Effect<
   A,
   E,

@@ -8,7 +8,7 @@ import { Context } from "typhoon-server/handler";
 import { Result } from "typhoon-core/schema";
 import { stripHandler } from "typhoon-core/bundler";
 
-const builders = Context.Subscription.Builder.builders();
+const builders = Context.Builder.Subscription.builders();
 
 export const getMessageRoomOrderHandler = pipe(
   builders.empty(),

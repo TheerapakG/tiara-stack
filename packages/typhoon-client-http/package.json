@@ -33,7 +33,8 @@
   "peerDependencies": {
     "effect": "^3.18.4",
     "@effect/platform": "^0.90.9",
-    "typhoon-core": "workspace:*"
+    "typhoon-core": "workspace:*",
+    "typhoon-server": "workspace:*"
   },
   "devDependencies": {
     "@typescript/native-preview": "latest",

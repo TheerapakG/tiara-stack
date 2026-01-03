@@ -15,7 +15,7 @@ export const getAutoCheckinGuildsHandlerConfig = pipe(
       Result.ResultSchema({
         optimistic: Schema.Either({
           right: Schema.Array(GuildConfig),
-          left: Schema.Union(Error.Core.ZeroQueryError),
+          left: Error.Core.ZeroQueryError,
         }),
         complete: Schema.Either({
           right: Schema.Array(GuildConfig),

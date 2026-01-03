@@ -49,8 +49,8 @@ import {
   Context as HandlerContextCore,
   type Context as HandlerContextCoreType,
 } from "typhoon-core/handler";
-import { type MutationHandlerT } from "../handler/context/mutation/type";
-import { type SubscriptionHandlerT } from "../handler/context/subscription/type";
+import { type MutationHandlerT } from "../handler/mutation/type";
+import { type SubscriptionHandlerT } from "../handler/subscription/type";
 import invalidHeaderErrorHtml from "./invalidHeaderError.html";
 
 class SubscriptionState extends Data.TaggedClass("SubscriptionState")<{

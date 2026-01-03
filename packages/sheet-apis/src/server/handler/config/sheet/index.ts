@@ -1,5 +1,6 @@
 import { pipe } from "effect";
-import { Handler } from "typhoon-core/server";
+import { Data as CoreData } from "typhoon-core/handler";
+import { Data as HandlerData } from "typhoon-server/handler";
 
 import { getAllSchedulesHandlerConfig } from "./getAllSchedules";
 import { getChannelSchedulesHandlerConfig } from "./getChannelSchedules";
@@ -25,16 +26,20 @@ export {
   getTeamsHandlerConfig,
 };
 
-export const sheetConfigHandlerConfigCollection = pipe(
-  Handler.Config.Collection.empty(),
-  Handler.Config.Collection.add(getAllSchedulesHandlerConfig),
-  Handler.Config.Collection.add(getChannelSchedulesHandlerConfig),
-  Handler.Config.Collection.add(getDaySchedulesHandlerConfig),
-  Handler.Config.Collection.add(getEventConfigHandlerConfig),
-  Handler.Config.Collection.add(getPlayersHandlerConfig),
-  Handler.Config.Collection.add(getRangesConfigHandlerConfig),
-  Handler.Config.Collection.add(getRunnerConfigHandlerConfig),
-  Handler.Config.Collection.add(getScheduleConfigHandlerConfig),
-  Handler.Config.Collection.add(getTeamConfigHandlerConfig),
-  Handler.Config.Collection.add(getTeamsHandlerConfig),
+export const HandlerDataGroupTypeId = CoreData.Group.HandlerDataGroupTypeId;
+export const HandlerDataCollectionTypeId =
+  CoreData.Collection.HandlerDataCollectionTypeId;
+
+export const sheetHandlerDataCollection = pipe(
+  HandlerData.Collection.empty(),
+  HandlerData.Collection.addSubscription(getAllSchedulesHandlerConfig),
+  HandlerData.Collection.addSubscription(getChannelSchedulesHandlerConfig),
+  HandlerData.Collection.addSubscription(getDaySchedulesHandlerConfig),
+  HandlerData.Collection.addSubscription(getEventConfigHandlerConfig),
+  HandlerData.Collection.addSubscription(getPlayersHandlerConfig),
+  HandlerData.Collection.addSubscription(getRangesConfigHandlerConfig),
+  HandlerData.Collection.addSubscription(getRunnerConfigHandlerConfig),
+  HandlerData.Collection.addSubscription(getScheduleConfigHandlerConfig),
+  HandlerData.Collection.addSubscription(getTeamConfigHandlerConfig),
+  HandlerData.Collection.addSubscription(getTeamsHandlerConfig),
 );
