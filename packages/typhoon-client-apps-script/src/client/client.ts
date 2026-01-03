@@ -14,7 +14,11 @@ import { Data as CoreData } from "typhoon-core/handler";
 import { Data as HandlerData } from "typhoon-server/handler";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { Validate, Validator } from "typhoon-core/validator";
-import { MissingRpcConfigError, RpcError } from "typhoon-core/error";
+import {
+  MissingRpcConfigError,
+  RpcError,
+  ValidationError,
+} from "typhoon-core/error";
 
 export const HandlerDataGroupTypeId = CoreData.Group.HandlerDataGroupTypeId;
 export const HandlerDataCollectionTypeId =
@@ -205,31 +209,46 @@ export class AppsScriptClient<
           : Effect.void,
       ),
       Effect.bind("decodedResponse", ({ pullEffect }) => pullEffect),
-      Effect.flatMap(({ header, decodedResponse, config }) =>
-        pipe(
-          decodedResponse,
-          Either.liftPredicate(
-            () => header.action === "server:update" && header.payload.success,
-            Function.identity,
-          ),
-          Handler.Config.decodeResponseUnknown(config),
-          Effect.map(
-            Either.mapLeft(
-              (error) =>
-                new RpcError({
-                  message:
-                    typeof error === "object" &&
-                    error !== null &&
-                    "message" in error &&
-                    typeof error.message === "string"
-                      ? error.message
-                      : "An unknown error occurred",
-                  cause: error,
-                }),
+      Effect.flatMap(
+        ({ header, decodedResponse, config }) =>
+          pipe(
+            decodedResponse,
+            Either.liftPredicate(
+              () => header.action === "server:update" && header.payload.success,
+              Function.identity,
             ),
-          ),
-          Effect.flatten,
-        ),
+            Handler.Config.decodeResponseUnknown(config),
+            Effect.map(
+              Either.mapLeft(
+                (error) =>
+                  new RpcError({
+                    message:
+                      typeof error === "object" &&
+                      error !== null &&
+                      "message" in error &&
+                      typeof error.message === "string"
+                        ? error.message
+                        : "An unknown error occurred",
+                    cause: error,
+                  }),
+              ),
+            ),
+            Effect.flatten,
+          ) as Effect.Effect<
+            Validator.Output<
+              Handler.Config.ResolvedResponseValidator<
+                Handler.Config.ResponseOrUndefined<HData>
+              >
+            >,
+            | RpcError<
+                Validator.Output<
+                  Handler.Config.ResolvedResponseErrorValidator<
+                    Handler.Config.ResponseErrorOrUndefined<HData>
+                  >
+                >
+              >
+            | ValidationError
+          >,
       ),
       Effect.scoped,
       Effect.withSpan("AppsScriptClient.once"),
