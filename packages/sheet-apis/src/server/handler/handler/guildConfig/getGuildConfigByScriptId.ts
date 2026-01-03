@@ -6,41 +6,44 @@ import { Handler } from "typhoon-core/server";
 import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
 import { Result } from "typhoon-core/schema";
+import { stripHandler } from "typhoon-core/bundler";
 
 const builders = Context.Subscription.Builder.builders();
 export const getGuildConfigByScriptIdHandler = pipe(
   builders.empty(),
   builders.data(getGuildConfigByScriptIdHandlerConfig),
   builders.handler(
-    pipe(
-      Effect.Do,
-      Effect.tap(() =>
-        pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-      ),
-      Effect.bind("parsed", () =>
-        Event.request.parsed(getGuildConfigByScriptIdHandlerConfig),
-      ),
-      Effect.flatMap(({ parsed }) =>
-        GuildConfigService.getGuildConfigByScriptId(parsed),
-      ),
-      Effect.map(
+    stripHandler(
+      pipe(
+        Effect.Do,
+        Effect.tap(() =>
+          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
+        ),
+        Effect.bind("parsed", () =>
+          Event.request.parsed(getGuildConfigByScriptIdHandlerConfig),
+        ),
+        Effect.flatMap(({ parsed }) =>
+          GuildConfigService.getGuildConfigByScriptId(parsed),
+        ),
         Effect.map(
-          Result.eitherSomeOrLeft(() =>
-            Error.Core.makeArgumentError(
-              "Cannot get guild config by script id, the script might not be registered",
+          Effect.map(
+            Result.eitherSomeOrLeft(() =>
+              Error.Core.makeArgumentError(
+                "Cannot get guild config by script id, the script might not be registered",
+              ),
             ),
           ),
         ),
-      ),
-      Effect.map(Error.Core.catchParseErrorAsValidationError),
-      Effect.map(
-        Handler.Config.encodeResponseEffect(
-          getGuildConfigByScriptIdHandlerConfig,
+        Effect.map(Error.Core.catchParseErrorAsValidationError),
+        Effect.map(
+          Handler.Config.encodeResponseEffect(
+            getGuildConfigByScriptIdHandlerConfig,
+          ),
         ),
+        Effect.withSpan("getGuildConfigByScriptIdHandler", {
+          captureStackTrace: true,
+        }),
       ),
-      Effect.withSpan("getGuildConfigByScriptIdHandler", {
-        captureStackTrace: true,
-      }),
     ),
   ),
 );
