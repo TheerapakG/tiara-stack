@@ -1,13 +1,13 @@
 import { pipe } from "effect";
-import { Handler } from "typhoon-core/server";
+import { Data as HandlerData } from "typhoon-server/handler";
 
 import { getMessageSlotDataHandlerConfig } from "./getMessageSlotData";
 import { upsertMessageSlotDataHandlerConfig } from "./upsertMessageSlotData";
 
 export { getMessageSlotDataHandlerConfig, upsertMessageSlotDataHandlerConfig };
 
-export const messageSlotHandlerConfigCollection = pipe(
-  Handler.Config.Collection.empty(),
-  Handler.Config.Collection.add(getMessageSlotDataHandlerConfig),
-  Handler.Config.Collection.add(upsertMessageSlotDataHandlerConfig),
+export const messageSlotHandlerDataCollection = pipe(
+  HandlerData.Collection.empty(),
+  HandlerData.Collection.addSubscription(getMessageSlotDataHandlerConfig),
+  HandlerData.Collection.addMutation(upsertMessageSlotDataHandlerConfig),
 );

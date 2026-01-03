@@ -7,7 +7,7 @@ import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
 import { stripHandler } from "typhoon-core/bundler";
 
-const builders = Context.Subscription.Builder.builders();
+const builders = Context.Builder.Subscription.builders();
 export const getAutoCheckinGuildsHandler = pipe(
   builders.empty(),
   builders.data(getAutoCheckinGuildsHandlerConfig),

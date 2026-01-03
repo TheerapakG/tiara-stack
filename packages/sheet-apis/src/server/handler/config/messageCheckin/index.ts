@@ -1,5 +1,5 @@
 import { pipe } from "effect";
-import { Handler } from "typhoon-core/server";
+import { Data as HandlerData } from "typhoon-server/handler";
 
 import { addMessageCheckinMembersHandlerConfig } from "./addMessageCheckinMembers";
 import { getMessageCheckinDataHandlerConfig } from "./getMessageCheckinData";
@@ -17,12 +17,14 @@ export {
   upsertMessageCheckinDataHandlerConfig,
 };
 
-export const messageCheckinHandlerConfigCollection = pipe(
-  Handler.Config.Collection.empty(),
-  Handler.Config.Collection.add(getMessageCheckinDataHandlerConfig),
-  Handler.Config.Collection.add(upsertMessageCheckinDataHandlerConfig),
-  Handler.Config.Collection.add(getMessageCheckinMembersHandlerConfig),
-  Handler.Config.Collection.add(addMessageCheckinMembersHandlerConfig),
-  Handler.Config.Collection.add(setMessageCheckinMemberCheckinAtHandlerConfig),
-  Handler.Config.Collection.add(removeMessageCheckinMemberHandlerConfig),
+export const messageCheckinHandlerDataCollection = pipe(
+  HandlerData.Collection.empty(),
+  HandlerData.Collection.addSubscription(getMessageCheckinDataHandlerConfig),
+  HandlerData.Collection.addMutation(upsertMessageCheckinDataHandlerConfig),
+  HandlerData.Collection.addSubscription(getMessageCheckinMembersHandlerConfig),
+  HandlerData.Collection.addMutation(addMessageCheckinMembersHandlerConfig),
+  HandlerData.Collection.addMutation(
+    setMessageCheckinMemberCheckinAtHandlerConfig,
+  ),
+  HandlerData.Collection.addMutation(removeMessageCheckinMemberHandlerConfig),
 );

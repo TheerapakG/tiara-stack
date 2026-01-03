@@ -8,7 +8,7 @@ import { Event } from "typhoon-server/event";
 import { Context } from "typhoon-server/handler";
 import { stripHandler } from "typhoon-core/bundler";
 
-const builders = Context.Mutation.Builder.builders();
+const builders = Context.Builder.Mutation.builders();
 
 export const upsertMessageCheckinDataHandler = pipe(
   builders.empty(),

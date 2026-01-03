@@ -10,56 +10,40 @@ import {
   Function,
 } from "effect";
 import { MissingRpcConfigError, RpcError } from "typhoon-core/error";
+import { Data as CoreData } from "typhoon-core/handler";
 import { Handler } from "typhoon-core/server";
+import { Data as HandlerData } from "typhoon-server/handler";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { Validate, Validator } from "typhoon-core/validator";
 
+export const HandlerDataGroupTypeId = CoreData.Group.HandlerDataGroupTypeId;
+export const HandlerDataCollectionTypeId =
+  CoreData.Collection.HandlerDataCollectionTypeId;
+
 export class HttpClient<
-  SubscriptionHandlerConfigs extends Record<
-    string,
-    Handler.Config.Subscription.SubscriptionHandlerConfig
-  > = Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
-  MutationHandlerConfigs extends Record<
-    string,
-    Handler.Config.Mutation.MutationHandlerConfig
-  > = Record<string, Handler.Config.Mutation.MutationHandlerConfig>,
+  HandlerDataCollection extends
+    HandlerData.Collection.HandlerDataCollection<HandlerData.Collection.BaseHandlerDataCollectionRecord>,
 > {
   constructor(
     private readonly url: string,
-    private readonly configCollection: Handler.Config.Collection.HandlerConfigCollection<
-      SubscriptionHandlerConfigs,
-      MutationHandlerConfigs
-    >,
+    private readonly handlerDataCollection: HandlerDataCollection,
     private readonly token: SynchronizedRef.SynchronizedRef<
       Option.Option<string>
     >,
   ) {}
 
   static create<
-    const Collection extends Handler.Config.Collection.HandlerConfigCollection<
-      any,
-      any
-    >,
+    const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
   >(
-    configCollection: Collection,
+    handlerDataCollection: Collection,
     url: string,
-  ): Effect.Effect<
-    HttpClient<
-      Handler.Config.Collection.HandlerConfigCollectionSubscriptionHandlerConfigs<Collection>,
-      Handler.Config.Collection.HandlerConfigCollectionMutationHandlerConfigs<Collection>
-    >,
-    never,
-    never
-  > {
+  ): Effect.Effect<HttpClient<Collection>, never, never> {
     return pipe(
       Effect.Do,
       Effect.bind("token", () => SynchronizedRef.make(Option.none<string>())),
       Effect.map(
         ({ token }) =>
-          new HttpClient<
-            Handler.Config.Collection.HandlerConfigCollectionSubscriptionHandlerConfigs<Collection>,
-            Handler.Config.Collection.HandlerConfigCollectionMutationHandlerConfigs<Collection>
-          >(url, configCollection, token),
+          new HttpClient<Collection>(url, handlerDataCollection, token),
       ),
       Effect.withSpan("HttpClient.create", {
         captureStackTrace: true,
@@ -69,12 +53,7 @@ export class HttpClient<
 
   static token =
     (token: Option.Option<string>) =>
-    (
-      client: HttpClient<
-        Record<string, Handler.Config.Subscription.SubscriptionHandlerConfig>,
-        Record<string, Handler.Config.Mutation.MutationHandlerConfig>
-      >,
-    ) =>
+    (client: HttpClient<HandlerData.Collection.HandlerDataCollection<any>>) =>
       pipe(
         SynchronizedRef.update(client.token, () => token),
         Effect.withSpan("HttpClient.token", {
@@ -83,21 +62,26 @@ export class HttpClient<
       );
 
   static once<
-    SubscriptionHandlerConfigs extends Record<
+    const Collection extends
+      HandlerData.Collection.HandlerDataCollection<HandlerData.Collection.BaseHandlerDataCollectionRecord>,
+    H extends keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
+      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">
+    > &
       string,
-      Handler.Config.Subscription.SubscriptionHandlerConfig
+    HData extends HandlerData.Group.Subscription.GetHandlerData<
+      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">,
+      H
+    > = HandlerData.Group.Subscription.GetHandlerData<
+      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">,
+      H
     >,
-    H extends keyof SubscriptionHandlerConfigs & string,
   >(
-    client: HttpClient<
-      SubscriptionHandlerConfigs,
-      Record<string, Handler.Config.Mutation.MutationHandlerConfig>
-    >,
+    client: HttpClient<Collection>,
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
       Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<SubscriptionHandlerConfigs[H]>
+        Handler.Config.RequestParamsOrUndefined<HData>
       >
     >,
   ) {
@@ -105,10 +89,14 @@ export class HttpClient<
       Effect.Do,
       Effect.let("config", () =>
         pipe(
-          Handler.Config.Collection.getHandlerConfig(
-            "subscription",
-            handler,
-          )(client.configCollection),
+          client.handlerDataCollection,
+          HandlerData.Collection.getHandlerDataGroup("subscription"),
+          Option.getOrThrowWith(() =>
+            MissingRpcConfigError.make({
+              message: `Failed to get handler config for ${handler}`,
+            }),
+          ),
+          HandlerData.Group.Subscription.getHandlerData(handler),
           Option.getOrThrowWith(() =>
             MissingRpcConfigError.make({
               message: `Failed to get handler config for ${handler}`,

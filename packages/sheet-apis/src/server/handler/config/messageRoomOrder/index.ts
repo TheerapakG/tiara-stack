@@ -1,5 +1,5 @@
 import { pipe } from "effect";
-import { Handler } from "typhoon-core/server";
+import { Data as HandlerData } from "typhoon-server/handler";
 
 import { decrementMessageRoomOrderRankHandlerConfig } from "./decrementMessageRoomOrderRank";
 import { getMessageRoomOrderHandlerConfig } from "./getMessageRoomOrder";
@@ -21,14 +21,18 @@ export {
   upsertMessageRoomOrderEntryHandlerConfig,
 };
 
-export const messageRoomOrderHandlerConfigCollection = pipe(
-  Handler.Config.Collection.empty(),
-  Handler.Config.Collection.add(getMessageRoomOrderHandlerConfig),
-  Handler.Config.Collection.add(upsertMessageRoomOrderHandlerConfig),
-  Handler.Config.Collection.add(decrementMessageRoomOrderRankHandlerConfig),
-  Handler.Config.Collection.add(incrementMessageRoomOrderRankHandlerConfig),
-  Handler.Config.Collection.add(getMessageRoomOrderEntryHandlerConfig),
-  Handler.Config.Collection.add(getMessageRoomOrderRangeHandlerConfig),
-  Handler.Config.Collection.add(upsertMessageRoomOrderEntryHandlerConfig),
-  Handler.Config.Collection.add(removeMessageRoomOrderEntryHandlerConfig),
+export const messageRoomOrderHandlerDataCollection = pipe(
+  HandlerData.Collection.empty(),
+  HandlerData.Collection.addSubscription(getMessageRoomOrderHandlerConfig),
+  HandlerData.Collection.addMutation(upsertMessageRoomOrderHandlerConfig),
+  HandlerData.Collection.addMutation(
+    decrementMessageRoomOrderRankHandlerConfig,
+  ),
+  HandlerData.Collection.addMutation(
+    incrementMessageRoomOrderRankHandlerConfig,
+  ),
+  HandlerData.Collection.addSubscription(getMessageRoomOrderEntryHandlerConfig),
+  HandlerData.Collection.addSubscription(getMessageRoomOrderRangeHandlerConfig),
+  HandlerData.Collection.addMutation(upsertMessageRoomOrderEntryHandlerConfig),
+  HandlerData.Collection.addMutation(removeMessageRoomOrderEntryHandlerConfig),
 );

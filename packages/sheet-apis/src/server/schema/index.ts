@@ -1,5 +1,5 @@
 export * as Error from "./error";
-export * as Core from "./core";
+export * from "./core";
 export * from "./eventConfig";
 export * from "./guildChannelConfig";
 export * from "./guildConfig";

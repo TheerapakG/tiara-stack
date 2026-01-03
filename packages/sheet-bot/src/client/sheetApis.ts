@@ -1,7 +1,7 @@
 import { Config } from "@/config";
 import { FileSystem } from "@effect/platform";
 import { Effect, Option, pipe, Schedule } from "effect";
-import { serverHandlerConfigCollection } from "sheet-apis";
+import { serverHandlerDataCollection } from "sheet-apis";
 import { WebSocketClient } from "typhoon-client-ws/client";
 
 export class SheetApisClient extends Effect.Service<SheetApisClient>()(
@@ -15,7 +15,7 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()(
           Effect.acquireRelease(
             pipe(
               WebSocketClient.create(
-                serverHandlerConfigCollection,
+                serverHandlerDataCollection,
                 config.sheetApisBaseUrl,
               ),
               Effect.tap(WebSocketClient.connect),

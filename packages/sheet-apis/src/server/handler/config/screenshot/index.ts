@@ -1,11 +1,11 @@
 import { pipe } from "effect";
-import { Handler } from "typhoon-core/server";
+import { Data as HandlerData } from "typhoon-server/handler";
 
 import { getScreenshotHandlerConfig } from "./getScreenshot";
 
 export { getScreenshotHandlerConfig };
 
-export const screenshotHandlerConfigCollection = pipe(
-  Handler.Config.Collection.empty(),
-  Handler.Config.Collection.add(getScreenshotHandlerConfig),
+export const screenshotHandlerDataCollection = pipe(
+  HandlerData.Collection.empty(),
+  HandlerData.Collection.addSubscription(getScreenshotHandlerConfig),
 );

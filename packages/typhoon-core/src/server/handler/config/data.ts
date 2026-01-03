@@ -97,7 +97,13 @@ export type RequestParamsOption<Config extends PartialHandlerConfig> =
     ? Config["data"]["requestParams"]
     : Option.None<RequestParamsConfig<StandardSchemaV1, boolean>>;
 export type RequestParamsOrUndefined<Config extends PartialHandlerConfig> =
-  GetOrUndefined<RequestParamsOption<Config>>;
+  GetOrUndefined<
+    RequestParamsOption<Config>
+  > extends infer RequestParams extends
+    | RequestParamsConfig<StandardSchemaV1, boolean>
+    | undefined
+    ? RequestParams
+    : never;
 
 export const requestParams = <const Config extends PartialHandlerConfig>(
   config: Config,
@@ -118,7 +124,11 @@ export type ResponseOption<Config extends PartialHandlerConfig> =
     ? Config["data"]["response"]
     : Option.None<ResponseConfig<StandardSchemaV1>>;
 export type ResponseOrUndefined<Config extends PartialHandlerConfig> =
-  GetOrUndefined<ResponseOption<Config>>;
+  GetOrUndefined<ResponseOption<Config>> extends infer Response extends
+    | ResponseConfig<StandardSchemaV1>
+    | undefined
+    ? Response
+    : never;
 
 export const response = <const Config extends PartialHandlerConfig>(
   config: Config,
@@ -138,7 +148,13 @@ export type ResponseErrorOption<Config extends PartialHandlerConfig> =
     ? Config["data"]["responseError"]
     : Option.None<ResponseErrorConfig<StandardSchemaV1>>;
 export type ResponseErrorOrUndefined<Config extends PartialHandlerConfig> =
-  GetOrUndefined<ResponseErrorOption<Config>>;
+  GetOrUndefined<
+    ResponseErrorOption<Config>
+  > extends infer ResponseError extends
+    | ResponseErrorConfig<StandardSchemaV1>
+    | undefined
+    ? ResponseError
+    : never;
 
 export const responseError = <const Config extends PartialHandlerConfig>(
   config: Config,

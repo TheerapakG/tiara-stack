@@ -32,7 +32,8 @@
   },
   "peerDependencies": {
     "effect": "^3.18.4",
-    "typhoon-core": "workspace:*"
+    "typhoon-core": "workspace:*",
+    "typhoon-server": "workspace:*"
   },
   "devDependencies": {
     "@types/google-apps-script": "^1.0.99",

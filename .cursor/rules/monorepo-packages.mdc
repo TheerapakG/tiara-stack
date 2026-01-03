@@ -10,7 +10,9 @@ This monorepo contains the following packages:
 ## Core Infrastructure Packages
 
 ### `typhoon-core` (packages/typhoon-core)
+
 Core framework for building RPC-like communication systems with WebSocket support.
+
 - **Main export** (`packages/typhoon-core/src/index.ts`): Exports Handler, Observability, Protocol, Runtime, Schema, Server, Signal, Utils, Validator modules
 - **Sub-exports** (`packages/typhoon-core/src/*`): Each subdirectory can be imported as `typhoon-core/<module-name>`
 - **Handler** (`packages/typhoon-core/src/handler`): Request/response handler context and types
@@ -24,7 +26,9 @@ Core framework for building RPC-like communication systems with WebSocket suppor
 - **Observability** (`packages/typhoon-core/src/observability`): Observability and monitoring utilities
 
 ### `typhoon-server` (packages/typhoon-server)
+
 Server-side implementation for the Typhoon framework.
+
 - **Main export** (`packages/typhoon-server/src/index.ts`): Exports DB, Event, Server modules
 - **Sub-exports** (`packages/typhoon-server/src/*`): Each subdirectory can be imported as `typhoon-server/<module-name>`
 - **Server** (`packages/typhoon-server/src/server`): Server implementation and WebSocket handling
@@ -33,19 +37,25 @@ Server-side implementation for the Typhoon framework.
 - **Handler** (`packages/typhoon-server/src/handler`): Server-side handler context and collections
 
 ### `typhoon-client-ws` (packages/typhoon-client-ws)
+
 WebSocket client implementation for Typhoon.
+
 - **Main export** (`packages/typhoon-client-ws/src/index.ts`): Exports Client module
 - **Sub-exports** (`packages/typhoon-client-ws/src/*`): Each subdirectory can be imported as `typhoon-client-ws/<module-name>`
 - **Client** (`packages/typhoon-client-ws/src/client`): WebSocket client implementation
 
 ### `typhoon-client-http` (packages/typhoon-client-http)
+
 HTTP client implementation for Typhoon.
+
 - **Main export** (`packages/typhoon-client-http/src/index.ts`): Exports Client module
 - **Sub-exports** (`packages/typhoon-client-http/src/*`): Each subdirectory can be imported as `typhoon-client-http/<module-name>`
 - **Client** (`packages/typhoon-client-http/src/client`): HTTP client implementation using Effect Platform
 
 ### `typhoon-client-apps-script` (packages/typhoon-client-apps-script)
+
 Google Apps Script client implementation for Typhoon.
+
 - **Main export** (`packages/typhoon-client-apps-script/src/index.ts`): Exports Client module
 - **Sub-exports** (`packages/typhoon-client-apps-script/src/*`): Each subdirectory can be imported as `typhoon-client-apps-script/<module-name>`
 - **Client** (`packages/typhoon-client-apps-script/src/client`): Google Apps Script client implementation
@@ -53,8 +63,10 @@ Google Apps Script client implementation for Typhoon.
 ## Application Packages
 
 ### `sheet-apis` (packages/sheet-apis)
+
 Backend API server for Google Sheets integration, providing RPC handlers for sheet operations, calculations, guild configuration, and message management.
-- **Main export** (`packages/sheet-apis/src/index.ts`): Exports Schema and serverHandlerConfigCollection
+
+- **Main export** (`packages/sheet-apis/src/index.ts`): Exports Schema and serverHandlerDataCollection
 - **runServer export** (`packages/sheet-apis/src/runServer.ts`): Server entry point that sets up WebSocket server, handlers, and services
 - **Server** (`packages/sheet-apis/src/server`): RPC handler implementations for:
   - Calc: Sheet calculation operations
@@ -70,7 +82,9 @@ Backend API server for Google Sheets integration, providing RPC handlers for she
 - **Config** (`packages/sheet-apis/src/config`): Configuration management
 
 ### `sheet-bot` (packages/sheet-bot)
+
 Discord bot application that integrates with sheet-apis to provide Discord commands and interactions.
+
 - **Main export** (`packages/sheet-bot/src/index.ts`): Bot entry point that initializes Discord bot with commands and handlers
 - **Bot** (`packages/sheet-bot/src/bot`): Discord bot implementation
 - **Commands** (`packages/sheet-bot/src/commands`): Discord slash command handlers
@@ -82,12 +96,16 @@ Discord bot application that integrates with sheet-apis to provide Discord comma
 - **Utils** (`packages/sheet-bot/src/utils`): Utility functions
 
 ### `sheet-formulas` (packages/sheet-formulas)
+
 Google Apps Script formulas library for performing calculations and operations on Google Sheets.
+
 - **Main export** (`packages/sheet-formulas/src/index.ts`): Exports formula functions
 - **Formulas** (`packages/sheet-formulas/src/formulas.ts`): Formula implementations for parsing players, calculating stats, and performing sheet operations
 
 ### `sheet-db-schema` (packages/sheet-db-schema)
+
 Database schema definitions using Drizzle ORM for PostgreSQL.
+
 - **Main export** (`packages/sheet-db-schema/src/schema.ts`): Exports Drizzle table definitions:
   - configGuild: Guild configuration table
   - configGuildManagerRole: Guild manager role configuration
@@ -101,5 +119,7 @@ Database schema definitions using Drizzle ORM for PostgreSQL.
 ## Utility Packages
 
 ### `bob` (packages/bob)
+
 Configuration builder utility library for building type-safe configuration objects with validation.
+
 - **Main export** (`packages/bob/src/builder/index.ts`): Exports configBuilderBuilder function and ConfigBuilder/ConfigBuilderBuilder classes for creating type-safe configuration builders with Standard Schema validation

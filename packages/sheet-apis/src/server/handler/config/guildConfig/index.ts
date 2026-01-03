@@ -1,5 +1,5 @@
 import { pipe } from "effect";
-import { Handler } from "typhoon-core/server";
+import { Data as HandlerData } from "typhoon-server/handler";
 
 import { addGuildManagerRoleHandlerConfig } from "./addGuildManagerRole";
 import { getGuildConfigByGuildIdHandlerConfig } from "./getGuildConfigByGuildId";
@@ -25,16 +25,20 @@ export {
   getAutoCheckinGuildsHandlerConfig,
 };
 
-export const guildConfigHandlerConfigCollection = pipe(
-  Handler.Config.Collection.empty(),
-  Handler.Config.Collection.add(getGuildConfigByGuildIdHandlerConfig),
-  Handler.Config.Collection.add(getGuildConfigByScriptIdHandlerConfig),
-  Handler.Config.Collection.add(upsertGuildConfigHandlerConfig),
-  Handler.Config.Collection.add(getGuildManagerRolesHandlerConfig),
-  Handler.Config.Collection.add(addGuildManagerRoleHandlerConfig),
-  Handler.Config.Collection.add(removeGuildManagerRoleHandlerConfig),
-  Handler.Config.Collection.add(upsertGuildChannelConfigHandlerConfig),
-  Handler.Config.Collection.add(getGuildRunningChannelByIdHandlerConfig),
-  Handler.Config.Collection.add(getGuildRunningChannelByNameHandlerConfig),
-  Handler.Config.Collection.add(getAutoCheckinGuildsHandlerConfig),
+export const guildConfigHandlerDataCollection = pipe(
+  HandlerData.Collection.empty(),
+  HandlerData.Collection.addSubscription(getGuildConfigByGuildIdHandlerConfig),
+  HandlerData.Collection.addSubscription(getGuildConfigByScriptIdHandlerConfig),
+  HandlerData.Collection.addMutation(upsertGuildConfigHandlerConfig),
+  HandlerData.Collection.addSubscription(getGuildManagerRolesHandlerConfig),
+  HandlerData.Collection.addMutation(addGuildManagerRoleHandlerConfig),
+  HandlerData.Collection.addMutation(removeGuildManagerRoleHandlerConfig),
+  HandlerData.Collection.addMutation(upsertGuildChannelConfigHandlerConfig),
+  HandlerData.Collection.addSubscription(
+    getGuildRunningChannelByIdHandlerConfig,
+  ),
+  HandlerData.Collection.addSubscription(
+    getGuildRunningChannelByNameHandlerConfig,
+  ),
+  HandlerData.Collection.addSubscription(getAutoCheckinGuildsHandlerConfig),
 );

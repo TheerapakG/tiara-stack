@@ -45,7 +45,7 @@ export const name: <const Name extends string>(
       data: Struct.evolve(config.data, {
         name: () => some(name),
       }),
-    });
+    }) as SetPartialSubscriptionHandlerName<Name, Config>;
 
 export type SetPartialSubscriptionHandlerRequestParams<
   RequestParams extends RequestParamsConfigIn,
@@ -71,7 +71,7 @@ export const requestParams: <const RequestParams extends RequestParamsConfigIn>(
       data: Struct.evolve(config.data, {
         requestParams: () => some(transformRequestParamConfig(requestParams)),
       }),
-    });
+    }) as SetPartialSubscriptionHandlerRequestParams<RequestParams, Config>;
 
 export type SetPartialSubscriptionHandlerResponse<
   Response extends ResponseConfigIn,
@@ -95,7 +95,7 @@ export const response: <const Response extends ResponseConfigIn>(
       data: Struct.evolve(config.data, {
         response: () => some(transformResponseConfig(response)),
       }),
-    });
+    }) as SetPartialSubscriptionHandlerResponse<Response, Config>;
 
 export type SetPartialSubscriptionHandlerResponseError<
   ResponseError extends ResponseErrorConfigIn,
@@ -121,4 +121,4 @@ export const responseError: <const ResponseError extends ResponseErrorConfigIn>(
       data: Struct.evolve(config.data, {
         responseError: () => some(transformResponseErrorConfig(responseError)),
       }),
-    });
+    }) as SetPartialSubscriptionHandlerResponseError<ResponseError, Config>;
