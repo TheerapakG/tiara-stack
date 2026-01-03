@@ -111,14 +111,14 @@ export const add =
     new HandlerDataGroup<HandlerT, AddHandlerData<HandlerT, G, HData>>(
       Struct.evolve(handlerDataGroup, {
         record: (record) =>
-          Record.modify(
+          Record.set(
             record,
             handlerDataGroup.dataKeyGetter(data) as HandlerDataKey<
               HandlerT,
               HData
             > &
               (string | symbol),
-            () => data,
+            data,
           ) as AddHandlerData<HandlerT, G, HData>,
       }),
     );
