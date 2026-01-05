@@ -1,16 +1,30 @@
 import { Data, Function, pipe, Record, Struct, Types, Option } from "effect";
 import { type BaseHandlerT, type HandlerData, type HandlerType } from "../type";
 import {
+  type BaseHandlerDataGroupRecord,
   HandlerDataGroup,
   empty as emptyHandlerDataGroup,
-  type AddHandlerData as GroupAddHandlerData,
-  type AddHandlerDataGroup as GroupAddHandlerDataGroup,
+  type AddHandlerDataGroupRecord as GroupAddHandlerDataRecord,
+  type AddHandlerDataGroupGroupRecord as GroupAddHandlerDataGroupRecord,
+  type HandlerDataGroupHandlerDataGroupRecord,
+  type HandlerDataGroupHandlerT,
   add as groupAddHandlerData,
   addGroup as groupAddHandlerDataGroup,
 } from "./group";
 
 export type BaseHandlerDataCollectionRecord<HandlerT extends BaseHandlerT> = {
-  [HT in HandlerT as HandlerType<HT>]: HandlerDataGroup<HT, any>;
+  [HT in HandlerT as HandlerType<HT>]: BaseHandlerDataGroupRecord<HT>;
+};
+export type StoredHandlerDataCollectionRecord<
+  HandlerT extends BaseHandlerT,
+  Base extends BaseHandlerDataCollectionRecord<HandlerT>,
+> = {
+  [HT in HandlerT as HandlerType<HT>]: HandlerDataGroup<
+    HT,
+    Base[HandlerType<HT>] extends infer R extends BaseHandlerDataGroupRecord<HT>
+      ? R
+      : never
+  >;
 };
 
 export const HandlerDataCollectionTypeId = Symbol(
@@ -46,7 +60,10 @@ export class HandlerDataCollection<
       BaseHandlerDataCollectionRecord<HandlerT>,
   >
   extends Data.TaggedClass("HandlerDataCollection")<{
-    record: HandlerDataCollectionRecord;
+    record: StoredHandlerDataCollectionRecord<
+      HandlerT,
+      HandlerDataCollectionRecord
+    >;
     dataTypeGetter: (data: HandlerData<HandlerT>) => HandlerType<HandlerT>;
   }>
   implements Variance<HandlerT, HandlerDataCollectionRecord>
@@ -73,7 +90,7 @@ export type HandlerDataCollectionHandlerDataCollectionRecord<
   Types.Invariant.Type<
     C[HandlerDataCollectionTypeId]["_HandlerDataCollectionRecord"]
   > extends infer R extends BaseHandlerDataCollectionRecord<
-    Types.Invariant.Type<C[HandlerDataCollectionTypeId]["_HandlerT"]>
+    HandlerDataCollectionHandlerT<C>
   >
     ? R
     : never;
@@ -89,48 +106,51 @@ export const empty = <HandlerT extends BaseHandlerT>(
   new HandlerDataCollection<
     HandlerT,
     {
-      [HT in HandlerT as HandlerType<HT>]: HandlerDataGroup<HT, {}>;
+      [HT in HandlerT as HandlerType<HT>]: {};
     }
   >({
     record: Record.map(dataKeyGetters, (dataKeyGetter) =>
       emptyHandlerDataGroup(dataKeyGetter),
-    ) as unknown as {
-      [HT in HandlerT as HandlerType<HT>]: HandlerDataGroup<
-        HT,
-        Record<string | symbol, {}>
-      >;
-    },
+    ) as unknown as StoredHandlerDataCollectionRecord<
+      HandlerT,
+      {
+        [HT in HandlerT as HandlerType<HT>]: {};
+      }
+    >,
     dataTypeGetter,
   });
+
+// Helper type to add a single data to a HandlerDataCollectionRecord
+export type AddHandlerDataCollectionRecord<
+  CollectionHandlerT extends BaseHandlerT,
+  HandlerT extends BaseHandlerT,
+  CollectionRecord extends BaseHandlerDataCollectionRecord<CollectionHandlerT>,
+  HData extends HandlerData<HandlerT>,
+> = {
+  [K in keyof CollectionRecord]: K extends HandlerType<HandlerT>
+    ? GroupAddHandlerDataRecord<
+        HandlerT,
+        CollectionRecord[K] extends BaseHandlerDataGroupRecord<HandlerT>
+          ? CollectionRecord[K]
+          : never,
+        HData
+      >
+    : CollectionRecord[K];
+} extends infer R extends BaseHandlerDataCollectionRecord<CollectionHandlerT>
+  ? R
+  : never;
 
 export type AddHandlerData<
   HandlerT extends BaseHandlerT,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   DataCollection extends HandlerDataCollection<any, any>,
   HData extends HandlerData<HandlerT>,
-> =
-  HandlerDataCollectionHandlerDataCollectionRecord<DataCollection> extends infer DataCollectionRecord extends
-    BaseHandlerDataCollectionRecord<
-      HandlerDataCollectionHandlerT<DataCollection>
-    >
-    ? {
-        [K in keyof DataCollectionRecord]: K extends HandlerType<HandlerT>
-          ? DataCollectionRecord[K] extends infer G extends HandlerDataGroup<
-              HandlerT,
-              any
-            >
-            ? HandlerDataGroup<
-                HandlerT,
-                GroupAddHandlerData<HandlerT, G, HData>
-              >
-            : never
-          : DataCollectionRecord[K];
-      } extends infer R extends BaseHandlerDataCollectionRecord<
-        HandlerDataCollectionHandlerT<DataCollection>
-      >
-      ? R
-      : never
-    : never;
+> = AddHandlerDataCollectionRecord<
+  HandlerDataCollectionHandlerT<DataCollection>,
+  HandlerT,
+  HandlerDataCollectionHandlerDataCollectionRecord<DataCollection>,
+  HData
+>;
 
 export const add =
   <HandlerT extends BaseHandlerT, const HData extends HandlerData<HandlerT>>(
@@ -152,39 +172,47 @@ export const add =
             record,
             handlerDataCollection.dataTypeGetter(data) as HandlerType<HandlerT>,
             (group) => pipe(group, groupAddHandlerData(data)),
-          ) as AddHandlerData<HandlerT, C, HData>,
+          ) as StoredHandlerDataCollectionRecord<
+            HandlerDataCollectionHandlerT<C>,
+            AddHandlerData<HandlerT, C, HData>
+          >,
       }),
     );
 
+// Helper type to add a data group to a HandlerDataCollectionRecord
+export type AddHandlerDataGroupCollectionRecord<
+  CollectionHandlerT extends BaseHandlerT,
+  GroupHandlerT extends BaseHandlerT,
+  CollectionRecord extends BaseHandlerDataCollectionRecord<CollectionHandlerT>,
+  GroupRecord extends BaseHandlerDataGroupRecord<GroupHandlerT>,
+> = {
+  [K in keyof CollectionRecord]: K extends HandlerType<GroupHandlerT>
+    ? GroupAddHandlerDataGroupRecord<
+        GroupHandlerT,
+        CollectionRecord[K] extends BaseHandlerDataGroupRecord<GroupHandlerT>
+          ? CollectionRecord[K]
+          : never,
+        GroupRecord
+      >
+    : CollectionRecord[K];
+} extends infer R extends BaseHandlerDataCollectionRecord<CollectionHandlerT>
+  ? R
+  : never;
+
 export type AddHandlerDataGroup<
-  HandlerT extends BaseHandlerT,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   DataCollection extends HandlerDataCollection<any, any>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  DataGroup extends HandlerDataGroup<HandlerT, any>,
-> =
-  HandlerDataCollectionHandlerDataCollectionRecord<DataCollection> extends infer DataCollectionRecord extends
-    BaseHandlerDataCollectionRecord<
-      HandlerDataCollectionHandlerT<DataCollection>
-    >
-    ? {
-        [K in keyof DataCollectionRecord]: K extends HandlerType<HandlerT>
-          ? DataCollectionRecord[K] extends infer G extends HandlerDataGroup<
-              HandlerT,
-              any
-            >
-            ? HandlerDataGroup<
-                HandlerT,
-                GroupAddHandlerDataGroup<HandlerT, G, DataGroup>
-              >
-            : never
-          : DataCollectionRecord[K];
-      } extends infer R extends BaseHandlerDataCollectionRecord<
-        HandlerDataCollectionHandlerT<DataCollection>
-      >
-      ? R
-      : never
-    : never;
+  DataGroup extends HandlerDataGroup<any, any>,
+> = AddHandlerDataGroupCollectionRecord<
+  HandlerDataCollectionHandlerT<DataCollection>,
+  HandlerDataGroupHandlerT<DataGroup>,
+  HandlerDataCollectionHandlerDataCollectionRecord<DataCollection>,
+  HandlerDataGroupHandlerDataGroupRecord<DataGroup> extends infer R extends
+    BaseHandlerDataGroupRecord<HandlerDataGroupHandlerT<DataGroup>>
+    ? R
+    : never
+>;
 
 export const addGroup =
   <
@@ -201,7 +229,7 @@ export const addGroup =
   ) =>
     new HandlerDataCollection<
       HandlerDataCollectionHandlerT<C>,
-      AddHandlerDataGroup<HandlerT, C, DataGroup>
+      AddHandlerDataGroup<C, DataGroup>
     >(
       Struct.evolve(handlerDataCollection, {
         record: (record) =>
@@ -213,67 +241,62 @@ export const addGroup =
             (group: HandlerDataGroup<HandlerT, any>) =>
               pipe(
                 group,
-                groupAddHandlerDataGroup<HandlerT, DataGroup>(dataGroup),
+                groupAddHandlerDataGroup(
+                  dataGroup as unknown as HandlerDataGroup<
+                    HandlerDataGroupHandlerT<typeof group>,
+                    any
+                  >,
+                ),
               ),
-          ) as unknown as AddHandlerDataGroup<HandlerT, C, DataGroup>,
+          ) as StoredHandlerDataCollectionRecord<
+            HandlerDataCollectionHandlerT<C>,
+            AddHandlerDataGroup<C, DataGroup>
+          >,
       }),
     );
+
+// Helper type to merge two HandlerDataCollectionRecords
+export type AddHandlerDataCollectionCollectionRecord<
+  ThisHandlerT extends BaseHandlerT,
+  OtherHandlerT extends BaseHandlerT,
+  ThisRecord extends BaseHandlerDataCollectionRecord<ThisHandlerT>,
+  OtherRecord extends BaseHandlerDataCollectionRecord<OtherHandlerT>,
+> = {
+  [HT in
+    | ThisHandlerT
+    | OtherHandlerT as HandlerType<HT>]: GroupAddHandlerDataGroupRecord<
+    HT,
+    ThisRecord[HandlerType<HT>] extends infer G extends
+      BaseHandlerDataGroupRecord<HT>
+      ? G
+      : {},
+    OtherRecord[HandlerType<HT>] extends infer G extends
+      BaseHandlerDataGroupRecord<HT>
+      ? G
+      : {}
+  >;
+};
 
 export type AddHandlerDataCollection<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ThisDataCollection extends HandlerDataCollection<any, any>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   OtherDataCollection extends HandlerDataCollection<any, any>,
-> =
-  HandlerDataCollectionHandlerDataCollectionRecord<ThisDataCollection> extends infer ThisDataCollectionRecord extends
-    BaseHandlerDataCollectionRecord<
-      HandlerDataCollectionHandlerT<ThisDataCollection>
-    >
-    ? HandlerDataCollectionHandlerDataCollectionRecord<OtherDataCollection> extends infer OtherDataCollectionRecord extends
-        BaseHandlerDataCollectionRecord<
-          HandlerDataCollectionHandlerT<OtherDataCollection>
-        >
-      ? {
-          [HT in
-            | HandlerDataCollectionHandlerT<ThisDataCollection>
-            | HandlerDataCollectionHandlerT<OtherDataCollection> as HandlerType<HT>]: HandlerDataGroup<
-            HT,
-            GroupAddHandlerDataGroup<
-              HT,
-              HandlerType<HT> extends infer T extends
-                keyof ThisDataCollectionRecord
-                ? ThisDataCollectionRecord[T] extends infer G extends
-                    HandlerDataGroup<HT, any>
-                  ? G
-                  : never
-                : HandlerDataGroup<HT, {}>,
-              HandlerType<HT> extends infer T extends
-                keyof OtherDataCollectionRecord
-                ? OtherDataCollectionRecord[T] extends infer G extends
-                    HandlerDataGroup<HT, any>
-                  ? G
-                  : never
-                : HandlerDataGroup<HT, {}>
-            >
-          >;
-        } extends infer R extends BaseHandlerDataCollectionRecord<
-          | HandlerDataCollectionHandlerT<ThisDataCollection>
-          | HandlerDataCollectionHandlerT<OtherDataCollection>
-        >
-        ? R
-        : never
-      : never
-    : never;
+> = AddHandlerDataCollectionCollectionRecord<
+  HandlerDataCollectionHandlerT<ThisDataCollection>,
+  HandlerDataCollectionHandlerT<OtherDataCollection>,
+  HandlerDataCollectionHandlerDataCollectionRecord<ThisDataCollection>,
+  HandlerDataCollectionHandlerDataCollectionRecord<OtherDataCollection>
+>;
 
 export const addCollection =
-  <
-    const ThisC extends HandlerDataCollection<any, any>,
-    const OtherC extends HandlerDataCollection<any, any>,
-  >(
+  <const OtherC extends HandlerDataCollection<any, any>>(
     otherCollection: OtherC,
   ) =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (thisCollection: ThisC) =>
+  <const ThisC extends HandlerDataCollection<any, any>>(
+    thisCollection: ThisC,
+  ) =>
     new HandlerDataCollection<
       | HandlerDataCollectionHandlerT<ThisC>
       | HandlerDataCollectionHandlerT<OtherC>,
@@ -287,21 +310,52 @@ export const addCollection =
               thisGroup: HandlerDataGroup<any, any>,
               otherGroup: HandlerDataGroup<any, any>,
             ) => pipe(thisGroup, groupAddHandlerDataGroup(otherGroup)),
-          )(record) as AddHandlerDataCollection<ThisC, OtherC>,
+          )(record) as StoredHandlerDataCollectionRecord<
+            | HandlerDataCollectionHandlerT<ThisC>
+            | HandlerDataCollectionHandlerT<OtherC>,
+            AddHandlerDataCollection<ThisC, OtherC>
+          >,
         // TODO: figure out how to merge type getters.
         // currently in the downstream packages all instances of type getters are the same.
       }),
     );
+
+export type HandlerTOfType<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  C extends HandlerDataCollection<any, any>,
+  Type extends keyof HandlerDataCollectionHandlerDataCollectionRecord<C> &
+    (string | symbol),
+> =
+  HandlerDataCollectionHandlerT<C> extends infer HT extends BaseHandlerT
+    ? HandlerType<HT> extends Type
+      ? HT
+      : never
+    : never;
+
+export type HandlerDataGroupRecordOfHandlerT<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  C extends HandlerDataCollection<any, any>,
+  HandlerT extends BaseHandlerT,
+> = HandlerDataCollectionHandlerDataCollectionRecord<C>[HandlerType<HandlerT>] extends infer G extends
+  BaseHandlerDataGroupRecord<HandlerT>
+  ? G
+  : never;
+
+export type GetHandlerDataGroupOfHandlerT<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  C extends HandlerDataCollection<any, any>,
+  HandlerT extends BaseHandlerT,
+> = HandlerDataGroup<HandlerT, HandlerDataGroupRecordOfHandlerT<C, HandlerT>>;
 
 export type GetHandlerDataGroup<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   C extends HandlerDataCollection<any, any>,
   Type extends keyof HandlerDataCollectionHandlerDataCollectionRecord<C> &
     (string | symbol),
-> = HandlerDataCollectionHandlerDataCollectionRecord<C>[Type] extends infer G extends
-  HandlerDataGroup<any, any>
-  ? G
-  : never;
+> = HandlerDataGroup<
+  HandlerTOfType<C, Type>,
+  HandlerDataGroupRecordOfHandlerT<C, HandlerTOfType<C, Type>>
+>;
 
 export const getHandlerDataGroup =
   <

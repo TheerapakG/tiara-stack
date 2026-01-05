@@ -17,15 +17,20 @@ export const add =
     handlerData: HData,
   ) =>
   <const G extends MutationHandlerDataGroup>(handlerDataGroup: G) =>
-    pipe(
-      handlerDataGroup,
-      Data.Group.add<MutationHandlerT, HData>(handlerData),
-    );
+    pipe(handlerDataGroup, Data.Group.add<G, HData>(handlerData));
 
 export const addGroup =
-  <const OtherG extends MutationHandlerDataGroup>(otherGroup: OtherG) =>
-  <const ThisG extends MutationHandlerDataGroup>(thisGroup: ThisG) =>
-    pipe(otherGroup, Data.Group.addGroup<MutationHandlerT, ThisG>(thisGroup));
+  <
+    const ThisG extends MutationHandlerDataGroup,
+    const OtherG extends Data.Group.HandlerDataGroup<
+      Data.Group.HandlerDataGroupHandlerT<ThisG>,
+      any
+    >,
+  >(
+    otherGroup: OtherG,
+  ) =>
+  (thisGroup: ThisG) =>
+    pipe(thisGroup, Data.Group.addGroup<ThisG, OtherG>(otherGroup));
 
 export type GetHandlerDataGroupRecord<G extends MutationHandlerDataGroup> =
   Data.Group.HandlerDataGroupHandlerDataGroupRecord<G>;

@@ -9,7 +9,6 @@ export type BaseHandlerDataGroupRecord<HandlerT extends BaseHandlerT> = Record<
   string,
   HandlerData<HandlerT>
 >;
-
 export const HandlerDataGroupTypeId = Symbol(
   "Typhoon/Handler/HandlerDataGroupTypeId",
 );
@@ -68,7 +67,7 @@ export type HandlerDataGroupHandlerDataGroupRecord<
   Types.Invariant.Type<
     G[HandlerDataGroupTypeId]["_HandlerDataGroupRecord"]
   > extends infer R extends BaseHandlerDataGroupRecord<
-    Types.Invariant.Type<G[HandlerDataGroupTypeId]["_HandlerT"]>
+    HandlerDataGroupHandlerT<G>
   >
     ? R
     : never;
@@ -81,34 +80,37 @@ export const empty = <HandlerT extends BaseHandlerT>(
     dataKeyGetter,
   });
 
-export type AddHandlerData<
+// Helper type to add a single data to a HandlerDataGroupRecord
+export type AddHandlerDataGroupRecord<
   HandlerT extends BaseHandlerT,
-  DataGroup extends HandlerDataGroup<HandlerT, any>,
+  Record extends BaseHandlerDataGroupRecord<HandlerT>,
   HData extends HandlerData<HandlerT>,
-> =
-  HandlerDataGroupHandlerDataGroupRecord<DataGroup> extends infer DataGroupRecord extends
-    BaseHandlerDataGroupRecord<HandlerT>
-    ? {
-        [K in
-          | keyof DataGroupRecord
-          | (HandlerDataKey<HandlerT, HData> &
-              (string | symbol))]: K extends keyof DataGroupRecord
-          ? DataGroupRecord[K]
-          : HData;
-      }
-    : never;
+> = {
+  [K in
+    | keyof Record
+    | (HandlerDataKey<HandlerT, HData> &
+        (string | symbol))]: K extends keyof Record ? Record[K] : HData;
+};
+
+export type AddHandlerData<
+  DataGroup extends HandlerDataGroup<any, any>,
+  HData extends HandlerData<HandlerDataGroupHandlerT<DataGroup>>,
+> = AddHandlerDataGroupRecord<
+  HandlerDataGroupHandlerT<DataGroup>,
+  HandlerDataGroupHandlerDataGroupRecord<DataGroup>,
+  HData
+>;
 
 export const add =
-  <HandlerT extends BaseHandlerT, const HData extends HandlerData<HandlerT>>(
+  <
+    const G extends HandlerDataGroup<any, any>,
+    const HData extends HandlerData<HandlerT>,
+    HandlerT extends HandlerDataGroupHandlerT<G> = HandlerDataGroupHandlerT<G>,
+  >(
     data: HData,
   ) =>
-  <
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const G extends HandlerDataGroup<HandlerT, any>,
-  >(
-    handlerDataGroup: G,
-  ) =>
-    new HandlerDataGroup<HandlerT, AddHandlerData<HandlerT, G, HData>>(
+  (handlerDataGroup: G) =>
+    new HandlerDataGroup<HandlerT, AddHandlerData<G, HData>>(
       Struct.evolve(handlerDataGroup, {
         record: (record) =>
           Record.set(
@@ -119,51 +121,59 @@ export const add =
             > &
               (string | symbol),
             data,
-          ) as AddHandlerData<HandlerT, G, HData>,
+          ) as AddHandlerData<G, HData>,
       }),
     );
 
-export type AddHandlerDataGroup<
+// Helper type to merge two HandlerDataGroupRecords
+export type AddHandlerDataGroupGroupRecord<
   HandlerT extends BaseHandlerT,
-  ThisDataGroup extends HandlerDataGroup<HandlerT, any>,
-  OtherDataGroup extends HandlerDataGroup<HandlerT, any>,
-> =
-  HandlerDataGroupHandlerDataGroupRecord<ThisDataGroup> extends infer ThisDataGroupRecord extends
-    BaseHandlerDataGroupRecord<HandlerT>
-    ? HandlerDataGroupHandlerDataGroupRecord<OtherDataGroup> extends infer OtherDataGroupRecord extends
-        BaseHandlerDataGroupRecord<HandlerT>
-      ? {
-          [K in
-            | keyof ThisDataGroupRecord
-            | keyof OtherDataGroupRecord]: K extends keyof ThisDataGroupRecord
-            ? ThisDataGroupRecord[K]
-            : K extends keyof OtherDataGroupRecord
-              ? OtherDataGroupRecord[K]
-              : never;
-        }
-      : never
-    : never;
+  ThisRecord extends BaseHandlerDataGroupRecord<HandlerT>,
+  OtherRecord extends BaseHandlerDataGroupRecord<HandlerT>,
+> = {
+  [K in keyof ThisRecord | keyof OtherRecord]: K extends keyof ThisRecord
+    ? ThisRecord[K]
+    : K extends keyof OtherRecord
+      ? OtherRecord[K]
+      : never;
+};
+
+export type AddHandlerDataGroup<
+  ThisDataGroup extends HandlerDataGroup<any, any>,
+  OtherDataGroup extends HandlerDataGroup<
+    HandlerDataGroupHandlerT<ThisDataGroup>,
+    any
+  >,
+> = AddHandlerDataGroupGroupRecord<
+  HandlerDataGroupHandlerT<ThisDataGroup>,
+  HandlerDataGroupHandlerDataGroupRecord<ThisDataGroup>,
+  HandlerDataGroupHandlerDataGroupRecord<OtherDataGroup> extends infer R extends
+    BaseHandlerDataGroupRecord<HandlerDataGroupHandlerT<ThisDataGroup>>
+    ? R
+    : never
+>;
 
 export const addGroup =
   <
-    HandlerT extends BaseHandlerT,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const OtherG extends HandlerDataGroup<HandlerT, any>,
+    const ThisG extends HandlerDataGroup<any, any>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const OtherG extends HandlerDataGroup<HandlerDataGroupHandlerT<ThisG>, any>,
   >(
     otherGroup: OtherG,
   ) =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  <const ThisG extends HandlerDataGroup<HandlerT, any>>(thisGroup: ThisG) =>
+  (thisGroup: ThisG) =>
     new HandlerDataGroup<
-      HandlerT,
-      AddHandlerDataGroup<HandlerT, ThisG, OtherG>
+      HandlerDataGroupHandlerT<ThisG>,
+      AddHandlerDataGroup<ThisG, OtherG>
     >(
       Struct.evolve(thisGroup, {
         record: (record) =>
           Record.union(
             otherGroup.record,
             (data) => data,
-          )(record) as AddHandlerDataGroup<HandlerT, ThisG, OtherG>,
+          )(record) as AddHandlerDataGroup<ThisG, OtherG>,
       }),
     );
 

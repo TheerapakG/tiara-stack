@@ -55,7 +55,12 @@ export class PartialHandlerContext<
 export type PartialHandlerContextHandlerT<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Config extends PartialHandlerContext<any>,
-> = Types.Invariant.Type<Config[PartialHandlerContextTypeId]["_HandlerT"]>;
+> =
+  Types.Invariant.Type<
+    Config[PartialHandlerContextTypeId]["_HandlerT"]
+  > extends infer HT extends BaseHandlerT
+    ? HT
+    : never;
 
 export type HandlerContext<
   HandlerT extends BaseHandlerT,

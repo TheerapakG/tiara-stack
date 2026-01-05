@@ -222,7 +222,10 @@ export const create = <R = never>(serveFn: typeof crosswsServe) =>
       () => ({
         traceProvider: Effect.succeed(Layer.empty),
         handlerContextCollection: Effect.succeed(
-          HandlerContextCore.CollectionWithMetrics.make(
+          HandlerContextCore.CollectionWithMetrics.make<
+            MutationHandlerT | SubscriptionHandlerT,
+            R
+          >(
             (
               context:
                 | HandlerContextCore.HandlerContext<MutationHandlerT>
@@ -365,6 +368,7 @@ export const addCollection =
     C extends HandlerContext.Collection.HandlerContextCollection<
       MutationHandlerT | SubscriptionHandlerT,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      any,
       any
     >,
   >(

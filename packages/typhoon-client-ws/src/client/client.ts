@@ -24,7 +24,12 @@ import {
   ValidationError,
 } from "typhoon-core/error";
 import { Handler } from "typhoon-core/server";
-import { Data as HandlerData } from "typhoon-server/handler";
+import { Data as CoreData } from "typhoon-core/handler";
+import {
+  Data as HandlerData,
+  type Subscription,
+  type Mutation,
+} from "typhoon-server/handler";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import {
   DependencySignal,
@@ -349,14 +354,23 @@ export class WebSocketClient<
     const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
     const H extends
       keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
-        HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">
+        HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+          Collection,
+          Subscription.Type.SubscriptionHandlerT
+        >
       > &
         string,
     HData extends HandlerData.Group.Subscription.GetHandlerData<
-      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">,
+      HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+        Collection,
+        Subscription.Type.SubscriptionHandlerT
+      >,
       H
     > = HandlerData.Group.Subscription.GetHandlerData<
-      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">,
+      HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+        Collection,
+        Subscription.Type.SubscriptionHandlerT
+      >,
       H
     >,
   >(
@@ -371,15 +385,25 @@ export class WebSocketClient<
   ) {
     return pipe(
       Effect.Do,
-      Effect.let("config", () =>
+      Effect.let(
+        "handlerDataGroup",
+        () =>
+          pipe(
+            client.handlerDataCollection,
+            HandlerData.Collection.getHandlerDataGroup("subscription"),
+            Option.getOrThrowWith(() =>
+              MissingRpcConfigError.make({
+                message: `Failed to get handler config for ${handler}`,
+              }),
+            ),
+          ) as unknown as CoreData.Collection.GetHandlerDataGroupOfHandlerT<
+            Collection,
+            Subscription.Type.SubscriptionHandlerT
+          >,
+      ),
+      Effect.let("config", ({ handlerDataGroup }) =>
         pipe(
-          client.handlerDataCollection,
-          HandlerData.Collection.getHandlerDataGroup("subscription"),
-          Option.getOrThrowWith(() =>
-            MissingRpcConfigError.make({
-              message: `Failed to get handler config for ${handler}`,
-            }),
-          ),
+          handlerDataGroup,
           HandlerData.Group.Subscription.getHandlerData(handler),
           Option.getOrThrowWith(() =>
             MissingRpcConfigError.make({
@@ -537,14 +561,23 @@ export class WebSocketClient<
     const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
     const H extends
       keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
-        HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">
+        HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+          Collection,
+          Subscription.Type.SubscriptionHandlerT
+        >
       > &
         string,
     HData extends HandlerData.Group.Subscription.GetHandlerData<
-      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">,
+      HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+        Collection,
+        Subscription.Type.SubscriptionHandlerT
+      >,
       H
     > = HandlerData.Group.Subscription.GetHandlerData<
-      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">,
+      HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+        Collection,
+        Subscription.Type.SubscriptionHandlerT
+      >,
       H
     >,
   >(
@@ -580,7 +613,10 @@ export class WebSocketClient<
     const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
     const H extends
       keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
-        HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">
+        HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+          Collection,
+          Subscription.Type.SubscriptionHandlerT
+        >
       > &
         string,
   >(client: WebSocketClient<Collection>, id: string, handler: H) {
@@ -635,14 +671,23 @@ export class WebSocketClient<
     const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
     const H extends
       keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
-        HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">
+        HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+          Collection,
+          Subscription.Type.SubscriptionHandlerT
+        >
       > &
         string,
     HData extends HandlerData.Group.Subscription.GetHandlerData<
-      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">,
+      HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+        Collection,
+        Subscription.Type.SubscriptionHandlerT
+      >,
       H
     > = HandlerData.Group.Subscription.GetHandlerData<
-      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">,
+      HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+        Collection,
+        Subscription.Type.SubscriptionHandlerT
+      >,
       H
     >,
   >(
@@ -657,15 +702,25 @@ export class WebSocketClient<
   ) {
     return pipe(
       Effect.Do,
-      Effect.let("config", () =>
+      Effect.let(
+        "handlerDataGroup",
+        () =>
+          pipe(
+            client.handlerDataCollection,
+            HandlerData.Collection.getHandlerDataGroup("subscription"),
+            Option.getOrThrowWith(() =>
+              MissingRpcConfigError.make({
+                message: `Failed to get handler config for ${handler}`,
+              }),
+            ),
+          ) as unknown as CoreData.Collection.GetHandlerDataGroupOfHandlerT<
+            Collection,
+            Subscription.Type.SubscriptionHandlerT
+          >,
+      ),
+      Effect.let("config", ({ handlerDataGroup }) =>
         pipe(
-          client.handlerDataCollection,
-          HandlerData.Collection.getHandlerDataGroup("subscription"),
-          Option.getOrThrowWith(() =>
-            MissingRpcConfigError.make({
-              message: `Failed to get handler config for ${handler}`,
-            }),
-          ),
+          handlerDataGroup,
           HandlerData.Group.Subscription.getHandlerData(handler),
           Option.getOrThrowWith(() =>
             MissingRpcConfigError.make({
@@ -804,14 +859,23 @@ export class WebSocketClient<
   static mutate<
     const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
     const H extends keyof HandlerData.Group.Mutation.GetHandlerDataGroupRecord<
-      HandlerData.Collection.GetHandlerDataGroup<Collection, "mutation">
+      HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+        Collection,
+        Mutation.Type.MutationHandlerT
+      >
     > &
       string,
     HData extends HandlerData.Group.Mutation.GetHandlerData<
-      HandlerData.Collection.GetHandlerDataGroup<Collection, "mutation">,
+      HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+        Collection,
+        Mutation.Type.MutationHandlerT
+      >,
       H
     > = HandlerData.Group.Mutation.GetHandlerData<
-      HandlerData.Collection.GetHandlerDataGroup<Collection, "mutation">,
+      HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+        Collection,
+        Mutation.Type.MutationHandlerT
+      >,
       H
     >,
   >(
@@ -826,15 +890,25 @@ export class WebSocketClient<
   ) {
     return pipe(
       Effect.Do,
-      Effect.let("config", () =>
+      Effect.let(
+        "handlerDataGroup",
+        () =>
+          pipe(
+            client.handlerDataCollection,
+            HandlerData.Collection.getHandlerDataGroup("mutation"),
+            Option.getOrThrowWith(() =>
+              MissingRpcConfigError.make({
+                message: `Failed to get handler config for ${handler}`,
+              }),
+            ),
+          ) as unknown as CoreData.Collection.GetHandlerDataGroupOfHandlerT<
+            Collection,
+            Mutation.Type.MutationHandlerT
+          >,
+      ),
+      Effect.let("config", ({ handlerDataGroup }) =>
         pipe(
-          client.handlerDataCollection,
-          HandlerData.Collection.getHandlerDataGroup("mutation"),
-          Option.getOrThrowWith(() =>
-            MissingRpcConfigError.make({
-              message: `Failed to get handler config for ${handler}`,
-            }),
-          ),
+          handlerDataGroup,
           HandlerData.Group.Mutation.getHandlerData(handler),
           Option.getOrThrowWith(() =>
             MissingRpcConfigError.make({

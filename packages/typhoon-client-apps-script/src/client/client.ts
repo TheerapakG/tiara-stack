@@ -11,7 +11,7 @@ import {
 } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Data as CoreData } from "typhoon-core/handler";
-import { Data as HandlerData } from "typhoon-server/handler";
+import { Data as HandlerData, type Subscription } from "typhoon-server/handler";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { Validate, Validator } from "typhoon-core/validator";
 import { MissingRpcConfigError, RpcError } from "typhoon-core/error";
@@ -71,17 +71,26 @@ export class AppsScriptClient<
       );
 
   static once<
-    const Collection extends
-      HandlerData.Collection.HandlerDataCollection<HandlerData.Collection.BaseHandlerDataCollectionRecord>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
     H extends keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
-      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">
+      HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+        Collection,
+        Subscription.Type.SubscriptionHandlerT
+      >
     > &
       string,
     HData extends HandlerData.Group.Subscription.GetHandlerData<
-      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">,
+      HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+        Collection,
+        Subscription.Type.SubscriptionHandlerT
+      >,
       H
     > = HandlerData.Group.Subscription.GetHandlerData<
-      HandlerData.Collection.GetHandlerDataGroup<Collection, "subscription">,
+      HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+        Collection,
+        Subscription.Type.SubscriptionHandlerT
+      >,
       H
     >,
   >(
@@ -96,15 +105,25 @@ export class AppsScriptClient<
   ) {
     return pipe(
       Effect.Do,
-      Effect.let("config", () =>
+      Effect.let(
+        "handlerDataGroup",
+        () =>
+          pipe(
+            client.handlerDataCollection,
+            HandlerData.Collection.getHandlerDataGroup("subscription"),
+            Option.getOrThrowWith(() =>
+              MissingRpcConfigError.make({
+                message: `Failed to get handler config for ${handler}`,
+              }),
+            ),
+          ) as unknown as CoreData.Collection.GetHandlerDataGroupOfHandlerT<
+            Collection,
+            Subscription.Type.SubscriptionHandlerT
+          >,
+      ),
+      Effect.let("config", ({ handlerDataGroup }) =>
         pipe(
-          client.handlerDataCollection,
-          HandlerData.Collection.getHandlerDataGroup("subscription"),
-          Option.getOrThrowWith(() =>
-            MissingRpcConfigError.make({
-              message: `Failed to get handler config for ${handler}`,
-            }),
-          ),
+          handlerDataGroup,
           HandlerData.Group.Subscription.getHandlerData(handler),
           Option.getOrThrowWith(() =>
             MissingRpcConfigError.make({

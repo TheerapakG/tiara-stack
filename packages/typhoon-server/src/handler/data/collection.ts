@@ -96,8 +96,13 @@ export const addCollection =
   <const ThisC extends HandlerDataCollection>(handlerDataCollection: ThisC) =>
     pipe(
       handlerDataCollection,
-      Data.Collection.addCollection<ThisC, OtherC>(otherCollection),
+      Data.Collection.addCollection<OtherC>(otherCollection),
     );
+
+export type GetHandlerDataGroupOfHandlerT<
+  C extends HandlerDataCollection,
+  HandlerT extends MutationHandlerT | SubscriptionHandlerT,
+> = Data.Collection.GetHandlerDataGroupOfHandlerT<C, HandlerT>;
 
 export type GetHandlerDataGroup<
   C extends HandlerDataCollection,

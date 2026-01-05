@@ -38,7 +38,7 @@ type HandlerContextGroupWithMetricsObject<
   HandlerT extends BaseHandlerT,
   R = never,
 > = {
-  group: HandlerContextGroup<HandlerT, R>;
+  group: HandlerContextGroup<HandlerT, R, any>;
   handlerType: HandlerType<HandlerT>;
   handlerCount: Metric.Metric.Counter<bigint>;
 };
@@ -94,7 +94,7 @@ export type HandlerContextGroupWithMetricsContext<
 
 export const make = <HandlerT extends BaseHandlerT, R = never>(
   handlerType: HandlerType<HandlerT>,
-  group: HandlerContextGroup<HandlerT, R>,
+  group: HandlerContextGroup<HandlerT, R, any>,
 ): HandlerContextGroupWithMetrics<HandlerT, R> =>
   new HandlerContextGroupWithMetrics({
     group,
@@ -176,50 +176,60 @@ export const execute =
     );
 
 export const add =
-  <
-    const Config extends HandlerContext<any>,
-    HandlerT extends
-      PartialHandlerContextHandlerT<Config> = PartialHandlerContextHandlerT<Config>,
-  >(
-    handlerContextConfig: Config,
-  ) =>
+  <const Config extends HandlerContext<any>>(handlerContextConfig: Config) =>
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const G extends HandlerContextGroupWithMetrics<HandlerT, any>,
+    const G extends HandlerContextGroupWithMetrics<
+      PartialHandlerContextHandlerT<Config>,
+      any
+    >,
   >(
     groupWithMetrics: G,
   ) =>
     new HandlerContextGroupWithMetrics<
-      HandlerT,
+      PartialHandlerContextHandlerT<Config>,
       | HandlerContextGroupWithMetricsContext<G>
-      | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>
+      | HandlerEffectContext<
+          PartialHandlerContextHandlerT<Config>,
+          HandlerOrUndefined<Config>
+        >
     >(
       Struct.evolve(groupWithMetrics, {
-        group: addHandlerContextGroup(handlerContextConfig),
-      }),
+        group: (group) =>
+          pipe(group, addHandlerContextGroup(handlerContextConfig)),
+      }) as HandlerContextGroupWithMetricsObject<
+        PartialHandlerContextHandlerT<Config>,
+        any
+      >,
     );
 
 export const addGroup =
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const OtherG extends HandlerContextGroup<any, any>,
-    HandlerT extends
-      HandlerContextGroupHandlerT<OtherG> = HandlerContextGroupHandlerT<OtherG>,
+    const OtherG extends HandlerContextGroup<any, any, any>,
   >(
     otherGroup: OtherG,
   ) =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  <const ThisG extends HandlerContextGroupWithMetrics<HandlerT, any>>(
+  <
+    const ThisG extends HandlerContextGroupWithMetrics<
+      HandlerContextGroupHandlerT<OtherG>,
+      any
+    >,
+  >(
     thisGroupWithMetrics: ThisG,
   ) =>
     new HandlerContextGroupWithMetrics<
-      HandlerT,
+      HandlerContextGroupHandlerT<OtherG>,
       | HandlerContextGroupWithMetricsContext<ThisG>
       | HandlerContextGroupContext<OtherG>
     >(
       Struct.evolve(thisGroupWithMetrics, {
         group: addGroupHandlerContextGroup(otherGroup),
-      }),
+      }) as HandlerContextGroupWithMetricsObject<
+        HandlerContextGroupHandlerT<OtherG>,
+        any
+      >,
     );
 
 export const initialize = <HandlerT extends BaseHandlerT, R = never>(

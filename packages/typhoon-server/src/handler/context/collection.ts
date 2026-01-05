@@ -1,13 +1,19 @@
 import { Match, Option, pipe } from "effect";
+import { Data as CoreData, Context, type Type } from "typhoon-core/handler";
 import { Handler } from "typhoon-core/server";
-import { Context, type Type } from "typhoon-core/handler";
 import { type MutationHandlerT } from "../mutation/type";
 import { type SubscriptionHandlerT } from "../subscription/type";
+
+export const HandlerDataGroupTypeId =
+  CoreData.Collection.HandlerDataCollectionTypeId;
+export const HandlerDataCollectionTypeId =
+  CoreData.Collection.HandlerDataCollectionTypeId;
 
 export type HandlerContextCollection<R = never> =
   Context.Collection.HandlerContextCollection<
     MutationHandlerT | SubscriptionHandlerT,
-    R
+    R,
+    any
   >;
 
 export const empty = <R = never>() =>
@@ -34,13 +40,19 @@ export const add =
   >(
     handlerContext: Config,
   ) =>
-  <R = never>(handlerContextCollection: HandlerContextCollection<R>) =>
-    Context.Collection.add(handlerContext)(handlerContextCollection);
+  <Collection extends HandlerContextCollection<any>>(
+    handlerContextCollection: Collection,
+  ) =>
+    pipe(handlerContextCollection, Context.Collection.add(handlerContext));
 
 export const addCollection =
-  <OtherR = never>(otherCollection: HandlerContextCollection<OtherR>) =>
-  <ThisR = never>(thisCollection: HandlerContextCollection<ThisR>) =>
-    Context.Collection.addCollection(otherCollection)(thisCollection);
+  <OtherCollection extends HandlerContextCollection<any>>(
+    otherCollection: OtherCollection,
+  ) =>
+  <ThisCollection extends HandlerContextCollection<any>>(
+    thisCollection: ThisCollection,
+  ) =>
+    pipe(thisCollection, Context.Collection.addCollection(otherCollection));
 
 export const getHandlerContext =
   <HandlerT extends MutationHandlerT | SubscriptionHandlerT>(

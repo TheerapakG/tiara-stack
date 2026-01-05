@@ -33,7 +33,6 @@ import {
   add as addHandlerContextGroupWithMetrics,
   addGroup as addGroupHandlerContextGroupWithMetrics,
 } from "./groupWithMetrics";
-import { HandlerContextGroup } from "./group";
 import type {
   HandlerContext,
   PartialHandlerContextHandlerT,
@@ -57,8 +56,8 @@ type HandlerDataKeyTransformerStruct<HandlerT extends BaseHandlerT> = {
 };
 
 type HandlerContextTypeTransformer<HandlerT extends BaseHandlerT> = (
-  handlerContext: HandlerT extends HandlerT
-    ? HandlerContext<HandlerT, HandlerData<HandlerT>, Handler<HandlerT>>
+  handlerContext: HandlerT extends infer HT extends BaseHandlerT
+    ? HandlerContext<HT, HandlerData<HT>, Handler<HT>>
     : never,
 ) => HandlerType<HandlerT>;
 
@@ -126,15 +125,13 @@ export type HandlerContextCollectionWithMetricsContext<
 
 export const make = <HandlerT extends BaseHandlerT, R = never>(
   handlerContextTypeTransformer: HandlerContextTypeTransformer<HandlerT>,
-  collection: HandlerContextCollection<HandlerT, R>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  collection: HandlerContextCollection<HandlerT, R, any>,
 ): HandlerContextCollectionWithMetrics<HandlerT, R> =>
   new HandlerContextCollectionWithMetrics({
     record: Record.mapEntries(collection.record, (group, type) => [
       type,
-      makeHandlerContextGroupWithMetrics(
-        type as HandlerType<HandlerT>,
-        group as unknown as HandlerContextGroup<HandlerT, R>,
-      ),
+      makeHandlerContextGroupWithMetrics(type, group),
     ]) as unknown as HandlerContextGroupWithMetricsRecord<HandlerT, R>,
     handlerContextTypeTransformer,
   });
@@ -178,15 +175,11 @@ export const add =
             record,
             collectionWithMetrics.handlerContextTypeTransformer(
               handlerContextConfig,
-            ),
-            (
-              groupWithMetrics: HandlerContextGroupWithMetricsType<
-                HandlerT,
-                HandlerContextCollectionWithMetricsContext<C>
-              >,
-            ) =>
-              addHandlerContextGroupWithMetrics(handlerContextConfig)(
+            ) as HandlerType<HandlerT>,
+            (groupWithMetrics) =>
+              pipe(
                 groupWithMetrics,
+                addHandlerContextGroupWithMetrics(handlerContextConfig),
               ),
           ) as HandlerContextGroupWithMetricsRecord<
             CollectionHandlerT,
@@ -202,7 +195,7 @@ export const add =
 export const addCollection =
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const OtherC extends HandlerContextCollection<any, any>,
+    const OtherC extends HandlerContextCollection<any, any, any>,
     HandlerT extends
       HandlerContextCollectionHandlerT<OtherC> = HandlerContextCollectionHandlerT<OtherC>,
   >(
