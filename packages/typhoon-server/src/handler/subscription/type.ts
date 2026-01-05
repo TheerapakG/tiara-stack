@@ -34,7 +34,7 @@ interface TransformUnknown extends HKT.TypeLambda {
   readonly type: unknown;
 }
 
-interface TransformDataKey extends HKT.TypeLambda {
+interface TransformDataKey extends Type.TransformDataKeyTypeLambda {
   readonly type: this["In"] extends infer Config extends SubscriptionData
     ? Handler.Config.NameOrUndefined<Config>
     : never;

@@ -171,9 +171,10 @@ export const addGroup =
       Struct.evolve(thisGroup, {
         record: (record) =>
           Record.union(
+            record,
             otherGroup.record,
             (data) => data,
-          )(record) as AddHandlerDataGroup<ThisG, OtherG>,
+          ) as AddHandlerDataGroup<ThisG, OtherG>,
       }),
     );
 

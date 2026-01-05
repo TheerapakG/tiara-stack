@@ -38,6 +38,7 @@ import type {
   PartialHandlerContextHandlerT,
   HandlerOrUndefined,
 } from "./context";
+import type { HandlerContextGroup } from "./group";
 
 type HandlerContextGroupWithMetricsRecord<
   HandlerT extends BaseHandlerT,
@@ -129,10 +130,12 @@ export const make = <HandlerT extends BaseHandlerT, R = never>(
   collection: HandlerContextCollection<HandlerT, R, any>,
 ): HandlerContextCollectionWithMetrics<HandlerT, R> =>
   new HandlerContextCollectionWithMetrics({
-    record: Record.mapEntries(collection.record, (group, type) => [
-      type,
-      makeHandlerContextGroupWithMetrics(type, group),
-    ]) as unknown as HandlerContextGroupWithMetricsRecord<HandlerT, R>,
+    record: Record.map(collection.record, (group, type) =>
+      makeHandlerContextGroupWithMetrics(
+        type as HandlerType<HandlerT>,
+        group as unknown as HandlerContextGroup<HandlerT, R, any>,
+      ),
+    ) as unknown as HandlerContextGroupWithMetricsRecord<HandlerT, R>,
     handlerContextTypeTransformer,
   });
 

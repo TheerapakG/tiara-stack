@@ -234,12 +234,11 @@ export const addCollection =
       Struct.evolve(thisCollection, {
         record: (record) =>
           Record.union(
+            record,
             otherCollection.record,
-            (
-              thisGroup: HandlerContextGroup<any, any, any>,
-              otherGroup: HandlerContextGroup<any, any, any>,
-            ) => pipe(thisGroup, addGroupHandlerContextGroup(otherGroup)),
-          )(record) as HandlerContextGroupRecord<
+            (thisGroup, otherGroup) =>
+              pipe(thisGroup, addGroupHandlerContextGroup(otherGroup)),
+          ) as HandlerContextGroupRecord<
             ThisHandlerT | OtherHandlerT,
             | HandlerContextCollectionContext<ThisC>
             | HandlerContextCollectionContext<OtherC>

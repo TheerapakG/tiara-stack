@@ -3,12 +3,12 @@ import {
   Effect,
   Either,
   Function,
-  HashMap,
   Metric,
   Option,
   pipe,
   Types,
   Struct,
+  Record,
 } from "effect";
 import type {
   BaseHandlerT,
@@ -236,7 +236,7 @@ export const initialize = <HandlerT extends BaseHandlerT, R = never>(
   groupWithMetrics: HandlerContextGroupWithMetrics<HandlerT, R>,
 ): Effect.Effect<void, never, never> =>
   pipe(
-    HashMap.keys(groupWithMetrics.group.map),
+    Record.keys(groupWithMetrics.group.record),
     Effect.forEach((handlerKey) =>
       pipe(
         ["success", "failure"],

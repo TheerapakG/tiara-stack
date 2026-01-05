@@ -1,4 +1,4 @@
-import { Data, Function, HashMap, Option, Struct, Types } from "effect";
+import { Data, Function, Option, Record, Struct, Types } from "effect";
 import {
   type BaseHandlerT,
   type Handler,
@@ -19,7 +19,7 @@ import {
   type AddHandlerDataGroupGroupRecord,
 } from "../data/group";
 
-type HandlerContextMap<HandlerT extends BaseHandlerT, R> = HashMap.HashMap<
+type HandlerContextGroupRecord<HandlerT extends BaseHandlerT, R> = Record<
   HandlerDataKey<HandlerT, HandlerData<HandlerT>>,
   HandlerContext<
     HandlerT,
@@ -61,7 +61,7 @@ export class HandlerContextGroup<
     HData extends BaseHandlerDataGroupRecord<HandlerT>,
   >
   extends Data.TaggedClass("HandlerContextGroup")<{
-    map: HandlerContextMap<HandlerT, R>;
+    record: HandlerContextGroupRecord<HandlerT, R>;
     dataKeyTransformer: (
       data: HandlerData<HandlerT>,
     ) => HandlerDataKey<HandlerT, HandlerData<HandlerT>>;
@@ -109,7 +109,7 @@ export const empty = <HandlerT extends BaseHandlerT, R = never>(
   ) => HandlerDataKey<HandlerT, HandlerData<HandlerT>>,
 ) =>
   new HandlerContextGroup<HandlerT, R, {}>({
-    map: HashMap.empty(),
+    record: {},
     dataKeyTransformer,
   });
 
@@ -145,9 +145,9 @@ export const add =
       >
     >(
       Struct.evolve(handlerContextGroup, {
-        map: (map) =>
-          HashMap.set(
-            map,
+        record: (record) =>
+          Record.set(
+            record,
             handlerContextGroup.dataKeyTransformer(data(handlerContextConfig)),
             handlerContextConfig,
           ),
@@ -183,7 +183,16 @@ export const addGroup =
       >
     >(
       Struct.evolve(thisGroup, {
-        map: (map) => HashMap.union(map, otherGroup.map),
+        record: (record) =>
+          Record.union(
+            record,
+            otherGroup.record,
+            (context) => context,
+          ) as HandlerContextGroupRecord<
+            HandlerT,
+            | HandlerContextGroupContext<ThisG>
+            | HandlerContextGroupContext<OtherG>
+          >,
       }),
     );
 
@@ -201,4 +210,4 @@ export const getHandlerContext =
       Handler<HandlerT, unknown, unknown, R>
     >
   > =>
-    HashMap.get(handlerContextGroup.map, key);
+    Record.get(handlerContextGroup.record, key);

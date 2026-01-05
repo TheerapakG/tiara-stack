@@ -59,37 +59,11 @@ export const addMutation =
     pipe(handlerDataCollection, add<MutationHandlerT, HData>(handlerData));
 
 export const addGroup =
-  <
-    HandlerT extends MutationHandlerT | SubscriptionHandlerT,
-    const G extends Data.Group.HandlerDataGroup<HandlerT, any>,
-  >(
+  <const G extends Data.Group.HandlerDataGroup<any, any>>(
     handlerDataGroup: G,
   ) =>
   <const C extends HandlerDataCollection>(handlerDataCollection: C) =>
-    pipe(
-      handlerDataCollection,
-      Data.Collection.addGroup<HandlerT, G>(handlerDataGroup),
-    );
-
-export const addSubscriptionGroup =
-  <const G extends Data.Group.HandlerDataGroup<SubscriptionHandlerT, any>>(
-    handlerDataGroup: G,
-  ) =>
-  <const C extends HandlerDataCollection>(handlerDataCollection: C) =>
-    pipe(
-      handlerDataCollection,
-      addGroup<SubscriptionHandlerT, G>(handlerDataGroup),
-    );
-
-export const addMutationGroup =
-  <const G extends Data.Group.HandlerDataGroup<MutationHandlerT, any>>(
-    handlerDataGroup: G,
-  ) =>
-  <const C extends HandlerDataCollection>(handlerDataCollection: C) =>
-    pipe(
-      handlerDataCollection,
-      addGroup<MutationHandlerT, G>(handlerDataGroup),
-    );
+    pipe(handlerDataCollection, Data.Collection.addGroup<G>(handlerDataGroup));
 
 export const addCollection =
   <const OtherC extends HandlerDataCollection>(otherCollection: OtherC) =>
@@ -106,20 +80,38 @@ export type GetHandlerDataGroupOfHandlerT<
 
 export type GetHandlerDataGroup<
   C extends HandlerDataCollection,
-  Key extends "subscription" | "mutation",
-> = Data.Collection.GetHandlerDataGroup<C, Key>;
+  T extends "mutation" | "subscription",
+> = Data.Collection.GetHandlerDataGroup<
+  C,
+  T extends Type.HandlerType<Data.Collection.HandlerDataCollectionHandlerT<C>>
+    ? T
+    : never
+>;
 
 export const getHandlerDataGroup =
   <
     const C extends HandlerDataCollection,
-    const Type extends "mutation" | "subscription",
+    const T extends "mutation" | "subscription",
   >(
-    type: Type,
+    type: T,
   ) =>
   (handlerDataCollection: C) =>
     pipe(
       handlerDataCollection,
-      Data.Collection.getHandlerDataGroup<C, Type>(type),
+      Data.Collection.getHandlerDataGroup<
+        C,
+        T extends Type.HandlerType<
+          Data.Collection.HandlerDataCollectionHandlerT<C>
+        >
+          ? T
+          : never
+      >(
+        type as T extends Type.HandlerType<
+          Data.Collection.HandlerDataCollectionHandlerT<C>
+        >
+          ? T
+          : never,
+      ),
     );
 
 export const getSubscriptionHandlerDataGroup = <

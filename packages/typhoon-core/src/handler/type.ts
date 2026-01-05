@@ -21,12 +21,27 @@ export type HandlerKind<
     })["type"]
   : never;
 
+export interface TransformDataKeyTypeLambda {
+  readonly In: unknown;
+}
+
+export type TransformDataKeyKind<
+  F extends TransformDataKeyTypeLambda,
+  In,
+> = F extends {
+  readonly type: string | symbol;
+}
+  ? (F & {
+      readonly In: In;
+    })["type"]
+  : never;
+
 export interface BaseHandlerT {
   readonly Type: string;
   readonly Data: unknown;
   readonly Handler: HandlerTypeLambda;
   readonly DefaultHandlerContext: unknown;
-  readonly TransformDataKey: HKT.TypeLambda;
+  readonly TransformDataKey: TransformDataKeyTypeLambda;
   readonly TransformDataSuccessIn: HKT.TypeLambda;
   readonly TransformDataSuccessOut: HKT.TypeLambda;
   readonly TransformDataErrorIn: HKT.TypeLambda;
@@ -37,7 +52,8 @@ export interface BaseHandlerT {
   readonly TransformHandlerContext: HKT.TypeLambda;
 }
 
-export type HandlerType<HandlerT extends BaseHandlerT> = HandlerT["Type"];
+export type HandlerType<HandlerT extends BaseHandlerT> =
+  HandlerT["Type"] extends infer T extends string ? T : never;
 export type HandlerData<HandlerT extends BaseHandlerT> = HandlerT["Data"];
 export type Handler<
   HandlerT extends BaseHandlerT,
@@ -53,9 +69,10 @@ export type HandlerDefaultContext<HandlerT extends BaseHandlerT> =
 export type HandlerDataKey<
   HandlerT extends BaseHandlerT,
   D extends HandlerData<HandlerT>,
-> = HandlerT["TransformDataKey"] extends infer F extends HKT.TypeLambda
+> = HandlerT["TransformDataKey"] extends infer F extends
+  TransformDataKeyTypeLambda
   ? D extends infer DD
-    ? HKT.Kind<F, DD, unknown, unknown, unknown>
+    ? TransformDataKeyKind<F, DD>
     : never
   : never;
 export type HandlerDataSuccessIn<
