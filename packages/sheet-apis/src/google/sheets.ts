@@ -116,9 +116,10 @@ const toNumberSchema = pipe(
   Schema.transform(Schema.String, {
     strict: true,
     decode: flow(
-      matchAll(regex("\\d+", "g")),
-      Array.map((match) => match[0]),
-      Array.join(""),
+      matchAll(regex("\\d+(?:\\.\\d+)?", "g")),
+      Array.head,
+      Option.map((match) => match[0]),
+      Option.getOrElse(() => ""),
     ),
     encode: Function.identity,
   }),
