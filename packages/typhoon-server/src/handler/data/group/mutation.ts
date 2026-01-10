@@ -30,7 +30,7 @@ export const addGroup =
     otherGroup: OtherG,
   ) =>
   (thisGroup: ThisG) =>
-    pipe(thisGroup, Data.Group.addGroup<ThisG, OtherG>(otherGroup));
+    Data.Group.addGroup<ThisG, OtherG>(thisGroup, otherGroup);
 
 export type GetHandlerDataGroupRecord<G extends MutationHandlerDataGroup> =
   Data.Group.HandlerDataGroupHandlerDataGroupRecord<G>;

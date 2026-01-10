@@ -113,32 +113,78 @@ export const empty = <HandlerT extends BaseHandlerT, R = never>(
     dataKeyTransformer,
   });
 
-export const add =
-  <
-    const Config extends HandlerContext<any>,
-    HandlerT extends
-      PartialHandlerContextHandlerT<Config> = PartialHandlerContextHandlerT<Config>,
-  >(
+export const add = Function.dual<
+  <const Config extends HandlerContext<any>>(
     handlerContextConfig: Config,
-  ) =>
-  <
+  ) => <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const G extends HandlerContextGroup<
-      HandlerT,
+      PartialHandlerContextHandlerT<Config>,
       any,
-      BaseHandlerDataGroupRecord<HandlerT>
+      BaseHandlerDataGroupRecord<PartialHandlerContextHandlerT<Config>>
     >,
   >(
     handlerContextGroup: G,
+  ) => HandlerContextGroup<
+    PartialHandlerContextHandlerT<Config>,
+    | HandlerContextGroupContext<G>
+    | HandlerEffectContext<
+        PartialHandlerContextHandlerT<Config>,
+        HandlerOrUndefined<Config>
+      >,
+    AddHandlerDataGroupRecord<
+      PartialHandlerContextHandlerT<Config>,
+      HandlerContextGroupHData<G> extends infer HData extends
+        BaseHandlerDataGroupRecord<PartialHandlerContextHandlerT<Config>>
+        ? HData
+        : never,
+      DataOrUndefined<Config>
+    >
+  >,
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const G extends HandlerContextGroup<any, any, any>,
+    const Config extends HandlerContext<HandlerContextGroupHandlerT<G>>,
+  >(
+    handlerContextGroup: G,
+    handlerContextConfig: Config,
+  ) => HandlerContextGroup<
+    HandlerContextGroupHandlerT<G>,
+    | HandlerContextGroupContext<G>
+    | HandlerEffectContext<
+        HandlerContextGroupHandlerT<G>,
+        HandlerOrUndefined<Config>
+      >,
+    AddHandlerDataGroupRecord<
+      HandlerContextGroupHandlerT<G>,
+      HandlerContextGroupHData<G> extends infer HData extends
+        BaseHandlerDataGroupRecord<PartialHandlerContextHandlerT<Config>>
+        ? HData
+        : never,
+      DataOrUndefined<Config>
+    >
+  >
+>(
+  2,
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const G extends HandlerContextGroup<any, any, any>,
+    const Config extends HandlerContext<HandlerContextGroupHandlerT<G>>,
+  >(
+    handlerContextGroup: G,
+    handlerContextConfig: Config,
   ) =>
     new HandlerContextGroup<
-      HandlerT,
+      HandlerContextGroupHandlerT<G>,
       | HandlerContextGroupContext<G>
-      | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>,
+      | HandlerEffectContext<
+          HandlerContextGroupHandlerT<G>,
+          HandlerOrUndefined<Config>
+        >,
       AddHandlerDataGroupRecord<
-        HandlerT,
+        HandlerContextGroupHandlerT<G>,
         HandlerContextGroupHData<G> extends infer HData extends
-          BaseHandlerDataGroupRecord<HandlerT>
+          BaseHandlerDataGroupRecord<HandlerContextGroupHandlerT<G>>
           ? HData
           : never,
         DataOrUndefined<Config>
@@ -152,32 +198,92 @@ export const add =
             handlerContextConfig,
           ),
       }),
-    );
+    ),
+);
 
-export const addGroup =
+export const addGroup = Function.dual<
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const OtherG extends HandlerContextGroup<any, any, any>,
-    HandlerT extends
-      HandlerContextGroupHandlerT<OtherG> = HandlerContextGroupHandlerT<OtherG>,
   >(
     otherGroup: OtherG,
-  ) =>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  <const ThisG extends HandlerContextGroup<HandlerT, any, any>>(
+  ) => <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ThisG extends HandlerContextGroup<
+      HandlerContextGroupHandlerT<OtherG>,
+      any,
+      any
+    >,
+  >(
     thisGroup: ThisG,
+  ) => HandlerContextGroup<
+    HandlerContextGroupHandlerT<ThisG>,
+    HandlerContextGroupContext<ThisG> | HandlerContextGroupContext<OtherG>,
+    AddHandlerDataGroupGroupRecord<
+      HandlerContextGroupHandlerT<ThisG>,
+      HandlerContextGroupHData<ThisG> extends infer HData extends
+        BaseHandlerDataGroupRecord<HandlerContextGroupHandlerT<ThisG>>
+        ? HData
+        : never,
+      HandlerContextGroupHData<OtherG> extends infer HData extends
+        BaseHandlerDataGroupRecord<HandlerContextGroupHandlerT<ThisG>>
+        ? HData
+        : never
+    >
+  >,
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ThisG extends HandlerContextGroup<any, any, any>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const OtherG extends HandlerContextGroup<
+      HandlerContextGroupHandlerT<ThisG>,
+      any,
+      any
+    >,
+  >(
+    thisGroup: ThisG,
+    otherGroup: OtherG,
+  ) => HandlerContextGroup<
+    HandlerContextGroupHandlerT<ThisG>,
+    HandlerContextGroupContext<ThisG> | HandlerContextGroupContext<OtherG>,
+    AddHandlerDataGroupGroupRecord<
+      HandlerContextGroupHandlerT<ThisG>,
+      HandlerContextGroupHData<ThisG> extends infer HData extends
+        BaseHandlerDataGroupRecord<HandlerContextGroupHandlerT<ThisG>>
+        ? HData
+        : never,
+      HandlerContextGroupHData<OtherG> extends infer HData extends
+        BaseHandlerDataGroupRecord<HandlerContextGroupHandlerT<ThisG>>
+        ? HData
+        : never
+    >
+  >
+>(
+  2,
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ThisG extends HandlerContextGroup<any, any, any>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const OtherG extends HandlerContextGroup<
+      HandlerContextGroupHandlerT<ThisG>,
+      any,
+      any
+    >,
+  >(
+    thisGroup: ThisG,
+    otherGroup: OtherG,
   ) =>
     new HandlerContextGroup<
-      HandlerT,
+      HandlerContextGroupHandlerT<ThisG>,
       HandlerContextGroupContext<ThisG> | HandlerContextGroupContext<OtherG>,
       AddHandlerDataGroupGroupRecord<
-        HandlerT,
+        HandlerContextGroupHandlerT<ThisG>,
         HandlerContextGroupHData<ThisG> extends infer HData extends
-          BaseHandlerDataGroupRecord<HandlerT>
+          BaseHandlerDataGroupRecord<HandlerContextGroupHandlerT<ThisG>>
           ? HData
           : never,
         HandlerContextGroupHData<OtherG> extends infer HData extends
-          BaseHandlerDataGroupRecord<HandlerT>
+          BaseHandlerDataGroupRecord<HandlerContextGroupHandlerT<ThisG>>
           ? HData
           : never
       >
@@ -189,25 +295,79 @@ export const addGroup =
             otherGroup.record,
             (context) => context,
           ) as HandlerContextGroupRecord<
-            HandlerT,
+            HandlerContextGroupHandlerT<ThisG>,
             | HandlerContextGroupContext<ThisG>
             | HandlerContextGroupContext<OtherG>
           >,
       }),
-    );
+    ),
+);
 
-export const getHandlerContext =
-  <HandlerT extends BaseHandlerT>(
-    key: HandlerDataKey<HandlerT, HandlerData<HandlerT>>,
-  ) =>
-  <R>(
+export const getHandlerContext = Function.dual<
+  <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    handlerContextGroup: HandlerContextGroup<HandlerT, R, any>,
+    G extends HandlerContextGroup<any, any, any>,
+  >(
+    key: HandlerDataKey<
+      HandlerContextGroupHandlerT<G>,
+      HandlerData<HandlerContextGroupHandlerT<G>>
+    >,
+  ) => (
+    handlerContextGroup: G,
+  ) => Option.Option<
+    HandlerContext<
+      HandlerContextGroupHandlerT<G>,
+      HandlerData<HandlerContextGroupHandlerT<G>>,
+      Handler<
+        HandlerContextGroupHandlerT<G>,
+        unknown,
+        unknown,
+        HandlerContextGroupContext<G>
+      >
+    >
+  >,
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    G extends HandlerContextGroup<any, any, any>,
+  >(
+    handlerContextGroup: G,
+    key: HandlerDataKey<
+      HandlerContextGroupHandlerT<G>,
+      HandlerData<HandlerContextGroupHandlerT<G>>
+    >,
+  ) => Option.Option<
+    HandlerContext<
+      HandlerContextGroupHandlerT<G>,
+      HandlerData<HandlerContextGroupHandlerT<G>>,
+      Handler<
+        HandlerContextGroupHandlerT<G>,
+        unknown,
+        unknown,
+        HandlerContextGroupContext<G>
+      >
+    >
+  >
+>(
+  2,
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    G extends HandlerContextGroup<any, any, any>,
+  >(
+    handlerContextGroup: G,
+    key: HandlerDataKey<
+      HandlerContextGroupHandlerT<G>,
+      HandlerData<HandlerContextGroupHandlerT<G>>
+    >,
   ): Option.Option<
     HandlerContext<
-      HandlerT,
-      HandlerData<HandlerT>,
-      Handler<HandlerT, unknown, unknown, R>
+      HandlerContextGroupHandlerT<G>,
+      HandlerData<HandlerContextGroupHandlerT<G>>,
+      Handler<
+        HandlerContextGroupHandlerT<G>,
+        unknown,
+        unknown,
+        HandlerContextGroupContext<G>
+      >
     >
-  > =>
-    Record.get(handlerContextGroup.record, key);
+  > => Record.get(handlerContextGroup.record, key),
+);

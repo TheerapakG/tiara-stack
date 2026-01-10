@@ -39,10 +39,13 @@ export const add =
     handlerData: HData,
   ) =>
   <const C extends HandlerDataCollection>(handlerDataCollection: C) =>
-    pipe(
-      handlerDataCollection,
-      Data.Collection.add<HandlerT, HData>(handlerData),
-    );
+    Data.Collection.add<
+      C,
+      HandlerT extends Data.Collection.HandlerDataCollectionHandlerT<C>
+        ? HandlerT
+        : never,
+      HData
+    >(handlerDataCollection, handlerData);
 
 export const addSubscription =
   <const HData extends Type.HandlerData<SubscriptionHandlerT>>(

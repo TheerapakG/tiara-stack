@@ -31,11 +31,7 @@ import {
   add as addHandlerContextGroupWithMetrics,
   addGroup as addGroupHandlerContextGroupWithMetrics,
 } from "./groupWithMetrics";
-import type {
-  HandlerContext,
-  PartialHandlerContextHandlerT,
-  HandlerOrUndefined,
-} from "./context";
+import type { HandlerContext, HandlerOrUndefined } from "./context";
 import type { HandlerContextGroup } from "./group";
 import type {
   WithMetricsExecutorContextKind,
@@ -310,27 +306,56 @@ export const empty = <
     executors,
   );
 
-export const add =
+export const add = Function.dual<
   <
-    const Config extends HandlerContext<any>,
+    const C extends HandlerContextCollectionWithMetrics<any, any, any>,
+    const Config extends HandlerContext<HandlerT>,
     HandlerT extends
-      PartialHandlerContextHandlerT<Config> = PartialHandlerContextHandlerT<Config>,
+      HandlerContextCollectionWithMetricsHandlerT<C> = HandlerContextCollectionWithMetricsHandlerT<C>,
   >(
     handlerContextConfig: Config,
-  ) =>
+  ) => (
+    collectionWithMetrics: C,
+  ) => HandlerContextCollectionWithMetrics<
+    HandlerContextCollectionWithMetricsHandlerT<C>,
+    HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<C>,
+    HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
+      ?
+          | HandlerContextCollectionWithMetricsContext<C>
+          | HandlerEffectContext<HandlerT, H>
+      : never
+  >,
   <
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const C extends HandlerContextCollectionWithMetrics<any, any, any>,
-    CollectionHandlerT extends
+    const Config extends HandlerContext<HandlerT>,
+    HandlerT extends
       HandlerContextCollectionWithMetricsHandlerT<C> = HandlerContextCollectionWithMetricsHandlerT<C>,
-    WithMetricsExecutorTRecord extends
-      HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<C> = HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<C>,
   >(
     collectionWithMetrics: C,
+    handlerContextConfig: Config,
+  ) => HandlerContextCollectionWithMetrics<
+    HandlerContextCollectionWithMetricsHandlerT<C>,
+    HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<C>,
+    HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
+      ?
+          | HandlerContextCollectionWithMetricsContext<C>
+          | HandlerEffectContext<HandlerT, H>
+      : never
+  >
+>(
+  2,
+  <
+    const C extends HandlerContextCollectionWithMetrics<any, any, any>,
+    const Config extends HandlerContext<HandlerT>,
+    HandlerT extends
+      HandlerContextCollectionWithMetricsHandlerT<C> = HandlerContextCollectionWithMetricsHandlerT<C>,
+  >(
+    collectionWithMetrics: C,
+    handlerContextConfig: Config,
   ) =>
     new HandlerContextCollectionWithMetrics<
-      HandlerT extends CollectionHandlerT ? CollectionHandlerT : never,
-      WithMetricsExecutorTRecord,
+      HandlerContextCollectionWithMetricsHandlerT<C>,
+      HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<C>,
       HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
         ?
             | HandlerContextCollectionWithMetricsContext<C>
@@ -344,14 +369,10 @@ export const add =
             collectionWithMetrics.handlerContextTypeTransformer(
               handlerContextConfig,
             ) as HandlerType<HandlerT>,
-            (groupWithMetrics) =>
-              pipe(
-                groupWithMetrics,
-                addHandlerContextGroupWithMetrics(handlerContextConfig),
-              ),
-          ) as unknown as HandlerContextGroupWithMetricsRecord<
-            CollectionHandlerT,
-            WithMetricsExecutorTRecord,
+            addHandlerContextGroupWithMetrics(handlerContextConfig),
+          ) as HandlerContextGroupWithMetricsRecord<
+            HandlerContextCollectionWithMetricsHandlerT<C>,
+            HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<C>,
             HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
               ?
                   | HandlerContextCollectionWithMetricsContext<C>
@@ -359,75 +380,164 @@ export const add =
               : never
           >,
       }),
-    );
+    ),
+);
 
-export const addCollection =
+export const addCollection = Function.dual<
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const OtherC extends HandlerContextCollection<any, any, any>,
-    HandlerT extends
-      HandlerContextCollectionHandlerT<OtherC> = HandlerContextCollectionHandlerT<OtherC>,
   >(
     otherCollection: OtherC,
-  ) =>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ) => // eslint-disable-next-line @typescript-eslint/no-explicit-any
   <
-    const ThisC extends HandlerContextCollectionWithMetrics<HandlerT, any, any>,
-    WithMetricsExecutorTRecord extends
-      HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<ThisC> = HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<ThisC>,
+    const ThisC extends HandlerContextCollectionWithMetrics<
+      HandlerContextCollectionHandlerT<OtherC>,
+      any,
+      any
+    >,
   >(
     thisCollectionWithMetrics: ThisC,
+  ) => HandlerContextCollectionWithMetrics<
+    HandlerContextCollectionWithMetricsHandlerT<ThisC>,
+    HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<ThisC>,
+    | HandlerContextCollectionWithMetricsContext<ThisC>
+    | HandlerContextCollectionContext<OtherC>
+  >,
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ThisC extends HandlerContextCollectionWithMetrics<any, any, any>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const OtherC extends HandlerContextCollection<
+      HandlerContextCollectionWithMetricsHandlerT<ThisC>,
+      any,
+      any
+    >,
+  >(
+    thisCollectionWithMetrics: ThisC,
+    otherCollection: OtherC,
+  ) => HandlerContextCollectionWithMetrics<
+    HandlerContextCollectionWithMetricsHandlerT<ThisC>,
+    HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<ThisC>,
+    | HandlerContextCollectionWithMetricsContext<ThisC>
+    | HandlerContextCollectionContext<OtherC>
+  >
+>(
+  2,
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ThisC extends HandlerContextCollectionWithMetrics<any, any, any>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const OtherC extends HandlerContextCollection<
+      HandlerContextCollectionWithMetricsHandlerT<ThisC>,
+      any,
+      any
+    >,
+  >(
+    thisCollectionWithMetrics: ThisC,
+    otherCollection: OtherC,
   ) =>
     new HandlerContextCollectionWithMetrics<
-      HandlerT,
-      WithMetricsExecutorTRecord,
+      HandlerContextCollectionWithMetricsHandlerT<ThisC>,
+      HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<ThisC>,
       | HandlerContextCollectionWithMetricsContext<ThisC>
       | HandlerContextCollectionContext<OtherC>
     >(
       Struct.evolve(thisCollectionWithMetrics, {
         record: (record) =>
-          Record.mapEntries(record, (groupWithMetrics, type) => [
-            type,
-            addGroupHandlerContextGroupWithMetrics(
-              otherCollection.record[type],
-            )(groupWithMetrics),
-          ]) as unknown as HandlerContextGroupWithMetricsRecord<
-            HandlerT,
-            WithMetricsExecutorTRecord,
+          Record.mapEntries(
+            record,
+            (
+              groupWithMetrics,
+              type: HandlerType<
+                HandlerContextCollectionWithMetricsHandlerT<ThisC>
+              >,
+            ) => [
+              type,
+              addGroupHandlerContextGroupWithMetrics(
+                otherCollection.record[type] as HandlerContextGroup<
+                  HandlerContextCollectionWithMetricsHandlerT<ThisC>,
+                  HandlerContextCollectionContext<OtherC>,
+                  any
+                >,
+              )(groupWithMetrics),
+            ],
+          ) as unknown as HandlerContextGroupWithMetricsRecord<
+            HandlerContextCollectionWithMetricsHandlerT<ThisC>,
+            HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<ThisC>,
             | HandlerContextCollectionWithMetricsContext<ThisC>
             | HandlerContextCollectionContext<OtherC>
           >,
       }),
-    );
+    ),
+);
 
-export const execute =
+export const execute = Function.dual<
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const C extends HandlerContextCollectionWithMetrics<any, any, any>,
     HandlerT extends HandlerContextCollectionWithMetricsHandlerT<C>,
-    WithMetricsExecutorT extends
-      HandlerContextCollectionWithMetricsWithMetricsExecutorT<
-        C,
-        HandlerT
-      > = HandlerContextCollectionWithMetricsWithMetricsExecutorT<C, HandlerT>,
-    R extends
-      HandlerContextCollectionWithMetricsContext<C> = HandlerContextCollectionWithMetricsContext<C>,
   >(
     type: HandlerType<HandlerT>,
     key: HandlerDataKey<HandlerT, HandlerData<HandlerT>>,
-    metricsContext: WithMetricsExecutorContextKind<WithMetricsExecutorT, R>,
-  ) =>
-  (
+    metricsContext: WithMetricsExecutorContextKind<
+      HandlerContextCollectionWithMetricsWithMetricsExecutorT<C, HandlerT>,
+      HandlerContextCollectionWithMetricsContext<C>
+    >,
+  ) => (
     collectionWithMetrics: C,
-  ): Option.Option<WithMetricsExecutorResultKind<WithMetricsExecutorT, R>> =>
+  ) => Option.Option<
+    WithMetricsExecutorResultKind<
+      HandlerContextCollectionWithMetricsWithMetricsExecutorT<C, HandlerT>,
+      HandlerContextCollectionWithMetricsContext<C>
+    >
+  >,
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const C extends HandlerContextCollectionWithMetrics<any, any, any>,
+    HandlerT extends HandlerContextCollectionWithMetricsHandlerT<C>,
+  >(
+    collectionWithMetrics: C,
+    type: HandlerType<HandlerT>,
+    key: HandlerDataKey<HandlerT, HandlerData<HandlerT>>,
+    metricsContext: WithMetricsExecutorContextKind<
+      HandlerContextCollectionWithMetricsWithMetricsExecutorT<C, HandlerT>,
+      HandlerContextCollectionWithMetricsContext<C>
+    >,
+  ) => Option.Option<
+    WithMetricsExecutorResultKind<
+      HandlerContextCollectionWithMetricsWithMetricsExecutorT<C, HandlerT>,
+      HandlerContextCollectionWithMetricsContext<C>
+    >
+  >
+>(
+  4,
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const C extends HandlerContextCollectionWithMetrics<any, any, any>,
+    HandlerT extends HandlerContextCollectionWithMetricsHandlerT<C>,
+  >(
+    collectionWithMetrics: C,
+    type: HandlerType<HandlerT>,
+    key: HandlerDataKey<HandlerT, HandlerData<HandlerT>>,
+    metricsContext: WithMetricsExecutorContextKind<
+      HandlerContextCollectionWithMetricsWithMetricsExecutorT<C, HandlerT>,
+      HandlerContextCollectionWithMetricsContext<C>
+    >,
+  ) =>
     pipe(
       Record.get(collectionWithMetrics.record, type) as Option.Option<
-        HandlerContextGroupWithMetricsType<HandlerT, WithMetricsExecutorT, R>
+        HandlerContextGroupWithMetricsType<
+          HandlerT,
+          HandlerContextCollectionWithMetricsWithMetricsExecutorT<C, HandlerT>,
+          HandlerContextCollectionWithMetricsContext<C>
+        >
       >,
       Option.flatMap(
         executeHandlerContextGroupWithMetrics(key, metricsContext),
       ),
-    );
+    ),
+);
 
 export const initialize = <HandlerT extends BaseHandlerT, R = never>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

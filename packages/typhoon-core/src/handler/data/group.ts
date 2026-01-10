@@ -5,10 +5,10 @@ import {
   type HandlerData,
 } from "../type";
 
-export type BaseHandlerDataGroupRecord<HandlerT extends BaseHandlerT> = Record<
-  string,
-  HandlerData<HandlerT>
->;
+export type BaseHandlerDataGroupRecord<
+  HandlerT extends BaseHandlerT,
+  Keys extends string = string,
+> = Record<Keys, HandlerData<HandlerT>>;
 export const HandlerDataGroupTypeId = Symbol(
   "Typhoon/Handler/HandlerDataGroupTypeId",
 );
@@ -101,29 +101,46 @@ export type AddHandlerData<
   HData
 >;
 
-export const add =
+export const add = Function.dual<
   <
     const G extends HandlerDataGroup<any, any>,
-    const HData extends HandlerData<HandlerT>,
-    HandlerT extends HandlerDataGroupHandlerT<G> = HandlerDataGroupHandlerT<G>,
+    const HData extends HandlerData<HandlerDataGroupHandlerT<G>>,
   >(
     data: HData,
+  ) => (
+    handlerDataGroup: G,
+  ) => HandlerDataGroup<HandlerDataGroupHandlerT<G>, AddHandlerData<G, HData>>,
+  <
+    const G extends HandlerDataGroup<any, any>,
+    const HData extends HandlerData<HandlerDataGroupHandlerT<G>>,
+  >(
+    handlerDataGroup: G,
+    data: HData,
+  ) => HandlerDataGroup<HandlerDataGroupHandlerT<G>, AddHandlerData<G, HData>>
+>(
+  2,
+  <
+    const G extends HandlerDataGroup<any, any>,
+    const HData extends HandlerData<HandlerDataGroupHandlerT<G>>,
+  >(
+    handlerDataGroup: G,
+    data: HData,
   ) =>
-  (handlerDataGroup: G) =>
-    new HandlerDataGroup<HandlerT, AddHandlerData<G, HData>>(
+    new HandlerDataGroup<HandlerDataGroupHandlerT<G>, AddHandlerData<G, HData>>(
       Struct.evolve(handlerDataGroup, {
         record: (record) =>
           Record.set(
             record,
             handlerDataGroup.dataKeyGetter(data) as HandlerDataKey<
-              HandlerT,
+              HandlerDataGroupHandlerT<G>,
               HData
             > &
               (string | symbol),
             data,
           ) as AddHandlerData<G, HData>,
       }),
-    );
+    ),
+);
 
 // Helper type to merge two HandlerDataGroupRecords
 export type AddHandlerDataGroupGroupRecord<
@@ -136,7 +153,14 @@ export type AddHandlerDataGroupGroupRecord<
     : K extends keyof OtherRecord
       ? OtherRecord[K]
       : never;
-};
+} extends infer R extends BaseHandlerDataGroupRecord<
+  HandlerT,
+  keyof ThisRecord | keyof OtherRecord extends infer Keys extends string
+    ? Keys
+    : never
+>
+  ? R
+  : never;
 
 export type AddHandlerDataGroup<
   ThisDataGroup extends HandlerDataGroup<any, any>,
@@ -153,17 +177,36 @@ export type AddHandlerDataGroup<
     : never
 >;
 
-export const addGroup =
+export const addGroup = Function.dual<
+  <const OtherG extends HandlerDataGroup<any, any>>(
+    otherGroup: OtherG,
+  ) => <
+    const ThisG extends HandlerDataGroup<HandlerDataGroupHandlerT<OtherG>, any>,
+  >(
+    thisGroup: ThisG,
+  ) => HandlerDataGroup<
+    HandlerDataGroupHandlerT<ThisG>,
+    AddHandlerDataGroup<ThisG, OtherG>
+  >,
   <
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ThisG extends HandlerDataGroup<any, any>,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const OtherG extends HandlerDataGroup<HandlerDataGroupHandlerT<ThisG>, any>,
   >(
+    thisGroup: ThisG,
+    otherGroup: OtherG,
+  ) => HandlerDataGroup<
+    HandlerDataGroupHandlerT<ThisG>,
+    AddHandlerDataGroup<ThisG, OtherG>
+  >
+>(
+  2,
+  <
+    const ThisG extends HandlerDataGroup<any, any>,
+    const OtherG extends HandlerDataGroup<HandlerDataGroupHandlerT<ThisG>, any>,
+  >(
+    thisGroup: ThisG,
     otherGroup: OtherG,
   ) =>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (thisGroup: ThisG) =>
     new HandlerDataGroup<
       HandlerDataGroupHandlerT<ThisG>,
       AddHandlerDataGroup<ThisG, OtherG>
@@ -176,7 +219,8 @@ export const addGroup =
             (data) => data,
           ) as AddHandlerDataGroup<ThisG, OtherG>,
       }),
-    );
+    ),
+);
 
 export type GetHandlerData<
   G extends HandlerDataGroup<any, any>,
@@ -187,16 +231,33 @@ export type GetHandlerData<
   ? HData
   : never;
 
-export const getHandlerData =
+export const getHandlerData = Function.dual<
   <
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const G extends HandlerDataGroup<any, any>,
     const Key extends keyof HandlerDataGroupHandlerDataGroupRecord<G> &
       (string | symbol),
   >(
     key: Key,
+  ) => (handlerDataGroup: G) => Option.Option<GetHandlerData<G, Key>>,
+  <
+    const G extends HandlerDataGroup<any, any>,
+    const Key extends keyof HandlerDataGroupHandlerDataGroupRecord<G> &
+      (string | symbol),
+  >(
+    handlerDataGroup: G,
+    key: Key,
+  ) => Option.Option<GetHandlerData<G, Key>>
+>(
+  2,
+  <
+    const G extends HandlerDataGroup<any, any>,
+    const Key extends keyof HandlerDataGroupHandlerDataGroupRecord<G> &
+      (string | symbol),
+  >(
+    handlerDataGroup: G,
+    key: Key,
   ) =>
-  (handlerDataGroup: G) =>
     Record.get(handlerDataGroup.record, key) as Option.Option<
       GetHandlerData<G, Key>
-    >;
+    >,
+);

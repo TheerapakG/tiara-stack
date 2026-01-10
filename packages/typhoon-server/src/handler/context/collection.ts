@@ -68,10 +68,11 @@ export const getHandlerContext =
       Type.Handler<HandlerT, unknown, unknown, R>
     >
   > =>
-    Context.Collection.getHandlerContext<HandlerT>(
+    Context.Collection.getHandlerContext<HandlerContextCollection<R>, HandlerT>(
+      handlerContextCollection,
       type,
       key,
-    )(handlerContextCollection);
+    );
 
 export const getMutationHandlerContext =
   (key: string) =>

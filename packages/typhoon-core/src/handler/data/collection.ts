@@ -154,15 +154,42 @@ export type AddHandlerData<
   HData
 >;
 
-export const add =
-  <HandlerT extends BaseHandlerT, const HData extends HandlerData<HandlerT>>(
-    data: HData,
-  ) =>
+export const add = Function.dual<
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const C extends HandlerDataCollection<any, any>,
+    HandlerT extends HandlerDataCollectionHandlerT<C>,
+    const HData extends HandlerData<HandlerT>,
+  >(
+    data: HData,
+  ) => (
+    handlerDataCollection: C,
+  ) => HandlerDataCollection<
+    HandlerDataCollectionHandlerT<C>,
+    AddHandlerData<HandlerT, C, HData>
+  >,
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const C extends HandlerDataCollection<any, any>,
+    HandlerT extends HandlerDataCollectionHandlerT<C>,
+    const HData extends HandlerData<HandlerT>,
   >(
     handlerDataCollection: C,
+    data: HData,
+  ) => HandlerDataCollection<
+    HandlerDataCollectionHandlerT<C>,
+    AddHandlerData<HandlerT, C, HData>
+  >
+>(
+  2,
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const C extends HandlerDataCollection<any, any>,
+    HandlerT extends HandlerDataCollectionHandlerT<C>,
+    const HData extends HandlerData<HandlerT>,
+  >(
+    handlerDataCollection: C,
+    data: HData,
   ) =>
     new HandlerDataCollection<
       HandlerDataCollectionHandlerT<C>,
@@ -179,7 +206,8 @@ export const add =
             AddHandlerData<HandlerT, C, HData>
           >,
       }),
-    );
+    ),
+);
 
 // Helper type to add a data group to a HandlerDataCollectionRecord
 export type AddHandlerDataGroupCollectionRecord<
@@ -216,38 +244,64 @@ export type AddHandlerDataGroup<
     : never
 >;
 
-export const addGroup =
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  <const DataGroup extends HandlerDataGroup<any, any>>(dataGroup: DataGroup) =>
-    <
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const C extends HandlerDataCollection<any, any>,
+export const addGroup = Function.dual<
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const DataGroup extends HandlerDataGroup<any, any>,
+  >(
+    dataGroup: DataGroup,
+  ) => <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const C extends HandlerDataCollection<any, any>,
+  >(
+    handlerDataCollection: C,
+  ) => HandlerDataCollection<
+    HandlerDataCollectionHandlerT<C>,
+    AddHandlerDataGroup<C, DataGroup>
+  >,
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const C extends HandlerDataCollection<any, any>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const DataGroup extends HandlerDataGroup<any, any>,
+  >(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    handlerDataCollection: C,
+    dataGroup: DataGroup,
+  ) => HandlerDataCollection<
+    HandlerDataCollectionHandlerT<C>,
+    AddHandlerDataGroup<C, DataGroup>
+  >
+>(
+  2,
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const C extends HandlerDataCollection<any, any>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const DataGroup extends HandlerDataGroup<any, any>,
+  >(
+    handlerDataCollection: C,
+    dataGroup: DataGroup,
+  ) =>
+    new HandlerDataCollection<
+      HandlerDataCollectionHandlerT<C>,
+      AddHandlerDataGroup<C, DataGroup>
     >(
-      handlerDataCollection: C,
-    ) =>
-      new HandlerDataCollection<
-        HandlerDataCollectionHandlerT<C>,
-        AddHandlerDataGroup<C, DataGroup>
-      >(
-        Struct.evolve(handlerDataCollection, {
-          record: (record) =>
-            Record.modify(
-              record,
-              handlerDataCollection.dataTypeGetter(
-                Record.values(dataGroup.record)[0],
-              ) as HandlerType<HandlerDataGroupHandlerT<DataGroup>>,
-              (
-                group: HandlerDataGroup<
-                  HandlerDataGroupHandlerT<DataGroup>,
-                  any
-                >,
-              ) => pipe(group, groupAddHandlerDataGroup(dataGroup)),
-            ) as StoredHandlerDataCollectionRecord<
-              HandlerDataCollectionHandlerT<C>,
-              AddHandlerDataGroup<C, DataGroup>
-            >,
-        }),
-      );
+      Struct.evolve(handlerDataCollection, {
+        record: (record) =>
+          Record.modify(
+            record,
+            handlerDataCollection.dataTypeGetter(
+              Record.values(dataGroup.record)[0],
+            ) as HandlerType<HandlerDataGroupHandlerT<DataGroup>>,
+            groupAddHandlerDataGroup(dataGroup),
+          ) as StoredHandlerDataCollectionRecord<
+            HandlerDataCollectionHandlerT<C>,
+            AddHandlerDataGroup<C, DataGroup>
+          >,
+      }),
+    ),
+);
 
 // Helper type to merge two HandlerDataCollectionRecords
 export type AddHandlerDataCollectionCollectionRecord<
@@ -285,13 +339,43 @@ export type AddHandlerDataCollection<
   HandlerDataCollectionHandlerDataCollectionRecord<OtherDataCollection>
 >;
 
-export const addCollection =
+export const addCollection = Function.dual<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   <const OtherC extends HandlerDataCollection<any, any>>(
     otherCollection: OtherC,
-  ) =>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  <const ThisC extends HandlerDataCollection<any, any>>(
+  ) => <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ThisC extends HandlerDataCollection<any, any>,
+  >(
     thisCollection: ThisC,
+  ) => HandlerDataCollection<
+    | HandlerDataCollectionHandlerT<ThisC>
+    | HandlerDataCollectionHandlerT<OtherC>,
+    AddHandlerDataCollection<ThisC, OtherC>
+  >,
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ThisC extends HandlerDataCollection<any, any>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const OtherC extends HandlerDataCollection<any, any>,
+  >(
+    thisCollection: ThisC,
+    otherCollection: OtherC,
+  ) => HandlerDataCollection<
+    | HandlerDataCollectionHandlerT<ThisC>
+    | HandlerDataCollectionHandlerT<OtherC>,
+    AddHandlerDataCollection<ThisC, OtherC>
+  >
+>(
+  2,
+  <
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ThisC extends HandlerDataCollection<any, any>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const OtherC extends HandlerDataCollection<any, any>,
+  >(
+    thisCollection: ThisC,
+    otherCollection: OtherC,
   ) =>
     new HandlerDataCollection<
       | HandlerDataCollectionHandlerT<ThisC>
@@ -303,17 +387,15 @@ export const addCollection =
           Record.union(
             record,
             otherCollection.record,
-            (thisGroup, otherGroup) =>
-              pipe(thisGroup, groupAddHandlerDataGroup(otherGroup)),
+            groupAddHandlerDataGroup,
           ) as StoredHandlerDataCollectionRecord<
             | HandlerDataCollectionHandlerT<ThisC>
             | HandlerDataCollectionHandlerT<OtherC>,
             AddHandlerDataCollection<ThisC, OtherC>
           >,
-        // TODO: figure out how to merge type getters.
-        // currently in the downstream packages all instances of type getters are the same.
       }),
-    );
+    ),
+);
 
 export type HandlerTOfType<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -355,15 +437,38 @@ export type GetHandlerDataGroup<
   HandlerDataGroupRecordOfHandlerT<C, HandlerTOfType<C, Type>>
 >;
 
-export const getHandlerDataGroup =
+export const getHandlerDataGroup = Function.dual<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   <
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const C extends HandlerDataCollection<any, any>,
     const Type extends HandlerType<HandlerDataCollectionHandlerT<C>>,
   >(
     type: Type,
+  ) => (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    handlerDataCollection: C,
+  ) => Option.Option<GetHandlerDataGroup<C, Type>>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  <
+    const C extends HandlerDataCollection<any, any>,
+    const Type extends HandlerType<HandlerDataCollectionHandlerT<C>>,
+  >(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    handlerDataCollection: C,
+    type: Type,
+  ) => Option.Option<GetHandlerDataGroup<C, Type>>
+>(
+  2,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  <
+    const C extends HandlerDataCollection<any, any>,
+    const Type extends HandlerType<HandlerDataCollectionHandlerT<C>>,
+  >(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    handlerDataCollection: C,
+    type: Type,
   ) =>
-  (handlerDataCollection: C) =>
     Record.get(handlerDataCollection.record, type) as Option.Option<
       GetHandlerDataGroup<C, Type>
-    >;
+    >,
+);
