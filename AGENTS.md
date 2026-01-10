@@ -1,8 +1,3 @@
----
-description: High-level overview of all packages in the tiara-stack monorepo
-alwaysApply: true
----
-
 # TiaraStack Monorepo Package Overview
 
 This monorepo contains the following packages:
@@ -123,3 +118,56 @@ Database schema definitions using Drizzle ORM for PostgreSQL.
 Configuration builder utility library for building type-safe configuration objects with validation.
 
 - **Main export** (`packages/bob/src/builder/index.ts`): Exports configBuilderBuilder function and ConfigBuilder/ConfigBuilderBuilder classes for creating type-safe configuration builders with Standard Schema validation
+
+## Scripts
+
+There are two workspace-level scripts defined in package.json.
+The "build" script invokes nx to build all the packages.
+The "format:apply" script invokes nx to apply the prettier formatter across all the packages.
+The "checks" script invokes nx to run linter, formatter, and type checkers in all the packages.
+Run these scripts using `pnpm -w <script>`, replacing `<script>` with the script you want to run.
+Run `pnpm -w format:apply` every time after you finished proposing a change to correctly format all the code.
+
+# Guidelines on Graphite Commit Messages For This Project
+
+We use Graphite for managing stacked pull requests. The following guidelines are to be followed for `gt create` and `gt modify` commands.
+
+- For the first commit you are creating, if you are on a trunk branch (master) use `gt create`. Otherwise, ask the developer if they want to create the commits on a new branch (`gt create`) or add commits to the current branch (`gt modify -c`).
+- For the rest of the commits, use `gt modify -c`.
+- When you create the commits on a new branch
+  - If the developer mentions that the commits is related to a linear issue, look up the git branch name to use via the linear MCP server. If the linear MCP server does not exist, tell the developer and stop proceeding.
+  - Otherwise, come up with a descriptive branch name with the user appended e.g. `user/branch-name`. Make sure you use the actual username.
+  - ALWAYS set the branch name. DO NOT leave the branch name blank.
+- Use conventional commit message. If the work is done inside a package, use the name of the package (or a shortened version if it is not ambiguous) of the changes as the scope of the commit. Optionally, you could also append the area where the work was done inside the package e.g. `feat(example-package/utils): implement new utility x`
+- There is no need to list functions or symbols affected by the changes separately from the main commit message body.
+- Use -m for new line in the commit message, and do not use \n anywhere.
+
+  GOOD:
+
+  - `gt create user/abc-123-linear-issue-branch-name -m "subject" -m "line1" -m "line2"  ...`
+    This correctly sets the branch name and supplies commit message in the correct format for a new branch.
+  - `gt modify -c -m "subject" -m "line1" -m "line2"  ...`
+    This correctly supplies commit message in the correct format for the current branch.
+
+  BAD:
+
+  - `gt create user/abc-123-linear-issue-branch-name -m "subject\nline1\nline2\n..."`
+    This correctly sets the branch name BUT supplies commit message in a bad format.
+  - `gt create user/abc-123-linear-issue-branch-name -m "subject" -m "line1\nline2\n..."`
+    This correctly sets the branch name BUT supplies commit message in a bad format.
+  - `gt create -m "subject" -m "line1" -m "line2"  ...`
+    This supplies commit message in the correct format BUT forgot to set the branch name for a new branch.
+  - `gt modify -c -m "subject\nline1\nline2\n..."`
+    This supplies commit message in a bad format.
+  - `gt modify -c -m "subject" -m "line1\nline2\n..."`
+    This supplies commit message in a bad format.
+
+# Guidelines on Library Usages
+
+## Effect.ts
+
+This project utilizes the Effect library for composability and type-safety. The version of the library being used is 3.18.4. The project prefers using the "pipe" syntax (with "do simulation" to combat excessive nesting) over the "generator" syntax. Use Effect/Schema for runtime validation except existing code use other validation library, or otherwise stated.
+
+## Arktype
+
+This project utilizes the ArkType library for runtime type validation in some limited case. The version of the library being used is 2.1.19.

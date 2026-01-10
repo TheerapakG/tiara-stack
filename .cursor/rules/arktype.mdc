@@ -1,6 +1,0 @@
----
-description: Guidelines on ArkType Runtime Type Validation Library Usage in This Project
-alwaysApply: true
----
-
-This project utilizes the ArkType library for runtime type validation in some limited case. The version of the library being used is 2.1.19.
