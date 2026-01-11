@@ -10,10 +10,10 @@ import { upsertMessageCheckinDataHandler } from "./upsertMessageCheckinData";
 
 export const messageCheckinHandlerCollection = pipe(
   Context.Collection.empty(),
-  Context.Collection.add(getMessageCheckinDataHandler),
-  Context.Collection.add(upsertMessageCheckinDataHandler),
-  Context.Collection.add(getMessageCheckinMembersHandler),
-  Context.Collection.add(addMessageCheckinMembersHandler),
-  Context.Collection.add(setMessageCheckinMemberCheckinAtHandler),
-  Context.Collection.add(removeMessageCheckinMemberHandler),
+  Context.Collection.addSubscription(getMessageCheckinDataHandler),
+  Context.Collection.addMutation(upsertMessageCheckinDataHandler),
+  Context.Collection.addSubscription(getMessageCheckinMembersHandler),
+  Context.Collection.addMutation(addMessageCheckinMembersHandler),
+  Context.Collection.addMutation(setMessageCheckinMemberCheckinAtHandler),
+  Context.Collection.addMutation(removeMessageCheckinMemberHandler),
 );

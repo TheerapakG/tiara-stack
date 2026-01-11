@@ -78,30 +78,26 @@ export class HandlerContextGroup<
 export type HandlerContextGroupHandlerT<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   G extends HandlerContextGroup<any, any, any>,
-> =
-  Types.Invariant.Type<
-    G[HandlerContextGroupTypeId]["_HandlerT"]
-  > extends infer HT extends BaseHandlerT
-    ? HT
-    : never;
+> = [G] extends [HandlerContextGroup<infer HandlerT, any, any>]
+  ? HandlerT
+  : never;
 export type HandlerContextGroupContext<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   G extends HandlerContextGroup<any, any, any>,
-> =
-  Types.Covariant.Type<G[HandlerContextGroupTypeId]["_R"]> extends infer R
-    ? R
-    : never;
+> = [G] extends [HandlerContextGroup<any, infer R, any>] ? R : never;
 export type HandlerContextGroupHData<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   G extends HandlerContextGroup<any, any, any>,
-> =
-  Types.Invariant.Type<
-    G[HandlerContextGroupTypeId]["_HData"]
-  > extends infer HData extends BaseHandlerDataGroupRecord<
-    HandlerContextGroupHandlerT<G>
-  >
-    ? HData
-    : never;
+> = [G] extends [HandlerContextGroup<any, any, infer HData>] ? HData : never;
+
+export type InferHandlerContextGroup<
+  //eslint-disable-next-line @typescript-eslint/no-explicit-any
+  G extends HandlerContextGroup<any, any, any>,
+> = HandlerContextGroup<
+  HandlerContextGroupHandlerT<G>,
+  HandlerContextGroupContext<G>,
+  HandlerContextGroupHData<G>
+>;
 
 export const empty = <HandlerT extends BaseHandlerT, R = never>(
   dataKeyTransformer: (
@@ -190,7 +186,7 @@ export const add = Function.dual<
         DataOrUndefined<Config>
       >
     >(
-      Struct.evolve(handlerContextGroup, {
+      Struct.evolve(handlerContextGroup as InferHandlerContextGroup<G>, {
         record: (record) =>
           Record.set(
             record,
@@ -288,17 +284,9 @@ export const addGroup = Function.dual<
           : never
       >
     >(
-      Struct.evolve(thisGroup, {
+      Struct.evolve(thisGroup as InferHandlerContextGroup<ThisG>, {
         record: (record) =>
-          Record.union(
-            record,
-            otherGroup.record,
-            (context) => context,
-          ) as HandlerContextGroupRecord<
-            HandlerContextGroupHandlerT<ThisG>,
-            | HandlerContextGroupContext<ThisG>
-            | HandlerContextGroupContext<OtherG>
-          >,
+          Record.union(record, otherGroup.record, (context) => context),
       }),
     ),
 );
@@ -369,5 +357,9 @@ export const getHandlerContext = Function.dual<
         HandlerContextGroupContext<G>
       >
     >
-  > => Record.get(handlerContextGroup.record, key),
+  > =>
+    Record.get(
+      (handlerContextGroup as InferHandlerContextGroup<G>).record,
+      key,
+    ),
 );

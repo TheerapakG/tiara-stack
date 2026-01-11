@@ -54,23 +54,20 @@ export class HandlerDataGroup<
 export type HandlerDataGroupHandlerT<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   G extends HandlerDataGroup<any, any>,
-> =
-  Types.Invariant.Type<
-    G[HandlerDataGroupTypeId]["_HandlerT"]
-  > extends infer HT extends BaseHandlerT
-    ? HT
-    : never;
+> = [G] extends [HandlerDataGroup<infer HandlerT, any>] ? HandlerT : never;
 export type HandlerDataGroupHandlerDataGroupRecord<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   G extends HandlerDataGroup<any, any>,
-> =
-  Types.Invariant.Type<
-    G[HandlerDataGroupTypeId]["_HandlerDataGroupRecord"]
-  > extends infer R extends BaseHandlerDataGroupRecord<
-    HandlerDataGroupHandlerT<G>
-  >
-    ? R
-    : never;
+> = [G] extends [HandlerDataGroup<any, infer HandlerDataGroupRecord>]
+  ? HandlerDataGroupRecord
+  : never;
+export type InferHandlerDataGroup<
+  //eslint-disable-next-line @typescript-eslint/no-explicit-any
+  G extends HandlerDataGroup<any, any>,
+> = HandlerDataGroup<
+  HandlerDataGroupHandlerT<G>,
+  HandlerDataGroupHandlerDataGroupRecord<G>
+>;
 
 export const empty = <HandlerT extends BaseHandlerT>(
   dataKeyGetter: (data: HandlerData<HandlerT>) => string | symbol,
@@ -127,15 +124,11 @@ export const add = Function.dual<
     data: HData,
   ) =>
     new HandlerDataGroup<HandlerDataGroupHandlerT<G>, AddHandlerData<G, HData>>(
-      Struct.evolve(handlerDataGroup, {
+      Struct.evolve(handlerDataGroup as InferHandlerDataGroup<G>, {
         record: (record) =>
           Record.set(
             record,
-            handlerDataGroup.dataKeyGetter(data) as HandlerDataKey<
-              HandlerDataGroupHandlerT<G>,
-              HData
-            > &
-              (string | symbol),
+            (handlerDataGroup as InferHandlerDataGroup<G>).dataKeyGetter(data),
             data,
           ) as AddHandlerData<G, HData>,
       }),
@@ -211,7 +204,7 @@ export const addGroup = Function.dual<
       HandlerDataGroupHandlerT<ThisG>,
       AddHandlerDataGroup<ThisG, OtherG>
     >(
-      Struct.evolve(thisGroup, {
+      Struct.evolve(thisGroup as InferHandlerDataGroup<ThisG>, {
         record: (record) =>
           Record.union(
             record,
@@ -224,8 +217,7 @@ export const addGroup = Function.dual<
 
 export type GetHandlerData<
   G extends HandlerDataGroup<any, any>,
-  Key extends keyof HandlerDataGroupHandlerDataGroupRecord<G> &
-    (string | symbol),
+  Key extends keyof HandlerDataGroupHandlerDataGroupRecord<G> & string,
 > = HandlerDataGroupHandlerDataGroupRecord<G>[Key] extends infer HData extends
   HandlerData<HandlerDataGroupHandlerT<G>>
   ? HData
@@ -234,15 +226,13 @@ export type GetHandlerData<
 export const getHandlerData = Function.dual<
   <
     const G extends HandlerDataGroup<any, any>,
-    const Key extends keyof HandlerDataGroupHandlerDataGroupRecord<G> &
-      (string | symbol),
+    const Key extends keyof HandlerDataGroupHandlerDataGroupRecord<G> & string,
   >(
     key: Key,
   ) => (handlerDataGroup: G) => Option.Option<GetHandlerData<G, Key>>,
   <
     const G extends HandlerDataGroup<any, any>,
-    const Key extends keyof HandlerDataGroupHandlerDataGroupRecord<G> &
-      (string | symbol),
+    const Key extends keyof HandlerDataGroupHandlerDataGroupRecord<G> & string,
   >(
     handlerDataGroup: G,
     key: Key,
@@ -251,13 +241,9 @@ export const getHandlerData = Function.dual<
   2,
   <
     const G extends HandlerDataGroup<any, any>,
-    const Key extends keyof HandlerDataGroupHandlerDataGroupRecord<G> &
-      (string | symbol),
+    const Key extends keyof HandlerDataGroupHandlerDataGroupRecord<G> & string,
   >(
     handlerDataGroup: G,
     key: Key,
-  ) =>
-    Record.get(handlerDataGroup.record, key) as Option.Option<
-      GetHandlerData<G, Key>
-    >,
+  ) => Record.get((handlerDataGroup as InferHandlerDataGroup<G>).record, key),
 );

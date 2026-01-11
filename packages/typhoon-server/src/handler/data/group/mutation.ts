@@ -37,7 +37,7 @@ export type GetHandlerDataGroupRecord<G extends MutationHandlerDataGroup> =
 
 export type GetHandlerData<
   G extends MutationHandlerDataGroup,
-  Key extends keyof GetHandlerDataGroupRecord<G> & (string | symbol),
+  Key extends keyof GetHandlerDataGroupRecord<G> & string,
 > =
   Data.Group.GetHandlerData<G, Key> extends infer HData extends
     Type.HandlerData<MutationHandlerT>
@@ -47,7 +47,7 @@ export type GetHandlerData<
 export const getHandlerData =
   <
     const G extends MutationHandlerDataGroup,
-    const Key extends keyof GetHandlerDataGroupRecord<G> & (string | symbol),
+    const Key extends keyof GetHandlerDataGroupRecord<G> & string,
   >(
     key: Key,
   ) =>

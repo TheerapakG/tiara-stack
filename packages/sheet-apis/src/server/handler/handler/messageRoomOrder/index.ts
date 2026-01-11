@@ -12,12 +12,12 @@ import { upsertMessageRoomOrderEntryHandler } from "./upsertMessageRoomOrderEntr
 
 export const messageRoomOrderHandlerCollection = pipe(
   Context.Collection.empty(),
-  Context.Collection.add(getMessageRoomOrderHandler),
-  Context.Collection.add(upsertMessageRoomOrderHandler),
-  Context.Collection.add(decrementMessageRoomOrderRankHandler),
-  Context.Collection.add(incrementMessageRoomOrderRankHandler),
-  Context.Collection.add(getMessageRoomOrderEntryHandler),
-  Context.Collection.add(getMessageRoomOrderRangeHandler),
-  Context.Collection.add(upsertMessageRoomOrderEntryHandler),
-  Context.Collection.add(removeMessageRoomOrderEntryHandler),
+  Context.Collection.addSubscription(getMessageRoomOrderHandler),
+  Context.Collection.addMutation(upsertMessageRoomOrderHandler),
+  Context.Collection.addMutation(decrementMessageRoomOrderRankHandler),
+  Context.Collection.addMutation(incrementMessageRoomOrderRankHandler),
+  Context.Collection.addSubscription(getMessageRoomOrderEntryHandler),
+  Context.Collection.addSubscription(getMessageRoomOrderRangeHandler),
+  Context.Collection.addMutation(upsertMessageRoomOrderEntryHandler),
+  Context.Collection.addMutation(removeMessageRoomOrderEntryHandler),
 );

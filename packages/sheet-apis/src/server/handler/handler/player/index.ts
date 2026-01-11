@@ -10,10 +10,10 @@ import { mapScheduleWithPlayersHandler } from "./mapScheduleWithPlayers";
 
 export const playerHandlerCollection = pipe(
   Context.Collection.empty(),
-  Context.Collection.add(getPlayerMapsHandler),
-  Context.Collection.add(getByNameHandler),
-  Context.Collection.add(getByIdHandler),
-  Context.Collection.add(getTeamsByNameHandler),
-  Context.Collection.add(getTeamsByIdHandler),
-  Context.Collection.add(mapScheduleWithPlayersHandler),
+  Context.Collection.addSubscription(getPlayerMapsHandler),
+  Context.Collection.addSubscription(getByNameHandler),
+  Context.Collection.addSubscription(getByIdHandler),
+  Context.Collection.addSubscription(getTeamsByNameHandler),
+  Context.Collection.addSubscription(getTeamsByIdHandler),
+  Context.Collection.addSubscription(mapScheduleWithPlayersHandler),
 );

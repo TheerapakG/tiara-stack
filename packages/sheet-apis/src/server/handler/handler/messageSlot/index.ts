@@ -6,6 +6,6 @@ import { upsertMessageSlotDataHandler } from "./upsertMessageSlotData";
 
 export const messageSlotHandlerCollection = pipe(
   Context.Collection.empty(),
-  Context.Collection.add(getMessageSlotDataHandler),
-  Context.Collection.add(upsertMessageSlotDataHandler),
+  Context.Collection.addSubscription(getMessageSlotDataHandler),
+  Context.Collection.addMutation(upsertMessageSlotDataHandler),
 );

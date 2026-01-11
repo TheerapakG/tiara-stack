@@ -16,9 +16,9 @@ import {
   getHandlerContext as getGroupHandlerContext,
 } from "./group";
 import {
+  type DataOrUndefined,
   type HandlerContext,
   type HandlerOrUndefined,
-  type PartialHandlerContextHandlerT,
 } from "./context";
 import {
   type BaseHandlerT,
@@ -92,30 +92,28 @@ export class HandlerContextCollection<
 export type HandlerContextCollectionHandlerT<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   C extends HandlerContextCollection<any, any, any>,
-> =
-  Types.Invariant.Type<
-    C[HandlerContextCollectionTypeId]["_HandlerT"]
-  > extends infer HT extends BaseHandlerT
-    ? HT
-    : never;
+> = [C] extends [HandlerContextCollection<infer HandlerT, any, any>]
+  ? HandlerT
+  : never;
 export type HandlerContextCollectionContext<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   C extends HandlerContextCollection<any, any, any>,
-> =
-  Types.Covariant.Type<C[HandlerContextCollectionTypeId]["_R"]> extends infer R
-    ? R
-    : never;
+> = [C] extends [HandlerContextCollection<any, infer R, any>] ? R : never;
 export type HandlerContextCollectionHData<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   C extends HandlerContextCollection<any, any, any>,
-> =
-  Types.Invariant.Type<
-    C[HandlerContextCollectionTypeId]["_HData"]
-  > extends infer HData extends BaseHandlerDataCollectionRecord<
-    HandlerContextCollectionHandlerT<C>
-  >
-    ? HData
-    : never;
+> = [C] extends [HandlerContextCollection<any, any, infer HData>]
+  ? HData
+  : never;
+
+export type InferHandlerContextCollection<
+  //eslint-disable-next-line @typescript-eslint/no-explicit-any
+  C extends HandlerContextCollection<any, any, any>,
+> = HandlerContextCollection<
+  HandlerContextCollectionHandlerT<C>,
+  HandlerContextCollectionContext<C>,
+  HandlerContextCollectionHData<C>
+>;
 
 type HandlerDataKeyTransformerStruct<HandlerT extends BaseHandlerT> = {
   [HT in HandlerT as HandlerType<HT>]: (
@@ -149,48 +147,41 @@ export const empty = <HandlerT extends BaseHandlerT, R = never>(
 export const add = Function.dual<
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const Config extends HandlerContext<any>,
+    const C extends HandlerContextCollection<any, any, any>,
+    HandlerT extends HandlerContextCollectionHandlerT<C>,
+    const Config extends HandlerContext<HandlerT>,
   >(
     handlerContextConfig: Config,
-  ) => <
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const C extends HandlerContextCollection<any, any, any>,
-  >(
+  ) => (
     handlerContextCollection: C,
   ) => HandlerContextCollection<
     HandlerContextCollectionHandlerT<C>,
     | HandlerContextCollectionContext<C>
-    | HandlerEffectContext<
-        PartialHandlerContextHandlerT<Config>,
-        HandlerOrUndefined<Config>
-      >,
+    | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>,
     AddHandlerDataCollectionRecord<
       HandlerContextCollectionHandlerT<C>,
-      PartialHandlerContextHandlerT<Config>,
+      HandlerT,
       HandlerContextCollectionHData<C>,
-      HandlerData<PartialHandlerContextHandlerT<Config>>
+      DataOrUndefined<Config>
     >
   >,
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const C extends HandlerContextCollection<any, any, any>,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const Config extends HandlerContext<any>,
+    HandlerT extends HandlerContextCollectionHandlerT<C>,
+    const Config extends HandlerContext<HandlerT>,
   >(
     handlerContextCollection: C,
     handlerContextConfig: Config,
   ) => HandlerContextCollection<
     HandlerContextCollectionHandlerT<C>,
     | HandlerContextCollectionContext<C>
-    | HandlerEffectContext<
-        PartialHandlerContextHandlerT<Config>,
-        HandlerOrUndefined<Config>
-      >,
+    | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>,
     AddHandlerDataCollectionRecord<
       HandlerContextCollectionHandlerT<C>,
-      PartialHandlerContextHandlerT<Config>,
+      HandlerT,
       HandlerContextCollectionHData<C>,
-      HandlerData<PartialHandlerContextHandlerT<Config>>
+      DataOrUndefined<Config>
     >
   >
 >(
@@ -198,8 +189,8 @@ export const add = Function.dual<
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const C extends HandlerContextCollection<any, any, any>,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const Config extends HandlerContext<any>,
+    HandlerT extends HandlerContextCollectionHandlerT<C>,
+    const Config extends HandlerContext<HandlerT>,
   >(
     handlerContextCollection: C,
     handlerContextConfig: Config,
@@ -207,34 +198,35 @@ export const add = Function.dual<
     new HandlerContextCollection<
       HandlerContextCollectionHandlerT<C>,
       | HandlerContextCollectionContext<C>
-      | HandlerEffectContext<
-          PartialHandlerContextHandlerT<Config>,
-          HandlerOrUndefined<Config>
-        >,
+      | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>,
       AddHandlerDataCollectionRecord<
         HandlerContextCollectionHandlerT<C>,
-        PartialHandlerContextHandlerT<Config>,
+        HandlerT,
         HandlerContextCollectionHData<C>,
-        HandlerData<PartialHandlerContextHandlerT<Config>>
+        DataOrUndefined<Config>
       >
     >(
-      Struct.evolve(handlerContextCollection, {
-        record: (record) =>
-          Record.modify(
-            record,
-            handlerContextCollection.handlerContextTypeTransformer(
-              handlerContextConfig,
-            ),
-            addHandlerContextGroup(handlerContextConfig),
-          ) as HandlerContextGroupRecord<
-            HandlerContextCollectionHandlerT<C>,
-            | HandlerContextCollectionContext<C>
-            | HandlerEffectContext<
-                PartialHandlerContextHandlerT<Config>,
-                HandlerOrUndefined<Config>
-              >
-          >,
-      }),
+      Struct.evolve(
+        handlerContextCollection as InferHandlerContextCollection<C>,
+        {
+          record: (record) =>
+            Record.modify(
+              record,
+              handlerContextCollection.handlerContextTypeTransformer(
+                handlerContextConfig,
+              ),
+              (group) =>
+                addHandlerContextGroup(
+                  group as unknown as HandlerContextGroup<HandlerT, any, any>,
+                  handlerContextConfig,
+                ),
+            ) as unknown as HandlerContextGroupRecord<
+              HandlerContextCollectionHandlerT<C>,
+              | HandlerContextCollectionContext<C>
+              | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>
+            >,
+        },
+      ),
     ),
 );
 
@@ -304,11 +296,11 @@ export const addCollection = Function.dual<
         HandlerContextCollectionHData<OtherC>
       >
     >(
-      Struct.evolve(thisCollection, {
+      Struct.evolve(thisCollection as InferHandlerContextCollection<ThisC>, {
         record: (record) =>
           Record.union(
             record,
-            otherCollection.record,
+            (otherCollection as InferHandlerContextCollection<OtherC>).record,
             addGroupHandlerContextGroup,
           ) as HandlerContextGroupRecord<
             | HandlerContextCollectionHandlerT<ThisC>
@@ -355,9 +347,9 @@ export const getHandlerContext = Function.dual<
 >(
   3,
   <
-    HandlerT extends BaseHandlerT,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const C extends HandlerContextCollection<any, any, any>,
+    HandlerT extends BaseHandlerT,
   >(
     handlerContextCollection: C,
     type: HandlerType<HandlerT>,
@@ -370,7 +362,16 @@ export const getHandlerContext = Function.dual<
     >
   > =>
     pipe(
-      Record.get(handlerContextCollection.record, type),
+      Record.get(
+        (handlerContextCollection as InferHandlerContextCollection<C>).record,
+        type,
+      ),
       Option.flatMap(getGroupHandlerContext(key)),
-    ),
+    ) as unknown as Option.Option<
+      HandlerContext<
+        HandlerT,
+        HandlerData<HandlerT>,
+        Handler<HandlerT, unknown, unknown, HandlerContextCollectionContext<C>>
+      >
+    >,
 );

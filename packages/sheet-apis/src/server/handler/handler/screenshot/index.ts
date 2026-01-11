@@ -5,5 +5,5 @@ import { getScreenshotHandler } from "./getScreenshot";
 
 export const screenshotHandlerCollection = pipe(
   Context.Collection.empty(),
-  Context.Collection.add(getScreenshotHandler),
+  Context.Collection.addSubscription(getScreenshotHandler),
 );

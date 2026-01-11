@@ -34,16 +34,54 @@ export const empty = <R = never>() =>
 
 export const add =
   <
-    const Config extends
-      | Context.HandlerContext<MutationHandlerT>
-      | Context.HandlerContext<SubscriptionHandlerT>,
+    const Collection extends HandlerContextCollection<any>,
+    const Config extends Context.HandlerContext<HandlerT>,
+    HandlerT extends (MutationHandlerT | SubscriptionHandlerT) &
+      Context.Collection.HandlerContextCollectionHandlerT<Collection>,
   >(
     handlerContext: Config,
   ) =>
-  <Collection extends HandlerContextCollection<any>>(
-    handlerContextCollection: Collection,
+  (handlerContextCollection: Collection) =>
+    Context.Collection.add<Collection, HandlerT, Config>(
+      handlerContextCollection,
+      handlerContext,
+    );
+
+export const addSubscription =
+  <
+    const Collection extends HandlerContextCollection<any>,
+    const Config extends Context.HandlerContext<
+      SubscriptionHandlerT &
+        Context.Collection.HandlerContextCollectionHandlerT<Collection>
+    >,
+  >(
+    handlerContext: Config,
   ) =>
-    pipe(handlerContextCollection, Context.Collection.add(handlerContext));
+  (handlerContextCollection: Collection) =>
+    Context.Collection.add<
+      Collection,
+      SubscriptionHandlerT &
+        Context.Collection.HandlerContextCollectionHandlerT<Collection>,
+      Config
+    >(handlerContextCollection, handlerContext);
+
+export const addMutation =
+  <
+    const Collection extends HandlerContextCollection<any>,
+    const Config extends Context.HandlerContext<
+      MutationHandlerT &
+        Context.Collection.HandlerContextCollectionHandlerT<Collection>
+    >,
+  >(
+    handlerContext: Config,
+  ) =>
+  (handlerContextCollection: Collection) =>
+    Context.Collection.add<
+      Collection,
+      MutationHandlerT &
+        Context.Collection.HandlerContextCollectionHandlerT<Collection>,
+      Config
+    >(handlerContextCollection, handlerContext);
 
 export const addCollection =
   <OtherCollection extends HandlerContextCollection<any>>(
@@ -52,7 +90,7 @@ export const addCollection =
   <ThisCollection extends HandlerContextCollection<any>>(
     thisCollection: ThisCollection,
   ) =>
-    pipe(thisCollection, Context.Collection.addCollection(otherCollection));
+    Context.Collection.addCollection(thisCollection, otherCollection);
 
 export const getHandlerContext =
   <HandlerT extends MutationHandlerT | SubscriptionHandlerT>(

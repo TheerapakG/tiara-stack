@@ -25,6 +25,7 @@ import {
 } from "./collection";
 import {
   type HandlerContextGroupWithMetrics as HandlerContextGroupWithMetricsType,
+  HandlerContextGroupWithMetrics,
   make as makeHandlerContextGroupWithMetrics,
   execute as executeHandlerContextGroupWithMetrics,
   initialize as initializeHandlerContextGroupWithMetrics,
@@ -170,19 +171,27 @@ export class HandlerContextCollectionWithMetrics<
 export type HandlerContextCollectionWithMetricsHandlerT<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   C extends HandlerContextCollectionWithMetrics<any, any, any>,
-> = Types.Invariant.Type<
-  C[HandlerContextCollectionWithMetricsTypeId]["_HandlerT"]
->;
+> = [C] extends [HandlerContextCollectionWithMetrics<infer HandlerT, any, any>]
+  ? HandlerT
+  : never;
 export type HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   C extends HandlerContextCollectionWithMetrics<any, any, any>,
-> = Types.Invariant.Type<
-  C[HandlerContextCollectionWithMetricsTypeId]["_WithMetricsExecutorTRecord"]
->;
+> = [C] extends [
+  HandlerContextCollectionWithMetrics<
+    any,
+    infer WithMetricsExecutorTRecord,
+    any
+  >,
+]
+  ? WithMetricsExecutorTRecord
+  : never;
 export type HandlerContextCollectionWithMetricsContext<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   C extends HandlerContextCollectionWithMetrics<any, any, any>,
-> = Types.Covariant.Type<C[HandlerContextCollectionWithMetricsTypeId]["_R"]>;
+> = [C] extends [HandlerContextCollectionWithMetrics<any, any, infer R>]
+  ? R
+  : never;
 export type HandlerContextCollectionWithMetricsWithMetricsExecutorT<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   C extends HandlerContextCollectionWithMetrics<any, any, any>,
@@ -191,6 +200,15 @@ export type HandlerContextCollectionWithMetricsWithMetricsExecutorT<
   WithMetricsExecutorTypeLambda
   ? W
   : never;
+
+export type InferHandlerContextCollectionWithMetrics<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  C extends HandlerContextCollectionWithMetrics<any, any, any>,
+> = HandlerContextCollectionWithMetrics<
+  HandlerContextCollectionWithMetricsHandlerT<C>,
+  HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<C>,
+  HandlerContextCollectionWithMetricsContext<C>
+>;
 
 export const make = <
   HandlerT extends BaseHandlerT,
@@ -362,24 +380,39 @@ export const add = Function.dual<
             | HandlerEffectContext<HandlerT, H>
         : never
     >(
-      Struct.evolve(collectionWithMetrics, {
-        record: (record) =>
-          Record.modify(
-            record,
-            collectionWithMetrics.handlerContextTypeTransformer(
-              handlerContextConfig,
-            ) as HandlerType<HandlerT>,
-            addHandlerContextGroupWithMetrics(handlerContextConfig),
-          ) as HandlerContextGroupWithMetricsRecord<
-            HandlerContextCollectionWithMetricsHandlerT<C>,
-            HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<C>,
-            HandlerOrUndefined<Config> extends infer H extends Handler<HandlerT>
-              ?
-                  | HandlerContextCollectionWithMetricsContext<C>
-                  | HandlerEffectContext<HandlerT, H>
-              : never
-          >,
-      }),
+      Struct.evolve(
+        collectionWithMetrics as InferHandlerContextCollectionWithMetrics<C>,
+        {
+          record: (record) =>
+            Record.modify(
+              record,
+              collectionWithMetrics.handlerContextTypeTransformer(
+                handlerContextConfig,
+              ) as HandlerType<HandlerT>,
+              (group) =>
+                addHandlerContextGroupWithMetrics(
+                  group as unknown as HandlerContextGroupWithMetrics<
+                    HandlerT,
+                    HandlerContextCollectionWithMetricsWithMetricsExecutorT<
+                      C,
+                      HandlerT
+                    >,
+                    HandlerContextCollectionWithMetricsContext<C>
+                  >,
+                  handlerContextConfig,
+                ),
+            ) as unknown as HandlerContextGroupWithMetricsRecord<
+              HandlerContextCollectionWithMetricsHandlerT<C>,
+              HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<C>,
+              HandlerOrUndefined<Config> extends infer H extends
+                Handler<HandlerT>
+                ?
+                    | HandlerContextCollectionWithMetricsContext<C>
+                    | HandlerEffectContext<HandlerT, H>
+                : never
+            >,
+        },
+      ),
     ),
 );
 
@@ -443,32 +476,39 @@ export const addCollection = Function.dual<
       | HandlerContextCollectionWithMetricsContext<ThisC>
       | HandlerContextCollectionContext<OtherC>
     >(
-      Struct.evolve(thisCollectionWithMetrics, {
-        record: (record) =>
-          Record.mapEntries(
-            record,
-            (
-              groupWithMetrics,
-              type: HandlerType<
-                HandlerContextCollectionWithMetricsHandlerT<ThisC>
-              >,
-            ) => [
-              type,
-              addGroupHandlerContextGroupWithMetrics(
-                otherCollection.record[type] as HandlerContextGroup<
-                  HandlerContextCollectionWithMetricsHandlerT<ThisC>,
-                  HandlerContextCollectionContext<OtherC>,
-                  any
-                >,
-              )(groupWithMetrics),
-            ],
-          ) as unknown as HandlerContextGroupWithMetricsRecord<
-            HandlerContextCollectionWithMetricsHandlerT<ThisC>,
-            HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<ThisC>,
-            | HandlerContextCollectionWithMetricsContext<ThisC>
-            | HandlerContextCollectionContext<OtherC>
-          >,
-      }),
+      Struct.evolve(
+        thisCollectionWithMetrics as InferHandlerContextCollectionWithMetrics<ThisC>,
+        {
+          record: (record) =>
+            Record.mapEntries(
+              record,
+              <HT extends HandlerContextCollectionWithMetricsHandlerT<ThisC>>(
+                groupWithMetrics: HandlerContextGroupWithMetrics<HT, any, any>,
+                type: string,
+              ) => [
+                type,
+                addGroupHandlerContextGroupWithMetrics(
+                  groupWithMetrics as HandlerContextGroupWithMetrics<
+                    HT,
+                    HandlerContextCollectionWithMetricsWithMetricsExecutorT<
+                      ThisC,
+                      HT
+                    >,
+                    HandlerContextCollectionWithMetricsContext<ThisC>
+                  >,
+                  otherCollection.record[
+                    type as HandlerType<HT>
+                  ] as HandlerContextGroup<HT, any, any>,
+                ),
+              ],
+            ) as unknown as HandlerContextGroupWithMetricsRecord<
+              HandlerContextCollectionWithMetricsHandlerT<ThisC>,
+              HandlerContextCollectionWithMetricsWithMetricsExecutorTRecord<ThisC>,
+              | HandlerContextCollectionWithMetricsContext<ThisC>
+              | HandlerContextCollectionContext<OtherC>
+            >,
+        },
+      ),
     ),
 );
 
@@ -526,7 +566,11 @@ export const execute = Function.dual<
     >,
   ) =>
     pipe(
-      Record.get(collectionWithMetrics.record, type) as Option.Option<
+      Record.get(
+        (collectionWithMetrics as InferHandlerContextCollectionWithMetrics<C>)
+          .record,
+        type,
+      ) as unknown as Option.Option<
         HandlerContextGroupWithMetricsType<
           HandlerT,
           HandlerContextCollectionWithMetricsWithMetricsExecutorT<C, HandlerT>,

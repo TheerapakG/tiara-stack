@@ -6,6 +6,6 @@ import { sheetCalcHandler } from "./sheetCalc";
 
 export const calcHandlerCollection = pipe(
   Context.Collection.empty(),
-  Context.Collection.add(botCalcHandler),
-  Context.Collection.add(sheetCalcHandler),
+  Context.Collection.addSubscription(botCalcHandler),
+  Context.Collection.addSubscription(sheetCalcHandler),
 );
