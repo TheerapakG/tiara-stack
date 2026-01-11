@@ -44,7 +44,7 @@ type HandlerContextGroupWithMetricsObject<
 > = {
   group: HandlerContextGroup<HandlerT, R, any>;
   executor: (
-    handler: Handler<HandlerT, unknown, unknown, R>,
+    handler: Option.Option<Handler<HandlerT, unknown, unknown, R>>,
     context: WithMetricsExecutorContextKind<WithMetricsContextT, R>,
   ) => WithMetricsExecutorResultKind<WithMetricsContextT, R>;
   handlerType: HandlerType<HandlerT>;
@@ -151,7 +151,7 @@ export const make = <
   handlerType: HandlerType<HandlerT>,
   group: HandlerContextGroup<HandlerT, R, any>,
   executor: <MetricsR>(
-    handler: Handler<HandlerT, unknown, unknown, R>,
+    handler: Option.Option<Handler<HandlerT, unknown, unknown, R>>,
     context: WithMetricsExecutorContextKind<WithMetricsExecutorT, MetricsR>,
   ) => WithMetricsExecutorResultKind<WithMetricsExecutorT, MetricsR>,
 ): HandlerContextGroupWithMetrics<HandlerT, WithMetricsExecutorT, R> =>
@@ -181,11 +181,9 @@ export const execute = Function.dual<
     >,
   ) => (
     groupWithMetrics: G,
-  ) => Option.Option<
-    WithMetricsExecutorResultKind<
-      HandlerContextGroupWithMetricsWithMetricsExecutorT<G>,
-      HandlerContextGroupWithMetricsContext<G>
-    >
+  ) => WithMetricsExecutorResultKind<
+    HandlerContextGroupWithMetricsWithMetricsExecutorT<G>,
+    HandlerContextGroupWithMetricsContext<G>
   >,
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -200,11 +198,9 @@ export const execute = Function.dual<
       HandlerContextGroupWithMetricsWithMetricsExecutorT<G>,
       HandlerContextGroupWithMetricsContext<G>
     >,
-  ) => Option.Option<
-    WithMetricsExecutorResultKind<
-      HandlerContextGroupWithMetricsWithMetricsExecutorT<G>,
-      HandlerContextGroupWithMetricsContext<G>
-    >
+  ) => WithMetricsExecutorResultKind<
+    HandlerContextGroupWithMetricsWithMetricsExecutorT<G>,
+    HandlerContextGroupWithMetricsContext<G>
   >
 >(
   3,
@@ -225,47 +221,43 @@ export const execute = Function.dual<
     pipe(
       groupWithMetrics.group,
       getHandlerContext(key),
-      Option.map((context) =>
-        pipe(
-          groupWithMetrics.executor(
-            handler(context),
-            metricsContext,
-          ) as WithMetricsExecutorResultKind<
-            HandlerContextGroupWithMetricsWithMetricsExecutorT<G>,
-            HandlerContextGroupWithMetricsContext<G>
-          >,
-          Effect.tapBoth({
-            onSuccess: () =>
-              pipe(
-                groupWithMetrics.handlerCount,
-                Metric.update(BigInt(1)),
-                Effect.tagMetrics({
-                  handler_type: String(groupWithMetrics.handlerType),
-                  handler_key: String(key),
-                  handler_status: "success",
-                }),
-              ),
-            onFailure: () =>
-              pipe(
-                groupWithMetrics.handlerCount,
-                Metric.update(BigInt(1)),
-                Effect.tagMetrics({
-                  handler_type: String(groupWithMetrics.handlerType),
-                  handler_key: String(key),
-                  handler_status: "failure",
-                }),
-              ),
-          }),
-          Effect.withSpan("HandlerContextGroupWithMetrics.execute", {
-            captureStackTrace: true,
-          }),
-        ),
-      ),
-    ) as Option.Option<
-      WithMetricsExecutorResultKind<
-        HandlerContextGroupWithMetricsWithMetricsExecutorT<G>,
-        HandlerContextGroupWithMetricsContext<G>
-      >
+      Option.map(handler),
+      (handlerOption) =>
+        groupWithMetrics.executor(
+          handlerOption,
+          metricsContext,
+        ) as WithMetricsExecutorResultKind<
+          HandlerContextGroupWithMetricsWithMetricsExecutorT<G>,
+          HandlerContextGroupWithMetricsContext<G>
+        >,
+      Effect.tapBoth({
+        onSuccess: () =>
+          pipe(
+            groupWithMetrics.handlerCount,
+            Metric.update(BigInt(1)),
+            Effect.tagMetrics({
+              handler_type: String(groupWithMetrics.handlerType),
+              handler_key: String(key),
+              handler_status: "success",
+            }),
+          ),
+        onFailure: () =>
+          pipe(
+            groupWithMetrics.handlerCount,
+            Metric.update(BigInt(1)),
+            Effect.tagMetrics({
+              handler_type: String(groupWithMetrics.handlerType),
+              handler_key: String(key),
+              handler_status: "failure",
+            }),
+          ),
+      }),
+      Effect.withSpan("HandlerContextGroupWithMetrics.execute", {
+        captureStackTrace: true,
+      }),
+    ) as WithMetricsExecutorResultKind<
+      HandlerContextGroupWithMetricsWithMetricsExecutorT<G>,
+      HandlerContextGroupWithMetricsContext<G>
     >,
 );
 

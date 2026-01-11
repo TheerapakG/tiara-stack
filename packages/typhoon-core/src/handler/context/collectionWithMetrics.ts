@@ -221,7 +221,7 @@ export const make = <
   collection: HandlerContextCollection<HandlerT, R, any>,
   executors: {
     [HT in HandlerT as HandlerType<HT>]: <MetricsR>(
-      handler: Handler<HT, unknown, unknown, R>,
+      handler: Option.Option<Handler<HT, unknown, unknown, R>>,
       context: WithMetricsExecutorContextKind<
         HandlerType<HT> extends keyof WithMetricsExecutorTRecord
           ? WithMetricsExecutorTRecord[HandlerType<HT>] extends infer W extends
@@ -252,7 +252,7 @@ export const make = <
         type as HandlerType<HandlerT>,
         group as unknown as HandlerContextGroup<HandlerT, R, any>,
         executors[type as HandlerType<HandlerT>] as (
-          handler: Handler<HandlerT, unknown, unknown, R>,
+          handler: Option.Option<Handler<HandlerT, unknown, unknown, R>>,
           context: WithMetricsExecutorContextKind<
             HandlerType<HandlerT> extends keyof WithMetricsExecutorTRecord
               ? WithMetricsExecutorTRecord[HandlerType<HandlerT>] extends infer W extends
@@ -290,7 +290,7 @@ export const empty = <
   handlerContextTypeTransformer: HandlerContextTypeTransformer<HandlerT>,
   executors: {
     [HT in HandlerT as HandlerType<HT>]: (
-      handler: Handler<HT, unknown, unknown, R>,
+      handler: Option.Option<Handler<HT, unknown, unknown, R>>,
       context: WithMetricsExecutorContextKind<
         HandlerType<HT> extends keyof WithMetricsExecutorTRecord
           ? WithMetricsExecutorTRecord[HandlerType<HT>] extends infer W extends
@@ -526,11 +526,9 @@ export const execute = Function.dual<
     >,
   ) => (
     collectionWithMetrics: C,
-  ) => Option.Option<
-    WithMetricsExecutorResultKind<
-      HandlerContextCollectionWithMetricsWithMetricsExecutorT<C, HandlerT>,
-      HandlerContextCollectionWithMetricsContext<C>
-    >
+  ) => WithMetricsExecutorResultKind<
+    HandlerContextCollectionWithMetricsWithMetricsExecutorT<C, HandlerT>,
+    HandlerContextCollectionWithMetricsContext<C>
   >,
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -544,11 +542,9 @@ export const execute = Function.dual<
       HandlerContextCollectionWithMetricsWithMetricsExecutorT<C, HandlerT>,
       HandlerContextCollectionWithMetricsContext<C>
     >,
-  ) => Option.Option<
-    WithMetricsExecutorResultKind<
-      HandlerContextCollectionWithMetricsWithMetricsExecutorT<C, HandlerT>,
-      HandlerContextCollectionWithMetricsContext<C>
-    >
+  ) => WithMetricsExecutorResultKind<
+    HandlerContextCollectionWithMetricsWithMetricsExecutorT<C, HandlerT>,
+    HandlerContextCollectionWithMetricsContext<C>
   >
 >(
   4,
@@ -577,9 +573,10 @@ export const execute = Function.dual<
           HandlerContextCollectionWithMetricsContext<C>
         >
       >,
-      Option.flatMap(
-        executeHandlerContextGroupWithMetrics(key, metricsContext),
+      Option.getOrThrowWith(
+        () => new Error(`No group with metrics of type ${type} found`),
       ),
+      executeHandlerContextGroupWithMetrics(key, metricsContext),
     ),
 );
 

@@ -34,6 +34,7 @@ import { UntilObserver, SideEffect, SignalService } from "typhoon-core/signal";
 import { parseURL, withoutTrailingSlash } from "ufo";
 import {
   close as closeEvent,
+  handler as eventHandler,
   Event,
   makeEventService,
   type MsgpackPullEffect,
@@ -290,15 +291,14 @@ export const create = <R = never>(serveFn: typeof crosswsServe) =>
               ),
             {
               mutation: (
-                handler: Type.Handler<MutationHandlerT, unknown, unknown, R>,
+                handler: Option.Option<
+                  Type.Handler<MutationHandlerT, unknown, unknown, R>
+                >,
                 context: MutationWithMetricsContext<R>,
               ) => runMutationHandler<R>(handler, context),
               subscription: (
-                handler: Type.Handler<
-                  SubscriptionHandlerT,
-                  unknown,
-                  unknown,
-                  R
+                handler: Option.Option<
+                  Type.Handler<SubscriptionHandlerT, unknown, unknown, R>
                 >,
                 context: SubscriptionWithMetricsContext<R>,
               ) => runSubscriptionHandler<R>(handler, context),
@@ -673,9 +673,21 @@ const encodeServerUpdateResult = (result: ServerUpdateResult) =>
 
 const runHandler =
   (id: string, span: Tracer.Span) =>
-  <R = never>(handler: Effect.Effect<unknown, unknown, R>) =>
+  <R = never>(handler: Option.Option<Effect.Effect<unknown, unknown, R>>) =>
     pipe(
-      Effect.exit(handler),
+      handler as Option.Option<Effect.Effect<unknown, unknown, R | Event>>,
+      Option.getOrElse(() =>
+        pipe(
+          eventHandler(),
+          Effect.flatMap(
+            Option.match({
+              onSome: (handler) => Effect.die(`Handler ${handler} not found`),
+              onNone: () => Effect.die(`Handler not found`),
+            }),
+          ),
+        ),
+      ),
+      Effect.exit,
       Effect.scoped,
       Effect.flatMap(getServerUpdateResult(id, span)),
       Effect.flatMap(encodeServerUpdateResult),
@@ -685,11 +697,14 @@ const runHandler =
     );
 
 const runSubscriptionHandlerOnce = <R>(
-  handler: Type.Handler<SubscriptionHandlerT, unknown, unknown, R>,
+  handler: Option.Option<
+    Type.Handler<SubscriptionHandlerT, unknown, unknown, R>
+  >,
   context: SubscriptionOnceWithMetricsContext<R>,
 ) =>
   pipe(
     handler,
+    Effect.transposeOption,
     Effect.map(
       flow(
         runHandler(context.id, context.span),
@@ -708,11 +723,14 @@ const runSubscriptionHandlerOnce = <R>(
   );
 
 const runSubscriptionHandlerSubscribe = <R>(
-  handler: Type.Handler<SubscriptionHandlerT, unknown, unknown, R>,
+  handler: Option.Option<
+    Type.Handler<SubscriptionHandlerT, unknown, unknown, R>
+  >,
   context: SubscriptionSubscribeWithMetricsContext<R>,
 ) =>
   pipe(
     handler,
+    Effect.transposeOption,
     Effect.map(
       flow(
         runHandler(context.id, context.span),
@@ -733,7 +751,9 @@ const runSubscriptionHandlerSubscribe = <R>(
   );
 
 const runSubscriptionHandler = <R>(
-  handler: Type.Handler<SubscriptionHandlerT, unknown, unknown, R>,
+  handler: Option.Option<
+    Type.Handler<SubscriptionHandlerT, unknown, unknown, R>
+  >,
   context: SubscriptionWithMetricsContext<R>,
 ) =>
   pipe(
@@ -748,7 +768,7 @@ const runSubscriptionHandler = <R>(
   );
 
 const runMutationHandler = <R>(
-  handler: Type.Handler<MutationHandlerT, unknown, unknown, R>,
+  handler: Option.Option<Type.Handler<MutationHandlerT, unknown, unknown, R>>,
   context: MutationWithMetricsContext<R>,
 ) =>
   pipe(
@@ -825,13 +845,6 @@ const handleSubscribe =
                       serverWithRuntime,
                       subscriptionState,
                     }),
-                    Option.getOrElse(() =>
-                      Effect.logError(
-                        new Error(
-                          `subscription handler ${header.payload.handler} not found`,
-                        ),
-                      ),
-                    ),
                   ),
                 ),
                 Effect.map((subscriptionState) =>
@@ -920,13 +933,6 @@ const handleOnce =
             sendClientBuffer: callback,
             serverWithRuntime,
           }),
-          Option.getOrElse(() =>
-            Effect.logError(
-              new Error(
-                `subscription handler ${header.payload.handler} not found`,
-              ),
-            ),
-          ),
         ),
       ),
       Effect.asVoid,
@@ -971,11 +977,6 @@ const handleMutate =
             sendClientBuffer: callback,
             serverWithRuntime,
           }),
-          Option.getOrElse(() =>
-            Effect.logError(
-              new Error(`mutation handler ${header.payload.handler} not found`),
-            ),
-          ),
         ),
       ),
       Effect.asVoid,
@@ -1004,15 +1005,19 @@ const makeEventServiceFromHeader = (
     header.payload,
     Schema.decodeUnknown(
       Schema.Struct({
-        token: Schema.optional(Schema.String),
+        handler: Schema.optionalWith(Schema.String, { as: "Option" }),
+        token: Schema.optionalWith(Schema.String, { as: "Option" }),
       }),
     ),
-    Effect.catchTag("ParseError", () => Effect.succeed({ token: undefined })),
+    Effect.catchTag("ParseError", () =>
+      Effect.succeed({ handler: Option.none(), token: Option.none() }),
+    ),
     Effect.flatMap((payload) =>
       makeEventService({
+        handler: payload.handler,
         request,
         token: pipe(
-          Option.fromNullable(payload.token),
+          payload.token,
           Option.orElse(() =>
             pipe(
               Option.fromNullable(request.headers.get("Authorization")),

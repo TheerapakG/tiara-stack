@@ -48,6 +48,7 @@ const pullEffectToParsed =
     );
 
 type EventContext = {
+  handler: Option.Option<string>;
   request: Request;
   token: Option.Option<string>;
   pullEffect: {
@@ -59,6 +60,7 @@ type EventContext = {
 export class Event extends Context.Tag("Event")<
   Event,
   SynchronizedRef.SynchronizedRef<{
+    handler: Option.Option<string>;
     request: Request;
     token: Option.Option<string>;
     pullEffect: Signal.Signal<
@@ -84,6 +86,7 @@ export const makeEventService = (
     }),
     Effect.flatMap((pullEffect) =>
       SynchronizedRef.make({
+        handler: ctx.handler,
         request: ctx.request,
         token: ctx.token,
         pullEffect,
@@ -142,6 +145,13 @@ export const close = (): Effect.Effect<void, never, Event> =>
     Effect.tap(({ oldPullStream }) =>
       Scope.close(oldPullStream.scope, Exit.void),
     ),
+  );
+
+export const handler = (): Effect.Effect<Option.Option<string>, never, Event> =>
+  pipe(
+    Event,
+    Effect.flatMap((ref) => SynchronizedRef.get(ref)),
+    Effect.map((ctx) => ctx.handler),
   );
 
 export const webRequest = (): Effect.Effect<Request, never, Event> =>
