@@ -39,9 +39,7 @@ export const incrementMessageRoomOrderRankHandler = pipe(
           }),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(
-          incrementMessageRoomOrderRankHandlerConfig,
-        ),
+        Handler.Config.encodeResponseEffect(incrementMessageRoomOrderRankHandlerConfig),
         Effect.withSpan("incrementMessageRoomOrderRankHandler", {
           captureStackTrace: true,
         }),

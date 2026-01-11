@@ -16,16 +16,10 @@ import * as DependentSignal from "./dependentSignal";
 import * as SignalContext from "./signalContext";
 import * as SignalService from "./signalService";
 
-export const DependencySymbol: unique symbol = Symbol(
-  "Typhoon/Signal/Dependency",
-);
+export const DependencySymbol: unique symbol = Symbol("Typhoon/Signal/Dependency");
 
 export abstract class DependencySignal<A = never, E = never, R = never>
-  extends Effectable.Class<
-    A,
-    E,
-    R | SignalContext.SignalContext | SignalService.SignalService
-  >
+  extends Effectable.Class<A, E, R | SignalContext.SignalContext | SignalService.SignalService>
   implements Observable.Observable
 {
   abstract readonly _tag: string;
@@ -33,21 +27,15 @@ export abstract class DependencySignal<A = never, E = never, R = never>
   abstract readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
   abstract addDependent(
-    dependent:
-      | WeakRef<DependentSignal.DependentSignal>
-      | DependentSignal.DependentSignal,
+    dependent: WeakRef<DependentSignal.DependentSignal> | DependentSignal.DependentSignal,
   ): STM.STM<void, never, never>;
   abstract removeDependent(
-    dependent:
-      | WeakRef<DependentSignal.DependentSignal>
-      | DependentSignal.DependentSignal,
+    dependent: WeakRef<DependentSignal.DependentSignal> | DependentSignal.DependentSignal,
   ): STM.STM<void, never, never>;
   abstract clearDependents(): STM.STM<void, never, never>;
 
   abstract getDependents(): STM.STM<
-    TSet.TSet<
-      WeakRef<DependentSignal.DependentSignal> | DependentSignal.DependentSignal
-    >,
+    TSet.TSet<WeakRef<DependentSignal.DependentSignal> | DependentSignal.DependentSignal>,
     never,
     never
   >;
@@ -67,19 +55,16 @@ export const isDependencySignal = (
 ): signal is DependencySignal<unknown, unknown, unknown> =>
   Boolean(
     signal &&
-      typeof signal === "object" &&
-      DependencySymbol in signal &&
-      signal[DependencySymbol] === signal,
+    typeof signal === "object" &&
+    DependencySymbol in signal &&
+    signal[DependencySymbol] === signal,
   );
 
 export const buildDependentsSnapshot = (
-  dependency:
-    | DependencySignal<unknown, unknown, unknown>
-    | DependentSignal.DependentSignal,
+  dependency: DependencySignal<unknown, unknown, unknown> | DependentSignal.DependentSignal,
 ): STM.STM<
   TMap.TMap<
-    | DependencySignal<unknown, unknown, unknown>
-    | DependentSignal.DependentSignal,
+    DependencySignal<unknown, unknown, unknown> | DependentSignal.DependentSignal,
     {
       dependencies: DependencySignal<unknown, unknown, unknown>[];
       dependents: DependentSignal.DependentSignal[];
@@ -103,9 +88,7 @@ export const buildDependentsSnapshot = (
     STM.let("derefDependents", ({ dependents }) =>
       pipe(
         dependents,
-        Array.map((dependent) =>
-          dependent instanceof WeakRef ? dependent.deref() : dependent,
-        ),
+        Array.map((dependent) => (dependent instanceof WeakRef ? dependent.deref() : dependent)),
         Array.filter((dependent) => dependent !== undefined),
       ),
     ),
@@ -117,11 +100,7 @@ export const buildDependentsSnapshot = (
         pipe(
           buildDependentsSnapshot(dependent),
           STM.flatMap(TMap.toArray),
-          STM.flatMap(
-            STM.forEach(([key, value]) =>
-              TMap.setIfAbsent(dependentsMap, key, value),
-            ),
-          ),
+          STM.flatMap(STM.forEach(([key, value]) => TMap.setIfAbsent(dependentsMap, key, value))),
         ),
       ),
     ),
@@ -130,8 +109,7 @@ export const buildDependentsSnapshot = (
 
 export const getDependentsUpdateOrder = (
   dependentsSnapshot: TMap.TMap<
-    | DependencySignal<unknown, unknown, unknown>
-    | DependentSignal.DependentSignal,
+    DependencySignal<unknown, unknown, unknown> | DependentSignal.DependentSignal,
     {
       dependencies: DependencySignal<unknown, unknown, unknown>[];
       dependents: DependentSignal.DependentSignal[];
@@ -145,9 +123,7 @@ export const getDependentsUpdateOrder = (
       pipe(
         TMap.get(dependentsSnapshot, dependency),
         STM.map(Option.map(({ dependents }) => dependents)),
-        STM.map(
-          Option.getOrElse(() => [] as DependentSignal.DependentSignal[]),
-        ),
+        STM.map(Option.getOrElse(() => [] as DependentSignal.DependentSignal[])),
       ),
     ),
     STM.bind("nestedDependents", ({ thisDependents }) =>
@@ -156,9 +132,7 @@ export const getDependentsUpdateOrder = (
           pipe(
             thisDependents,
             Array.filter((dependency) => isDependencySignal(dependency)),
-            Array.map((dependency) =>
-              getDependentsUpdateOrder(dependentsSnapshot, dependency),
-            ),
+            Array.map((dependency) => getDependentsUpdateOrder(dependentsSnapshot, dependency)),
           ),
         ),
         STM.map(Array.flatten),
@@ -183,8 +157,7 @@ export const getDependentsUpdateOrder = (
 const computeChanged = (
   changed: TSet.TSet<DependencySignal<unknown, unknown, unknown>>,
   dependentsSnapshot: TMap.TMap<
-    | DependencySignal<unknown, unknown, unknown>
-    | DependentSignal.DependentSignal,
+    DependencySignal<unknown, unknown, unknown> | DependentSignal.DependentSignal,
     {
       dependencies: DependencySignal<unknown, unknown, unknown>[];
       dependents: DependentSignal.DependentSignal[];
@@ -202,8 +175,7 @@ const computeChanged = (
             context.unchanged,
             Option.match({
               onSome: (unchanged) => TRef.get(unchanged),
-              onNone: () =>
-                TSet.empty<DependencySignal<unknown, unknown, unknown>>(),
+              onNone: () => TSet.empty<DependencySignal<unknown, unknown, unknown>>(),
             }),
           ),
         ),
@@ -255,9 +227,7 @@ export const notifyAllDependents =
             STM.map(HashSet.size),
             STM.map((size) => !Number.Equivalence(size, 0)),
             STM.tap(() =>
-              isDependencySignal(dependent)
-                ? TSet.add(changed, dependent)
-                : STM.void,
+              isDependencySignal(dependent) ? TSet.add(changed, dependent) : STM.void,
             ),
             STM.commit,
             Effect.tap((changed) =>
@@ -266,11 +236,7 @@ export const notifyAllDependents =
                 : isDependencySignal(dependent)
                   ? pipe(
                       TRef.get(context.unchanged),
-                      STM.flatMap(
-                        TSet.add<DependencySignal<unknown, unknown, unknown>>(
-                          dependent,
-                        ),
-                      ),
+                      STM.flatMap(TSet.add<DependencySignal<unknown, unknown, unknown>>(dependent)),
                       STM.asVoid,
                       STM.commit,
                     )

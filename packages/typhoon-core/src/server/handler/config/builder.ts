@@ -3,10 +3,7 @@ import { type TypedPartialHandlerConfig, DummyHandlerConfig } from "./data";
 import { type RequestParamsConfigIn } from "./shared/requestParams";
 import { type ResponseConfigIn } from "./shared/response";
 import { type ResponseErrorConfigIn } from "./shared/responseError";
-import {
-  empty as emptySubscription,
-  PartialSubscriptionHandlerConfig,
-} from "./subscription/data";
+import { empty as emptySubscription, PartialSubscriptionHandlerConfig } from "./subscription/data";
 import {
   name as nameSubscription,
   type SetPartialSubscriptionHandlerName,
@@ -17,10 +14,7 @@ import {
   responseError as responseErrorSubscription,
   type SetPartialSubscriptionHandlerResponseError,
 } from "./subscription/builder";
-import {
-  empty as emptyMutation,
-  PartialMutationHandlerConfig,
-} from "./mutation/data";
+import { empty as emptyMutation, PartialMutationHandlerConfig } from "./mutation/data";
 import {
   name as nameMutation,
   type SetPartialMutationHandlerName,
@@ -32,13 +26,12 @@ import {
   type SetPartialMutationHandlerResponseError,
 } from "./mutation/builder";
 
-export type SetTypedPartialHandlerType<
-  Type extends "subscription" | "mutation",
-> = Type extends "subscription"
-  ? PartialSubscriptionHandlerConfig
-  : Type extends "mutation"
-    ? PartialMutationHandlerConfig
-    : never;
+export type SetTypedPartialHandlerType<Type extends "subscription" | "mutation"> =
+  Type extends "subscription"
+    ? PartialSubscriptionHandlerConfig
+    : Type extends "mutation"
+      ? PartialMutationHandlerConfig
+      : never;
 export const type =
   <const Type extends "subscription" | "mutation">(type: Type) =>
   <const Config extends DummyHandlerConfig>(_: Config) =>
@@ -63,8 +56,7 @@ export const name =
     pipe(
       Match.value(config as TypedPartialHandlerConfig),
       Match.tagsExhaustive({
-        PartialSubscriptionHandlerConfig: (config) =>
-          nameSubscription(name)(config),
+        PartialSubscriptionHandlerConfig: (config) => nameSubscription(name)(config),
         PartialMutationHandlerConfig: (config) => nameMutation(name)(config),
       }),
     ) as SetTypedPartialHandlerName<Name, Config>;
@@ -78,17 +70,14 @@ export type SetTypedPartialHandlerRequestParams<
     ? SetPartialMutationHandlerRequestParams<RequestParams, Config>
     : never;
 export const requestParams =
-  <const RequestParams extends RequestParamsConfigIn>(
-    requestParams: RequestParams,
-  ) =>
+  <const RequestParams extends RequestParamsConfigIn>(requestParams: RequestParams) =>
   <const Config extends TypedPartialHandlerConfig>(config: Config) =>
     pipe(
       Match.value(config as TypedPartialHandlerConfig),
       Match.tagsExhaustive({
         PartialSubscriptionHandlerConfig: (config) =>
           requestParamsSubscription(requestParams)(config),
-        PartialMutationHandlerConfig: (config) =>
-          requestParamsMutation(requestParams)(config),
+        PartialMutationHandlerConfig: (config) => requestParamsMutation(requestParams)(config),
       }),
     ) as SetTypedPartialHandlerRequestParams<RequestParams, Config>;
 
@@ -106,10 +95,8 @@ export const response =
     pipe(
       Match.value(config as TypedPartialHandlerConfig),
       Match.tagsExhaustive({
-        PartialSubscriptionHandlerConfig: (config) =>
-          responseSubscription(response)(config),
-        PartialMutationHandlerConfig: (config) =>
-          responseMutation(response)(config),
+        PartialSubscriptionHandlerConfig: (config) => responseSubscription(response)(config),
+        PartialMutationHandlerConfig: (config) => responseMutation(response)(config),
       }),
     ) as SetTypedPartialHandlerResponse<Response, Config>;
 
@@ -122,16 +109,13 @@ export type SetTypedPartialHandlerResponseError<
     ? SetPartialMutationHandlerResponseError<ResponseError, Config>
     : never;
 export const responseError =
-  <const ResponseError extends ResponseErrorConfigIn>(
-    responseError: ResponseError,
-  ) =>
+  <const ResponseError extends ResponseErrorConfigIn>(responseError: ResponseError) =>
   <const Config extends TypedPartialHandlerConfig>(config: Config) =>
     pipe(
       Match.value(config as TypedPartialHandlerConfig),
       Match.tagsExhaustive({
         PartialSubscriptionHandlerConfig: (config) =>
           responseErrorSubscription(responseError)(config),
-        PartialMutationHandlerConfig: (config) =>
-          responseErrorMutation(responseError)(config),
+        PartialMutationHandlerConfig: (config) => responseErrorMutation(responseError)(config),
       }),
     ) as SetTypedPartialHandlerResponseError<ResponseError, Config>;

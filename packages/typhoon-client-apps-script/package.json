@@ -1,11 +1,13 @@
 {
   "name": "typhoon-client-apps-script",
-  "private": true,
   "version": "0.0.0",
-  "type": "module",
+  "private": true,
+  "keywords": [],
+  "author": "",
   "files": [
     "./dist/**"
   ],
+  "type": "module",
   "sideEffects": [],
   "exports": {
     ".": {
@@ -19,30 +21,28 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "format": "prettier -c .",
-    "format:apply": "prettier -w .",
+    "format": "oxfmt --check",
+    "format:apply": "oxfmt",
     "lint": "oxlint .",
     "typecheck": "tsgo --noEmit",
     "build": "tsdown -c tsdown.config.ts"
   },
-  "keywords": [],
-  "author": "",
   "dependencies": {
     "@standard-schema/spec": "^1.0.0"
-  },
-  "peerDependencies": {
-    "effect": "^3.18.4",
-    "typhoon-core": "workspace:*",
-    "typhoon-server": "workspace:*"
   },
   "devDependencies": {
     "@types/google-apps-script": "^1.0.99",
     "@typescript/native-preview": "latest",
     "glob": "^11.0.1",
-    "oxlint": "^1.16.0",
+    "oxfmt": "^0.23.0",
+    "oxlint": "^1.38.0",
     "pathe": "^2.0.3",
-    "prettier": "^3.5.3",
     "tsdown": "^0.16.4",
     "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "effect": "^3.18.4",
+    "typhoon-core": "workspace:*",
+    "typhoon-server": "workspace:*"
   }
 }

@@ -4,9 +4,7 @@ import type * as DependencySignal from "./dependencySignal";
 import type * as SignalService from "./signalService";
 import type * as SignalContext from "./signalContext";
 
-export const DependentSymbol: unique symbol = Symbol(
-  "Typhoon/Signal/Dependent",
-);
+export const DependentSymbol: unique symbol = Symbol("Typhoon/Signal/Dependent");
 
 export abstract class DependentSignal implements Observable.Observable {
   abstract readonly _tag: string;
@@ -42,20 +40,16 @@ export abstract class DependentSignal implements Observable.Observable {
 export const isDependentSignal = (signal: unknown): signal is DependentSignal =>
   Boolean(
     signal &&
-      typeof signal === "object" &&
-      DependentSymbol in signal &&
-      signal[DependentSymbol] === signal,
+    typeof signal === "object" &&
+    DependentSymbol in signal &&
+    signal[DependentSymbol] === signal,
   );
 
 export const mask = (signal: DependentSignal) => signal;
 
 export const getDependencyUpdateOrder = (
   dependent: DependentSignal,
-): STM.STM<
-  DependencySignal.DependencySignal<unknown, unknown, unknown>[],
-  never,
-  never
-> =>
+): STM.STM<DependencySignal.DependencySignal<unknown, unknown, unknown>[], never, never> =>
   pipe(
     STM.Do,
     STM.bind("thisDependencies", () =>
@@ -66,9 +60,7 @@ export const getDependencyUpdateOrder = (
         STM.all(
           thisDependencies.map((dependency) =>
             isDependentSignal(dependency as any)
-              ? getDependencyUpdateOrder(
-                  dependency as unknown as DependentSignal,
-                )
+              ? getDependencyUpdateOrder(dependency as unknown as DependentSignal)
               : STM.succeed([]),
           ),
         ),
@@ -91,12 +83,8 @@ export const getDependencyUpdateOrder = (
     }),
   );
 
-export const reconcileAllDependencies = (
-  dependent: DependentSignal,
-): STM.STM<void, never, never> =>
+export const reconcileAllDependencies = (dependent: DependentSignal): STM.STM<void, never, never> =>
   pipe(
     getDependencyUpdateOrder(dependent),
-    STM.flatMap((deps) =>
-      STM.forEach(deps, (dep) => dep.reconcile(), { discard: true }),
-    ),
+    STM.flatMap((deps) => STM.forEach(deps, (dep) => dep.reconcile(), { discard: true })),
   );

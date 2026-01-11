@@ -8,18 +8,12 @@ import * as SignalContext from "./signalContext";
 export interface ExternalSource<T> {
   poll: () => STM.STM<T, never, never>;
   emit: (
-    onEmit: (
-      value: T,
-    ) => Effect.Effect<void, never, SignalService.SignalService>,
+    onEmit: (value: T) => Effect.Effect<void, never, SignalService.SignalService>,
   ) => STM.STM<void, never, never>;
 }
 
 export class ExternalComputed<T = unknown>
-  extends Effectable.Class<
-    T,
-    never,
-    SignalContext.SignalContext | SignalService.SignalService
-  >
+  extends Effectable.Class<T, never, SignalContext.SignalContext | SignalService.SignalService>
   implements DependencySignal<T, never, never>
 {
   readonly _tag = "ExternalComputed" as const;
@@ -65,19 +59,11 @@ export class ExternalComputed<T = unknown>
     );
   }
 
-  getDependents(): STM.STM<
-    TSet.TSet<WeakRef<DependentSignal> | DependentSignal>,
-    never,
-    never
-  > {
+  getDependents(): STM.STM<TSet.TSet<WeakRef<DependentSignal> | DependentSignal>, never, never> {
     return STM.succeed(this._dependents);
   }
 
-  value(): Effect.Effect<
-    T,
-    never,
-    SignalContext.SignalContext | SignalService.SignalService
-  > {
+  value(): Effect.Effect<T, never, SignalContext.SignalContext | SignalService.SignalService> {
     return pipe(
       SignalContext.bindDependency(this),
       STM.commit,
@@ -88,11 +74,7 @@ export class ExternalComputed<T = unknown>
     );
   }
 
-  commit(): Effect.Effect<
-    T,
-    never,
-    SignalContext.SignalContext | SignalService.SignalService
-  > {
+  commit(): Effect.Effect<T, never, SignalContext.SignalContext | SignalService.SignalService> {
     return this.value();
   }
 
@@ -102,9 +84,7 @@ export class ExternalComputed<T = unknown>
       STM.bind("value", () => TRef.get(this._value)),
       STM.bind("last", ({ value }) => TRef.getAndSet(this._lastValue, value)),
       STM.tap(({ value, last }) =>
-        STM.when(() => Equal.equals(last, value))(
-          SignalContext.markUnchanged(this),
-        ),
+        STM.when(() => Equal.equals(last, value))(SignalContext.markUnchanged(this)),
       ),
       STM.map(({ value }) => value),
       STM.commit,
@@ -114,9 +94,7 @@ export class ExternalComputed<T = unknown>
     );
   }
 
-  handleEmit(
-    value: T,
-  ): Effect.Effect<void, never, SignalService.SignalService> {
+  handleEmit(value: T): Effect.Effect<void, never, SignalService.SignalService> {
     return SignalService.enqueueNotify(
       new SignalService.NotifyRequest({
         signal: this,
@@ -130,35 +108,21 @@ export class ExternalComputed<T = unknown>
   }
 }
 
-export const makeSTM = <T>(
-  source: ExternalSource<T>,
-  options?: Observable.ObservableOptions,
-) =>
+export const makeSTM = <T>(source: ExternalSource<T>, options?: Observable.ObservableOptions) =>
   pipe(
     STM.Do,
     STM.bind("initialValue", () => source.poll()),
     STM.bind("initial", ({ initialValue }) => TRef.make(initialValue)),
     STM.bind("lastValue", ({ initialValue }) => TRef.make(initialValue)),
-    STM.bind("dependents", () =>
-      TSet.empty<WeakRef<DependentSignal> | DependentSignal>(),
-    ),
+    STM.bind("dependents", () => TSet.empty<WeakRef<DependentSignal> | DependentSignal>()),
     STM.map(
       ({ initial, lastValue, dependents }) =>
-        new ExternalComputed(
-          initial,
-          source,
-          dependents,
-          options ?? {},
-          lastValue,
-        ),
+        new ExternalComputed(initial, source, dependents, options ?? {}, lastValue),
     ),
     STM.tap((signal) => source.emit((value) => signal.handleEmit(value))),
   );
 
-export const make = <T>(
-  source: ExternalSource<T>,
-  options?: Observable.ObservableOptions,
-) =>
+export const make = <T>(source: ExternalSource<T>, options?: Observable.ObservableOptions) =>
   pipe(
     makeSTM(source, options),
     STM.commit,

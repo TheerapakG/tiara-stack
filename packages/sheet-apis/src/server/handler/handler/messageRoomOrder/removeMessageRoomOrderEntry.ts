@@ -28,9 +28,7 @@ export const removeMessageRoomOrderEntryHandler = pipe(
           MessageRoomOrderService.removeMessageRoomOrderEntry(messageId),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(
-          removeMessageRoomOrderEntryHandlerConfig,
-        ),
+        Handler.Config.encodeResponseEffect(removeMessageRoomOrderEntryHandlerConfig),
         Effect.withSpan("removeMessageRoomOrderEntryHandler", {
           captureStackTrace: true,
         }),

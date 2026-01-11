@@ -1,8 +1,4 @@
-import {
-  DiscordjsError,
-  DiscordjsRangeError,
-  DiscordjsTypeError,
-} from "discord.js";
+import { DiscordjsError, DiscordjsRangeError, DiscordjsTypeError } from "discord.js";
 import { Cause, Data, Effect, Either, Function, pipe, Schema } from "effect";
 
 export type Constructor<Instance> = abstract new (...args: never[]) => Instance;
@@ -17,15 +13,9 @@ export class DiscordError extends Data.TaggedError("DiscordError")<{
       Schema.decodeUnknown(
         pipe(
           Schema.Union(
-            Schema.instanceOf(
-              DiscordjsError as unknown as Constructor<DiscordjsError>,
-            ),
-            Schema.instanceOf(
-              DiscordjsTypeError as unknown as Constructor<DiscordjsTypeError>,
-            ),
-            Schema.instanceOf(
-              DiscordjsRangeError as unknown as Constructor<DiscordjsRangeError>,
-            ),
+            Schema.instanceOf(DiscordjsError as unknown as Constructor<DiscordjsError>),
+            Schema.instanceOf(DiscordjsTypeError as unknown as Constructor<DiscordjsTypeError>),
+            Schema.instanceOf(DiscordjsRangeError as unknown as Constructor<DiscordjsRangeError>),
           ),
         ),
       ),
@@ -33,8 +23,7 @@ export class DiscordError extends Data.TaggedError("DiscordError")<{
       Effect.map(
         Either.match({
           onLeft: () => cause,
-          onRight: (error) =>
-            new DiscordError({ message: error.message, cause: error }),
+          onRight: (error) => new DiscordError({ message: error.message, cause: error }),
         }),
       ),
     );
@@ -48,9 +37,7 @@ export class DiscordError extends Data.TaggedError("DiscordError")<{
       ),
     );
 
-  static wrapTryPromise = <A>(
-    evaluate: (signal: AbortSignal) => PromiseLike<A>,
-  ) =>
+  static wrapTryPromise = <A>(evaluate: (signal: AbortSignal) => PromiseLike<A>) =>
     pipe(
       Effect.tryPromise(evaluate),
       Effect.catchTag("UnknownException", (cause) =>

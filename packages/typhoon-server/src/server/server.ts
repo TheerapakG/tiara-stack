@@ -69,9 +69,7 @@ type PeerStateMap = HashMap.HashMap<string, PeerState>;
 type MutationWithMetricsContext<R> = {
   id: string;
   span: Tracer.Span;
-  sendClientBuffer: (
-    buffer: Uint8Array,
-  ) => Effect.Effect<unknown, unknown, R | Event>;
+  sendClientBuffer: (buffer: Uint8Array) => Effect.Effect<unknown, unknown, R | Event>;
   serverWithRuntime: ServerWithRuntime<R>;
 };
 
@@ -79,9 +77,7 @@ type SubscriptionOnceWithMetricsContext<R> = {
   operation: "once";
   id: string;
   span: Tracer.Span;
-  sendClientBuffer: (
-    buffer: Uint8Array,
-  ) => Effect.Effect<unknown, unknown, R | Event>;
+  sendClientBuffer: (buffer: Uint8Array) => Effect.Effect<unknown, unknown, R | Event>;
   serverWithRuntime: ServerWithRuntime<R>;
 };
 
@@ -98,8 +94,7 @@ type SubscriptionSubscribeWithMetricsContext<R> = {
   serverWithRuntime: ServerWithRuntime<R>;
 };
 
-interface MutationWithMetricsContextT
-  extends HandlerContext.Type.WithMetricsExecutorTypeLambda {
+interface MutationWithMetricsContextT extends HandlerContext.Type.WithMetricsExecutorTypeLambda {
   readonly context: MutationWithMetricsContext<this["R"]>;
   readonly result: Effect.Effect<void, never, Event>;
 }
@@ -116,11 +111,9 @@ type ServerWithMetricsContextTRecord = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type ServerContext<S extends Server<any>> =
-  S extends Server<infer R> ? R : never;
+type ServerContext<S extends Server<any>> = S extends Server<infer R> ? R : never;
 
-interface ServerRunStateContextTypeLambda
-  extends RunState.RunStateContextTypeLambda {
+interface ServerRunStateContextTypeLambda extends RunState.RunStateContextTypeLambda {
   readonly type: Server<Exclude<this["R"], SignalService.SignalService>>;
 }
 
@@ -146,33 +139,21 @@ type ServerData<R = never> = {
   >;
 };
 
-export class Server<R = never> extends Data.TaggedClass("Server")<
-  ServerData<R>
-> {}
+export class Server<R = never> extends Data.TaggedClass("Server")<ServerData<R>> {}
 
-export class ServerWithRuntime<R = never> extends Data.TaggedClass(
-  "ServerWithRuntime",
-)<{
+export class ServerWithRuntime<R = never> extends Data.TaggedClass("ServerWithRuntime")<{
   server: Server<R>;
   runtime: Runtime.Runtime<R | SignalService.SignalService>;
 }> {}
 
 const makeServeEffect =
   (serveFn: typeof crosswsServe) =>
-  <R = never>(
-    server: Server<R>,
-    runtime: Runtime.Runtime<R | SignalService.SignalService>,
-  ) =>
+  <R = never>(server: Server<R>, runtime: Runtime.Runtime<R | SignalService.SignalService>) =>
     pipe(
       Effect.Do,
-      Effect.let(
-        "serverWithRuntime",
-        () => new ServerWithRuntime({ server, runtime }),
-      ),
+      Effect.let("serverWithRuntime", () => new ServerWithRuntime({ server, runtime })),
       Effect.tap(() =>
-        HandlerContextCore.CollectionWithMetrics.initialize(
-          server.handlerContextCollection,
-        ),
+        HandlerContextCore.CollectionWithMetrics.initialize(server.handlerContextCollection),
       ),
       Effect.flatMap(({ serverWithRuntime }) =>
         Effect.try(() =>
@@ -241,9 +222,7 @@ const makeServeEffect =
                   pipe(
                     serverWithRuntime,
                     handleWebRequest(request, span),
-                    transformErrorResult(() =>
-                      Effect.succeed(new Response("", { status: 500 })),
-                    ),
+                    transformErrorResult(() => Effect.succeed(new Response("", { status: 500 }))),
                   ),
                 ),
                 Effect.withSpan("serve.fetch", {
@@ -273,8 +252,7 @@ export const create = <R = never>(serveFn: typeof crosswsServe) =>
           >(
             {
               mutation: (config) => Handler.Config.Mutation.name(config),
-              subscription: (config) =>
-                Handler.Config.Subscription.name(config),
+              subscription: (config) => Handler.Config.Subscription.name(config),
             },
             (
               context:
@@ -285,33 +263,25 @@ export const create = <R = never>(serveFn: typeof crosswsServe) =>
                 Match.value(HandlerContextCore.data(context)),
                 Match.tagsExhaustive({
                   PartialMutationHandlerConfig: () => "mutation" as const,
-                  PartialSubscriptionHandlerConfig: () =>
-                    "subscription" as const,
+                  PartialSubscriptionHandlerConfig: () => "subscription" as const,
                 }),
               ),
             {
               mutation: (
-                handler: Option.Option<
-                  Type.Handler<MutationHandlerT, unknown, unknown, R>
-                >,
+                handler: Option.Option<Type.Handler<MutationHandlerT, unknown, unknown, R>>,
                 context: MutationWithMetricsContext<R>,
               ) => runMutationHandler<R>(handler, context),
               subscription: (
-                handler: Option.Option<
-                  Type.Handler<SubscriptionHandlerT, unknown, unknown, R>
-                >,
+                handler: Option.Option<Type.Handler<SubscriptionHandlerT, unknown, unknown, R>>,
                 context: SubscriptionWithMetricsContext<R>,
               ) => runSubscriptionHandler<R>(handler, context),
             },
           ),
         ),
-        peerStateMapRef: SynchronizedRef.make(
-          HashMap.empty<string, PeerState>(),
-        ),
+        peerStateMapRef: SynchronizedRef.make(HashMap.empty<string, PeerState>()),
         peerActive: Effect.succeed(
           Metric.gauge("typhoon_server_peer_active", {
-            description:
-              "The number of peers currently connected to the server",
+            description: "The number of peers currently connected to the server",
             bigint: true,
           }),
         ),
@@ -422,10 +392,7 @@ export const addCollection =
   ) =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   <S extends Server<any>>(server: S) =>
-    new Server<
-      | ServerContext<S>
-      | HandlerContext.Collection.HandlerContextCollectionContext<C>
-    >(
+    new Server<ServerContext<S> | HandlerContext.Collection.HandlerContextCollectionContext<C>>(
       Struct.evolve(server, {
         handlerContextCollection: (collection) =>
           HandlerContextCore.CollectionWithMetrics.addCollection(
@@ -452,9 +419,7 @@ const updatePeerMetrics =
           peerActive: serverWithRuntime.server.peerActive(
             Effect.succeed(BigInt(HashMap.size(peerStateMap))),
           ),
-          peerTotal: serverWithRuntime.server.peerTotal(
-            Effect.succeed(BigInt(increment ? 1 : 0)),
-          ),
+          peerTotal: serverWithRuntime.server.peerTotal(Effect.succeed(BigInt(increment ? 1 : 0))),
         }),
         { concurrency: "unbounded" },
       ),
@@ -495,9 +460,7 @@ const transformPeerSubscriptionState =
   <E = never, R = never>(
     subscriptionId: string,
     updaterOptions: {
-      onSome: (
-        state: SubscriptionState,
-      ) => Effect.Effect<Option.Option<SubscriptionState>, E, R>;
+      onSome: (state: SubscriptionState) => Effect.Effect<Option.Option<SubscriptionState>, E, R>;
       onNone: () => Effect.Effect<Option.Option<SubscriptionState>, E, R>;
     },
   ) =>
@@ -509,10 +472,7 @@ const transformPeerSubscriptionState =
       Effect.map((newSubscriptionState) =>
         Option.some(
           Struct.evolve(peerState, {
-            subscriptionStateMap: HashMap.modifyAt(
-              subscriptionId,
-              () => newSubscriptionState,
-            ),
+            subscriptionStateMap: HashMap.modifyAt(subscriptionId, () => newSubscriptionState),
           }),
         ),
       ),
@@ -526,9 +486,7 @@ const updatePeerSubscriptionState =
     peer: Peer,
     subscriptionId: string,
     updaterOptions: {
-      onSome: (
-        state: SubscriptionState,
-      ) => Effect.Effect<Option.Option<SubscriptionState>, E, R>;
+      onSome: (state: SubscriptionState) => Effect.Effect<Option.Option<SubscriptionState>, E, R>;
       onNone: () => Effect.Effect<Option.Option<SubscriptionState>, E, R>;
     },
   ) =>
@@ -538,10 +496,7 @@ const updatePeerSubscriptionState =
       updatePeerState(
         peer,
         Option.match({
-          onSome: transformPeerSubscriptionState(
-            subscriptionId,
-            updaterOptions,
-          ),
+          onSome: transformPeerSubscriptionState(subscriptionId, updaterOptions),
           onNone: () =>
             pipe(
               emptyPeerState(peer),
@@ -560,9 +515,7 @@ const open =
     pipe(
       serverWithRuntime,
       updatePeerState(peer, () => Effect.succeedSome(emptyPeerState(peer))),
-      Effect.tap((peerStateMap) =>
-        pipe(serverWithRuntime, updatePeerMetrics(peerStateMap, true)),
-      ),
+      Effect.tap((peerStateMap) => pipe(serverWithRuntime, updatePeerMetrics(peerStateMap, true))),
       Effect.asVoid,
       Effect.withSpan("Server.open", {
         captureStackTrace: true,
@@ -594,9 +547,7 @@ const close =
           onNone: () => Effect.succeedNone,
         }),
       ),
-      Effect.tap((peerStateMap) =>
-        pipe(serverWithRuntime, updatePeerMetrics(peerStateMap, false)),
-      ),
+      Effect.tap((peerStateMap) => pipe(serverWithRuntime, updatePeerMetrics(peerStateMap, false))),
       Effect.asVoid,
       Effect.withSpan("Server.close", {
         captureStackTrace: true,
@@ -658,9 +609,7 @@ const encodeServerUpdateResult = (result: ServerUpdateResult) =>
       { concurrency: "unbounded" },
     ),
     Effect.let("updateBuffer", ({ headerEncoded, messageEncoded }) => {
-      const updateBuffer = new Uint8Array(
-        headerEncoded.length + messageEncoded.length,
-      );
+      const updateBuffer = new Uint8Array(headerEncoded.length + messageEncoded.length);
       updateBuffer.set(headerEncoded, 0);
       updateBuffer.set(messageEncoded, headerEncoded.length);
       return updateBuffer;
@@ -697,9 +646,7 @@ const runHandler =
     );
 
 const runSubscriptionHandlerOnce = <R>(
-  handler: Option.Option<
-    Type.Handler<SubscriptionHandlerT, unknown, unknown, R>
-  >,
+  handler: Option.Option<Type.Handler<SubscriptionHandlerT, unknown, unknown, R>>,
   context: SubscriptionOnceWithMetricsContext<R>,
 ) =>
   pipe(
@@ -723,19 +670,14 @@ const runSubscriptionHandlerOnce = <R>(
   );
 
 const runSubscriptionHandlerSubscribe = <R>(
-  handler: Option.Option<
-    Type.Handler<SubscriptionHandlerT, unknown, unknown, R>
-  >,
+  handler: Option.Option<Type.Handler<SubscriptionHandlerT, unknown, unknown, R>>,
   context: SubscriptionSubscribeWithMetricsContext<R>,
 ) =>
   pipe(
     handler,
     Effect.transposeOption,
     Effect.map(
-      flow(
-        runHandler(context.id, context.span),
-        Effect.provide(context.serverWithRuntime.runtime),
-      ),
+      flow(runHandler(context.id, context.span), Effect.provide(context.serverWithRuntime.runtime)),
     ),
     SideEffect.tapWithContext(
       context.sendClientBuffer,
@@ -751,16 +693,12 @@ const runSubscriptionHandlerSubscribe = <R>(
   );
 
 const runSubscriptionHandler = <R>(
-  handler: Option.Option<
-    Type.Handler<SubscriptionHandlerT, unknown, unknown, R>
-  >,
+  handler: Option.Option<Type.Handler<SubscriptionHandlerT, unknown, unknown, R>>,
   context: SubscriptionWithMetricsContext<R>,
 ) =>
   pipe(
     Match.value(context),
-    Match.when({ operation: "once" }, (context) =>
-      runSubscriptionHandlerOnce(handler, context),
-    ),
+    Match.when({ operation: "once" }, (context) => runSubscriptionHandlerOnce(handler, context)),
     Match.when({ operation: "subscribe" }, (context) =>
       runSubscriptionHandlerSubscribe(handler, context),
     ),
@@ -784,11 +722,7 @@ const runMutationHandler = <R>(
     }),
   );
 
-type ServerHandler = Effect.Effect<
-  void,
-  never,
-  Event | SignalService.SignalService
->;
+type ServerHandler = Effect.Effect<void, never, Event | SignalService.SignalService>;
 
 const handleSubscribe =
   (peer: Peer, header: Header.Header<"client:subscribe">, span: Tracer.Span) =>
@@ -824,9 +758,7 @@ const handleSubscribe =
                   event: Event,
                   scope: Scope.make(),
                 }),
-                Effect.map(
-                  ({ event, scope }) => new SubscriptionState({ event, scope }),
-                ),
+                Effect.map(({ event, scope }) => new SubscriptionState({ event, scope })),
                 Effect.tap((subscriptionState) =>
                   pipe(
                     serverWithRuntime.server.handlerContextCollection,
@@ -847,9 +779,7 @@ const handleSubscribe =
                     }),
                   ),
                 ),
-                Effect.map((subscriptionState) =>
-                  Option.some(subscriptionState),
-                ),
+                Effect.map((subscriptionState) => Option.some(subscriptionState)),
               ),
           }),
         ),
@@ -869,11 +799,7 @@ const handleSubscribe =
     );
 
 const handleUnsubscribe =
-  (
-    peer: Peer,
-    header: Header.Header<"client:unsubscribe">,
-    _span: Tracer.Span,
-  ) =>
+  (peer: Peer, header: Header.Header<"client:unsubscribe">, _span: Tracer.Span) =>
   <R = never>(serverWithRuntime: ServerWithRuntime<R>): ServerHandler =>
     pipe(
       serverWithRuntime.server.unsubscribeTotal(Effect.succeed(BigInt(1))),
@@ -913,9 +839,7 @@ const handleOnce =
   <R = never>(serverWithRuntime: ServerWithRuntime<R>): ServerHandler =>
     pipe(
       Effect.Do,
-      Effect.tap(() =>
-        serverWithRuntime.server.onceTotal(Effect.succeed(BigInt(1))),
-      ),
+      Effect.tap(() => serverWithRuntime.server.onceTotal(Effect.succeed(BigInt(1)))),
       Effect.andThen(() =>
         pipe(
           serverWithRuntime.server.handlerContextCollection,
@@ -958,9 +882,7 @@ const handleMutate =
   <R = never>(serverWithRuntime: ServerWithRuntime<R>): ServerHandler =>
     pipe(
       Effect.Do,
-      Effect.tap(() =>
-        serverWithRuntime.server.mutationTotal(Effect.succeed(BigInt(1))),
-      ),
+      Effect.tap(() => serverWithRuntime.server.mutationTotal(Effect.succeed(BigInt(1)))),
       Effect.andThen(() =>
         pipe(
           serverWithRuntime.server.handlerContextCollection,
@@ -1071,17 +993,12 @@ const makeHeaderAndEventServiceFromPullStream = (
   );
 
 const applySpanLink = (span: Tracer.Span, linkSpan: Tracer.AnySpan) =>
-  Effect.sync(() =>
-    span.addLinks([{ _tag: "SpanLink", span: linkSpan, attributes: {} }]),
-  );
+  Effect.sync(() => span.addLinks([{ _tag: "SpanLink", span: linkSpan, attributes: {} }]));
 
 const applyExternalSpanLink = (
   span: Tracer.Span,
   externalSpan?: { traceId: string; spanId: string },
-) =>
-  externalSpan
-    ? applySpanLink(span, Tracer.externalSpan(externalSpan))
-    : Effect.void;
+) => (externalSpan ? applySpanLink(span, Tracer.externalSpan(externalSpan)) : Effect.void);
 
 const sendPeerBuffer = (peer: Peer) => (buffer: Uint8Array) =>
   pipe(
@@ -1099,11 +1016,7 @@ const handleProtocolWebSocketMessage =
       Effect.bind("scope", () => Scope.make()),
       Effect.let("blob", () => message.blob()),
       Effect.bind("pullEffect", ({ scope, blob }) =>
-        pipe(
-          Msgpack.Decoder.blobToStream(blob),
-          Stream.toPullEffect,
-          Scope.extend(scope),
-        ),
+        pipe(Msgpack.Decoder.blobToStream(blob), Stream.toPullEffect, Scope.extend(scope)),
       ),
       Effect.flatMap(({ pullEffect, scope }) =>
         makeHeaderAndEventServiceFromPullStream(peer.request, {
@@ -1131,13 +1044,11 @@ const handleProtocolWebSocketMessage =
                     ),
                     Match.when(
                       { action: "client:once" },
-                      (header) =>
-                        handleOnce(header, sendPeerBuffer(peer), span)<R>,
+                      (header) => handleOnce(header, sendPeerBuffer(peer), span)<R>,
                     ),
                     Match.when(
                       { action: "client:mutate" },
-                      (header) =>
-                        handleMutate(header, sendPeerBuffer(peer), span)<R>,
+                      (header) => handleMutate(header, sendPeerBuffer(peer), span)<R>,
                     ),
                     Match.orElse(() => () => Effect.void),
                   ),
@@ -1193,11 +1104,7 @@ const handleProtocolWebRequest =
       Effect.bind("scope", () => Scope.make()),
       Effect.bind("blob", () => Effect.promise(() => request.blob())),
       Effect.bind("pullEffect", ({ blob, scope }) =>
-        pipe(
-          Msgpack.Decoder.blobToStream(blob),
-          Stream.toPullEffect,
-          Scope.extend(scope),
-        ),
+        pipe(Msgpack.Decoder.blobToStream(blob), Stream.toPullEffect, Scope.extend(scope)),
       ),
       Effect.flatMap(({ pullEffect, scope }) =>
         makeHeaderAndEventServiceFromPullStream(request, {
@@ -1230,9 +1137,7 @@ const handleProtocolWebRequest =
                               ),
                             ),
                           ),
-                          Effect.andThen((deferred) =>
-                            Deferred.await(deferred),
-                          ),
+                          Effect.andThen((deferred) => Deferred.await(deferred)),
                           Effect.flatMap(returnBufferSuccess),
                         ),
                     ),
@@ -1251,9 +1156,7 @@ const handleProtocolWebRequest =
                               ),
                             ),
                           ),
-                          Effect.andThen((deferred) =>
-                            Deferred.await(deferred),
-                          ),
+                          Effect.andThen((deferred) => Deferred.await(deferred)),
                           Effect.flatMap(returnBufferSuccess),
                         ),
                     ),
@@ -1289,9 +1192,7 @@ const handleWebRequest =
           "/ready",
           () =>
             handleReady((ready) =>
-              Effect.sync(
-                () => new Response("", { status: ready ? 200 : 500 }),
-              ),
+              Effect.sync(() => new Response("", { status: ready ? 200 : 500 })),
             )<R>,
         ),
         Match.orElse(() => handleProtocolWebRequest(request, span)<R>),
@@ -1313,16 +1214,12 @@ const isReady = <R = never>(serverWithRuntime: ServerWithRuntime<R>) =>
   );
 
 const handleLive =
-  <A = never, E = never, R1 = never>(
-    callback: (live: boolean) => Effect.Effect<A, E, R1>,
-  ) =>
+  <A = never, E = never, R1 = never>(callback: (live: boolean) => Effect.Effect<A, E, R1>) =>
   <R2 = never>(serverWithRuntime: ServerWithRuntime<R2>) =>
     pipe(serverWithRuntime, isStarted, Effect.flatMap(callback));
 
 const handleReady =
-  <A = never, E = never, R1 = never>(
-    callback: (ready: boolean) => Effect.Effect<A, E, R1>,
-  ) =>
+  <A = never, E = never, R1 = never>(callback: (ready: boolean) => Effect.Effect<A, E, R1>) =>
   <R2 = never>(serverWithRuntime: ServerWithRuntime<R2>) =>
     pipe(
       Effect.Do,
@@ -1350,9 +1247,7 @@ const transformErrorResult = <A = never, E = never, R = never>(
           onFailure: (cause) =>
             pipe(
               Effect.Do,
-              Effect.let("pretty", () =>
-                Cause.pretty(cause, { renderErrorCause: true }),
-              ),
+              Effect.let("pretty", () => Cause.pretty(cause, { renderErrorCause: true })),
               Effect.tap(({ pretty }) => Effect.log(pretty)),
               Effect.flatMap(() => onError(cause)),
             ),

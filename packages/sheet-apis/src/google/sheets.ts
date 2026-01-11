@@ -44,10 +44,11 @@ const parseValueRanges = <
     Types.TupleOf<Length, readonly string[]>,
     never
   >;
-  const decodeSchema = pipe(
-    rowTupleSchema,
-    Schema.compose(rowSchemas),
-  ) as Schema.Schema<A, Types.TupleOf<Length, readonly string[]>, R>;
+  const decodeSchema = pipe(rowTupleSchema, Schema.compose(rowSchemas)) as Schema.Schema<
+    A,
+    Types.TupleOf<Length, readonly string[]>,
+    R
+  >;
 
   return pipe(
     valueRanges,
@@ -57,16 +58,13 @@ const parseValueRanges = <
     Array.map(ArrayUtils.WithDefault.wrap<any[][]>({ default: () => [] })),
     Array.map(ArrayUtils.WithDefault.map((row) => [row])),
     (ranges) =>
-      Array.reduce(
-        Array.tailNonEmpty(ranges),
-        Array.headNonEmpty(ranges),
-        (acc, curr) => pipe(acc, ArrayUtils.WithDefault.zipArray(curr)),
+      Array.reduce(Array.tailNonEmpty(ranges), Array.headNonEmpty(ranges), (acc, curr) =>
+        pipe(acc, ArrayUtils.WithDefault.zipArray(curr)),
       ),
     ArrayUtils.WithDefault.toArray,
-    Effect.forEach(
-      (rows) => pipe(rows, Schema.decodeUnknown(decodeSchema), Effect.either),
-      { concurrency: "unbounded" },
-    ),
+    Effect.forEach((rows) => pipe(rows, Schema.decodeUnknown(decodeSchema), Effect.either), {
+      concurrency: "unbounded",
+    }),
     Effect.withSpan("parseValueRanges", { captureStackTrace: true }),
   );
 };
@@ -74,10 +72,7 @@ const parseValueRanges = <
 const tupleSchema = <const Length extends number, S extends Schema.Schema.Any>(
   length: Length,
   schema: S,
-) =>
-  Schema.Tuple(
-    ...(Array.makeBy(length, () => schema) as Types.TupleOf<Length, S>),
-  );
+) => Schema.Tuple(...(Array.makeBy(length, () => schema) as Types.TupleOf<Length, S>));
 
 const cellSchema = Schema.OptionFromSelf(Schema.String);
 const rowSchema = Schema.Array(cellSchema);
@@ -93,9 +88,7 @@ const rowToCellSchema = pipe(
 );
 
 const matchAll =
-  <Pattern extends string, Context extends RegexContext>(
-    regex: Regex<Pattern, Context>,
-  ) =>
+  <Pattern extends string, Context extends RegexContext>(regex: Regex<Pattern, Context>) =>
   (str: string) => {
     const matches: RegexExecArray<
       [Pattern, ...(typeof regex)["inferCaptures"]],
@@ -129,23 +122,19 @@ const toBooleanSchema = pipe(
   Schema.String,
   Schema.transformOrFail(Schema.Literal("TRUE", "FALSE"), {
     strict: true,
-    decode: (str) =>
-      ParseResult.decodeUnknown(Schema.Literal("TRUE", "FALSE"))(str),
+    decode: (str) => ParseResult.decodeUnknown(Schema.Literal("TRUE", "FALSE"))(str),
     encode: (str) => ParseResult.succeed(str),
   }),
   Schema.compose(Schema.transformLiterals(["TRUE", true], ["FALSE", false])),
 );
-const toLiteralSchema = <
-  const Literals extends Array.NonEmptyReadonlyArray<string>,
->(
+const toLiteralSchema = <const Literals extends Array.NonEmptyReadonlyArray<string>>(
   literals: Literals,
 ) =>
   pipe(
     Schema.String,
     Schema.transformOrFail(Schema.Literal(...literals), {
       strict: true,
-      decode: (str) =>
-        ParseResult.decodeUnknown(Schema.Literal(...literals))(str),
+      decode: (str) => ParseResult.decodeUnknown(Schema.Literal(...literals))(str),
       encode: (str) => ParseResult.succeed(str),
     }),
   );
@@ -159,174 +148,163 @@ const toStringArraySchema = pipe(
   }),
 );
 
-export class GoogleSheets extends Effect.Service<GoogleSheets>()(
-  "GoogleSheets",
-  {
-    effect: pipe(
-      Effect.Do,
-      Effect.bind("auth", () => GoogleAuthService.getAuth()),
-      Effect.bind("sheets", ({ auth }) =>
-        Effect.try(() =>
-          sheets({
-            version: "v4",
-            auth,
+export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets", {
+  effect: pipe(
+    Effect.Do,
+    Effect.bind("auth", () => GoogleAuthService.getAuth()),
+    Effect.bind("sheets", ({ auth }) =>
+      Effect.try(() =>
+        sheets({
+          version: "v4",
+          auth,
+        }),
+      ),
+    ),
+    Effect.map(({ sheets }) => ({
+      sheets,
+      get: (
+        params?: sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
+        options?: MethodOptions,
+      ) =>
+        pipe(
+          Effect.tryPromise({
+            try: () => sheets.spreadsheets.values.batchGet(params, options),
+            catch: Function.identity,
+          }),
+          Effect.catchAll((error) =>
+            pipe(
+              error,
+              Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
+              Effect.option,
+              Effect.flatMap((message) =>
+                Effect.fail(
+                  new Error.GoogleSheetsError({
+                    message: pipe(
+                      message,
+                      Option.map((message) => message.message),
+                      Option.getOrElse(() => "An unknown error occurred"),
+                    ),
+                    cause: error,
+                  }),
+                ),
+              ),
+            ),
+          ),
+          Effect.withSpan("GoogleSheets.get", { captureStackTrace: true }),
+        ),
+      getHashMap: <K>(
+        ranges: HashMap.HashMap<K, string>,
+        params?: Omit<sheets_v4.Params$Resource$Spreadsheets$Values$Batchget, "ranges">,
+        options?: MethodOptions,
+      ) =>
+        pipe(
+          ranges,
+          Utils.hashMapPositional((ranges: readonly string[]) =>
+            pipe(
+              Effect.tryPromise({
+                try: () =>
+                  sheets.spreadsheets.values.batchGet(
+                    { ...params, ranges: Array.copy(ranges) },
+                    options,
+                  ),
+                catch: Function.identity,
+              }),
+              Effect.catchAll((error) =>
+                pipe(
+                  error,
+                  Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
+                  Effect.option,
+                  Effect.flatMap((message) =>
+                    Effect.fail(
+                      new Error.GoogleSheetsError({
+                        message: pipe(
+                          message,
+                          Option.map((message) => message.message),
+                          Option.getOrElse(() => "An unknown error occurred"),
+                        ),
+                        cause: error,
+                      }),
+                    ),
+                  ),
+                ),
+              ),
+              Effect.map((sheet) => sheet.data.valueRanges ?? []),
+            ),
+          ),
+          Effect.withSpan("GoogleSheets.getHashMap", {
+            captureStackTrace: true,
           }),
         ),
-      ),
-      Effect.map(({ sheets }) => ({
-        sheets,
-        get: (
-          params?: sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
-          options?: MethodOptions,
-        ) =>
-          pipe(
-            Effect.tryPromise({
-              try: () => sheets.spreadsheets.values.batchGet(params, options),
-              catch: Function.identity,
-            }),
-            Effect.catchAll((error) =>
-              pipe(
-                error,
-                Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
-                Effect.option,
-                Effect.flatMap((message) =>
-                  Effect.fail(
-                    new Error.GoogleSheetsError({
-                      message: pipe(
-                        message,
-                        Option.map((message) => message.message),
-                        Option.getOrElse(() => "An unknown error occurred"),
-                      ),
-                      cause: error,
-                    }),
-                  ),
-                ),
-              ),
-            ),
-            Effect.withSpan("GoogleSheets.get", { captureStackTrace: true }),
-          ),
-        getHashMap: <K>(
-          ranges: HashMap.HashMap<K, string>,
-          params?: Omit<
-            sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
-            "ranges"
-          >,
-          options?: MethodOptions,
-        ) =>
-          pipe(
-            ranges,
-            Utils.hashMapPositional((ranges: readonly string[]) =>
-              pipe(
-                Effect.tryPromise({
-                  try: () =>
-                    sheets.spreadsheets.values.batchGet(
-                      { ...params, ranges: Array.copy(ranges) },
-                      options,
+      update: (
+        params?: sheets_v4.Params$Resource$Spreadsheets$Values$Batchupdate,
+        options?: MethodOptions,
+      ) =>
+        pipe(
+          Effect.tryPromise({
+            try: () => sheets.spreadsheets.values.batchUpdate(params, options),
+            catch: Function.identity,
+          }),
+          Effect.catchAll((error) =>
+            pipe(
+              error,
+              Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
+              Effect.option,
+              Effect.flatMap((message) =>
+                Effect.fail(
+                  new Error.GoogleSheetsError({
+                    message: pipe(
+                      message,
+                      Option.map((message) => message.message),
+                      Option.getOrElse(() => "An unknown error occurred"),
                     ),
-                  catch: Function.identity,
-                }),
-                Effect.catchAll((error) =>
-                  pipe(
-                    error,
-                    Schema.decodeUnknown(
-                      Schema.Struct({ message: Schema.String }),
+                    cause: error,
+                  }),
+                ),
+              ),
+            ),
+          ),
+          Effect.withSpan("GoogleSheets.update", { captureStackTrace: true }),
+        ),
+      getSheetGids: (sheetId: string) =>
+        pipe(
+          Effect.tryPromise({
+            try: () => sheets.spreadsheets.get({ spreadsheetId: sheetId }),
+            catch: Function.identity,
+          }),
+          Effect.catchAll((error) =>
+            pipe(
+              error,
+              Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
+              Effect.option,
+              Effect.flatMap((message) =>
+                Effect.fail(
+                  new Error.GoogleSheetsError({
+                    message: pipe(
+                      message,
+                      Option.map((message) => message.message),
+                      Option.getOrElse(() => "An unknown error occurred"),
                     ),
-                    Effect.option,
-                    Effect.flatMap((message) =>
-                      Effect.fail(
-                        new Error.GoogleSheetsError({
-                          message: pipe(
-                            message,
-                            Option.map((message) => message.message),
-                            Option.getOrElse(() => "An unknown error occurred"),
-                          ),
-                          cause: error,
-                        }),
-                      ),
-                    ),
-                  ),
-                ),
-                Effect.map((sheet) => sheet.data.valueRanges ?? []),
-              ),
-            ),
-            Effect.withSpan("GoogleSheets.getHashMap", {
-              captureStackTrace: true,
-            }),
-          ),
-        update: (
-          params?: sheets_v4.Params$Resource$Spreadsheets$Values$Batchupdate,
-          options?: MethodOptions,
-        ) =>
-          pipe(
-            Effect.tryPromise({
-              try: () =>
-                sheets.spreadsheets.values.batchUpdate(params, options),
-              catch: Function.identity,
-            }),
-            Effect.catchAll((error) =>
-              pipe(
-                error,
-                Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
-                Effect.option,
-                Effect.flatMap((message) =>
-                  Effect.fail(
-                    new Error.GoogleSheetsError({
-                      message: pipe(
-                        message,
-                        Option.map((message) => message.message),
-                        Option.getOrElse(() => "An unknown error occurred"),
-                      ),
-                      cause: error,
-                    }),
-                  ),
+                    cause: error,
+                  }),
                 ),
               ),
             ),
-            Effect.withSpan("GoogleSheets.update", { captureStackTrace: true }),
           ),
-        getSheetGids: (sheetId: string) =>
-          pipe(
-            Effect.tryPromise({
-              try: () => sheets.spreadsheets.get({ spreadsheetId: sheetId }),
-              catch: Function.identity,
-            }),
-            Effect.catchAll((error) =>
-              pipe(
-                error,
-                Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
-                Effect.option,
-                Effect.flatMap((message) =>
-                  Effect.fail(
-                    new Error.GoogleSheetsError({
-                      message: pipe(
-                        message,
-                        Option.map((message) => message.message),
-                        Option.getOrElse(() => "An unknown error occurred"),
-                      ),
-                      cause: error,
-                    }),
-                  ),
-                ),
-              ),
-            ),
-            Effect.map((sheet) => sheet.data.sheets ?? []),
-            Effect.map(Array.map((sheet) => sheet.properties)),
-            Effect.map(Array.map(Option.fromNullable)),
-            Effect.map(Array.getSomes),
-            Effect.map(ArrayUtils.Collect.toHashMapByKey("title")),
-            Effect.map(
-              HashMap.map(({ sheetId }) => Option.fromNullable(sheetId)),
-            ),
-            Effect.withSpan("GoogleSheets.getSheetGids", {
-              captureStackTrace: true,
-            }),
-          ),
-      })),
-    ),
-    dependencies: [GoogleAuthService.Default],
-    accessors: true,
-  },
-) {
+          Effect.map((sheet) => sheet.data.sheets ?? []),
+          Effect.map(Array.map((sheet) => sheet.properties)),
+          Effect.map(Array.map(Option.fromNullable)),
+          Effect.map(Array.getSomes),
+          Effect.map(ArrayUtils.Collect.toHashMapByKey("title")),
+          Effect.map(HashMap.map(({ sheetId }) => Option.fromNullable(sheetId))),
+          Effect.withSpan("GoogleSheets.getSheetGids", {
+            captureStackTrace: true,
+          }),
+        ),
+    })),
+  ),
+  dependencies: [GoogleAuthService.Default],
+  accessors: true,
+}) {
   static parseValueRanges = parseValueRanges;
 
   static tupleSchema = tupleSchema;
@@ -340,9 +318,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()(
   static toBooleanSchema = toBooleanSchema;
   static cellToBooleanSchema = Schema.OptionFromSelf(toBooleanSchema);
   static toLiteralSchema = toLiteralSchema;
-  static cellToLiteralSchema = <
-    const Literals extends Array.NonEmptyReadonlyArray<string>,
-  >(
+  static cellToLiteralSchema = <const Literals extends Array.NonEmptyReadonlyArray<string>>(
     literals: Literals,
   ) => Schema.OptionFromSelf(toLiteralSchema(literals));
   static toStringArraySchema = toStringArraySchema;

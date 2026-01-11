@@ -4,9 +4,9 @@ interface KeyOrderLookupSchema<
   Keys extends ReadonlyArray<string | number | symbol>,
   Fields extends { readonly [x in Keys[number]]: Schema.Struct.Field },
 > extends Schema.transformOrFail<
-    Schema.Array$<Schema.Tuple<[typeof Schema.Number, typeof Schema.Unknown]>>,
-    Schema.Struct<Fields>
-  > {
+  Schema.Array$<Schema.Tuple<[typeof Schema.Number, typeof Schema.Unknown]>>,
+  Schema.Struct<Fields>
+> {
   readonly keys: Keys;
   readonly fields: Fields;
 }
@@ -37,14 +37,10 @@ const makeKeyOrderLookupClass = <
             pipe(
               Array.get(keys, index),
               Option.match({
-                onSome: (key) =>
-                  ParseResult.succeed([key, value] as [Keys[number], unknown]),
+                onSome: (key) => ParseResult.succeed([key, value] as [Keys[number], unknown]),
                 onNone: () =>
                   ParseResult.fail(
-                    new ParseResult.Unexpected(
-                      index,
-                      `Index ${index} not found in keys array`,
-                    ),
+                    new ParseResult.Unexpected(index, `Index ${index} not found in keys array`),
                   ),
               }),
             ),
@@ -76,10 +72,7 @@ const makeKeyOrderLookupClass = <
                 onSome: (index) => ParseResult.succeed([index, value] as const),
                 onNone: () =>
                   ParseResult.fail(
-                    new ParseResult.Unexpected(
-                      key,
-                      `Key ${key} not found in keys array`,
-                    ),
+                    new ParseResult.Unexpected(key, `Key ${key} not found in keys array`),
                   ),
               }),
             ),

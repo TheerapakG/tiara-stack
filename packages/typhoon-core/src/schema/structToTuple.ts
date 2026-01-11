@@ -6,10 +6,7 @@ export { StructToTupleTypeId };
 type StructHelper<
   A extends ReadonlyArray<string>,
   B extends ReadonlyArray<Schema.Schema.Any>,
-> = A extends readonly [
-  infer AHead extends string,
-  ...infer ATail extends ReadonlyArray<string>,
-]
+> = A extends readonly [infer AHead extends string, ...infer ATail extends ReadonlyArray<string>]
   ? B extends readonly [
       infer BHead extends Schema.Schema.All,
       ...infer BTail extends ReadonlyArray<Schema.Schema.Any>,
@@ -23,21 +20,17 @@ type Struct<
   Fields extends ReadonlyArray<Schema.Schema.Any>,
 > = StructHelper<Keys, Fields>;
 
-type EncodedFields<Fields extends ReadonlyArray<Schema.Schema.Any>> =
-  Fields extends readonly [
-    infer Head extends Schema.Schema.Any,
-    ...infer Tail extends ReadonlyArray<Schema.Schema.Any>,
-  ]
-    ? [Schema.SchemaClass<Schema.Schema.Encoded<Head>>, ...EncodedFields<Tail>]
-    : [];
+type EncodedFields<Fields extends ReadonlyArray<Schema.Schema.Any>> = Fields extends readonly [
+  infer Head extends Schema.Schema.Any,
+  ...infer Tail extends ReadonlyArray<Schema.Schema.Any>,
+]
+  ? [Schema.SchemaClass<Schema.Schema.Encoded<Head>>, ...EncodedFields<Tail>]
+  : [];
 
 type StructToTupleSchema<
   Keys extends ReadonlyArray<string>,
   Fields extends Types.TupleOf<Keys["length"], Schema.Schema.Any>,
-> = Schema.transform<
-  Schema.Struct<Struct<Keys, Fields>>,
-  Schema.Tuple<EncodedFields<Fields>>
-> & {
+> = Schema.transform<Schema.Struct<Struct<Keys, Fields>>, Schema.Tuple<EncodedFields<Fields>>> & {
   readonly keys: Keys;
   readonly fields: Fields;
 };
@@ -61,10 +54,7 @@ const makeStructToTupleClass = <
     decode: (struct) =>
       pipe(
         keys,
-        Tuple.map(
-          (key) =>
-            struct[key as keyof Schema.Struct.Type<Struct<Keys, Fields>>],
-        ),
+        Tuple.map((key) => struct[key as keyof Schema.Struct.Type<Struct<Keys, Fields>>]),
       ) as Schema.Schema.Encoded<typeof TupleSchema>,
     encode: (tuple) => pipe(Array.zip(keys, tuple), Object.fromEntries),
   }) {
@@ -81,18 +71,14 @@ const StructToTupleSchema = <
   fields: Fields,
 ): StructToTupleSchema<Keys, Fields> => makeStructToTupleClass(keys, fields);
 
-type StructValue<
-  Keys extends ReadonlyArray<string>,
-  Value extends Schema.Schema.Any,
-> = { [K in Keys[number]]: Value };
+type StructValue<Keys extends ReadonlyArray<string>, Value extends Schema.Schema.Any> = {
+  [K in Keys[number]]: Value;
+};
 
 type EncodedValues<
   Keys extends ReadonlyArray<string>,
   Value extends Schema.Schema.Any,
-> = Types.TupleOf<
-  Keys["length"],
-  Schema.SchemaClass<Schema.Schema.Encoded<Value>>
->;
+> = Types.TupleOf<Keys["length"], Schema.SchemaClass<Schema.Schema.Encoded<Value>>>;
 
 type StructToTupleValueSchema<
   Keys extends ReadonlyArray<string>,
@@ -113,9 +99,7 @@ const makeStructToTupleValueClass = <
   value: Value,
 ) => {
   const TupleSchema = Schema.Tuple<EncodedValues<Keys, Value>>(
-    ...(Array.makeBy(keys.length, () =>
-      Schema.encodedSchema(value),
-    ) as EncodedValues<Keys, Value>),
+    ...(Array.makeBy(keys.length, () => Schema.encodedSchema(value)) as EncodedValues<Keys, Value>),
   );
   const StructSchema = Schema.Struct(
     Object.fromEntries(
@@ -131,10 +115,7 @@ const makeStructToTupleValueClass = <
     decode: (struct) =>
       pipe(
         keys,
-        Tuple.map(
-          (key) =>
-            struct[key as keyof Schema.Struct.Type<StructValue<Keys, Value>>],
-        ),
+        Tuple.map((key) => struct[key as keyof Schema.Struct.Type<StructValue<Keys, Value>>]),
       ) as Schema.Schema.Encoded<typeof TupleSchema>,
     encode: (tuple) => pipe(Array.zip(keys, tuple), Object.fromEntries),
   }) {
@@ -149,7 +130,6 @@ const StructToTupleValueSchema = <
 >(
   keys: Keys,
   value: Value,
-): StructToTupleValueSchema<Keys, Value> =>
-  makeStructToTupleValueClass(keys, value);
+): StructToTupleValueSchema<Keys, Value> => makeStructToTupleValueClass(keys, value);
 
 export { StructToTupleSchema, StructToTupleValueSchema };

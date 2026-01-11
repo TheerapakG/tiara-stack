@@ -16,12 +16,8 @@ export const getRunnerConfigHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(getRunnerConfigHandlerConfig),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
+        Effect.bind("parsed", () => Event.request.parsed(getRunnerConfigHandlerConfig)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -45,17 +41,12 @@ export const getRunnerConfigHandler = pipe(
           pipe(
             layerOfGuildId,
             Effect.flatMap((layerOfGuildId) =>
-              pipe(
-                Sheet.SheetService.getRunnerConfig(),
-                Result.provideEitherLayer(layerOfGuildId),
-              ),
+              pipe(Sheet.SheetService.getRunnerConfig(), Result.provideEitherLayer(layerOfGuildId)),
             ),
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(
-          Handler.Config.encodeResponseEffect(getRunnerConfigHandlerConfig),
-        ),
+        Effect.map(Handler.Config.encodeResponseEffect(getRunnerConfigHandlerConfig)),
         Effect.map(
           Effect.withSpan("getRunnerConfigHandler", {
             captureStackTrace: true,

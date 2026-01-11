@@ -1,9 +1,4 @@
-import {
-  BreakSchedule,
-  Schedule,
-  ScheduleWithPlayers,
-  Error,
-} from "@/server/schema";
+import { BreakSchedule, Schedule, ScheduleWithPlayers, Error } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 import { DefaultTaggedClass } from "typhoon-core/schema";
@@ -18,10 +13,7 @@ export const mapScheduleWithPlayersHandlerConfig = pipe(
       Schema.Struct({
         guildId: Schema.String,
         schedules: Schema.Array(
-          Schema.Union(
-            DefaultTaggedClass(Schedule),
-            DefaultTaggedClass(BreakSchedule),
-          ),
+          Schema.Union(DefaultTaggedClass(Schedule), DefaultTaggedClass(BreakSchedule)),
         ),
       }),
       Schema.standardSchemaV1,

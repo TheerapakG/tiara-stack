@@ -1,9 +1,4 @@
-import {
-  Player,
-  PartialIdPlayer,
-  PartialNamePlayer,
-  Error,
-} from "@/server/schema";
+import { Player, PartialIdPlayer, PartialNamePlayer, Error } from "@/server/schema";
 import { pipe, Schema } from "effect";
 import { Handler } from "typhoon-core/server";
 import { Result } from "typhoon-core/schema";

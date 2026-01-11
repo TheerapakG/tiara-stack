@@ -2,15 +2,12 @@ import { Effect, Schema, ParseResult, pipe } from "effect";
 import { Validate } from "../validator";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
-interface FromStandardSchemaV1Schema<S extends StandardSchemaV1>
-  extends Schema.declare<
-    StandardSchemaV1.InferOutput<S>,
-    StandardSchemaV1.InferInput<S>
-  > {}
+interface FromStandardSchemaV1Schema<S extends StandardSchemaV1> extends Schema.declare<
+  StandardSchemaV1.InferOutput<S>,
+  StandardSchemaV1.InferInput<S>
+> {}
 
-const makeFromStandardSchemaV1Class = <S extends StandardSchemaV1>(
-  schema: S,
-) => {
+const makeFromStandardSchemaV1Class = <S extends StandardSchemaV1>(schema: S) => {
   return class extends Schema.declare([], {
     decode: () => (input, _, ast) =>
       pipe(
@@ -21,9 +18,7 @@ const makeFromStandardSchemaV1Class = <S extends StandardSchemaV1>(
         ),
       ),
     encode: () => (output, _, ast) =>
-      ParseResult.fail(
-        new ParseResult.Forbidden(ast, output, "Not implemented"),
-      ) as Effect.Effect<
+      ParseResult.fail(new ParseResult.Forbidden(ast, output, "Not implemented")) as Effect.Effect<
         StandardSchemaV1.InferInput<S>,
         ParseResult.ParseIssue
       >,

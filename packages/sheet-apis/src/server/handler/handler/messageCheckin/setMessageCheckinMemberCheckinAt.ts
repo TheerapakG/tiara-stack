@@ -37,9 +37,7 @@ export const setMessageCheckinMemberCheckinAtHandler = pipe(
           }),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(
-          setMessageCheckinMemberCheckinAtHandlerConfig,
-        ),
+        Handler.Config.encodeResponseEffect(setMessageCheckinMemberCheckinAtHandlerConfig),
         Effect.withSpan("setMessageCheckinMemberCheckinAtHandler", {
           captureStackTrace: true,
         }),

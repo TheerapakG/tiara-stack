@@ -3,15 +3,13 @@ import { Data, Effect, Option, pipe } from "effect";
 import { Observable } from "../observability";
 import { ValidationError, makeValidationError } from "~/error";
 
-export type Input<Schema extends StandardSchemaV1 | undefined> =
-  Schema extends StandardSchemaV1
-    ? StandardSchemaV1.InferInput<Schema>
-    : unknown;
+export type Input<Schema extends StandardSchemaV1 | undefined> = Schema extends StandardSchemaV1
+  ? StandardSchemaV1.InferInput<Schema>
+  : unknown;
 
-export type Output<Schema extends StandardSchemaV1 | undefined> =
-  Schema extends StandardSchemaV1
-    ? StandardSchemaV1.InferOutput<Schema>
-    : unknown;
+export type Output<Schema extends StandardSchemaV1 | undefined> = Schema extends StandardSchemaV1
+  ? StandardSchemaV1.InferOutput<Schema>
+  : unknown;
 
 const parseStandardSchemaV1Result = <Output = unknown>(
   result: StandardSchemaV1.Result<Output>,
@@ -35,14 +33,12 @@ export class Validator<Schema extends StandardSchemaV1 | undefined>
 
 export const hasSchema = <Schema extends StandardSchemaV1 | undefined>(
   validator: Validator<Schema>,
-): validator is Validator<Exclude<Schema, undefined>> =>
-  validator.schema !== undefined;
+): validator is Validator<Exclude<Schema, undefined>> => validator.schema !== undefined;
 
 export const validateSchema =
   <
     Schema extends StandardSchemaV1,
-    Output extends
-      StandardSchemaV1.InferOutput<Schema> = StandardSchemaV1.InferOutput<Schema>,
+    Output extends StandardSchemaV1.InferOutput<Schema> = StandardSchemaV1.InferOutput<Schema>,
   >(
     validator: Validator<Schema>,
   ) =>
@@ -72,8 +68,7 @@ export const validateSchema =
 export const validateSchemaOption =
   <
     Schema extends StandardSchemaV1,
-    Output extends
-      StandardSchemaV1.InferOutput<Schema> = StandardSchemaV1.InferOutput<Schema>,
+    Output extends StandardSchemaV1.InferOutput<Schema> = StandardSchemaV1.InferOutput<Schema>,
   >(
     validator: Validator<Schema>,
   ) =>
@@ -91,8 +86,7 @@ export const validateSchemaOption =
 export const validateSchemaWithDefault =
   <
     Schema extends StandardSchemaV1,
-    Output extends
-      StandardSchemaV1.InferOutput<Schema> = StandardSchemaV1.InferOutput<Schema>,
+    Output extends StandardSchemaV1.InferOutput<Schema> = StandardSchemaV1.InferOutput<Schema>,
   >(
     validator: Validator<Schema>,
     defaultValue: Output,
@@ -108,19 +102,13 @@ export const validateSchemaWithDefault =
     );
 
 export const validate =
-  <
-    Schema extends StandardSchemaV1 | undefined,
-    Out extends Output<Schema> = Output<Schema>,
-  >(
+  <Schema extends StandardSchemaV1 | undefined, Out extends Output<Schema> = Output<Schema>>(
     validator: Validator<Schema>,
   ) =>
   (value: unknown): Effect.Effect<Out, ValidationError> =>
     pipe(
       hasSchema(validator)
-        ? (validateSchema(validator)(value) as Effect.Effect<
-            Out,
-            ValidationError
-          >)
+        ? (validateSchema(validator)(value) as Effect.Effect<Out, ValidationError>)
         : Effect.succeed(value as Out),
       Observable.withSpan(validator, "Validator.validate", {
         captureStackTrace: true,
@@ -128,10 +116,7 @@ export const validate =
     );
 
 export const validateOption =
-  <
-    Schema extends StandardSchemaV1 | undefined,
-    Out extends Output<Schema> = Output<Schema>,
-  >(
+  <Schema extends StandardSchemaV1 | undefined, Out extends Output<Schema> = Output<Schema>>(
     validator: Validator<Schema>,
   ) =>
   (value: unknown): Effect.Effect<Option.Option<Out>> =>
@@ -146,10 +131,7 @@ export const validateOption =
     );
 
 export const validateWithDefault =
-  <
-    Schema extends StandardSchemaV1 | undefined,
-    Out extends Output<Schema> = Output<Schema>,
-  >(
+  <Schema extends StandardSchemaV1 | undefined, Out extends Output<Schema> = Output<Schema>>(
     validator: Validator<Schema>,
     defaultValue: Out,
   ) =>

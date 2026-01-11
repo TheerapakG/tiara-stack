@@ -19,11 +19,11 @@ import { RpcResult, Result } from "../schema";
 import * as SignalService from "./signalService";
 
 class UntilObserver<
-    A = never,
-    E = never,
-    R = never,
-    P extends Match.Types.PatternPrimitive<A> = Match.Types.PatternPrimitive<A>,
-  >
+  A = never,
+  E = never,
+  R = never,
+  P extends Match.Types.PatternPrimitive<A> = Match.Types.PatternPrimitive<A>,
+>
   extends Effectable.Class<Match.Types.WhenMatch<A, P>, never, never>
   implements DependentSignal
 {
@@ -69,10 +69,7 @@ class UntilObserver<
                     pipe(
                       Match.value(value),
                       Match.when(this._pattern, (matched) =>
-                        pipe(
-                          TDeferred.succeed(this._value, matched),
-                          STM.commit,
-                        ),
+                        pipe(TDeferred.succeed(this._value, matched), STM.commit),
                       ),
                       Match.orElse(() => Effect.void),
                     ) as Effect.Effect<void, never, never>,
@@ -99,18 +96,12 @@ class UntilObserver<
 
   clearDependencies(): STM.STM<void, never, never> {
     return pipe(
-      TSet.forEach(this._dependencies, (dependency) =>
-        dependency.removeDependent(this),
-      ),
+      TSet.forEach(this._dependencies, (dependency) => dependency.removeDependent(this)),
       STM.zipRight(TSet.removeIf(this._dependencies, () => true)),
     );
   }
 
-  getDependencies(): STM.STM<
-    TSet.TSet<DependencySignal<unknown, unknown, unknown>>,
-    never,
-    never
-  > {
+  getDependencies(): STM.STM<TSet.TSet<DependencySignal<unknown, unknown, unknown>>, never, never> {
     return STM.succeed(this._dependencies);
   }
 
@@ -128,19 +119,11 @@ class UntilObserver<
     );
   }
 
-  getReferenceForDependency(): STM.STM<
-    WeakRef<DependentSignal> | DependentSignal,
-    never,
-    never
-  > {
+  getReferenceForDependency(): STM.STM<WeakRef<DependentSignal> | DependentSignal, never, never> {
     return STM.succeed(this);
   }
 
-  notify(): Effect.Effect<
-    unknown,
-    never,
-    SignalService.SignalService | SignalContext
-  > {
+  notify(): Effect.Effect<unknown, never, SignalService.SignalService | SignalContext> {
     return pipe(
       TDeferred.poll(this._value),
       STM.zipLeft(this.clearDependencies()),
@@ -177,11 +160,7 @@ const make = <
     Effect.map(
       ({ context, value, dependencies }) =>
         new UntilObserver<A, E, Exclude<R, SignalContext>, P>(
-          effect as Effect.Effect<
-            A,
-            E,
-            Exclude<R, SignalContext> | SignalContext
-          >,
+          effect as Effect.Effect<A, E, Exclude<R, SignalContext> | SignalContext>,
           context,
           value,
           pattern,
@@ -223,10 +202,7 @@ export const observeUntil = <
   );
 
 export const observeUntilSignal =
-  <
-    A = never,
-    P extends Match.Types.PatternPrimitive<A> = Match.Types.PatternPrimitive<A>,
-  >(
+  <A = never, P extends Match.Types.PatternPrimitive<A> = Match.Types.PatternPrimitive<A>>(
     pattern: P,
     options?: Observable.ObservableOptions,
   ) =>
@@ -253,10 +229,7 @@ export const observeUntilSignal =
     );
 
 export const observeUntilScoped =
-  <
-    A = never,
-    P extends Match.Types.PatternPrimitive<A> = Match.Types.PatternPrimitive<A>,
-  >(
+  <A = never, P extends Match.Types.PatternPrimitive<A> = Match.Types.PatternPrimitive<A>>(
     pattern: P,
     options?: Observable.ObservableOptions,
   ) =>
@@ -265,8 +238,7 @@ export const observeUntilScoped =
   ): Effect.Effect<
     Match.Types.WhenMatch<A, P>,
     E | E1,
-    | Exclude<Exclude<R, SignalContext> | R1, Scope.Scope>
-    | SignalService.SignalService
+    Exclude<Exclude<R, SignalContext> | R1, Scope.Scope> | SignalService.SignalService
   > =>
     pipe(
       effect,
@@ -287,16 +259,11 @@ export const observeUntilScoped =
 export const observeUntilRpcResolved =
   (options?: Observable.ObservableOptions) =>
   <A = never, E = never, R = never, E1 = never, E2 = never, R2 = never>(
-    effect: Effect.Effect<
-      Effect.Effect<RpcResult.RpcResult<A, E>, E1, R | SignalContext>,
-      E2,
-      R2
-    >,
+    effect: Effect.Effect<Effect.Effect<RpcResult.RpcResult<A, E>, E1, R | SignalContext>, E2, R2>,
   ): Effect.Effect<
     A,
     RpcError<E> | ValidationError | E1 | E2,
-    | Exclude<Exclude<R, SignalContext> | R2, Scope.Scope>
-    | SignalService.SignalService
+    Exclude<Exclude<R, SignalContext> | R2, Scope.Scope> | SignalService.SignalService
   > =>
     pipe(
       effect,
@@ -318,19 +285,14 @@ export const observeUntilRpcResultResolved =
   (options?: Observable.ObservableOptions) =>
   <A = never, E = never, R = never, E1 = never, E2 = never, R2 = never>(
     effect: Effect.Effect<
-      Effect.Effect<
-        RpcResult.RpcResult<Result.Result<unknown, A>, E>,
-        E1,
-        R | SignalContext
-      >,
+      Effect.Effect<RpcResult.RpcResult<Result.Result<unknown, A>, E>, E1, R | SignalContext>,
       E2,
       R2
     >,
   ): Effect.Effect<
     A,
     RpcError<E> | ValidationError | E1 | E2,
-    | Exclude<Exclude<R, SignalContext> | R2, Scope.Scope>
-    | SignalService.SignalService
+    Exclude<Exclude<R, SignalContext> | R2, Scope.Scope> | SignalService.SignalService
   > =>
     pipe(
       effect,
@@ -352,11 +314,7 @@ export const observeUntilRpcResultResolved =
 export const observeOnce = <A = never, E = never, R = never>(
   effect: Effect.Effect<A, E, R | SignalContext>,
   options?: Observable.ObservableOptions,
-): Effect.Effect<
-  A,
-  E,
-  Exclude<R, SignalContext> | SignalService.SignalService
-> =>
+): Effect.Effect<A, E, Exclude<R, SignalContext> | SignalService.SignalService> =>
   pipe(
     observeUntil(effect, Match.any as Match.Types.PatternPrimitive<A>, options),
     Effect.map((value) => value as A),
@@ -376,11 +334,7 @@ export const observeOnceSignal =
   (options?: Observable.ObservableOptions) =>
   <A = never, E = never, R = never, E2 = never, R2 = never>(
     effect: Effect.Effect<Effect.Effect<A, E, R | SignalContext>, E2, R2>,
-  ): Effect.Effect<
-    A,
-    E | E2,
-    Exclude<R, SignalContext> | R2 | SignalService.SignalService
-  > =>
+  ): Effect.Effect<A, E | E2, Exclude<R, SignalContext> | R2 | SignalService.SignalService> =>
     pipe(
       effect,
       Effect.flatMap((innerEffect) => observeOnce(innerEffect, options)),
@@ -403,8 +357,7 @@ export const observeOnceScoped =
   ): Effect.Effect<
     A,
     E | E2,
-    | Exclude<Exclude<R, SignalContext> | R2, Scope.Scope>
-    | SignalService.SignalService
+    Exclude<Exclude<R, SignalContext> | R2, Scope.Scope> | SignalService.SignalService
   > =>
     pipe(
       effect,

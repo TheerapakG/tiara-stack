@@ -4,23 +4,23 @@ import { Context, Effect, HKT, pipe, Types } from "effect";
 import { DiscordError, NotInGuildError } from "~~/src/types";
 
 export interface MessageT extends HKT.TypeLambda {
-  readonly type: this["Target"] extends boolean
-    ? Message<this["Target"]>
-    : Message;
+  readonly type: this["Target"] extends boolean ? Message<this["Target"]> : Message;
 }
 
-export type MessageKind<
-  F extends BaseMessageT,
-  B extends boolean = boolean,
-> = HKT.Kind<F, never, never, never, B>;
+export type MessageKind<F extends BaseMessageT, B extends boolean = boolean> = HKT.Kind<
+  F,
+  never,
+  never,
+  never,
+  B
+>;
 
 export interface BaseMessageT extends HKT.TypeLambda {
   readonly type: Message<boolean>;
 }
 
 export class MessageContext<M extends BaseMessageT = MessageT> {
-  $inferMessageType: Types.Contravariant<M> =
-    undefined as unknown as Types.Contravariant<M>;
+  $inferMessageType: Types.Contravariant<M> = undefined as unknown as Types.Contravariant<M>;
 
   static messageTag = <M extends BaseMessageT = MessageT>() =>
     Context.GenericTag<MessageContext<M>, MessageKind<M>>("MessageContext");
@@ -35,9 +35,7 @@ export class MessageContext<M extends BaseMessageT = MessageT> {
   static edit = wrap((content: string | MessageEditOptions | MessagePayload) =>
     pipe(
       MessageContext.message<MessageT>().sync(),
-      Effect.flatMap((message) =>
-        DiscordError.wrapTryPromise(() => message.edit(content)),
-      ),
+      Effect.flatMap((message) => DiscordError.wrapTryPromise(() => message.edit(content))),
       Effect.withSpan("MessageContext.edit", {
         captureStackTrace: true,
       }),
@@ -54,9 +52,7 @@ export class InGuildMessageContext {
       pipe(
         MessageContext.message<M>().sync(),
         Effect.flatMap((message) =>
-          !message.inGuild()
-            ? Effect.fail(new NotInGuildError())
-            : Effect.succeed(message as Kind),
+          !message.inGuild() ? Effect.fail(new NotInGuildError()) : Effect.succeed(message as Kind),
         ),
       ),
     );
@@ -64,9 +60,7 @@ export class InGuildMessageContext {
   static edit = wrap((content: string | MessageEditOptions | MessagePayload) =>
     pipe(
       InGuildMessageContext.message<MessageT>().sync(),
-      Effect.flatMap((message) =>
-        DiscordError.wrapTryPromise(() => message.edit(content)),
-      ),
+      Effect.flatMap((message) => DiscordError.wrapTryPromise(() => message.edit(content))),
       Effect.withSpan("InGuildMessageContext.edit", {
         captureStackTrace: true,
       }),

@@ -1,11 +1,13 @@
 {
   "name": "sheet-apis",
-  "private": true,
   "version": "0.0.0",
-  "type": "module",
+  "private": true,
+  "keywords": [],
+  "author": "",
   "files": [
     "./dist/**"
   ],
+  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
@@ -18,14 +20,12 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "format": "prettier -c .",
-    "format:apply": "prettier -w .",
+    "format": "oxfmt --check",
+    "format:apply": "oxfmt",
     "lint": "oxlint .",
     "typecheck": "tsgo --noEmit",
     "build": "tsdown -c tsdown.config.ts && tar -acf dist.tar.zst ./dist"
   },
-  "keywords": [],
-  "author": "",
   "dependencies": {
     "@effect/opentelemetry": "^0.58.0",
     "@effect/platform": "^0.92.1",
@@ -55,9 +55,9 @@
   "devDependencies": {
     "@types/node": "^24.7.2",
     "crossws": "^0.4.1",
-    "oxlint": "^1.16.0",
+    "oxfmt": "^0.23.0",
+    "oxlint": "^1.38.0",
     "pathe": "^2.0.3",
-    "prettier": "^3.5.3",
     "tsdown": "^0.16.4",
     "typescript": "^5.9.3"
   }

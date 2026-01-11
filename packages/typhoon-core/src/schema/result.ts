@@ -21,8 +21,7 @@ type OptimisticData<T> = {
 };
 const OptimisticTaggedClass: new <T>(
   args: Readonly<OptimisticData<T>>,
-) => Readonly<OptimisticData<T>> & { readonly _tag: "Optimistic" } =
-  Data.TaggedClass("Optimistic");
+) => Readonly<OptimisticData<T>> & { readonly _tag: "Optimistic" } = Data.TaggedClass("Optimistic");
 
 /**
  * Encoded Optimistic result type.
@@ -57,8 +56,7 @@ type CompleteData<T> = {
 };
 const CompleteTaggedClass: new <T>(
   args: Readonly<CompleteData<T>>,
-) => Readonly<CompleteData<T>> & { readonly _tag: "Complete" } =
-  Data.TaggedClass("Complete");
+) => Readonly<CompleteData<T>> & { readonly _tag: "Complete" } = Data.TaggedClass("Complete");
 
 /**
  * Encoded Complete result type.
@@ -88,9 +86,7 @@ export type Result<O, C = O> = Optimistic<O> | Complete<C>;
 /**
  * Schema for Optimistic Encoded result type.
  */
-export const OptimisticEncodedSchema = <O extends Schema.Schema.All>(
-  value: O,
-) =>
+export const OptimisticEncodedSchema = <O extends Schema.Schema.All>(value: O) =>
   Schema.Struct({
     _tag: Schema.Literal("Optimistic"),
     value,
@@ -108,26 +104,18 @@ export const CompleteEncodedSchema = <C extends Schema.Schema.All>(value: C) =>
     value,
   });
 
-const makeCompleteEncoded = <C>(value: C) =>
-  ({ _tag: "Complete", value }) as CompleteEncoded<C>;
+const makeCompleteEncoded = <C>(value: C) => ({ _tag: "Complete", value }) as CompleteEncoded<C>;
 
 /**
  * Schema for Result Encoded union type.
  */
-export const ResultEncodedSchema = <
-  O extends Schema.Schema.All,
-  C extends Schema.Schema.All,
->({
+export const ResultEncodedSchema = <O extends Schema.Schema.All, C extends Schema.Schema.All>({
   optimistic,
   complete,
 }: {
   readonly optimistic: O;
   readonly complete: C;
-}) =>
-  Schema.Union(
-    OptimisticEncodedSchema(optimistic),
-    CompleteEncodedSchema(complete),
-  );
+}) => Schema.Union(OptimisticEncodedSchema(optimistic), CompleteEncodedSchema(complete));
 
 const ResultDecode = <O, C>(input: ResultEncoded<O, C>): Result<O, C> =>
   pipe(
@@ -179,10 +167,7 @@ const ResultParse =
         )
       : ParseResult.fail(new ParseResult.Type(ast, u));
 
-export const ResultFromSelfSchema = <
-  O extends Schema.Schema.All,
-  C extends Schema.Schema.All,
->({
+export const ResultFromSelfSchema = <O extends Schema.Schema.All, C extends Schema.Schema.All>({
   optimistic,
   complete,
 }: {
@@ -193,28 +178,18 @@ export const ResultFromSelfSchema = <
     [optimistic, complete],
     {
       decode: (optimistic, complete) =>
-        ResultParse(
-          ParseResult.decodeUnknown(optimistic),
-          ParseResult.decodeUnknown(complete),
-        ),
+        ResultParse(ParseResult.decodeUnknown(optimistic), ParseResult.decodeUnknown(complete)),
       encode: (optimistic, complete) =>
-        ResultParse(
-          ParseResult.encodeUnknown(optimistic),
-          ParseResult.encodeUnknown(complete),
-        ),
+        ResultParse(ParseResult.encodeUnknown(optimistic), ParseResult.encodeUnknown(complete)),
     },
     {
       description: `Result<${Schema.format(optimistic)}, ${Schema.format(complete)}>`,
       pretty: ResultPretty,
-      equivalence: (optimistic, complete) =>
-        getEquivalence({ optimistic, complete }),
+      equivalence: (optimistic, complete) => getEquivalence({ optimistic, complete }),
     },
   );
 
-export const ResultSchema = <
-  O extends Schema.Schema.All,
-  C extends Schema.Schema.All,
->({
+export const ResultSchema = <O extends Schema.Schema.All, C extends Schema.Schema.All>({
   optimistic,
   complete,
 }: {
@@ -280,10 +255,7 @@ export const flatten = <OO, OC, CO, CC>(
   );
 
 export const match =
-  <OA, OB, CA, CB>(f: {
-    onOptimistic: (value: OA) => OB;
-    onComplete: (value: CA) => CB;
-  }) =>
+  <OA, OB, CA, CB>(f: { onOptimistic: (value: OA) => OB; onComplete: (value: CA) => CB }) =>
   (result: Result<OA, CA>): Unify.Unify<OB | CB> =>
     pipe(
       Match.value(result),
@@ -294,9 +266,7 @@ export const match =
     );
 
 export const predicate =
-  <O, C>(
-    predicate: Predicate.Predicate<O | C>,
-  ): Predicate.Predicate<Result<O, C>> =>
+  <O, C>(predicate: Predicate.Predicate<O | C>): Predicate.Predicate<Result<O, C>> =>
   (v: Result<O, C>): boolean =>
     predicate(v.value);
 
@@ -382,9 +352,7 @@ export const someOrLeft =
 
 export const eitherSomeOrLeft =
   <E1>(onNone: () => E1) =>
-  <T, E2>(
-    result: Result<Either.Either<Option.Option<T>, E2>>,
-  ): Result<Either.Either<T, E1 | E2>> =>
+  <T, E2>(result: Result<Either.Either<Option.Option<T>, E2>>): Result<Either.Either<T, E1 | E2>> =>
     pipe(
       result,
       map(Either.filterOrLeft(Option.isSome, onNone)),
@@ -392,21 +360,13 @@ export const eitherSomeOrLeft =
     );
 
 export const provideEitherLayer =
-  <ROut, E1, RIn, E2>(
-    layer: Result<Either.Either<Layer.Layer<ROut, E1, RIn>, E2>>,
-  ) =>
+  <ROut, E1, RIn, E2>(layer: Result<Either.Either<Layer.Layer<ROut, E1, RIn>, E2>>) =>
   <A, E, R>(
     effect: Effect.Effect<A, E, R>,
-  ): Effect.Effect<
-    Result<Either.Either<A, E | E1 | E2>>,
-    never,
-    Exclude<R, ROut> | RIn
-  > =>
+  ): Effect.Effect<Result<Either.Either<A, E | E1 | E2>>, never, Exclude<R, ROut> | RIn> =>
     pipe(
       layer,
-      map(
-        Either.map((layer) => pipe(effect, Effect.provide(Layer.fresh(layer)))),
-      ),
+      map(Either.map((layer) => pipe(effect, Effect.provide(Layer.fresh(layer))))),
       map(Effect.flatten),
       map(Effect.either),
       transposeEffect,
@@ -414,28 +374,14 @@ export const provideEitherLayer =
 
 export const provideEitherLayerEffect =
   <ROut, E1, RIn, E2, E3, R3>(
-    layer: Effect.Effect<
-      Result<Either.Either<Layer.Layer<ROut, E1, RIn>, E2>>,
-      E3,
-      R3
-    >,
+    layer: Effect.Effect<Result<Either.Either<Layer.Layer<ROut, E1, RIn>, E2>>, E3, R3>,
   ) =>
   <A, E, R>(
     effect: Effect.Effect<A, E, R>,
-  ): Effect.Effect<
-    Result<Either.Either<A, E | E1 | E2>>,
-    E3,
-    Exclude<R, ROut> | RIn | R3
-  > =>
+  ): Effect.Effect<Result<Either.Either<A, E | E1 | E2>>, E3, Exclude<R, ROut> | RIn | R3> =>
     pipe(
       layer,
-      Effect.map(
-        map(
-          Either.map((layer) =>
-            pipe(effect, Effect.provide(Layer.fresh(layer))),
-          ),
-        ),
-      ),
+      Effect.map(map(Either.map((layer) => pipe(effect, Effect.provide(Layer.fresh(layer)))))),
       Effect.map(map(Effect.flatten)),
       Effect.map(map(Effect.either)),
       Effect.flatMap(transposeEffect),

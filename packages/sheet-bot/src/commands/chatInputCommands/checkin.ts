@@ -29,17 +29,7 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import {
-  Array,
-  DateTime,
-  Effect,
-  HashMap,
-  Match,
-  Option,
-  pipe,
-  HashSet,
-  flow,
-} from "effect";
+import { Array, DateTime, Effect, HashMap, Match, Option, pipe, HashSet, flow } from "effect";
 import { Schema } from "sheet-apis";
 import { UntilObserver } from "typhoon-core/signal";
 import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
@@ -99,9 +89,7 @@ const getCheckinData = ({
 
 const getCheckinMessages = (
   data: {
-    prevSchedule: Option.Option<
-      Schema.ScheduleWithPlayers | Schema.BreakSchedule
-    >;
+    prevSchedule: Option.Option<Schema.ScheduleWithPlayers | Schema.BreakSchedule>;
     schedule: Option.Option<Schema.ScheduleWithPlayers | Schema.BreakSchedule>;
     runningChannel: {
       channelId: string;
@@ -120,213 +108,192 @@ const getCheckinMessages = (
           data.runningChannel.name,
           Option.map((name) => `head to ${name}`),
           Option.getOrElse(
-            () =>
-              "await further instructions from the manager on where the running channel is",
+            () => "await further instructions from the manager on where the running channel is",
           ),
         ),
     template: pipe(template, Option.getOrUndefined),
   });
 
-const handleManual =
-  handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
-    .data(
-      new SlashCommandSubcommandBuilder()
-        .setName("manual")
-        .setDescription("Manually check in users")
-        .addStringOption((option) =>
-          option
-            .setName("channel_name")
-            .setDescription("The name of the running channel"),
-        )
-        .addNumberOption((option) =>
-          option
-            .setName("hour")
-            .setDescription("The hour to check in users for"),
-        )
-        .addStringOption((option) =>
-          option
-            .setName("server_id")
-            .setDescription("The server to check in users for"),
-        )
-        .addStringOption((option) =>
-          option
-            .setName("template")
-            .setDescription(
-              "Optional Handlebars template for the check-in message",
-            ),
+const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
+  .data(
+    new SlashCommandSubcommandBuilder()
+      .setName("manual")
+      .setDescription("Manually check in users")
+      .addStringOption((option) =>
+        option.setName("channel_name").setDescription("The name of the running channel"),
+      )
+      .addNumberOption((option) =>
+        option.setName("hour").setDescription("The hour to check in users for"),
+      )
+      .addStringOption((option) =>
+        option.setName("server_id").setDescription("The server to check in users for"),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("template")
+          .setDescription("Optional Handlebars template for the check-in message"),
+      ),
+  )
+  .handler(
+    Effect.provide(guildServicesFromInteractionOption("server_id"))(
+      pipe(
+        Effect.Do,
+        InteractionContext.deferReply.tap(() => ({
+          flags: MessageFlags.Ephemeral,
+        })),
+        PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
+        PermissionService.checkRoles.tapEffect(() =>
+          pipe(
+            GuildConfigService.getGuildManagerRoles(),
+            UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatten,
+            Effect.map((roles) => ({
+              roles: pipe(
+                roles,
+                Array.map((role) => role.roleId),
+              ),
+              reason: "You can only check in users as a manager",
+            })),
+          ),
         ),
-    )
-    .handler(
-      Effect.provide(guildServicesFromInteractionOption("server_id"))(
-        pipe(
-          Effect.Do,
-          InteractionContext.deferReply.tap(() => ({
-            flags: MessageFlags.Ephemeral,
-          })),
-          PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
-          PermissionService.checkRoles.tapEffect(() =>
-            pipe(
-              GuildConfigService.getGuildManagerRoles(),
-              UntilObserver.observeUntilRpcResultResolved(),
-              Effect.flatten,
-              Effect.map((roles) => ({
-                roles: pipe(
-                  roles,
-                  Array.map((role) => role.roleId),
-                ),
-                reason: "You can only check in users as a manager",
-              })),
-            ),
-          ),
-          InteractionContext.user.bind("user"),
-          bindObject({
-            hourOption: InteractionContext.getNumber("hour"),
-            channelNameOption: InteractionContext.getString("channel_name"),
-            templateOption: InteractionContext.getString("template"),
-          }),
-          Effect.bind("hour", ({ hourOption }) =>
-            pipe(
-              hourOption,
-              Option.match({
-                onSome: Effect.succeed,
-                onNone: () =>
-                  pipe(
-                    DateTime.now,
-                    Effect.map(DateTime.addDuration("20 minutes")),
-                    Effect.flatMap(ConverterService.convertDateTimeToHour),
-                  ),
-              }),
-            ),
-          ),
-          Effect.bind("runningChannel", ({ channelNameOption }) =>
-            pipe(
-              channelNameOption,
-              Option.match({
-                onSome: (channelName) =>
-                  pipe(
-                    GuildConfigService.getGuildRunningChannelByName(
-                      channelName,
-                    ),
-                    UntilObserver.observeUntilRpcResultResolved(),
-                    Effect.flatten,
-                  ),
-                onNone: () =>
-                  pipe(
-                    InteractionContext.channel(true).sync(),
-                    Effect.flatMap((channel) =>
-                      pipe(
-                        GuildConfigService.getGuildRunningChannelById(
-                          channel.id,
-                        ),
-                        UntilObserver.observeUntilRpcResultResolved(),
-                        Effect.flatten,
-                      ),
-                    ),
-                  ),
-              }),
-            ),
-          ),
-          Effect.bind("checkinChannelId", ({ runningChannel }) =>
-            pipe(
-              runningChannel.checkinChannelId,
-              Option.match({
-                onSome: Effect.succeed,
-                onNone: () => InteractionContext.channelId(true).sync(),
-              }),
-            ),
-          ),
-          Effect.bind("checkinData", ({ hour, runningChannel }) =>
-            getCheckinData({ hour, runningChannel }),
-          ),
-          Effect.let("fillIds", ({ checkinData }) =>
-            pipe(
-              checkinData.schedule,
-              Option.map((schedule) =>
+        InteractionContext.user.bind("user"),
+        bindObject({
+          hourOption: InteractionContext.getNumber("hour"),
+          channelNameOption: InteractionContext.getString("channel_name"),
+          templateOption: InteractionContext.getString("template"),
+        }),
+        Effect.bind("hour", ({ hourOption }) =>
+          pipe(
+            hourOption,
+            Option.match({
+              onSome: Effect.succeed,
+              onNone: () =>
                 pipe(
-                  Match.value(schedule),
-                  Match.tagsExhaustive({
-                    BreakSchedule: () => [],
-                    ScheduleWithPlayers: (schedule) => schedule.fills,
-                  }),
+                  DateTime.now,
+                  Effect.map(DateTime.addDuration("20 minutes")),
+                  Effect.flatMap(ConverterService.convertDateTimeToHour),
                 ),
-              ),
-              Option.getOrElse(() => []),
-              Array.getSomes,
-              Array.map((player) =>
+            }),
+          ),
+        ),
+        Effect.bind("runningChannel", ({ channelNameOption }) =>
+          pipe(
+            channelNameOption,
+            Option.match({
+              onSome: (channelName) =>
                 pipe(
-                  Match.value(player.player),
-                  Match.tagsExhaustive({
-                    Player: (player) => Option.some(player.id),
-                    PartialNamePlayer: () => Option.none(),
-                  }),
+                  GuildConfigService.getGuildRunningChannelByName(channelName),
+                  UntilObserver.observeUntilRpcResultResolved(),
+                  Effect.flatten,
                 ),
-              ),
-              Array.getSomes,
-              HashSet.fromIterable,
-              HashSet.toValues,
-            ),
-          ),
-          Effect.bind("checkinMessages", ({ checkinData, templateOption }) =>
-            getCheckinMessages(checkinData, templateOption),
-          ),
-          Effect.bind("message", ({ checkinMessages, checkinChannelId }) =>
-            pipe(
-              checkinMessages.checkinMessage,
-              Effect.transposeMapOption((checkinMessage) =>
+              onNone: () =>
                 pipe(
-                  Effect.Do,
-                  Effect.let("initialMessage", () => checkinMessage),
-                  SendableChannelContext.send().bind("message", () => ({
-                    content: checkinMessage,
-                    components: [
-                      new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                        new ButtonBuilder(checkinButton.data),
-                      ),
-                    ],
-                  })),
-                ),
-              ),
-              Effect.provide(
-                channelServicesFromGuildChannelId(checkinChannelId),
-              ),
-            ),
-          ),
-          Effect.tap(({ checkinData, message, fillIds, hour }) =>
-            pipe(
-              message,
-              Effect.transposeMapOption(({ initialMessage, message }) =>
-                Effect.all(
-                  [
-                    MessageCheckinService.upsertMessageCheckinData(message.id, {
-                      initialMessage,
-                      hour,
-                      channelId: checkinData.runningChannel.channelId,
-                      roleId: Option.getOrNull(
-                        checkinData.runningChannel.roleId,
-                      ),
-                    }),
+                  InteractionContext.channel(true).sync(),
+                  Effect.flatMap((channel) =>
                     pipe(
-                      MessageCheckinService.addMessageCheckinMembers(
-                        message.id,
-                        fillIds,
-                      ),
-                      Effect.unless(() => Array.isEmptyArray(fillIds)),
+                      GuildConfigService.getGuildRunningChannelById(channel.id),
+                      UntilObserver.observeUntilRpcResultResolved(),
+                      Effect.flatten,
+                    ),
+                  ),
+                ),
+            }),
+          ),
+        ),
+        Effect.bind("checkinChannelId", ({ runningChannel }) =>
+          pipe(
+            runningChannel.checkinChannelId,
+            Option.match({
+              onSome: Effect.succeed,
+              onNone: () => InteractionContext.channelId(true).sync(),
+            }),
+          ),
+        ),
+        Effect.bind("checkinData", ({ hour, runningChannel }) =>
+          getCheckinData({ hour, runningChannel }),
+        ),
+        Effect.let("fillIds", ({ checkinData }) =>
+          pipe(
+            checkinData.schedule,
+            Option.map((schedule) =>
+              pipe(
+                Match.value(schedule),
+                Match.tagsExhaustive({
+                  BreakSchedule: () => [],
+                  ScheduleWithPlayers: (schedule) => schedule.fills,
+                }),
+              ),
+            ),
+            Option.getOrElse(() => []),
+            Array.getSomes,
+            Array.map((player) =>
+              pipe(
+                Match.value(player.player),
+                Match.tagsExhaustive({
+                  Player: (player) => Option.some(player.id),
+                  PartialNamePlayer: () => Option.none(),
+                }),
+              ),
+            ),
+            Array.getSomes,
+            HashSet.fromIterable,
+            HashSet.toValues,
+          ),
+        ),
+        Effect.bind("checkinMessages", ({ checkinData, templateOption }) =>
+          getCheckinMessages(checkinData, templateOption),
+        ),
+        Effect.bind("message", ({ checkinMessages, checkinChannelId }) =>
+          pipe(
+            checkinMessages.checkinMessage,
+            Effect.transposeMapOption((checkinMessage) =>
+              pipe(
+                Effect.Do,
+                Effect.let("initialMessage", () => checkinMessage),
+                SendableChannelContext.send().bind("message", () => ({
+                  content: checkinMessage,
+                  components: [
+                    new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                      new ButtonBuilder(checkinButton.data),
                     ),
                   ],
-                  { concurrency: "unbounded" },
-                ),
+                })),
+              ),
+            ),
+            Effect.provide(channelServicesFromGuildChannelId(checkinChannelId)),
+          ),
+        ),
+        Effect.tap(({ checkinData, message, fillIds, hour }) =>
+          pipe(
+            message,
+            Effect.transposeMapOption(({ initialMessage, message }) =>
+              Effect.all(
+                [
+                  MessageCheckinService.upsertMessageCheckinData(message.id, {
+                    initialMessage,
+                    hour,
+                    channelId: checkinData.runningChannel.channelId,
+                    roleId: Option.getOrNull(checkinData.runningChannel.roleId),
+                  }),
+                  pipe(
+                    MessageCheckinService.addMessageCheckinMembers(message.id, fillIds),
+                    Effect.unless(() => Array.isEmptyArray(fillIds)),
+                  ),
+                ],
+                { concurrency: "unbounded" },
               ),
             ),
           ),
-          InteractionContext.editReply.tap(({ checkinMessages }) => ({
-            content: checkinMessages.managerCheckinMessage,
-          })),
-          Effect.asVoid,
-          Effect.withSpan("handleCheckinManual", { captureStackTrace: true }),
         ),
+        InteractionContext.editReply.tap(({ checkinMessages }) => ({
+          content: checkinMessages.managerCheckinMessage,
+        })),
+        Effect.asVoid,
+        Effect.withSpan("handleCheckinManual", { captureStackTrace: true }),
       ),
-    )
-    .build();
+    ),
+  )
+  .build();
 
 export const command = chatInputCommandSubcommandHandlerContextBuilder()
   .data(

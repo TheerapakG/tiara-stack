@@ -27,8 +27,7 @@ export {
 };
 
 export const HandlerDataGroupTypeId = CoreData.Group.HandlerDataGroupTypeId;
-export const HandlerDataCollectionTypeId =
-  CoreData.Collection.HandlerDataCollectionTypeId;
+export const HandlerDataCollectionTypeId = CoreData.Collection.HandlerDataCollectionTypeId;
 
 export const sheetHandlerDataCollection = pipe(
   HandlerData.Collection.empty(),

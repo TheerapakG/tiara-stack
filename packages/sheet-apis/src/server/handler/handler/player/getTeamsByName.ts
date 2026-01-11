@@ -16,12 +16,8 @@ export const getTeamsByNameHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(getTeamsByNameHandlerConfig),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
+        Effect.bind("parsed", () => Event.request.parsed(getTeamsByNameHandlerConfig)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -58,9 +54,7 @@ export const getTeamsByNameHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(
-          Handler.Config.encodeResponseEffect(getTeamsByNameHandlerConfig),
-        ),
+        Effect.map(Handler.Config.encodeResponseEffect(getTeamsByNameHandlerConfig)),
         Effect.withSpan("getTeamsByNameHandler", {
           captureStackTrace: true,
         }),

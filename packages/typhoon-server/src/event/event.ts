@@ -1,19 +1,6 @@
-import {
-  Context,
-  Effect,
-  Exit,
-  Option,
-  pipe,
-  Scope,
-  SynchronizedRef,
-} from "effect";
+import { Context, Effect, Exit, Option, pipe, Scope, SynchronizedRef } from "effect";
 import { Handler } from "typhoon-core/server";
-import {
-  Signal,
-  SignalContext,
-  Computed,
-  SignalService,
-} from "typhoon-core/signal";
+import { Signal, SignalContext, Computed, SignalService } from "typhoon-core/signal";
 import { Validate, Validator } from "typhoon-core/validator";
 import {
   AuthorizationError,
@@ -30,20 +17,14 @@ export type MsgpackPullEffect = Effect.Effect<
 >;
 
 const pullEffectToParsed =
-  <
-    const RequestParams extends
-      | Handler.Config.Shared.RequestParams.RequestParamsConfig
-      | undefined,
-  >(
+  <const RequestParams extends Handler.Config.Shared.RequestParams.RequestParamsConfig | undefined>(
     requestParams: RequestParams,
   ) =>
   (pullEffect: MsgpackPullEffect) =>
     pipe(
       pullEffect,
       Effect.flatMap(
-        Validate.validate(
-          Handler.Config.resolveRequestParamsValidator(requestParams),
-        ),
+        Validate.validate(Handler.Config.resolveRequestParamsValidator(requestParams)),
       ),
     );
 
@@ -74,11 +55,7 @@ export class Event extends Context.Tag("Event")<
 
 export const makeEventService = (
   ctx: EventContext,
-): Effect.Effect<
-  Context.Tag.Service<Event>,
-  never,
-  SignalService.SignalService
-> =>
+): Effect.Effect<Context.Tag.Service<Event>, never, SignalService.SignalService> =>
   pipe(
     Signal.make({
       effect: ctx.pullEffect.effect,
@@ -113,24 +90,14 @@ export const replacePullStream = ({
 }: {
   effect: MsgpackPullEffect;
   scope: Scope.CloseableScope;
-}): Effect.Effect<
-  Context.Tag.Service<Event>,
-  never,
-  Event | SignalService.SignalService
-> =>
+}): Effect.Effect<Context.Tag.Service<Event>, never, Event | SignalService.SignalService> =>
   pipe(
     Effect.Do,
     Effect.bind("ref", () => Event),
     Effect.bind("oldContext", ({ ref }) => SynchronizedRef.get(ref)),
-    Effect.bind("oldPullStream", ({ oldContext }) =>
-      oldContext.pullEffect.peek(),
-    ),
-    Effect.tap(({ oldContext }) =>
-      oldContext.pullEffect.setValue({ effect, scope }),
-    ),
-    Effect.tap(({ oldPullStream }) =>
-      Scope.close(oldPullStream.scope, Exit.void),
-    ),
+    Effect.bind("oldPullStream", ({ oldContext }) => oldContext.pullEffect.peek()),
+    Effect.tap(({ oldContext }) => oldContext.pullEffect.setValue({ effect, scope })),
+    Effect.tap(({ oldPullStream }) => Scope.close(oldPullStream.scope, Exit.void)),
     Effect.map(({ ref }) => ref),
   );
 
@@ -139,12 +106,8 @@ export const close = (): Effect.Effect<void, never, Event> =>
     Effect.Do,
     Effect.bind("ref", () => Event),
     Effect.bind("oldContext", ({ ref }) => SynchronizedRef.get(ref)),
-    Effect.bind("oldPullStream", ({ oldContext }) =>
-      oldContext.pullEffect.peek(),
-    ),
-    Effect.tap(({ oldPullStream }) =>
-      Scope.close(oldPullStream.scope, Exit.void),
-    ),
+    Effect.bind("oldPullStream", ({ oldContext }) => oldContext.pullEffect.peek()),
+    Effect.tap(({ oldPullStream }) => Scope.close(oldPullStream.scope, Exit.void)),
   );
 
 export const handler = (): Effect.Effect<Option.Option<string>, never, Event> =>
@@ -174,10 +137,7 @@ export const someToken = (): Effect.Effect<string, AuthorizationError, Event> =>
     Effect.flatMap(
       Option.match({
         onSome: Effect.succeed,
-        onNone: () =>
-          Effect.fail(
-            makeAuthorizationError("No authorization token found for event"),
-          ),
+        onNone: () => Effect.fail(makeAuthorizationError("No authorization token found for event")),
       }),
     ),
   );
@@ -249,22 +209,15 @@ export const request = {
           captureStackTrace: true,
         }),
       ),
-      Effect.map(
-        Effect.withSpan("Event.request.raw", { captureStackTrace: true }),
-      ),
+      Effect.map(Effect.withSpan("Event.request.raw", { captureStackTrace: true })),
     ),
-  parsedWithScope: <Config extends Handler.Config.TypedHandlerConfig>(
-    config: Config,
-  ) =>
+  parsedWithScope: <Config extends Handler.Config.TypedHandlerConfig>(config: Config) =>
     pipe(
       request.rawWithScope(),
       Effect.map(
         Effect.flatMap(({ effect, scope }) =>
           Effect.all({
-            parsed: pipe(
-              effect,
-              pullEffectToParsed(Handler.Config.requestParams(config)),
-            ),
+            parsed: pipe(effect, pullEffectToParsed(Handler.Config.requestParams(config))),
             scope: Effect.succeed(scope),
           }),
         ),
@@ -283,18 +236,12 @@ export const request = {
   parsed: <Config extends Handler.Config.TypedHandlerConfig>(config: Config) =>
     pipe(
       request.raw(),
-      Effect.map(
-        Effect.flatMap(
-          pullEffectToParsed(Handler.Config.requestParams(config)),
-        ),
-      ),
+      Effect.map(Effect.flatMap(pullEffectToParsed(Handler.Config.requestParams(config)))),
       Effect.map(
         Effect.withSpan("Event.request.parsed subscription", {
           captureStackTrace: true,
         }),
       ),
-      Effect.map(
-        Effect.withSpan("Event.request.parsed", { captureStackTrace: true }),
-      ),
+      Effect.map(Effect.withSpan("Event.request.parsed", { captureStackTrace: true })),
     ),
 };

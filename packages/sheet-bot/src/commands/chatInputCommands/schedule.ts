@@ -18,17 +18,7 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import {
-  Array,
-  Effect,
-  flow,
-  Match,
-  Number,
-  Option,
-  Order,
-  pipe,
-  String,
-} from "effect";
+import { Array, Effect, flow, Match, Number, Option, Order, pipe, String } from "effect";
 import { UntilObserver } from "typhoon-core/signal";
 
 const formatHourRanges = (hours: readonly number[]): string => {
@@ -45,202 +35,175 @@ const formatHourRanges = (hours: readonly number[]): string => {
       ranges.push({ start: h, end: h });
     }
   }
-  return ranges
-    .map(({ start, end }) => (start === end ? `${start}` : `${start}-${end}`))
-    .join(",");
+  return ranges.map(({ start, end }) => (start === end ? `${start}` : `${start}-${end}`)).join(",");
 };
 
-const handleList =
-  handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
-    .data(
-      new SlashCommandSubcommandBuilder()
-        .setName("list")
-        .setDescription("Get your schedule (fill/overfill/standby) for a day")
-        .addNumberOption((option) =>
-          option
-            .setName("day")
-            .setDescription("The day to get the schedule for")
-            .setRequired(true),
-        )
-        .addStringOption((option) =>
-          option
-            .setName("server_id")
-            .setDescription("Owner-only: the server to get the schedule for"),
-        ),
-    )
-    .handler(
-      Effect.provide(guildServicesFromInteractionOption("server_id"))(
-        pipe(
-          Effect.Do,
-          PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
-          InteractionContext.deferReply.tap(() => ({
-            flags: MessageFlags.Ephemeral,
-          })),
-          InteractionContext.user.bind("user"),
-          Effect.bind("day", () => InteractionContext.getNumber("day", true)),
-          Effect.bind("daySchedules", ({ day }) =>
-            pipe(
-              SheetService.daySchedules(day),
-              Effect.map(
-                Array.map((s) =>
-                  pipe(
-                    s.hour,
-                    Option.map(() => s),
-                  ),
+const handleList = handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
+  .data(
+    new SlashCommandSubcommandBuilder()
+      .setName("list")
+      .setDescription("Get your schedule (fill/overfill/standby) for a day")
+      .addNumberOption((option) =>
+        option.setName("day").setDescription("The day to get the schedule for").setRequired(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("server_id")
+          .setDescription("Owner-only: the server to get the schedule for"),
+      ),
+  )
+  .handler(
+    Effect.provide(guildServicesFromInteractionOption("server_id"))(
+      pipe(
+        Effect.Do,
+        PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
+        InteractionContext.deferReply.tap(() => ({
+          flags: MessageFlags.Ephemeral,
+        })),
+        InteractionContext.user.bind("user"),
+        Effect.bind("day", () => InteractionContext.getNumber("day", true)),
+        Effect.bind("daySchedules", ({ day }) =>
+          pipe(
+            SheetService.daySchedules(day),
+            Effect.map(
+              Array.map((s) =>
+                pipe(
+                  s.hour,
+                  Option.map(() => s),
                 ),
               ),
-              Effect.map(Array.getSomes),
             ),
+            Effect.map(Array.getSomes),
           ),
-          Effect.bind("schedulesWithPlayers", ({ daySchedules }) =>
-            pipe(
-              daySchedules,
-              PlayerService.mapScheduleWithPlayers,
-              UntilObserver.observeUntilRpcResultResolved(),
-              Effect.flatten,
-              Effect.map(
-                Array.sortBy(
-                  Order.mapInput(
-                    Option.getOrder(Number.Order),
-                    ({ hour }) => hour,
-                  ),
+        ),
+        Effect.bind("schedulesWithPlayers", ({ daySchedules }) =>
+          pipe(
+            daySchedules,
+            PlayerService.mapScheduleWithPlayers,
+            UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatten,
+            Effect.map(
+              Array.sortBy(Order.mapInput(Option.getOrder(Number.Order), ({ hour }) => hour)),
+            ),
+            Effect.map(
+              Array.map((schedule) =>
+                pipe(
+                  Match.value(schedule),
+                  Match.tagsExhaustive({
+                    BreakSchedule: () => Option.none(),
+                    ScheduleWithPlayers: (schedule) => Option.some(schedule),
+                  }),
                 ),
               ),
-              Effect.map(
-                Array.map((schedule) =>
+            ),
+            Effect.map(Array.getSomes),
+          ),
+        ),
+        Effect.let("invisible", ({ schedulesWithPlayers }) =>
+          pipe(
+            schedulesWithPlayers,
+            Array.some(({ visible }) => !visible),
+          ),
+        ),
+        Effect.let("fillHours", ({ schedulesWithPlayers, user }) =>
+          pipe(
+            schedulesWithPlayers,
+            Array.filter(
+              flow(
+                (schedule) => schedule.fills,
+                Array.getSomes,
+                Array.some((fill) =>
                   pipe(
-                    Match.value(schedule),
+                    Match.value(fill.player),
                     Match.tagsExhaustive({
-                      BreakSchedule: () => Option.none(),
-                      ScheduleWithPlayers: (schedule) => Option.some(schedule),
+                      Player: (player) => String.Equivalence(player.id, user.id),
+                      PartialNamePlayer: () => false,
                     }),
                   ),
                 ),
               ),
-              Effect.map(Array.getSomes),
             ),
+            Array.map((schedule) => schedule.hour),
+            Array.getSomes,
           ),
-          Effect.let("invisible", ({ schedulesWithPlayers }) =>
-            pipe(
-              schedulesWithPlayers,
-              Array.some(({ visible }) => !visible),
-            ),
-          ),
-          Effect.let("fillHours", ({ schedulesWithPlayers, user }) =>
-            pipe(
-              schedulesWithPlayers,
-              Array.filter(
-                flow(
-                  (schedule) => schedule.fills,
-                  Array.getSomes,
-                  Array.some((fill) =>
-                    pipe(
-                      Match.value(fill.player),
-                      Match.tagsExhaustive({
-                        Player: (player) =>
-                          String.Equivalence(player.id, user.id),
-                        PartialNamePlayer: () => false,
-                      }),
-                    ),
-                  ),
-                ),
-              ),
-              Array.map((schedule) => schedule.hour),
-              Array.getSomes,
-            ),
-          ),
-          Effect.let("overfillHours", ({ schedulesWithPlayers, user }) =>
-            pipe(
-              schedulesWithPlayers,
-              Array.filter(
-                flow(
-                  (schedule) => schedule.overfills,
-                  Array.some((overfill) =>
-                    pipe(
-                      Match.value(overfill.player),
-                      Match.tagsExhaustive({
-                        Player: (player) =>
-                          String.Equivalence(player.id, user.id),
-                        PartialNamePlayer: () => false,
-                      }),
-                    ),
-                  ),
-                ),
-              ),
-              Array.map((schedule) => schedule.hour),
-              Array.getSomes,
-            ),
-          ),
-          Effect.let("standbyHours", ({ schedulesWithPlayers, user }) =>
-            pipe(
-              schedulesWithPlayers,
-              Array.filter(
-                flow(
-                  (schedule) => schedule.standbys,
-                  Array.some((standby) =>
-                    pipe(
-                      Match.value(standby.player),
-                      Match.tagsExhaustive({
-                        Player: (player) =>
-                          String.Equivalence(player.id, user.id),
-                        PartialNamePlayer: () => false,
-                      }),
-                    ),
-                  ),
-                ),
-              ),
-              Array.map((schedule) => schedule.hour),
-              Array.getSomes,
-            ),
-          ),
-          InteractionContext.editReply.tapEffect(
-            ({
-              day,
-              user,
-              invisible,
-              fillHours,
-              overfillHours,
-              standbyHours,
-            }) =>
-              pipe(
-                ClientService.makeEmbedBuilder(),
-                Effect.map((embed) => ({
-                  embeds: [
-                    invisible
-                      ? embed
-                          .setTitle(
-                            `${user.username}'s Schedule for Day ${day}`,
-                          )
-                          .setDescription(
-                            "It is kinda foggy around here... This schedule is not visible to you yet.",
-                          )
-                      : embed
-                          .setTitle(
-                            `${user.username}'s Schedule for Day ${day}`,
-                          )
-                          .addFields(
-                            {
-                              name: "Fill",
-                              value: formatHourRanges(fillHours),
-                            },
-                            {
-                              name: "Overfill",
-                              value: formatHourRanges(overfillHours),
-                            },
-                            {
-                              name: "Standby",
-                              value: formatHourRanges(standbyHours),
-                            },
-                          ),
-                  ],
-                })),
-              ),
-          ),
-          Effect.withSpan("handleScheduleList", { captureStackTrace: true }),
         ),
+        Effect.let("overfillHours", ({ schedulesWithPlayers, user }) =>
+          pipe(
+            schedulesWithPlayers,
+            Array.filter(
+              flow(
+                (schedule) => schedule.overfills,
+                Array.some((overfill) =>
+                  pipe(
+                    Match.value(overfill.player),
+                    Match.tagsExhaustive({
+                      Player: (player) => String.Equivalence(player.id, user.id),
+                      PartialNamePlayer: () => false,
+                    }),
+                  ),
+                ),
+              ),
+            ),
+            Array.map((schedule) => schedule.hour),
+            Array.getSomes,
+          ),
+        ),
+        Effect.let("standbyHours", ({ schedulesWithPlayers, user }) =>
+          pipe(
+            schedulesWithPlayers,
+            Array.filter(
+              flow(
+                (schedule) => schedule.standbys,
+                Array.some((standby) =>
+                  pipe(
+                    Match.value(standby.player),
+                    Match.tagsExhaustive({
+                      Player: (player) => String.Equivalence(player.id, user.id),
+                      PartialNamePlayer: () => false,
+                    }),
+                  ),
+                ),
+              ),
+            ),
+            Array.map((schedule) => schedule.hour),
+            Array.getSomes,
+          ),
+        ),
+        InteractionContext.editReply.tapEffect(
+          ({ day, user, invisible, fillHours, overfillHours, standbyHours }) =>
+            pipe(
+              ClientService.makeEmbedBuilder(),
+              Effect.map((embed) => ({
+                embeds: [
+                  invisible
+                    ? embed
+                        .setTitle(`${user.username}'s Schedule for Day ${day}`)
+                        .setDescription(
+                          "It is kinda foggy around here... This schedule is not visible to you yet.",
+                        )
+                    : embed.setTitle(`${user.username}'s Schedule for Day ${day}`).addFields(
+                        {
+                          name: "Fill",
+                          value: formatHourRanges(fillHours),
+                        },
+                        {
+                          name: "Overfill",
+                          value: formatHourRanges(overfillHours),
+                        },
+                        {
+                          name: "Standby",
+                          value: formatHourRanges(standbyHours),
+                        },
+                      ),
+                ],
+              })),
+            ),
+        ),
+        Effect.withSpan("handleScheduleList", { captureStackTrace: true }),
       ),
-    )
-    .build();
+    ),
+  )
+  .build();
 
 export const command = chatInputCommandSubcommandHandlerContextBuilder()
   .data(

@@ -1,26 +1,18 @@
 import { Data, pipe, Types, Function } from "effect";
 import { Option } from "effect";
-import {
-  none,
-  type GetOrUndefined,
-  getOrUndefined,
-} from "~/utils/strictOption";
+import { none, type GetOrUndefined, getOrUndefined } from "~/utils/strictOption";
 import type { BaseHandlerT, HandlerData, Handler } from "../type";
 
 export type BasePartialHandlerContext<
   HandlerT extends BaseHandlerT,
-  D extends Option.Option<HandlerData<HandlerT>> = Option.Option<
-    HandlerData<HandlerT>
-  >,
+  D extends Option.Option<HandlerData<HandlerT>> = Option.Option<HandlerData<HandlerT>>,
   H extends Option.Option<Handler<HandlerT>> = Option.Option<Handler<HandlerT>>,
 > = {
   data: D;
   handler: H;
 };
 
-const PartialHandlerContextTypeId = Symbol(
-  "Typhoon/Handler/PartialHandlerContextTypeId",
-);
+const PartialHandlerContextTypeId = Symbol("Typhoon/Handler/PartialHandlerContextTypeId");
 export type PartialHandlerContextTypeId = typeof PartialHandlerContextTypeId;
 
 interface Variance<in out HandlerT extends BaseHandlerT> {
@@ -36,14 +28,10 @@ const partialHandlerContextVariance: <
 });
 
 export class PartialHandlerContext<
-    HandlerT extends BaseHandlerT,
-    D extends Option.Option<HandlerData<HandlerT>> = Option.Option<
-      HandlerData<HandlerT>
-    >,
-    H extends Option.Option<Handler<HandlerT>> = Option.Option<
-      Handler<HandlerT>
-    >,
-  >
+  HandlerT extends BaseHandlerT,
+  D extends Option.Option<HandlerData<HandlerT>> = Option.Option<HandlerData<HandlerT>>,
+  H extends Option.Option<Handler<HandlerT>> = Option.Option<Handler<HandlerT>>,
+>
   extends Data.TaggedClass("PartialHandlerContext")<{
     data: BasePartialHandlerContext<HandlerT, D, H>;
   }>
@@ -56,9 +44,8 @@ export type PartialHandlerContextHandlerT<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Config extends PartialHandlerContext<any>,
 > =
-  Types.Invariant.Type<
-    Config[PartialHandlerContextTypeId]["_HandlerT"]
-  > extends infer HT extends BaseHandlerT
+  Types.Invariant.Type<Config[PartialHandlerContextTypeId]["_HandlerT"]> extends infer HT extends
+    BaseHandlerT
     ? HT
     : never;
 

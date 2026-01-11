@@ -16,13 +16,11 @@ import {
 export * as Schema from "./server/schema";
 
 export const HandlerDataGroupTypeId = CoreData.Group.HandlerDataGroupTypeId;
-export const HandlerDataCollectionTypeId =
-  CoreData.Collection.HandlerDataCollectionTypeId;
+export const HandlerDataCollectionTypeId = CoreData.Collection.HandlerDataCollectionTypeId;
 
 export const PartialSubscriptionHandlerConfig =
   Handler.Config.Subscription.PartialSubscriptionHandlerConfig;
-export const PartialMutationHandlerConfig =
-  Handler.Config.Mutation.PartialMutationHandlerConfig;
+export const PartialMutationHandlerConfig = Handler.Config.Mutation.PartialMutationHandlerConfig;
 
 export const serverHandlerDataCollection = pipe(
   HandlerData.Collection.empty(),

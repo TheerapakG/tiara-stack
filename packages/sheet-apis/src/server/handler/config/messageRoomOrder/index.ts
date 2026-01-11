@@ -25,12 +25,8 @@ export const messageRoomOrderHandlerDataCollection = pipe(
   HandlerData.Collection.empty(),
   HandlerData.Collection.addSubscription(getMessageRoomOrderHandlerConfig),
   HandlerData.Collection.addMutation(upsertMessageRoomOrderHandlerConfig),
-  HandlerData.Collection.addMutation(
-    decrementMessageRoomOrderRankHandlerConfig,
-  ),
-  HandlerData.Collection.addMutation(
-    incrementMessageRoomOrderRankHandlerConfig,
-  ),
+  HandlerData.Collection.addMutation(decrementMessageRoomOrderRankHandlerConfig),
+  HandlerData.Collection.addMutation(incrementMessageRoomOrderRankHandlerConfig),
   HandlerData.Collection.addSubscription(getMessageRoomOrderEntryHandlerConfig),
   HandlerData.Collection.addSubscription(getMessageRoomOrderRangeHandlerConfig),
   HandlerData.Collection.addMutation(upsertMessageRoomOrderEntryHandlerConfig),

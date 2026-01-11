@@ -14,10 +14,7 @@ export const botCalcHandlerConfig = pipe(
           healNeeded: Schema.Number,
           considerEnc: Schema.Boolean,
         }),
-        players: pipe(
-          Schema.Array(Schema.Array(DefaultTaggedClass(Team))),
-          Schema.itemsCount(5),
-        ),
+        players: pipe(Schema.Array(Schema.Array(DefaultTaggedClass(Team))), Schema.itemsCount(5)),
       }),
       Schema.standardSchemaV1,
     ),

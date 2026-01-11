@@ -15,10 +15,7 @@ export const removeMessageRoomOrderEntryHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(
-      Schema.Array(MessageRoomOrderEntry),
-      Schema.standardSchemaV1,
-    ),
+    validator: pipe(Schema.Array(MessageRoomOrderEntry), Schema.standardSchemaV1),
   }),
   Handler.Config.Builder.responseError({
     validator: pipe(

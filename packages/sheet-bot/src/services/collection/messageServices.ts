@@ -1,14 +1,7 @@
-import {
-  BaseMessageT,
-  MessageContext,
-  MessageKind,
-  MessageT,
-} from "@/services/message";
+import { BaseMessageT, MessageContext, MessageKind, MessageT } from "@/services/message";
 import { Effect, Layer, pipe } from "effect";
 
-export const messageServices = <M extends BaseMessageT = MessageT>(
-  message: MessageKind<M>,
-) =>
+export const messageServices = <M extends BaseMessageT = MessageT>(message: MessageKind<M>) =>
   pipe(
     Layer.succeedContext(MessageContext.make<M>(message)),
     Effect.succeed,

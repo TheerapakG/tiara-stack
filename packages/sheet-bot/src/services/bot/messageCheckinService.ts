@@ -18,12 +18,9 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
               messageId,
             ),
             Effect.map(
-              Effect.withSpan(
-                "MessageCheckinService.getMessageCheckinData subscription",
-                {
-                  captureStackTrace: true,
-                },
-              ),
+              Effect.withSpan("MessageCheckinService.getMessageCheckinData subscription", {
+                captureStackTrace: true,
+              }),
             ),
             Effect.withSpan("MessageCheckinService.getMessageCheckinData", {
               captureStackTrace: true,
@@ -37,11 +34,10 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
           >,
         ) =>
           pipe(
-            WebSocketClient.mutate(
-              client,
-              "messageCheckin.upsertMessageCheckinData",
-              { messageId, ...data },
-            ),
+            WebSocketClient.mutate(client, "messageCheckin.upsertMessageCheckinData", {
+              messageId,
+              ...data,
+            }),
             Effect.withSpan("MessageCheckinService.upsertMessageCheckinData", {
               captureStackTrace: true,
             }),
@@ -54,12 +50,9 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
               messageId,
             ),
             Effect.map(
-              Effect.withSpan(
-                "MessageCheckinService.getMessageCheckinMembers subscription",
-                {
-                  captureStackTrace: true,
-                },
-              ),
+              Effect.withSpan("MessageCheckinService.getMessageCheckinMembers subscription", {
+                captureStackTrace: true,
+              }),
             ),
             Effect.withSpan("MessageCheckinService.getMessageCheckinMembers", {
               captureStackTrace: true,
@@ -67,41 +60,33 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
           ),
         addMessageCheckinMembers: (messageId: string, memberIds: string[]) =>
           pipe(
-            WebSocketClient.mutate(
-              client,
-              "messageCheckin.addMessageCheckinMembers",
-              { messageId, memberIds },
-            ),
+            WebSocketClient.mutate(client, "messageCheckin.addMessageCheckinMembers", {
+              messageId,
+              memberIds,
+            }),
             Effect.withSpan("MessageCheckinService.addMessageCheckinMembers", {
               captureStackTrace: true,
             }),
           ),
-        setMessageCheckinMemberCheckinAt: (
-          messageId: string,
-          memberId: string,
-        ) =>
+        setMessageCheckinMemberCheckinAt: (messageId: string, memberId: string) =>
           pipe(
-            WebSocketClient.mutate(
-              client,
-              "messageCheckin.setMessageCheckinMemberCheckinAt",
-              { messageId, memberId },
-            ),
-            Effect.withSpan(
-              "MessageCheckinService.setMessageCheckinMemberCheckinAt",
-              { captureStackTrace: true },
-            ),
+            WebSocketClient.mutate(client, "messageCheckin.setMessageCheckinMemberCheckinAt", {
+              messageId,
+              memberId,
+            }),
+            Effect.withSpan("MessageCheckinService.setMessageCheckinMemberCheckinAt", {
+              captureStackTrace: true,
+            }),
           ),
         removeMessageCheckinMember: (messageId: string, memberId: string) =>
           pipe(
-            WebSocketClient.mutate(
-              client,
-              "messageCheckin.removeMessageCheckinMember",
-              { messageId, memberId },
-            ),
-            Effect.withSpan(
-              "MessageCheckinService.removeMessageCheckinMember",
-              { captureStackTrace: true },
-            ),
+            WebSocketClient.mutate(client, "messageCheckin.removeMessageCheckinMember", {
+              messageId,
+              memberId,
+            }),
+            Effect.withSpan("MessageCheckinService.removeMessageCheckinMember", {
+              captureStackTrace: true,
+            }),
           ),
       })),
     ),

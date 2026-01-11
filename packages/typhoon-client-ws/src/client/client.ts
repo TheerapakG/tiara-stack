@@ -18,25 +18,12 @@ import {
   Function,
   flow,
 } from "effect";
-import {
-  MissingRpcConfigError,
-  RpcError,
-  ValidationError,
-} from "typhoon-core/error";
+import { MissingRpcConfigError, RpcError, ValidationError } from "typhoon-core/error";
 import { Handler } from "typhoon-core/server";
 import { Data as CoreData } from "typhoon-core/handler";
-import {
-  Data as HandlerData,
-  type Subscription,
-  type Mutation,
-} from "typhoon-server/handler";
+import { Data as HandlerData, type Subscription, type Mutation } from "typhoon-server/handler";
 import { Header, Msgpack, Stream } from "typhoon-core/protocol";
-import {
-  DependencySignal,
-  Signal,
-  Computed,
-  SignalService,
-} from "typhoon-core/signal";
+import { DependencySignal, Signal, Computed, SignalService } from "typhoon-core/signal";
 import { Validator } from "typhoon-core/validator";
 import { RpcResult } from "typhoon-core/schema";
 
@@ -60,22 +47,16 @@ export class WebSocketClient<
 > {
   constructor(
     private readonly url: string,
-    private readonly ws: SynchronizedRef.SynchronizedRef<
-      Option.Option<WebSocket>
-    >,
+    private readonly ws: SynchronizedRef.SynchronizedRef<Option.Option<WebSocket>>,
     private readonly updaterStateMapRef: SynchronizedRef.SynchronizedRef<UpdaterStateMap>,
     private readonly handlerDataCollection: HandlerDataCollection,
-    private readonly token: SynchronizedRef.SynchronizedRef<
-      Option.Option<string>
-    >,
+    private readonly token: SynchronizedRef.SynchronizedRef<Option.Option<string>>,
     private readonly status: SynchronizedRef.SynchronizedRef<
       "disconnecting" | "disconnected" | "connecting" | "connected"
     >,
   ) {}
 
-  static create<
-    const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
-  >(
+  static create<const Collection extends HandlerData.Collection.HandlerDataCollection<any>>(
     handlerDataCollection: Collection,
     url: string,
   ): Effect.Effect<WebSocketClient<Collection>, never, never> {
@@ -87,9 +68,9 @@ export class WebSocketClient<
       ),
       Effect.bind("token", () => SynchronizedRef.make(Option.none<string>())),
       Effect.bind("status", () =>
-        SynchronizedRef.make<
-          "disconnected" | "disconnecting" | "connecting" | "connected"
-        >("disconnected"),
+        SynchronizedRef.make<"disconnected" | "disconnecting" | "connecting" | "connected">(
+          "disconnected",
+        ),
       ),
       Effect.map(
         ({ ws, updaterStateMapRef, token, status }) =>
@@ -117,19 +98,13 @@ export class WebSocketClient<
   ) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (client: WebSocketClient<any>) =>
-      pipe(
-        client.updaterStateMapRef,
-        SynchronizedRef.update(HashMap.set(id, { updater })),
-      );
+      pipe(client.updaterStateMapRef, SynchronizedRef.update(HashMap.set(id, { updater })));
   }
 
   static removeUpdater(id: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (client: WebSocketClient<any>) =>
-      pipe(
-        client.updaterStateMapRef,
-        SynchronizedRef.update(HashMap.remove(id)),
-      );
+      pipe(client.updaterStateMapRef, SynchronizedRef.update(HashMap.remove(id)));
   }
 
   static handleUpdate(header: Header.Header, decodedResponse: unknown) {
@@ -148,10 +123,7 @@ export class WebSocketClient<
                   header,
                   pipe(
                     decodedResponse,
-                    Either.liftPredicate(
-                      () => header.payload.success,
-                      Function.identity,
-                    ),
+                    Either.liftPredicate(() => header.payload.success, Function.identity),
                   ),
                 ),
               ),
@@ -165,16 +137,10 @@ export class WebSocketClient<
   static connectOnce = (client: WebSocketClient<any>) =>
     pipe(
       Effect.Do,
-      Effect.tap(() =>
-        SynchronizedRef.update(client.status, () => "connecting" as const),
-      ),
+      Effect.tap(() => SynchronizedRef.update(client.status, () => "connecting" as const)),
       Effect.tap(() => Effect.log("connecting to websocket")),
-      Effect.bind("deferred", () =>
-        Deferred.make<Option.Option<WebSocket>, WebSocketError>(),
-      ),
-      Effect.bind("runtime", () =>
-        Effect.runtime<SignalService.SignalService>(),
-      ),
+      Effect.bind("deferred", () => Deferred.make<Option.Option<WebSocket>, WebSocketError>()),
+      Effect.bind("runtime", () => Effect.runtime<SignalService.SignalService>()),
       Effect.tap(({ deferred, runtime }) =>
         pipe(
           client.ws,
@@ -189,10 +155,7 @@ export class WebSocketClient<
                   pipe(Msgpack.Decoder.blobToStream(data), Stream.toPullEffect),
                 ),
                 Effect.bind("header", ({ pullEffect }) =>
-                  pipe(
-                    pullEffect,
-                    Effect.flatMap(Schema.decodeUnknown(Header.HeaderSchema)),
-                  ),
+                  pipe(pullEffect, Effect.flatMap(Schema.decodeUnknown(Header.HeaderSchema))),
                 ),
                 Effect.tap(({ header, pullEffect }) =>
                   pipe(
@@ -201,10 +164,7 @@ export class WebSocketClient<
                       pipe(
                         pullEffect,
                         Effect.andThen((decodedResponse) =>
-                          WebSocketClient.handleUpdate(
-                            header,
-                            decodedResponse,
-                          )(client),
+                          WebSocketClient.handleUpdate(header, decodedResponse)(client),
                         ),
                       ),
                     ),
@@ -222,12 +182,8 @@ export class WebSocketClient<
             ws.addEventListener("open", () =>
               pipe(
                 Effect.log("websocket opened"),
-                Effect.andThen(() =>
-                  pipe(deferred, Deferred.succeed(Option.some(ws))),
-                ),
-                Effect.catchAllCause((cause) =>
-                  Effect.logError("Error opening websocket", cause),
-                ),
+                Effect.andThen(() => pipe(deferred, Deferred.succeed(Option.some(ws)))),
+                Effect.catchAllCause((cause) => Effect.logError("Error opening websocket", cause)),
                 Runtime.runPromise(runtime),
               ),
             );
@@ -238,20 +194,12 @@ export class WebSocketClient<
                   pipe(
                     WebSocketClient.connect(client),
                     Effect.unlessEffect(
-                      pipe(
-                        deferred,
-                        Deferred.fail(
-                          new WebSocketError({ cause: errorEvent }),
-                        ),
-                      ),
+                      pipe(deferred, Deferred.fail(new WebSocketError({ cause: errorEvent }))),
                     ),
                   ),
                 ),
                 Effect.catchAllCause((cause) =>
-                  Effect.logError(
-                    "Error handling websocket error event",
-                    cause,
-                  ),
+                  Effect.logError("Error handling websocket error event", cause),
                 ),
                 Runtime.runPromise(runtime),
               ),
@@ -264,19 +212,12 @@ export class WebSocketClient<
                     WebSocketClient.connect(client),
                     Effect.unlessEffect(
                       pipe(
-                        pipe(
-                          deferred,
-                          Deferred.fail(
-                            new WebSocketError({ cause: closeEvent }),
-                          ),
-                        ),
+                        pipe(deferred, Deferred.fail(new WebSocketError({ cause: closeEvent }))),
                       ),
                     ),
                   ),
                 ),
-                Effect.catchAllCause((cause) =>
-                  Effect.logError("Error closing websocket", cause),
-                ),
+                Effect.catchAllCause((cause) => Effect.logError("Error closing websocket", cause)),
                 Runtime.runPromise(runtime),
               ),
             );
@@ -284,9 +225,7 @@ export class WebSocketClient<
           }),
         ),
       ),
-      Effect.tap(() =>
-        SynchronizedRef.update(client.status, () => "connected" as const),
-      ),
+      Effect.tap(() => SynchronizedRef.update(client.status, () => "connected" as const)),
       Effect.withSpan("WebSocketClient.connect", {
         captureStackTrace: true,
       }),
@@ -320,9 +259,7 @@ export class WebSocketClient<
               pipe(
                 Effect.makeLatch(),
                 Effect.tap((latch) =>
-                  ws.addEventListener("close", () =>
-                    Effect.runPromise(latch.open),
-                  ),
+                  ws.addEventListener("close", () => Effect.runPromise(latch.open)),
                 ),
                 Effect.tap(() => ws.close()),
                 Effect.flatMap((latch) => latch.whenOpen(Effect.succeedNone)),
@@ -332,34 +269,30 @@ export class WebSocketClient<
           ),
         ),
       ),
-      Effect.andThen(
-        SynchronizedRef.update(client.status, () => "disconnected" as const),
-      ),
+      Effect.andThen(SynchronizedRef.update(client.status, () => "disconnected" as const)),
       Effect.withSpan("WebSocketClient.close", {
         captureStackTrace: true,
       }),
     );
   }
 
-  static token =
-    (token: Option.Option<string>) => (client: WebSocketClient<any>) =>
-      pipe(
-        SynchronizedRef.update(client.token, () => token),
-        Effect.withSpan("WebSocketClient.token", {
-          captureStackTrace: true,
-        }),
-      );
+  static token = (token: Option.Option<string>) => (client: WebSocketClient<any>) =>
+    pipe(
+      SynchronizedRef.update(client.token, () => token),
+      Effect.withSpan("WebSocketClient.token", {
+        captureStackTrace: true,
+      }),
+    );
 
   static subscribe<
     const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
-    const H extends
-      keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
-        HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
-          Collection,
-          Subscription.Type.SubscriptionHandlerT
-        >
-      > &
-        string,
+    const H extends keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
+      HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+        Collection,
+        Subscription.Type.SubscriptionHandlerT
+      >
+    > &
+      string,
     HData extends HandlerData.Group.Subscription.GetHandlerData<
       HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
         Collection,
@@ -378,9 +311,7 @@ export class WebSocketClient<
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
-      Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<HData>
-      >
+      Handler.Config.ResolvedRequestParamsValidator<Handler.Config.RequestParamsOrUndefined<HData>>
     >,
   ) {
     return pipe(
@@ -413,18 +344,14 @@ export class WebSocketClient<
         ),
       ),
       Effect.let("responseErrorValidator", ({ config }) =>
-        Handler.Config.resolveResponseErrorValidator(
-          Handler.Config.responseError(config),
-        ),
+        Handler.Config.resolveResponseErrorValidator(Handler.Config.responseError(config)),
       ),
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("signal", () =>
         Signal.make<
           RpcResult.RpcResult<
             Validator.Output<
-              Handler.Config.ResolvedResponseValidator<
-                Handler.Config.ResponseOrUndefined<HData>
-              >
+              Handler.Config.ResolvedResponseValidator<Handler.Config.ResponseOrUndefined<HData>>
             >,
             Validator.Output<
               Handler.Config.ResolvedResponseErrorValidator<
@@ -465,10 +392,7 @@ export class WebSocketClient<
                     Effect.flatten,
                     Effect.either,
                     Effect.map((value) =>
-                      RpcResult.resolved(
-                        DateTime.make(header.payload.timestamp),
-                        value,
-                      ),
+                      RpcResult.resolved(DateTime.make(header.payload.timestamp), value),
                     ),
                   )
                 : Effect.succeed(prev),
@@ -511,17 +435,13 @@ export class WebSocketClient<
       ),
       Effect.bind("dataEncoded", () => Msgpack.Encoder.encode(data)),
       Effect.let("requestBuffer", ({ requestHeaderEncoded, dataEncoded }) => {
-        const requestBuffer = new Uint8Array(
-          requestHeaderEncoded.length + dataEncoded.length,
-        );
+        const requestBuffer = new Uint8Array(requestHeaderEncoded.length + dataEncoded.length);
         requestBuffer.set(requestHeaderEncoded, 0);
         requestBuffer.set(dataEncoded, requestHeaderEncoded.length);
         return requestBuffer;
       }),
       Effect.bind("ws", () => client.ws),
-      Effect.tap(({ ws, requestBuffer }) =>
-        Option.map(ws, (ws) => ws.send(requestBuffer)),
-      ),
+      Effect.tap(({ ws, requestBuffer }) => Option.map(ws, (ws) => ws.send(requestBuffer))),
       Effect.bind("maskedSignal", ({ signal }) =>
         Computed.make(
           pipe(
@@ -559,14 +479,13 @@ export class WebSocketClient<
 
   static subscribeScoped<
     const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
-    const H extends
-      keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
-        HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
-          Collection,
-          Subscription.Type.SubscriptionHandlerT
-        >
-      > &
-        string,
+    const H extends keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
+      HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+        Collection,
+        Subscription.Type.SubscriptionHandlerT
+      >
+    > &
+      string,
     HData extends HandlerData.Group.Subscription.GetHandlerData<
       HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
         Collection,
@@ -585,19 +504,15 @@ export class WebSocketClient<
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
-      Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<HData>
-      >
+      Handler.Config.ResolvedRequestParamsValidator<Handler.Config.RequestParamsOrUndefined<HData>>
     >,
   ) {
     return pipe(
-      Effect.acquireRelease(
-        WebSocketClient.subscribe(client, handler, data),
-        ({ requestId }) =>
-          pipe(
-            WebSocketClient.unsubscribe(client, requestId, handler),
-            Effect.catchAll(() => Effect.void),
-          ),
+      Effect.acquireRelease(WebSocketClient.subscribe(client, handler, data), ({ requestId }) =>
+        pipe(
+          WebSocketClient.unsubscribe(client, requestId, handler),
+          Effect.catchAll(() => Effect.void),
+        ),
       ),
       Effect.map(({ signal }) => signal),
       Effect.withSpan("WebSocketClient.subscribeScoped", {
@@ -611,14 +526,13 @@ export class WebSocketClient<
 
   static unsubscribe<
     const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
-    const H extends
-      keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
-        HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
-          Collection,
-          Subscription.Type.SubscriptionHandlerT
-        >
-      > &
-        string,
+    const H extends keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
+      HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+        Collection,
+        Subscription.Type.SubscriptionHandlerT
+      >
+    > &
+      string,
   >(client: WebSocketClient<Collection>, id: string, handler: H) {
     return pipe(
       Effect.Do,
@@ -649,13 +563,9 @@ export class WebSocketClient<
           ),
         }),
       ),
-      Effect.bind("headerEncoded", ({ header }) =>
-        Msgpack.Encoder.encode(header),
-      ),
+      Effect.bind("headerEncoded", ({ header }) => Msgpack.Encoder.encode(header)),
       Effect.bind("ws", () => client.ws),
-      Effect.tap(({ ws, headerEncoded }) =>
-        Option.map(ws, (ws) => ws.send(headerEncoded)),
-      ),
+      Effect.tap(({ ws, headerEncoded }) => Option.map(ws, (ws) => ws.send(headerEncoded))),
       Effect.asVoid,
       Effect.withSpan("WebSocketClient.unsubscribe", {
         attributes: {
@@ -669,14 +579,13 @@ export class WebSocketClient<
 
   static once<
     const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
-    const H extends
-      keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
-        HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
-          Collection,
-          Subscription.Type.SubscriptionHandlerT
-        >
-      > &
-        string,
+    const H extends keyof HandlerData.Group.Subscription.GetHandlerDataGroupRecord<
+      HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
+        Collection,
+        Subscription.Type.SubscriptionHandlerT
+      >
+    > &
+      string,
     HData extends HandlerData.Group.Subscription.GetHandlerData<
       HandlerData.Collection.GetHandlerDataGroupOfHandlerT<
         Collection,
@@ -695,9 +604,7 @@ export class WebSocketClient<
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
-      Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<HData>
-      >
+      Handler.Config.ResolvedRequestParamsValidator<Handler.Config.RequestParamsOrUndefined<HData>>
     >,
   ) {
     return pipe(
@@ -730,9 +637,7 @@ export class WebSocketClient<
         ),
       ),
       Effect.let("responseErrorValidator", ({ config }) =>
-        Handler.Config.resolveResponseErrorValidator(
-          Handler.Config.responseError(config),
-        ),
+        Handler.Config.resolveResponseErrorValidator(Handler.Config.responseError(config)),
       ),
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("deferred", () =>
@@ -740,9 +645,7 @@ export class WebSocketClient<
           {
             result: Either.Either<
               Validator.Output<
-                Handler.Config.ResolvedResponseValidator<
-                  Handler.Config.ResponseOrUndefined<HData>
-                >
+                Handler.Config.ResolvedResponseValidator<Handler.Config.ResponseOrUndefined<HData>>
               >,
               | RpcError<
                   Validator.Output<
@@ -788,9 +691,7 @@ export class WebSocketClient<
                   Effect.map((result) => ({ result, span: header.span })),
                 ),
               ),
-              Effect.andThen(() =>
-                pipe(client, WebSocketClient.removeUpdater(id)),
-              ),
+              Effect.andThen(() => pipe(client, WebSocketClient.removeUpdater(id))),
               Effect.asVoid,
             ),
           ),
@@ -831,17 +732,13 @@ export class WebSocketClient<
       ),
       Effect.bind("dataEncoded", () => Msgpack.Encoder.encode(data)),
       Effect.let("requestBuffer", ({ requestHeaderEncoded, dataEncoded }) => {
-        const requestBuffer = new Uint8Array(
-          requestHeaderEncoded.length + dataEncoded.length,
-        );
+        const requestBuffer = new Uint8Array(requestHeaderEncoded.length + dataEncoded.length);
         requestBuffer.set(requestHeaderEncoded, 0);
         requestBuffer.set(dataEncoded, requestHeaderEncoded.length);
         return requestBuffer;
       }),
       Effect.bind("ws", () => client.ws),
-      Effect.tap(({ ws, requestBuffer }) =>
-        Option.map(ws, (ws) => ws.send(requestBuffer)),
-      ),
+      Effect.tap(({ ws, requestBuffer }) => Option.map(ws, (ws) => ws.send(requestBuffer))),
       Effect.flatMap(({ deferred }) => Deferred.await(deferred)),
       Effect.tap(({ span }) =>
         span ? Effect.linkSpanCurrent(Tracer.externalSpan(span)) : Effect.void,
@@ -883,9 +780,7 @@ export class WebSocketClient<
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
-      Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<HData>
-      >
+      Handler.Config.ResolvedRequestParamsValidator<Handler.Config.RequestParamsOrUndefined<HData>>
     >,
   ) {
     return pipe(
@@ -918,9 +813,7 @@ export class WebSocketClient<
         ),
       ),
       Effect.let("responseErrorValidator", ({ config }) =>
-        Handler.Config.resolveResponseErrorValidator(
-          Handler.Config.responseError(config),
-        ),
+        Handler.Config.resolveResponseErrorValidator(Handler.Config.responseError(config)),
       ),
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("deferred", () =>
@@ -928,9 +821,7 @@ export class WebSocketClient<
           {
             result: Either.Either<
               Validator.Output<
-                Handler.Config.ResolvedResponseValidator<
-                  Handler.Config.ResponseOrUndefined<HData>
-                >
+                Handler.Config.ResolvedResponseValidator<Handler.Config.ResponseOrUndefined<HData>>
               >,
               | RpcError<
                   Validator.Output<
@@ -976,9 +867,7 @@ export class WebSocketClient<
                   Effect.map((result) => ({ result, span: header.span })),
                 ),
               ),
-              Effect.andThen(() =>
-                pipe(client, WebSocketClient.removeUpdater(id)),
-              ),
+              Effect.andThen(() => pipe(client, WebSocketClient.removeUpdater(id))),
               Effect.asVoid,
             ),
           ),
@@ -1019,17 +908,13 @@ export class WebSocketClient<
       ),
       Effect.bind("dataEncoded", () => Msgpack.Encoder.encode(data)),
       Effect.let("requestBuffer", ({ requestHeaderEncoded, dataEncoded }) => {
-        const requestBuffer = new Uint8Array(
-          requestHeaderEncoded.length + dataEncoded.length,
-        );
+        const requestBuffer = new Uint8Array(requestHeaderEncoded.length + dataEncoded.length);
         requestBuffer.set(requestHeaderEncoded, 0);
         requestBuffer.set(dataEncoded, requestHeaderEncoded.length);
         return requestBuffer;
       }),
       Effect.bind("ws", () => client.ws),
-      Effect.tap(({ ws, requestBuffer }) =>
-        Option.map(ws, (ws) => ws.send(requestBuffer)),
-      ),
+      Effect.tap(({ ws, requestBuffer }) => Option.map(ws, (ws) => ws.send(requestBuffer))),
       Effect.flatMap(({ deferred }) => Deferred.await(deferred)),
       Effect.tap(({ span }) =>
         span ? Effect.linkSpanCurrent(Tracer.externalSpan(span)) : Effect.void,

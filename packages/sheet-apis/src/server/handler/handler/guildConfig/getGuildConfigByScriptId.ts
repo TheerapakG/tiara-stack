@@ -16,15 +16,9 @@ export const getGuildConfigByScriptIdHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(getGuildConfigByScriptIdHandlerConfig),
-        ),
-        Effect.flatMap(({ parsed }) =>
-          GuildConfigService.getGuildConfigByScriptId(parsed),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
+        Effect.bind("parsed", () => Event.request.parsed(getGuildConfigByScriptIdHandlerConfig)),
+        Effect.flatMap(({ parsed }) => GuildConfigService.getGuildConfigByScriptId(parsed)),
         Effect.map(
           Effect.map(
             Result.eitherSomeOrLeft(() =>
@@ -35,11 +29,7 @@ export const getGuildConfigByScriptIdHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(
-          Handler.Config.encodeResponseEffect(
-            getGuildConfigByScriptIdHandlerConfig,
-          ),
-        ),
+        Effect.map(Handler.Config.encodeResponseEffect(getGuildConfigByScriptIdHandlerConfig)),
         Effect.withSpan("getGuildConfigByScriptIdHandler", {
           captureStackTrace: true,
         }),

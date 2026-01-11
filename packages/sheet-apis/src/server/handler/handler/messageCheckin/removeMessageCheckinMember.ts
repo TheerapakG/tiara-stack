@@ -39,9 +39,7 @@ export const removeMessageCheckinMemberHandler = pipe(
           }),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(
-          removeMessageCheckinMemberHandlerConfig,
-        ),
+        Handler.Config.encodeResponseEffect(removeMessageCheckinMemberHandlerConfig),
         Effect.withSpan("removeMessageCheckinMemberHandler", {
           captureStackTrace: true,
         }),

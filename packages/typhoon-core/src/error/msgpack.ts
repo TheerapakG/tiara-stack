@@ -12,10 +12,7 @@ const MsgpackDecodeErrorTaggedError: Schema.TaggedErrorClass<
   {
     readonly _tag: Schema.tag<"MsgpackDecodeError">;
   } & (typeof MsgpackDecodeErrorData)["fields"]
-> = Schema.TaggedError<MsgpackDecodeError>()(
-  "MsgpackDecodeError",
-  MsgpackDecodeErrorData,
-);
+> = Schema.TaggedError<MsgpackDecodeError>()("MsgpackDecodeError", MsgpackDecodeErrorData);
 export class MsgpackDecodeError extends MsgpackDecodeErrorTaggedError {}
 
 export const makeMsgpackDecodeError = (cause: RangeError | DecodeError) =>
@@ -37,10 +34,7 @@ const MsgpackEncodeErrorTaggedError: Schema.TaggedErrorClass<
   {
     readonly _tag: Schema.tag<"MsgpackEncodeError">;
   } & (typeof MsgpackEncodeErrorData)["fields"]
-> = Schema.TaggedError<MsgpackEncodeError>()(
-  "MsgpackEncodeError",
-  MsgpackEncodeErrorData,
-);
+> = Schema.TaggedError<MsgpackEncodeError>()("MsgpackEncodeError", MsgpackEncodeErrorData);
 export class MsgpackEncodeError extends MsgpackEncodeErrorTaggedError {}
 
 export const makeMsgpackEncodeError = (cause: Error) =>

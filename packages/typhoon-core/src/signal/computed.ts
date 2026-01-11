@@ -14,21 +14,13 @@ import {
   Types,
 } from "effect";
 import { Observable } from "../observability";
-import {
-  DependencySignal,
-  DependencySymbol,
-  notifyAllDependents,
-} from "./dependencySignal";
+import { DependencySignal, DependencySymbol, notifyAllDependents } from "./dependencySignal";
 import { DependentSignal, DependentSymbol } from "./dependentSignal";
 import * as SignalContext from "./signalContext";
 import * as SignalService from "./signalService";
 
 export class Computed<A = never, E = never, R = never>
-  extends Effectable.Class<
-    A,
-    E,
-    R | SignalContext.SignalContext | SignalService.SignalService
-  >
+  extends Effectable.Class<A, E, R | SignalContext.SignalContext | SignalService.SignalService>
   implements DependentSignal, DependencySignal<A, E, R>
 {
   readonly _tag = "Computed" as const;
@@ -90,34 +82,20 @@ export class Computed<A = never, E = never, R = never>
 
   clearDependencies() {
     return pipe(
-      TSet.forEach(this._dependencies, (dependency) =>
-        dependency.removeDependent(this),
-      ),
+      TSet.forEach(this._dependencies, (dependency) => dependency.removeDependent(this)),
       STM.zipRight(TSet.removeIf(this._dependencies, () => true)),
     );
   }
 
-  getDependencies(): STM.STM<
-    TSet.TSet<DependencySignal<unknown, unknown, unknown>>,
-    never,
-    never
-  > {
+  getDependencies(): STM.STM<TSet.TSet<DependencySignal<unknown, unknown, unknown>>, never, never> {
     return STM.succeed(this._dependencies);
   }
 
-  getDependents(): STM.STM<
-    TSet.TSet<WeakRef<DependentSignal> | DependentSignal>,
-    never,
-    never
-  > {
+  getDependents(): STM.STM<TSet.TSet<WeakRef<DependentSignal> | DependentSignal>, never, never> {
     return STM.succeed(this._dependents);
   }
 
-  value(): Effect.Effect<
-    A,
-    E,
-    R | SignalContext.SignalContext | SignalService.SignalService
-  > {
+  value(): Effect.Effect<A, E, R | SignalContext.SignalContext | SignalService.SignalService> {
     return pipe(
       SignalContext.bindDependency(this),
       STM.commit,
@@ -128,11 +106,7 @@ export class Computed<A = never, E = never, R = never>
     );
   }
 
-  commit(): Effect.Effect<
-    A,
-    E,
-    R | SignalContext.SignalContext | SignalService.SignalService
-  > {
+  commit(): Effect.Effect<A, E, R | SignalContext.SignalContext | SignalService.SignalService> {
     return this.value();
   }
 
@@ -140,10 +114,7 @@ export class Computed<A = never, E = never, R = never>
     return pipe(
       STM.all({
         queue: TQueue.peekOption(this._queue),
-        context: pipe(
-          STM.context<R>(),
-          STM.map(Context.omit(SignalContext.SignalContext)),
-        ),
+        context: pipe(STM.context<R>(), STM.map(Context.omit(SignalContext.SignalContext))),
       }),
       STM.commit,
       Effect.flatMap(({ queue, context }) =>
@@ -156,9 +127,7 @@ export class Computed<A = never, E = never, R = never>
                 SignalContext.fromDependent(this),
                 STM.commit,
                 Effect.flatMap((ctx) =>
-                  SignalService.enqueueRunTracked(
-                    this._makeRunTrackedRequest(context, ctx),
-                  ),
+                  SignalService.enqueueRunTracked(this._makeRunTrackedRequest(context, ctx)),
                 ),
               ),
           }),
@@ -174,11 +143,7 @@ export class Computed<A = never, E = never, R = never>
     return pipe(TQueue.takeAll(this._queue), STM.asVoid);
   }
 
-  getReferenceForDependency(): STM.STM<
-    WeakRef<DependentSignal> | DependentSignal,
-    never,
-    never
-  > {
+  getReferenceForDependency(): STM.STM<WeakRef<DependentSignal> | DependentSignal, never, never> {
     return STM.succeed(this._reference);
   }
 
@@ -239,14 +204,17 @@ export class Computed<A = never, E = never, R = never>
   }
 }
 
-export type Success<S extends Computed<unknown, unknown, unknown>> =
-  Effect.Effect.Success<ReturnType<S["peek"]>>;
+export type Success<S extends Computed<unknown, unknown, unknown>> = Effect.Effect.Success<
+  ReturnType<S["peek"]>
+>;
 
-export type Error<S extends Computed<unknown, unknown, unknown>> =
-  Effect.Effect.Error<ReturnType<S["peek"]>>;
+export type Error<S extends Computed<unknown, unknown, unknown>> = Effect.Effect.Error<
+  ReturnType<S["peek"]>
+>;
 
-export type Context<S extends Computed<unknown, unknown, unknown>> =
-  Effect.Effect.Context<ReturnType<S["peek"]>>;
+export type Context<S extends Computed<unknown, unknown, unknown>> = Effect.Effect.Context<
+  ReturnType<S["peek"]>
+>;
 
 export const makeSTM = <A = never, E = never, R = never>(
   effect: Effect.Effect<A, E, R>,
@@ -262,11 +230,7 @@ export const makeSTM = <A = never, E = never, R = never>(
     STM.map(
       ({ dependents, dependencies, queue, lastExit }) =>
         new Computed<A, E, Exclude<R, SignalContext.SignalContext>>(
-          effect as Effect.Effect<
-            A,
-            E,
-            Exclude<R, SignalContext.SignalContext>
-          >,
+          effect as Effect.Effect<A, E, Exclude<R, SignalContext.SignalContext>>,
           dependents,
           dependencies,
           queue,

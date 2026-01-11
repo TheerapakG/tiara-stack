@@ -15,18 +15,12 @@ import * as SignalService from "../signalService";
 export const make = <T>(
   fiber: Fiber.Fiber<T, unknown>,
   initial: T,
-): Effect.Effect<
-  ExternalSource<T>,
-  never,
-  Scope.Scope | SignalService.SignalService
-> =>
+): Effect.Effect<ExternalSource<T>, never, Scope.Scope | SignalService.SignalService> =>
   pipe(
     STM.all({
       valueRef: TRef.make(initial),
       onEmitRef: TRef.make<
-        Option.Option<
-          (value: T) => Effect.Effect<void, never, SignalService.SignalService>
-        >
+        Option.Option<(value: T) => Effect.Effect<void, never, SignalService.SignalService>>
       >(Option.none()),
     }),
     Effect.tap(({ valueRef, onEmitRef }) =>
@@ -43,9 +37,7 @@ export const make = <T>(
                   pipe(
                     TRef.get(onEmitRef),
                     STM.commit,
-                    Effect.flatMap(
-                      Effect.transposeMapOption((onEmit) => onEmit(value)),
-                    ),
+                    Effect.flatMap(Effect.transposeMapOption((onEmit) => onEmit(value))),
                   ),
                 ),
               ),
@@ -56,10 +48,7 @@ export const make = <T>(
     ),
     Effect.map(({ valueRef, onEmitRef }) => ({
       poll: () => TRef.get(valueRef),
-      emit: (
-        onEmit: (
-          value: T,
-        ) => Effect.Effect<void, never, SignalService.SignalService>,
-      ) => TRef.set(onEmitRef, Option.some(onEmit)),
+      emit: (onEmit: (value: T) => Effect.Effect<void, never, SignalService.SignalService>) =>
+        TRef.set(onEmitRef, Option.some(onEmit)),
     })),
   );

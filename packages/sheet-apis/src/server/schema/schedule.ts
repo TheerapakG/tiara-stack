@@ -8,15 +8,12 @@ export class RawSchedulePlayer extends Schema.TaggedClass<RawSchedulePlayer>()(
   },
 ) {}
 
-export class BreakSchedule extends Schema.TaggedClass<BreakSchedule>()(
-  "BreakSchedule",
-  {
-    channel: Schema.String,
-    day: Schema.Number,
-    visible: Schema.Boolean,
-    hour: Schema.OptionFromNullishOr(Schema.Number, undefined),
-  },
-) {}
+export class BreakSchedule extends Schema.TaggedClass<BreakSchedule>()("BreakSchedule", {
+  channel: Schema.String,
+  day: Schema.Number,
+  visible: Schema.Boolean,
+  hour: Schema.OptionFromNullishOr(Schema.Number, undefined),
+}) {}
 
 export class Schedule extends Schema.TaggedClass<Schedule>()("Schedule", {
   channel: Schema.String,
@@ -33,10 +30,7 @@ export class Schedule extends Schema.TaggedClass<Schedule>()("Schedule", {
   monitor: Schema.OptionFromNullishOr(Schema.String, undefined),
 }) {
   static empty = ({ fills, overfills }: Schedule) =>
-    Order.max(Number.Order)(
-      5 - fills.filter(Option.isSome).length - overfills.length,
-      0,
-    );
+    Order.max(Number.Order)(5 - fills.filter(Option.isSome).length - overfills.length, 0);
 }
 
 export const makeSchedule = ({

@@ -1,15 +1,13 @@
 import { Array, Function, Option, pipe, Struct, Types } from "effect";
 
 type OptionFields<A> = {
-  [K in keyof A as A[K] extends Option.Option<any>
-    ? K
-    : never]: A[K] extends Option.Option<any> ? A[K] : never;
+  [K in keyof A as A[K] extends Option.Option<any> ? K : never]: A[K] extends Option.Option<any>
+    ? A[K]
+    : never;
 };
 
 type OptionFieldValues<A> = {
-  [K in keyof A as A[K] extends Option.Option<any>
-    ? K
-    : never]: A[K] extends Option.Option<any>
+  [K in keyof A as A[K] extends Option.Option<any> ? K : never]: A[K] extends Option.Option<any>
     ? Option.Option.Value<A[K]>
     : never;
 };
@@ -33,9 +31,9 @@ export const getSomeFields = Function.dual<
     fields: Array.NonEmptyReadonlyArray<F>,
   ) =>
     pipe(
-      Option.all(
-        Struct.pick(a, ...fields) as Pick<OptionFields<A>, F>,
-      ) as Option.Option<Pick<OptionFieldValues<A>, F>>,
+      Option.all(Struct.pick(a, ...fields) as Pick<OptionFields<A>, F>) as Option.Option<
+        Pick<OptionFieldValues<A>, F>
+      >,
       Option.map((v) => ({ ...a, ...v })),
     ) as GetSomeFields<A, F>,
 );

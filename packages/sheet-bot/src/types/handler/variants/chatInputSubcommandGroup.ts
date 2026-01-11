@@ -1,24 +1,10 @@
 import { SlashCommandSubcommandGroupBuilder } from "discord.js";
 import { ChatInputCommandInteractionT } from "@/services";
-import {
-  HandlerVariant,
-  HandlerVariantT,
-  handlerVariantMap,
-} from "@/types/handler/handlerVariant";
+import { HandlerVariant, HandlerVariantT, handlerVariantMap } from "@/types/handler/handlerVariant";
 
-export interface ChatInputSubcommandGroupHandlerVariantT
-  extends HandlerVariantT {
-  readonly type: HandlerVariant<
-    SlashCommandSubcommandGroupBuilder,
-    ChatInputCommandInteractionT
-  >;
+export interface ChatInputSubcommandGroupHandlerVariantT extends HandlerVariantT {
+  readonly type: HandlerVariant<SlashCommandSubcommandGroupBuilder, ChatInputCommandInteractionT>;
 }
 
-export const chatInputSubcommandGroupInteractionHandlerMap = <
-  A = never,
-  E = never,
-  R = never,
->() =>
-  handlerVariantMap<ChatInputSubcommandGroupHandlerVariantT, A, E, R>(
-    (data) => data.name,
-  );
+export const chatInputSubcommandGroupInteractionHandlerMap = <A = never, E = never, R = never>() =>
+  handlerVariantMap<ChatInputSubcommandGroupHandlerVariantT, A, E, R>((data) => data.name);

@@ -15,16 +15,10 @@ export const getAutoCheckinGuildsHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
         Effect.flatMap(() => GuildConfigService.getAutoCheckinGuilds()),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(
-          Handler.Config.encodeResponseEffect(
-            getAutoCheckinGuildsHandlerConfig,
-          ),
-        ),
+        Effect.map(Handler.Config.encodeResponseEffect(getAutoCheckinGuildsHandlerConfig)),
         Effect.withSpan("getAutoCheckinGuildsHandler", {
           captureStackTrace: true,
         }),

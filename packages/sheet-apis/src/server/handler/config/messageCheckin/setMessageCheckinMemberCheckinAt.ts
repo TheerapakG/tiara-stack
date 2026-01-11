@@ -5,9 +5,7 @@ import { Handler } from "typhoon-core/server";
 export const setMessageCheckinMemberCheckinAtHandlerConfig = pipe(
   Handler.Config.empty(),
   Handler.Config.Builder.type("mutation"),
-  Handler.Config.Builder.name(
-    "messageCheckin.setMessageCheckinMemberCheckinAt",
-  ),
+  Handler.Config.Builder.name("messageCheckin.setMessageCheckinMemberCheckinAt"),
   Handler.Config.Builder.requestParams({
     validator: pipe(
       Schema.Struct({

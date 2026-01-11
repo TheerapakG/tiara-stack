@@ -17,15 +17,9 @@ export const getMessageSlotDataHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(getMessageSlotDataHandlerConfig),
-        ),
-        Effect.flatMap(({ parsed }) =>
-          MessageSlotService.getMessageSlotData(parsed),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
+        Effect.bind("parsed", () => Event.request.parsed(getMessageSlotDataHandlerConfig)),
+        Effect.flatMap(({ parsed }) => MessageSlotService.getMessageSlotData(parsed)),
         Effect.map(
           Effect.map(
             Result.eitherSomeOrLeft(() =>
@@ -36,9 +30,7 @@ export const getMessageSlotDataHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(
-          Handler.Config.encodeResponseEffect(getMessageSlotDataHandlerConfig),
-        ),
+        Effect.map(Handler.Config.encodeResponseEffect(getMessageSlotDataHandlerConfig)),
         Effect.withSpan("getMessageSlotDataHandler", {
           captureStackTrace: true,
         }),

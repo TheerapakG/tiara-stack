@@ -20,9 +20,7 @@ export const getByIdHandlerConfig = pipe(
     validator: pipe(
       Result.ResultSchema({
         optimistic: Schema.Either({
-          right: Schema.Array(
-            Schema.Array(Schema.Union(Player, PartialIdPlayer)),
-          ),
+          right: Schema.Array(Schema.Array(Schema.Union(Player, PartialIdPlayer))),
           left: Schema.Union(
             Error.Core.ArgumentError,
             Error.Core.MsgpackDecodeError,
@@ -35,9 +33,7 @@ export const getByIdHandlerConfig = pipe(
           ),
         }),
         complete: Schema.Either({
-          right: Schema.Array(
-            Schema.Array(Schema.Union(Player, PartialIdPlayer)),
-          ),
+          right: Schema.Array(Schema.Array(Schema.Union(Player, PartialIdPlayer))),
           left: Schema.Union(
             Error.Core.ArgumentError,
             Error.Core.MsgpackDecodeError,

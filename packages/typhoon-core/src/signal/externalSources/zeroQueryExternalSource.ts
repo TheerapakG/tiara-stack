@@ -107,9 +107,7 @@ export type ZeroMaterializeOptions = {
 /**
  * Converts a raw Zero query error to a typed ZeroQueryError
  */
-const rawZeroQueryErrorToZeroQueryError = (
-  error: RawZeroQueryError,
-): ZeroQueryError =>
+const rawZeroQueryErrorToZeroQueryError = (error: RawZeroQueryError): ZeroQueryError =>
   pipe(
     Match.value(error),
     Match.discriminatorsExhaustive("error")({
@@ -158,9 +156,7 @@ type ViewState = {
  * - Either.left<ZeroQueryError | E>: errors from input signal or Zero sync
  */
 class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
-  implements
-    ExternalSource<Result<Either.Either<T, ZeroQueryError | E>>>,
-    Output
+  implements ExternalSource<Result<Either.Either<T, ZeroQueryError | E>>>, Output
 {
   constructor(
     private readonly viewRef: TRef.TRef<Option.Option<ViewState>>,
@@ -195,13 +191,7 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
               pipe(
                 input.fetch({}),
                 Array.forEach((node) =>
-                  applyChange(
-                    value,
-                    { type: "add", node },
-                    input.getSchema(),
-                    "",
-                    format,
-                  ),
+                  applyChange(value, { type: "add", node }, input.getSchema(), "", format),
                 ),
               ),
             onNone: () => Effect.void,
@@ -216,9 +206,7 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
     return pipe(
       TRef.getAndSet(this.dirtyRef, false),
       STM.commit,
-      Effect.flatMap((dirty) =>
-        pipe(dirty ? this.doEmit() : Effect.void, Effect.as(false)),
-      ),
+      Effect.flatMap((dirty) => pipe(dirty ? this.doEmit() : Effect.void, Effect.as(false))),
     );
   }
 
@@ -274,13 +262,11 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
                   onRight: (zeroStatus) => {
                     // Both input complete AND zero complete -> Complete
                     // Otherwise -> Optimistic
-                    const isComplete =
-                      inputResultComplete && zeroStatus === "complete";
-                    const eitherValue: Either.Either<T, ZeroQueryError | E> =
-                      Either.right(value[""]);
-                    return isComplete
-                      ? complete(eitherValue)
-                      : optimistic(eitherValue);
+                    const isComplete = inputResultComplete && zeroStatus === "complete";
+                    const eitherValue: Either.Either<T, ZeroQueryError | E> = Either.right(
+                      value[""],
+                    );
+                    return isComplete ? complete(eitherValue) : optimistic(eitherValue);
                   },
                 }),
               ),
@@ -333,17 +319,14 @@ const destroyView = (viewRef: TRef.TRef<Option.Option<ViewState>>) =>
 /**
  * Creates the shared refs and source for both make variants
  */
-const createSourceWithRefs = <
-  T extends ReadonlyJSONValue | View,
-  E = never,
->() =>
+const createSourceWithRefs = <T extends ReadonlyJSONValue | View, E = never>() =>
   pipe(
     STM.all({
       viewRef: TRef.make<Option.Option<ViewState>>(Option.none()),
       inputResultCompleteRef: TRef.make(true), // Default true for non-Result inputs
-      zeroResultTypeRef: TRef.make<
-        Either.Either<"unknown" | "complete", ZeroQueryError>
-      >(Either.right("unknown")),
+      zeroResultTypeRef: TRef.make<Either.Either<"unknown" | "complete", ZeroQueryError>>(
+        Either.right("unknown"),
+      ),
       dirtyRef: TRef.make(false),
       valueRef: TRef.make<{ "": T }>({
         "": undefined as T,
@@ -356,9 +339,9 @@ const createSourceWithRefs = <
         >
       >(Option.none()),
       inputErrorRef: TRef.make<Option.Option<E>>(Option.none()),
-      queryCompletePromiseFiberRef: TRef.make<
-        Option.Option<Fiber.Fiber<void, never>>
-      >(Option.none()),
+      queryCompletePromiseFiberRef: TRef.make<Option.Option<Fiber.Fiber<void, never>>>(
+        Option.none(),
+      ),
       materializedQueue: TQueue.sliding<void>(1),
     }),
     STM.let(
@@ -391,13 +374,9 @@ const createMaterializeCallback =
   <T extends ReadonlyJSONValue | View, E = never>(
     source: ZeroQueryExternalSource<T, E>,
     viewRef: TRef.TRef<Option.Option<ViewState>>,
-    zeroResultTypeRef: TRef.TRef<
-      Either.Either<"unknown" | "complete", ZeroQueryError>
-    >,
+    zeroResultTypeRef: TRef.TRef<Either.Either<"unknown" | "complete", ZeroQueryError>>,
     valueRef: TRef.TRef<{ "": T }>,
-    queryCompletePromiseFiberRef: TRef.TRef<
-      Option.Option<Fiber.Fiber<void, never>>
-    >,
+    queryCompletePromiseFiberRef: TRef.TRef<Option.Option<Fiber.Fiber<void, never>>>,
     materializedQueue: TQueue.TQueue<void>,
   ) =>
   (
@@ -419,14 +398,11 @@ const createMaterializeCallback =
             pipe(
               Effect.tryPromise({
                 try: () => queryComplete,
-                catch: (error) =>
-                  rawZeroQueryErrorToZeroQueryError(error as RawZeroQueryError),
+                catch: (error) => rawZeroQueryErrorToZeroQueryError(error as RawZeroQueryError),
               }),
               Effect.as("complete" as const),
               Effect.either,
-              Effect.tap((result) =>
-                pipe(TRef.set(zeroResultTypeRef, result), STM.commit),
-              ),
+              Effect.tap((result) => pipe(TRef.set(zeroResultTypeRef, result), STM.commit)),
               Effect.andThen(source.doEmit()),
               Effect.asVoid,
 
@@ -437,45 +413,30 @@ const createMaterializeCallback =
           Match.orElse(() => Effect.succeedNone),
         ),
       ),
-      Effect.bind(
-        "oldQueryCompletePromiseFiber",
-        ({ newQueryCompletePromiseFiber }) =>
-          pipe(
-            TRef.set(viewRef, Option.some({ input, format, onDestroy })),
-            STM.zipRight(
-              TRef.set(valueRef, {
-                "": (format.singular ? undefined : []) as T,
-              }),
-            ),
-            STM.zipRight(
-              pipe(
-                Match.value(queryComplete),
-                Match.when(true, () =>
-                  TRef.set(zeroResultTypeRef, Either.right("complete")),
-                ),
-                Match.when(Predicate.hasProperty("error"), (error) =>
-                  TRef.set(
-                    zeroResultTypeRef,
-                    Either.left(
-                      rawZeroQueryErrorToZeroQueryError(
-                        error as RawZeroQueryError,
-                      ),
-                    ),
-                  ),
-                ),
-                Match.orElse(() =>
-                  TRef.set(zeroResultTypeRef, Either.right("unknown")),
-                ),
-              ),
-            ),
-            STM.zipRight(
-              TRef.getAndSet(
-                queryCompletePromiseFiberRef,
-                newQueryCompletePromiseFiber,
-              ),
-            ),
-            STM.commit,
+      Effect.bind("oldQueryCompletePromiseFiber", ({ newQueryCompletePromiseFiber }) =>
+        pipe(
+          TRef.set(viewRef, Option.some({ input, format, onDestroy })),
+          STM.zipRight(
+            TRef.set(valueRef, {
+              "": (format.singular ? undefined : []) as T,
+            }),
           ),
+          STM.zipRight(
+            pipe(
+              Match.value(queryComplete),
+              Match.when(true, () => TRef.set(zeroResultTypeRef, Either.right("complete"))),
+              Match.when(Predicate.hasProperty("error"), (error) =>
+                TRef.set(
+                  zeroResultTypeRef,
+                  Either.left(rawZeroQueryErrorToZeroQueryError(error as RawZeroQueryError)),
+                ),
+              ),
+              Match.orElse(() => TRef.set(zeroResultTypeRef, Either.right("unknown"))),
+            ),
+          ),
+          STM.zipRight(TRef.getAndSet(queryCompletePromiseFiberRef, newQueryCompletePromiseFiber)),
+          STM.commit,
+        ),
       ),
       Effect.andThen(({ oldQueryCompletePromiseFiber }) =>
         pipe(
@@ -492,28 +453,23 @@ const createMaterializeCallback =
             Effect.sync(() =>
               onTransactionCommit(() =>
                 Effect.runFork(
-                  pipe(
-                    source.flush(),
-                    Effect.provideService(SignalService.SignalService, service),
-                  ),
+                  pipe(source.flush(), Effect.provideService(SignalService.SignalService, service)),
                 ),
               ),
             ),
           ),
         ),
       ),
-      Effect.andThen(() =>
-        pipe(TQueue.offer(materializedQueue, undefined), STM.commit),
-      ),
+      Effect.andThen(() => pipe(TQueue.offer(materializedQueue, undefined), STM.commit)),
       Effect.asVoid,
     );
 
 export const makeWithContext = <
   M,
   Q = Effect.Effect.Success<MaybeSignalEffectValue<M>>,
-  T extends ReadonlyJSONValue | View = HumanReadable<
-    QueryRowType<Q>
-  > extends infer T extends ReadonlyJSONValue | View
+  T extends ReadonlyJSONValue | View = HumanReadable<QueryRowType<Q>> extends infer T extends
+    | ReadonlyJSONValue
+    | View
     ? T
     : never,
   E = Effect.Effect.Error<MaybeSignalEffectValue<M>>,
@@ -549,9 +505,11 @@ export const makeWithContext = <
               Effect.flatMap((service) =>
                 SideEffect.makeWithContext(
                   pipe(
-                    getMaybeSignalEffectValue(
-                      maybeSignalQuery,
-                    ) as Effect.Effect<Q, E, R | SignalContext>,
+                    getMaybeSignalEffectValue(maybeSignalQuery) as Effect.Effect<
+                      Q,
+                      E,
+                      R | SignalContext
+                    >,
                     Effect.either,
                     Effect.flatMap((queryResult) =>
                       pipe(
@@ -563,9 +521,7 @@ export const makeWithContext = <
                               Effect.andThen(
                                 pipe(
                                   TRef.set(inputErrorRef, Option.some(error)), // Input errors with non-Result input are considered complete
-                                  STM.zipRight(
-                                    TRef.set(inputResultCompleteRef, true),
-                                  ),
+                                  STM.zipRight(TRef.set(inputResultCompleteRef, true)),
                                   STM.commit,
                                 ),
                               ),
@@ -575,9 +531,7 @@ export const makeWithContext = <
                             pipe(
                               TRef.set(inputErrorRef, Option.none()),
                               // Non-Result input is always considered complete
-                              STM.zipRight(
-                                TRef.set(inputResultCompleteRef, true),
-                              ),
+                              STM.zipRight(TRef.set(inputResultCompleteRef, true)),
                               STM.commit,
                               Effect.andThen(
                                 zero.materialize(
@@ -604,12 +558,8 @@ export const makeWithContext = <
               ),
             ),
         ),
-        Effect.tap(({ viewRef }) =>
-          Effect.addFinalizer(() => destroyView(viewRef)),
-        ),
-        Effect.tap(({ materializedQueue }) =>
-          pipe(TQueue.take(materializedQueue), STM.commit),
-        ),
+        Effect.tap(({ viewRef }) => Effect.addFinalizer(() => destroyView(viewRef))),
+        Effect.tap(({ materializedQueue }) => pipe(TQueue.take(materializedQueue), STM.commit)),
         Effect.map(({ source }) => source),
       ),
     ),
@@ -618,9 +568,9 @@ export const makeWithContext = <
 export const make = <
   M,
   Q = Effect.Effect.Success<MaybeSignalEffectValue<M>>,
-  T extends ReadonlyJSONValue | View = HumanReadable<
-    QueryRowType<Q>
-  > extends infer T extends ReadonlyJSONValue | View
+  T extends ReadonlyJSONValue | View = HumanReadable<QueryRowType<Q>> extends infer T extends
+    | ReadonlyJSONValue
+    | View
     ? T
     : never,
 >(
@@ -630,12 +580,7 @@ export const make = <
   ZeroQueryExternalSource<T, never>,
   never,
   ZeroService<any, any> | Scope.Scope | SignalService.SignalService
-> =>
-  makeWithContext<M, Q, T, never, never>(
-    maybeSignalQuery,
-    Context.empty(),
-    options,
-  );
+> => makeWithContext<M, Q, T, never, never>(maybeSignalQuery, Context.empty(), options);
 
 /**
  * Creates an ExternalSource for Zero queries where the input is wrapped in a Result type.
@@ -647,15 +592,12 @@ export const make = <
  */
 export const makeFromResultWithContext = <
   M,
-  Q = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends Result<
-    infer QO,
-    infer QC
-  >
+  Q = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends Result<infer QO, infer QC>
     ? QO | QC
     : never,
-  T extends ReadonlyJSONValue | View = HumanReadable<
-    QueryRowType<Q>
-  > extends infer T extends ReadonlyJSONValue | View
+  T extends ReadonlyJSONValue | View = HumanReadable<QueryRowType<Q>> extends infer T extends
+    | ReadonlyJSONValue
+    | View
     ? T
     : never,
   E = Effect.Effect.Error<MaybeSignalEffectValue<M>>,
@@ -675,9 +617,7 @@ export const makeFromResultWithContext = <
       pipe(
         createSourceWithRefs<T, E>(),
         // Set inputResultCompleteRef to false initially for Result inputs
-        STM.tap(({ inputResultCompleteRef }) =>
-          TRef.set(inputResultCompleteRef, false),
-        ),
+        STM.tap(({ inputResultCompleteRef }) => TRef.set(inputResultCompleteRef, false)),
         STM.commit,
         Effect.tap(
           ({
@@ -695,9 +635,11 @@ export const makeFromResultWithContext = <
               Effect.flatMap((service) =>
                 SideEffect.makeWithContext(
                   pipe(
-                    getMaybeSignalEffectValue(
-                      maybeSignalQuery,
-                    ) as Effect.Effect<Result<Q>, E, R | SignalContext>,
+                    getMaybeSignalEffectValue(maybeSignalQuery) as Effect.Effect<
+                      Result<Q>,
+                      E,
+                      R | SignalContext
+                    >,
                     Effect.either,
                     Effect.flatMap((queryResultEither) =>
                       pipe(
@@ -709,9 +651,7 @@ export const makeFromResultWithContext = <
                               Effect.andThen(
                                 pipe(
                                   TRef.set(inputErrorRef, Option.some(error)),
-                                  STM.zipRight(
-                                    TRef.set(inputResultCompleteRef, true),
-                                  ),
+                                  STM.zipRight(TRef.set(inputResultCompleteRef, true)),
                                   STM.commit,
                                 ),
                               ),
@@ -721,10 +661,7 @@ export const makeFromResultWithContext = <
                             pipe(
                               TRef.set(inputErrorRef, Option.none()),
                               STM.zipRight(
-                                TRef.set(
-                                  inputResultCompleteRef,
-                                  isResultComplete(queryResult),
-                                ),
+                                TRef.set(inputResultCompleteRef, isResultComplete(queryResult)),
                               ),
                               STM.commit,
                               // Extract the query from the Result and materialize
@@ -753,12 +690,8 @@ export const makeFromResultWithContext = <
               ),
             ),
         ),
-        Effect.tap(({ viewRef }) =>
-          Effect.addFinalizer(() => destroyView(viewRef)),
-        ),
-        Effect.tap(({ materializedQueue }) =>
-          pipe(TQueue.take(materializedQueue), STM.commit),
-        ),
+        Effect.tap(({ viewRef }) => Effect.addFinalizer(() => destroyView(viewRef))),
+        Effect.tap(({ materializedQueue }) => pipe(TQueue.take(materializedQueue), STM.commit)),
         Effect.map(({ source }) => source),
       ),
     ),
@@ -766,15 +699,12 @@ export const makeFromResultWithContext = <
 
 export const makeFromResult = <
   M,
-  Q = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends Result<
-    infer Q,
-    infer _C
-  >
+  Q = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends Result<infer Q, infer _C>
     ? Q
     : never,
-  T extends ReadonlyJSONValue | View = HumanReadable<
-    QueryRowType<Q>
-  > extends infer T extends ReadonlyJSONValue | View
+  T extends ReadonlyJSONValue | View = HumanReadable<QueryRowType<Q>> extends infer T extends
+    | ReadonlyJSONValue
+    | View
     ? T
     : never,
 >(
@@ -784,9 +714,4 @@ export const makeFromResult = <
   ZeroQueryExternalSource<T, never>,
   never,
   ZeroService<any, any> | Scope.Scope | SignalService.SignalService
-> =>
-  makeFromResultWithContext<M, Q, T, never, never>(
-    maybeSignalQuery,
-    Context.empty(),
-    options,
-  );
+> => makeFromResultWithContext<M, Q, T, never, never>(maybeSignalQuery, Context.empty(), options);

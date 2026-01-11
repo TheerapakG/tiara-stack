@@ -1,22 +1,9 @@
-import {
-  Chunk,
-  Effect,
-  Function,
-  Option,
-  pipe,
-  Scope,
-  Stream,
-  flow,
-} from "effect";
+import { Chunk, Effect, Function, Option, pipe, Scope, Stream, flow } from "effect";
 import { StreamExhaustedError, makeStreamExhaustedError } from "~/error";
 
 export const toPullEffect = <A, E, R>(
   stream: Stream.Stream<A, E, R>,
-): Effect.Effect<
-  Effect.Effect<A, StreamExhaustedError | E, R>,
-  never,
-  R | Scope.Scope
-> =>
+): Effect.Effect<Effect.Effect<A, StreamExhaustedError | E, R>, never, R | Scope.Scope> =>
   pipe(
     stream,
     Stream.rechunk(1),

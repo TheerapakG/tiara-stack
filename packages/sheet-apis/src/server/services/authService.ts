@@ -9,18 +9,13 @@ export class AuthService extends Effect.Service<AuthService>()("AuthService", {
     Effect.Do,
     Effect.bind("fs", () => FileSystem.FileSystem),
     Effect.bind("kubernetesToken", ({ fs }) =>
-      fs.readFileString(
-        "/var/run/secrets/kubernetes.io/serviceaccount/token",
-        "utf-8",
-      ),
+      fs.readFileString("/var/run/secrets/kubernetes.io/serviceaccount/token", "utf-8"),
     ),
     Effect.bind("jwks", ({ kubernetesToken }) =>
       pipe(
         Effect.try(() =>
           createRemoteJWKSet(
-            new URL(
-              "https://kubernetes.default.svc.cluster.local/openid/v1/jwks",
-            ),
+            new URL("https://kubernetes.default.svc.cluster.local/openid/v1/jwks"),
             { headers: { Authorization: `Bearer ${kubernetesToken}` } },
           ),
         ),
@@ -36,10 +31,7 @@ export class AuthService extends Effect.Service<AuthService>()("AuthService", {
                 audience: "sheet-apis",
               }),
             catch: (cause) =>
-              Error.Core.makeAuthorizationError(
-                "Error verifying authorization token",
-                cause,
-              ),
+              Error.Core.makeAuthorizationError("Error verifying authorization token", cause),
           }),
           Effect.withSpan("AuthService.verify", { captureStackTrace: true }),
         ),

@@ -1,18 +1,7 @@
-import {
-  Data,
-  Option,
-  DateTime,
-  Either,
-  pipe,
-  Match,
-  flow,
-  Function,
-  Unify,
-} from "effect";
+import { Data, Option, DateTime, Either, pipe, Match, flow, Function, Unify } from "effect";
 import { RpcError, ValidationError } from "../../error";
 
-const LoadingTaggedClass: new () => { readonly _tag: "Loading" } =
-  Data.TaggedClass("Loading")<{}>;
+const LoadingTaggedClass: new () => { readonly _tag: "Loading" } = Data.TaggedClass("Loading")<{}>;
 
 /**
  * RPC result type indicating the RPC is loading.
@@ -34,8 +23,7 @@ type ResolvedData<A, E> = {
 };
 const ResolvedTaggedClass: new <A, E>(
   args: Readonly<ResolvedData<A, E>>,
-) => Readonly<ResolvedData<A, E>> & { readonly _tag: "Resolved" } =
-  Data.TaggedClass("Resolved");
+) => Readonly<ResolvedData<A, E>> & { readonly _tag: "Resolved" } = Data.TaggedClass("Resolved");
 
 /**
  * RPC result type indicating the RPC is resolved.
@@ -63,8 +51,7 @@ export const map =
       Match.value(result),
       Match.tagsExhaustive({
         Loading: () => loading(),
-        Resolved: ({ timestamp, value, span }) =>
-          resolved(timestamp, Either.map(value, f), span),
+        Resolved: ({ timestamp, value, span }) => resolved(timestamp, Either.map(value, f), span),
       }),
     );
 
@@ -99,10 +86,7 @@ export const mapLeft =
     );
 
 export const match =
-  <A, E, LB, RB>(f: {
-    onLoading: () => LB;
-    onResolved: (value: Resolved<A, E>) => RB;
-  }) =>
+  <A, E, LB, RB>(f: { onLoading: () => LB; onResolved: (value: Resolved<A, E>) => RB }) =>
   (result: RpcResult<A, E>): Unify.Unify<LB | RB> =>
     pipe(
       Match.value(result),
@@ -112,9 +96,7 @@ export const match =
       }),
     );
 
-export const isLoading = (result: unknown): result is Loading =>
-  result instanceof Loading;
+export const isLoading = (result: unknown): result is Loading => result instanceof Loading;
 
-export const isResolved = (
-  result: unknown,
-): result is Resolved<unknown, unknown> => result instanceof Resolved;
+export const isResolved = (result: unknown): result is Resolved<unknown, unknown> =>
+  result instanceof Resolved;

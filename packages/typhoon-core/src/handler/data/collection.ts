@@ -1,13 +1,4 @@
-import {
-  Array,
-  Data,
-  Function,
-  pipe,
-  Record,
-  Struct,
-  Types,
-  Option,
-} from "effect";
+import { Array, Data, Function, pipe, Record, Struct, Types, Option } from "effect";
 import { type BaseHandlerT, type HandlerData, type HandlerType } from "../type";
 import {
   type BaseHandlerDataGroupRecord,
@@ -39,15 +30,12 @@ export type StoredHandlerDataCollectionRecord<
   >;
 };
 
-export const HandlerDataCollectionTypeId = Symbol(
-  "Typhoon/Handler/HandlerDataCollectionTypeId",
-);
+export const HandlerDataCollectionTypeId = Symbol("Typhoon/Handler/HandlerDataCollectionTypeId");
 export type HandlerDataCollectionTypeId = typeof HandlerDataCollectionTypeId;
 
 interface Variance<
   in out HandlerT extends BaseHandlerT,
-  in out HandlerDataCollectionRecord extends
-    BaseHandlerDataCollectionRecord<HandlerT>,
+  in out HandlerDataCollectionRecord extends BaseHandlerDataCollectionRecord<HandlerT>,
 > {
   [HandlerDataCollectionTypeId]: {
     _HandlerT: Types.Invariant<HandlerT>;
@@ -58,24 +46,17 @@ interface Variance<
 const handlerDataCollectionVariance: <
   HandlerT extends BaseHandlerT,
   HandlerDataCollectionRecord extends BaseHandlerDataCollectionRecord<HandlerT>,
->() => Variance<
-  HandlerT,
-  HandlerDataCollectionRecord
->[HandlerDataCollectionTypeId] = () => ({
+>() => Variance<HandlerT, HandlerDataCollectionRecord>[HandlerDataCollectionTypeId] = () => ({
   _HandlerT: Function.identity,
   _HandlerDataCollectionRecord: Function.identity,
 });
 
 export class HandlerDataCollection<
-    HandlerT extends BaseHandlerT,
-    HandlerDataCollectionRecord extends
-      BaseHandlerDataCollectionRecord<HandlerT>,
-  >
+  HandlerT extends BaseHandlerT,
+  HandlerDataCollectionRecord extends BaseHandlerDataCollectionRecord<HandlerT>,
+>
   extends Data.TaggedClass("HandlerDataCollection")<{
-    record: StoredHandlerDataCollectionRecord<
-      HandlerT,
-      HandlerDataCollectionRecord
-    >;
+    record: StoredHandlerDataCollectionRecord<HandlerT, HandlerDataCollectionRecord>;
     dataTypeGetter: (data: HandlerData<HandlerT>) => HandlerType<HandlerT>;
   }>
   implements Variance<HandlerT, HandlerDataCollectionRecord>
@@ -107,9 +88,7 @@ export type InferHandlerDataCollection<
 export const empty = <HandlerT extends BaseHandlerT>(
   dataTypeGetter: (data: HandlerData<HandlerT>) => HandlerType<HandlerT>,
   dataKeyGetters: {
-    [HT in HandlerT as HandlerType<HT>]: (
-      data: HandlerData<HT>,
-    ) => string | symbol;
+    [HT in HandlerT as HandlerType<HT>]: (data: HandlerData<HT>) => string | symbol;
   },
 ) =>
   new HandlerDataCollection<
@@ -171,10 +150,7 @@ export const add = Function.dual<
     data: HData,
   ) => (
     handlerDataCollection: C,
-  ) => HandlerDataCollection<
-    HandlerDataCollectionHandlerT<C>,
-    AddHandlerData<HandlerT, C, HData>
-  >,
+  ) => HandlerDataCollection<HandlerDataCollectionHandlerT<C>, AddHandlerData<HandlerT, C, HData>>,
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const C extends HandlerDataCollection<any, any>,
@@ -183,10 +159,7 @@ export const add = Function.dual<
   >(
     handlerDataCollection: C,
     data: HData,
-  ) => HandlerDataCollection<
-    HandlerDataCollectionHandlerT<C>,
-    AddHandlerData<HandlerT, C, HData>
-  >
+  ) => HandlerDataCollection<HandlerDataCollectionHandlerT<C>, AddHandlerData<HandlerT, C, HData>>
 >(
   2,
   <
@@ -198,10 +171,7 @@ export const add = Function.dual<
     handlerDataCollection: C,
     data: HData,
   ) =>
-    new HandlerDataCollection<
-      HandlerDataCollectionHandlerT<C>,
-      AddHandlerData<HandlerT, C, HData>
-    >(
+    new HandlerDataCollection<HandlerDataCollectionHandlerT<C>, AddHandlerData<HandlerT, C, HData>>(
       Struct.evolve(handlerDataCollection as InferHandlerDataCollection<C>, {
         record: (record) =>
           Record.modify(
@@ -262,10 +232,7 @@ export const addGroup = Function.dual<
     const C extends HandlerDataCollection<any, any>,
   >(
     handlerDataCollection: C,
-  ) => HandlerDataCollection<
-    HandlerDataCollectionHandlerT<C>,
-    AddHandlerDataGroup<C, DataGroup>
-  >,
+  ) => HandlerDataCollection<HandlerDataCollectionHandlerT<C>, AddHandlerDataGroup<C, DataGroup>>,
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const C extends HandlerDataCollection<any, any>,
@@ -275,10 +242,7 @@ export const addGroup = Function.dual<
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     handlerDataCollection: C,
     dataGroup: DataGroup,
-  ) => HandlerDataCollection<
-    HandlerDataCollectionHandlerT<C>,
-    AddHandlerDataGroup<C, DataGroup>
-  >
+  ) => HandlerDataCollection<HandlerDataCollectionHandlerT<C>, AddHandlerDataGroup<C, DataGroup>>
 >(
   2,
   <
@@ -290,24 +254,17 @@ export const addGroup = Function.dual<
     handlerDataCollection: C,
     dataGroup: DataGroup,
   ) =>
-    new HandlerDataCollection<
-      HandlerDataCollectionHandlerT<C>,
-      AddHandlerDataGroup<C, DataGroup>
-    >(
+    new HandlerDataCollection<HandlerDataCollectionHandlerT<C>, AddHandlerDataGroup<C, DataGroup>>(
       Struct.evolve(handlerDataCollection as InferHandlerDataCollection<C>, {
         record: (record) =>
           pipe(
-            Record.values(
-              (dataGroup as InferHandlerDataGroup<DataGroup>).record,
-            ),
+            Record.values((dataGroup as InferHandlerDataGroup<DataGroup>).record),
             Array.head,
             Option.match({
               onSome: (data) =>
                 Record.modify(
                   record,
-                  (
-                    handlerDataCollection as InferHandlerDataCollection<C>
-                  ).dataTypeGetter(data),
+                  (handlerDataCollection as InferHandlerDataCollection<C>).dataTypeGetter(data),
                   (group) => groupAddHandlerDataGroup(group, dataGroup),
                 ),
               onNone: () => record,
@@ -327,9 +284,7 @@ export type AddHandlerDataCollectionCollectionRecord<
   ThisRecord extends BaseHandlerDataCollectionRecord<ThisHandlerT>,
   OtherRecord extends BaseHandlerDataCollectionRecord<OtherHandlerT>,
 > = {
-  [HT in
-    | ThisHandlerT
-    | OtherHandlerT as HandlerType<HT>]: GroupAddHandlerDataGroupRecord<
+  [HT in ThisHandlerT | OtherHandlerT as HandlerType<HT>]: GroupAddHandlerDataGroupRecord<
     HT,
     HandlerType<HT> extends infer T extends keyof ThisRecord
       ? ThisRecord[T] extends infer G extends BaseHandlerDataGroupRecord<HT>
@@ -366,8 +321,7 @@ export const addCollection = Function.dual<
   >(
     thisCollection: ThisC,
   ) => HandlerDataCollection<
-    | HandlerDataCollectionHandlerT<ThisC>
-    | HandlerDataCollectionHandlerT<OtherC>,
+    HandlerDataCollectionHandlerT<ThisC> | HandlerDataCollectionHandlerT<OtherC>,
     AddHandlerDataCollection<ThisC, OtherC>
   >,
   <
@@ -379,8 +333,7 @@ export const addCollection = Function.dual<
     thisCollection: ThisC,
     otherCollection: OtherC,
   ) => HandlerDataCollection<
-    | HandlerDataCollectionHandlerT<ThisC>
-    | HandlerDataCollectionHandlerT<OtherC>,
+    HandlerDataCollectionHandlerT<ThisC> | HandlerDataCollectionHandlerT<OtherC>,
     AddHandlerDataCollection<ThisC, OtherC>
   >
 >(
@@ -395,8 +348,7 @@ export const addCollection = Function.dual<
     otherCollection: OtherC,
   ) =>
     new HandlerDataCollection<
-      | HandlerDataCollectionHandlerT<ThisC>
-      | HandlerDataCollectionHandlerT<OtherC>,
+      HandlerDataCollectionHandlerT<ThisC> | HandlerDataCollectionHandlerT<OtherC>,
       AddHandlerDataCollection<ThisC, OtherC>
     >(
       Struct.evolve(thisCollection as InferHandlerDataCollection<ThisC>, {
@@ -406,8 +358,7 @@ export const addCollection = Function.dual<
             (otherCollection as InferHandlerDataCollection<OtherC>).record,
             groupAddHandlerDataGroup,
           ) as unknown as StoredHandlerDataCollectionRecord<
-            | HandlerDataCollectionHandlerT<ThisC>
-            | HandlerDataCollectionHandlerT<OtherC>,
+            HandlerDataCollectionHandlerT<ThisC> | HandlerDataCollectionHandlerT<OtherC>,
             AddHandlerDataCollection<ThisC, OtherC>
           >,
       }),
@@ -417,8 +368,7 @@ export const addCollection = Function.dual<
 export type HandlerTOfType<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   C extends HandlerDataCollection<any, any>,
-  Type extends keyof HandlerDataCollectionHandlerDataCollectionRecord<C> &
-    (string | symbol),
+  Type extends keyof HandlerDataCollectionHandlerDataCollectionRecord<C> & (string | symbol),
 > =
   HandlerDataCollectionHandlerT<C> extends infer HT extends BaseHandlerT
     ? HandlerType<HT> extends Type

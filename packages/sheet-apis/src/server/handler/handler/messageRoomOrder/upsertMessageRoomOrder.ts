@@ -32,9 +32,7 @@ export const upsertMessageRoomOrderHandler = pipe(
           }),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(
-          upsertMessageRoomOrderHandlerConfig,
-        ),
+        Handler.Config.encodeResponseEffect(upsertMessageRoomOrderHandlerConfig),
         Effect.withSpan("upsertMessageRoomOrderHandler", {
           captureStackTrace: true,
         }),

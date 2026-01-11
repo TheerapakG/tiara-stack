@@ -8,25 +8,16 @@ type TaggedClass = Schema.Schema.Any & {
 type Tag<Tagged extends TaggedClass> = Tagged["_tag"];
 type Fields<Tagged extends TaggedClass> = Tagged["fields"];
 
-type DefaultTaggedClassType<Tagged extends TaggedClass> =
-  Schema.Schema.Type<Tagged>;
-type DefaultTaggedClassEncoded<Tagged extends TaggedClass> =
-  Schema.Struct.Encoded<Omit<Fields<Tagged>, "_tag">> &
-    Schema.Struct.Encoded<{
-      _tag: Schema.PropertySignature<
-        ":",
-        Tag<Tagged>,
-        never,
-        "?:",
-        Tag<Tagged>,
-        false,
-        never
-      >;
-    }> extends infer B
-    ? B
-    : never;
-type DefaultTaggedClassContext<Tagged extends TaggedClass> =
-  Schema.Schema.Context<Tagged>;
+type DefaultTaggedClassType<Tagged extends TaggedClass> = Schema.Schema.Type<Tagged>;
+type DefaultTaggedClassEncoded<Tagged extends TaggedClass> = Schema.Struct.Encoded<
+  Omit<Fields<Tagged>, "_tag">
+> &
+  Schema.Struct.Encoded<{
+    _tag: Schema.PropertySignature<":", Tag<Tagged>, never, "?:", Tag<Tagged>, false, never>;
+  }> extends infer B
+  ? B
+  : never;
+type DefaultTaggedClassContext<Tagged extends TaggedClass> = Schema.Schema.Context<Tagged>;
 type DefaultTaggedClass<Tagged extends TaggedClass> = Schema.Schema<
   DefaultTaggedClassType<Tagged>,
   DefaultTaggedClassEncoded<Tagged>,

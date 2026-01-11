@@ -1,13 +1,4 @@
-import {
-  Data,
-  Function,
-  Record,
-  Struct,
-  Types,
-  Option,
-  pipe,
-  Array,
-} from "effect";
+import { Data, Function, Record, Struct, Types, Option, pipe, Array } from "effect";
 import {
   HandlerContextGroup,
   empty as emptyHandlerContextGroup,
@@ -15,11 +6,7 @@ import {
   addGroup as addGroupHandlerContextGroup,
   getHandlerContext as getGroupHandlerContext,
 } from "./group";
-import {
-  type DataOrUndefined,
-  type HandlerContext,
-  type HandlerOrUndefined,
-} from "./context";
+import { type DataOrUndefined, type HandlerContext, type HandlerOrUndefined } from "./context";
 import {
   type BaseHandlerT,
   type HandlerData,
@@ -43,11 +30,8 @@ type HandlerContextTypeTransformer<HandlerT extends BaseHandlerT> = (
     : never,
 ) => HandlerType<HandlerT>;
 
-const HandlerContextCollectionTypeId = Symbol(
-  "Typhoon/Handler/HandlerContextCollectionTypeId",
-);
-export type HandlerContextCollectionTypeId =
-  typeof HandlerContextCollectionTypeId;
+const HandlerContextCollectionTypeId = Symbol("Typhoon/Handler/HandlerContextCollectionTypeId");
+export type HandlerContextCollectionTypeId = typeof HandlerContextCollectionTypeId;
 
 interface Variance<
   in out HandlerT extends BaseHandlerT,
@@ -72,29 +56,23 @@ const handlerContextCollectionVariance: <
 });
 
 export class HandlerContextCollection<
-    HandlerT extends BaseHandlerT,
-    R,
-    HData extends BaseHandlerDataCollectionRecord<HandlerT>,
-  >
+  HandlerT extends BaseHandlerT,
+  R,
+  HData extends BaseHandlerDataCollectionRecord<HandlerT>,
+>
   extends Data.TaggedClass("HandlerContextCollection")<{
     record: HandlerContextGroupRecord<HandlerT, R>;
     handlerContextTypeTransformer: HandlerContextTypeTransformer<HandlerT>;
   }>
   implements Variance<HandlerT, R, HData>
 {
-  [HandlerContextCollectionTypeId] = handlerContextCollectionVariance<
-    HandlerT,
-    R,
-    HData
-  >();
+  [HandlerContextCollectionTypeId] = handlerContextCollectionVariance<HandlerT, R, HData>();
 }
 
 export type HandlerContextCollectionHandlerT<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   C extends HandlerContextCollection<any, any, any>,
-> = [C] extends [HandlerContextCollection<infer HandlerT, any, any>]
-  ? HandlerT
-  : never;
+> = [C] extends [HandlerContextCollection<infer HandlerT, any, any>] ? HandlerT : never;
 export type HandlerContextCollectionContext<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   C extends HandlerContextCollection<any, any, any>,
@@ -102,9 +80,7 @@ export type HandlerContextCollectionContext<
 export type HandlerContextCollectionHData<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   C extends HandlerContextCollection<any, any, any>,
-> = [C] extends [HandlerContextCollection<any, any, infer HData>]
-  ? HData
-  : never;
+> = [C] extends [HandlerContextCollection<any, any, infer HData>] ? HData : never;
 
 export type InferHandlerContextCollection<
   //eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -156,8 +132,7 @@ export const add = Function.dual<
     handlerContextCollection: C,
   ) => HandlerContextCollection<
     HandlerContextCollectionHandlerT<C>,
-    | HandlerContextCollectionContext<C>
-    | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>,
+    HandlerContextCollectionContext<C> | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>,
     AddHandlerDataCollectionRecord<
       HandlerContextCollectionHandlerT<C>,
       HandlerT,
@@ -175,8 +150,7 @@ export const add = Function.dual<
     handlerContextConfig: Config,
   ) => HandlerContextCollection<
     HandlerContextCollectionHandlerT<C>,
-    | HandlerContextCollectionContext<C>
-    | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>,
+    HandlerContextCollectionContext<C> | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>,
     AddHandlerDataCollectionRecord<
       HandlerContextCollectionHandlerT<C>,
       HandlerT,
@@ -206,27 +180,22 @@ export const add = Function.dual<
         DataOrUndefined<Config>
       >
     >(
-      Struct.evolve(
-        handlerContextCollection as InferHandlerContextCollection<C>,
-        {
-          record: (record) =>
-            Record.modify(
-              record,
-              handlerContextCollection.handlerContextTypeTransformer(
+      Struct.evolve(handlerContextCollection as InferHandlerContextCollection<C>, {
+        record: (record) =>
+          Record.modify(
+            record,
+            handlerContextCollection.handlerContextTypeTransformer(handlerContextConfig),
+            (group) =>
+              addHandlerContextGroup(
+                group as unknown as HandlerContextGroup<HandlerT, any, any>,
                 handlerContextConfig,
               ),
-              (group) =>
-                addHandlerContextGroup(
-                  group as unknown as HandlerContextGroup<HandlerT, any, any>,
-                  handlerContextConfig,
-                ),
-            ) as unknown as HandlerContextGroupRecord<
-              HandlerContextCollectionHandlerT<C>,
-              | HandlerContextCollectionContext<C>
-              | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>
-            >,
-        },
-      ),
+          ) as unknown as HandlerContextGroupRecord<
+            HandlerContextCollectionHandlerT<C>,
+            | HandlerContextCollectionContext<C>
+            | HandlerEffectContext<HandlerT, HandlerOrUndefined<Config>>
+          >,
+      }),
     ),
 );
 
@@ -242,10 +211,8 @@ export const addCollection = Function.dual<
   >(
     thisCollection: ThisC,
   ) => HandlerContextCollection<
-    | HandlerContextCollectionHandlerT<ThisC>
-    | HandlerContextCollectionHandlerT<OtherC>,
-    | HandlerContextCollectionContext<ThisC>
-    | HandlerContextCollectionContext<OtherC>,
+    HandlerContextCollectionHandlerT<ThisC> | HandlerContextCollectionHandlerT<OtherC>,
+    HandlerContextCollectionContext<ThisC> | HandlerContextCollectionContext<OtherC>,
     AddHandlerDataCollectionCollectionRecord<
       HandlerContextCollectionHandlerT<ThisC>,
       HandlerContextCollectionHandlerT<OtherC>,
@@ -262,10 +229,8 @@ export const addCollection = Function.dual<
     thisCollection: ThisC,
     otherCollection: OtherC,
   ) => HandlerContextCollection<
-    | HandlerContextCollectionHandlerT<ThisC>
-    | HandlerContextCollectionHandlerT<OtherC>,
-    | HandlerContextCollectionContext<ThisC>
-    | HandlerContextCollectionContext<OtherC>,
+    HandlerContextCollectionHandlerT<ThisC> | HandlerContextCollectionHandlerT<OtherC>,
+    HandlerContextCollectionContext<ThisC> | HandlerContextCollectionContext<OtherC>,
     AddHandlerDataCollectionCollectionRecord<
       HandlerContextCollectionHandlerT<ThisC>,
       HandlerContextCollectionHandlerT<OtherC>,
@@ -285,10 +250,8 @@ export const addCollection = Function.dual<
     otherCollection: OtherC,
   ) =>
     new HandlerContextCollection<
-      | HandlerContextCollectionHandlerT<ThisC>
-      | HandlerContextCollectionHandlerT<OtherC>,
-      | HandlerContextCollectionContext<ThisC>
-      | HandlerContextCollectionContext<OtherC>,
+      HandlerContextCollectionHandlerT<ThisC> | HandlerContextCollectionHandlerT<OtherC>,
+      HandlerContextCollectionContext<ThisC> | HandlerContextCollectionContext<OtherC>,
       AddHandlerDataCollectionCollectionRecord<
         HandlerContextCollectionHandlerT<ThisC>,
         HandlerContextCollectionHandlerT<OtherC>,
@@ -303,10 +266,8 @@ export const addCollection = Function.dual<
             (otherCollection as InferHandlerContextCollection<OtherC>).record,
             addGroupHandlerContextGroup,
           ) as HandlerContextGroupRecord<
-            | HandlerContextCollectionHandlerT<ThisC>
-            | HandlerContextCollectionHandlerT<OtherC>,
-            | HandlerContextCollectionContext<ThisC>
-            | HandlerContextCollectionContext<OtherC>
+            HandlerContextCollectionHandlerT<ThisC> | HandlerContextCollectionHandlerT<OtherC>,
+            HandlerContextCollectionContext<ThisC> | HandlerContextCollectionContext<OtherC>
           >,
       }),
     ),
@@ -362,10 +323,7 @@ export const getHandlerContext = Function.dual<
     >
   > =>
     pipe(
-      Record.get(
-        (handlerContextCollection as InferHandlerContextCollection<C>).record,
-        type,
-      ),
+      Record.get((handlerContextCollection as InferHandlerContextCollection<C>).record, type),
       Option.flatMap(getGroupHandlerContext(key)),
     ) as unknown as Option.Option<
       HandlerContext<

@@ -21,16 +21,10 @@ import {
 
 type HandlerContextGroupRecord<HandlerT extends BaseHandlerT, R> = Record<
   HandlerDataKey<HandlerT, HandlerData<HandlerT>>,
-  HandlerContext<
-    HandlerT,
-    HandlerData<HandlerT>,
-    Handler<HandlerT, unknown, unknown, R>
-  >
+  HandlerContext<HandlerT, HandlerData<HandlerT>, Handler<HandlerT, unknown, unknown, R>>
 >;
 
-const HandlerContextGroupTypeId = Symbol(
-  "Typhoon/Handler/HandlerContextGroupTypeId",
-);
+const HandlerContextGroupTypeId = Symbol("Typhoon/Handler/HandlerContextGroupTypeId");
 export type HandlerContextGroupTypeId = typeof HandlerContextGroupTypeId;
 
 interface Variance<
@@ -56,10 +50,10 @@ const handlerContextGroupVariance: <
 });
 
 export class HandlerContextGroup<
-    HandlerT extends BaseHandlerT,
-    R,
-    HData extends BaseHandlerDataGroupRecord<HandlerT>,
-  >
+  HandlerT extends BaseHandlerT,
+  R,
+  HData extends BaseHandlerDataGroupRecord<HandlerT>,
+>
   extends Data.TaggedClass("HandlerContextGroup")<{
     record: HandlerContextGroupRecord<HandlerT, R>;
     dataKeyTransformer: (
@@ -68,19 +62,13 @@ export class HandlerContextGroup<
   }>
   implements Variance<HandlerT, R, HData>
 {
-  [HandlerContextGroupTypeId] = handlerContextGroupVariance<
-    HandlerT,
-    R,
-    HData
-  >();
+  [HandlerContextGroupTypeId] = handlerContextGroupVariance<HandlerT, R, HData>();
 }
 
 export type HandlerContextGroupHandlerT<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   G extends HandlerContextGroup<any, any, any>,
-> = [G] extends [HandlerContextGroup<infer HandlerT, any, any>]
-  ? HandlerT
-  : never;
+> = [G] extends [HandlerContextGroup<infer HandlerT, any, any>] ? HandlerT : never;
 export type HandlerContextGroupContext<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   G extends HandlerContextGroup<any, any, any>,
@@ -124,14 +112,12 @@ export const add = Function.dual<
   ) => HandlerContextGroup<
     PartialHandlerContextHandlerT<Config>,
     | HandlerContextGroupContext<G>
-    | HandlerEffectContext<
-        PartialHandlerContextHandlerT<Config>,
-        HandlerOrUndefined<Config>
-      >,
+    | HandlerEffectContext<PartialHandlerContextHandlerT<Config>, HandlerOrUndefined<Config>>,
     AddHandlerDataGroupRecord<
       PartialHandlerContextHandlerT<Config>,
-      HandlerContextGroupHData<G> extends infer HData extends
-        BaseHandlerDataGroupRecord<PartialHandlerContextHandlerT<Config>>
+      HandlerContextGroupHData<G> extends infer HData extends BaseHandlerDataGroupRecord<
+        PartialHandlerContextHandlerT<Config>
+      >
         ? HData
         : never,
       DataOrUndefined<Config>
@@ -147,14 +133,12 @@ export const add = Function.dual<
   ) => HandlerContextGroup<
     HandlerContextGroupHandlerT<G>,
     | HandlerContextGroupContext<G>
-    | HandlerEffectContext<
-        HandlerContextGroupHandlerT<G>,
-        HandlerOrUndefined<Config>
-      >,
+    | HandlerEffectContext<HandlerContextGroupHandlerT<G>, HandlerOrUndefined<Config>>,
     AddHandlerDataGroupRecord<
       HandlerContextGroupHandlerT<G>,
-      HandlerContextGroupHData<G> extends infer HData extends
-        BaseHandlerDataGroupRecord<PartialHandlerContextHandlerT<Config>>
+      HandlerContextGroupHData<G> extends infer HData extends BaseHandlerDataGroupRecord<
+        PartialHandlerContextHandlerT<Config>
+      >
         ? HData
         : never,
       DataOrUndefined<Config>
@@ -173,14 +157,12 @@ export const add = Function.dual<
     new HandlerContextGroup<
       HandlerContextGroupHandlerT<G>,
       | HandlerContextGroupContext<G>
-      | HandlerEffectContext<
-          HandlerContextGroupHandlerT<G>,
-          HandlerOrUndefined<Config>
-        >,
+      | HandlerEffectContext<HandlerContextGroupHandlerT<G>, HandlerOrUndefined<Config>>,
       AddHandlerDataGroupRecord<
         HandlerContextGroupHandlerT<G>,
-        HandlerContextGroupHData<G> extends infer HData extends
-          BaseHandlerDataGroupRecord<HandlerContextGroupHandlerT<G>>
+        HandlerContextGroupHData<G> extends infer HData extends BaseHandlerDataGroupRecord<
+          HandlerContextGroupHandlerT<G>
+        >
           ? HData
           : never,
         DataOrUndefined<Config>
@@ -205,11 +187,7 @@ export const addGroup = Function.dual<
     otherGroup: OtherG,
   ) => <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ThisG extends HandlerContextGroup<
-      HandlerContextGroupHandlerT<OtherG>,
-      any,
-      any
-    >,
+    const ThisG extends HandlerContextGroup<HandlerContextGroupHandlerT<OtherG>, any, any>,
   >(
     thisGroup: ThisG,
   ) => HandlerContextGroup<
@@ -217,12 +195,14 @@ export const addGroup = Function.dual<
     HandlerContextGroupContext<ThisG> | HandlerContextGroupContext<OtherG>,
     AddHandlerDataGroupGroupRecord<
       HandlerContextGroupHandlerT<ThisG>,
-      HandlerContextGroupHData<ThisG> extends infer HData extends
-        BaseHandlerDataGroupRecord<HandlerContextGroupHandlerT<ThisG>>
+      HandlerContextGroupHData<ThisG> extends infer HData extends BaseHandlerDataGroupRecord<
+        HandlerContextGroupHandlerT<ThisG>
+      >
         ? HData
         : never,
-      HandlerContextGroupHData<OtherG> extends infer HData extends
-        BaseHandlerDataGroupRecord<HandlerContextGroupHandlerT<ThisG>>
+      HandlerContextGroupHData<OtherG> extends infer HData extends BaseHandlerDataGroupRecord<
+        HandlerContextGroupHandlerT<ThisG>
+      >
         ? HData
         : never
     >
@@ -231,11 +211,7 @@ export const addGroup = Function.dual<
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ThisG extends HandlerContextGroup<any, any, any>,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const OtherG extends HandlerContextGroup<
-      HandlerContextGroupHandlerT<ThisG>,
-      any,
-      any
-    >,
+    const OtherG extends HandlerContextGroup<HandlerContextGroupHandlerT<ThisG>, any, any>,
   >(
     thisGroup: ThisG,
     otherGroup: OtherG,
@@ -244,12 +220,14 @@ export const addGroup = Function.dual<
     HandlerContextGroupContext<ThisG> | HandlerContextGroupContext<OtherG>,
     AddHandlerDataGroupGroupRecord<
       HandlerContextGroupHandlerT<ThisG>,
-      HandlerContextGroupHData<ThisG> extends infer HData extends
-        BaseHandlerDataGroupRecord<HandlerContextGroupHandlerT<ThisG>>
+      HandlerContextGroupHData<ThisG> extends infer HData extends BaseHandlerDataGroupRecord<
+        HandlerContextGroupHandlerT<ThisG>
+      >
         ? HData
         : never,
-      HandlerContextGroupHData<OtherG> extends infer HData extends
-        BaseHandlerDataGroupRecord<HandlerContextGroupHandlerT<ThisG>>
+      HandlerContextGroupHData<OtherG> extends infer HData extends BaseHandlerDataGroupRecord<
+        HandlerContextGroupHandlerT<ThisG>
+      >
         ? HData
         : never
     >
@@ -260,11 +238,7 @@ export const addGroup = Function.dual<
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ThisG extends HandlerContextGroup<any, any, any>,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const OtherG extends HandlerContextGroup<
-      HandlerContextGroupHandlerT<ThisG>,
-      any,
-      any
-    >,
+    const OtherG extends HandlerContextGroup<HandlerContextGroupHandlerT<ThisG>, any, any>,
   >(
     thisGroup: ThisG,
     otherGroup: OtherG,
@@ -274,19 +248,20 @@ export const addGroup = Function.dual<
       HandlerContextGroupContext<ThisG> | HandlerContextGroupContext<OtherG>,
       AddHandlerDataGroupGroupRecord<
         HandlerContextGroupHandlerT<ThisG>,
-        HandlerContextGroupHData<ThisG> extends infer HData extends
-          BaseHandlerDataGroupRecord<HandlerContextGroupHandlerT<ThisG>>
+        HandlerContextGroupHData<ThisG> extends infer HData extends BaseHandlerDataGroupRecord<
+          HandlerContextGroupHandlerT<ThisG>
+        >
           ? HData
           : never,
-        HandlerContextGroupHData<OtherG> extends infer HData extends
-          BaseHandlerDataGroupRecord<HandlerContextGroupHandlerT<ThisG>>
+        HandlerContextGroupHData<OtherG> extends infer HData extends BaseHandlerDataGroupRecord<
+          HandlerContextGroupHandlerT<ThisG>
+        >
           ? HData
           : never
       >
     >(
       Struct.evolve(thisGroup as InferHandlerContextGroup<ThisG>, {
-        record: (record) =>
-          Record.union(record, otherGroup.record, (context) => context),
+        record: (record) => Record.union(record, otherGroup.record, (context) => context),
       }),
     ),
 );
@@ -306,12 +281,7 @@ export const getHandlerContext = Function.dual<
     HandlerContext<
       HandlerContextGroupHandlerT<G>,
       HandlerData<HandlerContextGroupHandlerT<G>>,
-      Handler<
-        HandlerContextGroupHandlerT<G>,
-        unknown,
-        unknown,
-        HandlerContextGroupContext<G>
-      >
+      Handler<HandlerContextGroupHandlerT<G>, unknown, unknown, HandlerContextGroupContext<G>>
     >
   >,
   <
@@ -327,12 +297,7 @@ export const getHandlerContext = Function.dual<
     HandlerContext<
       HandlerContextGroupHandlerT<G>,
       HandlerData<HandlerContextGroupHandlerT<G>>,
-      Handler<
-        HandlerContextGroupHandlerT<G>,
-        unknown,
-        unknown,
-        HandlerContextGroupContext<G>
-      >
+      Handler<HandlerContextGroupHandlerT<G>, unknown, unknown, HandlerContextGroupContext<G>>
     >
   >
 >(
@@ -350,16 +315,7 @@ export const getHandlerContext = Function.dual<
     HandlerContext<
       HandlerContextGroupHandlerT<G>,
       HandlerData<HandlerContextGroupHandlerT<G>>,
-      Handler<
-        HandlerContextGroupHandlerT<G>,
-        unknown,
-        unknown,
-        HandlerContextGroupContext<G>
-      >
+      Handler<HandlerContextGroupHandlerT<G>, unknown, unknown, HandlerContextGroupContext<G>>
     >
-  > =>
-    Record.get(
-      (handlerContextGroup as InferHandlerContextGroup<G>).record,
-      key,
-    ),
+  > => Record.get((handlerContextGroup as InferHandlerContextGroup<G>).record, key),
 );

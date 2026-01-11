@@ -2,16 +2,11 @@ import MagicString from "magic-string";
 import { type SourceMapInput, type Plugin } from "rolldown";
 
 export const plugin = (options: { sourcemap?: boolean } = {}): Plugin => {
-  const codeHasReplacements = (
-    code: string,
-    _id: string,
-    magicString: MagicString,
-  ): boolean => {
+  const codeHasReplacements = (code: string, _id: string, magicString: MagicString): boolean => {
     let result = false;
     let match;
 
-    const importPattern =
-      /import { stripHandler } from "typhoon-core\/bundler";/g;
+    const importPattern = /import { stripHandler } from "typhoon-core\/bundler";/g;
 
     // eslint-disable-next-line no-cond-assign
     while ((match = importPattern.exec(code))) {

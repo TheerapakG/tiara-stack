@@ -16,12 +16,8 @@ export const getTeamsHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(getTeamsHandlerConfig),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
+        Effect.bind("parsed", () => Event.request.parsed(getTeamsHandlerConfig)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -45,10 +41,7 @@ export const getTeamsHandler = pipe(
           pipe(
             layerOfGuildId,
             Effect.flatMap((layerOfGuildId) =>
-              pipe(
-                Sheet.SheetService.getTeams(),
-                Result.provideEitherLayer(layerOfGuildId),
-              ),
+              pipe(Sheet.SheetService.getTeams(), Result.provideEitherLayer(layerOfGuildId)),
             ),
           ),
         ),

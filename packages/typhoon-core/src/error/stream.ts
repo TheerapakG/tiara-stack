@@ -10,10 +10,7 @@ const StreamExhaustedErrorTaggedError: Schema.TaggedErrorClass<
   {
     readonly _tag: Schema.tag<"StreamExhaustedError">;
   } & (typeof StreamExhaustedErrorData)["fields"]
-> = Schema.TaggedError<StreamExhaustedError>()(
-  "StreamExhaustedError",
-  StreamExhaustedErrorData,
-);
+> = Schema.TaggedError<StreamExhaustedError>()("StreamExhaustedError", StreamExhaustedErrorData);
 export class StreamExhaustedError extends StreamExhaustedErrorTaggedError {}
 
 export const makeStreamExhaustedError = (message: string, cause?: unknown) =>

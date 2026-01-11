@@ -56,9 +56,7 @@ const layer = pipe(
     MessageSlotService.DefaultWithoutDependencies,
     SheetConfigService.DefaultWithoutDependencies,
   ),
-  Layer.provideMerge(
-    Layer.mergeAll(DBService.DefaultWithoutDependencies, ZeroServiceLayer),
-  ),
+  Layer.provideMerge(Layer.mergeAll(DBService.DefaultWithoutDependencies, ZeroServiceLayer)),
   Layer.provideMerge(
     Layer.mergeAll(
       DB.DBSubscriptionContext.Default,

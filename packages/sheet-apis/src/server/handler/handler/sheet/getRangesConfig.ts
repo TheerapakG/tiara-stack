@@ -16,12 +16,8 @@ export const getRangesConfigHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(getRangesConfigHandlerConfig),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
+        Effect.bind("parsed", () => Event.request.parsed(getRangesConfigHandlerConfig)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -45,17 +41,12 @@ export const getRangesConfigHandler = pipe(
           pipe(
             layerOfGuildId,
             Effect.flatMap((layerOfGuildId) =>
-              pipe(
-                Sheet.SheetService.getRangesConfig(),
-                Result.provideEitherLayer(layerOfGuildId),
-              ),
+              pipe(Sheet.SheetService.getRangesConfig(), Result.provideEitherLayer(layerOfGuildId)),
             ),
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(
-          Handler.Config.encodeResponseEffect(getRangesConfigHandlerConfig),
-        ),
+        Effect.map(Handler.Config.encodeResponseEffect(getRangesConfigHandlerConfig)),
         Effect.map(
           Effect.withSpan("getRangesConfigHandler", {
             captureStackTrace: true,

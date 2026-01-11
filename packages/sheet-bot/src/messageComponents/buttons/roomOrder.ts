@@ -24,16 +24,7 @@ import {
   time,
   TimestampStyles,
 } from "discord.js";
-import {
-  Array,
-  Effect,
-  Function,
-  HashSet,
-  Layer,
-  Number,
-  Option,
-  pipe,
-} from "effect";
+import { Array, Effect, Function, HashSet, Layer, Number, Option, pipe } from "effect";
 import { Schema } from "sheet-apis";
 import { UntilObserver } from "typhoon-core/signal";
 
@@ -64,10 +55,7 @@ const roomOrderSendButtonData = {
   style: ButtonStyle.Primary,
 } as const satisfies InteractionButtonComponentData;
 
-export const roomOrderActionRow = (
-  range: { minRank: number; maxRank: number },
-  rank: number,
-) =>
+export const roomOrderActionRow = (range: { minRank: number; maxRank: number }, rank: number) =>
   new ActionRowBuilder<MessageActionRowComponentBuilder>()
     .addComponents(
       new ButtonBuilder(roomOrderPreviousButtonData).setDisabled(
@@ -81,9 +69,7 @@ export const roomOrderActionRow = (
     )
     .addComponents(new ButtonBuilder(roomOrderSendButtonData));
 
-export const roomOrderInteractionGetReply = (
-  messageRoomOrder: Schema.MessageRoomOrder,
-) =>
+export const roomOrderInteractionGetReply = (messageRoomOrder: Schema.MessageRoomOrder) =>
   pipe(
     Effect.Do,
     CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
@@ -96,10 +82,7 @@ export const roomOrderInteractionGetReply = (
     ),
     Effect.bind("messageRoomOrderEntry", ({ message }) =>
       pipe(
-        MessageRoomOrderService.getMessageRoomOrderEntry(
-          message.id,
-          messageRoomOrder.rank,
-        ),
+        MessageRoomOrderService.getMessageRoomOrderEntry(message.id, messageRoomOrder.rank),
         UntilObserver.observeUntilRpcResultResolved(),
         Effect.flatten,
       ),
@@ -111,11 +94,7 @@ export const roomOrderInteractionGetReply = (
       ),
     ),
     Effect.map(
-      ({
-        messageRoomOrderEntry,
-        messageRoomOrderRange,
-        formattedHourWindow: { start, end },
-      }) => ({
+      ({ messageRoomOrderEntry, messageRoomOrderRange, formattedHourWindow: { start, end } }) => ({
         content: [
           `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.ShortDateTime)} - ${time(end, TimestampStyles.ShortDateTime)}`,
           ...pipe(
@@ -136,16 +115,11 @@ export const roomOrderInteractionGetReply = (
                     [
                       Option.some(formatEffectValue(effectValue)),
                       tags.includes("enc") ? Option.some("enc") : Option.none(),
-                      tags.includes("doormat")
-                        ? Option.some("doormat")
-                        : Option.none(),
+                      tags.includes("doormat") ? Option.some("doormat") : Option.none(),
                     ],
                     Array.getSomes,
                   );
-              const effectStr =
-                effectParts.length > 0
-                  ? ` (${Array.join(effectParts, ", ")})`
-                  : "";
+              const effectStr = effectParts.length > 0 ? ` (${Array.join(effectParts, ", ")})` : "";
               return `${inlineCode(`P${position + 1}:`)}  ${team}${effectStr}`;
             }),
           ),
@@ -163,9 +137,7 @@ export const roomOrderInteractionGetReply = (
             Array.join(", "),
           )}`,
         ].join("\n"),
-        components: [
-          roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank),
-        ],
+        components: [roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank)],
       }),
     ),
     Effect.withSpan("roomOrderInteractionGetReply", {
@@ -173,111 +145,95 @@ export const roomOrderInteractionGetReply = (
     }),
   );
 
-export const roomOrderPreviousButton =
-  handlerVariantContextBuilder<ButtonHandlerVariantT>()
-    .data(roomOrderPreviousButtonData)
-    .handler(
-      Effect.provide(guildServicesFromInteraction())(
-        pipe(
-          Effect.Do,
-          InteractionContext.deferUpdate.tap(),
-          CachedInteractionContext.message<ButtonInteractionT>().bind(
-            "message",
-          ),
-          bindObject({
-            eventConfig: SheetService.eventConfig(),
-          }),
-          Effect.bind("messageRoomOrder", ({ message }) =>
-            MessageRoomOrderService.decrementMessageRoomOrderRank(message.id),
-          ),
-          Effect.bind("messageRoomOrderReply", ({ messageRoomOrder }) =>
-            roomOrderInteractionGetReply(messageRoomOrder),
-          ),
-          InteractionContext.editReply.tap(
-            ({ messageRoomOrderReply }) => messageRoomOrderReply,
-          ),
-          Effect.asVoid,
-          Effect.withSpan("handleRoomOrderPreviousButton", {
-            captureStackTrace: true,
-          }),
+export const roomOrderPreviousButton = handlerVariantContextBuilder<ButtonHandlerVariantT>()
+  .data(roomOrderPreviousButtonData)
+  .handler(
+    Effect.provide(guildServicesFromInteraction())(
+      pipe(
+        Effect.Do,
+        InteractionContext.deferUpdate.tap(),
+        CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
+        bindObject({
+          eventConfig: SheetService.eventConfig(),
+        }),
+        Effect.bind("messageRoomOrder", ({ message }) =>
+          MessageRoomOrderService.decrementMessageRoomOrderRank(message.id),
         ),
+        Effect.bind("messageRoomOrderReply", ({ messageRoomOrder }) =>
+          roomOrderInteractionGetReply(messageRoomOrder),
+        ),
+        InteractionContext.editReply.tap(({ messageRoomOrderReply }) => messageRoomOrderReply),
+        Effect.asVoid,
+        Effect.withSpan("handleRoomOrderPreviousButton", {
+          captureStackTrace: true,
+        }),
       ),
-    )
-    .build();
+    ),
+  )
+  .build();
 
-export const roomOrderNextButton =
-  handlerVariantContextBuilder<ButtonHandlerVariantT>()
-    .data(roomOrderNextButtonData)
-    .handler(
-      Effect.provide(guildServicesFromInteraction())(
-        pipe(
-          Effect.Do,
-          InteractionContext.deferUpdate.tap(),
-          CachedInteractionContext.message<ButtonInteractionT>().bind(
-            "message",
-          ),
-          bindObject({
-            eventConfig: SheetService.eventConfig(),
-          }),
-          Effect.bind("messageRoomOrder", ({ message }) =>
-            MessageRoomOrderService.incrementMessageRoomOrderRank(message.id),
-          ),
-          Effect.bind("messageRoomOrderReply", ({ messageRoomOrder }) =>
-            roomOrderInteractionGetReply(messageRoomOrder),
-          ),
-          InteractionContext.editReply.tap(
-            ({ messageRoomOrderReply }) => messageRoomOrderReply,
-          ),
-          Effect.asVoid,
-          Effect.withSpan("handleRoomOrderNextButton", {
-            captureStackTrace: true,
-          }),
+export const roomOrderNextButton = handlerVariantContextBuilder<ButtonHandlerVariantT>()
+  .data(roomOrderNextButtonData)
+  .handler(
+    Effect.provide(guildServicesFromInteraction())(
+      pipe(
+        Effect.Do,
+        InteractionContext.deferUpdate.tap(),
+        CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
+        bindObject({
+          eventConfig: SheetService.eventConfig(),
+        }),
+        Effect.bind("messageRoomOrder", ({ message }) =>
+          MessageRoomOrderService.incrementMessageRoomOrderRank(message.id),
         ),
+        Effect.bind("messageRoomOrderReply", ({ messageRoomOrder }) =>
+          roomOrderInteractionGetReply(messageRoomOrder),
+        ),
+        InteractionContext.editReply.tap(({ messageRoomOrderReply }) => messageRoomOrderReply),
+        Effect.asVoid,
+        Effect.withSpan("handleRoomOrderNextButton", {
+          captureStackTrace: true,
+        }),
       ),
-    )
-    .build();
+    ),
+  )
+  .build();
 
-export const roomOrderSendButton =
-  handlerVariantContextBuilder<ButtonHandlerVariantT>()
-    .data(roomOrderSendButtonData)
-    .handler(
-      Effect.provide(
-        Layer.mergeAll(
-          guildServicesFromInteraction(),
-          channelServicesFromInteraction(),
+export const roomOrderSendButton = handlerVariantContextBuilder<ButtonHandlerVariantT>()
+  .data(roomOrderSendButtonData)
+  .handler(
+    Effect.provide(
+      Layer.mergeAll(guildServicesFromInteraction(), channelServicesFromInteraction()),
+    )(
+      pipe(
+        Effect.Do,
+        InteractionContext.deferUpdate.tap(),
+        CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
+        bindObject({
+          eventConfig: SheetService.eventConfig(),
+        }),
+        Effect.bind("messageRoomOrder", ({ message }) =>
+          pipe(
+            MessageRoomOrderService.getMessageRoomOrder(message.id),
+            UntilObserver.observeUntilRpcResultResolved(),
+            Effect.flatMap(Function.identity),
+          ),
         ),
-      )(
-        pipe(
-          Effect.Do,
-          InteractionContext.deferUpdate.tap(),
-          CachedInteractionContext.message<ButtonInteractionT>().bind(
-            "message",
-          ),
-          bindObject({
-            eventConfig: SheetService.eventConfig(),
-          }),
-          Effect.bind("messageRoomOrder", ({ message }) =>
-            pipe(
-              MessageRoomOrderService.getMessageRoomOrder(message.id),
-              UntilObserver.observeUntilRpcResultResolved(),
-              Effect.flatMap(Function.identity),
-            ),
-          ),
-          Effect.bind("messageRoomOrderReply", ({ messageRoomOrder }) =>
-            roomOrderInteractionGetReply(messageRoomOrder),
-          ),
-          SendableChannelContext.send().tap(({ messageRoomOrderReply }) => ({
-            content: messageRoomOrderReply.content,
-          })),
-          InteractionContext.editReply.tap(() => ({
-            content: "sent room order!",
-            components: [],
-          })),
-          Effect.asVoid,
-          Effect.withSpan("handleRoomOrderSendButton", {
-            captureStackTrace: true,
-          }),
+        Effect.bind("messageRoomOrderReply", ({ messageRoomOrder }) =>
+          roomOrderInteractionGetReply(messageRoomOrder),
         ),
+        SendableChannelContext.send().tap(({ messageRoomOrderReply }) => ({
+          content: messageRoomOrderReply.content,
+        })),
+        InteractionContext.editReply.tap(() => ({
+          content: "sent room order!",
+          components: [],
+        })),
+        Effect.asVoid,
+        Effect.withSpan("handleRoomOrderSendButton", {
+          captureStackTrace: true,
+        }),
       ),
-    )
-    .build();
+    ),
+  )
+  .build();

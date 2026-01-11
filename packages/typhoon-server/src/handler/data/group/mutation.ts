@@ -9,13 +9,10 @@ export type MutationHandlerDataGroup<
   HandlerDataGroupRecord extends BaseMutationHandlerDataGroupRecord = any,
 > = Data.Group.HandlerDataGroup<MutationHandlerT, HandlerDataGroupRecord>;
 
-export const empty = () =>
-  Data.Group.empty<MutationHandlerT>((data) => data.data.name.value);
+export const empty = () => Data.Group.empty<MutationHandlerT>((data) => data.data.name.value);
 
 export const add =
-  <const HData extends Type.HandlerData<MutationHandlerT>>(
-    handlerData: HData,
-  ) =>
+  <const HData extends Type.HandlerData<MutationHandlerT>>(handlerData: HData) =>
   <const G extends MutationHandlerDataGroup>(handlerDataGroup: G) =>
     pipe(handlerDataGroup, Data.Group.add<G, HData>(handlerData));
 
@@ -39,8 +36,7 @@ export type GetHandlerData<
   G extends MutationHandlerDataGroup,
   Key extends keyof GetHandlerDataGroupRecord<G> & string,
 > =
-  Data.Group.GetHandlerData<G, Key> extends infer HData extends
-    Type.HandlerData<MutationHandlerT>
+  Data.Group.GetHandlerData<G, Key> extends infer HData extends Type.HandlerData<MutationHandlerT>
     ? HData
     : never;
 
@@ -52,7 +48,6 @@ export const getHandlerData =
     key: Key,
   ) =>
   (handlerDataGroup: G) =>
-    pipe(
-      handlerDataGroup,
-      Data.Group.getHandlerData<G, Key>(key),
-    ) as Option.Option<GetHandlerData<G, Key>>;
+    pipe(handlerDataGroup, Data.Group.getHandlerData<G, Key>(key)) as Option.Option<
+      GetHandlerData<G, Key>
+    >;

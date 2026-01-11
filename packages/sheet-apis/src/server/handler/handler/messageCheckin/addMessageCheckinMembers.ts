@@ -28,9 +28,7 @@ export const addMessageCheckinMembersHandler = pipe(
           MessageCheckinService.addMessageCheckinMembers(messageId, memberIds),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(
-          addMessageCheckinMembersHandlerConfig,
-        ),
+        Handler.Config.encodeResponseEffect(addMessageCheckinMembersHandlerConfig),
         Effect.withSpan("addMessageCheckinMembersHandler", {
           captureStackTrace: true,
         }),

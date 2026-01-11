@@ -17,27 +17,9 @@ import {
   SlashCommandSubcommandsOnlyBuilder,
   UserSelectMenuComponentData,
 } from "discord.js";
-import {
-  Array,
-  Cause,
-  Data,
-  Effect,
-  HashMap,
-  Metric,
-  Option,
-  pipe,
-  Struct,
-  Scope,
-} from "effect";
-import {
-  InteractionHandler,
-  InteractionHandlerContext,
-  InteractionHandlerMap,
-} from "./handler";
-import {
-  HandlerVariantHandlerContext,
-  HandlerVariantMap,
-} from "./handlerVariant";
+import { Array, Cause, Data, Effect, HashMap, Metric, Option, pipe, Struct, Scope } from "effect";
+import { InteractionHandler, InteractionHandlerContext, InteractionHandlerMap } from "./handler";
+import { HandlerVariantHandlerContext, HandlerVariantMap } from "./handlerVariant";
 import {
   ButtonHandlerVariantT,
   buttonInteractionHandlerMap,
@@ -47,12 +29,7 @@ import {
   userSelectMenuInteractionHandlerMap,
 } from "./variants";
 
-type InteractionHandlerMapWithMetricsObject<
-  Data = unknown,
-  A = never,
-  E = never,
-  R = never,
-> = {
+type InteractionHandlerMapWithMetricsObject<Data = unknown, A = never, E = never, R = never> = {
   map: InteractionHandlerMap<Data, A, E, R>;
   interactionType: string;
   interactionCount: Metric.Metric.Counter<bigint>;
@@ -73,14 +50,11 @@ export class InteractionHandlerMapWithMetrics<
     new InteractionHandlerMapWithMetrics({
       map,
       interactionType,
-      interactionCount: Metric.counter(
-        `typhoon_discord_bot_interaction_total`,
-        {
-          description: `The number of interactions with the bot`,
-          bigint: true,
-          incremental: true,
-        },
-      ),
+      interactionCount: Metric.counter(`typhoon_discord_bot_interaction_total`, {
+        description: `The number of interactions with the bot`,
+        bigint: true,
+        incremental: true,
+      }),
     });
 
   static add =
@@ -115,9 +89,7 @@ export class InteractionHandlerMapWithMetrics<
       pipe(
         map.map,
         InteractionHandlerMap.get(interactionKey),
-        Option.map(
-          (context) => context.handler as InteractionHandler<A | void, E, R>,
-        ),
+        Option.map((context) => context.handler as InteractionHandler<A | void, E, R>),
         Option.getOrElse(() => Effect.void as Effect.Effect<A | void, E, R>),
         Effect.scoped,
         Effect.tapBoth({
@@ -179,9 +151,7 @@ export class InteractionHandlerMapWithMetrics<
               Effect.Do,
               InteractionContext.replied.bind("replied"),
               InteractionContext.deferred.bind("deferred"),
-              Effect.let("pretty", () =>
-                Cause.pretty(cause, { renderErrorCause: true }),
-              ),
+              Effect.let("pretty", () => Cause.pretty(cause, { renderErrorCause: true })),
               Effect.tap(({ pretty }) => Effect.logError(pretty)),
               Effect.tap(({ replied, deferred, pretty }) =>
                 pipe(
@@ -208,26 +178,20 @@ export class InteractionHandlerMapWithMetrics<
                   ),
                   // TODO: handle errors
                   Effect.catchAllCause((cause) =>
-                    Effect.logError(
-                      Cause.pretty(cause, { renderErrorCause: true }),
-                    ),
+                    Effect.logError(Cause.pretty(cause, { renderErrorCause: true })),
                   ),
                 ),
               ),
             ),
         }),
         Effect.unsandbox,
-        Effect.withSpan(
-          "InteractionHandlerMapWithMetrics.executeAndReplyError",
-          {
-            captureStackTrace: true,
-          },
-        ),
+        Effect.withSpan("InteractionHandlerMapWithMetrics.executeAndReplyError", {
+          captureStackTrace: true,
+        }),
       );
 
-  static values = <Data, A, E, R>(
-    map: InteractionHandlerMapWithMetrics<Data, A, E, R>,
-  ) => InteractionHandlerMap.values(map.map);
+  static values = <Data, A, E, R>(map: InteractionHandlerMapWithMetrics<Data, A, E, R>) =>
+    InteractionHandlerMap.values(map.map);
 }
 
 export class InteractionHandlerMapWithMetricsGroup<
@@ -279,11 +243,7 @@ export class InteractionHandlerMapWithMetricsGroup<
       new InteractionHandlerMapWithMetricsGroup<
         A | BA,
         E | BE,
-        | Exclude<
-            R,
-            InteractionContext<ChatInputCommandInteractionT> | Scope.Scope
-          >
-        | BR
+        Exclude<R, InteractionContext<ChatInputCommandInteractionT> | Scope.Scope> | BR
       >(
         pipe(
           group,
@@ -296,11 +256,7 @@ export class InteractionHandlerMapWithMetricsGroup<
                     ChatInputHandlerVariantT,
                     A,
                     E,
-                    | Exclude<
-                        R,
-                        | InteractionContext<ChatInputCommandInteractionT>
-                        | Scope.Scope
-                      >
+                    | Exclude<R, InteractionContext<ChatInputCommandInteractionT> | Scope.Scope>
                     | InteractionContext<ChatInputCommandInteractionT>
                   >,
                 ),
@@ -319,11 +275,7 @@ export class InteractionHandlerMapWithMetricsGroup<
       new InteractionHandlerMapWithMetricsGroup<
         A | BA,
         E | BE,
-        | Exclude<
-            R,
-            InteractionContext<ChatInputCommandInteractionT> | Scope.Scope
-          >
-        | BR
+        Exclude<R, InteractionContext<ChatInputCommandInteractionT> | Scope.Scope> | BR
       >(
         pipe(
           group,
@@ -336,11 +288,7 @@ export class InteractionHandlerMapWithMetricsGroup<
                     ChatInputHandlerVariantT,
                     A,
                     E,
-                    | Exclude<
-                        R,
-                        | InteractionContext<ChatInputCommandInteractionT>
-                        | Scope.Scope
-                      >
+                    | Exclude<R, InteractionContext<ChatInputCommandInteractionT> | Scope.Scope>
                     | InteractionContext<ChatInputCommandInteractionT>
                   >,
                 ),
@@ -372,10 +320,7 @@ export class InteractionHandlerMapWithMetricsGroup<
                     ButtonHandlerVariantT,
                     A,
                     E,
-                    | Exclude<
-                        R,
-                        InteractionContext<ButtonInteractionT> | Scope.Scope
-                      >
+                    | Exclude<R, InteractionContext<ButtonInteractionT> | Scope.Scope>
                     | InteractionContext<ButtonInteractionT>
                   >,
                 ),
@@ -407,10 +352,7 @@ export class InteractionHandlerMapWithMetricsGroup<
                     ButtonHandlerVariantT,
                     A,
                     E,
-                    | Exclude<
-                        R,
-                        InteractionContext<ButtonInteractionT> | Scope.Scope
-                      >
+                    | Exclude<R, InteractionContext<ButtonInteractionT> | Scope.Scope>
                     | InteractionContext<ButtonInteractionT>
                   >,
                 ),
@@ -421,12 +363,7 @@ export class InteractionHandlerMapWithMetricsGroup<
   };
 
   static addUserSelectMenu = <A = never, E = never, R = never>(
-    userSelectMenu: HandlerVariantHandlerContext<
-      UserSelectMenuHandlerVariantT,
-      A,
-      E,
-      R
-    >,
+    userSelectMenu: HandlerVariantHandlerContext<UserSelectMenuHandlerVariantT, A, E, R>,
   ) => {
     return <BA = never, BE = never, BR = never>(
       group: InteractionHandlerMapWithMetricsGroup<BA, BE, BR>,
@@ -434,11 +371,7 @@ export class InteractionHandlerMapWithMetricsGroup<
       new InteractionHandlerMapWithMetricsGroup<
         A | BA,
         E | BE,
-        | Exclude<
-            R,
-            InteractionContext<UserSelectMenuInteractionT> | Scope.Scope
-          >
-        | BR
+        Exclude<R, InteractionContext<UserSelectMenuInteractionT> | Scope.Scope> | BR
       >(
         pipe(
           group,
@@ -451,11 +384,7 @@ export class InteractionHandlerMapWithMetricsGroup<
                     UserSelectMenuHandlerVariantT,
                     A,
                     E,
-                    | Exclude<
-                        R,
-                        | InteractionContext<UserSelectMenuInteractionT>
-                        | Scope.Scope
-                      >
+                    | Exclude<R, InteractionContext<UserSelectMenuInteractionT> | Scope.Scope>
                     | InteractionContext<UserSelectMenuInteractionT>
                   >,
                 ),
@@ -465,11 +394,7 @@ export class InteractionHandlerMapWithMetricsGroup<
       );
   };
 
-  static addUserSelectMenuInteractionHandlerMap = <
-    A = never,
-    E = never,
-    R = never,
-  >(
+  static addUserSelectMenuInteractionHandlerMap = <A = never, E = never, R = never>(
     userSelectMenus: HandlerVariantMap<UserSelectMenuHandlerVariantT, A, E, R>,
   ) => {
     return <BA = never, BE = never, BR = never>(
@@ -478,11 +403,7 @@ export class InteractionHandlerMapWithMetricsGroup<
       new InteractionHandlerMapWithMetricsGroup<
         A | BA,
         E | BE,
-        | Exclude<
-            R,
-            InteractionContext<UserSelectMenuInteractionT> | Scope.Scope
-          >
-        | BR
+        Exclude<R, InteractionContext<UserSelectMenuInteractionT> | Scope.Scope> | BR
       >(
         pipe(
           group,
@@ -495,11 +416,7 @@ export class InteractionHandlerMapWithMetricsGroup<
                     UserSelectMenuHandlerVariantT,
                     A,
                     E,
-                    | Exclude<
-                        R,
-                        | InteractionContext<UserSelectMenuInteractionT>
-                        | Scope.Scope
-                      >
+                    | Exclude<R, InteractionContext<UserSelectMenuInteractionT> | Scope.Scope>
                     | InteractionContext<UserSelectMenuInteractionT>
                   >,
                 ),
@@ -509,9 +426,7 @@ export class InteractionHandlerMapWithMetricsGroup<
       );
   };
 
-  static initialize = (
-    map: InteractionHandlerMapWithMetricsGroup<unknown, unknown, unknown>,
-  ) =>
+  static initialize = (map: InteractionHandlerMapWithMetricsGroup<unknown, unknown, unknown>) =>
     pipe(
       ClientService.getGuilds(),
       Effect.map(HashMap.values),
@@ -571,12 +486,9 @@ export class InteractionHandlerMapWithMetricsGroup<
       pipe(
         group.buttonsMap,
         InteractionHandlerMapWithMetrics.executeAndReplyError(interactionKey),
-        Effect.withSpan(
-          "InteractionHandlerMapWithMetricsGroup.buttonsExecuteAndReplyError",
-          {
-            captureStackTrace: true,
-          },
-        ),
+        Effect.withSpan("InteractionHandlerMapWithMetricsGroup.buttonsExecuteAndReplyError", {
+          captureStackTrace: true,
+        }),
       );
 
   static userSelectMenuExecuteAndReplyError =

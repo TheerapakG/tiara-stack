@@ -36,10 +36,7 @@ await Effect.runPromise(
       Effect.try(() =>
         rest.put(
           env.discordGuildId
-            ? Routes.applicationGuildCommands(
-                env.discordClientId,
-                env.discordGuildId,
-              )
+            ? Routes.applicationGuildCommands(env.discordClientId, env.discordGuildId)
             : Routes.applicationCommands(env.discordClientId),
           {
             body: commands,

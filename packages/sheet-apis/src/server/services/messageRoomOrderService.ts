@@ -10,11 +10,7 @@ import { Array, DateTime, Effect, Either, Option, pipe, Schema } from "effect";
 import { messageRoomOrder, messageRoomOrderEntry } from "sheet-db-schema";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass, Result } from "typhoon-core/schema";
-import {
-  ExternalComputed,
-  SignalContext,
-  ZeroQueryExternalSource,
-} from "typhoon-core/signal";
+import { ExternalComputed, SignalContext, ZeroQueryExternalSource } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
 import { ZeroServiceTag } from "@/db/zeroService";
 
@@ -29,9 +25,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
       Effect.bind("db", () => DBService),
       Effect.bind("dbSubscriptionContext", () => DB.DBSubscriptionContext),
       Effect.map(({ db, dbSubscriptionContext }) => ({
-        _getMessageRoomOrder: <E = never>(
-          messageId: SignalContext.MaybeSignalEffect<string, E>,
-        ) =>
+        _getMessageRoomOrder: <E = never>(messageId: SignalContext.MaybeSignalEffect<string, E>) =>
           pipe(
             ZeroServiceTag,
             Effect.flatMap((zero) =>
@@ -93,16 +87,11 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ),
             Effect.map(Array.head),
             Effect.flatMap(
-              Schema.decode(
-                Schema.OptionFromSelf(DefaultTaggedClass(MessageRoomOrder)),
-              ),
+              Schema.decode(Schema.OptionFromSelf(DefaultTaggedClass(MessageRoomOrder))),
             ),
-            Effect.withSpan(
-              "MessageRoomOrderService.decrementMessageRoomOrderRank",
-              {
-                captureStackTrace: true,
-              },
-            ),
+            Effect.withSpan("MessageRoomOrderService.decrementMessageRoomOrderRank", {
+              captureStackTrace: true,
+            }),
           ),
         incrementMessageRoomOrderRank: (messageId: string) =>
           pipe(
@@ -120,16 +109,11 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ),
             Effect.map(Array.head),
             Effect.flatMap(
-              Schema.decode(
-                Schema.OptionFromSelf(DefaultTaggedClass(MessageRoomOrder)),
-              ),
+              Schema.decode(Schema.OptionFromSelf(DefaultTaggedClass(MessageRoomOrder))),
             ),
-            Effect.withSpan(
-              "MessageRoomOrderService.incrementMessageRoomOrderRank",
-              {
-                captureStackTrace: true,
-              },
-            ),
+            Effect.withSpan("MessageRoomOrderService.incrementMessageRoomOrderRank", {
+              captureStackTrace: true,
+            }),
           ),
         upsertMessageRoomOrder: (
           messageId: string,
@@ -159,10 +143,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             Effect.flatMap(
               Array.match({
                 onNonEmpty: Effect.succeed,
-                onEmpty: () =>
-                  Effect.die(
-                    makeDBQueryError("Failed to upsert message room order"),
-                  ),
+                onEmpty: () => Effect.die(makeDBQueryError("Failed to upsert message room order")),
               }),
             ),
             Effect.map(Array.headNonEmpty),
@@ -172,10 +153,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             }),
           ),
         _getMessageRoomOrderEntry: <E = never>(
-          params: SignalContext.MaybeSignalEffect<
-            { messageId: string; rank: number },
-            E
-          >,
+          params: SignalContext.MaybeSignalEffect<{ messageId: string; rank: number }, E>,
         ) =>
           pipe(
             ZeroServiceTag,
@@ -200,15 +178,11 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                 Schema.decode(
                   Result.ResultSchema({
                     optimistic: Schema.EitherFromSelf({
-                      right: Schema.Array(
-                        DefaultTaggedClass(MessageRoomOrderEntry),
-                      ),
+                      right: Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)),
                       left: Error.Core.ZeroQueryError,
                     }),
                     complete: Schema.EitherFromSelf({
-                      right: Schema.Array(
-                        DefaultTaggedClass(MessageRoomOrderEntry),
-                      ),
+                      right: Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)),
                       left: Error.Core.ZeroQueryError,
                     }),
                   }),
@@ -216,12 +190,9 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
               ),
             ),
             Effect.map(
-              Effect.withSpan(
-                "MessageRoomOrderService.getMessageRoomOrderEntry",
-                {
-                  captureStackTrace: true,
-                },
-              ),
+              Effect.withSpan("MessageRoomOrderService.getMessageRoomOrderEntry", {
+                captureStackTrace: true,
+              }),
             ),
           ),
         _getMessageRoomOrderRange: <E = never>(
@@ -248,15 +219,11 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                 Schema.decode(
                   Result.ResultSchema({
                     optimistic: Schema.EitherFromSelf({
-                      right: Schema.Array(
-                        DefaultTaggedClass(MessageRoomOrderEntry),
-                      ),
+                      right: Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)),
                       left: Error.Core.ZeroQueryError,
                     }),
                     complete: Schema.EitherFromSelf({
-                      right: Schema.Array(
-                        DefaultTaggedClass(MessageRoomOrderEntry),
-                      ),
+                      right: Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)),
                       left: Error.Core.ZeroQueryError,
                     }),
                   }),
@@ -285,9 +252,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                               }),
                             ),
                           );
-                          return Option.some(
-                            new MessageRoomOrderRange({ minRank, maxRank }),
-                          );
+                          return Option.some(new MessageRoomOrderRange({ minRank, maxRank }));
                         },
                       }),
                     ),
@@ -296,12 +261,9 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
               ),
             ),
             Effect.map(
-              Effect.withSpan(
-                "MessageRoomOrderService.getMessageRoomOrderRange",
-                {
-                  captureStackTrace: true,
-                },
-              ),
+              Effect.withSpan("MessageRoomOrderService.getMessageRoomOrderRange", {
+                captureStackTrace: true,
+              }),
             ),
           ),
         upsertMessageRoomOrderEntry: (
@@ -340,17 +302,10 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                 })
                 .returning(),
             ),
-            Effect.flatMap(
-              Schema.decode(
-                Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)),
-              ),
-            ),
-            Effect.withSpan(
-              "MessageRoomOrderService.upsertMessageRoomOrderEntry",
-              {
-                captureStackTrace: true,
-              },
-            ),
+            Effect.flatMap(Schema.decode(Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)))),
+            Effect.withSpan("MessageRoomOrderService.upsertMessageRoomOrderEntry", {
+              captureStackTrace: true,
+            }),
           ),
         removeMessageRoomOrderEntry: (messageId: string) =>
           pipe(
@@ -369,17 +324,10 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                   .returning(),
               ),
             ),
-            Effect.flatMap(
-              Schema.decode(
-                Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)),
-              ),
-            ),
-            Effect.withSpan(
-              "MessageRoomOrderService.removeMessageRoomOrderEntry",
-              {
-                captureStackTrace: true,
-              },
-            ),
+            Effect.flatMap(Schema.decode(Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)))),
+            Effect.withSpan("MessageRoomOrderService.removeMessageRoomOrderEntry", {
+              captureStackTrace: true,
+            }),
           ),
       })),
     ),
@@ -387,18 +335,13 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
     accessors: true,
   },
 ) {
-  static getMessageRoomOrder = <E = never>(
-    messageId: SignalContext.MaybeSignalEffect<string, E>,
-  ) =>
+  static getMessageRoomOrder = <E = never>(messageId: SignalContext.MaybeSignalEffect<string, E>) =>
     MessageRoomOrderService.use((messageRoomOrderService) =>
       messageRoomOrderService._getMessageRoomOrder(messageId),
     );
 
   static getMessageRoomOrderEntry = <E = never>(
-    params: SignalContext.MaybeSignalEffect<
-      { messageId: string; rank: number },
-      E
-    >,
+    params: SignalContext.MaybeSignalEffect<{ messageId: string; rank: number }, E>,
   ) =>
     MessageRoomOrderService.use((messageRoomOrderService) =>
       messageRoomOrderService._getMessageRoomOrderEntry(params),

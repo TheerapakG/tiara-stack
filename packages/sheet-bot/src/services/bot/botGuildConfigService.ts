@@ -20,12 +20,9 @@ export class BotGuildConfigService extends Effect.Service<BotGuildConfigService>
               {},
             ),
             Effect.map(
-              Effect.withSpan(
-                "BotGuildConfigService.getAutoCheckinGuilds subscription",
-                {
-                  captureStackTrace: true,
-                },
-              ),
+              Effect.withSpan("BotGuildConfigService.getAutoCheckinGuilds subscription", {
+                captureStackTrace: true,
+              }),
             ),
             Effect.withSpan("BotGuildConfigService.getAutoCheckinGuilds", {
               captureStackTrace: true,

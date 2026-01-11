@@ -16,9 +16,7 @@ import { ValidationError } from "~/error";
 export const validateSchema = <Schema extends StandardSchemaV1>(
   schema: Schema,
   options?: Observable.ObservableOptions,
-): ((
-  value: unknown,
-) => Effect.Effect<StandardSchemaV1.InferOutput<Schema>, ValidationError>) =>
+): ((value: unknown) => Effect.Effect<StandardSchemaV1.InferOutput<Schema>, ValidationError>) =>
   validateSchemaWithValidator(
     new Validator({
       [Observable.ObservableSymbol]: options ?? {},
@@ -29,9 +27,7 @@ export const validateSchema = <Schema extends StandardSchemaV1>(
 export const validateSchemaOption = <Schema extends StandardSchemaV1>(
   schema: Schema,
   options?: Observable.ObservableOptions,
-): ((
-  value: unknown,
-) => Effect.Effect<Option.Option<StandardSchemaV1.InferOutput<Schema>>>) =>
+): ((value: unknown) => Effect.Effect<Option.Option<StandardSchemaV1.InferOutput<Schema>>>) =>
   validateSchemaOptionWithValidator(
     new Validator({
       [Observable.ObservableSymbol]: options ?? {},
@@ -41,8 +37,7 @@ export const validateSchemaOption = <Schema extends StandardSchemaV1>(
 
 export const validateSchemaWithDefault = <
   Schema extends StandardSchemaV1,
-  Output extends
-    StandardSchemaV1.InferOutput<Schema> = StandardSchemaV1.InferOutput<Schema>,
+  Output extends StandardSchemaV1.InferOutput<Schema> = StandardSchemaV1.InferOutput<Schema>,
 >(
   schema: Schema,
   defaultValue: Output,
@@ -78,13 +73,9 @@ export const validateOption = <Schema extends StandardSchemaV1 | undefined>(
     }),
   );
 
-export const validateWithDefault = <
-  Schema extends StandardSchemaV1 | undefined,
->(
+export const validateWithDefault = <Schema extends StandardSchemaV1 | undefined>(
   schema: Schema,
-  defaultValue: Schema extends StandardSchemaV1
-    ? StandardSchemaV1.InferOutput<Schema>
-    : unknown,
+  defaultValue: Schema extends StandardSchemaV1 ? StandardSchemaV1.InferOutput<Schema> : unknown,
   options?: Observable.ObservableOptions,
 ): ((value: unknown) => Effect.Effect<Output<Schema>>) =>
   validateWithDefaultWithValidator(

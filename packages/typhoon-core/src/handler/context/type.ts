@@ -4,10 +4,7 @@ export interface WithMetricsExecutorTypeLambda {
   readonly R: unknown;
 }
 
-export type WithMetricsExecutorContextKind<
-  F extends WithMetricsExecutorTypeLambda,
-  R,
-> = F extends {
+export type WithMetricsExecutorContextKind<F extends WithMetricsExecutorTypeLambda, R> = F extends {
   readonly context: unknown;
 }
   ? (F & {
@@ -15,10 +12,7 @@ export type WithMetricsExecutorContextKind<
     })["context"]
   : never;
 
-export type WithMetricsExecutorResultKind<
-  F extends WithMetricsExecutorTypeLambda,
-  R,
-> = F extends {
+export type WithMetricsExecutorResultKind<F extends WithMetricsExecutorTypeLambda, R> = F extends {
   readonly result: Effect.All.EffectAny;
 }
   ? (F & {

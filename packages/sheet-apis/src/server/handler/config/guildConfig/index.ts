@@ -34,11 +34,7 @@ export const guildConfigHandlerDataCollection = pipe(
   HandlerData.Collection.addMutation(addGuildManagerRoleHandlerConfig),
   HandlerData.Collection.addMutation(removeGuildManagerRoleHandlerConfig),
   HandlerData.Collection.addMutation(upsertGuildChannelConfigHandlerConfig),
-  HandlerData.Collection.addSubscription(
-    getGuildRunningChannelByIdHandlerConfig,
-  ),
-  HandlerData.Collection.addSubscription(
-    getGuildRunningChannelByNameHandlerConfig,
-  ),
+  HandlerData.Collection.addSubscription(getGuildRunningChannelByIdHandlerConfig),
+  HandlerData.Collection.addSubscription(getGuildRunningChannelByNameHandlerConfig),
   HandlerData.Collection.addSubscription(getAutoCheckinGuildsHandlerConfig),
 );

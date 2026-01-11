@@ -32,15 +32,12 @@ export class UncachedGuildError extends Data.TaggedError("UncachedGuildError")<{
 }> {
   constructor() {
     super({
-      message:
-        "This guild is not cached for some reason... Maybe try again later?",
+      message: "This guild is not cached for some reason... Maybe try again later?",
     });
   }
 }
 
-export class MissingChannelError extends Data.TaggedError(
-  "MissingChannelError",
-)<{
+export class MissingChannelError extends Data.TaggedError("MissingChannelError")<{
   readonly message: string;
 }> {
   constructor() {
@@ -70,13 +67,7 @@ export class ArgumentError extends Data.TaggedError("ArgumentError")<{
   }
 }
 
-type RequiredEffect<
-  Required extends boolean,
-  A,
-  EOptional,
-  ERequired,
-  R,
-> = Effect.Effect<
+type RequiredEffect<Required extends boolean, A, EOptional, ERequired, R> = Effect.Effect<
   [Required] extends [true] ? NonNullable<A> : Option.Option<NonNullable<A>>,
   EOptional | ([Required] extends [true] ? ERequired : never),
   R
@@ -84,9 +75,7 @@ type RequiredEffect<
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type InferEffect<Ef extends Effect.Effect<any, any, any>> =
-  Ef extends Effect.Effect<infer A, infer E, infer R>
-    ? Effect.Effect<A, E, R>
-    : never;
+  Ef extends Effect.Effect<infer A, infer E, infer R> ? Effect.Effect<A, E, R> : never;
 
 export interface ChatInputCommandInteractionT extends HKT.TypeLambda {
   readonly type: this["Target"] extends CacheType
@@ -149,9 +138,7 @@ export interface ModalSubmitInteractionT extends HKT.TypeLambda {
 }
 
 export interface InteractionT extends HKT.TypeLambda {
-  readonly type: this["Target"] extends CacheType
-    ? Interaction<this["Target"]>
-    : Interaction;
+  readonly type: this["Target"] extends CacheType ? Interaction<this["Target"]> : Interaction;
 }
 
 export interface RepliableInteractionT extends HKT.TypeLambda {
@@ -184,9 +171,7 @@ const mapNullableInteraction =
   <E, R>(self: Effect.Effect<I, E, R>) =>
     pipe(
       self,
-      Effect.map((interaction) =>
-        f(interaction, required ?? (false as Required)),
-      ),
+      Effect.map((interaction) => f(interaction, required ?? (false as Required))),
       Effect.map(Option.fromNullable),
       (e) =>
         (required
@@ -203,13 +188,7 @@ const mapNullableInteraction =
     );
 
 const mapTryNullableInteraction =
-  <
-    I extends BaseInteraction,
-    A,
-    EOptional,
-    ERequired,
-    Required extends boolean = false,
-  >(
+  <I extends BaseInteraction, A, EOptional, ERequired, Required extends boolean = false>(
     f: (interaction: I, required: Required) => A,
     optionalError: () => EOptional,
     requiredError: () => ERequired,
@@ -238,13 +217,10 @@ const mapTryNullableInteraction =
     );
 
 export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
-  $inferInteractionType: Types.Contravariant<I> =
-    undefined as unknown as Types.Contravariant<I>;
+  $inferInteractionType: Types.Contravariant<I> = undefined as unknown as Types.Contravariant<I>;
 
   static interactionTag = <I extends BaseBaseInteractionT = InteractionT>() =>
-    Context.GenericTag<InteractionContext<I>, InteractionKind<I>>(
-      "InteractionContext",
-    );
+    Context.GenericTag<InteractionContext<I>, InteractionKind<I>>("InteractionContext");
 
   static interaction = <I extends BaseBaseInteractionT = InteractionT>() =>
     wrapOptional(() => InteractionContext.interactionTag<I>());
@@ -279,19 +255,18 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     ),
   );
 
-  static deferReplyWithResponse = wrapOptional(
-    (options?: InteractionDeferReplyOptions) =>
-      pipe(
-        InteractionContext.interaction<RepliableInteractionT>().sync(),
-        Effect.flatMap((interaction) =>
-          DiscordError.wrapTryPromise(() =>
-            interaction.deferReply({ ...options, withResponse: true }),
-          ),
+  static deferReplyWithResponse = wrapOptional((options?: InteractionDeferReplyOptions) =>
+    pipe(
+      InteractionContext.interaction<RepliableInteractionT>().sync(),
+      Effect.flatMap((interaction) =>
+        DiscordError.wrapTryPromise(() =>
+          interaction.deferReply({ ...options, withResponse: true }),
         ),
-        Effect.withSpan("InteractionContext.deferReplyWithResponse", {
-          captureStackTrace: true,
-        }),
       ),
+      Effect.withSpan("InteractionContext.deferReplyWithResponse", {
+        captureStackTrace: true,
+      }),
+    ),
   );
 
   static deferUpdate = wrapOptional((options?: InteractionDeferUpdateOptions) =>
@@ -306,45 +281,42 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     ),
   );
 
-  static deferUpdateWithResponse = wrapOptional(
-    (options?: InteractionDeferUpdateOptions) =>
-      pipe(
-        InteractionContext.interaction<MessageComponentInteractionT>().sync(),
-        Effect.flatMap((interaction) =>
-          DiscordError.wrapTryPromise(() =>
-            interaction.deferUpdate({ ...options, withResponse: true }),
-          ),
+  static deferUpdateWithResponse = wrapOptional((options?: InteractionDeferUpdateOptions) =>
+    pipe(
+      InteractionContext.interaction<MessageComponentInteractionT>().sync(),
+      Effect.flatMap((interaction) =>
+        DiscordError.wrapTryPromise(() =>
+          interaction.deferUpdate({ ...options, withResponse: true }),
         ),
-        Effect.withSpan("InteractionContext.deferUpdateWithResponse", {
-          captureStackTrace: true,
-        }),
       ),
+      Effect.withSpan("InteractionContext.deferUpdateWithResponse", {
+        captureStackTrace: true,
+      }),
+    ),
   );
 
-  static deleteReply = wrapOptional(
-    (message?: MessageResolvable | "@original") =>
-      pipe(
-        InteractionContext.interaction<RepliableInteractionT>().sync(),
-        Effect.flatMap((interaction) =>
-          DiscordError.wrapTryPromise(() => interaction.deleteReply(message)),
-        ),
-        Effect.withSpan("InteractionContext.deleteReply", {
-          captureStackTrace: true,
-        }),
+  static deleteReply = wrapOptional((message?: MessageResolvable | "@original") =>
+    pipe(
+      InteractionContext.interaction<RepliableInteractionT>().sync(),
+      Effect.flatMap((interaction) =>
+        DiscordError.wrapTryPromise(() => interaction.deleteReply(message)),
       ),
+      Effect.withSpan("InteractionContext.deleteReply", {
+        captureStackTrace: true,
+      }),
+    ),
   );
 
-  static editReply = wrap(
-    (options: string | MessagePayload | InteractionEditReplyOptions) =>
-      pipe(
-        InteractionContext.interaction<RepliableInteractionT>().sync(),
-        Effect.flatMap((interaction) =>
-          DiscordError.wrapTryPromise(() => interaction.editReply(options)),
-        ),
-        Effect.withSpan("InteractionContext.editReply", {
-          captureStackTrace: true,
-        }),
+  static editReply = wrap((options: string | MessagePayload | InteractionEditReplyOptions) =>
+    pipe(
+      InteractionContext.interaction<RepliableInteractionT>().sync(),
+      Effect.flatMap((interaction) =>
+        DiscordError.wrapTryPromise(() => interaction.editReply(options)),
       ),
+      Effect.withSpan("InteractionContext.editReply", {
+        captureStackTrace: true,
+      }),
+    ),
   );
 
   static fetchReply = wrapOptional((message?: Snowflake | "@original") =>
@@ -359,39 +331,35 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     ),
   );
 
-  static followUp = wrap(
-    (options: string | MessagePayload | InteractionReplyOptions) =>
-      pipe(
-        InteractionContext.interaction<RepliableInteractionT>().sync(),
-        Effect.flatMap((interaction) =>
-          DiscordError.wrapTryPromise(() => interaction.followUp(options)),
-        ),
-        Effect.withSpan("InteractionContext.followUp", {
-          captureStackTrace: true,
-        }),
+  static followUp = wrap((options: string | MessagePayload | InteractionReplyOptions) =>
+    pipe(
+      InteractionContext.interaction<RepliableInteractionT>().sync(),
+      Effect.flatMap((interaction) =>
+        DiscordError.wrapTryPromise(() => interaction.followUp(options)),
       ),
+      Effect.withSpan("InteractionContext.followUp", {
+        captureStackTrace: true,
+      }),
+    ),
   );
 
-  static reply = wrap(
-    (options: string | MessagePayload | InteractionReplyOptions) =>
-      pipe(
-        InteractionContext.interaction<RepliableInteractionT>().sync(),
-        Effect.flatMap((interaction) =>
-          DiscordError.wrapTryPromise(() => interaction.reply(options)),
-        ),
-        Effect.withSpan("InteractionContext.reply", {
-          captureStackTrace: true,
-        }),
+  static reply = wrap((options: string | MessagePayload | InteractionReplyOptions) =>
+    pipe(
+      InteractionContext.interaction<RepliableInteractionT>().sync(),
+      Effect.flatMap((interaction) =>
+        DiscordError.wrapTryPromise(() => interaction.reply(options)),
       ),
+      Effect.withSpan("InteractionContext.reply", {
+        captureStackTrace: true,
+      }),
+    ),
   );
 
   static replyWithResponse = wrap((options: InteractionReplyOptions) =>
     pipe(
       InteractionContext.interaction<RepliableInteractionT>().sync(),
       Effect.flatMap((interaction) =>
-        DiscordError.wrapTryPromise(() =>
-          interaction.reply({ ...options, withResponse: true }),
-        ),
+        DiscordError.wrapTryPromise(() => interaction.reply({ ...options, withResponse: true })),
       ),
       Effect.withSpan("InteractionContext.replyWithResponse", {
         captureStackTrace: true,
@@ -399,26 +367,23 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     ),
   );
 
-  static update = wrap(
-    (options: string | MessagePayload | InteractionUpdateOptions) =>
-      pipe(
-        InteractionContext.interaction<MessageComponentInteractionT>().sync(),
-        Effect.flatMap((interaction) =>
-          DiscordError.wrapTryPromise(() => interaction.update(options)),
-        ),
-        Effect.withSpan("InteractionContext.updateWithResponse", {
-          captureStackTrace: true,
-        }),
+  static update = wrap((options: string | MessagePayload | InteractionUpdateOptions) =>
+    pipe(
+      InteractionContext.interaction<MessageComponentInteractionT>().sync(),
+      Effect.flatMap((interaction) =>
+        DiscordError.wrapTryPromise(() => interaction.update(options)),
       ),
+      Effect.withSpan("InteractionContext.updateWithResponse", {
+        captureStackTrace: true,
+      }),
+    ),
   );
 
   static updateWithResponse = wrap((options: InteractionUpdateOptions) =>
     pipe(
       InteractionContext.interaction<MessageComponentInteractionT>().sync(),
       Effect.flatMap((interaction) =>
-        DiscordError.wrapTryPromise(() =>
-          interaction.update({ ...options, withResponse: true }),
-        ),
+        DiscordError.wrapTryPromise(() => interaction.update({ ...options, withResponse: true })),
       ),
       Effect.withSpan("InteractionContext.updateWithResponse", {
         captureStackTrace: true,
@@ -492,8 +457,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>().sync(),
       mapTryNullableInteraction(
-        (interaction, required) =>
-          interaction.options.getSubcommandGroup(required),
+        (interaction, required) => interaction.options.getSubcommandGroup(required),
         () => new ArgumentError("subcommandGroup", required),
         () => new ArgumentError("subcommandGroup", required),
         required,
@@ -513,15 +477,11 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static getBoolean<Required extends boolean>(
-    name: string,
-    required?: Required,
-  ) {
+  static getBoolean<Required extends boolean>(name: string, required?: Required) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>().sync(),
       mapTryNullableInteraction(
-        (interaction, required) =>
-          interaction.options.getBoolean(name, required),
+        (interaction, required) => interaction.options.getBoolean(name, required),
         () => new ArgumentError(name, required),
         () => new ArgumentError(name, required),
         required,
@@ -529,15 +489,15 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static getChannel<
-    Required extends boolean,
-    const Type extends ChannelType = ChannelType,
-  >(name: string, required?: Required, channelTypes?: readonly Type[]) {
+  static getChannel<Required extends boolean, const Type extends ChannelType = ChannelType>(
+    name: string,
+    required?: Required,
+    channelTypes?: readonly Type[],
+  ) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>().sync(),
       mapTryNullableInteraction(
-        (interaction, required) =>
-          interaction.options.getChannel(name, required, channelTypes),
+        (interaction, required) => interaction.options.getChannel(name, required, channelTypes),
         () => new ArgumentError(name, required),
         () => new ArgumentError(name, required),
         required,
@@ -545,15 +505,11 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static getString<Required extends boolean>(
-    name: string,
-    required?: Required,
-  ) {
+  static getString<Required extends boolean>(name: string, required?: Required) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>().sync(),
       mapTryNullableInteraction(
-        (interaction, required) =>
-          interaction.options.getString(name, required),
+        (interaction, required) => interaction.options.getString(name, required),
         () => new ArgumentError(name, required),
         () => new ArgumentError(name, required),
         required,
@@ -561,15 +517,11 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static getInteger<Required extends boolean>(
-    name: string,
-    required?: Required,
-  ) {
+  static getInteger<Required extends boolean>(name: string, required?: Required) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>().sync(),
       mapTryNullableInteraction(
-        (interaction, required) =>
-          interaction.options.getInteger(name, required),
+        (interaction, required) => interaction.options.getInteger(name, required),
         () => new ArgumentError(name, required),
         () => new ArgumentError(name, required),
         required,
@@ -577,15 +529,11 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static getNumber<Required extends boolean>(
-    name: string,
-    required?: Required,
-  ) {
+  static getNumber<Required extends boolean>(name: string, required?: Required) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>().sync(),
       mapTryNullableInteraction(
-        (interaction, required) =>
-          interaction.options.getNumber(name, required),
+        (interaction, required) => interaction.options.getNumber(name, required),
         () => new ArgumentError(name, required),
         () => new ArgumentError(name, required),
         required,
@@ -605,10 +553,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static getMember<Required extends boolean>(
-    name: string,
-    required?: Required,
-  ) {
+  static getMember<Required extends boolean>(name: string, required?: Required) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>().sync(),
       mapTryNullableInteraction(
@@ -632,10 +577,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static getAttachment<Required extends boolean>(
-    name: string,
-    required?: Required,
-  ) {
+  static getAttachment<Required extends boolean>(name: string, required?: Required) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>().sync(),
       mapTryNullableInteraction(
@@ -647,15 +589,11 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
     );
   }
 
-  static getMentionable<Required extends boolean>(
-    name: string,
-    required?: Required,
-  ) {
+  static getMentionable<Required extends boolean>(name: string, required?: Required) {
     return pipe(
       InteractionContext.interaction<ChatInputCommandInteractionT>().sync(),
       mapTryNullableInteraction(
-        (interaction, required) =>
-          interaction.options.getMentionable(name, required),
+        (interaction, required) => interaction.options.getMentionable(name, required),
         () => new ArgumentError(name, required),
         () => new ArgumentError(name, required),
         required,
@@ -665,9 +603,7 @@ export class InteractionContext<I extends BaseBaseInteractionT = InteractionT> {
 }
 
 interface BaseMessageInteractionT extends HKT.TypeLambda {
-  readonly type:
-    | MessageComponentInteraction<CacheType>
-    | ModalSubmitInteraction<CacheType>;
+  readonly type: MessageComponentInteraction<CacheType> | ModalSubmitInteraction<CacheType>;
 }
 
 export class CachedInteractionContext {
@@ -701,9 +637,7 @@ export class CachedInteractionContext {
     wrapOptional(() =>
       pipe(
         CachedInteractionContext.interaction<I, Kind>().sync(),
-        Effect.flatMap((interaction) =>
-          Effect.succeed(interaction.message as Kind["message"]),
-        ),
+        Effect.flatMap((interaction) => Effect.succeed(interaction.message as Kind["message"])),
       ),
     );
 
@@ -743,15 +677,15 @@ export class CachedInteractionContext {
       ),
     );
 
-  static getChannel<
-    Required extends boolean,
-    const Type extends ChannelType = ChannelType,
-  >(name: string, required?: Required, channelTypes?: readonly Type[]) {
+  static getChannel<Required extends boolean, const Type extends ChannelType = ChannelType>(
+    name: string,
+    required?: Required,
+    channelTypes?: readonly Type[],
+  ) {
     return pipe(
       CachedInteractionContext.interaction<ChatInputCommandInteractionT>().sync(),
       mapTryNullableInteraction(
-        (interaction) =>
-          interaction.options.getChannel(name, required, channelTypes),
+        (interaction) => interaction.options.getChannel(name, required, channelTypes),
         () => new ArgumentError(name, required),
         () => new ArgumentError(name, required),
         required,
@@ -759,10 +693,7 @@ export class CachedInteractionContext {
     );
   }
 
-  static getMember<Required extends boolean>(
-    name: string,
-    required?: Required,
-  ) {
+  static getMember<Required extends boolean>(name: string, required?: Required) {
     return pipe(
       CachedInteractionContext.interaction<ChatInputCommandInteractionT>().sync(),
       mapTryNullableInteraction(
@@ -786,10 +717,7 @@ export class CachedInteractionContext {
     );
   }
 
-  static getMentionable<Required extends boolean>(
-    name: string,
-    required?: Required,
-  ) {
+  static getMentionable<Required extends boolean>(name: string, required?: Required) {
     return pipe(
       CachedInteractionContext.interaction<ChatInputCommandInteractionT>().sync(),
       mapTryNullableInteraction(

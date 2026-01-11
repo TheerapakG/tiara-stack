@@ -1,21 +1,7 @@
-import {
-  Context,
-  Effect,
-  Layer,
-  pipe,
-  Either,
-  Option,
-  flow,
-  ParseResult,
-  Scope,
-} from "effect";
+import { Context, Effect, Layer, pipe, Either, Option, flow, ParseResult, Scope } from "effect";
 import { Result } from "typhoon-core/schema";
 import { SignalContext, SignalService } from "typhoon-core/signal";
-import {
-  ZeroQueryAppError,
-  ZeroQueryHttpError,
-  ZeroQueryZeroError,
-} from "typhoon-core/error";
+import { ZeroQueryAppError, ZeroQueryHttpError, ZeroQueryZeroError } from "typhoon-core/error";
 import { GoogleSheets } from "@/google";
 import { ZeroService } from "typhoon-core/services";
 import { Schema } from "sheet-db-schema/zero";
@@ -33,23 +19,17 @@ export * from "./sheetContext";
 export * from "./sheetService";
 
 const sheetContextDependendents = pipe(
-  Layer.mergeAll(
-    PlayerService.Default,
-    ScreenshotService.DefaultWithoutDependencies,
-  ),
+  Layer.mergeAll(PlayerService.Default, ScreenshotService.DefaultWithoutDependencies),
   Layer.provideMerge(SheetService.DefaultWithoutDependencies),
 );
 
 export const layerOfSheetId = (sheetId: string) =>
   pipe(
     sheetContextDependendents,
-    Layer.provideMerge(
-      Layer.syncContext(() => Context.make(SheetContext, { sheetId })),
-    ),
+    Layer.provideMerge(Layer.syncContext(() => Context.make(SheetContext, { sheetId }))),
   );
 
-export const contextOfSheetId = (sheetId: string) =>
-  pipe(layerOfSheetId(sheetId), Layer.build);
+export const contextOfSheetId = (sheetId: string) => pipe(layerOfSheetId(sheetId), Layer.build);
 
 export const layerOfGuildId = <E = never>(
   guildId: SignalContext.MaybeSignalEffect<string, E>,

@@ -28,9 +28,7 @@ export const upsertMessageCheckinDataHandler = pipe(
           MessageCheckinService.upsertMessageCheckinData(messageId, data),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(
-          upsertMessageCheckinDataHandlerConfig,
-        ),
+        Handler.Config.encodeResponseEffect(upsertMessageCheckinDataHandlerConfig),
         Effect.withSpan("upsertMessageCheckinDataHandler", {
           captureStackTrace: true,
         }),

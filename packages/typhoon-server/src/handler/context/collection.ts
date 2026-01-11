@@ -4,17 +4,14 @@ import { Handler } from "typhoon-core/server";
 import { type MutationHandlerT } from "../mutation/type";
 import { type SubscriptionHandlerT } from "../subscription/type";
 
-export const HandlerDataGroupTypeId =
-  CoreData.Collection.HandlerDataCollectionTypeId;
-export const HandlerDataCollectionTypeId =
-  CoreData.Collection.HandlerDataCollectionTypeId;
+export const HandlerDataGroupTypeId = CoreData.Collection.HandlerDataCollectionTypeId;
+export const HandlerDataCollectionTypeId = CoreData.Collection.HandlerDataCollectionTypeId;
 
-export type HandlerContextCollection<R = never> =
-  Context.Collection.HandlerContextCollection<
-    MutationHandlerT | SubscriptionHandlerT,
-    R,
-    any
-  >;
+export type HandlerContextCollection<R = never> = Context.Collection.HandlerContextCollection<
+  MutationHandlerT | SubscriptionHandlerT,
+  R,
+  any
+>;
 
 export const empty = <R = never>() =>
   Context.Collection.empty<MutationHandlerT | SubscriptionHandlerT, R>(
@@ -42,17 +39,13 @@ export const add =
     handlerContext: Config,
   ) =>
   (handlerContextCollection: Collection) =>
-    Context.Collection.add<Collection, HandlerT, Config>(
-      handlerContextCollection,
-      handlerContext,
-    );
+    Context.Collection.add<Collection, HandlerT, Config>(handlerContextCollection, handlerContext);
 
 export const addSubscription =
   <
     const Collection extends HandlerContextCollection<any>,
     const Config extends Context.HandlerContext<
-      SubscriptionHandlerT &
-        Context.Collection.HandlerContextCollectionHandlerT<Collection>
+      SubscriptionHandlerT & Context.Collection.HandlerContextCollectionHandlerT<Collection>
     >,
   >(
     handlerContext: Config,
@@ -60,8 +53,7 @@ export const addSubscription =
   (handlerContextCollection: Collection) =>
     Context.Collection.add<
       Collection,
-      SubscriptionHandlerT &
-        Context.Collection.HandlerContextCollectionHandlerT<Collection>,
+      SubscriptionHandlerT & Context.Collection.HandlerContextCollectionHandlerT<Collection>,
       Config
     >(handlerContextCollection, handlerContext);
 
@@ -69,8 +61,7 @@ export const addMutation =
   <
     const Collection extends HandlerContextCollection<any>,
     const Config extends Context.HandlerContext<
-      MutationHandlerT &
-        Context.Collection.HandlerContextCollectionHandlerT<Collection>
+      MutationHandlerT & Context.Collection.HandlerContextCollectionHandlerT<Collection>
     >,
   >(
     handlerContext: Config,
@@ -78,18 +69,13 @@ export const addMutation =
   (handlerContextCollection: Collection) =>
     Context.Collection.add<
       Collection,
-      MutationHandlerT &
-        Context.Collection.HandlerContextCollectionHandlerT<Collection>,
+      MutationHandlerT & Context.Collection.HandlerContextCollectionHandlerT<Collection>,
       Config
     >(handlerContextCollection, handlerContext);
 
 export const addCollection =
-  <OtherCollection extends HandlerContextCollection<any>>(
-    otherCollection: OtherCollection,
-  ) =>
-  <ThisCollection extends HandlerContextCollection<any>>(
-    thisCollection: ThisCollection,
-  ) =>
+  <OtherCollection extends HandlerContextCollection<any>>(otherCollection: OtherCollection) =>
+  <ThisCollection extends HandlerContextCollection<any>>(thisCollection: ThisCollection) =>
     Context.Collection.addCollection(thisCollection, otherCollection);
 
 export const getHandlerContext =
@@ -123,10 +109,7 @@ export const getMutationHandlerContext =
       Type.Handler<MutationHandlerT, unknown, unknown, R>
     >
   > =>
-    getHandlerContext<MutationHandlerT>(
-      "mutation",
-      key,
-    )(handlerContextCollection);
+    getHandlerContext<MutationHandlerT>("mutation", key)(handlerContextCollection);
 
 export const getSubscriptionHandlerContext =
   (key: string) =>
@@ -139,7 +122,4 @@ export const getSubscriptionHandlerContext =
       Type.Handler<SubscriptionHandlerT, unknown, unknown, R>
     >
   > =>
-    getHandlerContext<SubscriptionHandlerT>(
-      "subscription",
-      key,
-    )(handlerContextCollection);
+    getHandlerContext<SubscriptionHandlerT>("subscription", key)(handlerContextCollection);

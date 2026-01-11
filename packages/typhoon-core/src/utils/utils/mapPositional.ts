@@ -1,56 +1,33 @@
-import {
-  Array,
-  Effect,
-  HashMap,
-  Option,
-  Struct,
-  pipe,
-  Tuple,
-  Types,
-} from "effect";
+import { Array, Effect, HashMap, Option, Struct, pipe, Tuple, Types } from "effect";
 
 export const hashMapPositional =
-  <In, Out, E, R>(
-    f: (a: ReadonlyArray<In>) => Effect.Effect<ReadonlyArray<Out>, E, R>,
-  ) =>
+  <In, Out, E, R>(f: (a: ReadonlyArray<In>) => Effect.Effect<ReadonlyArray<Out>, E, R>) =>
   <T extends HashMap.HashMap<unknown, In>>(
     map: T,
   ): Effect.Effect<HashMap.HashMap<HashMap.HashMap.Key<T>, Out>, E, R> =>
     pipe(
       Effect.Do,
       Effect.let("entries", () => HashMap.toEntries(map)),
-      Effect.let("keys", ({ entries }) =>
-        pipe(entries, Array.map(Tuple.getFirst)),
-      ),
-      Effect.let("values", ({ entries }) =>
-        pipe(entries, Array.map(Tuple.getSecond)),
-      ),
+      Effect.let("keys", ({ entries }) => pipe(entries, Array.map(Tuple.getFirst))),
+      Effect.let("values", ({ entries }) => pipe(entries, Array.map(Tuple.getSecond))),
       Effect.bind("resultValues", ({ values }) => f(values)),
       Effect.map(
         ({ keys, resultValues }) =>
-          pipe(
-            Array.zip(keys, resultValues),
-            HashMap.fromIterable,
-          ) as HashMap.HashMap<HashMap.HashMap.Key<T>, Out>,
+          pipe(Array.zip(keys, resultValues), HashMap.fromIterable) as HashMap.HashMap<
+            HashMap.HashMap.Key<T>,
+            Out
+          >,
       ),
     );
 
 export const mapPositional =
-  <In, Out, E, R>(
-    f: (a: ReadonlyArray<In>) => Effect.Effect<ReadonlyArray<Out>, E, R>,
-  ) =>
-  <T extends Record<string, In>>(
-    map: T,
-  ): Effect.Effect<Record<keyof T, Out>, E, R> =>
+  <In, Out, E, R>(f: (a: ReadonlyArray<In>) => Effect.Effect<ReadonlyArray<Out>, E, R>) =>
+  <T extends Record<string, In>>(map: T): Effect.Effect<Record<keyof T, Out>, E, R> =>
     pipe(
       Effect.Do,
       Effect.let("entries", () => Struct.entries(map)),
-      Effect.let("keys", ({ entries }) =>
-        pipe(entries, Array.map(Tuple.getFirst)),
-      ),
-      Effect.let("values", ({ entries }) =>
-        pipe(entries, Array.map(Tuple.getSecond)),
-      ),
+      Effect.let("keys", ({ entries }) => pipe(entries, Array.map(Tuple.getFirst))),
+      Effect.let("values", ({ entries }) => pipe(entries, Array.map(Tuple.getSecond))),
       Effect.bind("resultValues", ({ values }) => f(values)),
       Effect.map(({ keys, resultValues }) =>
         pipe(Array.zip(keys, resultValues), Object.fromEntries),
@@ -58,9 +35,7 @@ export const mapPositional =
     );
 
 export const arraySomesPositional =
-  <In, Out, E, R>(
-    f: (a: ReadonlyArray<In>) => Effect.Effect<ReadonlyArray<Out>, E, R>,
-  ) =>
+  <In, Out, E, R>(f: (a: ReadonlyArray<In>) => Effect.Effect<ReadonlyArray<Out>, E, R>) =>
   (
     array: ReadonlyArray<Option.Option<In>>,
   ): Effect.Effect<ReadonlyArray<Option.Option<Out>>, E, R> =>

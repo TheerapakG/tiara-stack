@@ -39,9 +39,7 @@ export const decrementMessageRoomOrderRankHandler = pipe(
           }),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(
-          decrementMessageRoomOrderRankHandlerConfig,
-        ),
+        Handler.Config.encodeResponseEffect(decrementMessageRoomOrderRankHandlerConfig),
         Effect.withSpan("decrementMessageRoomOrderRankHandler", {
           captureStackTrace: true,
         }),

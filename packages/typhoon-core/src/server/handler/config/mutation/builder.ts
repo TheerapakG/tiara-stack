@@ -61,9 +61,7 @@ export const requestParams: <const RequestParams extends RequestParamsConfigIn>(
 ) => <const Config extends PartialMutationHandlerConfig>(
   config: Config,
 ) => SetPartialMutationHandlerRequestParams<RequestParams, Config> =
-  <const RequestParams extends RequestParamsConfigIn>(
-    requestParams: RequestParams,
-  ) =>
+  <const RequestParams extends RequestParamsConfigIn>(requestParams: RequestParams) =>
   <const Config extends PartialMutationHandlerConfig>(
     config: Config,
   ): SetPartialMutationHandlerRequestParams<RequestParams, Config> =>
@@ -111,9 +109,7 @@ export const responseError: <const ResponseError extends ResponseErrorConfigIn>(
 ) => <const Config extends PartialMutationHandlerConfig>(
   config: Config,
 ) => SetPartialMutationHandlerResponseError<ResponseError, Config> =
-  <const ResponseError extends ResponseErrorConfigIn>(
-    responseError: ResponseError,
-  ) =>
+  <const ResponseError extends ResponseErrorConfigIn>(responseError: ResponseError) =>
   <const Config extends PartialMutationHandlerConfig>(
     config: Config,
   ): SetPartialMutationHandlerResponseError<ResponseError, Config> =>

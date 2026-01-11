@@ -15,17 +15,11 @@ export const getMessageRoomOrderRangeHandlerConfig = pipe(
       Result.ResultSchema({
         optimistic: Schema.Either({
           right: MessageRoomOrderRange,
-          left: Schema.Union(
-            Error.Core.ArgumentError,
-            Error.Core.ZeroQueryError,
-          ),
+          left: Schema.Union(Error.Core.ArgumentError, Error.Core.ZeroQueryError),
         }),
         complete: Schema.Either({
           right: MessageRoomOrderRange,
-          left: Schema.Union(
-            Error.Core.ArgumentError,
-            Error.Core.ZeroQueryError,
-          ),
+          left: Schema.Union(Error.Core.ArgumentError, Error.Core.ZeroQueryError),
         }),
       }),
       Schema.standardSchemaV1,

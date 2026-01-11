@@ -32,21 +32,16 @@ class TransactionSubscription extends Schema.TaggedClass<TransactionSubscription
   },
 ) {}
 
-class TransactionMutation extends Schema.TaggedClass<TransactionMutation>()(
-  "TransactionMutation",
-  {
-    tables: Schema.HashSetFromSelf(Schema.String),
-  },
-) {}
+class TransactionMutation extends Schema.TaggedClass<TransactionMutation>()("TransactionMutation", {
+  tables: Schema.HashSetFromSelf(Schema.String),
+}) {}
 
 export class TransactionContext extends Context.Tag("TransactionContext")<
   TransactionContext,
   | SynchronizedRef.SynchronizedRef<TransactionSubscription>
   | SynchronizedRef.SynchronizedRef<TransactionMutation>
 >() {
-  static subscription(): Effect.Effect<
-    SynchronizedRef.SynchronizedRef<TransactionSubscription>
-  > {
+  static subscription(): Effect.Effect<SynchronizedRef.SynchronizedRef<TransactionSubscription>> {
     return SynchronizedRef.make(
       TransactionSubscription.make({
         tables: HashSet.empty<string>(),
@@ -54,9 +49,7 @@ export class TransactionContext extends Context.Tag("TransactionContext")<
     );
   }
 
-  static mutation(): Effect.Effect<
-    SynchronizedRef.SynchronizedRef<TransactionMutation>
-  > {
+  static mutation(): Effect.Effect<SynchronizedRef.SynchronizedRef<TransactionMutation>> {
     return SynchronizedRef.make(
       TransactionMutation.make({
         tables: HashSet.empty<string>(),
@@ -64,18 +57,12 @@ export class TransactionContext extends Context.Tag("TransactionContext")<
     );
   }
 
-  static tables(): Effect.Effect<
-    HashSet.HashSet<string>,
-    never,
-    TransactionContext
-  > {
+  static tables(): Effect.Effect<HashSet.HashSet<string>, never, TransactionContext> {
     return pipe(
       TransactionContext,
       Effect.flatMap((context) =>
         SynchronizedRef.get(
-          context as SynchronizedRef.SynchronizedRef<
-            TransactionSubscription | TransactionMutation
-          >,
+          context as SynchronizedRef.SynchronizedRef<TransactionSubscription | TransactionMutation>,
         ),
       ),
       Effect.map((context) => context.tables),
@@ -142,9 +129,7 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
                 Array.getSomes,
                 Array.map((subscription) => subscription.source),
                 Computed.makeAll,
-                Effect.tap((aggregatedSource) =>
-                  SignalContext.bindDependency(aggregatedSource),
-                ),
+                Effect.tap((aggregatedSource) => SignalContext.bindDependency(aggregatedSource)),
               ),
             ),
           ),
@@ -159,9 +144,7 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
                 Array.fromIterable,
                 Array.map((table) => HashMap.get(subscriptions, table)),
                 Array.getSomes,
-                Array.map((subscription) =>
-                  subscription.emitter.emit(undefined),
-                ),
+                Array.map((subscription) => subscription.emitter.emit(undefined)),
                 Effect.all,
               ),
             ),
@@ -211,21 +194,14 @@ export const query = <T, TDialect extends Dialect>(
     Effect.map(({ query, tables }) => ({ query, tables })),
   );
 
-export const run = <T, E>(
-  query: Effect.Effect<QueryAnalysis<T>, E, TransactionContext>,
-) =>
+export const run = <T, E>(query: Effect.Effect<QueryAnalysis<T>, E, TransactionContext>) =>
   pipe(
     Effect.Do,
     Effect.bind("transactionContext", () => TransactionContext),
     Effect.bind("queryAnalysis", ({ transactionContext }) =>
-      pipe(
-        query,
-        Effect.provideService(TransactionContext, transactionContext),
-      ),
+      pipe(query, Effect.provideService(TransactionContext, transactionContext)),
     ),
-    Effect.bind("result", ({ queryAnalysis }) =>
-      pipe(queryAnalysis.query, Effect.either),
-    ),
+    Effect.bind("result", ({ queryAnalysis }) => pipe(queryAnalysis.query, Effect.either)),
     Effect.tap(({ transactionContext, queryAnalysis }) =>
       SynchronizedRef.update(
         transactionContext as SynchronizedRef.SynchronizedRef<
@@ -275,22 +251,15 @@ export const subscribe = <A, E>(
               Effect.flatMap(BaseDBSubscriptionContext.subscribeTables),
             ),
           ),
-          Effect.provideServiceEffect(
-            TransactionContext,
-            TransactionContext.subscription(),
-          ),
-          Effect.provideService(
-            BaseDBSubscriptionContext,
-            baseDBSubscriptionContext,
-          ),
+          Effect.provideServiceEffect(TransactionContext, TransactionContext.subscription()),
+          Effect.provideService(BaseDBSubscriptionContext, baseDBSubscriptionContext),
         ),
       ),
     ),
   );
 
-export const subscribeQuery = <T, TDialect extends Dialect>(
-  q: RunnableQuery<T, TDialect>,
-) => pipe(q, query, run, subscribe);
+export const subscribeQuery = <T, TDialect extends Dialect>(q: RunnableQuery<T, TDialect>) =>
+  pipe(q, query, run, subscribe);
 
 export const mutate = <A, E>(
   query: Effect.Effect<
@@ -298,18 +267,11 @@ export const mutate = <A, E>(
     E,
     TransactionContext | BaseDBSubscriptionContext | SignalContext.SignalContext
   >,
-): Effect.Effect<
-  A,
-  E,
-  BaseDBSubscriptionContext | SignalService.SignalService
-> =>
+): Effect.Effect<A, E, BaseDBSubscriptionContext | SignalService.SignalService> =>
   pipe(
     query,
     Effect.tap(() =>
-      pipe(
-        TransactionContext.tables(),
-        Effect.flatMap(BaseDBSubscriptionContext.notifyTables),
-      ),
+      pipe(TransactionContext.tables(), Effect.flatMap(BaseDBSubscriptionContext.notifyTables)),
     ),
     Effect.provideServiceEffect(
       SignalContext.SignalContext,
@@ -319,22 +281,15 @@ export const mutate = <A, E>(
         STM.commit,
       ),
     ),
-    Effect.provideServiceEffect(
-      TransactionContext,
-      TransactionContext.mutation(),
-    ),
+    Effect.provideServiceEffect(TransactionContext, TransactionContext.mutation()),
   );
 
-export const mutateQuery = <T, TDialect extends Dialect>(
-  q: RunnableQuery<T, TDialect>,
-) => pipe(q, query, run, mutate);
+export const mutateQuery = <T, TDialect extends Dialect>(q: RunnableQuery<T, TDialect>) =>
+  pipe(q, query, run, mutate);
 
 export const wrapTransaction =
   <Transaction, Config>(
-    transactionFn: <T>(
-      fn: (tx: Transaction) => Promise<T>,
-      config?: Config,
-    ) => Promise<T>,
+    transactionFn: <T>(fn: (tx: Transaction) => Promise<T>, config?: Config) => Promise<T>,
   ): (<T>(
     fn: (
       tx: Transaction,
@@ -367,9 +322,7 @@ export const wrapTransaction =
         >(),
       ),
       Effect.bind("result", ({ runtime }) =>
-        Effect.tryPromise(() =>
-          transactionFn((tx) => Runtime.runPromise(runtime, fn(tx)), config),
-        ),
+        Effect.tryPromise(() => transactionFn((tx) => Runtime.runPromise(runtime, fn(tx)), config)),
       ),
       Effect.map(({ result }) => result),
     );
@@ -381,93 +334,51 @@ export class DBSubscriptionContext extends Effect.Service<DBSubscriptionContext>
       base: context,
       subscribeTables: context.subscribeTables,
       notifyTables: context.notifyTables,
-      subscribeQuery: <T, TDialect extends Dialect>(
-        q: RunnableQuery<T, TDialect>,
-      ) =>
-        pipe(
-          subscribeQuery(q),
-          Effect.provideService(BaseDBSubscriptionContext, context),
-        ),
-      mutateQuery: <T, TDialect extends Dialect>(
-        q: RunnableQuery<T, TDialect>,
-      ) =>
-        pipe(
-          mutateQuery(q),
-          Effect.provideService(BaseDBSubscriptionContext, context),
-        ),
+      subscribeQuery: <T, TDialect extends Dialect>(q: RunnableQuery<T, TDialect>) =>
+        pipe(subscribeQuery(q), Effect.provideService(BaseDBSubscriptionContext, context)),
+      mutateQuery: <T, TDialect extends Dialect>(q: RunnableQuery<T, TDialect>) =>
+        pipe(mutateQuery(q), Effect.provideService(BaseDBSubscriptionContext, context)),
     })),
     accessors: true,
     dependencies: [BaseDBSubscriptionContext.Default],
   },
 ) {
-  static run<T>(
-    query: Effect.Effect<QueryAnalysis<T>, unknown, TransactionContext>,
-  ) {
+  static run<T>(query: Effect.Effect<QueryAnalysis<T>, unknown, TransactionContext>) {
     return DBSubscriptionContext.use((context) =>
-      pipe(
-        run(query),
-        Effect.provideService(BaseDBSubscriptionContext, context.base),
-      ),
+      pipe(run(query), Effect.provideService(BaseDBSubscriptionContext, context.base)),
     );
   }
 
   static subscribe<A, E>(
-    query: Effect.Effect<
-      A,
-      E,
-      TransactionContext | SignalContext.SignalContext
-    >,
+    query: Effect.Effect<A, E, TransactionContext | SignalContext.SignalContext>,
   ) {
     return DBSubscriptionContext.use((context) =>
-      pipe(
-        subscribe(query),
-        Effect.provideService(BaseDBSubscriptionContext, context.base),
-      ),
+      pipe(subscribe(query), Effect.provideService(BaseDBSubscriptionContext, context.base)),
     );
   }
 
-  static subscribeQuery<T, TDialect extends Dialect>(
-    q: RunnableQuery<T, TDialect>,
-  ) {
+  static subscribeQuery<T, TDialect extends Dialect>(q: RunnableQuery<T, TDialect>) {
     return DBSubscriptionContext.use((context) =>
-      pipe(
-        subscribeQuery(q),
-        Effect.provideService(BaseDBSubscriptionContext, context.base),
-      ),
+      pipe(subscribeQuery(q), Effect.provideService(BaseDBSubscriptionContext, context.base)),
     );
   }
 
   static mutate<A, E>(
-    query: Effect.Effect<
-      A,
-      E,
-      TransactionContext | SignalContext.SignalContext
-    >,
+    query: Effect.Effect<A, E, TransactionContext | SignalContext.SignalContext>,
   ) {
     return DBSubscriptionContext.use((context) =>
-      pipe(
-        mutate(query),
-        Effect.provideService(BaseDBSubscriptionContext, context.base),
-      ),
+      pipe(mutate(query), Effect.provideService(BaseDBSubscriptionContext, context.base)),
     );
   }
 
-  static mutateQuery<T, TDialect extends Dialect>(
-    q: RunnableQuery<T, TDialect>,
-  ) {
+  static mutateQuery<T, TDialect extends Dialect>(q: RunnableQuery<T, TDialect>) {
     return DBSubscriptionContext.use((context) =>
-      pipe(
-        mutateQuery(q),
-        Effect.provideService(BaseDBSubscriptionContext, context.base),
-      ),
+      pipe(mutateQuery(q), Effect.provideService(BaseDBSubscriptionContext, context.base)),
     );
   }
 
   static wrapTransaction<Transaction, Config>(
-    transactionFn: <T>(
-      fn: (tx: Transaction) => Promise<T>,
-      config?: Config,
-    ) => Promise<T>,
+    transactionFn: <T>(fn: (tx: Transaction) => Promise<T>, config?: Config) => Promise<T>,
   ) {
     return <T>(
       fn: (
@@ -475,9 +386,7 @@ export class DBSubscriptionContext extends Effect.Service<DBSubscriptionContext>
       ) => Effect.Effect<
         T,
         unknown,
-        | TransactionContext
-        | BaseDBSubscriptionContext
-        | SignalContext.SignalContext
+        TransactionContext | BaseDBSubscriptionContext | SignalContext.SignalContext
       >,
       config?: Config,
     ) =>

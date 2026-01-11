@@ -7,9 +7,7 @@ type OptionArrayToOptionTupleSchema<
   Count extends number,
   Value extends Schema.Schema.Any,
 > = Schema.transform<
-  Schema.Array$<
-    Schema.OptionFromSelf<Schema.SchemaClass<Schema.Schema.Encoded<Value>>>
-  >,
+  Schema.Array$<Schema.OptionFromSelf<Schema.SchemaClass<Schema.Schema.Encoded<Value>>>>,
   Schema.Tuple<Types.TupleOf<Count, Schema.OptionFromSelf<Value>>>
 > & {
   readonly count: Count;
@@ -23,13 +21,12 @@ const makeOptionArrayToOptionTupleClass = <
   count: Count,
   value: Value,
 ) => {
-  const ArraySchema = Schema.Array(
-    Schema.OptionFromSelf(Schema.encodedSchema(value)),
-  );
+  const ArraySchema = Schema.Array(Schema.OptionFromSelf(Schema.encodedSchema(value)));
   const TupleSchema = Schema.Tuple(
-    ...(Array.makeBy(count, () =>
-      Schema.OptionFromSelf(value),
-    ) as Types.TupleOf<Count, Schema.OptionFromSelf<Value>>),
+    ...(Array.makeBy(count, () => Schema.OptionFromSelf(value)) as Types.TupleOf<
+      Count,
+      Schema.OptionFromSelf<Value>
+    >),
   );
 
   return class extends Schema.transform(ArraySchema, TupleSchema, {
@@ -52,7 +49,6 @@ const OptionArrayToOptionTupleSchema = <
 >(
   count: Count,
   value: Value,
-): OptionArrayToOptionTupleSchema<Count, Value> =>
-  makeOptionArrayToOptionTupleClass(count, value);
+): OptionArrayToOptionTupleSchema<Count, Value> => makeOptionArrayToOptionTupleClass(count, value);
 
 export { OptionArrayToOptionTupleSchema };

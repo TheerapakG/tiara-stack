@@ -16,15 +16,11 @@ export const getGuildRunningChannelByNameHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
         Effect.bind("parsed", () =>
           Event.request.parsed(getGuildRunningChannelByNameHandlerConfig),
         ),
-        Effect.flatMap(({ parsed }) =>
-          GuildConfigService.getGuildRunningChannelByName(parsed),
-        ),
+        Effect.flatMap(({ parsed }) => GuildConfigService.getGuildRunningChannelByName(parsed)),
         Effect.map(
           Effect.map(
             Result.eitherSomeOrLeft(() =>
@@ -35,11 +31,7 @@ export const getGuildRunningChannelByNameHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(
-          Handler.Config.encodeResponseEffect(
-            getGuildRunningChannelByNameHandlerConfig,
-          ),
-        ),
+        Effect.map(Handler.Config.encodeResponseEffect(getGuildRunningChannelByNameHandlerConfig)),
         Effect.withSpan("getGuildRunningChannelByNameHandler", {
           captureStackTrace: true,
         }),

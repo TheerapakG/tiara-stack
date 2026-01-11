@@ -23,19 +23,16 @@ export const upsertGuildChannelConfigHandler = pipe(
             Effect.flatMap(UntilObserver.observeOnce),
           ),
         ),
-        Effect.flatMap(
-          ({ guildId, channelId, name, running, roleId, checkinChannelId }) =>
-            GuildConfigService.upsertGuildChannelConfig(guildId, channelId, {
-              name,
-              running,
-              roleId,
-              checkinChannelId,
-            }),
+        Effect.flatMap(({ guildId, channelId, name, running, roleId, checkinChannelId }) =>
+          GuildConfigService.upsertGuildChannelConfig(guildId, channelId, {
+            name,
+            running,
+            roleId,
+            checkinChannelId,
+          }),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(
-          upsertGuildChannelConfigHandlerConfig,
-        ),
+        Handler.Config.encodeResponseEffect(upsertGuildChannelConfigHandlerConfig),
         Effect.withSpan("upsertGuildChannelConfigHandler", {
           captureStackTrace: true,
         }),

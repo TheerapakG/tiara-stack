@@ -15,10 +15,7 @@ export interface RunStateContextTypeLambda {
   readonly R: unknown;
 }
 
-export type RunStateContextKind<
-  F extends RunStateContextTypeLambda,
-  R,
-> = F extends {
+export type RunStateContextKind<F extends RunStateContextTypeLambda, R> = F extends {
   readonly type: unknown;
 }
   ? (F & {
@@ -36,12 +33,7 @@ const UnsafeRunStateTaggedClass: new <A, E>(
   Data.TaggedClass("UnsafeRunState");
 class UnsafeRunState<A, E> extends UnsafeRunStateTaggedClass<A, E> {}
 
-type RunStateData<
-  F extends RunStateContextTypeLambda,
-  A,
-  E,
-  DefaultR = never,
-> = {
+type RunStateData<F extends RunStateContextTypeLambda, A, E, DefaultR = never> = {
   semaphore: Effect.Semaphore;
   effect: <R>(
     ctx: RunStateContextKind<F, R>,
@@ -53,12 +45,7 @@ type RunStateData<
   ) => Effect.Effect<unknown, never, never>;
   state: SynchronizedRef.SynchronizedRef<UnsafeRunState<A, E>>;
 };
-const RunStateTaggedClass: new <
-  F extends RunStateContextTypeLambda,
-  A,
-  E,
-  DefaultR = never,
->(
+const RunStateTaggedClass: new <F extends RunStateContextTypeLambda, A, E, DefaultR = never>(
   args: Readonly<RunStateData<F, A, E, DefaultR>>,
 ) => Readonly<RunStateData<F, A, E, DefaultR>> & { readonly _tag: "RunState" } =
   Data.TaggedClass("RunState");
@@ -69,12 +56,7 @@ export class RunState<
   DefaultR = never,
 > extends RunStateTaggedClass<F, A, E, DefaultR> {}
 
-export const make = <
-  F extends RunStateContextTypeLambda,
-  A = never,
-  E = never,
-  DefaultR = never,
->(
+export const make = <F extends RunStateContextTypeLambda, A = never, E = never, DefaultR = never>(
   effect: <R>(
     ctx: RunStateContextKind<F, R>,
     runtime: Runtime.Runtime<R | DefaultR>,
@@ -95,10 +77,7 @@ export const make = <
         }),
       ),
     ),
-    Effect.map(
-      ({ semaphore, state }) =>
-        new RunState({ semaphore, effect, finalizer, state }),
-    ),
+    Effect.map(({ semaphore, state }) => new RunState({ semaphore, effect, finalizer, state })),
   );
 
 export const start =
@@ -106,18 +85,14 @@ export const start =
     ctx: RunStateContextKind<F, R>,
     runtime: Runtime.Runtime<R | DefaultR>,
   ) =>
-  <A, E>(
-    runState: RunState<F, A, E, DefaultR>,
-  ): Effect.Effect<Option.Option<A>, E, Scope.Scope> =>
+  <A, E>(runState: RunState<F, A, E, DefaultR>): Effect.Effect<Option.Option<A>, E, Scope.Scope> =>
     Effect.whenEffect(
       runState.semaphore.withPermits(1)(
         pipe(
           SynchronizedRef.getAndUpdateSome(runState.state, (state) =>
             pipe(
               Option.some(state),
-              Option.filter(({ status }) =>
-                String.Equivalence(status, "stopped"),
-              ),
+              Option.filter(({ status }) => String.Equivalence(status, "stopped")),
               Option.map(
                 (state) =>
                   new UnsafeRunState<A, E>(
@@ -162,18 +137,14 @@ export const stop =
     ctx: RunStateContextKind<F, R>,
     runtime: Runtime.Runtime<R | DefaultR>,
   ) =>
-  <A, E>(
-    runState: RunState<F, A, E, DefaultR>,
-  ): Effect.Effect<Option.Option<void>, never, never> =>
+  <A, E>(runState: RunState<F, A, E, DefaultR>): Effect.Effect<Option.Option<void>, never, never> =>
     Effect.whenEffect(
       runState.semaphore.withPermits(1)(
         pipe(
           SynchronizedRef.getAndUpdateSome(runState.state, (state) =>
             pipe(
               Option.some(state),
-              Option.filter(({ status }) =>
-                String.Equivalence(status, "ready"),
-              ),
+              Option.filter(({ status }) => String.Equivalence(status, "ready")),
               Option.map(
                 (state) =>
                   new UnsafeRunState<A, E>(
@@ -189,9 +160,7 @@ export const stop =
       pipe(
         runState.finalizer(ctx, runtime),
         Effect.andThen(SynchronizedRef.get(runState.state)),
-        Effect.tap(({ runFiber }) =>
-          Effect.transposeMapOption(runFiber, Fiber.interrupt),
-        ),
+        Effect.tap(({ runFiber }) => Effect.transposeMapOption(runFiber, Fiber.interrupt)),
         Effect.andThen(() =>
           SynchronizedRef.set(
             runState.state,
@@ -204,12 +173,7 @@ export const stop =
       ),
     );
 
-export const status = <
-  F extends RunStateContextTypeLambda,
-  A,
-  E,
-  DefaultR = never,
->(
+export const status = <F extends RunStateContextTypeLambda, A, E, DefaultR = never>(
   runState: RunState<F, A, E, DefaultR>,
 ): Effect.Effect<"stopped" | "pending" | "ready", never, never> =>
   pipe(

@@ -16,12 +16,8 @@ export const getDaySchedulesHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(getDaySchedulesHandlerConfig),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
+        Effect.bind("parsed", () => Event.request.parsed(getDaySchedulesHandlerConfig)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -47,18 +43,14 @@ export const getDaySchedulesHandler = pipe(
             Effect.flatMap((layerOfGuildId) =>
               pipe(
                 parsed,
-                Effect.flatMap(({ day }) =>
-                  Sheet.SheetService.getDaySchedules(day),
-                ),
+                Effect.flatMap(({ day }) => Sheet.SheetService.getDaySchedules(day)),
                 Result.provideEitherLayer(layerOfGuildId),
               ),
             ),
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(
-          Handler.Config.encodeResponseEffect(getDaySchedulesHandlerConfig),
-        ),
+        Effect.map(Handler.Config.encodeResponseEffect(getDaySchedulesHandlerConfig)),
         Effect.map(
           Effect.withSpan("getDaySchedulesHandler", {
             captureStackTrace: true,

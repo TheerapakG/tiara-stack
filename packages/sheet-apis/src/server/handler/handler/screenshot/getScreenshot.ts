@@ -16,12 +16,8 @@ export const getScreenshotHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(getScreenshotHandlerConfig),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
+        Effect.bind("parsed", () => Event.request.parsed(getScreenshotHandlerConfig)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -65,9 +61,7 @@ export const getScreenshotHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(
-          Handler.Config.encodeResponseEffect(getScreenshotHandlerConfig),
-        ),
+        Effect.map(Handler.Config.encodeResponseEffect(getScreenshotHandlerConfig)),
         Effect.withSpan("getScreenshotHandler", {
           captureStackTrace: true,
         }),

@@ -18,9 +18,7 @@ export const configGuild = pgTable(
     scriptId: varchar("script_id"),
     sheetId: varchar("sheet_id"),
     autoCheckin: boolean("auto_checkin").notNull(),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull()
@@ -40,9 +38,7 @@ export const configGuildManagerRole = pgTable(
     id: serial("id").primaryKey(),
     guildId: varchar("guild_id").notNull(),
     roleId: varchar("role_id").notNull(),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull()
@@ -50,10 +46,7 @@ export const configGuildManagerRole = pgTable(
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
   },
   (table) => [
-    uniqueIndex("config_guild_manager_role_guild_id_role_id_idx").on(
-      table.guildId,
-      table.roleId,
-    ),
+    uniqueIndex("config_guild_manager_role_guild_id_role_id_idx").on(table.guildId, table.roleId),
   ],
 );
 
@@ -67,9 +60,7 @@ export const configGuildChannel = pgTable(
     running: boolean("running").notNull(),
     roleId: varchar("role_id"),
     checkinChannelId: varchar("checkin_channel_id"),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull()
@@ -77,14 +68,8 @@ export const configGuildChannel = pgTable(
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
   },
   (table) => [
-    uniqueIndex("config_guild_channel_guild_id_channel_id_idx").on(
-      table.guildId,
-      table.channelId,
-    ),
-    uniqueIndex("config_guild_channel_guild_id_name_idx").on(
-      table.guildId,
-      table.name,
-    ),
+    uniqueIndex("config_guild_channel_guild_id_channel_id_idx").on(table.guildId, table.channelId),
+    uniqueIndex("config_guild_channel_guild_id_name_idx").on(table.guildId, table.name),
   ],
 );
 
@@ -94,9 +79,7 @@ export const messageSlot = pgTable(
     id: serial("id").primaryKey(),
     messageId: varchar("message_id").notNull(),
     day: integer("day").notNull(),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull()
@@ -115,18 +98,14 @@ export const messageCheckin = pgTable(
     hour: integer("hour").notNull(),
     channelId: varchar("channel_id").notNull(),
     roleId: varchar("role_id"),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull()
       .$onUpdate(() => new Date()),
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
   },
-  (table) => [
-    uniqueIndex("message_checkin_message_id_idx").on(table.messageId),
-  ],
+  (table) => [uniqueIndex("message_checkin_message_id_idx").on(table.messageId)],
 );
 
 export const messageCheckinMember = pgTable(
@@ -136,9 +115,7 @@ export const messageCheckinMember = pgTable(
     messageId: varchar("message_id").notNull(),
     memberId: varchar("member_id").notNull(),
     checkinAt: timestamp("checkin_at", { mode: "date", withTimezone: true }),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull()
@@ -163,18 +140,14 @@ export const messageRoomOrder = pgTable(
     hour: integer("hour").notNull(),
     rank: integer("rank").notNull(),
     monitor: varchar("monitor"),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull()
       .$onUpdate(() => new Date()),
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
   },
-  (table) => [
-    uniqueIndex("message_room_order_message_id_idx").on(table.messageId),
-  ],
+  (table) => [uniqueIndex("message_room_order_message_id_idx").on(table.messageId)],
 );
 
 export const messageRoomOrderEntry = pgTable(
@@ -188,9 +161,7 @@ export const messageRoomOrderEntry = pgTable(
     team: varchar("team").notNull(),
     tags: varchar("tags").array().notNull(),
     effectValue: real("effect_value").notNull(),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .notNull()
@@ -203,9 +174,6 @@ export const messageRoomOrderEntry = pgTable(
       table.rank,
       table.position,
     ),
-    index("message_room_order_entry_message_id_rank_idx").on(
-      table.messageId,
-      table.rank,
-    ),
+    index("message_room_order_entry_message_id_rank_idx").on(table.messageId, table.rank),
   ],
 );

@@ -9,9 +9,7 @@ type Merge<S extends Array.NonEmptyReadonlyArray<object>> = S extends readonly [
     ? A
     : never;
 
-export const merge = <const S extends Array.NonEmptyReadonlyArray<object>>(
-  objects: S,
-) =>
+export const merge = <const S extends Array.NonEmptyReadonlyArray<object>>(objects: S) =>
   pipe(
     Array.tailNonEmpty(objects),
     Array.match({

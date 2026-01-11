@@ -23,8 +23,6 @@ export const messageCheckinHandlerDataCollection = pipe(
   HandlerData.Collection.addMutation(upsertMessageCheckinDataHandlerConfig),
   HandlerData.Collection.addSubscription(getMessageCheckinMembersHandlerConfig),
   HandlerData.Collection.addMutation(addMessageCheckinMembersHandlerConfig),
-  HandlerData.Collection.addMutation(
-    setMessageCheckinMemberCheckinAtHandlerConfig,
-  ),
+  HandlerData.Collection.addMutation(setMessageCheckinMemberCheckinAtHandlerConfig),
   HandlerData.Collection.addMutation(removeMessageCheckinMemberHandlerConfig),
 );

@@ -1,12 +1,6 @@
 import { InteractionContext } from "@/services";
-import {
-  InteractionHandler,
-  InteractionHandlerMap,
-} from "@/types/handler/handler";
-import {
-  HandlerVariantHandlerContext,
-  HandlerVariantMap,
-} from "@/types/handler/handlerVariant";
+import { InteractionHandler, InteractionHandlerMap } from "@/types/handler/handler";
+import { HandlerVariantHandlerContext, HandlerVariantMap } from "@/types/handler/handlerVariant";
 import {
   ChatInputSubcommandGroupHandlerVariantT,
   ChatInputSubcommandHandlerVariantT,
@@ -17,45 +11,22 @@ import { bindObject } from "@/utils";
 import { Data, Effect, Option, pipe } from "effect";
 
 export type SubcommandHandlerObject<A = never, E = never, R = never> = {
-  subcommandGroupHandlerMap: HandlerVariantMap<
-    ChatInputSubcommandGroupHandlerVariantT,
-    A,
-    E,
-    R
-  >;
-  subcommandHandlerMap: HandlerVariantMap<
-    ChatInputSubcommandHandlerVariantT,
-    A,
-    E,
-    R
-  >;
+  subcommandGroupHandlerMap: HandlerVariantMap<ChatInputSubcommandGroupHandlerVariantT, A, E, R>;
+  subcommandHandlerMap: HandlerVariantMap<ChatInputSubcommandHandlerVariantT, A, E, R>;
 };
 
-export class SubcommandHandler<
-  A = never,
-  E = never,
-  R = never,
-> extends Data.TaggedClass("SubcommandHandler")<
-  SubcommandHandlerObject<A, E, R>
-> {
+export class SubcommandHandler<A = never, E = never, R = never> extends Data.TaggedClass(
+  "SubcommandHandler",
+)<SubcommandHandlerObject<A, E, R>> {
   static empty = <A = never, E = never, R = never>() =>
     new SubcommandHandler({
-      subcommandGroupHandlerMap: chatInputSubcommandGroupInteractionHandlerMap<
-        A,
-        E,
-        R
-      >(),
+      subcommandGroupHandlerMap: chatInputSubcommandGroupInteractionHandlerMap<A, E, R>(),
       subcommandHandlerMap: chatInputSubcommandInteractionHandlerMap<A, E, R>(),
     });
 
   static addSubcommandGroupHandler =
     <A = never, E = never, R = never>(
-      handler: HandlerVariantHandlerContext<
-        ChatInputSubcommandGroupHandlerVariantT,
-        A,
-        E,
-        R
-      >,
+      handler: HandlerVariantHandlerContext<ChatInputSubcommandGroupHandlerVariantT, A, E, R>,
     ) =>
     <MA = never, ME = never, MR = never>(map: SubcommandHandler<MA, ME, MR>) =>
       new SubcommandHandler({
@@ -68,12 +39,7 @@ export class SubcommandHandler<
 
   static addSubcommandGroupHandlerMap =
     <A = never, E = never, R = never>(
-      handlerMap: HandlerVariantMap<
-        ChatInputSubcommandGroupHandlerVariantT,
-        A,
-        E,
-        R
-      >,
+      handlerMap: HandlerVariantMap<ChatInputSubcommandGroupHandlerVariantT, A, E, R>,
     ) =>
     <MA = never, ME = never, MR = never>(map: SubcommandHandler<MA, ME, MR>) =>
       new SubcommandHandler({
@@ -86,30 +52,17 @@ export class SubcommandHandler<
 
   static addSubcommandHandler =
     <A = never, E = never, R = never>(
-      handler: HandlerVariantHandlerContext<
-        ChatInputSubcommandHandlerVariantT,
-        A,
-        E,
-        R
-      >,
+      handler: HandlerVariantHandlerContext<ChatInputSubcommandHandlerVariantT, A, E, R>,
     ) =>
     <MA = never, ME = never, MR = never>(map: SubcommandHandler<MA, ME, MR>) =>
       new SubcommandHandler({
         subcommandGroupHandlerMap: map.subcommandGroupHandlerMap,
-        subcommandHandlerMap: pipe(
-          map.subcommandHandlerMap,
-          InteractionHandlerMap.add(handler),
-        ),
+        subcommandHandlerMap: pipe(map.subcommandHandlerMap, InteractionHandlerMap.add(handler)),
       });
 
   static addSubcommandHandlerMap =
     <A = never, E = never, R = never>(
-      handlerMap: HandlerVariantMap<
-        ChatInputSubcommandHandlerVariantT,
-        A,
-        E,
-        R
-      >,
+      handlerMap: HandlerVariantMap<ChatInputSubcommandHandlerVariantT, A, E, R>,
     ) =>
     <MA = never, ME = never, MR = never>(map: SubcommandHandler<MA, ME, MR>) =>
       new SubcommandHandler({
@@ -120,9 +73,7 @@ export class SubcommandHandler<
         ),
       });
 
-  static handler = <A = never, E = never, R = never>(
-    handler: SubcommandHandler<A, E, R>,
-  ) =>
+  static handler = <A = never, E = never, R = never>(handler: SubcommandHandler<A, E, R>) =>
     pipe(
       Effect.Do,
       bindObject({
@@ -140,16 +91,12 @@ export class SubcommandHandler<
             pipe(
               subcommand,
               Option.flatMap((subcommand) =>
-                InteractionHandlerMap.get(subcommand)(
-                  handler.subcommandHandlerMap,
-                ),
+                InteractionHandlerMap.get(subcommand)(handler.subcommandHandlerMap),
               ),
               Option.map((ctx) => ctx.handler),
             ),
           ),
-          Option.getOrElse<InteractionHandler<void, never, never>>(
-            () => Effect.void,
-          ),
+          Option.getOrElse<InteractionHandler<void, never, never>>(() => Effect.void),
         ),
       ),
     );

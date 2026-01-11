@@ -36,19 +36,14 @@ export const make = <T>(
     Effect.all({
       valueRef: TRef.make(initial),
       onEmitRef: TRef.make<
-        Option.Option<
-          (value: T) => Effect.Effect<void, never, SignalService.SignalService>
-        >
+        Option.Option<(value: T) => Effect.Effect<void, never, SignalService.SignalService>>
       >(Option.none()),
     }),
     Effect.map(({ valueRef, onEmitRef }) => ({
       source: {
         poll: () => TRef.get(valueRef),
-        emit: (
-          onEmit: (
-            value: T,
-          ) => Effect.Effect<void, never, SignalService.SignalService>,
-        ) => TRef.set(onEmitRef, Option.some(onEmit)),
+        emit: (onEmit: (value: T) => Effect.Effect<void, never, SignalService.SignalService>) =>
+          TRef.set(onEmitRef, Option.some(onEmit)),
       },
       emitter: {
         emit: (value: T) =>
@@ -59,9 +54,7 @@ export const make = <T>(
               pipe(
                 TRef.get(onEmitRef),
                 STM.commit,
-                Effect.flatMap(
-                  Effect.transposeMapOption((onEmit) => onEmit(value)),
-                ),
+                Effect.flatMap(Effect.transposeMapOption((onEmit) => onEmit(value))),
               ),
             ),
           ),

@@ -13,22 +13,8 @@ import {
   TeamIsvSplitConfig,
 } from "@/server/schema";
 import { type sheets_v4 } from "@googleapis/sheets";
-import {
-  Array,
-  Effect,
-  flow,
-  HashMap,
-  Number,
-  Option,
-  pipe,
-  Schema,
-  String,
-  Match,
-} from "effect";
-import {
-  DefaultTaggedClass,
-  OptionArrayToOptionStructValueSchema,
-} from "typhoon-core/schema";
+import { Array, Effect, flow, HashMap, Number, Option, pipe, Schema, String, Match } from "effect";
+import { DefaultTaggedClass, OptionArrayToOptionStructValueSchema } from "typhoon-core/schema";
 
 const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
   pipe(
@@ -107,15 +93,9 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
                 sheet: GoogleSheets.cellToStringSchema,
                 playerNameRange: GoogleSheets.cellToStringSchema,
                 teamNameRange: GoogleSheets.cellToStringSchema,
-                isvType: GoogleSheets.cellToLiteralSchema([
-                  "split",
-                  "combined",
-                ]),
+                isvType: GoogleSheets.cellToLiteralSchema(["split", "combined"]),
                 isvRanges: GoogleSheets.cellToStringSchema,
-                tagsType: GoogleSheets.cellToLiteralSchema([
-                  "constants",
-                  "ranges",
-                ]),
+                tagsType: GoogleSheets.cellToLiteralSchema(["constants", "ranges"]),
                 tags: GoogleSheets.cellToStringSchema,
               }),
             ),
@@ -126,18 +106,7 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
     Effect.map(Array.getRights),
     Effect.map(
       Array.map(
-        ([
-          {
-            name,
-            sheet,
-            playerNameRange,
-            teamNameRange,
-            isvType,
-            isvRanges,
-            tagsType,
-            tags,
-          },
-        ]) =>
+        ([{ name, sheet, playerNameRange, teamNameRange, isvType, isvRanges, tagsType, tags }]) =>
           TeamConfig.make({
             name,
             sheet,
@@ -161,9 +130,7 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
                               backlineRange: pipe(array, Array.get(1)),
                               talentRange: pipe(array, Array.get(2)),
                             }),
-                          Option.map((config) =>
-                            TeamIsvSplitConfig.make(config),
-                          ),
+                          Option.map((config) => TeamIsvSplitConfig.make(config)),
                         ),
                       ),
                     ),
@@ -203,9 +170,7 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
                   Match.when("ranges", () =>
                     pipe(
                       tags,
-                      Option.map(
-                        (tags) => new TeamTagsRangesConfig({ tagsRange: tags }),
-                      ),
+                      Option.map((tags) => new TeamTagsRangesConfig({ tagsRange: tags })),
                     ),
                   ),
                   Match.exhaustive,
@@ -236,10 +201,7 @@ const runnerConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
       [range],
       Schema.Tuple(
         pipe(
-          OptionArrayToOptionStructValueSchema(
-            ["name", "hours"],
-            Schema.String,
-          ),
+          OptionArrayToOptionStructValueSchema(["name", "hours"], Schema.String),
           Schema.compose(
             pipe(
               Schema.Struct({
@@ -267,190 +229,182 @@ const runnerConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
     Effect.withSpan("runnerConfigParser", { captureStackTrace: true }),
   );
 
-export class SheetConfigService extends Effect.Service<SheetConfigService>()(
-  "SheetConfigService",
-  {
-    effect: pipe(
-      Effect.Do,
-      Effect.bind("sheet", () => GoogleSheets),
-      Effect.map(({ sheet }) => ({
-        getRangesConfig: (sheetId: string) =>
-          pipe(
-            sheet.get({
-              spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!B8:C"],
-            }),
-            Effect.flatMap((response) =>
-              pipe(
-                Option.fromNullable(response.data.valueRanges),
-                Option.flatMap(Array.get(0)),
-                Option.flatMap((range) => Option.fromNullable(range.values)),
-                Option.map(Object.fromEntries),
-                Option.match({
-                  onSome: Effect.succeed,
-                  onNone: () =>
-                    Effect.fail(
-                      new Error.SheetConfigError({
-                        message:
-                          "Error getting ranges config, no value ranges found",
-                      }),
-                    ),
-                }),
-              ),
+export class SheetConfigService extends Effect.Service<SheetConfigService>()("SheetConfigService", {
+  effect: pipe(
+    Effect.Do,
+    Effect.bind("sheet", () => GoogleSheets),
+    Effect.map(({ sheet }) => ({
+      getRangesConfig: (sheetId: string) =>
+        pipe(
+          sheet.get({
+            spreadsheetId: sheetId,
+            ranges: ["'Thee's Sheet Settings'!B8:C"],
+          }),
+          Effect.flatMap((response) =>
+            pipe(
+              Option.fromNullable(response.data.valueRanges),
+              Option.flatMap(Array.get(0)),
+              Option.flatMap((range) => Option.fromNullable(range.values)),
+              Option.map(Object.fromEntries),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  Effect.fail(
+                    new Error.SheetConfigError({
+                      message: "Error getting ranges config, no value ranges found",
+                    }),
+                  ),
+              }),
             ),
-            Effect.flatMap(
-              Schema.decodeUnknown(
-                pipe(
-                  Schema.Struct({
-                    "User IDs": Schema.String,
-                    "User Sheet Names": Schema.String,
-                  }),
-                  Schema.rename({
-                    "User IDs": "userIds",
-                    "User Sheet Names": "userSheetNames",
-                  }),
-                  Schema.compose(DefaultTaggedClass(RangesConfig)),
-                ),
-              ),
-            ),
-            Error.Core.catchParseErrorAsValidationError,
-            Effect.withSpan("SheetConfigService.getRangesConfig", {
-              captureStackTrace: true,
-            }),
           ),
-        getTeamConfig: (sheetId: string) =>
-          pipe(
-            sheet.get({
-              spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!E8:L"],
-            }),
-            Effect.flatMap((response) =>
+          Effect.flatMap(
+            Schema.decodeUnknown(
               pipe(
-                Option.fromNullable(response.data.valueRanges),
-                Option.match({
-                  onSome: Effect.succeed,
-                  onNone: () =>
-                    Effect.fail(
-                      new Error.SheetConfigError({
-                        message:
-                          "Error getting team config, no value ranges found",
-                      }),
-                    ),
+                Schema.Struct({
+                  "User IDs": Schema.String,
+                  "User Sheet Names": Schema.String,
                 }),
-                Effect.flatMap(teamConfigParser),
-                Effect.provideService(GoogleSheets, sheet),
+                Schema.rename({
+                  "User IDs": "userIds",
+                  "User Sheet Names": "userSheetNames",
+                }),
+                Schema.compose(DefaultTaggedClass(RangesConfig)),
               ),
             ),
-            Effect.withSpan("SheetConfigService.getTeamConfig", {
-              captureStackTrace: true,
-            }),
           ),
-        getEventConfig: (sheetId: string) =>
-          pipe(
-            sheet.get({
-              spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!N8:O"],
-            }),
-            Effect.flatMap((response) =>
+          Error.Core.catchParseErrorAsValidationError,
+          Effect.withSpan("SheetConfigService.getRangesConfig", {
+            captureStackTrace: true,
+          }),
+        ),
+      getTeamConfig: (sheetId: string) =>
+        pipe(
+          sheet.get({
+            spreadsheetId: sheetId,
+            ranges: ["'Thee's Sheet Settings'!E8:L"],
+          }),
+          Effect.flatMap((response) =>
+            pipe(
+              Option.fromNullable(response.data.valueRanges),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  Effect.fail(
+                    new Error.SheetConfigError({
+                      message: "Error getting team config, no value ranges found",
+                    }),
+                  ),
+              }),
+              Effect.flatMap(teamConfigParser),
+              Effect.provideService(GoogleSheets, sheet),
+            ),
+          ),
+          Effect.withSpan("SheetConfigService.getTeamConfig", {
+            captureStackTrace: true,
+          }),
+        ),
+      getEventConfig: (sheetId: string) =>
+        pipe(
+          sheet.get({
+            spreadsheetId: sheetId,
+            ranges: ["'Thee's Sheet Settings'!N8:O"],
+          }),
+          Effect.flatMap((response) =>
+            pipe(
+              Option.fromNullable(response.data.valueRanges),
+              Option.flatMap(Array.get(0)),
+              Option.flatMap((range) => Option.fromNullable(range.values)),
+              Option.map(Object.fromEntries),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  Effect.fail(
+                    new Error.SheetConfigError({
+                      message: "Error getting event config, no value ranges found",
+                    }),
+                  ),
+              }),
+            ),
+          ),
+          Effect.flatMap(
+            Schema.decodeUnknown(
               pipe(
-                Option.fromNullable(response.data.valueRanges),
-                Option.flatMap(Array.get(0)),
-                Option.flatMap((range) => Option.fromNullable(range.values)),
-                Option.map(Object.fromEntries),
-                Option.match({
-                  onSome: Effect.succeed,
-                  onNone: () =>
-                    Effect.fail(
-                      new Error.SheetConfigError({
-                        message:
-                          "Error getting event config, no value ranges found",
-                      }),
-                    ),
+                Schema.Struct({
+                  "Start Time": pipe(
+                    Schema.NumberFromString,
+                    Schema.transform(Schema.Number, {
+                      strict: true,
+                      decode: Number.multiply(1000),
+                      encode: Number.unsafeDivide(1000),
+                    }),
+                  ),
                 }),
-              ),
-            ),
-            Effect.flatMap(
-              Schema.decodeUnknown(
-                pipe(
-                  Schema.Struct({
-                    "Start Time": pipe(
-                      Schema.NumberFromString,
-                      Schema.transform(Schema.Number, {
-                        strict: true,
-                        decode: Number.multiply(1000),
-                        encode: Number.unsafeDivide(1000),
-                      }),
-                    ),
-                  }),
-                  Schema.rename({
-                    "Start Time": "startTime",
-                  }),
-                  Schema.compose(DefaultTaggedClass(EventConfig)),
-                ),
-              ),
-            ),
-            Error.Core.catchParseErrorAsValidationError,
-            Effect.withSpan("SheetConfigService.getEventConfig", {
-              captureStackTrace: true,
-            }),
-          ),
-        getScheduleConfig: (sheetId: string) =>
-          pipe(
-            sheet.get({
-              spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!Q8:AB"],
-            }),
-            Effect.flatMap((response) =>
-              pipe(
-                Option.fromNullable(response.data.valueRanges),
-                Option.match({
-                  onSome: Effect.succeed,
-                  onNone: () =>
-                    Effect.fail(
-                      new Error.SheetConfigError({
-                        message:
-                          "Error getting schedule config, no value ranges found",
-                      }),
-                    ),
+                Schema.rename({
+                  "Start Time": "startTime",
                 }),
-                Effect.flatMap(scheduleConfigParser),
-                Effect.provideService(GoogleSheets, sheet),
+                Schema.compose(DefaultTaggedClass(EventConfig)),
               ),
             ),
-            Effect.withSpan("SheetConfigService.getScheduleConfig", {
-              captureStackTrace: true,
-            }),
           ),
-        getRunnerConfig: (sheetId: string) =>
-          pipe(
-            sheet.get({
-              spreadsheetId: sheetId,
-              ranges: ["'Thee's Sheet Settings'!AE8:AF"],
-            }),
-            Effect.flatMap((response) =>
-              pipe(
-                Option.fromNullable(response.data.valueRanges),
-                Option.match({
-                  onSome: Effect.succeed,
-                  onNone: () =>
-                    Effect.fail(
-                      new Error.SheetConfigError({
-                        message:
-                          "Error getting runner config, no value ranges found",
-                      }),
-                    ),
-                }),
-                Effect.flatMap(runnerConfigParser),
-                Effect.provideService(GoogleSheets, sheet),
-              ),
+          Error.Core.catchParseErrorAsValidationError,
+          Effect.withSpan("SheetConfigService.getEventConfig", {
+            captureStackTrace: true,
+          }),
+        ),
+      getScheduleConfig: (sheetId: string) =>
+        pipe(
+          sheet.get({
+            spreadsheetId: sheetId,
+            ranges: ["'Thee's Sheet Settings'!Q8:AB"],
+          }),
+          Effect.flatMap((response) =>
+            pipe(
+              Option.fromNullable(response.data.valueRanges),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  Effect.fail(
+                    new Error.SheetConfigError({
+                      message: "Error getting schedule config, no value ranges found",
+                    }),
+                  ),
+              }),
+              Effect.flatMap(scheduleConfigParser),
+              Effect.provideService(GoogleSheets, sheet),
             ),
-            Effect.withSpan("SheetConfigService.getRunnerConfig", {
-              captureStackTrace: true,
-            }),
           ),
-      })),
-    ),
-    dependencies: [GoogleSheets.Default],
-    accessors: true,
-  },
-) {}
+          Effect.withSpan("SheetConfigService.getScheduleConfig", {
+            captureStackTrace: true,
+          }),
+        ),
+      getRunnerConfig: (sheetId: string) =>
+        pipe(
+          sheet.get({
+            spreadsheetId: sheetId,
+            ranges: ["'Thee's Sheet Settings'!AE8:AF"],
+          }),
+          Effect.flatMap((response) =>
+            pipe(
+              Option.fromNullable(response.data.valueRanges),
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () =>
+                  Effect.fail(
+                    new Error.SheetConfigError({
+                      message: "Error getting runner config, no value ranges found",
+                    }),
+                  ),
+              }),
+              Effect.flatMap(runnerConfigParser),
+              Effect.provideService(GoogleSheets, sheet),
+            ),
+          ),
+          Effect.withSpan("SheetConfigService.getRunnerConfig", {
+            captureStackTrace: true,
+          }),
+        ),
+    })),
+  ),
+  dependencies: [GoogleSheets.Default],
+  accessors: true,
+}) {}

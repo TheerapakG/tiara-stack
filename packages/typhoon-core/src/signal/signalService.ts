@@ -17,9 +17,7 @@ import * as SignalContext from "./signalContext";
 
 type NotifyRequestData = {
   readonly signal: DependencySignal<unknown, unknown, unknown>;
-  readonly beforeNotify: (
-    watched: boolean,
-  ) => Effect.Effect<void, never, never>;
+  readonly beforeNotify: (watched: boolean) => Effect.Effect<void, never, never>;
 };
 const NotifyRequestTaggedClass: new (
   args: Readonly<NotifyRequestData>,
@@ -41,10 +39,7 @@ const RunTrackedRequestTaggedClass: new <A, E>(
 ) => Readonly<RunTrackedRequestData<A, E>> & {
   readonly _tag: "RunTrackedRequest";
 } = Data.TaggedClass("RunTrackedRequest");
-export class RunTrackedRequest<A, E> extends RunTrackedRequestTaggedClass<
-  A,
-  E
-> {}
+export class RunTrackedRequest<A, E> extends RunTrackedRequestTaggedClass<A, E> {}
 
 class RunTrackedWorkItem extends Data.TaggedClass("RunTrackedWorkItem")<{
   readonly deferred: Deferred.Deferred<unknown, unknown>;
@@ -54,18 +49,13 @@ class RunTrackedWorkItem extends Data.TaggedClass("RunTrackedWorkItem")<{
 type WorkItem = NotifyWorkItem | RunTrackedWorkItem;
 
 type SignalServiceShape = {
-  readonly enqueueNotify: (
-    request: NotifyRequest,
-  ) => Effect.Effect<void, never, SignalService>;
+  readonly enqueueNotify: (request: NotifyRequest) => Effect.Effect<void, never, SignalService>;
   readonly enqueueRunTracked: <A, E>(
     request: RunTrackedRequest<A, E>,
   ) => Effect.Effect<A, E, SignalService>;
 };
-const SignalServiceTag: Context.TagClass<
-  SignalService,
-  "SignalService",
-  SignalServiceShape
-> = Context.Tag("SignalService")<SignalService, SignalServiceShape>();
+const SignalServiceTag: Context.TagClass<SignalService, "SignalService", SignalServiceShape> =
+  Context.Tag("SignalService")<SignalService, SignalServiceShape>();
 export class SignalService extends SignalServiceTag {}
 
 export const layer: Layer.Layer<SignalService, never, never> = pipe(
@@ -157,9 +147,7 @@ export const layer: Layer.Layer<SignalService, never, never> = pipe(
   Layer.scoped(SignalService),
 );
 
-export const enqueueNotify = (
-  request: NotifyRequest,
-): Effect.Effect<void, never, SignalService> =>
+export const enqueueNotify = (request: NotifyRequest): Effect.Effect<void, never, SignalService> =>
   pipe(
     SignalService,
     Effect.flatMap((service) => service.enqueueNotify(request)),

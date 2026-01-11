@@ -15,10 +15,7 @@ import {
   channelServicesFromInteraction,
   guildMemberServicesFromInteraction,
 } from "@/services";
-import {
-  ChatInputHandlerVariantT,
-  handlerVariantContextBuilder,
-} from "@/types";
+import { ChatInputHandlerVariantT, handlerVariantContextBuilder } from "@/types";
 import { bindObject } from "@/utils";
 import {
   ApplicationIntegrationType,
@@ -48,16 +45,10 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
       .setName("debug")
       .setDescription("Debug command")
       .addStringOption((option) =>
-        option
-          .setName("service")
-          .setDescription("The service to debug")
-          .setRequired(true),
+        option.setName("service").setDescription("The service to debug").setRequired(true),
       )
       .addStringOption((option) =>
-        option
-          .setName("method")
-          .setDescription("The method to debug")
-          .setRequired(true),
+        option.setName("method").setDescription("The method to debug").setRequired(true),
       )
       .addStringOption((option) =>
         option
@@ -93,17 +84,9 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
         }),
         InteractionContext.deferReply.tap(),
         Effect.bind("parsedArgs", ({ args }) =>
-          pipe(
-            args,
-            Schema.decodeUnknown(
-              Schema.parseJson(Schema.Array(Schema.Unknown)),
-            ),
-          ),
+          pipe(args, Schema.decodeUnknown(Schema.parseJson(Schema.Array(Schema.Unknown)))),
         ),
-        Effect.let(
-          "serviceObject",
-          ({ service }) => Services[service as keyof typeof Services],
-        ),
+        Effect.let("serviceObject", ({ service }) => Services[service as keyof typeof Services]),
         Effect.bind(
           "result",
           ({ serviceObject, method, parsedArgs }) =>
@@ -126,9 +109,7 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
             >,
         ),
         Effect.tap(({ result }) => Effect.log(result)),
-        Effect.let("stringResult", ({ result }) =>
-          JSON.stringify(result, null, 2),
-        ),
+        Effect.let("stringResult", ({ result }) => JSON.stringify(result, null, 2)),
         InteractionContext.editReply.tap(({ stringResult }) =>
           stringResult.length > 500
             ? {

@@ -16,12 +16,8 @@ export const mapScheduleWithPlayersHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(mapScheduleWithPlayersHandlerConfig),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
+        Effect.bind("parsed", () => Event.request.parsed(mapScheduleWithPlayersHandlerConfig)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -48,13 +44,9 @@ export const mapScheduleWithPlayersHandler = pipe(
               pipe(
                 parsed,
                 Effect.flatMap(({ schedules }) =>
-                  Effect.forEach(
-                    schedules,
-                    Sheet.PlayerService.mapScheduleWithPlayers,
-                    {
-                      concurrency: "unbounded",
-                    },
-                  ),
+                  Effect.forEach(schedules, Sheet.PlayerService.mapScheduleWithPlayers, {
+                    concurrency: "unbounded",
+                  }),
                 ),
                 Result.provideEitherLayer(layerOfGuildId),
               ),
@@ -63,12 +55,7 @@ export const mapScheduleWithPlayersHandler = pipe(
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
         Effect.map((result) =>
-          pipe(
-            result,
-            Handler.Config.encodeResponseEffect(
-              mapScheduleWithPlayersHandlerConfig,
-            ),
-          ),
+          pipe(result, Handler.Config.encodeResponseEffect(mapScheduleWithPlayersHandlerConfig)),
         ),
         Effect.withSpan("mapScheduleWithPlayersHandler", {
           captureStackTrace: true,

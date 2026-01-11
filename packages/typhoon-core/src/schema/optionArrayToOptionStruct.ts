@@ -6,10 +6,7 @@ type OptionArrayToOptionStructValueSchema<
   Keys extends ReadonlyArray<string>,
   Value extends Schema.Schema.Any,
 > = Schema.transform<
-  OptionArrayToOptionTupleSchema<
-    Keys["length"],
-    Schema.SchemaClass<Schema.Schema.Encoded<Value>>
-  >,
+  OptionArrayToOptionTupleSchema<Keys["length"], Schema.SchemaClass<Schema.Schema.Encoded<Value>>>,
   TupleToStructValueSchema<Keys, Schema.OptionFromSelf<Value>>
 >;
 
@@ -24,16 +21,11 @@ const makeOptionArrayToOptionStructValueClass = <
     keys.length as Keys["length"],
     Schema.encodedSchema(value),
   );
-  const tupleToStructValueSchema = TupleToStructValueSchema(
-    keys,
-    Schema.OptionFromSelf(value),
-  );
+  const tupleToStructValueSchema = TupleToStructValueSchema(keys, Schema.OptionFromSelf(value));
 
-  return class extends Schema.compose(
-    optionArrayToOptionTupleSchema,
-    tupleToStructValueSchema,
-    { strict: false },
-  ) {
+  return class extends Schema.compose(optionArrayToOptionTupleSchema, tupleToStructValueSchema, {
+    strict: false,
+  }) {
     static keys = keys;
     static value = value;
   } as unknown as OptionArrayToOptionStructValueSchema<Keys, Value>;

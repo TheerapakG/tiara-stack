@@ -16,9 +16,7 @@ export const sheetCalcHandlerConfig = pipe(
           healNeeded: Schema.Number,
         }),
         players: pipe(
-          Schema.Array(
-            Schema.Struct({ name: Schema.String, encable: Schema.Boolean }),
-          ),
+          Schema.Array(Schema.Struct({ name: Schema.String, encable: Schema.Boolean })),
           Schema.itemsCount(5),
         ),
         fixedTeams: Schema.Array(

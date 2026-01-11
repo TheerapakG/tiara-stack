@@ -1,21 +1,20 @@
 import { Schema } from "effect";
 import type { ReadonlyJSONValue } from "@rocicorp/zero";
 
-export const ReadonlyJSONValueSchema: Schema.Schema<ReadonlyJSONValue> =
-  Schema.Union(
-    Schema.Null,
-    Schema.String,
-    Schema.Number,
-    Schema.Boolean,
-    Schema.Array(Schema.suspend(() => ReadonlyJSONValueSchema)),
-    Schema.Record({
-      key: Schema.String,
-      value: Schema.Union(
-        Schema.suspend(() => ReadonlyJSONValueSchema),
-        Schema.Undefined,
-      ),
-    }),
-  );
+export const ReadonlyJSONValueSchema: Schema.Schema<ReadonlyJSONValue> = Schema.Union(
+  Schema.Null,
+  Schema.String,
+  Schema.Number,
+  Schema.Boolean,
+  Schema.Array(Schema.suspend(() => ReadonlyJSONValueSchema)),
+  Schema.Record({
+    key: Schema.String,
+    value: Schema.Union(
+      Schema.suspend(() => ReadonlyJSONValueSchema),
+      Schema.Undefined,
+    ),
+  }),
+);
 
 const ZeroQueryErrorData = Schema.Struct({
   id: Schema.String,

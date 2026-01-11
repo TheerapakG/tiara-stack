@@ -52,10 +52,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
           ),
         ),
         Effect.tap(({ message, user }) =>
-          MessageCheckinService.setMessageCheckinMemberCheckinAt(
-            message.id,
-            user.id,
-          ),
+          MessageCheckinService.setMessageCheckinMemberCheckinAt(message.id, user.id),
         ),
         InteractionContext.editReply.tap(() => ({
           content: "You have been checked in!",
@@ -77,13 +74,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
                 Array.map((m) => userMention(m.memberId)),
                 Array.join(" "),
                 Effect.succeed,
-                Effect.when(() =>
-                  pipe(
-                    members,
-                    Array.length,
-                    Order.greaterThan(Number.Order)(0),
-                  ),
-                ),
+                Effect.when(() => pipe(members, Array.length, Order.greaterThan(Number.Order)(0))),
               ),
             ),
           ),
@@ -121,9 +112,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
               SendableChannelContext.send().sync({
                 content: `${userMention(user.id)} has checked in!`,
               }),
-              Effect.provide(
-                channelServicesFromGuildChannelId(messageCheckinData.channelId),
-              ),
+              Effect.provide(channelServicesFromGuildChannelId(messageCheckinData.channelId)),
             ),
           ]),
         ),

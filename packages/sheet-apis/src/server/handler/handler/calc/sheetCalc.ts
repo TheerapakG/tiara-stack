@@ -16,9 +16,7 @@ export const sheetCalcHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.bind("parsed", () =>
-          Event.request.parsed(sheetCalcHandlerConfig),
-        ),
+        Effect.bind("parsed", () => Event.request.parsed(sheetCalcHandlerConfig)),
         Effect.map(({ parsed }) =>
           pipe(
             parsed,
@@ -33,18 +31,14 @@ export const sheetCalcHandler = pipe(
                     HashMap.map(({ heal }) =>
                       pipe(
                         HashSet.make("fixed"),
-                        HashSet.union(
-                          heal ? HashSet.make("heal") : HashSet.empty(),
-                        ),
+                        HashSet.union(heal ? HashSet.make("heal") : HashSet.empty()),
                       ),
                     ),
                   ),
                 ),
                 Effect.bind("playerTeams", ({ fixedTeams }) =>
                   pipe(
-                    Sheet.PlayerService.getTeamsByNames(
-                      Array.map(players, ({ name }) => name),
-                    ),
+                    Sheet.PlayerService.getTeamsByNames(Array.map(players, ({ name }) => name)),
                     Effect.map(
                       Array.zipWith(players, (teams, { encable }) => ({
                         teams,
@@ -55,19 +49,13 @@ export const sheetCalcHandler = pipe(
                       Array.map(({ teams, encable }) =>
                         pipe(
                           teams,
-                          Array.map((team) =>
-                            PlayerTeam.fromTeam(config.cc, team),
-                          ),
+                          Array.map((team) => PlayerTeam.fromTeam(config.cc, team)),
                           Array.getSomes,
                           Array.map((team) =>
                             PlayerTeam.addTags(
                               pipe(
                                 HashSet.empty(),
-                                HashSet.union(
-                                  encable
-                                    ? HashSet.make("encable")
-                                    : HashSet.empty(),
-                                ),
+                                HashSet.union(encable ? HashSet.make("encable") : HashSet.empty()),
                                 HashSet.union(
                                   pipe(
                                     HashMap.get(fixedTeams, team.teamName),
@@ -82,9 +70,7 @@ export const sheetCalcHandler = pipe(
                     ),
                   ),
                 ),
-                Effect.flatMap(({ config, playerTeams }) =>
-                  CalcService.calc(config, playerTeams),
-                ),
+                Effect.flatMap(({ config, playerTeams }) => CalcService.calc(config, playerTeams)),
                 Effect.provide(Sheet.layerOfSheetId(sheetId)),
               ),
             ),

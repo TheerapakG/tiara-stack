@@ -16,9 +16,7 @@ export const getByIdHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
         Effect.bind("parsed", () => Event.request.parsed(getByIdHandlerConfig)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(

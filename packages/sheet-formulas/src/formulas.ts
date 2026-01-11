@@ -42,14 +42,11 @@ function parsePlayers(players: CellValue[][]) {
       Schema.Array(
         pipe(
           Schema.Tuple(Schema.String, Schema.Boolean),
-          Schema.transform(
-            Schema.Struct({ name: Schema.String, encable: Schema.Boolean }),
-            {
-              strict: true,
-              decode: ([name, encable]) => ({ name, encable }),
-              encode: ({ name, encable }) => [name, encable] as const,
-            },
-          ),
+          Schema.transform(Schema.Struct({ name: Schema.String, encable: Schema.Boolean }), {
+            strict: true,
+            decode: ([name, encable]) => ({ name, encable }),
+            encode: ({ name, encable }) => [name, encable] as const,
+          }),
         ),
       ),
     ),
@@ -63,9 +60,7 @@ function parseFixedTeams(fixedTeams: CellValue[][]) {
       pipe(
         Schema.Array(Schema.Tuple(Schema.String, Schema.Boolean)),
         Schema.transform(
-          Schema.Array(
-            Schema.Struct({ name: Schema.String, heal: Schema.Boolean }),
-          ),
+          Schema.Array(Schema.Struct({ name: Schema.String, heal: Schema.Boolean })),
           {
             strict: true,
             decode: Array.map(([name, heal]) => ({ name, heal })),
@@ -86,11 +81,7 @@ export function THEECALC(
   _p4: CellValue[][],
   _p5: CellValue[][],
 ) {
-  return [
-    [
-      "The legacy formula-based calc is sunsetted. Use the button menu version instead.",
-    ],
-  ];
+  return [["The legacy formula-based calc is sunsetted. Use the button menu version instead."]];
 }
 
 export function theeCalc(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
@@ -99,51 +90,35 @@ export function theeCalc(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
       Effect.all(
         {
           settingSheet: Option.fromNullable(
-            SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
-              SETTING_SHEET_NAME,
-            ),
+            SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SETTING_SHEET_NAME),
           ),
         },
         { concurrency: "unbounded" },
       ),
       Effect.bind("hour", () =>
-        pipe(
-          calcSheet.getRange("D23").getValue(),
-          Schema.decodeUnknown(Schema.Number),
-        ),
+        pipe(calcSheet.getRange("D23").getValue(), Schema.decodeUnknown(Schema.Number)),
       ),
       Effect.tap(() => calcSheet.getRange(`AX30:CC`).clearContent()),
-      Effect.tap(({ hour }) =>
-        calcSheet.getRange(`AX30:AY30`).setValues([[hour, "calculating"]]),
-      ),
+      Effect.tap(({ hour }) => calcSheet.getRange(`AX30:AY30`).setValues([[hour, "calculating"]])),
       Effect.andThen(({ hour, settingSheet }) =>
         pipe(
           Effect.Do,
           Effect.bind("url", () =>
-            pipe(
-              settingSheet.getRange("AI8").getValue(),
-              Schema.decodeUnknown(Schema.String),
-            ),
+            pipe(settingSheet.getRange("AI8").getValue(), Schema.decodeUnknown(Schema.String)),
           ),
           Effect.bind("config", () =>
             pipe(
               calcSheet.getRange("U30:V32").getValues(),
               Schema.decodeUnknown(
-                Schema.Array(
-                  Schema.Tuple(cellValueValidator, cellValueValidator),
-                ),
+                Schema.Array(Schema.Tuple(cellValueValidator, cellValueValidator)),
               ),
               Effect.map(HashMap.fromIterable),
               Effect.flatMap((config) =>
                 pipe(
                   Effect.Do,
                   Effect.bind("cc", () => HashMap.get(config, "cc")),
-                  Effect.bind("considerEnc", () =>
-                    HashMap.get(config, "consider_enc"),
-                  ),
-                  Effect.bind("healNeeded", () =>
-                    HashMap.get(config, "heal_needed"),
-                  ),
+                  Effect.bind("considerEnc", () => HashMap.get(config, "consider_enc")),
+                  Effect.bind("healNeeded", () => HashMap.get(config, "heal_needed")),
                 ),
               ),
               Effect.flatMap(Schema.decodeUnknown(calcConfigValidator)),
@@ -168,9 +143,7 @@ export function theeCalc(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
               pipe(
                 Effect.logError(e),
                 Effect.andThen(() =>
-                  calcSheet
-                    .getRange(`AX30:AY30`)
-                    .setValues([[hour, "sheet value error"]]),
+                  calcSheet.getRange(`AX30:AY30`).setValues([[hour, "sheet value error"]]),
                 ),
               ),
             onSuccess: ({ url, config, players, fixedTeams }) =>
@@ -209,22 +182,16 @@ export function theeCalc(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
                     pipe(
                       Effect.logError(e),
                       Effect.andThen(() =>
-                        calcSheet
-                          .getRange(`AX30:AY30`)
-                          .setValues([[hour, e.message]]),
+                        calcSheet.getRange(`AX30:AY30`).setValues([[hour, e.message]]),
                       ),
                     ),
                   onSuccess: (result) =>
                     pipe(
                       Effect.log(result),
-                      Effect.andThen(() =>
-                        calcSheet.getRange(`AX30:AY30`).setValues([[hour, ""]]),
-                      ),
+                      Effect.andThen(() => calcSheet.getRange(`AX30:AY30`).setValues([[hour, ""]])),
                       Effect.andThen(() =>
                         result.length > 0
-                          ? calcSheet
-                              .getRange(`AX31:CC${result.length + 30}`)
-                              .setValues(result)
+                          ? calcSheet.getRange(`AX31:CC${result.length + 30}`).setValues(result)
                           : undefined,
                       ),
                     ),
@@ -259,9 +226,7 @@ export function copyRange({
   targetColumnEnd: string;
 }) {
   targetSheet
-    .getRange(
-      `${targetColumnStart}${targetRowStart}:${targetColumnEnd}${targetRowStart + rows}`,
-    )
+    .getRange(`${targetColumnStart}${targetRowStart}:${targetColumnEnd}${targetRowStart + rows}`)
     .setValues(
       sourceSheet
         .getRange(
@@ -271,11 +236,7 @@ export function copyRange({
     );
 }
 
-export function TZSHORTSTAMPS(
-  start: CellValue,
-  tzs: CellValue[][],
-  hours: CellValue[][],
-) {
+export function TZSHORTSTAMPS(start: CellValue, tzs: CellValue[][], hours: CellValue[][]) {
   return Effect.runSync(
     pipe(
       Effect.Do,
@@ -296,18 +257,10 @@ export function TZSHORTSTAMPS(
         ),
       ),
       Effect.bind("tzs", () =>
-        pipe(
-          tzs,
-          Array.flatten,
-          Schema.decodeUnknown(Schema.Array(Schema.String)),
-        ),
+        pipe(tzs, Array.flatten, Schema.decodeUnknown(Schema.Array(Schema.String))),
       ),
       Effect.bind("hours", () =>
-        pipe(
-          hours,
-          Array.flatten,
-          Schema.decodeUnknown(Schema.Array(Schema.Number)),
-        ),
+        pipe(hours, Array.flatten, Schema.decodeUnknown(Schema.Array(Schema.Number))),
       ),
       Effect.andThen(({ start, tzs, hours }) =>
         pipe(
@@ -360,11 +313,7 @@ export function TZSHORTSTAMPS(
   );
 }
 
-export function TZLONGSTAMPS(
-  start: CellValue,
-  tzs: CellValue[][],
-  hours: CellValue[][],
-) {
+export function TZLONGSTAMPS(start: CellValue, tzs: CellValue[][], hours: CellValue[][]) {
   return Effect.runSync(
     pipe(
       Effect.Do,
@@ -385,18 +334,10 @@ export function TZLONGSTAMPS(
         ),
       ),
       Effect.bind("tzs", () =>
-        pipe(
-          tzs,
-          Array.flatten,
-          Schema.decodeUnknown(Schema.Array(Schema.String)),
-        ),
+        pipe(tzs, Array.flatten, Schema.decodeUnknown(Schema.Array(Schema.String))),
       ),
       Effect.bind("hours", () =>
-        pipe(
-          hours,
-          Array.flatten,
-          Schema.decodeUnknown(Schema.Array(Schema.Number)),
-        ),
+        pipe(hours, Array.flatten, Schema.decodeUnknown(Schema.Array(Schema.Number))),
       ),
       Effect.andThen(({ start, tzs, hours }) =>
         pipe(
@@ -407,9 +348,7 @@ export function TZLONGSTAMPS(
               Effect.let("startTime", () =>
                 pipe(start, DateTime.addDuration(Duration.hours(hour - 1))),
               ),
-              Effect.let("endTime", () =>
-                pipe(start, DateTime.addDuration(Duration.hours(hour))),
-              ),
+              Effect.let("endTime", () => pipe(start, DateTime.addDuration(Duration.hours(hour)))),
               Effect.map(({ startTime, endTime }) =>
                 pipe(
                   tzs,
@@ -419,9 +358,7 @@ export function TZLONGSTAMPS(
                       Option.bind("startTimeTz", () =>
                         DateTime.makeZoned(startTime, { timeZone: tz }),
                       ),
-                      Option.bind("endTimeTz", () =>
-                        DateTime.makeZoned(endTime, { timeZone: tz }),
-                      ),
+                      Option.bind("endTimeTz", () => DateTime.makeZoned(endTime, { timeZone: tz })),
                       Option.let("startTimeTzHours", ({ startTimeTz }) =>
                         pipe(
                           startTimeTz,
@@ -498,9 +435,7 @@ export function tzLongStamps({
       Effect.all(
         {
           settingSheet: Option.fromNullable(
-            SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
-              SETTING_SHEET_NAME,
-            ),
+            SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SETTING_SHEET_NAME),
           ),
         },
         { concurrency: "unbounded" },
@@ -524,17 +459,13 @@ export function tzLongStamps({
       Effect.bind("tzsLookup", ({ settingSheet }) =>
         pipe(
           settingSheet.getRange("AJ8:AK").getValues(),
-          Schema.decodeUnknown(
-            Schema.Array(Schema.Tuple(Schema.String, Schema.String)),
-          ),
+          Schema.decodeUnknown(Schema.Array(Schema.Tuple(Schema.String, Schema.String))),
           Effect.map(HashMap.fromIterable),
         ),
       ),
       Effect.bind("tzs", ({ tzsLookup }) =>
         pipe(
-          sheet
-            .getRange(`${tzsColumnStart}${tzsRow}:${tzsColumnEnd}${tzsRow}`)
-            .getValues(),
+          sheet.getRange(`${tzsColumnStart}${tzsRow}:${tzsColumnEnd}${tzsRow}`).getValues(),
           Array.flatten,
           Schema.decodeUnknown(Schema.Array(Schema.String)),
           Effect.map(
@@ -549,11 +480,7 @@ export function tzLongStamps({
       ),
       Effect.bind("hours", () =>
         pipe(
-          sheet
-            .getRange(
-              `${hoursColumn}${hoursRowStart}:${hoursColumn}${hoursRowEnd}`,
-            )
-            .getValues(),
+          sheet.getRange(`${hoursColumn}${hoursRowStart}:${hoursColumn}${hoursRowEnd}`).getValues(),
           Array.flatten,
           Schema.decodeUnknown(Schema.Array(Schema.Number)),
         ),
@@ -565,19 +492,13 @@ export function tzLongStamps({
             Effect.let("startTime", () =>
               pipe(start, DateTime.addDuration(Duration.hours(hour - 1))),
             ),
-            Effect.let("endTime", () =>
-              pipe(start, DateTime.addDuration(Duration.hours(hour))),
-            ),
+            Effect.let("endTime", () => pipe(start, DateTime.addDuration(Duration.hours(hour)))),
             Effect.map(({ startTime, endTime }) =>
               Array.map(tzs, (tz) =>
                 pipe(
                   Option.Do,
-                  Option.bind("startTimeTz", () =>
-                    DateTime.makeZoned(startTime, { timeZone: tz }),
-                  ),
-                  Option.bind("endTimeTz", () =>
-                    DateTime.makeZoned(endTime, { timeZone: tz }),
-                  ),
+                  Option.bind("startTimeTz", () => DateTime.makeZoned(startTime, { timeZone: tz })),
+                  Option.bind("endTimeTz", () => DateTime.makeZoned(endTime, { timeZone: tz })),
                   Option.let("startTimeTzHours", ({ startTimeTz }) =>
                     pipe(
                       startTimeTz,
@@ -611,12 +532,7 @@ export function tzLongStamps({
                     ),
                   ),
                   Option.map(
-                    ({
-                      startTimeTzHours,
-                      startTimeTzMinutes,
-                      endTimeTzHours,
-                      endTimeTzMinutes,
-                    }) =>
+                    ({ startTimeTzHours, startTimeTzMinutes, endTimeTzHours, endTimeTzMinutes }) =>
                       `${startTimeTzHours}:${startTimeTzMinutes} - ${endTimeTzHours}:${endTimeTzMinutes}`,
                   ),
                   Option.getOrElse(() => ""),
@@ -628,9 +544,7 @@ export function tzLongStamps({
       ),
       Effect.andThen((result) =>
         sheet
-          .getRange(
-            `${tzsColumnStart}${hoursRowStart}:${tzsColumnEnd}${hoursRowEnd}`,
-          )
+          .getRange(`${tzsColumnStart}${hoursRowStart}:${tzsColumnEnd}${hoursRowEnd}`)
           .setValues(result),
       ),
     ),
@@ -685,13 +599,10 @@ export function onEditInstallable(e: GoogleAppsScript.Events.SheetsOnEdit) {
       () => {
         const drafterSheet = e.range.getSheet();
         const rows =
-          drafterSheet.getRange("C13").getValue() -
-          drafterSheet.getRange("C12").getValue() +
-          1;
-        const scheduleSheet =
-          SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
-            drafterSheet.getRange("S12").getValue(),
-          );
+          drafterSheet.getRange("C13").getValue() - drafterSheet.getRange("C12").getValue() + 1;
+        const scheduleSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
+          drafterSheet.getRange("S12").getValue(),
+        );
 
         if (scheduleSheet) {
           copyRange({
@@ -716,13 +627,10 @@ export function onEditInstallable(e: GoogleAppsScript.Events.SheetsOnEdit) {
       () => {
         const drafterSheet = e.range.getSheet();
         const rows =
-          drafterSheet.getRange("C13").getValue() -
-          drafterSheet.getRange("C12").getValue() +
-          1;
-        const scheduleSheet =
-          SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
-            drafterSheet.getRange("S12").getValue(),
-          );
+          drafterSheet.getRange("C13").getValue() - drafterSheet.getRange("C12").getValue() + 1;
+        const scheduleSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
+          drafterSheet.getRange("S12").getValue(),
+        );
 
         if (scheduleSheet) {
           copyRange({
@@ -747,9 +655,7 @@ export function onEditInstallable(e: GoogleAppsScript.Events.SheetsOnEdit) {
       () => {
         const drafterSheet = e.range.getSheet();
         const rows =
-          drafterSheet.getRange("C13").getValue() -
-          drafterSheet.getRange("C12").getValue() +
-          1;
+          drafterSheet.getRange("C13").getValue() - drafterSheet.getRange("C12").getValue() + 1;
 
         tzLongStamps({
           sheet: drafterSheet,

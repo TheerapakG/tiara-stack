@@ -16,21 +16,13 @@ import {
   pipe,
 } from "effect";
 import { Observable } from "../observability";
-import {
-  DependencySignal,
-  DependencySymbol,
-  notifyAllDependents,
-} from "./dependencySignal";
+import { DependencySignal, DependencySymbol, notifyAllDependents } from "./dependencySignal";
 import { DependentSignal, DependentSymbol } from "./dependentSignal";
 import * as SignalContext from "./signalContext";
 import * as SignalService from "./signalService";
 
 export class WithScopeComputed<A = never, E = never, R = never>
-  extends Effectable.Class<
-    A,
-    E,
-    R | SignalContext.SignalContext | SignalService.SignalService
-  >
+  extends Effectable.Class<A, E, R | SignalContext.SignalContext | SignalService.SignalService>
   implements DependentSignal, DependencySignal<A, E, R>
 {
   readonly _tag = "WithScopeComputed" as const;
@@ -88,9 +80,7 @@ export class WithScopeComputed<A = never, E = never, R = never>
   addDependency(dependency: DependencySignal<unknown, unknown, unknown>) {
     return pipe(
       TRef.get(this._isScopeClosed),
-      STM.flatMap((isClosed) =>
-        isClosed ? STM.void : TSet.add(this._dependencies, dependency),
-      ),
+      STM.flatMap((isClosed) => (isClosed ? STM.void : TSet.add(this._dependencies, dependency))),
     );
   }
 
@@ -100,34 +90,20 @@ export class WithScopeComputed<A = never, E = never, R = never>
 
   clearDependencies() {
     return pipe(
-      TSet.forEach(this._dependencies, (dependency) =>
-        dependency.removeDependent(this),
-      ),
+      TSet.forEach(this._dependencies, (dependency) => dependency.removeDependent(this)),
       STM.zipRight(TSet.removeIf(this._dependencies, () => true)),
     );
   }
 
-  getDependencies(): STM.STM<
-    TSet.TSet<DependencySignal<unknown, unknown, unknown>>,
-    never,
-    never
-  > {
+  getDependencies(): STM.STM<TSet.TSet<DependencySignal<unknown, unknown, unknown>>, never, never> {
     return STM.succeed(this._dependencies);
   }
 
-  getDependents(): STM.STM<
-    TSet.TSet<WeakRef<DependentSignal> | DependentSignal>,
-    never,
-    never
-  > {
+  getDependents(): STM.STM<TSet.TSet<WeakRef<DependentSignal> | DependentSignal>, never, never> {
     return STM.succeed(this._dependents);
   }
 
-  value(): Effect.Effect<
-    A,
-    E,
-    R | SignalContext.SignalContext | SignalService.SignalService
-  > {
+  value(): Effect.Effect<A, E, R | SignalContext.SignalContext | SignalService.SignalService> {
     return pipe(
       SignalContext.bindDependency(this),
       STM.commit,
@@ -138,11 +114,7 @@ export class WithScopeComputed<A = never, E = never, R = never>
     );
   }
 
-  commit(): Effect.Effect<
-    A,
-    E,
-    R | SignalContext.SignalContext | SignalService.SignalService
-  > {
+  commit(): Effect.Effect<A, E, R | SignalContext.SignalContext | SignalService.SignalService> {
     return this.value();
   }
 
@@ -153,17 +125,12 @@ export class WithScopeComputed<A = never, E = never, R = never>
       Effect.flatMap(
         flow(
           Match.value,
-          Match.when(true, () =>
-            pipe(TQueue.peek(this._queue), STM.commit, Effect.flatten),
-          ),
+          Match.when(true, () => pipe(TQueue.peek(this._queue), STM.commit, Effect.flatten)),
           Match.when(false, () =>
             pipe(
               STM.all({
                 queue: TQueue.peekOption(this._queue),
-                context: pipe(
-                  STM.context<R>(),
-                  STM.map(Context.omit(SignalContext.SignalContext)),
-                ),
+                context: pipe(STM.context<R>(), STM.map(Context.omit(SignalContext.SignalContext))),
               }),
               STM.commit,
               Effect.flatMap(({ queue, context }) =>
@@ -203,11 +170,7 @@ export class WithScopeComputed<A = never, E = never, R = never>
     );
   }
 
-  getReferenceForDependency(): STM.STM<
-    WeakRef<DependentSignal> | DependentSignal,
-    never,
-    never
-  > {
+  getReferenceForDependency(): STM.STM<WeakRef<DependentSignal> | DependentSignal, never, never> {
     return STM.succeed(this._reference);
   }
 
@@ -278,14 +241,17 @@ export class WithScopeComputed<A = never, E = never, R = never>
   }
 }
 
-export type Success<S extends WithScopeComputed<unknown, unknown, unknown>> =
-  Effect.Effect.Success<ReturnType<S["peek"]>>;
+export type Success<S extends WithScopeComputed<unknown, unknown, unknown>> = Effect.Effect.Success<
+  ReturnType<S["peek"]>
+>;
 
-export type Error<S extends WithScopeComputed<unknown, unknown, unknown>> =
-  Effect.Effect.Error<ReturnType<S["peek"]>>;
+export type Error<S extends WithScopeComputed<unknown, unknown, unknown>> = Effect.Effect.Error<
+  ReturnType<S["peek"]>
+>;
 
-export type Context<S extends WithScopeComputed<unknown, unknown, unknown>> =
-  Effect.Effect.Context<ReturnType<S["peek"]>>;
+export type Context<S extends WithScopeComputed<unknown, unknown, unknown>> = Effect.Effect.Context<
+  ReturnType<S["peek"]>
+>;
 
 export const make = <A = never, E = never, R = never>(
   effect: Effect.Effect<A, E, R>,
@@ -307,11 +273,7 @@ export const make = <A = never, E = never, R = never>(
       "computed",
       ({ isScopeClosed, queue, dependents, dependencies, lastExit }) =>
         new WithScopeComputed<A, E, Exclude<R, SignalContext.SignalContext>>(
-          effect as Effect.Effect<
-            A,
-            E,
-            Exclude<R, SignalContext.SignalContext>
-          >,
+          effect as Effect.Effect<A, E, Exclude<R, SignalContext.SignalContext>>,
           isScopeClosed,
           queue,
           dependents,
@@ -323,11 +285,7 @@ export const make = <A = never, E = never, R = never>(
     STM.commit,
     Effect.flatMap(({ computed, isScopeClosed }) =>
       Effect.acquireRelease(Effect.succeed(computed), () =>
-        pipe(
-          TRef.set(isScopeClosed, true),
-          STM.zipRight(computed.clearDependencies()),
-          STM.commit,
-        ),
+        pipe(TRef.set(isScopeClosed, true), STM.zipRight(computed.clearDependencies()), STM.commit),
       ),
     ),
     Observable.withSpan(

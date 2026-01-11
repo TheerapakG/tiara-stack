@@ -1,25 +1,12 @@
-import {
-  Array,
-  HashMap,
-  Option,
-  ParseResult,
-  pipe,
-  Schema,
-  SchemaAST,
-} from "effect";
+import { Array, HashMap, Option, ParseResult, pipe, Schema, SchemaAST } from "effect";
 
 interface ArrayLookupSchema<
   Literals extends Array.NonEmptyReadonlyArray<SchemaAST.LiteralValue>,
-> extends Schema.transformOrFail<
-    typeof Schema.Number,
-    Schema.Literal<Literals>
-  > {
+> extends Schema.transformOrFail<typeof Schema.Number, Schema.Literal<Literals>> {
   readonly literals: Literals;
 }
 
-const makeArrayLookupClass = <
-  Literals extends Array.NonEmptyReadonlyArray<SchemaAST.LiteralValue>,
->(
+const makeArrayLookupClass = <Literals extends Array.NonEmptyReadonlyArray<SchemaAST.LiteralValue>>(
   literals: Literals,
 ) => {
   const reverseLookup = pipe(
@@ -40,19 +27,13 @@ const makeArrayLookupClass = <
             onSome: ParseResult.succeed,
             onNone: () =>
               ParseResult.fail(
-                new ParseResult.Unexpected(
-                  index,
-                  `Index ${index} not found in literals array`,
-                ),
+                new ParseResult.Unexpected(index, `Index ${index} not found in literals array`),
               ),
           }),
         ),
       encode: (literal) =>
         pipe(
-          HashMap.get(
-            reverseLookup,
-            literal as Array.ReadonlyArray.Infer<Literals>,
-          ),
+          HashMap.get(reverseLookup, literal as Array.ReadonlyArray.Infer<Literals>),
           Option.match({
             onSome: ParseResult.succeed,
             onNone: () =>
@@ -70,9 +51,7 @@ const makeArrayLookupClass = <
   } as ArrayLookupSchema<Literals>;
 };
 
-const ArrayLookupSchema = <
-  Literals extends Array.NonEmptyReadonlyArray<SchemaAST.LiteralValue>,
->(
+const ArrayLookupSchema = <Literals extends Array.NonEmptyReadonlyArray<SchemaAST.LiteralValue>>(
   literals: Literals,
 ): ArrayLookupSchema<Literals> => makeArrayLookupClass(literals);
 

@@ -16,12 +16,8 @@ export const getEventConfigHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(getEventConfigHandlerConfig),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
+        Effect.bind("parsed", () => Event.request.parsed(getEventConfigHandlerConfig)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -49,9 +45,7 @@ export const getEventConfigHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(
-          Handler.Config.encodeResponseEffect(getEventConfigHandlerConfig),
-        ),
+        Effect.map(Handler.Config.encodeResponseEffect(getEventConfigHandlerConfig)),
         Effect.map(
           Effect.withSpan("getEventConfigHandler", {
             captureStackTrace: true,

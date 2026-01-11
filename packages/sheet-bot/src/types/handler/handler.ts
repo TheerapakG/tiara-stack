@@ -2,11 +2,7 @@ import { Data, Effect, HashMap, Option } from "effect";
 
 type Constrain<T, C> = T extends infer U extends C ? U : never;
 
-export type InteractionHandler<A = never, E = never, R = never> = Effect.Effect<
-  A,
-  E,
-  R
->;
+export type InteractionHandler<A = never, E = never, R = never> = Effect.Effect<A, E, R>;
 export type AnyInteractionHandler<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   A = any,
@@ -25,12 +21,7 @@ type InteractionHandlerError<H extends AnyInteractionHandler> =
 type InteractionHandlerRequirement<H extends AnyInteractionHandler> =
   H extends InteractionHandler<unknown, unknown, infer R> ? R : never;
 
-export type InteractionHandlerContextObject<
-  Data = unknown,
-  A = never,
-  E = never,
-  R = never,
-> = {
+export type InteractionHandlerContextObject<Data = unknown, A = never, E = never, R = never> = {
   data: Data;
   handler: InteractionHandler<A, E, R>;
 };
@@ -46,8 +37,7 @@ export class InteractionHandlerContext<
 
 export type InteractionHandlerContextBuilderObject<
   Data extends Option.Option<unknown> = Option.None<unknown>,
-  Handler extends
-    Option.Option<AnyInteractionHandler> = Option.None<AnyInteractionHandler>,
+  Handler extends Option.Option<AnyInteractionHandler> = Option.None<AnyInteractionHandler>,
 > = {
   _data: Data;
   _handler: Handler;
@@ -55,8 +45,7 @@ export type InteractionHandlerContextBuilderObject<
 
 export class InteractionHandlerContextBuilder<
   Data extends Option.Option<unknown> = Option.None<unknown>,
-  Handler extends
-    Option.Option<AnyInteractionHandler> = Option.None<AnyInteractionHandler>,
+  Handler extends Option.Option<AnyInteractionHandler> = Option.None<AnyInteractionHandler>,
 > extends Data.TaggedClass("InteractionHandlerContextBuilder")<
   InteractionHandlerContextBuilderObject<Data, Handler>
 > {
@@ -68,10 +57,7 @@ export class InteractionHandlerContextBuilder<
   };
 
   data<BuilderData extends Option.Option.Value<Data>>(
-    this: InteractionHandlerContextBuilder<
-      Option.None<Option.Option.Value<Data>>,
-      Handler
-    >,
+    this: InteractionHandlerContextBuilder<Option.None<Option.Option.Value<Data>>, Handler>,
     data: BuilderData,
   ) {
     return new InteractionHandlerContextBuilder({
@@ -80,17 +66,10 @@ export class InteractionHandlerContextBuilder<
     });
   }
 
-  handler<
-    BuilderHandler extends Constrain<
-      Option.Option.Value<Handler>,
-      AnyInteractionHandler
-    >,
-  >(
+  handler<BuilderHandler extends Constrain<Option.Option.Value<Handler>, AnyInteractionHandler>>(
     this: InteractionHandlerContextBuilder<
       Data,
-      Option.None<
-        Constrain<Option.Option.Value<Handler>, AnyInteractionHandler>
-      >
+      Option.None<Constrain<Option.Option.Value<Handler>, AnyInteractionHandler>>
     >,
     handler: BuilderHandler,
   ) {
@@ -102,16 +81,11 @@ export class InteractionHandlerContextBuilder<
 
   build<
     InnerData extends Option.Option.Value<Data> = Option.Option.Value<Data>,
-    InnerHandler extends Constrain<
+    InnerHandler extends Constrain<Option.Option.Value<Handler>, AnyInteractionHandler> = Constrain<
       Option.Option.Value<Handler>,
       AnyInteractionHandler
-    > = Constrain<Option.Option.Value<Handler>, AnyInteractionHandler>,
-  >(
-    this: InteractionHandlerContextBuilder<
-      Option.Some<InnerData>,
-      Option.Some<InnerHandler>
     >,
-  ) {
+  >(this: InteractionHandlerContextBuilder<Option.Some<InnerData>, Option.Some<InnerHandler>>) {
     return new InteractionHandlerContext<
       InnerData,
       InteractionHandlerSuccess<InnerHandler>,
@@ -124,12 +98,7 @@ export class InteractionHandlerContextBuilder<
   }
 }
 
-export type InteractionHandlerMapObject<
-  Data = unknown,
-  A = never,
-  E = never,
-  R = never,
-> = {
+export type InteractionHandlerMapObject<Data = unknown, A = never, E = never, R = never> = {
   map: HashMap.HashMap<string, InteractionHandlerContext<Data, A, E, R>>;
   keyGetter: (data: Data) => string;
 };
@@ -139,9 +108,7 @@ export class InteractionHandlerMap<
   A = never,
   E = never,
   R = never,
-> extends Data.TaggedClass("InteractionHandlerMap")<
-  InteractionHandlerMapObject<Data, A, E, R>
-> {
+> extends Data.TaggedClass("InteractionHandlerMap")<InteractionHandlerMapObject<Data, A, E, R>> {
   static empty = <Data = unknown, A = never, E = never, R = never>(
     keyGetter: (data: Data) => string,
   ) => {
@@ -154,9 +121,7 @@ export class InteractionHandlerMap<
   static add = <Data1 extends Data2, Data2, A1 = never, E1 = never, R1 = never>(
     context: InteractionHandlerContext<Data1, A1, E1, R1>,
   ) => {
-    return <A2 = never, E2 = never, R2 = never>(
-      map: InteractionHandlerMap<Data2, A2, E2, R2>,
-    ) =>
+    return <A2 = never, E2 = never, R2 = never>(map: InteractionHandlerMap<Data2, A2, E2, R2>) =>
       new InteractionHandlerMap({
         map: HashMap.set(
           map.map as HashMap.HashMap<
@@ -171,22 +136,13 @@ export class InteractionHandlerMap<
   };
 
   static get = (key: string) => {
-    return <Data, A, E, R>(map: InteractionHandlerMap<Data, A, E, R>) =>
-      HashMap.get(map.map, key);
+    return <Data, A, E, R>(map: InteractionHandlerMap<Data, A, E, R>) => HashMap.get(map.map, key);
   };
 
-  static union = <
-    Data1 extends Data2,
-    Data2,
-    A1 = never,
-    E1 = never,
-    R1 = never,
-  >(
+  static union = <Data1 extends Data2, Data2, A1 = never, E1 = never, R1 = never>(
     map: InteractionHandlerMap<Data1, A1, E1, R1>,
   ) => {
-    return <A2 = never, E2 = never, R2 = never>(
-      other: InteractionHandlerMap<Data2, A2, E2, R2>,
-    ) =>
+    return <A2 = never, E2 = never, R2 = never>(other: InteractionHandlerMap<Data2, A2, E2, R2>) =>
       new InteractionHandlerMap({
         map: HashMap.union(
           map.map as HashMap.HashMap<

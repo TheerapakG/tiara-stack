@@ -5,10 +5,7 @@ import {
   PermissionService,
   ScreenshotService,
 } from "@/services";
-import {
-  ChatInputHandlerVariantT,
-  handlerVariantContextBuilder,
-} from "@/types";
+import { ChatInputHandlerVariantT, handlerVariantContextBuilder } from "@/types";
 import { bindObject } from "@/utils";
 import {
   ApplicationIntegrationType,
@@ -31,15 +28,10 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
           .setRequired(true),
       )
       .addNumberOption((option) =>
-        option
-          .setName("day")
-          .setDescription("The day to get the slots for")
-          .setRequired(true),
+        option.setName("day").setDescription("The day to get the slots for").setRequired(true),
       )
       .addStringOption((option) =>
-        option
-          .setName("server_id")
-          .setDescription("The server to get the teams for"),
+        option.setName("server_id").setDescription("The server to get the teams for"),
       )
       .setIntegrationTypes(
         ApplicationIntegrationType.GuildInstall,

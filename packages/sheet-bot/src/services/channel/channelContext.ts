@@ -32,22 +32,13 @@ export interface GuildBasedChannelT extends HKT.TypeLambda {
   readonly type: GuildBasedChannel;
 }
 
-export type ChannelKind<F extends BaseChannelT> = HKT.Kind<
-  F,
-  never,
-  never,
-  never,
-  never
->;
+export type ChannelKind<F extends BaseChannelT> = HKT.Kind<F, never, never, never, never>;
 
 export class ChannelContext<C extends BaseChannelT = ChannelT> {
-  $inferChannelType: Types.Contravariant<C> =
-    undefined as unknown as Types.Contravariant<C>;
+  $inferChannelType: Types.Contravariant<C> = undefined as unknown as Types.Contravariant<C>;
 
   static channel<C extends BaseChannelT = ChannelT>() {
-    return Context.GenericTag<ChannelContext<C>, ChannelKind<C>>(
-      "ChannelContext",
-    );
+    return Context.GenericTag<ChannelContext<C>, ChannelKind<C>>("ChannelContext");
   }
 
   static make<C extends BaseChannelT>(channel: ChannelKind<C>) {
@@ -55,9 +46,7 @@ export class ChannelContext<C extends BaseChannelT = ChannelT> {
   }
 }
 
-export class UnsendableChannelError extends Data.TaggedError(
-  "UnsendableChannelError",
-)<{
+export class UnsendableChannelError extends Data.TaggedError("UnsendableChannelError")<{
   readonly message: string;
 }> {
   constructor() {
@@ -68,8 +57,7 @@ export class UnsendableChannelError extends Data.TaggedError(
 export class SendableChannelContext {
   static channel<
     C extends BaseChannelT = ChannelT,
-    Kind extends ChannelKind<C> &
-      ChannelKind<SendableChannelT> = ChannelKind<C> &
+    Kind extends ChannelKind<C> & ChannelKind<SendableChannelT> = ChannelKind<C> &
       ChannelKind<SendableChannelT>,
   >() {
     return pipe(
@@ -89,8 +77,7 @@ export class SendableChannelContext {
 
   static send = <
     C extends BaseChannelT = ChannelT,
-    Kind extends ChannelKind<C> &
-      ChannelKind<SendableChannelT> = ChannelKind<C> &
+    Kind extends ChannelKind<C> & ChannelKind<SendableChannelT> = ChannelKind<C> &
       ChannelKind<SendableChannelT>,
   >() =>
     wrap((options: string | MessagePayload | MessageCreateOptions) =>
@@ -98,10 +85,7 @@ export class SendableChannelContext {
         SendableChannelContext.channel<C, Kind>(),
         Effect.flatMap((channel: Kind) =>
           DiscordError.wrapTryPromise(
-            () =>
-              channel.send(options) as Promise<
-                Awaited<ReturnType<Kind["send"]>>
-              >,
+            () => channel.send(options) as Promise<Awaited<ReturnType<Kind["send"]>>>,
           ),
         ),
         Effect.withSpan("SendableChannelContext.send", {

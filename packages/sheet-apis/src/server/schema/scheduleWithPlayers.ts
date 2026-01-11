@@ -3,13 +3,10 @@ import { Player } from "./player";
 import { PartialNamePlayer } from "./partialNamePlayer";
 import { BreakSchedule } from "./schedule";
 
-export class SchedulePlayer extends Schema.TaggedClass<SchedulePlayer>()(
-  "SchedulePlayer",
-  {
-    player: Schema.Union(Player, PartialNamePlayer),
-    enc: Schema.Boolean,
-  },
-) {}
+export class SchedulePlayer extends Schema.TaggedClass<SchedulePlayer>()("SchedulePlayer", {
+  player: Schema.Union(Player, PartialNamePlayer),
+  enc: Schema.Boolean,
+}) {}
 
 export class ScheduleWithPlayers extends Schema.TaggedClass<ScheduleWithPlayers>()(
   "ScheduleWithPlayers",
@@ -29,10 +26,7 @@ export class ScheduleWithPlayers extends Schema.TaggedClass<ScheduleWithPlayers>
   },
 ) {
   static empty = ({ fills, overfills }: ScheduleWithPlayers) =>
-    Order.max(Number.Order)(
-      5 - fills.filter(Option.isSome).length - overfills.length,
-      0,
-    );
+    Order.max(Number.Order)(5 - fills.filter(Option.isSome).length - overfills.length, 0);
 }
 
 export const makeScheduleWithPlayers = (

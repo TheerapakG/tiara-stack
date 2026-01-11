@@ -35,8 +35,7 @@ export const bytesToStream = (bytes: Uint8Array) =>
     Stream.fromIterableEffect(
       Effect.try({
         try: () => decodeMulti(bytes),
-        catch: (error) =>
-          makeMsgpackDecodeError(error as RangeError | DecodeError),
+        catch: (error) => makeMsgpackDecodeError(error as RangeError | DecodeError),
       }),
     ),
     Stream.rechunk(1),

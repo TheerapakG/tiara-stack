@@ -8,9 +8,7 @@ const StandardSchemaV1PathSegmentData = Schema.Struct({
 const StandardSchemaV1IssueData = Schema.Struct({
   message: Schema.String,
   path: Schema.optionalWith(
-    Schema.Array(
-      Schema.Union(Schema.PropertyKey, StandardSchemaV1PathSegmentData),
-    ),
+    Schema.Array(Schema.Union(Schema.PropertyKey, StandardSchemaV1PathSegmentData)),
     { nullable: true },
   ),
 });
@@ -25,23 +23,16 @@ const ValidationErrorTaggedError: Schema.TaggedErrorClass<
   {
     readonly _tag: Schema.tag<"ValidationError">;
   } & (typeof ValidationErrorData)["fields"]
-> = Schema.TaggedError<ValidationError>()(
-  "ValidationError",
-  ValidationErrorData,
-);
+> = Schema.TaggedError<ValidationError>()("ValidationError", ValidationErrorData);
 export class ValidationError extends ValidationErrorTaggedError {}
 
-export const makeValidationError = (
-  issues: readonly StandardSchemaV1.Issue[],
-) =>
+export const makeValidationError = (issues: readonly StandardSchemaV1.Issue[]) =>
   new ValidationError({
     issues,
     message: `Validation failed: ${issues.map((issue) => issue.message).join(", ")}`,
   });
 
-export const makeValidationErrorFromParseError = (
-  error: ParseResult.ParseError,
-) =>
+export const makeValidationErrorFromParseError = (error: ParseResult.ParseError) =>
   pipe(
     ParseResult.ArrayFormatter.formatIssue(error.issue),
     Effect.map(
@@ -59,14 +50,6 @@ export const catchParseErrorAsValidationError = <A, E, R>(
   pipe(
     effect,
     Effect.catchTag("ParseError" as unknown as never, (error) =>
-      Effect.flip(
-        makeValidationErrorFromParseError(
-          error as unknown as ParseResult.ParseError,
-        ),
-      ),
+      Effect.flip(makeValidationErrorFromParseError(error as unknown as ParseResult.ParseError)),
     ),
-  ) as Effect.Effect<
-    A,
-    Exclude<E, ParseResult.ParseError> | ValidationError,
-    R
-  >;
+  ) as Effect.Effect<A, Exclude<E, ParseResult.ParseError> | ValidationError, R>;

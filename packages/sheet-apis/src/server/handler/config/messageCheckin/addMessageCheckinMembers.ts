@@ -16,10 +16,7 @@ export const addMessageCheckinMembersHandlerConfig = pipe(
     ),
   }),
   Handler.Config.Builder.response({
-    validator: pipe(
-      Schema.Array(MessageCheckinMember),
-      Schema.standardSchemaV1,
-    ),
+    validator: pipe(Schema.Array(MessageCheckinMember), Schema.standardSchemaV1),
   }),
   Handler.Config.Builder.responseError({
     validator: pipe(

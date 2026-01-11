@@ -6,12 +6,7 @@ export interface HandlerTypeLambda {
   readonly Context: unknown;
 }
 
-export type HandlerKind<
-  F extends HandlerTypeLambda,
-  Success,
-  Error,
-  Context,
-> = F extends {
+export type HandlerKind<F extends HandlerTypeLambda, Success, Error, Context> = F extends {
   readonly type: unknown;
 }
   ? (F & {
@@ -25,10 +20,7 @@ export interface TransformDataKeyTypeLambda {
   readonly In: unknown;
 }
 
-export type TransformDataKeyKind<
-  F extends TransformDataKeyTypeLambda,
-  In,
-> = F extends {
+export type TransformDataKeyKind<F extends TransformDataKeyTypeLambda, In> = F extends {
   readonly type: string | symbol;
 }
   ? (F & {
@@ -52,8 +44,10 @@ export interface BaseHandlerT {
   readonly TransformHandlerContext: HKT.TypeLambda;
 }
 
-export type HandlerType<HandlerT extends BaseHandlerT> =
-  HandlerT["Type"] extends infer T extends string ? T : never;
+export type HandlerType<HandlerT extends BaseHandlerT> = HandlerT["Type"] extends infer T extends
+  string
+  ? T
+  : never;
 export type HandlerData<HandlerT extends BaseHandlerT> = HandlerT["Data"];
 export type Handler<
   HandlerT extends BaseHandlerT,
@@ -69,8 +63,7 @@ export type HandlerDefaultContext<HandlerT extends BaseHandlerT> =
 export type HandlerDataKey<
   HandlerT extends BaseHandlerT,
   D extends HandlerData<HandlerT>,
-> = HandlerT["TransformDataKey"] extends infer F extends
-  TransformDataKeyTypeLambda
+> = HandlerT["TransformDataKey"] extends infer F extends TransformDataKeyTypeLambda
   ? D extends infer DD
     ? TransformDataKeyKind<F, DD>
     : never
@@ -135,10 +128,7 @@ export type HandlerError<
     ? HKT.Kind<F, HH, unknown, unknown, unknown>
     : never
   : never;
-export type HandlerContext<
-  HandlerT extends BaseHandlerT,
-  H extends Handler<HandlerT>,
-> = Exclude<
+export type HandlerContext<HandlerT extends BaseHandlerT, H extends Handler<HandlerT>> = Exclude<
   HandlerT["TransformHandlerContext"] extends infer F extends HKT.TypeLambda
     ? H extends infer HH
       ? HKT.Kind<F, HH, unknown, unknown, unknown>

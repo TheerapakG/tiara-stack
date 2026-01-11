@@ -10,30 +10,20 @@ const RpcErrorTaggedError = Data.TaggedError("RpcError") as new <CauseType>(
   readonly _tag: "RpcError";
 };
 
-type RpcErrorStructSchema<CauseType, CauseEncoded, CauseContext> =
-  Schema.TaggedStruct<
-    "RpcError",
-    {
-      readonly message: typeof Schema.String;
-      readonly cause: Schema.Schema<CauseType, CauseEncoded, CauseContext>;
-    }
-  >;
-interface RpcErrorSchema<CauseType, CauseEncoded, CauseContext>
-  extends Schema.declare<
-    Schema.Schema.Type<
-      RpcErrorStructSchema<CauseType, CauseEncoded, CauseContext>
-    >,
-    Schema.Schema.Encoded<
-      RpcErrorStructSchema<CauseType, CauseEncoded, CauseContext>
-    >,
-    [RpcErrorStructSchema<CauseType, CauseEncoded, CauseContext>]
-  > {
+type RpcErrorStructSchema<CauseType, CauseEncoded, CauseContext> = Schema.TaggedStruct<
+  "RpcError",
+  {
+    readonly message: typeof Schema.String;
+    readonly cause: Schema.Schema<CauseType, CauseEncoded, CauseContext>;
+  }
+>;
+interface RpcErrorSchema<CauseType, CauseEncoded, CauseContext> extends Schema.declare<
+  Schema.Schema.Type<RpcErrorStructSchema<CauseType, CauseEncoded, CauseContext>>,
+  Schema.Schema.Encoded<RpcErrorStructSchema<CauseType, CauseEncoded, CauseContext>>,
+  [RpcErrorStructSchema<CauseType, CauseEncoded, CauseContext>]
+> {
   readonly _tag: "RpcError";
-  readonly fields: RpcErrorStructSchema<
-    CauseType,
-    CauseEncoded,
-    CauseContext
-  >["fields"];
+  readonly fields: RpcErrorStructSchema<CauseType, CauseEncoded, CauseContext>["fields"];
 }
 
 export class RpcError<CauseType> extends RpcErrorTaggedError<CauseType> {
@@ -73,8 +63,5 @@ const MissingRpcConfigTaggedError: Schema.TaggedErrorClass<
   {
     readonly _tag: Schema.tag<"MissingRpcConfigError">;
   } & (typeof MissingRpcConfigErrorData)["fields"]
-> = Schema.TaggedError<MissingRpcConfigError>()(
-  "MissingRpcConfigError",
-  MissingRpcConfigErrorData,
-);
+> = Schema.TaggedError<MissingRpcConfigError>()("MissingRpcConfigError", MissingRpcConfigErrorData);
 export class MissingRpcConfigError extends MissingRpcConfigTaggedError {}

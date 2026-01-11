@@ -1,24 +1,9 @@
-import {
-  Array,
-  Chunk,
-  Effect,
-  flow,
-  ParseResult,
-  pipe,
-  Schema,
-  String,
-} from "effect";
+import { Array, Chunk, Effect, flow, ParseResult, pipe, Schema, String } from "effect";
 import { ArrayLookupSchema } from "../schema/arrayLookup";
 import { KeyOrderLookupSchema } from "../schema/keyOrderLookup";
 
 export const HeaderActionSchema: ArrayLookupSchema<
-  [
-    "client:subscribe",
-    "client:unsubscribe",
-    "client:once",
-    "client:mutate",
-    "server:update",
-  ]
+  ["client:subscribe", "client:unsubscribe", "client:once", "client:mutate", "server:update"]
 > = ArrayLookupSchema([
   "client:subscribe",
   "client:unsubscribe",
@@ -37,13 +22,10 @@ export const HandlerPayloadSchema = KeyOrderLookupSchema(["handler", "token"], {
   token: Schema.optionalWith(Schema.String, { nullable: true }),
 });
 
-export const SuccessTimestampPayloadSchema = KeyOrderLookupSchema(
-  ["success", "timestamp"],
-  {
-    success: Schema.Boolean,
-    timestamp: Schema.ValidDateFromSelf,
-  },
-);
+export const SuccessTimestampPayloadSchema = KeyOrderLookupSchema(["success", "timestamp"], {
+  success: Schema.Boolean,
+  timestamp: Schema.ValidDateFromSelf,
+});
 
 export const BaseHeaderSchema = KeyOrderLookupSchema(
   ["protocol", "version", "id", "action", "payload", "span"],
@@ -98,8 +80,7 @@ export const ActionPayloadSchemas = {
 };
 
 export type ActionPayload<
-  Actions extends
-    typeof HeaderActionSchema.Type = typeof HeaderActionSchema.Type,
+  Actions extends typeof HeaderActionSchema.Type = typeof HeaderActionSchema.Type,
 > = {
   [action in Actions]: {
     action: action;
@@ -107,9 +88,7 @@ export type ActionPayload<
   };
 }[Actions];
 
-const makeActionPayloadUnionMemberSchema = <
-  Action extends typeof HeaderActionSchema.Type,
->(
+const makeActionPayloadUnionMemberSchema = <Action extends typeof HeaderActionSchema.Type>(
   literal: Action,
 ) =>
   Schema.Struct({
@@ -121,9 +100,7 @@ const ActionPayloadUnionMemberSchemas = pipe(
   HeaderActionSchema.literals,
   Array.map(makeActionPayloadUnionMemberSchema),
 ) as {
-  [action in typeof HeaderActionSchema.Type]: Schema.Schema<
-    ActionPayload<action>
-  >;
+  [action in typeof HeaderActionSchema.Type]: Schema.Schema<ActionPayload<action>>;
 }[typeof HeaderActionSchema.Type][];
 
 export const ActionPayloadSchema = pipe(
@@ -170,8 +147,7 @@ export const ActionPayloadSchema = pipe(
 );
 
 export type Header<
-  Actions extends
-    typeof HeaderActionSchema.Type = typeof HeaderActionSchema.Type,
+  Actions extends typeof HeaderActionSchema.Type = typeof HeaderActionSchema.Type,
 > = {
   [action in Actions]: {
     protocol: string;
@@ -186,9 +162,7 @@ export type Header<
   };
 }[Actions];
 
-const makeHeaderUnionMemberSchema = <
-  Action extends typeof HeaderActionSchema.Type,
->(
+const makeHeaderUnionMemberSchema = <Action extends typeof HeaderActionSchema.Type>(
   literal: Action,
 ) =>
   Schema.Struct({

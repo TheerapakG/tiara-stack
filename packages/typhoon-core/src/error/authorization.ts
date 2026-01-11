@@ -10,10 +10,7 @@ const AuthorizationErrorTaggedError: Schema.TaggedErrorClass<
   {
     readonly _tag: Schema.tag<"AuthorizationError">;
   } & (typeof AuthorizationErrorData)["fields"]
-> = Schema.TaggedError<AuthorizationError>()(
-  "AuthorizationError",
-  AuthorizationErrorData,
-);
+> = Schema.TaggedError<AuthorizationError>()("AuthorizationError", AuthorizationErrorData);
 export class AuthorizationError extends AuthorizationErrorTaggedError {}
 
 export const makeAuthorizationError = (message: string, cause?: unknown) =>

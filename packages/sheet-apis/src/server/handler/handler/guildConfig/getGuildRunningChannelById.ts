@@ -16,15 +16,9 @@ export const getGuildRunningChannelByIdHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(getGuildRunningChannelByIdHandlerConfig),
-        ),
-        Effect.flatMap(({ parsed }) =>
-          GuildConfigService.getGuildRunningChannelById(parsed),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
+        Effect.bind("parsed", () => Event.request.parsed(getGuildRunningChannelByIdHandlerConfig)),
+        Effect.flatMap(({ parsed }) => GuildConfigService.getGuildRunningChannelById(parsed)),
         Effect.map(
           Effect.map(
             Result.eitherSomeOrLeft(() =>
@@ -35,11 +29,7 @@ export const getGuildRunningChannelByIdHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(
-          Handler.Config.encodeResponseEffect(
-            getGuildRunningChannelByIdHandlerConfig,
-          ),
-        ),
+        Effect.map(Handler.Config.encodeResponseEffect(getGuildRunningChannelByIdHandlerConfig)),
         Effect.withSpan("getGuildRunningChannelByIdHandler", {
           captureStackTrace: true,
         }),

@@ -16,12 +16,8 @@ export const getTeamConfigHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(getTeamConfigHandlerConfig),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
+        Effect.bind("parsed", () => Event.request.parsed(getTeamConfigHandlerConfig)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -45,17 +41,12 @@ export const getTeamConfigHandler = pipe(
           pipe(
             layerOfGuildId,
             Effect.flatMap((layerOfGuildId) =>
-              pipe(
-                Sheet.SheetService.getTeamConfig(),
-                Result.provideEitherLayer(layerOfGuildId),
-              ),
+              pipe(Sheet.SheetService.getTeamConfig(), Result.provideEitherLayer(layerOfGuildId)),
             ),
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(
-          Handler.Config.encodeResponseEffect(getTeamConfigHandlerConfig),
-        ),
+        Effect.map(Handler.Config.encodeResponseEffect(getTeamConfigHandlerConfig)),
         Effect.map(
           Effect.withSpan("getTeamConfigHandler", {
             captureStackTrace: true,

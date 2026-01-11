@@ -38,9 +38,7 @@ export const removeGuildManagerRoleHandler = pipe(
           }),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(
-          removeGuildManagerRoleHandlerConfig,
-        ),
+        Handler.Config.encodeResponseEffect(removeGuildManagerRoleHandlerConfig),
         Effect.withSpan("removeGuildManagerRoleHandler", {
           captureStackTrace: true,
         }),

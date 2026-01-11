@@ -6,10 +6,7 @@ import {
   GuildTextBasedChannelT,
 } from "@/services/channel";
 import { GuildService } from "@/services/guild";
-import {
-  CachedInteractionContext,
-  ClientService,
-} from "@/services/interaction";
+import { CachedInteractionContext, ClientService } from "@/services/interaction";
 import { Client } from "discord.js";
 import { Effect, Function, Layer, pipe } from "effect";
 

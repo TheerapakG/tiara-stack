@@ -1,14 +1,4 @@
-import {
-  Data,
-  Effect,
-  Function,
-  Metric,
-  Option,
-  pipe,
-  Types,
-  Struct,
-  Record,
-} from "effect";
+import { Data, Effect, Function, Metric, Option, pipe, Types, Struct, Record } from "effect";
 import type {
   BaseHandlerT,
   Handler,
@@ -54,8 +44,7 @@ type HandlerContextGroupWithMetricsObject<
 const HandlerContextGroupWithMetricsTypeId = Symbol(
   "Typhoon/Handler/HandlerContextGroupWithMetricsTypeId",
 );
-export type HandlerContextGroupWithMetricsTypeId =
-  typeof HandlerContextGroupWithMetricsTypeId;
+export type HandlerContextGroupWithMetricsTypeId = typeof HandlerContextGroupWithMetricsTypeId;
 
 interface Variance<
   in out HandlerT extends BaseHandlerT,
@@ -73,11 +62,7 @@ const handlerContextGroupWithMetricsVariance: <
   HandlerT extends BaseHandlerT,
   WithMetricsExecutorT extends WithMetricsExecutorTypeLambda,
   R,
->() => Variance<
-  HandlerT,
-  WithMetricsExecutorT,
-  R
->[HandlerContextGroupWithMetricsTypeId] = () => ({
+>() => Variance<HandlerT, WithMetricsExecutorT, R>[HandlerContextGroupWithMetricsTypeId] = () => ({
   _HandlerT: Function.identity,
   _WithMetricsExecutorT: Function.identity,
   _R: Function.identity,
@@ -90,43 +75,34 @@ const HandlerContextGroupWithMetricsTaggedClass = Data.TaggedClass(
   WithMetricsExecutorT extends WithMetricsExecutorTypeLambda,
   R,
 >(
-  args: Readonly<
-    HandlerContextGroupWithMetricsObject<HandlerT, WithMetricsExecutorT, R>
-  >,
-) => Readonly<
-  HandlerContextGroupWithMetricsObject<HandlerT, WithMetricsExecutorT, R>
-> & {
+  args: Readonly<HandlerContextGroupWithMetricsObject<HandlerT, WithMetricsExecutorT, R>>,
+) => Readonly<HandlerContextGroupWithMetricsObject<HandlerT, WithMetricsExecutorT, R>> & {
   readonly _tag: "HandlerContextGroupWithMetrics";
 };
 
 export class HandlerContextGroupWithMetrics<
-    HandlerT extends BaseHandlerT,
-    WithMetricsExecutorT extends WithMetricsExecutorTypeLambda,
-    R,
-  >
-  extends HandlerContextGroupWithMetricsTaggedClass<
+  HandlerT extends BaseHandlerT,
+  WithMetricsExecutorT extends WithMetricsExecutorTypeLambda,
+  R,
+>
+  extends HandlerContextGroupWithMetricsTaggedClass<HandlerT, WithMetricsExecutorT, R>
+  implements Variance<HandlerT, WithMetricsExecutorT, R>
+{
+  [HandlerContextGroupWithMetricsTypeId] = handlerContextGroupWithMetricsVariance<
     HandlerT,
     WithMetricsExecutorT,
     R
-  >
-  implements Variance<HandlerT, WithMetricsExecutorT, R>
-{
-  [HandlerContextGroupWithMetricsTypeId] =
-    handlerContextGroupWithMetricsVariance<HandlerT, WithMetricsExecutorT, R>();
+  >();
 }
 
 export type HandlerContextGroupWithMetricsHandlerT<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   G extends HandlerContextGroupWithMetrics<any, any, any>,
-> = [G] extends [HandlerContextGroupWithMetrics<infer HandlerT, any, any>]
-  ? HandlerT
-  : never;
+> = [G] extends [HandlerContextGroupWithMetrics<infer HandlerT, any, any>] ? HandlerT : never;
 export type HandlerContextGroupWithMetricsWithMetricsExecutorT<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   G extends HandlerContextGroupWithMetrics<any, any, any>,
-> = [G] extends [
-  HandlerContextGroupWithMetrics<any, infer WithMetricsExecutorT, any>,
-]
+> = [G] extends [HandlerContextGroupWithMetrics<any, infer WithMetricsExecutorT, any>]
   ? WithMetricsExecutorT
   : never;
 export type HandlerContextGroupWithMetricsContext<
@@ -223,10 +199,7 @@ export const execute = Function.dual<
       getHandlerContext(key),
       Option.map(handler),
       (handlerOption) =>
-        groupWithMetrics.executor(
-          handlerOption,
-          metricsContext,
-        ) as WithMetricsExecutorResultKind<
+        groupWithMetrics.executor(handlerOption, metricsContext) as WithMetricsExecutorResultKind<
           HandlerContextGroupWithMetricsWithMetricsExecutorT<G>,
           HandlerContextGroupWithMetricsContext<G>
         >,
@@ -266,28 +239,19 @@ export const add = Function.dual<
     handlerContextConfig: Config,
   ) => <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const G extends HandlerContextGroupWithMetrics<
-      PartialHandlerContextHandlerT<Config>,
-      any,
-      any
-    >,
+    const G extends HandlerContextGroupWithMetrics<PartialHandlerContextHandlerT<Config>, any, any>,
   >(
     groupWithMetrics: G,
   ) => HandlerContextGroupWithMetrics<
     HandlerContextGroupWithMetricsHandlerT<G>,
     HandlerContextGroupWithMetricsWithMetricsExecutorT<G>,
     | HandlerContextGroupWithMetricsContext<G>
-    | HandlerEffectContext<
-        HandlerContextGroupWithMetricsHandlerT<G>,
-        HandlerOrUndefined<Config>
-      >
+    | HandlerEffectContext<HandlerContextGroupWithMetricsHandlerT<G>, HandlerOrUndefined<Config>>
   >,
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const G extends HandlerContextGroupWithMetrics<any, any, any>,
-    const Config extends HandlerContext<
-      HandlerContextGroupWithMetricsHandlerT<G>
-    >,
+    const Config extends HandlerContext<HandlerContextGroupWithMetricsHandlerT<G>>,
   >(
     groupWithMetrics: G,
     handlerContextConfig: Config,
@@ -295,19 +259,14 @@ export const add = Function.dual<
     HandlerContextGroupWithMetricsHandlerT<G>,
     HandlerContextGroupWithMetricsWithMetricsExecutorT<G>,
     | HandlerContextGroupWithMetricsContext<G>
-    | HandlerEffectContext<
-        HandlerContextGroupWithMetricsHandlerT<G>,
-        HandlerOrUndefined<Config>
-      >
+    | HandlerEffectContext<HandlerContextGroupWithMetricsHandlerT<G>, HandlerOrUndefined<Config>>
   >
 >(
   2,
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const G extends HandlerContextGroupWithMetrics<any, any, any>,
-    const Config extends HandlerContext<
-      HandlerContextGroupWithMetricsHandlerT<G>
-    >,
+    const Config extends HandlerContext<HandlerContextGroupWithMetricsHandlerT<G>>,
   >(
     groupWithMetrics: G,
     handlerContextConfig: Config,
@@ -316,17 +275,11 @@ export const add = Function.dual<
       HandlerContextGroupWithMetricsHandlerT<G>,
       HandlerContextGroupWithMetricsWithMetricsExecutorT<G>,
       | HandlerContextGroupWithMetricsContext<G>
-      | HandlerEffectContext<
-          HandlerContextGroupWithMetricsHandlerT<G>,
-          HandlerOrUndefined<Config>
-        >
+      | HandlerEffectContext<HandlerContextGroupWithMetricsHandlerT<G>, HandlerOrUndefined<Config>>
     >(
-      Struct.evolve(
-        groupWithMetrics as InferHandlerContextGroupWithMetrics<G>,
-        {
-          group: (group) => addHandlerContextGroup(group, handlerContextConfig),
-        },
-      ),
+      Struct.evolve(groupWithMetrics as InferHandlerContextGroupWithMetrics<G>, {
+        group: (group) => addHandlerContextGroup(group, handlerContextConfig),
+      }),
     ),
 );
 
@@ -348,8 +301,7 @@ export const addGroup = Function.dual<
   ) => HandlerContextGroupWithMetrics<
     HandlerContextGroupWithMetricsHandlerT<ThisG>,
     HandlerContextGroupWithMetricsWithMetricsExecutorT<ThisG>,
-    | HandlerContextGroupWithMetricsContext<ThisG>
-    | HandlerContextGroupContext<OtherG>
+    HandlerContextGroupWithMetricsContext<ThisG> | HandlerContextGroupContext<OtherG>
   >,
   <
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -366,8 +318,7 @@ export const addGroup = Function.dual<
   ) => HandlerContextGroupWithMetrics<
     HandlerContextGroupWithMetricsHandlerT<ThisG>,
     HandlerContextGroupWithMetricsWithMetricsExecutorT<ThisG>,
-    | HandlerContextGroupWithMetricsContext<ThisG>
-    | HandlerContextGroupContext<OtherG>
+    HandlerContextGroupWithMetricsContext<ThisG> | HandlerContextGroupContext<OtherG>
   >
 >(
   2,
@@ -387,15 +338,11 @@ export const addGroup = Function.dual<
     new HandlerContextGroupWithMetrics<
       HandlerContextGroupWithMetricsHandlerT<ThisG>,
       HandlerContextGroupWithMetricsWithMetricsExecutorT<ThisG>,
-      | HandlerContextGroupWithMetricsContext<ThisG>
-      | HandlerContextGroupContext<OtherG>
+      HandlerContextGroupWithMetricsContext<ThisG> | HandlerContextGroupContext<OtherG>
     >(
-      Struct.evolve(
-        thisGroupWithMetrics as InferHandlerContextGroupWithMetrics<ThisG>,
-        {
-          group: (group) => addGroupHandlerContextGroup(group, otherGroup),
-        },
-      ),
+      Struct.evolve(thisGroupWithMetrics as InferHandlerContextGroupWithMetrics<ThisG>, {
+        group: (group) => addGroupHandlerContextGroup(group, otherGroup),
+      }),
     ),
 );
 
@@ -404,11 +351,7 @@ export const initialize = <
   WithMetricsExecutorT extends WithMetricsExecutorTypeLambda,
   R,
 >(
-  groupWithMetrics: HandlerContextGroupWithMetrics<
-    HandlerT,
-    WithMetricsExecutorT,
-    R
-  >,
+  groupWithMetrics: HandlerContextGroupWithMetrics<HandlerT, WithMetricsExecutorT, R>,
 ): Effect.Effect<void, never, never> =>
   pipe(
     Record.keys(groupWithMetrics.group.record),

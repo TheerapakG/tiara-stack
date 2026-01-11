@@ -20,9 +20,7 @@ export const getByNameHandlerConfig = pipe(
     validator: pipe(
       Result.ResultSchema({
         optimistic: Schema.Either({
-          right: Schema.Array(
-            Schema.Array(Schema.Union(Player, PartialNamePlayer)),
-          ),
+          right: Schema.Array(Schema.Array(Schema.Union(Player, PartialNamePlayer))),
           left: Schema.Union(
             Error.Core.ArgumentError,
             Error.Core.MsgpackDecodeError,
@@ -35,9 +33,7 @@ export const getByNameHandlerConfig = pipe(
           ),
         }),
         complete: Schema.Either({
-          right: Schema.Array(
-            Schema.Array(Schema.Union(Player, PartialNamePlayer)),
-          ),
+          right: Schema.Array(Schema.Array(Schema.Union(Player, PartialNamePlayer))),
           left: Schema.Union(
             Error.Core.ArgumentError,
             Error.Core.MsgpackDecodeError,

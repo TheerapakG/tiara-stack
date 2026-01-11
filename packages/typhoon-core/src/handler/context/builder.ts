@@ -23,11 +23,7 @@ export type SetDataInput<HandlerT extends BaseHandlerT> = PartialHandlerContext<
 export type SetDataOutput<
   HandlerT extends BaseHandlerT,
   D extends HandlerData<HandlerT>,
-> = PartialHandlerContext<
-  HandlerT,
-  Option.Some<D>,
-  Option.None<Handler<HandlerT>>
->;
+> = PartialHandlerContext<HandlerT, Option.Some<D>, Option.None<Handler<HandlerT>>>;
 
 export const data =
   <HandlerT extends BaseHandlerT>() =>
@@ -39,12 +35,11 @@ export const data =
       }),
     }) as SetDataOutput<HandlerT, D>;
 
-export type SetHandlerInput<HandlerT extends BaseHandlerT> =
-  PartialHandlerContext<
-    HandlerT,
-    Option.Some<HandlerData<HandlerT>>,
-    Option.None<Handler<HandlerT>>
-  >;
+export type SetHandlerInput<HandlerT extends BaseHandlerT> = PartialHandlerContext<
+  HandlerT,
+  Option.Some<HandlerData<HandlerT>>,
+  Option.None<Handler<HandlerT>>
+>;
 export type SetHandlerOutput<
   HandlerT extends BaseHandlerT,
   Input extends SetHandlerInput<HandlerT>,
@@ -88,9 +83,7 @@ export type Builders<HandlerT extends BaseHandlerT> = {
   >;
   data: <const D extends HandlerData<HandlerT>>(
     d: D,
-  ) => <const Input extends SetDataInput<HandlerT>>(
-    config: Input,
-  ) => SetDataOutput<HandlerT, D>;
+  ) => <const Input extends SetDataInput<HandlerT>>(config: Input) => SetDataOutput<HandlerT, D>;
   handler: <const H extends Handler<HandlerT>>(
     h: H,
   ) => <
@@ -102,9 +95,7 @@ export type Builders<HandlerT extends BaseHandlerT> = {
   ) => SetHandlerOutput<HandlerT, Input, H>;
 };
 
-export const builders = <
-  HandlerT extends BaseHandlerT,
->(): Builders<HandlerT> => ({
+export const builders = <HandlerT extends BaseHandlerT>(): Builders<HandlerT> => ({
   empty: () => empty<HandlerT>(),
   data: data<HandlerT>(),
   handler: handler<HandlerT>(),

@@ -16,21 +16,11 @@ export const getMessageCheckinMembersHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(getMessageCheckinMembersHandlerConfig),
-        ),
-        Effect.flatMap(({ parsed }) =>
-          MessageCheckinService.getMessageCheckinMembers(parsed),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
+        Effect.bind("parsed", () => Event.request.parsed(getMessageCheckinMembersHandlerConfig)),
+        Effect.flatMap(({ parsed }) => MessageCheckinService.getMessageCheckinMembers(parsed)),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(
-          Handler.Config.encodeResponseEffect(
-            getMessageCheckinMembersHandlerConfig,
-          ),
-        ),
+        Effect.map(Handler.Config.encodeResponseEffect(getMessageCheckinMembersHandlerConfig)),
         Effect.withSpan("getMessageCheckinMembersHandler", {
           captureStackTrace: true,
         }),

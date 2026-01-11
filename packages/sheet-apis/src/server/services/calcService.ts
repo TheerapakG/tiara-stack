@@ -1,15 +1,5 @@
 import { PlayerTeam, Room } from "@/server/schema";
-import {
-  Array,
-  Chunk,
-  Data,
-  Effect,
-  Function,
-  HashSet,
-  Option,
-  pipe,
-  Stream,
-} from "effect";
+import { Array, Chunk, Data, Effect, Function, HashSet, Option, pipe, Stream } from "effect";
 
 export class CalcConfig extends Data.TaggedClass("CalcConfig")<{
   healNeeded: number;
@@ -28,9 +18,7 @@ const filterFixedTeams = (playerTeams: PlayerTeam[]) =>
             : playerTeam,
         ),
     ),
-    Effect.map(({ fixedTeams }) =>
-      fixedTeams.length > 0 ? fixedTeams : playerTeams,
-    ),
+    Effect.map(({ fixedTeams }) => (fixedTeams.length > 0 ? fixedTeams : playerTeams)),
   );
 
 const baseRoom = (teams: ReadonlyArray<PlayerTeam>) => {
@@ -99,9 +87,7 @@ const applyRoomEncAndDoormat = (roomTeam: Room) => {
   const encTeam = teams[encIndex];
   const updatedTeams = teams.map((t, i) => {
     if (i === encIndex) {
-      return PlayerTeam.addTags(
-        HashSet.make(tiererOverride ? "tierer_enc_override" : "enc"),
-      )(t);
+      return PlayerTeam.addTags(HashSet.make(tiererOverride ? "tierer_enc_override" : "enc"))(t);
     }
     return t.talent >= encTeam.talent && !HashSet.has(t.tags, "tierer")
       ? PlayerTeam.addTags(HashSet.make("doormat"))(t)
@@ -155,45 +141,41 @@ const cartesianTeams = (
         pipe(
           cartesianTeams(self),
           Array.flatMap((product) =>
-            pipe(
-              Array.headNonEmpty(playerTeams),
-              cartesianHeadTeams,
-              (headTeams) =>
-                pipe(
-                  headTeams,
-                  Array.filter(
-                    (headTeam) =>
-                      !pipe(
-                        product,
-                        Array.map((t) => t.playerName),
-                        Array.contains(headTeam.playerName),
-                      ),
-                  ),
-                  Array.match({
-                    onEmpty: () =>
-                      pipe(
-                        Array.make(
-                          new PlayerTeam({
-                            type: "Placeholder",
-                            playerName:
-                              Array.headNonEmpty(headTeams).playerName,
-                            teamName: pipe(
-                              Array.headNonEmpty(headTeams).playerName,
-                              Option.map((name) => `${name} | placeholder`),
-                              Option.getOrElse(() => "Placeholder"),
-                            ),
-                            lead: 0,
-                            backline: 0,
-                            talent: 0,
-                            tags: HashSet.make("placeholder"),
-                          }),
-                        ),
-                      ),
-                    onNonEmpty: Function.identity,
-                  }),
-                  Array.map((headTeam) => Array.make(headTeam)),
-                  Array.map(Array.appendAll(product)),
+            pipe(Array.headNonEmpty(playerTeams), cartesianHeadTeams, (headTeams) =>
+              pipe(
+                headTeams,
+                Array.filter(
+                  (headTeam) =>
+                    !pipe(
+                      product,
+                      Array.map((t) => t.playerName),
+                      Array.contains(headTeam.playerName),
+                    ),
                 ),
+                Array.match({
+                  onEmpty: () =>
+                    pipe(
+                      Array.make(
+                        new PlayerTeam({
+                          type: "Placeholder",
+                          playerName: Array.headNonEmpty(headTeams).playerName,
+                          teamName: pipe(
+                            Array.headNonEmpty(headTeams).playerName,
+                            Option.map((name) => `${name} | placeholder`),
+                            Option.getOrElse(() => "Placeholder"),
+                          ),
+                          lead: 0,
+                          backline: 0,
+                          talent: 0,
+                          tags: HashSet.make("placeholder"),
+                        }),
+                      ),
+                    ),
+                  onNonEmpty: Function.identity,
+                }),
+                Array.map((headTeam) => Array.make(headTeam)),
+                Array.map(Array.appendAll(product)),
+              ),
             ),
           ),
         ),
@@ -201,23 +183,17 @@ const cartesianTeams = (
   );
 
 const deriveRoomsFromCartesian =
-  (config: CalcConfig) =>
-  (playerTeams: Array.NonEmptyReadonlyArray<ReadonlyArray<PlayerTeam>>) =>
+  (config: CalcConfig) => (playerTeams: Array.NonEmptyReadonlyArray<ReadonlyArray<PlayerTeam>>) =>
     pipe(
       Effect.succeed(cartesianTeams(playerTeams)),
       Effect.map(
         Array.map((teams) =>
-          pipe(
-            baseRoom(teams),
-            config.considerEnc ? applyRoomEncAndDoormat : Function.identity,
-          ),
+          pipe(baseRoom(teams), config.considerEnc ? applyRoomEncAndDoormat : Function.identity),
         ),
       ),
       Effect.map(Chunk.fromIterable),
       Effect.tap((derived) =>
-        Effect.log(
-          `Derived ${Chunk.size(derived)} rooms from cartesian product`,
-        ),
+        Effect.log(`Derived ${Chunk.size(derived)} rooms from cartesian product`),
       ),
       Effect.withSpan("deriveRoomsFromCartesian", { captureStackTrace: true }),
     );

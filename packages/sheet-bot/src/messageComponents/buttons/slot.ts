@@ -11,16 +11,7 @@ import {
 import { ButtonHandlerVariantT, handlerVariantContextBuilder } from "@/types";
 import { bindObject } from "@/utils";
 import { ButtonStyle, ComponentType, MessageFlags } from "discord.js";
-import {
-  Array,
-  Chunk,
-  Effect,
-  Number,
-  Order,
-  Option,
-  pipe,
-  String,
-} from "effect";
+import { Array, Chunk, Effect, Number, Order, Option, pipe, String } from "effect";
 import { UntilObserver } from "typhoon-core/signal";
 
 const getSlotMessage = (day: number) =>
@@ -43,32 +34,24 @@ const getSlotMessage = (day: number) =>
     Effect.bindAll(({ daySchedule }) => ({
       openSlots: pipe(
         daySchedule,
-        Array.sortBy(
-          Order.mapInput(Option.getOrder(Number.Order), ({ hour }) => hour),
-        ),
+        Array.sortBy(Order.mapInput(Option.getOrder(Number.Order), ({ hour }) => hour)),
         Effect.forEach((schedule) => FormatService.formatOpenSlot(schedule)),
         Effect.map(Chunk.fromIterable),
         Effect.map(Chunk.dedupeAdjacent),
         Effect.map(Chunk.join("\n")),
         Effect.map((description) =>
-          String.Equivalence(description, String.empty)
-            ? "All Filled :3"
-            : description,
+          String.Equivalence(description, String.empty) ? "All Filled :3" : description,
         ),
       ),
       filledSlots: pipe(
         daySchedule,
-        Array.sortBy(
-          Order.mapInput(Option.getOrder(Number.Order), ({ hour }) => hour),
-        ),
+        Array.sortBy(Order.mapInput(Option.getOrder(Number.Order), ({ hour }) => hour)),
         Effect.forEach((schedule) => FormatService.formatFilledSlot(schedule)),
         Effect.map(Chunk.fromIterable),
         Effect.map(Chunk.dedupeAdjacent),
         Effect.map(Chunk.join("\n")),
         Effect.map((description) =>
-          String.Equivalence(description, String.empty)
-            ? "All Open :3"
-            : description,
+          String.Equivalence(description, String.empty) ? "All Open :3" : description,
         ),
       ),
     })),
@@ -106,9 +89,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
             Effect.flatten,
           ),
         ),
-        Effect.bind("slotMessage", ({ messageSlotData }) =>
-          getSlotMessage(messageSlotData.day),
-        ),
+        Effect.bind("slotMessage", ({ messageSlotData }) => getSlotMessage(messageSlotData.day)),
         InteractionContext.editReply.tapEffect(({ slotMessage }) =>
           pipe(
             Effect.all({

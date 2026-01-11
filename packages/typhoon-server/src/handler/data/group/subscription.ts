@@ -6,17 +6,13 @@ export type BaseSubscriptionHandlerDataGroupRecord =
   Data.Group.BaseHandlerDataGroupRecord<SubscriptionHandlerT>;
 
 export type SubscriptionHandlerDataGroup<
-  HandlerDataGroupRecord extends
-    Data.Group.BaseHandlerDataGroupRecord<SubscriptionHandlerT> = any,
+  HandlerDataGroupRecord extends Data.Group.BaseHandlerDataGroupRecord<SubscriptionHandlerT> = any,
 > = Data.Group.HandlerDataGroup<SubscriptionHandlerT, HandlerDataGroupRecord>;
 
-export const empty = () =>
-  Data.Group.empty<SubscriptionHandlerT>((data) => data.data.name.value);
+export const empty = () => Data.Group.empty<SubscriptionHandlerT>((data) => data.data.name.value);
 
 export const add =
-  <const HData extends Type.HandlerData<SubscriptionHandlerT>>(
-    handlerData: HData,
-  ) =>
+  <const HData extends Type.HandlerData<SubscriptionHandlerT>>(handlerData: HData) =>
   <const G extends SubscriptionHandlerDataGroup>(handlerDataGroup: G) =>
     pipe(handlerDataGroup, Data.Group.add<G, HData>(handlerData));
 
@@ -53,7 +49,6 @@ export const getHandlerData =
     key: Key,
   ) =>
   (handlerDataGroup: G) =>
-    pipe(
-      handlerDataGroup,
-      Data.Group.getHandlerData<G, Key>(key),
-    ) as Option.Option<GetHandlerData<G, Key>>;
+    pipe(handlerDataGroup, Data.Group.getHandlerData<G, Key>(key)) as Option.Option<
+      GetHandlerData<G, Key>
+    >;

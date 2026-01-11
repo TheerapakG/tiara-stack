@@ -18,14 +18,8 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
     Option.getOrder(String.Order),
     ({ playerName }: PlayerTeam) => playerName,
   );
-  static byTalent = Order.mapInput(
-    Order.number,
-    ({ talent }: PlayerTeam) => talent,
-  );
-  static byEffectValue = Order.mapInput(
-    Order.number,
-    PlayerTeam.getEffectValue,
-  );
+  static byTalent = Order.mapInput(Order.number, ({ talent }: PlayerTeam) => talent);
+  static byEffectValue = Order.mapInput(Order.number, PlayerTeam.getEffectValue);
 
   static addTags(tags: HashSet.HashSet<string>) {
     return (playerTeam: PlayerTeam) =>
@@ -41,13 +35,9 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
   }
 
   static fromTeam(cc: boolean, team: Team) {
-    const talent = pipe(
-      team.talent,
-      cc ? Function.identity : Option.orElseSome(() => 0),
-    );
+    const talent = pipe(team.talent, cc ? Function.identity : Option.orElseSome(() => 0));
 
-    if (Option.isNone(team.teamName) || Option.isNone(talent))
-      return Option.none();
+    if (Option.isNone(team.teamName) || Option.isNone(talent)) return Option.none();
 
     return Option.some(
       new PlayerTeam({

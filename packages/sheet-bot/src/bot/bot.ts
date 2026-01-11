@@ -46,29 +46,18 @@ import {
 import { RunState } from "typhoon-core/runtime";
 import { SignalService } from "typhoon-core/signal";
 
-interface BotRunStateContextTypeLambda
-  extends RunState.RunStateContextTypeLambda {
+interface BotRunStateContextTypeLambda extends RunState.RunStateContextTypeLambda {
   readonly type: Bot<any, any, Exclude<this["R"], SignalService.SignalService>>;
 }
-export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
-  "Bot",
-)<{
+export class Bot<A = never, E = never, R = never> extends Data.TaggedClass("Bot")<{
   readonly client: Client;
   readonly interactionHandlerMapWithMetricsGroup: SynchronizedRef.SynchronizedRef<
-    InteractionHandlerMapWithMetricsGroup<
-      A,
-      E,
-      R | ClientService | SignalService.SignalService
-    >
+    InteractionHandlerMapWithMetricsGroup<A, E, R | ClientService | SignalService.SignalService>
   >;
   readonly traceProvider: Layer.Layer<never>;
   readonly tasks: SynchronizedRef.SynchronizedRef<
     HashSet.HashSet<
-      Effect.Effect<
-        unknown,
-        unknown,
-        R | ClientService | SignalService.SignalService
-      >
+      Effect.Effect<unknown, unknown, R | ClientService | SignalService.SignalService>
     >
   >;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,9 +68,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
     SignalService.SignalService
   >;
 }> {
-  static onChatInputCommandInteraction = (
-    interaction: ChatInputCommandInteraction,
-  ) => {
+  static onChatInputCommandInteraction = (interaction: ChatInputCommandInteraction) => {
     return <A = never, E = never, R = never>(
       bot: Bot<A, E, R>,
       runtime: Runtime.Runtime<R | SignalService.SignalService>,
@@ -97,9 +84,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
             InteractionHandlerMapWithMetricsGroup.chatInputCommandsExecuteAndReplyError(
               interaction.commandName,
             ),
-            Effect.provide(
-              interactionServices<ChatInputCommandInteractionT>(interaction),
-            ),
+            Effect.provide(interactionServices<ChatInputCommandInteractionT>(interaction)),
             Effect.provide(runtime),
           ),
         ),
@@ -123,9 +108,10 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       pipe(
         Match.value(interaction),
         Match.when({ commandType: ApplicationCommandType.ChatInput }, () =>
-          Bot.onChatInputCommandInteraction(
-            interaction as ChatInputCommandInteraction,
-          )(bot, runtime),
+          Bot.onChatInputCommandInteraction(interaction as ChatInputCommandInteraction)(
+            bot,
+            runtime,
+          ),
         ),
         Match.orElse(() => Effect.void),
       );
@@ -144,12 +130,8 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         Effect.flatMap(({ interactionHandlerMapWithMetricsGroup }) =>
           pipe(
             interactionHandlerMapWithMetricsGroup,
-            InteractionHandlerMapWithMetricsGroup.buttonsExecuteAndReplyError(
-              interaction.customId,
-            ),
-            Effect.provide(
-              interactionServices<ButtonInteractionT>(interaction),
-            ),
+            InteractionHandlerMapWithMetricsGroup.buttonsExecuteAndReplyError(interaction.customId),
+            Effect.provide(interactionServices<ButtonInteractionT>(interaction)),
             Effect.provide(runtime),
           ),
         ),
@@ -162,9 +144,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       );
   };
 
-  static onUserSelectMenuInteraction = (
-    interaction: UserSelectMenuInteraction,
-  ) => {
+  static onUserSelectMenuInteraction = (interaction: UserSelectMenuInteraction) => {
     return <A = never, E = never, R = never>(
       bot: Bot<A, E, R>,
       runtime: Runtime.Runtime<R | SignalService.SignalService>,
@@ -180,9 +160,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
             InteractionHandlerMapWithMetricsGroup.userSelectMenuExecuteAndReplyError(
               interaction.customId,
             ),
-            Effect.provide(
-              interactionServices<UserSelectMenuInteractionT>(interaction),
-            ),
+            Effect.provide(interactionServices<UserSelectMenuInteractionT>(interaction)),
             Effect.provide(runtime),
           ),
         ),
@@ -195,9 +173,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       );
   };
 
-  static onMessageComponentInteraction = (
-    interaction: MessageComponentInteraction,
-  ) => {
+  static onMessageComponentInteraction = (interaction: MessageComponentInteraction) => {
     return <A = never, E = never, R = never>(
       bot: Bot<A, E, R>,
       runtime: Runtime.Runtime<R | SignalService.SignalService>,
@@ -205,15 +181,10 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       pipe(
         Match.value(interaction),
         Match.when({ componentType: ComponentType.Button }, () =>
-          Bot.onButtonInteraction(interaction as ButtonInteraction)(
-            bot,
-            runtime,
-          ),
+          Bot.onButtonInteraction(interaction as ButtonInteraction)(bot, runtime),
         ),
         Match.when({ componentType: ComponentType.UserSelect }, () =>
-          Bot.onUserSelectMenuInteraction(
-            interaction as UserSelectMenuInteraction,
-          )(bot, runtime),
+          Bot.onUserSelectMenuInteraction(interaction as UserSelectMenuInteraction)(bot, runtime),
         ),
         Match.orElse(() => Effect.void),
       );
@@ -227,15 +198,13 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       pipe(
         Match.value(interaction),
         Match.when({ type: InteractionType.ApplicationCommand }, () =>
-          Bot.onCommandInteraction(interaction as CommandInteraction)(
+          Bot.onCommandInteraction(interaction as CommandInteraction)(bot, runtime),
+        ),
+        Match.when({ type: InteractionType.MessageComponent }, () =>
+          Bot.onMessageComponentInteraction(interaction as MessageComponentInteraction)(
             bot,
             runtime,
           ),
-        ),
-        Match.when({ type: InteractionType.MessageComponent }, () =>
-          Bot.onMessageComponentInteraction(
-            interaction as MessageComponentInteraction,
-          )(bot, runtime),
         ),
         Match.orElse(() => Effect.void),
       );
@@ -243,10 +212,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
 
   static makeStartEffect =
     <A = never, E = never>(discordToken: string) =>
-    <R = never>(
-      bot: Bot<A, E, R>,
-      runtime: Runtime.Runtime<R | SignalService.SignalService>,
-    ) =>
+    <R = never>(bot: Bot<A, E, R>, runtime: Runtime.Runtime<R | SignalService.SignalService>) =>
       pipe(
         Effect.try(() =>
           bot.client
@@ -258,18 +224,14 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                   Effect.andThen(() => ClientService.getGuilds()),
                   Effect.tap((guilds) =>
                     Effect.forEach(HashMap.values(guilds), (guild) =>
-                      Effect.log(
-                        `guildId: ${guild.id} guildName: ${guild.name}`,
-                      ),
+                      Effect.log(`guildId: ${guild.id} guildName: ${guild.name}`),
                     ),
                   ),
                   Effect.tap(() =>
                     pipe(
                       bot.interactionHandlerMapWithMetricsGroup,
                       SynchronizedRef.get,
-                      Effect.flatMap(
-                        InteractionHandlerMapWithMetricsGroup.initialize,
-                      ),
+                      Effect.flatMap(InteractionHandlerMapWithMetricsGroup.initialize),
                     ),
                   ),
                   Effect.andThen(
@@ -285,9 +247,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
                                 task,
                                 Effect.provide(bot.traceProvider),
                                 Effect.provide(ClientService.Default(client)),
-                                Effect.catchAll((error) =>
-                                  Effect.logError(error),
-                                ),
+                                Effect.catchAll((error) => Effect.logError(error)),
                               ),
                             ),
                           ),
@@ -312,18 +272,14 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
               ),
             ),
         ),
-        Effect.andThen(() =>
-          Effect.promise(() => bot.client.login(discordToken)),
-        ),
+        Effect.andThen(() => Effect.promise(() => bot.client.login(discordToken))),
         Effect.andThen(() => Effect.makeLatch()),
         Effect.andThen((latch) => latch.await),
       );
 
   static makeFinalizer =
     () =>
-    <A = never, E = never, R = never>(
-      bot: Bot<A, E, Exclude<R, SignalService.SignalService>>,
-    ) =>
+    <A = never, E = never, R = never>(bot: Bot<A, E, Exclude<R, SignalService.SignalService>>) =>
       Effect.promise(() => bot.client.destroy());
 
   static create = <A = never, E = never, R = never>() =>
@@ -333,10 +289,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         bindObject({
           client: Effect.succeed(
             new Client({
-              intents: [
-                GatewayIntentBits.Guilds,
-                GatewayIntentBits.GuildMembers,
-              ],
+              intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
             }),
           ),
           interactionHandlerMapWithMetricsGroup: SynchronizedRef.make(
@@ -348,11 +301,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
           ),
           tasks: SynchronizedRef.make(
             HashSet.empty<
-              Effect.Effect<
-                unknown,
-                unknown,
-                R | ClientService | SignalService.SignalService
-              >
+              Effect.Effect<unknown, unknown, R | ClientService | SignalService.SignalService>
             >(),
           ),
           traceProvider: Effect.succeed(Layer.empty),
@@ -573,12 +522,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
   };
 
   static addUserSelectMenu = <A = never, E = never, R = never>(
-    userSelectMenu: HandlerVariantHandlerContext<
-      UserSelectMenuHandlerVariantT,
-      A,
-      E,
-      R
-    >,
+    userSelectMenu: HandlerVariantHandlerContext<UserSelectMenuHandlerVariantT, A, E, R>,
   ) => {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
@@ -622,11 +566,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       );
   };
 
-  static addUserSelectMenuInteractionHandlerMap = <
-    A = never,
-    E = never,
-    R = never,
-  >(
+  static addUserSelectMenuInteractionHandlerMap = <A = never, E = never, R = never>(
     userSelectMenus: HandlerVariantMap<UserSelectMenuHandlerVariantT, A, E, R>,
   ) => {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
@@ -677,12 +617,7 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
         Effect.Do,
         Effect.let(
           "bot",
-          () =>
-            bot as Bot<
-              BA,
-              BE,
-              Exclude<R, ClientService | SignalService.SignalService> | BR
-            >,
+          () => bot as Bot<BA, BE, Exclude<R, ClientService | SignalService.SignalService> | BR>,
         ),
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(bot.tasks, (tasks) =>
@@ -706,20 +641,13 @@ export class Bot<A = never, E = never, R = never> extends Data.TaggedClass(
       );
   };
 
-  static addTasks = <R = never>(
-    tasks: Iterable<Effect.Effect<unknown, unknown, R>>,
-  ) => {
+  static addTasks = <R = never>(tasks: Iterable<Effect.Effect<unknown, unknown, R>>) => {
     return <BA = never, BE = never, BR = never>(bot: Bot<BA, BE, BR>) =>
       pipe(
         Effect.Do,
         Effect.let(
           "bot",
-          () =>
-            bot as Bot<
-              BA,
-              BE,
-              Exclude<R, ClientService | SignalService.SignalService> | BR
-            >,
+          () => bot as Bot<BA, BE, Exclude<R, ClientService | SignalService.SignalService> | BR>,
         ),
         Effect.tap(({ bot }) =>
           SynchronizedRef.update(bot.tasks, (existing) =>

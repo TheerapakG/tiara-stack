@@ -17,8 +17,7 @@ import { Validate, Validator } from "typhoon-core/validator";
 import { MissingRpcConfigError, RpcError } from "typhoon-core/error";
 
 export const HandlerDataGroupTypeId = CoreData.Group.HandlerDataGroupTypeId;
-export const HandlerDataCollectionTypeId =
-  CoreData.Collection.HandlerDataCollectionTypeId;
+export const HandlerDataCollectionTypeId = CoreData.Collection.HandlerDataCollectionTypeId;
 
 export class HandlerError extends Data.TaggedError("HandlerError")<{
   message: string;
@@ -32,14 +31,10 @@ export class AppsScriptClient<
   constructor(
     private readonly url: string,
     private readonly handlerDataCollection: HandlerDataCollection,
-    private readonly token: SynchronizedRef.SynchronizedRef<
-      Option.Option<string>
-    >,
+    private readonly token: SynchronizedRef.SynchronizedRef<Option.Option<string>>,
   ) {}
 
-  static create<
-    const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
-  >(
+  static create<const Collection extends HandlerData.Collection.HandlerDataCollection<any>>(
     handlerDataCollection: Collection,
     url: string,
   ): Effect.Effect<AppsScriptClient<Collection>, never, never> {
@@ -47,8 +42,7 @@ export class AppsScriptClient<
       Effect.Do,
       Effect.bind("token", () => SynchronizedRef.make(Option.none<string>())),
       Effect.map(
-        ({ token }) =>
-          new AppsScriptClient<Collection>(url, handlerDataCollection, token),
+        ({ token }) => new AppsScriptClient<Collection>(url, handlerDataCollection, token),
       ),
       Effect.withSpan("AppsScriptClient.create", {
         captureStackTrace: true,
@@ -58,11 +52,7 @@ export class AppsScriptClient<
 
   static token =
     (token: Option.Option<string>) =>
-    (
-      client: AppsScriptClient<
-        HandlerData.Collection.HandlerDataCollection<any>
-      >,
-    ) =>
+    (client: AppsScriptClient<HandlerData.Collection.HandlerDataCollection<any>>) =>
       pipe(
         SynchronizedRef.update(client.token, () => token),
         Effect.withSpan("AppsScriptClient.token", {
@@ -98,9 +88,7 @@ export class AppsScriptClient<
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
-      Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<HData>
-      >
+      Handler.Config.ResolvedRequestParamsValidator<Handler.Config.RequestParamsOrUndefined<HData>>
     >,
   ) {
     return pipe(
@@ -133,9 +121,7 @@ export class AppsScriptClient<
         ),
       ),
       Effect.let("responseErrorValidator", ({ config }) =>
-        Handler.Config.resolveResponseErrorValidator(
-          Handler.Config.responseError(config),
-        ),
+        Handler.Config.resolveResponseErrorValidator(Handler.Config.responseError(config)),
       ),
       Effect.let("id", () => Utilities.getUuid() as string),
       Effect.bind("token", () => client.token),
@@ -173,9 +159,7 @@ export class AppsScriptClient<
       ),
       Effect.bind("dataEncoded", () => Msgpack.Encoder.encode(data)),
       Effect.let("requestBuffer", ({ requestHeaderEncoded, dataEncoded }) => {
-        const requestBuffer = new Uint8Array(
-          requestHeaderEncoded.length + dataEncoded.length,
-        );
+        const requestBuffer = new Uint8Array(requestHeaderEncoded.length + dataEncoded.length);
         requestBuffer.set(requestHeaderEncoded, 0);
         requestBuffer.set(dataEncoded, requestHeaderEncoded.length);
         return requestBuffer;
@@ -201,27 +185,18 @@ export class AppsScriptClient<
             }),
         }),
       ),
-      Effect.let(
-        "bytes",
-        ({ response }) => new Uint8Array(response.getBlob().getBytes()),
-      ),
+      Effect.let("bytes", ({ response }) => new Uint8Array(response.getBlob().getBytes())),
       Effect.bind("pullEffect", ({ bytes }) =>
         pipe(Msgpack.Decoder.bytesToStream(bytes), Stream.toPullEffect),
       ),
       Effect.bind("header", ({ pullEffect }) =>
         pipe(
           pullEffect,
-          Effect.flatMap(
-            Validate.validate(
-              pipe(Header.HeaderSchema, Schema.standardSchemaV1),
-            ),
-          ),
+          Effect.flatMap(Validate.validate(pipe(Header.HeaderSchema, Schema.standardSchemaV1))),
         ),
       ),
       Effect.tap(({ header }) =>
-        header.span
-          ? Effect.linkSpanCurrent(Tracer.externalSpan(header.span))
-          : Effect.void,
+        header.span ? Effect.linkSpanCurrent(Tracer.externalSpan(header.span)) : Effect.void,
       ),
       Effect.bind("decodedResponse", ({ pullEffect }) => pullEffect),
       Effect.flatMap(({ header, decodedResponse, config }) =>

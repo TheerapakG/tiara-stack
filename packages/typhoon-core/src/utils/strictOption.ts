@@ -3,11 +3,7 @@ import { Option } from "effect";
 export type ValueExtendsOr<O extends Option.Option<unknown>, E, D> =
   O extends Option.Some<infer T extends E> ? T : D;
 
-export type ValueExtends<O extends Option.Option<unknown>, E> = ValueExtendsOr<
-  O,
-  E,
-  never
->;
+export type ValueExtends<O extends Option.Option<unknown>, E> = ValueExtendsOr<O, E, never>;
 
 export const some = <T>(value: T) => Option.some(value) as Option.Some<T>;
 

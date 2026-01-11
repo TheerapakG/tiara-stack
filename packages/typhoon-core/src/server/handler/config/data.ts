@@ -1,11 +1,6 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { Data, Option, pipe, Match } from "effect";
-import {
-  type GetOrUndefined,
-  getOrUndefined,
-  none,
-  some,
-} from "~/utils/strictOption";
+import { type GetOrUndefined, getOrUndefined, none, some } from "~/utils/strictOption";
 import { PartialSubscriptionHandlerConfig } from "./subscription/data";
 import { PartialMutationHandlerConfig } from "./mutation/data";
 import { RequestParamsConfig } from "./shared/requestParams";
@@ -21,34 +16,27 @@ export const empty = () => new DummyHandlerConfig();
 
 export type TypedPartialHandlerConfig<
   Name extends Option.Option<string> = Option.Option<string>,
-  RequestParams extends Option.Option<
-    RequestParamsConfig<StandardSchemaV1, boolean>
-  > = Option.Option<RequestParamsConfig<StandardSchemaV1, boolean>>,
-  Response extends Option.Option<
+  RequestParams extends Option.Option<RequestParamsConfig<StandardSchemaV1, boolean>> =
+    Option.Option<RequestParamsConfig<StandardSchemaV1, boolean>>,
+  Response extends Option.Option<ResponseConfig<StandardSchemaV1>> = Option.Option<
     ResponseConfig<StandardSchemaV1>
-  > = Option.Option<ResponseConfig<StandardSchemaV1>>,
+  >,
 > =
   | PartialSubscriptionHandlerConfig<Name, RequestParams, Response>
   | PartialMutationHandlerConfig<Name, RequestParams, Response>;
 
-export type PartialHandlerConfig =
-  | DummyHandlerConfig
-  | TypedPartialHandlerConfig;
+export type PartialHandlerConfig = DummyHandlerConfig | TypedPartialHandlerConfig;
 
 export type TypedHandlerConfig<
   Name extends string = string,
-  RequestParams extends RequestParamsConfig<
+  RequestParams extends RequestParamsConfig<StandardSchemaV1, boolean> = RequestParamsConfig<
     StandardSchemaV1,
     boolean
-  > = RequestParamsConfig<StandardSchemaV1, boolean>,
-  Response extends Option.Option<
+  >,
+  Response extends Option.Option<ResponseConfig<StandardSchemaV1>> = Option.Option<
     ResponseConfig<StandardSchemaV1>
-  > = Option.Option<ResponseConfig<StandardSchemaV1>>,
-> = TypedPartialHandlerConfig<
-  Option.Some<Name>,
-  Option.Some<RequestParams>,
-  Response
->;
+  >,
+> = TypedPartialHandlerConfig<Option.Some<Name>, Option.Some<RequestParams>, Response>;
 
 export type TypeOption<Config extends PartialHandlerConfig> =
   Config extends PartialSubscriptionHandlerConfig
@@ -56,12 +44,11 @@ export type TypeOption<Config extends PartialHandlerConfig> =
     : Config extends PartialMutationHandlerConfig
       ? Option.Some<"mutation">
       : Option.None<"subscription" | "mutation">;
-export type TypeOrUndefined<Config extends PartialHandlerConfig> =
-  GetOrUndefined<TypeOption<Config>>;
+export type TypeOrUndefined<Config extends PartialHandlerConfig> = GetOrUndefined<
+  TypeOption<Config>
+>;
 
-export const type = <const Config extends PartialHandlerConfig>(
-  config: Config,
-) =>
+export const type = <const Config extends PartialHandlerConfig>(config: Config) =>
   pipe(
     Match.value(config as PartialHandlerConfig),
     Match.tagsExhaustive({
@@ -73,15 +60,12 @@ export const type = <const Config extends PartialHandlerConfig>(
   ) as TypeOrUndefined<Config>;
 
 export type NameOption<Config extends PartialHandlerConfig> =
-  Config extends TypedPartialHandlerConfig
-    ? Config["data"]["name"]
-    : Option.None<string>;
-export type NameOrUndefined<Config extends PartialHandlerConfig> =
-  GetOrUndefined<NameOption<Config>>;
+  Config extends TypedPartialHandlerConfig ? Config["data"]["name"] : Option.None<string>;
+export type NameOrUndefined<Config extends PartialHandlerConfig> = GetOrUndefined<
+  NameOption<Config>
+>;
 
-export const name = <const Config extends PartialHandlerConfig>(
-  config: Config,
-) =>
+export const name = <const Config extends PartialHandlerConfig>(config: Config) =>
   pipe(
     Match.value(config as PartialHandlerConfig),
     Match.tagsExhaustive({
@@ -97,22 +81,17 @@ export type RequestParamsOption<Config extends PartialHandlerConfig> =
     ? Config["data"]["requestParams"]
     : Option.None<RequestParamsConfig<StandardSchemaV1, boolean>>;
 export type RequestParamsOrUndefined<Config extends PartialHandlerConfig> =
-  GetOrUndefined<
-    RequestParamsOption<Config>
-  > extends infer RequestParams extends
+  GetOrUndefined<RequestParamsOption<Config>> extends infer RequestParams extends
     | RequestParamsConfig<StandardSchemaV1, boolean>
     | undefined
     ? RequestParams
     : never;
 
-export const requestParams = <const Config extends PartialHandlerConfig>(
-  config: Config,
-) =>
+export const requestParams = <const Config extends PartialHandlerConfig>(config: Config) =>
   pipe(
     Match.value(config as PartialHandlerConfig),
     Match.tagsExhaustive({
-      DummyHandlerConfig: () =>
-        none<RequestParamsConfig<StandardSchemaV1, boolean>>(),
+      DummyHandlerConfig: () => none<RequestParamsConfig<StandardSchemaV1, boolean>>(),
       PartialSubscriptionHandlerConfig: (config) => config.data.requestParams,
       PartialMutationHandlerConfig: (config) => config.data.requestParams,
     }),
@@ -130,9 +109,7 @@ export type ResponseOrUndefined<Config extends PartialHandlerConfig> =
     ? Response
     : never;
 
-export const response = <const Config extends PartialHandlerConfig>(
-  config: Config,
-) =>
+export const response = <const Config extends PartialHandlerConfig>(config: Config) =>
   pipe(
     Match.value(config as PartialHandlerConfig),
     Match.tagsExhaustive({
@@ -148,17 +125,13 @@ export type ResponseErrorOption<Config extends PartialHandlerConfig> =
     ? Config["data"]["responseError"]
     : Option.None<ResponseErrorConfig<StandardSchemaV1>>;
 export type ResponseErrorOrUndefined<Config extends PartialHandlerConfig> =
-  GetOrUndefined<
-    ResponseErrorOption<Config>
-  > extends infer ResponseError extends
+  GetOrUndefined<ResponseErrorOption<Config>> extends infer ResponseError extends
     | ResponseErrorConfig<StandardSchemaV1>
     | undefined
     ? ResponseError
     : never;
 
-export const responseError = <const Config extends PartialHandlerConfig>(
-  config: Config,
-) =>
+export const responseError = <const Config extends PartialHandlerConfig>(config: Config) =>
   pipe(
     Match.value(config as PartialHandlerConfig),
     Match.tagsExhaustive({

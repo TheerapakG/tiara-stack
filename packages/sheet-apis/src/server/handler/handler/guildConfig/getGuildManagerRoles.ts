@@ -15,21 +15,11 @@ export const getGuildManagerRolesHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(getGuildManagerRolesHandlerConfig),
-        ),
-        Effect.flatMap(({ parsed }) =>
-          GuildConfigService.getGuildManagerRoles(parsed),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
+        Effect.bind("parsed", () => Event.request.parsed(getGuildManagerRolesHandlerConfig)),
+        Effect.flatMap(({ parsed }) => GuildConfigService.getGuildManagerRoles(parsed)),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(
-          Handler.Config.encodeResponseEffect(
-            getGuildManagerRolesHandlerConfig,
-          ),
-        ),
+        Effect.map(Handler.Config.encodeResponseEffect(getGuildManagerRolesHandlerConfig)),
         Effect.withSpan("getGuildManagerRolesHandler", {
           captureStackTrace: true,
         }),

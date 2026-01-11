@@ -16,12 +16,10 @@ import { SubcommandHandler } from "./handler";
 
 type SubcommandHandlerBuilderData<
   Data extends Option.Option<
-    | (SharedSlashCommandSubcommands<SlashCommandSubcommandsOnlyBuilder> &
-        SharedSlashCommand)
+    | (SharedSlashCommandSubcommands<SlashCommandSubcommandsOnlyBuilder> & SharedSlashCommand)
     | SlashCommandSubcommandGroupBuilder
   > = Option.None<
-    | (SharedSlashCommandSubcommands<SlashCommandSubcommandsOnlyBuilder> &
-        SharedSlashCommand)
+    | (SharedSlashCommandSubcommands<SlashCommandSubcommandsOnlyBuilder> & SharedSlashCommand)
     | SlashCommandSubcommandGroupBuilder
   >,
   A = never,
@@ -34,13 +32,9 @@ type SubcommandHandlerBuilderData<
 
 export class SubcommandHandlerBuilder<
   Data extends Option.Option<
-    | SlashCommandBuilder
-    | SlashCommandSubcommandsOnlyBuilder
-    | SlashCommandSubcommandGroupBuilder
+    SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder | SlashCommandSubcommandGroupBuilder
   > = Option.None<
-    | SlashCommandBuilder
-    | SlashCommandSubcommandsOnlyBuilder
-    | SlashCommandSubcommandGroupBuilder
+    SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder | SlashCommandSubcommandGroupBuilder
   >,
   A = never,
   E = never,
@@ -103,32 +97,20 @@ export class SubcommandHandlerBuilder<
     MR,
   >(
     this: SubcommandHandlerBuilder<Option.Some<BuilderData>, MA, ME, MR>,
-    handler: HandlerVariantHandlerContext<
-      ChatInputSubcommandHandlerVariantT,
-      A,
-      E,
-      R
-    >,
+    handler: HandlerVariantHandlerContext<ChatInputSubcommandHandlerVariantT, A, E, R>,
   ) {
     return new SubcommandHandlerBuilder({
-      _data: Option.some(
-        this._data.value.addSubcommand(handler.data),
-      ) as Option.Some<
+      _data: Option.some(this._data.value.addSubcommand(handler.data)) as Option.Some<
         BuilderData extends SlashCommandSubcommandGroupBuilder
           ? SlashCommandSubcommandGroupBuilder
           : SlashCommandSubcommandsOnlyBuilder
       >,
-      _handler: pipe(
-        this._handler,
-        SubcommandHandler.addSubcommandHandler(handler),
-      ),
+      _handler: pipe(this._handler, SubcommandHandler.addSubcommandHandler(handler)),
     });
   }
 
   addSubcommandGroupHandler<
-    BuilderData extends
-      | SlashCommandBuilder
-      | SlashCommandSubcommandsOnlyBuilder,
+    BuilderData extends SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder,
     A,
     E,
     R,
@@ -137,21 +119,13 @@ export class SubcommandHandlerBuilder<
     MR,
   >(
     this: SubcommandHandlerBuilder<Option.Some<BuilderData>, MA, ME, MR>,
-    handler: HandlerVariantHandlerContext<
-      ChatInputSubcommandGroupHandlerVariantT,
-      A,
-      E,
-      R
-    >,
+    handler: HandlerVariantHandlerContext<ChatInputSubcommandGroupHandlerVariantT, A, E, R>,
   ) {
     return new SubcommandHandlerBuilder({
       _data: Option.some(
         this._data.value.addSubcommandGroup(handler.data),
       ) as Option.Some<SlashCommandSubcommandsOnlyBuilder>,
-      _handler: pipe(
-        this._handler,
-        SubcommandHandler.addSubcommandGroupHandler(handler),
-      ),
+      _handler: pipe(this._handler, SubcommandHandler.addSubcommandGroupHandler(handler)),
     });
   }
 
@@ -169,9 +143,8 @@ export class SubcommandHandlerBuilder<
 }
 
 export class ChatInputCommandSubcommandHandlerContextBuilder<
-  Data extends Option.Option<
-    SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder
-  > = Option.None<SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder>,
+  Data extends Option.Option<SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder> =
+    Option.None<SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder>,
   A = never,
   E = never,
   R = never,
@@ -186,14 +159,7 @@ export class ChatInputCommandSubcommandHandlerContextBuilder<
     });
   };
 
-  data<
-    BuilderData extends
-      | SlashCommandBuilder
-      | SlashCommandSubcommandsOnlyBuilder,
-    A,
-    E,
-    R,
-  >(
+  data<BuilderData extends SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder, A, E, R>(
     this: ChatInputCommandSubcommandHandlerContextBuilder<
       Option.None<SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder>,
       A,
@@ -208,9 +174,7 @@ export class ChatInputCommandSubcommandHandlerContextBuilder<
   }
 
   addSubcommandHandler<
-    BuilderData extends
-      | SlashCommandBuilder
-      | SlashCommandSubcommandsOnlyBuilder,
+    BuilderData extends SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder,
     A,
     E,
     R,
@@ -218,18 +182,8 @@ export class ChatInputCommandSubcommandHandlerContextBuilder<
     ME,
     MR,
   >(
-    this: ChatInputCommandSubcommandHandlerContextBuilder<
-      Option.Some<BuilderData>,
-      MA,
-      ME,
-      MR
-    >,
-    handler: HandlerVariantHandlerContext<
-      ChatInputSubcommandHandlerVariantT,
-      A,
-      E,
-      R
-    >,
+    this: ChatInputCommandSubcommandHandlerContextBuilder<Option.Some<BuilderData>, MA, ME, MR>,
+    handler: HandlerVariantHandlerContext<ChatInputSubcommandHandlerVariantT, A, E, R>,
   ) {
     return new ChatInputCommandSubcommandHandlerContextBuilder({
       builder: this.builder.addSubcommandHandler(handler),
@@ -237,9 +191,7 @@ export class ChatInputCommandSubcommandHandlerContextBuilder<
   }
 
   addSubcommandGroupHandler<
-    BuilderData extends
-      | SlashCommandBuilder
-      | SlashCommandSubcommandsOnlyBuilder,
+    BuilderData extends SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder,
     A,
     E,
     R,
@@ -247,58 +199,33 @@ export class ChatInputCommandSubcommandHandlerContextBuilder<
     ME,
     MR,
   >(
-    this: ChatInputCommandSubcommandHandlerContextBuilder<
-      Option.Some<BuilderData>,
-      MA,
-      ME,
-      MR
-    >,
-    handler: HandlerVariantHandlerContext<
-      ChatInputSubcommandGroupHandlerVariantT,
-      A,
-      E,
-      R
-    >,
+    this: ChatInputCommandSubcommandHandlerContextBuilder<Option.Some<BuilderData>, MA, ME, MR>,
+    handler: HandlerVariantHandlerContext<ChatInputSubcommandGroupHandlerVariantT, A, E, R>,
   ) {
     return new ChatInputCommandSubcommandHandlerContextBuilder({
       builder: this.builder.addSubcommandGroupHandler(handler),
     });
   }
 
-  build<
-    BuilderData extends
-      | SlashCommandBuilder
-      | SlashCommandSubcommandsOnlyBuilder,
-    A,
-    E,
-    R,
-  >(
-    this: ChatInputCommandSubcommandHandlerContextBuilder<
-      Option.Some<BuilderData>,
-      A,
-      E,
-      R
-    >,
+  build<BuilderData extends SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder, A, E, R>(
+    this: ChatInputCommandSubcommandHandlerContextBuilder<Option.Some<BuilderData>, A, E, R>,
   ) {
     return this.builder.toContext();
   }
 }
 
 export class ChatInputSubcommandGroupSubcommandHandlerContextBuilder<
-  Data extends
-    Option.Option<SlashCommandSubcommandGroupBuilder> = Option.None<SlashCommandSubcommandGroupBuilder>,
+  Data extends Option.Option<SlashCommandSubcommandGroupBuilder> =
+    Option.None<SlashCommandSubcommandGroupBuilder>,
   A = never,
   E = never,
   R = never,
-> extends Data.TaggedClass(
-  "ChatInputSubcommandGroupSubcommandHandlerContextBuilder",
-)<{
+> extends Data.TaggedClass("ChatInputSubcommandGroupSubcommandHandlerContextBuilder")<{
   builder: SubcommandHandlerBuilder<Data, A, E, R>;
 }> {
   static empty = () => {
     return new ChatInputSubcommandGroupSubcommandHandlerContextBuilder({
-      builder:
-        SubcommandHandlerBuilder.empty<SlashCommandSubcommandGroupBuilder>(),
+      builder: SubcommandHandlerBuilder.empty<SlashCommandSubcommandGroupBuilder>(),
     });
   };
 
@@ -316,27 +243,14 @@ export class ChatInputSubcommandGroupSubcommandHandlerContextBuilder<
     });
   }
 
-  addSubcommandHandler<
-    BuilderData extends SlashCommandSubcommandGroupBuilder,
-    A,
-    E,
-    R,
-    MA,
-    ME,
-    MR,
-  >(
+  addSubcommandHandler<BuilderData extends SlashCommandSubcommandGroupBuilder, A, E, R, MA, ME, MR>(
     this: ChatInputSubcommandGroupSubcommandHandlerContextBuilder<
       Option.Some<BuilderData>,
       MA,
       ME,
       MR
     >,
-    handler: HandlerVariantHandlerContext<
-      ChatInputSubcommandHandlerVariantT,
-      A,
-      E,
-      R
-    >,
+    handler: HandlerVariantHandlerContext<ChatInputSubcommandHandlerVariantT, A, E, R>,
   ) {
     return new ChatInputSubcommandGroupSubcommandHandlerContextBuilder({
       builder: this.builder.addSubcommandHandler(handler),

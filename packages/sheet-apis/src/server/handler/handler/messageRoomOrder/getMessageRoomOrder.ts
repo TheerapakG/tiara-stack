@@ -17,15 +17,9 @@ export const getMessageRoomOrderHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(getMessageRoomOrderHandlerConfig),
-        ),
-        Effect.flatMap(({ parsed }) =>
-          MessageRoomOrderService.getMessageRoomOrder(parsed),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
+        Effect.bind("parsed", () => Event.request.parsed(getMessageRoomOrderHandlerConfig)),
+        Effect.flatMap(({ parsed }) => MessageRoomOrderService.getMessageRoomOrder(parsed)),
         Effect.map(
           Effect.map(
             Result.eitherSomeOrLeft(() =>
@@ -36,9 +30,7 @@ export const getMessageRoomOrderHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(
-          Handler.Config.encodeResponseEffect(getMessageRoomOrderHandlerConfig),
-        ),
+        Effect.map(Handler.Config.encodeResponseEffect(getMessageRoomOrderHandlerConfig)),
         Effect.withSpan("getMessageRoomOrderHandler", {
           captureStackTrace: true,
         }),

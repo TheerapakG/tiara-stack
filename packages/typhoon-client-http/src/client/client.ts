@@ -1,14 +1,5 @@
 import { HttpClient as EffectHttpClient, HttpBody } from "@effect/platform";
-import {
-  Effect,
-  Either,
-  Option,
-  pipe,
-  Schema,
-  SynchronizedRef,
-  Tracer,
-  Function,
-} from "effect";
+import { Effect, Either, Option, pipe, Schema, SynchronizedRef, Tracer, Function } from "effect";
 import { MissingRpcConfigError, RpcError } from "typhoon-core/error";
 import { Data as CoreData } from "typhoon-core/handler";
 import { Handler } from "typhoon-core/server";
@@ -17,8 +8,7 @@ import { Header, Msgpack, Stream } from "typhoon-core/protocol";
 import { Validate, Validator } from "typhoon-core/validator";
 
 export const HandlerDataGroupTypeId = CoreData.Group.HandlerDataGroupTypeId;
-export const HandlerDataCollectionTypeId =
-  CoreData.Collection.HandlerDataCollectionTypeId;
+export const HandlerDataCollectionTypeId = CoreData.Collection.HandlerDataCollectionTypeId;
 
 export class HttpClient<
   HandlerDataCollection extends
@@ -27,24 +17,17 @@ export class HttpClient<
   constructor(
     private readonly url: string,
     private readonly handlerDataCollection: HandlerDataCollection,
-    private readonly token: SynchronizedRef.SynchronizedRef<
-      Option.Option<string>
-    >,
+    private readonly token: SynchronizedRef.SynchronizedRef<Option.Option<string>>,
   ) {}
 
-  static create<
-    const Collection extends HandlerData.Collection.HandlerDataCollection<any>,
-  >(
+  static create<const Collection extends HandlerData.Collection.HandlerDataCollection<any>>(
     handlerDataCollection: Collection,
     url: string,
   ): Effect.Effect<HttpClient<Collection>, never, never> {
     return pipe(
       Effect.Do,
       Effect.bind("token", () => SynchronizedRef.make(Option.none<string>())),
-      Effect.map(
-        ({ token }) =>
-          new HttpClient<Collection>(url, handlerDataCollection, token),
-      ),
+      Effect.map(({ token }) => new HttpClient<Collection>(url, handlerDataCollection, token)),
       Effect.withSpan("HttpClient.create", {
         captureStackTrace: true,
       }),
@@ -89,9 +72,7 @@ export class HttpClient<
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
-      Handler.Config.ResolvedRequestParamsValidator<
-        Handler.Config.RequestParamsOrUndefined<HData>
-      >
+      Handler.Config.ResolvedRequestParamsValidator<Handler.Config.RequestParamsOrUndefined<HData>>
     >,
   ) {
     return pipe(
@@ -124,9 +105,7 @@ export class HttpClient<
         ),
       ),
       Effect.let("responseErrorValidator", ({ config }) =>
-        Handler.Config.resolveResponseErrorValidator(
-          Handler.Config.responseError(config),
-        ),
+        Handler.Config.resolveResponseErrorValidator(Handler.Config.responseError(config)),
       ),
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("token", () => client.token),
@@ -164,9 +143,7 @@ export class HttpClient<
       ),
       Effect.bind("dataEncoded", () => Msgpack.Encoder.encode(data)),
       Effect.let("requestBuffer", ({ requestHeaderEncoded, dataEncoded }) => {
-        const requestBuffer = new Uint8Array(
-          requestHeaderEncoded.length + dataEncoded.length,
-        );
+        const requestBuffer = new Uint8Array(requestHeaderEncoded.length + dataEncoded.length);
         requestBuffer.set(requestHeaderEncoded, 0);
         requestBuffer.set(dataEncoded, requestHeaderEncoded.length);
         return requestBuffer;
@@ -174,10 +151,7 @@ export class HttpClient<
       Effect.bind("stream", ({ requestBuffer }) =>
         pipe(
           EffectHttpClient.post(client.url, {
-            body: HttpBody.uint8Array(
-              requestBuffer,
-              "application/octet-stream",
-            ),
+            body: HttpBody.uint8Array(requestBuffer, "application/octet-stream"),
           }),
           Effect.map((response) => response.stream),
         ),
@@ -188,17 +162,11 @@ export class HttpClient<
       Effect.bind("header", ({ pullEffect }) =>
         pipe(
           pullEffect,
-          Effect.flatMap(
-            Validate.validate(
-              pipe(Header.HeaderSchema, Schema.standardSchemaV1),
-            ),
-          ),
+          Effect.flatMap(Validate.validate(pipe(Header.HeaderSchema, Schema.standardSchemaV1))),
         ),
       ),
       Effect.tap(({ header }) =>
-        header.span
-          ? Effect.linkSpanCurrent(Tracer.externalSpan(header.span))
-          : Effect.void,
+        header.span ? Effect.linkSpanCurrent(Tracer.externalSpan(header.span)) : Effect.void,
       ),
       Effect.bind("decodedResponse", ({ pullEffect }) => pullEffect),
       Effect.flatMap(({ header, decodedResponse, config }) =>

@@ -28,9 +28,7 @@ export const botCalcHandler = pipe(
                   ),
                 ),
               ),
-              Effect.flatMap(({ config, playerTeams }) =>
-                CalcService.calc(config, playerTeams),
-              ),
+              Effect.flatMap(({ config, playerTeams }) => CalcService.calc(config, playerTeams)),
               Effect.map(
                 Chunk.map((room) => ({
                   averageTalent: Room.avgTalent(room),

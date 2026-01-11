@@ -10,14 +10,8 @@ export class Room extends Schema.TaggedClass<Room>()("Room", {
   teams: Schema.Chunk(PlayerTeam),
 }) {
   static byTalent = Order.mapInput(Order.number, ({ talent }: Room) => talent);
-  static byEffectValue = Order.mapInput(
-    Order.number,
-    ({ effectValue }: Room) => effectValue,
-  );
-  static Order = Order.combine(
-    Room.byTalent,
-    Order.reverse(Room.byEffectValue),
-  );
+  static byEffectValue = Order.mapInput(Order.number, ({ effectValue }: Room) => effectValue);
+  static Order = Order.combine(Room.byTalent, Order.reverse(Room.byEffectValue));
 
   static avgTalent(room: Room) {
     return room.talent / room.teams.length;

@@ -16,12 +16,8 @@ export const getScheduleConfigHandler = pipe(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.tap(() =>
-          pipe(Event.someToken(), Effect.flatMap(AuthService.verify)),
-        ),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(getScheduleConfigHandlerConfig),
-        ),
+        Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
+        Effect.bind("parsed", () => Event.request.parsed(getScheduleConfigHandlerConfig)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -53,9 +49,7 @@ export const getScheduleConfigHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(
-          Handler.Config.encodeResponseEffect(getScheduleConfigHandlerConfig),
-        ),
+        Effect.map(Handler.Config.encodeResponseEffect(getScheduleConfigHandlerConfig)),
         Effect.map(
           Effect.withSpan("getScheduleConfigHandler", {
             captureStackTrace: true,

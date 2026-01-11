@@ -6,11 +6,7 @@ import * as SignalService from "./signalService";
 import * as SignalContext from "./signalContext";
 
 export class Signal<T = unknown>
-  extends Effectable.Class<
-    T,
-    never,
-    SignalContext.SignalContext | SignalService.SignalService
-  >
+  extends Effectable.Class<T, never, SignalContext.SignalContext | SignalService.SignalService>
   implements DependencySignal<T, never, never>
 {
   readonly _tag = "Signal" as const;
@@ -53,19 +49,11 @@ export class Signal<T = unknown>
     );
   }
 
-  getDependents(): STM.STM<
-    TSet.TSet<WeakRef<DependentSignal> | DependentSignal>,
-    never,
-    never
-  > {
+  getDependents(): STM.STM<TSet.TSet<WeakRef<DependentSignal> | DependentSignal>, never, never> {
     return STM.succeed(this._dependents);
   }
 
-  value(): Effect.Effect<
-    T,
-    never,
-    SignalContext.SignalContext | SignalService.SignalService
-  > {
+  value(): Effect.Effect<T, never, SignalContext.SignalContext | SignalService.SignalService> {
     return pipe(
       SignalContext.bindDependency(this),
       STM.commit,
@@ -76,11 +64,7 @@ export class Signal<T = unknown>
     );
   }
 
-  commit(): Effect.Effect<
-    T,
-    never,
-    SignalContext.SignalContext | SignalService.SignalService
-  > {
+  commit(): Effect.Effect<T, never, SignalContext.SignalContext | SignalService.SignalService> {
     return this.value();
   }
 
@@ -88,13 +72,9 @@ export class Signal<T = unknown>
     return pipe(
       STM.Do,
       STM.bind("value", () => TRef.get(this._valueRef)),
-      STM.bind("last", ({ value }) =>
-        TRef.getAndSet(this._lastValueRef, value),
-      ),
+      STM.bind("last", ({ value }) => TRef.getAndSet(this._lastValueRef, value)),
       STM.tap(({ value, last }) =>
-        STM.when(() => Equal.equals(last, value))(
-          SignalContext.markUnchanged(this),
-        ),
+        STM.when(() => Equal.equals(last, value))(SignalContext.markUnchanged(this)),
       ),
       STM.map(({ value }) => value),
       STM.commit,
@@ -124,9 +104,7 @@ export class Signal<T = unknown>
             TRef.get(this._valueRef),
             STM.commit,
             Effect.flatMap((value) => updater(value)),
-            Effect.tap((value) =>
-              pipe(TRef.set(this._valueRef, value), STM.commit),
-            ),
+            Effect.tap((value) => pipe(TRef.set(this._valueRef, value), STM.commit)),
           ),
       }),
     );
@@ -137,9 +115,7 @@ export class Signal<T = unknown>
   }
 }
 
-export type Value<S extends Signal<unknown>> = Effect.Effect.Success<
-  ReturnType<S["peek"]>
->;
+export type Value<S extends Signal<unknown>> = Effect.Effect.Success<ReturnType<S["peek"]>>;
 
 export const makeSTM = <T>(value: T, options?: Observable.ObservableOptions) =>
   pipe(

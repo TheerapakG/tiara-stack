@@ -7,24 +7,15 @@ import * as SignalService from "./signalService";
 type SignalContextShape = {
   readonly signal: Option.Option<DependentSignal.DependentSignal>;
   readonly unchanged: Option.Option<
-    TRef.TRef<
-      TSet.TSet<DependencySignal.DependencySignal<unknown, unknown, unknown>>
-    >
+    TRef.TRef<TSet.TSet<DependencySignal.DependencySignal<unknown, unknown, unknown>>>
   >;
 };
-const SignalContextTag: Context.TagClass<
-  SignalContext,
-  "SignalContext",
-  SignalContextShape
-> = Context.Tag("SignalContext")<SignalContext, SignalContextShape>();
+const SignalContextTag: Context.TagClass<SignalContext, "SignalContext", SignalContextShape> =
+  Context.Tag("SignalContext")<SignalContext, SignalContextShape>();
 export class SignalContext extends SignalContextTag {}
 
 const inheritUnchanged: STM.STM<
-  Option.Option<
-    TRef.TRef<
-      TSet.TSet<DependencySignal.DependencySignal<unknown, unknown, unknown>>
-    >
-  >,
+  Option.Option<TRef.TRef<TSet.TSet<DependencySignal.DependencySignal<unknown, unknown, unknown>>>>,
   never,
   never
 > = pipe(
@@ -33,11 +24,7 @@ const inheritUnchanged: STM.STM<
   STM.map(Option.flatMap((ctx) => ctx.unchanged)),
 );
 
-export const empty: STM.STM<
-  Context.Tag.Service<SignalContext>,
-  never,
-  never
-> = pipe(
+export const empty: STM.STM<Context.Tag.Service<SignalContext>, never, never> = pipe(
   inheritUnchanged,
   STM.map((unchanged) => ({
     signal: Option.none(),
@@ -117,9 +104,7 @@ export const bindDependency = (
 
 export const runAndTrackEffect =
   <A = never, E = never, R = never>(effect: Effect.Effect<A, E, R>) =>
-  (
-    ctx: Context.Tag.Service<SignalContext>,
-  ): Effect.Effect<A, E, Exclude<R, SignalContext>> => {
+  (ctx: Context.Tag.Service<SignalContext>): Effect.Effect<A, E, Exclude<R, SignalContext>> => {
     return pipe(
       effect,
       Effect.provideService(SignalContext, ctx),
@@ -127,8 +112,7 @@ export const runAndTrackEffect =
         pipe(
           ctx.signal,
           Option.match({
-            onSome: (signal) =>
-              DependentSignal.reconcileAllDependencies(signal),
+            onSome: (signal) => DependentSignal.reconcileAllDependencies(signal),
             onNone: () => Effect.void,
           }),
         ),
@@ -155,9 +139,5 @@ export type MaybeSignalEffectValue<X> =
     ? Effect.Effect.AsEffect<X>
     : Effect.Effect<X, never, never>;
 
-export const getMaybeSignalEffectValue = <X>(
-  value: X,
-): MaybeSignalEffectValue<X> =>
-  (Effect.isEffect(value)
-    ? value
-    : Effect.succeed(value)) as MaybeSignalEffectValue<X>;
+export const getMaybeSignalEffectValue = <X>(value: X): MaybeSignalEffectValue<X> =>
+  (Effect.isEffect(value) ? value : Effect.succeed(value)) as MaybeSignalEffectValue<X>;
