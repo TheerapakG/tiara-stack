@@ -1,12 +1,18 @@
-import { Data, Function, Record, Struct, Types, Option, pipe, Array } from "effect";
+import { Data, Effect, Function, Record, Struct, Types, Option, pipe, Array } from "effect";
 import {
   HandlerContextGroup,
   empty as emptyHandlerContextGroup,
   add as addHandlerContextGroup,
   addGroup as addGroupHandlerContextGroup,
   getHandlerContext as getGroupHandlerContext,
+  initializeMetrics as initializeGroupMetrics,
 } from "./group";
-import { type DataOrUndefined, type HandlerContext, type HandlerOrUndefined } from "./context";
+import {
+  type DataOrUndefined,
+  type HandlerContext,
+  type HandlerOrUndefined,
+  handler,
+} from "./context";
 import {
   type BaseHandlerT,
   type HandlerData,
@@ -20,6 +26,7 @@ import {
   type AddHandlerDataCollectionRecord,
   type BaseHandlerDataCollectionRecord,
 } from "../data/collection";
+import { execute as executeHandler } from "../metrics";
 
 type HandlerContextGroupRecord<HandlerT extends BaseHandlerT, R> = {
   [HT in HandlerT as HandlerType<HT>]: HandlerContextGroup<HT, R, any>;
@@ -332,4 +339,75 @@ export const getHandlerContext = Function.dual<
         Handler<HandlerT, unknown, unknown, HandlerContextCollectionContext<C>>
       >
     >,
+);
+
+export const initializeMetrics = <const C extends HandlerContextCollection<any, any, any>>(
+  collection: C,
+): Effect.Effect<void, never, never> =>
+  pipe(
+    Record.toEntries((collection as InferHandlerContextCollection<C>).record),
+    Effect.forEach(
+      ([type, group]) =>
+        initializeGroupMetrics(
+          group as unknown as HandlerContextGroup<HandlerContextCollectionHandlerT<C>, any, any>,
+          type as HandlerType<HandlerContextCollectionHandlerT<C>>,
+        ),
+      { discard: true },
+    ),
+    Effect.withSpan("HandlerContextCollection.initializeMetrics", {
+      captureStackTrace: true,
+    }),
+  );
+
+export const execute = Function.dual<
+  <
+    const C extends HandlerContextCollection<any, any, any>,
+    const ExecutorResult extends Effect.Effect<any, any, any>,
+    HandlerT extends HandlerContextCollectionHandlerT<C>,
+  >(
+    type: HandlerType<HandlerT>,
+    key: HandlerDataKey<HandlerT, HandlerData<HandlerT>>,
+    executor: (
+      handler: Option.Option<
+        Handler<HandlerT, unknown, unknown, HandlerContextCollectionContext<C>>
+      >,
+    ) => ExecutorResult,
+  ) => (collection: C) => ExecutorResult,
+  <
+    const C extends HandlerContextCollection<any, any, any>,
+    const ExecutorResult extends Effect.Effect<any, any, any>,
+    HandlerT extends HandlerContextCollectionHandlerT<C>,
+  >(
+    collection: C,
+    type: HandlerType<HandlerT>,
+    key: HandlerDataKey<HandlerT, HandlerData<HandlerT>>,
+    executor: (
+      handler: Option.Option<
+        Handler<HandlerT, unknown, unknown, HandlerContextCollectionContext<C>>
+      >,
+    ) => ExecutorResult,
+  ) => ExecutorResult
+>(
+  4,
+  <
+    const C extends HandlerContextCollection<any, any, any>,
+    const ExecutorResult extends Effect.Effect<any, any, any>,
+    HandlerT extends HandlerContextCollectionHandlerT<C>,
+  >(
+    collection: C,
+    type: HandlerType<HandlerT>,
+    key: HandlerDataKey<HandlerT, HandlerData<HandlerT>>,
+    executor: (
+      handler: Option.Option<
+        Handler<HandlerT, unknown, unknown, HandlerContextCollectionContext<C>>
+      >,
+    ) => ExecutorResult,
+  ) =>
+    pipe(
+      Option.flatMapNullable(getHandlerContext(collection, type, key), handler),
+      executeHandler<HandlerT, HandlerContextCollectionContext<C>>()(type, key, executor),
+      Effect.withSpan("HandlerContextCollection.execute", {
+        captureStackTrace: true,
+      }),
+    ) as ExecutorResult,
 );

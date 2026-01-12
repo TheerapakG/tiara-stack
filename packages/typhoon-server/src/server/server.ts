@@ -74,40 +74,18 @@ type MutationWithMetricsContext<R> = {
 };
 
 type SubscriptionOnceWithMetricsContext<R> = {
-  operation: "once";
   id: string;
   span: Tracer.Span;
   sendClientBuffer: (buffer: Uint8Array) => Effect.Effect<unknown, unknown, R | Event>;
   serverWithRuntime: ServerWithRuntime<R>;
 };
 
-type SubscriptionWithMetricsContext<R> =
-  | SubscriptionOnceWithMetricsContext<R>
-  | SubscriptionSubscribeWithMetricsContext<R>;
-
 type SubscriptionSubscribeWithMetricsContext<R> = {
-  operation: "subscribe";
   subscriptionState: SubscriptionState;
   id: string;
   span: Tracer.Span;
   sendClientBuffer: (buffer: Uint8Array) => Effect.Effect<void, never, never>;
   serverWithRuntime: ServerWithRuntime<R>;
-};
-
-interface MutationWithMetricsContextT extends HandlerContext.Type.WithMetricsExecutorTypeLambda {
-  readonly context: MutationWithMetricsContext<this["R"]>;
-  readonly result: Effect.Effect<void, never, Event>;
-}
-
-interface SubscriptionWithMetricsContextT
-  extends HandlerContext.Type.WithMetricsExecutorTypeLambda {
-  readonly context: SubscriptionWithMetricsContext<this["R"]>;
-  readonly result: Effect.Effect<void, never, Event>;
-}
-
-type ServerWithMetricsContextTRecord = {
-  mutation: MutationWithMetricsContextT;
-  subscription: SubscriptionWithMetricsContextT;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -119,11 +97,7 @@ interface ServerRunStateContextTypeLambda extends RunState.RunStateContextTypeLa
 
 type ServerData<R = never> = {
   traceProvider: Layer.Layer<never>;
-  handlerContextCollection: HandlerContextCore.CollectionWithMetrics.HandlerContextCollectionWithMetrics<
-    MutationHandlerT | SubscriptionHandlerT,
-    ServerWithMetricsContextTRecord,
-    R
-  >;
+  handlerContextCollection: HandlerContextCollection<R>;
   peerStateMapRef: SynchronizedRef.SynchronizedRef<PeerStateMap>;
   peerActive: Metric.Metric.Gauge<bigint>;
   peerTotal: Metric.Metric.Counter<bigint>;
@@ -153,7 +127,7 @@ const makeServeEffect =
       Effect.Do,
       Effect.let("serverWithRuntime", () => new ServerWithRuntime({ server, runtime })),
       Effect.tap(() =>
-        HandlerContextCore.CollectionWithMetrics.initialize(server.handlerContextCollection),
+        HandlerContextCore.Collection.initializeMetrics(server.handlerContextCollection),
       ),
       Effect.flatMap(({ serverWithRuntime }) =>
         Effect.try(() =>
@@ -245,11 +219,7 @@ export const create = <R = never>(serveFn: typeof crosswsServe) =>
       () => ({
         traceProvider: Effect.succeed(Layer.empty),
         handlerContextCollection: Effect.succeed(
-          HandlerContextCore.CollectionWithMetrics.empty<
-            MutationHandlerT | SubscriptionHandlerT,
-            ServerWithMetricsContextTRecord,
-            R
-          >(
+          HandlerContextCore.Collection.empty<MutationHandlerT | SubscriptionHandlerT, R>(
             {
               mutation: (config) => Handler.Config.Mutation.name(config),
               subscription: (config) => Handler.Config.Subscription.name(config),
@@ -266,16 +236,6 @@ export const create = <R = never>(serveFn: typeof crosswsServe) =>
                   PartialSubscriptionHandlerConfig: () => "subscription" as const,
                 }),
               ),
-            {
-              mutation: (
-                handler: Option.Option<Type.Handler<MutationHandlerT, unknown, unknown, R>>,
-                context: MutationWithMetricsContext<R>,
-              ) => runMutationHandler<R>(handler, context),
-              subscription: (
-                handler: Option.Option<Type.Handler<SubscriptionHandlerT, unknown, unknown, R>>,
-                context: SubscriptionWithMetricsContext<R>,
-              ) => runSubscriptionHandler<R>(handler, context),
-            },
           ),
         ),
         peerStateMapRef: SynchronizedRef.make(HashMap.empty<string, PeerState>()),
@@ -359,17 +319,11 @@ export const add =
     >(
       Struct.evolve(server, {
         handlerContextCollection: (collection) =>
-          HandlerContextCore.CollectionWithMetrics.add(
+          HandlerContextCore.Collection.add(
             handlerContext as
               | HandlerContext.HandlerContext<MutationHandlerT>
               | HandlerContext.HandlerContext<SubscriptionHandlerT>,
-          )(
-            collection as HandlerContextCore.CollectionWithMetrics.HandlerContextCollectionWithMetrics<
-              MutationHandlerT | SubscriptionHandlerT,
-              ServerWithMetricsContextTRecord,
-              ServerContext<S>
-            >,
-          ),
+          )(collection as HandlerContextCollection<ServerContext<S>>),
       }) as ServerData<
         | ServerContext<S>
         | Type.HandlerContext<
@@ -395,17 +349,13 @@ export const addCollection =
     new Server<ServerContext<S> | HandlerContext.Collection.HandlerContextCollectionContext<C>>(
       Struct.evolve(server, {
         handlerContextCollection: (collection) =>
-          HandlerContextCore.CollectionWithMetrics.addCollection(
-            handlerContextCollection as HandlerContextCollection<
-              HandlerContext.Collection.HandlerContextCollectionContext<C>
-            >,
-          )(
-            collection as HandlerContextCore.CollectionWithMetrics.HandlerContextCollectionWithMetrics<
+          HandlerContextCore.Collection.addCollection(
+            handlerContextCollection as HandlerContextCore.Collection.HandlerContextCollection<
               MutationHandlerT | SubscriptionHandlerT,
-              ServerWithMetricsContextTRecord,
-              ServerContext<S>
+              HandlerContext.Collection.HandlerContextCollectionContext<C>,
+              any
             >,
-          ),
+          )(collection as HandlerContextCollection<ServerContext<S>>),
       }),
     );
 
@@ -692,19 +642,6 @@ const runSubscriptionHandlerSubscribe = <R>(
     }),
   );
 
-const runSubscriptionHandler = <R>(
-  handler: Option.Option<Type.Handler<SubscriptionHandlerT, unknown, unknown, R>>,
-  context: SubscriptionWithMetricsContext<R>,
-) =>
-  pipe(
-    Match.value(context),
-    Match.when({ operation: "once" }, (context) => runSubscriptionHandlerOnce(handler, context)),
-    Match.when({ operation: "subscribe" }, (context) =>
-      runSubscriptionHandlerSubscribe(handler, context),
-    ),
-    Match.exhaustive,
-  );
-
 const runMutationHandler = <R>(
   handler: Option.Option<Type.Handler<MutationHandlerT, unknown, unknown, R>>,
   context: MutationWithMetricsContext<R>,
@@ -760,23 +697,22 @@ const handleSubscribe =
                 }),
                 Effect.map(({ event, scope }) => new SubscriptionState({ event, scope })),
                 Effect.tap((subscriptionState) =>
-                  pipe(
+                  HandlerContextCore.Collection.execute<
+                    HandlerContextCollection<R>,
+                    Effect.Effect<void, never, Event>,
+                    SubscriptionHandlerT
+                  >(
                     serverWithRuntime.server.handlerContextCollection,
-                    HandlerContextCore.CollectionWithMetrics.execute<
-                      HandlerContextCore.CollectionWithMetrics.HandlerContextCollectionWithMetrics<
-                        MutationHandlerT | SubscriptionHandlerT,
-                        ServerWithMetricsContextTRecord,
-                        R
-                      >,
-                      SubscriptionHandlerT
-                    >("subscription", header.payload.handler, {
-                      operation: "subscribe",
-                      id: header.id,
-                      span,
-                      sendClientBuffer: sendPeerBuffer(peer),
-                      serverWithRuntime,
-                      subscriptionState,
-                    }),
+                    "subscription",
+                    header.payload.handler,
+                    (handler) =>
+                      runSubscriptionHandlerSubscribe(handler, {
+                        id: header.id,
+                        span,
+                        sendClientBuffer: sendPeerBuffer(peer),
+                        serverWithRuntime,
+                        subscriptionState,
+                      }),
                   ),
                 ),
                 Effect.map((subscriptionState) => Option.some(subscriptionState)),
@@ -841,22 +777,21 @@ const handleOnce =
       Effect.Do,
       Effect.tap(() => serverWithRuntime.server.onceTotal(Effect.succeed(BigInt(1)))),
       Effect.andThen(() =>
-        pipe(
+        HandlerContextCore.Collection.execute<
+          HandlerContextCollection<R>,
+          Effect.Effect<void, never, Event>,
+          SubscriptionHandlerT
+        >(
           serverWithRuntime.server.handlerContextCollection,
-          HandlerContextCore.CollectionWithMetrics.execute<
-            HandlerContextCore.CollectionWithMetrics.HandlerContextCollectionWithMetrics<
-              MutationHandlerT | SubscriptionHandlerT,
-              ServerWithMetricsContextTRecord,
-              R
-            >,
-            SubscriptionHandlerT
-          >("subscription", header.payload.handler, {
-            operation: "once",
-            id: header.id,
-            span,
-            sendClientBuffer: callback,
-            serverWithRuntime,
-          }),
+          "subscription",
+          header.payload.handler,
+          (handler) =>
+            runSubscriptionHandlerOnce(handler, {
+              id: header.id,
+              span,
+              sendClientBuffer: callback,
+              serverWithRuntime,
+            }),
         ),
       ),
       Effect.asVoid,
@@ -884,21 +819,21 @@ const handleMutate =
       Effect.Do,
       Effect.tap(() => serverWithRuntime.server.mutationTotal(Effect.succeed(BigInt(1)))),
       Effect.andThen(() =>
-        pipe(
+        HandlerContextCore.Collection.execute<
+          HandlerContextCollection<R>,
+          Effect.Effect<void, never, Event>,
+          MutationHandlerT
+        >(
           serverWithRuntime.server.handlerContextCollection,
-          HandlerContextCore.CollectionWithMetrics.execute<
-            HandlerContextCore.CollectionWithMetrics.HandlerContextCollectionWithMetrics<
-              MutationHandlerT | SubscriptionHandlerT,
-              ServerWithMetricsContextTRecord,
-              R
-            >,
-            MutationHandlerT
-          >("mutation", header.payload.handler, {
-            id: header.id,
-            span,
-            sendClientBuffer: callback,
-            serverWithRuntime,
-          }),
+          "mutation",
+          header.payload.handler,
+          (handler) =>
+            runMutationHandler(handler, {
+              id: header.id,
+              span,
+              sendClientBuffer: callback,
+              serverWithRuntime,
+            }),
         ),
       ),
       Effect.asVoid,
