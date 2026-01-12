@@ -1,4 +1,4 @@
-import { getScreenshotHandlerConfig } from "@/server/handler/config";
+import { getScreenshotHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, Sheet } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -11,13 +11,13 @@ import { stripHandler } from "typhoon-core/bundler";
 const builders = Context.Builder.Subscription.builders();
 export const getScreenshotHandler = pipe(
   builders.empty(),
-  builders.data(getScreenshotHandlerConfig),
+  builders.data(getScreenshotHandlerData),
   builders.handler(
     stripHandler(
       pipe(
         Effect.Do,
         Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
-        Effect.bind("parsed", () => Event.request.parsed(getScreenshotHandlerConfig)),
+        Effect.bind("parsed", () => Event.request.parsed(getScreenshotHandlerData)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -61,7 +61,7 @@ export const getScreenshotHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(Handler.Config.encodeResponseEffect(getScreenshotHandlerConfig)),
+        Effect.map(Handler.Data.encodeResponseEffect(getScreenshotHandlerData)),
         Effect.withSpan("getScreenshotHandler", {
           captureStackTrace: true,
         }),

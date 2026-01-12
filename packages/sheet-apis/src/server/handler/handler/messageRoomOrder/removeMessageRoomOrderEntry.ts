@@ -1,4 +1,4 @@
-import { removeMessageRoomOrderEntryHandlerConfig } from "@/server/handler/config";
+import { removeMessageRoomOrderEntryHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, MessageRoomOrderService } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -12,7 +12,7 @@ const builders = Context.Builder.Mutation.builders();
 
 export const removeMessageRoomOrderEntryHandler = pipe(
   builders.empty(),
-  builders.data(removeMessageRoomOrderEntryHandlerConfig),
+  builders.data(removeMessageRoomOrderEntryHandlerData),
   builders.handler(
     stripHandler(
       pipe(
@@ -20,7 +20,7 @@ export const removeMessageRoomOrderEntryHandler = pipe(
         Effect.flatMap(AuthService.verify),
         Effect.flatMap(() =>
           pipe(
-            Event.request.parsed(removeMessageRoomOrderEntryHandlerConfig),
+            Event.request.parsed(removeMessageRoomOrderEntryHandlerData),
             Effect.flatMap(UntilObserver.observeOnce),
           ),
         ),
@@ -28,7 +28,7 @@ export const removeMessageRoomOrderEntryHandler = pipe(
           MessageRoomOrderService.removeMessageRoomOrderEntry(messageId),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(removeMessageRoomOrderEntryHandlerConfig),
+        Handler.Data.encodeResponseEffect(removeMessageRoomOrderEntryHandlerData),
         Effect.withSpan("removeMessageRoomOrderEntryHandler", {
           captureStackTrace: true,
         }),

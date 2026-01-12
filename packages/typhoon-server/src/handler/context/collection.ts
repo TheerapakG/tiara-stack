@@ -16,15 +16,15 @@ export type HandlerContextCollection<R = never> = Context.Collection.HandlerCont
 export const empty = <R = never>() =>
   Context.Collection.empty<MutationHandlerT | SubscriptionHandlerT, R>(
     {
-      mutation: (config) => Handler.Config.Mutation.name(config),
-      subscription: (config) => Handler.Config.Subscription.name(config),
+      mutation: (config) => Handler.Data.Mutation.name(config),
+      subscription: (config) => Handler.Data.Subscription.name(config),
     },
     (context) =>
       pipe(
         Match.value(Context.data(context)),
         Match.tagsExhaustive({
-          PartialMutationHandlerConfig: () => "mutation" as const,
-          PartialSubscriptionHandlerConfig: () => "subscription" as const,
+          PartialMutationHandlerData: () => "mutation" as const,
+          PartialSubscriptionHandlerData: () => "subscription" as const,
         }),
       ),
   );

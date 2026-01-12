@@ -1,4 +1,4 @@
-import { upsertMessageCheckinDataHandlerConfig } from "@/server/handler/config";
+import { upsertMessageCheckinDataHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, MessageCheckinService } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -12,7 +12,7 @@ const builders = Context.Builder.Mutation.builders();
 
 export const upsertMessageCheckinDataHandler = pipe(
   builders.empty(),
-  builders.data(upsertMessageCheckinDataHandlerConfig),
+  builders.data(upsertMessageCheckinDataHandlerData),
   builders.handler(
     stripHandler(
       pipe(
@@ -20,7 +20,7 @@ export const upsertMessageCheckinDataHandler = pipe(
         Effect.flatMap(AuthService.verify),
         Effect.flatMap(() =>
           pipe(
-            Event.request.parsed(upsertMessageCheckinDataHandlerConfig),
+            Event.request.parsed(upsertMessageCheckinDataHandlerData),
             Effect.flatMap(UntilObserver.observeOnce),
           ),
         ),
@@ -28,7 +28,7 @@ export const upsertMessageCheckinDataHandler = pipe(
           MessageCheckinService.upsertMessageCheckinData(messageId, data),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(upsertMessageCheckinDataHandlerConfig),
+        Handler.Data.encodeResponseEffect(upsertMessageCheckinDataHandlerData),
         Effect.withSpan("upsertMessageCheckinDataHandler", {
           captureStackTrace: true,
         }),

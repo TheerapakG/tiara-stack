@@ -1,4 +1,4 @@
-import { upsertGuildChannelConfigHandlerConfig } from "@/server/handler/config";
+import { upsertGuildChannelConfigHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -11,7 +11,7 @@ import { stripHandler } from "typhoon-core/bundler";
 const builders = Context.Builder.Mutation.builders();
 export const upsertGuildChannelConfigHandler = pipe(
   builders.empty(),
-  builders.data(upsertGuildChannelConfigHandlerConfig),
+  builders.data(upsertGuildChannelConfigHandlerData),
   builders.handler(
     stripHandler(
       pipe(
@@ -19,7 +19,7 @@ export const upsertGuildChannelConfigHandler = pipe(
         Effect.flatMap(AuthService.verify),
         Effect.flatMap(() =>
           pipe(
-            Event.request.parsed(upsertGuildChannelConfigHandlerConfig),
+            Event.request.parsed(upsertGuildChannelConfigHandlerData),
             Effect.flatMap(UntilObserver.observeOnce),
           ),
         ),
@@ -32,7 +32,7 @@ export const upsertGuildChannelConfigHandler = pipe(
           }),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(upsertGuildChannelConfigHandlerConfig),
+        Handler.Data.encodeResponseEffect(upsertGuildChannelConfigHandlerData),
         Effect.withSpan("upsertGuildChannelConfigHandler", {
           captureStackTrace: true,
         }),

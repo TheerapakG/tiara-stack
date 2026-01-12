@@ -13,7 +13,7 @@ Core framework for building RPC-like communication systems with WebSocket suppor
 - **Handler** (`packages/typhoon-core/src/handler`): Request/response handler context and types
 - **Protocol** (`packages/typhoon-core/src/protocol`): Communication protocol definitions including Msgpack serialization
 - **Runtime** (`packages/typhoon-core/src/runtime`): Runtime state management
-- **Server** (`packages/typhoon-core/src/server`): Server-side handler configuration and utilities
+- **Server** (`packages/typhoon-core/src/server`): Server-side handler data and utilities
 - **Schema** (`packages/typhoon-core/src/schema`): Schema definitions for validation
 - **Utils** (`packages/typhoon-core/src/utils`): Utility functions and data structures
 - **Validator** (`packages/typhoon-core/src/validator`): Validation utilities

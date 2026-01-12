@@ -6,7 +6,7 @@ import { SignalContext, SignalService } from "typhoon-core/signal";
 import { Validator } from "typhoon-core/validator";
 import { Event } from "@/event/event";
 
-export type SubscriptionData = Handler.Config.Subscription.SubscriptionHandlerConfig;
+export type SubscriptionData = Handler.Data.Subscription.SubscriptionHandlerData;
 type InnerSubscriptionHandler<A = unknown, E = unknown, R = unknown> = Effect.Effect<
   A,
   E,
@@ -27,48 +27,48 @@ interface TransformUnknown extends HKT.TypeLambda {
 
 interface TransformDataKey extends Type.TransformDataKeyTypeLambda {
   readonly type: this["In"] extends infer Config extends SubscriptionData
-    ? Handler.Config.NameOrUndefined<Config>
+    ? Handler.Data.NameOrUndefined<Config>
     : never;
 }
 
 interface TransformDataSuccessIn extends HKT.TypeLambda {
   readonly type: this["In"] extends infer Config extends SubscriptionData
-    ? Handler.Config.ResponseOption<Config> extends Option.Some<
-        infer Response extends Handler.Config.Shared.Response.ResponseConfig<StandardSchemaV1>
+    ? Handler.Data.ResponseOption<Config> extends Option.Some<
+        infer Response extends Handler.Data.Shared.Response.ResponseConfig<StandardSchemaV1>
       >
-      ? Validator.Input<Handler.Config.ResolvedResponseValidator<Response>>
+      ? Validator.Input<Handler.Data.ResolvedResponseValidator<Response>>
       : unknown
     : never;
 }
 
 interface TransformDataSuccessOut extends HKT.TypeLambda {
   readonly type: this["In"] extends infer Config extends SubscriptionData
-    ? Handler.Config.ResponseOption<Config> extends Option.Some<
-        infer Response extends Handler.Config.Shared.Response.ResponseConfig<StandardSchemaV1>
+    ? Handler.Data.ResponseOption<Config> extends Option.Some<
+        infer Response extends Handler.Data.Shared.Response.ResponseConfig<StandardSchemaV1>
       >
-      ? Validator.Output<Handler.Config.ResolvedResponseValidator<Response>>
+      ? Validator.Output<Handler.Data.ResolvedResponseValidator<Response>>
       : unknown
     : never;
 }
 
 interface TransformDataErrorIn extends HKT.TypeLambda {
   readonly type: this["In"] extends infer Config extends SubscriptionData
-    ? Handler.Config.ResponseErrorOption<Config> extends Option.Some<
+    ? Handler.Data.ResponseErrorOption<Config> extends Option.Some<
         infer ResponseError extends
-          Handler.Config.Shared.ResponseError.ResponseErrorConfig<StandardSchemaV1>
+          Handler.Data.Shared.ResponseError.ResponseErrorConfig<StandardSchemaV1>
       >
-      ? Validator.Input<Handler.Config.ResolvedResponseErrorValidator<ResponseError>>
+      ? Validator.Input<Handler.Data.ResolvedResponseErrorValidator<ResponseError>>
       : unknown
     : never;
 }
 
 interface TransformDataErrorOut extends HKT.TypeLambda {
   readonly type: this["In"] extends infer Config extends SubscriptionData
-    ? Handler.Config.ResponseErrorOption<Config> extends Option.Some<
+    ? Handler.Data.ResponseErrorOption<Config> extends Option.Some<
         infer ResponseError extends
-          Handler.Config.Shared.ResponseError.ResponseErrorConfig<StandardSchemaV1>
+          Handler.Data.Shared.ResponseError.ResponseErrorConfig<StandardSchemaV1>
       >
-      ? Validator.Output<Handler.Config.ResolvedResponseErrorValidator<ResponseError>>
+      ? Validator.Output<Handler.Data.ResolvedResponseErrorValidator<ResponseError>>
       : unknown
     : never;
 }

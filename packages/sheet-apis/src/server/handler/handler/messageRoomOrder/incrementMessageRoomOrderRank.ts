@@ -1,4 +1,4 @@
-import { incrementMessageRoomOrderRankHandlerConfig } from "@/server/handler/config";
+import { incrementMessageRoomOrderRankHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, MessageRoomOrderService } from "@/server/services";
 import { Effect, Option, pipe } from "effect";
@@ -12,7 +12,7 @@ const builders = Context.Builder.Mutation.builders();
 
 export const incrementMessageRoomOrderRankHandler = pipe(
   builders.empty(),
-  builders.data(incrementMessageRoomOrderRankHandlerConfig),
+  builders.data(incrementMessageRoomOrderRankHandlerData),
   builders.handler(
     stripHandler(
       pipe(
@@ -20,7 +20,7 @@ export const incrementMessageRoomOrderRankHandler = pipe(
         Effect.flatMap(AuthService.verify),
         Effect.flatMap(() =>
           pipe(
-            Event.request.parsed(incrementMessageRoomOrderRankHandlerConfig),
+            Event.request.parsed(incrementMessageRoomOrderRankHandlerData),
             Effect.flatMap(UntilObserver.observeOnce),
           ),
         ),
@@ -39,7 +39,7 @@ export const incrementMessageRoomOrderRankHandler = pipe(
           }),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(incrementMessageRoomOrderRankHandlerConfig),
+        Handler.Data.encodeResponseEffect(incrementMessageRoomOrderRankHandlerData),
         Effect.withSpan("incrementMessageRoomOrderRankHandler", {
           captureStackTrace: true,
         }),

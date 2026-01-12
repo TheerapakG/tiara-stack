@@ -311,7 +311,7 @@ export class WebSocketClient<
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
-      Handler.Config.ResolvedRequestParamsValidator<Handler.Config.RequestParamsOrUndefined<HData>>
+      Handler.Data.ResolvedRequestParamsValidator<Handler.Data.RequestParamsOrUndefined<HData>>
     >,
   ) {
     return pipe(
@@ -324,7 +324,7 @@ export class WebSocketClient<
             HandlerData.Collection.getHandlerDataGroup("subscription"),
             Option.getOrThrowWith(() =>
               MissingRpcConfigError.make({
-                message: `Failed to get handler config for ${handler}`,
+                message: `Failed to get handler data for ${handler}`,
               }),
             ),
           ) as unknown as CoreData.Collection.GetHandlerDataGroupOfHandlerT<
@@ -338,24 +338,24 @@ export class WebSocketClient<
           HandlerData.Group.Subscription.getHandlerData(handler),
           Option.getOrThrowWith(() =>
             MissingRpcConfigError.make({
-              message: `Failed to get handler config for ${handler}`,
+              message: `Failed to get handler data for ${handler}`,
             }),
           ),
         ),
       ),
       Effect.let("responseErrorValidator", ({ config }) =>
-        Handler.Config.resolveResponseErrorValidator(Handler.Config.responseError(config)),
+        Handler.Data.resolveResponseErrorValidator(Handler.Data.responseError(config)),
       ),
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("signal", () =>
         Signal.make<
           RpcResult.RpcResult<
             Validator.Output<
-              Handler.Config.ResolvedResponseValidator<Handler.Config.ResponseOrUndefined<HData>>
+              Handler.Data.ResolvedResponseValidator<Handler.Data.ResponseOrUndefined<HData>>
             >,
             Validator.Output<
-              Handler.Config.ResolvedResponseErrorValidator<
-                Handler.Config.ResponseErrorOrUndefined<HData>
+              Handler.Data.ResolvedResponseErrorValidator<
+                Handler.Data.ResponseErrorOrUndefined<HData>
               >
             >
           >
@@ -373,7 +373,7 @@ export class WebSocketClient<
               )
                 ? pipe(
                     result,
-                    Handler.Config.decodeResponseUnknown(config),
+                    Handler.Data.decodeResponseUnknown(config),
                     Effect.map(
                       Either.mapLeft(
                         (error) =>
@@ -504,7 +504,7 @@ export class WebSocketClient<
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
-      Handler.Config.ResolvedRequestParamsValidator<Handler.Config.RequestParamsOrUndefined<HData>>
+      Handler.Data.ResolvedRequestParamsValidator<Handler.Data.RequestParamsOrUndefined<HData>>
     >,
   ) {
     return pipe(
@@ -604,7 +604,7 @@ export class WebSocketClient<
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
-      Handler.Config.ResolvedRequestParamsValidator<Handler.Config.RequestParamsOrUndefined<HData>>
+      Handler.Data.ResolvedRequestParamsValidator<Handler.Data.RequestParamsOrUndefined<HData>>
     >,
   ) {
     return pipe(
@@ -617,7 +617,7 @@ export class WebSocketClient<
             HandlerData.Collection.getHandlerDataGroup("subscription"),
             Option.getOrThrowWith(() =>
               MissingRpcConfigError.make({
-                message: `Failed to get handler config for ${handler}`,
+                message: `Failed to get handler data for ${handler}`,
               }),
             ),
           ) as unknown as CoreData.Collection.GetHandlerDataGroupOfHandlerT<
@@ -631,13 +631,13 @@ export class WebSocketClient<
           HandlerData.Group.Subscription.getHandlerData(handler),
           Option.getOrThrowWith(() =>
             MissingRpcConfigError.make({
-              message: `Failed to get handler config for ${handler}`,
+              message: `Failed to get handler data for ${handler}`,
             }),
           ),
         ),
       ),
       Effect.let("responseErrorValidator", ({ config }) =>
-        Handler.Config.resolveResponseErrorValidator(Handler.Config.responseError(config)),
+        Handler.Data.resolveResponseErrorValidator(Handler.Data.responseError(config)),
       ),
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("deferred", () =>
@@ -645,12 +645,12 @@ export class WebSocketClient<
           {
             result: Either.Either<
               Validator.Output<
-                Handler.Config.ResolvedResponseValidator<Handler.Config.ResponseOrUndefined<HData>>
+                Handler.Data.ResolvedResponseValidator<Handler.Data.ResponseOrUndefined<HData>>
               >,
               | RpcError<
                   Validator.Output<
-                    Handler.Config.ResolvedResponseErrorValidator<
-                      Handler.Config.ResponseErrorOrUndefined<HData>
+                    Handler.Data.ResolvedResponseErrorValidator<
+                      Handler.Data.ResponseErrorOrUndefined<HData>
                     >
                   >
                 >
@@ -670,7 +670,7 @@ export class WebSocketClient<
               Deferred.complete(
                 pipe(
                   result,
-                  Handler.Config.decodeResponseUnknown(config),
+                  Handler.Data.decodeResponseUnknown(config),
                   Effect.map(
                     Either.mapLeft(
                       (error) =>
@@ -780,7 +780,7 @@ export class WebSocketClient<
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
-      Handler.Config.ResolvedRequestParamsValidator<Handler.Config.RequestParamsOrUndefined<HData>>
+      Handler.Data.ResolvedRequestParamsValidator<Handler.Data.RequestParamsOrUndefined<HData>>
     >,
   ) {
     return pipe(
@@ -793,7 +793,7 @@ export class WebSocketClient<
             HandlerData.Collection.getHandlerDataGroup("mutation"),
             Option.getOrThrowWith(() =>
               MissingRpcConfigError.make({
-                message: `Failed to get handler config for ${handler}`,
+                message: `Failed to get handler data for ${handler}`,
               }),
             ),
           ) as unknown as CoreData.Collection.GetHandlerDataGroupOfHandlerT<
@@ -807,13 +807,13 @@ export class WebSocketClient<
           HandlerData.Group.Mutation.getHandlerData(handler),
           Option.getOrThrowWith(() =>
             MissingRpcConfigError.make({
-              message: `Failed to get handler config for ${handler}`,
+              message: `Failed to get handler data for ${handler}`,
             }),
           ),
         ),
       ),
       Effect.let("responseErrorValidator", ({ config }) =>
-        Handler.Config.resolveResponseErrorValidator(Handler.Config.responseError(config)),
+        Handler.Data.resolveResponseErrorValidator(Handler.Data.responseError(config)),
       ),
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("deferred", () =>
@@ -821,12 +821,12 @@ export class WebSocketClient<
           {
             result: Either.Either<
               Validator.Output<
-                Handler.Config.ResolvedResponseValidator<Handler.Config.ResponseOrUndefined<HData>>
+                Handler.Data.ResolvedResponseValidator<Handler.Data.ResponseOrUndefined<HData>>
               >,
               | RpcError<
                   Validator.Output<
-                    Handler.Config.ResolvedResponseErrorValidator<
-                      Handler.Config.ResponseErrorOrUndefined<HData>
+                    Handler.Data.ResolvedResponseErrorValidator<
+                      Handler.Data.ResponseErrorOrUndefined<HData>
                     >
                   >
                 >
@@ -846,7 +846,7 @@ export class WebSocketClient<
               Deferred.complete(
                 pipe(
                   result,
-                  Handler.Config.decodeResponseUnknown(config),
+                  Handler.Data.decodeResponseUnknown(config),
                   Effect.map(
                     Either.mapLeft(
                       (error) =>

@@ -1,4 +1,4 @@
-import { sheetCalcHandlerConfig } from "@/server/handler/config";
+import { sheetCalcHandlerData } from "@/server/handler/data";
 import { CalcConfig, CalcService, Sheet } from "@/server/services";
 import { Error, PlayerTeam } from "@/server/schema";
 import { Array, Chunk, Effect, HashMap, HashSet, pipe, Option } from "effect";
@@ -11,12 +11,12 @@ import { stripHandler } from "typhoon-core/bundler";
 const builders = Context.Builder.Subscription.builders();
 export const sheetCalcHandler = pipe(
   builders.empty(),
-  builders.data(sheetCalcHandlerConfig),
+  builders.data(sheetCalcHandlerData),
   builders.handler(
     stripHandler(
       pipe(
         Effect.Do,
-        Effect.bind("parsed", () => Event.request.parsed(sheetCalcHandlerConfig)),
+        Effect.bind("parsed", () => Event.request.parsed(sheetCalcHandlerData)),
         Effect.map(({ parsed }) =>
           pipe(
             parsed,
@@ -78,7 +78,7 @@ export const sheetCalcHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(Handler.Config.encodeResponseEffect(sheetCalcHandlerConfig)),
+        Effect.map(Handler.Data.encodeResponseEffect(sheetCalcHandlerData)),
         Effect.withSpan("sheetCalcHandler", { captureStackTrace: true }),
       ),
     ),

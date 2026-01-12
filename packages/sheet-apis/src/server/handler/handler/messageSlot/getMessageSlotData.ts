@@ -1,4 +1,4 @@
-import { getMessageSlotDataHandlerConfig } from "@/server/handler/config";
+import { getMessageSlotDataHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, MessageSlotService } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -12,13 +12,13 @@ const builders = Context.Builder.Subscription.builders();
 
 export const getMessageSlotDataHandler = pipe(
   builders.empty(),
-  builders.data(getMessageSlotDataHandlerConfig),
+  builders.data(getMessageSlotDataHandlerData),
   builders.handler(
     stripHandler(
       pipe(
         Effect.Do,
         Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
-        Effect.bind("parsed", () => Event.request.parsed(getMessageSlotDataHandlerConfig)),
+        Effect.bind("parsed", () => Event.request.parsed(getMessageSlotDataHandlerData)),
         Effect.flatMap(({ parsed }) => MessageSlotService.getMessageSlotData(parsed)),
         Effect.map(
           Effect.map(
@@ -30,7 +30,7 @@ export const getMessageSlotDataHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(Handler.Config.encodeResponseEffect(getMessageSlotDataHandlerConfig)),
+        Effect.map(Handler.Data.encodeResponseEffect(getMessageSlotDataHandlerData)),
         Effect.withSpan("getMessageSlotDataHandler", {
           captureStackTrace: true,
         }),

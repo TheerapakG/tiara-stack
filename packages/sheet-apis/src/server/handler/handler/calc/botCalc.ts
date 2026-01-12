@@ -1,4 +1,4 @@
-import { botCalcHandlerConfig } from "@/server/handler/config";
+import { botCalcHandlerData } from "@/server/handler/data";
 import { CalcConfig, CalcService } from "@/server/services";
 import { Error, PlayerTeam, Room } from "@/server/schema";
 import { Chunk, Effect, HashSet, pipe } from "effect";
@@ -10,11 +10,11 @@ import { stripHandler } from "typhoon-core/bundler";
 const builders = Context.Builder.Subscription.builders();
 export const botCalcHandler = pipe(
   builders.empty(),
-  builders.data(botCalcHandlerConfig),
+  builders.data(botCalcHandlerData),
   builders.handler(
     stripHandler(
       pipe(
-        Event.request.parsed(botCalcHandlerConfig),
+        Event.request.parsed(botCalcHandlerData),
         Effect.map(
           Effect.flatMap(({ config, players }) =>
             pipe(
@@ -51,7 +51,7 @@ export const botCalcHandler = pipe(
         ),
         Effect.map(Effect.map(Chunk.toArray)),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(Handler.Config.encodeResponseEffect(botCalcHandlerConfig)),
+        Effect.map(Handler.Data.encodeResponseEffect(botCalcHandlerData)),
         Effect.withSpan("botCalcHandler", { captureStackTrace: true }),
       ),
     ),

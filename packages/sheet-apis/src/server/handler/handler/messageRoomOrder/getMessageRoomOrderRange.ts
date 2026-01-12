@@ -1,4 +1,4 @@
-import { getMessageRoomOrderRangeHandlerConfig } from "@/server/handler/config";
+import { getMessageRoomOrderRangeHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, MessageRoomOrderService } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -12,13 +12,13 @@ const builders = Context.Builder.Subscription.builders();
 
 export const getMessageRoomOrderRangeHandler = pipe(
   builders.empty(),
-  builders.data(getMessageRoomOrderRangeHandlerConfig),
+  builders.data(getMessageRoomOrderRangeHandlerData),
   builders.handler(
     stripHandler(
       pipe(
         Effect.Do,
         Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
-        Effect.bind("parsed", () => Event.request.parsed(getMessageRoomOrderRangeHandlerConfig)),
+        Effect.bind("parsed", () => Event.request.parsed(getMessageRoomOrderRangeHandlerData)),
         Effect.flatMap(({ parsed }) => MessageRoomOrderService.getMessageRoomOrderRange(parsed)),
         Effect.map(
           Effect.map(
@@ -30,7 +30,7 @@ export const getMessageRoomOrderRangeHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(Handler.Config.encodeResponseEffect(getMessageRoomOrderRangeHandlerConfig)),
+        Effect.map(Handler.Data.encodeResponseEffect(getMessageRoomOrderRangeHandlerData)),
         Effect.withSpan("getMessageRoomOrderRangeHandler", {
           captureStackTrace: true,
         }),

@@ -17,15 +17,13 @@ export type MsgpackPullEffect = Effect.Effect<
 >;
 
 const pullEffectToParsed =
-  <const RequestParams extends Handler.Config.Shared.RequestParams.RequestParamsConfig | undefined>(
+  <const RequestParams extends Handler.Data.Shared.RequestParams.RequestParamsConfig | undefined>(
     requestParams: RequestParams,
   ) =>
   (pullEffect: MsgpackPullEffect) =>
     pipe(
       pullEffect,
-      Effect.flatMap(
-        Validate.validate(Handler.Config.resolveRequestParamsValidator(requestParams)),
-      ),
+      Effect.flatMap(Validate.validate(Handler.Data.resolveRequestParamsValidator(requestParams))),
     );
 
 type EventContext = {
@@ -211,13 +209,13 @@ export const request = {
       ),
       Effect.map(Effect.withSpan("Event.request.raw", { captureStackTrace: true })),
     ),
-  parsedWithScope: <Config extends Handler.Config.TypedHandlerConfig>(config: Config) =>
+  parsedWithScope: <Config extends Handler.Data.TypedHandlerData>(config: Config) =>
     pipe(
       request.rawWithScope(),
       Effect.map(
         Effect.flatMap(({ effect, scope }) =>
           Effect.all({
-            parsed: pipe(effect, pullEffectToParsed(Handler.Config.requestParams(config))),
+            parsed: pipe(effect, pullEffectToParsed(Handler.Data.requestParams(config))),
             scope: Effect.succeed(scope),
           }),
         ),
@@ -233,10 +231,10 @@ export const request = {
         }),
       ),
     ),
-  parsed: <Config extends Handler.Config.TypedHandlerConfig>(config: Config) =>
+  parsed: <Config extends Handler.Data.TypedHandlerData>(config: Config) =>
     pipe(
       request.raw(),
-      Effect.map(Effect.flatMap(pullEffectToParsed(Handler.Config.requestParams(config)))),
+      Effect.map(Effect.flatMap(pullEffectToParsed(Handler.Data.requestParams(config)))),
       Effect.map(
         Effect.withSpan("Event.request.parsed subscription", {
           captureStackTrace: true,

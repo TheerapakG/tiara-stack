@@ -1,4 +1,4 @@
-import { getAllSchedulesHandlerConfig } from "@/server/handler/config";
+import { getAllSchedulesHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, Sheet } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -11,13 +11,13 @@ import { stripHandler } from "typhoon-core/bundler";
 const builders = Context.Builder.Subscription.builders();
 export const getAllSchedulesHandler = pipe(
   builders.empty(),
-  builders.data(getAllSchedulesHandlerConfig),
+  builders.data(getAllSchedulesHandlerData),
   builders.handler(
     stripHandler(
       pipe(
         Effect.Do,
         Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
-        Effect.bind("parsed", () => Event.request.parsed(getAllSchedulesHandlerConfig)),
+        Effect.bind("parsed", () => Event.request.parsed(getAllSchedulesHandlerData)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -46,7 +46,7 @@ export const getAllSchedulesHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(Handler.Config.encodeResponseEffect(getAllSchedulesHandlerConfig)),
+        Effect.map(Handler.Data.encodeResponseEffect(getAllSchedulesHandlerData)),
         Effect.map(
           Effect.withSpan("getAllSchedulesHandler", {
             captureStackTrace: true,

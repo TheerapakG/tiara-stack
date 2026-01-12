@@ -1,4 +1,4 @@
-import { getTeamsByNameHandlerConfig } from "@/server/handler/config";
+import { getTeamsByNameHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, Sheet } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -11,13 +11,13 @@ import { stripHandler } from "typhoon-core/bundler";
 const builders = Context.Builder.Subscription.builders();
 export const getTeamsByNameHandler = pipe(
   builders.empty(),
-  builders.data(getTeamsByNameHandlerConfig),
+  builders.data(getTeamsByNameHandlerData),
   builders.handler(
     stripHandler(
       pipe(
         Effect.Do,
         Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
-        Effect.bind("parsed", () => Event.request.parsed(getTeamsByNameHandlerConfig)),
+        Effect.bind("parsed", () => Event.request.parsed(getTeamsByNameHandlerData)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -54,7 +54,7 @@ export const getTeamsByNameHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(Handler.Config.encodeResponseEffect(getTeamsByNameHandlerConfig)),
+        Effect.map(Handler.Data.encodeResponseEffect(getTeamsByNameHandlerData)),
         Effect.withSpan("getTeamsByNameHandler", {
           captureStackTrace: true,
         }),

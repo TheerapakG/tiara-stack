@@ -1,4 +1,4 @@
-import { setMessageCheckinMemberCheckinAtHandlerConfig } from "@/server/handler/config";
+import { setMessageCheckinMemberCheckinAtHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, MessageCheckinService } from "@/server/services";
 import { Effect, Option, pipe } from "effect";
@@ -12,7 +12,7 @@ const builders = Context.Builder.Mutation.builders();
 
 export const setMessageCheckinMemberCheckinAtHandler = pipe(
   builders.empty(),
-  builders.data(setMessageCheckinMemberCheckinAtHandlerConfig),
+  builders.data(setMessageCheckinMemberCheckinAtHandlerData),
   builders.handler(
     stripHandler(
       pipe(
@@ -20,7 +20,7 @@ export const setMessageCheckinMemberCheckinAtHandler = pipe(
         Effect.flatMap(AuthService.verify),
         Effect.flatMap(() =>
           pipe(
-            Event.request.parsed(setMessageCheckinMemberCheckinAtHandlerConfig),
+            Event.request.parsed(setMessageCheckinMemberCheckinAtHandlerData),
             Effect.flatMap(UntilObserver.observeOnce),
           ),
         ),
@@ -37,7 +37,7 @@ export const setMessageCheckinMemberCheckinAtHandler = pipe(
           }),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(setMessageCheckinMemberCheckinAtHandlerConfig),
+        Handler.Data.encodeResponseEffect(setMessageCheckinMemberCheckinAtHandlerData),
         Effect.withSpan("setMessageCheckinMemberCheckinAtHandler", {
           captureStackTrace: true,
         }),

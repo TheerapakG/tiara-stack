@@ -11,16 +11,16 @@ import {
   messageRoomOrderHandlerDataCollection,
   messageSlotHandlerDataCollection,
   screenshotHandlerDataCollection,
-} from "./server/handler/config";
+} from "./server/handler/data";
 
 export * as Schema from "./server/schema";
 
 export const HandlerDataGroupTypeId = CoreData.Group.HandlerDataGroupTypeId;
 export const HandlerDataCollectionTypeId = CoreData.Collection.HandlerDataCollectionTypeId;
 
-export const PartialSubscriptionHandlerConfig =
-  Handler.Config.Subscription.PartialSubscriptionHandlerConfig;
-export const PartialMutationHandlerConfig = Handler.Config.Mutation.PartialMutationHandlerConfig;
+export const PartialSubscriptionHandlerData =
+  Handler.Data.Subscription.PartialSubscriptionHandlerData;
+export const PartialMutationHandlerData = Handler.Data.Mutation.PartialMutationHandlerData;
 
 export const serverHandlerDataCollection = pipe(
   HandlerData.Collection.empty(),

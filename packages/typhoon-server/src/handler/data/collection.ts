@@ -16,8 +16,8 @@ export const empty = () =>
       pipe(
         Match.value(data),
         Match.tagsExhaustive({
-          PartialMutationHandlerConfig: () => "mutation" as const,
-          PartialSubscriptionHandlerConfig: () => "subscription" as const,
+          PartialMutationHandlerData: () => "mutation" as const,
+          PartialSubscriptionHandlerData: () => "subscription" as const,
         }),
       ),
     {

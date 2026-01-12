@@ -1,4 +1,4 @@
-import { getByIdHandlerConfig } from "@/server/handler/config";
+import { getByIdHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, Sheet } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -11,13 +11,13 @@ import { stripHandler } from "typhoon-core/bundler";
 const builders = Context.Builder.Subscription.builders();
 export const getByIdHandler = pipe(
   builders.empty(),
-  builders.data(getByIdHandlerConfig),
+  builders.data(getByIdHandlerData),
   builders.handler(
     stripHandler(
       pipe(
         Effect.Do,
         Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
-        Effect.bind("parsed", () => Event.request.parsed(getByIdHandlerConfig)),
+        Effect.bind("parsed", () => Event.request.parsed(getByIdHandlerData)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -54,7 +54,7 @@ export const getByIdHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(Handler.Config.encodeResponseEffect(getByIdHandlerConfig)),
+        Effect.map(Handler.Data.encodeResponseEffect(getByIdHandlerData)),
         Effect.withSpan("getByIdHandler", {
           captureStackTrace: true,
         }),

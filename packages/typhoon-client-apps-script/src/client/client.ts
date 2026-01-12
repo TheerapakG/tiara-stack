@@ -88,7 +88,7 @@ export class AppsScriptClient<
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
-      Handler.Config.ResolvedRequestParamsValidator<Handler.Config.RequestParamsOrUndefined<HData>>
+      Handler.Data.ResolvedRequestParamsValidator<Handler.Data.RequestParamsOrUndefined<HData>>
     >,
   ) {
     return pipe(
@@ -101,7 +101,7 @@ export class AppsScriptClient<
             HandlerData.Collection.getHandlerDataGroup("subscription"),
             Option.getOrThrowWith(() =>
               MissingRpcConfigError.make({
-                message: `Failed to get handler config for ${handler}`,
+                message: `Failed to get handler data for ${handler}`,
               }),
             ),
           ) as unknown as CoreData.Collection.GetHandlerDataGroupOfHandlerT<
@@ -115,13 +115,13 @@ export class AppsScriptClient<
           HandlerData.Group.Subscription.getHandlerData(handler),
           Option.getOrThrowWith(() =>
             MissingRpcConfigError.make({
-              message: `Failed to get handler config for ${handler}`,
+              message: `Failed to get handler data for ${handler}`,
             }),
           ),
         ),
       ),
       Effect.let("responseErrorValidator", ({ config }) =>
-        Handler.Config.resolveResponseErrorValidator(Handler.Config.responseError(config)),
+        Handler.Data.resolveResponseErrorValidator(Handler.Data.responseError(config)),
       ),
       Effect.let("id", () => Utilities.getUuid() as string),
       Effect.bind("token", () => client.token),
@@ -206,7 +206,7 @@ export class AppsScriptClient<
             () => header.action === "server:update" && header.payload.success,
             Function.identity,
           ),
-          Handler.Config.decodeResponseUnknown(config),
+          Handler.Data.decodeResponseUnknown(config),
           Effect.map(
             Either.mapLeft(
               (error) =>

@@ -1,4 +1,4 @@
-import { upsertMessageSlotDataHandlerConfig } from "@/server/handler/config";
+import { upsertMessageSlotDataHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, MessageSlotService } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -12,7 +12,7 @@ const builders = Context.Builder.Mutation.builders();
 
 export const upsertMessageSlotDataHandler = pipe(
   builders.empty(),
-  builders.data(upsertMessageSlotDataHandlerConfig),
+  builders.data(upsertMessageSlotDataHandlerData),
   builders.handler(
     stripHandler(
       pipe(
@@ -20,7 +20,7 @@ export const upsertMessageSlotDataHandler = pipe(
         Effect.flatMap(AuthService.verify),
         Effect.flatMap(() =>
           pipe(
-            Event.request.parsed(upsertMessageSlotDataHandlerConfig),
+            Event.request.parsed(upsertMessageSlotDataHandlerData),
             Effect.flatMap(UntilObserver.observeOnce),
           ),
         ),
@@ -28,7 +28,7 @@ export const upsertMessageSlotDataHandler = pipe(
           MessageSlotService.upsertMessageSlotData(messageId, data),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(upsertMessageSlotDataHandlerConfig),
+        Handler.Data.encodeResponseEffect(upsertMessageSlotDataHandlerData),
         Effect.withSpan("upsertMessageSlotDataHandler", {
           captureStackTrace: true,
         }),

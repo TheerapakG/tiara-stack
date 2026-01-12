@@ -1,4 +1,4 @@
-import { removeMessageCheckinMemberHandlerConfig } from "@/server/handler/config";
+import { removeMessageCheckinMemberHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, MessageCheckinService } from "@/server/services";
 import { Effect, Option, pipe } from "effect";
@@ -12,7 +12,7 @@ const builders = Context.Builder.Mutation.builders();
 
 export const removeMessageCheckinMemberHandler = pipe(
   builders.empty(),
-  builders.data(removeMessageCheckinMemberHandlerConfig),
+  builders.data(removeMessageCheckinMemberHandlerData),
   builders.handler(
     stripHandler(
       pipe(
@@ -20,7 +20,7 @@ export const removeMessageCheckinMemberHandler = pipe(
         Effect.flatMap(AuthService.verify),
         Effect.flatMap(() =>
           pipe(
-            Event.request.parsed(removeMessageCheckinMemberHandlerConfig),
+            Event.request.parsed(removeMessageCheckinMemberHandlerData),
             Effect.flatMap(UntilObserver.observeOnce),
           ),
         ),
@@ -39,7 +39,7 @@ export const removeMessageCheckinMemberHandler = pipe(
           }),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(removeMessageCheckinMemberHandlerConfig),
+        Handler.Data.encodeResponseEffect(removeMessageCheckinMemberHandlerData),
         Effect.withSpan("removeMessageCheckinMemberHandler", {
           captureStackTrace: true,
         }),

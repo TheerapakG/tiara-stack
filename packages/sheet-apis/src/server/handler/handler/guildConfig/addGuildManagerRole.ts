@@ -1,4 +1,4 @@
-import { addGuildManagerRoleHandlerConfig } from "@/server/handler/config";
+import { addGuildManagerRoleHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -11,7 +11,7 @@ import { stripHandler } from "typhoon-core/bundler";
 const builders = Context.Builder.Mutation.builders();
 export const addGuildManagerRoleHandler = pipe(
   builders.empty(),
-  builders.data(addGuildManagerRoleHandlerConfig),
+  builders.data(addGuildManagerRoleHandlerData),
   builders.handler(
     stripHandler(
       pipe(
@@ -19,7 +19,7 @@ export const addGuildManagerRoleHandler = pipe(
         Effect.flatMap(AuthService.verify),
         Effect.flatMap(() =>
           pipe(
-            Event.request.parsed(addGuildManagerRoleHandlerConfig),
+            Event.request.parsed(addGuildManagerRoleHandlerData),
             Effect.flatMap(UntilObserver.observeOnce),
           ),
         ),
@@ -27,7 +27,7 @@ export const addGuildManagerRoleHandler = pipe(
           GuildConfigService.addGuildManagerRole(guildId, roleId),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(addGuildManagerRoleHandlerConfig),
+        Handler.Data.encodeResponseEffect(addGuildManagerRoleHandlerData),
         Effect.withSpan("addGuildManagerRoleHandler", {
           captureStackTrace: true,
         }),

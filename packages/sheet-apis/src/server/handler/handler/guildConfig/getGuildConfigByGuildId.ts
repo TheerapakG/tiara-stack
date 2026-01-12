@@ -1,4 +1,4 @@
-import { getGuildConfigByGuildIdHandlerConfig } from "@/server/handler/config";
+import { getGuildConfigByGuildIdHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -11,13 +11,13 @@ import { stripHandler } from "typhoon-core/bundler";
 const builders = Context.Builder.Subscription.builders();
 export const getGuildConfigByGuildIdHandler = pipe(
   builders.empty(),
-  builders.data(getGuildConfigByGuildIdHandlerConfig),
+  builders.data(getGuildConfigByGuildIdHandlerData),
   builders.handler(
     stripHandler(
       pipe(
         Effect.Do,
         Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
-        Effect.bind("parsed", () => Event.request.parsed(getGuildConfigByGuildIdHandlerConfig)),
+        Effect.bind("parsed", () => Event.request.parsed(getGuildConfigByGuildIdHandlerData)),
         Effect.flatMap(({ parsed }) => GuildConfigService.getGuildConfigByGuildId(parsed)),
         Effect.map(
           Effect.map(
@@ -29,7 +29,7 @@ export const getGuildConfigByGuildIdHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(Handler.Config.encodeResponseEffect(getGuildConfigByGuildIdHandlerConfig)),
+        Effect.map(Handler.Data.encodeResponseEffect(getGuildConfigByGuildIdHandlerData)),
         Effect.withSpan("getGuildConfigByGuildIdHandler", {
           captureStackTrace: true,
         }),

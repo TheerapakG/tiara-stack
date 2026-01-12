@@ -1,4 +1,4 @@
-import { getMessageCheckinDataHandlerConfig } from "@/server/handler/config";
+import { getMessageCheckinDataHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, MessageCheckinService } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -12,13 +12,13 @@ const builders = Context.Builder.Subscription.builders();
 
 export const getMessageCheckinDataHandler = pipe(
   builders.empty(),
-  builders.data(getMessageCheckinDataHandlerConfig),
+  builders.data(getMessageCheckinDataHandlerData),
   builders.handler(
     stripHandler(
       pipe(
         Effect.Do,
         Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
-        Effect.bind("parsed", () => Event.request.parsed(getMessageCheckinDataHandlerConfig)),
+        Effect.bind("parsed", () => Event.request.parsed(getMessageCheckinDataHandlerData)),
         Effect.flatMap(({ parsed }) => MessageCheckinService.getMessageCheckinData(parsed)),
         Effect.map(
           Effect.map(
@@ -30,7 +30,7 @@ export const getMessageCheckinDataHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(Handler.Config.encodeResponseEffect(getMessageCheckinDataHandlerConfig)),
+        Effect.map(Handler.Data.encodeResponseEffect(getMessageCheckinDataHandlerData)),
         Effect.withSpan("getMessageCheckinDataHandler", {
           captureStackTrace: true,
         }),

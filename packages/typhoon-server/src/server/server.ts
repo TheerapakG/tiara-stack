@@ -221,8 +221,8 @@ export const create = <R = never>(serveFn: typeof crosswsServe) =>
         handlerContextCollection: Effect.succeed(
           HandlerContextCore.Collection.empty<MutationHandlerT | SubscriptionHandlerT, R>(
             {
-              mutation: (config) => Handler.Config.Mutation.name(config),
-              subscription: (config) => Handler.Config.Subscription.name(config),
+              mutation: (config) => Handler.Data.Mutation.name(config),
+              subscription: (config) => Handler.Data.Subscription.name(config),
             },
             (
               context:
@@ -232,8 +232,8 @@ export const create = <R = never>(serveFn: typeof crosswsServe) =>
               pipe(
                 Match.value(HandlerContextCore.data(context)),
                 Match.tagsExhaustive({
-                  PartialMutationHandlerConfig: () => "mutation" as const,
-                  PartialSubscriptionHandlerConfig: () => "subscription" as const,
+                  PartialMutationHandlerData: () => "mutation" as const,
+                  PartialSubscriptionHandlerData: () => "subscription" as const,
                 }),
               ),
           ),

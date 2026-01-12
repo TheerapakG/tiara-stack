@@ -72,7 +72,7 @@ export class HttpClient<
     handler: H,
     // TODO: make this conditionally optional
     data?: Validator.Input<
-      Handler.Config.ResolvedRequestParamsValidator<Handler.Config.RequestParamsOrUndefined<HData>>
+      Handler.Data.ResolvedRequestParamsValidator<Handler.Data.RequestParamsOrUndefined<HData>>
     >,
   ) {
     return pipe(
@@ -85,7 +85,7 @@ export class HttpClient<
             HandlerData.Collection.getHandlerDataGroup("subscription"),
             Option.getOrThrowWith(() =>
               MissingRpcConfigError.make({
-                message: `Failed to get handler config for ${handler}`,
+                message: `Failed to get handler data for ${handler}`,
               }),
             ),
           ) as unknown as CoreData.Collection.GetHandlerDataGroupOfHandlerT<
@@ -99,13 +99,13 @@ export class HttpClient<
           HandlerData.Group.Subscription.getHandlerData(handler),
           Option.getOrThrowWith(() =>
             MissingRpcConfigError.make({
-              message: `Failed to get handler config for ${handler}`,
+              message: `Failed to get handler data for ${handler}`,
             }),
           ),
         ),
       ),
       Effect.let("responseErrorValidator", ({ config }) =>
-        Handler.Config.resolveResponseErrorValidator(Handler.Config.responseError(config)),
+        Handler.Data.resolveResponseErrorValidator(Handler.Data.responseError(config)),
       ),
       Effect.let("id", () => crypto.randomUUID() as string),
       Effect.bind("token", () => client.token),
@@ -176,7 +176,7 @@ export class HttpClient<
             () => header.action === "server:update" && header.payload.success,
             Function.identity,
           ),
-          Handler.Config.decodeResponseUnknown(config),
+          Handler.Data.decodeResponseUnknown(config),
           Effect.map(
             Either.mapLeft(
               (error) =>

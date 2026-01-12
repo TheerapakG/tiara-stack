@@ -1,4 +1,4 @@
-import { getGuildRunningChannelByNameHandlerConfig } from "@/server/handler/config";
+import { getGuildRunningChannelByNameHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -11,15 +11,13 @@ import { stripHandler } from "typhoon-core/bundler";
 const builders = Context.Builder.Subscription.builders();
 export const getGuildRunningChannelByNameHandler = pipe(
   builders.empty(),
-  builders.data(getGuildRunningChannelByNameHandlerConfig),
+  builders.data(getGuildRunningChannelByNameHandlerData),
   builders.handler(
     stripHandler(
       pipe(
         Effect.Do,
         Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
-        Effect.bind("parsed", () =>
-          Event.request.parsed(getGuildRunningChannelByNameHandlerConfig),
-        ),
+        Effect.bind("parsed", () => Event.request.parsed(getGuildRunningChannelByNameHandlerData)),
         Effect.flatMap(({ parsed }) => GuildConfigService.getGuildRunningChannelByName(parsed)),
         Effect.map(
           Effect.map(
@@ -31,7 +29,7 @@ export const getGuildRunningChannelByNameHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(Handler.Config.encodeResponseEffect(getGuildRunningChannelByNameHandlerConfig)),
+        Effect.map(Handler.Data.encodeResponseEffect(getGuildRunningChannelByNameHandlerData)),
         Effect.withSpan("getGuildRunningChannelByNameHandler", {
           captureStackTrace: true,
         }),

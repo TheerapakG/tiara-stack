@@ -1,4 +1,4 @@
-import { removeGuildManagerRoleHandlerConfig } from "@/server/handler/config";
+import { removeGuildManagerRoleHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
 import { Effect, Option, pipe } from "effect";
@@ -11,7 +11,7 @@ import { stripHandler } from "typhoon-core/bundler";
 const builders = Context.Builder.Mutation.builders();
 export const removeGuildManagerRoleHandler = pipe(
   builders.empty(),
-  builders.data(removeGuildManagerRoleHandlerConfig),
+  builders.data(removeGuildManagerRoleHandlerData),
   builders.handler(
     stripHandler(
       pipe(
@@ -19,7 +19,7 @@ export const removeGuildManagerRoleHandler = pipe(
         Effect.flatMap(AuthService.verify),
         Effect.flatMap(() =>
           pipe(
-            Event.request.parsed(removeGuildManagerRoleHandlerConfig),
+            Event.request.parsed(removeGuildManagerRoleHandlerData),
             Effect.flatMap(UntilObserver.observeOnce),
           ),
         ),
@@ -38,7 +38,7 @@ export const removeGuildManagerRoleHandler = pipe(
           }),
         ),
         Error.Core.catchParseErrorAsValidationError,
-        Handler.Config.encodeResponseEffect(removeGuildManagerRoleHandlerConfig),
+        Handler.Data.encodeResponseEffect(removeGuildManagerRoleHandlerData),
         Effect.withSpan("removeGuildManagerRoleHandler", {
           captureStackTrace: true,
         }),

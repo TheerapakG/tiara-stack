@@ -1,4 +1,4 @@
-import { getChannelSchedulesHandlerConfig } from "@/server/handler/config";
+import { getChannelSchedulesHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, Sheet } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -11,13 +11,13 @@ import { stripHandler } from "typhoon-core/bundler";
 const builders = Context.Builder.Subscription.builders();
 export const getChannelSchedulesHandler = pipe(
   builders.empty(),
-  builders.data(getChannelSchedulesHandlerConfig),
+  builders.data(getChannelSchedulesHandlerData),
   builders.handler(
     stripHandler(
       pipe(
         Effect.Do,
         Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
-        Effect.bind("parsed", () => Event.request.parsed(getChannelSchedulesHandlerConfig)),
+        Effect.bind("parsed", () => Event.request.parsed(getChannelSchedulesHandlerData)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -50,7 +50,7 @@ export const getChannelSchedulesHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(Handler.Config.encodeResponseEffect(getChannelSchedulesHandlerConfig)),
+        Effect.map(Handler.Data.encodeResponseEffect(getChannelSchedulesHandlerData)),
         Effect.map(
           Effect.withSpan("getChannelSchedulesHandler", {
             captureStackTrace: true,

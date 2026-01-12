@@ -1,4 +1,4 @@
-import { getRunnerConfigHandlerConfig } from "@/server/handler/config";
+import { getRunnerConfigHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, Sheet } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -11,13 +11,13 @@ import { stripHandler } from "typhoon-core/bundler";
 const builders = Context.Builder.Subscription.builders();
 export const getRunnerConfigHandler = pipe(
   builders.empty(),
-  builders.data(getRunnerConfigHandlerConfig),
+  builders.data(getRunnerConfigHandlerData),
   builders.handler(
     stripHandler(
       pipe(
         Effect.Do,
         Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
-        Effect.bind("parsed", () => Event.request.parsed(getRunnerConfigHandlerConfig)),
+        Effect.bind("parsed", () => Event.request.parsed(getRunnerConfigHandlerData)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -46,7 +46,7 @@ export const getRunnerConfigHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(Handler.Config.encodeResponseEffect(getRunnerConfigHandlerConfig)),
+        Effect.map(Handler.Data.encodeResponseEffect(getRunnerConfigHandlerData)),
         Effect.map(
           Effect.withSpan("getRunnerConfigHandler", {
             captureStackTrace: true,

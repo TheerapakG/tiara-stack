@@ -1,4 +1,4 @@
-import { getPlayersHandlerConfig } from "@/server/handler/config";
+import { getPlayersHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, Sheet } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -11,13 +11,13 @@ import { stripHandler } from "typhoon-core/bundler";
 const builders = Context.Builder.Subscription.builders();
 export const getPlayersHandler = pipe(
   builders.empty(),
-  builders.data(getPlayersHandlerConfig),
+  builders.data(getPlayersHandlerData),
   builders.handler(
     stripHandler(
       pipe(
         Effect.Do,
         Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
-        Effect.bind("parsed", () => Event.request.parsed(getPlayersHandlerConfig)),
+        Effect.bind("parsed", () => Event.request.parsed(getPlayersHandlerData)),
         Effect.bind("layerOfGuildId", ({ parsed }) =>
           pipe(
             Sheet.layerOfGuildId(
@@ -46,7 +46,7 @@ export const getPlayersHandler = pipe(
           ),
         ),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(Handler.Config.encodeResponseEffect(getPlayersHandlerConfig)),
+        Effect.map(Handler.Data.encodeResponseEffect(getPlayersHandlerData)),
         Effect.map(
           Effect.withSpan("getPlayersHandler", {
             captureStackTrace: true,

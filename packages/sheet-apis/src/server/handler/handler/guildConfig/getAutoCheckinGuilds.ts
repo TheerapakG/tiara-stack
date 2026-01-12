@@ -1,4 +1,4 @@
-import { getAutoCheckinGuildsHandlerConfig } from "@/server/handler/config";
+import { getAutoCheckinGuildsHandlerData } from "@/server/handler/data";
 import { Error } from "@/server/schema";
 import { AuthService, GuildConfigService } from "@/server/services";
 import { Effect, pipe } from "effect";
@@ -10,7 +10,7 @@ import { stripHandler } from "typhoon-core/bundler";
 const builders = Context.Builder.Subscription.builders();
 export const getAutoCheckinGuildsHandler = pipe(
   builders.empty(),
-  builders.data(getAutoCheckinGuildsHandlerConfig),
+  builders.data(getAutoCheckinGuildsHandlerData),
   builders.handler(
     stripHandler(
       pipe(
@@ -18,7 +18,7 @@ export const getAutoCheckinGuildsHandler = pipe(
         Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
         Effect.flatMap(() => GuildConfigService.getAutoCheckinGuilds()),
         Effect.map(Error.Core.catchParseErrorAsValidationError),
-        Effect.map(Handler.Config.encodeResponseEffect(getAutoCheckinGuildsHandlerConfig)),
+        Effect.map(Handler.Data.encodeResponseEffect(getAutoCheckinGuildsHandlerData)),
         Effect.withSpan("getAutoCheckinGuildsHandler", {
           captureStackTrace: true,
         }),
