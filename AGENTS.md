@@ -136,8 +136,8 @@ We use Graphite for managing stacked pull requests. The following guidelines are
 - For the rest of the commits, use `gt modify -c`.
 - When you create the commits on a new branch
   - If the developer mentions that the commits is related to a linear issue, look up the git branch name to use via the linear MCP server. If the linear MCP server does not exist, tell the developer and stop proceeding.
-  - Otherwise, come up with a descriptive branch name with the user appended e.g. `user/branch-name`. Make sure you use the actual username.
-  - ALWAYS set the branch name. DO NOT leave the branch name blank.
+  - Otherwise, come up with a descriptive branch name with the user prepended before the slash e.g. `<username>/branch-name`. **ALWAYS use the actual username. DO NOT directly put `<username>` in the branch name**
+  - **ALWAYS set the branch name. DO NOT leave the branch name blank.**
 - Use conventional commit message. If the work is done inside a package, use the name of the package (or a shortened version if it is not ambiguous) of the changes as the scope of the commit. Optionally, you could also append the area where the work was done inside the package e.g. `feat(example-package/utils): implement new utility x`
 - There is no need to list functions or symbols affected by the changes separately from the main commit message body.
 - Use -m for new line in the commit message, and do not use \n anywhere.
