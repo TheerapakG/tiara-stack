@@ -4,6 +4,7 @@ import {
   ConverterService,
   FormatService,
   GuildConfigService,
+  ClientService,
   PlayerService,
   SendableChannelContext,
   SheetService,
@@ -120,7 +121,7 @@ const getCheckinMessages = (
           data.runningChannel.name,
           Option.map((name) => `head to ${name}`),
           Option.getOrElse(
-            () => "await further instructions from the manager on where the running channel is",
+            () => "await further instructions from the monitor on where the running channel is",
           ),
         ),
     template: pipe(template, Option.getOrUndefined),
@@ -258,6 +259,34 @@ const runOnce = Effect.suspend(() =>
                                     ),
                                   ],
                                   { concurrency: "unbounded" },
+                                ),
+                              ),
+                            ),
+                          ),
+                          Effect.tap(({ checkinMessages, checkinData }) =>
+                            pipe(
+                              ClientService.makeEmbedBuilder(),
+                              Effect.map((embed) =>
+                                embed
+                                  .setTitle("Auto check-in summary for monitors")
+                                  .setDescription(
+                                    [
+                                      checkinMessages.managerCheckinMessage,
+                                      subtext(autoCheckinPreviewNotice),
+                                    ].join("\n"),
+                                  ),
+                              ),
+                              Effect.flatMap((embed) =>
+                                pipe(
+                                  SendableChannelContext.send().sync({
+                                    embeds: [embed],
+                                    allowedMentions: { parse: [] },
+                                  }),
+                                  Effect.provide(
+                                    channelServicesFromGuildChannelId(
+                                      checkinData.runningChannel.channelId,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),

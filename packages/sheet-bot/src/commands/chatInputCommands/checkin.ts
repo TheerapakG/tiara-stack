@@ -108,7 +108,7 @@ const getCheckinMessages = (
           data.runningChannel.name,
           Option.map((name) => `head to ${name}`),
           Option.getOrElse(
-            () => "await further instructions from the manager on where the running channel is",
+            () => "await further instructions from the monitor on where the running channel is",
           ),
         ),
     template: pipe(template, Option.getOrUndefined),
@@ -152,7 +152,7 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
                 roles,
                 Array.map((role) => role.roleId),
               ),
-              reason: "You can only check in users as a manager",
+              reason: "You can only check in users as a monitor",
             })),
           ),
         ),
