@@ -6,6 +6,7 @@ import {
   GuildConfigService,
   ClientService,
   PlayerService,
+  MonitorService,
   SendableChannelContext,
   SheetService,
 } from "@/services";
@@ -17,6 +18,7 @@ import {
   channelMention,
   MessageActionRowComponentBuilder,
   subtext,
+  userMention,
 } from "discord.js";
 import {
   Array,
@@ -37,6 +39,107 @@ import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 import { bindObject } from "@/utils";
 
 const autoCheckinPreviewNotice = "Sent automatically via auto check-in (preview; may have bugs).";
+
+const noMonitor = {
+  mention: Option.none<string>(),
+  failure: Option.none<string>(),
+};
+
+const monitorNotAssigned = {
+  mention: Option.none<string>(),
+  failure: Option.some("Cannot ping monitor: monitor not assigned for this hour."),
+};
+
+const monitorConfigMissing = {
+  mention: Option.none<string>(),
+  failure: Option.some("Cannot ping monitor: sheet is not configured for monitor data."),
+};
+
+const resolveMonitorFromName = (monitorName: string, rangesConfig: Schema.RangesConfig) =>
+  pipe(
+    Option.all({
+      ids: rangesConfig.monitorIds,
+      names: rangesConfig.monitorNames,
+    }),
+    Option.match({
+      onNone: () => Effect.succeed(monitorConfigMissing),
+      onSome: () =>
+        pipe(
+          MonitorService.getMonitorByName([monitorName]),
+          UntilObserver.observeUntilRpcResultResolved(),
+          Effect.flatten,
+          Effect.map(Array.flatten),
+          Effect.map(Array.head),
+          Effect.map((monitor) =>
+            pipe(
+              monitor,
+              Option.flatMap((monitor) =>
+                pipe(
+                  Match.value(monitor),
+                  Match.tagsExhaustive({
+                    Monitor: (monitor) => Option.some(monitor),
+                    PartialNameMonitor: () => Option.none(),
+                  }),
+                ),
+              ),
+              Option.map((monitor) => monitor.id),
+              Option.match({
+                onSome: (id) => ({
+                  mention: Option.some(userMention(id)),
+                  failure: Option.none<string>(),
+                }),
+                onNone: () => ({
+                  mention: Option.none<string>(),
+                  failure: Option.some(
+                    `Cannot ping monitor: monitor "${monitorName}" is missing a Discord ID in the sheet.`,
+                  ),
+                }),
+              }),
+            ),
+          ),
+          Effect.catchAll((error) =>
+            pipe(
+              Effect.logError(error),
+              Effect.as({
+                mention: Option.none<string>(),
+                failure: Option.some(
+                  `Cannot ping monitor: monitor lookup failed for "${monitorName}".`,
+                ),
+              }),
+            ),
+          ),
+        ),
+    }),
+  );
+
+const resolveMonitorMention = ({
+  schedule,
+  rangesConfig,
+}: {
+  schedule: Option.Option<Schema.ScheduleWithPlayers | Schema.BreakSchedule>;
+  rangesConfig: Schema.RangesConfig;
+}) =>
+  pipe(
+    schedule,
+    Option.match({
+      onNone: () => Effect.succeed(noMonitor),
+      onSome: (schedule) =>
+        pipe(
+          Match.value(schedule),
+          Match.tagsExhaustive({
+            BreakSchedule: () => Effect.succeed(noMonitor),
+            ScheduleWithPlayers: (schedule) =>
+              pipe(
+                schedule.monitor,
+                Option.match({
+                  onNone: () => Effect.succeed(monitorNotAssigned),
+                  onSome: (monitorName) => resolveMonitorFromName(monitorName, rangesConfig),
+                }),
+              ),
+          }),
+        ),
+    }),
+  );
 
 const computeHour = Effect.suspend(() =>
   pipe(
@@ -145,6 +248,7 @@ const runOnce = Effect.suspend(() =>
             Effect.Do,
             Effect.tap(() => Effect.log(`running auto check-in task for guild ${guild.guildId}`)),
             Effect.bind("hour", () => computeHour),
+            Effect.bind("rangesConfig", () => SheetService.rangesConfig()),
             Effect.bind("allSchedules", () => SheetService.allSchedules()),
             Effect.let("channels", ({ allSchedules }) =>
               pipe(
@@ -154,7 +258,7 @@ const runOnce = Effect.suspend(() =>
                 HashSet.toValues,
               ),
             ),
-            Effect.flatMap(({ hour, channels }) =>
+            Effect.flatMap(({ hour, channels, rangesConfig }) =>
               pipe(
                 Effect.forEach(
                   channels,
@@ -178,6 +282,12 @@ const runOnce = Effect.suspend(() =>
                               getCheckinData({ hour, runningChannel }),
                               Effect.tap((checkinData) => Effect.log(checkinData)),
                             ),
+                          ),
+                          Effect.bind("monitorInfo", ({ checkinData }) =>
+                            resolveMonitorMention({
+                              schedule: checkinData.schedule,
+                              rangesConfig,
+                            }),
                           ),
                           Effect.let("fillIds", ({ checkinData }) =>
                             pipe(
@@ -213,30 +323,40 @@ const runOnce = Effect.suspend(() =>
                               Effect.tap((checkinMessages) => Effect.log(checkinMessages)),
                             ),
                           ),
-                          Effect.bind("message", ({ checkinMessages, checkinChannelId }) =>
-                            pipe(
-                              checkinMessages.checkinMessage,
-                              Effect.transposeMapOption((checkinMessage) =>
-                                pipe(
-                                  Effect.Do,
-                                  Effect.let("initialMessage", () =>
-                                    [checkinMessage, subtext(autoCheckinPreviewNotice)].join("\n"),
-                                  ),
-                                  SendableChannelContext.send().bind(
-                                    "message",
-                                    ({ initialMessage }) => ({
-                                      content: initialMessage,
-                                      components: [
-                                        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                                          new ButtonBuilder(checkinButton.data),
-                                        ),
-                                      ],
-                                    }),
+                          Effect.bind(
+                            "message",
+                            ({ checkinMessages, checkinChannelId, monitorInfo }) =>
+                              pipe(
+                                checkinMessages.checkinMessage,
+                                Effect.transposeMapOption((checkinMessage) =>
+                                  pipe(
+                                    Effect.Do,
+                                    Effect.let("initialMessage", () =>
+                                      pipe(
+                                        [
+                                          monitorInfo.mention,
+                                          Option.some(checkinMessage),
+                                          Option.some(subtext(autoCheckinPreviewNotice)),
+                                        ],
+                                        Array.getSomes,
+                                        Array.join("\n"),
+                                      ),
+                                    ),
+                                    SendableChannelContext.send().bind(
+                                      "message",
+                                      ({ initialMessage }) => ({
+                                        content: initialMessage,
+                                        components: [
+                                          new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                                            new ButtonBuilder(checkinButton.data),
+                                          ),
+                                        ],
+                                      }),
+                                    ),
                                   ),
                                 ),
+                                Effect.provide(channelServicesFromGuildChannelId(checkinChannelId)),
                               ),
-                              Effect.provide(channelServicesFromGuildChannelId(checkinChannelId)),
-                            ),
                           ),
                           Effect.tap(({ checkinData, message, fillIds }) =>
                             pipe(
@@ -263,18 +383,23 @@ const runOnce = Effect.suspend(() =>
                               ),
                             ),
                           ),
-                          Effect.tap(({ checkinMessages, checkinData }) =>
+                          Effect.tap(({ checkinMessages, checkinData, monitorInfo }) =>
                             pipe(
                               ClientService.makeEmbedBuilder(),
                               Effect.map((embed) =>
-                                embed
-                                  .setTitle("Auto check-in summary for monitors")
-                                  .setDescription(
-                                    [
-                                      checkinMessages.managerCheckinMessage,
-                                      subtext(autoCheckinPreviewNotice),
-                                    ].join("\n"),
-                                  ),
+                                embed.setTitle("Auto check-in summary for monitors").setDescription(
+                                  [
+                                    checkinMessages.managerCheckinMessage,
+                                    ...pipe(
+                                      monitorInfo.failure,
+                                      Option.match({
+                                        onSome: (failure) => [subtext(failure)],
+                                        onNone: () => [],
+                                      }),
+                                    ),
+                                    subtext(autoCheckinPreviewNotice),
+                                  ].join("\n"),
+                                ),
                               ),
                               Effect.flatMap((embed) =>
                                 pipe(
