@@ -3,5 +3,6 @@ export * from "./formatService";
 export * from "./guildConfigService";
 export * from "./guildService";
 export * from "./playerService";
+export * from "./monitorService";
 export * from "./sheetService";
 export * from "./screenshotService";

@@ -4,6 +4,7 @@ import {
   HourRange,
   RunnerConfig,
   RawPlayer,
+  RawMonitor,
   ScheduleConfig,
   RawSchedulePlayer,
   Team,
@@ -64,6 +65,25 @@ const playerParser = ([userIds, userSheetNames]: sheets_v4.Schema$ValueRange[]) 
     Effect.map(Array.getRights),
     Effect.map(Array.map((config, index) => new RawPlayer({ index, ...config }))),
     Effect.withSpan("playerParser", { captureStackTrace: true }),
+  );
+
+const monitorParser = ([monitorIds, monitorNames]: sheets_v4.Schema$ValueRange[]) =>
+  pipe(
+    GoogleSheets.parseValueRanges(
+      [monitorIds, monitorNames],
+      pipe(
+        TupleToStructValueSchema(["id", "name"], GoogleSheets.rowToCellSchema),
+        Schema.compose(
+          Schema.Struct({
+            id: GoogleSheets.cellToStringSchema,
+            name: GoogleSheets.cellToStringSchema,
+          }),
+        ),
+      ),
+    ),
+    Effect.map(Array.getRights),
+    Effect.map(Array.map((config, index) => new RawMonitor({ index, ...config }))),
+    Effect.withSpan("monitorParser", { captureStackTrace: true }),
   );
 
 class TeamConfigRange extends Data.TaggedClass("TeamConfigRange")<{
@@ -957,6 +977,35 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
           }),
           Effect.cached,
         ),
+        monitors: pipe(
+          Effect.Do,
+          Effect.bind("rangesConfig", () => rangesConfig),
+          Effect.bind("ranges", ({ rangesConfig }) =>
+            Effect.succeed(
+              Option.all({ ids: rangesConfig.monitorIds, names: rangesConfig.monitorNames }),
+            ),
+          ),
+          Effect.flatMap(({ ranges }) =>
+            pipe(
+              ranges,
+              Option.match({
+                onNone: () => Effect.succeed([] as RawMonitor[]),
+                onSome: ({ ids, names }) =>
+                  pipe(
+                    sheetGet({
+                      ranges: [ids, names],
+                    }),
+                    Effect.flatMap((response) => monitorParser(response.data.valueRanges ?? [])),
+                    Effect.provideService(GoogleSheets, sheet),
+                  ),
+              }),
+            ),
+          ),
+          Effect.withSpan("SheetService.monitors", {
+            captureStackTrace: true,
+          }),
+          Effect.cached,
+        ),
         teams: pipe(
           Effect.Do,
           Effect.bind("teamConfigs", () => teamConfig),
@@ -1017,6 +1066,7 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
         eventConfig,
         scheduleConfig,
         players,
+        monitors,
         teams,
         allSchedules,
         runnerConfig,
@@ -1065,6 +1115,13 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
           pipe(
             players,
             Effect.withSpan("SheetService.getPlayers", {
+              captureStackTrace: true,
+            }),
+          ),
+        getMonitors: () =>
+          pipe(
+            monitors,
+            Effect.withSpan("SheetService.getMonitors", {
               captureStackTrace: true,
             }),
           ),

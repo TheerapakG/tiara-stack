@@ -43,6 +43,21 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
           }),
         ),
       ),
+      monitors: Effect.cached(
+        pipe(
+          guildService.getId(),
+          Effect.flatMap((guildId) =>
+            WebSocketClient.subscribeScoped(sheetApisClient.get(), "sheet.getMonitors", {
+              guildId,
+            }),
+          ),
+          UntilObserver.observeUntilRpcResultResolved(),
+          Effect.flatten,
+          Effect.withSpan("SheetService.monitors", {
+            captureStackTrace: true,
+          }),
+        ),
+      ),
       eventConfig: Effect.cached(
         pipe(
           guildService.getId(),
@@ -166,6 +181,7 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
       ({
         rangesConfig,
         teamConfig,
+        monitors,
         eventConfig,
         scheduleConfig,
         runnerConfig,
@@ -177,6 +193,7 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
       }) => ({
         rangesConfig: () => rangesConfig,
         teamConfig: () => teamConfig,
+        monitors: () => monitors,
         eventConfig: () => eventConfig,
         scheduleConfig: () => scheduleConfig,
         runnerConfig: () => runnerConfig,

@@ -12,6 +12,7 @@ import { getRunnerConfigHandlerData } from "./getRunnerConfig";
 import { getScheduleConfigHandlerData } from "./getScheduleConfig";
 import { getTeamConfigHandlerData } from "./getTeamConfig";
 import { getTeamsHandlerData } from "./getTeams";
+import { getMonitorsHandlerData } from "./getMonitors";
 
 export {
   getAllSchedulesHandlerData,
@@ -24,6 +25,7 @@ export {
   getScheduleConfigHandlerData,
   getTeamConfigHandlerData,
   getTeamsHandlerData,
+  getMonitorsHandlerData,
 };
 
 export const HandlerDataGroupTypeId = CoreData.Group.HandlerDataGroupTypeId;
@@ -36,6 +38,7 @@ export const sheetHandlerDataCollection = pipe(
   HandlerData.Collection.addSubscription(getDaySchedulesHandlerData),
   HandlerData.Collection.addSubscription(getEventConfigHandlerData),
   HandlerData.Collection.addSubscription(getPlayersHandlerData),
+  HandlerData.Collection.addSubscription(getMonitorsHandlerData),
   HandlerData.Collection.addSubscription(getRangesConfigHandlerData),
   HandlerData.Collection.addSubscription(getRunnerConfigHandlerData),
   HandlerData.Collection.addSubscription(getScheduleConfigHandlerData),

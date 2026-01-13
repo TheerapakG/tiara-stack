@@ -7,6 +7,7 @@ import { ZeroService } from "typhoon-core/services";
 import { Schema } from "sheet-db-schema/zero";
 
 import { PlayerService } from "./playerService";
+import { MonitorService } from "./monitorService";
 import { ScreenshotService } from "./screenshotService";
 import { SheetContext } from "./sheetContext";
 import { SheetService } from "./sheetService";
@@ -14,12 +15,17 @@ import { GuildConfigService } from "../guildConfigService";
 import { SheetConfigService } from "../sheetConfigService";
 
 export * from "./playerService";
+export * from "./monitorService";
 export * from "./screenshotService";
 export * from "./sheetContext";
 export * from "./sheetService";
 
 const sheetContextDependendents = pipe(
-  Layer.mergeAll(PlayerService.Default, ScreenshotService.DefaultWithoutDependencies),
+  Layer.mergeAll(
+    PlayerService.Default,
+    MonitorService.Default,
+    ScreenshotService.DefaultWithoutDependencies,
+  ),
   Layer.provideMerge(SheetService.DefaultWithoutDependencies),
 );
 
@@ -38,7 +44,7 @@ export const layerOfGuildId = <E = never>(
     Result.Result<
       Option.Option<
         Layer.Layer<
-          PlayerService | ScreenshotService | SheetService | SheetContext,
+          PlayerService | MonitorService | ScreenshotService | SheetService | SheetContext,
           ZeroQueryAppError | ZeroQueryHttpError | ZeroQueryZeroError,
           GoogleSheets | SheetConfigService
         >

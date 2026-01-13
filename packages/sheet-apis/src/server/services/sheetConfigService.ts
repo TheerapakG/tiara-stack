@@ -263,15 +263,21 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()("Sh
                 Schema.Struct({
                   "User IDs": Schema.String,
                   "User Sheet Names": Schema.String,
+                  "User Notes": Schema.OptionFromNonEmptyTrimmedString,
+                  "Moni IDs": Schema.OptionFromNonEmptyTrimmedString,
+                  "Moni Names": Schema.OptionFromNonEmptyTrimmedString,
                 }),
                 Schema.rename({
                   "User IDs": "userIds",
                   "User Sheet Names": "userSheetNames",
+                  "User Notes": "userNotes",
+                  "Moni IDs": "monitorIds",
+                  "Moni Names": "monitorNames",
                 }),
-                Schema.compose(DefaultTaggedClass(RangesConfig)),
               ),
             ),
           ),
+          Effect.map((config) => RangesConfig.make(config)),
           Error.Core.catchParseErrorAsValidationError,
           Effect.withSpan("SheetConfigService.getRangesConfig", {
             captureStackTrace: true,

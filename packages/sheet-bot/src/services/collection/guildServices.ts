@@ -4,6 +4,7 @@ import {
   GuildConfigService,
   GuildService,
   PlayerService,
+  MonitorService,
   SheetService,
   ScreenshotService,
 } from "@/services/guild";
@@ -19,6 +20,7 @@ export const guildServices = (guildId: string) =>
         GuildConfigService.DefaultWithoutDependencies,
         SheetService.DefaultWithoutDependencies,
         PlayerService.DefaultWithoutDependencies,
+        MonitorService.DefaultWithoutDependencies,
         ScreenshotService.DefaultWithoutDependencies,
       ),
     ),

@@ -7,6 +7,7 @@ import { getEventConfigHandler } from "./getEventConfig";
 import { getScheduleConfigHandler } from "./getScheduleConfig";
 import { getRunnerConfigHandler } from "./getRunnerConfig";
 import { getPlayersHandler } from "./getPlayers";
+import { getMonitorsHandler } from "./getMonitors";
 import { getTeamsHandler } from "./getTeams";
 import { getAllSchedulesHandler } from "./getAllSchedules";
 import { getDaySchedulesHandler } from "./getDaySchedules";
@@ -20,6 +21,7 @@ export const sheetHandlerCollection = pipe(
   Context.Collection.addSubscription(getScheduleConfigHandler),
   Context.Collection.addSubscription(getRunnerConfigHandler),
   Context.Collection.addSubscription(getPlayersHandler),
+  Context.Collection.addSubscription(getMonitorsHandler),
   Context.Collection.addSubscription(getTeamsHandler),
   Context.Collection.addSubscription(getAllSchedulesHandler),
   Context.Collection.addSubscription(getDaySchedulesHandler),
