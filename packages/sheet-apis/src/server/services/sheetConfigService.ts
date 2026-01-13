@@ -263,9 +263,9 @@ export class SheetConfigService extends Effect.Service<SheetConfigService>()("Sh
                 Schema.Struct({
                   "User IDs": Schema.String,
                   "User Sheet Names": Schema.String,
-                  "User Notes": Schema.OptionFromNonEmptyTrimmedString,
-                  "Moni IDs": Schema.OptionFromNonEmptyTrimmedString,
-                  "Moni Names": Schema.OptionFromNonEmptyTrimmedString,
+                  "User Notes": Schema.OptionFromNullishOr(Schema.String, undefined),
+                  "Moni IDs": Schema.OptionFromNullishOr(Schema.String, undefined),
+                  "Moni Names": Schema.OptionFromNullishOr(Schema.String, undefined),
                 }),
                 Schema.rename({
                   "User IDs": "userIds",
