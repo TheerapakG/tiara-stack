@@ -48,6 +48,27 @@ const getConfigFieldValueRange =
       Effect.withSpan("getConfigFieldValueRange", { captureStackTrace: true }),
     );
 
+const getConfigFieldRowData =
+  <Range>(configField: ConfigField<Range>) =>
+  (sheet: HashMap.HashMap<ConfigField<Range>, sheets_v4.Schema$RowData[]>) =>
+    pipe(
+      sheet,
+      HashMap.get(configField),
+      Option.match({
+        onSome: Effect.succeed,
+        onNone: () =>
+          Effect.fail(
+            new Error.ParserFieldError({
+              message: `Error getting ${configField.field}, no config field found`,
+              range: configField.range,
+              field: configField.field,
+            }),
+          ),
+      }),
+      (e) => Effect.suspend(() => e),
+      Effect.withSpan("getConfigFieldRowData", { captureStackTrace: true }),
+    );
+
 const playerParser = ([userIds, userSheetNames]: sheets_v4.Schema$ValueRange[]) =>
   pipe(
     GoogleSheets.parseValueRanges(
@@ -606,7 +627,7 @@ const runnersInFills =
 
 const baseScheduleParser = (
   scheduleConfigValue: FilteredScheduleConfigValue,
-  sheet: HashMap.HashMap<ScheduleConfigField, sheets_v4.Schema$ValueRange>,
+  sheet: HashMap.HashMap<ScheduleConfigField, sheets_v4.Schema$RowData[]>,
 ) =>
   pipe(
     Effect.Do,
@@ -614,27 +635,27 @@ const baseScheduleParser = (
     Effect.flatMap(({ range }) =>
       Effect.all(
         [
-          pipe(sheet, getConfigFieldValueRange(range.hours.field)),
-          pipe(sheet, getConfigFieldValueRange(range.fills.field)),
-          pipe(sheet, getConfigFieldValueRange(range.overfills.field)),
-          pipe(sheet, getConfigFieldValueRange(range.standbys.field)),
+          pipe(sheet, getConfigFieldRowData(range.hours.field)),
+          pipe(sheet, getConfigFieldRowData(range.fills.field)),
+          pipe(sheet, getConfigFieldRowData(range.overfills.field)),
+          pipe(sheet, getConfigFieldRowData(range.standbys.field)),
           pipe(
             Match.value(scheduleConfigValue.breakRange),
-            Match.when("auto", () => Effect.succeed({ values: [] })),
-            Match.orElse(() => pipe(sheet, getConfigFieldValueRange(range.breaks.field))),
+            Match.when("auto", () => Effect.succeed([] as sheets_v4.Schema$RowData[])),
+            Match.orElse(() => pipe(sheet, getConfigFieldRowData(range.breaks.field))),
           ),
-          pipe(sheet, getConfigFieldValueRange(range.visible.field)),
+          pipe(sheet, getConfigFieldRowData(range.visible.field)),
         ],
         { concurrency: "unbounded" },
       ),
     ),
-    Effect.flatMap((valueRanges) =>
-      GoogleSheets.parseValueRanges(
-        valueRanges,
+    Effect.flatMap((rowDatas) =>
+      GoogleSheets.parseRowDatas(
+        rowDatas,
         pipe(
           TupleToStructValueSchema(
             ["hour", "fills", "overfills", "standbys", "breakHour", "visible"],
-            GoogleSheets.rowSchema,
+            Schema.Array(GoogleSheets.rowDataCellToCellSchema),
           ),
           Schema.compose(
             Schema.Struct({
@@ -680,17 +701,17 @@ const baseScheduleParser = (
 
 const scheduleMonitorParser = (
   scheduleConfigValue: FilteredScheduleConfigValue,
-  sheet: HashMap.HashMap<ScheduleConfigField, sheets_v4.Schema$ValueRange>,
+  sheet: HashMap.HashMap<ScheduleConfigField, sheets_v4.Schema$RowData[]>,
 ) => {
   const monitorField = makeScheduleConfigField(scheduleConfigValue, "monitor");
   return pipe(
     sheet,
-    getConfigFieldValueRange(monitorField),
-    Effect.flatMap((valueRange) =>
-      GoogleSheets.parseValueRanges(
-        [valueRange],
+    getConfigFieldRowData(monitorField),
+    Effect.flatMap((rowData) =>
+      GoogleSheets.parseRowDatas(
+        [rowData],
         pipe(
-          TupleToStructValueSchema(["monitor"], GoogleSheets.rowToCellSchema),
+          TupleToStructValueSchema(["monitor"], GoogleSheets.rowDataToCellSchema),
           Schema.compose(
             Schema.Struct({
               monitor: GoogleSheets.cellToStringSchema,
@@ -711,7 +732,7 @@ const scheduleMonitorParser = (
 
 const scheduleParser = (
   scheduleConfigValues: FilteredScheduleConfigValue[],
-  sheet: HashMap.HashMap<ScheduleConfigField, sheets_v4.Schema$ValueRange>,
+  sheet: HashMap.HashMap<ScheduleConfigField, sheets_v4.Schema$RowData[]>,
   runnerConfigs: RunnerConfig[],
 ) =>
   pipe(
@@ -844,13 +865,12 @@ const scheduleParser = (
 
 export class SheetService extends Effect.Service<SheetService>()("SheetService", {
   effect: pipe(
-    Effect.Do,
-    Effect.bindAll(
-      () => ({
+    Effect.all(
+      {
         sheet: GoogleSheets,
         sheetContext: SheetContext,
         sheetConfigService: SheetConfigService,
-      }),
+      },
       { concurrency: "unbounded" },
     ),
     Effect.bindAll(
@@ -928,6 +948,25 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
           ),
     ),
     Effect.let(
+      "sheetGetRowDatasHashMap",
+      ({ sheet, sheetContext }) =>
+        <K>(
+          ranges: HashMap.HashMap<K, string>,
+          params?: Omit<sheets_v4.Params$Resource$Spreadsheets$Get, "ranges">,
+          options?: MethodOptions,
+        ) =>
+          pipe(
+            sheet.getRowDatasHashMap(
+              ranges,
+              { spreadsheetId: sheetContext.sheetId, ...params },
+              options,
+            ),
+            Effect.withSpan("SheetService.getRowDataHashMap", {
+              captureStackTrace: true,
+            }),
+          ),
+    ),
+    Effect.let(
       "sheetUpdate",
       ({ sheet, sheetContext }) =>
         (
@@ -957,6 +996,7 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
         sheet,
         sheetGet,
         sheetGetHashMap,
+        sheetGetRowDatasHashMap,
         rangesConfig,
         scheduleConfig,
         teamConfig,
@@ -1038,7 +1078,7 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
             filterScheduleConfigValues(scheduleConfigs),
           ),
           Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
-            sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
+            sheetGetRowDatasHashMap(scheduleRanges(filteredScheduleConfigs)),
           ),
           Effect.bind("schedules", ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
             scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
@@ -1059,6 +1099,7 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
         sheetContext,
         sheetGet,
         sheetGetHashMap,
+        sheetGetRowDatasHashMap,
         sheetUpdate,
         sheetGetSheetGids,
         rangesConfig,
@@ -1074,6 +1115,7 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
         sheetId: sheetContext.sheetId,
         get: sheetGet,
         getHashMap: () => sheetGetHashMap,
+        getRowDatasHashMap: () => sheetGetRowDatasHashMap,
         update: sheetUpdate,
         getSheetGids: sheetGetSheetGids,
         getRangesConfig: () =>
@@ -1157,7 +1199,7 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
               ),
             ),
             Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
-              sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
+              sheetGetRowDatasHashMap(scheduleRanges(filteredScheduleConfigs)),
             ),
             Effect.bind("schedules", ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
               scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
@@ -1186,7 +1228,7 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
               ),
             ),
             Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
-              sheetGetHashMap(scheduleRanges(filteredScheduleConfigs)),
+              sheetGetRowDatasHashMap(scheduleRanges(filteredScheduleConfigs)),
             ),
             Effect.bind("schedules", ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
               scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
