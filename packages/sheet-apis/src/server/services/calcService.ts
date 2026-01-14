@@ -90,7 +90,7 @@ const applyRoomEncAndDoormat = (roomTeam: Room) => {
       return PlayerTeam.addTags(HashSet.make(tiererOverride ? "tierer_enc_override" : "enc"))(t);
     }
     return t.talent >= encTeam.talent && !HashSet.has(t.tags, "tierer")
-      ? PlayerTeam.addTags(HashSet.make("doormat"))(t)
+      ? PlayerTeam.addTags(HashSet.make("avoid_enc"))(t)
       : t;
   });
 

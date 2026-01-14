@@ -115,7 +115,7 @@ export const roomOrderInteractionGetReply = (messageRoomOrder: Schema.MessageRoo
                     [
                       Option.some(formatEffectValue(effectValue)),
                       tags.includes("enc") ? Option.some("enc") : Option.none(),
-                      tags.includes("doormat") ? Option.some("doormat") : Option.none(),
+                      tags.includes("avoid_enc") ? Option.some("avoid enc") : Option.none(),
                     ],
                     Array.getSomes,
                   );
