@@ -64,16 +64,26 @@ const checkinMessageTemplates: Array.NonEmptyReadonlyArray<Weighted<string>> = [
   {
     value:
       "{{mentionsString}} Press the button below to check in, and {{channelString}} {{hourString}} {{timeStampString}}",
-    weight: 0.7,
+    weight: 0.5,
   },
   {
     value:
-      "{{mentionsString}} The goddess Miku is calling for you to fill, {{channelString}} {{hourString}} {{timeStampString}}",
+      "{{mentionsString}} The goddess Miku is calling for you to fill. Press the button below to check in, and {{channelString}} {{hourString}} {{timeStampString}}",
     weight: 0.2,
   },
   {
     value:
-      "{{mentionsString}} Ebi jail AAAAAAAAAAAAAAAAAAAAAAA, {{channelString}} {{hourString}} {{timeStampString}}",
+      "{{mentionsString}} Press the button below to check in, and {{channelString}} {{hourString}} {{timeStampString}}. ... Beep Boop. Beep Boop. zzzt... zzzt... zzzt...",
+    weight: 0.1,
+  },
+  {
+    value:
+      "{{mentionsString}} Press the button below to check in, and {{channelString}} {{hourString}} {{timeStampString}}\n~~or VBS Miku will recruit you for some taste testing of her cooking.~~",
+    weight: 0.1,
+  },
+  {
+    value:
+      "{{mentionsString}} Ebi jail AAAAAAAAAAAAAAAAAAAAAAA. Press the button below to check in, and {{channelString}} {{hourString}} {{timeStampString}}",
     weight: 0.1,
   },
 ];
