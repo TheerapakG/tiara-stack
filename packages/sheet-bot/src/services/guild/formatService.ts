@@ -11,11 +11,72 @@ import {
   Option,
   Order,
   pipe,
+  Random,
   String,
   flow,
 } from "effect";
 import { ConverterService, HourWindow } from "./converterService";
 import { Schema } from "sheet-apis";
+
+type Weighted<A> = { value: A; weight: number };
+
+const pickWeighted = <A>(items: Array.NonEmptyReadonlyArray<Weighted<A>>) =>
+  pipe(
+    Effect.Do,
+    Effect.bind("accumItems", () =>
+      pipe(
+        items,
+        Array.scan({ value: Option.none<A>(), weight: 0 }, (s, { value, weight }) => ({
+          value: Option.some(value),
+          weight: s.weight + weight,
+        })),
+        Array.filterMap(({ value, weight }) =>
+          pipe(
+            value,
+            Option.map((value) => ({ value, weight })),
+          ),
+        ),
+        Array.match({
+          onEmpty: () => Effect.die("pickWeighted: impossible"),
+          onNonEmpty: (items) => Effect.succeed(items),
+        }),
+      ),
+    ),
+    Effect.bind("random", ({ accumItems }) =>
+      Random.nextRange(
+        0,
+        pipe(accumItems, Array.lastNonEmpty, ({ weight }) => weight),
+      ),
+    ),
+    Effect.flatMap(({ accumItems, random }) =>
+      pipe(
+        accumItems,
+        Array.findFirst(({ weight }) => random < weight),
+        Option.match({
+          onSome: ({ value }) => Effect.succeed(value),
+          onNone: () => Effect.die("pickWeighted: impossible"),
+        }),
+      ),
+    ),
+  );
+
+const checkinMessageTemplates: Array.NonEmptyReadonlyArray<Weighted<string>> = [
+  {
+    value:
+      "{{mentionsString}} Press the button below to check in, and {{channelString}} {{hourString}} {{timeStampString}}",
+    weight: 0.7,
+  },
+  {
+    value:
+      "{{mentionsString}} The goddess Miku is calling for you to fill, {{channelString}} {{hourString}} {{timeStampString}}",
+    weight: 0.2,
+  },
+  {
+    value:
+      "{{mentionsString}} Ebi jail AAAAAAAAAAAAAAAAAAAAAAA, {{channelString}} {{hourString}} {{timeStampString}}",
+    weight: 0.1,
+  },
+];
 
 export class FormattedHourWindow extends Data.TaggedClass("FormattedHourWindow")<{
   start: number;
@@ -244,25 +305,33 @@ export class FormatService extends Effect.Service<FormatService>()("FormatServic
               Option.getOrElse(() => ""),
             ),
           ),
-          Effect.let("checkinMessage", ({ mentionsString, hourString, timeStampString }) =>
+          Effect.bind("template", () =>
             pipe(
-              mentionsString,
-              Option.map((mentionsString) => {
-                const render = Handlebars.compile(
-                  template ??
-                    "{{mentionsString}} Press the button below to check in, and {{channelString}} {{hourString}} {{timeStampString}}",
-                  {
-                    noEscape: true,
-                  },
-                );
-                return render({
-                  mentionsString,
-                  channelString,
-                  hourString,
-                  timeStampString,
-                });
+              template,
+              Option.fromNullable,
+              Option.match({
+                onSome: () => Effect.succeed(template),
+                onNone: () => pickWeighted(checkinMessageTemplates),
               }),
             ),
+          ),
+          Effect.let(
+            "checkinMessage",
+            ({ mentionsString, hourString, timeStampString, template }) =>
+              pipe(
+                mentionsString,
+                Option.map((mentionsString) => {
+                  const render = Handlebars.compile(template, {
+                    noEscape: true,
+                  });
+                  return render({
+                    mentionsString,
+                    channelString,
+                    hourString,
+                    timeStampString,
+                  });
+                }),
+              ),
           ),
           Effect.let("empty", () =>
             pipe(
