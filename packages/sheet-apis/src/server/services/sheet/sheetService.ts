@@ -655,29 +655,29 @@ const baseScheduleParser = (
         pipe(
           TupleToStructValueSchema(
             ["hour", "fills", "overfills", "standbys", "breakHour", "visible"],
-            Schema.Array(GoogleSheets.rowDataCellToCellSchema),
+            Schema.typeSchema(GoogleSheets.rowDataSchema),
           ),
           Schema.compose(
             Schema.Struct({
               hour: pipe(
-                GoogleSheets.rowToCellSchema,
+                GoogleSheets.rowDataToCellSchema,
                 Schema.compose(GoogleSheets.cellToNumberSchema),
               ),
-              fills: GoogleSheets.rowSchema,
+              fills: GoogleSheets.rowDataToRowSchema,
               overfills: pipe(
-                GoogleSheets.rowToCellSchema,
+                GoogleSheets.rowDataToCellSchema,
                 Schema.compose(GoogleSheets.cellToStringArraySchema),
               ),
               standbys: pipe(
-                GoogleSheets.rowToCellSchema,
+                GoogleSheets.rowDataToCellSchema,
                 Schema.compose(GoogleSheets.cellToStringArraySchema),
               ),
               breakHour: pipe(
-                GoogleSheets.rowToCellSchema,
+                GoogleSheets.rowDataToCellSchema,
                 Schema.compose(GoogleSheets.cellToBooleanSchema),
               ),
               visible: pipe(
-                GoogleSheets.rowToCellSchema,
+                GoogleSheets.rowDataToCellSchema,
                 Schema.compose(GoogleSheets.cellToBooleanSchema),
               ),
             }),

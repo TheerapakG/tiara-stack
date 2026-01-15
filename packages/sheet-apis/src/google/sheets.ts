@@ -179,6 +179,7 @@ const rowDataCellToCellSchema = pipe(
       ),
   }),
 );
+const rowDataToRowSchema = Schema.Array(rowDataCellToCellSchema);
 const rowToCellSchema = pipe(
   rowSchema,
   Schema.head,
@@ -514,6 +515,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets",
   static rowDataSchema = rowDataSchema;
   static rowSchema = rowSchema;
   static rowDataCellToCellSchema = rowDataCellToCellSchema;
+  static rowDataToRowSchema = rowDataToRowSchema;
   static rowDataToCellSchema = rowDataToCellSchema;
   static toStringSchema = toStringSchema;
   static cellToStringSchema = Schema.OptionFromSelf(toStringSchema);
