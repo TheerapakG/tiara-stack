@@ -255,26 +255,45 @@ const toStringArraySchema = pipe(
   }),
 );
 
-const toCol = (n: number) => {
-  let col = "";
-  let num = n;
-  while (num > 0) {
-    const rem = (num - 1) % 26;
-    col = globalThis.String.fromCharCode(65 + rem) + col;
-    num = Math.floor((num - 1) / 26);
+const colToNumber = (col: string) => {
+  let result = 0;
+  for (const char of col) {
+    const upper = char.toUpperCase();
+    result = result * 26 + (upper.charCodeAt(0) - 64);
   }
-  return col;
+  return result;
 };
 
-const gridDataToA1Start = (sheetTitle: string, gridData: sheets_v4.Schema$GridData) => {
-  const startRow = (gridData.startRow ?? 0) + 1;
-  const startCol = (gridData.startColumn ?? 0) + 1;
+const toRangeKey = (sheetTitle: string, startRow: number, startCol: number) =>
+  `${sheetTitle}::${startRow}::${startCol}`;
 
-  const a1Start = `${toCol(startCol)}${startRow}`;
-  return sheetTitle.includes("'") || sheetTitle.includes(" ")
-    ? `'${sheetTitle}'!${a1Start}`
-    : `${sheetTitle}!${a1Start}`;
-};
+const parseA1RangeKey = (range: string) =>
+  pipe(
+    /^(?:'((?:[^']|'')*)'|([^!]+))!(.+)$/u.exec(range),
+    Option.fromNullable,
+    Option.flatMap(([, quoted, unquoted, reference]) =>
+      pipe(
+        reference.split(":").at(0),
+        Option.fromNullable,
+        Option.flatMap((start) =>
+          pipe(
+            /^\$?([A-Za-z]+)\$?(\d+)$/u.exec(start),
+            Option.fromNullable,
+            Option.map(([, col, row]) =>
+              toRangeKey(
+                (quoted ?? unquoted ?? "").replace(/''/g, "'"),
+                Number.parseInt(row, 10),
+                colToNumber(col),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+const gridDataToKey = (sheetTitle: string, gridData: sheets_v4.Schema$GridData) =>
+  toRangeKey(sheetTitle, (gridData.startRow ?? 0) + 1, (gridData.startColumn ?? 0) + 1);
 
 export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets", {
   effect: pipe(
@@ -290,10 +309,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets",
     ),
     Effect.map(({ sheets }) => ({
       sheets,
-      getSheetRowDatas: (
-        params: sheets_v4.Params$Resource$Spreadsheets$Get,
-        options?: MethodOptions,
-      ) =>
+      getRowDatas: (params: sheets_v4.Params$Resource$Spreadsheets$Get, options?: MethodOptions) =>
         pipe(
           Effect.tryPromise({
             try: () => sheets.spreadsheets.get(params, options),
@@ -329,8 +345,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets",
                 pipe(
                   gridData,
                   Array.map(
-                    (gridData) =>
-                      [gridDataToA1Start(sheet, gridData), gridData.rowData ?? []] as const,
+                    (gridData) => [gridDataToKey(sheet, gridData), gridData.rowData ?? []] as const,
                   ),
                 ),
               ),
@@ -340,7 +355,13 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets",
           Effect.map((map) =>
             pipe(
               params.ranges ?? [],
-              Array.map((range) => HashMap.get(map, range.split(":").at(0) ?? "")),
+              Array.map((range) =>
+                pipe(
+                  range,
+                  parseA1RangeKey,
+                  Option.flatMap((key) => HashMap.get(map, key)),
+                ),
+              ),
               Array.getSomes,
             ),
           ),
@@ -354,7 +375,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets",
                   }),
                 ),
           ),
-          Effect.withSpan("GoogleSheets.getSheetRowDatas", { captureStackTrace: true }),
+          Effect.withSpan("GoogleSheets.getRowDatas", { captureStackTrace: true }),
         ),
       get: (
         params: sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
@@ -481,7 +502,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets",
                       gridData,
                       Array.map(
                         (gridData) =>
-                          [gridDataToA1Start(sheet, gridData), gridData.rowData ?? []] as const,
+                          [gridDataToKey(sheet, gridData), gridData.rowData ?? []] as const,
                       ),
                     ),
                   ),
@@ -491,7 +512,13 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets",
               Effect.map((map) =>
                 pipe(
                   ranges,
-                  Array.map((range) => HashMap.get(map, range.split(":").at(0) ?? "")),
+                  Array.map((range) =>
+                    pipe(
+                      range,
+                      parseA1RangeKey,
+                      Option.flatMap((key) => HashMap.get(map, key)),
+                    ),
+                  ),
                   Array.getSomes,
                 ),
               ),
