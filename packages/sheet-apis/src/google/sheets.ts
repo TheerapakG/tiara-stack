@@ -271,7 +271,9 @@ const gridDataToA1Start = (sheetTitle: string, gridData: sheets_v4.Schema$GridDa
   const startCol = (gridData.startColumn ?? 0) + 1;
 
   const a1Start = `${toCol(startCol)}${startRow}`;
-  return `${sheetTitle}!${a1Start}`;
+  return sheetTitle.includes("'") || sheetTitle.includes(" ")
+    ? `'${sheetTitle}'!${a1Start}`
+    : `${sheetTitle}!${a1Start}`;
 };
 
 export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets", {
