@@ -470,13 +470,38 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets",
               Effect.map((sheet) =>
                 pipe(
                   sheet.data.sheets ?? [],
-                  Array.flatMap((sheet) => sheet.data ?? []),
-                  Array.map((gridData) => gridData.rowData ?? []),
-                  ArrayUtils.WithDefault.wrap<sheets_v4.Schema$RowData[][]>({
-                    default: () => [],
-                  }),
-                  ArrayUtils.WithDefault.toArray,
+                  Array.map((sheet) => ({
+                    sheet: sheet.properties?.title ?? "",
+                    gridData: sheet.data ?? [],
+                  })),
+                  Array.flatMap(({ sheet, gridData }) =>
+                    pipe(
+                      gridData,
+                      Array.map(
+                        (gridData) =>
+                          [gridDataToA1Start(sheet, gridData), gridData.rowData ?? []] as const,
+                      ),
+                    ),
+                  ),
+                  HashMap.fromIterable,
                 ),
+              ),
+              Effect.map((map) =>
+                pipe(
+                  ranges,
+                  Array.map((range) => HashMap.get(map, range.split(":").at(0) ?? "")),
+                  Array.getSomes,
+                ),
+              ),
+              Effect.flatMap((rowDatas) =>
+                rowDatas.length === ranges.length
+                  ? Effect.succeed(rowDatas)
+                  : Effect.fail(
+                      new Error.GoogleSheetsError({
+                        message: "Row datas length does not match ranges length",
+                        cause: undefined,
+                      }),
+                    ),
               ),
             ),
           ),
