@@ -255,6 +255,25 @@ const toStringArraySchema = pipe(
   }),
 );
 
+const toCol = (n: number) => {
+  let col = "";
+  let num = n;
+  while (num > 0) {
+    const rem = (num - 1) % 26;
+    col = globalThis.String.fromCharCode(65 + rem) + col;
+    num = Math.floor((num - 1) / 26);
+  }
+  return col;
+};
+
+const gridDataToA1Start = (sheetTitle: string, gridData: sheets_v4.Schema$GridData) => {
+  const startRow = (gridData.startRow ?? 0) + 1;
+  const startCol = (gridData.startColumn ?? 0) + 1;
+
+  const a1Start = `${toCol(startCol)}${startRow}`;
+  return `${sheetTitle}!${a1Start}`;
+};
+
 export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets", {
   effect: pipe(
     Effect.Do,
@@ -270,7 +289,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets",
     Effect.map(({ sheets }) => ({
       sheets,
       getSheetRowDatas: (
-        params?: sheets_v4.Params$Resource$Spreadsheets$Get,
+        params: sheets_v4.Params$Resource$Spreadsheets$Get,
         options?: MethodOptions,
       ) =>
         pipe(
@@ -300,14 +319,43 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets",
           Effect.map((sheet) =>
             pipe(
               sheet.data.sheets ?? [],
-              Array.flatMap((sheet) => sheet.data ?? []),
-              Array.map((gridData) => gridData.rowData ?? []),
+              Array.map((sheet) => ({
+                sheet: sheet.properties?.title ?? "",
+                gridData: sheet.data ?? [],
+              })),
+              Array.flatMap(({ sheet, gridData }) =>
+                pipe(
+                  gridData,
+                  Array.map(
+                    (gridData) =>
+                      [gridDataToA1Start(sheet, gridData), gridData.rowData ?? []] as const,
+                  ),
+                ),
+              ),
+              HashMap.fromIterable,
             ),
           ),
-          Effect.withSpan("GoogleSheets.get", { captureStackTrace: true }),
+          Effect.map((map) =>
+            pipe(
+              params.ranges ?? [],
+              Array.map((range) => HashMap.get(map, range.split(":").at(0) ?? "")),
+              Array.getSomes,
+            ),
+          ),
+          Effect.flatMap((rowDatas) =>
+            rowDatas.length === (params.ranges?.length ?? 0)
+              ? Effect.succeed(rowDatas)
+              : Effect.fail(
+                  new Error.GoogleSheetsError({
+                    message: "Row datas length does not match ranges length",
+                    cause: undefined,
+                  }),
+                ),
+          ),
+          Effect.withSpan("GoogleSheets.getSheetRowDatas", { captureStackTrace: true }),
         ),
       get: (
-        params?: sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
+        params: sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
         options?: MethodOptions,
       ) =>
         pipe(
