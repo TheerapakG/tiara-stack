@@ -24,6 +24,8 @@ import {
   AttachmentBuilder,
 } from "discord.js";
 import { Effect, Layer, pipe, Schema } from "effect";
+import { UntilObserver } from "typhoon-core/signal";
+import { RpcResult, Result } from "typhoon-core/schema";
 
 const Services = {
   MessageCheckinService,
@@ -90,8 +92,24 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
         Effect.bind(
           "result",
           ({ serviceObject, method, parsedArgs }) =>
-            (serviceObject[method as keyof typeof serviceObject] as any)(
-              ...parsedArgs,
+            pipe(
+              (serviceObject[method as keyof typeof serviceObject] as any)(...parsedArgs),
+              Effect.flatMap((result) =>
+                Effect.isEffect(result)
+                  ? pipe(
+                      Effect.succeed(result) as Effect.Effect<
+                        Effect.Effect<
+                          RpcResult.RpcResult<Result.Result<unknown, unknown>, unknown>,
+                          unknown,
+                          never
+                        >,
+                        never,
+                        never
+                      >,
+                      UntilObserver.observeUntilRpcResultResolved(),
+                    )
+                  : Effect.succeed(result),
+              ),
             ) as Effect.Effect<
               unknown,
               unknown,
