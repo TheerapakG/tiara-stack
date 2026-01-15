@@ -17,6 +17,7 @@ import {
 import { regex } from "arkregex";
 import { type MethodOptions, type sheets_v4 } from "@googleapis/sheets";
 import { Array, Data, Effect, HashMap, Match, Number, Option, pipe, Schema, String } from "effect";
+import { titleCase } from "scule";
 import { TupleToStructValueSchema } from "typhoon-core/schema";
 import { Array as ArrayUtils, Struct as StructUtils } from "typhoon-core/utils";
 import { SheetConfigService } from "../sheetConfigService";
@@ -84,7 +85,19 @@ const playerParser = ([userIds, userSheetNames]: sheets_v4.Schema$ValueRange[]) 
       ),
     ),
     Effect.map(Array.getRights),
-    Effect.map(Array.map((config, index) => new RawPlayer({ index, ...config }))),
+    Effect.map(
+      Array.map(
+        (config, index) =>
+          new RawPlayer({
+            index,
+            id: config.id,
+            name: pipe(
+              config.name,
+              Option.map((name) => titleCase(name, { normalize: true })),
+            ),
+          }),
+      ),
+    ),
     Effect.withSpan("playerParser", { captureStackTrace: true }),
   );
 
@@ -103,7 +116,19 @@ const monitorParser = ([monitorIds, monitorNames]: sheets_v4.Schema$ValueRange[]
       ),
     ),
     Effect.map(Array.getRights),
-    Effect.map(Array.map((config, index) => new RawMonitor({ index, ...config }))),
+    Effect.map(
+      Array.map(
+        (config, index) =>
+          new RawMonitor({
+            index,
+            id: config.id,
+            name: pipe(
+              config.name,
+              Option.map((name) => titleCase(name, { normalize: true })),
+            ),
+          }),
+      ),
+    ),
     Effect.withSpan("monitorParser", { captureStackTrace: true }),
   );
 
@@ -204,6 +229,7 @@ const teamBaseParser = (
         playerName: pipe(
           playerName,
           Option.map((name) => playerNameRegex.exec(name)?.groups?.name ?? name),
+          Option.map((name) => titleCase(name, { normalize: true })),
         ),
         teamName: pipe(
           Match.value(teamConfigValue.teamNameRange),
@@ -777,7 +803,7 @@ const scheduleParser = (
                     Option.flatten,
                     Option.map((fill) =>
                       RawSchedulePlayer.make({
-                        player: fill,
+                        player: titleCase(fill, { normalize: true }),
                         enc:
                           scheduleConfig.encType === "regex"
                             ? playerNameRegex.exec(fill)?.groups?.enc !== undefined
@@ -791,7 +817,7 @@ const scheduleParser = (
                   Option.getOrElse(() => []),
                   Array.map((overfill) =>
                     RawSchedulePlayer.make({
-                      player: overfill,
+                      player: titleCase(overfill, { normalize: true }),
                       enc:
                         scheduleConfig.encType === "regex"
                           ? playerNameRegex.exec(overfill)?.groups?.enc !== undefined
@@ -804,7 +830,7 @@ const scheduleParser = (
                   Option.getOrElse(() => []),
                   Array.map((standby) =>
                     RawSchedulePlayer.make({
-                      player: standby,
+                      player: titleCase(standby, { normalize: true }),
                       enc:
                         scheduleConfig.encType === "regex"
                           ? playerNameRegex.exec(standby)?.groups?.enc !== undefined
@@ -817,7 +843,10 @@ const scheduleParser = (
                   visible,
                   Option.getOrElse(() => true),
                 ),
-                monitor,
+                monitor: pipe(
+                  monitor,
+                  Option.map((monitor) => titleCase(monitor, { normalize: true })),
+                ),
               }),
             ),
           ),

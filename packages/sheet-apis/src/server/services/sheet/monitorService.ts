@@ -3,6 +3,7 @@ import { Array as ArrayUtils } from "typhoon-core/utils";
 import { SheetService } from "./sheetService";
 import { Monitor, PartialIdMonitor, PartialNameMonitor } from "@/server/schema";
 import { SignalContext } from "typhoon-core/signal";
+import { titleCase } from "scule";
 
 export class MonitorService extends Effect.Service<MonitorService>()("MonitorService", {
   effect: pipe(
@@ -16,7 +17,14 @@ export class MonitorService extends Effect.Service<MonitorService>()("MonitorSer
             Array.filterMap((monitor) =>
               pipe(
                 Option.all({ id: monitor.id, name: monitor.name }),
-                Option.map(({ id, name }) => new Monitor({ index: monitor.index, id, name })),
+                Option.map(
+                  ({ id, name }) =>
+                    new Monitor({
+                      index: monitor.index,
+                      id,
+                      name,
+                    }),
+                ),
               ),
             ),
           ),
@@ -79,9 +87,13 @@ export class MonitorService extends Effect.Service<MonitorService>()("MonitorSer
             Array.map(names, (name) =>
               pipe(
                 nameToMonitor,
-                HashMap.get(name),
+                HashMap.get(titleCase(name, { normalize: true })),
                 Option.map((entry) => entry.monitors),
-                Option.getOrElse(() => Array.make(new PartialNameMonitor({ name }))),
+                Option.getOrElse(() =>
+                  Array.make(
+                    new PartialNameMonitor({ name: titleCase(name, { normalize: true }) }),
+                  ),
+                ),
                 Array.map(Function.identity),
               ),
             ),
