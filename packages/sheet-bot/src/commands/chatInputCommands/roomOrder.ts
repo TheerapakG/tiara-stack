@@ -173,6 +173,7 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
             ),
           ),
         ),
+        Effect.tap(({ hour, schedules, schedule }) => Effect.log(hour, schedules, schedule)),
         Effect.bindAll(({ schedule }) => ({
           previousFills: pipe(
             schedule.prevSchedule,
