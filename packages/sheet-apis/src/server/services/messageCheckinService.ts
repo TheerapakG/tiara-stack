@@ -95,7 +95,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
               Array.match({
                 onNonEmpty: Effect.succeed,
                 onEmpty: () =>
-                  Effect.die(makeDBQueryError("Failed to upsert message checkin data")),
+                  Effect.die(makeDBQueryError("Failed to upsert message check-in data")),
               }),
             ),
             Effect.map(Array.headNonEmpty),

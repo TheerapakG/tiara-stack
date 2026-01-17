@@ -420,7 +420,7 @@ export class FormatService extends Effect.Service<FormatService>()("FormatServic
                   onSome: () =>
                     pipe(
                       [
-                        Option.some("Checkin message sent!"),
+                        Option.some("Check-in message sent!"),
                         Option.some(emptySlotMessage),
                         Option.some(playersMessage),
                         lookupFailedMessage,
@@ -428,7 +428,7 @@ export class FormatService extends Effect.Service<FormatService>()("FormatServic
                       Array.getSomes,
                       Array.join("\n"),
                     ),
-                  onNone: () => "No checkin message sent, no players changed",
+                  onNone: () => "No check-in message sent, no players changed",
                 }),
               ),
             }),

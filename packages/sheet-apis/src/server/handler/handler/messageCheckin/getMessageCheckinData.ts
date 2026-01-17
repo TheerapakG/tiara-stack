@@ -24,7 +24,7 @@ export const getMessageCheckinDataHandler = pipe(
           Effect.map(
             Result.eitherSomeOrLeft(() =>
               Error.Core.makeArgumentError(
-                "Cannot get checkin data, the message might not be registered",
+                "Cannot get check-in data, the message might not be registered",
               ),
             ),
           ),
