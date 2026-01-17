@@ -3,7 +3,7 @@ import { Array as ArrayUtils } from "typhoon-core/utils";
 import { SheetService } from "./sheetService";
 import { Monitor, PartialIdMonitor, PartialNameMonitor } from "@/server/schema";
 import { SignalContext } from "typhoon-core/signal";
-import { titleCase } from "scule";
+import { upperFirst } from "scule";
 
 export class MonitorService extends Effect.Service<MonitorService>()("MonitorService", {
   effect: pipe(
@@ -87,12 +87,10 @@ export class MonitorService extends Effect.Service<MonitorService>()("MonitorSer
             Array.map(names, (name) =>
               pipe(
                 nameToMonitor,
-                HashMap.get(titleCase(name, { normalize: true })),
+                HashMap.get(upperFirst(name)),
                 Option.map((entry) => entry.monitors),
                 Option.getOrElse(() =>
-                  Array.make(
-                    new PartialNameMonitor({ name: titleCase(name, { normalize: true }) }),
-                  ),
+                  Array.make(new PartialNameMonitor({ name: upperFirst(name) })),
                 ),
                 Array.map(Function.identity),
               ),

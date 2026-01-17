@@ -1,5 +1,5 @@
 import { Array, Effect, Function, HashMap, Match, Option, pipe } from "effect";
-import { titleCase } from "scule";
+import { upperFirst } from "scule";
 import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 import { SheetService } from "./sheetService";
 import {
@@ -80,13 +80,13 @@ export class PlayerService extends Effect.Service<PlayerService>()("PlayerServic
             Array.map(names, (name) =>
               pipe(
                 nameToPlayer,
-                HashMap.get(titleCase(name, { normalize: true })),
+                HashMap.get(upperFirst(name)),
                 Option.map(
                   ({ players }) => players as Array.NonEmptyArray<Player | PartialNamePlayer>,
                 ),
                 Option.getOrElse(() =>
                   Array.make<Array.NonEmptyArray<Player | PartialNamePlayer>>(
-                    new PartialNamePlayer({ name: titleCase(name, { normalize: true }) }),
+                    new PartialNamePlayer({ name: upperFirst(name) }),
                   ),
                 ),
               ),

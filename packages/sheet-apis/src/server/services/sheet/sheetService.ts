@@ -17,7 +17,7 @@ import {
 import { regex } from "arkregex";
 import { type MethodOptions, type sheets_v4 } from "@googleapis/sheets";
 import { Array, Data, Effect, HashMap, Match, Number, Option, pipe, Schema, String } from "effect";
-import { titleCase } from "scule";
+import { upperFirst } from "scule";
 import { TupleToStructValueSchema } from "typhoon-core/schema";
 import { Array as ArrayUtils, Struct as StructUtils } from "typhoon-core/utils";
 import { SheetConfigService } from "../sheetConfigService";
@@ -93,7 +93,7 @@ const playerParser = ([userIds, userSheetNames]: sheets_v4.Schema$ValueRange[]) 
             id: config.id,
             name: pipe(
               config.name,
-              Option.map((name) => titleCase(name, { normalize: true })),
+              Option.map((name) => upperFirst(name)),
             ),
           }),
       ),
@@ -124,7 +124,7 @@ const monitorParser = ([monitorIds, monitorNames]: sheets_v4.Schema$ValueRange[]
             id: config.id,
             name: pipe(
               config.name,
-              Option.map((name) => titleCase(name, { normalize: true })),
+              Option.map((name) => upperFirst(name)),
             ),
           }),
       ),
@@ -229,7 +229,7 @@ const teamBaseParser = (
         playerName: pipe(
           playerName,
           Option.map((name) => playerNameRegex.exec(name)?.groups?.name ?? name),
-          Option.map((name) => titleCase(name, { normalize: true })),
+          Option.map((name) => upperFirst(name)),
         ),
         teamName: pipe(
           Match.value(teamConfigValue.teamNameRange),
@@ -803,7 +803,7 @@ const scheduleParser = (
                     Option.flatten,
                     Option.map((fill) =>
                       RawSchedulePlayer.make({
-                        player: titleCase(fill, { normalize: true }),
+                        player: upperFirst(fill),
                         enc:
                           scheduleConfig.encType === "regex"
                             ? playerNameRegex.exec(fill)?.groups?.enc !== undefined
@@ -817,7 +817,7 @@ const scheduleParser = (
                   Option.getOrElse(() => []),
                   Array.map((overfill) =>
                     RawSchedulePlayer.make({
-                      player: titleCase(overfill, { normalize: true }),
+                      player: upperFirst(overfill),
                       enc:
                         scheduleConfig.encType === "regex"
                           ? playerNameRegex.exec(overfill)?.groups?.enc !== undefined
@@ -830,7 +830,7 @@ const scheduleParser = (
                   Option.getOrElse(() => []),
                   Array.map((standby) =>
                     RawSchedulePlayer.make({
-                      player: titleCase(standby, { normalize: true }),
+                      player: upperFirst(standby),
                       enc:
                         scheduleConfig.encType === "regex"
                           ? playerNameRegex.exec(standby)?.groups?.enc !== undefined
@@ -845,7 +845,7 @@ const scheduleParser = (
                 ),
                 monitor: pipe(
                   monitor,
-                  Option.map((monitor) => titleCase(monitor, { normalize: true })),
+                  Option.map((monitor) => upperFirst(monitor)),
                 ),
               }),
             ),
