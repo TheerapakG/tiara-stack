@@ -42,16 +42,19 @@ const autoCheckinPreviewNotice = "Sent automatically via auto check-in (preview;
 
 const noMonitor = {
   mention: Option.none<string>(),
+  mentionUserId: Option.none<string>(),
   failure: Option.none<string>(),
 };
 
 const monitorNotAssigned = {
   mention: Option.none<string>(),
+  mentionUserId: Option.none<string>(),
   failure: Option.some("Cannot ping monitor: monitor not assigned for this hour."),
 };
 
 const monitorConfigMissing = {
   mention: Option.none<string>(),
+  mentionUserId: Option.none<string>(),
   failure: Option.some("Cannot ping monitor: sheet is not configured for monitor data."),
 };
 
@@ -86,10 +89,12 @@ const resolveMonitorFromName = (monitorName: string, rangesConfig: Schema.Ranges
               Option.match({
                 onSome: (id) => ({
                   mention: Option.some(userMention(id)),
+                  mentionUserId: Option.some(id),
                   failure: Option.none<string>(),
                 }),
                 onNone: () => ({
                   mention: Option.none<string>(),
+                  mentionUserId: Option.none<string>(),
                   failure: Option.some(
                     `Cannot ping monitor: monitor "${monitorName}" is missing a Discord ID in the sheet.`,
                   ),
@@ -102,6 +107,7 @@ const resolveMonitorFromName = (monitorName: string, rangesConfig: Schema.Ranges
               Effect.logError(error),
               Effect.as({
                 mention: Option.none<string>(),
+                mentionUserId: Option.none<string>(),
                 failure: Option.some(
                   `Cannot ping monitor: monitor lookup failed for "${monitorName}".`,
                 ),
@@ -323,40 +329,30 @@ const runOnce = Effect.suspend(() =>
                               Effect.tap((checkinMessages) => Effect.log(checkinMessages)),
                             ),
                           ),
-                          Effect.bind(
-                            "message",
-                            ({ checkinMessages, checkinChannelId, monitorInfo }) =>
-                              pipe(
-                                checkinMessages.checkinMessage,
-                                Effect.transposeMapOption((checkinMessage) =>
-                                  pipe(
-                                    Effect.Do,
-                                    Effect.let("initialMessage", () =>
-                                      pipe(
-                                        [
-                                          monitorInfo.mention,
-                                          Option.some(checkinMessage),
-                                          Option.some(subtext(autoCheckinPreviewNotice)),
-                                        ],
-                                        Array.getSomes,
-                                        Array.join("\n"),
-                                      ),
-                                    ),
-                                    SendableChannelContext.send().bind(
-                                      "message",
-                                      ({ initialMessage }) => ({
-                                        content: initialMessage,
-                                        components: [
-                                          new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                                            new ButtonBuilder(checkinButton.data),
-                                          ),
-                                        ],
-                                      }),
-                                    ),
+                          Effect.bind("message", ({ checkinMessages, checkinChannelId }) =>
+                            pipe(
+                              checkinMessages.checkinMessage,
+                              Effect.transposeMapOption((checkinMessage) =>
+                                pipe(
+                                  Effect.Do,
+                                  Effect.let("initialMessage", () =>
+                                    [checkinMessage, subtext(autoCheckinPreviewNotice)].join("\n"),
+                                  ),
+                                  SendableChannelContext.send().bind(
+                                    "message",
+                                    ({ initialMessage }) => ({
+                                      content: initialMessage,
+                                      components: [
+                                        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+                                          new ButtonBuilder(checkinButton.data),
+                                        ),
+                                      ],
+                                    }),
                                   ),
                                 ),
-                                Effect.provide(channelServicesFromGuildChannelId(checkinChannelId)),
                               ),
+                              Effect.provide(channelServicesFromGuildChannelId(checkinChannelId)),
+                            ),
                           ),
                           Effect.tap(({ checkinData, message, fillIds }) =>
                             pipe(
@@ -404,8 +400,15 @@ const runOnce = Effect.suspend(() =>
                               Effect.flatMap((embed) =>
                                 pipe(
                                   SendableChannelContext.send().sync({
+                                    content: pipe(monitorInfo.mention, Option.getOrUndefined),
                                     embeds: [embed],
-                                    allowedMentions: { parse: [] },
+                                    allowedMentions: pipe(
+                                      monitorInfo.mentionUserId,
+                                      Option.match({
+                                        onSome: (userId) => ({ users: [userId] }),
+                                        onNone: () => ({ parse: [] as const }),
+                                      }),
+                                    ),
                                   }),
                                   Effect.provide(
                                     channelServicesFromGuildChannelId(
