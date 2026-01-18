@@ -1,6 +1,7 @@
 import { Record } from "effect";
 import { ANYONE_CAN, definePermissions } from "@rocicorp/zero";
 import { schema, type Schema } from "./schema";
+export { queries, type Queries } from "./queries";
 
 export { schema, type Schema };
 

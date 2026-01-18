@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: zero-cache
-          image: rocicorp/zero:latest
+          image: rocicorp/zero:0.25.9
           ports:
             - containerPort: 4848
               name: zero-cache-svc
