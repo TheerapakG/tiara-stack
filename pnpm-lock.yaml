@@ -58,8 +58,8 @@ importers:
         specifier: ^2.2.0
         version: 2.2.0(@opentelemetry/api@1.9.0)
       '@rocicorp/zero':
-        specifier: ^0.24.3000000000
-        version: 0.24.3000000000(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0))
+        specifier: ^0.25.9
+        version: 0.25.9(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0))
       '@standard-schema/spec':
         specifier: ^1.0.0
         version: 1.0.0
@@ -231,14 +231,14 @@ importers:
   packages/sheet-db-schema:
     dependencies:
       '@rocicorp/zero':
-        specifier: ^0.24.3000000000
-        version: 0.24.3000000000(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0))
+        specifier: ^0.25.9
+        version: 0.25.9(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0))
       drizzle-orm:
         specifier: ^0.44.0
         version: 0.44.0(@opentelemetry/api@1.9.0)(@types/pg@8.15.5)(pg@8.16.0)(postgres@3.4.7)
       drizzle-zero:
-        specifier: ^0.16.1
-        version: 0.16.1(@rocicorp/zero@0.24.3000000000(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0)))(@types/pg@8.15.5)(drizzle-orm@0.44.0(@opentelemetry/api@1.9.0)(@types/pg@8.15.5)(pg@8.16.0)(postgres@3.4.7))(pg@8.16.0)(postgres@3.4.7)(prettier@3.6.2)
+        specifier: ^0.17.2
+        version: 0.17.2(@rocicorp/zero@0.25.9(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0)))(@types/pg@8.15.5)(drizzle-orm@0.44.0(@opentelemetry/api@1.9.0)(@types/pg@8.15.5)(pg@8.16.0)(postgres@3.4.7))(pg@8.16.0)(postgres@3.4.7)(prettier@3.6.2)
       effect:
         specifier: ^3.18.4
         version: 3.18.4
@@ -446,8 +446,8 @@ importers:
         specifier: ^3.1.2
         version: 3.1.2
       '@rocicorp/zero':
-        specifier: ^0.24.3000000000
-        version: 0.24.3000000000(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0))
+        specifier: ^0.25.9
+        version: 0.25.9(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0))
       '@standard-schema/spec':
         specifier: ^1.0.0
         version: 1.0.0
@@ -2137,8 +2137,8 @@ packages:
     engines: {bun: '>=1.1.0', node: 20.x || 22.x || 23.x || 24.x}
     hasBin: true
 
-  '@rocicorp/zero@0.24.3000000000':
-    resolution: {integrity: sha512-rKIoRXnrNj08NLM8I8e5+d0Jl7dNhuolzg2yx8NOVJQERzFBwjApaiTDj1151x+cnt88pnbCf6PsSAEmbcHnBw==}
+  '@rocicorp/zero@0.25.9':
+    resolution: {integrity: sha512-bn9IcFYfh3IXUIO6LEYhv/wPtbfpba6/jA0L+/nB7hEOGPPIeeBGDPLEf5KtDrnB+a6k/1EbQkUSVoIw9bjN5A==}
     engines: {node: '>=22'}
     hasBin: true
     peerDependencies:
@@ -2619,9 +2619,9 @@ packages:
     resolution: {integrity: sha512-+ys997U96po4Kx/ABpBCqhA9EuxJaQWDQg7295H4hBphv3IZg0boBKuwYpt4YXp6MZ5AmZQnU/tyMTlRpaSejg==}
     engines: {node: '>= 0.4'}
 
-  camelcase@8.0.0:
-    resolution: {integrity: sha512-8WB3Jcas3swSvjIeA2yvCJ+Miyz5l1ZmB6HFb9R1317dt9LCQoswg/BGrmAmkWVEszSrrg4RwmO46qIm2OEnSA==}
-    engines: {node: '>=16'}
+  camelcase@9.0.0:
+    resolution: {integrity: sha512-TO9xmyXTZ9HUHI8M1OnvExxYB0eYVS/1e5s7IDMTAoIcwUd+aNcFODs6Xk83mobk0velyHFQgA1yIrvYc6wclw==}
+    engines: {node: '>=20'}
 
   chalk-template@0.4.0:
     resolution: {integrity: sha512-/ghrgmhfY8RaSdeo43hNXxpoHAtxdbskUHjPpfqUWGttFgycUhYPGx3YZBCnUCvOa7Doivn1IZec3DEGFoMgLg==}
@@ -3023,11 +3023,11 @@ packages:
       sqlite3:
         optional: true
 
-  drizzle-zero@0.16.1:
-    resolution: {integrity: sha512-seUMn6Yn4SiCJ2JKdAAJCIR8a9wmda49n9USd+pJn/lHuyUYGJbNYHQ2ofvyWDujx7oj6RnsCGGpxTgjIqFt5w==}
+  drizzle-zero@0.17.2:
+    resolution: {integrity: sha512-Iqbah49cc7tqgzV4nZ3dhbIPeo9AE3WRjrBTjV6f3OTueGM4PHZYr9KdpEqxM1Fdg9pg+sFDCpfGBJm2mQPZKw==}
     hasBin: true
     peerDependencies:
-      '@rocicorp/zero': '>=0.22.2025081301'
+      '@rocicorp/zero': ''
       '@types/pg': ''
       drizzle-orm: '>=0.36.0'
       pg: ''
@@ -6079,7 +6079,7 @@ snapshots:
       bindings: 1.5.0
       prebuild-install: 7.1.3
 
-  '@rocicorp/zero@0.24.3000000000(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0))':
+  '@rocicorp/zero@0.25.9(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0))':
     dependencies:
       '@badrap/valita': 0.3.11
       '@databases/escape-identifier': 1.0.3
@@ -6102,6 +6102,7 @@ snapshots:
       '@rocicorp/logger': 5.4.0
       '@rocicorp/resolver': 1.0.2
       '@rocicorp/zero-sqlite3': 1.0.12
+      '@standard-schema/spec': 1.0.0
       '@types/basic-auth': 1.1.8
       basic-auth: 2.0.1
       chalk: 5.6.2
@@ -6542,7 +6543,7 @@ snapshots:
       call-bind-apply-helpers: 1.0.2
       get-intrinsic: 1.3.0
 
-  camelcase@8.0.0: {}
+  camelcase@9.0.0: {}
 
   chalk-template@0.4.0:
     dependencies:
@@ -6758,10 +6759,10 @@ snapshots:
       pg: 8.16.0
       postgres: 3.4.7
 
-  drizzle-zero@0.16.1(@rocicorp/zero@0.24.3000000000(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0)))(@types/pg@8.15.5)(drizzle-orm@0.44.0(@opentelemetry/api@1.9.0)(@types/pg@8.15.5)(pg@8.16.0)(postgres@3.4.7))(pg@8.16.0)(postgres@3.4.7)(prettier@3.6.2):
+  drizzle-zero@0.17.2(@rocicorp/zero@0.25.9(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0)))(@types/pg@8.15.5)(drizzle-orm@0.44.0(@opentelemetry/api@1.9.0)(@types/pg@8.15.5)(pg@8.16.0)(postgres@3.4.7))(pg@8.16.0)(postgres@3.4.7)(prettier@3.6.2):
     dependencies:
-      '@rocicorp/zero': 0.24.3000000000(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0))
-      camelcase: 8.0.0
+      '@rocicorp/zero': 0.25.9(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0))
+      camelcase: 9.0.0
       commander: 14.0.2
       drizzle-orm: 0.44.0(@opentelemetry/api@1.9.0)(@types/pg@8.15.5)(pg@8.16.0)(postgres@3.4.7)
       jsonc-parser: 3.3.1
