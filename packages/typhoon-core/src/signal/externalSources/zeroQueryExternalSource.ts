@@ -7,8 +7,9 @@ import type {
   ReadonlyJSONValue,
   View,
   HumanReadable,
+  AnyQuery,
 } from "@rocicorp/zero";
-import { applyChange } from "@rocicorp/zero";
+import { applyChange, skipYields } from "@rocicorp/zero/bindings";
 import {
   Context,
   Effect,
@@ -34,6 +35,7 @@ import {
 import {
   ZeroQueryAppError,
   ZeroQueryHttpError,
+  ZeroQueryParseError,
   ZeroQueryZeroError,
   type ZeroQueryError,
   type RawZeroQueryError,
@@ -130,6 +132,12 @@ const rawZeroQueryErrorToZeroQueryError = (error: RawZeroQueryError): ZeroQueryE
           name: error.name,
           details: error.details,
         }),
+      parse: (error) =>
+        new ZeroQueryParseError({
+          id: error.id,
+          name: error.name,
+          details: error.details,
+        }),
     }),
   );
 
@@ -189,7 +197,7 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
           Option.match({
             onSome: ({ input, format }) =>
               pipe(
-                input.fetch({}),
+                skipYields(input.fetch({})),
                 Array.forEach((node) =>
                   applyChange(value, { type: "add", node }, input.getSchema(), "", format),
                 ),
@@ -231,6 +239,7 @@ class ZeroQueryExternalSource<T extends ReadonlyJSONValue | View, E = never>
         Effect.andThen(pipe(TRef.set(this.dirtyRef, true), STM.commit)),
       ),
     );
+    return [];
   }
 
   poll() {
@@ -466,7 +475,10 @@ const createMaterializeCallback =
 
 export const makeWithContext = <
   M,
-  Q = Effect.Effect.Success<MaybeSignalEffectValue<M>>,
+  Q extends AnyQuery = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends infer Q extends
+    AnyQuery
+    ? Q
+    : never,
   T extends ReadonlyJSONValue | View = HumanReadable<QueryRowType<Q>> extends infer T extends
     | ReadonlyJSONValue
     | View
@@ -567,7 +579,10 @@ export const makeWithContext = <
 
 export const make = <
   M,
-  Q = Effect.Effect.Success<MaybeSignalEffectValue<M>>,
+  Q extends AnyQuery = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends infer Q extends
+    AnyQuery
+    ? Q
+    : never,
   T extends ReadonlyJSONValue | View = HumanReadable<QueryRowType<Q>> extends infer T extends
     | ReadonlyJSONValue
     | View
@@ -592,7 +607,10 @@ export const make = <
  */
 export const makeFromResultWithContext = <
   M,
-  Q = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends Result<infer QO, infer QC>
+  Q extends AnyQuery = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends Result<
+    infer QO extends AnyQuery,
+    infer QC extends AnyQuery
+  >
     ? QO | QC
     : never,
   T extends ReadonlyJSONValue | View = HumanReadable<QueryRowType<Q>> extends infer T extends
@@ -699,8 +717,11 @@ export const makeFromResultWithContext = <
 
 export const makeFromResult = <
   M,
-  Q = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends Result<infer Q, infer _C>
-    ? Q
+  Q extends AnyQuery = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends Result<
+    infer QO extends AnyQuery,
+    infer QC extends AnyQuery
+  >
+    ? QO | QC
     : never,
   T extends ReadonlyJSONValue | View = HumanReadable<QueryRowType<Q>> extends infer T extends
     | ReadonlyJSONValue

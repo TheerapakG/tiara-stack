@@ -24,12 +24,12 @@
     "format:apply": "oxfmt",
     "lint": "oxlint .",
     "typecheck": "tsgo --noEmit",
-    "build": "drizzle-zero generate --output ./src/zero/schema.ts --skip-types --skip-builder && tsdown -c tsdown.config.ts"
+    "build": "drizzle-zero generate --output ./src/zero/schema.ts --skip-types --skip-declare --enable-legacy-queries --suppress-defaults-warning && tsdown -c tsdown.config.ts"
   },
   "dependencies": {
-    "@rocicorp/zero": "^0.24.3000000000",
+    "@rocicorp/zero": "^0.25.9",
     "drizzle-orm": "^0.44.0",
-    "drizzle-zero": "^0.16.1",
+    "drizzle-zero": "^0.17.2",
     "effect": "^3.18.4",
     "postgres": "^3.4.7",
     "typhoon-core": "workspace:*"

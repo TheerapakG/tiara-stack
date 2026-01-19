@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, pipe, Either, Option, flow, ParseResult, Scope } from "effect";
 import { Result } from "typhoon-core/schema";
 import { SignalContext, SignalService } from "typhoon-core/signal";
-import { ZeroQueryAppError, ZeroQueryHttpError, ZeroQueryZeroError } from "typhoon-core/error";
+import { ZeroQueryError } from "typhoon-core/error";
 import { GoogleSheets } from "@/google";
 import { ZeroService } from "typhoon-core/services";
 import { Schema } from "sheet-db-schema/zero";
@@ -45,7 +45,7 @@ export const layerOfGuildId = <E = never>(
       Option.Option<
         Layer.Layer<
           PlayerService | MonitorService | ScreenshotService | SheetService | SheetContext,
-          ZeroQueryAppError | ZeroQueryHttpError | ZeroQueryZeroError,
+          ZeroQueryError,
           GoogleSheets | SheetConfigService
         >
       >

@@ -19,7 +19,8 @@ export const ReadonlyJSONValueSchema: Schema.Schema<ReadonlyJSONValue> = Schema.
 const ZeroQueryErrorData = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
-  details: ReadonlyJSONValueSchema,
+  message: Schema.optional(Schema.String),
+  details: Schema.optional(ReadonlyJSONValueSchema),
 });
 
 export class ZeroQueryAppError extends Schema.TaggedError<ZeroQueryAppError>()(
@@ -42,10 +43,16 @@ export class ZeroQueryZeroError extends Schema.TaggedError<ZeroQueryZeroError>()
   ZeroQueryErrorData,
 ) {}
 
+export class ZeroQueryParseError extends Schema.TaggedError<ZeroQueryParseError>()(
+  "ZeroQueryParseError",
+  ZeroQueryErrorData,
+) {}
+
 export const ZeroQueryError = Schema.Union(
   ZeroQueryAppError,
   ZeroQueryHttpError,
   ZeroQueryZeroError,
+  ZeroQueryParseError,
 );
 
 export type ZeroQueryError = Schema.Schema.Type<typeof ZeroQueryError>;
@@ -61,6 +68,10 @@ export const RawZeroQueryError = Schema.Union(
   }),
   Schema.Struct({
     error: Schema.Literal("zero"),
+    ...ZeroQueryErrorData.fields,
+  }),
+  Schema.Struct({
+    error: Schema.Literal("parse"),
     ...ZeroQueryErrorData.fields,
   }),
 );
