@@ -51,6 +51,10 @@ spec:
                 secretKeyRef:
                   name: zero-secret
                   key: zeroAppPublications
+            - name: ZERO_QUERY_FORWARD_COOKIES
+              value: "true"
+            - name: ZERO_QUERY_URL
+              value: http://sheet-db-server-service:80/zero/query
             - name: ZERO_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
