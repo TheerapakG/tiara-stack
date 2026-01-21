@@ -1,6 +1,6 @@
 import { Context, Effect, Either, Option, pipe } from "effect";
 import { Result } from "typhoon-core/schema";
-import { SignalContext } from "typhoon-core/signal";
+import { SignalService } from "typhoon-core/signal";
 import { GuildConfigService } from "../guildConfigService";
 
 export class SheetContext extends Context.Tag("SheetContext")<
@@ -9,7 +9,7 @@ export class SheetContext extends Context.Tag("SheetContext")<
     sheetId: string;
   }
 >() {
-  static ofGuild = <E = never>(guildId: SignalContext.MaybeSignalEffect<string, E>) =>
+  static ofGuild = <E = never>(guildId: SignalService.MaybeSignalEffect<string, E>) =>
     pipe(
       GuildConfigService.getGuildConfigByGuildId(guildId),
       Effect.map(Effect.map(Result.map(Either.map(Option.flatMap((config) => config.sheetId))))),

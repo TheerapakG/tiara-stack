@@ -3,7 +3,6 @@ import { Observable } from "../observability";
 import { DependencySignal, DependencySymbol } from "./dependencySignal";
 import { DependentSignal } from "./dependentSignal";
 import * as SignalService from "./signalService";
-import * as SignalContext from "./signalContext";
 
 export interface ExternalSource<T> {
   poll: () => STM.STM<T, never, never>;
@@ -13,7 +12,7 @@ export interface ExternalSource<T> {
 }
 
 export class ExternalComputed<T = unknown>
-  extends Effectable.Class<T, never, SignalContext.SignalContext | SignalService.SignalService>
+  extends Effectable.Class<T, never, SignalService.SignalService>
   implements DependencySignal<T, never, never>
 {
   readonly _tag = "ExternalComputed" as const;
@@ -63,10 +62,9 @@ export class ExternalComputed<T = unknown>
     return STM.succeed(this._dependents);
   }
 
-  value(): Effect.Effect<T, never, SignalContext.SignalContext | SignalService.SignalService> {
+  value(): Effect.Effect<T, never, SignalService.SignalService> {
     return pipe(
-      SignalContext.bindDependency(this),
-      STM.commit,
+      SignalService.bindDependency(this),
       Effect.flatMap(() => this.peek()),
       Observable.withSpan(this, "ExternalComputed.value", {
         captureStackTrace: true,
@@ -74,20 +72,20 @@ export class ExternalComputed<T = unknown>
     );
   }
 
-  commit(): Effect.Effect<T, never, SignalContext.SignalContext | SignalService.SignalService> {
+  commit(): Effect.Effect<T, never, SignalService.SignalService> {
     return this.value();
   }
 
-  peek(): Effect.Effect<T, never, never> {
+  peek(): Effect.Effect<T, never, SignalService.SignalService> {
     return pipe(
       STM.Do,
       STM.bind("value", () => TRef.get(this._value)),
       STM.bind("last", ({ value }) => TRef.getAndSet(this._lastValue, value)),
-      STM.tap(({ value, last }) =>
-        STM.when(() => Equal.equals(last, value))(SignalContext.markUnchanged(this)),
-      ),
-      STM.map(({ value }) => value),
       STM.commit,
+      Effect.tap(({ value, last }) =>
+        Effect.when(() => Equal.equals(last, value))(SignalService.markUnchanged(this)),
+      ),
+      Effect.map(({ value }) => value),
       Observable.withSpan(this, "ExternalComputed.peek", {
         captureStackTrace: true,
       }),

@@ -11,7 +11,7 @@ import { messageRoomOrder, messageRoomOrderEntry } from "sheet-db-schema";
 import { queries } from "sheet-db-schema/zero";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass, Result } from "typhoon-core/schema";
-import { ExternalComputed, SignalContext, ZeroQueryExternalSource } from "typhoon-core/signal";
+import { ExternalComputed, SignalService, ZeroQueryExternalSource } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
 
 type MessageRoomOrderInsert = typeof messageRoomOrder.$inferInsert;
@@ -25,12 +25,12 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
       Effect.bind("db", () => DBService),
       Effect.bind("dbSubscriptionContext", () => DB.DBSubscriptionContext),
       Effect.map(({ db, dbSubscriptionContext }) => ({
-        _getMessageRoomOrder: <E = never>(messageId: SignalContext.MaybeSignalEffect<string, E>) =>
+        _getMessageRoomOrder: <E = never>(messageId: SignalService.MaybeSignalEffect<string, E>) =>
           pipe(
             ZeroQueryExternalSource.make(
               pipe(
                 messageId,
-                SignalContext.getMaybeSignalEffectValue,
+                SignalService.getMaybeSignalEffectValue,
                 Effect.map((messageId) =>
                   queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
                 ),
@@ -147,13 +147,13 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             }),
           ),
         _getMessageRoomOrderEntry: <E = never>(
-          params: SignalContext.MaybeSignalEffect<{ messageId: string; rank: number }, E>,
+          params: SignalService.MaybeSignalEffect<{ messageId: string; rank: number }, E>,
         ) =>
           pipe(
             ZeroQueryExternalSource.make(
               pipe(
                 params,
-                SignalContext.getMaybeSignalEffectValue,
+                SignalService.getMaybeSignalEffectValue,
                 Effect.map(({ messageId, rank }) =>
                   queries.messageRoomOrder.getMessageRoomOrderEntry({ messageId, rank }),
                 ),
@@ -183,13 +183,13 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ),
           ),
         _getMessageRoomOrderRange: <E = never>(
-          messageId: SignalContext.MaybeSignalEffect<string, E>,
+          messageId: SignalService.MaybeSignalEffect<string, E>,
         ) =>
           pipe(
             ZeroQueryExternalSource.make(
               pipe(
                 messageId,
-                SignalContext.getMaybeSignalEffectValue,
+                SignalService.getMaybeSignalEffectValue,
                 Effect.map((messageId) =>
                   queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }),
                 ),
@@ -317,20 +317,20 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
     accessors: true,
   },
 ) {
-  static getMessageRoomOrder = <E = never>(messageId: SignalContext.MaybeSignalEffect<string, E>) =>
+  static getMessageRoomOrder = <E = never>(messageId: SignalService.MaybeSignalEffect<string, E>) =>
     MessageRoomOrderService.use((messageRoomOrderService) =>
       messageRoomOrderService._getMessageRoomOrder(messageId),
     );
 
   static getMessageRoomOrderEntry = <E = never>(
-    params: SignalContext.MaybeSignalEffect<{ messageId: string; rank: number }, E>,
+    params: SignalService.MaybeSignalEffect<{ messageId: string; rank: number }, E>,
   ) =>
     MessageRoomOrderService.use((messageRoomOrderService) =>
       messageRoomOrderService._getMessageRoomOrderEntry(params),
     );
 
   static getMessageRoomOrderRange = <E = never>(
-    messageId: SignalContext.MaybeSignalEffect<string, E>,
+    messageId: SignalService.MaybeSignalEffect<string, E>,
   ) =>
     MessageRoomOrderService.use((messageRoomOrderService) =>
       messageRoomOrderService._getMessageRoomOrderRange(messageId),

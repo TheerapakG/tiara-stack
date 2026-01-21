@@ -43,11 +43,6 @@ import {
 } from "../../error/zero";
 import type { ExternalSource } from "../externalComputed";
 import { ZeroService } from "../../services/zeroService";
-import {
-  SignalContext,
-  getMaybeSignalEffectValue,
-  type MaybeSignalEffectValue,
-} from "../signalContext";
 import * as SideEffect from "../sideEffect";
 
 /**
@@ -477,7 +472,7 @@ const createMaterializeCallback =
 export const makeWithContext = <
   M,
   Q extends QueryOrQueryRequest<any, any, any, any, any, any> = Effect.Effect.Success<
-    MaybeSignalEffectValue<M>
+    SignalService.MaybeSignalEffectValue<M>
   > extends infer Q extends QueryOrQueryRequest<any, any, any, any, any, any>
     ? Q
     : never,
@@ -486,11 +481,11 @@ export const makeWithContext = <
     | View
     ? T
     : never,
-  E = Effect.Effect.Error<MaybeSignalEffectValue<M>>,
-  R = Effect.Effect.Context<MaybeSignalEffectValue<M>>,
+  E = Effect.Effect.Error<SignalService.MaybeSignalEffectValue<M>>,
+  R = Effect.Effect.Context<SignalService.MaybeSignalEffectValue<M>>,
 >(
   maybeSignalQuery: M,
-  context: Context.Context<Exclude<R, SignalContext>>,
+  context: Context.Context<Exclude<R, SignalService.SignalService>>,
   options?: ZeroMaterializeOptions,
 ): Effect.Effect<
   ZeroQueryExternalSource<T, E>,
@@ -519,10 +514,10 @@ export const makeWithContext = <
               Effect.flatMap((service) =>
                 SideEffect.makeWithContext(
                   pipe(
-                    getMaybeSignalEffectValue(maybeSignalQuery) as Effect.Effect<
+                    SignalService.getMaybeSignalEffectValue(maybeSignalQuery) as Effect.Effect<
                       Q,
                       E,
-                      R | SignalContext
+                      R | SignalService.SignalService
                     >,
                     Effect.either,
                     Effect.flatMap((queryResult) =>
@@ -582,7 +577,7 @@ export const makeWithContext = <
 export const make = <
   M,
   Q extends QueryOrQueryRequest<any, any, any, any, any, any> = Effect.Effect.Success<
-    MaybeSignalEffectValue<M>
+    SignalService.MaybeSignalEffectValue<M>
   > extends infer Q extends QueryOrQueryRequest<any, any, any, any, any, any>
     ? Q
     : never,
@@ -610,10 +605,9 @@ export const make = <
  */
 export const makeFromResultWithContext = <
   M,
-  Q extends AnyQuery = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends Result<
-    infer QO extends AnyQuery,
-    infer QC extends AnyQuery
-  >
+  Q extends AnyQuery = Effect.Effect.Success<
+    SignalService.MaybeSignalEffectValue<M>
+  > extends Result<infer QO extends AnyQuery, infer QC extends AnyQuery>
     ? QO | QC
     : never,
   T extends ReadonlyJSONValue | View = HumanReadable<QueryRowType<Q>> extends infer T extends
@@ -621,11 +615,11 @@ export const makeFromResultWithContext = <
     | View
     ? T
     : never,
-  E = Effect.Effect.Error<MaybeSignalEffectValue<M>>,
-  R = Effect.Effect.Context<MaybeSignalEffectValue<M>>,
+  E = Effect.Effect.Error<SignalService.MaybeSignalEffectValue<M>>,
+  R = Effect.Effect.Context<SignalService.MaybeSignalEffectValue<M>>,
 >(
   maybeSignalQuery: M,
-  context: Context.Context<Exclude<R, SignalContext>>,
+  context: Context.Context<Exclude<R, SignalService.SignalService>>,
   options?: ZeroMaterializeOptions,
 ): Effect.Effect<
   ZeroQueryExternalSource<T, E>,
@@ -656,10 +650,10 @@ export const makeFromResultWithContext = <
               Effect.flatMap((service) =>
                 SideEffect.makeWithContext(
                   pipe(
-                    getMaybeSignalEffectValue(maybeSignalQuery) as Effect.Effect<
+                    SignalService.getMaybeSignalEffectValue(maybeSignalQuery) as Effect.Effect<
                       Result<Q>,
                       E,
-                      R | SignalContext
+                      R | SignalService.SignalService
                     >,
                     Effect.either,
                     Effect.flatMap((queryResultEither) =>
@@ -720,10 +714,9 @@ export const makeFromResultWithContext = <
 
 export const makeFromResult = <
   M,
-  Q extends AnyQuery = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends Result<
-    infer QO extends AnyQuery,
-    infer QC extends AnyQuery
-  >
+  Q extends AnyQuery = Effect.Effect.Success<
+    SignalService.MaybeSignalEffectValue<M>
+  > extends Result<infer QO extends AnyQuery, infer QC extends AnyQuery>
     ? QO | QC
     : never,
   T extends ReadonlyJSONValue | View = HumanReadable<QueryRowType<Q>> extends infer T extends

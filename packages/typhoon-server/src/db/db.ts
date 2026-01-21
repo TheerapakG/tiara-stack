@@ -13,12 +13,10 @@ import {
   Array,
   Runtime,
   Scope,
-  STM,
 } from "effect";
 import { DBQueryError, makeDBQueryError } from "typhoon-core/error";
 import {
   Computed,
-  SignalContext,
   ExternalComputed,
   ManualEmitExternalSource,
   WithScopeComputed,
@@ -90,7 +88,7 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
         ): Effect.Effect<
           Computed.Computed<void[], never, SignalService.SignalService>,
           never,
-          SignalContext.SignalContext | SignalService.SignalService
+          SignalService.SignalService
         > =>
           pipe(
             subscriptions,
@@ -129,7 +127,7 @@ export class BaseDBSubscriptionContext extends Effect.Service<BaseDBSubscription
                 Array.getSomes,
                 Array.map((subscription) => subscription.source),
                 Computed.makeAll,
-                Effect.tap((aggregatedSource) => SignalContext.bindDependency(aggregatedSource)),
+                Effect.tap((aggregatedSource) => SignalService.bindDependency(aggregatedSource)),
               ),
             ),
           ),
@@ -232,7 +230,7 @@ export const subscribe = <A, E>(
   query: Effect.Effect<
     A,
     E,
-    TransactionContext | BaseDBSubscriptionContext | SignalContext.SignalContext
+    TransactionContext | BaseDBSubscriptionContext | SignalService.SignalService
   >,
 ): Effect.Effect<
   WithScopeComputed.WithScopeComputed<A, E, SignalService.SignalService>,
@@ -265,21 +263,13 @@ export const mutate = <A, E>(
   query: Effect.Effect<
     A,
     E,
-    TransactionContext | BaseDBSubscriptionContext | SignalContext.SignalContext
+    TransactionContext | BaseDBSubscriptionContext | SignalService.SignalService
   >,
 ): Effect.Effect<A, E, BaseDBSubscriptionContext | SignalService.SignalService> =>
   pipe(
     query,
     Effect.tap(() =>
       pipe(TransactionContext.tables(), Effect.flatMap(BaseDBSubscriptionContext.notifyTables)),
-    ),
-    Effect.provideServiceEffect(
-      SignalContext.SignalContext,
-      pipe(
-        Computed.makeSTM(Effect.void),
-        STM.flatMap((signal) => SignalContext.fromDependent(signal)),
-        STM.commit,
-      ),
     ),
     Effect.provideServiceEffect(TransactionContext, TransactionContext.mutation()),
   );
@@ -296,29 +286,20 @@ export const wrapTransaction =
     ) => Effect.Effect<
       T,
       unknown,
-      | TransactionContext
-      | BaseDBSubscriptionContext
-      | SignalContext.SignalContext
-      | SignalService.SignalService
+      TransactionContext | BaseDBSubscriptionContext | SignalService.SignalService
     >,
     config?: Config,
   ) => Effect.Effect<
     T,
     unknown,
-    | TransactionContext
-    | BaseDBSubscriptionContext
-    | SignalContext.SignalContext
-    | SignalService.SignalService
+    TransactionContext | BaseDBSubscriptionContext | SignalService.SignalService
   >) =>
   (fn, config) =>
     pipe(
       Effect.Do,
       Effect.bind("runtime", () =>
         Effect.runtime<
-          | TransactionContext
-          | BaseDBSubscriptionContext
-          | SignalContext.SignalContext
-          | SignalService.SignalService
+          TransactionContext | BaseDBSubscriptionContext | SignalService.SignalService
         >(),
       ),
       Effect.bind("result", ({ runtime }) =>
@@ -350,7 +331,7 @@ export class DBSubscriptionContext extends Effect.Service<DBSubscriptionContext>
   }
 
   static subscribe<A, E>(
-    query: Effect.Effect<A, E, TransactionContext | SignalContext.SignalContext>,
+    query: Effect.Effect<A, E, TransactionContext | SignalService.SignalService>,
   ) {
     return DBSubscriptionContext.use((context) =>
       pipe(subscribe(query), Effect.provideService(BaseDBSubscriptionContext, context.base)),
@@ -364,7 +345,7 @@ export class DBSubscriptionContext extends Effect.Service<DBSubscriptionContext>
   }
 
   static mutate<A, E>(
-    query: Effect.Effect<A, E, TransactionContext | SignalContext.SignalContext>,
+    query: Effect.Effect<A, E, TransactionContext | SignalService.SignalService>,
   ) {
     return DBSubscriptionContext.use((context) =>
       pipe(mutate(query), Effect.provideService(BaseDBSubscriptionContext, context.base)),
@@ -386,7 +367,7 @@ export class DBSubscriptionContext extends Effect.Service<DBSubscriptionContext>
       ) => Effect.Effect<
         T,
         unknown,
-        TransactionContext | BaseDBSubscriptionContext | SignalContext.SignalContext
+        TransactionContext | BaseDBSubscriptionContext | SignalService.SignalService
       >,
       config?: Config,
     ) =>

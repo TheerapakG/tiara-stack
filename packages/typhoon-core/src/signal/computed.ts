@@ -14,13 +14,12 @@ import {
   Types,
 } from "effect";
 import { Observable } from "../observability";
-import { DependencySignal, DependencySymbol, notifyAllDependents } from "./dependencySignal";
+import { DependencySignal, DependencySymbol } from "./dependencySignal";
 import { DependentSignal, DependentSymbol } from "./dependentSignal";
-import * as SignalContext from "./signalContext";
 import * as SignalService from "./signalService";
 
 export class Computed<A = never, E = never, R = never>
-  extends Effectable.Class<A, E, R | SignalContext.SignalContext | SignalService.SignalService>
+  extends Effectable.Class<A, E, R | SignalService.SignalService>
   implements DependentSignal, DependencySignal<A, E, R>
 {
   readonly _tag = "Computed" as const;
@@ -28,7 +27,7 @@ export class Computed<A = never, E = never, R = never>
   readonly [DependentSymbol]: DependentSignal = this;
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
-  private _effect: Effect.Effect<A, E, R | SignalContext.SignalContext>;
+  private _effect: Effect.Effect<A, E, R | SignalService.SignalService>;
   private _dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>;
   private _dependencies: TSet.TSet<DependencySignal<unknown, unknown, unknown>>;
   private _reference: WeakRef<Computed<A, E, R>>;
@@ -36,7 +35,7 @@ export class Computed<A = never, E = never, R = never>
   private _lastExit: TRef.TRef<Option.Option<Exit.Exit<A, E>>>;
 
   constructor(
-    effect: Effect.Effect<A, E, R | SignalContext.SignalContext>,
+    effect: Effect.Effect<A, E, R | SignalService.SignalService>,
     dependents: TSet.TSet<WeakRef<DependentSignal> | DependentSignal>,
     dependencies: TSet.TSet<DependencySignal<unknown, unknown, unknown>>,
     queue: TQueue.TQueue<Exit.Exit<A, E>>,
@@ -95,10 +94,9 @@ export class Computed<A = never, E = never, R = never>
     return STM.succeed(this._dependents);
   }
 
-  value(): Effect.Effect<A, E, R | SignalContext.SignalContext | SignalService.SignalService> {
+  value(): Effect.Effect<A, E, R | SignalService.SignalService> {
     return pipe(
-      SignalContext.bindDependency(this),
-      STM.commit,
+      SignalService.bindDependency(this),
       Effect.flatMap(() => this.peek()),
       Observable.withSpan(this, "Computed.value", {
         captureStackTrace: true,
@@ -106,7 +104,7 @@ export class Computed<A = never, E = never, R = never>
     );
   }
 
-  commit(): Effect.Effect<A, E, R | SignalContext.SignalContext | SignalService.SignalService> {
+  commit(): Effect.Effect<A, E, R | SignalService.SignalService> {
     return this.value();
   }
 
@@ -114,7 +112,7 @@ export class Computed<A = never, E = never, R = never>
     return pipe(
       STM.all({
         queue: TQueue.peekOption(this._queue),
-        context: pipe(STM.context<R>(), STM.map(Context.omit(SignalContext.SignalContext))),
+        context: pipe(STM.context<R>(), STM.map(Context.omit(SignalService.SignalService))),
       }),
       STM.commit,
       Effect.flatMap(({ queue, context }) =>
@@ -123,13 +121,7 @@ export class Computed<A = never, E = never, R = never>
           Option.match({
             onSome: Function.identity,
             onNone: () =>
-              pipe(
-                SignalContext.fromDependent(this),
-                STM.commit,
-                Effect.flatMap((ctx) =>
-                  SignalService.enqueueRunTracked(this._makeRunTrackedRequest(context, ctx)),
-                ),
-              ),
+              pipe(SignalService.enqueueRunTracked(this._makeRunTrackedRequest(context))),
           }),
         ),
       ),
@@ -147,11 +139,7 @@ export class Computed<A = never, E = never, R = never>
     return STM.succeed(this._reference);
   }
 
-  notify(): Effect.Effect<
-    unknown,
-    never,
-    SignalContext.SignalContext | SignalService.SignalService
-  > {
+  notify(): Effect.Effect<unknown, never, SignalService.SignalService> {
     return pipe(
       this.clearDependencies(),
       STM.zipRight(this.reset()),
@@ -164,8 +152,13 @@ export class Computed<A = never, E = never, R = never>
 
   recompute(): Effect.Effect<void, never, SignalService.SignalService> {
     return pipe(
-      this,
-      notifyAllDependents(() => this.reset()),
+      SignalService.enqueueNotify(
+        new SignalService.NotifyRequest({
+          beforeNotify: () => pipe(this.reset(), STM.commit),
+          signal: this,
+        }),
+      ),
+      Effect.asVoid,
       Observable.withSpan(this, "Computed.recompute", {
         captureStackTrace: true,
       }),
@@ -177,8 +170,7 @@ export class Computed<A = never, E = never, R = never>
   }
 
   private _makeRunTrackedRequest(
-    context: Context.Context<Exclude<R, SignalContext.SignalContext>>,
-    ctx: Context.Tag.Service<SignalContext.SignalContext>,
+    context: Context.Context<Exclude<R, SignalService.SignalService>>,
   ) {
     return new SignalService.RunTrackedRequest({
       effect: pipe(
@@ -188,18 +180,18 @@ export class Computed<A = never, E = never, R = never>
           pipe(
             TQueue.offer(this._queue, exit),
             STM.zipRight(TRef.getAndSet(this._lastExit, Option.some(exit))),
-            STM.flatMap((lastExit) =>
-              STM.when(() => Equal.equals(lastExit, Option.some(exit)))(
-                SignalContext.markUnchanged(this),
+            STM.commit,
+            Effect.flatMap((lastExit) =>
+              Effect.when(() => Equal.equals(lastExit, Option.some(exit)))(
+                SignalService.markUnchanged(this),
               ),
             ),
-            STM.commit,
           ),
         ),
         Effect.flatten,
         Effect.provide(context),
-      ) as Effect.Effect<A, E, SignalContext.SignalContext>,
-      ctx,
+      ) as Effect.Effect<A, E, SignalService.SignalService>,
+      signal: this,
     });
   }
 }
@@ -229,8 +221,8 @@ export const makeSTM = <A = never, E = never, R = never>(
     }),
     STM.map(
       ({ dependents, dependencies, queue, lastExit }) =>
-        new Computed<A, E, Exclude<R, SignalContext.SignalContext>>(
-          effect as Effect.Effect<A, E, Exclude<R, SignalContext.SignalContext>>,
+        new Computed<A, E, Exclude<R, SignalService.SignalService>>(
+          effect as Effect.Effect<A, E, Exclude<R, SignalService.SignalService>>,
           dependents,
           dependencies,
           queue,

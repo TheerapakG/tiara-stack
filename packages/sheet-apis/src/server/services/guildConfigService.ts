@@ -8,7 +8,7 @@ import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass, Result } from "typhoon-core/schema";
 import { ZeroQueryExternalSource, ExternalComputed } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
-import { SignalContext } from "typhoon-core/signal";
+import { SignalService } from "typhoon-core/signal";
 
 type GuildConfigInsert = typeof configGuild.$inferInsert;
 type GuildChannelConfigInsert = typeof configGuildChannel.$inferInsert;
@@ -45,12 +45,12 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
             }),
           ),
         ),
-      _getGuildConfigByGuildId: <E = never>(guildId: SignalContext.MaybeSignalEffect<string, E>) =>
+      _getGuildConfigByGuildId: <E = never>(guildId: SignalService.MaybeSignalEffect<string, E>) =>
         pipe(
           ZeroQueryExternalSource.make(
             pipe(
               guildId,
-              SignalContext.getMaybeSignalEffectValue,
+              SignalService.getMaybeSignalEffectValue,
               Effect.map((guildId) => queries.guildConfig.getGuildConfigByGuildId({ guildId })),
             ),
           ),
@@ -78,13 +78,13 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
           ),
         ),
       _getGuildConfigByScriptId: <E = never>(
-        scriptId: SignalContext.MaybeSignalEffect<string, E>,
+        scriptId: SignalService.MaybeSignalEffect<string, E>,
       ) =>
         pipe(
           ZeroQueryExternalSource.make(
             pipe(
               scriptId,
-              SignalContext.getMaybeSignalEffectValue,
+              SignalService.getMaybeSignalEffectValue,
               Effect.map((scriptId) => queries.guildConfig.getGuildConfigByScriptId({ scriptId })),
             ),
           ),
@@ -147,12 +147,12 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
             captureStackTrace: true,
           }),
         ),
-      _getGuildManagerRoles: <E = never>(guildId: SignalContext.MaybeSignalEffect<string, E>) =>
+      _getGuildManagerRoles: <E = never>(guildId: SignalService.MaybeSignalEffect<string, E>) =>
         pipe(
           ZeroQueryExternalSource.make(
             pipe(
               guildId,
-              SignalContext.getMaybeSignalEffectValue,
+              SignalService.getMaybeSignalEffectValue,
               Effect.map((guildId) => queries.guildConfig.getGuildManagerRoles({ guildId })),
             ),
           ),
@@ -262,13 +262,13 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
           }),
         ),
       _getGuildRunningChannelById: <E = never>(
-        params: SignalContext.MaybeSignalEffect<{ guildId: string; channelId: string }, E>,
+        params: SignalService.MaybeSignalEffect<{ guildId: string; channelId: string }, E>,
       ) =>
         pipe(
           ZeroQueryExternalSource.make(
             pipe(
               params,
-              SignalContext.getMaybeSignalEffectValue,
+              SignalService.getMaybeSignalEffectValue,
               Effect.map(({ guildId, channelId }) =>
                 queries.guildConfig.getGuildRunningChannelById({ guildId, channelId }),
               ),
@@ -304,13 +304,13 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
           ),
         ),
       _getGuildRunningChannelByName: <E = never>(
-        params: SignalContext.MaybeSignalEffect<{ guildId: string; channelName: string }, E>,
+        params: SignalService.MaybeSignalEffect<{ guildId: string; channelName: string }, E>,
       ) =>
         pipe(
           ZeroQueryExternalSource.make(
             pipe(
               params,
-              SignalContext.getMaybeSignalEffectValue,
+              SignalService.getMaybeSignalEffectValue,
               Effect.map(({ guildId, channelName }) =>
                 queries.guildConfig.getGuildRunningChannelByName({ guildId, channelName }),
               ),
@@ -351,33 +351,33 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
   accessors: true,
 }) {
   static getGuildConfigByGuildId = <E = never>(
-    guildId: SignalContext.MaybeSignalEffect<string, E>,
+    guildId: SignalService.MaybeSignalEffect<string, E>,
   ) =>
     GuildConfigService.use((guildConfigService) =>
       guildConfigService._getGuildConfigByGuildId(guildId),
     );
 
   static getGuildConfigByScriptId = <E = never>(
-    scriptId: SignalContext.MaybeSignalEffect<string, E>,
+    scriptId: SignalService.MaybeSignalEffect<string, E>,
   ) =>
     GuildConfigService.use((guildConfigService) =>
       guildConfigService._getGuildConfigByScriptId(scriptId),
     );
 
-  static getGuildManagerRoles = <E = never>(guildId: SignalContext.MaybeSignalEffect<string, E>) =>
+  static getGuildManagerRoles = <E = never>(guildId: SignalService.MaybeSignalEffect<string, E>) =>
     GuildConfigService.use((guildConfigService) =>
       guildConfigService._getGuildManagerRoles(guildId),
     );
 
   static getGuildRunningChannelById = <E = never>(
-    params: SignalContext.MaybeSignalEffect<{ guildId: string; channelId: string }, E>,
+    params: SignalService.MaybeSignalEffect<{ guildId: string; channelId: string }, E>,
   ) =>
     GuildConfigService.use((guildConfigService) =>
       guildConfigService._getGuildRunningChannelById(params),
     );
 
   static getGuildRunningChannelByName = <E = never>(
-    params: SignalContext.MaybeSignalEffect<{ guildId: string; channelName: string }, E>,
+    params: SignalService.MaybeSignalEffect<{ guildId: string; channelName: string }, E>,
   ) =>
     GuildConfigService.use((guildConfigService) =>
       guildConfigService._getGuildRunningChannelByName(params),

@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, pipe, Either, Option, flow, ParseResult, Scope } from "effect";
 import { Result } from "typhoon-core/schema";
-import { SignalContext, SignalService } from "typhoon-core/signal";
+import { SignalService } from "typhoon-core/signal";
 import { ZeroQueryError } from "typhoon-core/error";
 import { GoogleSheets } from "@/google";
 import { ZeroService } from "typhoon-core/services";
@@ -38,7 +38,7 @@ export const layerOfSheetId = (sheetId: string) =>
 export const contextOfSheetId = (sheetId: string) => pipe(layerOfSheetId(sheetId), Layer.build);
 
 export const layerOfGuildId = <E = never>(
-  guildId: SignalContext.MaybeSignalEffect<string, E>,
+  guildId: SignalService.MaybeSignalEffect<string, E>,
 ): Effect.Effect<
   Effect.Effect<
     Result.Result<
@@ -51,7 +51,7 @@ export const layerOfGuildId = <E = never>(
       >
     >,
     ParseResult.ParseError,
-    SignalContext.SignalContext | SignalService.SignalService
+    SignalService.SignalService
   >,
   never,
   | GuildConfigService

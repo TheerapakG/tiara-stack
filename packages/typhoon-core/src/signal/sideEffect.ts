@@ -2,7 +2,6 @@ import { Context, Effect, pipe, Scope, STM, TSet, TRef } from "effect";
 import { Observable } from "../observability";
 import { DependencySignal } from "./dependencySignal";
 import { DependentSignal, DependentSymbol } from "./dependentSignal";
-import { fromDependent, SignalContext } from "./signalContext";
 import * as SignalService from "./signalService";
 
 export class SideEffect<R = never> implements DependentSignal {
@@ -10,12 +9,12 @@ export class SideEffect<R = never> implements DependentSignal {
   readonly [DependentSymbol]: DependentSignal = this;
   readonly [Observable.ObservableSymbol]: Observable.ObservableOptions;
 
-  private _effect: TRef.TRef<Effect.Effect<unknown, unknown, R | SignalContext>>;
+  private _effect: TRef.TRef<Effect.Effect<unknown, unknown, R | SignalService.SignalService>>;
   private _context: Context.Context<R>;
   private _dependencies: TSet.TSet<DependencySignal<unknown, unknown, unknown>>;
 
   constructor(
-    effect: TRef.TRef<Effect.Effect<unknown, unknown, R | SignalContext>>,
+    effect: TRef.TRef<Effect.Effect<unknown, unknown, R | SignalService.SignalService>>,
     context: Context.Context<R>,
     dependencies: TSet.TSet<DependencySignal<unknown, unknown, unknown>>,
     options: Observable.ObservableOptions,
@@ -27,26 +26,17 @@ export class SideEffect<R = never> implements DependentSignal {
   }
 
   runOnce(): Effect.Effect<void, never, SignalService.SignalService> {
-    return pipe(
-      fromDependent(this),
-      STM.commit,
-      Effect.flatMap((ctx) =>
-        pipe(
-          SignalService.enqueueRunTracked(
-            new SignalService.RunTrackedRequest({
-              effect: pipe(
-                TRef.get(this._effect),
-                STM.commit,
-                Effect.flatten,
-                Effect.catchAll(() => Effect.void),
-                Effect.provide(this._context),
-              ),
-              ctx,
-            }),
-          ),
-          Effect.asVoid,
+    return SignalService.enqueueRunTracked(
+      new SignalService.RunTrackedRequest({
+        effect: pipe(
+          TRef.get(this._effect),
+          STM.commit,
+          Effect.flatten,
+          Effect.catchAll(() => Effect.void),
+          Effect.provide(this._context),
         ),
-      ),
+        signal: this,
+      }),
     );
   }
 
@@ -73,7 +63,7 @@ export class SideEffect<R = never> implements DependentSignal {
     return STM.succeed(this);
   }
 
-  notify(): Effect.Effect<unknown, never, SignalService.SignalService | SignalContext> {
+  notify(): Effect.Effect<unknown, never, SignalService.SignalService> {
     return pipe(
       this.clearDependencies(),
       STM.commit,
@@ -98,10 +88,10 @@ export class SideEffect<R = never> implements DependentSignal {
 
 export const makeWithContext = <R = never>(
   effect: Effect.Effect<unknown, unknown, R>,
-  context: Context.Context<NoInfer<Exclude<R, SignalContext>>>,
+  context: Context.Context<NoInfer<Exclude<R, SignalService.SignalService>>>,
   options?: Observable.ObservableOptions,
 ): Effect.Effect<
-  SideEffect<Exclude<R, SignalContext>>,
+  SideEffect<Exclude<R, SignalService.SignalService>>,
   never,
   Scope.Scope | SignalService.SignalService
 > =>
@@ -110,13 +100,22 @@ export const makeWithContext = <R = never>(
       pipe(
         STM.all({
           effect: TRef.make(
-            effect as Effect.Effect<unknown, unknown, SignalContext | Exclude<R, SignalContext>>,
+            effect as Effect.Effect<
+              unknown,
+              unknown,
+              SignalService.SignalService | Exclude<R, SignalService.SignalService>
+            >,
           ),
           dependencies: TSet.empty<DependencySignal<unknown, unknown, unknown>>(),
         }),
         Effect.map(
           ({ effect, dependencies }) =>
-            new SideEffect<Exclude<R, SignalContext>>(effect, context, dependencies, options ?? {}),
+            new SideEffect<Exclude<R, SignalService.SignalService>>(
+              effect,
+              context,
+              dependencies,
+              options ?? {},
+            ),
         ),
         Effect.tap((sideEffect) => sideEffect.runOnce()),
       ),
@@ -136,8 +135,10 @@ export const makeWithContext = <R = never>(
 
 export const mapEffectWithContext =
   <A, E1, R1, B, E2, R2>(
-    mapper: (effect: Effect.Effect<A, E1, R1 | SignalContext>) => Effect.Effect<B, E2, R2>,
-    context: Context.Context<NoInfer<Exclude<R2, SignalContext>>>,
+    mapper: (
+      effect: Effect.Effect<A, E1, R1 | SignalService.SignalService>,
+    ) => Effect.Effect<B, E2, R2>,
+    context: Context.Context<NoInfer<Exclude<R2, SignalService.SignalService>>>,
     options?: Observable.ObservableOptions,
   ) =>
   <E3, R3>(signal: Effect.Effect<Effect.Effect<A, E1, R1>, E3, R3>) =>
@@ -153,7 +154,7 @@ export const tapWithContext =
       NoInfer<
         Exclude<
           R1 | ([X] extends [Effect.Effect<infer _A2, infer _E2, infer R2>] ? R2 : never),
-          SignalContext
+          SignalService.SignalService
         >
       >
     >,
@@ -164,13 +165,13 @@ export const tapWithContext =
       signal,
       mapEffectWithContext(
         Effect.tap(mapper) as (
-          effect: Effect.Effect<A, E1, R1 | SignalContext>,
+          effect: Effect.Effect<A, E1, R1 | SignalService.SignalService>,
         ) => Effect.Effect<
           A,
           unknown,
           | R1
           | ([X] extends [Effect.Effect<infer _A2, infer _E2, infer R2>] ? R2 : never)
-          | SignalContext
+          | SignalService.SignalService
         >,
         context,
         options,
@@ -178,7 +179,7 @@ export const tapWithContext =
     );
 
 export const make = (
-  effect: Effect.Effect<unknown, unknown, SignalContext>,
+  effect: Effect.Effect<unknown, unknown, SignalService.SignalService>,
   options?: Observable.ObservableOptions,
 ): Effect.Effect<SideEffect<never>, never, Scope.Scope | SignalService.SignalService> =>
   makeWithContext(effect, Context.empty(), options);
@@ -186,8 +187,8 @@ export const make = (
 export const mapEffect =
   <A, E1, R1, B, E2>(
     mapper: (
-      effect: Effect.Effect<A, E1, R1 | SignalContext>,
-    ) => Effect.Effect<B, E2, SignalContext>,
+      effect: Effect.Effect<A, E1, R1 | SignalService.SignalService>,
+    ) => Effect.Effect<B, E2, SignalService.SignalService>,
     options?: Observable.ObservableOptions,
   ) =>
   <E3, R3>(signal: Effect.Effect<Effect.Effect<A, E1, R1>, E3, R3>) =>
@@ -204,10 +205,10 @@ export const tap =
       : X,
     options?: Observable.ObservableOptions,
   ) =>
-  <E1, E2, R2>(signal: Effect.Effect<Effect.Effect<A, E1, SignalContext>, E2, R2>) =>
+  <E1, E2, R2>(signal: Effect.Effect<Effect.Effect<A, E1, SignalService.SignalService>, E2, R2>) =>
     pipe(
       signal,
-      tapWithContext<A, X, SignalContext>(
+      tapWithContext<A, X, SignalService.SignalService>(
         mapper,
         Context.empty() as Context.Context<unknown>,
         options,

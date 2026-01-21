@@ -2,7 +2,7 @@ import { Array, Effect, Function, HashMap, Option, pipe } from "effect";
 import { Array as ArrayUtils } from "typhoon-core/utils";
 import { SheetService } from "./sheetService";
 import { Monitor, PartialIdMonitor, PartialNameMonitor } from "@/server/schema";
-import { SignalContext } from "typhoon-core/signal";
+import { SignalService } from "typhoon-core/signal";
 import { upperFirst } from "scule";
 
 export class MonitorService extends Effect.Service<MonitorService>()("MonitorService", {
@@ -57,10 +57,10 @@ export class MonitorService extends Effect.Service<MonitorService>()("MonitorSer
             captureStackTrace: true,
           }),
         ),
-      _getByIds: <E = never>(ids: SignalContext.MaybeSignalEffect<readonly string[], E>) =>
+      _getByIds: <E = never>(ids: SignalService.MaybeSignalEffect<readonly string[], E>) =>
         pipe(
           Effect.all({
-            ids: SignalContext.getMaybeSignalEffectValue(ids),
+            ids: SignalService.getMaybeSignalEffectValue(ids),
             monitorMaps,
           }),
           Effect.map(({ ids, monitorMaps: { idToMonitor } }) =>
@@ -77,10 +77,10 @@ export class MonitorService extends Effect.Service<MonitorService>()("MonitorSer
             captureStackTrace: true,
           }),
         ),
-      _getByNames: <E = never>(names: SignalContext.MaybeSignalEffect<readonly string[], E>) =>
+      _getByNames: <E = never>(names: SignalService.MaybeSignalEffect<readonly string[], E>) =>
         pipe(
           Effect.all({
-            names: SignalContext.getMaybeSignalEffectValue(names),
+            names: SignalService.getMaybeSignalEffectValue(names),
             monitorMaps,
           }),
           Effect.map(({ names, monitorMaps: { nameToMonitor } }) =>
@@ -107,9 +107,9 @@ export class MonitorService extends Effect.Service<MonitorService>()("MonitorSer
 }) {
   static getMonitorMaps = () => MonitorService.use(({ getMonitorMaps }) => getMonitorMaps());
 
-  static getByIds = <E = never>(ids: SignalContext.MaybeSignalEffect<readonly string[], E>) =>
+  static getByIds = <E = never>(ids: SignalService.MaybeSignalEffect<readonly string[], E>) =>
     MonitorService.use(({ _getByIds }) => _getByIds(ids));
 
-  static getByNames = <E = never>(names: SignalContext.MaybeSignalEffect<readonly string[], E>) =>
+  static getByNames = <E = never>(names: SignalService.MaybeSignalEffect<readonly string[], E>) =>
     MonitorService.use(({ _getByNames }) => _getByNames(names));
 }

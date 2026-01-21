@@ -5,7 +5,7 @@ import { messageSlot } from "sheet-db-schema";
 import { queries } from "sheet-db-schema/zero";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass, Result } from "typhoon-core/schema";
-import { ExternalComputed, SignalContext, ZeroQueryExternalSource } from "typhoon-core/signal";
+import { ExternalComputed, SignalService, ZeroQueryExternalSource } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
 
 type MessageSlotInsert = typeof messageSlot.$inferInsert;
@@ -16,12 +16,12 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()("Me
     Effect.bind("db", () => DBService),
     Effect.bind("dbSubscriptionContext", () => DB.DBSubscriptionContext),
     Effect.map(({ db, dbSubscriptionContext }) => ({
-      _getMessageSlotData: <E = never>(messageId: SignalContext.MaybeSignalEffect<string, E>) =>
+      _getMessageSlotData: <E = never>(messageId: SignalService.MaybeSignalEffect<string, E>) =>
         pipe(
           ZeroQueryExternalSource.make(
             pipe(
               messageId,
-              SignalContext.getMaybeSignalEffectValue,
+              SignalService.getMaybeSignalEffectValue,
               Effect.map((messageId) => queries.messageSlot.getMessageSlotData({ messageId })),
             ),
           ),
@@ -85,7 +85,7 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()("Me
   dependencies: [DBService.Default, DB.DBSubscriptionContext.Default],
   accessors: true,
 }) {
-  static getMessageSlotData = <E = never>(messageId: SignalContext.MaybeSignalEffect<string, E>) =>
+  static getMessageSlotData = <E = never>(messageId: SignalService.MaybeSignalEffect<string, E>) =>
     MessageSlotService.use((messageSlotService) =>
       messageSlotService._getMessageSlotData(messageId),
     );

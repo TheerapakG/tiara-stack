@@ -4,7 +4,6 @@ export * as DependentSignal from "./dependentSignal";
 export * as UntilObserver from "./untilObserver";
 export * as SideEffect from "./sideEffect";
 export * as Signal from "./signal";
-export * as SignalContext from "./signalContext";
 export * as ExternalComputed from "./externalComputed";
 export * as PubSubExternalSource from "./externalSources/pubsubExternalSource";
 export * as ManualEmitExternalSource from "./externalSources/manualEmitExternalSource";

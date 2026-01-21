@@ -1,6 +1,6 @@
 import { Context, Effect, Exit, Option, pipe, Scope, SynchronizedRef } from "effect";
 import { Handler } from "typhoon-core/server";
-import { Signal, SignalContext, Computed, SignalService } from "typhoon-core/signal";
+import { Signal, Computed, SignalService } from "typhoon-core/signal";
 import { Validate, Validator } from "typhoon-core/validator";
 import {
   AuthorizationError,
@@ -99,7 +99,7 @@ export const replacePullStream = ({
     Effect.map(({ ref }) => ref),
   );
 
-export const close = (): Effect.Effect<void, never, Event> =>
+export const close = (): Effect.Effect<void, never, Event | SignalService.SignalService> =>
   pipe(
     Effect.Do,
     Effect.bind("ref", () => Event),
@@ -162,7 +162,7 @@ export const request = {
         scope: Scope.CloseableScope;
       },
       never,
-      SignalContext.SignalContext | SignalService.SignalService
+      SignalService.SignalService
     >,
     never,
     Event
@@ -191,11 +191,7 @@ export const request = {
       ),
     ),
   raw: (): Effect.Effect<
-    Effect.Effect<
-      MsgpackPullEffect,
-      never,
-      SignalContext.SignalContext | SignalService.SignalService
-    >,
+    Effect.Effect<MsgpackPullEffect, never, SignalService.SignalService>,
     never,
     Event
   > =>

@@ -11,7 +11,7 @@ import {
   SchedulePlayer,
   makeScheduleWithPlayers,
 } from "@/server/schema";
-import { SignalContext } from "typhoon-core/signal";
+import { SignalService } from "typhoon-core/signal";
 
 export class PlayerService extends Effect.Service<PlayerService>()("PlayerService", {
   effect: pipe(
@@ -70,10 +70,10 @@ export class PlayerService extends Effect.Service<PlayerService>()("PlayerServic
             captureStackTrace: true,
           }),
         ),
-      _getByNames: <E = never>(names: SignalContext.MaybeSignalEffect<readonly string[], E>) =>
+      _getByNames: <E = never>(names: SignalService.MaybeSignalEffect<readonly string[], E>) =>
         pipe(
           Effect.all({
-            names: SignalContext.getMaybeSignalEffectValue(names),
+            names: SignalService.getMaybeSignalEffectValue(names),
             playerMaps,
           }),
           Effect.map(({ names, playerMaps: { nameToPlayer } }) =>
@@ -96,10 +96,10 @@ export class PlayerService extends Effect.Service<PlayerService>()("PlayerServic
             captureStackTrace: true,
           }),
         ),
-      _getByIds: <E = never>(ids: SignalContext.MaybeSignalEffect<readonly string[], E>) =>
+      _getByIds: <E = never>(ids: SignalService.MaybeSignalEffect<readonly string[], E>) =>
         pipe(
           Effect.all({
-            ids: SignalContext.getMaybeSignalEffectValue(ids),
+            ids: SignalService.getMaybeSignalEffectValue(ids),
             playerMaps,
           }),
           Effect.map(({ ids, playerMaps: { idToPlayer } }) =>
@@ -206,7 +206,7 @@ export class PlayerService extends Effect.Service<PlayerService>()("PlayerServic
             captureStackTrace: true,
           }),
         ),
-      _getTeamsByNames: <E = never>(names: SignalContext.MaybeSignalEffect<readonly string[], E>) =>
+      _getTeamsByNames: <E = never>(names: SignalService.MaybeSignalEffect<readonly string[], E>) =>
         pipe(
           Effect.Do,
           Effect.bindAll(() => ({
@@ -228,7 +228,7 @@ export class PlayerService extends Effect.Service<PlayerService>()("PlayerServic
             captureStackTrace: true,
           }),
         ),
-      _getTeamsByIds: <E = never>(ids: SignalContext.MaybeSignalEffect<readonly string[], E>) =>
+      _getTeamsByIds: <E = never>(ids: SignalService.MaybeSignalEffect<readonly string[], E>) =>
         pipe(
           Effect.Do,
           Effect.bindAll(() => ({
@@ -266,16 +266,16 @@ export class PlayerService extends Effect.Service<PlayerService>()("PlayerServic
   ),
   accessors: true,
 }) {
-  static getByIds = <E = never>(ids: SignalContext.MaybeSignalEffect<readonly string[], E>) =>
+  static getByIds = <E = never>(ids: SignalService.MaybeSignalEffect<readonly string[], E>) =>
     PlayerService.use(({ _getByIds }) => _getByIds(ids));
 
-  static getByNames = <E = never>(names: SignalContext.MaybeSignalEffect<readonly string[], E>) =>
+  static getByNames = <E = never>(names: SignalService.MaybeSignalEffect<readonly string[], E>) =>
     PlayerService.use(({ _getByNames }) => _getByNames(names));
 
   static getTeamsByNames = <E = never>(
-    names: SignalContext.MaybeSignalEffect<readonly string[], E>,
+    names: SignalService.MaybeSignalEffect<readonly string[], E>,
   ) => PlayerService.use(({ _getTeamsByNames }) => _getTeamsByNames(names));
 
-  static getTeamsByIds = <E = never>(ids: SignalContext.MaybeSignalEffect<readonly string[], E>) =>
+  static getTeamsByIds = <E = never>(ids: SignalService.MaybeSignalEffect<readonly string[], E>) =>
     PlayerService.use(({ _getTeamsByIds }) => _getTeamsByIds(ids));
 }

@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { Effect, HKT, Option, Scope } from "effect";
 import type { Type } from "typhoon-core/handler";
 import { Handler } from "typhoon-core/server";
-import { SignalContext, SignalService } from "typhoon-core/signal";
+import { SignalService } from "typhoon-core/signal";
 import { Validator } from "typhoon-core/validator";
 import { Event } from "@/event/event";
 
@@ -10,7 +10,7 @@ export type SubscriptionData = Handler.Data.Subscription.SubscriptionHandlerData
 type InnerSubscriptionHandler<A = unknown, E = unknown, R = unknown> = Effect.Effect<
   A,
   E,
-  R | SignalContext.SignalContext | SignalService.SignalService
+  R | SignalService.SignalService
 >;
 type SubscriptionHandler<A = unknown, E = unknown, R = unknown> = Effect.Effect<
   InnerSubscriptionHandler<A, E, R>,
@@ -94,10 +94,7 @@ interface TransformHandlerContext extends HKT.TypeLambda {
     ? Effect.Effect.Success<H> extends infer IH extends InnerSubscriptionHandler
       ?
           | Exclude<Effect.Effect.Context<H>, SignalService.SignalService>
-          | Exclude<
-              Effect.Effect.Context<IH>,
-              SignalContext.SignalContext | SignalService.SignalService
-            >
+          | Exclude<Effect.Effect.Context<IH>, SignalService.SignalService>
       : never
     : never;
 }

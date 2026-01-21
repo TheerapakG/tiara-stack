@@ -2,7 +2,6 @@ import { Array, Effect, pipe, STM, TSet } from "effect";
 import { Observable } from "../observability";
 import type * as DependencySignal from "./dependencySignal";
 import type * as SignalService from "./signalService";
-import type * as SignalContext from "./signalContext";
 
 export const DependentSymbol: unique symbol = Symbol("Typhoon/Signal/Dependent");
 
@@ -30,11 +29,7 @@ export abstract class DependentSignal implements Observable.Observable {
     never,
     never
   >;
-  abstract notify(): Effect.Effect<
-    unknown,
-    never,
-    SignalService.SignalService | SignalContext.SignalContext
-  >;
+  abstract notify(): Effect.Effect<unknown, never, SignalService.SignalService>;
 }
 
 export const isDependentSignal = (signal: unknown): signal is DependentSignal =>
