@@ -23,4 +23,5 @@ export default defineConfig({
     }),
   ),
   sourcemap: true,
+  noExternal: [/^.*$/],
 });
