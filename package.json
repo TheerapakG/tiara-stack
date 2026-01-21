@@ -3,7 +3,9 @@
   "type": "module",
   "private": true,
   "devDependencies": {
-    "nx": "19.7.4"
+    "nx": "19.7.4",
+    "oxfmt": "^0.26.0",
+    "oxlint": "^1.41.0"
   },
   "scripts": {
     "checks": "nx run-many -t format,lint,typecheck --output-style=stream",
