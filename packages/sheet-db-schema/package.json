@@ -24,7 +24,7 @@
     "format:apply": "oxfmt",
     "lint": "oxlint .",
     "typecheck": "tsgo --noEmit",
-    "build": "drizzle-zero generate --output ./src/zero/schema.ts --skip-types --skip-declare --enable-legacy-queries --suppress-defaults-warning && tsdown -c tsdown.config.ts"
+    "build": "drizzle-zero generate --output ./src/zero/schema.ts --skip-types --skip-declare --suppress-defaults-warning && tsdown -c tsdown.config.ts"
   },
   "dependencies": {
     "@rocicorp/zero": "^0.25.9",
