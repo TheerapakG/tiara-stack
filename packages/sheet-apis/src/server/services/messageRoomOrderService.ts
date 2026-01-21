@@ -8,11 +8,11 @@ import {
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Either, Option, pipe, Schema } from "effect";
 import { messageRoomOrder, messageRoomOrderEntry } from "sheet-db-schema";
+import { queries } from "sheet-db-schema/zero";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass, Result } from "typhoon-core/schema";
 import { ExternalComputed, SignalContext, ZeroQueryExternalSource } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
-import { ZeroServiceTag } from "@/db/zeroService";
 
 type MessageRoomOrderInsert = typeof messageRoomOrder.$inferInsert;
 type MessageRoomOrderEntryInsert = typeof messageRoomOrderEntry.$inferInsert;
@@ -27,18 +27,12 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
       Effect.map(({ db, dbSubscriptionContext }) => ({
         _getMessageRoomOrder: <E = never>(messageId: SignalContext.MaybeSignalEffect<string, E>) =>
           pipe(
-            ZeroServiceTag,
-            Effect.flatMap((zero) =>
-              ZeroQueryExternalSource.make(
-                pipe(
-                  messageId,
-                  SignalContext.getMaybeSignalEffectValue,
-                  Effect.map((messageId) =>
-                    zero.query.messageRoomOrder
-                      .where("messageId", "=", messageId)
-                      .where("deletedAt", "IS", null)
-                      .one(),
-                  ),
+            ZeroQueryExternalSource.make(
+              pipe(
+                messageId,
+                SignalContext.getMaybeSignalEffectValue,
+                Effect.map((messageId) =>
+                  queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
                 ),
               ),
             ),
@@ -156,19 +150,12 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
           params: SignalContext.MaybeSignalEffect<{ messageId: string; rank: number }, E>,
         ) =>
           pipe(
-            ZeroServiceTag,
-            Effect.flatMap((zero) =>
-              ZeroQueryExternalSource.make(
-                pipe(
-                  params,
-                  SignalContext.getMaybeSignalEffectValue,
-                  Effect.map(({ messageId, rank }) =>
-                    zero.query.messageRoomOrderEntry
-                      .where("messageId", "=", messageId)
-                      .where("rank", "=", rank)
-                      .where("deletedAt", "IS", null)
-                      .orderBy("position", "asc"),
-                  ),
+            ZeroQueryExternalSource.make(
+              pipe(
+                params,
+                SignalContext.getMaybeSignalEffectValue,
+                Effect.map(({ messageId, rank }) =>
+                  queries.messageRoomOrder.getMessageRoomOrderEntry({ messageId, rank }),
                 ),
               ),
             ),
@@ -199,17 +186,12 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
           messageId: SignalContext.MaybeSignalEffect<string, E>,
         ) =>
           pipe(
-            ZeroServiceTag,
-            Effect.flatMap((zero) =>
-              ZeroQueryExternalSource.make(
-                pipe(
-                  messageId,
-                  SignalContext.getMaybeSignalEffectValue,
-                  Effect.map((messageId) =>
-                    zero.query.messageRoomOrderEntry
-                      .where("messageId", "=", messageId)
-                      .where("deletedAt", "IS", null),
-                  ),
+            ZeroQueryExternalSource.make(
+              pipe(
+                messageId,
+                SignalContext.getMaybeSignalEffectValue,
+                Effect.map((messageId) =>
+                  queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }),
                 ),
               ),
             ),

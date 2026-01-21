@@ -3,11 +3,11 @@ import { Error, MessageCheckin, MessageCheckinMember } from "@/server/schema";
 import { and, eq, gte, isNull } from "drizzle-orm";
 import { Array, DateTime, Effect, pipe, Schema } from "effect";
 import { messageCheckin, messageCheckinMember } from "sheet-db-schema";
+import { queries } from "sheet-db-schema/zero";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass, Result } from "typhoon-core/schema";
 import { ExternalComputed, SignalContext, ZeroQueryExternalSource } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
-import { ZeroServiceTag } from "@/db/zeroService";
 
 type MessageCheckinInsert = typeof messageCheckin.$inferInsert;
 
@@ -23,18 +23,12 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
           messageId: SignalContext.MaybeSignalEffect<string, E>,
         ) =>
           pipe(
-            ZeroServiceTag,
-            Effect.flatMap((zero) =>
-              ZeroQueryExternalSource.make(
-                pipe(
-                  messageId,
-                  SignalContext.getMaybeSignalEffectValue,
-                  Effect.map((messageId) =>
-                    zero.query.messageCheckin
-                      .where("messageId", "=", messageId)
-                      .where("deletedAt", "IS", null)
-                      .one(),
-                  ),
+            ZeroQueryExternalSource.make(
+              pipe(
+                messageId,
+                SignalContext.getMaybeSignalEffectValue,
+                Effect.map((messageId) =>
+                  queries.messageCheckin.getMessageCheckinData({ messageId }),
                 ),
               ),
             ),
@@ -108,17 +102,12 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
           messageId: SignalContext.MaybeSignalEffect<string, E>,
         ) =>
           pipe(
-            ZeroServiceTag,
-            Effect.flatMap((zero) =>
-              ZeroQueryExternalSource.make(
-                pipe(
-                  messageId,
-                  SignalContext.getMaybeSignalEffectValue,
-                  Effect.map((messageId) =>
-                    zero.query.messageCheckinMember
-                      .where("messageId", "=", messageId)
-                      .where("deletedAt", "IS", null),
-                  ),
+            ZeroQueryExternalSource.make(
+              pipe(
+                messageId,
+                SignalContext.getMaybeSignalEffectValue,
+                Effect.map((messageId) =>
+                  queries.messageCheckin.getMessageCheckinMembers({ messageId }),
                 ),
               ),
             ),

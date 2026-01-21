@@ -2,11 +2,11 @@ import { DBService } from "@/db";
 import { Error, MessageSlot } from "@/server/schema";
 import { Array, Effect, pipe, Schema } from "effect";
 import { messageSlot } from "sheet-db-schema";
+import { queries } from "sheet-db-schema/zero";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass, Result } from "typhoon-core/schema";
 import { ExternalComputed, SignalContext, ZeroQueryExternalSource } from "typhoon-core/signal";
 import { DB } from "typhoon-server/db";
-import { ZeroServiceTag } from "@/db/zeroService";
 
 type MessageSlotInsert = typeof messageSlot.$inferInsert;
 
@@ -18,19 +18,11 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()("Me
     Effect.map(({ db, dbSubscriptionContext }) => ({
       _getMessageSlotData: <E = never>(messageId: SignalContext.MaybeSignalEffect<string, E>) =>
         pipe(
-          ZeroServiceTag,
-          Effect.flatMap((zero) =>
-            ZeroQueryExternalSource.make(
-              pipe(
-                messageId,
-                SignalContext.getMaybeSignalEffectValue,
-                Effect.map((messageId) =>
-                  zero.query.messageSlot
-                    .where("messageId", "=", messageId)
-                    .where("deletedAt", "IS", null)
-                    .one(),
-                ),
-              ),
+          ZeroQueryExternalSource.make(
+            pipe(
+              messageId,
+              SignalContext.getMaybeSignalEffectValue,
+              Effect.map((messageId) => queries.messageSlot.getMessageSlotData({ messageId })),
             ),
           ),
           Effect.flatMap(ExternalComputed.make),

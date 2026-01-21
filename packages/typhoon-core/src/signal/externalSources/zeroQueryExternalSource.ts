@@ -8,6 +8,7 @@ import type {
   View,
   HumanReadable,
   AnyQuery,
+  QueryOrQueryRequest,
 } from "@rocicorp/zero";
 import { applyChange, skipYields } from "@rocicorp/zero/bindings";
 import {
@@ -475,8 +476,9 @@ const createMaterializeCallback =
 
 export const makeWithContext = <
   M,
-  Q extends AnyQuery = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends infer Q extends
-    AnyQuery
+  Q extends QueryOrQueryRequest<any, any, any, any, any, any> = Effect.Effect.Success<
+    MaybeSignalEffectValue<M>
+  > extends infer Q extends QueryOrQueryRequest<any, any, any, any, any, any>
     ? Q
     : never,
   T extends ReadonlyJSONValue | View = HumanReadable<QueryRowType<Q>> extends infer T extends
@@ -579,8 +581,9 @@ export const makeWithContext = <
 
 export const make = <
   M,
-  Q extends AnyQuery = Effect.Effect.Success<MaybeSignalEffectValue<M>> extends infer Q extends
-    AnyQuery
+  Q extends QueryOrQueryRequest<any, any, any, any, any, any> = Effect.Effect.Success<
+    MaybeSignalEffectValue<M>
+  > extends infer Q extends QueryOrQueryRequest<any, any, any, any, any, any>
     ? Q
     : never,
   T extends ReadonlyJSONValue | View = HumanReadable<QueryRowType<Q>> extends infer T extends
