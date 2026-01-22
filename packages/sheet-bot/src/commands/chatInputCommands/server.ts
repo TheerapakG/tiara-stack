@@ -47,6 +47,7 @@ const handleListConfig = handlerVariantContextBuilder<ChatInputSubcommandHandler
         Effect.bind("guildConfig", () =>
           pipe(
             GuildConfigService.getGuildConfigByGuildId(),
+            Effect.map(Effect.tap((config) => Effect.log(config))),
             UntilObserver.observeUntilRpcResultResolved(),
             Effect.flatten,
           ),
