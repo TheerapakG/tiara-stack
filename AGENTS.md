@@ -132,7 +132,9 @@ Run `pnpm -w format:apply` every time after you finished proposing a change to c
 
 We use Graphite for managing stacked pull requests. The following guidelines are to be followed for `gt create` and `gt modify` commands.
 
-- For the first commit you are creating, if you are on a trunk branch (master) use `gt create`. Otherwise, ask the developer if they want to create the commits on a new branch (`gt create`) or add commits to the current branch (`gt modify -c`).
+- For the first commit you are creating
+  - If you are on a trunk branch (master) use `gt create` to create the commit on a new branch. **DO NOT commit directly to master**
+  - Otherwise, ask the developer if they want to create the commits on a new branch (`gt create`) or add commits to the current branch (`gt modify -c`).
 - For the rest of the commits, use `gt modify -c`.
 - When you create the commits on a new branch
   - If the developer mentions that the commits is related to a linear issue, look up the git branch name to use via the linear MCP server. If the linear MCP server does not exist, tell the developer and stop proceeding.
@@ -143,20 +145,20 @@ We use Graphite for managing stacked pull requests. The following guidelines are
 - Use -m for new line in the commit message, and do not use \n anywhere.
 
   GOOD:
-
-  - `gt create user/abc-123-linear-issue-branch-name -m "subject" -m "line1" -m "line2"  ...`
-    This correctly sets the branch name and supplies commit message in the correct format for a new branch.
+  - `gt create matthew/abc-123-linear-issue-branch-name -m "subject" -m "line1" -m "line2"  ...`
+    This correctly sets the branch name (for a user named "matthew" against a linear issue abc-123) and supplies commit message in the correct format for a new branch.
   - `gt modify -c -m "subject" -m "line1" -m "line2"  ...`
     This correctly supplies commit message in the correct format for the current branch.
 
   BAD:
-
-  - `gt create user/abc-123-linear-issue-branch-name -m "subject\nline1\nline2\n..."`
-    This correctly sets the branch name BUT supplies commit message in a bad format.
-  - `gt create user/abc-123-linear-issue-branch-name -m "subject" -m "line1\nline2\n..."`
-    This correctly sets the branch name BUT supplies commit message in a bad format.
+  - `gt create matthew/abc-123-linear-issue-branch-name -m "subject\nline1\nline2\n..."`
+    This correctly sets the branch name (for a user named "matthew" against a linear issue abc-123) BUT supplies commit message in a bad format.
+  - `gt create matthew/abc-123-linear-issue-branch-name -m "subject" -m "line1\nline2\n..."`
+    This correctly sets the branch name (for a user named "matthew" against a linear issue abc-123) BUT supplies commit message in a bad format.
   - `gt create -m "subject" -m "line1" -m "line2"  ...`
     This supplies commit message in the correct format BUT forgot to set the branch name for a new branch.
+  - `gt create <username>/abc-123-linear-issue-branch-name -m "subject" -m "line1" -m "line2"  ...`
+    This supplies commit message in the correct format BUT wrongly set the branch name with a placeholder username.
   - `gt modify -c -m "subject\nline1\nline2\n..."`
     This supplies commit message in a bad format.
   - `gt modify -c -m "subject" -m "line1\nline2\n..."`

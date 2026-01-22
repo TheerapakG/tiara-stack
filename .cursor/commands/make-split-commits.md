@@ -7,23 +7,20 @@ Evaluate what changes has been done within the repository, and commit them. The 
 ## Steps
 
 1. **Explore the Changes**
-
    - Use `git status -s` to list files that got changed in the working directory, both tracked and untracked, and their statuses. The information of the output is as outlined in the "Git Status Short Format" in the "References" section.
    - If there is any staged file, run `git restore --staged .` to unstage all the changes and redo `git status -s` to get the updated file and status list.
    - Use `git -P diff` to view the diff of all tracked files.
    - For every untracked file creation, use your tool to read the file content.
 
 2. **Evaluate the Changes**
-
    - Reason through what each of the changes are trying to achieve and how they might be related. If you think you lack contexts due to the truncation in the diff output, use your tool to read more file content.
    - Logically group related changes together based on projects and the modification concerns.
 
 3. **Staging and Committing**
 
    For each of the changes group:
-
    - Stage all the relevant files using `gt add -v -- [<pathspec>...]`.
-   - Commit the changes, conforming to the "Guidelines on Graphite Commit Messages For This Project".
+   - Commit the changes, conforming to the [Guidelines on Graphite Commit Messages For This Project](../../AGENTS.md#guidelines-on-graphite-commit-messages-for-this-project).
 
 4. **Submitting Changes**
 
