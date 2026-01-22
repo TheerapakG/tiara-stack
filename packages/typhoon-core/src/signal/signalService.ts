@@ -353,10 +353,9 @@ export const layer: Layer.Layer<SignalService, never, never> = pipe(
                     onNone: () => STM.void,
                   }),
                 ),
+                STM.commit,
               )
-            : Effect.logError(
-                "[SignalService] bindDependency can only be called from the worker fiber",
-              ),
+            : Effect.void,
         ),
         Effect.asVoid,
       ),
@@ -373,10 +372,9 @@ export const layer: Layer.Layer<SignalService, never, never> = pipe(
                     onNone: () => STM.void,
                   }),
                 ),
+                STM.commit,
               )
-            : Effect.logError(
-                "[SignalService] markUnchanged can only be called from the worker fiber",
-              ),
+            : Effect.void,
         ),
         Effect.asVoid,
       ),
