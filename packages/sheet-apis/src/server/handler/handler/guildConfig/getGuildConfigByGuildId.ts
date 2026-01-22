@@ -17,8 +17,14 @@ export const getGuildConfigByGuildIdHandler = pipe(
       pipe(
         Effect.Do,
         Effect.tap(() => pipe(Event.someToken(), Effect.flatMap(AuthService.verify))),
-        Effect.bind("parsed", () => Event.request.parsed(getGuildConfigByGuildIdHandlerData)),
+        Effect.bind("parsed", () =>
+          pipe(
+            Event.request.parsed(getGuildConfigByGuildIdHandlerData),
+            Effect.map(Effect.tap((parsed) => Effect.log(parsed))),
+          ),
+        ),
         Effect.flatMap(({ parsed }) => GuildConfigService.getGuildConfigByGuildId(parsed)),
+        Effect.map(Effect.tap((config) => Effect.log(config))),
         Effect.map(
           Effect.map(
             Result.eitherSomeOrLeft(() =>
