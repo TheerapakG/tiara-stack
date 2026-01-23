@@ -709,7 +709,11 @@ const handleSubscribe =
                       runSubscriptionHandlerSubscribe(handler, {
                         id: header.id,
                         span,
-                        sendClientBuffer: sendPeerBuffer(peer),
+                        sendClientBuffer: (buffer) =>
+                          pipe(
+                            Effect.log("sending buffer"),
+                            Effect.andThen(() => sendPeerBuffer(peer)(buffer)),
+                          ),
                         serverWithRuntime,
                         subscriptionState,
                       }),
