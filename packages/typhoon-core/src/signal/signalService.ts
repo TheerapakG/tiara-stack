@@ -297,13 +297,17 @@ export const layer: Layer.Layer<SignalService, never, never> = pipe(
               NotifyWorkItem: ({ request, service }) =>
                 pipe(
                   Effect.acquireUseRelease(
-                    pipe(TSet.empty<DependencySignal<unknown, unknown, unknown>>(), STM.commit),
+                    pipe(
+                      TSet.empty<DependencySignal<unknown, unknown, unknown>>(),
+                      STM.flatMap((set) => TRef.getAndSet(currentUnchanged, Option.some(set))),
+                      STM.commit,
+                    ),
                     () =>
                       pipe(
                         notifyAllDependents(request.beforeNotify, request.signal, currentUnchanged),
                         Effect.provideService(SignalService, service),
                       ),
-                    (set) => TRef.set(currentUnchanged, Option.some(set)),
+                    (previousSet) => pipe(TRef.set(currentUnchanged, previousSet), STM.commit),
                   ),
                   Effect.catchAllCause((cause) => Effect.logError(cause)),
                 ),
