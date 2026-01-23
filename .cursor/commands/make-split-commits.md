@@ -17,10 +17,12 @@ Evaluate what changes has been done within the repository, and commit them. The 
    - Logically group related changes together based on projects and the modification concerns.
 
 3. **Staging and Committing**
+   - Before committing, make sure to read the [Guidelines on Graphite Commit Messages For This Project](../../AGENTS.md#guidelines-on-graphite-commit-messages-for-this-project).
+   - You MUST commit according to the guidelines. Failure to do so may result in graphite blocking you on submitting.
 
    For each of the changes group:
    - Stage all the relevant files using `gt add -v -- [<pathspec>...]`.
-   - Commit the changes, conforming to the [Guidelines on Graphite Commit Messages For This Project](../../AGENTS.md#guidelines-on-graphite-commit-messages-for-this-project).
+   - Commit according to the guidelines.
 
 4. **Submitting Changes**
 
