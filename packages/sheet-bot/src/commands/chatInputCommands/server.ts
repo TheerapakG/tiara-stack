@@ -56,6 +56,7 @@ const handleListConfig = handlerVariantContextBuilder<ChatInputSubcommandHandler
           pipe(
             GuildConfigService.getGuildManagerRoles(),
             UntilObserver.observeUntilRpcResultResolved(),
+            Effect.tap((roles) => Effect.log(roles)),
             Effect.flatten,
           ),
         ),
