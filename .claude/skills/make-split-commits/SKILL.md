@@ -1,3 +1,9 @@
+---
+name: make-split-commits
+description: Make Split Commits
+disable-model-invocation: true
+---
+
 # Make Split Commits
 
 ## Overview
