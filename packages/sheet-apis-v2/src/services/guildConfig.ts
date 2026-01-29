@@ -66,6 +66,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
       ) =>
         pipe(
           ZeroService.mutate(mutators.guildConfig.upsertGuildConfig({ guildId, ...config })),
+          Effect.andThen((mutation) => mutation.server()),
           Effect.andThen(
             ZeroService.run(queries.guildConfig.getGuildConfigByGuildId({ guildId }), {
               type: "complete",
