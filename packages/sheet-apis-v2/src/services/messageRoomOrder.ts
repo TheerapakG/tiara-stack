@@ -45,6 +45,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ZeroService.mutate(
               mutators.messageRoomOrder.decrementMessageRoomOrderRank({ messageId }),
             ),
+            Effect.andThen((mutation) => mutation.server()),
             Effect.andThen(
               ZeroService.run(queries.messageRoomOrder.getMessageRoomOrder({ messageId }), {
                 type: "complete",
@@ -72,6 +73,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ZeroService.mutate(
               mutators.messageRoomOrder.incrementMessageRoomOrderRank({ messageId }),
             ),
+            Effect.andThen((mutation) => mutation.server()),
             Effect.andThen(
               ZeroService.run(queries.messageRoomOrder.getMessageRoomOrder({ messageId }), {
                 type: "complete",
@@ -115,6 +117,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                 monitor: data.monitor,
               }),
             ),
+            Effect.andThen((mutation) => mutation.server()),
             Effect.andThen(
               ZeroService.run(queries.messageRoomOrder.getMessageRoomOrder({ messageId }), {
                 type: "complete",
@@ -201,6 +204,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ZeroService.mutate(
               mutators.messageRoomOrder.upsertMessageRoomOrderEntry({ messageId, entries }),
             ),
+            Effect.andThen((mutation) => mutation.server()),
             Effect.andThen(
               ZeroService.run(queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }), {
                 type: "complete",
@@ -241,6 +245,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                 position: 0,
               }),
             ),
+            Effect.andThen((mutation) => mutation.server()),
             Effect.andThen(
               ZeroService.run(queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }), {
                 type: "complete",

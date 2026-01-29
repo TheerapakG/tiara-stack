@@ -79,7 +79,7 @@ export const RawZeroQueryError = Schema.Union(
 export type RawZeroQueryError = Schema.Schema.Type<typeof RawZeroQueryError>;
 
 export class QueryResultAppError extends Schema.TaggedError<QueryResultAppError>()(
-  "MutatorResultAppError",
+  "QueryResultAppError",
   Schema.Struct({
     error: Schema.Literal("app"),
     id: Schema.String,
@@ -90,7 +90,7 @@ export class QueryResultAppError extends Schema.TaggedError<QueryResultAppError>
 ) {}
 
 export class QueryResultParseError extends Schema.TaggedError<QueryResultParseError>()(
-  "MutatorResultZeroError",
+  "QueryResultParseError",
   Schema.Struct({
     error: Schema.Literal("parse"),
     id: Schema.String,

@@ -101,6 +101,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
       addGuildManagerRole: (guildId: string, roleId: string) =>
         pipe(
           ZeroService.mutate(mutators.guildConfig.addGuildManagerRole({ guildId, roleId })),
+          Effect.andThen((mutation) => mutation.server()),
           Effect.andThen(
             ZeroService.run(queries.guildConfig.getGuildManagerRoles({ guildId }), {
               type: "complete",
@@ -123,6 +124,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
       removeGuildManagerRole: (guildId: string, roleId: string) =>
         pipe(
           ZeroService.mutate(mutators.guildConfig.removeGuildManagerRole({ guildId, roleId })),
+          Effect.andThen((mutation) => mutation.server()),
           Effect.andThen(
             ZeroService.run(queries.guildConfig.getGuildManagerRoles({ guildId }), {
               type: "complete",
@@ -163,6 +165,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
               checkinChannelId: config.checkinChannelId,
             }),
           ),
+          Effect.andThen((mutation) => mutation.server()),
           Effect.andThen(
             ZeroService.run(
               queries.guildConfig.getGuildRunningChannelById({ guildId, channelId }),

@@ -55,6 +55,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
                 roleId: data.roleId,
               }),
             ),
+            Effect.andThen((mutation) => mutation.server()),
             Effect.andThen(
               ZeroService.run(queries.messageCheckin.getMessageCheckinData({ messageId }), {
                 type: "complete",
@@ -95,6 +96,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
             ZeroService.mutate(
               mutators.messageCheckin.addMessageCheckinMembers({ messageId, memberIds }),
             ),
+            Effect.andThen((mutation) => mutation.server()),
             Effect.andThen(
               ZeroService.run(queries.messageCheckin.getMessageCheckinMembers({ messageId }), {
                 type: "complete",
@@ -120,6 +122,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
                 checkinAt,
               }),
             ),
+            Effect.andThen((mutation) => mutation.server()),
             Effect.andThen(
               ZeroService.run(queries.messageCheckin.getMessageCheckinMembers({ messageId }), {
                 type: "complete",
@@ -144,6 +147,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
             ZeroService.mutate(
               mutators.messageCheckin.removeMessageCheckinMember({ messageId, memberId }),
             ),
+            Effect.andThen((mutation) => mutation.server()),
             Effect.andThen(
               ZeroService.run(queries.messageCheckin.getMessageCheckinMembers({ messageId }), {
                 type: "complete",

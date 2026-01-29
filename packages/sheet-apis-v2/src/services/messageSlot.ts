@@ -35,6 +35,7 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()("Me
       upsertMessageSlotData: (messageId: string, day: number) =>
         pipe(
           ZeroService.mutate(mutators.messageSlot.upsertMessageSlotData({ messageId, day })),
+          Effect.andThen((mutation) => mutation.server()),
           Effect.andThen(
             ZeroService.run(queries.messageSlot.getMessageSlotData({ messageId }), {
               type: "complete",
