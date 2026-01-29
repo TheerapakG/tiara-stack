@@ -2,7 +2,6 @@ import { Schema } from "effect";
 import { DateTimeUtcFromUnknown } from "./dateSchemas";
 
 export class MessageRoomOrder extends Schema.TaggedClass<MessageRoomOrder>()("MessageRoomOrder", {
-  id: Schema.Number,
   messageId: Schema.String,
   hour: Schema.Number,
   previousFills: Schema.Array(Schema.String),

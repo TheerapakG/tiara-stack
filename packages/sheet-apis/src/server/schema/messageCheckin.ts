@@ -2,7 +2,6 @@ import { Schema } from "effect";
 import { DateTimeUtcFromUnknown } from "./dateSchemas";
 
 export class MessageCheckin extends Schema.TaggedClass<MessageCheckin>()("MessageCheckin", {
-  id: Schema.Number,
   messageId: Schema.String,
   initialMessage: Schema.String,
   hour: Schema.Number,

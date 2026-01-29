@@ -4,7 +4,6 @@ import { DateFromUnknown } from "./dateSchemas";
 export class GuildChannelConfig extends Schema.TaggedClass<GuildChannelConfig>()(
   "GuildChannelConfig",
   {
-    id: Schema.Number,
     guildId: Schema.String,
     channelId: Schema.String,
     name: Schema.OptionFromNullishOr(Schema.String, undefined),

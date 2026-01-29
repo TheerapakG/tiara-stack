@@ -28,7 +28,7 @@
   },
   "dependencies": {
     "@rocicorp/zero": "^0.25.9",
-    "drizzle-orm": "^0.44.0",
+    "drizzle-orm": "^0.45.1",
     "drizzle-zero": "^0.17.2",
     "effect": "^3.18.4",
     "postgres": "^3.4.7",

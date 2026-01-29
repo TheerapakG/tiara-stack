@@ -4,7 +4,6 @@ import { DateTimeUtcFromUnknown } from "./dateSchemas";
 export class MessageRoomOrderEntry extends Schema.TaggedClass<MessageRoomOrderEntry>()(
   "MessageRoomOrderEntry",
   {
-    id: Schema.Number,
     messageId: Schema.String,
     rank: Schema.Number,
     position: Schema.Number,

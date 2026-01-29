@@ -56,7 +56,7 @@ export const layerOfGuildId = <E = never>(
   never,
   | GuildConfigService
   | Scope.Scope
-  | ZeroService.ZeroService<Schema, undefined>
+  | ZeroService.ZeroService<Schema, undefined, any>
   | SignalService.SignalService
 > =>
   pipe(

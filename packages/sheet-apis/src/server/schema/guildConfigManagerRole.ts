@@ -4,7 +4,6 @@ import { DateFromUnknown } from "./dateSchemas";
 export class GuildConfigManagerRole extends Schema.TaggedClass<GuildConfigManagerRole>()(
   "GuildConfigManagerRole",
   {
-    id: Schema.Number,
     guildId: Schema.String,
     roleId: Schema.String,
     createdAt: Schema.OptionFromNullishOr(DateFromUnknown, undefined),
