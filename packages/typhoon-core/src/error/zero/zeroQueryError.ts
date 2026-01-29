@@ -77,3 +77,50 @@ export const RawZeroQueryError = Schema.Union(
 );
 
 export type RawZeroQueryError = Schema.Schema.Type<typeof RawZeroQueryError>;
+
+export class QueryResultAppError extends Schema.TaggedError<QueryResultAppError>()(
+  "QueryResultAppError",
+  Schema.Struct({
+    error: Schema.Literal("app"),
+    id: Schema.String,
+    name: Schema.String,
+    message: Schema.optional(Schema.String),
+    details: Schema.optional(ReadonlyJSONValueSchema),
+  }),
+) {}
+
+export class QueryResultParseError extends Schema.TaggedError<QueryResultParseError>()(
+  "QueryResultParseError",
+  Schema.Struct({
+    error: Schema.Literal("parse"),
+    id: Schema.String,
+    name: Schema.String,
+    message: Schema.optional(Schema.String),
+    details: Schema.optional(ReadonlyJSONValueSchema),
+  }),
+) {}
+
+export const QueryResultError = Schema.Union(QueryResultAppError, QueryResultParseError);
+
+export type QueryResultError = Schema.Schema.Type<typeof QueryResultError>;
+
+export class MutatorResultAppError extends Schema.TaggedError<MutatorResultAppError>()(
+  "MutatorResultAppError",
+  Schema.Struct({
+    type: Schema.Literal("app"),
+    message: Schema.String,
+    details: Schema.optional(ReadonlyJSONValueSchema),
+  }),
+) {}
+
+export class MutatorResultZeroError extends Schema.TaggedError<MutatorResultZeroError>()(
+  "MutatorResultZeroError",
+  Schema.Struct({
+    type: Schema.Literal("zero"),
+    message: Schema.String,
+  }),
+) {}
+
+export const MutatorResultError = Schema.Union(MutatorResultAppError, MutatorResultZeroError);
+
+export type MutatorResultError = Schema.Schema.Type<typeof MutatorResultError>;

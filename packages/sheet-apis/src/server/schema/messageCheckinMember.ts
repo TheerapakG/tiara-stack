@@ -4,7 +4,6 @@ import { DateTimeUtcFromUnknown } from "./dateSchemas";
 export class MessageCheckinMember extends Schema.TaggedClass<MessageCheckinMember>()(
   "MessageCheckinMember",
   {
-    id: Schema.Number,
     messageId: Schema.String,
     memberId: Schema.String,
     checkinAt: Schema.OptionFromNullishOr(DateTimeUtcFromUnknown, undefined),

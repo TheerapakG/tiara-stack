@@ -55,6 +55,10 @@ spec:
               value: "true"
             - name: ZERO_QUERY_URL
               value: http://sheet-db-server-service:80/zero/query
+            - name: ZERO_MUTATE_FORWARD_COOKIES
+              value: "true"
+            - name: ZERO_MUTATE_URL
+              value: http://sheet-db-server-service:80/zero/mutate
             - name: ZERO_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:

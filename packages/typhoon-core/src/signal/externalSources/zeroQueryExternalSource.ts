@@ -490,10 +490,10 @@ export const makeWithContext = <
 ): Effect.Effect<
   ZeroQueryExternalSource<T, E>,
   never,
-  ZeroService<any, any> | Scope.Scope | SignalService.SignalService
+  ZeroService<any, any, any> | Scope.Scope | SignalService.SignalService
 > =>
   pipe(
-    ZeroService<any, any>(),
+    ZeroService<any, any, any>(),
     Effect.andThen((zero) =>
       pipe(
         createSourceWithRefs<T, E>(),
@@ -592,7 +592,7 @@ export const make = <
 ): Effect.Effect<
   ZeroQueryExternalSource<T, never>,
   never,
-  ZeroService<any, any> | Scope.Scope | SignalService.SignalService
+  ZeroService<any, any, any> | Scope.Scope | SignalService.SignalService
 > => makeWithContext<M, Q, T, never, never>(maybeSignalQuery, Context.empty(), options);
 
 /**
@@ -624,10 +624,10 @@ export const makeFromResultWithContext = <
 ): Effect.Effect<
   ZeroQueryExternalSource<T, E>,
   never,
-  ZeroService<any, any> | Scope.Scope | SignalService.SignalService
+  ZeroService<any, any, any> | Scope.Scope | SignalService.SignalService
 > =>
   pipe(
-    ZeroService<any, any>(),
+    ZeroService<any, any, any>(),
     Effect.andThen((zero) =>
       pipe(
         createSourceWithRefs<T, E>(),
@@ -730,5 +730,5 @@ export const makeFromResult = <
 ): Effect.Effect<
   ZeroQueryExternalSource<T, never>,
   never,
-  ZeroService<any, any> | Scope.Scope | SignalService.SignalService
+  ZeroService<any, any, any> | Scope.Scope | SignalService.SignalService
 > => makeFromResultWithContext<M, Q, T, never, never>(maybeSignalQuery, Context.empty(), options);

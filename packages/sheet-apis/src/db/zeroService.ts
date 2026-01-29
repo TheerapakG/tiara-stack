@@ -51,7 +51,7 @@ const makeZero = (config: Config) =>
     Effect.map(({ zero }) => zero),
   );
 
-export const ZeroServiceTag = BaseZeroService.ZeroService<Schema, undefined>();
+export const ZeroServiceTag = BaseZeroService.ZeroService<Schema, undefined, {}>();
 export const ZeroServiceLayer = pipe(
   Config.use((config) => pipe(makeZero(config), Effect.andThen(BaseZeroService.make))),
   Layer.scopedContext,

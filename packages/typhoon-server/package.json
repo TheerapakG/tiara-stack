@@ -30,7 +30,7 @@
   "dependencies": {
     "@standard-schema/spec": "^1.0.0",
     "crossws": "^0.4.1",
-    "drizzle-orm": "^0.44.0",
+    "drizzle-orm": "^0.45.1",
     "ufo": "^1.6.1"
   },
   "devDependencies": {

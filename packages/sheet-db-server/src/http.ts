@@ -3,7 +3,7 @@ import { NodeHttpServer } from "@effect/platform-node";
 import { Layer } from "effect";
 import { createServer } from "http";
 import { Api } from "./api";
-import { ZeroHttpLive } from "./zero/http";
+import { ZeroHttpLive } from "./handlers/zero/http";
 
 const ApiLive = Layer.provide(HttpApiBuilder.api(Api), [ZeroHttpLive]);
 
