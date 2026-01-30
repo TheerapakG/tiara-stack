@@ -217,7 +217,7 @@ class VibecordClient implements acp.Client {
       case "plan":
         return `[Plan]\n${content}`;
       case "agent_thought":
-        return this.applyFormattingWithCodePreserved(content, "_", "_");
+        return this.formatThought(content);
       case "user_message":
         return this.applyFormattingWithCodePreserved(content, "**", "**");
       default:
@@ -330,6 +330,50 @@ class VibecordClient implements acp.Client {
     const afterText = text.slice(lastEnd);
     if (afterText.length > 0) {
       result += `${openFormat}${afterText}${closeFormat}`;
+    }
+
+    return result;
+  }
+
+  private formatThought(content: string): string {
+    // Escape code blocks and inline code, prefix lines with -#
+    const codeBlockRegex = /```[\s\S]*?```/g;
+    const inlineCodeRegex = /`[^`\n]+`/g;
+
+    // First, escape inline code by temporarily replacing with placeholders
+    const inlineCodes: Array<{ placeholder: string; text: string }> = [];
+    let match;
+    let placeholderIndex = 0;
+
+    while ((match = inlineCodeRegex.exec(content)) !== null) {
+      const placeholder = `__INLINE_CODE_${placeholderIndex++}__`;
+      inlineCodes.push({ placeholder, text: match[0] });
+      content = content.replace(match[0], placeholder);
+    }
+
+    // Then escape code blocks
+    const codeBlocks: Array<{ placeholder: string; text: string }> = [];
+    placeholderIndex = 0;
+
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+      const placeholder = `__CODE_BLOCK_${placeholderIndex++}__`;
+      codeBlocks.push({ placeholder, text: match[0] });
+      content = content.replace(match[0], placeholder);
+    }
+
+    // Prefix each line with -#
+    const lines = content.split("\n");
+    const prefixedLines = lines.map((line) => (line.trim() ? `-# ${line}` : line));
+    let result = prefixedLines.join("\n");
+
+    // Restore code blocks (escape backticks to prevent rendering)
+    for (const block of codeBlocks) {
+      result = result.replace(block.placeholder, block.text.replace(/```/g, "```"));
+    }
+
+    // Restore inline code (escape backticks)
+    for (const code of inlineCodes) {
+      result = result.replace(code.placeholder, code.text.replace(/`/g, "\\`"));
     }
 
     return result;
