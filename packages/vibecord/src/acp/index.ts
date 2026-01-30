@@ -217,7 +217,7 @@ class VibecordClient implements acp.Client {
       case "plan":
         return `[Plan]\n${content}`;
       case "agent_thought":
-        return this.applyFormattingWithCodePreserved(content, "_", "_");
+        return this.applyFormattingWithCodePreserved(content, "-# ", "");
       case "user_message":
         return this.applyFormattingWithCodePreserved(content, "**", "**");
       default:
@@ -293,46 +293,47 @@ class VibecordClient implements acp.Client {
     closeFormat: string,
     inlineCodeRegex: RegExp,
   ): string {
-    // Find all inline code in this segment
-    const inlineCodes: Array<{ start: number; end: number; text: string }> = [];
-    let match;
+    return text
+      .split("\n")
+      .map((line) => {
+        if (line.length === 0) return line;
 
-    while ((match = inlineCodeRegex.exec(text)) !== null) {
-      inlineCodes.push({
-        start: match.index,
-        end: match.index + match[0].length,
-        text: match[0],
-      });
-    }
+        const inlineCodes: Array<{ start: number; end: number; text: string }> = [];
+        let match;
 
-    // If no inline code, apply formatting to the whole text
-    if (inlineCodes.length === 0) {
-      return text.length > 0 ? `${openFormat}${text}${closeFormat}` : "";
-    }
+        inlineCodeRegex.lastIndex = 0;
+        while ((match = inlineCodeRegex.exec(line)) !== null) {
+          inlineCodes.push({
+            start: match.index,
+            end: match.index + match[0].length,
+            text: match[0],
+          });
+        }
 
-    // Process segments between inline code
-    let result = "";
-    let lastEnd = 0;
+        if (inlineCodes.length === 0) {
+          return `${openFormat}${line}${closeFormat}`;
+        }
 
-    for (const code of inlineCodes) {
-      // Add the text before the inline code (with formatting applied)
-      const beforeText = text.slice(lastEnd, code.start);
-      if (beforeText.length > 0) {
-        result += `${openFormat}${beforeText}${closeFormat}`;
-      }
+        let result = "";
+        let lastEnd = 0;
 
-      // Add the inline code as-is
-      result += code.text;
-      lastEnd = code.end;
-    }
+        for (const code of inlineCodes) {
+          const beforeText = line.slice(lastEnd, code.start);
+          if (beforeText.length > 0) {
+            result += `${openFormat}${beforeText}${closeFormat}`;
+          }
+          result += code.text;
+          lastEnd = code.end;
+        }
 
-    // Add any remaining text after the last inline code
-    const afterText = text.slice(lastEnd);
-    if (afterText.length > 0) {
-      result += `${openFormat}${afterText}${closeFormat}`;
-    }
+        const afterText = line.slice(lastEnd);
+        if (afterText.length > 0) {
+          result += `${openFormat}${afterText}${closeFormat}`;
+        }
 
-    return result;
+        return result;
+      })
+      .join("\n");
   }
 
   private startBatchTimer(): void {
@@ -371,9 +372,12 @@ class VibecordClient implements acp.Client {
       const completeEntries = entries.slice(0, -1);
       const incompleteEntry = entries[entries.length - 1];
 
+      // Concatenate consecutive entries of the same type
+      const concatenatedEntries = this.concatenateEntries(completeEntries);
+
       // Apply formatting and send complete entries
-      if (completeEntries.length > 0) {
-        const formattedEntries = completeEntries.map((e) =>
+      if (concatenatedEntries.length > 0) {
+        const formattedEntries = concatenatedEntries.map((e) =>
           this.applyFormatting(e.updateType, e.content),
         );
         const contentToSend = formattedEntries.join("\n");
@@ -399,6 +403,45 @@ class VibecordClient implements acp.Client {
     this.flushingBatch.clear();
   }
 
+  private concatenateEntries(entries: BatchEntry[]): BatchEntry[] {
+    const result: BatchEntry[] = [];
+    let currentRun: BatchEntry[] = [];
+
+    const pushCurrentRun = () => {
+      if (currentRun.length === 0) return;
+      if (currentRun.length === 1) {
+        result.push(currentRun[0]);
+      } else {
+        const first = currentRun[0];
+        const shouldNotConcat = ["diff", "plan"].includes(first.updateType);
+        const shouldCommaConcat = first.updateType === "tool_call";
+
+        if (shouldNotConcat) {
+          result.push(...currentRun);
+        } else if (shouldCommaConcat) {
+          const concatenated = currentRun.map((e) => e.content).join(", ");
+          result.push({ ...first, content: concatenated });
+        } else {
+          const concatenated = currentRun.map((e) => e.content).join("");
+          result.push({ ...first, content: concatenated });
+        }
+      }
+      currentRun = [];
+    };
+
+    for (const entry of entries) {
+      if (currentRun.length === 0 || entry.updateType === currentRun[0].updateType) {
+        currentRun.push(entry);
+      } else {
+        pushCurrentRun();
+        currentRun.push(entry);
+      }
+    }
+    pushCurrentRun();
+
+    return result;
+  }
+
   async flushNow(): Promise<void> {
     // Flush all pending updates immediately, including partial lines
     // Use when prompt completes to ensure all output is sent
@@ -418,8 +461,13 @@ class VibecordClient implements acp.Client {
       const thread = await this.getThreadForSession(sessionId);
       if (!thread) continue;
 
-      // Apply formatting to each entry and send
-      const formattedEntries = entries.map((e) => this.applyFormatting(e.updateType, e.content));
+      // Concatenate consecutive entries of the same type
+      const concatenatedEntries = this.concatenateEntries(entries);
+
+      // Apply formatting and send
+      const formattedEntries = concatenatedEntries.map((e) =>
+        this.applyFormatting(e.updateType, e.content),
+      );
       const contentToSend = formattedEntries.join("\n");
       try {
         await thread.send(contentToSend);
