@@ -76,6 +76,40 @@ Backend API server for Google Sheets integration, providing RPC handlers for she
 - **Google** (`packages/sheet-apis/src/google`): Google Sheets API integration
 - **Config** (`packages/sheet-apis/src/config`): Configuration management
 
+### `sheet-apis-v2` (packages/sheet-apis-v2)
+
+Backend API server v2 for Google Sheets integration using Effect's HttpApiBuilder, providing HTTP API handlers for sheet operations, calculations, guild configuration, and message management.
+
+- **Main entry** (`packages/sheet-apis-v2/src/index.ts`): Server entry point that launches the HTTP API server
+- **HTTP** (`packages/sheet-apis-v2/src/http.ts`): HTTP server configuration with all handler groups
+- **API** (`packages/sheet-apis-v2/src/api.ts`): API definitions using HttpApiBuilder
+- **Handlers** (`packages/sheet-apis-v2/src/handlers`): HTTP API handler implementations for:
+  - Calc: Sheet calculation operations
+  - GuildConfig: Discord guild configuration management
+  - Health: Health check endpoint
+  - MessageCheckin: Check-in message handling
+  - MessageRoomOrder: Room ordering message handling
+  - MessageSlot: Slot message handling
+  - Monitor: Monitoring and observability
+  - Player: Player data management
+  - Schedule: Scheduling operations
+  - Screenshot: Screenshot generation
+  - Sheet: Google Sheets operations
+- **Services** (`packages/sheet-apis-v2/src/services`): Business logic services including Google Sheets integration and Zero sync
+- **Schemas** (`packages/sheet-apis-v2/src/schemas`): Protocol buffer schema definitions
+- **Config** (`packages/sheet-apis-v2/src/config.ts`): Configuration management
+
+### `sheet-db-server` (packages/sheet-db-server)
+
+Database server providing Zero (real-time sync) HTTP API for the sheet database schema using Rocicorp Zero.
+
+- **Main entry** (`packages/sheet-db-server/src/index.ts`): Server entry point that launches the HTTP API server
+- **HTTP** (`packages/sheet-db-server/src/http.ts`): HTTP server configuration with Zero handler group
+- **API** (`packages/sheet-db-server/src/api.ts`): API definitions using HttpApiBuilder
+- **Handlers** (`packages/sheet-db-server/src/handlers`): HTTP API handler implementations for:
+  - Zero: Real-time sync handlers for query and mutate requests using Rocicorp Zero
+- **Services** (`packages/sheet-db-server/src/services`): Database service layer
+
 ### `sheet-bot` (packages/sheet-bot)
 
 Discord bot application that integrates with sheet-apis to provide Discord commands and interactions.
@@ -110,6 +144,19 @@ Database schema definitions using Drizzle ORM for PostgreSQL.
   - messageCheckinMember: Member check-in records
   - messageRoomOrder: Room order message tracking
   - messageRoomOrderEntry: Room order entry records
+
+### `vibecord` (packages/vibecord)
+
+Discord bot application for VibeCord, providing workspace and session management with ACP (Agent Client Protocol) integration.
+
+- **Main export** (`packages/vibecord/src/index.ts`): Exports package name and version
+- **register** (`packages/vibecord/src/register.ts`): Discord command registration script
+- **Bot** (`packages/vibecord/src/bot`): Discord bot implementation with Gateway event handling
+- **Commands** (`packages/vibecord/src/commands`): Discord slash command handlers including workspace and session management
+- **ACP** (`packages/vibecord/src/acp`): OpenCode Agent Client Protocol integration
+- **DB** (`packages/vibecord/src/db`): Database service layer using Drizzle ORM with SQLite
+- **Config** (`packages/vibecord/src/config`): Configuration management
+- **Utils** (`packages/vibecord/src/utils`): Utility functions
 
 ## Utility Packages
 
