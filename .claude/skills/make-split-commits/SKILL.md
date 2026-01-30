@@ -30,6 +30,18 @@ Evaluate what changes has been done within the repository, and commit them. The 
    - Stage all the relevant files using `gt add -v -- [<pathspec>...]`.
    - Commit according to the guidelines.
 
+   **Checklist before committing:**
+   - [ ] Is this the first commit on a new branch?
+     - If on trunk (master): use `gt create` (DO NOT commit directly to master)
+     - Otherwise: ask developer or use `gt modify -c`
+   - [ ] Branch name is set (if creating new branch):
+     - Format: `<username>/<branch-name>` or `<username>/<linear-issue-branch-name>`
+     - NOT blank, NOT placeholder `<username>`
+   - [ ] Commit message format:
+     - Uses conventional commit (e.g., `feat(package): description`)
+     - Uses `-m` for new lines, NOT `\n`
+     - Example: `gt create user/feature-branch -m "subject" -m "line1" -m "line2"`
+
 4. **Submitting Changes**
 
    Use `gt submit --no-interactive` to submit all changes.

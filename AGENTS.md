@@ -8,7 +8,7 @@ This monorepo contains the following packages:
 
 Core framework for building RPC-like communication systems with WebSocket support.
 
-- **Main export** (`packages/typhoon-core/src/index.ts`): Exports Handler, Observability, Protocol, Runtime, Schema, Server, Signal, Utils, Validator modules
+- **Main export** (`packages/typhoon-core/src/index.ts`): Exports Handler, Observability, Protocol, Runtime, Schema, Server, Signal, Utils, Validator, Bundler, Error, Services modules
 - **Sub-exports** (`packages/typhoon-core/src/*`): Each subdirectory can be imported as `typhoon-core/<module-name>`
 - **Handler** (`packages/typhoon-core/src/handler`): Request/response handler context and types
 - **Protocol** (`packages/typhoon-core/src/protocol`): Communication protocol definitions including Msgpack serialization
@@ -19,6 +19,9 @@ Core framework for building RPC-like communication systems with WebSocket suppor
 - **Validator** (`packages/typhoon-core/src/validator`): Validation utilities
 - **Signal** (`packages/typhoon-core/src/signal`): Signal/event handling
 - **Observability** (`packages/typhoon-core/src/observability`): Observability and monitoring utilities
+- **Bundler** (`packages/typhoon-core/src/bundler`): Code bundling utilities
+- **Error** (`packages/typhoon-core/src/error`): Error handling utilities
+- **Services** (`packages/typhoon-core/src/services`): Core service implementations
 
 ### `typhoon-server` (packages/typhoon-server)
 
@@ -30,6 +33,7 @@ Server-side implementation for the Typhoon framework.
 - **DB** (`packages/typhoon-server/src/db`): Database connection and context management
 - **Event** (`packages/typhoon-server/src/event`): Event handling system
 - **Handler** (`packages/typhoon-server/src/handler`): Server-side handler context and collections
+- **Bundler** (`packages/typhoon-server/src/bundler.d.ts`): Ambient type definitions for bundler (not an exported module)
 
 ### `typhoon-client-ws` (packages/typhoon-client-ws)
 
@@ -83,6 +87,8 @@ Backend API server v2 for Google Sheets integration using Effect's HttpApiBuilde
 - **Main entry** (`packages/sheet-apis-v2/src/index.ts`): Server entry point that launches the HTTP API server
 - **HTTP** (`packages/sheet-apis-v2/src/http.ts`): HTTP server configuration with all handler groups
 - **API** (`packages/sheet-apis-v2/src/api.ts`): API definitions using HttpApiBuilder
+- **Metrics** (`packages/sheet-apis-v2/src/metrics.ts`): OpenTelemetry metrics configuration
+- **Traces** (`packages/sheet-apis-v2/src/traces.ts`): OpenTelemetry traces configuration
 - **Handlers** (`packages/sheet-apis-v2/src/handlers`): HTTP API handler implementations for:
   - Calc: Sheet calculation operations
   - GuildConfig: Discord guild configuration management
@@ -95,7 +101,20 @@ Backend API server v2 for Google Sheets integration using Effect's HttpApiBuilde
   - Schedule: Scheduling operations
   - Screenshot: Screenshot generation
   - Sheet: Google Sheets operations
-- **Services** (`packages/sheet-apis-v2/src/services`): Business logic services including Google Sheets integration and Zero sync
+- **Services** (`packages/sheet-apis-v2/src/services`): Business logic services:
+  - calc.ts: Calculation service
+  - google/: Google Sheets API integration
+  - guildConfig.ts: Guild configuration service
+  - messageCheckin.ts: Check-in message service
+  - messageRoomOrder.ts: Room order message service
+  - messageSlot.ts: Slot message service
+  - monitor.ts: Monitoring service
+  - player.ts: Player data service
+  - schedule.ts: Scheduling service
+  - screenshot.ts: Screenshot service
+  - sheet.ts: Google Sheets operations service
+  - sheetConfig.ts: Sheet configuration service
+  - zero.ts: Zero sync service
 - **Schemas** (`packages/sheet-apis-v2/src/schemas`): Protocol buffer schema definitions
 - **Config** (`packages/sheet-apis-v2/src/config.ts`): Configuration management
 
@@ -106,6 +125,8 @@ Database server providing Zero (real-time sync) HTTP API for the sheet database 
 - **Main entry** (`packages/sheet-db-server/src/index.ts`): Server entry point that launches the HTTP API server
 - **HTTP** (`packages/sheet-db-server/src/http.ts`): HTTP server configuration with Zero handler group
 - **API** (`packages/sheet-db-server/src/api.ts`): API definitions using HttpApiBuilder
+- **Metrics** (`packages/sheet-db-server/src/metrics.ts`): OpenTelemetry metrics configuration
+- **Traces** (`packages/sheet-db-server/src/traces.ts`): OpenTelemetry traces configuration
 - **Handlers** (`packages/sheet-db-server/src/handlers`): HTTP API handler implementations for:
   - Zero: Real-time sync handlers for query and mutate requests using Rocicorp Zero
 - **Services** (`packages/sheet-db-server/src/services`): Database service layer
@@ -115,6 +136,7 @@ Database server providing Zero (real-time sync) HTTP API for the sheet database 
 Discord bot application that integrates with sheet-apis to provide Discord commands and interactions.
 
 - **Main export** (`packages/sheet-bot/src/index.ts`): Bot entry point that initializes Discord bot with commands and handlers
+- **register** (`packages/sheet-bot/src/register.ts`): Discord command registration script
 - **Bot** (`packages/sheet-bot/src/bot`): Discord bot implementation
 - **Commands** (`packages/sheet-bot/src/commands`): Discord slash command handlers
 - **Services** (`packages/sheet-bot/src/services`): Business logic services for guild, member, collection, message, channel, and interaction management
@@ -123,6 +145,7 @@ Discord bot application that integrates with sheet-apis to provide Discord comma
 - **Types** (`packages/sheet-bot/src/types`): Type definitions for handlers and errors
 - **Config** (`packages/sheet-bot/src/config`): Configuration management
 - **Utils** (`packages/sheet-bot/src/utils`): Utility functions
+- **Tasks** (`packages/sheet-bot/src/tasks`): Background task implementations including auto-checkin
 
 ### `sheet-formulas` (packages/sheet-formulas)
 
@@ -144,6 +167,9 @@ Database schema definitions using Drizzle ORM for PostgreSQL.
   - messageCheckinMember: Member check-in records
   - messageRoomOrder: Room order message tracking
   - messageRoomOrderEntry: Room order entry records
+- **Zero** (`packages/sheet-db-schema/src/zero`): Rocicorp Zero schema definitions:
+  - queries: Zero query definitions
+  - mutators: Zero mutator definitions
 
 ### `vibecord` (packages/vibecord)
 
