@@ -1,15 +1,15 @@
 import { HttpApi, OpenApi } from "@effect/platform";
-import { CalcApi } from "./handlers/calc";
-import { HealthApi } from "./handlers/health";
-import { GuildConfigApi } from "./handlers/guildConfig";
-import { MessageCheckinApi } from "./handlers/messageCheckin";
-import { MessageRoomOrderApi } from "./handlers/messageRoomOrder";
-import { MessageSlotApi } from "./handlers/messageSlot";
-import { SheetApi } from "./handlers/sheet";
-import { MonitorApi } from "./handlers/monitor";
-import { PlayerApi } from "./handlers/player";
-import { ScreenshotApi } from "./handlers/screenshot";
-import { ScheduleApi } from "./handlers/schedule";
+import { CalcApi } from "./handlers/calc/api";
+import { HealthApi } from "./handlers/health/api";
+import { GuildConfigApi } from "./handlers/guildConfig/api";
+import { MessageCheckinApi } from "./handlers/messageCheckin/api";
+import { MessageRoomOrderApi } from "./handlers/messageRoomOrder/api";
+import { MessageSlotApi } from "./handlers/messageSlot/api";
+import { SheetApi } from "./handlers/sheet/api";
+import { MonitorApi } from "./handlers/monitor/api";
+import { PlayerApi } from "./handlers/player/api";
+import { ScreenshotApi } from "./handlers/screenshot/api";
+import { ScheduleApi } from "./handlers/schedule/api";
 
 export class Api extends HttpApi.make("api")
   .add(CalcApi)

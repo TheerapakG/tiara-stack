@@ -17,6 +17,6 @@ const configSchema = pipe(
 export class Config extends Effect.Service<Config>()("Config", {
   effect: pipe(
     Effect.tryPromise(() => loadConfig({ dotenv: true })),
-    Effect.andThen(Schema.decodeUnknown(configSchema)(process.env)),
+    Effect.andThen(() => Schema.decodeUnknown(configSchema)(process.env)),
   ),
 }) {}

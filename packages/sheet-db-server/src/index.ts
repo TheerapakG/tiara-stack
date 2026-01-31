@@ -10,7 +10,6 @@ HttpLive.pipe(
   Layer.provide(Logger.logFmt),
   Layer.launch,
   NodeRuntime.runMain({
-    disableErrorReporting: true,
     disablePrettyLogger: true,
   }),
 );

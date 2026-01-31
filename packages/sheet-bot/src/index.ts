@@ -46,7 +46,6 @@ NodeRuntime.runMain(
     Effect.scoped,
   ),
   {
-    disableErrorReporting: true,
     disablePrettyLogger: true,
   },
 );
