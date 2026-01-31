@@ -1,5 +1,4 @@
 import { Schema } from "effect";
-import { DateFromUnknown } from "../date";
 
 export class GuildChannelConfig extends Schema.TaggedClass<GuildChannelConfig>()(
   "GuildChannelConfig",
@@ -10,8 +9,8 @@ export class GuildChannelConfig extends Schema.TaggedClass<GuildChannelConfig>()
     running: Schema.Boolean,
     roleId: Schema.OptionFromNullishOr(Schema.String, undefined),
     checkinChannelId: Schema.OptionFromNullishOr(Schema.String, undefined),
-    createdAt: Schema.OptionFromNullishOr(DateFromUnknown, undefined),
-    updatedAt: Schema.OptionFromNullishOr(DateFromUnknown, undefined),
-    deletedAt: Schema.OptionFromNullishOr(DateFromUnknown, undefined),
+    createdAt: Schema.OptionFromNullishOr(Schema.DateTimeUtcFromNumber, undefined),
+    updatedAt: Schema.OptionFromNullishOr(Schema.DateTimeUtcFromNumber, undefined),
+    deletedAt: Schema.OptionFromNullishOr(Schema.DateTimeUtcFromNumber, undefined),
   },
 ) {}

@@ -6,7 +6,6 @@ import { ParserFieldError } from "@/schemas/sheet/error";
 import { SheetConfigError } from "@/schemas/sheetConfig";
 import { Room } from "@/schemas/sheet/room";
 import { Team } from "@/schemas/sheet";
-import { DefaultTaggedClass } from "typhoon-core/schema";
 
 const CalcError = Schema.Union(
   GoogleSheetsError,
@@ -25,7 +24,7 @@ export class CalcApi extends HttpApiGroup.make("calc")
             healNeeded: Schema.Number,
             considerEnc: Schema.Boolean,
           }),
-          players: pipe(Schema.Array(Schema.Array(DefaultTaggedClass(Team))), Schema.itemsCount(5)),
+          players: pipe(Schema.Array(Schema.Array(Team)), Schema.itemsCount(5)),
         }),
       )
       .addSuccess(
