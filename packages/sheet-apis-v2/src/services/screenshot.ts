@@ -2,21 +2,20 @@ import { Array, Effect, Option, pipe } from "effect";
 import { HttpClient } from "@effect/platform";
 import { chromium } from "playwright";
 import { SheetService } from "./sheet";
-import { GoogleSheets } from "./google/sheets";
 import { joinURL, withQuery } from "ufo";
 import { Struct as StructUtils } from "typhoon-core/utils";
 import { makeUnknownError } from "typhoon-core/error";
 
 export class ScreenshotService extends Effect.Service<ScreenshotService>()("ScreenshotService", {
   effect: pipe(
-    Effect.Do,
-    Effect.bindAll(
-      () => ({
+    Effect.all(
+      {
         sheetService: SheetService,
-      }),
+        httpClient: HttpClient.HttpClient,
+      },
       { concurrency: "unbounded" },
     ),
-    Effect.map(({ sheetService }) => ({
+    Effect.map(({ sheetService, httpClient }) => ({
       getScreenshot: (sheetId: string, channel: string, day: number) =>
         pipe(
           Effect.Do,
@@ -60,7 +59,7 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()("Scre
           }),
           Effect.bind("css", () =>
             pipe(
-              HttpClient.get(
+              httpClient.get(
                 withQuery("https://fonts.googleapis.com/css2", {
                   family: ["Lexend:wght@100..900", "Pacifico"],
                   display: "swap",
@@ -104,6 +103,6 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()("Scre
         ),
     })),
   ),
-  dependencies: [SheetService.Default, GoogleSheets.Default],
+  dependencies: [SheetService.Default],
   accessors: true,
 }) {}

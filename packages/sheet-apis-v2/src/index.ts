@@ -9,5 +9,5 @@ HttpLive.pipe(
   Layer.provide(TracesLive),
   Layer.provide(Logger.logFmt),
   Layer.launch,
-  NodeRuntime.runMain as any,
+  NodeRuntime.runMain,
 );

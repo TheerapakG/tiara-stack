@@ -889,7 +889,7 @@ const scheduleParser = (
   );
 
 export class SheetService extends Effect.Service<SheetService>()("SheetService", {
-  effect: pipe(
+  scoped: pipe(
     Effect.all(
       {
         sheet: GoogleSheets,

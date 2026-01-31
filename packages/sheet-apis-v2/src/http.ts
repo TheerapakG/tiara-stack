@@ -1,5 +1,5 @@
 import { HttpApiBuilder, HttpApiSwagger, HttpMiddleware, HttpServer } from "@effect/platform";
-import { NodeHttpServer } from "@effect/platform-node";
+import { NodeHttpClient, NodeHttpServer } from "@effect/platform-node";
 import { Layer } from "effect";
 import { createServer } from "http";
 import { Api } from "./api";
@@ -14,8 +14,6 @@ import { MonitorLive } from "./handlers/monitor";
 import { PlayerLive } from "./handlers/player";
 import { ScreenshotLive } from "./handlers/screenshot";
 import { ScheduleLive } from "./handlers/schedule";
-import { SheetConfigService } from "./services/sheetConfig";
-import { GoogleLive } from "./services/google";
 
 const ApiLive = Layer.provide(HttpApiBuilder.api(Api), [
   CalcLive,
@@ -36,8 +34,7 @@ export const HttpLive = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
   Layer.provide(HttpApiBuilder.middlewareOpenApi()),
   Layer.provide(HttpApiBuilder.middlewareCors()),
   Layer.provide(ApiLive),
-  Layer.provide(SheetConfigService.DefaultWithoutDependencies),
-  Layer.provide(GoogleLive),
+  Layer.provide(NodeHttpClient.layer),
   HttpServer.withLogAddress,
   Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 })),
 );

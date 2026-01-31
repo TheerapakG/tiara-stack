@@ -56,4 +56,5 @@ export const ZeroTag = BaseZeroService.ZeroService<Schema, undefined, {}>();
 export const ZeroLive = pipe(
   Config.use((config) => pipe(makeZero(config), Effect.andThen(BaseZeroService.make))),
   Layer.scopedContext,
+  Layer.provide(Config.Default),
 );

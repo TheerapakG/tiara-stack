@@ -6,7 +6,7 @@ import { upperFirst } from "scule";
 import { ScopedCache } from "typhoon-core/utils";
 
 export class MonitorService extends Effect.Service<MonitorService>()("MonitorService", {
-  effect: pipe(
+  scoped: pipe(
     Effect.Do,
     Effect.bind("sheetService", () => SheetService),
     Effect.bindAll(({ sheetService }) => ({

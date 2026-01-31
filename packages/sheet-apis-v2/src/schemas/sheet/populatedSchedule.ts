@@ -1,8 +1,8 @@
-import { Array, HashMap, Match, Number, Option, pipe, Schema } from "effect";
+import { Array, HashMap, Number, Option, pipe, Schema } from "effect";
 import { Player, PartialNamePlayer } from "./player";
 import { Monitor, PartialNameMonitor } from "./monitor";
 import { RawSchedulePlayer } from "./rawSchedulePlayer";
-import { BreakSchedule, Schedule } from "./schedule";
+import { Schedule } from "./schedule";
 
 // Player wrapper with resolved player and enc flag
 export class PopulatedSchedulePlayer extends Schema.TaggedClass<PopulatedSchedulePlayer>()(

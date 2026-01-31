@@ -6,7 +6,7 @@ import { Player, PartialIdPlayer, PartialNamePlayer } from "@/schemas/sheet";
 import { ScopedCache } from "typhoon-core/utils";
 
 export class PlayerService extends Effect.Service<PlayerService>()("PlayerService", {
-  effect: pipe(
+  scoped: pipe(
     Effect.Do,
     Effect.bind("sheetService", () => SheetService),
     Effect.bindAll(({ sheetService }) => ({
