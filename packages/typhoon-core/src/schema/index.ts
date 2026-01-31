@@ -9,3 +9,4 @@ export * as Result from "./result";
 export * from "./rpc";
 export * from "./structToTuple";
 export * from "./tupleToStruct";
+export * from "./readonlyJsonValue";

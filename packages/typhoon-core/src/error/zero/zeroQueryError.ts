@@ -1,26 +1,11 @@
 import { Schema } from "effect";
-import type { ReadonlyJSONValue } from "@rocicorp/zero";
-
-export const ReadonlyJSONValueSchema: Schema.Schema<ReadonlyJSONValue> = Schema.Union(
-  Schema.Null,
-  Schema.String,
-  Schema.Number,
-  Schema.Boolean,
-  Schema.Array(Schema.suspend(() => ReadonlyJSONValueSchema)),
-  Schema.Record({
-    key: Schema.String,
-    value: Schema.Union(
-      Schema.suspend(() => ReadonlyJSONValueSchema),
-      Schema.Undefined,
-    ),
-  }),
-);
+import { ReadonlyJSONValue } from "@/schema/readonlyJsonValue";
 
 const ZeroQueryErrorData = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   message: Schema.optional(Schema.String),
-  details: Schema.optional(ReadonlyJSONValueSchema),
+  details: Schema.optional(ReadonlyJSONValue),
 });
 
 export class ZeroQueryAppError extends Schema.TaggedError<ZeroQueryAppError>()(
@@ -85,7 +70,7 @@ export class QueryResultAppError extends Schema.TaggedError<QueryResultAppError>
     id: Schema.String,
     name: Schema.String,
     message: Schema.optional(Schema.String),
-    details: Schema.optional(ReadonlyJSONValueSchema),
+    details: Schema.optional(ReadonlyJSONValue),
   }),
 ) {}
 
@@ -96,7 +81,7 @@ export class QueryResultParseError extends Schema.TaggedError<QueryResultParseEr
     id: Schema.String,
     name: Schema.String,
     message: Schema.optional(Schema.String),
-    details: Schema.optional(ReadonlyJSONValueSchema),
+    details: Schema.optional(ReadonlyJSONValue),
   }),
 ) {}
 
@@ -109,7 +94,7 @@ export class MutatorResultAppError extends Schema.TaggedError<MutatorResultAppEr
   Schema.Struct({
     type: Schema.Literal("app"),
     message: Schema.String,
-    details: Schema.optional(ReadonlyJSONValueSchema),
+    details: Schema.optional(ReadonlyJSONValue),
   }),
 ) {}
 

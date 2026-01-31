@@ -349,6 +349,9 @@ importers:
       sheet-db-schema:
         specifier: workspace:*
         version: link:../sheet-db-schema
+      typhoon-core:
+        specifier: workspace:*
+        version: link:../typhoon-core
     devDependencies:
       '@types/node':
         specifier: ^24.7.2
