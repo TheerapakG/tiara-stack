@@ -39,7 +39,7 @@
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
-    "@effect/platform": "^0.90.9",
+    "@effect/platform": "^0.92.1",
     "effect": "^3.18.4"
   }
 }

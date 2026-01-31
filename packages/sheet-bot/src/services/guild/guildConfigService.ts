@@ -1,8 +1,7 @@
 import { bindObject } from "@/utils";
 import { Effect, pipe } from "effect";
 import { configGuild, configGuildChannel } from "sheet-db-schema";
-import { WebSocketClient } from "typhoon-client-ws/client";
-import { SheetApisClient } from "~~/src/client/sheetApis";
+import { SheetApisClient } from "@/client/sheetApis";
 import { GuildService } from "./guildService";
 
 type GuildConfigInsert = typeof configGuild.$inferInsert;
@@ -20,16 +19,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.subscribeScoped(
-              sheetApisClient.get(),
-              "guildConfig.getGuildConfigByGuildId",
-              guildId,
-            ),
-          ),
-          Effect.map(
-            Effect.withSpan("GuildConfigService.getGuildConfigByGuildId subscription", {
-              captureStackTrace: true,
-            }),
+            sheetApisClient.get().guildConfig.getGuildConfigByGuildId({ urlParams: { guildId } }),
           ),
           Effect.withSpan("GuildConfigService.getGuildConfigByGuildId", {
             captureStackTrace: true,
@@ -44,9 +34,15 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.mutate(sheetApisClient.get(), "guildConfig.upsertGuildConfig", {
-              guildId,
-              ...config,
+            sheetApisClient.get().guildConfig.upsertGuildConfig({
+              payload: {
+                guildId,
+                config: {
+                  scriptId: config.scriptId ?? undefined,
+                  sheetId: config.sheetId ?? undefined,
+                  autoCheckin: config.autoCheckin ?? undefined,
+                },
+              },
             }),
           ),
           Effect.withSpan("GuildConfigService.upsertGuildConfig", {
@@ -57,16 +53,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.subscribeScoped(
-              sheetApisClient.get(),
-              "guildConfig.getGuildManagerRoles",
-              guildId,
-            ),
-          ),
-          Effect.map(
-            Effect.withSpan("GuildConfigService.getGuildManagerRoles subscription", {
-              captureStackTrace: true,
-            }),
+            sheetApisClient.get().guildConfig.getGuildManagerRoles({ urlParams: { guildId } }),
           ),
           Effect.withSpan("GuildConfigService.getGuildManagerRoles", {
             captureStackTrace: true,
@@ -76,10 +63,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.mutate(sheetApisClient.get(), "guildConfig.addGuildManagerRole", {
-              guildId,
-              roleId,
-            }),
+            sheetApisClient.get().guildConfig.addGuildManagerRole({ payload: { guildId, roleId } }),
           ),
           Effect.withSpan("GuildConfigService.addGuildManagerRole", {
             captureStackTrace: true,
@@ -89,10 +73,9 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.mutate(sheetApisClient.get(), "guildConfig.removeGuildManagerRole", {
-              guildId,
-              roleId,
-            }),
+            sheetApisClient
+              .get()
+              .guildConfig.removeGuildManagerRole({ payload: { guildId, roleId } }),
           ),
           Effect.withSpan("GuildConfigService.removeGuildManagerRole", {
             captureStackTrace: true,
@@ -108,10 +91,17 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.mutate(sheetApisClient.get(), "guildConfig.upsertGuildChannelConfig", {
-              guildId,
-              channelId,
-              ...config,
+            sheetApisClient.get().guildConfig.upsertGuildChannelConfig({
+              payload: {
+                guildId,
+                channelId,
+                config: {
+                  name: config.name ?? undefined,
+                  running: config.running ?? undefined,
+                  roleId: config.roleId ?? undefined,
+                  checkinChannelId: config.checkinChannelId ?? undefined,
+                },
+              },
             }),
           ),
           Effect.withSpan("GuildConfigService.upsertGuildChannelConfig", {
@@ -120,16 +110,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
         ),
       getGuildConfigByScriptId: (scriptId: string) =>
         pipe(
-          WebSocketClient.subscribeScoped(
-            sheetApisClient.get(),
-            "guildConfig.getGuildConfigByScriptId",
-            scriptId,
-          ),
-          Effect.map(
-            Effect.withSpan("GuildConfigService.getGuildConfigByScriptId subscription", {
-              captureStackTrace: true,
-            }),
-          ),
+          sheetApisClient.get().guildConfig.getGuildConfigByScriptId({ urlParams: { scriptId } }),
           Effect.withSpan("GuildConfigService.getGuildConfigByScriptId", {
             captureStackTrace: true,
           }),
@@ -138,19 +119,9 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.subscribeScoped(
-              sheetApisClient.get(),
-              "guildConfig.getGuildRunningChannelById",
-              {
-                guildId,
-                channelId,
-              },
-            ),
-          ),
-          Effect.map(
-            Effect.withSpan("GuildConfigService.getGuildRunningChannelById subscription", {
-              captureStackTrace: true,
-            }),
+            sheetApisClient
+              .get()
+              .guildConfig.getGuildRunningChannelById({ urlParams: { guildId, channelId } }),
           ),
           Effect.withSpan("GuildConfigService.getGuildRunningChannelById", {
             captureStackTrace: true,
@@ -160,18 +131,8 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.subscribeScoped(
-              sheetApisClient.get(),
-              "guildConfig.getGuildRunningChannelByName",
-              {
-                guildId,
-                channelName,
-              },
-            ),
-          ),
-          Effect.map(
-            Effect.withSpan("GuildConfigService.getGuildRunningChannelByName subscription", {
-              captureStackTrace: true,
+            sheetApisClient.get().guildConfig.getGuildRunningChannelByName({
+              urlParams: { guildId, channelName },
             }),
           ),
           Effect.withSpan("GuildConfigService.getGuildRunningChannelByName", {

@@ -7,6 +7,7 @@ import {
   MonitorService,
   SheetService,
   ScreenshotService,
+  ScheduleService,
 } from "@/services/guild";
 import { CachedInteractionContext, InteractionContext } from "@/services/interaction";
 import { Effect, Layer, Option, pipe } from "effect";
@@ -22,6 +23,7 @@ export const guildServices = (guildId: string) =>
         PlayerService.DefaultWithoutDependencies,
         MonitorService.DefaultWithoutDependencies,
         ScreenshotService.DefaultWithoutDependencies,
+        ScheduleService.DefaultWithoutDependencies,
       ),
     ),
     Layer.provideMerge(GuildService.fromGuildId(guildId)),

@@ -2,7 +2,8 @@ import { zeroDrizzle } from "@rocicorp/zero/server/adapters/drizzle";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { Effect, pipe } from "effect";
 import postgres from "postgres";
-import { schema } from "sheet-db-schema/zero";
+import * as schema from "sheet-db-schema";
+import { schema as zeroSchema } from "sheet-db-schema/zero";
 import { Config } from "@/config";
 
 export class DBService extends Effect.Service<DBService>()("DBService", {
@@ -12,8 +13,8 @@ export class DBService extends Effect.Service<DBService>()("DBService", {
     Effect.bind("client", () =>
       Config.use(({ postgresUrl }) => Effect.try(() => postgres(postgresUrl))),
     ),
-    Effect.bind("db", ({ client }) => Effect.try(() => drizzle(client))),
-    Effect.bind("zql", ({ db }) => Effect.try(() => zeroDrizzle(schema, db))),
+    Effect.bind("db", ({ client }) => Effect.try(() => drizzle(client, { schema }))),
+    Effect.bind("zql", ({ db }) => Effect.try(() => zeroDrizzle(zeroSchema, db))),
     Effect.tap(({ client }) =>
       Effect.addFinalizer(() =>
         pipe(

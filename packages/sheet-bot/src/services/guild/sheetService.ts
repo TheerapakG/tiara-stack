@@ -1,9 +1,7 @@
 import { bindObject } from "@/utils";
 import { Effect, pipe } from "effect";
-import { WebSocketClient } from "typhoon-client-ws/client";
 import { SheetApisClient } from "@/client/sheetApis";
 import { GuildService } from "./guildService";
-import { UntilObserver } from "typhoon-core/signal";
 
 export class SheetService extends Effect.Service<SheetService>()("SheetService", {
   effect: pipe(
@@ -17,12 +15,8 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.subscribeScoped(sheetApisClient.get(), "sheetConfig.getRangesConfig", {
-              guildId,
-            }),
+            sheetApisClient.get().sheet.getRangesConfig({ urlParams: { guildId } }),
           ),
-          UntilObserver.observeUntilRpcResultResolved(),
-          Effect.flatten,
           Effect.withSpan("SheetService.rangesConfig", {
             captureStackTrace: true,
           }),
@@ -32,12 +26,8 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.subscribeScoped(sheetApisClient.get(), "sheetConfig.getTeamConfig", {
-              guildId,
-            }),
+            sheetApisClient.get().sheet.getTeamConfig({ urlParams: { guildId } }),
           ),
-          UntilObserver.observeUntilRpcResultResolved(),
-          Effect.flatten,
           Effect.withSpan("SheetService.teamConfig", {
             captureStackTrace: true,
           }),
@@ -47,12 +37,8 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.subscribeScoped(sheetApisClient.get(), "sheet.getMonitors", {
-              guildId,
-            }),
+            sheetApisClient.get().sheet.getMonitors({ urlParams: { guildId } }),
           ),
-          UntilObserver.observeUntilRpcResultResolved(),
-          Effect.flatten,
           Effect.withSpan("SheetService.monitors", {
             captureStackTrace: true,
           }),
@@ -62,12 +48,8 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.subscribeScoped(sheetApisClient.get(), "sheetConfig.getEventConfig", {
-              guildId,
-            }),
+            sheetApisClient.get().sheet.getEventConfig({ urlParams: { guildId } }),
           ),
-          UntilObserver.observeUntilRpcResultResolved(),
-          Effect.flatten,
           Effect.withSpan("SheetService.eventConfig", {
             captureStackTrace: true,
           }),
@@ -77,14 +59,8 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.subscribeScoped(
-              sheetApisClient.get(),
-              "sheetConfig.getScheduleConfig",
-              { guildId },
-            ),
+            sheetApisClient.get().sheet.getScheduleConfig({ urlParams: { guildId } }),
           ),
-          UntilObserver.observeUntilRpcResultResolved(),
-          Effect.flatten,
           Effect.withSpan("SheetService.scheduleConfig", {
             captureStackTrace: true,
           }),
@@ -94,12 +70,8 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.subscribeScoped(sheetApisClient.get(), "sheetConfig.getRunnerConfig", {
-              guildId,
-            }),
+            sheetApisClient.get().sheet.getRunnerConfig({ urlParams: { guildId } }),
           ),
-          UntilObserver.observeUntilRpcResultResolved(),
-          Effect.flatten,
           Effect.withSpan("SheetService.runnerConfig", {
             captureStackTrace: true,
           }),
@@ -109,10 +81,8 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.subscribeScoped(sheetApisClient.get(), "sheet.getPlayers", { guildId }),
+            sheetApisClient.get().sheet.getPlayers({ urlParams: { guildId } }),
           ),
-          UntilObserver.observeUntilRpcResultResolved(),
-          Effect.flatten,
           Effect.withSpan("SheetService.players", {
             captureStackTrace: true,
           }),
@@ -122,7 +92,7 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.subscribeScoped(sheetApisClient.get(), "sheet.getTeams", { guildId }),
+            sheetApisClient.get().sheet.getTeams({ urlParams: { guildId } }),
           ),
           Effect.withSpan("SheetService.teams", {
             captureStackTrace: true,
@@ -133,12 +103,8 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.subscribeScoped(sheetApisClient.get(), "sheet.getAllSchedules", {
-              guildId,
-            }),
+            sheetApisClient.get().sheet.getAllSchedules({ urlParams: { guildId } }),
           ),
-          UntilObserver.observeUntilRpcResultResolved(),
-          Effect.flatten,
           Effect.withSpan("SheetService.allSchedules", {
             captureStackTrace: true,
           }),
@@ -148,13 +114,8 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.subscribeScoped(sheetApisClient.get(), "sheet.getDaySchedules", {
-              guildId,
-              day,
-            }),
+            sheetApisClient.get().sheet.getDaySchedules({ urlParams: { guildId, day } }),
           ),
-          UntilObserver.observeUntilRpcResultResolved(),
-          Effect.flatten,
           Effect.withSpan("SheetService.daySchedules", {
             captureStackTrace: true,
           }),
@@ -164,13 +125,8 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.subscribeScoped(sheetApisClient.get(), "sheet.getChannelSchedules", {
-              guildId,
-              channel,
-            }),
+            sheetApisClient.get().sheet.getChannelSchedules({ urlParams: { guildId, channel } }),
           ),
-          UntilObserver.observeUntilRpcResultResolved(),
-          Effect.flatten,
           Effect.withSpan("SheetService.channelSchedules", {
             captureStackTrace: true,
           }),

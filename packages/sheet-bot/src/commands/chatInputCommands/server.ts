@@ -24,7 +24,6 @@ import {
   SlashCommandSubcommandGroupBuilder,
 } from "discord.js";
 import { Array, Effect, Number, Option, Order, pipe } from "effect";
-import { UntilObserver } from "typhoon-core/signal";
 
 const handleListConfig = handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
   .data(
@@ -47,17 +46,13 @@ const handleListConfig = handlerVariantContextBuilder<ChatInputSubcommandHandler
         Effect.bind("guildConfig", () =>
           pipe(
             GuildConfigService.getGuildConfigByGuildId(),
-            UntilObserver.observeUntilRpcResultResolved(),
             Effect.tap((config) => Effect.log(config)),
-            Effect.flatten,
           ),
         ),
         Effect.bind("managerRoles", () =>
           pipe(
             GuildConfigService.getGuildManagerRoles(),
-            UntilObserver.observeUntilRpcResultResolved(),
             Effect.tap((roles) => Effect.log(roles)),
-            Effect.flatten,
           ),
         ),
         Effect.bindAll(({ guildConfig }) => ({

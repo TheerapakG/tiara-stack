@@ -8,9 +8,8 @@ import {
   InteractionContext,
   MessageCheckinService,
   PermissionService,
-  PlayerService,
+  ScheduleService,
   SendableChannelContext,
-  SheetService,
 } from "@/services";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
@@ -29,17 +28,16 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, DateTime, Effect, HashMap, Match, Option, pipe, HashSet, flow } from "effect";
-import { Schema } from "sheet-apis";
-import { UntilObserver } from "typhoon-core/signal";
-import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
+import { Array, DateTime, Effect, HashMap, Match, Option, pipe, HashSet } from "effect";
+import { GuildConfig, Sheet } from "sheet-apis/schema";
+import { Array as ArrayUtils } from "typhoon-core/utils";
 
 const getCheckinData = ({
   hour,
   runningChannel,
 }: {
   hour: number;
-  runningChannel: Schema.GuildChannelConfig;
+  runningChannel: GuildConfig.GuildChannelConfig;
 }) =>
   pipe(
     Effect.Do,
@@ -48,7 +46,7 @@ const getCheckinData = ({
     }),
     Effect.bind("schedules", ({ channelName }) =>
       pipe(
-        SheetService.channelSchedules(channelName),
+        ScheduleService.channelPopulatedSchedules(channelName),
         Effect.map(
           Array.map((s) =>
             pipe(
@@ -62,23 +60,10 @@ const getCheckinData = ({
         Effect.map(HashMap.map(({ schedule }) => schedule)),
       ),
     ),
-    Effect.flatMap(({ schedules }) =>
-      pipe(
-        {
-          prevSchedule: HashMap.get(schedules, hour - 1),
-          schedule: HashMap.get(schedules, hour),
-        },
-        Utils.mapPositional(
-          Utils.arraySomesPositional(
-            flow(
-              PlayerService.mapScheduleWithPlayers,
-              UntilObserver.observeUntilRpcResultResolved(),
-              Effect.flatten,
-            ),
-          ),
-        ),
-      ),
-    ),
+    Effect.map(({ schedules }) => ({
+      prevSchedule: HashMap.get(schedules, hour - 1),
+      schedule: HashMap.get(schedules, hour),
+    })),
     Effect.map(({ prevSchedule, schedule }) => ({
       prevSchedule,
       schedule,
@@ -89,8 +74,8 @@ const getCheckinData = ({
 
 const getCheckinMessages = (
   data: {
-    prevSchedule: Option.Option<Schema.ScheduleWithPlayers | Schema.BreakSchedule>;
-    schedule: Option.Option<Schema.ScheduleWithPlayers | Schema.BreakSchedule>;
+    prevSchedule: Option.Option<Sheet.PopulatedSchedule | Sheet.PopulatedBreakSchedule>;
+    schedule: Option.Option<Sheet.PopulatedSchedule | Sheet.PopulatedBreakSchedule>;
     runningChannel: {
       channelId: string;
       name: Option.Option<string>;
@@ -145,8 +130,6 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
         PermissionService.checkRoles.tapEffect(() =>
           pipe(
             GuildConfigService.getGuildManagerRoles(),
-            UntilObserver.observeUntilRpcResultResolved(),
-            Effect.flatten,
             Effect.map((roles) => ({
               roles: pipe(
                 roles,
@@ -180,21 +163,13 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
           pipe(
             channelNameOption,
             Option.match({
-              onSome: (channelName) =>
-                pipe(
-                  GuildConfigService.getGuildRunningChannelByName(channelName),
-                  UntilObserver.observeUntilRpcResultResolved(),
-                  Effect.flatten,
-                ),
+              onSome: (channelName) => GuildConfigService.getGuildRunningChannelByName(channelName),
+
               onNone: () =>
                 pipe(
                   InteractionContext.channel(true).sync(),
                   Effect.flatMap((channel) =>
-                    pipe(
-                      GuildConfigService.getGuildRunningChannelById(channel.id),
-                      UntilObserver.observeUntilRpcResultResolved(),
-                      Effect.flatten,
-                    ),
+                    GuildConfigService.getGuildRunningChannelById(channel.id),
                   ),
                 ),
             }),
@@ -219,8 +194,8 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
               pipe(
                 Match.value(schedule),
                 Match.tagsExhaustive({
-                  BreakSchedule: () => [],
-                  ScheduleWithPlayers: (schedule) => schedule.fills,
+                  PopulatedBreakSchedule: () => [],
+                  PopulatedSchedule: (schedule) => schedule.fills,
                 }),
               ),
             ),

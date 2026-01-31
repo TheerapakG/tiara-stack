@@ -6,29 +6,27 @@ import {
   guildServicesFromInteraction,
   InteractionContext,
   MessageSlotService,
-  SheetService,
+  ScheduleService,
 } from "@/services";
 import { ButtonHandlerVariantT, handlerVariantContextBuilder } from "@/types";
 import { bindObject } from "@/utils";
 import { ButtonStyle, ComponentType, MessageFlags } from "discord.js";
 import { Array, Chunk, Effect, Number, Order, Option, pipe, String } from "effect";
-import { UntilObserver } from "typhoon-core/signal";
 
 const getSlotMessage = (day: number) =>
   pipe(
     Effect.Do,
     bindObject({
       daySchedule: pipe(
-        SheetService.daySchedules(day),
+        ScheduleService.dayPopulatedSchedules(day),
         Effect.map(
-          Array.map((s) =>
+          Array.filterMap((schedule) =>
             pipe(
-              s.hour,
-              Option.map(() => s),
+              schedule.hour,
+              Option.map(() => schedule),
             ),
           ),
         ),
-        Effect.map(Array.getSomes),
       ),
     }),
     Effect.bindAll(({ daySchedule }) => ({
@@ -83,11 +81,7 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         })),
         CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
         Effect.bind("messageSlotData", ({ message }) =>
-          pipe(
-            MessageSlotService.getMessageSlotData(message.id),
-            UntilObserver.observeUntilRpcResultResolved(),
-            Effect.flatten,
-          ),
+          MessageSlotService.getMessageSlotData(message.id),
         ),
         Effect.bind("slotMessage", ({ messageSlotData }) => getSlotMessage(messageSlotData.day)),
         InteractionContext.editReply.tapEffect(({ slotMessage }) =>

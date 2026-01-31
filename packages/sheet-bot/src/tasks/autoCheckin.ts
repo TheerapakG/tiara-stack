@@ -5,10 +5,9 @@ import {
   FormatService,
   GuildConfigService,
   ClientService,
-  PlayerService,
-  MonitorService,
   SendableChannelContext,
   SheetService,
+  ScheduleService,
 } from "@/services";
 import { guildServices } from "@/services/collection/guildServices";
 import { BotGuildConfigService, MessageCheckinService } from "@/services/bot";
@@ -25,7 +24,6 @@ import {
   DateTime,
   Effect,
   HashMap,
-  flow,
   HashSet,
   Match,
   Option,
@@ -33,9 +31,8 @@ import {
   Cron,
   pipe,
 } from "effect";
-import { UntilObserver } from "typhoon-core/signal";
-import { Schema } from "sheet-apis";
-import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
+import { GuildConfig, Sheet } from "sheet-apis/schema";
+import { Array as ArrayUtils } from "typhoon-core/utils";
 import { bindObject } from "@/utils";
 
 const autoCheckinPreviewNotice = "Sent automatically via auto check-in (preview; may have bugs).";
@@ -52,94 +49,48 @@ const monitorNotAssigned = {
   failure: Option.some("Cannot ping monitor: monitor not assigned for this hour."),
 };
 
-const monitorConfigMissing = {
-  mention: Option.none<string>(),
-  mentionUserId: Option.none<string>(),
-  failure: Option.some("Cannot ping monitor: sheet is not configured for monitor data."),
-};
-
-const resolveMonitorFromName = (monitorName: string, rangesConfig: Schema.RangesConfig) =>
+const resolveMonitorFromName = (monitor: Sheet.PopulatedScheduleMonitor) =>
   pipe(
-    Option.all({
-      ids: rangesConfig.monitorIds,
-      names: rangesConfig.monitorNames,
+    Match.value(monitor.monitor),
+    Match.tagsExhaustive({
+      Monitor: (monitor) => Option.some(monitor),
+      PartialNameMonitor: () => Option.none(),
     }),
+    Option.map((monitor) => monitor.id),
     Option.match({
-      onNone: () => Effect.succeed(monitorConfigMissing),
-      onSome: () =>
-        pipe(
-          MonitorService.getMonitorByName([monitorName]),
-          UntilObserver.observeUntilRpcResultResolved(),
-          Effect.flatten,
-          Effect.map(Array.flatten),
-          Effect.map(Array.head),
-          Effect.map((monitor) =>
-            pipe(
-              monitor,
-              Option.flatMap((monitor) =>
-                pipe(
-                  Match.value(monitor),
-                  Match.tagsExhaustive({
-                    Monitor: (monitor) => Option.some(monitor),
-                    PartialNameMonitor: () => Option.none(),
-                  }),
-                ),
-              ),
-              Option.map((monitor) => monitor.id),
-              Option.match({
-                onSome: (id) => ({
-                  mention: Option.some(userMention(id)),
-                  mentionUserId: Option.some(id),
-                  failure: Option.none<string>(),
-                }),
-                onNone: () => ({
-                  mention: Option.none<string>(),
-                  mentionUserId: Option.none<string>(),
-                  failure: Option.some(
-                    `Cannot ping monitor: monitor "${monitorName}" is missing a Discord ID in the sheet.`,
-                  ),
-                }),
-              }),
-            ),
-          ),
-          Effect.catchAll((error) =>
-            pipe(
-              Effect.logError(error),
-              Effect.as({
-                mention: Option.none<string>(),
-                mentionUserId: Option.none<string>(),
-                failure: Option.some(
-                  `Cannot ping monitor: monitor lookup failed for "${monitorName}".`,
-                ),
-              }),
-            ),
-          ),
+      onSome: (id) => ({
+        mention: Option.some(userMention(id)),
+        mentionUserId: Option.some(id),
+        failure: Option.none<string>(),
+      }),
+      onNone: () => ({
+        mention: Option.none<string>(),
+        mentionUserId: Option.none<string>(),
+        failure: Option.some(
+          `Cannot ping monitor: monitor "${monitor.monitor.name}" is missing a Discord ID in the sheet.`,
         ),
+      }),
     }),
   );
 
-const resolveMonitorMention = ({
-  schedule,
-  rangesConfig,
-}: {
-  schedule: Option.Option<Schema.ScheduleWithPlayers | Schema.BreakSchedule>;
-  rangesConfig: Schema.RangesConfig;
-}) =>
+const resolveMonitorMention = (
+  schedule: Option.Option<Sheet.PopulatedSchedule | Sheet.PopulatedBreakSchedule>,
+) =>
   pipe(
     schedule,
     Option.match({
-      onNone: () => Effect.succeed(noMonitor),
+      onNone: () => noMonitor,
       onSome: (schedule) =>
         pipe(
           Match.value(schedule),
           Match.tagsExhaustive({
-            BreakSchedule: () => Effect.succeed(noMonitor),
-            ScheduleWithPlayers: (schedule) =>
+            PopulatedBreakSchedule: () => noMonitor,
+            PopulatedSchedule: (schedule) =>
               pipe(
                 schedule.monitor,
                 Option.match({
-                  onNone: () => Effect.succeed(monitorNotAssigned),
-                  onSome: (monitorName) => resolveMonitorFromName(monitorName, rangesConfig),
+                  onNone: () => monitorNotAssigned,
+                  onSome: (monitor) => resolveMonitorFromName(monitor),
                 }),
               ),
           }),
@@ -161,7 +112,7 @@ const getCheckinData = ({
   runningChannel,
 }: {
   hour: number;
-  runningChannel: Schema.GuildChannelConfig;
+  runningChannel: GuildConfig.GuildChannelConfig;
 }) =>
   pipe(
     Effect.Do,
@@ -170,37 +121,23 @@ const getCheckinData = ({
     }),
     Effect.bind("schedules", ({ channelName }) =>
       pipe(
-        SheetService.channelSchedules(channelName),
+        ScheduleService.channelPopulatedSchedules(channelName),
         Effect.map(
-          Array.map((s) =>
+          Array.filterMap((schedule) =>
             pipe(
-              s.hour,
-              Option.map((hour) => ({ hour, schedule: s })),
+              schedule.hour,
+              Option.map((hour) => ({ hour, schedule })),
             ),
           ),
         ),
-        Effect.map(Array.getSomes),
         Effect.map(ArrayUtils.Collect.toHashMapByKey("hour")),
         Effect.map(HashMap.map(({ schedule }) => schedule)),
       ),
     ),
-    Effect.flatMap(({ schedules }) =>
-      pipe(
-        {
-          prevSchedule: HashMap.get(schedules, hour - 1),
-          schedule: HashMap.get(schedules, hour),
-        },
-        Utils.mapPositional(
-          Utils.arraySomesPositional(
-            flow(
-              PlayerService.mapScheduleWithPlayers,
-              UntilObserver.observeUntilRpcResultResolved(),
-              Effect.flatten,
-            ),
-          ),
-        ),
-      ),
-    ),
+    Effect.map(({ schedules }) => ({
+      prevSchedule: HashMap.get(schedules, hour - 1),
+      schedule: HashMap.get(schedules, hour),
+    })),
     Effect.map(({ prevSchedule, schedule }) => ({
       prevSchedule,
       schedule,
@@ -211,8 +148,8 @@ const getCheckinData = ({
 
 const getCheckinMessages = (
   data: {
-    prevSchedule: Option.Option<Schema.ScheduleWithPlayers | Schema.BreakSchedule>;
-    schedule: Option.Option<Schema.ScheduleWithPlayers | Schema.BreakSchedule>;
+    prevSchedule: Option.Option<Sheet.PopulatedSchedule | Sheet.PopulatedBreakSchedule>;
+    schedule: Option.Option<Sheet.PopulatedSchedule | Sheet.PopulatedBreakSchedule>;
     runningChannel: {
       channelId: string;
       name: Option.Option<string>;
@@ -240,13 +177,7 @@ const runOnce = Effect.suspend(() =>
   pipe(
     Effect.Do,
     Effect.tap(() => Effect.log(`running auto check-in task...`)),
-    Effect.bind("guilds", () =>
-      pipe(
-        BotGuildConfigService.getAutoCheckinGuilds(),
-        UntilObserver.observeUntilRpcResultResolved(),
-        Effect.flatten,
-      ),
-    ),
+    Effect.bind("guilds", () => BotGuildConfigService.getAutoCheckinGuilds()),
     Effect.bind("guildCounts", ({ guilds }) =>
       Effect.forEach(guilds, (guild) =>
         Effect.provide(guildServices(guild.guildId))(
@@ -254,7 +185,6 @@ const runOnce = Effect.suspend(() =>
             Effect.Do,
             Effect.tap(() => Effect.log(`running auto check-in task for guild ${guild.guildId}`)),
             Effect.bind("hour", () => computeHour),
-            Effect.bind("rangesConfig", () => SheetService.rangesConfig()),
             Effect.bind("allSchedules", () => SheetService.allSchedules()),
             Effect.let("channels", ({ allSchedules }) =>
               pipe(
@@ -264,15 +194,13 @@ const runOnce = Effect.suspend(() =>
                 HashSet.toValues,
               ),
             ),
-            Effect.flatMap(({ hour, channels, rangesConfig }) =>
+            Effect.flatMap(({ hour, channels }) =>
               pipe(
                 Effect.forEach(
                   channels,
                   (channelName) =>
                     pipe(
                       GuildConfigService.getGuildRunningChannelByName(channelName),
-                      UntilObserver.observeUntilRpcResultResolved(),
-                      Effect.flatten,
                       Effect.tap((runningChannel) => Effect.log(runningChannel)),
                       Effect.flatMap((runningChannel) =>
                         pipe(
@@ -289,11 +217,8 @@ const runOnce = Effect.suspend(() =>
                               Effect.tap((checkinData) => Effect.log(checkinData)),
                             ),
                           ),
-                          Effect.bind("monitorInfo", ({ checkinData }) =>
-                            resolveMonitorMention({
-                              schedule: checkinData.schedule,
-                              rangesConfig,
-                            }),
+                          Effect.let("monitorInfo", ({ checkinData }) =>
+                            resolveMonitorMention(checkinData.schedule),
                           ),
                           Effect.let("fillIds", ({ checkinData }) =>
                             pipe(
@@ -302,8 +227,8 @@ const runOnce = Effect.suspend(() =>
                                 pipe(
                                   Match.value(schedule),
                                   Match.tagsExhaustive({
-                                    BreakSchedule: () => [],
-                                    ScheduleWithPlayers: (schedule) => schedule.fills,
+                                    PopulatedBreakSchedule: () => [],
+                                    PopulatedSchedule: (schedule) => schedule.fills,
                                   }),
                                 ),
                               ),

@@ -1,25 +1,20 @@
-import { fileURLToPath } from "url";
 import { defineConfig } from "tsdown";
-import { tiaraPlugin } from "typhoon-core/bundler";
+import { fileURLToPath } from "url";
 
 export default defineConfig([
   {
     entry: {
-      index: fileURLToPath(new URL("src/index.ts", import.meta.url)),
-    },
-    env: {
-      TIARA_STRIP_HANDLER: "true",
+      api: fileURLToPath(new URL("./src/api.ts", import.meta.url)),
+      schema: fileURLToPath(new URL("./src/schema.ts", import.meta.url)),
     },
     sourcemap: true,
-    plugins: [tiaraPlugin()],
   },
   {
     entry: {
-      runServer: fileURLToPath(new URL("src/runServer.ts", import.meta.url)),
+      index: fileURLToPath(new URL("./src/index.ts", import.meta.url)),
     },
     sourcemap: true,
     external: ["playwright", "playwright-core"],
     noExternal: [/^.*$/],
-    plugins: [tiaraPlugin()],
   },
 ]);

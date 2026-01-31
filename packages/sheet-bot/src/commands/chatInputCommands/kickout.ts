@@ -7,8 +7,7 @@ import {
   guildServicesFromInteractionOption,
   InteractionContext,
   PermissionService,
-  PlayerService,
-  SheetService,
+  ScheduleService,
 } from "@/services";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
@@ -23,22 +22,9 @@ import {
   SlashCommandSubcommandBuilder,
   userMention,
 } from "discord.js";
-import {
-  Array,
-  Data,
-  DateTime,
-  Effect,
-  HashMap,
-  Match,
-  Number,
-  Option,
-  Order,
-  pipe,
-  flow,
-} from "effect";
-import { Schema } from "sheet-apis";
-import { UntilObserver } from "typhoon-core/signal";
-import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
+import { Array, Data, DateTime, Effect, HashMap, Match, Number, Option, Order, pipe } from "effect";
+import { GuildConfig } from "sheet-apis/schema";
+import { Array as ArrayUtils } from "typhoon-core/utils";
 
 class TimeError extends Data.TaggedError("TimeError")<{
   readonly message: string;
@@ -53,14 +39,14 @@ const getKickoutData = ({
   runningChannel,
 }: {
   hour: number;
-  runningChannel: Schema.GuildChannelConfig;
+  runningChannel: GuildConfig.GuildChannelConfig;
 }) =>
   pipe(
     Effect.Do,
     Effect.bind("schedules", () =>
       pipe(
         runningChannel.name,
-        Effect.flatMap(SheetService.channelSchedules),
+        Effect.flatMap(ScheduleService.channelPopulatedSchedules),
         Effect.map(
           Array.map((s) =>
             pipe(
@@ -74,22 +60,9 @@ const getKickoutData = ({
         Effect.map(HashMap.map(({ schedule }) => schedule)),
       ),
     ),
-    Effect.bind("schedule", ({ schedules }) =>
-      pipe(
-        {
-          schedule: HashMap.get(schedules, hour),
-        },
-        Utils.mapPositional(
-          Utils.arraySomesPositional(
-            flow(
-              PlayerService.mapScheduleWithPlayers,
-              UntilObserver.observeUntilRpcResultResolved(),
-              Effect.flatten,
-            ),
-          ),
-        ),
-      ),
-    ),
+    Effect.let("schedule", ({ schedules }) => ({
+      schedule: HashMap.get(schedules, hour),
+    })),
     Effect.map(({ schedule }) => ({
       schedule: schedule.schedule,
       runningChannel,
@@ -117,8 +90,6 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
         PermissionService.checkRoles.tapEffect(() =>
           pipe(
             GuildConfigService.getGuildManagerRoles(),
-            UntilObserver.observeUntilRpcResultResolved(),
-            Effect.flatten,
             Effect.map(Array.map((role) => role.roleId)),
             Effect.map((roles) => ({
               roles,
@@ -156,21 +127,12 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
           pipe(
             channelNameOption,
             Option.match({
-              onSome: (channelName) =>
-                pipe(
-                  GuildConfigService.getGuildRunningChannelByName(channelName),
-                  UntilObserver.observeUntilRpcResultResolved(),
-                  Effect.flatten,
-                ),
+              onSome: (channelName) => GuildConfigService.getGuildRunningChannelByName(channelName),
               onNone: () =>
                 pipe(
                   InteractionContext.channel(true).sync(),
                   Effect.flatMap((channel) =>
-                    pipe(
-                      GuildConfigService.getGuildRunningChannelById(channel.id),
-                      UntilObserver.observeUntilRpcResultResolved(),
-                      Effect.flatten,
-                    ),
+                    GuildConfigService.getGuildRunningChannelById(channel.id),
                   ),
                 ),
             }),
@@ -194,8 +156,8 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
               pipe(
                 Match.value(schedule),
                 Match.tagsExhaustive({
-                  BreakSchedule: () => [],
-                  ScheduleWithPlayers: (schedule) => schedule.fills,
+                  PopulatedBreakSchedule: () => [],
+                  PopulatedSchedule: (schedule) => schedule.fills,
                 }),
               ),
             ),

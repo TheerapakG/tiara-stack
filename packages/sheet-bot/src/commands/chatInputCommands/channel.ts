@@ -22,10 +22,9 @@ import {
   SlashCommandSubcommandBuilder,
 } from "discord.js";
 import { Effect, Option, pipe } from "effect";
-import { Schema } from "sheet-apis";
-import { UntilObserver } from "typhoon-core/signal";
+import { GuildConfig } from "sheet-apis/schema";
 
-const configFields = (config: Schema.GuildChannelConfig) => [
+const configFields = (config: GuildConfig.GuildChannelConfig) => [
   {
     name: "Name",
     value: pipe(
@@ -73,11 +72,7 @@ const handleListConfig = handlerVariantContextBuilder<ChatInputSubcommandHandler
           permissions: PermissionFlagsBits.ManageGuild,
         })),
         Effect.bind("config", ({ channel }) =>
-          pipe(
-            GuildConfigService.getGuildRunningChannelById(channel.id),
-            UntilObserver.observeUntilRpcResultResolved(),
-            Effect.flatten,
-          ),
+          GuildConfigService.getGuildRunningChannelById(channel.id),
         ),
         InteractionContext.editReply.tapEffect(({ config }) =>
           pipe(

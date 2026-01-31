@@ -16,7 +16,7 @@ import {
   flow,
 } from "effect";
 import { ConverterService, HourWindow } from "./converterService";
-import { Schema } from "sheet-apis";
+import { Sheet } from "sheet-apis/schema";
 
 type Weighted<A> = { value: A; weight: number };
 
@@ -124,16 +124,16 @@ export class FormatService extends Effect.Service<FormatService>()("FormatServic
     Effect.map(({ converterService, formatDateTime, formatHourWindow }) => ({
       formatDateTime,
       formatHourWindow,
-      formatOpenSlot: (schedule: Schema.BreakSchedule | Schema.Schedule) =>
+      formatOpenSlot: (schedule: Sheet.PopulatedBreakSchedule | Sheet.PopulatedSchedule) =>
         pipe(
           Match.value(schedule),
           Match.tagsExhaustive({
-            BreakSchedule: () => Effect.succeed(""),
-            Schedule: (schedule) =>
+            PopulatedBreakSchedule: () => Effect.succeed(""),
+            PopulatedSchedule: (schedule) =>
               pipe(
                 Effect.succeed({
                   hour: schedule.hour,
-                  empty: Schema.Schedule.empty(schedule),
+                  empty: Sheet.PopulatedSchedule.empty(schedule),
                 }),
                 Effect.let("slotCountString", ({ empty }) =>
                   schedule.visible ? bold(`+${empty} |`) : "",
@@ -176,16 +176,16 @@ export class FormatService extends Effect.Service<FormatService>()("FormatServic
             captureStackTrace: true,
           }),
         ),
-      formatFilledSlot: (schedule: Schema.BreakSchedule | Schema.Schedule) =>
+      formatFilledSlot: (schedule: Sheet.PopulatedBreakSchedule | Sheet.PopulatedSchedule) =>
         pipe(
           Match.value(schedule),
           Match.tagsExhaustive({
-            BreakSchedule: () => Effect.succeed(""),
-            Schedule: (schedule) =>
+            PopulatedBreakSchedule: () => Effect.succeed(""),
+            PopulatedSchedule: (schedule) =>
               pipe(
                 Effect.succeed({
                   hour: schedule.hour,
-                  empty: Schema.Schedule.empty(schedule),
+                  empty: Sheet.PopulatedSchedule.empty(schedule),
                 }),
                 Effect.let("hourString", ({ hour }) =>
                   pipe(
@@ -231,8 +231,8 @@ export class FormatService extends Effect.Service<FormatService>()("FormatServic
         channelString,
         template,
       }: {
-        prevSchedule: Option.Option<Schema.ScheduleWithPlayers | Schema.BreakSchedule>;
-        schedule: Option.Option<Schema.ScheduleWithPlayers | Schema.BreakSchedule>;
+        prevSchedule: Option.Option<Sheet.PopulatedSchedule | Sheet.PopulatedBreakSchedule>;
+        schedule: Option.Option<Sheet.PopulatedSchedule | Sheet.PopulatedBreakSchedule>;
         channelString: string;
         template?: string;
       }) =>
@@ -251,8 +251,8 @@ export class FormatService extends Effect.Service<FormatService>()("FormatServic
                 pipe(
                   Match.value(prevSchedule),
                   Match.tagsExhaustive({
-                    BreakSchedule: () => [],
-                    ScheduleWithPlayers: (prevSchedule) => prevSchedule.fills,
+                    PopulatedBreakSchedule: () => [],
+                    PopulatedSchedule: (prevSchedule) => prevSchedule.fills,
                   }),
                 ),
               ),
@@ -276,8 +276,8 @@ export class FormatService extends Effect.Service<FormatService>()("FormatServic
                 pipe(
                   Match.value(schedule),
                   Match.tagsExhaustive({
-                    BreakSchedule: () => [],
-                    ScheduleWithPlayers: (schedule) => schedule.fills,
+                    PopulatedBreakSchedule: () => [],
+                    PopulatedSchedule: (schedule) => schedule.fills,
                   }),
                 ),
               ),
@@ -360,8 +360,8 @@ export class FormatService extends Effect.Service<FormatService>()("FormatServic
                 pipe(
                   Match.value(schedule),
                   Match.tagsExhaustive({
-                    BreakSchedule: () => 5,
-                    ScheduleWithPlayers: (schedule) => Schema.ScheduleWithPlayers.empty(schedule),
+                    PopulatedBreakSchedule: () => 5,
+                    PopulatedSchedule: (schedule) => Sheet.PopulatedSchedule.empty(schedule),
                   }),
                 ),
               ),
@@ -383,8 +383,8 @@ export class FormatService extends Effect.Service<FormatService>()("FormatServic
                 pipe(
                   Match.value(schedule),
                   Match.tagsExhaustive({
-                    BreakSchedule: () => [],
-                    ScheduleWithPlayers: (schedule) => schedule.fills,
+                    PopulatedBreakSchedule: () => [],
+                    PopulatedSchedule: (schedule) => schedule.fills,
                   }),
                 ),
               ),

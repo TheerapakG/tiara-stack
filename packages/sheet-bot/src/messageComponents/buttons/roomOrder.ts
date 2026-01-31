@@ -8,10 +8,8 @@ import {
   InteractionContext,
   MessageRoomOrderService,
   SendableChannelContext,
-  SheetService,
 } from "@/services";
 import { ButtonHandlerVariantT, handlerVariantContextBuilder } from "@/types";
-import { bindObject } from "@/utils";
 import {
   ActionRowBuilder,
   bold,
@@ -24,9 +22,8 @@ import {
   time,
   TimestampStyles,
 } from "discord.js";
-import { Array, Effect, Function, HashSet, Layer, Number, Option, pipe } from "effect";
-import { Schema } from "sheet-apis";
-import { UntilObserver } from "typhoon-core/signal";
+import { Array, Effect, HashSet, Layer, Number, Option, pipe } from "effect";
+import { MessageRoomOrder as MessageRoomOrderNamespace } from "sheet-apis/schema";
 
 const formatEffectValue = (effectValue: number): string => {
   const rounded = Math.round(effectValue * 10) / 10;
@@ -69,23 +66,17 @@ export const roomOrderActionRow = (range: { minRank: number; maxRank: number }, 
     )
     .addComponents(new ButtonBuilder(roomOrderSendButtonData));
 
-export const roomOrderInteractionGetReply = (messageRoomOrder: Schema.MessageRoomOrder) =>
+export const roomOrderInteractionGetReply = (
+  messageRoomOrder: MessageRoomOrderNamespace.MessageRoomOrder,
+) =>
   pipe(
     Effect.Do,
     CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
     Effect.bind("messageRoomOrderRange", ({ message }) =>
-      pipe(
-        MessageRoomOrderService.getMessageRoomOrderRange(message.id),
-        UntilObserver.observeUntilRpcResultResolved(),
-        Effect.flatten,
-      ),
+      MessageRoomOrderService.getMessageRoomOrderRange(message.id),
     ),
     Effect.bind("messageRoomOrderEntry", ({ message }) =>
-      pipe(
-        MessageRoomOrderService.getMessageRoomOrderEntry(message.id, messageRoomOrder.rank),
-        UntilObserver.observeUntilRpcResultResolved(),
-        Effect.flatten,
-      ),
+      MessageRoomOrderService.getMessageRoomOrderEntry(message.id, messageRoomOrder.rank),
     ),
     Effect.bind("formattedHourWindow", () =>
       pipe(
@@ -153,9 +144,6 @@ export const roomOrderPreviousButton = handlerVariantContextBuilder<ButtonHandle
         Effect.Do,
         InteractionContext.deferUpdate.tap(),
         CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
-        bindObject({
-          eventConfig: SheetService.eventConfig(),
-        }),
         Effect.bind("messageRoomOrder", ({ message }) =>
           MessageRoomOrderService.decrementMessageRoomOrderRank(message.id),
         ),
@@ -180,9 +168,6 @@ export const roomOrderNextButton = handlerVariantContextBuilder<ButtonHandlerVar
         Effect.Do,
         InteractionContext.deferUpdate.tap(),
         CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
-        bindObject({
-          eventConfig: SheetService.eventConfig(),
-        }),
         Effect.bind("messageRoomOrder", ({ message }) =>
           MessageRoomOrderService.incrementMessageRoomOrderRank(message.id),
         ),
@@ -209,15 +194,8 @@ export const roomOrderSendButton = handlerVariantContextBuilder<ButtonHandlerVar
         Effect.Do,
         InteractionContext.deferUpdate.tap(),
         CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
-        bindObject({
-          eventConfig: SheetService.eventConfig(),
-        }),
         Effect.bind("messageRoomOrder", ({ message }) =>
-          pipe(
-            MessageRoomOrderService.getMessageRoomOrder(message.id),
-            UntilObserver.observeUntilRpcResultResolved(),
-            Effect.flatMap(Function.identity),
-          ),
+          MessageRoomOrderService.getMessageRoomOrder(message.id),
         ),
         Effect.bind("messageRoomOrderReply", ({ messageRoomOrder }) =>
           roomOrderInteractionGetReply(messageRoomOrder),

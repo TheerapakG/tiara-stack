@@ -3,8 +3,7 @@ import {
   guildServicesFromInteractionOption,
   InteractionContext,
   PermissionService,
-  PlayerService,
-  SheetService,
+  ScheduleService,
 } from "@/services";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
@@ -18,8 +17,7 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, Effect, flow, Match, Number, Option, Order, pipe, String } from "effect";
-import { UntilObserver } from "typhoon-core/signal";
+import { Array, Effect, flow, Match, Option, pipe, String } from "effect";
 
 const formatHourRanges = (hours: readonly number[]): string => {
   if (Array.isEmptyReadonlyArray(hours)) return "None";
@@ -64,50 +62,35 @@ const handleList = handlerVariantContextBuilder<ChatInputSubcommandHandlerVarian
         Effect.bind("day", () => InteractionContext.getNumber("day", true)),
         Effect.bind("daySchedules", ({ day }) =>
           pipe(
-            SheetService.daySchedules(day),
+            ScheduleService.dayPopulatedSchedules(day),
             Effect.map(
-              Array.map((s) =>
+              Array.filterMap((schedule) =>
                 pipe(
-                  s.hour,
-                  Option.map(() => s),
+                  schedule.hour,
+                  Option.map(() => schedule),
+                  Option.flatMap((schedule) =>
+                    pipe(
+                      Match.value(schedule),
+                      Match.tagsExhaustive({
+                        PopulatedBreakSchedule: () => Option.none(),
+                        PopulatedSchedule: (schedule) => Option.some(schedule),
+                      }),
+                    ),
+                  ),
                 ),
               ),
             ),
-            Effect.map(Array.getSomes),
           ),
         ),
-        Effect.bind("schedulesWithPlayers", ({ daySchedules }) =>
+        Effect.let("invisible", ({ daySchedules }) =>
           pipe(
             daySchedules,
-            PlayerService.mapScheduleWithPlayers,
-            UntilObserver.observeUntilRpcResultResolved(),
-            Effect.flatten,
-            Effect.map(
-              Array.sortBy(Order.mapInput(Option.getOrder(Number.Order), ({ hour }) => hour)),
-            ),
-            Effect.map(
-              Array.map((schedule) =>
-                pipe(
-                  Match.value(schedule),
-                  Match.tagsExhaustive({
-                    BreakSchedule: () => Option.none(),
-                    ScheduleWithPlayers: (schedule) => Option.some(schedule),
-                  }),
-                ),
-              ),
-            ),
-            Effect.map(Array.getSomes),
-          ),
-        ),
-        Effect.let("invisible", ({ schedulesWithPlayers }) =>
-          pipe(
-            schedulesWithPlayers,
             Array.some(({ visible }) => !visible),
           ),
         ),
-        Effect.let("fillHours", ({ schedulesWithPlayers, user }) =>
+        Effect.let("fillHours", ({ daySchedules, user }) =>
           pipe(
-            schedulesWithPlayers,
+            daySchedules,
             Array.filter(
               flow(
                 (schedule) => schedule.fills,
@@ -127,9 +110,9 @@ const handleList = handlerVariantContextBuilder<ChatInputSubcommandHandlerVarian
             Array.getSomes,
           ),
         ),
-        Effect.let("overfillHours", ({ schedulesWithPlayers, user }) =>
+        Effect.let("overfillHours", ({ daySchedules, user }) =>
           pipe(
-            schedulesWithPlayers,
+            daySchedules,
             Array.filter(
               flow(
                 (schedule) => schedule.overfills,
@@ -148,9 +131,9 @@ const handleList = handlerVariantContextBuilder<ChatInputSubcommandHandlerVarian
             Array.getSomes,
           ),
         ),
-        Effect.let("standbyHours", ({ schedulesWithPlayers, user }) =>
+        Effect.let("standbyHours", ({ daySchedules, user }) =>
           pipe(
-            schedulesWithPlayers,
+            daySchedules,
             Array.filter(
               flow(
                 (schedule) => schedule.standbys,

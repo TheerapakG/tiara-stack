@@ -1,6 +1,5 @@
 import { SheetApisClient } from "@/client/sheetApis";
 import { Effect, pipe } from "effect";
-import { WebSocketClient } from "typhoon-client-ws/client";
 import type { messageRoomOrder, messageRoomOrderEntry } from "sheet-db-schema";
 
 export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderService>()(
@@ -12,34 +11,21 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
       Effect.map(({ client }) => ({
         getMessageRoomOrder: (messageId: string) =>
           pipe(
-            WebSocketClient.subscribeScoped(
-              client,
-              "messageRoomOrder.getMessageRoomOrder",
-              messageId,
-            ),
-            Effect.map(
-              Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder subscription", {
-                captureStackTrace: true,
-              }),
-            ),
+            client.messageRoomOrder.getMessageRoomOrder({ urlParams: { messageId } }),
             Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder", {
               captureStackTrace: true,
             }),
           ),
         decrementMessageRoomOrderRank: (messageId: string) =>
           pipe(
-            WebSocketClient.mutate(client, "messageRoomOrder.decrementMessageRoomOrderRank", {
-              messageId,
-            }),
+            client.messageRoomOrder.decrementMessageRoomOrderRank({ payload: { messageId } }),
             Effect.withSpan("MessageRoomOrderService.decrementMessageRoomOrderRank", {
               captureStackTrace: true,
             }),
           ),
         incrementMessageRoomOrderRank: (messageId: string) =>
           pipe(
-            WebSocketClient.mutate(client, "messageRoomOrder.incrementMessageRoomOrderRank", {
-              messageId,
-            }),
+            client.messageRoomOrder.incrementMessageRoomOrderRank({ payload: { messageId } }),
             Effect.withSpan("MessageRoomOrderService.incrementMessageRoomOrderRank", {
               captureStackTrace: true,
             }),
@@ -52,9 +38,15 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
           >,
         ) =>
           pipe(
-            WebSocketClient.mutate(client, "messageRoomOrder.upsertMessageRoomOrder", {
-              messageId,
-              ...data,
+            client.messageRoomOrder.upsertMessageRoomOrder({
+              payload: {
+                messageId,
+                previousFills: data.previousFills,
+                fills: data.fills,
+                hour: data.hour,
+                rank: data.rank,
+                monitor: data.monitor ?? undefined,
+              },
             }),
             Effect.withSpan("MessageRoomOrderService.upsertMessageRoomOrder", {
               captureStackTrace: true,
@@ -62,48 +54,40 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
           ),
         getMessageRoomOrderEntry: (messageId: string, rank: number) =>
           pipe(
-            WebSocketClient.subscribeScoped(client, "messageRoomOrder.getMessageRoomOrderEntry", {
-              messageId,
-              rank,
+            client.messageRoomOrder.getMessageRoomOrderEntry({
+              urlParams: { messageId, rank: String(rank) },
             }),
-            Effect.map(
-              Effect.withSpan("MessageRoomOrderService.getMessageRoomOrderEntry subscription", {
-                captureStackTrace: true,
-              }),
-            ),
             Effect.withSpan("MessageRoomOrderService.getMessageRoomOrderEntry", {
               captureStackTrace: true,
             }),
           ),
         getMessageRoomOrderRange: (messageId: string) =>
           pipe(
-            WebSocketClient.subscribeScoped(
-              client,
-              "messageRoomOrder.getMessageRoomOrderRange",
-              messageId,
-            ),
-            Effect.map(
-              Effect.withSpan("MessageRoomOrderService.getMessageRoomOrderRange subscription", {
-                captureStackTrace: true,
-              }),
-            ),
+            client.messageRoomOrder.getMessageRoomOrderRange({ urlParams: { messageId } }),
             Effect.withSpan("MessageRoomOrderService.getMessageRoomOrderRange", {
               captureStackTrace: true,
             }),
           ),
         upsertMessageRoomOrderEntry: (
           messageId: string,
-          hour: number,
           entries: Omit<
             typeof messageRoomOrderEntry.$inferInsert,
             "id" | "createdAt" | "updatedAt" | "deletedAt" | "messageId"
           >[],
         ) =>
           pipe(
-            WebSocketClient.mutate(client, "messageRoomOrder.upsertMessageRoomOrderEntry", {
-              messageId,
-              hour,
-              entries,
+            client.messageRoomOrder.upsertMessageRoomOrderEntry({
+              payload: {
+                messageId,
+                entries: entries.map((entry) => ({
+                  rank: entry.rank,
+                  position: entry.position,
+                  hour: entry.hour,
+                  team: entry.team,
+                  tags: entry.tags,
+                  effectValue: entry.effectValue,
+                })),
+              },
             }),
             Effect.withSpan("MessageRoomOrderService.upsertMessageRoomOrderEntry", {
               captureStackTrace: true,
@@ -111,9 +95,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
           ),
         removeMessageRoomOrderEntry: (messageId: string) =>
           pipe(
-            WebSocketClient.mutate(client, "messageRoomOrder.removeMessageRoomOrderEntry", {
-              messageId,
-            }),
+            client.messageRoomOrder.removeMessageRoomOrderEntry({ payload: { messageId } }),
             Effect.withSpan("MessageRoomOrderService.removeMessageRoomOrderEntry", {
               captureStackTrace: true,
             }),

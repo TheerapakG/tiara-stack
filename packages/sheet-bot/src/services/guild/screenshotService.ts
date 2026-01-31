@@ -1,6 +1,5 @@
 import { bindObject } from "@/utils";
 import { Effect, pipe } from "effect";
-import { WebSocketClient } from "typhoon-client-ws/client";
 import { SheetApisClient } from "@/client/sheetApis";
 import { GuildService } from "./guildService";
 
@@ -16,17 +15,17 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()("Scre
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
-            WebSocketClient.subscribeScoped(sheetApisClient.get(), "screenshot.getScreenshot", {
-              guildId,
-              channel,
-              day,
+            sheetApisClient.get().screenshot.getScreenshot({
+              urlParams: {
+                guildId,
+                channel,
+                day,
+              },
             }),
           ),
-          Effect.map(
-            Effect.withSpan("ScreenshotService.getScreenshot", {
-              captureStackTrace: true,
-            }),
-          ),
+          Effect.withSpan("ScreenshotService.getScreenshot", {
+            captureStackTrace: true,
+          }),
         ),
     })),
   ),

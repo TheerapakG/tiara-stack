@@ -14,7 +14,6 @@ import {
   SlashCommandBuilder,
 } from "discord.js";
 import { Array, Effect, pipe } from "effect";
-import { UntilObserver } from "typhoon-core/signal";
 
 export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
   .data(
@@ -51,8 +50,6 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
         PermissionService.checkRoles.tapEffect(() =>
           pipe(
             GuildConfigService.getGuildManagerRoles(),
-            UntilObserver.observeUntilRpcResultResolved(),
-            Effect.flatten,
             Effect.map(Array.map((role) => role.roleId)),
             Effect.map((roles) => ({
               roles,
@@ -66,11 +63,7 @@ export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()
         }),
         InteractionContext.deferReply.tap(),
         Effect.bind("screenshot", ({ channelName, day }) =>
-          pipe(
-            ScreenshotService.getScreenshot(channelName, day),
-            UntilObserver.observeUntilRpcResultResolved(),
-            Effect.flatten,
-          ),
+          ScreenshotService.getScreenshot(channelName, day),
         ),
         InteractionContext.editReply.tap(({ screenshot }) => ({
           files: [

@@ -23,7 +23,6 @@ import {
   userMention,
 } from "discord.js";
 import { Array, Effect, Number, Option, Order, pipe } from "effect";
-import { UntilObserver } from "typhoon-core/signal";
 
 const buttonData = {
   type: ComponentType.Button,
@@ -45,14 +44,10 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         InteractionContext.user.bind("user"),
         CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
         Effect.bind("messageCheckinData", ({ message }) =>
-          pipe(
-            MessageCheckinService.getMessageCheckinData(message.id),
-            UntilObserver.observeUntilRpcResultResolved(),
-            Effect.flatten,
-          ),
+          MessageCheckinService.getMessageCheckinData(message.id),
         ),
         Effect.tap(({ message, user }) =>
-          MessageCheckinService.setMessageCheckinMemberCheckinAt(message.id, user.id),
+          MessageCheckinService.setMessageCheckinMemberCheckinAt(message.id, user.id, Date.now()),
         ),
         InteractionContext.editReply.tap(() => ({
           content: "You have been checked in!",
@@ -60,8 +55,6 @@ export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
         Effect.bind("checkedInMentions", ({ message }) =>
           pipe(
             MessageCheckinService.getMessageCheckinMembers(message.id),
-            UntilObserver.observeUntilRpcResultResolved(),
-            Effect.flatten,
             Effect.map((members) =>
               pipe(
                 members,

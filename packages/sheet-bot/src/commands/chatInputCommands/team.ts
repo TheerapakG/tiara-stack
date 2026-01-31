@@ -18,10 +18,9 @@ import {
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
 } from "discord.js";
-import { Array, Effect, Function, Number, Option, Order, flow, pipe, String } from "effect";
-import { Schema } from "sheet-apis";
+import { Array, Effect, Function, Number, Option, Order, pipe, String } from "effect";
+import { Sheet } from "sheet-apis/schema";
 import { Utils } from "typhoon-core/utils";
-import { UntilObserver } from "typhoon-core/signal";
 
 const handleList = handlerVariantContextBuilder<ChatInputSubcommandHandlerVariantT>()
   .data(
@@ -43,11 +42,7 @@ const handleList = handlerVariantContextBuilder<ChatInputSubcommandHandlerVarian
         PermissionService.checkOwner.tap(() => ({ allowSameGuild: true })),
         InteractionContext.user.bind("interactionUser"),
         Effect.bindAll(({ interactionUser }) => ({
-          managerRoles: pipe(
-            GuildConfigService.getGuildManagerRoles(),
-            UntilObserver.observeUntilRpcResultResolved(),
-            Effect.flatten,
-          ),
+          managerRoles: GuildConfigService.getGuildManagerRoles(),
           user: pipe(
             InteractionContext.getUser("user"),
             Effect.map(Option.getOrElse(() => interactionUser)),
@@ -67,13 +62,7 @@ const handleList = handlerVariantContextBuilder<ChatInputSubcommandHandlerVarian
             {
               user: user.id,
             },
-            Utils.mapPositional(
-              flow(
-                PlayerService.getTeamsById,
-                UntilObserver.observeUntilRpcResultResolved(),
-                Effect.flatten,
-              ),
-            ),
+            Utils.mapPositional(PlayerService.getTeamsById),
           ),
         ),
         Effect.let("formattedTeams", ({ teams }) =>
@@ -82,7 +71,7 @@ const handleList = handlerVariantContextBuilder<ChatInputSubcommandHandlerVarian
             Array.filter((team) => !team.tags.includes("tierer_hint")),
             Array.sortWith(
               Function.identity,
-              Order.combine(Schema.Team.byPlayerName, Order.reverse(Schema.Team.byEffectValue)),
+              Order.combine(Sheet.Team.byPlayerName, Order.reverse(Sheet.Team.byEffectValue)),
             ),
             Array.map((team) => ({
               teamName: team.teamName,
@@ -90,7 +79,7 @@ const handleList = handlerVariantContextBuilder<ChatInputSubcommandHandlerVarian
               lead: team.lead,
               backline: team.backline,
               talent: team.talent,
-              effectValue: Schema.Team.getEffectValue(team),
+              effectValue: Sheet.Team.getEffectValue(team),
             })),
             Array.filterMap((team) =>
               pipe(

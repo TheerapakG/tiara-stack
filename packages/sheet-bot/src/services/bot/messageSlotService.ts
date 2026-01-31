@@ -1,6 +1,5 @@
 import { SheetApisClient } from "@/client/sheetApis";
 import { Effect, pipe } from "effect";
-import { WebSocketClient } from "typhoon-client-ws/client";
 import type { messageSlot } from "sheet-db-schema";
 
 export class MessageSlotService extends Effect.Service<MessageSlotService>()("MessageSlotService", {
@@ -10,12 +9,7 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()("Me
     Effect.map(({ client }) => ({
       getMessageSlotData: (messageId: string) =>
         pipe(
-          WebSocketClient.subscribeScoped(client, "messageSlot.getMessageSlotData", messageId),
-          Effect.map(
-            Effect.withSpan("MessageSlotService.getMessageSlotData subscription", {
-              captureStackTrace: true,
-            }),
-          ),
+          client.messageSlot.getMessageSlotData({ urlParams: { messageId } }),
           Effect.withSpan("MessageSlotService.getMessageSlotData", {
             captureStackTrace: true,
           }),
@@ -28,9 +22,8 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()("Me
         >,
       ) =>
         pipe(
-          WebSocketClient.mutate(client, "messageSlot.upsertMessageSlotData", {
-            messageId,
-            ...data,
+          client.messageSlot.upsertMessageSlotData({
+            payload: { messageId, day: data.day },
           }),
           Effect.withSpan("MessageSlotService.upsertMessageSlotData", {
             captureStackTrace: true,

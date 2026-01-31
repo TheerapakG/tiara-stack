@@ -1,5 +1,5 @@
 import { NodeSdk } from "@effect/opentelemetry";
-import { NodeRuntime } from "@effect/platform-node";
+import { NodeHttpClient, NodeRuntime } from "@effect/platform-node";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
@@ -23,7 +23,7 @@ const MetricsLive = NodeSdk.layer(() => ({
 
 const baseLayer = pipe(
   Config.Default,
-  Layer.provideMerge(Layer.mergeAll(MetricsLive, Logger.logFmt)),
+  Layer.provideMerge(Layer.mergeAll(MetricsLive, Logger.logFmt, NodeHttpClient.layer)),
 );
 
 NodeRuntime.runMain(

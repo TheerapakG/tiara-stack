@@ -1,6 +1,5 @@
 import { bindObject } from "@/utils";
 import { Effect, pipe } from "effect";
-import { WebSocketClient } from "typhoon-client-ws/client";
 import { SheetApisClient } from "~~/src/client/sheetApis";
 
 export class BotGuildConfigService extends Effect.Service<BotGuildConfigService>()(
@@ -14,16 +13,7 @@ export class BotGuildConfigService extends Effect.Service<BotGuildConfigService>
       Effect.map(({ sheetApisClient }) => ({
         getAutoCheckinGuilds: () =>
           pipe(
-            WebSocketClient.subscribeScoped(
-              sheetApisClient.get(),
-              "guildConfig.getAutoCheckinGuilds",
-              {},
-            ),
-            Effect.map(
-              Effect.withSpan("BotGuildConfigService.getAutoCheckinGuilds subscription", {
-                captureStackTrace: true,
-              }),
-            ),
+            sheetApisClient.get().guildConfig.getAutoCheckinGuilds(),
             Effect.withSpan("BotGuildConfigService.getAutoCheckinGuilds", {
               captureStackTrace: true,
             }),

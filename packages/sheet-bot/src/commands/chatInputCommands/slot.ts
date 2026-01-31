@@ -8,8 +8,8 @@ import {
   InteractionContext,
   MessageSlotService,
   PermissionService,
+  ScheduleService,
   SendableChannelContext,
-  SheetService,
 } from "@/services";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
@@ -41,23 +41,21 @@ import {
   Schema,
   String,
 } from "effect";
-import { UntilObserver } from "typhoon-core/signal";
 
 const getSlotMessage = (day: number) =>
   pipe(
     Effect.Do,
     bindObject({
       daySchedule: pipe(
-        SheetService.daySchedules(day),
+        ScheduleService.dayPopulatedSchedules(day),
         Effect.map(
-          Array.map((s) =>
+          Array.filterMap((schedule) =>
             pipe(
-              s.hour,
-              Option.map(() => s),
+              schedule.hour,
+              Option.map(() => schedule),
             ),
           ),
         ),
-        Effect.map(Array.getSomes),
       ),
     }),
     Effect.bindAll(({ daySchedule }) => ({
@@ -143,8 +141,6 @@ const handleList = handlerVariantContextBuilder<ChatInputSubcommandHandlerVarian
             PermissionService.checkRoles.effect(
               pipe(
                 GuildConfigService.getGuildManagerRoles(),
-                UntilObserver.observeUntilRpcResultResolved(),
-                Effect.flatten,
                 Effect.map(Array.map((role) => role.roleId)),
                 Effect.map((roles) => ({
                   roles,
@@ -208,8 +204,6 @@ const handleButton = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
         PermissionService.checkRoles.tapEffect(() =>
           pipe(
             GuildConfigService.getGuildManagerRoles(),
-            UntilObserver.observeUntilRpcResultResolved(),
-            Effect.flatten,
             Effect.map(Array.map((role) => role.roleId)),
             Effect.map((roles) => ({
               roles,

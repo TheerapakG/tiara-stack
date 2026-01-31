@@ -37,7 +37,7 @@
     "@standard-schema/spec": "^1.0.0",
     "c12": "^3.3.3",
     "discord.js": "^14.24.2",
-    "drizzle-orm": "^0.44.7",
+    "drizzle-orm": "^0.45.1",
     "effect": "^3.18.4",
     "handlebars": "^4.7.8",
     "postgres": "^3.4.7",

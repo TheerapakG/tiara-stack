@@ -12,13 +12,17 @@ import {
   Duration,
   String,
 } from "effect";
-import { serverHandlerDataCollection, Schema as SheetSchema } from "sheet-apis";
-import { AppsScriptClient } from "typhoon-client-apps-script/client";
+import { HttpApiClient } from "@effect/platform";
+import { Api } from "sheet-apis/api";
+import { Sheet } from "sheet-apis/schema";
+import { layer as AppsScriptHttpClientLayer } from "effect-platform-apps-script";
 
 const SETTING_SHEET_NAME = "Thee's Sheet Settings";
 
 function getClient(url: string) {
-  return AppsScriptClient.create(serverHandlerDataCollection, url);
+  return HttpApiClient.make(Api, {
+    baseUrl: url,
+  });
 }
 
 const cellValueValidator = Schema.Union(
@@ -152,17 +156,19 @@ export function theeCalc(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
                 Effect.bind("client", () => getClient(url)),
                 Effect.tap(() => Effect.log("calc.sheet")),
                 Effect.bind("result", ({ client }) =>
-                  AppsScriptClient.once(client, "calc.sheet", {
-                    sheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
-                    config,
-                    players,
-                    fixedTeams,
+                  client.calc.calcSheet({
+                    payload: {
+                      sheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
+                      config,
+                      players,
+                      fixedTeams,
+                    },
                   }),
                 ),
                 Effect.map(({ result }) =>
                   result.map((r) => [
-                    SheetSchema.Room.avgTalent(r),
-                    SheetSchema.Room.avgEffectValue(r),
+                    Sheet.Room.avgTalent(r),
+                    Sheet.Room.avgEffectValue(r),
                     ...pipe(
                       r.teams,
                       Chunk.toArray,
@@ -170,7 +176,7 @@ export function theeCalc(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
                         team.teamName,
                         team.lead,
                         team.backline,
-                        SheetSchema.PlayerTeam.getEffectValue(team),
+                        Sheet.PlayerTeam.getEffectValue(team),
                         team.talent,
                         pipe(team.tags, Array.join(", ")),
                       ]),
@@ -200,6 +206,7 @@ export function theeCalc(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
           }),
         ),
       ),
+      Effect.provide(AppsScriptHttpClientLayer),
     ),
   );
 }

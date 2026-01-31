@@ -14,6 +14,7 @@ import {
   InteractionContext,
   channelServicesFromInteraction,
   guildMemberServicesFromInteraction,
+  ScheduleService,
 } from "@/services";
 import { ChatInputHandlerVariantT, handlerVariantContextBuilder } from "@/types";
 import { bindObject } from "@/utils";
@@ -39,6 +40,7 @@ const Services = {
   ScreenshotService,
   SheetService,
   PermissionService,
+  ScheduleService,
 } as const;
 
 export const command = handlerVariantContextBuilder<ChatInputHandlerVariantT>()

@@ -1,37 +1,16 @@
-import { pipe } from "effect";
-import { Handler } from "typhoon-core/server";
-import { Data as CoreData } from "typhoon-core/handler";
-import { Data as HandlerData } from "typhoon-server/handler";
-import {
-  calcHandlerDataCollection,
-  guildConfigHandlerDataCollection,
-  sheetHandlerDataCollection,
-  playerHandlerDataCollection,
-  monitorHandlerDataCollection,
-  messageCheckinHandlerDataCollection,
-  messageRoomOrderHandlerDataCollection,
-  messageSlotHandlerDataCollection,
-  screenshotHandlerDataCollection,
-} from "./server/handler/data";
+import { NodeRuntime } from "@effect/platform-node";
+import { Layer, Logger } from "effect";
+import { HttpLive } from "./http";
+import { MetricsLive } from "./metrics";
+import { TracesLive } from "./traces";
 
-export * as Schema from "./server/schema";
-
-export const HandlerDataGroupTypeId = CoreData.Group.HandlerDataGroupTypeId;
-export const HandlerDataCollectionTypeId = CoreData.Collection.HandlerDataCollectionTypeId;
-
-export const PartialSubscriptionHandlerData =
-  Handler.Data.Subscription.PartialSubscriptionHandlerData;
-export const PartialMutationHandlerData = Handler.Data.Mutation.PartialMutationHandlerData;
-
-export const serverHandlerDataCollection = pipe(
-  HandlerData.Collection.empty(),
-  HandlerData.Collection.addCollection(calcHandlerDataCollection),
-  HandlerData.Collection.addCollection(guildConfigHandlerDataCollection),
-  HandlerData.Collection.addCollection(sheetHandlerDataCollection),
-  HandlerData.Collection.addCollection(playerHandlerDataCollection),
-  HandlerData.Collection.addCollection(monitorHandlerDataCollection),
-  HandlerData.Collection.addCollection(messageCheckinHandlerDataCollection),
-  HandlerData.Collection.addCollection(messageRoomOrderHandlerDataCollection),
-  HandlerData.Collection.addCollection(messageSlotHandlerDataCollection),
-  HandlerData.Collection.addCollection(screenshotHandlerDataCollection),
+HttpLive.pipe(
+  Layer.provide(MetricsLive),
+  Layer.provide(TracesLive),
+  Layer.provide(Logger.logFmt),
+  Layer.launch,
+  NodeRuntime.runMain({
+    disableErrorReporting: true,
+    disablePrettyLogger: true,
+  }),
 );

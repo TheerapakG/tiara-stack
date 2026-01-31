@@ -63,33 +63,14 @@ Google Apps Script client implementation for Typhoon.
 
 ### `sheet-apis` (packages/sheet-apis)
 
-Backend API server for Google Sheets integration, providing RPC handlers for sheet operations, calculations, guild configuration, and message management.
+Backend API server for Google Sheets integration using Effect's HttpApiBuilder, providing HTTP API handlers for sheet operations, calculations, guild configuration, and message management.
 
-- **Main export** (`packages/sheet-apis/src/index.ts`): Exports Schema and serverHandlerDataCollection
-- **runServer export** (`packages/sheet-apis/src/runServer.ts`): Server entry point that sets up WebSocket server, handlers, and services
-- **Server** (`packages/sheet-apis/src/server`): RPC handler implementations for:
-  - Calc: Sheet calculation operations
-  - GuildConfig: Discord guild configuration management
-  - Sheet: Google Sheets operations
-  - Player: Player data management
-  - MessageCheckin: Check-in message handling
-  - MessageRoomOrder: Room ordering message handling
-  - MessageSlot: Slot message handling
-  - Screenshot: Screenshot generation
-- **DB** (`packages/sheet-apis/src/db`): Database service layer
-- **Google** (`packages/sheet-apis/src/google`): Google Sheets API integration
-- **Config** (`packages/sheet-apis/src/config`): Configuration management
-
-### `sheet-apis-v2` (packages/sheet-apis-v2)
-
-Backend API server v2 for Google Sheets integration using Effect's HttpApiBuilder, providing HTTP API handlers for sheet operations, calculations, guild configuration, and message management.
-
-- **Main entry** (`packages/sheet-apis-v2/src/index.ts`): Server entry point that launches the HTTP API server
-- **HTTP** (`packages/sheet-apis-v2/src/http.ts`): HTTP server configuration with all handler groups
-- **API** (`packages/sheet-apis-v2/src/api.ts`): API definitions using HttpApiBuilder
-- **Metrics** (`packages/sheet-apis-v2/src/metrics.ts`): OpenTelemetry metrics configuration
-- **Traces** (`packages/sheet-apis-v2/src/traces.ts`): OpenTelemetry traces configuration
-- **Handlers** (`packages/sheet-apis-v2/src/handlers`): HTTP API handler implementations for:
+- **Main entry** (`packages/sheet-apis/src/index.ts`): Server entry point that launches the HTTP API server
+- **HTTP** (`packages/sheet-apis/src/http.ts`): HTTP server configuration with all handler groups
+- **API** (`packages/sheet-apis/src/api.ts`): API definitions using HttpApiBuilder
+- **Metrics** (`packages/sheet-apis/src/metrics.ts`): OpenTelemetry metrics configuration
+- **Traces** (`packages/sheet-apis/src/traces.ts`): OpenTelemetry traces configuration
+- **Handlers** (`packages/sheet-apis/src/handlers`): HTTP API handler implementations for:
   - Calc: Sheet calculation operations
   - GuildConfig: Discord guild configuration management
   - Health: Health check endpoint
@@ -101,7 +82,7 @@ Backend API server v2 for Google Sheets integration using Effect's HttpApiBuilde
   - Schedule: Scheduling operations
   - Screenshot: Screenshot generation
   - Sheet: Google Sheets operations
-- **Services** (`packages/sheet-apis-v2/src/services`): Business logic services:
+- **Services** (`packages/sheet-apis/src/services`): Business logic services:
   - calc.ts: Calculation service
   - google/: Google Sheets API integration
   - guildConfig.ts: Guild configuration service
@@ -115,8 +96,8 @@ Backend API server v2 for Google Sheets integration using Effect's HttpApiBuilde
   - sheet.ts: Google Sheets operations service
   - sheetConfig.ts: Sheet configuration service
   - zero.ts: Zero sync service
-- **Schemas** (`packages/sheet-apis-v2/src/schemas`): Protocol buffer schema definitions
-- **Config** (`packages/sheet-apis-v2/src/config.ts`): Configuration management
+- **Schemas** (`packages/sheet-apis/src/schemas`): Protocol buffer schema definitions
+- **Config** (`packages/sheet-apis/src/config.ts`): Configuration management
 
 ### `sheet-db-server` (packages/sheet-db-server)
 

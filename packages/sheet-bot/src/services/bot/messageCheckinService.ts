@@ -1,6 +1,5 @@
 import { SheetApisClient } from "@/client/sheetApis";
 import { Effect, pipe } from "effect";
-import { WebSocketClient } from "typhoon-client-ws/client";
 import type { messageCheckin } from "sheet-db-schema";
 
 export class MessageCheckinService extends Effect.Service<MessageCheckinService>()(
@@ -12,16 +11,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
       Effect.map(({ client }) => ({
         getMessageCheckinData: (messageId: string) =>
           pipe(
-            WebSocketClient.subscribeScoped(
-              client,
-              "messageCheckin.getMessageCheckinData",
-              messageId,
-            ),
-            Effect.map(
-              Effect.withSpan("MessageCheckinService.getMessageCheckinData subscription", {
-                captureStackTrace: true,
-              }),
-            ),
+            client.messageCheckin.getMessageCheckinData({ urlParams: { messageId } }),
             Effect.withSpan("MessageCheckinService.getMessageCheckinData", {
               captureStackTrace: true,
             }),
@@ -34,9 +24,14 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
           >,
         ) =>
           pipe(
-            WebSocketClient.mutate(client, "messageCheckin.upsertMessageCheckinData", {
-              messageId,
-              ...data,
+            client.messageCheckin.upsertMessageCheckinData({
+              payload: {
+                messageId,
+                initialMessage: data.initialMessage,
+                hour: data.hour,
+                channelId: data.channelId,
+                roleId: data.roleId ?? undefined,
+              },
             }),
             Effect.withSpan("MessageCheckinService.upsertMessageCheckinData", {
               captureStackTrace: true,
@@ -44,35 +39,26 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
           ),
         getMessageCheckinMembers: (messageId: string) =>
           pipe(
-            WebSocketClient.subscribeScoped(
-              client,
-              "messageCheckin.getMessageCheckinMembers",
-              messageId,
-            ),
-            Effect.map(
-              Effect.withSpan("MessageCheckinService.getMessageCheckinMembers subscription", {
-                captureStackTrace: true,
-              }),
-            ),
+            client.messageCheckin.getMessageCheckinMembers({ urlParams: { messageId } }),
             Effect.withSpan("MessageCheckinService.getMessageCheckinMembers", {
               captureStackTrace: true,
             }),
           ),
         addMessageCheckinMembers: (messageId: string, memberIds: string[]) =>
           pipe(
-            WebSocketClient.mutate(client, "messageCheckin.addMessageCheckinMembers", {
-              messageId,
-              memberIds,
-            }),
+            client.messageCheckin.addMessageCheckinMembers({ payload: { messageId, memberIds } }),
             Effect.withSpan("MessageCheckinService.addMessageCheckinMembers", {
               captureStackTrace: true,
             }),
           ),
-        setMessageCheckinMemberCheckinAt: (messageId: string, memberId: string) =>
+        setMessageCheckinMemberCheckinAt: (
+          messageId: string,
+          memberId: string,
+          checkinAt: number,
+        ) =>
           pipe(
-            WebSocketClient.mutate(client, "messageCheckin.setMessageCheckinMemberCheckinAt", {
-              messageId,
-              memberId,
+            client.messageCheckin.setMessageCheckinMemberCheckinAt({
+              payload: { messageId, memberId, checkinAt },
             }),
             Effect.withSpan("MessageCheckinService.setMessageCheckinMemberCheckinAt", {
               captureStackTrace: true,
@@ -80,10 +66,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
           ),
         removeMessageCheckinMember: (messageId: string, memberId: string) =>
           pipe(
-            WebSocketClient.mutate(client, "messageCheckin.removeMessageCheckinMember", {
-              messageId,
-              memberId,
-            }),
+            client.messageCheckin.removeMessageCheckinMember({ payload: { messageId, memberId } }),
             Effect.withSpan("MessageCheckinService.removeMessageCheckinMember", {
               captureStackTrace: true,
             }),

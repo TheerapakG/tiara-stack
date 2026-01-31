@@ -9,7 +9,7 @@ import {
   MessageRoomOrderService,
   PermissionService,
   PlayerService,
-  SheetService,
+  ScheduleService,
 } from "@/services";
 import {
   chatInputCommandSubcommandHandlerContextBuilder,
@@ -35,17 +35,13 @@ import {
   Effect,
   Function,
   HashSet,
-  Match,
   HashMap,
+  Match,
   Option,
   pipe,
-  Schema,
-  flow,
 } from "effect";
-import { WebSocketClient } from "typhoon-client-ws/client";
-import { Schema as SheetSchema } from "sheet-apis";
-import { UntilObserver } from "typhoon-core/signal";
-import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
+import { Sheet } from "sheet-apis/schema";
+import { Array as ArrayUtils } from "typhoon-core/utils";
 
 const formatEffectValue = (effectValue: number): string => {
   const rounded = Math.round(effectValue * 10) / 10;
@@ -80,8 +76,6 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
         PermissionService.checkRoles.tapEffect(() =>
           pipe(
             GuildConfigService.getGuildManagerRoles(),
-            UntilObserver.observeUntilRpcResultResolved(),
-            Effect.flatten,
             Effect.map(Array.map((role) => role.roleId)),
             Effect.map((roles) => ({
               roles,
@@ -113,21 +107,12 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
           pipe(
             channelNameOption,
             Option.match({
-              onSome: (channelName) =>
-                pipe(
-                  GuildConfigService.getGuildRunningChannelByName(channelName),
-                  UntilObserver.observeUntilRpcResultResolved(),
-                  Effect.flatten,
-                ),
+              onSome: (channelName) => GuildConfigService.getGuildRunningChannelByName(channelName),
               onNone: () =>
                 pipe(
                   InteractionContext.channel(true).sync(),
                   Effect.flatMap((channel) =>
-                    pipe(
-                      GuildConfigService.getGuildRunningChannelById(channel.id),
-                      UntilObserver.observeUntilRpcResultResolved(),
-                      Effect.flatten,
-                    ),
+                    GuildConfigService.getGuildRunningChannelById(channel.id),
                   ),
                 ),
             }),
@@ -139,10 +124,11 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
             Effect.flatMap(FormatService.formatHourWindow),
           ),
         ),
+
         Effect.bind("schedules", ({ runningChannel }) =>
           pipe(
             runningChannel.name,
-            Effect.flatMap(SheetService.channelSchedules),
+            Effect.flatMap(ScheduleService.channelPopulatedSchedules),
             Effect.map(
               Array.map((s) =>
                 pipe(
@@ -156,23 +142,10 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
             Effect.map(HashMap.map(({ schedule }) => schedule)),
           ),
         ),
-        Effect.bind("schedule", ({ hour, schedules }) =>
-          pipe(
-            {
-              prevSchedule: HashMap.get(schedules, hour - 1),
-              schedule: HashMap.get(schedules, hour),
-            },
-            Utils.mapPositional(
-              Utils.arraySomesPositional(
-                flow(
-                  PlayerService.mapScheduleWithPlayers,
-                  UntilObserver.observeUntilRpcResultResolved(),
-                  Effect.flatten,
-                ),
-              ),
-            ),
-          ),
-        ),
+        Effect.let("schedule", ({ hour, schedules }) => ({
+          prevSchedule: HashMap.get(schedules, hour - 1),
+          schedule: HashMap.get(schedules, hour),
+        })),
         Effect.tap(({ hour, schedules, schedule }) => Effect.log(hour, schedules, schedule)),
         Effect.bindAll(({ schedule }) => ({
           previousFills: pipe(
@@ -181,8 +154,8 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
               pipe(
                 Match.value(schedule),
                 Match.tagsExhaustive({
-                  BreakSchedule: () => [],
-                  ScheduleWithPlayers: (schedule) => schedule.fills,
+                  PopulatedBreakSchedule: () => [],
+                  PopulatedSchedule: (schedule) => schedule.fills,
                 }),
               ),
             ),
@@ -196,8 +169,8 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
               pipe(
                 Match.value(schedule),
                 Match.tagsExhaustive({
-                  BreakSchedule: () => [],
-                  ScheduleWithPlayers: (schedule) => schedule.fills,
+                  PopulatedBreakSchedule: () => [],
+                  PopulatedSchedule: (schedule) => schedule.fills,
                 }),
               ),
             ),
@@ -211,8 +184,8 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
               pipe(
                 Match.value(schedule),
                 Match.tagsExhaustive({
-                  BreakSchedule: () => [],
-                  ScheduleWithPlayers: (schedule) => schedule.fills,
+                  PopulatedBreakSchedule: () => [],
+                  PopulatedSchedule: (schedule) => schedule.fills,
                 }),
               ),
             ),
@@ -226,16 +199,16 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
               pipe(
                 Match.value(schedule),
                 Match.tagsExhaustive({
-                  BreakSchedule: () => Option.none<string>(),
-                  ScheduleWithPlayers: (schedule) => schedule.monitor,
+                  PopulatedBreakSchedule: () => Option.none<Sheet.PopulatedScheduleMonitor>(),
+                  PopulatedSchedule: (schedule) => schedule.monitor,
                 }),
               ),
             ),
-            Option.getOrElse(() => Option.none<string>()),
+            Option.getOrElse(() => Option.none<Sheet.PopulatedScheduleMonitor>()),
             Effect.succeed,
           ),
         })),
-        Effect.bindAll(({ previousFills, fills, runners }) => ({
+        Effect.bindAll(({ previousFills, fills, runners, monitor }) => ({
           previousFillNames: pipe(
             previousFills,
             Array.map((player) => player.player.name),
@@ -251,17 +224,21 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
             Array.map((player) => player.player.name),
             Effect.succeed,
           ),
+          monitorName: pipe(
+            monitor,
+            Option.map((monitor) => monitor.monitor.name),
+            Effect.succeed,
+          ),
         })),
         Effect.bind("teams", ({ fills, fillNames, runnerNames }) =>
           pipe(
             PlayerService.getTeamsByName(fillNames),
-            UntilObserver.observeUntilRpcResultResolved(),
-            Effect.flatten,
-            Effect.flatMap((teams) =>
-              Effect.forEach(Array.zip(fills, teams), ([fill, teams]) =>
-                Effect.forEach(teams, (team) =>
-                  pipe(
-                    new SheetSchema.Team({
+            Effect.map((teams) =>
+              Array.map(Array.zip(fills, teams), ([fill, teams]) =>
+                Array.map(
+                  teams,
+                  (team) =>
+                    new Sheet.Team({
                       ...team,
                       tags: pipe(
                         team.tags,
@@ -272,8 +249,6 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
                         fill.enc ? Array.append("encable") : Function.identity,
                       ),
                     }),
-                    Schema.encode(SheetSchema.Team),
-                  ),
                 ),
               ),
             ),
@@ -283,12 +258,14 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
           pipe(
             SheetApisClient.get(),
             Effect.flatMap((client) =>
-              WebSocketClient.once(client, "calc.bot", {
-                config: {
-                  healNeeded: heal,
-                  considerEnc: true,
+              client.calc.calcBot({
+                payload: {
+                  config: {
+                    healNeeded: heal,
+                    considerEnc: true,
+                  },
+                  players: teams,
                 },
-                players: teams,
               }),
             ),
             Effect.flatMap(
@@ -362,18 +339,17 @@ const handleManual = handlerVariantContextBuilder<ChatInputSubcommandHandlerVari
             ],
           }),
         ),
-        Effect.tap(({ hour, previousFillNames, fillNames, message, roomOrders, monitor }) =>
+        Effect.tap(({ hour, previousFillNames, fillNames, monitorName, message, roomOrders }) =>
           Effect.all([
             MessageRoomOrderService.upsertMessageRoomOrder(message.id, {
               hour,
               previousFills: previousFillNames,
               fills: fillNames,
               rank: 0,
-              monitor: Option.getOrUndefined(monitor),
+              monitor: Option.getOrUndefined(monitorName),
             }),
             MessageRoomOrderService.upsertMessageRoomOrderEntry(
               message.id,
-              hour,
               pipe(
                 roomOrders,
                 Array.map(({ room }, rank) =>
