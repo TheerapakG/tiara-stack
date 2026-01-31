@@ -1,31 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "@effect/platform";
 import { Schema } from "effect";
-import type { ReadonlyJSONValue, ReadonlyJSONObject } from "@rocicorp/zero";
-
-const ReadonlyJSONValue = Schema.Union(
-  Schema.Null,
-  Schema.String,
-  Schema.Boolean,
-  Schema.Number,
-  Schema.Array(
-    Schema.suspend((): Schema.Schema<ReadonlyJSONValue> => ReadonlyJSONValue).annotations({
-      identifier: "ReadonlyJSONValue",
-    }),
-  ),
-  Schema.suspend((): Schema.Schema<ReadonlyJSONObject> => ReadonlyJSONObject).annotations({
-    identifier: "ReadonlyJSONObject",
-  }),
-);
-
-const ReadonlyJSONObject = Schema.Record({
-  key: Schema.String,
-  value: Schema.Union(
-    Schema.suspend((): Schema.Schema<ReadonlyJSONValue> => ReadonlyJSONValue).annotations({
-      identifier: "ReadonlyJSONValue",
-    }),
-    Schema.Undefined,
-  ),
-});
+import { ReadonlyJSONValue } from "typhoon-core/schema";
 
 export class ZeroApi extends HttpApiGroup.make("zero")
   .add(
