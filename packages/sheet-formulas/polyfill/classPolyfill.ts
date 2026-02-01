@@ -87,6 +87,10 @@ class Response {
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
+globalThis.AbortSignal = AbortSignal;
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
 globalThis.AbortController = AbortController;
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment

@@ -30,9 +30,10 @@ export const MonitorLive = HttpApiBuilder.group(Api, "monitor", (handlers) =>
     }),
     Effect.map(({ monitorService, guildConfigService }) =>
       handlers
-        .handle("getMonitorMaps", () =>
+        .handle("getMonitorMaps", ({ urlParams }) =>
           pipe(
-            monitorService.getMonitorMaps(),
+            getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
+            Effect.flatMap((sheetId) => monitorService.getMonitorMaps(sheetId)),
             Effect.map((monitorMaps) => ({
               idToMonitor: Array.fromIterable(HashMap.entries(monitorMaps.idToMonitor)).map(
                 ([key, value]) => ({

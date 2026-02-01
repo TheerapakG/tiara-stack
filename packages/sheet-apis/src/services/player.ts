@@ -9,63 +9,57 @@ export class PlayerService extends Effect.Service<PlayerService>()("PlayerServic
   scoped: pipe(
     Effect.Do,
     Effect.bind("sheetService", () => SheetService),
-    Effect.bindAll(({ sheetService }) => ({
-      playerMaps: Effect.cached(
-        pipe(
-          sheetService.getPlayers(""),
-          Effect.map(
-            Array.map(({ index, id, name }) =>
-              Option.isSome(id) && Option.isSome(name)
-                ? Option.some(
-                    new Player({
-                      index,
-                      id: id.value,
-                      name: name.value,
-                    }),
-                  )
-                : Option.none(),
-            ),
-          ),
-          Effect.map(Array.getSomes),
-          Effect.map((players) => ({
-            privateNameToPlayer: pipe(players, ArrayUtils.Collect.toHashMapByKey("name")),
-            idToPlayer: pipe(players, ArrayUtils.Collect.toArrayHashMapByKey("id")),
-          })),
-          Effect.map(({ privateNameToPlayer, idToPlayer }) => ({
-            nameToPlayer: pipe(
-              privateNameToPlayer,
-              HashMap.map((player) => ({
-                name: player.name,
-                players: pipe(idToPlayer, HashMap.get(player.id)),
-              })),
-              HashMap.filterMap((a, _) =>
-                pipe(
-                  a.players,
-                  Option.map((players) => ({ name: a.name, players })),
-                ),
+    Effect.let(
+      "getPlayerMaps",
+      ({ sheetService }) =>
+        (sheetId: string) =>
+          pipe(
+            sheetService.getPlayers(sheetId),
+            Effect.map(
+              Array.map(({ index, id, name }) =>
+                Option.isSome(id) && Option.isSome(name)
+                  ? Option.some(
+                      new Player({
+                        index,
+                        id: id.value,
+                        name: name.value,
+                      }),
+                    )
+                  : Option.none(),
               ),
             ),
-            idToPlayer,
-          })),
-          Effect.withSpan("PlayerService.playerMaps", {
-            captureStackTrace: true,
-          }),
-        ),
-      ),
-    })),
-    Effect.map(({ sheetService, playerMaps }) => ({
-      sheetService,
-      getPlayerMaps: () =>
-        pipe(
-          playerMaps,
-          Effect.withSpan("PlayerService.getPlayerMaps", {
-            captureStackTrace: true,
-          }),
-        ),
+            Effect.map(Array.getSomes),
+            Effect.map((players) => ({
+              privateNameToPlayer: pipe(players, ArrayUtils.Collect.toHashMapByKey("name")),
+              idToPlayer: pipe(players, ArrayUtils.Collect.toArrayHashMapByKey("id")),
+            })),
+            Effect.map(({ privateNameToPlayer, idToPlayer }) => ({
+              nameToPlayer: pipe(
+                privateNameToPlayer,
+                HashMap.map((player) => ({
+                  name: player.name,
+                  players: pipe(idToPlayer, HashMap.get(player.id)),
+                })),
+                HashMap.filterMap((a, _) =>
+                  pipe(
+                    a.players,
+                    Option.map((players) => ({ name: a.name, players })),
+                  ),
+                ),
+              ),
+              idToPlayer,
+            })),
+            Effect.withSpan("PlayerService.getPlayerMaps", {
+              captureStackTrace: true,
+            }),
+          ),
+    ),
+    Effect.map(({ sheetService, getPlayerMaps }) => ({
+      getPlayerMaps,
       getByNames: (sheetId: string, names: readonly string[]) =>
         pipe(
           Effect.Do,
-          Effect.bind("playerMaps", () => playerMaps),
+          Effect.bind("playerMaps", () => getPlayerMaps(sheetId)),
           Effect.map(({ playerMaps: { nameToPlayer } }) =>
             Array.map(names, (name) =>
               pipe(
@@ -89,7 +83,7 @@ export class PlayerService extends Effect.Service<PlayerService>()("PlayerServic
       getByIds: (sheetId: string, ids: readonly string[]) =>
         pipe(
           Effect.Do,
-          Effect.bind("playerMaps", () => playerMaps),
+          Effect.bind("playerMaps", () => getPlayerMaps(sheetId)),
           Effect.map(({ playerMaps: { idToPlayer } }) =>
             Array.map(ids, (id) =>
               pipe(
@@ -108,7 +102,7 @@ export class PlayerService extends Effect.Service<PlayerService>()("PlayerServic
         pipe(
           Effect.Do,
           Effect.bind("teams", () => sheetService.getTeams(sheetId)),
-          Effect.bind("playerMaps", () => playerMaps),
+          Effect.bind("playerMaps", () => getPlayerMaps(sheetId)),
           Effect.map(({ teams, playerMaps: { nameToPlayer } }) =>
             pipe(
               names,
@@ -144,7 +138,7 @@ export class PlayerService extends Effect.Service<PlayerService>()("PlayerServic
         pipe(
           Effect.Do,
           Effect.bind("teams", () => sheetService.getTeams(sheetId)),
-          Effect.bind("playerMaps", () => playerMaps),
+          Effect.bind("playerMaps", () => getPlayerMaps(sheetId)),
           Effect.map(({ teams, playerMaps: { idToPlayer } }) =>
             pipe(
               ids,
@@ -208,7 +202,7 @@ export class PlayerService extends Effect.Service<PlayerService>()("PlayerServic
         getTeamsByIdsCache,
         getTeamsByNamesCache,
       }) => ({
-        getPlayerMaps: () => getPlayerMapsCache.get(Data.struct({})),
+        getPlayerMaps: (sheetId: string) => getPlayerMapsCache.get(sheetId),
         getByIds: (sheetId: string, ids: readonly string[]) =>
           getByIdsCache.get(Data.struct({ sheetId, ids })),
         getByNames: (sheetId: string, names: readonly string[]) =>

@@ -30,9 +30,10 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
     }),
     Effect.map(({ playerService, guildConfigService }) =>
       handlers
-        .handle("getPlayerMaps", () =>
+        .handle("getPlayerMaps", ({ urlParams }) =>
           pipe(
-            playerService.getPlayerMaps(),
+            getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
+            Effect.flatMap((sheetId) => playerService.getPlayerMaps(sheetId)),
             Effect.map((playerMaps) => ({
               nameToPlayer: Array.fromIterable(HashMap.entries(playerMaps.nameToPlayer)).map(
                 ([key, value]) => ({

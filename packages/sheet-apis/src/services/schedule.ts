@@ -110,8 +110,8 @@ export class ScheduleService extends Effect.Service<ScheduleService>()("Schedule
           pipe(
             Effect.Do,
             Effect.bind("schedules", () => sheetService.getAllSchedules(sheetId)),
-            Effect.bind("playerMaps", () => playerService.getPlayerMaps()),
-            Effect.bind("monitorMaps", () => monitorService.getMonitorMaps()),
+            Effect.bind("playerMaps", () => playerService.getPlayerMaps(sheetId)),
+            Effect.bind("monitorMaps", () => monitorService.getMonitorMaps(sheetId)),
             Effect.map(({ schedules, playerMaps, monitorMaps }) => {
               const playerMap = new Map<string, Array.NonEmptyArray<Player | PartialNamePlayer>>();
 
@@ -172,8 +172,8 @@ export class ScheduleService extends Effect.Service<ScheduleService>()("Schedule
           pipe(
             Effect.Do,
             Effect.bind("schedules", () => sheetService.getDaySchedules(sheetId, day)),
-            Effect.bind("playerMaps", () => playerService.getPlayerMaps()),
-            Effect.bind("monitorMaps", () => monitorService.getMonitorMaps()),
+            Effect.bind("playerMaps", () => playerService.getPlayerMaps(sheetId)),
+            Effect.bind("monitorMaps", () => monitorService.getMonitorMaps(sheetId)),
             Effect.map(({ schedules, playerMaps, monitorMaps }) => {
               const playerMap = new Map<string, Array.NonEmptyArray<Player | PartialNamePlayer>>();
 
@@ -231,8 +231,8 @@ export class ScheduleService extends Effect.Service<ScheduleService>()("Schedule
           pipe(
             Effect.Do,
             Effect.bind("schedules", () => sheetService.getChannelSchedules(sheetId, channel)),
-            Effect.bind("playerMaps", () => playerService.getPlayerMaps()),
-            Effect.bind("monitorMaps", () => monitorService.getMonitorMaps()),
+            Effect.bind("playerMaps", () => playerService.getPlayerMaps(sheetId)),
+            Effect.bind("monitorMaps", () => monitorService.getMonitorMaps(sheetId)),
             Effect.map(({ schedules, playerMaps, monitorMaps }) => {
               const playerMap = new Map<string, Array.NonEmptyArray<Player | PartialNamePlayer>>();
 

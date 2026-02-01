@@ -9,58 +9,56 @@ export class MonitorService extends Effect.Service<MonitorService>()("MonitorSer
   scoped: pipe(
     Effect.Do,
     Effect.bind("sheetService", () => SheetService),
-    Effect.bindAll(({ sheetService }) => ({
-      monitorMaps: Effect.cached(
-        pipe(
-          sheetService.getMonitors(""),
-          Effect.map(
-            Array.filterMap((monitor) =>
-              pipe(
-                Option.all({ id: monitor.id, name: monitor.name }),
-                Option.map(
-                  ({ id, name }) =>
-                    new Monitor({
-                      index: monitor.index,
-                      id,
-                      name,
-                    }),
+    Effect.let(
+      "getMonitorMaps",
+      ({ sheetService }) =>
+        (sheetId: string) =>
+          pipe(
+            sheetService.getMonitors(sheetId),
+            Effect.map(
+              Array.filterMap((monitor) =>
+                pipe(
+                  Option.all({ id: monitor.id, name: monitor.name }),
+                  Option.map(
+                    ({ id, name }) =>
+                      new Monitor({
+                        index: monitor.index,
+                        id,
+                        name,
+                      }),
+                  ),
                 ),
               ),
             ),
+            Effect.map((monitors) => {
+              const idToMonitor = pipe(monitors, ArrayUtils.Collect.toArrayHashMapByKey("id"));
+              const nameGroups = pipe(monitors, ArrayUtils.Collect.toArrayHashMapByKey("name"));
+
+              const nameToMonitor = pipe(nameGroups, (groups) =>
+                HashMap.fromIterable<string, { name: string; monitors: ReadonlyArray<Monitor> }>(
+                  globalThis.Array.from(groups).map(([name, monitors]) => [
+                    name,
+                    { name, monitors },
+                  ]),
+                ),
+              );
+
+              return {
+                idToMonitor,
+                nameToMonitor,
+              };
+            }),
+            Effect.withSpan("MonitorService.getMonitorMaps", {
+              captureStackTrace: true,
+            }),
           ),
-          Effect.map((monitors) => {
-            const idToMonitor = pipe(monitors, ArrayUtils.Collect.toArrayHashMapByKey("id"));
-            const nameGroups = pipe(monitors, ArrayUtils.Collect.toArrayHashMapByKey("name"));
-
-            const nameToMonitor = pipe(nameGroups, (groups) =>
-              HashMap.fromIterable<string, { name: string; monitors: ReadonlyArray<Monitor> }>(
-                globalThis.Array.from(groups).map(([name, monitors]) => [name, { name, monitors }]),
-              ),
-            );
-
-            return {
-              idToMonitor,
-              nameToMonitor,
-            };
-          }),
-          Effect.withSpan("MonitorService.monitorMaps", {
-            captureStackTrace: true,
-          }),
-        ),
-      ),
-    })),
-    Effect.map(({ monitorMaps }) => ({
-      getMonitorMaps: () =>
-        pipe(
-          monitorMaps,
-          Effect.withSpan("MonitorService.getMonitorMaps", {
-            captureStackTrace: true,
-          }),
-        ),
+    ),
+    Effect.map(({ getMonitorMaps }) => ({
+      getMonitorMaps,
       getByIds: (sheetId: string, ids: readonly string[]) =>
         pipe(
           Effect.Do,
-          Effect.bind("monitorMaps", () => monitorMaps),
+          Effect.bind("monitorMaps", () => getMonitorMaps(sheetId)),
           Effect.map(({ monitorMaps: { idToMonitor } }) =>
             Array.map(ids, (id) =>
               pipe(
@@ -78,7 +76,7 @@ export class MonitorService extends Effect.Service<MonitorService>()("MonitorSer
       getByNames: (sheetId: string, names: readonly string[]) =>
         pipe(
           Effect.Do,
-          Effect.bind("monitorMaps", () => monitorMaps),
+          Effect.bind("monitorMaps", () => getMonitorMaps(sheetId)),
           Effect.map(({ monitorMaps: { nameToMonitor } }) =>
             Array.map(names, (name) =>
               pipe(
@@ -113,7 +111,7 @@ export class MonitorService extends Effect.Service<MonitorService>()("MonitorSer
       }),
     ),
     Effect.map(({ getMonitorMapsCache, getByIdsCache, getByNamesCache }) => ({
-      getMonitorMaps: () => getMonitorMapsCache.get(Data.struct({})),
+      getMonitorMaps: (sheetId: string) => getMonitorMapsCache.get(sheetId),
       getByIds: (sheetId: string, ids: readonly string[]) =>
         getByIdsCache.get(Data.struct({ sheetId, ids })),
       getByNames: (sheetId: string, names: readonly string[]) =>

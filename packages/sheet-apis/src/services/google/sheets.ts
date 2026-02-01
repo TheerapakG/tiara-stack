@@ -384,10 +384,7 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets",
       ) =>
         pipe(
           Effect.tryPromise({
-            try: () => {
-              console.log("get", params, options);
-              return sheets.spreadsheets.values.batchGet(params, options);
-            },
+            try: () => sheets.spreadsheets.values.batchGet(params, options),
             catch: Function.identity,
           }),
           Effect.catchAll((error) =>
