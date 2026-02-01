@@ -12,6 +12,7 @@ import {
   TeamConfig,
 } from "@/schemas/sheetConfig";
 import { RawPlayer, RawMonitor, Team, BreakSchedule, Schedule } from "@/schemas/sheet";
+import { KubernetesTokenAuthorization } from "@/middlewares/kubernetesTokenAuthorization/tag";
 
 const SheetError = Schema.Union(
   GoogleSheetsError,
@@ -88,5 +89,6 @@ export class SheetApi extends HttpApiGroup.make("sheet")
       .addSuccess(Schema.Array(RunnerConfig))
       .addError(SheetError),
   )
+  .middleware(KubernetesTokenAuthorization)
   .annotate(OpenApi.Title, "Sheet")
   .annotate(OpenApi.Description, "Sheet data endpoints") {}

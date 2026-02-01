@@ -3,6 +3,7 @@ import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import { MessageSlotService } from "@/services/messageSlot";
+import { KubernetesTokenAuthorizationLive } from "@/middlewares/kubernetesTokenAuthorization/live";
 
 export const MessageSlotLive = HttpApiBuilder.group(Api, "messageSlot", (handlers) =>
   pipe(
@@ -32,4 +33,4 @@ export const MessageSlotLive = HttpApiBuilder.group(Api, "messageSlot", (handler
         ),
     ),
   ),
-).pipe(Layer.provide(MessageSlotService.Default));
+).pipe(Layer.provide(Layer.mergeAll(MessageSlotService.Default, KubernetesTokenAuthorizationLive)));

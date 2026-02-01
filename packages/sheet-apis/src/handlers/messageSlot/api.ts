@@ -2,6 +2,7 @@ import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "@effect/platform";
 import { Schema } from "effect";
 import { ValidationError, QueryResultError, ArgumentError } from "typhoon-core/error";
 import { MessageSlot } from "@/schemas/messageSlot";
+import { KubernetesTokenAuthorization } from "@/middlewares/kubernetesTokenAuthorization/tag";
 
 export class MessageSlotApi extends HttpApiGroup.make("messageSlot")
   .add(
@@ -25,5 +26,6 @@ export class MessageSlotApi extends HttpApiGroup.make("messageSlot")
       .addSuccess(MessageSlot)
       .addError(Schema.Union(ValidationError, QueryResultError)),
   )
+  .middleware(KubernetesTokenAuthorization)
   .annotate(OpenApi.Title, "Message Slot")
   .annotate(OpenApi.Description, "Message slot endpoints") {}

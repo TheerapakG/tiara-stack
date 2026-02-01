@@ -3,6 +3,7 @@ import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import { GuildConfigService } from "@/services/guildConfig";
+import { KubernetesTokenAuthorizationLive } from "@/middlewares/kubernetesTokenAuthorization/live";
 
 export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handlers) =>
   pipe(
@@ -101,4 +102,4 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
         ),
     ),
   ),
-).pipe(Layer.provide(GuildConfigService.Default));
+).pipe(Layer.provide(Layer.mergeAll(GuildConfigService.Default, KubernetesTokenAuthorizationLive)));

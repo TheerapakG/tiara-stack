@@ -2,6 +2,7 @@ import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "@effect/platform";
 import { Schema } from "effect";
 import { ValidationError, QueryResultError, ArgumentError } from "typhoon-core/error";
 import { MessageCheckin, MessageCheckinMember } from "@/schemas/messageCheckin";
+import { KubernetesTokenAuthorization } from "@/middlewares/kubernetesTokenAuthorization/tag";
 
 export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
   .add(
@@ -75,5 +76,6 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
       .addSuccess(MessageCheckinMember)
       .addError(Schema.Union(ValidationError, QueryResultError)),
   )
+  .middleware(KubernetesTokenAuthorization)
   .annotate(OpenApi.Title, "Message Checkin")
   .annotate(OpenApi.Description, "Message check-in endpoints") {}

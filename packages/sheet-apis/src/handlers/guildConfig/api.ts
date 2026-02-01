@@ -2,6 +2,7 @@ import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "@effect/platform";
 import { Schema } from "effect";
 import { ValidationError, QueryResultError, ArgumentError } from "typhoon-core/error";
 import { GuildChannelConfig, GuildConfig, GuildConfigManagerRole } from "@/schemas/guildConfig";
+import { KubernetesTokenAuthorization } from "@/middlewares/kubernetesTokenAuthorization/tag";
 
 export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
   .add(
@@ -115,5 +116,6 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
       .addSuccess(GuildChannelConfig)
       .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
   )
+  .middleware(KubernetesTokenAuthorization)
   .annotate(OpenApi.Title, "Guild Config")
   .annotate(OpenApi.Description, "Guild config endpoints") {}

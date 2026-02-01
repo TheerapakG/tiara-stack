@@ -3,6 +3,7 @@ import { Array, Effect, HashMap, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import { PlayerService } from "@/services/player";
 import { GuildConfigService } from "@/services/guildConfig";
+import { KubernetesTokenAuthorizationLive } from "@/middlewares/kubernetesTokenAuthorization/live";
 
 const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigService) =>
   pipe(
@@ -86,4 +87,12 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
         ),
     ),
   ),
-).pipe(Layer.provide(PlayerService.Default), Layer.provide(GuildConfigService.Default));
+).pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      PlayerService.Default,
+      GuildConfigService.Default,
+      KubernetesTokenAuthorizationLive,
+    ),
+  ),
+);

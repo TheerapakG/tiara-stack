@@ -23,4 +23,4 @@ export class Api extends HttpApi.make("api")
   .add(PlayerApi)
   .add(ScreenshotApi)
   .add(ScheduleApi)
-  .annotate(OpenApi.Title, "Sheet APIs V2") {}
+  .annotate(OpenApi.Title, "Sheet APIs") {}

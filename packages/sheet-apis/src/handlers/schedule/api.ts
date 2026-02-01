@@ -5,6 +5,7 @@ import { GoogleSheetsError } from "@/schemas/google";
 import { ParserFieldError } from "@/schemas/sheet/error";
 import { SheetConfigError } from "@/schemas/sheetConfig";
 import { PopulatedScheduleResult } from "@/schemas/sheet";
+import { KubernetesTokenAuthorization } from "@/middlewares/kubernetesTokenAuthorization/tag";
 
 const ScheduleError = Schema.Union(
   GoogleSheetsError,
@@ -33,5 +34,6 @@ export class ScheduleApi extends HttpApiGroup.make("schedule")
       .addSuccess(Schema.Array(PopulatedScheduleResult))
       .addError(ScheduleError),
   )
+  .middleware(KubernetesTokenAuthorization)
   .annotate(OpenApi.Title, "Schedule")
   .annotate(OpenApi.Description, "Populated schedule data endpoints") {}

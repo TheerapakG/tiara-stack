@@ -6,6 +6,7 @@ import { ParserFieldError } from "@/schemas/sheet/error";
 import { SheetConfigError } from "@/schemas/sheetConfig";
 import { Room } from "@/schemas/sheet/room";
 import { Team } from "@/schemas/sheet";
+import { KubernetesTokenAuthorization } from "@/middlewares/kubernetesTokenAuthorization/tag";
 
 const CalcError = Schema.Union(
   GoogleSheetsError,
@@ -44,7 +45,8 @@ export class CalcApi extends HttpApiGroup.make("calc")
           }),
         ),
       )
-      .addError(ValidationError),
+      .addError(ValidationError)
+      .middleware(KubernetesTokenAuthorization),
   )
   .add(
     HttpApiEndpoint.post("calcSheet", "/calc/sheet")
@@ -70,6 +72,9 @@ export class CalcApi extends HttpApiGroup.make("calc")
       )
       .addSuccess(Schema.Array(Room))
       .addError(CalcError),
+    // This endpoint needs to be callable from outside the cluster from the Google Sheets,
+    // and it does not expose further information than what is derived from the Google Sheet with specified id,
+    // so we are not adding security middleware here for now
   )
   .annotate(OpenApi.Title, "Calc")
   .annotate(OpenApi.Description, "Calculation endpoints") {}

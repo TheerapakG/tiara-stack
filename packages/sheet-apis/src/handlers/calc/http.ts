@@ -6,6 +6,7 @@ import { PlayerTeam, Team } from "@/schemas/sheet";
 import { Room } from "@/schemas/sheet/room";
 import { PlayerService } from "@/services/player";
 import { Array as ArrayUtils } from "typhoon-core/utils";
+import { KubernetesTokenAuthorizationLive } from "@/middlewares/kubernetesTokenAuthorization/live";
 
 export const CalcLive = HttpApiBuilder.group(Api, "calc", (handlers) =>
   pipe(
@@ -105,4 +106,8 @@ export const CalcLive = HttpApiBuilder.group(Api, "calc", (handlers) =>
         ),
     ),
   ),
-).pipe(Layer.provide(CalcService.Default), Layer.provide(PlayerService.Default));
+).pipe(
+  Layer.provide(
+    Layer.mergeAll(CalcService.Default, PlayerService.Default, KubernetesTokenAuthorizationLive),
+  ),
+);

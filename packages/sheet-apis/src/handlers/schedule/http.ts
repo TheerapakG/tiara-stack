@@ -3,6 +3,7 @@ import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import { ScheduleService } from "@/services/schedule";
 import { GuildConfigService } from "@/services/guildConfig";
+import { KubernetesTokenAuthorizationLive } from "@/middlewares/kubernetesTokenAuthorization/live";
 
 const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigService) =>
   pipe(
@@ -54,4 +55,12 @@ export const ScheduleLive = HttpApiBuilder.group(Api, "schedule", (handlers) =>
         ),
     ),
   ),
-).pipe(Layer.provide(ScheduleService.Default), Layer.provide(GuildConfigService.Default));
+).pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      ScheduleService.Default,
+      GuildConfigService.Default,
+      KubernetesTokenAuthorizationLive,
+    ),
+  ),
+);
