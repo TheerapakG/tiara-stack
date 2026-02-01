@@ -102,7 +102,7 @@ class HttpIncomingMessageImpl
   get arrayBuffer(): Effect.Effect<ArrayBuffer, HttpClientError.ResponseError> {
     const content = this.source.getContent();
     const uint8Array = Uint8Array.from(content);
-    return Effect.succeed(uint8Array.buffer as ArrayBuffer);
+    return Effect.succeed(uint8Array.buffer);
   }
 
   toJSON(): object {

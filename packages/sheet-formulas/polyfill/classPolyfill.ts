@@ -50,8 +50,16 @@ class TextEncoder {
 }
 
 class TextDecoder {
-  decode(buffer: Uint8Array) {
-    return Utilities.newBlob(Array.from(buffer)).getDataAsString();
+  decode(buffer: ArrayBufferLike | ArrayBufferView<ArrayBufferLike>) {
+    return Utilities.newBlob(
+      Array.from(
+        new Uint8Array(
+          buffer instanceof ArrayBuffer || buffer instanceof SharedArrayBuffer
+            ? buffer
+            : buffer.buffer,
+        ),
+      ),
+    ).getDataAsString();
   }
 }
 
