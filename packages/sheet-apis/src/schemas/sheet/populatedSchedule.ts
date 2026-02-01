@@ -28,15 +28,15 @@ export class PopulatedSchedule extends Schema.TaggedClass<PopulatedSchedule>()(
     channel: Schema.String,
     day: Schema.Number,
     visible: Schema.Boolean,
-    hour: Schema.OptionFromNullishOr(Schema.Number, undefined),
+    hour: Schema.OptionFromNullOr(Schema.Number),
     fills: pipe(
-      Schema.Array(Schema.OptionFromNullishOr(PopulatedSchedulePlayer, undefined)),
+      Schema.Array(Schema.OptionFromNullOr(PopulatedSchedulePlayer)),
       Schema.itemsCount(5),
     ),
     overfills: Schema.Array(PopulatedSchedulePlayer),
     standbys: Schema.Array(PopulatedSchedulePlayer),
     runners: Schema.Array(PopulatedSchedulePlayer),
-    monitor: Schema.OptionFromNullishOr(PopulatedScheduleMonitor, undefined),
+    monitor: Schema.OptionFromNullOr(PopulatedScheduleMonitor),
   },
 ) {
   static empty = ({ fills, overfills }: PopulatedSchedule): number =>
@@ -50,7 +50,7 @@ export class PopulatedBreakSchedule extends Schema.TaggedClass<PopulatedBreakSch
     channel: Schema.String,
     day: Schema.Number,
     visible: Schema.Boolean,
-    hour: Schema.OptionFromNullishOr(Schema.Number, undefined),
+    hour: Schema.OptionFromNullOr(Schema.Number),
   },
 ) {}
 

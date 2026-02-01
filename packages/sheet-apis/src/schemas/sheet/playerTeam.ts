@@ -4,7 +4,7 @@ import { Option, pipe, String } from "effect";
 
 export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
   type: Schema.String,
-  playerName: Schema.OptionFromNullishOr(Schema.String, undefined),
+  playerName: Schema.OptionFromNullOr(Schema.String),
   teamName: Schema.String,
   lead: Schema.Number,
   backline: Schema.Number,

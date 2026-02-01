@@ -1,16 +1,16 @@
 {
   "name": "tiara-stack-monorepo",
-  "type": "module",
   "private": true,
+  "type": "module",
+  "scripts": {
+    "checks": "nx run-many -t format,lint,typecheck,test --output-style=stream",
+    "format:apply": "nx run-many -t format:apply --output-style=stream",
+    "build": "nx run-many -t build --output-style=stream"
+  },
   "devDependencies": {
     "nx": "19.7.4",
     "oxfmt": "^0.26.0",
     "oxlint": "^1.41.0"
-  },
-  "scripts": {
-    "checks": "nx run-many -t format,lint,typecheck --output-style=stream",
-    "format:apply": "nx run-many -t format:apply --output-style=stream",
-    "build": "nx run-many -t build --output-style=stream"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

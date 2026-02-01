@@ -5,9 +5,9 @@ export class MessageCheckinMember extends Schema.TaggedClass<MessageCheckinMembe
   {
     messageId: Schema.String,
     memberId: Schema.String,
-    checkinAt: Schema.OptionFromNullishOr(Schema.DateTimeUtcFromNumber, undefined),
-    createdAt: Schema.OptionFromNullishOr(Schema.DateTimeUtcFromNumber, undefined),
-    updatedAt: Schema.OptionFromNullishOr(Schema.DateTimeUtcFromNumber, undefined),
-    deletedAt: Schema.OptionFromNullishOr(Schema.DateTimeUtcFromNumber, undefined),
+    checkinAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromNumber),
+    createdAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromNumber),
+    updatedAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromNumber),
+    deletedAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromNumber),
   },
 ) {}

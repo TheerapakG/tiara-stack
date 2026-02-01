@@ -5,22 +5,19 @@ export class BreakSchedule extends Schema.TaggedClass<BreakSchedule>()("BreakSch
   channel: Schema.String,
   day: Schema.Number,
   visible: Schema.Boolean,
-  hour: Schema.OptionFromNullishOr(Schema.Number, undefined),
+  hour: Schema.OptionFromNullOr(Schema.Number),
 }) {}
 
 export class Schedule extends Schema.TaggedClass<Schedule>()("Schedule", {
   channel: Schema.String,
   day: Schema.Number,
   visible: Schema.Boolean,
-  hour: Schema.OptionFromNullishOr(Schema.Number, undefined),
-  fills: pipe(
-    Schema.Array(Schema.OptionFromNullishOr(RawSchedulePlayer, undefined)),
-    Schema.itemsCount(5),
-  ),
+  hour: Schema.OptionFromNullOr(Schema.Number),
+  fills: pipe(Schema.Array(Schema.OptionFromNullOr(RawSchedulePlayer)), Schema.itemsCount(5)),
   overfills: Schema.Array(RawSchedulePlayer),
   standbys: Schema.Array(RawSchedulePlayer),
   runners: Schema.Array(RawSchedulePlayer),
-  monitor: Schema.OptionFromNullishOr(Schema.String, undefined),
+  monitor: Schema.OptionFromNullOr(Schema.String),
 }) {
   static empty = ({ fills, overfills }: Schedule) =>
     Order.max(Number.Order)(5 - fills.filter(Option.isSome).length - overfills.length, 0);

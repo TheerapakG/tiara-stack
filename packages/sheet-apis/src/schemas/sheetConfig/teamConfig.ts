@@ -31,16 +31,10 @@ export class TeamIsvCombinedConfig extends Schema.TaggedClass<TeamIsvCombinedCon
 ) {}
 
 export class TeamConfig extends Schema.TaggedClass<TeamConfig>()("TeamConfig", {
-  name: Schema.OptionFromNullishOr(Schema.String, undefined),
-  sheet: Schema.OptionFromNullishOr(Schema.String, undefined),
-  playerNameRange: Schema.OptionFromNullishOr(Schema.String, undefined),
-  teamNameRange: Schema.OptionFromNullishOr(Schema.String, undefined),
-  isvConfig: Schema.OptionFromNullishOr(
-    Schema.Union(TeamIsvSplitConfig, TeamIsvCombinedConfig),
-    undefined,
-  ),
-  tagsConfig: Schema.OptionFromNullishOr(
-    Schema.Union(TeamTagsConstantsConfig, TeamTagsRangesConfig),
-    undefined,
-  ),
+  name: Schema.OptionFromNullOr(Schema.String),
+  sheet: Schema.OptionFromNullOr(Schema.String),
+  playerNameRange: Schema.OptionFromNullOr(Schema.String),
+  teamNameRange: Schema.OptionFromNullOr(Schema.String),
+  isvConfig: Schema.OptionFromNullOr(Schema.Union(TeamIsvSplitConfig, TeamIsvCombinedConfig)),
+  tagsConfig: Schema.OptionFromNullOr(Schema.Union(TeamTagsConstantsConfig, TeamTagsRangesConfig)),
 }) {}

@@ -5,12 +5,12 @@ export class GuildChannelConfig extends Schema.TaggedClass<GuildChannelConfig>()
   {
     guildId: Schema.String,
     channelId: Schema.String,
-    name: Schema.OptionFromNullishOr(Schema.String, undefined),
+    name: Schema.OptionFromNullOr(Schema.String),
     running: Schema.Boolean,
-    roleId: Schema.OptionFromNullishOr(Schema.String, undefined),
-    checkinChannelId: Schema.OptionFromNullishOr(Schema.String, undefined),
-    createdAt: Schema.OptionFromNullishOr(Schema.DateTimeUtcFromNumber, undefined),
-    updatedAt: Schema.OptionFromNullishOr(Schema.DateTimeUtcFromNumber, undefined),
-    deletedAt: Schema.OptionFromNullishOr(Schema.DateTimeUtcFromNumber, undefined),
+    roleId: Schema.OptionFromNullOr(Schema.String),
+    checkinChannelId: Schema.OptionFromNullOr(Schema.String),
+    createdAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromNumber),
+    updatedAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromNumber),
+    deletedAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromNumber),
   },
 ) {}

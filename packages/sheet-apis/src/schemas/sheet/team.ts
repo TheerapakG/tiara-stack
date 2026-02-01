@@ -2,12 +2,12 @@ import { Number, Option, Order, Schema, String } from "effect";
 
 export class Team extends Schema.TaggedClass<Team>()("Team", {
   type: Schema.String,
-  playerName: Schema.OptionFromNullishOr(Schema.String, undefined),
-  teamName: Schema.OptionFromNullishOr(Schema.String, undefined),
+  playerName: Schema.OptionFromNullOr(Schema.String),
+  teamName: Schema.OptionFromNullOr(Schema.String),
   tags: Schema.Array(Schema.String),
   lead: Schema.Number,
   backline: Schema.Number,
-  talent: Schema.OptionFromNullishOr(Schema.Number, undefined),
+  talent: Schema.OptionFromNullOr(Schema.Number),
 }) {
   static getEffectValue = ({ lead, backline }: Team) => lead + (backline - lead) / 5;
 
