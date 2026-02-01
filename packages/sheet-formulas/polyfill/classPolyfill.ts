@@ -10,6 +10,33 @@ class GASPolyfillError extends Error {
   }
 }
 
+class AbortSignal {
+  readonly aborted = false;
+  readonly reason = undefined;
+
+  static aborted() {
+    throw new GASPolyfillError("AbortSignal.aborted");
+  }
+
+  static any(..._signals: AbortSignal[]) {
+    throw new GASPolyfillError("AbortSignal.any");
+  }
+
+  static timeout(_ms: number) {
+    throw new GASPolyfillError("AbortSignal.timeout");
+  }
+
+  throwIfAborted() {}
+}
+
+class AbortController {
+  readonly signal = new AbortSignal();
+
+  abort(_reason?: unknown) {
+    throw new GASPolyfillError("AbortController.abort");
+  }
+}
+
 class TextEncoder {
   readonly encoding = "utf-8";
 
@@ -57,6 +84,10 @@ class Response {
     throw new GASPolyfillError("Response");
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+globalThis.AbortController = AbortController;
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore

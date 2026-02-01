@@ -1,18 +1,14 @@
-import * as Cookies from "@effect/platform/Cookies";
-import * as Client from "@effect/platform/HttpClient";
-import * as HttpClientError from "@effect/platform/HttpClientError";
-import * as ClientRequest from "@effect/platform/HttpClientRequest";
-import * as ClientResponse from "@effect/platform/HttpClientResponse";
-import * as IncomingMessage from "@effect/platform/HttpIncomingMessage";
-import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import { pipe } from "effect/Function";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Stream from "effect/Stream";
-import * as Headers from "@effect/platform/Headers";
-import * as UrlParams from "@effect/platform/UrlParams";
-import * as Inspectable from "effect/Inspectable";
+import {
+  Cookies,
+  HttpClient,
+  HttpClientError,
+  HttpClientRequest,
+  HttpClientResponse,
+  HttpIncomingMessage,
+  Headers,
+  UrlParams,
+} from "@effect/platform";
+import { Context, Effect, pipe, Layer, Option, Stream, Inspectable, Record } from "effect";
 
 export const AppsScriptHttpClientTypeId = Symbol.for(
   "@effect/platform-apps-script/AppsScriptHttpClient",
@@ -30,12 +26,12 @@ interface AppsScriptHttpRequest {
 
 class HttpIncomingMessageImpl
   extends Inspectable.Class
-  implements IncomingMessage.HttpIncomingMessage<HttpClientError.ResponseError>
+  implements HttpIncomingMessage.HttpIncomingMessage<HttpClientError.ResponseError>
 {
   source: GoogleAppsScript.URL_Fetch.HTTPResponse;
   onError: (cause: unknown) => HttpClientError.ResponseError;
   remoteAddressOverride?: string;
-  [IncomingMessage.TypeId]: typeof IncomingMessage.TypeId;
+  [HttpIncomingMessage.TypeId]: typeof HttpIncomingMessage.TypeId;
 
   constructor(
     source: GoogleAppsScript.URL_Fetch.HTTPResponse,
@@ -46,7 +42,7 @@ class HttpIncomingMessageImpl
     this.source = source;
     this.onError = onError;
     this.remoteAddressOverride = remoteAddressOverride;
-    this[IncomingMessage.TypeId] = IncomingMessage.TypeId;
+    this[HttpIncomingMessage.TypeId] = HttpIncomingMessage.TypeId;
   }
 
   get headers(): Headers.Headers {
@@ -110,7 +106,7 @@ class HttpIncomingMessageImpl
   }
 
   toJSON(): object {
-    return IncomingMessage.inspect(this, {
+    return HttpIncomingMessage.inspect(this, {
       _id: "@effect/platform/HttpIncomingMessage",
     });
   }
@@ -118,13 +114,13 @@ class HttpIncomingMessageImpl
 
 class ClientResponseImpl
   extends HttpIncomingMessageImpl
-  implements ClientResponse.HttpClientResponse
+  implements HttpClientResponse.HttpClientResponse
 {
-  request: ClientRequest.HttpClientRequest;
-  [ClientResponse.TypeId]: typeof ClientResponse.TypeId;
+  request: HttpClientRequest.HttpClientRequest;
+  [HttpClientResponse.TypeId]: typeof HttpClientResponse.TypeId;
 
   constructor(
-    request: ClientRequest.HttpClientRequest,
+    request: HttpClientRequest.HttpClientRequest,
     source: GoogleAppsScript.URL_Fetch.HTTPResponse,
   ) {
     super(
@@ -138,7 +134,7 @@ class ClientResponseImpl
         }),
     );
     this.request = request;
-    this[ClientResponse.TypeId] = ClientResponse.TypeId;
+    this[HttpClientResponse.TypeId] = HttpClientResponse.TypeId;
   }
 
   get status(): number {
@@ -193,7 +189,7 @@ class ClientResponseImpl
   }
 
   override toJSON(): object {
-    return IncomingMessage.inspect(this, {
+    return HttpIncomingMessage.inspect(this, {
       _id: "@effect/platform/HttpClientResponse",
       request: this.request.toJSON(),
       status: this.status,
@@ -201,7 +197,7 @@ class ClientResponseImpl
   }
 }
 
-const makeAppsScriptHttpRequest = Client.make((request, _url, _signal) => {
+const makeAppsScriptHttpRequest = HttpClient.make((request, _url, _signal) => {
   const urlString = typeof _url === "string" ? _url : _url.toString();
 
   const headersObj: Record<string, string> = {};
@@ -224,7 +220,7 @@ const makeAppsScriptHttpRequest = Client.make((request, _url, _signal) => {
 });
 
 const sendBody = (
-  request: ClientRequest.HttpClientRequest,
+  request: HttpClientRequest.HttpClientRequest,
   httpRequest: AppsScriptHttpRequest,
 ): Effect.Effect<void, HttpClientError.HttpClientError> => {
   const body = request.body;
@@ -277,7 +273,7 @@ const sendBody = (
 };
 
 const waitForResponse = (
-  request: ClientRequest.HttpClientRequest,
+  request: HttpClientRequest.HttpClientRequest,
   httpRequest: AppsScriptHttpRequest,
 ): Effect.Effect<GoogleAppsScript.URL_Fetch.HTTPResponse, HttpClientError.HttpClientError> => {
   return Effect.try({
@@ -288,13 +284,15 @@ const waitForResponse = (
         validMethods.includes(m as "get" | "post" | "put" | "delete" | "patch");
       const validMethod = isValidMethod(method) ? method : "get";
 
+      const headers = Record.remove(httpRequest.headers, "content-length");
+
       const options: GoogleAppsScript.URL_Fetch.URLFetchRequest = {
         url: httpRequest.url,
         method: validMethod,
-        headers: httpRequest.headers,
+        headers,
         payload: httpRequest.body,
-        muteHttpExceptions: true,
       };
+
       return UrlFetchApp.fetch(httpRequest.url, options);
     },
     catch: (cause: unknown) =>
@@ -306,6 +304,5 @@ const waitForResponse = (
   });
 };
 
-export const layer: Layer.Layer<Client.HttpClient, never, never> = Client.layerMergedContext(
-  Effect.succeed(makeAppsScriptHttpRequest),
-);
+export const layer: Layer.Layer<HttpClient.HttpClient, never, never> =
+  HttpClient.layerMergedContext(Effect.succeed(makeAppsScriptHttpRequest));
