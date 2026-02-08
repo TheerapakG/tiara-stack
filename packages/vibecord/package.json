@@ -34,11 +34,11 @@
     "@agentclientprotocol/sdk": "^0.13.1",
     "@effect/sql-drizzle": "^0.48.0",
     "better-sqlite3": "^11.6.0",
-    "c12": "^2.0.1",
+    "c12": "^3.3.3",
     "diff": "^8.0.3",
     "discord.js": "^14.18.0",
     "drizzle-orm": "^0.45.1",
-    "effect": "^3.18.4"
+    "effect": "^3.19.8"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",

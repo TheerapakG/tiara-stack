@@ -70,7 +70,7 @@ export const messageRoomOrder = {
         fills: args.fills.slice(),
         hour: args.hour,
         rank: args.rank,
-        monitor: args.monitor ?? null,
+        monitor: "monitor" in args ? (args.monitor ?? null) : undefined,
         deletedAt: null,
       }),
   ),

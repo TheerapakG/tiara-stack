@@ -20,10 +20,10 @@
     "build": "tsdown -c tsdown.config.ts"
   },
   "dependencies": {
-    "@effect/platform": "^0.92.1",
+    "@effect/platform": "^0.94.2",
     "@standard-schema/spec": "^1.0.0",
     "core-js": "^3.44.0",
-    "effect": "^3.18.4",
+    "effect": "^3.19.8",
     "effect-platform-apps-script": "workspace:*",
     "sheet-apis": "workspace:*",
     "typhoon-core": "workspace:*"

@@ -42,7 +42,7 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
             initialMessage: string;
             hour: number;
             channelId: string;
-            roleId?: string | null | undefined;
+            roleId?: string | undefined;
           },
         ) =>
           pipe(

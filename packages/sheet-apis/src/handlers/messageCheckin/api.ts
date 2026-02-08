@@ -23,7 +23,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
           initialMessage: Schema.String,
           hour: Schema.Number,
           channelId: Schema.String,
-          roleId: Schema.optionalWith(Schema.String, { nullable: true }),
+          roleId: Schema.optional(Schema.String),
         }),
       )
       .addSuccess(MessageCheckin)
