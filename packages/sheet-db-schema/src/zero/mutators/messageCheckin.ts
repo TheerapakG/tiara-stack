@@ -26,7 +26,7 @@ export const messageCheckin = {
         initialMessage: args.initialMessage,
         hour: args.hour,
         channelId: args.channelId,
-        roleId: args.roleId ?? null,
+        roleId: "roleId" in args ? (args.roleId ?? null) : undefined,
         deletedAt: null,
       }),
   ),

@@ -103,7 +103,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             fills: readonly string[];
             hour: number;
             rank: number;
-            monitor?: string | null | undefined;
+            monitor?: string | undefined;
           },
         ) =>
           pipe(

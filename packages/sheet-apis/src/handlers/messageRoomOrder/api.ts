@@ -28,7 +28,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
           fills: Schema.Array(Schema.String),
           hour: Schema.Number,
           rank: Schema.Number,
-          monitor: Schema.optionalWith(Schema.String, { nullable: true }),
+          monitor: Schema.optional(Schema.String),
         }),
       )
       .addSuccess(MessageRoomOrder)

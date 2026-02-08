@@ -59,9 +59,9 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
       upsertGuildConfig: (
         guildId: string,
         config: {
-          scriptId?: string | null | undefined;
-          sheetId?: string | null | undefined;
-          autoCheckin?: boolean | null | undefined;
+          scriptId?: string | undefined;
+          sheetId?: string | undefined;
+          autoCheckin?: boolean | undefined;
         },
       ) =>
         pipe(
@@ -149,10 +149,10 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
         guildId: string,
         channelId: string,
         config: {
-          name?: string | null | undefined;
-          running?: boolean | null | undefined;
-          roleId?: string | null | undefined;
-          checkinChannelId?: string | null | undefined;
+          name?: string | undefined;
+          running?: boolean | undefined;
+          roleId?: string | undefined;
+          checkinChannelId?: string | undefined;
         },
       ) =>
         pipe(

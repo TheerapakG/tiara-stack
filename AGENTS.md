@@ -222,7 +222,7 @@ We use Graphite for managing stacked pull requests. The following guidelines are
 
 ## Effect.ts
 
-This project utilizes the Effect library for composability and type-safety. The version of the library being used is 3.18.4. The project prefers using the "pipe" syntax (with "do simulation" to combat excessive nesting) over the "generator" syntax. Use Effect/Schema for runtime validation except existing code use other validation library, or otherwise stated.
+This project utilizes the Effect library for composability and type-safety. The version of the library being used is 3.19.8. The project prefers using the "pipe" syntax (with "do simulation" to combat excessive nesting) over the "generator" syntax. Use Effect/Schema for runtime validation except existing code use other validation library, or otherwise stated.
 
 ## Arktype
 
