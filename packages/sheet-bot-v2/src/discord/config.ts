@@ -4,6 +4,6 @@ import { Config } from "effect";
 export const DiscordConfigLayer = DiscordConfig.layerConfig({
   token: Config.redacted("DISCORD_TOKEN"),
   gateway: {
-    intents: Config.succeed(Intents.fromList(["GuildMessages", "MessageContent", "Guilds"])),
+    intents: Config.succeed(Intents.fromList(["Guilds", "GuildMembers"])),
   },
 });
