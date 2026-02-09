@@ -1,11 +1,7 @@
 import { bindObject } from "@/utils";
 import { Effect, pipe } from "effect";
-import { configGuild, configGuildChannel } from "sheet-db-schema";
 import { SheetApisClient } from "@/client/sheetApis";
 import { GuildService } from "./guildService";
-
-type GuildConfigInsert = typeof configGuild.$inferInsert;
-type GuildChannelConfigInsert = typeof configGuildChannel.$inferInsert;
 
 export class GuildConfigService extends Effect.Service<GuildConfigService>()("GuildConfigService", {
   effect: pipe(
@@ -25,23 +21,18 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
             captureStackTrace: true,
           }),
         ),
-      upsertGuildConfig: (
-        config: Omit<
-          Partial<GuildConfigInsert>,
-          "id" | "createdAt" | "updatedAt" | "deletedAt" | "guildId"
-        >,
-      ) =>
+      upsertGuildConfig: (config: {
+        scriptId?: string | null | undefined;
+        sheetId?: string | null | undefined;
+        autoCheckin?: boolean | null | undefined;
+      }) =>
         pipe(
           guildService.getId(),
           Effect.flatMap((guildId) =>
             sheetApisClient.get().guildConfig.upsertGuildConfig({
               payload: {
                 guildId,
-                config: {
-                  scriptId: config.scriptId ?? undefined,
-                  sheetId: config.sheetId ?? undefined,
-                  autoCheckin: config.autoCheckin ?? undefined,
-                },
+                config,
               },
             }),
           ),
@@ -83,10 +74,12 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
         ),
       upsertGuildChannelConfig: (
         channelId: string,
-        config: Omit<
-          Partial<GuildChannelConfigInsert>,
-          "id" | "createdAt" | "updatedAt" | "deletedAt" | "guildId" | "channelId"
-        >,
+        config: {
+          name?: string | null | undefined;
+          running?: boolean | null | undefined;
+          roleId?: string | null | undefined;
+          checkinChannelId?: string | null | undefined;
+        },
       ) =>
         pipe(
           guildService.getId(),
@@ -95,12 +88,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
               payload: {
                 guildId,
                 channelId,
-                config: {
-                  name: config.name ?? undefined,
-                  running: config.running ?? undefined,
-                  roleId: config.roleId ?? undefined,
-                  checkinChannelId: config.checkinChannelId ?? undefined,
-                },
+                config,
               },
             }),
           ),

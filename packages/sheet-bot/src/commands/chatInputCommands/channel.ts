@@ -128,18 +128,12 @@ const handleSet = handlerVariantContextBuilder<ChatInputSubcommandHandlerVariant
         Effect.bind("config", ({ channel, running, name, role, checkinChannel }) =>
           pipe(
             GuildConfigService.upsertGuildChannelConfig(channel.id, {
-              running: Option.getOrUndefined(running),
-              name: Option.getOrUndefined(name),
-              roleId: pipe(
-                role,
-                Option.map((r) => r.id),
-                Option.getOrUndefined,
-              ),
-              checkinChannelId: pipe(
-                checkinChannel,
-                Option.map((c) => c.id),
-                Option.getOrUndefined,
-              ),
+              ...(Option.isSome(running) ? { running: running.value } : {}),
+              ...(Option.isSome(name) ? { name: name.value } : {}),
+              ...(Option.isSome(role) ? { roleId: role.value.id } : {}),
+              ...(Option.isSome(checkinChannel)
+                ? { checkinChannelId: checkinChannel.value.id }
+                : {}),
             }),
           ),
         ),
@@ -198,9 +192,9 @@ const handleUnset = handlerVariantContextBuilder<ChatInputSubcommandHandlerVaria
         Effect.bind("config", ({ channel, name, role, checkinChannel }) =>
           pipe(
             GuildConfigService.upsertGuildChannelConfig(channel.id, {
-              name: pipe(name, Option.as(null), Option.getOrUndefined),
-              roleId: pipe(role, Option.as(null), Option.getOrUndefined),
-              checkinChannelId: pipe(checkinChannel, Option.as(null), Option.getOrUndefined),
+              ...(Option.getOrUndefined(name) ? { name: null } : {}),
+              ...(Option.getOrUndefined(role) ? { roleId: null } : {}),
+              ...(Option.getOrUndefined(checkinChannel) ? { checkinChannelId: null } : {}),
             }),
           ),
         ),

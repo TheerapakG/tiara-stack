@@ -20,10 +20,12 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
       .setPayload(
         Schema.Struct({
           messageId: Schema.String,
-          initialMessage: Schema.String,
-          hour: Schema.Number,
-          channelId: Schema.String,
-          roleId: Schema.optionalWith(Schema.String, { nullable: true }),
+          data: Schema.Struct({
+            initialMessage: Schema.String,
+            hour: Schema.Number,
+            channelId: Schema.String,
+            roleId: Schema.optional(Schema.NullOr(Schema.String)),
+          }),
         }),
       )
       .addSuccess(MessageCheckin)

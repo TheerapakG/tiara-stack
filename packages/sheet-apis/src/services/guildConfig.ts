@@ -161,7 +161,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
               guildId,
               channelId,
               name: config.name,
-              running: config.running ?? false,
+              running: config.running,
               roleId: config.roleId,
               checkinChannelId: config.checkinChannelId,
             }),

@@ -1,6 +1,5 @@
 import { SheetApisClient } from "@/client/sheetApis";
 import { Effect, pipe } from "effect";
-import type { messageCheckin } from "sheet-db-schema";
 
 export class MessageCheckinService extends Effect.Service<MessageCheckinService>()(
   "MessageCheckinService",
@@ -18,19 +17,18 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
           ),
         upsertMessageCheckinData: (
           messageId: string,
-          data: Omit<
-            typeof messageCheckin.$inferInsert,
-            "id" | "createdAt" | "updatedAt" | "deletedAt" | "messageId"
-          >,
+          data: {
+            initialMessage: string;
+            hour: number;
+            channelId: string;
+            roleId?: string | null | undefined;
+          },
         ) =>
           pipe(
             client.messageCheckin.upsertMessageCheckinData({
               payload: {
                 messageId,
-                initialMessage: data.initialMessage,
-                hour: data.hour,
-                channelId: data.channelId,
-                roleId: data.roleId ?? undefined,
+                data,
               },
             }),
             Effect.withSpan("MessageCheckinService.upsertMessageCheckinData", {

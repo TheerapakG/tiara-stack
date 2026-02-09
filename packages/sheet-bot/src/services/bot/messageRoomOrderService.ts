@@ -1,6 +1,5 @@
 import { SheetApisClient } from "@/client/sheetApis";
 import { Effect, pipe } from "effect";
-import type { messageRoomOrder, messageRoomOrderEntry } from "sheet-db-schema";
 
 export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderService>()(
   "MessageRoomOrderService",
@@ -32,20 +31,19 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
           ),
         upsertMessageRoomOrder: (
           messageId: string,
-          data: Omit<
-            typeof messageRoomOrder.$inferInsert,
-            "id" | "createdAt" | "updatedAt" | "deletedAt" | "messageId"
-          >,
+          data: {
+            previousFills: ReadonlyArray<string>;
+            fills: ReadonlyArray<string>;
+            hour: number;
+            rank: number;
+            monitor?: string | null | undefined;
+          },
         ) =>
           pipe(
             client.messageRoomOrder.upsertMessageRoomOrder({
               payload: {
                 messageId,
-                previousFills: data.previousFills,
-                fills: data.fills,
-                hour: data.hour,
-                rank: data.rank,
-                monitor: data.monitor ?? undefined,
+                data,
               },
             }),
             Effect.withSpan("MessageRoomOrderService.upsertMessageRoomOrder", {
@@ -70,23 +68,20 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
           ),
         upsertMessageRoomOrderEntry: (
           messageId: string,
-          entries: Omit<
-            typeof messageRoomOrderEntry.$inferInsert,
-            "id" | "createdAt" | "updatedAt" | "deletedAt" | "messageId"
-          >[],
+          entries: ReadonlyArray<{
+            rank: number;
+            position: number;
+            hour: number;
+            team: string;
+            tags: ReadonlyArray<string>;
+            effectValue: number;
+          }>,
         ) =>
           pipe(
             client.messageRoomOrder.upsertMessageRoomOrderEntry({
               payload: {
                 messageId,
-                entries: entries.map((entry) => ({
-                  rank: entry.rank,
-                  position: entry.position,
-                  hour: entry.hour,
-                  team: entry.team,
-                  tags: entry.tags,
-                  effectValue: entry.effectValue,
-                })),
+                entries,
               },
             }),
             Effect.withSpan("MessageRoomOrderService.upsertMessageRoomOrderEntry", {

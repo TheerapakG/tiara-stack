@@ -16,7 +16,7 @@ export const configGuild = pgTable(
     guildId: varchar("guild_id").primaryKey(),
     scriptId: varchar("script_id"),
     sheetId: varchar("sheet_id"),
-    autoCheckin: boolean("auto_checkin").notNull(),
+    autoCheckin: boolean("auto_checkin"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
       .defaultNow()
@@ -51,7 +51,7 @@ export const configGuildChannel = pgTable(
     guildId: varchar("guild_id").notNull(),
     channelId: varchar("channel_id").notNull(),
     name: varchar("name"),
-    running: boolean("running").notNull(),
+    running: boolean("running"),
     roleId: varchar("role_id"),
     checkinChannelId: varchar("checkin_channel_id"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),

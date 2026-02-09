@@ -29,13 +29,7 @@ export const MessageRoomOrderLive = HttpApiBuilder.group(Api, "messageRoomOrder"
           ),
         )
         .handle("upsertMessageRoomOrder", ({ payload }) =>
-          messageRoomOrderService.upsertMessageRoomOrder(payload.messageId, {
-            previousFills: payload.previousFills,
-            fills: payload.fills,
-            hour: payload.hour,
-            rank: payload.rank,
-            monitor: payload.monitor,
-          }),
+          messageRoomOrderService.upsertMessageRoomOrder(payload.messageId, payload.data),
         )
         .handle("decrementMessageRoomOrderRank", ({ payload }) =>
           messageRoomOrderService.decrementMessageRoomOrderRank(payload.messageId),

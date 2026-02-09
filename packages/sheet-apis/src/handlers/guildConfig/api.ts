@@ -36,9 +36,9 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
         Schema.Struct({
           guildId: Schema.String,
           config: Schema.Struct({
-            scriptId: Schema.optionalWith(Schema.String, { nullable: true }),
-            sheetId: Schema.optionalWith(Schema.String, { nullable: true }),
-            autoCheckin: Schema.optionalWith(Schema.Boolean, { nullable: true }),
+            scriptId: Schema.optional(Schema.NullOr(Schema.String)),
+            sheetId: Schema.optional(Schema.NullOr(Schema.String)),
+            autoCheckin: Schema.optional(Schema.NullOr(Schema.Boolean)),
           }),
         }),
       )
@@ -84,10 +84,10 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
           guildId: Schema.String,
           channelId: Schema.String,
           config: Schema.Struct({
-            name: Schema.optionalWith(Schema.String, { nullable: true }),
-            running: Schema.optionalWith(Schema.Boolean, { nullable: true }),
-            roleId: Schema.optionalWith(Schema.String, { nullable: true }),
-            checkinChannelId: Schema.optionalWith(Schema.String, { nullable: true }),
+            name: Schema.optional(Schema.NullOr(Schema.String)),
+            running: Schema.optional(Schema.NullOr(Schema.Boolean)),
+            roleId: Schema.optional(Schema.NullOr(Schema.String)),
+            checkinChannelId: Schema.optional(Schema.NullOr(Schema.String)),
           }),
         }),
       )

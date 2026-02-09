@@ -24,11 +24,13 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
       .setPayload(
         Schema.Struct({
           messageId: Schema.String,
-          previousFills: Schema.Array(Schema.String),
-          fills: Schema.Array(Schema.String),
-          hour: Schema.Number,
-          rank: Schema.Number,
-          monitor: Schema.optionalWith(Schema.String, { nullable: true }),
+          data: Schema.Struct({
+            previousFills: Schema.Array(Schema.String),
+            fills: Schema.Array(Schema.String),
+            hour: Schema.Number,
+            rank: Schema.Number,
+            monitor: Schema.optional(Schema.NullOr(Schema.String)),
+          }),
         }),
       )
       .addSuccess(MessageRoomOrder)

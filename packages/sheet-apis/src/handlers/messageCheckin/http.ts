@@ -29,12 +29,7 @@ export const MessageCheckinLive = HttpApiBuilder.group(Api, "messageCheckin", (h
           ),
         )
         .handle("upsertMessageCheckinData", ({ payload }) =>
-          messageCheckinService.upsertMessageCheckinData(payload.messageId, {
-            initialMessage: payload.initialMessage,
-            hour: payload.hour,
-            channelId: payload.channelId,
-            roleId: payload.roleId,
-          }),
+          messageCheckinService.upsertMessageCheckinData(payload.messageId, payload.data),
         )
         .handle("getMessageCheckinMembers", ({ urlParams }) =>
           messageCheckinService.getMessageCheckinMembers(urlParams.messageId),
