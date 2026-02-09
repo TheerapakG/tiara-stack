@@ -25,7 +25,6 @@
     "@effect/rpc": "^0.73.0",
     "@effect/sql": "^0.49.0",
     "@effect/workflow": "^0.16.0",
-    "c12": "^3.3.3",
     "dfx": "^0.127.0",
     "discord-api-types": "^0.38.38",
     "effect": "^3.19.8",
