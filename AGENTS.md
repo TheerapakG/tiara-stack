@@ -23,42 +23,6 @@ Core framework for building RPC-like communication systems with WebSocket suppor
 - **Error** (`packages/typhoon-core/src/error`): Error handling utilities
 - **Services** (`packages/typhoon-core/src/services`): Core service implementations
 
-### `typhoon-server` (packages/typhoon-server)
-
-Server-side implementation for the Typhoon framework.
-
-- **Main export** (`packages/typhoon-server/src/index.ts`): Exports DB, Event, Server modules
-- **Sub-exports** (`packages/typhoon-server/src/*`): Each subdirectory can be imported as `typhoon-server/<module-name>`
-- **Server** (`packages/typhoon-server/src/server`): Server implementation and WebSocket handling
-- **DB** (`packages/typhoon-server/src/db`): Database connection and context management
-- **Event** (`packages/typhoon-server/src/event`): Event handling system
-- **Handler** (`packages/typhoon-server/src/handler`): Server-side handler context and collections
-- **Bundler** (`packages/typhoon-server/src/bundler.d.ts`): Ambient type definitions for bundler (not an exported module)
-
-### `typhoon-client-ws` (packages/typhoon-client-ws)
-
-WebSocket client implementation for Typhoon.
-
-- **Main export** (`packages/typhoon-client-ws/src/index.ts`): Exports Client module
-- **Sub-exports** (`packages/typhoon-client-ws/src/*`): Each subdirectory can be imported as `typhoon-client-ws/<module-name>`
-- **Client** (`packages/typhoon-client-ws/src/client`): WebSocket client implementation
-
-### `typhoon-client-http` (packages/typhoon-client-http)
-
-HTTP client implementation for Typhoon.
-
-- **Main export** (`packages/typhoon-client-http/src/index.ts`): Exports Client module
-- **Sub-exports** (`packages/typhoon-client-http/src/*`): Each subdirectory can be imported as `typhoon-client-http/<module-name>`
-- **Client** (`packages/typhoon-client-http/src/client`): HTTP client implementation using Effect Platform
-
-### `typhoon-client-apps-script` (packages/typhoon-client-apps-script)
-
-Google Apps Script client implementation for Typhoon.
-
-- **Main export** (`packages/typhoon-client-apps-script/src/index.ts`): Exports Client module
-- **Sub-exports** (`packages/typhoon-client-apps-script/src/*`): Each subdirectory can be imported as `typhoon-client-apps-script/<module-name>`
-- **Client** (`packages/typhoon-client-apps-script/src/client`): Google Apps Script client implementation
-
 ## Application Packages
 
 ### `sheet-apis` (packages/sheet-apis)
@@ -121,7 +85,6 @@ Discord bot application that integrates with sheet-apis to provide Discord comma
 - **Bot** (`packages/sheet-bot/src/bot`): Discord bot implementation
 - **Commands** (`packages/sheet-bot/src/commands`): Discord slash command handlers
 - **Services** (`packages/sheet-bot/src/services`): Business logic services for guild, member, collection, message, channel, and interaction management
-- **Client** (`packages/sheet-bot/src/client`): Client wrapper for typhoon-client-ws
 - **MessageComponents** (`packages/sheet-bot/src/messageComponents`): Discord message component handlers (buttons, etc.)
 - **Types** (`packages/sheet-bot/src/types`): Type definitions for handlers and errors
 - **Config** (`packages/sheet-bot/src/config`): Configuration management
