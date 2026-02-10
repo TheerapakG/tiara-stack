@@ -3,7 +3,7 @@ import { Effect, Match, pipe, Layer, Runtime } from "effect";
 import { FileSystem } from "@effect/platform";
 import { type Schema, schema, mutators } from "sheet-db-schema/zero";
 import { ZeroService as BaseZeroService } from "typhoon-core/services";
-import { Config } from "../config";
+import { config } from "@/config";
 
 const getAuth = () =>
   pipe(
@@ -11,15 +11,18 @@ const getAuth = () =>
     Effect.andThen((fs) => fs.readFileString("/var/run/secrets/tokens/zero-cache-token", "utf-8")),
   );
 
-const makeZero = (config: Config) =>
+const makeZero = () =>
   pipe(
-    Effect.Do,
-    Effect.bind("auth", () => getAuth()),
-    Effect.bindAll(({ auth }) => ({
+    Effect.all({
+      auth: getAuth(),
+      zeroCacheServer: config.zeroCacheServer,
+      zeroCacheUserId: config.zeroCacheUserId,
+    }),
+    Effect.bindAll(({ auth, zeroCacheServer, zeroCacheUserId }) => ({
       zero: Effect.succeed(
         new Zero({
-          server: config.zeroCacheServer,
-          userID: config.zeroCacheUserId,
+          server: zeroCacheServer,
+          userID: zeroCacheUserId,
           auth,
           schema,
           mutators,
@@ -53,8 +56,4 @@ const makeZero = (config: Config) =>
   );
 
 export const ZeroTag = BaseZeroService.ZeroService<Schema, undefined, {}>();
-export const ZeroLive = pipe(
-  Config.use((config) => pipe(makeZero(config), Effect.andThen(BaseZeroService.make))),
-  Layer.scopedContext,
-  Layer.provide(Config.Default),
-);
+export const ZeroLive = pipe(makeZero(), Effect.andThen(BaseZeroService.make), Layer.scopedContext);

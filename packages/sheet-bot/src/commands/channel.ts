@@ -20,7 +20,7 @@ const configFields = (
       Option.getOrElse(() => "None!"),
     ),
   },
-  { name: "Running channel", value: config.running ? "Yes" : "No" },
+  { name: "Running channel", value: Option.getOrUndefined(config.running) ? "Yes" : "No" },
   {
     name: "Role",
     value: pipe(
