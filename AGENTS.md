@@ -8,18 +8,10 @@ This monorepo contains the following packages:
 
 Core framework for building RPC-like communication systems with WebSocket support.
 
-- **Main export** (`packages/typhoon-core/src/index.ts`): Exports Handler, Observability, Protocol, Runtime, Schema, Server, Signal, Utils, Validator, Bundler, Error, Services modules
+- **Main export** (`packages/typhoon-core/src/index.ts`): Exports Schema, Utils, Error, Services modules
 - **Sub-exports** (`packages/typhoon-core/src/*`): Each subdirectory can be imported as `typhoon-core/<module-name>`
-- **Handler** (`packages/typhoon-core/src/handler`): Request/response handler context and types
-- **Protocol** (`packages/typhoon-core/src/protocol`): Communication protocol definitions including Msgpack serialization
-- **Runtime** (`packages/typhoon-core/src/runtime`): Runtime state management
-- **Server** (`packages/typhoon-core/src/server`): Server-side handler data and utilities
-- **Schema** (`packages/typhoon-core/src/schema`): Schema definitions for validation
+- **Schema** (`packages/typhoon-core/src/schema`): Schema definitions including array lookup, key order lookup, and tuple/struct conversions
 - **Utils** (`packages/typhoon-core/src/utils`): Utility functions and data structures
-- **Validator** (`packages/typhoon-core/src/validator`): Validation utilities
-- **Signal** (`packages/typhoon-core/src/signal`): Signal/event handling
-- **Observability** (`packages/typhoon-core/src/observability`): Observability and monitoring utilities
-- **Bundler** (`packages/typhoon-core/src/bundler`): Code bundling utilities
 - **Error** (`packages/typhoon-core/src/error`): Error handling utilities
 - **Services** (`packages/typhoon-core/src/services`): Core service implementations
 
