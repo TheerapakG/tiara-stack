@@ -111,14 +111,15 @@ export class FormatService extends Effect.Service<FormatService>()("FormatServic
       () => (dateTime: DateTime.DateTime) =>
         pipe(dateTime, DateTime.toEpochMillis, Number.unsafeDivide(1000)),
     ),
-    Effect.let(
-      "formatHourWindow",
-      ({ formatDateTime }) =>
-        (hourWindow: HourWindow) =>
+    Effect.let("formatHourWindow", ({ formatDateTime }) =>
+      Effect.fn("FormatService.formatHourWindow")((hourWindow: HourWindow) =>
+        Effect.succeed(
           new FormattedHourWindow({
             start: formatDateTime(hourWindow.start),
             end: formatDateTime(hourWindow.end),
           }),
+        ),
+      ),
     ),
     Effect.map(({ converterService, formatDateTime, formatHourWindow }) => ({
       formatDateTime,
@@ -151,7 +152,7 @@ export class FormatService extends Effect.Service<FormatService>()("FormatServic
                       Option.map((h) =>
                         pipe(
                           converterService.convertHourToHourWindow(guildId, h),
-                          Effect.map(formatHourWindow),
+                          Effect.flatMap(formatHourWindow),
                           Effect.map(
                             (hw) =>
                               `${time(hw.start, TimestampStyles.ShortTime)}-${time(hw.end, TimestampStyles.ShortTime)}`,
@@ -200,7 +201,7 @@ export class FormatService extends Effect.Service<FormatService>()("FormatServic
                       Option.map((h) =>
                         pipe(
                           converterService.convertHourToHourWindow(guildId, h),
-                          Effect.map(formatHourWindow),
+                          Effect.flatMap(formatHourWindow),
                           Effect.map(
                             (hw) =>
                               `${time(hw.start, TimestampStyles.ShortTime)}-${time(hw.end, TimestampStyles.ShortTime)}`,
@@ -303,7 +304,7 @@ export class FormatService extends Effect.Service<FormatService>()("FormatServic
                 Option.map((h) =>
                   pipe(
                     converterService.convertHourToHourWindow(guildId, h),
-                    Effect.map(formatHourWindow),
+                    Effect.flatMap(formatHourWindow),
                     Effect.map((hw) => time(hw.start, TimestampStyles.RelativeTime)),
                     Effect.catchAll(() => Effect.succeed("")),
                   ),

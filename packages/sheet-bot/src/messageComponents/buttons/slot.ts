@@ -1,112 +1,146 @@
+import { Ix } from "dfx";
+import { InteractionsRegistry } from "dfx/gateway";
+import { Array, Chunk, Effect, Layer, Number, Option, Order, pipe, String } from "effect";
+import { DiscordGatewayLayer } from "@/discord/gateway";
 import {
-  ButtonInteractionT,
-  CachedInteractionContext,
-  ClientService,
-  FormatService,
-  guildServicesFromInteraction,
-  InteractionContext,
-  MessageSlotService,
-  ScheduleService,
-} from "@/services";
-import { ButtonHandlerVariantT, handlerVariantContextBuilder } from "@/types";
-import { bindObject } from "@/utils";
-import { ButtonStyle, ComponentType, MessageFlags } from "discord.js";
-import { Array, Chunk, Effect, Number, Order, Option, pipe, String } from "effect";
+  MessageComponentHelper,
+  makeButton,
+  makeButtonData,
+  makeMessageComponent,
+} from "@/utils/messageComponentHelper";
+import { EmbedService, FormatService, MessageSlotService, ScheduleService } from "@/services";
+import { Interaction } from "@/utils";
+import { ButtonStyle, MessageFlags } from "discord-api-types/v10";
 
-const getSlotMessage = (day: number) =>
-  pipe(
-    Effect.Do,
-    bindObject({
-      daySchedule: pipe(
-        ScheduleService.dayPopulatedSchedules(day),
-        Effect.map(
-          Array.filterMap((schedule) =>
+class SlotHelper extends Effect.Service<SlotHelper>()("SlotHelper", {
+  effect: pipe(
+    Effect.all({
+      scheduleService: ScheduleService,
+      formatService: FormatService,
+    }),
+    Effect.map(({ scheduleService, formatService }) => ({
+      getSlotMessage: Effect.fn("SlotHelper.getSlotMessage")(function* (
+        guildId: string,
+        day: number,
+      ) {
+        const daySchedule = yield* scheduleService.dayPopulatedSchedules(guildId, day);
+
+        const filteredSchedules = pipe(
+          daySchedule,
+          Array.filterMap((s) =>
             pipe(
-              schedule.hour,
-              Option.map(() => schedule),
+              s.hour,
+              Option.map(() => s),
             ),
           ),
-        ),
-      ),
-    }),
-    Effect.bindAll(({ daySchedule }) => ({
-      openSlots: pipe(
-        daySchedule,
-        Array.sortBy(Order.mapInput(Option.getOrder(Number.Order), ({ hour }) => hour)),
-        Effect.forEach((schedule) => FormatService.formatOpenSlot(schedule)),
-        Effect.map(Chunk.fromIterable),
-        Effect.map(Chunk.dedupeAdjacent),
-        Effect.map(Chunk.join("\n")),
-        Effect.map((description) =>
-          String.Equivalence(description, String.empty) ? "All Filled :3" : description,
-        ),
-      ),
-      filledSlots: pipe(
-        daySchedule,
-        Array.sortBy(Order.mapInput(Option.getOrder(Number.Order), ({ hour }) => hour)),
-        Effect.forEach((schedule) => FormatService.formatFilledSlot(schedule)),
-        Effect.map(Chunk.fromIterable),
-        Effect.map(Chunk.dedupeAdjacent),
-        Effect.map(Chunk.join("\n")),
-        Effect.map((description) =>
-          String.Equivalence(description, String.empty) ? "All Open :3" : description,
-        ),
-      ),
-    })),
-    Effect.map(({ openSlots, filledSlots }) => ({
-      open: {
-        title: `Day ${day} Open Slots~`,
-        description: openSlots,
-      },
-      filled: {
-        title: `Day ${day} Filled Slots~`,
-        description: filledSlots,
-      },
-    })),
-  );
+        );
 
-export const button = handlerVariantContextBuilder<ButtonHandlerVariantT>()
-  .data({
-    type: ComponentType.Button,
-    customId: "interaction:slot",
-    label: "Open slots",
-    style: ButtonStyle.Primary,
-  })
-  .handler(
-    Effect.provide(guildServicesFromInteraction())(
-      pipe(
-        Effect.Do,
-        InteractionContext.deferReply.tap(() => ({
-          flags: MessageFlags.Ephemeral,
-        })),
-        CachedInteractionContext.message<ButtonInteractionT>().bind("message"),
-        Effect.bind("messageSlotData", ({ message }) =>
-          MessageSlotService.getMessageSlotData(message.id),
-        ),
-        Effect.bind("slotMessage", ({ messageSlotData }) => getSlotMessage(messageSlotData.day)),
-        InteractionContext.editReply.tapEffect(({ slotMessage }) =>
-          pipe(
-            Effect.all({
-              openEmbed: ClientService.makeEmbedBuilder(),
-              filledEmbed: ClientService.makeEmbedBuilder(),
-            }),
-            Effect.map(({ openEmbed, filledEmbed }) => ({
-              embeds: [
-                openEmbed
-                  .setTitle(slotMessage.open.title)
-                  .setDescription(slotMessage.open.description),
-                filledEmbed
-                  .setTitle(slotMessage.filled.title)
-                  .setDescription(slotMessage.filled.description),
-              ],
-            })),
+        const sortedSchedules = pipe(
+          filteredSchedules,
+          Array.sortBy(Order.mapInput(Option.getOrder(Number.Order), (s) => s.hour)),
+        );
+
+        const openSlots = yield* pipe(
+          sortedSchedules,
+          Effect.forEach((s) => formatService.formatOpenSlot(guildId, s)),
+          Effect.map(Chunk.fromIterable),
+          Effect.map(Chunk.dedupeAdjacent),
+          Effect.map(Chunk.join("\n")),
+          Effect.map((description) =>
+            String.Equivalence(description, String.empty) ? "All Filled :3" : description,
           ),
-        ),
-        Effect.asVoid,
-        Effect.withSpan("handleInteractionSlot", {
-          captureStackTrace: true,
-        }),
-      ),
+        );
+
+        const filledSlots = yield* pipe(
+          sortedSchedules,
+          Effect.forEach((s) => formatService.formatFilledSlot(guildId, s)),
+          Effect.map(Chunk.fromIterable),
+          Effect.map(Chunk.dedupeAdjacent),
+          Effect.map(Chunk.join("\n")),
+          Effect.map((description) =>
+            String.Equivalence(description, String.empty) ? "All Open :3" : description,
+          ),
+        );
+
+        return {
+          open: {
+            title: `Day ${day} Open Slots~`,
+            description: openSlots,
+          },
+          filled: {
+            title: `Day ${day} Filled Slots~`,
+            description: filledSlots,
+          },
+        };
+      }),
+    })),
+  ),
+  dependencies: [ScheduleService.Default, FormatService.Default],
+  accessors: true,
+}) {}
+
+export const slotButtonData = makeButtonData((b) =>
+  b.setCustomId("interaction:slot").setLabel("Open slots").setStyle(ButtonStyle.Primary),
+);
+
+const makeSlotButtonHandler = Effect.gen(function* () {
+  const slotHelper = yield* SlotHelper;
+  const messageSlotService = yield* MessageSlotService;
+  const embedService = yield* EmbedService;
+
+  return yield* makeButton(
+    slotButtonData.toJSON(),
+    Effect.fn("makeSlotButtonHandler")(function* (msgHelper: MessageComponentHelper) {
+      yield* msgHelper.deferReply({ flags: MessageFlags.Ephemeral });
+
+      const guild = yield* Interaction.guild();
+      const message = yield* Interaction.message();
+
+      const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
+      const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
+
+      const messageSlotData = yield* messageSlotService.getMessageSlotData(messageId);
+
+      const slotMessage = yield* slotHelper.getSlotMessage(guildId, messageSlotData.day);
+
+      const embeds = [
+        (yield* embedService.makeBaseEmbedBuilder())
+          .setTitle(slotMessage.open.title)
+          .setDescription(slotMessage.open.description)
+          .toJSON(),
+        (yield* embedService.makeBaseEmbedBuilder())
+          .setTitle(slotMessage.filled.title)
+          .setDescription(slotMessage.filled.description)
+          .toJSON(),
+      ];
+
+      yield* msgHelper.editReply({ payload: { embeds } });
+    }),
+  );
+});
+
+const makeSlotButton = Effect.gen(function* () {
+  const button = yield* makeSlotButtonHandler;
+
+  return makeMessageComponent(button.data, button.handler);
+});
+
+export const SlotButtonLive = Layer.scopedDiscard(
+  Effect.gen(function* () {
+    const registry = yield* InteractionsRegistry;
+    const button = yield* makeSlotButton;
+
+    yield* registry.register(Ix.builder.add(button).catchAllCause(Effect.log));
+  }),
+).pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      DiscordGatewayLayer,
+      MessageSlotService.Default,
+      ScheduleService.Default,
+      FormatService.Default,
+      EmbedService.Default,
+      SlotHelper.Default,
     ),
-  )
-  .build();
+  ),
+);

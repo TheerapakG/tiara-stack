@@ -1,96 +1,141 @@
-import { checkinButton } from "@/messageComponents";
-import {
-  channelServicesFromGuildChannelId,
-  ConverterService,
-  FormatService,
-  GuildConfigService,
-  ClientService,
-  SendableChannelContext,
-  SheetService,
-  ScheduleService,
-} from "@/services";
-import { guildServices } from "@/services/collection/guildServices";
-import { BotGuildConfigService, MessageCheckinService } from "@/services/bot";
-import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  channelMention,
-  MessageActionRowComponentBuilder,
-  subtext,
-  userMention,
-} from "discord.js";
+import { channelMention, subtext, userMention } from "@discordjs/formatters";
 import {
   Array,
   DateTime,
   Effect,
   HashMap,
   HashSet,
+  Layer,
   Match,
   Option,
   Schedule,
   Cron,
   pipe,
 } from "effect";
-import { GuildConfig, Sheet } from "sheet-apis/schema";
+import { DiscordREST } from "dfx";
+import { DiscordGatewayLayer } from "../discord/gateway";
+import { checkinButtonData } from "../messageComponents/buttons/checkin";
 import { Array as ArrayUtils } from "typhoon-core/utils";
-import { bindObject } from "@/utils";
+import {
+  ConverterService,
+  EmbedService,
+  FormatService,
+  GuildConfigService,
+  MessageCheckinService,
+  ScheduleService,
+  SheetService,
+} from "../services";
+import { ActionRowBuilder } from "../utils/messageComponentBuilder";
+import { Sheet } from "sheet-apis/schema";
 
 const autoCheckinPreviewNotice = "Sent automatically via auto check-in (preview; may have bugs).";
 
-const noMonitor = {
-  mention: Option.none<string>(),
-  mentionUserId: Option.none<string>(),
-  failure: Option.none<string>(),
-};
-
-const monitorNotAssigned = {
-  mention: Option.none<string>(),
-  mentionUserId: Option.none<string>(),
-  failure: Option.some("Cannot ping monitor: monitor not assigned for this hour."),
-};
-
-const resolveMonitorFromName = (monitor: Sheet.PopulatedScheduleMonitor) =>
+// Formatter helpers for auto check-in formatting logic
+const formatChannelString = (
+  roleId: Option.Option<string>,
+  channelId: string,
+  channelName: Option.Option<string>,
+): string =>
   pipe(
-    Match.value(monitor.monitor),
-    Match.tagsExhaustive({
-      Monitor: (monitor) => Option.some(monitor),
-      PartialNameMonitor: () => Option.none(),
-    }),
-    Option.map((monitor) => monitor.id),
+    roleId,
     Option.match({
-      onSome: (id) => ({
-        mention: Option.some(userMention(id)),
-        mentionUserId: Option.some(id),
-        failure: Option.none<string>(),
-      }),
-      onNone: () => ({
-        mention: Option.none<string>(),
-        mentionUserId: Option.none<string>(),
-        failure: Option.some(
-          `Cannot ping monitor: monitor "${monitor.monitor.name}" is missing a Discord ID in the sheet.`,
+      onSome: () =>
+        pipe(
+          channelName,
+          Option.map((name) => `head to ${name}`),
+          Option.getOrElse(
+            () => "await further instructions from the monitor on where the running channel is",
+          ),
         ),
-      }),
+      onNone: () => `head to ${channelMention(channelId)}`,
     }),
   );
 
-const resolveMonitorMention = (
+const formatPreviewContent = (content: string): string =>
+  [content, subtext(autoCheckinPreviewNotice)].join("\n");
+
+const getFillIds = (
+  schedule: Option.Option<Sheet.PopulatedSchedule | Sheet.PopulatedBreakSchedule>,
+): Option.Option<string[]> =>
+  pipe(
+    schedule,
+    Option.flatMap((s) =>
+      pipe(
+        Match.value(s),
+        Match.tagsExhaustive({
+          PopulatedBreakSchedule: () => Option.none<string[]>(),
+          PopulatedSchedule: (schedule) =>
+            pipe(
+              schedule.fills,
+              Array.filter(Option.isSome),
+              Array.map((f) => f.value),
+              Array.filterMap((p) =>
+                pipe(
+                  Match.value(p.player),
+                  Match.tagsExhaustive({
+                    Player: (player) => Option.some(player.id),
+                    PartialNamePlayer: () => Option.none(),
+                  }),
+                ),
+              ),
+              HashSet.fromIterable,
+              HashSet.toValues,
+              Option.some,
+            ),
+        }),
+      ),
+    ),
+  );
+
+const getMonitorInfo = (
   schedule: Option.Option<Sheet.PopulatedSchedule | Sheet.PopulatedBreakSchedule>,
 ) =>
   pipe(
     schedule,
     Option.match({
-      onNone: () => noMonitor,
-      onSome: (schedule) =>
+      onNone: () => ({
+        mention: Option.none() as Option.Option<string>,
+        mentionUserId: Option.none() as Option.Option<string>,
+        failure: Option.none() as Option.Option<string>,
+      }),
+      onSome: (s) =>
         pipe(
-          Match.value(schedule),
+          Match.value(s),
           Match.tagsExhaustive({
-            PopulatedBreakSchedule: () => noMonitor,
+            PopulatedBreakSchedule: () => ({
+              mention: Option.none() as Option.Option<string>,
+              mentionUserId: Option.none() as Option.Option<string>,
+              failure: Option.none() as Option.Option<string>,
+            }),
             PopulatedSchedule: (schedule) =>
               pipe(
                 schedule.monitor,
                 Option.match({
-                  onNone: () => monitorNotAssigned,
-                  onSome: (monitor) => resolveMonitorFromName(monitor),
+                  onNone: () => ({
+                    mention: Option.none() as Option.Option<string>,
+                    mentionUserId: Option.none() as Option.Option<string>,
+                    failure: Option.some(
+                      "Cannot ping monitor: monitor not assigned for this hour.",
+                    ),
+                  }),
+                  onSome: (populatedMonitor) =>
+                    pipe(
+                      Match.value(populatedMonitor.monitor),
+                      Match.tagsExhaustive({
+                        Monitor: (monitorData) => ({
+                          mention: Option.some(userMention(monitorData.id)),
+                          mentionUserId: Option.some(monitorData.id),
+                          failure: Option.none() as Option.Option<string>,
+                        }),
+                        PartialNameMonitor: (monitorData) => ({
+                          mention: Option.none() as Option.Option<string>,
+                          mentionUserId: Option.none() as Option.Option<string>,
+                          failure: Option.some(
+                            `Cannot ping monitor: monitor "${monitorData.name}" is missing a Discord ID in the sheet.`,
+                          ),
+                        }),
+                      }),
+                    ),
                 }),
               ),
           }),
@@ -98,296 +143,213 @@ const resolveMonitorMention = (
     }),
   );
 
-const computeHour = Effect.suspend(() =>
-  pipe(
-    Effect.Do,
-    Effect.bind("now", () => DateTime.now),
-    Effect.map(({ now }) => DateTime.addDuration("20 minutes")(now)),
-    Effect.flatMap((dt) => ConverterService.convertDateTimeToHour(dt)),
-  ),
-);
-
-const getCheckinData = ({
-  hour,
-  runningChannel,
-}: {
-  hour: number;
-  runningChannel: GuildConfig.GuildChannelConfig;
-}) =>
-  pipe(
-    Effect.Do,
-    bindObject({
-      channelName: runningChannel.name,
-    }),
-    Effect.bind("schedules", ({ channelName }) =>
-      pipe(
-        ScheduleService.channelPopulatedSchedules(channelName),
-        Effect.map(
-          Array.filterMap((schedule) =>
-            pipe(
-              schedule.hour,
-              Option.map((hour) => ({ hour, schedule })),
-            ),
-          ),
-        ),
-        Effect.map(ArrayUtils.Collect.toHashMapByKey("hour")),
-        Effect.map(HashMap.map(({ schedule }) => schedule)),
-      ),
-    ),
-    Effect.map(({ schedules }) => ({
-      prevSchedule: HashMap.get(schedules, hour - 1),
-      schedule: HashMap.get(schedules, hour),
-    })),
-    Effect.map(({ prevSchedule, schedule }) => ({
-      prevSchedule,
-      schedule,
-      runningChannel,
-      showChannelMention: Option.isNone(runningChannel.roleId),
-    })),
+const processChannel = Effect.fn("processChannel")(function* (
+  guildId: string,
+  hour: number,
+  channelName: string,
+) {
+  const runningChannel = yield* GuildConfigService.getGuildRunningChannelByName(
+    guildId,
+    channelName,
   );
 
-const getCheckinMessages = (
-  data: {
-    prevSchedule: Option.Option<Sheet.PopulatedSchedule | Sheet.PopulatedBreakSchedule>;
-    schedule: Option.Option<Sheet.PopulatedSchedule | Sheet.PopulatedBreakSchedule>;
-    runningChannel: {
-      channelId: string;
-      name: Option.Option<string>;
-    };
-    showChannelMention: boolean;
-  },
-  template: Option.Option<string>,
-) =>
-  FormatService.formatCheckIn({
-    prevSchedule: data.prevSchedule,
-    schedule: data.schedule,
-    channelString: data.showChannelMention
-      ? `head to ${channelMention(data.runningChannel.channelId)}`
-      : pipe(
-          data.runningChannel.name,
-          Option.map((name) => `head to ${name}`),
-          Option.getOrElse(
-            () => "await further instructions from the monitor on where the running channel is",
-          ),
-        ),
-    template: pipe(template, Option.getOrUndefined),
-  });
+  const checkinChannelId = Option.getOrElse(
+    runningChannel.checkinChannelId,
+    () => runningChannel.channelId,
+  );
 
-const runOnce = Effect.suspend(() =>
-  pipe(
-    Effect.Do,
-    Effect.tap(() => Effect.log(`running auto check-in task...`)),
-    Effect.bind("guilds", () => BotGuildConfigService.getAutoCheckinGuilds()),
-    Effect.bind("guildCounts", ({ guilds }) =>
-      Effect.forEach(guilds, (guild) =>
-        Effect.provide(guildServices(guild.guildId))(
-          pipe(
-            Effect.Do,
-            Effect.tap(() => Effect.log(`running auto check-in task for guild ${guild.guildId}`)),
-            Effect.bind("hour", () => computeHour),
-            Effect.bind("allSchedules", () => SheetService.allSchedules()),
-            Effect.let("channels", ({ allSchedules }) =>
-              pipe(
-                allSchedules,
-                Array.map((s) => s.channel),
-                (names) => HashSet.fromIterable(names),
-                HashSet.toValues,
-              ),
-            ),
-            Effect.flatMap(({ hour, channels }) =>
-              pipe(
-                Effect.forEach(
-                  channels,
-                  (channelName) =>
-                    pipe(
-                      GuildConfigService.getGuildRunningChannelByName(channelName),
-                      Effect.tap((runningChannel) => Effect.log(runningChannel)),
-                      Effect.flatMap((runningChannel) =>
-                        pipe(
-                          Effect.Do,
-                          Effect.let("checkinChannelId", () =>
-                            pipe(
-                              runningChannel.checkinChannelId,
-                              Option.getOrElse(() => runningChannel.channelId),
-                            ),
-                          ),
-                          Effect.bind("checkinData", () =>
-                            pipe(
-                              getCheckinData({ hour, runningChannel }),
-                              Effect.tap((checkinData) => Effect.log(checkinData)),
-                            ),
-                          ),
-                          Effect.let("monitorInfo", ({ checkinData }) =>
-                            resolveMonitorMention(checkinData.schedule),
-                          ),
-                          Effect.let("fillIds", ({ checkinData }) =>
-                            pipe(
-                              checkinData.schedule,
-                              Option.map((schedule) =>
-                                pipe(
-                                  Match.value(schedule),
-                                  Match.tagsExhaustive({
-                                    PopulatedBreakSchedule: () => [],
-                                    PopulatedSchedule: (schedule) => schedule.fills,
-                                  }),
-                                ),
-                              ),
-                              Option.getOrElse(() => []),
-                              Array.getSomes,
-                              Array.map((player) =>
-                                pipe(
-                                  Match.value(player.player),
-                                  Match.tagsExhaustive({
-                                    Player: (player) => Option.some(player.id),
-                                    PartialNamePlayer: () => Option.none(),
-                                  }),
-                                ),
-                              ),
-                              Array.getSomes,
-                              HashSet.fromIterable,
-                              HashSet.toValues,
-                            ),
-                          ),
-                          Effect.bind("checkinMessages", ({ checkinData }) =>
-                            pipe(
-                              getCheckinMessages(checkinData, Option.none()),
-                              Effect.tap((checkinMessages) => Effect.log(checkinMessages)),
-                            ),
-                          ),
-                          Effect.bind("message", ({ checkinMessages, checkinChannelId }) =>
-                            pipe(
-                              checkinMessages.checkinMessage,
-                              Effect.transposeMapOption((checkinMessage) =>
-                                pipe(
-                                  Effect.Do,
-                                  Effect.let("initialMessage", () =>
-                                    [checkinMessage, subtext(autoCheckinPreviewNotice)].join("\n"),
-                                  ),
-                                  SendableChannelContext.send().bind(
-                                    "message",
-                                    ({ initialMessage }) => ({
-                                      content: initialMessage,
-                                      components: [
-                                        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-                                          new ButtonBuilder(checkinButton.data),
-                                        ),
-                                      ],
-                                    }),
-                                  ),
-                                ),
-                              ),
-                              Effect.provide(channelServicesFromGuildChannelId(checkinChannelId)),
-                            ),
-                          ),
-                          Effect.tap(({ checkinData, message, fillIds }) =>
-                            pipe(
-                              message,
-                              Effect.transposeMapOption(({ initialMessage, message }) =>
-                                Effect.all(
-                                  [
-                                    MessageCheckinService.upsertMessageCheckinData(message.id, {
-                                      initialMessage,
-                                      hour,
-                                      channelId: checkinData.runningChannel.channelId,
-                                      roleId: Option.getOrNull(checkinData.runningChannel.roleId),
-                                    }),
-                                    pipe(
-                                      MessageCheckinService.addMessageCheckinMembers(
-                                        message.id,
-                                        fillIds,
-                                      ),
-                                      Effect.unless(() => Array.isEmptyArray(fillIds)),
-                                    ),
-                                  ],
-                                  { concurrency: "unbounded" },
-                                ),
-                              ),
-                            ),
-                          ),
-                          Effect.tap(({ checkinMessages, checkinData, monitorInfo }) =>
-                            pipe(
-                              ClientService.makeEmbedBuilder(),
-                              Effect.map((embed) =>
-                                embed.setTitle("Auto check-in summary for monitors").setDescription(
-                                  [
-                                    checkinMessages.managerCheckinMessage,
-                                    ...pipe(
-                                      monitorInfo.failure,
-                                      Option.match({
-                                        onSome: (failure) => [subtext(failure)],
-                                        onNone: () => [],
-                                      }),
-                                    ),
-                                    subtext(autoCheckinPreviewNotice),
-                                  ].join("\n"),
-                                ),
-                              ),
-                              Effect.flatMap((embed) =>
-                                pipe(
-                                  SendableChannelContext.send().sync({
-                                    content: pipe(monitorInfo.mention, Option.getOrUndefined),
-                                    embeds: [embed],
-                                    allowedMentions: pipe(
-                                      monitorInfo.mentionUserId,
-                                      Option.match({
-                                        onSome: (userId) => ({ users: [userId] }),
-                                        onNone: () => ({ parse: [] as const }),
-                                      }),
-                                    ),
-                                  }),
-                                  Effect.provide(
-                                    channelServicesFromGuildChannelId(
-                                      checkinData.runningChannel.channelId,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Effect.map(({ message }) => (Option.isSome(message) ? 1 : 0)),
-                        ),
-                      ),
-                      Effect.catchAll((error) => pipe(Effect.logError(error), Effect.as(0))),
-                    ),
-                  { concurrency: "unbounded" },
-                ),
-                Effect.map((counts) => counts.reduce((acc: number, n: number) => acc + n, 0)),
-                Effect.tap((sent) =>
-                  Effect.log(`sent ${sent} check-in message(s) for guild ${guild.guildId}`),
-                ),
-              ),
-            ),
-          ),
-        ),
+  const channelSchedules = yield* ScheduleService.channelPopulatedSchedules(guildId, channelName);
+
+  const schedulesByHour = pipe(
+    channelSchedules,
+    Array.filterMap((schedule) =>
+      pipe(
+        schedule.hour,
+        Option.map((h) => ({ hour: h, schedule })),
       ),
     ),
-    Effect.let("total", ({ guildCounts }) =>
-      guildCounts.reduce((acc: number, n: number) => acc + n, 0),
-    ),
-    Effect.tap(({ total, guildCounts }) =>
-      Effect.log(`sent ${total} check-in message(s) across all ${guildCounts.length} guilds`),
-    ),
-    Effect.withSpan("autoCheckin.runOnce", { captureStackTrace: true }),
-  ),
-);
+    ArrayUtils.Collect.toHashMapByKey("hour"),
+    HashMap.map(({ schedule }) => schedule),
+  );
 
-export const autoCheckinTask = pipe(
-  runOnce,
-  Effect.schedule(
-    Schedule.cron(
-      Cron.make({
-        seconds: [0],
-        minutes: [45],
-        hours: [],
-        days: [],
-        months: [],
-        weekdays: [],
+  const prevScheduleOption = HashMap.get(schedulesByHour, hour - 1);
+  const currentScheduleOption = HashMap.get(schedulesByHour, hour);
+
+  const formatResult = yield* pipe(
+    FormatService.formatCheckIn(guildId, {
+      prevSchedule: prevScheduleOption,
+      schedule: currentScheduleOption,
+      channelString: formatChannelString(
+        runningChannel.roleId,
+        runningChannel.channelId,
+        runningChannel.name,
+      ),
+      template: undefined,
+    }),
+  );
+
+  const discordRest = yield* DiscordREST;
+
+  yield* pipe(
+    formatResult.checkinMessage,
+    Option.match({
+      onNone: () => Effect.succeed(undefined),
+      onSome: (checkinMessage) =>
+        pipe(
+          discordRest.createMessage(checkinChannelId, {
+            content: formatPreviewContent(checkinMessage),
+            components: [new ActionRowBuilder().addComponent(checkinButtonData).toJSON()],
+          }),
+          Effect.flatMap((messageResult) =>
+            pipe(
+              getFillIds(currentScheduleOption),
+              Option.match({
+                onNone: () =>
+                  Effect.all([
+                    MessageCheckinService.upsertMessageCheckinData(messageResult.id, {
+                      initialMessage: formatPreviewContent(checkinMessage),
+                      hour,
+                      channelId: runningChannel.channelId,
+                      roleId: Option.getOrNull(runningChannel.roleId),
+                    }),
+                    Effect.succeed(undefined),
+                  ]),
+                onSome: (fillIds) =>
+                  Effect.all([
+                    MessageCheckinService.upsertMessageCheckinData(messageResult.id, {
+                      initialMessage: formatPreviewContent(checkinMessage),
+                      hour,
+                      channelId: runningChannel.channelId,
+                      roleId: Option.getOrNull(runningChannel.roleId),
+                    }),
+                    fillIds.length > 0
+                      ? MessageCheckinService.addMessageCheckinMembers(messageResult.id, fillIds)
+                      : Effect.succeed(undefined),
+                  ]),
+              }),
+            ),
+          ),
+        ),
+    }),
+  );
+
+  const monitorInfo = getMonitorInfo(currentScheduleOption);
+
+  const embedDescriptionParts = [
+    formatResult.managerCheckinMessage,
+    ...pipe(
+      monitorInfo.failure,
+      Option.match({
+        onSome: (failure) => [subtext(failure)],
+        onNone: () => [],
       }),
     ),
+    subtext(autoCheckinPreviewNotice),
+  ];
+
+  const embed = yield* EmbedService.makeBaseEmbedBuilder().pipe(
+    Effect.map((builder) =>
+      builder
+        .setTitle("Auto check-in summary for monitors")
+        .setDescription(embedDescriptionParts.join("\n"))
+        .toJSON(),
+    ),
+  );
+
+  yield* discordRest.createMessage(runningChannel.channelId, {
+    content: pipe(monitorInfo.mention, Option.getOrUndefined),
+    embeds: [embed],
+    allowed_mentions: Option.match(monitorInfo.mentionUserId, {
+      onSome: (uid) => ({ users: [uid] as const }),
+      onNone: () => ({ parse: [] as const }),
+    }),
+  });
+
+  return Option.isSome(formatResult.checkinMessage) ? 1 : 0;
+});
+
+const processGuild = (guildId: string) =>
+  Effect.gen(function* () {
+    const hour = yield* pipe(
+      DateTime.now,
+      Effect.map(DateTime.addDuration("20 minutes")),
+      Effect.flatMap((dt) => ConverterService.convertDateTimeToHour(guildId, dt)),
+    );
+
+    const allSchedules = yield* SheetService.getAllSchedules(guildId);
+
+    const channelNames: string[] = pipe(
+      allSchedules,
+      Array.map((s) => s.channel),
+      (names) => HashSet.fromIterable(names),
+      HashSet.toValues,
+    );
+
+    const sentCount = yield* pipe(
+      channelNames,
+      Effect.forEach(
+        (channelName) =>
+          pipe(
+            processChannel(guildId, hour, channelName),
+            Effect.catchAll((err) => pipe(Effect.logError(err), Effect.as(0))),
+          ),
+        { concurrency: "unbounded" },
+      ),
+      Effect.map((counts) => counts.reduce((acc: number, n: number) => acc + n, 0)),
+    );
+
+    return sentCount;
+  });
+
+export const AutoCheckinTaskLive = Layer.scopedDiscard(
+  pipe(
+    Effect.gen(function* () {
+      yield* Effect.log("running auto check-in task...");
+
+      const guildConfigs = yield* GuildConfigService.getAutoCheckinGuilds();
+
+      const totalSent = yield* pipe(
+        guildConfigs,
+        Effect.forEach(
+          (guildConfig) =>
+            pipe(
+              processGuild(guildConfig.guildId),
+              Effect.provide(
+                Layer.mergeAll(
+                  DiscordGatewayLayer,
+                  ConverterService.Default,
+                  EmbedService.Default,
+                  FormatService.Default,
+                  MessageCheckinService.Default,
+                  ScheduleService.Default,
+                  SheetService.Default,
+                ),
+              ),
+              Effect.catchAll((err) => pipe(Effect.logError(err), Effect.as(0))),
+            ),
+          { concurrency: "unbounded" },
+        ),
+        Effect.map((counts) => counts.reduce((acc: number, n: number) => acc + n, 0)),
+      );
+
+      yield* Effect.log(
+        `sent ${totalSent} check-in message(s) across all ${guildConfigs.length} guilds`,
+      );
+    }),
+    Effect.schedule(
+      Schedule.cron(
+        Cron.make({
+          seconds: [0],
+          minutes: [45],
+          hours: [],
+          days: [],
+          months: [],
+          weekdays: [],
+        }),
+      ),
+    ),
+    Effect.withSpan("AutoCheckinTask", { attributes: { task: "autoCheckin" } }),
+    Effect.annotateLogs({ task: "autoCheckin" }),
+    Effect.forkDaemon,
   ),
-  Effect.withSpan("autoCheckinTask", {
-    attributes: { task: "autoCheckin" },
-    captureStackTrace: true,
-  }),
-  Effect.annotateLogs({ task: "autoCheckin" }),
-);
+).pipe(Layer.provide(Layer.mergeAll(GuildConfigService.Default, SheetService.Default)));

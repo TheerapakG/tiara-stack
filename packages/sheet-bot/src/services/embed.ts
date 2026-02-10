@@ -2,7 +2,7 @@ import { Effect, DateTime } from "effect";
 import { EmbedBuilder } from "@discordjs/builders";
 import { DiscordApplication } from "../discord/gateway";
 
-export class EmbedService extends Effect.Service<EmbedService>()("PermissionService", {
+export class EmbedService extends Effect.Service<EmbedService>()("EmbedService", {
   effect: Effect.gen(function* () {
     const application = yield* DiscordApplication;
 

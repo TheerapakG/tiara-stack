@@ -124,7 +124,7 @@ const makeManualSubCommand = Effect.gen(function* () {
 
       const { start, end } = yield* pipe(
         converterService.convertHourToHourWindow(guildId, hour),
-        Effect.map(formatService.formatHourWindow),
+        Effect.flatMap(formatService.formatHourWindow),
       );
 
       const channelName = pipe(runningChannel.name, Option.getOrThrow);
