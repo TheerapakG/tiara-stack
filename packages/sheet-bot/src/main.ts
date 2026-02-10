@@ -1,6 +1,8 @@
 import { PlatformConfigProvider } from "@effect/platform";
 import { NodeRuntime, NodeContext, NodeHttpClient } from "@effect/platform-node";
-import { Layer, pipe } from "effect";
+import { Layer, Logger } from "effect";
+import { MetricsLive } from "./metrics";
+import { TracesLive } from "./traces";
 import { ChannelCommandLive } from "./commands/channel";
 import { CheckinCommandLive } from "./commands/checkin";
 import { KickoutCommandLive } from "./commands/kickout";
@@ -15,29 +17,31 @@ import { RoomOrderButtonLive } from "./messageComponents/buttons/roomOrder";
 import { SlotButtonLive } from "./messageComponents/buttons/slot";
 import { AutoCheckinTaskLive } from "./tasks";
 
-const MainLive = pipe(
-  Layer.mergeAll(
-    ChannelCommandLive,
-    CheckinCommandLive,
-    KickoutCommandLive,
-    RoomOrderCommandLive,
-    ScreenshotCommandLive,
-    ScheduleCommandLive,
-    ServerCommandLive,
-    SlotCommandLive,
-    TeamCommandLive,
-    CheckinButtonLive,
-    RoomOrderButtonLive,
-    SlotButtonLive,
-    AutoCheckinTaskLive,
-  ),
+const MainLive = Layer.mergeAll(
+  ChannelCommandLive,
+  CheckinCommandLive,
+  KickoutCommandLive,
+  RoomOrderCommandLive,
+  ScreenshotCommandLive,
+  ScheduleCommandLive,
+  ServerCommandLive,
+  SlotCommandLive,
+  TeamCommandLive,
+  CheckinButtonLive,
+  RoomOrderButtonLive,
+  SlotButtonLive,
+  AutoCheckinTaskLive,
+);
+
+MainLive.pipe(
+  Layer.provide(MetricsLive),
+  Layer.provide(TracesLive),
+  Layer.provide(Logger.logFmt),
   Layer.provide(PlatformConfigProvider.layerDotEnvAdd(".env")),
   Layer.provide(NodeContext.layer),
   Layer.provide(NodeHttpClient.layer),
+  Layer.launch,
+  NodeRuntime.runMain({
+    disablePrettyLogger: true,
+  }),
 );
-
-const MainEffect = pipe(Layer.launch(MainLive));
-
-NodeRuntime.runMain(MainEffect, {
-  disablePrettyLogger: true,
-});
