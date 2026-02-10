@@ -30,6 +30,7 @@ export const guildConfig = {
       builder.configGuildChannel
         .where("guildId", "=", guildId)
         .where("channelId", "=", channelId)
+        .where("running", "=", true)
         .where("deletedAt", "IS", null)
         .one(),
   ),
@@ -42,6 +43,7 @@ export const guildConfig = {
       builder.configGuildChannel
         .where("guildId", "=", guildId)
         .where("name", "=", channelName)
+        .where("running", "=", true)
         .where("deletedAt", "IS", null)
         .one(),
   ),
