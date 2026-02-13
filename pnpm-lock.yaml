@@ -496,12 +496,12 @@ importers:
 
   packages/vibecord:
     dependencies:
-      '@agentclientprotocol/sdk':
-        specifier: ^0.13.1
-        version: 0.13.1(zod@4.3.6)
       '@effect/sql-drizzle':
         specifier: ^0.48.0
         version: 0.48.0(@effect/sql@0.49.0(@effect/experimental@0.58.0(@effect/platform@0.94.2(effect@3.19.15))(effect@3.19.15))(@effect/platform@0.94.2(effect@3.19.15))(effect@3.19.15))(drizzle-orm@0.45.1(@opentelemetry/api@1.9.0)(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@11.10.0)(gel@2.2.0)(pg@8.17.2)(postgres@3.4.7))(effect@3.19.15)
+      '@opencode-ai/sdk':
+        specifier: ^1.1.64
+        version: 1.1.64
       better-sqlite3:
         specifier: ^11.6.0
         version: 11.10.0
@@ -550,11 +550,6 @@ importers:
         version: 5.9.3
 
 packages:
-
-  '@agentclientprotocol/sdk@0.13.1':
-    resolution: {integrity: sha512-6byvu+F/xc96GBkdAx4hq6/tB3vT63DSBO4i3gYCz8nuyZMerVFna2Gkhm8EHNpZX0J9DjUxzZCW+rnHXUg0FA==}
-    peerDependencies:
-      zod: ^3.25.0 || ^4.0.0
 
   '@ark/attest@0.46.0':
     resolution: {integrity: sha512-bDo8Mtx94oFkhozao9rjoWf1/MOV4lakpoKtPvIFfHceE3M3jVqIOVY46Xh1TibMhjQ1vMtd55PcfllHYjbm8w==}
@@ -1694,6 +1689,9 @@ packages:
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
+
+  '@opencode-ai/sdk@1.1.64':
+    resolution: {integrity: sha512-g+bZGx/86JlRTKyPWsD1oFu1SoENIHeKK4LhzWWFToPv4tpN3MSLVGSUsoTSi2XqSd9JzkfPBHPdTeFvqcbzMA==}
 
   '@opentelemetry/api-logs@0.203.0':
     resolution: {integrity: sha512-9B9RU0H7Ya1Dx/Rkyc4stuBZSGVQF27WigitInx2QQoj6KUpEFYPKoWjdFTunJYxmXmh17HeBvbMa1EhGyPmqQ==}
@@ -5000,14 +4998,7 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
-  zod@4.3.6:
-    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
-
 snapshots:
-
-  '@agentclientprotocol/sdk@0.13.1(zod@4.3.6)':
-    dependencies:
-      zod: 4.3.6
 
   '@ark/attest@0.46.0(typescript@5.9.3)':
     dependencies:
@@ -5806,6 +5797,8 @@ snapshots:
 
   '@nx/nx-win32-x64-msvc@19.7.4':
     optional: true
+
+  '@opencode-ai/sdk@1.1.64': {}
 
   '@opentelemetry/api-logs@0.203.0':
     dependencies:
@@ -9320,5 +9313,3 @@ snapshots:
       yargs-parser: 21.1.1
 
   yocto-queue@0.1.0: {}
-
-  zod@4.3.6: {}

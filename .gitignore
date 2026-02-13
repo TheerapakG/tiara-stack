@@ -39,3 +39,6 @@ volume.yaml
 
 .nx/cache
 .nx/workspace-data
+
+# Local configuration files
+config.json

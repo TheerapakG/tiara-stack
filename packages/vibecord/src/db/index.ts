@@ -2,15 +2,21 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import * as schema from "./schema";
 
-let db: ReturnType<typeof drizzle> | null = null;
+export type DatabaseInstance = ReturnType<typeof drizzle>;
 
-export function getDb() {
-  if (!db) {
+let dbInstance: DatabaseInstance | null = null;
+
+export function getDb(): DatabaseInstance {
+  if (!dbInstance) {
     const dbPath = schema.getDbPath();
     const sqlite = new Database(dbPath);
-    db = drizzle(sqlite, { schema });
+    dbInstance = drizzle(sqlite, { schema });
   }
-  return db;
+  return dbInstance;
+}
+
+export function resetDb(): void {
+  dbInstance = null;
 }
 
 export { schema };

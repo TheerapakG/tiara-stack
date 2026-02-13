@@ -1,41 +1,62 @@
-import { Client, GatewayIntentBits, Collection } from "discord.js";
+import {
+  Client,
+  GatewayIntentBits,
+  Collection,
+  SlashCommandBuilder,
+  ChatInputCommandInteraction,
+} from "discord.js";
 import { Config } from "../config/config";
 import { commands } from "../commands/index";
-import { acpClient } from "../acp/index";
+import { sdkClient } from "../sdk/index";
 import { Effect, pipe } from "effect";
+import { APPLICATION_COMMAND_OPTION_TYPE } from "../constants";
+
+// Properly typed command interface
+interface Command {
+  data: SlashCommandBuilder;
+  execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
+}
+
+// Command option type from Discord.js
+interface CommandOption {
+  type: number;
+  name: string;
+  options?: CommandOption[];
+}
+
+// JSON representation of command data
+interface CommandJson {
+  name: string;
+  options?: CommandOption[];
+}
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
 
-const commandMap = new Collection<string, unknown>();
+const commandMap = new Collection<string, Command>();
 
 for (const cmd of commands) {
-  const json = cmd.data.toJSON() as {
-    name: string;
-    options?: Array<{
-      type: number;
-      name: string;
-      options?: Array<{ type: number; name: string }>;
-    }>;
-  };
+  const command = cmd as Command;
+  const json = command.data.toJSON() as CommandJson;
 
   if (json.options) {
     for (const option of json.options) {
-      if (option.type === 1) {
-        // Subcommand
-        commandMap.set(`${json.name} ${option.name}`, cmd);
-      } else if (option.type === 2 && option.options) {
-        // Subcommand group with subcommands
+      if (option.type === APPLICATION_COMMAND_OPTION_TYPE.SUB_COMMAND) {
+        commandMap.set(`${json.name} ${option.name}`, command);
+      } else if (
+        option.type === APPLICATION_COMMAND_OPTION_TYPE.SUB_COMMAND_GROUP &&
+        option.options
+      ) {
         for (const subOption of option.options) {
-          if (subOption.type === 1) {
-            commandMap.set(`${json.name} ${option.name} ${subOption.name}`, cmd);
+          if (subOption.type === APPLICATION_COMMAND_OPTION_TYPE.SUB_COMMAND) {
+            commandMap.set(`${json.name} ${option.name} ${subOption.name}`, command);
           }
         }
       }
     }
   } else {
-    commandMap.set(json.name, cmd);
+    commandMap.set(json.name, command);
   }
 }
 
@@ -47,12 +68,12 @@ const botProgram = pipe(
       await client.application?.fetch();
       console.log(`Owner ID: ${client.application?.owner?.id}`);
 
-      // Set Discord client for ACP client to use for thread lookups
-      acpClient.setDiscordClient(client);
+      // Set Discord client for SDK client to use for thread lookups
+      sdkClient.setDiscordClient(client);
 
-      // Connect to OpenCode ACP
+      // Connect to OpenCode SDK
       try {
-        await acpClient.connect();
+        await sdkClient.connect();
       } catch (err) {
         console.error("Failed to connect to OpenCode:", err);
       }
@@ -76,14 +97,7 @@ const botProgram = pipe(
 
       const cmd = commandMap.get(key);
       if (cmd) {
-        const execute = (
-          cmd as {
-            execute: (
-              interaction: import("discord.js").ChatInputCommandInteraction,
-            ) => Promise<void>;
-          }
-        ).execute;
-        await execute(interaction);
+        await cmd.execute(interaction);
       }
     });
 

@@ -1,8 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags } from "discord.js";
-import { getDb, schema } from "../../db/index";
-import { eq } from "drizzle-orm";
-import { acpClient } from "../../acp/index";
+import { sdkClient } from "../../sdk/index";
 import { isOwner } from "../../utils";
+import { getValidSessionByThreadId, getWorkspaceById } from "../../services/session";
 import { sessionNew } from "./new";
 
 const data = new SlashCommandBuilder()
@@ -60,36 +59,38 @@ async function execute(interaction: ChatInputCommandInteraction) {
 }
 
 async function executeModelSet(interaction: ChatInputCommandInteraction) {
-  const modelName = interaction.options.getString("model", true);
-  const threadId = interaction.channelId;
-
-  const db = getDb();
-
-  // Look up session by thread ID
-  const session = await db
-    .select()
-    .from(schema.session)
-    .where(eq(schema.session.threadId, threadId))
-    .get();
-
-  if (!session) {
+  if (!isOwner(interaction)) {
     await interaction.reply({
-      content: "No session found for this thread.",
+      content: "You are not the owner.",
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
-  if (session.deletedAt) {
+  const modelName = interaction.options.getString("model", true);
+  const threadId = interaction.channelId;
+
+  const { session, error } = await getValidSessionByThreadId(threadId);
+  if (error || !session) {
     await interaction.reply({
-      content: "This session has been deleted.",
+      content: error ?? "Unknown error",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  // Fetch workspace to get cwd for session info
+  const workspace = await getWorkspaceById(session.workspaceId);
+  if (!workspace) {
+    await interaction.reply({
+      content: "Workspace not found for this session.",
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
   // Get session info to find available models and their IDs
-  const sessionInfo = await acpClient.getSessionInfo("");
+  const sessionInfo = await sdkClient.getSessionInfo(workspace.cwd);
 
   // Find the model ID by name
   const model = sessionInfo.models.find((m) => m.name.toLowerCase() === modelName.toLowerCase());
@@ -102,7 +103,7 @@ async function executeModelSet(interaction: ChatInputCommandInteraction) {
   }
 
   // Set the model
-  await acpClient.setSessionModel(session.acpSessionId, model.id);
+  await sdkClient.setSessionModel(session.acpSessionId, model.id);
 
   await interaction.reply({
     content: `Model set to "${model.name}" for this session.`,
@@ -110,36 +111,38 @@ async function executeModelSet(interaction: ChatInputCommandInteraction) {
 }
 
 async function executeModeSet(interaction: ChatInputCommandInteraction) {
-  const modeName = interaction.options.getString("mode", true);
-  const threadId = interaction.channelId;
-
-  const db = getDb();
-
-  // Look up session by thread ID
-  const session = await db
-    .select()
-    .from(schema.session)
-    .where(eq(schema.session.threadId, threadId))
-    .get();
-
-  if (!session) {
+  if (!isOwner(interaction)) {
     await interaction.reply({
-      content: "No session found for this thread.",
+      content: "You are not the owner.",
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
-  if (session.deletedAt) {
+  const modeName = interaction.options.getString("mode", true);
+  const threadId = interaction.channelId;
+
+  const { session, error } = await getValidSessionByThreadId(threadId);
+  if (error || !session) {
     await interaction.reply({
-      content: "This session has been deleted.",
+      content: error ?? "Unknown error",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  // Fetch workspace to get cwd for session info
+  const workspace = await getWorkspaceById(session.workspaceId);
+  if (!workspace) {
+    await interaction.reply({
+      content: "Workspace not found for this session.",
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
   // Get session info to find available modes and their IDs
-  const sessionInfo = await acpClient.getSessionInfo("");
+  const sessionInfo = await sdkClient.getSessionInfo(workspace.cwd);
 
   // Find the mode ID by name
   const mode = sessionInfo.modes.find((m) => m.name.toLowerCase() === modeName.toLowerCase());
@@ -152,7 +155,7 @@ async function executeModeSet(interaction: ChatInputCommandInteraction) {
   }
 
   // Set the mode
-  await acpClient.setSessionMode(session.acpSessionId, mode.id);
+  await sdkClient.setSessionMode(session.acpSessionId, mode.id);
 
   await interaction.reply({
     content: `Mode set to "${mode.name}" for this session.`,
@@ -171,33 +174,17 @@ async function executePrompt(interaction: ChatInputCommandInteraction) {
   const promptText = interaction.options.getString("text", true);
   const threadId = interaction.channelId;
 
-  const db = getDb();
-
-  // Look up session by thread ID
-  const session = await db
-    .select()
-    .from(schema.session)
-    .where(eq(schema.session.threadId, threadId))
-    .get();
-
-  if (!session) {
+  const { session, error } = await getValidSessionByThreadId(threadId);
+  if (error || !session) {
     await interaction.reply({
-      content: "No session found for this thread.",
+      content: error ?? "Unknown error",
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
-  if (session.deletedAt) {
-    await interaction.reply({
-      content: "This session has been deleted.",
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-
-  // Send the prompt to the ACP session
-  await acpClient.sendPrompt(session.acpSessionId, promptText);
+  // Send the prompt to the SDK session
+  await sdkClient.sendPrompt(session.acpSessionId, promptText);
 
   await interaction.reply({
     content: "Prompt sent to the session.",

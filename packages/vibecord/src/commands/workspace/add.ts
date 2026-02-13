@@ -3,9 +3,8 @@ import {
   ChatInputCommandInteraction,
   MessageFlags,
 } from "discord.js";
-import { getDb, schema } from "../../db/index";
-import { eq, and } from "drizzle-orm";
 import { isOwner } from "../../utils";
+import { createOrUpdateWorkspace } from "../../services/workspace";
 
 const addData = new SlashCommandSubcommandBuilder()
   .setName("add")
@@ -27,22 +26,11 @@ async function executeAdd(interaction: ChatInputCommandInteraction) {
   const cwd = interaction.options.getString("cwd", true);
   const userId = interaction.user.id;
 
-  const db = getDb();
+  const { action } = await createOrUpdateWorkspace(userId, name, cwd);
 
-  const existing = await db
-    .select()
-    .from(schema.workspace)
-    .where(and(eq(schema.workspace.userId, userId), eq(schema.workspace.name, name)))
-    .get();
-
-  if (existing) {
-    await db
-      .update(schema.workspace)
-      .set({ cwd, updatedAt: new Date() })
-      .where(eq(schema.workspace.id, existing.id));
+  if (action === "updated") {
     await interaction.reply(`Workspace "${name}" updated!`);
   } else {
-    await db.insert(schema.workspace).values({ userId, name, cwd });
     await interaction.reply(`Workspace "${name}" added!`);
   }
 }
