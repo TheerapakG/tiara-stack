@@ -7,13 +7,21 @@ import {
 import { sdkClient } from "../../sdk/index";
 import { isOwner } from "../../utils";
 import { getValidWorkspaceByUserAndName } from "../../services/workspace";
+import { createWorktree, isGitRepository } from "../../services/git";
 import { getDb, schema } from "../../db/index";
+import simpleGit from "simple-git";
 
 const newData = new SlashCommandSubcommandBuilder()
   .setName("new")
   .setDescription("Create a new session")
   .addStringOption((option) =>
     option.setName("workspace").setDescription("Workspace name").setRequired(true),
+  )
+  .addBooleanOption((option) =>
+    option
+      .setName("use_worktree")
+      .setDescription("Create a git worktree for this session (if workspace is a git repo)")
+      .setRequired(false),
   );
 
 async function executeNew(interaction: ChatInputCommandInteraction) {
@@ -23,6 +31,7 @@ async function executeNew(interaction: ChatInputCommandInteraction) {
   }
 
   const workspaceName = interaction.options.getString("workspace", true);
+  const useWorktree = interaction.options.getBoolean("use_worktree") ?? false;
   const userId = interaction.user.id;
 
   const { workspace, error } = await getValidWorkspaceByUserAndName(userId, workspaceName);
@@ -68,8 +77,52 @@ async function executeNew(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  // Create SDK session with workspace cwd
-  const sessionResponse = await sdkClient.createSession(workspace.cwd);
+  // Check if worktree should be created
+  let worktreePath: string | null = null;
+  let worktreeBranchName: string | null = null;
+
+  if (useWorktree) {
+    const isGitRepo = await isGitRepository(workspace.cwd);
+    if (isGitRepo) {
+      // Use thread ID for unique branch name (avoids creating throwaway SDK session)
+      const worktreeResult = await createWorktree(workspace.cwd, thread.id);
+      if (worktreeResult.error) {
+        // Clean up the thread since session creation is being aborted
+        try {
+          await thread.delete("Worktree creation failed");
+        } catch {
+          /* ignore cleanup errors */
+        }
+        await interaction.editReply({
+          content: `Failed to create git worktree: ${worktreeResult.error}\n\nSession creation aborted.`,
+        });
+        return;
+      }
+      worktreePath = worktreeResult.worktreePath;
+      worktreeBranchName = worktreeResult.branchName;
+    }
+  }
+
+  // Create SDK session with worktree cwd if available, otherwise workspace cwd
+  const sessionCwd = worktreePath ?? workspace.cwd;
+  let sessionResponse;
+  try {
+    sessionResponse = await sdkClient.createSession(sessionCwd);
+  } catch (error) {
+    // Clean up worktree and thread on session creation failure
+    if (worktreePath) {
+      const git = simpleGit(workspace.cwd);
+      await git.raw(["worktree", "remove", worktreePath]).catch(() => {});
+      await git.raw(["branch", "-D", worktreeBranchName!]).catch(() => {});
+    }
+    try {
+      await thread.delete("SDK session creation failed");
+    } catch {}
+    await interaction.editReply({
+      content: `Failed to create SDK session: ${error instanceof Error ? error.message : "Unknown error"}\n\nSession creation aborted.`,
+    });
+    return;
+  }
   const sdkSessionId = sessionResponse.sessionId;
 
   // Extract model and mode information
@@ -95,6 +148,7 @@ async function executeNew(interaction: ChatInputCommandInteraction) {
     workspaceId: workspace.id,
     threadId: thread.id,
     acpSessionId: sdkSessionId,
+    worktreePath: worktreePath,
   });
 
   // Format available models list
@@ -120,18 +174,25 @@ async function executeNew(interaction: ChatInputCommandInteraction) {
       : "  No modes available";
 
   // Send initial info to the thread
+  let worktreeInfo = "";
+  if (worktreePath && worktreeBranchName) {
+    worktreeInfo = `\n**Git Worktree:**\n- Path: \`${worktreePath}\`\n- Branch: \`${worktreeBranchName}\`\n`;
+  }
+
   await thread.send(
     `## New Session Created\n` +
       `**Workspace:** ${workspaceName}\n` +
-      `**CWD:** ${workspace.cwd}\n` +
-      `**Session ID:** ${sdkSessionId}\n\n` +
-      `### Current Settings\n` +
+      `**CWD:** ${sessionCwd}\n` +
+      `**Session ID:** ${sdkSessionId}\n` +
+      worktreeInfo +
+      `\n### Current Settings\n` +
       `**Model:** ${currentModel}\n` +
       `**Mode:** ${currentMode}\n\n` +
       `### Available Models\n` +
       `${modelsList}\n\n` +
       `### Available Modes\n` +
-      `${modesList}`,
+      `${modesList}\n\n` +
+      `Use \`/session close\` in this thread to close the session and remove the worktree.`,
   );
 
   // SDK client will look up the thread from the database automatically

@@ -3,11 +3,13 @@ import { sdkClient } from "../../sdk/index";
 import { isOwner } from "../../utils";
 import { getValidSessionByThreadId, getWorkspaceById } from "../../services/session";
 import { sessionNew } from "./new";
+import { sessionClose } from "./close";
 
 const data = new SlashCommandBuilder()
   .setName("session")
   .setDescription("Manage sessions")
   .addSubcommand(sessionNew.data)
+  .addSubcommand(sessionClose.data)
   .addSubcommand((subcommand) =>
     subcommand
       .setName("prompt")
@@ -49,6 +51,8 @@ async function execute(interaction: ChatInputCommandInteraction) {
 
   if (subcommand === "new") {
     await sessionNew.execute(interaction);
+  } else if (subcommand === "close") {
+    await sessionClose.execute(interaction);
   } else if (subcommand === "prompt") {
     await executePrompt(interaction);
   } else if (subcommandGroup === "model" && subcommand === "set") {
@@ -90,7 +94,9 @@ async function executeModelSet(interaction: ChatInputCommandInteraction) {
   }
 
   // Get session info to find available models and their IDs
-  const sessionInfo = await sdkClient.getSessionInfo(workspace.cwd);
+  // Use worktree path if available, otherwise use workspace cwd
+  const sessionCwd = session.worktreePath ?? workspace.cwd;
+  const sessionInfo = await sdkClient.getSessionInfo(sessionCwd);
 
   // Find the model ID by name
   const model = sessionInfo.models.find((m) => m.name.toLowerCase() === modelName.toLowerCase());
@@ -142,7 +148,9 @@ async function executeModeSet(interaction: ChatInputCommandInteraction) {
   }
 
   // Get session info to find available modes and their IDs
-  const sessionInfo = await sdkClient.getSessionInfo(workspace.cwd);
+  // Use worktree path if available, otherwise use workspace cwd
+  const sessionCwd = session.worktreePath ?? workspace.cwd;
+  const sessionInfo = await sdkClient.getSessionInfo(sessionCwd);
 
   // Find the mode ID by name
   const mode = sessionInfo.modes.find((m) => m.name.toLowerCase() === modeName.toLowerCase());

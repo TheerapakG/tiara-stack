@@ -31,6 +31,7 @@ export const session = sqliteTable("session", {
   workspaceId: integer("workspace_id").notNull(),
   threadId: text("thread_id").notNull(),
   acpSessionId: text("acp_session_id").notNull(),
+  worktreePath: text("worktree_path"),
   model: text("model"),
   mode: text("mode"),
   createdAt: integer("created_at", { mode: "timestamp" })

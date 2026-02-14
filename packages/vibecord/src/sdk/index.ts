@@ -1577,7 +1577,8 @@ class VibecordClient {
         throw new Error("Workspace not found");
       }
 
-      cwd = workspace.cwd;
+      // Use worktree path if available, otherwise use workspace cwd
+      cwd = session.worktreePath ?? workspace.cwd;
       this.sessionDirectories.set(sessionId, cwd);
     }
     return cwd;

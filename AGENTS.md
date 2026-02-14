@@ -144,6 +144,11 @@ We use Graphite for managing stacked pull requests. The following guidelines are
 - For the first commit you are creating
   - If you are on a trunk branch (master) use `gt create` to create the commit on a new branch. **DO NOT commit directly to master**
   - Otherwise, ask the developer if they want to create the commits on a new branch (`gt create`) or add commits to the current branch (`gt modify -c`).
+  - When working in a git worktree (vibecord session)
+    - Check if the branch name follows `<username>/<branch-name>` format
+    - If the branch name does NOT follow the format, rename it: `git branch -m <username>/<new-branch-name>`
+    - Track with trunk: `gt track master`
+    - Use `gt modify -c` for all commits (do NOT use `gt create`)
 - For the rest of the commits, use `gt modify -c`.
 - When you create the commits on a new branch
   - If the developer mentions that the commits is related to a linear issue, look up the git branch name to use via the linear MCP server. If the linear MCP server does not exist, tell the developer and stop proceeding.

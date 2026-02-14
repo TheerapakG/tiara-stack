@@ -520,6 +520,9 @@ importers:
       effect:
         specifier: ^3.19.8
         version: 3.19.15
+      simple-git:
+        specifier: ^3.30.0
+        version: 3.30.0
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.12

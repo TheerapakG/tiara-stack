@@ -1,8 +1,13 @@
 import { getDb, schema } from "../db/index";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 export interface SessionValidationResult {
   session: typeof schema.session.$inferSelect | null;
+  error: string | null;
+}
+
+export interface CloseSessionResult {
+  success: boolean;
   error: string | null;
 }
 
@@ -58,4 +63,26 @@ export async function getSessionWithWorkspace(acpSessionId: string) {
     .get();
 
   return session;
+}
+
+export async function closeSession(sessionId: number): Promise<CloseSessionResult> {
+  const db = getDb();
+
+  try {
+    // Soft delete the session by setting deletedAt
+    await db
+      .update(schema.session)
+      .set({
+        deletedAt: sql`(strftime('%s', 'now'))`,
+        updatedAt: sql`(strftime('%s', 'now'))`,
+      })
+      .where(eq(schema.session.id, sessionId));
+
+    return { success: true, error: null };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to close session: ${error instanceof Error ? error.message : "Unknown error"}`,
+    };
+  }
 }

@@ -31,6 +31,13 @@ Evaluate what changes has been done within the repository, and commit them. The 
    - Commit according to the guidelines.
 
    **Checklist before committing:**
+   - [ ] Check if you are in a git worktree (run `git rev-parse --is-inside-work-tree` and check if the path is different from the main repo)
+   - [ ] If in a worktree:
+     - [ ] Check if the branch name follows the guideline format: `<username>/<branch-name>`
+     - [ ] If branch name does NOT follow the guideline:
+       - Rename the branch: `git branch -m <username>/<new-branch-name>`
+       - Track with trunk: `gt track master`
+       - Use `gt modify` for all subsequent commits instead of `gt create`
    - [ ] Is this the first commit on a new branch?
      - If on trunk (master): use `gt create` (DO NOT commit directly to master)
      - Otherwise: ask developer or use `gt modify -c`

@@ -38,7 +38,8 @@
     "diff": "^8.0.3",
     "discord.js": "^14.18.0",
     "drizzle-orm": "^0.45.1",
-    "effect": "^3.19.8"
+    "effect": "^3.19.8",
+    "simple-git": "^3.30.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
