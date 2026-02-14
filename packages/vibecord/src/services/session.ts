@@ -43,3 +43,19 @@ export async function getWorkspaceById(workspaceId: number) {
 
   return await db.select().from(schema.workspace).where(eq(schema.workspace.id, workspaceId)).get();
 }
+
+export async function getSessionWithWorkspace(acpSessionId: string) {
+  const db = getDb();
+
+  const session = await db
+    .select({
+      session: schema.session,
+      workspace: schema.workspace,
+    })
+    .from(schema.session)
+    .where(eq(schema.session.acpSessionId, acpSessionId))
+    .leftJoin(schema.workspace, eq(schema.session.workspaceId, schema.workspace.id))
+    .get();
+
+  return session;
+}

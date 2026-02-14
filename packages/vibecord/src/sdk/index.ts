@@ -1,7 +1,16 @@
-import { createOpencode, ToolPart, ToolStateCompleted } from "@opencode-ai/sdk";
-import type { OpencodeClient, Event } from "@opencode-ai/sdk";
+import { createOpencode, ToolPart, ToolStateCompleted } from "@opencode-ai/sdk/v2";
+import type { OpencodeClient, Event } from "@opencode-ai/sdk/v2";
 import * as Diff from "diff";
-import { Client, ThreadChannel } from "discord.js";
+import { eq } from "drizzle-orm";
+import {
+  Client,
+  ThreadChannel,
+  EmbedBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ActionRowBuilder,
+  type ButtonInteraction,
+} from "discord.js";
 import {
   BATCH_INTERVAL_MS,
   DIFF_TRUNCATION_LINES,
@@ -13,7 +22,13 @@ import {
   DISCORD_THREAD_NAME_MAX_LENGTH,
   DISCORD_MESSAGE_MAX_LENGTH,
 } from "../constants";
-import { getSessionByAcpSessionId, getWorkspaceById } from "../services/session";
+import {
+  getSessionByAcpSessionId,
+  getWorkspaceById,
+  getSessionWithWorkspace,
+} from "../services/session";
+import { getDb, schema } from "../db/index";
+import { randomUUID } from "crypto";
 
 interface BatchEntry {
   sessionId: string;
@@ -34,6 +49,78 @@ interface RawBatchEntry {
 interface ServerInstance {
   url: string;
   close: () => void;
+}
+
+// Generate a unique button ID using UUID v4
+function generateButtonId(): string {
+  return randomUUID();
+}
+
+// Batch store multiple button mappings
+async function storeButtonMappings(
+  mappings: Array<{
+    buttonId: string;
+    sessionId: string;
+    requestId: string;
+    optionValue: string;
+    userId?: string;
+  }>,
+): Promise<void> {
+  const db = getDb();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  // UUID v4 collisions are astronomically unlikely, so we don't handle them
+  await Promise.all(
+    mappings.map((m) =>
+      db.insert(schema.buttonMapping).values({
+        buttonId: m.buttonId,
+        sessionId: m.sessionId,
+        requestId: m.requestId,
+        optionValue: m.optionValue,
+        userId: m.userId,
+        expiresAt,
+      }),
+    ),
+  );
+}
+
+// Lookup button mapping from database
+async function lookupButtonMapping(buttonId: string): Promise<{
+  sessionId: string;
+  requestId: string;
+  optionValue: string;
+  userId: string | null;
+} | null> {
+  const db = getDb();
+
+  const mapping = await db
+    .select()
+    .from(schema.buttonMapping)
+    .where(eq(schema.buttonMapping.buttonId, buttonId))
+    .get();
+
+  if (!mapping) {
+    return null;
+  }
+
+  // Check if expired and clean up
+  if (mapping.expiresAt && new Date() > mapping.expiresAt) {
+    // Delete expired entry asynchronously (don't await)
+    void db
+      .delete(schema.buttonMapping)
+      .where(eq(schema.buttonMapping.buttonId, buttonId))
+      .catch(() => {
+        // Silently ignore delete errors
+      });
+    return null;
+  }
+
+  return {
+    sessionId: mapping.sessionId,
+    requestId: mapping.requestId,
+    optionValue: mapping.optionValue,
+    userId: mapping.userId,
+  };
 }
 
 class VibecordClient {
@@ -415,9 +502,49 @@ class VibecordClient {
     thread: ThreadChannel,
     maxLength: number,
   ): Promise<void> {
+    const textEntries: BatchEntry[] = [];
+    const todoEntries: BatchEntry[] = [];
+
+    // Separate text and todo entries
+    for (const entry of entries) {
+      if (entry.updateType === UPDATE_TYPE.TODO) {
+        todoEntries.push(entry);
+      } else {
+        textEntries.push(entry);
+      }
+    }
+
+    // Send todo entries as embeds
+    for (const todoEntry of todoEntries) {
+      const todos = todoEntry.content
+        .split("\n")
+        .map((line) => {
+          const match = line.match(/^([✓◐○])\s+(.+)$/);
+          if (match) {
+            const status =
+              match[1] === STATUS_EMOJI.COMPLETED
+                ? SESSION_STATUS.COMPLETED
+                : match[1] === STATUS_EMOJI.IN_PROGRESS
+                  ? SESSION_STATUS.IN_PROGRESS
+                  : "pending";
+            return { status, content: match[2] };
+          }
+          return { status: "pending", content: line };
+        })
+        .filter((t) => t.content.length > 0);
+
+      if (todos.length > 0) {
+        const embed = this.createTodoEmbed(todos);
+        await this.sendEmbed(embed, thread);
+      }
+    }
+
+    // Process text entries as before
+    if (textEntries.length === 0) return;
+
     // Format entries (adds -# prefix for thoughts, etc.)
     const lines: string[] = [];
-    for (const entry of entries) {
+    for (const entry of textEntries) {
       lines.push(...this.formatEntryToLines(entry));
     }
 
@@ -551,6 +678,11 @@ class VibecordClient {
   }
 
   private async handleEvent(event: Event): Promise<void> {
+    // Log all events for debugging (except the spammy ones)
+    if (event.type !== "message.part.updated") {
+      console.log(`[SDK] Received event: ${event.type}`);
+    }
+
     // Handle session idle - flush immediately to send remaining entries
     if (event.type === "session.idle") {
       const idleSessionId = event.properties.sessionID;
@@ -577,6 +709,18 @@ class VibecordClient {
           console.error(`[SDK] Failed to update thread name:`, err);
         }
       }
+      return;
+    }
+
+    // Handle permission requests
+    if (event.type === "permission.asked") {
+      await this.handlePermissionRequest(event);
+      return;
+    }
+
+    // Handle question requests
+    if (event.type === "question.asked") {
+      await this.handleQuestionRequest(event);
       return;
     }
 
@@ -694,6 +838,631 @@ class VibecordClient {
     return a.updateType === UPDATE_TYPE.AGENT_MESSAGE || a.updateType === UPDATE_TYPE.AGENT_THOUGHT;
   }
 
+  // Create an embed for displaying todo lists
+  private createTodoEmbed(todos: Array<{ status: string; content: string }>): EmbedBuilder {
+    const todoItems = todos.map((todo) => {
+      const status =
+        todo.status === SESSION_STATUS.COMPLETED
+          ? STATUS_EMOJI.COMPLETED
+          : todo.status === SESSION_STATUS.IN_PROGRESS
+            ? STATUS_EMOJI.IN_PROGRESS
+            : STATUS_EMOJI.PENDING;
+      return `${status} ${todo.content}`;
+    });
+
+    const fullDescription = todoItems.join("\n") || "No todos";
+    const description =
+      fullDescription.length > 4096 ? fullDescription.substring(0, 4093) + "..." : fullDescription;
+    if (fullDescription.length > 4096) {
+      console.warn(`[SDK] Todo list truncated from ${fullDescription.length} to 4096 characters`);
+    }
+    return new EmbedBuilder().setTitle("Todo List").setDescription(description).setColor(0x5865f2);
+  }
+
+  // Send an embed to a thread
+  private async sendEmbed(embed: EmbedBuilder, thread: ThreadChannel): Promise<void> {
+    try {
+      await thread.send({ embeds: [embed] });
+    } catch {
+      // Silently fail - thread may have been deleted
+    }
+  }
+
+  // Format permission type with emoji
+  private formatPermissionType(type: string): string {
+    const emojiMap: Record<string, string> = {
+      tool: "🔧",
+      file_read: "📖",
+      file_write: "✏️",
+      command: "⚡",
+      browser: "🌐",
+      shell: "🐚",
+    };
+    return `${emojiMap[type] || "🔒"} ${type}`;
+  }
+
+  // Get detailed description for permission type
+  private getPermissionDetails(type: string): { title: string; description: string } {
+    const details: Record<string, { title: string; description: string }> = {
+      tool: {
+        title: "Tool Execution Request",
+        description:
+          "The agent wants to execute a tool. Tools can perform various actions like file operations, web searches, and more.",
+      },
+      file_read: {
+        title: "File Read Request",
+        description: "The agent wants to read a file from your workspace.",
+      },
+      file_write: {
+        title: "File Write Request",
+        description: "The agent wants to modify or create a file in your workspace.",
+      },
+      command: {
+        title: "Command Execution Request",
+        description: "The agent wants to execute a command in your terminal.",
+      },
+      browser: {
+        title: "Browser Action Request",
+        description: "The agent wants to perform an action in the browser.",
+      },
+      shell: {
+        title: "Shell Command Request",
+        description: "The agent wants to run a shell command.",
+      },
+    };
+    return (
+      details[type] || {
+        title: "Permission Request",
+        description: `The agent is requesting ${type} permission.`,
+      }
+    );
+  }
+
+  // Create permission request embed
+  private createPermissionEmbed(
+    type: string,
+    details: string,
+    allowButtonId: string,
+    denyButtonId: string,
+    requestId: string,
+  ): { embed: EmbedBuilder; components: ActionRowBuilder<ButtonBuilder>[] } {
+    const permissionInfo = this.getPermissionDetails(type);
+    const embed = new EmbedBuilder()
+      .setTitle(permissionInfo.title)
+      .setDescription(permissionInfo.description)
+      .addFields(
+        { name: "Permission Type", value: this.formatPermissionType(type), inline: true },
+        {
+          name: "Details",
+          value: details.length > 1000 ? details.substring(0, 1000) + "..." : details,
+          inline: false,
+        },
+      )
+      .setColor(0xffa500)
+      .setFooter({ text: requestId })
+      .setTimestamp();
+
+    const allowButton = new ButtonBuilder()
+      .setCustomId(`p_${allowButtonId}`)
+      .setLabel("Allow")
+      .setStyle(ButtonStyle.Success);
+
+    const denyButton = new ButtonBuilder()
+      .setCustomId(`p_${denyButtonId}`)
+      .setLabel("Deny")
+      .setStyle(ButtonStyle.Danger);
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(allowButton, denyButton);
+
+    return { embed, components: [row] };
+  }
+
+  // Handle permission.asked events
+  private async handlePermissionRequest(event: Event): Promise<void> {
+    if (event.type !== "permission.asked") return;
+
+    const props = event.properties as unknown as {
+      requestID: string;
+      sessionID: string;
+      type?: string;
+      details?: string;
+    };
+    const requestID = props.requestID;
+    const sessionID = props.sessionID;
+    const type = props.type || "tool";
+    const details = props.details || "";
+
+    try {
+      const thread = await this.getThreadForSession(sessionID);
+      if (!thread) {
+        console.error(`[SDK] No thread found for session ${sessionID}`);
+        return;
+      }
+
+      // Get the session owner (Discord user ID) for authorization
+      const sessionWithWorkspace = await getSessionWithWorkspace(sessionID);
+      const ownerUserId = sessionWithWorkspace?.workspace?.userId;
+
+      // Generate button IDs and batch store mappings
+      const allowButtonId = generateButtonId();
+      const denyButtonId = generateButtonId();
+      await storeButtonMappings([
+        {
+          buttonId: allowButtonId,
+          sessionId: sessionID,
+          requestId: requestID,
+          optionValue: "__allow__",
+          userId: ownerUserId,
+        },
+        {
+          buttonId: denyButtonId,
+          sessionId: sessionID,
+          requestId: requestID,
+          optionValue: "__deny__",
+          userId: ownerUserId,
+        },
+      ]);
+
+      const { embed, components } = this.createPermissionEmbed(
+        type,
+        details,
+        allowButtonId,
+        denyButtonId,
+        requestID,
+      );
+      await thread.send({ embeds: [embed], components });
+
+      console.log(`[SDK] Sent permission request ${requestID} for session ${sessionID}`);
+    } catch (err) {
+      console.error(`[SDK] Error handling permission request:`, err);
+    }
+  }
+
+  // Handle button clicks for permissions
+  async handlePermissionButton(interaction: ButtonInteraction): Promise<boolean> {
+    const customId = interaction.customId;
+
+    if (!customId.startsWith("p_")) {
+      return false;
+    }
+
+    const buttonId = customId.replace("p_", "");
+
+    try {
+      // Look up the button mapping from database
+      const mapping = await lookupButtonMapping(buttonId);
+
+      if (!mapping) {
+        console.error(`[SDK] Button mapping not found for: ${buttonId}`);
+        await interaction.reply({
+          content: "This button has expired. Please try again.",
+          ephemeral: true,
+        });
+        return true;
+      }
+
+      // Check authorization - only the session owner can click permission buttons
+      if (mapping.userId && mapping.userId !== interaction.user.id) {
+        await interaction.reply({
+          content: "You are not authorized to respond to this permission request.",
+          ephemeral: true,
+        });
+        return true;
+      }
+
+      const allowed = mapping.optionValue === "__allow__";
+
+      // Get the directory for this session
+      let cwd: string | undefined;
+      try {
+        cwd = await this.resolveSessionCwd(mapping.sessionId);
+      } catch {
+        console.log(
+          `[SDK] Session ${mapping.sessionId} not found in bot's directory map, continuing without directory`,
+        );
+      }
+
+      // Update the button state
+      const updatedRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(customId)
+          .setLabel(allowed ? "Allowed" : "Denied")
+          .setStyle(allowed ? ButtonStyle.Success : ButtonStyle.Danger)
+          .setDisabled(true),
+      );
+
+      await interaction.update({ components: [updatedRow] });
+
+      // Send the permission response to the SDK
+      if (this.client) {
+        const replyData: { requestID: string; reply: "always" | "reject"; directory?: string } = {
+          requestID: mapping.requestId,
+          reply: allowed ? "always" : "reject",
+        };
+        if (cwd) {
+          replyData.directory = cwd;
+        }
+        await this.client.permission.reply(replyData);
+      } else {
+        console.error(`[SDK] Cannot send permission reply - SDK client not connected`);
+        await interaction.followUp({
+          content: "Error: Cannot process permission. SDK connection unavailable.",
+          ephemeral: true,
+        });
+        return true;
+      }
+
+      console.log(
+        `[SDK] Permission ${allowed ? "granted" : "denied"} for session ${mapping.sessionId}`,
+      );
+      return true;
+    } catch (err) {
+      console.error(`[SDK] Error handling permission button:`, err);
+      await interaction.reply({
+        content: "Failed to process permission. Please try again.",
+        ephemeral: true,
+      });
+      return true;
+    }
+  }
+
+  // Handle question.asked events
+  private async handleQuestionRequest(event: Event): Promise<void> {
+    if (event.type !== "question.asked") return;
+
+    const props = event.properties as unknown as {
+      id: string;
+      sessionID: string;
+      questions: Array<{
+        question: string;
+        header: string;
+        options: Array<{ label: string; description: string }>;
+        multiple?: boolean;
+        custom?: boolean;
+      }>;
+    };
+
+    // Extract the first question info
+    const requestID = props.id;
+    const sessionID = props.sessionID;
+
+    // Warn if multiple questions are present (only first is handled)
+    if (props.questions && props.questions.length > 1) {
+      console.warn(
+        `[SDK] Question request contains ${props.questions.length} questions, but only the first will be handled`,
+      );
+    }
+
+    const firstQuestion = props.questions?.[0];
+    const question = firstQuestion?.question || "";
+    const options =
+      firstQuestion?.options.map((opt) => ({
+        value: opt.label,
+        label: opt.label,
+      })) || [];
+    const _allowCustom = firstQuestion?.custom || false;
+
+    console.log(`[SDK] Received question request:`, {
+      requestID,
+      sessionID,
+      question: question || "(empty)",
+      optionsCount: options.length,
+    });
+
+    try {
+      const thread = await this.getThreadForSession(sessionID);
+      if (!thread) {
+        console.error(`[SDK] No thread found for session ${sessionID}`);
+        return;
+      }
+
+      await this.sendQuestionMessage(thread, requestID, sessionID, question, options, _allowCustom);
+
+      console.log(`[SDK] Sent question ${requestID} for session ${sessionID}`);
+    } catch (err) {
+      console.error(`[SDK] Error handling question request:`, err);
+    }
+  }
+
+  // Send a question message with buttons
+  private async sendQuestionMessage(
+    thread: ThreadChannel,
+    requestId: string,
+    sessionId: string,
+    question: string,
+    options: Array<{ value: string; label: string }>,
+    _allowCustom: boolean,
+  ): Promise<void> {
+    const embed = new EmbedBuilder()
+      .setTitle("Question")
+      .setDescription(question || "Please select an option:")
+      .setColor(0x5865f2)
+      .setFooter({ text: requestId || "Question" });
+
+    const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+    let currentRow = new ActionRowBuilder<ButtonBuilder>();
+    let buttonCount = 0;
+
+    // Discord allows max 5 action rows, reserve 1 for cancel button = max 4 option rows (20 buttons)
+    const MAX_BUTTONS = 20;
+    const limitedOptions = options.slice(0, MAX_BUTTONS);
+
+    if (options.length > MAX_BUTTONS) {
+      console.warn(
+        `[SDK] Question has ${options.length} options, truncating to ${MAX_BUTTONS} to fit Discord limits`,
+      );
+    }
+
+    // Generate all button IDs first
+    const buttonIds: Array<{ id: string; option: { value: string; label: string } }> = [];
+    for (const option of limitedOptions) {
+      buttonIds.push({ id: generateButtonId(), option });
+    }
+    const cancelButtonId = generateButtonId();
+
+    // Batch store all mappings in parallel
+    const mappings = [
+      ...buttonIds.map((b) => ({
+        buttonId: b.id,
+        sessionId,
+        requestId,
+        optionValue: b.option.value,
+      })),
+      { buttonId: cancelButtonId, sessionId, requestId, optionValue: "__cancel__" },
+    ];
+    await storeButtonMappings(mappings);
+
+    // Build buttons with label length validation (max 80 chars)
+    for (const { id, option } of buttonIds) {
+      const label = option.label.length > 80 ? option.label.substring(0, 77) + "..." : option.label;
+      const button = new ButtonBuilder()
+        .setCustomId(`q_${id}`)
+        .setLabel(label)
+        .setStyle(ButtonStyle.Primary);
+
+      currentRow.addComponents(button);
+      buttonCount++;
+
+      // Discord allows max 5 buttons per row
+      if (buttonCount === 5) {
+        rows.push(currentRow);
+        currentRow = new ActionRowBuilder<ButtonBuilder>();
+        buttonCount = 0;
+      }
+    }
+
+    if (buttonCount > 0) {
+      rows.push(currentRow);
+    }
+
+    // Add cancel button with stored mapping (5th row)
+    const cancelRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`qc_${cancelButtonId}`)
+        .setLabel("Cancel")
+        .setStyle(ButtonStyle.Secondary),
+    );
+    rows.push(cancelRow);
+
+    await thread.send({ embeds: [embed], components: rows });
+  }
+
+  // Handle button clicks for questions
+  async handleQuestionButton(interaction: ButtonInteraction): Promise<boolean> {
+    const customId = interaction.customId;
+
+    // Check if this is a question button (q_<buttonId> or qc_<buttonId>)
+    if (!customId.startsWith("q_") && !customId.startsWith("qc_")) {
+      return false;
+    }
+
+    try {
+      const buttonId = customId.replace("q_", "").replace("qc_", "");
+      const isCancel = customId.startsWith("qc_");
+
+      // Look up the button mapping from database
+      const mapping = await lookupButtonMapping(buttonId);
+
+      if (!mapping) {
+        console.error(`[SDK] Button mapping not found for: ${buttonId}`);
+        await interaction.reply({
+          content: "This button has expired. Please try the question again.",
+          ephemeral: true,
+        });
+        return true;
+      }
+
+      if (isCancel || mapping.optionValue === "__cancel__") {
+        await this.cancelQuestion(interaction, mapping.sessionId, mapping.requestId);
+        return true;
+      }
+
+      await this.submitQuestionAnswer(
+        interaction,
+        mapping.sessionId,
+        mapping.requestId,
+        mapping.optionValue,
+      );
+      return true;
+    } catch (err) {
+      console.error(`[SDK] Error handling question button:`, err);
+      const errorMessage = "Failed to process your answer. Please try again.";
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content: errorMessage, ephemeral: true });
+      } else {
+        await interaction.reply({ content: errorMessage, ephemeral: true });
+      }
+      return true;
+    }
+  }
+
+  // Submit question answer
+  private async submitQuestionAnswer(
+    interaction: ButtonInteraction,
+    sessionId: string,
+    requestId: string,
+    optionValue: string,
+  ): Promise<void> {
+    try {
+      // Get session directory if available (may not be for CLI-created sessions)
+      let cwd: string | undefined;
+      try {
+        cwd = await this.resolveSessionCwd(sessionId);
+      } catch {
+        console.log(
+          `[SDK] Session ${sessionId} not found in bot's directory map, continuing without directory`,
+        );
+      }
+
+      await this.disableQuestionButtons(interaction);
+
+      if (this.client) {
+        const replyData: {
+          requestID: string;
+          answers: string[][];
+          directory?: string;
+        } = {
+          requestID: requestId,
+          answers: [[optionValue]],
+        };
+        if (cwd) {
+          replyData.directory = cwd;
+        }
+        console.log(`[SDK] Sending question reply:`, JSON.stringify(replyData));
+        try {
+          const result = await this.client.question.reply(replyData);
+          console.log(`[SDK] Question reply result:`, result);
+        } catch (replyErr) {
+          console.error(`[SDK] Error from question.reply:`, replyErr);
+          throw replyErr;
+        }
+      } else {
+        console.error(`[SDK] No client available to send reply`);
+      }
+
+      await interaction.followUp({
+        content: `Selected: **${optionValue}**`,
+        ephemeral: true,
+      });
+
+      console.log(`[SDK] Question ${requestId} answered with: ${optionValue}`);
+    } catch (err) {
+      console.error(`[SDK] Error submitting question answer:`, err);
+      // Try to reply if we haven't already
+      try {
+        await interaction.reply({
+          content: "Failed to submit your answer. Please try again.",
+          ephemeral: true,
+        });
+      } catch {
+        // If reply fails, try followUp
+        try {
+          await interaction.followUp({
+            content: "Failed to submit your answer. Please try again.",
+            ephemeral: true,
+          });
+        } catch {
+          // Ignore if both fail
+        }
+      }
+    }
+  }
+
+  // Cancel question
+  private async cancelQuestion(
+    interaction: ButtonInteraction,
+    sessionId: string,
+    requestId: string,
+  ): Promise<void> {
+    try {
+      // Get session directory if available (may not be for CLI-created sessions)
+      let cwd: string | undefined;
+      try {
+        cwd = await this.resolveSessionCwd(sessionId);
+      } catch {
+        console.log(
+          `[SDK] Session ${sessionId} not found in bot's directory map, continuing without directory`,
+        );
+      }
+
+      await this.disableQuestionButtons(interaction);
+
+      if (this.client) {
+        const rejectData: { requestID: string; directory?: string } = {
+          requestID: requestId,
+        };
+        if (cwd) {
+          rejectData.directory = cwd;
+        }
+        await this.client.question.reject(
+          rejectData as unknown as Parameters<typeof this.client.question.reject>[0],
+        );
+      }
+
+      await interaction.followUp({
+        content: "Question cancelled.",
+        ephemeral: true,
+      });
+
+      console.log(`[SDK] Question ${requestId} cancelled`);
+    } catch (err) {
+      console.error(`[SDK] Error cancelling question:`, err);
+      // Try to reply if we haven't already
+      try {
+        await interaction.reply({
+          content: "Failed to cancel the question.",
+          ephemeral: true,
+        });
+      } catch {
+        // If reply fails, try followUp
+        try {
+          await interaction.followUp({
+            content: "Failed to cancel the question.",
+            ephemeral: true,
+          });
+        } catch {
+          // Ignore if both fail
+        }
+      }
+    }
+  }
+
+  // Disable all buttons
+  private async disableQuestionButtons(interaction: ButtonInteraction): Promise<void> {
+    const message = interaction.message;
+    const disabledComponents: ActionRowBuilder<ButtonBuilder>[] = [];
+
+    for (const row of message.components) {
+      // Cast to unknown first, then to the expected type
+      const actionRow = row as unknown as {
+        components: Array<{
+          type: number;
+          customId?: string;
+          label?: string;
+          style?: number;
+          disabled?: boolean;
+        }>;
+      };
+      const newRow = new ActionRowBuilder<ButtonBuilder>();
+      for (const component of actionRow.components) {
+        if (component.type === 2) {
+          // Button component
+          const button = new ButtonBuilder()
+            .setCustomId(component.customId || "")
+            .setLabel(component.label || "")
+            .setStyle(component.style || 1)
+            .setDisabled(true);
+          newRow.addComponents(button);
+        }
+      }
+      if (newRow.components.length > 0) {
+        disabledComponents.push(newRow);
+      }
+    }
+
+    await interaction.update({ components: disabledComponents });
+  }
+
   async connect(): Promise<void> {
     // Create opencode server and client
     const opencode = await createOpencode();
@@ -723,7 +1492,7 @@ class VibecordClient {
 
     // Create session using the main client
     const response = await this.client.session.create({
-      query: { directory: cwd },
+      directory: cwd,
     });
 
     const session = response.data;
@@ -736,12 +1505,12 @@ class VibecordClient {
 
     // Get config to retrieve models and modes
     const configResponse = await this.client.config.get({
-      query: { directory: cwd },
+      directory: cwd,
     });
 
     const config = configResponse.data;
     const providersResponse = await this.client.config.providers({
-      query: { directory: cwd },
+      directory: cwd,
     });
     const providers = providersResponse.data;
 
@@ -823,8 +1592,8 @@ class VibecordClient {
 
     // Update the config with the new model using the main client
     await this.client.config.update({
-      body: { model: modelId },
-      query: { directory: cwd },
+      directory: cwd,
+      config: { model: modelId },
     });
   }
 
@@ -837,7 +1606,7 @@ class VibecordClient {
 
     // Get current config using the main client
     const configResponse = await this.client.config.get({
-      query: { directory: cwd },
+      directory: cwd,
     });
     const config = configResponse.data;
 
@@ -846,10 +1615,10 @@ class VibecordClient {
       const currentAgent = config.agent[modeId];
       if (currentAgent?.model) {
         await this.client.config.update({
-          body: {
+          directory: cwd,
+          config: {
             model: currentAgent.model,
           },
-          query: { directory: cwd },
         });
       }
     }
@@ -867,12 +1636,12 @@ class VibecordClient {
 
     // Get config to retrieve models and modes using the main client
     const configResponse = await this.client.config.get({
-      query: { directory: cwd },
+      directory: cwd,
     });
     const config = configResponse.data;
 
     const providersResponse = await this.client.config.providers({
-      query: { directory: cwd },
+      directory: cwd,
     });
     const providers = providersResponse.data;
 
@@ -922,11 +1691,9 @@ class VibecordClient {
 
     // Send prompt using async endpoint with the main client
     await this.client.session.promptAsync({
-      path: { id: sessionId },
-      body: {
-        parts: [{ type: "text", text }],
-      },
-      query: { directory: cwd },
+      sessionID: sessionId,
+      directory: cwd,
+      parts: [{ type: "text", text }],
     });
   }
 

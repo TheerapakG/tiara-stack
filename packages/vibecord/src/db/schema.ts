@@ -42,15 +42,15 @@ export const session = sqliteTable("session", {
   deletedAt: integer("deleted_at", { mode: "timestamp" }),
 });
 
-export const sessionFile = sqliteTable("session_file", {
+export const buttonMapping = sqliteTable("button_mapping", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  sessionId: integer("session_id").notNull(),
-  path: text("path").notNull(),
-  content: text("content").notNull(),
+  buttonId: text("button_id").notNull().unique(),
+  sessionId: text("session_id").notNull(),
+  requestId: text("request_id").notNull(),
+  optionValue: text("option_value").notNull(),
+  userId: text("user_id"), // Discord user ID for authorization
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(strftime('%s', 'now'))`),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(strftime('%s', 'now'))`),
+  expiresAt: integer("expires_at", { mode: "timestamp" }),
 });

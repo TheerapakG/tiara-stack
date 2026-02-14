@@ -80,6 +80,15 @@ const botProgram = pipe(
     });
 
     client.on("interactionCreate", async (interaction) => {
+      // Handle button interactions first
+      if (interaction.isButton()) {
+        const permissionHandled = await sdkClient.handlePermissionButton(interaction);
+        if (permissionHandled) return;
+
+        const questionHandled = await sdkClient.handleQuestionButton(interaction);
+        if (questionHandled) return;
+      }
+
       if (!interaction.isChatInputCommand()) return;
 
       const commandName = interaction.commandName;
