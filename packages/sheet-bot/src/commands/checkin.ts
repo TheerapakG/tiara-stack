@@ -7,8 +7,9 @@ import {
   InteractionContextType,
   MessageFlags,
 } from "discord-api-types/v10";
-import { DiscordGatewayLayer } from "../discord/gateway";
-import { CommandHelper, Interaction } from "../utils";
+import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { CommandHelper } from "dfx-discord-utils/utils";
+import { Interaction } from "dfx-discord-utils/utils";
 import {
   ConverterService,
   FormatService,
@@ -18,7 +19,7 @@ import {
   ScheduleService,
 } from "../services";
 import { checkinButtonData } from "../messageComponents/buttons/checkin";
-import { makeMessageActionRowData } from "../utils/messageComponentHelper";
+import { makeMessageActionRowData } from "dfx-discord-utils/utils";
 import { Array as ArrayUtils } from "typhoon-core/utils";
 
 const makeManualSubCommand = Effect.gen(function* () {

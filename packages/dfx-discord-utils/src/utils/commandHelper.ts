@@ -1,4 +1,6 @@
+import type { HttpClientError } from "@effect/platform/HttpClientError";
 import { Discord, DiscordREST, Ix } from "dfx";
+import type { DiscordRESTError } from "dfx/DiscordREST";
 import { CommandHelper } from "dfx/Interactions/commandHelper";
 import {
   SubCommandNotFound,
@@ -16,6 +18,9 @@ import {
 } from "./commandBuilder";
 import { DiscordRestService } from "dfx/DiscordREST";
 
+// Re-export types to ensure they're available in generated d.ts files
+export type { HttpClientError, DiscordRESTError };
+
 type CommandOptionType = Exclude<
   Discord.ApplicationCommandOptionType,
   | typeof Discord.ApplicationCommandOptionType.SUB_COMMAND
@@ -30,7 +35,7 @@ interface CommandOption {
 
 type StringLiteral<T> = T extends string ? (string extends T ? never : T) : never;
 
-type Option<A> = A extends { readonly name: infer N }
+type InferOption<A> = A extends { readonly name: infer N }
   ? N extends StringLiteral<N>
     ? A
     : never
@@ -39,7 +44,7 @@ type Option<A> = A extends { readonly name: infer N }
 type OptionsWithLiteral<A, T> = A extends {
   readonly options: ReadonlyArray<CommandOption>;
 }
-  ? Extract<A["options"][number], Option<A["options"][number]> & T>
+  ? Extract<A["options"][number], InferOption<A["options"][number]> & T>
   : never;
 
 type SubCommandGroups<A> = A extends { readonly options: ReadonlyArray<CommandOption> }
@@ -52,7 +57,7 @@ type SubCommandGroups<A> = A extends { readonly options: ReadonlyArray<CommandOp
     >
   : never;
 
-type SubCommandGroupNames<A> = Option<SubCommandGroups<A>>["name"];
+type SubCommandGroupNames<A> = InferOption<SubCommandGroups<A>>["name"];
 
 type SubCommands<A> = A extends { readonly options: ReadonlyArray<CommandOption> }
   ? Extract<
@@ -64,7 +69,7 @@ type SubCommands<A> = A extends { readonly options: ReadonlyArray<CommandOption>
     >
   : never;
 
-type SubCommandNames<A> = Option<SubCommands<A>>["name"];
+type SubCommandNames<A> = InferOption<SubCommands<A>>["name"];
 
 type SubCommandWithName<A, Name extends SubCommandGroupNames<A> | SubCommandNames<A>> = A extends {
   readonly options: ReadonlyArray<CommandOption>;
@@ -142,6 +147,27 @@ type RequiredChannelOptions<A> = OptionsWithLiteral<
   { readonly type: typeof Discord.ApplicationCommandOptionType.CHANNEL; readonly required: true }
 >;
 
+// Type mapping from Discord enum values to TypeScript types
+type OptionTypeToTs<T> = T extends typeof Discord.ApplicationCommandOptionType.STRING
+  ? string
+  : T extends typeof Discord.ApplicationCommandOptionType.INTEGER
+    ? number
+    : T extends typeof Discord.ApplicationCommandOptionType.NUMBER
+      ? number
+      : T extends typeof Discord.ApplicationCommandOptionType.BOOLEAN
+        ? boolean
+        : T extends typeof Discord.ApplicationCommandOptionType.USER
+          ? Discord.UserResponse | Discord.GuildMemberResponse
+          : T extends typeof Discord.ApplicationCommandOptionType.CHANNEL
+            ? Discord.GuildChannelResponse
+            : T extends typeof Discord.ApplicationCommandOptionType.ROLE
+              ? Discord.GuildRoleResponse
+              : T extends typeof Discord.ApplicationCommandOptionType.MENTIONABLE
+                ? Discord.GuildRoleResponse | Discord.UserResponse | Discord.GuildMemberResponse
+                : T extends typeof Discord.ApplicationCommandOptionType.ATTACHMENT
+                  ? Discord.AttachmentResponse
+                  : string | number | boolean;
+
 type CommandRoleValue<A, N> = CommandWithName<
   A,
   N
@@ -173,7 +199,7 @@ export class WrappedCommandHelper<A> {
     private readonly subcommandGroupOptionName: Option.Option<string>,
     private readonly subcommandOptionName: Option.Option<string>,
     readonly rest: DiscordRestService,
-    private readonly application: DiscordApplication,
+    private readonly application: Discord.PrivateApplicationResponse,
     readonly response: Deferred.Deferred<{
       readonly files: ReadonlyArray<File>;
       readonly payload: Discord.CreateInteractionResponseRequest;
@@ -199,23 +225,27 @@ export class WrappedCommandHelper<A> {
     return this.helper.resolvedValues(f);
   }
 
-  option(name: CommandOptions<A>["name"]) {
-    return this.helper.option(name);
+  option(name: CommandOptions<A>["name"]): OptionTypeToTs<CommandWithName<A, typeof name>["type"]> {
+    return this.helper.option(name) as any;
   }
 
-  optionValue<N extends RequiredCommandOptions<A>["name"]>(name: N) {
-    return this.helper.optionValue(name);
+  optionValue<N extends RequiredCommandOptions<A>["name"]>(
+    name: N,
+  ): OptionTypeToTs<CommandWithName<A, N>["type"]> {
+    return this.helper.optionValue(name) as any;
   }
 
-  optionValueOptional<N extends CommandOptions<A>["name"]>(name: N) {
-    return this.helper.optionValueOptional(name);
+  optionValueOptional<N extends CommandOptions<A>["name"]>(
+    name: N,
+  ): Option.Option<OptionTypeToTs<CommandWithName<A, N>["type"]>> {
+    return this.helper.optionValueOptional(name) as any;
   }
 
   optionValueOrElse<N extends CommandOptions<A>["name"], const OrElse>(
     name: N,
     orElse: () => OrElse,
-  ) {
-    return this.helper.optionValueOrElse(name, orElse);
+  ): OptionTypeToTs<CommandWithName<A, N>["type"]> | OrElse {
+    return this.helper.optionValueOrElse(name, orElse) as any;
   }
 
   optionRoleValue<N extends RequiredRoleOptions<A>["name"]>(name: N): CommandRoleValue<A, N> {
@@ -413,7 +443,7 @@ export class WrappedCommandHelper<A> {
   editReply(response: {
     readonly params?: Discord.UpdateOriginalWebhookMessageParams;
     readonly payload: Discord.IncomingWebhookUpdateRequestPartial;
-  }) {
+  }): Effect.Effect<Discord.MessageResponse, DiscordRESTError, DiscordInteraction> {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const command = this;
 
@@ -434,7 +464,7 @@ export class WrappedCommandHelper<A> {
       readonly params?: Discord.UpdateOriginalWebhookMessageParams;
       readonly payload: Discord.IncomingWebhookUpdateRequestPartial;
     },
-  ) {
+  ): Effect.Effect<Discord.MessageResponse, DiscordRESTError, DiscordInteraction> {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const command = this;
 
@@ -451,7 +481,7 @@ export class WrappedCommandHelper<A> {
 export const wrapCommandHelper = Effect.fnUntraced(function* <A>(
   helper: CommandHelper<A>,
   rest: DiscordRestService,
-  application: DiscordApplication,
+  application: Discord.PrivateApplicationResponse,
 ) {
   const response = yield* Deferred.make<{
     readonly files: ReadonlyArray<File>;

@@ -1,6 +1,6 @@
 import { Effect, DateTime } from "effect";
 import { EmbedBuilder } from "@discordjs/builders";
-import { DiscordApplication } from "../discord/gateway";
+import { DiscordApplication } from "dfx-discord-utils/discord";
 
 export class EmbedService extends Effect.Service<EmbedService>()("EmbedService", {
   effect: Effect.gen(function* () {

@@ -210,7 +210,12 @@ export class ActionRowBuilder<
 > {
   readonly builder = new BaseActionRowBuilder();
 
-  addComponent<const Components extends ReadonlyArray<ComponentType>>(...components: Components) {
+  addComponent<const Components extends ReadonlyArray<ComponentType>>(
+    ...components: Components
+  ): BuilderType<
+    BuilderBuilderT<typeof this>,
+    AppendAllKey<A, "components", BuilderInnerTypes<Components>>
+  > {
     this.builder.addComponents(components.map((c) => c.builder));
     return this as unknown as BuilderType<
       BuilderBuilderT<typeof this>,
@@ -218,7 +223,12 @@ export class ActionRowBuilder<
     >;
   }
 
-  setComponents<const Components extends ReadonlyArray<ComponentType>>(...components: Components) {
+  setComponents<const Components extends ReadonlyArray<ComponentType>>(
+    ...components: Components
+  ): BuilderType<
+    BuilderBuilderT<typeof this>,
+    ReplaceKey<A, "components", BuilderInnerTypes<Components>>
+  > {
     this.builder.setComponents(components.map((c) => c.builder));
     return this as unknown as BuilderType<
       BuilderBuilderT<typeof this>,

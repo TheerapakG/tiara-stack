@@ -13,7 +13,7 @@ import {
   pipe,
 } from "effect";
 import { DiscordREST } from "dfx";
-import { DiscordGatewayLayer } from "../discord/gateway";
+import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import { checkinButtonData } from "../messageComponents/buttons/checkin";
 import { Array as ArrayUtils } from "typhoon-core/utils";
 import {
@@ -25,7 +25,7 @@ import {
   ScheduleService,
   SheetService,
 } from "../services";
-import { ActionRowBuilder } from "../utils/messageComponentBuilder";
+import { ActionRowBuilder } from "dfx-discord-utils/utils";
 import { Sheet } from "sheet-apis/schema";
 
 const autoCheckinPreviewNotice = "Sent automatically via auto check-in (preview; may have bugs).";

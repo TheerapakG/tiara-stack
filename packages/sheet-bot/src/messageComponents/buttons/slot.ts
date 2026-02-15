@@ -1,15 +1,15 @@
 import { Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
 import { Array, Chunk, Effect, Layer, Number, Option, Order, pipe, String } from "effect";
-import { DiscordGatewayLayer } from "@/discord/gateway";
+import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import {
   MessageComponentHelper,
   makeButton,
   makeButtonData,
   makeMessageComponent,
-} from "@/utils/messageComponentHelper";
+} from "dfx-discord-utils/utils";
 import { EmbedService, FormatService, MessageSlotService, ScheduleService } from "@/services";
-import { Interaction } from "@/utils";
+import { Interaction } from "dfx-discord-utils/utils";
 import { ButtonStyle, MessageFlags } from "discord-api-types/v10";
 
 class SlotHelper extends Effect.Service<SlotHelper>()("SlotHelper", {

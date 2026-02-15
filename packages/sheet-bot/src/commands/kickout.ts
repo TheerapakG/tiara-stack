@@ -3,8 +3,9 @@ import { Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
 import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
 import { Array, DateTime, Effect, Equal, Layer, Match, Option, Order, Number, pipe } from "effect";
-import { DiscordGatewayLayer } from "../discord/gateway";
-import { CommandHelper, Interaction } from "../utils";
+import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { CommandHelper } from "dfx-discord-utils/utils";
+import { Interaction } from "dfx-discord-utils/utils";
 import {
   ConverterService,
   EmbedService,
@@ -12,13 +13,13 @@ import {
   PermissionService,
   ScheduleService,
 } from "../services";
-import { MembersCache, RolesCache } from "../discord/cache";
-import { GuildMember } from "../utils";
+import { MembersCache, RolesCache } from "dfx-discord-utils/discord";
+import { GuildMemberUtils } from "dfx-discord-utils/utils";
 
 const makeManualSubCommand = Effect.gen(function* () {
   const converterService = yield* ConverterService;
   const guildConfigService = yield* GuildConfigService;
-  const guildMemberUtils = yield* GuildMember.GuildMemberUtils;
+  const guildMemberUtils = yield* GuildMemberUtils;
   const membersCache = yield* MembersCache;
   const permissionService = yield* PermissionService;
   const scheduleService = yield* ScheduleService;
@@ -223,7 +224,7 @@ export const KickoutCommandLive = Layer.scopedDiscard(
   Layer.provide(
     Layer.mergeAll(
       DiscordGatewayLayer,
-      GuildMember.GuildMemberUtils.Default,
+      GuildMemberUtils.Default,
       MembersCache.Default,
       PermissionService.Default,
       RolesCache.Default,

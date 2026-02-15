@@ -1,0 +1,51 @@
+{
+  "name": "dfx-discord-utils",
+  "version": "0.0.0",
+  "private": true,
+  "keywords": [],
+  "author": "",
+  "files": [
+    "./dist/**"
+  ],
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./*": {
+      "types": "./dist/*/index.d.mts",
+      "default": "./dist/*/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "format": "oxfmt --check",
+    "format:apply": "oxfmt",
+    "lint": "oxlint .",
+    "typecheck": "tsgo --noEmit",
+    "build": "tsdown -c tsdown.config.ts"
+  },
+  "dependencies": {
+    "@discordjs/builders": "^1.13.1",
+    "discord-api-types": "^0.38.38",
+    "ts-mixer": "^6.0.4"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "latest",
+    "dfx": "^0.127.0",
+    "glob": "^11.0.3",
+    "oxfmt": "^0.26.0",
+    "oxlint": "^1.41.0",
+    "pathe": "^2.0.3",
+    "tsdown": "^0.16.4",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "@effect/platform": "^0.94.2",
+    "@effect/platform-node": "^0.104.1",
+    "dfx": "^0.127.0",
+    "effect": "^3.19.8"
+  }
+}

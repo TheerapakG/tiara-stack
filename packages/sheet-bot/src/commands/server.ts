@@ -2,9 +2,10 @@ import { escapeMarkdown, roleMention } from "@discordjs/formatters";
 import { Discord, Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
 import { Effect, Layer, Option, pipe } from "effect";
-import { GuildsCache } from "../discord/cache";
-import { DiscordGatewayLayer } from "../discord/gateway";
-import { CommandHelper, Interaction } from "../utils";
+import { GuildsCache } from "dfx-discord-utils/discord";
+import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { CommandHelper } from "dfx-discord-utils/utils";
+import { Interaction } from "dfx-discord-utils/utils";
 import { PermissionService, GuildConfigService, EmbedService } from "../services";
 import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
 

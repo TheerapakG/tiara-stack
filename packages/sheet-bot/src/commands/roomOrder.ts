@@ -19,8 +19,9 @@ import {
   Option,
   pipe,
 } from "effect";
-import { DiscordGatewayLayer } from "../discord/gateway";
-import { CommandHelper, Interaction } from "../utils";
+import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { CommandHelper } from "dfx-discord-utils/utils";
+import { Interaction } from "dfx-discord-utils/utils";
 import {
   ConverterService,
   FormatService,

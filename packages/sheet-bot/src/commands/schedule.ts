@@ -7,8 +7,9 @@ import {
   MessageFlags,
 } from "discord-api-types/v10";
 import { Array, Effect, Layer, Match, Option, pipe, String } from "effect";
-import { DiscordGatewayLayer } from "../discord/gateway";
-import { CommandHelper, Interaction } from "../utils";
+import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { CommandHelper } from "dfx-discord-utils/utils";
+import { Interaction } from "dfx-discord-utils/utils";
 import { EmbedService, GuildConfigService, PermissionService, ScheduleService } from "../services";
 
 const formatHourRanges = (hours: readonly number[]): string => {

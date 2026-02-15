@@ -3,8 +3,9 @@ import { Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
 import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
 import { Array, Effect, Function, Layer, Number, Option, Order, pipe } from "effect";
-import { DiscordGatewayLayer } from "../discord/gateway";
-import { CommandHelper, Interaction } from "../utils";
+import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { CommandHelper } from "dfx-discord-utils/utils";
+import { Interaction } from "dfx-discord-utils/utils";
 import { EmbedService, GuildConfigService, PermissionService, PlayerService } from "../services";
 import { Sheet } from "sheet-apis/schema";
 

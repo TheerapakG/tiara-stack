@@ -31,6 +31,7 @@
     "@opentelemetry/sdk-metrics": "^2.2.0",
     "@opentelemetry/sdk-trace-base": "^2.2.0",
     "dfx": "^0.127.0",
+    "dfx-discord-utils": "workspace:*",
     "discord-api-types": "^0.38.38",
     "effect": "^3.19.8",
     "handlebars": "^4.7.8",

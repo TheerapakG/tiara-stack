@@ -1,8 +1,8 @@
 import { Cache, Discord, DiscordREST } from "dfx";
 import { CachePrelude, DiscordGateway } from "dfx/gateway";
 import { Effect, Stream } from "effect";
-import { DiscordGatewayLayer } from "./gateway";
 import { CacheMissError, ParentCacheDriver, makeWithParent } from "dfx/Cache";
+import { DiscordGatewayLayer } from "./gateway";
 
 const membersCachePrelude = <RM, EM, E>(
   makeDriver: Effect.Effect<
@@ -40,6 +40,12 @@ const membersCachePrelude = <RM, EM, E>(
           .listGuildMembers(guildId)
           .pipe(Effect.map((_) => _.map((member) => [member.user.id, member]))),
     });
+  });
+
+export const makeGuildsCache = () =>
+  Effect.Service<GuildsCache>()("GuildsCache", {
+    scoped: CachePrelude.guilds(Cache.memoryDriver()),
+    dependencies: [DiscordGatewayLayer],
   });
 
 export class GuildsCache extends Effect.Service<GuildsCache>()("GuildsCache", {

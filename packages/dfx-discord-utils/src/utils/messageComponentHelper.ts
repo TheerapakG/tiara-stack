@@ -1,5 +1,10 @@
+import type { HttpClientError } from "@effect/platform/HttpClientError";
 import { Discord, DiscordREST, Ix } from "dfx";
+import type { DiscordRESTError } from "dfx/DiscordREST";
 import { DiscordRestService } from "dfx/DiscordREST";
+
+// Re-export types to ensure they're available in generated d.ts files
+export type { HttpClientError, DiscordRESTError };
 import { Deferred, Effect, FiberMap, pipe } from "effect";
 import { DiscordApplication } from "../discord/gateway";
 import {
@@ -7,11 +12,12 @@ import {
   ButtonBuilder,
   MessageActionRowComponentBuilder,
 } from "./messageComponentBuilder";
+import { DiscordInteraction } from "dfx/Interactions/context";
 
 export class MessageComponentHelper {
   constructor(
     readonly rest: DiscordRestService,
-    private readonly application: DiscordApplication,
+    private readonly application: Discord.PrivateApplicationResponse,
     readonly response: Deferred.Deferred<{
       readonly files: ReadonlyArray<File>;
       readonly payload: Discord.CreateInteractionResponseRequest;
@@ -81,7 +87,7 @@ export class MessageComponentHelper {
   editReply(response: {
     readonly params?: Discord.UpdateOriginalWebhookMessageParams;
     readonly payload: Discord.IncomingWebhookUpdateRequestPartial;
-  }) {
+  }): Effect.Effect<Discord.MessageResponse, DiscordRESTError, DiscordInteraction> {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const command = this;
 
@@ -102,7 +108,7 @@ export class MessageComponentHelper {
       readonly params?: Discord.UpdateOriginalWebhookMessageParams;
       readonly payload: Discord.IncomingWebhookUpdateRequestPartial;
     },
-  ) {
+  ): Effect.Effect<Discord.MessageResponse, DiscordRESTError, DiscordInteraction> {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const command = this;
 
@@ -118,7 +124,7 @@ export class MessageComponentHelper {
 
 export const makeMessageComponentHelper = Effect.fnUntraced(function* (
   rest: DiscordRestService,
-  application: DiscordApplication,
+  application: Discord.PrivateApplicationResponse,
 ) {
   const response = yield* Deferred.make<{
     readonly files: ReadonlyArray<File>;

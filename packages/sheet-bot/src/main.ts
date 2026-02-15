@@ -1,5 +1,6 @@
 import { PlatformConfigProvider } from "@effect/platform";
 import { NodeRuntime, NodeContext, NodeHttpClient } from "@effect/platform-node";
+import { DiscordConfigLayer } from "./discord/config";
 import { Layer, Logger } from "effect";
 import { MetricsLive } from "./metrics";
 import { TracesLive } from "./traces";
@@ -34,6 +35,7 @@ const MainLive = Layer.mergeAll(
 );
 
 MainLive.pipe(
+  Layer.provide(DiscordConfigLayer),
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
   Layer.provide(Logger.logFmt),

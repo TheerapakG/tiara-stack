@@ -1,8 +1,8 @@
 import { Data, Effect, Option, pipe } from "effect";
 import { DiscordREST, Perms } from "dfx";
-import { GuildsCache, RolesCache } from "../discord/cache";
-import { DiscordApplication, DiscordGatewayLayer } from "../discord/gateway";
-import { Interaction } from "@/utils";
+import { GuildsCache, RolesCache } from "dfx-discord-utils/discord";
+import { DiscordApplication, DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { Interaction } from "dfx-discord-utils/utils";
 
 export class PermissionError extends Data.TaggedError("PermissionError")<{
   readonly message: string;

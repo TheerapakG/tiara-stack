@@ -1,8 +1,26 @@
+import type { HttpClientError } from "@effect/platform";
+import type { DiscordRESTError } from "dfx/DiscordREST";
 import { Effect, pipe } from "effect";
-import { DiscordGatewayLayer } from "../discord/gateway";
 import { DiscordREST } from "dfx";
+import { DiscordGatewayLayer } from "../discord/gateway";
 
-export class GuildMemberUtils extends Effect.Service<GuildMemberUtils>()("GuildMemberUtils", {
+// Import HttpClientError to ensure it's available in the type definitions
+export type { HttpClientError, DiscordRESTError };
+
+export interface GuildMemberUtilsService {
+  readonly addRoles: (
+    guildId: string,
+    userId: string,
+    roleIds: string[],
+  ) => Effect.Effect<void[], DiscordRESTError, never>;
+  readonly removeRoles: (
+    guildId: string,
+    userId: string,
+    roleIds: string[],
+  ) => Effect.Effect<void[], DiscordRESTError, never>;
+}
+
+const GuildMemberUtilsBase = Effect.Service<GuildMemberUtilsService>()("GuildMemberUtils", {
   effect: pipe(
     DiscordREST,
     Effect.map((rest) => ({
@@ -28,4 +46,6 @@ export class GuildMemberUtils extends Effect.Service<GuildMemberUtils>()("GuildM
   ),
   accessors: true,
   dependencies: [DiscordGatewayLayer],
-}) {}
+});
+
+export class GuildMemberUtils extends GuildMemberUtilsBase {}

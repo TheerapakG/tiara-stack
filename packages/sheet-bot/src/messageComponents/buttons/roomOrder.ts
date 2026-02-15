@@ -4,15 +4,15 @@ import { bold, inlineCode, time, TimestampStyles } from "@discordjs/formatters";
 import { Array, Effect, HashSet, Layer, Option, pipe } from "effect";
 import { MessageRoomOrder } from "sheet-apis/schema";
 import { ConverterService, FormatService, MessageRoomOrderService } from "@/services";
-import { DiscordGatewayLayer } from "@/discord/gateway";
+import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import {
   MessageComponentHelper,
   makeButton,
   makeButtonData,
   makeMessageActionRowData,
   makeMessageComponent,
-} from "@/utils/messageComponentHelper";
-import { Interaction } from "@/utils";
+} from "dfx-discord-utils/utils";
+import { Interaction } from "dfx-discord-utils/utils";
 import { ButtonStyle, MessageFlags } from "discord-api-types/v10";
 
 const formatEffectValue = (effectValue: number): string => {

@@ -3,16 +3,17 @@ import { InteractionsRegistry } from "dfx/gateway";
 import { userMention } from "@discordjs/formatters";
 import { ButtonStyle, MessageFlags } from "discord-api-types/v10";
 import { Array, Effect, Layer, Option, pipe } from "effect";
-import { DiscordGatewayLayer } from "@/discord/gateway";
+import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import {
   MessageComponentHelper,
   makeButton,
   makeButtonData,
   makeMessageActionRowData,
   makeMessageComponent,
-} from "@/utils/messageComponentHelper";
+} from "dfx-discord-utils/utils";
 import { MessageCheckinService } from "@/services";
-import { GuildMember, Interaction } from "@/utils";
+import { GuildMemberUtils } from "dfx-discord-utils/utils";
+import { Interaction } from "dfx-discord-utils/utils";
 
 export const checkinButtonData = makeButtonData((b) =>
   b
@@ -24,7 +25,7 @@ export const checkinButtonData = makeButtonData((b) =>
 
 const makeCheckinButtonHandler = Effect.gen(function* () {
   const messageCheckinService = yield* MessageCheckinService;
-  const guildMemberUtils = yield* GuildMember.GuildMemberUtils;
+  const guildMemberUtils = yield* GuildMemberUtils;
 
   return yield* makeButton(checkinButtonData.toJSON(), (helper: MessageComponentHelper) =>
     Effect.gen(function* () {
@@ -105,10 +106,6 @@ export const CheckinButtonLive = Layer.scopedDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(
-      DiscordGatewayLayer,
-      MessageCheckinService.Default,
-      GuildMember.GuildMemberUtils.Default,
-    ),
+    Layer.mergeAll(DiscordGatewayLayer, MessageCheckinService.Default, GuildMemberUtils.Default),
   ),
 );
