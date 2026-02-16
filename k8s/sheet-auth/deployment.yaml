@@ -1,0 +1,120 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sheet-auth
+  labels:
+    app: sheet-auth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sheet-auth
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  minReadySeconds: 5
+  template:
+    metadata:
+      labels:
+        app: sheet-auth
+    spec:
+      containers:
+        - name: sheet-auth
+          image: <IMAGE>
+          ports:
+            - containerPort: 3000
+              name: sheet-auth-svc
+            - containerPort: 9464
+              name: sheet-auth-met
+          env:
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-auth-secret
+                  key: otelExporterOtlpEndpoint
+            - name: DISCORD_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-auth-secret
+                  key: discordClientId
+            - name: DISCORD_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-auth-secret
+                  key: discordClientSecret
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-auth-secret
+                  key: redisUrl
+            - name: KUBERNETES_AUDIENCE
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-auth-secret
+                  key: kubernetesAudience
+                  optional: true
+            - name: KUBERNETES_API_SERVER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-auth-secret
+                  key: kubernetesApiServerUrl
+                  optional: true
+          livenessProbe:
+            httpGet:
+              path: /.well-known/oauth-authorization-server
+              port: sheet-auth-svc
+              scheme: HTTP
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /.well-known/oauth-authorization-server
+              port: sheet-auth-svc
+              scheme: HTTP
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /.well-known/oauth-authorization-server
+              port: sheet-auth-svc
+              scheme: HTTP
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 12
+      serviceAccountName: sheet-auth
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sheet-auth-service
+  labels:
+    app: sheet-auth
+spec:
+  ports:
+    - name: sheet-auth-svc
+      protocol: TCP
+      port: 80
+      targetPort: sheet-auth-svc
+    - name: sheet-auth-met
+      protocol: TCP
+      port: 9464
+      targetPort: sheet-auth-met
+  selector:
+    app: sheet-auth
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: sheet-auth
+  labels:
+    app: sheet-auth
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: sheet-auth
+  endpoints:
+    - port: sheet-auth-met

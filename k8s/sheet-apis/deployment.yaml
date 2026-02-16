@@ -87,6 +87,10 @@ spec:
                   path: zero-cache-token
                   expirationSeconds: 3600
                   audience: zero-cache
+              - serviceAccountToken:
+                  path: sheet-auth-token
+                  expirationSeconds: 3600
+                  audience: sheet-auth
 ---
 apiVersion: v1
 kind: Service

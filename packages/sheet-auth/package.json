@@ -1,0 +1,55 @@
+{
+  "name": "sheet-auth",
+  "version": "0.0.0",
+  "private": true,
+  "keywords": [],
+  "author": "",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./subjects": {
+      "types": "./dist/subjects.d.mts",
+      "default": "./dist/subjects.mjs"
+    },
+    "./server": {
+      "types": "./dist/server.d.mts",
+      "default": "./dist/server.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "format": "oxfmt --check",
+    "format:apply": "oxfmt",
+    "lint": "oxlint .",
+    "typecheck": "tsgo --noEmit",
+    "build": "tsdown -c tsdown.config.ts && tar -acf dist.tar.zst ./dist"
+  },
+  "dependencies": {
+    "@effect/opentelemetry": "^0.61.0",
+    "@effect/platform": "^0.94.2",
+    "@effect/platform-node": "^0.104.1",
+    "@hono/node-server": "^1.19.9",
+    "@openauthjs/openauth": "^0.4.3",
+    "@opentelemetry/exporter-prometheus": "^0.207.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.207.0",
+    "@opentelemetry/sdk-metrics": "^2.2.0",
+    "@opentelemetry/sdk-trace-base": "^2.2.0",
+    "@standard-schema/spec": "^1.0.0",
+    "effect": "^3.19.8",
+    "hono": "^4.11.9",
+    "ioredis": "^5.6.0",
+    "jose": "^6.1.3",
+    "unstorage": "^1.15.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "@typescript/native-preview": "latest",
+    "oxfmt": "^0.26.0",
+    "oxlint": "1.41.0",
+    "tsdown": "^0.16.4",
+    "typescript": "^5.9.3"
+  }
+}
