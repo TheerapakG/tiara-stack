@@ -8,4 +8,5 @@ export default defineConfig({
     server: fileURLToPath(new URL("./src/server.ts", import.meta.url)),
   },
   sourcemap: true,
+  noExternal: [/^.*$/],
 });
