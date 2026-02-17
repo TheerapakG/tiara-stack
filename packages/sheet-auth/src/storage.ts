@@ -1,13 +1,16 @@
 import type { StorageAdapter } from "@openauthjs/openauth/storage/storage";
-import { createStorage, type Storage as Unstorage } from "unstorage";
+import { createStorage, prefixStorage } from "unstorage";
 import redisDriver from "unstorage/drivers/redis";
 
 export function createRedisStorage(redisUrl: string): StorageAdapter {
-  const storage: Unstorage = createStorage({
-    driver: redisDriver({
-      url: redisUrl,
+  const storage = prefixStorage(
+    createStorage<{ items: Record<string, Record<string, any>> }>({
+      driver: redisDriver({
+        url: redisUrl,
+      }),
     }),
-  });
+    "sheet-auth:",
+  );
 
   const SEPARATOR = ":";
 
@@ -21,7 +24,7 @@ export function createRedisStorage(redisUrl: string): StorageAdapter {
 
   return {
     async get(key: string[]) {
-      const value = await storage.getItem<Record<string, any>>(joinKey(key));
+      const value = await storage.getItem(joinKey(key));
       return value ?? undefined;
     },
 
@@ -46,7 +49,7 @@ export function createRedisStorage(redisUrl: string): StorageAdapter {
       const keys = await storage.getKeys(joinKey(prefix));
 
       for (const key of keys) {
-        const value = await storage.getItem<any>(key);
+        const value = await storage.getItem(key);
         if (value !== null) {
           yield [splitKey(key), value];
         }

@@ -30,7 +30,8 @@
   "dependencies": {
     "@discordjs/builders": "^1.13.1",
     "discord-api-types": "^0.38.38",
-    "ts-mixer": "^6.0.4"
+    "ts-mixer": "^6.0.4",
+    "unstorage": "^1.17.4"
   },
   "devDependencies": {
     "@typescript/native-preview": "latest",
