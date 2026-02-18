@@ -13,5 +13,11 @@ export {
   channelsWithReverseLookup,
   rolesWithReverseLookup,
   membersWithReverseLookup,
+  channelsCacheViewWithReverseLookup,
+  rolesCacheViewWithReverseLookup,
+  membersCacheViewWithReverseLookup,
+  cacheView,
+  guildsCacheView,
 } from "./prelude";
+export type { Cache } from "dfx/Cache";
 export { makeWithReverseLookup, type ReverseLookupCache } from "./cache";

@@ -5,6 +5,10 @@ import { default as memoryDriver } from "unstorage/drivers/memory";
 import { default as redisDriver, RedisOptions } from "unstorage/drivers/redis";
 import { DiscordGatewayLayer } from "./gateway";
 import {
+  channelsCacheViewWithReverseLookup,
+  membersCacheViewWithReverseLookup,
+  rolesCacheViewWithReverseLookup,
+  guildsCacheView,
   membersWithReverseLookup,
   rolesWithReverseLookup,
   channelsWithReverseLookup,
@@ -69,4 +73,38 @@ export class ChannelsCache extends Effect.Service<ChannelsCache>()("ChannelsCach
     ),
   ),
   dependencies: [DiscordGatewayLayer],
+}) {}
+
+export class GuildsCacheView extends Effect.Service<GuildsCacheView>()("GuildsCacheView", {
+  scoped: pipe(
+    Unstorage.prefixed("guilds:"),
+    Effect.andThen((storage) => guildsCacheView(unstorageDriver({ storage }))),
+  ),
+}) {}
+
+export class RolesCacheView extends Effect.Service<RolesCacheView>()("RolesCacheView", {
+  scoped: pipe(
+    Unstorage.prefixed("roles:"),
+    Effect.andThen((storage) =>
+      rolesCacheViewWithReverseLookup(unstorageWithReverseLookupDriver({ storage })),
+    ),
+  ),
+}) {}
+
+export class MembersCacheView extends Effect.Service<MembersCacheView>()("MembersCacheView", {
+  scoped: pipe(
+    Unstorage.prefixed("members:"),
+    Effect.andThen((storage) =>
+      membersCacheViewWithReverseLookup(unstorageWithReverseLookupDriver({ storage })),
+    ),
+  ),
+}) {}
+
+export class ChannelsCacheView extends Effect.Service<ChannelsCacheView>()("ChannelsCacheView", {
+  scoped: pipe(
+    Unstorage.prefixed("channels:"),
+    Effect.andThen((storage) =>
+      channelsCacheViewWithReverseLookup(unstorageWithReverseLookupDriver({ storage })),
+    ),
+  ),
 }) {}

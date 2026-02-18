@@ -1,9 +1,10 @@
 import { Cache, Discord, DiscordREST } from "dfx";
 import type { DiscordRESTError } from "dfx/DiscordREST";
+import type { CacheDriver } from "dfx/Cache/driver";
 import { DiscordGateway } from "dfx/DiscordGateway";
 import * as Effect from "effect/Effect";
 import * as Scope from "effect/Scope";
-import { Stream } from "effect";
+import * as Stream from "effect/Stream";
 import type { ReverseLookupCacheDriver } from "./driver";
 import { makeWithReverseLookup, type ReverseLookupCache } from "./cache";
 
@@ -310,3 +311,94 @@ export const membersWithReverseLookup = <RM, EM, E>(
         ),
     });
   });
+
+// Cache view reverse lookup cache prelude
+export const cacheViewWithReverseLookup = <T, RM, EM, E>(
+  id: (a: T) => string,
+  makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, T>, EM, RM>,
+): Effect.Effect<
+  ReverseLookupCache<E, Cache.CacheMissError, Cache.CacheMissError, Cache.CacheMissError, T>,
+  EM,
+  RM | Scope.Scope
+> =>
+  Effect.gen(function* () {
+    const driver = yield* makeDriver;
+
+    return yield* makeWithReverseLookup({
+      driver,
+      id: (_) =>
+        Effect.fail(
+          new Cache.CacheMissError({ cacheName: "CacheViewReverseLookupCache/id", id: id(_) }),
+        ),
+      ops: opsWithReverseLookup({
+        id: (m: T) => id(m),
+        fromParent: Stream.never,
+        create: Stream.never,
+        update: Stream.never,
+        remove: Stream.never,
+        parentRemove: Stream.never,
+        resourceRemove: Stream.never,
+      }),
+      onMiss: (_, id) =>
+        Effect.fail(
+          new Cache.CacheMissError({
+            cacheName: "CacheViewReverseLookupCache",
+            id,
+          }),
+        ),
+      onParentMiss: (guildId) =>
+        Effect.fail(
+          new Cache.CacheMissError({
+            cacheName: "CacheViewReverseLookupCache",
+            id: guildId,
+          }),
+        ),
+      onResourceMiss: (id) =>
+        Effect.fail(
+          new Cache.CacheMissError({
+            cacheName: "CacheViewReverseLookupCache",
+            id,
+          }),
+        ),
+    });
+  });
+
+export const channelsCacheViewWithReverseLookup = <RM, EM, E>(
+  makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, Discord.GetChannel200>, EM, RM>,
+) => cacheViewWithReverseLookup((c) => c.id, makeDriver);
+
+export const rolesCacheViewWithReverseLookup = <RM, EM, E>(
+  makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, Discord.GuildRoleResponse>, EM, RM>,
+) => cacheViewWithReverseLookup((r) => r.id, makeDriver);
+
+export const membersCacheViewWithReverseLookup = <RM, EM, E>(
+  makeDriver: Effect.Effect<
+    ReverseLookupCacheDriver<
+      E,
+      Omit<Discord.GuildMemberResponse, "deaf" | "flags" | "joined_at" | "mute">
+    >,
+    EM,
+    RM
+  >,
+) => cacheViewWithReverseLookup((m) => m.user.id, makeDriver);
+
+// Generic cache view prelude (no gateway subscriptions, read-only view, dies on miss)
+export const cacheView = <T, RM, EM, E>(
+  id: (a: T) => string,
+  makeDriver: Effect.Effect<CacheDriver<E, T>, EM, RM>,
+): Effect.Effect<Cache.Cache<E, Cache.CacheMissError, T>, EM, RM | Scope.Scope> =>
+  Effect.gen(function* () {
+    const driver = yield* makeDriver;
+
+    return yield* Cache.make({
+      driver,
+      id: (a: T) => id(a),
+      onMiss: (id) => Effect.fail(new Cache.CacheMissError({ cacheName: "CacheView", id })),
+      ops: Stream.never,
+    });
+  });
+
+// Guilds cache view prelude - uses CacheDriver (not ReverseLookupCacheDriver) since guilds don't have parent relationships
+export const guildsCacheView = <RM, EM, E>(
+  makeDriver: Effect.Effect<CacheDriver<E, Discord.GuildResponse>, EM, RM>,
+) => cacheView((g) => g.id, makeDriver);
