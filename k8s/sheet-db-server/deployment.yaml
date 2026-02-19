@@ -31,7 +31,7 @@ spec:
             - name: POSTGRES_URL
               valueFrom:
                 secretKeyRef:
-                  name: sheet-apis-secret
+                  name: sdbs-secret
                   key: postgresUrl
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               valueFrom:
