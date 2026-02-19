@@ -149,6 +149,9 @@ importers:
       '@googleapis/sheets':
         specifier: ^10.0.1
         version: 10.0.1
+      '@openauthjs/openauth':
+        specifier: ^0.4.3
+        version: 0.4.3(arctic@2.3.4)(hono@4.11.9)
       '@opentelemetry/exporter-prometheus':
         specifier: ^0.207.0
         version: 0.207.0(@opentelemetry/api@1.9.0)
@@ -182,6 +185,9 @@ importers:
       scule:
         specifier: ^1.3.0
         version: 1.3.0
+      sheet-auth:
+        specifier: workspace:*
+        version: link:../sheet-auth
       sheet-db-schema:
         specifier: workspace:*
         version: link:../sheet-db-schema
@@ -322,6 +328,9 @@ importers:
       '@effect/workflow':
         specifier: ^0.16.0
         version: 0.16.0(@effect/experimental@0.58.0(@effect/platform@0.94.2(effect@3.19.15))(effect@3.19.15)(ioredis@5.9.3))(@effect/platform@0.94.2(effect@3.19.15))(@effect/rpc@0.73.0(@effect/platform@0.94.2(effect@3.19.15))(effect@3.19.15))(effect@3.19.15)
+      '@openauthjs/openauth':
+        specifier: ^0.4.3
+        version: 0.4.3(arctic@2.3.4)(hono@4.11.9)
       '@opentelemetry/exporter-prometheus':
         specifier: ^0.207.0
         version: 0.207.0(@opentelemetry/api@1.9.0)

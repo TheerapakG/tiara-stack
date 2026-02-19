@@ -6,7 +6,7 @@ import {
   MessageRoomOrderEntry,
   MessageRoomOrderRange,
 } from "@/schemas/messageRoomOrder";
-import { KubernetesTokenAuthorization } from "@/middlewares/kubernetesTokenAuthorization/tag";
+import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthorization/tag";
 
 export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
   .add(
@@ -119,6 +119,6 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
       .addSuccess(Schema.Array(MessageRoomOrderEntry))
       .addError(Schema.Union(ValidationError, QueryResultError)),
   )
-  .middleware(KubernetesTokenAuthorization)
+  .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Message Room Order")
   .annotate(OpenApi.Description, "Message room order endpoints") {}

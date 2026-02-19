@@ -1,7 +1,8 @@
 import { FileSystem } from "@effect/platform";
 import { Effect, Layer, pipe, Redacted } from "effect";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import { KubernetesTokenAuthorization, Unauthorized } from "./tag";
+import { KubernetesTokenAuthorization } from "./tag";
+import { Unauthorized } from "../error";
 
 export const KubernetesTokenAuthorizationLive = Layer.effect(
   KubernetesTokenAuthorization,

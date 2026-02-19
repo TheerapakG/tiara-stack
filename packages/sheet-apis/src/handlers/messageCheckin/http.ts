@@ -3,7 +3,7 @@ import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import { MessageCheckinService } from "@/services/messageCheckin";
-import { KubernetesTokenAuthorizationLive } from "@/middlewares/kubernetesTokenAuthorization/live";
+import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 
 export const MessageCheckinLive = HttpApiBuilder.group(Api, "messageCheckin", (handlers) =>
   pipe(
@@ -50,5 +50,5 @@ export const MessageCheckinLive = HttpApiBuilder.group(Api, "messageCheckin", (h
     ),
   ),
 ).pipe(
-  Layer.provide(Layer.mergeAll(MessageCheckinService.Default, KubernetesTokenAuthorizationLive)),
+  Layer.provide(Layer.mergeAll(MessageCheckinService.Default, SheetAuthTokenAuthorizationLive)),
 );

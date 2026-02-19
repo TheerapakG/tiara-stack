@@ -4,7 +4,7 @@ import { ValidationError, QueryResultError, UnknownError } from "typhoon-core/er
 import { GoogleSheetsError } from "@/schemas/google";
 import { ParserFieldError } from "@/schemas/sheet/error";
 import { SheetConfigError } from "@/schemas/sheetConfig";
-import { KubernetesTokenAuthorization } from "@/middlewares/kubernetesTokenAuthorization/tag";
+import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthorization/tag";
 
 const ScreenshotError = Schema.Union(
   GoogleSheetsError,
@@ -28,6 +28,6 @@ export class ScreenshotApi extends HttpApiGroup.make("screenshot")
       .addSuccess(Schema.Uint8Array)
       .addError(ScreenshotError),
   )
-  .middleware(KubernetesTokenAuthorization)
+  .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Screenshot")
   .annotate(OpenApi.Description, "Screenshot endpoints") {}

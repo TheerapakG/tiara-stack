@@ -5,7 +5,7 @@ import { GoogleSheetsError } from "@/schemas/google";
 import { ParserFieldError } from "@/schemas/sheet/error";
 import { SheetConfigError } from "@/schemas/sheetConfig";
 import { Player, PartialIdPlayer, PartialNamePlayer, Team } from "@/schemas/sheet";
-import { KubernetesTokenAuthorization } from "@/middlewares/kubernetesTokenAuthorization/tag";
+import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthorization/tag";
 
 const PlayerError = Schema.Union(
   GoogleSheetsError,
@@ -64,6 +64,6 @@ export class PlayerApi extends HttpApiGroup.make("player")
       .addSuccess(Schema.Array(Schema.Array(Team)))
       .addError(PlayerError),
   )
-  .middleware(KubernetesTokenAuthorization)
+  .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Player")
   .annotate(OpenApi.Description, "Player data endpoints") {}

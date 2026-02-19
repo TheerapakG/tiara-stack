@@ -4,7 +4,7 @@ import { Api } from "@/api";
 import { SheetService } from "@/services/sheet";
 import { SheetConfigService } from "@/services/sheetConfig";
 import { GuildConfigService } from "@/services/guildConfig";
-import { KubernetesTokenAuthorizationLive } from "@/middlewares/kubernetesTokenAuthorization/live";
+import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 
 const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigService) =>
   pipe(
@@ -109,7 +109,7 @@ export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
       SheetService.Default,
       SheetConfigService.Default,
       GuildConfigService.Default,
-      KubernetesTokenAuthorizationLive,
+      SheetAuthTokenAuthorizationLive,
     ),
   ),
 );

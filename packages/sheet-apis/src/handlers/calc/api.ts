@@ -6,7 +6,7 @@ import { ParserFieldError } from "@/schemas/sheet/error";
 import { SheetConfigError } from "@/schemas/sheetConfig";
 import { Room } from "@/schemas/sheet/room";
 import { Team } from "@/schemas/sheet";
-import { KubernetesTokenAuthorization } from "@/middlewares/kubernetesTokenAuthorization/tag";
+import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthorization/tag";
 
 const CalcError = Schema.Union(
   GoogleSheetsError,
@@ -46,7 +46,7 @@ export class CalcApi extends HttpApiGroup.make("calc")
         ),
       )
       .addError(ValidationError)
-      .middleware(KubernetesTokenAuthorization),
+      .middleware(SheetAuthTokenAuthorization),
   )
   .add(
     HttpApiEndpoint.post("calcSheet", "/calc/sheet")

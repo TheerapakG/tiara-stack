@@ -5,7 +5,7 @@ import { GoogleSheetsError } from "@/schemas/google";
 import { ParserFieldError } from "@/schemas/sheet/error";
 import { SheetConfigError } from "@/schemas/sheetConfig";
 import { Monitor, PartialIdMonitor, PartialNameMonitor } from "@/schemas/sheet";
-import { KubernetesTokenAuthorization } from "@/middlewares/kubernetesTokenAuthorization/tag";
+import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthorization/tag";
 
 const MonitorError = Schema.Union(
   GoogleSheetsError,
@@ -52,6 +52,6 @@ export class MonitorApi extends HttpApiGroup.make("monitor")
       .addSuccess(Schema.Array(Schema.Array(Schema.Union(Monitor, PartialNameMonitor))))
       .addError(MonitorError),
   )
-  .middleware(KubernetesTokenAuthorization)
+  .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Monitor")
   .annotate(OpenApi.Description, "Monitor data endpoints") {}

@@ -53,6 +53,11 @@ spec:
                 secretKeyRef:
                   name: sheet-bot-secret
                   key: sheetApisBaseUrl
+            - name: SHEET_AUTH_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-bot-secret
+                  key: sheetAuthIssuer
           volumeMounts:
             - name: sheet-bot-tokens
               readOnly: true
@@ -63,9 +68,9 @@ spec:
           projected:
             sources:
               - serviceAccountToken:
-                  path: sheet-apis-token
+                  path: sheet-auth-token
                   expirationSeconds: 3600
-                  audience: sheet-apis
+                  audience: sheet-auth
 ---
 apiVersion: v1
 kind: Service

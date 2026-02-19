@@ -1,11 +1,5 @@
-import { HttpApiMiddleware, HttpApiSchema, HttpApiSecurity, OpenApi } from "@effect/platform";
-import { Schema } from "effect";
-
-export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
-  "Unauthorized",
-  { message: Schema.String, cause: Schema.Unknown },
-  HttpApiSchema.annotations({ status: 401 }),
-) {}
+import { HttpApiMiddleware, HttpApiSecurity, OpenApi } from "@effect/platform";
+import { Unauthorized } from "../error";
 
 export class KubernetesTokenAuthorization extends HttpApiMiddleware.Tag<KubernetesTokenAuthorization>()(
   "KubernetesTokenAuthorization",
