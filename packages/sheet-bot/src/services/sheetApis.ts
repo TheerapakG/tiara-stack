@@ -48,7 +48,12 @@ const exchangeClientCredentials = (
       accessToken: response.access_token,
       expiresIn: response.expires_in ?? 3600,
     })),
-    Effect.catchAll((error) => Effect.fail(new Error(`Failed to exchange token: ${error}`))),
+    Effect.catchAll((error) =>
+      pipe(
+        Effect.logError(error),
+        Effect.andThen(() => Effect.fail(new Error(`Failed to exchange token: ${error}`))),
+      ),
+    ),
   );
 };
 
@@ -65,15 +70,6 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApi
       baseUrl: config.sheetApisBaseUrl,
     }),
     Effect.tap(({ fs, k8sTokenRef }) =>
-      // Initial K8s token load
-      pipe(
-        fs.readFileString("/var/run/secrets/tokens/sheet-auth-token", "utf-8"),
-        Effect.map((token) => token.trim()),
-        Effect.flatMap((token) => FiberRef.set(k8sTokenRef, token)),
-        Effect.retry({ schedule: Schedule.exponential("1 second"), times: 3 }),
-      ),
-    ),
-    Effect.tap(({ fs, k8sTokenRef }) =>
       // Periodic K8s token refresh every 5 minutes
       Effect.forkScoped(
         pipe(
@@ -89,12 +85,6 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApi
     Effect.bind("tokenCache", ({ httpClient, tokenEndpoint, k8sTokenRef }) =>
       Cache.makeWith({
         capacity: Infinity,
-        // Set TTL based on token's expires_in (minus 60 second buffer for safety)
-        timeToLive: (exit) =>
-          Exit.match(exit, {
-            onFailure: () => Duration.minutes(1),
-            onSuccess: (token) => Duration.seconds(token.expiresIn - 60),
-          }),
         lookup: (discordUserId: string) =>
           pipe(
             FiberRef.get(k8sTokenRef),
@@ -102,6 +92,12 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApi
               exchangeClientCredentials(httpClient, tokenEndpoint, k8sToken, discordUserId),
             ),
           ),
+        // Set TTL based on token's expires_in (minus 60 second buffer for safety)
+        timeToLive: (exit) =>
+          Exit.match(exit, {
+            onFailure: () => Duration.minutes(1),
+            onSuccess: (token) => Duration.seconds(token.expiresIn - 60),
+          }),
       }),
     ),
     Effect.bind("client", ({ tokenCache, baseUrl }) =>
