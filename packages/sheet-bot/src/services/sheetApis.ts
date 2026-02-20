@@ -44,6 +44,7 @@ const exchangeClientCredentials = (
     ),
     (request) => httpClient.execute(request),
     Effect.flatMap(HttpClientResponse.filterStatusOk),
+    Effect.tap((response) => response.json.pipe(Effect.tap(Effect.log))),
     Effect.flatMap(HttpClientResponse.schemaBodyJson(TokenResponseSchema)),
     Effect.map((response) => ({
       accessToken: response.access_token,
