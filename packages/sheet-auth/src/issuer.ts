@@ -82,6 +82,7 @@ export function createAuthIssuer({
         const discordUser = await fetchDiscordUser(value.tokenset.access);
 
         return ctx.subject("user", {
+          discordAccessToken: value.tokenset.access,
           discordUserId: discordUser.id,
         });
       }

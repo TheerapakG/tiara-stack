@@ -5,6 +5,7 @@ import { Context } from "effect";
 export class SheetAuthUser extends Context.Tag("SheetAuthUser")<
   SheetAuthUser,
   {
+    discordAccessToken?: string;
     discordUserId: string;
   }
 >() {}

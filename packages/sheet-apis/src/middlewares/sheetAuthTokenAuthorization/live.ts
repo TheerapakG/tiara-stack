@@ -31,9 +31,7 @@ export const SheetAuthTokenAuthorizationLive = Layer.effect(
                   }),
                 );
               }
-              return Effect.succeed({
-                discordUserId: result.subject.properties.discordUserId,
-              });
+              return Effect.succeed(result.subject.properties);
             }),
             Effect.withSpan("SheetAuthTokenAuthorization.sheetAuthToken", {
               captureStackTrace: true,

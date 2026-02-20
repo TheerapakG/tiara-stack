@@ -14,6 +14,7 @@ import { MonitorLive } from "./handlers/monitor";
 import { PlayerLive } from "./handlers/player";
 import { ScreenshotLive } from "./handlers/screenshot";
 import { ScheduleLive } from "./handlers/schedule";
+import { DiscordLive } from "./handlers/discord";
 
 const ApiLive = Layer.provide(HttpApiBuilder.api(Api), [
   CalcLive,
@@ -27,6 +28,7 @@ const ApiLive = Layer.provide(HttpApiBuilder.api(Api), [
   PlayerLive,
   ScreenshotLive,
   ScheduleLive,
+  DiscordLive,
 ]);
 
 export const HttpLive = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(

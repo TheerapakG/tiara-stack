@@ -10,6 +10,7 @@ import { MonitorApi } from "./handlers/monitor/api";
 import { PlayerApi } from "./handlers/player/api";
 import { ScreenshotApi } from "./handlers/screenshot/api";
 import { ScheduleApi } from "./handlers/schedule/api";
+import { DiscordApi } from "./handlers/discord/api";
 
 export class Api extends HttpApi.make("api")
   .add(CalcApi)
@@ -23,4 +24,5 @@ export class Api extends HttpApi.make("api")
   .add(PlayerApi)
   .add(ScreenshotApi)
   .add(ScheduleApi)
+  .add(DiscordApi)
   .annotate(OpenApi.Title, "Sheet APIs") {}

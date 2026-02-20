@@ -21,7 +21,6 @@
   },
   "dependencies": {
     "@effect/platform": "^0.94.2",
-    "@standard-schema/spec": "^1.0.0",
     "core-js": "^3.44.0",
     "effect": "^3.19.8",
     "effect-platform-apps-script": "workspace:*",

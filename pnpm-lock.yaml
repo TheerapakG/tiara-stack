@@ -544,9 +544,6 @@ importers:
       '@effect/platform':
         specifier: ^0.94.2
         version: 0.94.2(effect@3.19.15)
-      '@standard-schema/spec':
-        specifier: ^1.0.0
-        version: 1.0.0
       core-js:
         specifier: ^3.44.0
         version: 3.44.0
