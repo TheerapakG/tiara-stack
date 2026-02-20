@@ -8,7 +8,7 @@ import {
   HttpClientResponse,
   UrlParams,
 } from "@effect/platform";
-import { Cache, Duration, Effect, Exit, FiberRef, pipe, Schedule, Schema } from "effect";
+import { Cache, Duration, Effect, Exit, Ref, pipe, Schedule, Schema } from "effect";
 import { Api } from "sheet-apis/api";
 
 interface CachedToken {
@@ -43,7 +43,6 @@ const exchangeClientCredentials = (
       ),
     ),
     (request) => httpClient.execute(request),
-    Effect.tap(() => Effect.log(k8sToken, discordUserId)),
     Effect.flatMap(HttpClientResponse.filterStatusOk),
     Effect.flatMap(HttpClientResponse.schemaBodyJson(TokenResponseSchema)),
     Effect.map((response) => ({
@@ -64,7 +63,7 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApi
     Effect.all({
       fs: FileSystem.FileSystem,
       httpClient: HttpClient.HttpClient,
-      k8sTokenRef: FiberRef.make(""),
+      k8sTokenRef: Ref.make(""),
       tokenEndpoint: pipe(
         config.sheetAuthIssuer,
         Effect.map((issuer) => `${issuer.replace(/\/$/, "")}/token`),
@@ -77,7 +76,7 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApi
         pipe(
           fs.readFileString("/var/run/secrets/tokens/sheet-auth-token", "utf-8"),
           Effect.map((token) => token.trim()),
-          Effect.flatMap((token) => FiberRef.set(k8sTokenRef, token)),
+          Effect.flatMap((token) => Ref.set(k8sTokenRef, token)),
           Effect.retry({ schedule: Schedule.exponential("1 second"), times: 3 }),
           Effect.catchAll(() => Effect.void),
           Effect.repeat(Schedule.spaced("5 minutes")),
@@ -89,7 +88,7 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApi
         capacity: Infinity,
         lookup: (discordUserId: string) =>
           pipe(
-            FiberRef.get(k8sTokenRef),
+            Ref.get(k8sTokenRef),
             Effect.flatMap((k8sToken) =>
               exchangeClientCredentials(httpClient, tokenEndpoint, k8sToken, discordUserId),
             ),
