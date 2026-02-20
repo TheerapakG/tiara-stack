@@ -1,6 +1,21 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createRemoteJWKSet, customFetch, jwtVerify } from "jose";
 import { Provider } from "@openauthjs/openauth/provider/provider";
 import { readFileSync } from "fs";
+
+const KUBERNETES_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token";
+const JWKS_URL = "https://kubernetes.default.svc.cluster.local/openid/v1/jwks";
+
+function readKubernetesToken(): string {
+  try {
+    return readFileSync(KUBERNETES_TOKEN_PATH, "utf-8");
+  } catch (cause) {
+    throw new Error(
+      `Failed to read Kubernetes service account token from ${KUBERNETES_TOKEN_PATH}. ` +
+        `Ensure the pod is running in Kubernetes with a mounted service account.`,
+      { cause },
+    );
+  }
+}
 
 interface KubernetesProviderConfig {
   /**
@@ -42,19 +57,17 @@ interface KubernetesCredentials {
 export function KubernetesProvider(
   config: KubernetesProviderConfig,
 ): Provider<KubernetesCredentials> {
-  // Read the Kubernetes service account token for JWKS authentication
-  const kubernetesToken = readFileSync(
-    "/var/run/secrets/kubernetes.io/serviceaccount/token",
-    "utf-8",
-  );
-
-  // Create JWKS client for token verification
-  const jwks = createRemoteJWKSet(
-    new URL("https://kubernetes.default.svc.cluster.local/openid/v1/jwks"),
-    {
-      headers: { Authorization: `Bearer ${kubernetesToken}` },
-    },
-  );
+  // Create JWKS client with dynamic token fetching to handle rotation
+  const jwks = createRemoteJWKSet(new URL(JWKS_URL), {
+    [customFetch]: (input: RequestInfo | URL, init?: RequestInit) =>
+      fetch(input, {
+        ...init,
+        headers: {
+          ...init?.headers,
+          Authorization: `Bearer ${readKubernetesToken()}`,
+        },
+      }),
+  });
 
   return {
     type: "kubernetes",
