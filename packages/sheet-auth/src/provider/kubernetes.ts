@@ -66,6 +66,9 @@ export function KubernetesProvider(
       const token = input.params.token;
       const discordUserId = input.params.discord_user_id;
 
+      console.log("token", token);
+      console.log("discordUserId", discordUserId);
+
       if (!token) {
         throw new Error("Missing required parameter: token");
       }
