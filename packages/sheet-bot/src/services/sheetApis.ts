@@ -43,6 +43,7 @@ const exchangeClientCredentials = (
       ),
     ),
     (request) => httpClient.execute(request),
+    Effect.tap(() => Effect.log(k8sToken, discordUserId)),
     Effect.flatMap(HttpClientResponse.filterStatusOk),
     Effect.flatMap(HttpClientResponse.schemaBodyJson(TokenResponseSchema)),
     Effect.map((response) => ({
@@ -106,7 +107,7 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApi
         transformClient: HttpClient.mapRequestEffect((request) =>
           pipe(
             // Future: extract discordUserId from request context for per-user impersonation
-            tokenCache.get(""),
+            tokenCache.get("dummy_discord_user_id"),
             Effect.map((token) => HttpClientRequest.bearerToken(request, token.accessToken)),
             Effect.catchAll(() => Effect.succeed(request)),
           ),
