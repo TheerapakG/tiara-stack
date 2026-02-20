@@ -1,5 +1,6 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { Provider } from "@openauthjs/openauth/provider/provider";
+import { readFileSync } from "fs";
 
 interface KubernetesProviderConfig {
   /**
@@ -41,13 +42,19 @@ interface KubernetesCredentials {
 export function KubernetesProvider(
   config: KubernetesProviderConfig,
 ): Provider<KubernetesCredentials> {
-  const apiServerUrl = config.apiServerUrl ?? "https://kubernetes.default.svc";
-  const jwksUrl = `${apiServerUrl}/openid/v1/jwks`;
+  // Read the Kubernetes service account token for JWKS authentication
+  const kubernetesToken = readFileSync(
+    "/var/run/secrets/kubernetes.io/serviceaccount/token",
+    "utf-8",
+  );
 
   // Create JWKS client for token verification
-  const jwks = createRemoteJWKSet(new URL(jwksUrl), {
-    cooldownDuration: 300000, // 5 minutes cooldown between fetches
-  });
+  const jwks = createRemoteJWKSet(
+    new URL("https://kubernetes.default.svc.cluster.local/openid/v1/jwks"),
+    {
+      headers: { Authorization: `Bearer ${kubernetesToken}` },
+    },
+  );
 
   return {
     type: "kubernetes",
