@@ -1,6 +1,5 @@
 import { Effect, Layer, pipe, Redacted } from "effect";
-import { createClient } from "@openauthjs/openauth/client";
-import { subjects } from "sheet-auth/subjects";
+import { verifyToken, createSheetAuthClient } from "sheet-auth/client";
 import { SheetAuthTokenAuthorization } from "./tag";
 import { Unauthorized } from "../error";
 import { config } from "../../config";
@@ -13,26 +12,27 @@ export const SheetAuthTokenAuthorizationLive = Layer.effect(
       Effect.map(config.sheetAuthIssuer, (url) => url.replace(/\/$/, "")),
     ),
     Effect.map(({ issuer }) => {
-      const client = createClient({
-        clientID: "sheet-apis",
-        issuer,
-      });
+      // Create Better Auth client with jwtClient plugin for token verification
+      const authClient = createSheetAuthClient(issuer);
 
       return SheetAuthTokenAuthorization.of({
         sheetAuthToken: (token) =>
           pipe(
-            Effect.promise(() => client.verify(subjects, Redacted.value(token))),
-            Effect.flatMap((result) => {
-              if (result.err) {
-                return Effect.fail(
-                  new Unauthorized({
-                    message: `Invalid sheet-auth token: ${result.err.name}`,
-                    cause: result.err,
-                  }),
-                );
-              }
-              return Effect.succeed(result.subject.properties);
-            }),
+            verifyToken(authClient, Redacted.value(token)),
+            Effect.map((result) => ({
+              // Return userId from sub claim and the raw token
+              // Use Better Auth client separately to get Discord info if needed
+              userId: result.payload.sub,
+              email: result.payload.email,
+              token: Redacted.value(token),
+            })),
+            Effect.mapError(
+              (error) =>
+                new Unauthorized({
+                  message: `Invalid sheet-auth token: ${error.message}`,
+                  cause: error.cause,
+                }),
+            ),
             Effect.withSpan("SheetAuthTokenAuthorization.sheetAuthToken", {
               captureStackTrace: true,
             }),

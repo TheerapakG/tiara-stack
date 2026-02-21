@@ -28,6 +28,16 @@ spec:
             - containerPort: 9464
               name: sheet-auth-met
           env:
+            - name: BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-auth-secret
+                  key: baseUrl
+            - name: POSTGRES_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-auth-secret
+                  key: postgresUrl
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               valueFrom:
                 secretKeyRef:
@@ -43,22 +53,11 @@ spec:
                 secretKeyRef:
                   name: sheet-auth-secret
                   key: discordClientSecret
-            - name: REDIS_URL
-              valueFrom:
-                secretKeyRef:
-                  name: sheet-auth-secret
-                  key: redisUrl
             - name: KUBERNETES_AUDIENCE
               valueFrom:
                 secretKeyRef:
                   name: sheet-auth-secret
                   key: kubernetesAudience
-                  optional: true
-            - name: KUBERNETES_API_SERVER_URL
-              valueFrom:
-                secretKeyRef:
-                  name: sheet-auth-secret
-                  key: kubernetesApiServerUrl
                   optional: true
           livenessProbe:
             httpGet:

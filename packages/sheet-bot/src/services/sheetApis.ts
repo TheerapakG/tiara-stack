@@ -66,7 +66,7 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApi
       k8sTokenRef: Ref.make(""),
       tokenEndpoint: pipe(
         config.sheetAuthIssuer,
-        Effect.map((issuer) => `${issuer.replace(/\/$/, "")}/token`),
+        Effect.map((issuer) => `${issuer.replace(/\/$/, "")}/oauth2/token`),
       ),
       baseUrl: config.sheetApisBaseUrl,
     }),

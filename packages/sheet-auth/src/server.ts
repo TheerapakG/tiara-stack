@@ -17,12 +17,12 @@ import {
 import { Effect, Layer, Logger, Redacted } from "effect";
 import { getRequestListener } from "@hono/node-server";
 import { createServer } from "http";
-import { createAuthIssuer } from "./issuer";
+import { authConfig } from "./auth-config";
 import { config } from "./config";
 import { MetricsLive } from "./metrics";
 import { TracesLive } from "./traces";
 
-// Create Effect HTTP API with catch-all endpoints
+// Create Effect HTTP API with catch-all endpoints for Better Auth
 const Api = HttpApi.make("sheet-auth").add(
   HttpApiGroup.make("auth")
     .add(HttpApiEndpoint.get("get", "/*"))
@@ -39,23 +39,44 @@ type HandlerParams = {
   request: HttpServerRequest.HttpServerRequest;
 };
 
-// Build handlers that forward to Hono
+// Build handlers that forward to Better Auth Hono handler
 const AuthLive = HttpApiBuilder.group(Api, "auth", (handlers) =>
   Effect.gen(function* () {
     const discordClientId = yield* config.discordClientId;
     const discordClientSecret = yield* config.discordClientSecret;
-    const redisUrl = yield* config.redisUrl;
+    const postgresUrl = yield* config.postgresUrl;
     const kubernetesAudience = yield* config.kubernetesAudience;
-    const kubernetesApiServerUrl = yield* config.kubernetesApiServerUrl;
+    const baseUrl = yield* config.baseUrl;
 
-    const honoApp = createAuthIssuer({
+    // Create Better Auth instance
+    const auth = authConfig({
+      postgresUrl,
       discordClientId,
       discordClientSecret: Redacted.value(discordClientSecret),
-      redisUrl,
       kubernetesAudience,
-      kubernetesApiServerUrl,
+      baseUrl,
     });
-    const listener = getRequestListener(honoApp.fetch);
+
+    // Add cleanup finalizer for PostgreSQL connection
+    yield* Effect.addFinalizer(() =>
+      Effect.promise(() => auth.close()).pipe(
+        Effect.tapBoth({
+          onFailure: (error) =>
+            Effect.sync(() => console.error("Failed to close auth connection:", error)),
+          onSuccess: () => Effect.sync(() => console.log("Auth connection closed")),
+        }),
+        Effect.orElse(() => Effect.void),
+      ),
+    );
+
+    // Better Auth provides all routes including:
+    // - /api/auth/* - Authentication (Discord OAuth, sessions, etc.)
+    // - /oauth2/token - OAuth 2.0 token endpoint (from oauth-provider plugin + kubernetes-oauth plugin)
+    // - /.well-known/jwks.json - JWKS for token verification
+    // - /.well-known/oauth-authorization-server - OAuth 2.0 discovery
+    // - /.well-known/openid-configuration - OpenID Connect discovery
+
+    const listener = getRequestListener(auth.handler);
 
     const forwardRequest = ({ request }: HandlerParams) =>
       Effect.promise(() =>

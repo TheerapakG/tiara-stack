@@ -2,11 +2,31 @@ import { HttpApiMiddleware, HttpApiSecurity, OpenApi } from "@effect/platform";
 import { Unauthorized } from "../error";
 import { Context } from "effect";
 
+/**
+ * SheetAuthUser context - contains user info from verified JWT token
+ *
+ * Includes the raw JWT token for service-to-service authentication using
+ * Better Auth's bearer plugin.
+ *
+ * The JWT contains standard claims (sub, email, name). To get Discord-specific
+ * info like discordUserId, use the Better Auth client:
+ *
+ * ```typescript
+ * const { data: accounts } = await client.listAccounts({
+ *   fetchOptions: { headers: { Authorization: `Bearer ${token}` } }
+ * });
+ * const discordAccount = accounts?.find(a => a.providerId === "discord");
+ * ```
+ */
 export class SheetAuthUser extends Context.Tag("SheetAuthUser")<
   SheetAuthUser,
   {
-    discordAccessToken?: string;
-    discordUserId: string;
+    /** Internal user ID from JWT sub claim */
+    userId: string;
+    /** User email from JWT claims */
+    email?: string;
+    /** Raw JWT token for bearer authentication to other services */
+    token: string;
   }
 >() {}
 

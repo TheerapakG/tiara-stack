@@ -5,7 +5,9 @@ export default defineConfig([
   {
     entry: {
       index: fileURLToPath(new URL("./src/index.ts", import.meta.url)),
-      subjects: fileURLToPath(new URL("./src/subjects.ts", import.meta.url)),
+      client: fileURLToPath(new URL("./src/client.ts", import.meta.url)),
+      schema: fileURLToPath(new URL("./src/schema.ts", import.meta.url)),
+      plugins: fileURLToPath(new URL("./src/plugins/index.ts", import.meta.url)),
     },
     sourcemap: true,
   },

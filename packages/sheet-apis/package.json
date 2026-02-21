@@ -44,7 +44,6 @@
     "@effect/vitest": "^0.27.0",
     "@effect/workflow": "^0.16.0",
     "@googleapis/sheets": "^10.0.1",
-    "@openauthjs/openauth": "^0.4.3",
     "@opentelemetry/exporter-prometheus": "^0.207.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.207.0",
     "@opentelemetry/sdk-metrics": "^2.2.0",
