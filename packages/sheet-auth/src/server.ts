@@ -17,6 +17,7 @@ import {
 import { Effect, Layer, Logger, Redacted } from "effect";
 import { getRequestListener } from "@hono/node-server";
 import { createServer } from "http";
+import redisDriver from "unstorage/drivers/redis";
 import { authConfig } from "./auth-config";
 import { config } from "./config";
 import { MetricsLive } from "./metrics";
@@ -47,6 +48,14 @@ const AuthLive = HttpApiBuilder.group(Api, "auth", (handlers) =>
     const postgresUrl = yield* config.postgresUrl;
     const kubernetesAudience = yield* config.kubernetesAudience;
     const baseUrl = yield* config.baseUrl;
+    const redisUrl = yield* config.redisUrl;
+    const redisBase = yield* config.redisBase;
+
+    // Create Redis driver for secondary storage
+    const redisStorageDriver = redisDriver({
+      url: Redacted.value(redisUrl),
+      base: redisBase,
+    });
 
     // Create Better Auth instance
     const auth = authConfig({
@@ -55,15 +64,19 @@ const AuthLive = HttpApiBuilder.group(Api, "auth", (handlers) =>
       discordClientSecret: Redacted.value(discordClientSecret),
       kubernetesAudience,
       baseUrl,
+      secondaryStorageDriver: redisStorageDriver,
     });
 
-    // Add cleanup finalizer for PostgreSQL connection
+    // Add cleanup finalizer for connections
     yield* Effect.addFinalizer(() =>
-      Effect.promise(() => auth.close()).pipe(
+      Effect.all([
+        Effect.promise(() => auth.close()),
+        Effect.promise(() => auth.closeStorage()),
+      ]).pipe(
         Effect.tapBoth({
           onFailure: (error) =>
-            Effect.sync(() => console.error("Failed to close auth connection:", error)),
-          onSuccess: () => Effect.sync(() => console.log("Auth connection closed")),
+            Effect.sync(() => console.error("Failed to close connections:", error)),
+          onSuccess: () => Effect.sync(() => console.log("Connections closed")),
         }),
         Effect.orElse(() => Effect.void),
       ),

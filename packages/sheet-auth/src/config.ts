@@ -6,4 +6,6 @@ export const config = {
   postgresUrl: Schema.Config("POSTGRES_URL", Schema.String),
   kubernetesAudience: Schema.Config("KUBERNETES_AUDIENCE", Schema.String),
   baseUrl: Schema.Config("BASE_URL", Schema.String),
+  redisUrl: Schema.Config("REDIS_URL", Schema.Redacted(Schema.String)),
+  redisBase: Schema.Config("REDIS_BASE", Schema.String),
 };
