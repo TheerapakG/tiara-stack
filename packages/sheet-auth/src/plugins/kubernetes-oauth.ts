@@ -210,8 +210,6 @@ export function kubernetesOAuth(options: KubernetesOAuthOptions): BetterAuthPlug
               },
             });
 
-            console.log("token", token);
-
             return ctx.json({
               token: token,
               expires_in: SESSION_EXPIRES_IN_SECONDS,
