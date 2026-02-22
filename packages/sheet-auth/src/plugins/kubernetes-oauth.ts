@@ -1,6 +1,6 @@
 import { createRemoteJWKSet, customFetch, jwtVerify } from "jose";
 import { readFileSync } from "fs";
-import type { BetterAuthPlugin } from "better-auth";
+import type { BetterAuthPlugin, DBAdapter } from "better-auth";
 import { createAuthEndpoint, signJWT } from "better-auth/plugins";
 import { Schema } from "effect";
 
@@ -75,64 +75,31 @@ export interface KubernetesOAuthOptions {
   audience: string;
 }
 
-// Type definitions for Better Auth adapter operations
-interface AdapterQuery {
-  field: string;
-  value: string;
-}
-
-interface AdapterFindOptions {
-  model: string;
-  where: AdapterQuery[];
-}
-
-interface AdapterCreateOptions {
-  model: string;
-  data: Record<string, unknown>;
-}
-
-interface DatabaseAdapter {
-  findMany: (options: AdapterFindOptions) => Promise<unknown[]>;
-  findOne?: (options: AdapterFindOptions) => Promise<unknown | null>;
-  create: (options: AdapterCreateOptions) => Promise<unknown>;
-}
-
 /**
  * Find user by Discord user ID via the account table (junction table).
  * The account table links internal user IDs to external OAuth provider IDs.
  */
 async function findUserByDiscordId(
-  adapter: DatabaseAdapter,
+  adapter: DBAdapter,
   discordUserId: string,
 ): Promise<Record<string, unknown> | undefined> {
   // 1. Find account by providerId + accountId (Discord user ID)
-  const accounts = await adapter.findMany({
+  const account = ((await adapter.findOne({
     model: "account",
     where: [
-      { field: "providerId", value: "discord" },
+      { field: "providerId", value: "kubernetes:discord" },
       { field: "accountId", value: discordUserId },
     ],
-  });
+  })) ?? undefined) as Record<string, unknown> | undefined;
 
-  const account = accounts[0] as Record<string, unknown> | undefined;
   if (!account?.userId) {
     return undefined;
   }
 
-  // 2. Find user by ID
-  if (!adapter.findOne) {
-    // Fallback: query all users and filter (not ideal for large datasets)
-    const users = await adapter.findMany({
-      model: "user",
-      where: [{ field: "id", value: account.userId as string }],
-    });
-    return users[0] as Record<string, unknown> | undefined;
-  }
-
-  return (await adapter.findOne({
+  return ((await adapter.findOne({
     model: "user",
     where: [{ field: "id", value: account.userId as string }],
-  })) as Record<string, unknown> | undefined;
+  })) ?? undefined) as Record<string, unknown> | undefined;
 }
 
 /**
@@ -140,19 +107,15 @@ async function findUserByDiscordId(
  * This creates both a user record and an account record (junction).
  */
 async function createPlaceholderUserWithDiscord(
-  adapter: DatabaseAdapter,
+  adapter: DBAdapter,
   discordUserId: string,
 ): Promise<Record<string, unknown>> {
-  const userId = crypto.randomUUID();
-
-  // 1. Create the user with UUID-based email to avoid conflicts
   const user = (await adapter.create({
     model: "user",
     data: {
-      id: userId,
-      email: `${userId}@k8s.internal`,
+      email: `discord_${discordUserId}@k8s.internal`,
       emailVerified: true,
-      name: `K8S ServiceAccount ${discordUserId}`,
+      name: `Discord User ${discordUserId}`,
       createdAt: new Date(),
       updatedAt: new Date(),
     },
@@ -162,9 +125,8 @@ async function createPlaceholderUserWithDiscord(
   await adapter.create({
     model: "account",
     data: {
-      id: crypto.randomUUID(),
-      userId: userId,
-      providerId: "discord",
+      userId: user.id,
+      providerId: "kubernetes:discord",
       accountId: discordUserId,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -256,10 +218,13 @@ export function kubernetesOAuth(options: KubernetesOAuthOptions): BetterAuthPlug
             });
           } catch (error) {
             const message = error instanceof Error ? error.message : "Token verification failed";
-            return ctx.json({
-              error: "invalid_grant",
-              error_description: message,
-            });
+            return ctx.json(
+              {
+                error: "invalid_grant",
+                error_description: message,
+              },
+              { status: 400 },
+            );
           }
         },
       ),
