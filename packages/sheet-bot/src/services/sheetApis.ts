@@ -12,14 +12,13 @@ import { Cache, Duration, Effect, Exit, Ref, pipe, Schedule, Schema } from "effe
 import { Api } from "sheet-apis/api";
 
 interface CachedToken {
-  readonly accessToken: string;
+  readonly token: string;
   readonly expiresIn: number;
 }
 
 const TokenResponseSchema = Schema.Struct({
-  access_token: Schema.String,
-  refresh_token: Schema.optional(Schema.String),
-  expires_in: Schema.optional(Schema.Number),
+  token: Schema.String,
+  expires_in: Schema.Number,
 });
 
 const exchangeClientCredentials = (
@@ -40,10 +39,11 @@ const exchangeClientCredentials = (
     ),
     (request) => httpClient.execute(request),
     Effect.flatMap(HttpClientResponse.filterStatusOk),
+    Effect.tap((response) => Effect.tap(response.json, (json) => Effect.log(json))),
     Effect.flatMap(HttpClientResponse.schemaBodyJson(TokenResponseSchema)),
     Effect.map((response) => ({
-      accessToken: response.access_token,
-      expiresIn: response.expires_in ?? 3600,
+      token: response.token,
+      expiresIn: response.expires_in,
     })),
     Effect.catchAll((error) =>
       pipe(
@@ -103,7 +103,7 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApi
           pipe(
             // Future: extract discordUserId from request context for per-user impersonation
             tokenCache.get("dummy_discord_user_id"),
-            Effect.map((token) => HttpClientRequest.bearerToken(request, token.accessToken)),
+            Effect.map(({ token }) => HttpClientRequest.bearerToken(request, token)),
             Effect.catchAll(() => Effect.succeed(request)),
           ),
         ),

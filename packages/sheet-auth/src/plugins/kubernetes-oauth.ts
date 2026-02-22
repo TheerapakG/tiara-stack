@@ -239,7 +239,7 @@ export function kubernetesOAuth(options: KubernetesOAuthOptions): BetterAuthPlug
               throw new Error("JWT plugin not found");
             }
 
-            const accessToken = await signJWT(ctx, {
+            const token = await signJWT(ctx, {
               options: jwtPlugin.options,
               payload: {
                 sub: user.id as string,
@@ -248,35 +248,18 @@ export function kubernetesOAuth(options: KubernetesOAuthOptions): BetterAuthPlug
               },
             });
 
-            // Return OAuth 2.0 token response with correct expiration
-            return ctx.json(
-              {
-                access_token: accessToken,
-                token_type: "Bearer",
-                expires_in: SESSION_EXPIRES_IN_SECONDS,
-                scope: "openid profile",
-              },
-              {
-                status: 200,
-                headers: {
-                  "Content-Type": "application/json",
-                  "Cache-Control": "no-store",
-                  Pragma: "no-cache",
-                },
-              },
-            );
+            console.log("token", token);
+
+            return ctx.json({
+              token: token,
+              expires_in: SESSION_EXPIRES_IN_SECONDS,
+            });
           } catch (error) {
             const message = error instanceof Error ? error.message : "Token verification failed";
-            return ctx.json(
-              {
-                error: "invalid_grant",
-                error_description: message,
-              },
-              {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-              },
-            );
+            return ctx.json({
+              error: "invalid_grant",
+              error_description: message,
+            });
           }
         },
       ),
