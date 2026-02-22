@@ -1,8 +1,8 @@
 import { createRemoteJWKSet, customFetch, jwtVerify } from "jose";
 import { readFileSync } from "fs";
 import type { BetterAuthPlugin } from "better-auth";
-import { createAuthMiddleware } from "better-auth/api";
-import { signJWT } from "better-auth/plugins";
+import { createAuthEndpoint, signJWT } from "better-auth/plugins";
+import { Schema } from "effect";
 
 const KUBERNETES_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token";
 const KUBERNETES_JWKS_URL = "https://kubernetes.default.svc.cluster.local/openid/v1/jwks";
@@ -186,167 +186,100 @@ const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7;
 export function kubernetesOAuth(options: KubernetesOAuthOptions): BetterAuthPlugin {
   return {
     id: "kubernetes-oauth",
-    hooks: {
-      before: [
+
+    endpoints: {
+      kubernetesOAuthToken: createAuthEndpoint(
+        "/kubernetes-oauth/token",
         {
-          matcher: (context) => {
-            // Match POST requests to /oauth2/token with Kubernetes provider
-            const isTokenEndpoint =
-              context.path?.endsWith("/oauth2/token") || context.path === "/oauth2/token";
-            const isPost = context.request?.method === "POST";
-            return isTokenEndpoint && isPost;
+          method: "POST",
+          body: Schema.Struct({
+            token: Schema.String,
+            discord_user_id: Schema.String,
+          }).pipe(Schema.standardSchemaV1),
+          metadata: {
+            allowedMediaTypes: ["application/x-www-form-urlencoded", "application/json"],
           },
-          handler: createAuthMiddleware(async (ctx) => {
-            // Parse the request body
-            if (!ctx.request) {
-              return { context: ctx };
-            }
-
-            const contentType = ctx.request.headers.get("content-type") || "";
-            let body: Record<string, unknown>;
-
-            try {
-              if (contentType.includes("application/json")) {
-                body = await ctx.request.json();
-              } else {
-                const formData = await ctx.request.formData();
-                body = {};
-                formData.forEach((value, key) => {
-                  body[key] = value;
-                });
-              }
-            } catch {
-              // If parsing fails, let the request continue to other handlers
-              return { context: ctx };
-            }
-
-            // Only handle Kubernetes client_credentials requests
-            if (body.grant_type !== "client_credentials" || body.provider !== "kubernetes") {
-              // Not a Kubernetes request, continue to other handlers
-              return { context: ctx };
-            }
-
-            const k8sToken = body.token as string | undefined;
-            const discordUserId = body.discord_user_id as string | undefined;
-
-            if (!k8sToken) {
-              return {
-                context: ctx,
-                response: new Response(
-                  JSON.stringify({
-                    error: "invalid_request",
-                    error_description: "Missing required parameter: token",
-                  }),
-                  {
-                    status: 400,
-                    headers: { "Content-Type": "application/json" },
-                  },
-                ),
-              };
-            }
-
-            if (!discordUserId) {
-              return {
-                context: ctx,
-                response: new Response(
-                  JSON.stringify({
-                    error: "invalid_request",
-                    error_description: "Missing required parameter: discord_user_id",
-                  }),
-                  {
-                    status: 400,
-                    headers: { "Content-Type": "application/json" },
-                  },
-                ),
-              };
-            }
-
-            try {
-              // Verify the Kubernetes token
-              await verifyKubernetesToken(k8sToken, options.audience);
-
-              // Access adapter from the context
-              const adapter = ctx.context.adapter;
-
-              // 1. Look up user by discordUserId via account table (junction)
-              let user = await findUserByDiscordId(adapter, discordUserId);
-
-              // 2. If not found, create placeholder user + account link
-              if (!user) {
-                user = await createPlaceholderUserWithDiscord(adapter, discordUserId);
-              }
-
-              // 3. Create a session for the user
-              const sessionToken = crypto.randomUUID();
-              const expiresAt = new Date();
-              expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
-
-              await adapter.create({
-                model: "session",
-                data: {
-                  id: crypto.randomUUID(),
-                  token: sessionToken,
-                  userId: user.id,
-                  expiresAt: expiresAt,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
-                },
-              });
-
-              // 4. Generate JWT using Better Auth's signJWT directly
-              const jwtPlugin = ctx.context.getPlugin("jwt");
-              if (!jwtPlugin) {
-                throw new Error("JWT plugin not found");
-              }
-
-              const accessToken = await signJWT(ctx, {
-                options: jwtPlugin.options,
-                payload: {
-                  sub: user.id as string,
-                  iat: Math.floor(Date.now() / 1000),
-                  exp: Math.floor(expiresAt.getTime() / 1000),
-                },
-              });
-
-              // Return OAuth 2.0 token response with correct expiration
-              return {
-                context: ctx,
-                response: new Response(
-                  JSON.stringify({
-                    access_token: accessToken,
-                    token_type: "Bearer",
-                    expires_in: SESSION_EXPIRES_IN_SECONDS,
-                    scope: "openid profile",
-                  }),
-                  {
-                    status: 200,
-                    headers: {
-                      "Content-Type": "application/json",
-                      "Cache-Control": "no-store",
-                      Pragma: "no-cache",
-                    },
-                  },
-                ),
-              };
-            } catch (error) {
-              const message = error instanceof Error ? error.message : "Token verification failed";
-              return {
-                context: ctx,
-                response: new Response(
-                  JSON.stringify({
-                    error: "invalid_grant",
-                    error_description: message,
-                  }),
-                  {
-                    status: 400,
-                    headers: { "Content-Type": "application/json" },
-                  },
-                ),
-              };
-            }
-          }),
         },
-      ],
+        async (ctx) => {
+          try {
+            // Verify the Kubernetes token
+            await verifyKubernetesToken(ctx.body.token, options.audience);
+
+            // Access adapter from the context
+            const adapter = ctx.context.adapter;
+
+            // 1. Look up user by discordUserId via account table (junction)
+            let user = await findUserByDiscordId(adapter, ctx.body.discord_user_id);
+
+            // 2. If not found, create placeholder user + account link
+            if (!user) {
+              user = await createPlaceholderUserWithDiscord(adapter, ctx.body.discord_user_id);
+            }
+
+            // 3. Create a session for the user
+            const sessionToken = crypto.randomUUID();
+            const expiresAt = new Date();
+            expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+
+            await adapter.create({
+              model: "session",
+              data: {
+                id: crypto.randomUUID(),
+                token: sessionToken,
+                userId: user.id,
+                expiresAt: expiresAt,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+            });
+
+            // 4. Generate JWT using Better Auth's signJWT directly
+            const jwtPlugin = ctx.context.getPlugin("jwt");
+            if (!jwtPlugin) {
+              throw new Error("JWT plugin not found");
+            }
+
+            const accessToken = await signJWT(ctx, {
+              options: jwtPlugin.options,
+              payload: {
+                sub: user.id as string,
+                iat: Math.floor(Date.now() / 1000),
+                exp: Math.floor(expiresAt.getTime() / 1000),
+              },
+            });
+
+            // Return OAuth 2.0 token response with correct expiration
+            return ctx.json(
+              {
+                access_token: accessToken,
+                token_type: "Bearer",
+                expires_in: SESSION_EXPIRES_IN_SECONDS,
+                scope: "openid profile",
+              },
+              {
+                status: 200,
+                headers: {
+                  "Content-Type": "application/json",
+                  "Cache-Control": "no-store",
+                  Pragma: "no-cache",
+                },
+              },
+            );
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Token verification failed";
+            return ctx.json(
+              {
+                error: "invalid_grant",
+                error_description: message,
+              },
+              {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          }
+        },
+      ),
     },
   } satisfies BetterAuthPlugin;
 }

@@ -33,10 +33,6 @@ const exchangeClientCredentials = (
     HttpClientRequest.setBody(
       HttpBody.urlParams(
         UrlParams.fromInput({
-          grant_type: "client_credentials",
-          provider: "kubernetes",
-          client_id: "sheet-bot",
-          client_secret: "client_secret_unused",
           token: k8sToken,
           discord_user_id: discordUserId,
         }),
@@ -66,7 +62,7 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApi
       k8sTokenRef: Ref.make(""),
       tokenEndpoint: pipe(
         config.sheetAuthIssuer,
-        Effect.map((issuer) => `${issuer.replace(/\/$/, "")}/oauth2/token`),
+        Effect.map((issuer) => `${issuer.replace(/\/$/, "")}/kubernetes-oauth/token`),
       ),
       baseUrl: config.sheetApisBaseUrl,
     }),
