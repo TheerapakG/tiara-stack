@@ -54,13 +54,7 @@ export function authConfig({
       },
     },
     plugins: [
-      jwt({
-        disableSettingJwtHeader: true,
-        jwks: {
-          jwksPath: "/.well-known/jwks.json",
-        },
-        // Use standard JWT payload (sub, email, name) - no custom claims
-      }),
+      jwt(),
       oauthProvider({
         loginPage: "/sign-in",
         consentPage: "/consent",

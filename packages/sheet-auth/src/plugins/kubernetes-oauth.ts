@@ -186,7 +186,6 @@ export function kubernetesOAuth(options: KubernetesOAuthOptions): BetterAuthPlug
             await adapter.create({
               model: "session",
               data: {
-                id: crypto.randomUUID(),
                 token: sessionToken,
                 userId: user.id,
                 expiresAt: expiresAt,
