@@ -7,6 +7,7 @@ import postgres from "postgres";
 import { createSecondaryStorage } from "./storage";
 import type { Driver } from "unstorage";
 import { kubernetesOAuth } from "./plugins/kubernetes-oauth";
+import * as schema from "./schema";
 
 interface CreateAuthOptions {
   postgresUrl: string;
@@ -44,7 +45,7 @@ export function authConfig({
   const auth = betterAuth({
     baseURL: baseUrl,
     basePath: "/",
-    database: drizzleAdapter(db, { provider: "pg" }),
+    database: drizzleAdapter(db, { provider: "pg", schema }),
     socialProviders: {
       discord: {
         clientId: discordClientId,

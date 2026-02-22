@@ -7,41 +7,75 @@ import {
   HttpMiddleware,
   HttpServer,
   HttpServerRequest,
+  PlatformConfigProvider,
 } from "@effect/platform";
 import {
   NodeHttpClient,
+  NodeContext,
   NodeHttpServer,
   NodeHttpServerRequest,
   NodeRuntime,
 } from "@effect/platform-node";
-import { Effect, Layer, Logger, Redacted } from "effect";
+import { Context, Effect, Layer, Logger, Redacted } from "effect";
 import { getRequestListener } from "@hono/node-server";
 import { createServer } from "http";
 import redisDriver from "unstorage/drivers/redis";
-import { authConfig } from "./auth-config";
+import { authConfig, type AuthWithCleanup } from "./auth-config";
+import {
+  oauthProviderAuthServerMetadata,
+  oauthProviderOpenIdConfigMetadata,
+} from "@better-auth/oauth-provider";
 import { config } from "./config";
 import { MetricsLive } from "./metrics";
 import { TracesLive } from "./traces";
 
 // Create Effect HTTP API with catch-all endpoints for Better Auth
-const Api = HttpApi.make("sheet-auth").add(
-  HttpApiGroup.make("auth")
-    .add(HttpApiEndpoint.get("get", "/*"))
-    .add(HttpApiEndpoint.post("post", "/*"))
-    .add(HttpApiEndpoint.put("put", "/*"))
-    .add(HttpApiEndpoint.del("delete", "/*"))
-    .add(HttpApiEndpoint.patch("patch", "/*"))
-    .add(HttpApiEndpoint.head("head", "/*"))
-    .add(HttpApiEndpoint.options("options", "/*")),
-);
+// and explicit endpoints for well-known metadata that have SERVER_ONLY flag
+const Api = HttpApi.make("sheet-auth")
+  .add(
+    HttpApiGroup.make("auth")
+      .add(HttpApiEndpoint.get("get", "/*"))
+      .add(HttpApiEndpoint.post("post", "/*"))
+      .add(HttpApiEndpoint.put("put", "/*"))
+      .add(HttpApiEndpoint.del("delete", "/*"))
+      .add(HttpApiEndpoint.patch("patch", "/*"))
+      .add(HttpApiEndpoint.head("head", "/*"))
+      .add(HttpApiEndpoint.options("options", "/*")),
+  )
+  .add(
+    HttpApiGroup.make("well-known")
+      .add(HttpApiEndpoint.get("oauthAuthServer", "/.well-known/oauth-authorization-server"))
+      .add(HttpApiEndpoint.get("openidConfig", "/.well-known/openid-configuration")),
+  );
 
 // Handler type
 type HandlerParams = {
   request: HttpServerRequest.HttpServerRequest;
 };
 
-// Build handlers that forward to Better Auth Hono handler
-const AuthLive = HttpApiBuilder.group(Api, "auth", (handlers) =>
+// Auth service type - just the auth instance with cleanup
+// Note: oauthProviderAuthServerMetadata and oauthProviderOpenIdConfigMetadata
+// are standalone helper functions, not methods on the auth instance
+interface AuthWithOAuthProvider extends AuthWithCleanup {}
+
+// Auth service tag to share auth instance between route groups
+class AuthService extends Context.Tag("AuthService")<AuthService, AuthWithOAuthProvider>() {}
+
+// Helper to create a forwarder from a web handler
+const createForwarder =
+  (webHandler: (req: Request) => Promise<Response>) =>
+  ({ request }: HandlerParams) =>
+    Effect.promise(() => {
+      const listener = getRequestListener(webHandler);
+      return listener(
+        NodeHttpServerRequest.toIncomingMessage(request),
+        NodeHttpServerRequest.toServerResponse(request),
+      );
+    });
+
+// Layer that creates the auth instance and provides it as a service
+const AuthServiceLive = Layer.scoped(
+  AuthService,
   Effect.gen(function* () {
     const discordClientId = yield* config.discordClientId;
     const discordClientSecret = yield* config.discordClientSecret;
@@ -58,7 +92,6 @@ const AuthLive = HttpApiBuilder.group(Api, "auth", (handlers) =>
     });
 
     // Create Better Auth instance with basePath: "/" (root)
-    // This places all routes including .well-known endpoints at the root level
     const auth = authConfig({
       postgresUrl,
       discordClientId,
@@ -66,7 +99,7 @@ const AuthLive = HttpApiBuilder.group(Api, "auth", (handlers) =>
       kubernetesAudience,
       baseUrl,
       secondaryStorageDriver: redisStorageDriver,
-    });
+    }) as AuthWithOAuthProvider;
 
     // Add cleanup finalizer for connections
     yield* Effect.addFinalizer(() =>
@@ -83,34 +116,56 @@ const AuthLive = HttpApiBuilder.group(Api, "auth", (handlers) =>
       ),
     );
 
-    const listener = getRequestListener(auth.handler);
-
-    const forwardRequest = ({ request }: HandlerParams) =>
-      Effect.promise(() =>
-        listener(
-          NodeHttpServerRequest.toIncomingMessage(request),
-          NodeHttpServerRequest.toServerResponse(request),
-        ),
-      );
-
-    return handlers
-      .handle("get", forwardRequest)
-      .handle("post", forwardRequest)
-      .handle("put", forwardRequest)
-      .handle("delete", forwardRequest)
-      .handle("patch", forwardRequest)
-      .handle("head", forwardRequest)
-      .handle("options", forwardRequest);
+    return auth;
   }),
 );
 
-const ApiLive = Layer.provide(HttpApiBuilder.api(Api), AuthLive);
+// Auth handler group - forwards all requests to Better Auth
+const AuthLive = HttpApiBuilder.group(Api, "auth", (handlers) =>
+  Effect.gen(function* () {
+    const auth = yield* AuthService;
+    const forward = createForwarder(auth.handler);
+    return handlers
+      .handle("get", forward)
+      .handle("post", forward)
+      .handle("put", forward)
+      .handle("delete", forward)
+      .handle("patch", forward)
+      .handle("head", forward)
+      .handle("options", forward);
+  }),
+);
+
+// Well-known handler group - handles SERVER_ONLY metadata endpoints
+// by wrapping the helper functions with getRequestListener
+const WellKnownLive = HttpApiBuilder.group(Api, "well-known", (handlers) =>
+  Effect.gen(function* () {
+    const auth = yield* AuthService;
+
+    // Create web handlers for well-known endpoints
+    // These helpers expect auth.api to have getOAuthServerConfig/getOpenIdConfig
+    // but those are SERVER_ONLY endpoints not actually on the api. We cast to satisfy types.
+    const oauthAuthServerHandler = oauthProviderAuthServerMetadata(
+      auth as AuthWithCleanup & { api: { getOAuthServerConfig: (...args: unknown[]) => unknown } },
+    );
+    const openIdConfigHandler = oauthProviderOpenIdConfigMetadata(
+      auth as AuthWithCleanup & { api: { getOpenIdConfig: (...args: unknown[]) => unknown } },
+    );
+
+    return handlers
+      .handle("oauthAuthServer", createForwarder(oauthAuthServerHandler))
+      .handle("openidConfig", createForwarder(openIdConfigHandler));
+  }),
+);
+
+const ApiLive = Layer.provide(HttpApiBuilder.api(Api), Layer.merge(AuthLive, WellKnownLive));
 
 const HttpLive = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
   Layer.provide(HttpApiSwagger.layer()),
   Layer.provide(HttpApiBuilder.middlewareOpenApi()),
   Layer.provide(HttpApiBuilder.middlewareCors()),
   Layer.provide(ApiLive),
+  Layer.provide(AuthServiceLive),
   Layer.provide(NodeHttpClient.layer),
   HttpServer.withLogAddress,
   Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 })),
@@ -120,8 +175,8 @@ HttpLive.pipe(
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
   Layer.provide(Logger.logFmt),
+  Layer.provide(PlatformConfigProvider.layerDotEnvAdd(".env")),
+  Layer.provide(NodeContext.layer),
   Layer.launch,
-  NodeRuntime.runMain({
-    disablePrettyLogger: true,
-  }),
+  NodeRuntime.runMain({ disablePrettyLogger: true }),
 );
