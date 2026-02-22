@@ -76,6 +76,7 @@ export type SheetAuthClient = ReturnType<typeof createSheetAuthClient>;
 export function createSheetAuthClient(baseURL: string) {
   return createAuthClient({
     baseURL,
+    basePath: "/",
     plugins: [jwtClient()],
   });
 }

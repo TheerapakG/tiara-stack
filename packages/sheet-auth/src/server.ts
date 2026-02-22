@@ -57,7 +57,8 @@ const AuthLive = HttpApiBuilder.group(Api, "auth", (handlers) =>
       base: redisBase,
     });
 
-    // Create Better Auth instance
+    // Create Better Auth instance with basePath: "/" (root)
+    // This places all routes including .well-known endpoints at the root level
     const auth = authConfig({
       postgresUrl,
       discordClientId,
@@ -81,13 +82,6 @@ const AuthLive = HttpApiBuilder.group(Api, "auth", (handlers) =>
         Effect.orElse(() => Effect.void),
       ),
     );
-
-    // Better Auth provides all routes including:
-    // - /api/auth/* - Authentication (Discord OAuth, sessions, etc.)
-    // - /oauth2/token - OAuth 2.0 token endpoint (from oauth-provider plugin + kubernetes-oauth plugin)
-    // - /.well-known/jwks.json - JWKS for token verification
-    // - /.well-known/oauth-authorization-server - OAuth 2.0 discovery
-    // - /.well-known/openid-configuration - OpenID Connect discovery
 
     const listener = getRequestListener(auth.handler);
 

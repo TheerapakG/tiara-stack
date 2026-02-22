@@ -43,6 +43,7 @@ export function authConfig({
 
   const auth = betterAuth({
     baseURL: baseUrl,
+    basePath: "/",
     database: drizzleAdapter(db, { provider: "pg" }),
     socialProviders: {
       discord: {
