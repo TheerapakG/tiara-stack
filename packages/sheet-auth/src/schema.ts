@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, varchar, json } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, json } from "drizzle-orm/pg-core";
 
 // Better Auth schema tables
 // These are managed by Better Auth's Drizzle adapter
