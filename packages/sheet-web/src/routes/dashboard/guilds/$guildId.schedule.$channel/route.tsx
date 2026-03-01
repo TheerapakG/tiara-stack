@@ -22,6 +22,8 @@ export const Route = createFileRoute("/dashboard/guilds/$guildId/schedule/$chann
         Effect.catchAll(() => Effect.succeed([])),
       ),
     );
+
+    console.log("schedule layout loader completed");
   },
 });
 
