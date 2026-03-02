@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo, Suspense, useEffect } from "react";
+import { useMemo, Suspense } from "react";
 import { DateTime, HashSet, Effect, Array } from "effect";
 import { Registry } from "@effect-atom/atom-react";
 import { useScheduledDays, scheduledDaysAtom, formatDayKey } from "#/lib/schedule";
@@ -34,8 +34,6 @@ export const Route = createFileRoute(
         }),
       ).pipe(Effect.catchAll(() => Effect.succeed(HashSet.empty<string>()))),
     );
-
-    console.log("calendar loader completed");
   },
 });
 
@@ -119,10 +117,6 @@ function CalendarView() {
   const calendarDays = useMemo(() => {
     return getCalendarDays(currentDate);
   }, [currentDate]);
-
-  useEffect(() => {
-    console.log("calendarDays", calendarDays);
-  }, [calendarDays]);
 
   // Get the date range for the calendar view in milliseconds
   const rangeStart = useMemo(() => Array.headNonEmpty(calendarDays), [calendarDays]);

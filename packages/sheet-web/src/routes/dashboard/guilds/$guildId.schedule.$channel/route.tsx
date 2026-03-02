@@ -3,7 +3,6 @@ import { Calendar as CalendarIcon, Users } from "lucide-react";
 import { Schema, pipe, Effect } from "effect";
 import { Registry } from "@effect-atom/atom-react";
 import { useAllChannels, getAllChannelsAtom } from "#/lib/schedule";
-import { useEffect } from "react";
 
 // Search params schema using Effect Schema
 // Timestamp in milliseconds for the selected date
@@ -22,8 +21,6 @@ export const Route = createFileRoute("/dashboard/guilds/$guildId/schedule/$chann
         Effect.catchAll(() => Effect.succeed([])),
       ),
     );
-
-    console.log("schedule layout loader completed");
   },
 });
 
@@ -32,10 +29,6 @@ function ScheduleLayout() {
   const search = Route.useSearch();
 
   const channels = useAllChannels(guildId);
-
-  useEffect(() => {
-    console.log("channels", channels);
-  }, [channels]);
 
   return (
     <div className="space-y-6">

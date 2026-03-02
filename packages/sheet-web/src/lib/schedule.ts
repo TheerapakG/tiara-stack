@@ -75,7 +75,6 @@ export const getAllChannelsAtom = Atom.family((guildId: string) =>
       const channelArray = populatedSchedules.map((s) => s.channel);
       const channelSet = HashSet.fromIterable(channelArray);
       const uniqueChannels = Array.fromIterable(HashSet.toValues(channelSet));
-      console.log("uniqueChannels", uniqueChannels);
       return [...uniqueChannels].sort() as readonly string[];
     }),
   ).pipe(
@@ -155,8 +154,6 @@ const _scheduledDaysAtom = Atom.family((params: ScheduledDaysParams) =>
         Array.map(getDayKey),
         HashSet.fromIterable,
       );
-
-      console.log("scheduledDays", scheduledDays);
 
       return scheduledDays;
     }),
