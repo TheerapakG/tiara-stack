@@ -9,106 +9,110 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as DashboardRouteRouteImport } from './routes/dashboard/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
-import { Route as DashboardShiftsRouteImport } from './routes/dashboard/shifts'
-import { Route as DashboardGuildsRouteRouteImport } from './routes/dashboard/guilds/route'
-import { Route as DashboardGuildsIndexRouteImport } from './routes/dashboard/guilds/index'
-import { Route as DashboardGuildsGuildIdScheduleRouteImport } from './routes/dashboard/guilds/$guildId.schedule'
-import { Route as DashboardGuildsGuildIdScheduleChannelRouteRouteImport } from './routes/dashboard/guilds/$guildId.schedule.$channel/route'
-import { Route as DashboardGuildsGuildIdScheduleChannelLayoutDailyRouteImport } from './routes/dashboard/guilds/$guildId.schedule.$channel/_layout/daily'
-import { Route as DashboardGuildsGuildIdScheduleChannelLayoutCalendarRouteImport } from './routes/dashboard/guilds/$guildId.schedule.$channel/_layout/calendar'
+import { Route as DashboardLayoutRouteImport } from './routes/dashboard/_layout'
+import { Route as DashboardLayoutIndexRouteImport } from './routes/dashboard/_layout/index'
+import { Route as DashboardLayoutShiftsRouteImport } from './routes/dashboard/_layout/shifts'
+import { Route as DashboardLayoutGuildsRouteRouteImport } from './routes/dashboard/_layout/guilds/route'
+import { Route as DashboardLayoutGuildsIndexRouteImport } from './routes/dashboard/_layout/guilds/index'
+import { Route as DashboardLayoutGuildsGuildIdScheduleRouteImport } from './routes/dashboard/_layout/guilds/$guildId.schedule'
+import { Route as DashboardLayoutGuildsGuildIdScheduleChannelLayoutRouteImport } from './routes/dashboard/_layout/guilds/$guildId.schedule.$channel/_layout'
+import { Route as DashboardLayoutGuildsGuildIdScheduleChannelLayoutDailyRouteImport } from './routes/dashboard/_layout/guilds/$guildId.schedule.$channel/_layout/daily'
+import { Route as DashboardLayoutGuildsGuildIdScheduleChannelLayoutCalendarRouteImport } from './routes/dashboard/_layout/guilds/$guildId.schedule.$channel/_layout/calendar'
 
-const DashboardRouteRoute = DashboardRouteRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardIndexRoute = DashboardIndexRouteImport.update({
+const DashboardLayoutRoute = DashboardLayoutRouteImport.update({
+  id: '/dashboard/_layout',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardLayoutIndexRoute = DashboardLayoutIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => DashboardRouteRoute,
+  getParentRoute: () => DashboardLayoutRoute,
 } as any)
-const DashboardShiftsRoute = DashboardShiftsRouteImport.update({
+const DashboardLayoutShiftsRoute = DashboardLayoutShiftsRouteImport.update({
   id: '/shifts',
   path: '/shifts',
-  getParentRoute: () => DashboardRouteRoute,
+  getParentRoute: () => DashboardLayoutRoute,
 } as any)
-const DashboardGuildsRouteRoute = DashboardGuildsRouteRouteImport.update({
-  id: '/guilds',
-  path: '/guilds',
-  getParentRoute: () => DashboardRouteRoute,
-} as any)
-const DashboardGuildsIndexRoute = DashboardGuildsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => DashboardGuildsRouteRoute,
-} as any)
-const DashboardGuildsGuildIdScheduleRoute =
-  DashboardGuildsGuildIdScheduleRouteImport.update({
+const DashboardLayoutGuildsRouteRoute =
+  DashboardLayoutGuildsRouteRouteImport.update({
+    id: '/guilds',
+    path: '/guilds',
+    getParentRoute: () => DashboardLayoutRoute,
+  } as any)
+const DashboardLayoutGuildsIndexRoute =
+  DashboardLayoutGuildsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => DashboardLayoutGuildsRouteRoute,
+  } as any)
+const DashboardLayoutGuildsGuildIdScheduleRoute =
+  DashboardLayoutGuildsGuildIdScheduleRouteImport.update({
     id: '/$guildId/schedule',
     path: '/$guildId/schedule',
-    getParentRoute: () => DashboardGuildsRouteRoute,
+    getParentRoute: () => DashboardLayoutGuildsRouteRoute,
   } as any)
-const DashboardGuildsGuildIdScheduleChannelRouteRoute =
-  DashboardGuildsGuildIdScheduleChannelRouteRouteImport.update({
-    id: '/$channel',
+const DashboardLayoutGuildsGuildIdScheduleChannelLayoutRoute =
+  DashboardLayoutGuildsGuildIdScheduleChannelLayoutRouteImport.update({
+    id: '/$channel/_layout',
     path: '/$channel',
-    getParentRoute: () => DashboardGuildsGuildIdScheduleRoute,
+    getParentRoute: () => DashboardLayoutGuildsGuildIdScheduleRoute,
   } as any)
-const DashboardGuildsGuildIdScheduleChannelLayoutDailyRoute =
-  DashboardGuildsGuildIdScheduleChannelLayoutDailyRouteImport.update({
-    id: '/_layout/daily',
+const DashboardLayoutGuildsGuildIdScheduleChannelLayoutDailyRoute =
+  DashboardLayoutGuildsGuildIdScheduleChannelLayoutDailyRouteImport.update({
+    id: '/daily',
     path: '/daily',
-    getParentRoute: () => DashboardGuildsGuildIdScheduleChannelRouteRoute,
+    getParentRoute: () =>
+      DashboardLayoutGuildsGuildIdScheduleChannelLayoutRoute,
   } as any)
-const DashboardGuildsGuildIdScheduleChannelLayoutCalendarRoute =
-  DashboardGuildsGuildIdScheduleChannelLayoutCalendarRouteImport.update({
-    id: '/_layout/calendar',
+const DashboardLayoutGuildsGuildIdScheduleChannelLayoutCalendarRoute =
+  DashboardLayoutGuildsGuildIdScheduleChannelLayoutCalendarRouteImport.update({
+    id: '/calendar',
     path: '/calendar',
-    getParentRoute: () => DashboardGuildsGuildIdScheduleChannelRouteRoute,
+    getParentRoute: () =>
+      DashboardLayoutGuildsGuildIdScheduleChannelLayoutRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRouteRouteWithChildren
-  '/dashboard/guilds': typeof DashboardGuildsRouteRouteWithChildren
-  '/dashboard/shifts': typeof DashboardShiftsRoute
-  '/dashboard/': typeof DashboardIndexRoute
-  '/dashboard/guilds/': typeof DashboardGuildsIndexRoute
-  '/dashboard/guilds/$guildId/schedule': typeof DashboardGuildsGuildIdScheduleRouteWithChildren
-  '/dashboard/guilds/$guildId/schedule/$channel': typeof DashboardGuildsGuildIdScheduleChannelRouteRouteWithChildren
-  '/dashboard/guilds/$guildId/schedule/$channel/calendar': typeof DashboardGuildsGuildIdScheduleChannelLayoutCalendarRoute
-  '/dashboard/guilds/$guildId/schedule/$channel/daily': typeof DashboardGuildsGuildIdScheduleChannelLayoutDailyRoute
+  '/dashboard': typeof DashboardLayoutRouteWithChildren
+  '/dashboard/guilds': typeof DashboardLayoutGuildsRouteRouteWithChildren
+  '/dashboard/shifts': typeof DashboardLayoutShiftsRoute
+  '/dashboard/': typeof DashboardLayoutIndexRoute
+  '/dashboard/guilds/': typeof DashboardLayoutGuildsIndexRoute
+  '/dashboard/guilds/$guildId/schedule': typeof DashboardLayoutGuildsGuildIdScheduleRouteWithChildren
+  '/dashboard/guilds/$guildId/schedule/$channel': typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutRouteWithChildren
+  '/dashboard/guilds/$guildId/schedule/$channel/calendar': typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutCalendarRoute
+  '/dashboard/guilds/$guildId/schedule/$channel/daily': typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutDailyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/dashboard/shifts': typeof DashboardShiftsRoute
-  '/dashboard': typeof DashboardIndexRoute
-  '/dashboard/guilds': typeof DashboardGuildsIndexRoute
-  '/dashboard/guilds/$guildId/schedule': typeof DashboardGuildsGuildIdScheduleRouteWithChildren
-  '/dashboard/guilds/$guildId/schedule/$channel': typeof DashboardGuildsGuildIdScheduleChannelRouteRouteWithChildren
-  '/dashboard/guilds/$guildId/schedule/$channel/calendar': typeof DashboardGuildsGuildIdScheduleChannelLayoutCalendarRoute
-  '/dashboard/guilds/$guildId/schedule/$channel/daily': typeof DashboardGuildsGuildIdScheduleChannelLayoutDailyRoute
+  '/dashboard/shifts': typeof DashboardLayoutShiftsRoute
+  '/dashboard': typeof DashboardLayoutIndexRoute
+  '/dashboard/guilds': typeof DashboardLayoutGuildsIndexRoute
+  '/dashboard/guilds/$guildId/schedule': typeof DashboardLayoutGuildsGuildIdScheduleRouteWithChildren
+  '/dashboard/guilds/$guildId/schedule/$channel': typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutRouteWithChildren
+  '/dashboard/guilds/$guildId/schedule/$channel/calendar': typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutCalendarRoute
+  '/dashboard/guilds/$guildId/schedule/$channel/daily': typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutDailyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRouteRouteWithChildren
-  '/dashboard/guilds': typeof DashboardGuildsRouteRouteWithChildren
-  '/dashboard/shifts': typeof DashboardShiftsRoute
-  '/dashboard/': typeof DashboardIndexRoute
-  '/dashboard/guilds/': typeof DashboardGuildsIndexRoute
-  '/dashboard/guilds/$guildId/schedule': typeof DashboardGuildsGuildIdScheduleRouteWithChildren
-  '/dashboard/guilds/$guildId/schedule/$channel': typeof DashboardGuildsGuildIdScheduleChannelRouteRouteWithChildren
-  '/dashboard/guilds/$guildId/schedule/$channel/_layout/calendar': typeof DashboardGuildsGuildIdScheduleChannelLayoutCalendarRoute
-  '/dashboard/guilds/$guildId/schedule/$channel/_layout/daily': typeof DashboardGuildsGuildIdScheduleChannelLayoutDailyRoute
+  '/dashboard/_layout': typeof DashboardLayoutRouteWithChildren
+  '/dashboard/_layout/guilds': typeof DashboardLayoutGuildsRouteRouteWithChildren
+  '/dashboard/_layout/shifts': typeof DashboardLayoutShiftsRoute
+  '/dashboard/_layout/': typeof DashboardLayoutIndexRoute
+  '/dashboard/_layout/guilds/': typeof DashboardLayoutGuildsIndexRoute
+  '/dashboard/_layout/guilds/$guildId/schedule': typeof DashboardLayoutGuildsGuildIdScheduleRouteWithChildren
+  '/dashboard/_layout/guilds/$guildId/schedule/$channel/_layout': typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutRouteWithChildren
+  '/dashboard/_layout/guilds/$guildId/schedule/$channel/_layout/calendar': typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutCalendarRoute
+  '/dashboard/_layout/guilds/$guildId/schedule/$channel/_layout/daily': typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutDailyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -136,31 +140,24 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/dashboard'
-    | '/dashboard/guilds'
-    | '/dashboard/shifts'
-    | '/dashboard/'
-    | '/dashboard/guilds/'
-    | '/dashboard/guilds/$guildId/schedule'
-    | '/dashboard/guilds/$guildId/schedule/$channel'
-    | '/dashboard/guilds/$guildId/schedule/$channel/_layout/calendar'
-    | '/dashboard/guilds/$guildId/schedule/$channel/_layout/daily'
+    | '/dashboard/_layout'
+    | '/dashboard/_layout/guilds'
+    | '/dashboard/_layout/shifts'
+    | '/dashboard/_layout/'
+    | '/dashboard/_layout/guilds/'
+    | '/dashboard/_layout/guilds/$guildId/schedule'
+    | '/dashboard/_layout/guilds/$guildId/schedule/$channel/_layout'
+    | '/dashboard/_layout/guilds/$guildId/schedule/$channel/_layout/calendar'
+    | '/dashboard/_layout/guilds/$guildId/schedule/$channel/_layout/daily'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  DashboardRouteRoute: typeof DashboardRouteRouteWithChildren
+  DashboardLayoutRoute: typeof DashboardLayoutRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -168,131 +165,141 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/dashboard/': {
-      id: '/dashboard/'
+    '/dashboard/_layout': {
+      id: '/dashboard/_layout'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardLayoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard/_layout/': {
+      id: '/dashboard/_layout/'
       path: '/'
       fullPath: '/dashboard/'
-      preLoaderRoute: typeof DashboardIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
+      preLoaderRoute: typeof DashboardLayoutIndexRouteImport
+      parentRoute: typeof DashboardLayoutRoute
     }
-    '/dashboard/shifts': {
-      id: '/dashboard/shifts'
+    '/dashboard/_layout/shifts': {
+      id: '/dashboard/_layout/shifts'
       path: '/shifts'
       fullPath: '/dashboard/shifts'
-      preLoaderRoute: typeof DashboardShiftsRouteImport
-      parentRoute: typeof DashboardRouteRoute
+      preLoaderRoute: typeof DashboardLayoutShiftsRouteImport
+      parentRoute: typeof DashboardLayoutRoute
     }
-    '/dashboard/guilds': {
-      id: '/dashboard/guilds'
+    '/dashboard/_layout/guilds': {
+      id: '/dashboard/_layout/guilds'
       path: '/guilds'
       fullPath: '/dashboard/guilds'
-      preLoaderRoute: typeof DashboardGuildsRouteRouteImport
-      parentRoute: typeof DashboardRouteRoute
+      preLoaderRoute: typeof DashboardLayoutGuildsRouteRouteImport
+      parentRoute: typeof DashboardLayoutRoute
     }
-    '/dashboard/guilds/': {
-      id: '/dashboard/guilds/'
+    '/dashboard/_layout/guilds/': {
+      id: '/dashboard/_layout/guilds/'
       path: '/'
       fullPath: '/dashboard/guilds/'
-      preLoaderRoute: typeof DashboardGuildsIndexRouteImport
-      parentRoute: typeof DashboardGuildsRouteRoute
+      preLoaderRoute: typeof DashboardLayoutGuildsIndexRouteImport
+      parentRoute: typeof DashboardLayoutGuildsRouteRoute
     }
-    '/dashboard/guilds/$guildId/schedule': {
-      id: '/dashboard/guilds/$guildId/schedule'
+    '/dashboard/_layout/guilds/$guildId/schedule': {
+      id: '/dashboard/_layout/guilds/$guildId/schedule'
       path: '/$guildId/schedule'
       fullPath: '/dashboard/guilds/$guildId/schedule'
-      preLoaderRoute: typeof DashboardGuildsGuildIdScheduleRouteImport
-      parentRoute: typeof DashboardGuildsRouteRoute
+      preLoaderRoute: typeof DashboardLayoutGuildsGuildIdScheduleRouteImport
+      parentRoute: typeof DashboardLayoutGuildsRouteRoute
     }
-    '/dashboard/guilds/$guildId/schedule/$channel': {
-      id: '/dashboard/guilds/$guildId/schedule/$channel'
+    '/dashboard/_layout/guilds/$guildId/schedule/$channel/_layout': {
+      id: '/dashboard/_layout/guilds/$guildId/schedule/$channel/_layout'
       path: '/$channel'
       fullPath: '/dashboard/guilds/$guildId/schedule/$channel'
-      preLoaderRoute: typeof DashboardGuildsGuildIdScheduleChannelRouteRouteImport
-      parentRoute: typeof DashboardGuildsGuildIdScheduleRoute
+      preLoaderRoute: typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutRouteImport
+      parentRoute: typeof DashboardLayoutGuildsGuildIdScheduleRoute
     }
-    '/dashboard/guilds/$guildId/schedule/$channel/_layout/daily': {
-      id: '/dashboard/guilds/$guildId/schedule/$channel/_layout/daily'
+    '/dashboard/_layout/guilds/$guildId/schedule/$channel/_layout/daily': {
+      id: '/dashboard/_layout/guilds/$guildId/schedule/$channel/_layout/daily'
       path: '/daily'
       fullPath: '/dashboard/guilds/$guildId/schedule/$channel/daily'
-      preLoaderRoute: typeof DashboardGuildsGuildIdScheduleChannelLayoutDailyRouteImport
-      parentRoute: typeof DashboardGuildsGuildIdScheduleChannelRouteRoute
+      preLoaderRoute: typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutDailyRouteImport
+      parentRoute: typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutRoute
     }
-    '/dashboard/guilds/$guildId/schedule/$channel/_layout/calendar': {
-      id: '/dashboard/guilds/$guildId/schedule/$channel/_layout/calendar'
+    '/dashboard/_layout/guilds/$guildId/schedule/$channel/_layout/calendar': {
+      id: '/dashboard/_layout/guilds/$guildId/schedule/$channel/_layout/calendar'
       path: '/calendar'
       fullPath: '/dashboard/guilds/$guildId/schedule/$channel/calendar'
-      preLoaderRoute: typeof DashboardGuildsGuildIdScheduleChannelLayoutCalendarRouteImport
-      parentRoute: typeof DashboardGuildsGuildIdScheduleChannelRouteRoute
+      preLoaderRoute: typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutCalendarRouteImport
+      parentRoute: typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutRoute
     }
   }
 }
 
-interface DashboardGuildsGuildIdScheduleChannelRouteRouteChildren {
-  DashboardGuildsGuildIdScheduleChannelLayoutCalendarRoute: typeof DashboardGuildsGuildIdScheduleChannelLayoutCalendarRoute
-  DashboardGuildsGuildIdScheduleChannelLayoutDailyRoute: typeof DashboardGuildsGuildIdScheduleChannelLayoutDailyRoute
+interface DashboardLayoutGuildsGuildIdScheduleChannelLayoutRouteChildren {
+  DashboardLayoutGuildsGuildIdScheduleChannelLayoutCalendarRoute: typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutCalendarRoute
+  DashboardLayoutGuildsGuildIdScheduleChannelLayoutDailyRoute: typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutDailyRoute
 }
 
-const DashboardGuildsGuildIdScheduleChannelRouteRouteChildren: DashboardGuildsGuildIdScheduleChannelRouteRouteChildren =
+const DashboardLayoutGuildsGuildIdScheduleChannelLayoutRouteChildren: DashboardLayoutGuildsGuildIdScheduleChannelLayoutRouteChildren =
   {
-    DashboardGuildsGuildIdScheduleChannelLayoutCalendarRoute:
-      DashboardGuildsGuildIdScheduleChannelLayoutCalendarRoute,
-    DashboardGuildsGuildIdScheduleChannelLayoutDailyRoute:
-      DashboardGuildsGuildIdScheduleChannelLayoutDailyRoute,
+    DashboardLayoutGuildsGuildIdScheduleChannelLayoutCalendarRoute:
+      DashboardLayoutGuildsGuildIdScheduleChannelLayoutCalendarRoute,
+    DashboardLayoutGuildsGuildIdScheduleChannelLayoutDailyRoute:
+      DashboardLayoutGuildsGuildIdScheduleChannelLayoutDailyRoute,
   }
 
-const DashboardGuildsGuildIdScheduleChannelRouteRouteWithChildren =
-  DashboardGuildsGuildIdScheduleChannelRouteRoute._addFileChildren(
-    DashboardGuildsGuildIdScheduleChannelRouteRouteChildren,
+const DashboardLayoutGuildsGuildIdScheduleChannelLayoutRouteWithChildren =
+  DashboardLayoutGuildsGuildIdScheduleChannelLayoutRoute._addFileChildren(
+    DashboardLayoutGuildsGuildIdScheduleChannelLayoutRouteChildren,
   )
 
-interface DashboardGuildsGuildIdScheduleRouteChildren {
-  DashboardGuildsGuildIdScheduleChannelRouteRoute: typeof DashboardGuildsGuildIdScheduleChannelRouteRouteWithChildren
+interface DashboardLayoutGuildsGuildIdScheduleRouteChildren {
+  DashboardLayoutGuildsGuildIdScheduleChannelLayoutRoute: typeof DashboardLayoutGuildsGuildIdScheduleChannelLayoutRouteWithChildren
 }
 
-const DashboardGuildsGuildIdScheduleRouteChildren: DashboardGuildsGuildIdScheduleRouteChildren =
+const DashboardLayoutGuildsGuildIdScheduleRouteChildren: DashboardLayoutGuildsGuildIdScheduleRouteChildren =
   {
-    DashboardGuildsGuildIdScheduleChannelRouteRoute:
-      DashboardGuildsGuildIdScheduleChannelRouteRouteWithChildren,
+    DashboardLayoutGuildsGuildIdScheduleChannelLayoutRoute:
+      DashboardLayoutGuildsGuildIdScheduleChannelLayoutRouteWithChildren,
   }
 
-const DashboardGuildsGuildIdScheduleRouteWithChildren =
-  DashboardGuildsGuildIdScheduleRoute._addFileChildren(
-    DashboardGuildsGuildIdScheduleRouteChildren,
+const DashboardLayoutGuildsGuildIdScheduleRouteWithChildren =
+  DashboardLayoutGuildsGuildIdScheduleRoute._addFileChildren(
+    DashboardLayoutGuildsGuildIdScheduleRouteChildren,
   )
 
-interface DashboardGuildsRouteRouteChildren {
-  DashboardGuildsIndexRoute: typeof DashboardGuildsIndexRoute
-  DashboardGuildsGuildIdScheduleRoute: typeof DashboardGuildsGuildIdScheduleRouteWithChildren
+interface DashboardLayoutGuildsRouteRouteChildren {
+  DashboardLayoutGuildsIndexRoute: typeof DashboardLayoutGuildsIndexRoute
+  DashboardLayoutGuildsGuildIdScheduleRoute: typeof DashboardLayoutGuildsGuildIdScheduleRouteWithChildren
 }
 
-const DashboardGuildsRouteRouteChildren: DashboardGuildsRouteRouteChildren = {
-  DashboardGuildsIndexRoute: DashboardGuildsIndexRoute,
-  DashboardGuildsGuildIdScheduleRoute:
-    DashboardGuildsGuildIdScheduleRouteWithChildren,
+const DashboardLayoutGuildsRouteRouteChildren: DashboardLayoutGuildsRouteRouteChildren =
+  {
+    DashboardLayoutGuildsIndexRoute: DashboardLayoutGuildsIndexRoute,
+    DashboardLayoutGuildsGuildIdScheduleRoute:
+      DashboardLayoutGuildsGuildIdScheduleRouteWithChildren,
+  }
+
+const DashboardLayoutGuildsRouteRouteWithChildren =
+  DashboardLayoutGuildsRouteRoute._addFileChildren(
+    DashboardLayoutGuildsRouteRouteChildren,
+  )
+
+interface DashboardLayoutRouteChildren {
+  DashboardLayoutGuildsRouteRoute: typeof DashboardLayoutGuildsRouteRouteWithChildren
+  DashboardLayoutShiftsRoute: typeof DashboardLayoutShiftsRoute
+  DashboardLayoutIndexRoute: typeof DashboardLayoutIndexRoute
 }
 
-const DashboardGuildsRouteRouteWithChildren =
-  DashboardGuildsRouteRoute._addFileChildren(DashboardGuildsRouteRouteChildren)
-
-interface DashboardRouteRouteChildren {
-  DashboardGuildsRouteRoute: typeof DashboardGuildsRouteRouteWithChildren
-  DashboardShiftsRoute: typeof DashboardShiftsRoute
-  DashboardIndexRoute: typeof DashboardIndexRoute
+const DashboardLayoutRouteChildren: DashboardLayoutRouteChildren = {
+  DashboardLayoutGuildsRouteRoute: DashboardLayoutGuildsRouteRouteWithChildren,
+  DashboardLayoutShiftsRoute: DashboardLayoutShiftsRoute,
+  DashboardLayoutIndexRoute: DashboardLayoutIndexRoute,
 }
 
-const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
-  DashboardGuildsRouteRoute: DashboardGuildsRouteRouteWithChildren,
-  DashboardShiftsRoute: DashboardShiftsRoute,
-  DashboardIndexRoute: DashboardIndexRoute,
-}
-
-const DashboardRouteRouteWithChildren = DashboardRouteRoute._addFileChildren(
-  DashboardRouteRouteChildren,
+const DashboardLayoutRouteWithChildren = DashboardLayoutRoute._addFileChildren(
+  DashboardLayoutRouteChildren,
 )
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  DashboardRouteRoute: DashboardRouteRouteWithChildren,
+  DashboardLayoutRoute: DashboardLayoutRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

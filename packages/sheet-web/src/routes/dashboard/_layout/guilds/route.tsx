@@ -58,7 +58,7 @@ function GuildSidebarContent() {
   );
 }
 
-export const Route = createFileRoute("/dashboard/guilds")({
+export const Route = createFileRoute("/dashboard/_layout/guilds")({
   component: GuildsLayout,
   loader: async ({ context }) => {
     await Effect.runPromise(

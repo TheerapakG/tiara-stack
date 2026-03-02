@@ -5,7 +5,7 @@ import { Effect, Option } from "effect";
 import { sessionAtom } from "#/lib/auth";
 
 // Route loader that fetches session on load using Atom Registry
-export const Route = createFileRoute("/dashboard")({
+export const Route = createFileRoute("/dashboard/_layout")({
   component: DashboardLayout,
   beforeLoad: async ({ context }) => {
     const session = await Effect.runPromise(

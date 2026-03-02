@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Users } from "lucide-react";
 
-export const Route = createFileRoute("/dashboard/guilds/")({
+export const Route = createFileRoute("/dashboard/_layout/guilds/")({
   component: GuildsIndexPage,
 });
 

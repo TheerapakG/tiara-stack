@@ -12,7 +12,7 @@ const ScheduleSearchSchema = Schema.Struct({
 
 export type ScheduleSearchParams = typeof ScheduleSearchSchema.Type;
 
-export const Route = createFileRoute("/dashboard/guilds/$guildId/schedule/$channel")({
+export const Route = createFileRoute("/dashboard/_layout/guilds/$guildId/schedule/$channel/_layout")({
   validateSearch: pipe(ScheduleSearchSchema, Schema.standardSchemaV1),
   component: ScheduleLayout,
   loader: async ({ context, params }) => {

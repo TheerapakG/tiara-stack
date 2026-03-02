@@ -8,7 +8,7 @@ import { getServerTimeZone, useTimeZone } from "#/hooks/useTimeZone";
 import { makeZoned, useZoned } from "#/lib/date";
 
 export const Route = createFileRoute(
-  "/dashboard/guilds/$guildId/schedule/$channel/_layout/calendar",
+  "/dashboard/_layout/guilds/$guildId/schedule/$channel/_layout/calendar",
 )({
   component: CalendarPage,
   ssr: "data-only", // Prevent component SSR to avoid timezone-based content flash

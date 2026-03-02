@@ -8,7 +8,7 @@ const ScheduleSearchSchema = Schema.Struct({
   timestamp: Schema.optional(Schema.Number),
 });
 
-export const Route = createFileRoute("/dashboard/guilds/$guildId/schedule")({
+export const Route = createFileRoute("/dashboard/_layout/guilds/$guildId/schedule")({
   component: ScheduleRedirect,
   validateSearch: pipe(ScheduleSearchSchema, Schema.standardSchemaV1),
   beforeLoad: async ({ params, search, context }) => {
