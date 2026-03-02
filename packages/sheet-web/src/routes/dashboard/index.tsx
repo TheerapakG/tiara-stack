@@ -1,6 +1,6 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/dashboard/_layout/")({
+export const Route = createFileRoute("/dashboard/")({
   component: DashboardIndex,
 });
 

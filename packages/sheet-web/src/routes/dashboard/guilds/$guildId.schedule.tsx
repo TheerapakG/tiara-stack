@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { Registry } from "@effect-atom/atom-react";
 import { Array, Effect, Option, Schema, pipe } from "effect";
 import { getAllChannelsAtom } from "#/lib/schedule";
@@ -8,7 +8,7 @@ const ScheduleSearchSchema = Schema.Struct({
   timestamp: Schema.optional(Schema.Number),
 });
 
-export const Route = createFileRoute("/dashboard/_layout/guilds/$guildId/schedule")({
+export const Route = createFileRoute("/dashboard/guilds/$guildId/schedule")({
   component: ScheduleRedirect,
   validateSearch: pipe(ScheduleSearchSchema, Schema.standardSchemaV1),
   beforeLoad: async ({ params, search, context }) => {
@@ -38,9 +38,5 @@ export const Route = createFileRoute("/dashboard/_layout/guilds/$guildId/schedul
 });
 
 function ScheduleRedirect() {
-  return (
-    <div className="flex items-center justify-center h-64">
-      <div className="text-white/60 font-medium tracking-wide">NO CHANNELS AVAILABLE</div>
-    </div>
-  );
+  return <Outlet />;
 }

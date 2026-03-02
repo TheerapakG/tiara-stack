@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Calendar } from "lucide-react";
 
-export const Route = createFileRoute("/dashboard/_layout/shifts")({
+export const Route = createFileRoute("/dashboard/shifts")({
   component: ShiftsPage,
 });
 

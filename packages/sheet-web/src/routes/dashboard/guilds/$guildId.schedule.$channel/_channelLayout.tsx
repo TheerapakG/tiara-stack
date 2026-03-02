@@ -12,17 +12,19 @@ const ScheduleSearchSchema = Schema.Struct({
 
 export type ScheduleSearchParams = typeof ScheduleSearchSchema.Type;
 
-export const Route = createFileRoute("/dashboard/_layout/guilds/$guildId/schedule/$channel/_layout")({
-  validateSearch: pipe(ScheduleSearchSchema, Schema.standardSchemaV1),
-  component: ScheduleLayout,
-  loader: async ({ context, params }) => {
-    await Effect.runPromise(
-      Registry.getResult(context.atomRegistry, getAllChannelsAtom(params.guildId)).pipe(
-        Effect.catchAll(() => Effect.succeed([])),
-      ),
-    );
+export const Route = createFileRoute("/dashboard/guilds/$guildId/schedule/$channel/_channelLayout")(
+  {
+    validateSearch: pipe(ScheduleSearchSchema, Schema.standardSchemaV1),
+    component: ScheduleLayout,
+    loader: async ({ context, params }) => {
+      await Effect.runPromise(
+        Registry.getResult(context.atomRegistry, getAllChannelsAtom(params.guildId)).pipe(
+          Effect.catchAll(() => Effect.succeed([])),
+        ),
+      );
+    },
   },
-});
+);
 
 function ScheduleLayout() {
   const { guildId, channel } = Route.useParams();

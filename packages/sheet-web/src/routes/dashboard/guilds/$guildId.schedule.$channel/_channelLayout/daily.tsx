@@ -17,7 +17,9 @@ import { useZoned } from "#/lib/date";
 
 const MAX_DAY_RANGE = 365;
 
-export const Route = createFileRoute("/dashboard/_layout/guilds/$guildId/schedule/$channel/_layout/daily")({
+export const Route = createFileRoute(
+  "/dashboard/guilds/$guildId/schedule/$channel/_channelLayout/daily",
+)({
   component: DailyPage,
   ssr: "data-only", // Prevent component SSR to avoid timezone-based content flash
   loader: async ({ context, params }) => {
@@ -369,15 +371,15 @@ function DayScheduleGrid({
                   </div>
                 ) : (
                   // Empty slot - subtle indication
-                  (<div className="h-full min-h-[44px]" />)
+                  <div className="h-full min-h-[44px]" />
                 )}
               </div>
             </div>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }
 
 // Schedule Block - Calendar Event Style
