@@ -12,6 +12,7 @@ const applyRequestHeadersFn = createIsomorphicFn()
   .server(
     () => (request: HttpClientRequest.HttpClientRequest) =>
       HttpClientRequest.setHeaders(request, {
+        Origin: getRequestHeaders().get("Origin") ?? undefined,
         Cookie: getRequestHeaders().get("Cookie") ?? undefined,
       }),
   )
