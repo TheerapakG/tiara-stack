@@ -1,7 +1,17 @@
 import { Atom, Result, useAtomSuspense } from "@effect-atom/atom-react";
 import { Sheet, Google, SheetConfig, Middlewares } from "sheet-apis/schema";
 import { SheetApisClient } from "#/lib/sheetApis";
-import { Array, DateTime, Effect, HashSet, Option, pipe, Predicate, Schema } from "effect";
+import {
+  Array,
+  DateTime,
+  Duration,
+  Effect,
+  HashSet,
+  Option,
+  pipe,
+  Predicate,
+  Schema,
+} from "effect";
 import {
   catchParseErrorAsValidationError,
   QueryResultError,
@@ -202,26 +212,27 @@ export const useScheduledDays = (params: ScheduledDaysParams) => {
 
 // Compute the actual date for a schedule day/hour relative to startTime
 // startTime is DateTime.Zoned, returns DateTime.Zoned
-// Note: hour field is cumulative across days (day 2 starts at hour 48)
+// Note: hour field is cumulative across days
 export const computeScheduleDateTime = (
   startTime: DateTime.Zoned,
   hour: Option.Option<number>,
 ): DateTime.Zoned => {
-  const hourValue = Option.getOrElse(hour, () => 0);
-  return DateTime.add(startTime, { hours: hourValue });
+  const hourValue = Option.getOrElse(hour, () => 1);
+  return DateTime.add(startTime, { hours: hourValue - 1 });
 };
 
-// Compute the day offset and hour from an absolute timestamp relative to startTime
-export const computeScheduleDayHour = (
-  startTime: DateTime.DateTime,
-  timestamp: number,
-): { day: number; hour: number } => {
-  const startTimeMs = DateTime.toEpochMillis(startTime);
-  const diffMs = timestamp - startTimeMs;
-  const totalHours = Math.floor(diffMs / (60 * 60 * 1000));
-  const day = Math.floor(totalHours / 24);
-  const hour = totalHours; // Keep as cumulative hour
-  return { day, hour };
+export const computeScheduleHour = (
+  startTime: DateTime.Zoned,
+  dateTime: DateTime.Zoned,
+  maxHour: number,
+): Option.Option<number> => {
+  // Return none if dateTime is before startTime
+  if (DateTime.lessThan(dateTime, startTime)) return Option.none();
+
+  const hours = Math.floor(Duration.toHours(DateTime.distance(startTime, dateTime))) + 1;
+  if (hours > maxHour) return Option.none();
+
+  return Option.some(hours);
 };
 
 // Filter schedules that fall within a specific date (in the target timezone)

@@ -2,13 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
 import { useMemo, useRef, useState, useEffect, Suspense } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { DateTime, Option, Effect, pipe, HashMap, Array, Duration, Number } from "effect";
+import { DateTime, Option, Effect, pipe, HashMap, Array, Duration } from "effect";
 import { Registry } from "@effect-atom/atom-react";
 import {
   type SchedulePlayer,
   guildScheduleAtom,
   useGuildSchedule,
   computeScheduleDateTime,
+  computeScheduleHour,
   formatDayKey,
 } from "#/lib/schedule";
 import { Sheet } from "sheet-apis/schema";
@@ -98,20 +99,41 @@ function DailyScheduleContent() {
   const eventConfig = useEventConfig(guildId);
   const startTimeZoned = useZoned(timeZone, DateTime.toEpochMillis(eventConfig.startTime));
 
-  // Filter schedules by channel (PopulatedSchedule only; break schedules excluded)
   const channelSchedules = useMemo(
-    () =>
-      allSchedules.filter(
-        (s): s is Sheet.PopulatedSchedule =>
-          s._tag === "PopulatedSchedule" && s.channel === channel && s.visible,
-      ),
+    () => allSchedules.filter((s) => s.channel === channel),
     [allSchedules, channel],
+  );
+
+  const dayByScheduleHour = useMemo(() => {
+    return pipe(
+      channelSchedules,
+      Array.reduce(HashMap.empty<number, number>(), (acc, schedule) => {
+        const hour = schedule.hour;
+        return Option.match(hour, {
+          onSome: (hour) => HashMap.set(acc, hour, schedule.day),
+          onNone: () => acc,
+        });
+      }),
+    );
+  }, [channelSchedules]);
+
+  const maxScheduleHour = useMemo(() => {
+    const hours = Array.getSomes(channelSchedules.map((s) => s.hour));
+    return hours.length > 0 ? Math.max(...hours) : 0;
+  }, [channelSchedules]);
+
+  const populatedChannelSchedules = useMemo(
+    () =>
+      channelSchedules.filter(
+        (s): s is Sheet.PopulatedSchedule => s._tag === "PopulatedSchedule" && s.visible,
+      ),
+    [channelSchedules],
   );
 
   // Group schedules by date -> DateTime -> PopulatedSchedule[]
   const schedulesByDate = useMemo(() => {
     return pipe(
-      channelSchedules,
+      populatedChannelSchedules,
       Array.reduce(
         HashMap.empty<DateTime.Zoned, HashMap.HashMap<DateTime.Zoned, Sheet.PopulatedSchedule[]>>(),
         (acc, schedule) => {
@@ -139,7 +161,7 @@ function DailyScheduleContent() {
         },
       ),
     );
-  }, [channelSchedules, startTimeZoned]);
+  }, [populatedChannelSchedules, startTimeZoned]);
 
   const currentDateKey = useMemo(() => DateTime.startOf(currentDate, "day"), [currentDate]);
 
@@ -234,6 +256,9 @@ function DailyScheduleContent() {
                 date={dayData.dateKey}
                 schedulesByDateTime={dayData.schedulesByDateTime}
                 isActive={isActive}
+                startTimeZoned={startTimeZoned}
+                maxHour={maxScheduleHour}
+                dayByScheduleHour={dayByScheduleHour}
               />
             </div>
           );
@@ -245,12 +270,20 @@ function DailyScheduleContent() {
 
 // Break Row Component - Full row for break hours
 interface BreakRowProps {
-  dateHour: number;
+  scheduleHour: Option.Option<number>;
+  scheduleDay: Option.Option<number>;
+  isScheduleDayBoundary: boolean;
   dateTimeParts: DateTime.DateTime.Parts;
   isDateTimeBoundary: boolean;
 }
 
-function BreakRow({ dateHour, dateTimeParts, isDateTimeBoundary }: BreakRowProps) {
+function BreakRow({
+  scheduleHour,
+  scheduleDay,
+  isScheduleDayBoundary,
+  dateTimeParts,
+  isDateTimeBoundary,
+}: BreakRowProps) {
   return (
     <div className="grid grid-cols-[140px_1fr] border-b border-[#33ccbb]/10 last:border-b-0 opacity-40">
       {/* Left Side - Hour */}
@@ -259,7 +292,16 @@ function BreakRow({ dateHour, dateTimeParts, isDateTimeBoundary }: BreakRowProps
           isDateTimeBoundary ? "border-t-2 border-t-[#33ccbb]/40" : ""
         }`}
       >
-        <span className="text-sm font-bold text-[#33ccbb]/80 tabular-nums">{dateHour}</span>
+        {Option.isSome(scheduleDay) && isScheduleDayBoundary && (
+          <span className="text-[10px] font-bold text-[#33ccbb]/60 uppercase tracking-wider mb-0.5">
+            Day {scheduleDay.value}
+          </span>
+        )}
+        {Option.isSome(scheduleHour) && (
+          <span className="text-sm font-bold text-[#33ccbb]/80 tabular-nums">
+            {scheduleHour.value}
+          </span>
+        )}
       </div>
 
       {/* Right Side - Date + Break */}
@@ -301,26 +343,21 @@ function BreakRow({ dateHour, dateTimeParts, isDateTimeBoundary }: BreakRowProps
 // Schedule Row Component - Full row for schedule hours
 interface ScheduleHourRowProps {
   schedules: Array.NonEmptyReadonlyArray<Sheet.PopulatedSchedule>;
-  previousSchedules: Sheet.PopulatedSchedule[];
+  scheduleHour: Option.Option<number>;
+  scheduleDay: Option.Option<number>;
+  isScheduleDayBoundary: boolean;
   dateTimeParts: DateTime.DateTime.Parts;
   isDateTimeBoundary: boolean;
 }
 
 function ScheduleHourRow({
   schedules,
-  previousSchedules,
+  scheduleHour,
+  scheduleDay,
+  isScheduleDayBoundary,
   dateTimeParts,
   isDateTimeBoundary,
 }: ScheduleHourRowProps) {
-  const firstSchedule = Array.headNonEmpty(schedules);
-  const scheduleDay = firstSchedule.day;
-  const scheduleHour = firstSchedule.hour;
-  const previousScheduleDay = Option.map(Array.head(previousSchedules), (s) => s.day);
-  const isScheduleDayBoundary = !Option.getEquivalence(Number.Equivalence)(
-    Option.some(scheduleDay),
-    previousScheduleDay,
-  );
-
   return (
     <div className="grid grid-cols-[140px_1fr] border-b border-[#33ccbb]/10 last:border-b-0">
       {/* Left Side - Schedule Day + Hour */}
@@ -329,14 +366,16 @@ function ScheduleHourRow({
           isDateTimeBoundary ? "border-t-2 border-t-[#33ccbb]/40" : ""
         }`}
       >
-        {isScheduleDayBoundary && (
+        {Option.isSome(scheduleDay) && isScheduleDayBoundary && (
           <span className="text-[10px] font-bold text-[#33ccbb]/60 uppercase tracking-wider mb-0.5">
-            Day {scheduleDay}
+            Day {scheduleDay.value}
           </span>
         )}
-        <span className="text-sm font-bold text-[#33ccbb]/80 tabular-nums">
-          {Option.getOrElse(scheduleHour, () => "??")}
-        </span>
+        {Option.isSome(scheduleHour) && (
+          <span className="text-sm font-bold text-[#33ccbb]/80 tabular-nums">
+            {scheduleHour.value}
+          </span>
+        )}
       </div>
 
       {/* Right Side - Actual Date + Hour */}
@@ -379,6 +418,9 @@ interface DateBlockProps {
   date: DateTime.Zoned;
   schedulesByDateTime: HashMap.HashMap<DateTime.Zoned, Sheet.PopulatedSchedule[]>;
   isActive: boolean;
+  startTimeZoned: DateTime.Zoned;
+  maxHour: number;
+  dayByScheduleHour: HashMap.HashMap<number, number>;
 }
 
 // Row data discriminated union
@@ -386,7 +428,9 @@ type RowData =
   | {
       type: "break";
       key: number;
-      dateHour: number;
+      scheduleHour: Option.Option<number>;
+      scheduleDay: Option.Option<number>;
+      isScheduleDayBoundary: boolean;
       dateTimeParts: DateTime.DateTime.Parts;
       isDateTimeBoundary: boolean;
     }
@@ -394,55 +438,78 @@ type RowData =
       type: "schedule";
       key: number;
       schedules: Array.NonEmptyReadonlyArray<Sheet.PopulatedSchedule>;
-      previousSchedules: Sheet.PopulatedSchedule[];
+      scheduleHour: Option.Option<number>;
+      scheduleDay: Option.Option<number>;
+      isScheduleDayBoundary: boolean;
       dateTimeParts: DateTime.DateTime.Parts;
       isDateTimeBoundary: boolean;
     };
 
-function DateBlock({ date, schedulesByDateTime, isActive }: DateBlockProps) {
-  // Build rows using reduce to track last non-empty schedules for proper day boundary detection
+function DateBlock({
+  date,
+  schedulesByDateTime,
+  isActive,
+  startTimeZoned,
+  maxHour,
+  dayByScheduleHour,
+}: DateBlockProps) {
+  // Build rows using dayByScheduleHour lookup for schedule day
   const rows = useMemo(
     () =>
       pipe(
         Array.range(0, 23),
-        Array.reduce(
-          { lastNonEmpty: [] as Sheet.PopulatedSchedule[], rows: [] as RowData[] },
-          (acc, dateHour, index) => {
-            const dateTimeHour = DateTime.addDuration(date, Duration.hours(dateHour));
-            const hourSchedules = Option.getOrElse(
-              HashMap.get(schedulesByDateTime, dateTimeHour),
-              () => [],
+        Array.map((dateHour, index) => {
+          const dateTimeHour = DateTime.addDuration(date, Duration.hours(dateHour));
+          const hourSchedules = Option.getOrElse(
+            HashMap.get(schedulesByDateTime, dateTimeHour),
+            () => [],
+          );
+          const dateTimeParts = DateTime.toParts(dateTimeHour);
+          const isDateTimeBoundary = index === 0;
+
+          // Compute schedule hour from datetime using computeScheduleHour
+          const scheduleHour = computeScheduleHour(startTimeZoned, dateTimeHour, maxHour);
+
+          // Look up schedule day from dayByScheduleHour using scheduleHour
+          const scheduleDay = Option.flatMap(scheduleHour, (hour) =>
+            HashMap.get(dayByScheduleHour, hour),
+          );
+
+          // Determine if this is a schedule day boundary
+          // It's a boundary if this hour has a schedule day and the previous hour has a different day or no day
+          const isScheduleDayBoundary =
+            Option.isSome(scheduleDay) &&
+            Option.isSome(scheduleHour) &&
+            pipe(
+              HashMap.get(dayByScheduleHour, scheduleHour.value - 1),
+              Option.map((prevDay) => prevDay !== scheduleDay.value),
+              Option.getOrElse(() => true),
             );
-            const dateTimeParts = DateTime.toParts(dateTimeHour);
-            const isDateTimeBoundary = index === 0;
 
-            const row: RowData = Array.match(hourSchedules, {
-              onEmpty: () => ({
-                type: "break",
-                key: dateHour,
-                dateHour,
-                dateTimeParts,
-                isDateTimeBoundary,
-              }),
-              onNonEmpty: (schedules) => ({
-                type: "schedule",
-                key: dateHour,
-                schedules,
-                previousSchedules: acc.lastNonEmpty,
-                dateTimeParts,
-                isDateTimeBoundary,
-              }),
-            });
-
-            return {
-              lastNonEmpty: Array.isNonEmptyArray(hourSchedules) ? hourSchedules : acc.lastNonEmpty,
-              rows: [...acc.rows, row],
-            };
-          },
-        ),
-        (result) => result.rows,
+          return Array.match(hourSchedules, {
+            onEmpty: (): RowData => ({
+              type: "break",
+              key: dateHour,
+              scheduleHour,
+              scheduleDay,
+              isScheduleDayBoundary,
+              dateTimeParts,
+              isDateTimeBoundary,
+            }),
+            onNonEmpty: (schedules): RowData => ({
+              type: "schedule",
+              key: dateHour,
+              schedules,
+              scheduleHour,
+              scheduleDay,
+              isScheduleDayBoundary,
+              dateTimeParts,
+              isDateTimeBoundary,
+            }),
+          });
+        }),
       ),
-    [date, schedulesByDateTime],
+    [date, schedulesByDateTime, startTimeZoned, maxHour, dayByScheduleHour],
   );
 
   return (
@@ -453,7 +520,9 @@ function DateBlock({ date, schedulesByDateTime, isActive }: DateBlockProps) {
           row.type === "break" ? (
             <BreakRow
               key={row.key}
-              dateHour={row.dateHour}
+              scheduleHour={row.scheduleHour}
+              scheduleDay={row.scheduleDay}
+              isScheduleDayBoundary={row.isScheduleDayBoundary}
               dateTimeParts={row.dateTimeParts}
               isDateTimeBoundary={row.isDateTimeBoundary}
             />
@@ -461,7 +530,9 @@ function DateBlock({ date, schedulesByDateTime, isActive }: DateBlockProps) {
             <ScheduleHourRow
               key={row.key}
               schedules={row.schedules}
-              previousSchedules={row.previousSchedules}
+              scheduleHour={row.scheduleHour}
+              scheduleDay={row.scheduleDay}
+              isScheduleDayBoundary={row.isScheduleDayBoundary}
               dateTimeParts={row.dateTimeParts}
               isDateTimeBoundary={row.isDateTimeBoundary}
             />
