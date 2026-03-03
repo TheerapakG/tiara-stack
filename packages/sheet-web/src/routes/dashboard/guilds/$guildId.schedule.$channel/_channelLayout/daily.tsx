@@ -18,7 +18,7 @@ import { useTimeZone } from "#/hooks/useTimeZone";
 import { useZoned } from "#/lib/date";
 
 // Virtualizer constants
-const ESTIMATE_SIZE = 1300;
+const ESTIMATE_SIZE = 2 + 24 * 45;
 const INITIAL_START_OFFSET = -10;
 const INITIAL_END_OFFSET = 10;
 
@@ -282,17 +282,17 @@ function BreakRow({
     <div className="grid grid-cols-[140px_1fr] border-b border-[#33ccbb]/10 last:border-b-0 opacity-40">
       {/* Left Side - Hour */}
       <div
-        className={`border-r border-[#33ccbb]/10 p-3 flex flex-col items-end justify-center bg-[#0f1615]/50 ${
+        className={`border-r border-[#33ccbb]/10 p-3 h-[44px] flex flex-col items-end justify-center bg-[#0f1615]/50 ${
           isDateTimeBoundary ? "border-t-2 border-t-[#33ccbb]/40" : ""
         }`}
       >
         {Option.isSome(scheduleDay) && isScheduleDayBoundary && (
-          <span className="text-[10px] font-bold text-[#33ccbb]/60 uppercase tracking-wider mb-0.5">
+          <span className="text-[9px] font-bold text-[#33ccbb]/60 uppercase tracking-wider leading-none">
             Day {scheduleDay.value}
           </span>
         )}
         {Option.isSome(scheduleHour) && (
-          <span className="text-sm font-bold text-[#33ccbb]/80 tabular-nums">
+          <span className="text-sm font-bold text-[#33ccbb]/80 tabular-nums leading-none">
             {scheduleHour.value}
           </span>
         )}
@@ -300,19 +300,19 @@ function BreakRow({
 
       {/* Right Side - Date + Break */}
       <div
-        className={`p-3 min-h-[44px] flex items-center gap-4 ${
+        className={`p-3 h-[44px] flex items-center gap-4 ${
           isDateTimeBoundary ? "border-t-2 border-t-[#33ccbb]/40" : ""
         }`}
       >
         {/* Actual Date Marker */}
         <div className="flex-shrink-0 w-20">
           {isDateTimeBoundary ? (
-            <div className="flex flex-col">
+            <div className="flex flex-col leading-tight">
               <span className="text-xs font-black text-white tabular-nums">
                 {dateTimeParts.day}
               </span>
-              <span className="text-[10px] font-bold text-[#33ccbb] uppercase tracking-wider">
-                {formatShortMonth(dateTimeParts.month)} {dateTimeParts.year}
+              <span className="text-[9px] font-bold text-[#33ccbb] uppercase tracking-wider">
+                {dateTimeParts.month}/{dateTimeParts.year}
               </span>
             </div>
           ) : (
@@ -356,17 +356,17 @@ function ScheduleHourRow({
     <div className="grid grid-cols-[140px_1fr] border-b border-[#33ccbb]/10 last:border-b-0">
       {/* Left Side - Schedule Day + Hour */}
       <div
-        className={`border-r border-[#33ccbb]/10 p-3 flex flex-col items-end justify-center bg-[#0f1615]/50 ${
+        className={`border-r border-[#33ccbb]/10 p-3 h-[44px] flex flex-col items-end justify-center bg-[#0f1615]/50 ${
           isDateTimeBoundary ? "border-t-2 border-t-[#33ccbb]/40" : ""
         }`}
       >
         {Option.isSome(scheduleDay) && isScheduleDayBoundary && (
-          <span className="text-[10px] font-bold text-[#33ccbb]/60 uppercase tracking-wider mb-0.5">
+          <span className="text-[9px] font-bold text-[#33ccbb]/60 uppercase tracking-wider leading-none">
             Day {scheduleDay.value}
           </span>
         )}
         {Option.isSome(scheduleHour) && (
-          <span className="text-sm font-bold text-[#33ccbb]/80 tabular-nums">
+          <span className="text-sm font-bold text-[#33ccbb]/80 tabular-nums leading-none">
             {scheduleHour.value}
           </span>
         )}
@@ -374,19 +374,19 @@ function ScheduleHourRow({
 
       {/* Right Side - Actual Date + Hour */}
       <div
-        className={`p-3 min-h-[44px] flex items-center gap-4 ${
+        className={`p-3 h-[44px] flex items-center gap-4 ${
           isDateTimeBoundary ? "border-t-2 border-t-[#33ccbb]/40" : ""
         }`}
       >
         {/* Actual Date Marker */}
         <div className="flex-shrink-0 w-20">
           {isDateTimeBoundary ? (
-            <div className="flex flex-col">
+            <div className="flex flex-col leading-tight">
               <span className="text-xs font-black text-white tabular-nums">
                 {dateTimeParts.day}
               </span>
-              <span className="text-[10px] font-bold text-[#33ccbb] uppercase tracking-wider">
-                {formatShortMonth(dateTimeParts.month)} {dateTimeParts.year}
+              <span className="text-[9px] font-bold text-[#33ccbb] uppercase tracking-wider">
+                {dateTimeParts.month}/{dateTimeParts.year}
               </span>
             </div>
           ) : (
@@ -561,22 +561,4 @@ function PlayerBadge({ player }: { player: SchedulePlayer }) {
       {player.player.name}
     </span>
   );
-}
-
-function formatShortMonth(month: number): string {
-  const monthNames = [
-    "JAN",
-    "FEB",
-    "MAR",
-    "APR",
-    "MAY",
-    "JUN",
-    "JUL",
-    "AUG",
-    "SEP",
-    "OCT",
-    "NOV",
-    "DEC",
-  ];
-  return monthNames[month - 1];
 }
