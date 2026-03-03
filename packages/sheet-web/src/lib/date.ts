@@ -1,5 +1,5 @@
 import { DateTime, Effect, Option, Match } from "effect";
-import { use, useMemo } from "react";
+import { useMemo } from "react";
 
 export const makeZoned = (timeZone: DateTime.TimeZone, timestamp?: number) =>
   Option.fromNullable(timestamp).pipe(
@@ -20,6 +20,9 @@ export const zoneId = (timeZone: DateTime.TimeZone) =>
   );
 
 export const useZoned = (timeZone: DateTime.TimeZone, timestamp?: number) => {
-  const promise = useMemo(() => makeZoned(timeZone, timestamp), [zoneId(timeZone), timestamp]);
-  return use(Effect.runPromise(promise));
+  const zoned = useMemo(
+    () => Effect.runSync(makeZoned(timeZone, timestamp)),
+    [zoneId(timeZone), timestamp],
+  );
+  return zoned;
 };
