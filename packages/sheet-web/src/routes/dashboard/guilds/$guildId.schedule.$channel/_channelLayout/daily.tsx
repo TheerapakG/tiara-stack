@@ -18,7 +18,7 @@ import { useTimeZone } from "#/hooks/useTimeZone";
 import { useZoned } from "#/lib/date";
 
 // Virtualizer constants
-const ESTIMATE_SIZE = 1100;
+const ESTIMATE_SIZE = 1300;
 const INITIAL_START_OFFSET = -10;
 const INITIAL_END_OFFSET = 10;
 
@@ -97,7 +97,7 @@ function DailyScheduleContent() {
   const startTimeZoned = useZoned(timeZone, DateTime.toEpochMillis(eventConfig.startTime));
 
   const channelSchedules = useMemo(
-    () => allSchedules.filter((s) => s.channel === channel),
+    () => allSchedules.filter((s) => s.channel === channel && Option.isSome(s.hour)),
     [allSchedules, channel],
   );
 
@@ -105,17 +105,14 @@ function DailyScheduleContent() {
     return pipe(
       channelSchedules,
       Array.reduce(HashMap.empty<number, number>(), (acc, schedule) => {
-        const hour = schedule.hour;
-        return Option.match(hour, {
-          onSome: (hour) => HashMap.set(acc, hour, schedule.day),
-          onNone: () => acc,
-        });
+        const hour = (schedule.hour as Option.Some<number>).value;
+        return HashMap.set(acc, hour, schedule.day);
       }),
     );
   }, [channelSchedules]);
 
   const maxScheduleHour = useMemo(() => {
-    const hours = Array.getSomes(channelSchedules.map((s) => s.hour));
+    const hours = channelSchedules.map((s) => (s.hour as Option.Some<number>).value);
     return hours.length > 0 ? Math.max(...hours) : 0;
   }, [channelSchedules]);
 
