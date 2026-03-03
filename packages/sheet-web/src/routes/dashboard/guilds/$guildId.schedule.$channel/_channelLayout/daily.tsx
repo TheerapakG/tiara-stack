@@ -18,7 +18,7 @@ import { useTimeZone } from "#/hooks/useTimeZone";
 import { useZoned } from "#/lib/date";
 
 // Virtualizer constants
-const ESTIMATE_SIZE = 400;
+const ESTIMATE_SIZE = 1100;
 const INITIAL_START_OFFSET = -10;
 const INITIAL_END_OFFSET = 10;
 
@@ -78,9 +78,6 @@ function DailyHeader() {
         <ChevronLeft className="w-4 h-4" />
         <span className="text-sm font-bold tracking-wide">BACK TO CALENDAR</span>
       </Link>
-      <h3 className="text-lg font-black tracking-tight text-white">
-        {formatFullDate(currentDate)}
-      </h3>
     </div>
   );
 }
@@ -567,27 +564,6 @@ function PlayerBadge({ player }: { player: SchedulePlayer }) {
       {player.player.name}
     </span>
   );
-}
-
-// Helper functions
-function formatFullDate(dateTime: DateTime.Zoned): string {
-  const parts = DateTime.toParts(dateTime);
-  const dayNames = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
-  const monthNames = [
-    "JANUARY",
-    "FEBRUARY",
-    "MARCH",
-    "APRIL",
-    "MAY",
-    "JUNE",
-    "JULY",
-    "AUGUST",
-    "SEPTEMBER",
-    "OCTOBER",
-    "NOVEMBER",
-    "DECEMBER",
-  ];
-  return `${dayNames[parts.weekDay]}, ${monthNames[parts.month - 1]} ${parts.day}, ${parts.year}`;
 }
 
 function formatShortMonth(month: number): string {
