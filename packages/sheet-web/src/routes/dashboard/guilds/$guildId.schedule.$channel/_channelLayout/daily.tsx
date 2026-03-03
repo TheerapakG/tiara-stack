@@ -18,7 +18,7 @@ import { useTimeZone } from "#/hooks/useTimeZone";
 import { useZoned } from "#/lib/date";
 
 // Virtualizer constants
-const ESTIMATE_SIZE = 2 + 24 * 45;
+const ESTIMATE_SIZE = 23 + 24 * 44;
 const INITIAL_START_OFFSET = -10;
 const INITIAL_END_OFFSET = 10;
 
