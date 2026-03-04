@@ -4,13 +4,13 @@ import { Api } from "sheet-apis/api";
 import { sessionJwtAtom } from "#/lib/auth";
 import { sheetApisBaseUrlAtom } from "#/lib/configAtoms";
 import { Effect, Function, Layer, Option, pipe } from "effect";
-import { getRequestHeaders } from "@tanstack/react-start/server";
+import { getRequest, getRequestHeaders } from "@tanstack/react-start/server";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { ensureResultAtomData } from "./atomRegistry";
 
 const getRequestHeadersFn = createIsomorphicFn()
   .server(() => ({
-    origin: getRequestHeaders().get("origin") ?? undefined,
+    origin: getRequestHeaders().get("origin") ?? new URL(getRequest().url).origin,
     cookie: getRequestHeaders().get("cookie") ?? undefined,
   }))
   .client(() => ({}));
