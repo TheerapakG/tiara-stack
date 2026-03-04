@@ -68,6 +68,7 @@ export function setupStartAtomCoreIntegration<TRouter extends AnyRouter>({
           if (value) {
             Hydration.hydrate(registry, value);
           }
+          console.log((registry as any).preloadedSerializable);
           reader.releaseLock();
         })
         .catch((err) => {
