@@ -1,7 +1,7 @@
 import { Atom, Result, useAtomSet, useAtomSuspense } from "@effect-atom/atom-react";
 import { createIsomorphicFn, getRouterInstance } from "@tanstack/react-start";
 import { getRequestHeaders } from "@tanstack/react-start/server";
-import { Effect, Schema } from "effect";
+import { Duration, Effect, Schema } from "effect";
 import { Reactivity } from "@effect/experimental";
 import { createSheetAuthClient, getSession, getToken, Session } from "sheet-auth/client";
 import { appBaseUrlAtom, authBaseUrlAtom } from "#/lib/configAtoms";
@@ -37,6 +37,7 @@ export const sessionAtom = Atom.make(
     }).pipe(Effect.catchAll(() => Effect.succeedNone));
   }),
 ).pipe(
+  Atom.setIdleTTL(Duration.minutes(5)),
   Atom.serializable({
     key: "session",
     schema: Result.Schema({
@@ -62,6 +63,7 @@ export const sessionJwtAtom = Atom.make(
     }).pipe(Effect.catchAll(() => Effect.succeedNone));
   }),
 ).pipe(
+  Atom.setIdleTTL(Duration.minutes(5)),
   Atom.serializable({
     key: "jwt",
     schema: Result.Schema({ success: Schema.Option(Schema.String) }),
