@@ -1,6 +1,6 @@
 import { HttpApiBuilder, HttpServerRequest } from "@effect/platform";
 import { catchParseErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
-import { Effect, Layer, pipe, Schema, Record } from "effect";
+import { Effect, Layer, pipe, Schema, Record, Struct } from "effect";
 import { Api } from "@/api";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { Discord } from "@/schema";
@@ -28,11 +28,16 @@ export const DiscordLive = HttpApiBuilder.group(Api, "discord", (handlers) =>
             Schema.Record({ key: Schema.String, value: Schema.UndefinedOr(Schema.String) }),
           ).pipe(catchParseErrorAsValidationError);
 
+          const authHeaders = pipe(
+            headers,
+            Record.filter((value) => value !== undefined),
+            Struct.pick("origin", "cookie"),
+          );
+
+          console.log(authHeaders);
+
           const tokenResult = yield* pipe(
-            getDiscordAccessToken(
-              authClient,
-              Record.filter(headers, (value) => value !== undefined),
-            ),
+            getDiscordAccessToken(authClient, authHeaders),
             Effect.mapError((error) =>
               makeArgumentError(
                 `Failed to get Discord access token: ${error.message}. ` +

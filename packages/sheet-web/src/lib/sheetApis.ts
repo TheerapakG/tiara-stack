@@ -25,7 +25,6 @@ const AuthClientLive = Effect.gen(function* () {
     httpClient,
     Effect.fnUntraced(function* (request) {
       const registry = yield* Registry.AtomRegistry;
-      console.log((registry as any).preloadedSerializable);
       const { baseUrl, jwt } = yield* Effect.all({
         baseUrl: ensureResultAtomData(registry, sheetApisBaseUrlAtom),
         jwt: ensureResultAtomData(registry, sessionJwtAtom),
