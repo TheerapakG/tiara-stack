@@ -1,4 +1,4 @@
-import { Effect, Option, Schema } from "effect";
+import { DateTime, Effect, Option, Schema } from "effect";
 import { createAuthClient } from "better-auth/client";
 import { jwtClient } from "better-auth/client/plugins";
 import { jwtVerify, createLocalJWKSet } from "jose";
@@ -97,6 +97,28 @@ export function createSheetAuthClient(baseURL: string) {
 // 4. Session
 // =============================================================================
 
+export class Session extends Schema.TaggedClass<Session>()("Session", {
+  user: Schema.Struct({
+    createdAt: Schema.DateTimeUtcFromNumber,
+    updatedAt: Schema.DateTimeUtcFromNumber,
+    email: Schema.String,
+    emailVerified: Schema.Boolean,
+    name: Schema.String,
+    image: Schema.optional(Schema.NullOr(Schema.String)),
+  }),
+  session: Schema.UndefinedOr(
+    Schema.Struct({
+      createdAt: Schema.DateTimeUtcFromNumber,
+      updatedAt: Schema.DateTimeUtcFromNumber,
+      userId: Schema.String,
+      expiresAt: Schema.DateTimeUtcFromNumber,
+      token: Schema.String,
+      ipAddress: Schema.optional(Schema.NullOr(Schema.String)),
+      userAgent: Schema.optional(Schema.NullOr(Schema.String)),
+    }),
+  ),
+}) {}
+
 /**
  * Get the session using the Better Auth client.
  *
@@ -127,7 +149,31 @@ export function getSession(client: SheetAuthClient, headers?: Headers | HeadersI
       return Option.none();
     }
 
-    return Option.fromNullable(session.data);
+    return Option.fromNullable(session.data).pipe(
+      Option.map((data) =>
+        Session.make({
+          user: {
+            createdAt: DateTime.unsafeFromDate(data.user.createdAt),
+            updatedAt: DateTime.unsafeFromDate(data.user.updatedAt),
+            email: data.user.email,
+            emailVerified: data.user.emailVerified,
+            name: data.user.name,
+            image: data.user.image,
+          },
+          session: data.session
+            ? {
+                createdAt: DateTime.unsafeFromDate(data.session.createdAt),
+                updatedAt: DateTime.unsafeFromDate(data.session.updatedAt),
+                userId: data.session.userId,
+                expiresAt: DateTime.unsafeFromDate(data.session.expiresAt),
+                token: data.session.token,
+                ipAddress: data.session.ipAddress,
+                userAgent: data.session.userAgent,
+              }
+            : undefined,
+        }),
+      ),
+    );
   });
 }
 
