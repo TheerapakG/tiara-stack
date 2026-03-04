@@ -34,8 +34,6 @@ const AuthClientLive = Effect.gen(function* () {
 
       const headers = getRequestHeadersFn();
 
-      console.log(headers);
-
       return pipe(
         request,
         Option.match(baseUrl, {

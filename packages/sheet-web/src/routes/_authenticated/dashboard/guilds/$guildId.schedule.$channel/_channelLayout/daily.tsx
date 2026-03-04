@@ -23,11 +23,12 @@ const INITIAL_START_OFFSET = -10;
 const INITIAL_END_OFFSET = 10;
 
 export const Route = createFileRoute(
-  "/dashboard/guilds/$guildId/schedule/$channel/_channelLayout/daily",
+  "/_authenticated/dashboard/guilds/$guildId/schedule/$channel/_channelLayout/daily",
 )({
   component: DailyPage,
   ssr: "data-only",
   loader: async ({ context, params }) => {
+    console.log("loading guild schedule and event config");
     await Effect.runPromise(
       Effect.all(
         [
@@ -37,6 +38,7 @@ export const Route = createFileRoute(
         { concurrency: "unbounded" },
       ),
     );
+    console.log("guild schedule and event config loaded");
   },
 });
 

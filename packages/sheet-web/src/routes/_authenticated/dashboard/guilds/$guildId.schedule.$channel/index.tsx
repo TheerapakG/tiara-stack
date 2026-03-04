@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/dashboard/guilds/$guildId/schedule/$channel/")({
+export const Route = createFileRoute(
+  "/_authenticated/dashboard/guilds/$guildId/schedule/$channel/",
+)({
   component: RouteComponent,
 });
 

@@ -4,14 +4,14 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { TooltipProvider } from "#/components/ui/tooltip";
 import { Button } from "#/components/ui/button";
-import { Effect } from "effect";
-import { sessionAtom } from "#/lib/auth";
-import { ensureResultAtomData } from "#/lib/atomRegistry";
 
 import Header from "../components/Header";
 import { Background } from "../components/Background";
 
 import appCss from "../styles.css?url";
+import { Effect } from "effect";
+import { ensureResultAtomData } from "#/lib/atomRegistry";
+import { sessionAtom } from "#/lib/auth";
 
 interface RouterContext {
   atomRegistry: Registry.Registry;
@@ -35,10 +35,6 @@ function RootErrorComponent({ error, reset }: { error: Error; reset: () => void 
 }
 
 export const Route = createRootRouteWithContext<RouterContext>()({
-  loader: async ({ context }) => {
-    await Effect.runPromise(ensureResultAtomData(context.atomRegistry, sessionAtom));
-  },
-  errorComponent: RootErrorComponent,
   head: () => ({
     meta: [
       {
@@ -63,7 +59,13 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       },
     ],
   }),
+  loader: async ({ context }) => {
+    console.log("loading session");
+    await Effect.runPromise(ensureResultAtomData(context.atomRegistry, sessionAtom));
+    console.log("session loaded");
+  },
   shellComponent: RootDocument,
+  errorComponent: RootErrorComponent,
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {

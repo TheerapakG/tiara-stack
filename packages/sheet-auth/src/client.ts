@@ -125,7 +125,10 @@ export class Session extends Schema.TaggedClass<Session>()("Session", {
  * @param client - Better Auth client instance
  * @returns Effect with the session
  */
-export function getSession(client: SheetAuthClient, headers?: Headers | HeadersInit) {
+export function getSession(
+  client: SheetAuthClient,
+  headers?: Headers | HeadersInit,
+): Effect.Effect<Option.Option<Session>, SessionResponseError> {
   return Effect.gen(function* () {
     const session = yield* Effect.tryPromise({
       try: async () =>
