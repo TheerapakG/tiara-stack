@@ -8,15 +8,12 @@ import { getRequestHeaders } from "@tanstack/react-start/server";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { ensureResultAtomData } from "./atomRegistry";
 
-const applyRequestHeadersFn = createIsomorphicFn()
-  .server(
-    () => (request: HttpClientRequest.HttpClientRequest) =>
-      HttpClientRequest.setHeaders(request, {
-        Origin: getRequestHeaders().get("Origin") ?? undefined,
-        Cookie: getRequestHeaders().get("Cookie") ?? undefined,
-      }),
-  )
-  .client(() => Function.identity<HttpClientRequest.HttpClientRequest>);
+const getRequestHeadersFn = createIsomorphicFn()
+  .server(() => ({
+    origin: getRequestHeaders().get("origin") ?? undefined,
+    cookie: getRequestHeaders().get("cookie") ?? undefined,
+  }))
+  .client(() => ({}));
 
 const AuthClientLive = Effect.gen(function* () {
   const httpClient = yield* HttpClient.HttpClient;
@@ -35,6 +32,10 @@ const AuthClientLive = Effect.gen(function* () {
         }),
       );
 
+      const headers = getRequestHeadersFn();
+
+      console.log(headers);
+
       return pipe(
         request,
         Option.match(baseUrl, {
@@ -45,7 +46,7 @@ const AuthClientLive = Effect.gen(function* () {
           onSome: (token) => HttpClientRequest.bearerToken(token),
           onNone: () => Function.identity<HttpClientRequest.HttpClientRequest>,
         }),
-        applyRequestHeadersFn(),
+        HttpClientRequest.setHeaders(headers),
       );
     }),
   ) as HttpClient.HttpClient;
