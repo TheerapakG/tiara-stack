@@ -54,7 +54,7 @@ export const eventConfigAtom = Atom.family((guildId: string) =>
 export const useEventConfig = (guildId: string) => {
   const atom = useMemo(() => eventConfigAtom(guildId), [guildId]);
   const result = useAtomSuspense(atom, {
-    suspendOnWaiting: true,
+    suspendOnWaiting: false,
     includeFailure: false,
   });
   return result.value;

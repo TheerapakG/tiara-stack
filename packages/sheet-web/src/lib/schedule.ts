@@ -69,7 +69,7 @@ export const guildScheduleAtom = Atom.family((guildId: string) =>
 export const useGuildSchedule = (guildId: string) => {
   const atom = useMemo(() => guildScheduleAtom(guildId), [guildId]);
   const result = useAtomSuspense(atom, {
-    suspendOnWaiting: true,
+    suspendOnWaiting: false,
     includeFailure: false,
   });
   return result.value;
@@ -110,7 +110,7 @@ export const getAllChannelsAtom = Atom.family((guildId: string) =>
 export const useAllChannels = (guildId: string) => {
   const atom = useMemo(() => getAllChannelsAtom(guildId), [guildId]);
   const result = useAtomSuspense(atom, {
-    suspendOnWaiting: true,
+    suspendOnWaiting: false,
     includeFailure: false,
   });
   return result.value;
@@ -204,7 +204,7 @@ export const useScheduledDays = (params: ScheduledDaysParams) => {
     ],
   );
   const result = useAtomSuspense(atom, {
-    suspendOnWaiting: true,
+    suspendOnWaiting: false,
     includeFailure: false,
   });
   return result.value;

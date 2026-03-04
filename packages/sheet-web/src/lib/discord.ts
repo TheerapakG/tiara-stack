@@ -41,7 +41,7 @@ export const currentUserGuildsAtom = Atom.make(
 
 export const useCurrentUserGuilds = () => {
   const result = useAtomSuspense(currentUserGuildsAtom, {
-    suspendOnWaiting: true,
+    suspendOnWaiting: false,
     includeFailure: false,
   });
 

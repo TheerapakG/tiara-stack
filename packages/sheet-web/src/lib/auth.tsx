@@ -22,7 +22,7 @@ export const authClientAtom = Atom.make(
 
 export const useAuthClient = () => {
   const result = useAtomSuspense(authClientAtom, {
-    suspendOnWaiting: true,
+    suspendOnWaiting: false,
     includeFailure: false,
   });
   return result.value;
@@ -48,7 +48,7 @@ export const sessionAtom = Atom.make(
 
 export const useSession = () => {
   const result = useAtomSuspense(sessionAtom, {
-    suspendOnWaiting: true,
+    suspendOnWaiting: false,
     includeFailure: false,
   });
   return result.value;
@@ -71,7 +71,7 @@ export const sessionJwtAtom = Atom.make(
 
 export const useSessionJwt = () => {
   const result = useAtomSuspense(sessionJwtAtom, {
-    suspendOnWaiting: true,
+    suspendOnWaiting: false,
     includeFailure: false,
   });
   return result.value;
