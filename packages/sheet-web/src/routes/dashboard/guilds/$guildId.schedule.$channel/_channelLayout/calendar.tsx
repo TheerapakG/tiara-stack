@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, Suspense } from "react";
 import { DateTime, HashSet, Effect, Array } from "effect";
-import { Registry } from "@effect-atom/atom-react";
+import { ensureResultAtomData } from "#/lib/atomRegistry";
 import { useScheduledDays, scheduledDaysAtom, formatDayKey } from "#/lib/schedule";
 import { getServerTimeZone, useTimeZone } from "#/hooks/useTimeZone";
 import { makeZoned, useZoned } from "#/lib/date";
@@ -23,7 +23,7 @@ export const Route = createFileRoute(
     const calendarEnd = DateTime.endOf(monthEndZoned, "week", { weekStartsOn: 0 });
 
     await Effect.runPromise(
-      Registry.getResult(
+      ensureResultAtomData(
         context.atomRegistry,
         scheduledDaysAtom({
           guildId: params.guildId,

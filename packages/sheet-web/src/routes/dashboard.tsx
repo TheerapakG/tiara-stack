@@ -1,17 +1,15 @@
 import { createFileRoute, Link, Outlet, redirect, useLocation } from "@tanstack/react-router";
 import { Calendar, Users, ChevronRight } from "lucide-react";
-import { Registry } from "@effect-atom/atom-react";
 import { Effect, Option } from "effect";
 import { sessionAtom } from "#/lib/auth";
+import { ensureResultAtomData } from "#/lib/atomRegistry";
 
 // Route loader that fetches session on load using Atom Registry
 export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
   beforeLoad: async ({ context }) => {
     const session = await Effect.runPromise(
-      Registry.getResult(context.atomRegistry, sessionAtom).pipe(
-        Effect.catchAll(() => Effect.succeedNone),
-      ),
+      ensureResultAtomData(context.atomRegistry, sessionAtom),
     );
 
     // Redirect to home if not authenticated

@@ -1,8 +1,8 @@
 import { createFileRoute, Outlet, Link } from "@tanstack/react-router";
 import { Calendar as CalendarIcon, Users } from "lucide-react";
 import { Schema, pipe, Effect } from "effect";
-import { Registry } from "@effect-atom/atom-react";
 import { useAllChannels, getAllChannelsAtom } from "#/lib/schedule";
+import { ensureResultAtomData } from "#/lib/atomRegistry";
 
 // Search params schema using Effect Schema
 // Timestamp in milliseconds for the selected date
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/dashboard/guilds/$guildId/schedule/$chann
     component: ScheduleLayout,
     loader: async ({ context, params }) => {
       await Effect.runPromise(
-        Registry.getResult(context.atomRegistry, getAllChannelsAtom(params.guildId)).pipe(
+        ensureResultAtomData(context.atomRegistry, getAllChannelsAtom(params.guildId)).pipe(
           Effect.catchAll(() => Effect.succeed([])),
         ),
       );

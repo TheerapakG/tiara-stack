@@ -3,7 +3,7 @@ import { ChevronLeft } from "lucide-react";
 import { useMemo, useRef, useState, useEffect, Suspense } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { DateTime, Option, Effect, pipe, HashMap, Array, Duration } from "effect";
-import { Registry } from "@effect-atom/atom-react";
+import { ensureResultAtomData } from "#/lib/atomRegistry";
 import {
   type SchedulePlayer,
   guildScheduleAtom,
@@ -31,8 +31,8 @@ export const Route = createFileRoute(
     await Effect.runPromise(
       Effect.all(
         [
-          Registry.getResult(context.atomRegistry, guildScheduleAtom(params.guildId)),
-          Registry.getResult(context.atomRegistry, eventConfigAtom(params.guildId)),
+          ensureResultAtomData(context.atomRegistry, guildScheduleAtom(params.guildId)),
+          ensureResultAtomData(context.atomRegistry, eventConfigAtom(params.guildId)),
         ],
         { concurrency: "unbounded" },
       ),

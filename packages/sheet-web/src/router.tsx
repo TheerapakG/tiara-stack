@@ -1,8 +1,11 @@
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
+import { setupStartAtomIntegration } from "start-atom";
 import { routeTree } from "./routeTree.gen";
-import { atomRegistry } from "#/lib/atomRegistry";
+import { makeAtomRegistry } from "#/lib/atomRegistry";
 
 export function getRouter() {
+  const atomRegistry = makeAtomRegistry();
+
   const router = createTanStackRouter({
     routeTree,
     scrollRestoration: true,
@@ -11,6 +14,11 @@ export function getRouter() {
     context: {
       atomRegistry,
     },
+  });
+
+  setupStartAtomIntegration({
+    router,
+    registry: atomRegistry,
   });
 
   return router;

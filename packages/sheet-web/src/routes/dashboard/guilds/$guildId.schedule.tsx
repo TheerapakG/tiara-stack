@@ -1,8 +1,8 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { Registry } from "@effect-atom/atom-react";
 import { Array, Effect, Option, Schema, pipe } from "effect";
 import { getAllChannelsAtom } from "#/lib/schedule";
 import { getCurrentTimestamp } from "#/lib/utils";
+import { ensureResultAtomData } from "#/lib/atomRegistry";
 
 const ScheduleSearchSchema = Schema.Struct({
   timestamp: Schema.optional(Schema.Number),
@@ -17,7 +17,7 @@ export const Route = createFileRoute("/dashboard/guilds/$guildId/schedule")({
     }
 
     const channels = await Effect.runPromise(
-      Registry.getResult(context.atomRegistry, getAllChannelsAtom(params.guildId)).pipe(
+      ensureResultAtomData(context.atomRegistry, getAllChannelsAtom(params.guildId)).pipe(
         Effect.catchAll(() => Effect.succeed([])),
       ),
     );

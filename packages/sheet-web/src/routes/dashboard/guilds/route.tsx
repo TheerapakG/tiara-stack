@@ -1,9 +1,9 @@
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 import { Suspense } from "react";
-import { Registry } from "@effect-atom/atom-react";
 import { Effect } from "effect";
 import { Discord } from "sheet-apis/schema";
 import { currentUserGuildsAtom, useCurrentUserGuilds } from "#/lib/discord";
+import { ensureResultAtomData } from "#/lib/atomRegistry";
 
 // Infer the type from the Schema
 type DiscordGuildType = typeof Discord.DiscordGuild.Type;
@@ -62,7 +62,7 @@ export const Route = createFileRoute("/dashboard/guilds")({
   component: GuildsLayout,
   loader: async ({ context }) => {
     await Effect.runPromise(
-      Registry.getResult(context.atomRegistry, currentUserGuildsAtom).pipe(
+      ensureResultAtomData(context.atomRegistry, currentUserGuildsAtom).pipe(
         Effect.catchAll(() => Effect.succeed([])),
       ),
     );
