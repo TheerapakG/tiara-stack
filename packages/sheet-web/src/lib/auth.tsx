@@ -89,8 +89,10 @@ export const signOut = runtimeAtom.fn(
       catch: () => new Error("Failed to sign out"),
     });
 
-    yield* Effect.log("Signed out successfully");
-    yield* Reactivity.invalidate(["session"]);
+    yield* Effect.all({
+      session: Reactivity.invalidate(["session"]),
+      jwt: Reactivity.invalidate(["jwt"]),
+    });
 
     const router = yield* Effect.promise(() => Promise.resolve(getRouterInstance()));
     router.invalidate();
@@ -102,30 +104,26 @@ export const useSignOut = () => {
   return useCallback(() => signOutFn(void 0), [signOutFn]);
 };
 
-// Sign in with Discord function atom
-export const signInWithDiscord = runtimeAtom.fn(
-  Effect.fnUntraced(function* (_, ctx: Atom.FnContext) {
+// Sign in with social provider function atom
+export const signInWithSocialProvider = runtimeAtom.fn(
+  Effect.fnUntraced(function* (provider: string, ctx: Atom.FnContext) {
     const authClient = yield* ctx.result(authClientAtom);
     const appBaseUrl = yield* ctx.result(appBaseUrlAtom);
 
     yield* Effect.promise(() =>
       authClient.signIn.social({
-        provider: "discord",
+        provider,
         callbackURL: `${appBaseUrl.href}/dashboard`,
       }),
     );
 
-    yield* Effect.log("Sign in initiated");
-    yield* Reactivity.invalidate(["session"]);
-
-    const router = yield* Effect.promise(() => Promise.resolve(getRouterInstance()));
-    router.invalidate();
+    // this redirects to the social provider login page, so we don't need to invalidate the session atom
   }),
 );
 
-export const useSignInWithDiscord = () => {
-  const signInWithDiscordFn = useAtomSet(signInWithDiscord, {
+export const useSignInWithSocialProvider = (provider: string) => {
+  const signInWithProviderFn = useAtomSet(signInWithSocialProvider, {
     mode: "promise",
   });
-  return useCallback(() => signInWithDiscordFn(void 0), [signInWithDiscordFn]);
+  return useCallback(() => signInWithProviderFn(provider), [signInWithProviderFn, provider]);
 };

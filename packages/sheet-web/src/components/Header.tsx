@@ -3,14 +3,14 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Menu, X, LayoutDashboard, LogOut, User as UserIcon } from "lucide-react";
 import { Button } from "#/components/ui/button";
-import { useSignOut, useSignInWithDiscord, useSession } from "#/lib/auth";
+import { useSignOut, useSignInWithSocialProvider, useSession } from "#/lib/auth";
 import { Option } from "effect";
 
 function AuthSection() {
   const session = useSession();
 
   const signOut = useSignOut();
-  const signIn = useSignInWithDiscord();
+  const signInWithDiscord = useSignInWithSocialProvider("discord");
 
   return Option.match(session, {
     onSome: (session) => (
@@ -56,7 +56,7 @@ function AuthSection() {
     onNone: () => (
       <Button
         className="bg-[#33ccbb] text-[#0a0f0e] hover:bg-[#2db8a8] px-6 h-12 font-bold text-sm tracking-wide transition-colors"
-        onClick={signIn}
+        onClick={signInWithDiscord}
       >
         GET STARTED
       </Button>
@@ -68,7 +68,7 @@ function MobileAuthSection({ onNavigate }: { onNavigate: () => void }) {
   const session = useSession();
 
   const signOut = useSignOut();
-  const signIn = useSignInWithDiscord();
+  const signInWithDiscord = useSignInWithSocialProvider("discord");
 
   return Option.match(session, {
     onSome: (session) => (
@@ -110,7 +110,7 @@ function MobileAuthSection({ onNavigate }: { onNavigate: () => void }) {
     onNone: () => (
       <Button
         className="w-full bg-[#33ccbb] hover:bg-[#2db8a8] text-[#0a0f0e] h-14 font-bold text-lg tracking-wide mt-4"
-        onClick={signIn}
+        onClick={signInWithDiscord}
       >
         GET STARTED
       </Button>
