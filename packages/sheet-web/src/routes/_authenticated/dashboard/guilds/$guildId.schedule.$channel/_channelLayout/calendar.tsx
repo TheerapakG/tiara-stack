@@ -91,51 +91,13 @@ function isSameMonth(a: DateTime.Zoned, b: DateTime.Zoned): boolean {
 }
 
 function CalendarPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center h-64">
-          <div className="text-white/60 font-medium tracking-wide">LOADING CALENDAR...</div>
-        </div>
-      }
-    >
-      <CalendarView />
-    </Suspense>
-  );
-}
-
-function CalendarView() {
   const { guildId, channel } = Route.useParams();
   const search = Route.useSearch();
-
-  const timeZone = useTimeZone();
   const navigate = useNavigate();
+  const timeZone = useTimeZone();
 
   // Use timestamp to determine the month to display
   const currentDate = useZoned(timeZone, search.timestamp);
-
-  const calendarDays = useMemo(() => {
-    return getCalendarDays(currentDate);
-  }, [currentDate]);
-
-  // Get the date range for the calendar view in milliseconds
-  const rangeStart = useMemo(() => Array.headNonEmpty(calendarDays), [calendarDays]);
-
-  const rangeEnd = useMemo(
-    () => DateTime.endOf(Array.lastNonEmpty(calendarDays), "day"),
-    [calendarDays],
-  );
-
-  // Use derived atom to get scheduled days for the calendar view
-  const scheduledDays = useScheduledDays({
-    guildId,
-    channel,
-    timeZone,
-    rangeStart,
-    rangeEnd,
-  });
-
-  const weekDays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
   const handlePrevMonth = () => {
     const prevMonthZoned = DateTime.subtract(currentDate, { months: 1 });
@@ -161,18 +123,9 @@ function CalendarView() {
     });
   };
 
-  const handleDayClick = (day: DateTime.Zoned) => {
-    const dayTimestamp = DateTime.toEpochMillis(DateTime.startOf(day, "day"));
-    navigate({
-      to: "/dashboard/guilds/$guildId/schedule/$channel/daily",
-      params: { guildId, channel },
-      search: { timestamp: dayTimestamp },
-    });
-  };
-
   return (
     <div className="border border-[#33ccbb]/20 bg-[#0f1615]">
-      {/* Calendar Header */}
+      {/* Calendar Header - Outside Suspense so navigation always works */}
       <div className="flex items-center justify-between p-4 border-b border-[#33ccbb]/20">
         <button
           onClick={handlePrevMonth}
@@ -189,6 +142,62 @@ function CalendarView() {
         </button>
       </div>
 
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center h-64">
+            <div className="text-white/60 font-medium tracking-wide">LOADING CALENDAR...</div>
+          </div>
+        }
+      >
+        <CalendarGrid currentDate={currentDate} />
+      </Suspense>
+    </div>
+  );
+}
+
+interface CalendarGridProps {
+  currentDate: DateTime.Zoned;
+}
+
+function CalendarGrid({ currentDate }: CalendarGridProps) {
+  const { guildId, channel } = Route.useParams();
+  const navigate = useNavigate();
+  const timeZone = useTimeZone();
+
+  const calendarDays = useMemo(() => {
+    return getCalendarDays(currentDate);
+  }, [currentDate]);
+
+  // Get the date range for the calendar view in milliseconds
+  const rangeStart = useMemo(() => Array.headNonEmpty(calendarDays), [calendarDays]);
+
+  const rangeEnd = useMemo(
+    () => DateTime.endOf(Array.lastNonEmpty(calendarDays), "day"),
+    [calendarDays],
+  );
+
+  // Use derived atom to get scheduled days for the calendar view
+  const scheduledDays = useScheduledDays({
+    guildId,
+    channel,
+    timeZone,
+    rangeStart,
+    rangeEnd,
+  });
+
+  const weekDays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+  const handleDayClick = (day: DateTime.Zoned) => {
+    const dayTimestamp = DateTime.toEpochMillis(DateTime.startOf(day, "day"));
+    navigate({
+      to: "/dashboard/guilds/$guildId/schedule/$channel/daily",
+      params: { guildId, channel },
+      search: { timestamp: dayTimestamp },
+    });
+  };
+
+  return (
+    <>
       {/* Weekday Headers */}
       <div className="grid grid-cols-7 border-b border-[#33ccbb]/20">
         {weekDays.map((day) => (
@@ -226,6 +235,6 @@ function CalendarView() {
           );
         })}
       </div>
-    </div>
+    </>
   );
 }
