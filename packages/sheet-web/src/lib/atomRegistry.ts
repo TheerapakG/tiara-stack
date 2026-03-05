@@ -29,6 +29,7 @@ interface Node<A> {
   readonly state: NodeState;
   readonly canBeRemoved: boolean;
   readonly _value: A;
+  readonly value: () => A;
   readonly subscribe: (listener: () => void) => () => void;
 }
 
@@ -81,7 +82,9 @@ const ensureAtomDataNode = <A>(registry: Registry.Registry, atom: Atom.Atom<A>) 
     return node;
   }
 
-  return registryImpl.ensureNode(atom);
+  const newNode = registryImpl.ensureNode(atom);
+  newNode.value(); // trigger initial value
+  return newNode;
 };
 
 export const ensureAtomData = <A>(registry: Registry.Registry, atom: Atom.Atom<A>) =>
