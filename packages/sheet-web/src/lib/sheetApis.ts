@@ -23,8 +23,8 @@ const AuthClientLive = Effect.gen(function* () {
     Effect.fnUntraced(function* (request) {
       const registry = yield* Registry.AtomRegistry;
       const { baseUrl, jwt } = yield* Effect.all({
-        baseUrl: ensureResultAtomData(registry, sheetApisBaseUrlAtom),
-        jwt: ensureResultAtomData(registry, sessionJwtAtom),
+        baseUrl: ensureResultAtomData(registry, sheetApisBaseUrlAtom, { revalidateIfStale: true }),
+        jwt: ensureResultAtomData(registry, sessionJwtAtom, { revalidateIfStale: true }),
       }).pipe(
         Effect.match({
           onFailure: () => ({ baseUrl: Option.none(), jwt: Option.none() }),

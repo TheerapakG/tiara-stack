@@ -18,9 +18,9 @@ export const Route = createFileRoute("/_authenticated/dashboard/guilds/$guildId/
 
     console.log("before-loading channels");
     const channels = await Effect.runPromise(
-      ensureResultAtomData(context.atomRegistry, getAllChannelsAtom(params.guildId)).pipe(
-        Effect.catchAll(() => Effect.succeed([])),
-      ),
+      ensureResultAtomData(context.atomRegistry, getAllChannelsAtom(params.guildId), {
+        revalidateIfStale: true,
+      }).pipe(Effect.catchAll(() => Effect.succeed([]))),
     );
     console.log("channels before-loaded");
 

@@ -8,7 +8,7 @@ export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ context }) => {
     console.log("before-loading session");
     const session = await Effect.runPromise(
-      ensureResultAtomData(context.atomRegistry, sessionAtom),
+      ensureResultAtomData(context.atomRegistry, sessionAtom, { revalidateIfStale: true }),
     );
     console.log("session before-loaded");
     // Redirect to home if not authenticated

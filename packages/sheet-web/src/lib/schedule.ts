@@ -46,6 +46,7 @@ export const guildScheduleAtom = Atom.family((guildId: string) =>
       );
     }),
   ).pipe(
+    Atom.setIdleTTL(Duration.infinity),
     Atom.serializable({
       key: `schedule.getAllPopulatedSchedules.${guildId}`,
       schema: Result.Schema({
@@ -88,6 +89,7 @@ export const getAllChannelsAtom = Atom.family((guildId: string) =>
       return [...uniqueChannels].sort() as readonly string[];
     }),
   ).pipe(
+    Atom.setIdleTTL(Duration.infinity),
     Atom.serializable({
       key: `schedule.derived.getAllChannels.${guildId}`,
       schema: Result.Schema({
@@ -172,6 +174,7 @@ const _scheduledDaysAtom = Atom.family((params: ScheduledDaysParams) =>
 
 export const scheduledDaysAtom = Atom.family((params: ScheduledDaysParams) =>
   _scheduledDaysAtom(params).pipe(
+    Atom.setIdleTTL(Duration.infinity),
     Atom.serializable({
       key: `schedule.derived.scheduledDays.${params.guildId}.${params.channel}.${zoneId(params.timeZone)}.${DateTime.toEpochMillis(params.rangeStart)}-${DateTime.toEpochMillis(params.rangeEnd)}`,
       schema: Result.Schema({

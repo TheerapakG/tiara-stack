@@ -54,7 +54,12 @@ interface Registry {
   readonly scheduleNodeRemoval: (node: Node<any>) => void;
 }
 
-const ensureAtomDataNode = <A>(registry: Registry.Registry, atom: Atom.Atom<A>) => {
+const ensureAtomDataNode = <A>(
+  registry: Registry.Registry,
+  atom: Atom.Atom<A>,
+  options?: { revalidateIfStale?: boolean },
+) => {
+  const { revalidateIfStale = false } = options ?? {};
   const registryImpl = registry as unknown as Registry;
 
   // Runtime safety check: fail fast if internal API changes
@@ -76,7 +81,8 @@ const ensureAtomDataNode = <A>(registry: Registry.Registry, atom: Atom.Atom<A>) 
   const isCached =
     node !== undefined &&
     (node.state & NodeFlags.alive) !== 0 &&
-    (node.state & NodeFlags.initialized) !== 0;
+    (node.state & NodeFlags.initialized) !== 0 &&
+    (!revalidateIfStale || (node.state & NodeFlags.waitingForValue) === 0);
 
   if (isCached) {
     return node;
@@ -87,16 +93,20 @@ const ensureAtomDataNode = <A>(registry: Registry.Registry, atom: Atom.Atom<A>) 
   return newNode;
 };
 
-export const ensureAtomData = <A>(registry: Registry.Registry, atom: Atom.Atom<A>) =>
-  ensureAtomDataNode(registry, atom)._value;
+export const ensureAtomData = <A>(
+  registry: Registry.Registry,
+  atom: Atom.Atom<A>,
+  options?: { revalidateIfStale?: boolean },
+) => ensureAtomDataNode(registry, atom, options)._value;
 
 export const ensureResultAtomData = <A, E>(
   registry: Registry.Registry,
   atom: Atom.Atom<Result.Result<A, E>>,
+  options?: { revalidateIfStale?: boolean },
 ): Effect.Effect<A, E> =>
   Effect.async((resume) => {
     const registryImpl = registry as unknown as Registry;
-    const node = ensureAtomDataNode(registry, atom);
+    const node = ensureAtomDataNode(registry, atom, options);
     if (node._value._tag !== "Initial") {
       return resume(Result.toExit(node._value) as Effect.Effect<A, E>);
     }

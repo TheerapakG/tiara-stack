@@ -1,6 +1,6 @@
 import { Atom, useAtomSuspense, Result } from "@effect-atom/atom-react";
 import { SheetApisClient } from "#/lib/sheetApis";
-import { Effect, Schema } from "effect";
+import { Duration, Effect, Schema } from "effect";
 import {
   ArgumentError,
   catchParseErrorAsValidationError,
@@ -23,6 +23,7 @@ export const currentUserGuildsAtom = Atom.make(
     );
   }),
 ).pipe(
+  Atom.setIdleTTL(Duration.infinity),
   Atom.serializable({
     key: "discord.getCurrentUserGuilds",
     schema: Result.Schema({

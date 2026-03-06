@@ -42,7 +42,7 @@ function ScheduleLayout() {
           to="/dashboard/guilds/$guildId/schedule/$channel/calendar"
           params={{ guildId, channel }}
           search={{ timestamp: search.timestamp }}
-          activeOptions={{ exact: true }}
+          activeOptions={{ includeSearch: false, exact: true }}
           className={`
             px-4 py-2 text-sm font-bold tracking-wide transition-colors
             [&.active]:bg-[#33ccbb] [&.active]:text-[#0a0f0e]
@@ -56,7 +56,7 @@ function ScheduleLayout() {
           to="/dashboard/guilds/$guildId/schedule/$channel/daily"
           params={{ guildId, channel }}
           search={{ timestamp: search.timestamp }}
-          activeOptions={{ exact: true }}
+          activeOptions={{ includeSearch: false, exact: true }}
           className={`
             px-4 py-2 text-sm font-bold tracking-wide transition-colors
             [&.active]:bg-[#33ccbb] [&.active]:text-[#0a0f0e]
@@ -77,7 +77,7 @@ function ScheduleLayout() {
               to="."
               params={(prev) => ({ ...prev, channel: ch })}
               search={{ timestamp: search.timestamp }}
-              activeOptions={{ exact: false }}
+              activeOptions={{ includeSearch: false, exact: false }}
               className={`
                 px-3 py-1.5 text-xs font-bold tracking-wide whitespace-nowrap transition-colors
                 [&.active]:bg-[#33ccbb] [&.active]:text-[#0a0f0e]
