@@ -1,6 +1,6 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo, Suspense } from "react";
+import { useMemo, Suspense, startTransition, ViewTransition } from "react";
 import { DateTime, HashSet, Effect, Array } from "effect";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 import { useScheduledDays, scheduledDaysAtom, formatDayKey } from "#/lib/schedule";
@@ -95,7 +95,6 @@ function CalendarPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
   const timeZone = useTimeZone();
-
   // Use timestamp to determine the month to display
   const currentDate = useZoned(timeZone, search.timestamp);
 
@@ -187,15 +186,6 @@ function CalendarGrid({ currentDate }: CalendarGridProps) {
 
   const weekDays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
-  const handleDayClick = (day: DateTime.Zoned) => {
-    const dayTimestamp = DateTime.toEpochMillis(DateTime.startOf(day, "day"));
-    navigate({
-      to: "/dashboard/guilds/$guildId/schedule/$channel/daily",
-      params: { guildId, channel },
-      search: { timestamp: dayTimestamp },
-    });
-  };
-
   return (
     <>
       {/* Weekday Headers */}
@@ -217,21 +207,40 @@ function CalendarGrid({ currentDate }: CalendarGridProps) {
           const dayKey = formatDayKey(day);
           const hasSchedule = HashSet.has(scheduledDays, dayKey);
 
+          const dayName = `day-${formatDayKey(day)}`;
+
+          const dayTimestamp = DateTime.toEpochMillis(DateTime.startOf(day, "day"));
+
+          const handleClick = (e: React.MouseEvent) => {
+            e.preventDefault();
+            startTransition(() => {
+              navigate({
+                to: "/dashboard/guilds/$guildId/schedule/$channel/daily",
+                params: { guildId, channel },
+                search: { timestamp: dayTimestamp },
+              });
+            });
+          };
+
           return (
-            <button
-              key={DateTime.toEpochMillis(day)}
-              onClick={() => handleDayClick(day)}
-              className={`
-                h-14 p-1 flex flex-col items-center justify-center
-                border-r border-b border-[#33ccbb]/10 last:border-r-0
-                transition-colors
-                ${isCurrentMonth ? "text-white hover:bg-[#33ccbb]/10" : "text-white/30"}
-                ${hasSchedule ? "bg-[#33ccbb]/5" : ""}
-              `}
-            >
-              <span className="text-sm font-medium">{formatDayOfMonth(day)}</span>
-              {hasSchedule && <div className="mt-1 w-1.5 h-1.5 rounded-full bg-[#33ccbb]" />}
-            </button>
+            <ViewTransition key={DateTime.toEpochMillis(day)} name={dayName}>
+              <Link
+                to="/dashboard/guilds/$guildId/schedule/$channel/daily"
+                params={{ guildId, channel }}
+                search={{ timestamp: dayTimestamp }}
+                onClick={handleClick}
+                className={`
+                  h-14 p-1 flex flex-col items-center justify-center
+                  border-r border-b border-[#33ccbb]/10 last:border-r-0
+                  transition-colors
+                  ${isCurrentMonth ? "text-white hover:bg-[#33ccbb]/10" : "text-white/30"}
+                  ${hasSchedule ? "bg-[#33ccbb]/5" : ""}
+                `}
+              >
+                <span className="text-sm font-medium">{formatDayOfMonth(day)}</span>
+                {hasSchedule && <div className="mt-1 w-1.5 h-1.5 rounded-full bg-[#33ccbb]" />}
+              </Link>
+            </ViewTransition>
           );
         })}
       </div>
