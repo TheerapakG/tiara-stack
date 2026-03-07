@@ -1,5 +1,4 @@
 import { createFileRoute, Outlet, Link } from "@tanstack/react-router";
-import { Calendar as CalendarIcon, Users } from "lucide-react";
 import { Schema, pipe, Effect } from "effect";
 import { useAllChannels, getAllChannelsAtom } from "#/lib/schedule";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
@@ -29,45 +28,13 @@ export const Route = createFileRoute(
 });
 
 function ScheduleLayout() {
-  const { guildId, channel } = Route.useParams();
+  const { guildId } = Route.useParams();
   const search = Route.useSearch();
 
   const channels = useAllChannels(guildId);
 
   return (
     <div className="space-y-6">
-      {/* View Toggle */}
-      <div className="flex gap-2">
-        <Link
-          to="/dashboard/guilds/$guildId/schedule/$channel/calendar"
-          params={{ guildId, channel }}
-          search={{ timestamp: search.timestamp }}
-          activeOptions={{ includeSearch: false, exact: true }}
-          className={`
-            px-4 py-2 text-sm font-bold tracking-wide transition-colors
-            [&.active]:bg-[#33ccbb] [&.active]:text-[#0a0f0e]
-            bg-[#0f1615] text-white border border-[#33ccbb]/30 hover:bg-[#33ccbb]/10
-          `}
-        >
-          <CalendarIcon className="w-4 h-4 inline mr-2" />
-          CALENDAR
-        </Link>
-        <Link
-          to="/dashboard/guilds/$guildId/schedule/$channel/daily"
-          params={{ guildId, channel }}
-          search={{ timestamp: search.timestamp }}
-          activeOptions={{ includeSearch: false, exact: true }}
-          className={`
-            px-4 py-2 text-sm font-bold tracking-wide transition-colors
-            [&.active]:bg-[#33ccbb] [&.active]:text-[#0a0f0e]
-            bg-[#0f1615] text-white border border-[#33ccbb]/30 hover:bg-[#33ccbb]/10
-          `}
-        >
-          <Users className="w-4 h-4 inline mr-2" />
-          DAILY VIEW
-        </Link>
-      </div>
-
       {/* Channel Tabs */}
       {channels.length > 0 && (
         <div className="flex gap-2 overflow-x-auto pb-2">
