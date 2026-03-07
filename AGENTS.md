@@ -120,6 +120,53 @@ Discord bot application for VibeCord, providing workspace and session management
 - **Config** (`packages/vibecord/src/config`): Configuration management
 - **Utils** (`packages/vibecord/src/utils`): Utility functions
 
+### `sheet-web` (packages/sheet-web)
+
+Web application for the sheet system built with TanStack Start, providing a dashboard for guild management, scheduling, and calendar views.
+
+- **Main entry** (`packages/sheet-web/src/router.tsx`): TanStack Router configuration
+- **Routes** (`packages/sheet-web/src/routes`): Application routes:
+  - `_authenticated`: Protected routes requiring authentication
+  - `dashboard`: Main dashboard with guilds list and shift management
+  - `dashboard/guilds`: Guild management routes with schedule and channel views
+  - `index`: Landing page
+- **Components** (`packages/sheet-web/src/components`): React components:
+  - `ui/`: shadcn/ui component library (50+ UI components)
+  - `Background.tsx`: Background component
+  - `Header.tsx`: Header component
+- **Hooks** (`packages/sheet-web/src/hooks`): Custom React hooks for mobile detection and timezone handling
+- **Lib** (`packages/sheet-web/src/lib`): Utility libraries:
+  - `auth.tsx`: Authentication context and hooks
+  - `sheetApis.ts`: Sheet APIs integration
+  - `atomRegistry.ts`: Atom registry for state management
+  - `config.ts`, `configAtoms.ts`: Configuration management
+  - `discord.ts`: Discord integration utilities
+  - `schedule.ts`: Schedule utilities
+  - `date.ts`: Date handling utilities
+  - `error.ts`: Error types for HTTP error handling
+  - `runtime.ts`: Runtime utilities and environment configuration
+  - `sheet.ts`: Sheet-related utilities and atoms
+  - `utils.ts`: General utilities (CSS class merging, etc.)
+
+### `sheet-auth` (packages/sheet-auth)
+
+Authentication service using BetterAuth for Discord OAuth and Kubernetes OAuth integration.
+
+- **Main export** (`packages/sheet-auth/src/index.ts`): Exports auth config, schema, and plugins
+- **Auth Config** (`packages/sheet-auth/src/auth-config.ts`): BetterAuth configuration with:
+  - Discord OAuth provider (identify, guilds scopes)
+  - JWT plugin
+  - OAuth provider for external clients
+  - Kubernetes OAuth plugin
+- **Schema** (`packages/sheet-auth/src/schema.ts`): Database schema for auth tables
+- **Plugins** (`packages/sheet-auth/src/plugins`): Authentication plugins:
+  - `kubernetes-oauth.ts`: Kubernetes service account OAuth provider
+- **Server** (`packages/sheet-auth/src/server.ts`): HTTP server handlers for auth endpoints
+- **Client** (`packages/sheet-auth/src/client.ts`): Client-side authentication utilities
+- **Storage** (`packages/sheet-auth/src/storage.ts`): Secondary storage implementation using unstorage
+- **Config** (`packages/sheet-auth/src/config.ts`): Environment configuration
+- **Metrics/Traces** (`packages/sheet-auth/src/metrics.ts`, `packages/sheet-auth/src/traces.ts`): OpenTelemetry configuration
+
 ## Utility Packages
 
 ### `bob` (packages/bob)
@@ -127,6 +174,45 @@ Discord bot application for VibeCord, providing workspace and session management
 Configuration builder utility library for building type-safe configuration objects with validation.
 
 - **Main export** (`packages/bob/src/builder/index.ts`): Exports configBuilderBuilder function and ConfigBuilder/ConfigBuilderBuilder classes for creating type-safe configuration builders with Standard Schema validation
+
+### `dfx-discord-utils` (packages/dfx-discord-utils)
+
+Discord utilities library extending dfx (Discord Effect) with caching, command builders, and interaction helpers.
+
+- **Main export** (`packages/dfx-discord-utils/src/index.ts`): Exports Discord and utils modules
+- **Discord** (`packages/dfx-discord-utils/src/discord`): Discord-specific utilities:
+  - `config.ts`: Configuration utilities
+  - `gateway.ts`: Gateway handling
+  - `cache.ts`: Discord cache implementation
+- **Cache** (`packages/dfx-discord-utils/src/cache`): Caching utilities:
+  - `driver.ts`: `ReverseLookupCacheDriver` interface and factory for building cache drivers
+  - `unstorage.ts`: Unstorage driver integration
+  - `prelude.ts`: Cache operations with reverse lookup
+  - `cache.ts`: Reverse lookup cache implementation
+- **Utils** (`packages/dfx-discord-utils/src/utils`): Utility functions:
+  - `commandBuilder.ts`: Discord slash command builders
+  - `commandHelper.ts`: Command helper functions
+  - `guildMember.ts`: Guild member utilities
+  - `interaction.ts`: Interaction helpers
+  - `messageComponentBuilder.ts`: Message component builders
+  - `messageComponentHelper.ts`: Message component helpers
+
+### `effect-platform-apps-script` (packages/effect-platform-apps-script)
+
+Effect Platform HTTP client implementation for Google Apps Script environment.
+
+- **Main export** (`packages/effect-platform-apps-script/src/index.ts`): Exports HttpClient for Apps Script
+- **HttpClient** (`packages/effect-platform-apps-script/src/HttpClient.ts`): HTTP client implementation using Google Apps Script's `UrlFetchApp` for making HTTP requests within the Apps Script environment
+
+### `start-atom` (packages/start-atom)
+
+Integration library connecting TanStack Start with Effect Atom for server-side rendering (SSR) compatible state management.
+
+- **Main export** (`packages/start-atom/src/index.tsx`): Exports setupStartAtomIntegration and setupStartAtomCoreIntegration
+- **Core** (`packages/start-atom/src/start-atom-core.ts`): Core integration logic:
+  - Server-side atom dehydration to streams
+  - Client-side atom hydration from streams
+  - TanStack Router integration for SSR state management
 
 ## Scripts
 
