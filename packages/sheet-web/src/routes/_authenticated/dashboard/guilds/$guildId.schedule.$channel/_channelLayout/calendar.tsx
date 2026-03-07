@@ -222,7 +222,7 @@ function CalendarGrid({ currentDate }: CalendarGridProps) {
               key={DateTime.toEpochMillis(day)}
               onClick={() => handleDayClick(day)}
               className={`
-                aspect-square p-2 flex flex-col items-center justify-center
+                h-10 p-1 flex flex-col items-center justify-center
                 border-r border-b border-[#33ccbb]/10 last:border-r-0
                 transition-colors
                 ${isCurrentMonth ? "text-white hover:bg-[#33ccbb]/10" : "text-white/30"}
