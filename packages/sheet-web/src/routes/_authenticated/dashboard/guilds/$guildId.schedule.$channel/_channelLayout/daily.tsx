@@ -16,6 +16,7 @@ import { Sheet } from "sheet-apis/schema";
 import { eventConfigAtom, useEventConfig } from "#/lib/sheet";
 import { useTimeZone } from "#/hooks/useTimeZone";
 import { useZoned } from "#/lib/date";
+import { currentUserAtom, useCurrentUser } from "#/lib/discord";
 
 // Virtualizer constants
 const ESTIMATE_SIZE = 23 + 24 * 44;
@@ -28,17 +29,18 @@ export const Route = createFileRoute(
   component: DailyPage,
   ssr: "data-only",
   loader: async ({ context, params }) => {
-    console.log("loading guild schedule and event config");
+    console.log("loading guild schedule, event config, and current user");
     await Effect.runPromise(
       Effect.all(
         [
           ensureResultAtomData(context.atomRegistry, guildScheduleAtom(params.guildId)),
           ensureResultAtomData(context.atomRegistry, eventConfigAtom(params.guildId)),
+          ensureResultAtomData(context.atomRegistry, currentUserAtom),
         ],
         { concurrency: "unbounded" },
       ),
     );
-    console.log("guild schedule and event config loaded");
+    console.log("guild schedule, event config, and current user loaded");
   },
 });
 
@@ -161,6 +163,10 @@ function DailyScheduleContent() {
 
   const currentDateKey = useMemo(() => DateTime.startOf(currentDate, "day"), [currentDate]);
 
+  // Get current user for highlighting
+  const currentUser = useCurrentUser();
+  const currentUserId = currentUser?.id;
+
   // Infinite scroll state
   const [dayOffsetRange, setDayOffsetRange] = useState({
     startOffset: INITIAL_START_OFFSET,
@@ -255,6 +261,7 @@ function DailyScheduleContent() {
                 startTimeZoned={startTimeZoned}
                 maxHour={maxScheduleHour}
                 dayByScheduleHour={dayByScheduleHour}
+                currentUserId={currentUserId}
               />
             </div>
           );
@@ -344,6 +351,7 @@ interface ScheduleHourRowProps {
   isScheduleDayBoundary: boolean;
   dateTimeParts: DateTime.DateTime.Parts;
   isDateTimeBoundary: boolean;
+  currentUserId: string | undefined;
 }
 
 function ScheduleHourRow({
@@ -353,6 +361,7 @@ function ScheduleHourRow({
   isScheduleDayBoundary,
   dateTimeParts,
   isDateTimeBoundary,
+  currentUserId,
 }: ScheduleHourRowProps) {
   return (
     <div className="grid grid-cols-[140px_1fr] border-b border-[#33ccbb]/10 last:border-b-0">
@@ -401,7 +410,7 @@ function ScheduleHourRow({
         {/* Schedule Content */}
         <div className="flex-1 space-y-2">
           {schedules.map((schedule, idx) => (
-            <ScheduleRow key={idx} schedule={schedule} />
+            <ScheduleRow key={idx} schedule={schedule} currentUserId={currentUserId} />
           ))}
         </div>
       </div>
@@ -410,16 +419,6 @@ function ScheduleHourRow({
 }
 
 // Individual Day Block - Shows unified timeline with both schedule and actual date perspectives
-interface DateBlockProps {
-  date: DateTime.Zoned;
-  schedulesByDateTime: HashMap.HashMap<DateTime.Zoned, Sheet.PopulatedSchedule[]>;
-  isActive: boolean;
-  startTimeZoned: DateTime.Zoned;
-  maxHour: number;
-  dayByScheduleHour: HashMap.HashMap<number, number>;
-}
-
-// Row data discriminated union
 type RowData =
   | {
       type: "break";
@@ -441,6 +440,16 @@ type RowData =
       isDateTimeBoundary: boolean;
     };
 
+interface DateBlockProps {
+  date: DateTime.Zoned;
+  schedulesByDateTime: HashMap.HashMap<DateTime.Zoned, Sheet.PopulatedSchedule[]>;
+  isActive: boolean;
+  startTimeZoned: DateTime.Zoned;
+  maxHour: number;
+  dayByScheduleHour: HashMap.HashMap<number, number>;
+  currentUserId: string | undefined;
+}
+
 function DateBlock({
   date,
   schedulesByDateTime,
@@ -448,6 +457,7 @@ function DateBlock({
   startTimeZoned,
   maxHour,
   dayByScheduleHour,
+  currentUserId,
 }: DateBlockProps) {
   // Build rows using dayByScheduleHour lookup for schedule day
   const rows = useMemo(
@@ -531,6 +541,7 @@ function DateBlock({
               isScheduleDayBoundary={row.isScheduleDayBoundary}
               dateTimeParts={row.dateTimeParts}
               isDateTimeBoundary={row.isDateTimeBoundary}
+              currentUserId={currentUserId}
             />
           ),
         )}
@@ -540,7 +551,13 @@ function DateBlock({
 }
 
 // Schedule Row Component - Shows only Fillers (callers must filter out break schedules)
-function ScheduleRow({ schedule }: { schedule: Sheet.PopulatedSchedule }) {
+function ScheduleRow({
+  schedule,
+  currentUserId,
+}: {
+  schedule: Sheet.PopulatedSchedule;
+  currentUserId: string | undefined;
+}) {
   const fills = schedule.fills.filter(Option.isSome).map((f: { value: SchedulePlayer }) => f.value);
 
   if (fills.length === 0) {
@@ -550,17 +567,45 @@ function ScheduleRow({ schedule }: { schedule: Sheet.PopulatedSchedule }) {
   return (
     <div className="flex flex-wrap items-center gap-1">
       {fills.map((fill: SchedulePlayer, idx: number) => (
-        <PlayerBadge key={idx} player={fill} />
+        <PlayerBadge key={idx} player={fill} currentUserId={currentUserId} />
       ))}
     </div>
   );
 }
 
 // Player Badge Component
-function PlayerBadge({ player }: { player: SchedulePlayer }) {
+function PlayerBadge({
+  player,
+  currentUserId,
+}: {
+  player: SchedulePlayer;
+  currentUserId: string | undefined;
+}) {
+  const isCurrentUser =
+    currentUserId !== undefined &&
+    player.player._tag === "Player" &&
+    player.player.id === currentUserId;
+
   return (
-    <span className={`text-xs ${player.enc ? "font-bold text-white" : "text-white/80"}`}>
+    <span
+      className={`text-xs ${
+        isCurrentUser
+          ? player.enc
+            ? "font-bold text-[#33ccbb]"
+            : "text-[#33ccbb]"
+          : player.enc
+            ? "font-bold text-white"
+            : "text-white/80"
+      }`}
+    >
       {player.player.name}
+      {player.enc && (
+        <span
+          className={`ml-1 text-[10px] ${isCurrentUser ? "text-[#33ccbb]/70" : "text-white/50"}`}
+        >
+          (encore)
+        </span>
+      )}
     </span>
   );
 }
