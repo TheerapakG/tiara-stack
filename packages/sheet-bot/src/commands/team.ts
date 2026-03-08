@@ -48,6 +48,8 @@ const makeListSubCommand = Effect.gen(function* () {
         Option.getOrElse(() => interactionUser),
       );
 
+      yield* Effect.log(interactionUser, targetUser);
+
       if (interactionUser.id !== targetUser.id) {
         const canView = yield* pipe(
           permissionService.checkInteractionUserGuildRoles(
