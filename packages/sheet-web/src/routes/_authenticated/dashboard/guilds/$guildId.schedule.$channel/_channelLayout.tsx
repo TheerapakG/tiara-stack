@@ -1,5 +1,6 @@
-import { createFileRoute, Outlet, Link } from "@tanstack/react-router";
-import { Schema, pipe, Effect } from "effect";
+import { createFileRoute, Outlet, Link, useChildMatches } from "@tanstack/react-router";
+import { Schema, pipe, Effect, Array, Option } from "effect";
+import { AnimatePresence } from "motion/react";
 import { useAllChannels, getAllChannelsAtom } from "#/lib/schedule";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 
@@ -30,6 +31,13 @@ export const Route = createFileRoute(
 function ScheduleLayout() {
   const { guildId } = Route.useParams();
   const search = Route.useSearch();
+  const childMatches = useChildMatches();
+
+  const routeKey = pipe(
+    Array.head(childMatches),
+    Option.map((match) => match.id),
+    Option.getOrElse(() => "default"),
+  );
 
   const channels = useAllChannels(guildId);
 
@@ -57,7 +65,9 @@ function ScheduleLayout() {
         </div>
       )}
 
-      <Outlet />
+      <AnimatePresence mode="popLayout">
+        <Outlet key={routeKey} />
+      </AnimatePresence>
     </div>
   );
 }
