@@ -3,6 +3,7 @@ import { Array, Effect, Option, Schema, pipe } from "effect";
 import { getAllChannelsAtom } from "#/lib/schedule";
 import { getCurrentTimestamp } from "#/lib/utils";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
+import { motion } from "motion/react";
 
 const ScheduleSearchSchema = Schema.Struct({
   timestamp: Schema.optional(Schema.Number),
@@ -40,5 +41,13 @@ export const Route = createFileRoute("/_authenticated/dashboard/guilds/$guildId/
 });
 
 function ScheduleRedirect() {
-  return <Outlet />;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+    >
+      <Outlet />
+    </motion.div>
+  );
 }
