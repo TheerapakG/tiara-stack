@@ -44,11 +44,9 @@ const makeListSubCommand = Effect.gen(function* () {
 
       const interactionUser = yield* Interaction.user();
       const targetUser = command.optionUserValueOptional("user").pipe(
-        Option.map((user) => ("user" in user ? user.user : user)),
+        Option.map(({ user }) => user),
         Option.getOrElse(() => interactionUser),
       );
-
-      yield* Effect.log(interactionUser, targetUser);
 
       if (interactionUser.id !== targetUser.id) {
         const canView = yield* pipe(

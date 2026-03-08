@@ -73,7 +73,7 @@ const makeListSubCommand = Effect.gen(function* () {
       ]);
 
       const targetUser = command.optionUserValueOptional("user").pipe(
-        Option.map((user) => ("user" in user ? user.user : user)),
+        Option.map(({ user }) => user),
         Option.getOrElse(() => interactionUser),
       );
 

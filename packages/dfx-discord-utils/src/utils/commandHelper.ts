@@ -157,13 +157,23 @@ type OptionTypeToTs<T> = T extends typeof Discord.ApplicationCommandOptionType.S
       : T extends typeof Discord.ApplicationCommandOptionType.BOOLEAN
         ? boolean
         : T extends typeof Discord.ApplicationCommandOptionType.USER
-          ? Discord.UserResponse | Discord.GuildMemberResponse
+          ? {
+              user: Discord.UserResponse;
+              member: Option.Option<Omit<Discord.GuildMemberResponse, "user" | "deaf" | "mute">>;
+            }
           : T extends typeof Discord.ApplicationCommandOptionType.CHANNEL
             ? Discord.GuildChannelResponse
             : T extends typeof Discord.ApplicationCommandOptionType.ROLE
               ? Discord.GuildRoleResponse
               : T extends typeof Discord.ApplicationCommandOptionType.MENTIONABLE
-                ? Discord.GuildRoleResponse | Discord.UserResponse | Discord.GuildMemberResponse
+                ?
+                    | Discord.GuildRoleResponse
+                    | {
+                        user: Discord.UserResponse;
+                        member: Option.Option<
+                          Omit<Discord.GuildMemberResponse, "user" | "deaf" | "mute">
+                        >;
+                      }
                 : T extends typeof Discord.ApplicationCommandOptionType.ATTACHMENT
                   ? Discord.AttachmentResponse
                   : string | number | boolean;
@@ -178,13 +188,21 @@ type CommandUserValue<A, N> = CommandWithName<
   A,
   N
 >["type"] extends typeof Discord.ApplicationCommandOptionType.USER
-  ? Discord.UserResponse | Discord.GuildMemberResponse
+  ? {
+      user: Discord.UserResponse;
+      member: Option.Option<Omit<Discord.GuildMemberResponse, "user" | "deaf" | "mute">>;
+    }
   : string;
 type CommandMentionableValue<A, N> = CommandWithName<
   A,
   N
 >["type"] extends typeof Discord.ApplicationCommandOptionType.MENTIONABLE
-  ? Discord.GuildRoleResponse | Discord.UserResponse | Discord.GuildMemberResponse
+  ?
+      | Discord.GuildRoleResponse
+      | {
+          user: Discord.UserResponse;
+          member: Option.Option<Omit<Discord.GuildMemberResponse, "user" | "deaf" | "mute">>;
+        }
   : string;
 type CommandChannelValue<A, N> = CommandWithName<
   A,
@@ -272,7 +290,18 @@ export class WrappedCommandHelper<A> {
   optionUserValueOptional<N extends UserOptions<A>["name"]>(
     name: N,
   ): Option.Option<CommandUserValue<A, N>> {
-    return this.helper.resolve(name, (id, data) => data.members?.[id] ?? data.users?.[id]);
+    return Option.flatten(
+      this.helper.resolve(name, (id, data) => {
+        const user = Option.fromNullable(data.users?.[id]);
+        const member = Option.fromNullable(data.members?.[id]);
+        return user.pipe(
+          Option.map((user) => ({
+            user,
+            member,
+          })),
+        );
+      }),
+    );
   }
 
   optionUserValueOrElse<N extends UserOptions<A>["name"]>(
@@ -291,9 +320,20 @@ export class WrappedCommandHelper<A> {
   optionMentionableValueOptional<N extends MentionableOptions<A>["name"]>(
     name: N,
   ): Option.Option<CommandMentionableValue<A, N>> {
-    return this.helper.resolve(
-      name,
-      (id, data) => data.roles?.[id] ?? data.members?.[id] ?? data.users?.[id],
+    return Option.flatten(
+      this.helper.resolve(name, (id, data) => {
+        const role = Option.fromNullable(data.roles?.[id]);
+        const user = Option.fromNullable(data.users?.[id]);
+        const member = Option.fromNullable(data.members?.[id]);
+        return Option.orElse(role, () =>
+          user.pipe(
+            Option.map((user) => ({
+              user,
+              member,
+            })),
+          ),
+        );
+      }),
     );
   }
 
