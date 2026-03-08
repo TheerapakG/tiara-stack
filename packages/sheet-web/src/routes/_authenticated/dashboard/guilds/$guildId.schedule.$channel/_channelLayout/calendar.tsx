@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, Suspense } from "react";
 import { DateTime, HashSet, Effect, Array } from "effect";
-import { motion } from "motion/react";
+import { motion, LayoutGroup } from "motion/react";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 import { useScheduledDays, scheduledDaysAtom, formatDayKey } from "#/lib/schedule";
 import { getServerTimeZone, useTimeZone } from "#/hooks/useTimeZone";
@@ -186,6 +186,8 @@ function CalendarGrid({ currentDate }: CalendarGridProps) {
 
   const weekDays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
+  const layoutGroupId = `${guildId}-${channel}`;
+
   return (
     <>
       {/* Weekday Headers */}
@@ -201,43 +203,48 @@ function CalendarGrid({ currentDate }: CalendarGridProps) {
       </div>
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7">
-        {calendarDays.map((day) => {
-          const isCurrentMonth = isSameMonth(day, currentDate);
-          const dayKey = formatDayKey(day);
-          const hasSchedule = HashSet.has(scheduledDays, dayKey);
+      <LayoutGroup id={layoutGroupId}>
+        <div className="grid grid-cols-7">
+          {calendarDays.map((day) => {
+            const isCurrentMonth = isSameMonth(day, currentDate);
+            const dayKey = formatDayKey(day);
+            const hasSchedule = HashSet.has(scheduledDays, dayKey);
 
-          const dayName = `day-${formatDayKey(day)}`;
+            const dayName = `day-${formatDayKey(day)}`;
 
-          const dayTimestamp = DateTime.toEpochMillis(DateTime.startOf(day, "day"));
+            const dayTimestamp = DateTime.toEpochMillis(DateTime.startOf(day, "day"));
 
-          return (
-            <motion.div
-              key={dayName}
-              layoutId={dayName}
-              transition={{
-                layout: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
-              }}
-            >
-              <Link
-                to="/dashboard/guilds/$guildId/schedule/$channel/daily"
-                params={{ guildId, channel }}
-                search={{ timestamp: dayTimestamp }}
+            return (
+              <motion.div
+                key={dayName}
+                layoutId={dayName}
+                transition={{
+                  layout: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+                }}
                 className={`
-                  h-14 p-1 flex flex-col items-center justify-center
-                  border-r border-b border-[#33ccbb]/10 last:border-r-0
-                  transition-colors
-                  ${isCurrentMonth ? "text-white hover:bg-[#33ccbb]/10" : "text-white/30"}
-                  ${hasSchedule ? "bg-[#33ccbb]/5" : ""}
-                `}
+                border-r border-b border-[#33ccbb]/10 last:border-r-0
+                ${isCurrentMonth ? "text-white" : "text-white/30"}
+                ${hasSchedule ? "bg-[#33ccbb]/5" : ""}
+              `}
               >
-                <span className="text-sm font-medium">{formatDayOfMonth(day)}</span>
-                {hasSchedule && <div className="mt-1 w-1.5 h-1.5 rounded-full bg-[#33ccbb]" />}
-              </Link>
-            </motion.div>
-          );
-        })}
-      </div>
+                <Link
+                  to="/dashboard/guilds/$guildId/schedule/$channel/daily"
+                  params={{ guildId, channel }}
+                  search={{ timestamp: dayTimestamp }}
+                  className={`
+                  h-14 p-1 flex flex-col items-center justify-center
+                  transition-colors
+                  ${isCurrentMonth ? "hover:bg-[#33ccbb]/10" : ""}
+                `}
+                >
+                  <span className="text-sm font-medium">{formatDayOfMonth(day)}</span>
+                  {hasSchedule && <div className="mt-1 w-1.5 h-1.5 rounded-full bg-[#33ccbb]" />}
+                </Link>
+              </motion.div>
+            );
+          })}
+        </div>
+      </LayoutGroup>
     </>
   );
 }

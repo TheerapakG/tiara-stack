@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
 import { useMemo, useRef, useState, useEffect, Suspense } from "react";
-import { motion } from "motion/react";
+import { motion, LayoutGroup } from "motion/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { DateTime, Option, Effect, pipe, HashMap, Array, Duration } from "effect";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
@@ -46,33 +46,42 @@ export const Route = createFileRoute(
 });
 
 function DailyPage() {
+  const { guildId, channel } = Route.useParams();
   const timeZone = useTimeZone();
   const search = Route.useSearch();
   const currentDate = useZoned(timeZone, search.timestamp);
   const dayName = `day-${formatDayKey(currentDate)}`;
+  const layoutGroupId = `${guildId}-${channel}`;
 
   return (
-    <motion.div
-      layoutId={dayName}
-      transition={{
-        layout: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
-      }}
-      className="border border-[#33ccbb]/20 bg-[#0a0f0e]"
-    >
-      {/* Header */}
-      <DailyHeader />
-
-      {/* Schedule with Virtual Scroll */}
-      <Suspense
-        fallback={
-          <div className="flex items-center justify-center h-[600px]">
-            <div className="text-white/60 font-medium tracking-wide">LOADING SCHEDULE...</div>
-          </div>
-        }
+    <LayoutGroup id={layoutGroupId}>
+      <motion.div
+        layoutId={dayName}
+        layout
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{
+          layout: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+          opacity: { duration: 0.2 },
+        }}
+        className="border border-[#33ccbb]/20 bg-[#0a0f0e]"
       >
-        <DailyScheduleContent />
-      </Suspense>
-    </motion.div>
+        {/* Header */}
+        <DailyHeader />
+
+        {/* Schedule with Virtual Scroll */}
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center h-[600px]">
+              <div className="text-white/60 font-medium tracking-wide">LOADING SCHEDULE...</div>
+            </div>
+          }
+        >
+          <DailyScheduleContent />
+        </Suspense>
+      </motion.div>
+    </LayoutGroup>
   );
 }
 
