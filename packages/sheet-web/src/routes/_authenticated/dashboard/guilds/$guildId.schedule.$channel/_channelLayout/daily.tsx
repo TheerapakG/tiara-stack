@@ -1,7 +1,7 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
-import { useMemo, useRef, useState, useEffect, Suspense, startTransition } from "react";
-import { ViewTransition } from "react";
+import { useMemo, useRef, useState, useEffect, Suspense } from "react";
+import { motion } from "motion/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { DateTime, Option, Effect, pipe, HashMap, Array, Duration } from "effect";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
@@ -52,23 +52,27 @@ function DailyPage() {
   const dayName = `day-${formatDayKey(currentDate)}`;
 
   return (
-    <ViewTransition name={dayName}>
-      <div className="border border-[#33ccbb]/20 bg-[#0a0f0e]">
-        {/* Header */}
-        <DailyHeader />
+    <motion.div
+      layoutId={dayName}
+      transition={{
+        layout: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+      }}
+      className="border border-[#33ccbb]/20 bg-[#0a0f0e]"
+    >
+      {/* Header */}
+      <DailyHeader />
 
-        {/* Schedule with Virtual Scroll */}
-        <Suspense
-          fallback={
-            <div className="flex items-center justify-center h-[600px]">
-              <div className="text-white/60 font-medium tracking-wide">LOADING SCHEDULE...</div>
-            </div>
-          }
-        >
-          <DailyScheduleContent />
-        </Suspense>
-      </div>
-    </ViewTransition>
+      {/* Schedule with Virtual Scroll */}
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center h-[600px]">
+            <div className="text-white/60 font-medium tracking-wide">LOADING SCHEDULE...</div>
+          </div>
+        }
+      >
+        <DailyScheduleContent />
+      </Suspense>
+    </motion.div>
   );
 }
 
@@ -76,20 +80,8 @@ function DailyPage() {
 function DailyHeader() {
   const { channel, guildId } = Route.useParams();
   const search = Route.useSearch();
-  const navigate = useNavigate();
   const timeZone = useTimeZone();
   const currentDate = useZoned(timeZone, search.timestamp);
-
-  const handleBackClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    startTransition(() => {
-      navigate({
-        to: "/dashboard/guilds/$guildId/schedule/$channel/calendar",
-        params: { guildId, channel },
-        search: { timestamp: DateTime.toEpochMillis(DateTime.startOf(currentDate, "month")) },
-      });
-    });
-  };
 
   return (
     <div className="flex items-center justify-between px-6 py-4 border-b border-[#33ccbb]/20 bg-[#0f1615]">
@@ -98,7 +90,6 @@ function DailyHeader() {
         to="/dashboard/guilds/$guildId/schedule/$channel/calendar"
         params={{ guildId, channel }}
         search={{ timestamp: DateTime.toEpochMillis(DateTime.startOf(currentDate, "month")) }}
-        onClick={handleBackClick}
       >
         <ChevronLeft className="w-4 h-4" />
         <span className="text-sm font-bold tracking-wide">BACK TO CALENDAR</span>
