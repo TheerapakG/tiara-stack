@@ -1,5 +1,6 @@
-import { createFileRoute, Outlet, Link } from "@tanstack/react-router";
-import { Schema, pipe, Effect } from "effect";
+import { createFileRoute, Outlet, Link, useChildMatches } from "@tanstack/react-router";
+import { Schema, pipe, Effect, Array, Option } from "effect";
+import { AnimatePresence, motion } from "motion/react";
 import { useAllChannels, getAllChannelsAtom } from "#/lib/schedule";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 
@@ -30,6 +31,20 @@ export const Route = createFileRoute(
 function ScheduleLayout() {
   const { guildId } = Route.useParams();
   const search = Route.useSearch();
+  const childMatches = useChildMatches();
+
+  // Extract view type from route path - explicit check for calendar vs daily
+  const viewType = pipe(
+    Array.head(childMatches),
+    Option.map((match) => {
+      // Check routeId explicitly for calendar or daily segment
+      if (match.routeId.includes("/daily")) return "daily";
+      if (match.routeId.includes("/calendar")) return "calendar";
+      return "default";
+    }),
+    Option.getOrElse(() => "default"),
+  );
+  const routeKey = `${guildId}-${viewType}`;
 
   const channels = useAllChannels(guildId);
 
@@ -57,7 +72,17 @@ function ScheduleLayout() {
         </div>
       )}
 
-      <Outlet />
+      <AnimatePresence mode="popLayout">
+        <motion.div
+          key={routeKey}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+        >
+          <Outlet />
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

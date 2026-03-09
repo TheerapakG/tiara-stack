@@ -2,6 +2,7 @@ import { Registry } from "@effect-atom/atom-react";
 import { HeadContent, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
+import { MotionConfig } from "motion/react";
 import { TooltipProvider } from "#/components/ui/tooltip";
 import { Button } from "#/components/ui/button";
 
@@ -76,9 +77,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body className="bg-[#0a0f0e]">
         <TooltipProvider>
-          <Background />
-          <Header />
-          {children}
+          <MotionConfig reducedMotion="user">
+            <Background />
+            <Header />
+            {children}
+          </MotionConfig>
           <TanStackDevtools
             config={{
               position: "bottom-right",

@@ -1,7 +1,8 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo, Suspense, startTransition, ViewTransition } from "react";
+import { useMemo, Suspense } from "react";
 import { DateTime, HashSet, Effect, Array } from "effect";
+import { motion, LayoutGroup } from "motion/react";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 import { useScheduledDays, scheduledDaysAtom, formatDayKey } from "#/lib/schedule";
 import { getServerTimeZone, useTimeZone } from "#/hooks/useTimeZone";
@@ -92,9 +93,9 @@ function isSameMonth(a: DateTime.Zoned, b: DateTime.Zoned): boolean {
 
 function CalendarPage() {
   const { guildId, channel } = Route.useParams();
+  const timeZone = useTimeZone();
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const timeZone = useTimeZone();
   // Use timestamp to determine the month to display
   const currentDate = useZoned(timeZone, search.timestamp);
 
@@ -122,25 +123,43 @@ function CalendarPage() {
     });
   };
 
+  const weekDays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
   return (
     <div className="border border-[#33ccbb]/20 bg-[#0f1615]">
-      {/* Calendar Header - Outside Suspense so navigation always works */}
-      <div className="flex items-center justify-between p-4 border-b border-[#33ccbb]/20">
-        <button
-          onClick={handlePrevMonth}
-          className="p-2 hover:bg-[#33ccbb]/10 transition-colors text-[#33ccbb]"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <h3 className="text-lg font-black tracking-tight">{formatMonthYear(currentDate)}</h3>
-        <button
-          onClick={handleNextMonth}
-          className="p-2 hover:bg-[#33ccbb]/10 transition-colors text-[#33ccbb]"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
+      {/* Header and Weekday Labels - outside Suspense for immediate interaction */}
+      <div>
+        {/* Calendar Header */}
+        <div className="flex items-center justify-between p-4 border-b border-[#33ccbb]/20">
+          <button
+            onClick={handlePrevMonth}
+            className="p-2 hover:bg-[#33ccbb]/10 transition-colors text-[#33ccbb]"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <h3 className="text-lg font-black tracking-tight">{formatMonthYear(currentDate)}</h3>
+          <button
+            onClick={handleNextMonth}
+            className="p-2 hover:bg-[#33ccbb]/10 transition-colors text-[#33ccbb]"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Weekday Headers */}
+        <div className="grid grid-cols-7 border-b border-[#33ccbb]/20">
+          {weekDays.map((day) => (
+            <div
+              key={day}
+              className="p-3 text-center text-xs font-bold text-[#33ccbb]/60 tracking-wider"
+            >
+              {day}
+            </div>
+          ))}
+        </div>
       </div>
 
+      {/* Calendar Grid - inside Suspense */}
       <Suspense
         fallback={
           <div className="flex items-center justify-center h-64">
@@ -160,7 +179,6 @@ interface CalendarGridProps {
 
 function CalendarGrid({ currentDate }: CalendarGridProps) {
   const { guildId, channel } = Route.useParams();
-  const navigate = useNavigate();
   const timeZone = useTimeZone();
 
   const calendarDays = useMemo(() => {
@@ -184,66 +202,58 @@ function CalendarGrid({ currentDate }: CalendarGridProps) {
     rangeEnd,
   });
 
-  const weekDays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+  const layoutGroupId = `${guildId}-${channel}`;
+  // Include month in layoutId to prevent cross-month padding day animations
+  const currentMonthKey = formatDayKey(DateTime.startOf(currentDate, "month"));
 
   return (
-    <>
-      {/* Weekday Headers */}
-      <div className="grid grid-cols-7 border-b border-[#33ccbb]/20">
-        {weekDays.map((day) => (
-          <div
-            key={day}
-            className="p-3 text-center text-xs font-bold text-[#33ccbb]/60 tracking-wider"
-          >
-            {day}
-          </div>
-        ))}
-      </div>
-
-      {/* Calendar Grid */}
-      <div className="grid grid-cols-7">
+    <LayoutGroup id={layoutGroupId}>
+      {/* Container animates, not individual cells */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+        className="grid grid-cols-7"
+      >
         {calendarDays.map((day) => {
           const isCurrentMonth = isSameMonth(day, currentDate);
           const dayKey = formatDayKey(day);
           const hasSchedule = HashSet.has(scheduledDays, dayKey);
 
-          const dayName = `day-${formatDayKey(day)}`;
+          const dayName = `day-${formatDayKey(day)}-${currentMonthKey}`;
 
           const dayTimestamp = DateTime.toEpochMillis(DateTime.startOf(day, "day"));
 
-          const handleClick = (e: React.MouseEvent) => {
-            e.preventDefault();
-            startTransition(() => {
-              navigate({
-                to: "/dashboard/guilds/$guildId/schedule/$channel/daily",
-                params: { guildId, channel },
-                search: { timestamp: dayTimestamp },
-              });
-            });
-          };
-
           return (
-            <ViewTransition key={DateTime.toEpochMillis(day)} name={dayName}>
+            <motion.div
+              key={dayName}
+              layoutId={dayName}
+              transition={{
+                layout: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+              }}
+              className={`
+              border-r border-b border-[#33ccbb]/10 last:border-r-0
+              ${isCurrentMonth ? "text-white" : "text-white/30"}
+              ${hasSchedule ? "bg-[#33ccbb]/5" : ""}
+            `}
+            >
               <Link
                 to="/dashboard/guilds/$guildId/schedule/$channel/daily"
                 params={{ guildId, channel }}
                 search={{ timestamp: dayTimestamp }}
-                onClick={handleClick}
                 className={`
                   h-14 p-1 flex flex-col items-center justify-center
-                  border-r border-b border-[#33ccbb]/10 last:border-r-0
                   transition-colors
-                  ${isCurrentMonth ? "text-white hover:bg-[#33ccbb]/10" : "text-white/30"}
-                  ${hasSchedule ? "bg-[#33ccbb]/5" : ""}
+                  ${isCurrentMonth ? "hover:bg-[#33ccbb]/10" : ""}
                 `}
               >
                 <span className="text-sm font-medium">{formatDayOfMonth(day)}</span>
                 {hasSchedule && <div className="mt-1 w-1.5 h-1.5 rounded-full bg-[#33ccbb]" />}
               </Link>
-            </ViewTransition>
+            </motion.div>
           );
         })}
-      </div>
-    </>
+      </motion.div>
+    </LayoutGroup>
   );
 }
