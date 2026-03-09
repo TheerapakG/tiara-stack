@@ -1,12 +1,22 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo, Suspense } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { DateTime, HashSet, Effect, Array } from "effect";
-import { motion, LayoutGroup } from "motion/react";
+import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 import { useScheduledDays, scheduledDaysAtom, formatDayKey } from "#/lib/schedule";
 import { getServerTimeZone, useTimeZone } from "#/hooks/useTimeZone";
 import { makeZoned, useZoned } from "#/lib/date";
+import {
+  buildSharedDayLayoutId,
+  calendarRestTransition,
+  getMonthTimestamp,
+  monthSlideTransition,
+  morphLayoutTransition,
+  useScheduleMonthDirection,
+  useScheduleSelectedDay,
+  useScheduleTransitionActions,
+} from "./-transition";
 
 export const Route = createFileRoute(
   "/_authenticated/dashboard/guilds/$guildId/schedule/$channel/_channelLayout/calendar",
@@ -91,29 +101,72 @@ function isSameMonth(a: DateTime.Zoned, b: DateTime.Zoned): boolean {
   return partsA.year === partsB.year && partsA.month === partsB.month;
 }
 
+function MonthPresenceShell({
+  children,
+  direction,
+}: {
+  children: React.ReactNode;
+  direction: -1 | 0 | 1;
+}) {
+  const isPresent = useIsPresent();
+  const exitDirectionRef = useRef(direction);
+
+  if (isPresent) {
+    exitDirectionRef.current = direction;
+  }
+
+  return (
+    <motion.div
+      initial={
+        direction === 0
+          ? false
+          : {
+              y: direction > 0 ? 56 : -56,
+              opacity: 0,
+            }
+      }
+      animate={{ y: 0, opacity: 1 }}
+      exit={
+        exitDirectionRef.current === 0
+          ? undefined
+          : {
+              y: exitDirectionRef.current > 0 ? -56 : 56,
+              opacity: 0,
+            }
+      }
+      transition={monthSlideTransition}
+      className={isPresent ? "relative w-full" : "absolute inset-0 w-full"}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 function CalendarPage() {
   const { guildId, channel } = Route.useParams();
   const timeZone = useTimeZone();
   const search = Route.useSearch();
   const navigate = useNavigate();
+  const selectedDay = useScheduleSelectedDay();
+  const monthDirection = useScheduleMonthDirection();
+  const { clearSelectedDay, setMonthDirection } = useScheduleTransitionActions();
   // Use timestamp to determine the month to display
   const currentDate = useZoned(timeZone, search.timestamp);
+  const currentMonthKey = formatDayKey(DateTime.startOf(currentDate, "month"));
+  const isTransitioningToDaily = selectedDay?.phase === "to-daily";
+  const isReturningToCalendar = selectedDay?.phase === "to-calendar";
+  const isCalendarLocked = isTransitioningToDaily || isReturningToCalendar;
 
-  const handlePrevMonth = () => {
-    const prevMonthZoned = DateTime.subtract(currentDate, { months: 1 });
-    const prevMonthStartZoned = DateTime.startOf(prevMonthZoned, "month");
-    navigate({
-      to: ".",
-      params: { guildId, channel },
-      search: {
-        timestamp: DateTime.toEpochMillis(prevMonthStartZoned),
-      },
-    });
-  };
-
-  const handleNextMonth = () => {
-    const nextMonthZoned = DateTime.add(currentDate, { months: 1 });
+  const navigateMonth = (direction: -1 | 1) => {
+    const nextMonthZoned =
+      direction < 0
+        ? DateTime.subtract(currentDate, { months: 1 })
+        : DateTime.add(currentDate, { months: 1 });
     const nextMonthStartZoned = DateTime.startOf(nextMonthZoned, "month");
+
+    clearSelectedDay();
+    setMonthDirection(direction);
+
     navigate({
       to: ".",
       params: { guildId, channel },
@@ -126,49 +179,57 @@ function CalendarPage() {
   const weekDays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
   return (
-    <div className="border border-[#33ccbb]/20 bg-[#0f1615]">
-      {/* Header and Weekday Labels - outside Suspense for immediate interaction */}
-      <div>
-        {/* Calendar Header */}
-        <div className="flex items-center justify-between p-4 border-b border-[#33ccbb]/20">
+    <div className="overflow-hidden border border-[#33ccbb]/20 bg-[#0f1615]">
+      <motion.div
+        initial={isReturningToCalendar ? { opacity: 0 } : false}
+        animate={{ opacity: isTransitioningToDaily ? 0 : 1 }}
+        transition={calendarRestTransition}
+        style={{ pointerEvents: isCalendarLocked ? "none" : undefined }}
+      >
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-[#33ccbb]/20 p-4">
           <button
-            onClick={handlePrevMonth}
-            className="p-2 hover:bg-[#33ccbb]/10 transition-colors text-[#33ccbb]"
+            onClick={() => navigateMonth(-1)}
+            className="justify-self-start p-2 text-[#33ccbb] transition-colors hover:bg-[#33ccbb]/10"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="h-5 w-5" />
           </button>
-          <h3 className="text-lg font-black tracking-tight">{formatMonthYear(currentDate)}</h3>
           <button
-            onClick={handleNextMonth}
-            className="p-2 hover:bg-[#33ccbb]/10 transition-colors text-[#33ccbb]"
+            onClick={() => navigateMonth(1)}
+            className="col-start-3 justify-self-end p-2 text-[#33ccbb] transition-colors hover:bg-[#33ccbb]/10"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="h-5 w-5" />
           </button>
         </div>
+      </motion.div>
 
-        {/* Weekday Headers */}
-        <div className="grid grid-cols-7 border-b border-[#33ccbb]/20">
-          {weekDays.map((day) => (
-            <div
-              key={day}
-              className="p-3 text-center text-xs font-bold text-[#33ccbb]/60 tracking-wider"
-            >
-              {day}
-            </div>
-          ))}
-        </div>
+      <div className="grid grid-cols-7 border-b border-[#33ccbb]/20">
+        {weekDays.map((day) => (
+          <div
+            key={day}
+            className="p-3 text-center text-xs font-bold tracking-wider text-[#33ccbb]/60"
+          >
+            {day}
+          </div>
+        ))}
       </div>
 
-      {/* Calendar Grid - inside Suspense */}
-      <Suspense
-        fallback={
-          <div className="flex items-center justify-center h-64">
-            <div className="text-white/60 font-medium tracking-wide">LOADING CALENDAR...</div>
-          </div>
-        }
-      >
-        <CalendarGrid currentDate={currentDate} />
-      </Suspense>
+      <div className="relative">
+        <AnimatePresence initial={false} mode="sync">
+          <MonthPresenceShell key={currentMonthKey} direction={monthDirection}>
+            <motion.div
+              initial={isReturningToCalendar ? { opacity: 0 } : false}
+              animate={{ opacity: isTransitioningToDaily ? 0 : 1 }}
+              transition={calendarRestTransition}
+              className="border-b border-[#33ccbb]/20 px-4 py-4 text-center"
+              style={{ pointerEvents: isCalendarLocked ? "none" : undefined }}
+            >
+              <h3 className="text-lg font-black tracking-tight">{formatMonthYear(currentDate)}</h3>
+            </motion.div>
+
+            <CalendarGrid currentDate={currentDate} />
+          </MonthPresenceShell>
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
@@ -180,6 +241,8 @@ interface CalendarGridProps {
 function CalendarGrid({ currentDate }: CalendarGridProps) {
   const { guildId, channel } = Route.useParams();
   const timeZone = useTimeZone();
+  const selectedDay = useScheduleSelectedDay();
+  const { finishCalendarTransition, startDailyTransition } = useScheduleTransitionActions();
 
   const calendarDays = useMemo(() => {
     return getCalendarDays(currentDate);
@@ -202,58 +265,86 @@ function CalendarGrid({ currentDate }: CalendarGridProps) {
     rangeEnd,
   });
 
-  const layoutGroupId = `${guildId}-${channel}`;
-  // Include month in layoutId to prevent cross-month padding day animations
-  const currentMonthKey = formatDayKey(DateTime.startOf(currentDate, "month"));
+  const currentMonthTimestamp = getMonthTimestamp(currentDate);
+  const isTransitioningToDaily = selectedDay?.phase === "to-daily";
+  const isReturningToCalendar = selectedDay?.phase === "to-calendar";
+  const isCalendarLocked = isTransitioningToDaily || isReturningToCalendar;
+  const hasSelectedDayInMonth = useMemo(
+    () =>
+      calendarDays.some((day) => {
+        const dayTimestamp = DateTime.toEpochMillis(DateTime.startOf(day, "day"));
+
+        return (
+          selectedDay?.dayTimestamp === dayTimestamp &&
+          selectedDay?.sourceMonthTimestamp === currentMonthTimestamp
+        );
+      }),
+    [calendarDays, currentMonthTimestamp, selectedDay],
+  );
+
+  useEffect(() => {
+    if (isReturningToCalendar && !hasSelectedDayInMonth) {
+      finishCalendarTransition();
+    }
+  }, [finishCalendarTransition, hasSelectedDayInMonth, isReturningToCalendar]);
 
   return (
-    <LayoutGroup id={layoutGroupId}>
-      {/* Container animates, not individual cells */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-        className="grid grid-cols-7"
-      >
-        {calendarDays.map((day) => {
-          const isCurrentMonth = isSameMonth(day, currentDate);
-          const dayKey = formatDayKey(day);
-          const hasSchedule = HashSet.has(scheduledDays, dayKey);
+    <div
+      className="grid grid-cols-7"
+      style={{ pointerEvents: isCalendarLocked ? "none" : undefined }}
+    >
+      {calendarDays.map((day) => {
+        const isCurrentMonth = isSameMonth(day, currentDate);
+        const dayKey = formatDayKey(day);
+        const hasSchedule = HashSet.has(scheduledDays, dayKey);
+        const dayTimestamp = DateTime.toEpochMillis(DateTime.startOf(day, "day"));
+        const sharedLayoutId = buildSharedDayLayoutId(day, currentDate);
+        const isSelectedDay =
+          selectedDay?.dayTimestamp === dayTimestamp &&
+          selectedDay?.sourceMonthTimestamp === currentMonthTimestamp;
 
-          const dayName = `day-${formatDayKey(day)}-${currentMonthKey}`;
-
-          const dayTimestamp = DateTime.toEpochMillis(DateTime.startOf(day, "day"));
-
-          return (
-            <motion.div
-              key={dayName}
-              layoutId={dayName}
-              transition={{
-                layout: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
-              }}
-              className={`
+        return (
+          <motion.div
+            key={sharedLayoutId}
+            layoutId={sharedLayoutId}
+            onLayoutAnimationComplete={() => {
+              if (isReturningToCalendar && isSelectedDay) {
+                finishCalendarTransition();
+              }
+            }}
+            initial={isReturningToCalendar && !isSelectedDay ? { opacity: 0 } : false}
+            animate={{ opacity: isTransitioningToDaily && !isSelectedDay ? 0 : 1 }}
+            transition={{
+              ...calendarRestTransition,
+              layout: morphLayoutTransition,
+            }}
+            style={{ pointerEvents: isCalendarLocked ? "none" : undefined }}
+            className={`
               border-r border-b border-[#33ccbb]/10 last:border-r-0
               ${isCurrentMonth ? "text-white" : "text-white/30"}
               ${hasSchedule ? "bg-[#33ccbb]/5" : ""}
+              ${isSelectedDay ? "relative z-10" : ""}
             `}
+          >
+            <Link
+              to="/dashboard/guilds/$guildId/schedule/$channel/daily"
+              params={{ guildId, channel }}
+              search={{ timestamp: dayTimestamp }}
+              onClick={() => {
+                startDailyTransition(dayTimestamp, currentMonthTimestamp);
+              }}
+              className={`
+                h-14 p-1 flex flex-col items-center justify-center
+                transition-colors
+                ${isCurrentMonth ? "hover:bg-[#33ccbb]/10" : ""}
+              `}
             >
-              <Link
-                to="/dashboard/guilds/$guildId/schedule/$channel/daily"
-                params={{ guildId, channel }}
-                search={{ timestamp: dayTimestamp }}
-                className={`
-                  h-14 p-1 flex flex-col items-center justify-center
-                  transition-colors
-                  ${isCurrentMonth ? "hover:bg-[#33ccbb]/10" : ""}
-                `}
-              >
-                <span className="text-sm font-medium">{formatDayOfMonth(day)}</span>
-                {hasSchedule && <div className="mt-1 w-1.5 h-1.5 rounded-full bg-[#33ccbb]" />}
-              </Link>
-            </motion.div>
-          );
-        })}
-      </motion.div>
-    </LayoutGroup>
+              <span className="text-sm font-medium">{formatDayOfMonth(day)}</span>
+              {hasSchedule && <div className="mt-1 h-1.5 w-1.5 rounded-full bg-[#33ccbb]" />}
+            </Link>
+          </motion.div>
+        );
+      })}
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
-import { useMemo, useRef, useState, useEffect, Suspense } from "react";
-import { motion, LayoutGroup } from "motion/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { motion } from "motion/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { DateTime, Option, Effect, pipe, HashMap, Array, Duration } from "effect";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
@@ -18,6 +18,14 @@ import { eventConfigAtom, useEventConfig } from "#/lib/sheet";
 import { useTimeZone } from "#/hooks/useTimeZone";
 import { useZoned } from "#/lib/date";
 import { currentUserAtom, useCurrentUser } from "#/lib/discord";
+import {
+  buildSharedDayLayoutId,
+  calendarRestTransition,
+  getMonthTimestamp,
+  morphLayoutTransition,
+  useScheduleSelectedDay,
+  useScheduleTransitionActions,
+} from "./-transition";
 
 // Virtualizer constants
 const ESTIMATE_SIZE = 23 + 24 * 44;
@@ -30,7 +38,6 @@ export const Route = createFileRoute(
   component: DailyPage,
   ssr: "data-only",
   loader: async ({ context, params }) => {
-    console.log("loading guild schedule, event config, and current user");
     await Effect.runPromise(
       Effect.all(
         [
@@ -41,64 +48,56 @@ export const Route = createFileRoute(
         { concurrency: "unbounded" },
       ),
     );
-    console.log("guild schedule, event config, and current user loaded");
   },
 });
 
 function DailyPage() {
-  const { guildId, channel } = Route.useParams();
   const timeZone = useTimeZone();
   const search = Route.useSearch();
+  const selectedDay = useScheduleSelectedDay();
+  const { clearSelectedDay } = useScheduleTransitionActions();
   const currentDate = useZoned(timeZone, search.timestamp);
-  // Use the displayed calendar month for layoutId, not the day's own month
-  // This ensures padding days (e.g., Sept 30 in October grid) match the calendar's key
-  const calendarMonthKey = formatDayKey(
-    DateTime.startOf(useZoned(timeZone, search.timestamp), "month"),
-  );
-  const dayName = `day-${formatDayKey(currentDate)}-${calendarMonthKey}`;
-  const layoutGroupId = `${guildId}-${channel}`;
+  const currentDayTimestamp = DateTime.toEpochMillis(DateTime.startOf(currentDate, "day"));
+  const isMatchingTransitionDay = selectedDay?.dayTimestamp === currentDayTimestamp;
+  const sourceMonthTimestamp = isMatchingTransitionDay
+    ? selectedDay.sourceMonthTimestamp
+    : getMonthTimestamp(currentDate);
+  const sourceMonth = useZoned(timeZone, sourceMonthTimestamp);
+  const sharedLayoutId = isMatchingTransitionDay
+    ? buildSharedDayLayoutId(currentDate, sourceMonth)
+    : undefined;
+
+  useEffect(() => {
+    return () => {
+      clearSelectedDay();
+    };
+  }, [clearSelectedDay]);
 
   return (
-    <LayoutGroup id={layoutGroupId}>
-      {/* Outer container with layoutId - parent AnimatePresence handles exit */}
+    <motion.div
+      layoutId={sharedLayoutId}
+      transition={{
+        layout: morphLayoutTransition,
+      }}
+      className="border border-[#33ccbb]/20 bg-[#0a0f0e]"
+    >
       <motion.div
-        layoutId={dayName}
-        transition={{
-          layout: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
-        }}
-        className="border border-[#33ccbb]/20 bg-[#0a0f0e]"
+        initial={sharedLayoutId ? { opacity: 0 } : false}
+        animate={{ opacity: 1 }}
+        exit={sharedLayoutId ? { opacity: 0 } : undefined}
+        transition={calendarRestTransition}
       >
-        {/* Inner content fades in - no exit (parent handles it) */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-        >
-          {/* Header */}
-          <DailyHeader />
-
-          {/* Schedule with Virtual Scroll */}
-          <Suspense
-            fallback={
-              <div className="flex items-center justify-center h-[600px]">
-                <div className="text-white/60 font-medium tracking-wide">LOADING SCHEDULE...</div>
-              </div>
-            }
-          >
-            <DailyScheduleContent />
-          </Suspense>
-        </motion.div>
+        <DailyHeader sourceMonthTimestamp={sourceMonthTimestamp} />
+        <DailyScheduleContent />
       </motion.div>
-    </LayoutGroup>
+    </motion.div>
   );
 }
 
 // Header component
-function DailyHeader() {
+function DailyHeader({ sourceMonthTimestamp }: { sourceMonthTimestamp: number }) {
   const { channel, guildId } = Route.useParams();
-  const search = Route.useSearch();
-  const timeZone = useTimeZone();
-  const currentDate = useZoned(timeZone, search.timestamp);
+  const { startCalendarTransition } = useScheduleTransitionActions();
 
   return (
     <div className="flex items-center justify-between px-6 py-4 border-b border-[#33ccbb]/20 bg-[#0f1615]">
@@ -106,7 +105,10 @@ function DailyHeader() {
         className="flex items-center gap-2 text-[#33ccbb] hover:text-white transition-colors"
         to="/dashboard/guilds/$guildId/schedule/$channel/calendar"
         params={{ guildId, channel }}
-        search={{ timestamp: DateTime.toEpochMillis(DateTime.startOf(currentDate, "month")) }}
+        search={{ timestamp: sourceMonthTimestamp }}
+        onClick={() => {
+          startCalendarTransition();
+        }}
       >
         <ChevronLeft className="w-4 h-4" />
         <span className="text-sm font-bold tracking-wide">BACK TO CALENDAR</span>
@@ -343,7 +345,7 @@ function BreakRow({
         }`}
       >
         {/* Actual Date Marker */}
-        <div className="flex-shrink-0 w-20">
+        <div className="w-20 shrink-0">
           {isDateTimeBoundary ? (
             <div className="flex flex-col leading-tight">
               <span className="text-xs font-black text-white tabular-nums">
@@ -419,7 +421,7 @@ function ScheduleHourRow({
         }`}
       >
         {/* Actual Date Marker */}
-        <div className="flex-shrink-0 w-20">
+        <div className="w-20 shrink-0">
           {isDateTimeBoundary ? (
             <div className="flex flex-col leading-tight">
               <span className="text-xs font-black text-white tabular-nums">

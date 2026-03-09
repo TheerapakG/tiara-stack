@@ -16,13 +16,11 @@ export const Route = createFileRoute("/_authenticated/dashboard/guilds/$guildId/
       return;
     }
 
-    console.log("before-loading channels");
     const channels = await Effect.runPromise(
       ensureResultAtomData(context.atomRegistry, getAllChannelsAtom(params.guildId), {
         revalidateIfStale: true,
       }).pipe(Effect.catchAll(() => Effect.succeed([]))),
     );
-    console.log("channels before-loaded");
 
     const defaultChannel = Array.head(channels);
 
