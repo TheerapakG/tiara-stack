@@ -104,16 +104,13 @@ function isSameMonth(a: DateTime.Zoned, b: DateTime.Zoned): boolean {
 function MonthPresenceShell({
   children,
   direction,
+  exitDirectionRef,
 }: {
   children: React.ReactNode;
   direction: -1 | 0 | 1;
+  exitDirectionRef: React.MutableRefObject<-1 | 0 | 1>;
 }) {
   const isPresent = useIsPresent();
-  const exitDirectionRef = useRef(direction);
-
-  if (isPresent) {
-    exitDirectionRef.current = direction;
-  }
 
   return (
     <motion.div
@@ -121,7 +118,46 @@ function MonthPresenceShell({
         direction === 0
           ? false
           : {
-              y: direction > 0 ? 56 : -56,
+              x: direction > 0 ? "100%" : "-100%",
+              opacity: 0,
+            }
+      }
+      animate={{ x: 0, opacity: 1 }}
+      exit={
+        exitDirectionRef.current === 0
+          ? undefined
+          : {
+              x: exitDirectionRef.current > 0 ? "-100%" : "100%",
+              opacity: 0,
+            }
+      }
+      transition={monthSlideTransition}
+      className={isPresent ? "relative z-20 w-full" : "absolute inset-0 z-20 w-full"}
+      style={{ pointerEvents: isPresent ? undefined : "none" }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function DayGridPresenceShell({
+  children,
+  direction,
+  exitDirectionRef,
+}: {
+  children: React.ReactNode;
+  direction: -1 | 0 | 1;
+  exitDirectionRef: React.MutableRefObject<-1 | 0 | 1>;
+}) {
+  const isPresent = useIsPresent();
+
+  return (
+    <motion.div
+      initial={
+        direction === 0
+          ? false
+          : {
+              y: direction > 0 ? "100%" : "-100%",
               opacity: 0,
             }
       }
@@ -130,12 +166,13 @@ function MonthPresenceShell({
         exitDirectionRef.current === 0
           ? undefined
           : {
-              y: exitDirectionRef.current > 0 ? -56 : 56,
+              y: exitDirectionRef.current > 0 ? "-100%" : "100%",
               opacity: 0,
             }
       }
       transition={monthSlideTransition}
       className={isPresent ? "relative w-full" : "absolute inset-0 w-full"}
+      style={{ pointerEvents: isPresent ? undefined : "none" }}
     >
       {children}
     </motion.div>
@@ -157,6 +194,8 @@ function CalendarPage() {
   const isReturningToCalendar = selectedDay?.phase === "to-calendar";
   const isCalendarLocked = isTransitioningToDaily || isReturningToCalendar;
 
+  const exitDirectionRef = useRef<-1 | 0 | 1>(0);
+
   const navigateMonth = (direction: -1 | 1) => {
     const nextMonthZoned =
       direction < 0
@@ -165,6 +204,7 @@ function CalendarPage() {
     const nextMonthStartZoned = DateTime.startOf(nextMonthZoned, "month");
 
     clearSelectedDay();
+    exitDirectionRef.current = direction;
     setMonthDirection(direction);
 
     navigate({
@@ -179,30 +219,13 @@ function CalendarPage() {
   const weekDays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
   return (
-    <div className="overflow-hidden border border-[#33ccbb]/20 bg-[#0f1615]">
+    <div className="relative overflow-hidden border border-[#33ccbb]/20 bg-[#0f1615]">
+      {/* Weekday header: fade only during daily nav, static during month slide */}
       <motion.div
-        initial={isReturningToCalendar ? { opacity: 0 } : false}
         animate={{ opacity: isTransitioningToDaily ? 0 : 1 }}
         transition={calendarRestTransition}
-        style={{ pointerEvents: isCalendarLocked ? "none" : undefined }}
+        className="relative z-10 grid grid-cols-7 border-b border-[#33ccbb]/20 bg-[#0f1615]"
       >
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-[#33ccbb]/20 p-4">
-          <button
-            onClick={() => navigateMonth(-1)}
-            className="justify-self-start p-2 text-[#33ccbb] transition-colors hover:bg-[#33ccbb]/10"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <button
-            onClick={() => navigateMonth(1)}
-            className="col-start-3 justify-self-end p-2 text-[#33ccbb] transition-colors hover:bg-[#33ccbb]/10"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        </div>
-      </motion.div>
-
-      <div className="grid grid-cols-7 border-b border-[#33ccbb]/20">
         {weekDays.map((day) => (
           <div
             key={day}
@@ -211,23 +234,50 @@ function CalendarPage() {
             {day}
           </div>
         ))}
-      </div>
+      </motion.div>
 
       <div className="relative">
         <AnimatePresence initial={false} mode="sync">
-          <MonthPresenceShell key={currentMonthKey} direction={monthDirection}>
+          {/* Month header: slide left/right + fade during daily nav */}
+          <MonthPresenceShell
+            key={`header-${currentMonthKey}`}
+            direction={monthDirection}
+            exitDirectionRef={exitDirectionRef}
+          >
             <motion.div
               initial={isReturningToCalendar ? { opacity: 0 } : false}
               animate={{ opacity: isTransitioningToDaily ? 0 : 1 }}
               transition={calendarRestTransition}
-              className="border-b border-[#33ccbb]/20 px-4 py-4 text-center"
               style={{ pointerEvents: isCalendarLocked ? "none" : undefined }}
             >
-              <h3 className="text-lg font-black tracking-tight">{formatMonthYear(currentDate)}</h3>
+              <div className="grid grid-cols-[auto_1fr_auto] items-center border-b border-[#33ccbb]/20 p-4">
+                <button
+                  onClick={() => navigateMonth(-1)}
+                  className="justify-self-start p-2 text-[#33ccbb] transition-colors hover:bg-[#33ccbb]/10"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <h3 className="text-center text-lg font-black tracking-tight">
+                  {formatMonthYear(currentDate)}
+                </h3>
+                <button
+                  onClick={() => navigateMonth(1)}
+                  className="justify-self-end p-2 text-[#33ccbb] transition-colors hover:bg-[#33ccbb]/10"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </div>
             </motion.div>
-
-            <CalendarGrid currentDate={currentDate} />
           </MonthPresenceShell>
+
+          {/* Day grid: slide up/down + cells handle morph + conditional fade */}
+          <DayGridPresenceShell
+            key={`grid-${currentMonthKey}`}
+            direction={monthDirection}
+            exitDirectionRef={exitDirectionRef}
+          >
+            <CalendarGrid currentDate={currentDate} />
+          </DayGridPresenceShell>
         </AnimatePresence>
       </div>
     </div>
@@ -242,7 +292,7 @@ function CalendarGrid({ currentDate }: CalendarGridProps) {
   const { guildId, channel } = Route.useParams();
   const timeZone = useTimeZone();
   const selectedDay = useScheduleSelectedDay();
-  const { finishCalendarTransition, startDailyTransition } = useScheduleTransitionActions();
+  const { clearSelectedDay, startDailyTransition } = useScheduleTransitionActions();
 
   const calendarDays = useMemo(() => {
     return getCalendarDays(currentDate);
@@ -284,9 +334,9 @@ function CalendarGrid({ currentDate }: CalendarGridProps) {
 
   useEffect(() => {
     if (isReturningToCalendar && !hasSelectedDayInMonth) {
-      finishCalendarTransition();
+      clearSelectedDay();
     }
-  }, [finishCalendarTransition, hasSelectedDayInMonth, isReturningToCalendar]);
+  }, [clearSelectedDay, hasSelectedDayInMonth, isReturningToCalendar]);
 
   return (
     <div
@@ -309,7 +359,7 @@ function CalendarGrid({ currentDate }: CalendarGridProps) {
             layoutId={sharedLayoutId}
             onLayoutAnimationComplete={() => {
               if (isReturningToCalendar && isSelectedDay) {
-                finishCalendarTransition();
+                clearSelectedDay();
               }
             }}
             initial={isReturningToCalendar && !isSelectedDay ? { opacity: 0 } : false}
@@ -323,7 +373,7 @@ function CalendarGrid({ currentDate }: CalendarGridProps) {
               border-r border-b border-[#33ccbb]/10 last:border-r-0
               ${isCurrentMonth ? "text-white" : "text-white/30"}
               ${hasSchedule ? "bg-[#33ccbb]/5" : ""}
-              ${isSelectedDay ? "relative z-10" : ""}
+              ${isSelectedDay ? "relative z-20" : ""}
             `}
           >
             <Link

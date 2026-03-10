@@ -77,10 +77,6 @@ function useScheduleTransitionActionsValue({
     );
   }, [selectedDayRef, setMonthDirectionState, setSelectedDay]);
 
-  const finishCalendarTransition = useCallback(() => {
-    setSelectedDay(null);
-  }, [setSelectedDay]);
-
   const clearSelectedDay = useCallback(() => {
     setSelectedDay(null);
   }, [setSelectedDay]);
@@ -90,16 +86,9 @@ function useScheduleTransitionActionsValue({
       setMonthDirection: setMonthDirectionState,
       startDailyTransition,
       startCalendarTransition,
-      finishCalendarTransition,
       clearSelectedDay,
     }),
-    [
-      clearSelectedDay,
-      finishCalendarTransition,
-      setMonthDirectionState,
-      startCalendarTransition,
-      startDailyTransition,
-    ],
+    [clearSelectedDay, setMonthDirectionState, startCalendarTransition, startDailyTransition],
   );
 }
 
