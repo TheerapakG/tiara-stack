@@ -220,22 +220,6 @@ function CalendarPage() {
 
   return (
     <div className="relative overflow-hidden border border-[#33ccbb]/20 bg-[#0f1615]">
-      {/* Weekday header: fade only during daily nav, static during month slide */}
-      <motion.div
-        animate={{ opacity: isTransitioningToDaily ? 0 : 1 }}
-        transition={calendarRestTransition}
-        className="relative z-10 grid grid-cols-7 border-b border-[#33ccbb]/20 bg-[#0f1615]"
-      >
-        {weekDays.map((day) => (
-          <div
-            key={day}
-            className="p-3 text-center text-xs font-bold tracking-wider text-[#33ccbb]/60"
-          >
-            {day}
-          </div>
-        ))}
-      </motion.div>
-
       <div className="relative">
         <AnimatePresence initial={false} mode="sync">
           {/* Month header: slide left/right + fade during daily nav */}
@@ -269,7 +253,27 @@ function CalendarPage() {
               </div>
             </motion.div>
           </MonthPresenceShell>
+        </AnimatePresence>
+      </div>
 
+      {/* Weekday header: fade only during daily nav, static during month slide */}
+      <motion.div
+        animate={{ opacity: isTransitioningToDaily ? 0 : 1 }}
+        transition={calendarRestTransition}
+        className="relative z-10 grid grid-cols-7 border-b border-[#33ccbb]/20 bg-[#0f1615]"
+      >
+        {weekDays.map((day) => (
+          <div
+            key={day}
+            className="p-3 text-center text-xs font-bold tracking-wider text-[#33ccbb]/60"
+          >
+            {day}
+          </div>
+        ))}
+      </motion.div>
+
+      <div className="relative">
+        <AnimatePresence initial={false} mode="sync">
           {/* Day grid: slide up/down + cells handle morph + conditional fade */}
           <DayGridPresenceShell
             key={`grid-${currentMonthKey}`}
