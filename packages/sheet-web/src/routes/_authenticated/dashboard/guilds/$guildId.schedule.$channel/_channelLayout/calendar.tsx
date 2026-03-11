@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import { DateTime, HashSet, Effect, Array } from "effect";
@@ -71,8 +71,8 @@ function getCalendarDays(dateTime: DateTime.Zoned) {
   return days as [DateTime.Zoned, ...DateTime.Zoned[]];
 }
 
-// Format month/year for display (e.g., "FEBRUARY 2026")
-function formatMonthYear(dateTime: DateTime.Zoned): string {
+// Get month name and year separately for animated display
+function getMonthYearParts(dateTime: DateTime.Zoned): { month: string; year: string } {
   const parts = DateTime.toParts(dateTime);
   const monthNames = [
     "JANUARY",
@@ -88,7 +88,7 @@ function formatMonthYear(dateTime: DateTime.Zoned): string {
     "NOVEMBER",
     "DECEMBER",
   ];
-  return `${monthNames[parts.month - 1]} ${parts.year}`;
+  return { month: monthNames[parts.month - 1], year: String(parts.year) };
 }
 
 // Format day of month for display
@@ -104,42 +104,64 @@ function isSameMonth(a: DateTime.Zoned, b: DateTime.Zoned): boolean {
   return partsA.year === partsB.year && partsA.month === partsB.month;
 }
 
-function MonthPresenceShell({
-  children,
+// Inner component that handles positioning based on presence state
+function SlidingTextInner({
+  text,
   direction,
   exitDirectionRef,
+  className,
 }: {
-  children: React.ReactNode;
+  text: string;
   direction: -1 | 0 | 1;
   exitDirectionRef: React.RefObject<-1 | 0 | 1>;
+  className?: string;
 }) {
   const isPresent = useIsPresent();
 
   return (
-    <motion.div
-      initial={
-        direction === 0
-          ? false
-          : {
-              x: direction > 0 ? "100%" : "-100%",
-              opacity: 0,
-            }
-      }
-      animate={{ x: 0, opacity: 1 }}
+    <motion.span
+      initial={direction === 0 ? false : { y: direction > 0 ? "100%" : "-100%", opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
       exit={
         exitDirectionRef.current === 0
           ? undefined
-          : {
-              x: exitDirectionRef.current > 0 ? "-100%" : "100%",
-              opacity: 0,
-            }
+          : { y: exitDirectionRef.current > 0 ? "-100%" : "100%", opacity: 0 }
       }
       transition={monthSlideTransition}
-      className={isPresent ? "relative z-20 w-full" : "absolute inset-0 z-20 w-full"}
-      style={{ pointerEvents: isPresent ? undefined : "none" }}
+      className={className}
+      style={isPresent ? { display: "block" } : { position: "absolute", inset: 0 }}
     >
-      {children}
-    </motion.div>
+      {text}
+    </motion.span>
+  );
+}
+
+// Animated text that slides in/out when content changes
+function SlidingText({
+  text,
+  direction,
+  exitDirectionRef,
+  className,
+  onExitComplete,
+}: {
+  text: string;
+  direction: -1 | 0 | 1;
+  exitDirectionRef: React.RefObject<-1 | 0 | 1>;
+  className?: string;
+  onExitComplete?: () => void;
+}) {
+  return (
+    <div className="relative h-[1lh] overflow-hidden">
+      <AnimatePresence initial={false} mode="sync" onExitComplete={onExitComplete}>
+        <SlidingTextInner
+          key={text}
+          text={text}
+          direction={direction}
+          exitDirectionRef={exitDirectionRef}
+          className={className}
+        />
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -186,7 +208,7 @@ function CalendarPage() {
   const { guildId, channel } = Route.useParams();
   const timeZone = useTimeZone();
   const search = Route.useSearch();
-  const navigate = useNavigate();
+
   const selected = useScheduleSelected();
   const monthDirection = useScheduleMonthDirection();
   const { isTransitioningToDaily, isTransitioningToCalendar, isCalendarLocked } =
@@ -198,64 +220,76 @@ function CalendarPage() {
 
   const exitDirectionRef = useRef<-1 | 0 | 1>(0);
 
-  const navigateMonth = (direction: -1 | 1) => {
-    const nextMonthZoned =
-      direction < 0
-        ? DateTime.subtract(currentDate, { months: 1 })
-        : DateTime.add(currentDate, { months: 1 });
-    const nextMonthStartZoned = DateTime.startOf(nextMonthZoned, "month");
+  // Pre-computed timestamps for prev/next month navigation
+  const prevMonthTimestamp = useMemo(
+    () =>
+      DateTime.toEpochMillis(
+        DateTime.startOf(DateTime.subtract(currentDate, { months: 1 }), "month"),
+      ),
+    [currentDate],
+  );
+  const nextMonthTimestamp = useMemo(
+    () =>
+      DateTime.toEpochMillis(DateTime.startOf(DateTime.add(currentDate, { months: 1 }), "month")),
+    [currentDate],
+  );
 
+  const handleMonthClick = (direction: -1 | 1) => {
     setState({ selected: undefined, phase: undefined, monthDirection: direction });
     exitDirectionRef.current = direction;
-
-    navigate({
-      to: ".",
-      params: { guildId, channel },
-      search: {
-        timestamp: DateTime.toEpochMillis(nextMonthStartZoned),
-      },
-    });
   };
 
+  const { month, year } = getMonthYearParts(currentDate);
   const weekDays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
   return (
     <div className="relative overflow-hidden border border-[#33ccbb]/20 bg-[#0f1615]">
-      <div className="relative">
-        <AnimatePresence initial={false} mode="sync">
-          {/* Month header: slide left/right + fade during daily nav */}
-          <MonthPresenceShell
-            key={`header-${currentMonthKey}`}
-            direction={monthDirection}
-            exitDirectionRef={exitDirectionRef}
+      {/* Month header: static buttons, only month/year text slides */}
+      <motion.div
+        initial={isTransitioningToCalendar ? { opacity: 0 } : false}
+        animate={{ opacity: isTransitioningToDaily ? 0 : 1 }}
+        transition={calendarRestTransition}
+        style={{ pointerEvents: isCalendarLocked ? "none" : undefined }}
+        className="relative z-20"
+      >
+        <div className="grid grid-cols-[auto_1fr_auto] items-center border-b border-[#33ccbb]/20 p-4">
+          <Link
+            to="."
+            params={{ guildId, channel }}
+            search={{ timestamp: prevMonthTimestamp }}
+            onClick={() => handleMonthClick(-1)}
+            className="justify-self-start p-2 text-[#33ccbb] transition-colors hover:bg-[#33ccbb]/10"
           >
-            <motion.div
-              initial={isTransitioningToCalendar ? { opacity: 0 } : false}
-              animate={{ opacity: isTransitioningToDaily ? 0 : 1 }}
-              transition={calendarRestTransition}
-              style={{ pointerEvents: isCalendarLocked ? "none" : undefined }}
-            >
-              <div className="grid grid-cols-[auto_1fr_auto] items-center border-b border-[#33ccbb]/20 p-4">
-                <button
-                  onClick={() => navigateMonth(-1)}
-                  className="justify-self-start p-2 text-[#33ccbb] transition-colors hover:bg-[#33ccbb]/10"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                <h3 className="text-center text-lg font-black tracking-tight">
-                  {formatMonthYear(currentDate)}
-                </h3>
-                <button
-                  onClick={() => navigateMonth(1)}
-                  className="justify-self-end p-2 text-[#33ccbb] transition-colors hover:bg-[#33ccbb]/10"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </button>
-              </div>
-            </motion.div>
-          </MonthPresenceShell>
-        </AnimatePresence>
-      </div>
+            <ChevronLeft className="h-5 w-5" />
+          </Link>
+          <h3 className="flex items-center justify-center gap-2 text-center text-lg font-black tracking-tight">
+            <SlidingText
+              text={month}
+              direction={monthDirection}
+              exitDirectionRef={exitDirectionRef}
+              onExitComplete={() => {
+                if (monthDirection !== 0) {
+                  setState((prev) => ({ ...prev, monthDirection: 0 }));
+                }
+              }}
+            />
+            <SlidingText
+              text={year}
+              direction={monthDirection}
+              exitDirectionRef={exitDirectionRef}
+            />
+          </h3>
+          <Link
+            to="."
+            params={{ guildId, channel }}
+            search={{ timestamp: nextMonthTimestamp }}
+            onClick={() => handleMonthClick(1)}
+            className="justify-self-end p-2 text-[#33ccbb] transition-colors hover:bg-[#33ccbb]/10"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </Link>
+        </div>
+      </motion.div>
 
       {/* Weekday header: fade only during daily nav, static during month slide */}
       <motion.div
