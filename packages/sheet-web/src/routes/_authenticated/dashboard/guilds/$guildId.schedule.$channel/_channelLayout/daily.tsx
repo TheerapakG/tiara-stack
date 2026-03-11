@@ -23,7 +23,7 @@ import {
   buildSharedDayLayoutId,
   calendarRestTransition,
   morphLayoutTransition,
-  useScheduleSelectedDay,
+  useScheduleSelected,
   useScheduleTransitionActions,
 } from "./-transition";
 
@@ -54,24 +54,26 @@ export const Route = createFileRoute(
 function DailyPage() {
   const timeZone = useTimeZone();
   const search = Route.useSearch();
-  const selectedDay = useScheduleSelectedDay();
-  const { clearSelectedDay } = useScheduleTransitionActions();
+  const selected = useScheduleSelected();
+  const { clearScheduleTransitionState } = useScheduleTransitionActions();
   const currentDate = useZoned(timeZone, search.timestamp);
-  const isMatchingTransitionDay =
-    selectedDay !== null &&
-    DateTime.Equivalence(selectedDay.day, DateTime.startOf(currentDate, "day"));
-  const sourceMonth = isMatchingTransitionDay
-    ? selectedDay.sourceMonth
-    : DateTime.startOf(currentDate, "month");
-  const sharedLayoutId = isMatchingTransitionDay
-    ? buildSharedDayLayoutId(currentDate, sourceMonth)
-    : undefined;
+  const sourceMonth = useMemo(
+    () =>
+      selected && DateTime.Equivalence(selected.day, DateTime.startOf(currentDate, "day"))
+        ? selected.month
+        : DateTime.startOf(currentDate, "month"),
+    [selected, currentDate],
+  );
+  const sharedLayoutId =
+    selected && DateTime.Equivalence(selected.day, DateTime.startOf(currentDate, "day"))
+      ? buildSharedDayLayoutId(currentDate, sourceMonth)
+      : undefined;
 
   useEffect(() => {
     return () => {
-      clearSelectedDay();
+      clearScheduleTransitionState();
     };
-  }, [clearSelectedDay]);
+  }, [clearScheduleTransitionState]);
 
   return (
     <motion.div

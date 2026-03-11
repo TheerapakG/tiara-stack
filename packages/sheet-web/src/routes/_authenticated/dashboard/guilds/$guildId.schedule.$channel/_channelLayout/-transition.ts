@@ -20,26 +20,77 @@ export const monthSlideTransition = {
 
 export type MonthDirection = -1 | 0 | 1;
 
-export interface SelectedDayTransition {
-  readonly day: DateTime.Zoned;
-  readonly sourceMonth: DateTime.Zoned;
-  readonly phase: "to-daily" | "to-calendar";
+export type TransitionPhase = "to-daily" | "to-calendar";
+
+export interface ScheduleTransitionState {
+  readonly selected?: {
+    readonly day: DateTime.Zoned;
+    readonly month: DateTime.Zoned;
+  };
+  readonly phase?: TransitionPhase;
+  readonly monthDirection: MonthDirection;
 }
 
-// Writable atom for the selected day transition state using Atom.make with initial value
-export const selectedDayAtom: Atom.Writable<SelectedDayTransition | null> =
-  Atom.make<SelectedDayTransition | null>(null);
+// Combined singular atom for all schedule transition state
+const scheduleTransitionAtom: Atom.Writable<ScheduleTransitionState> =
+  Atom.make<ScheduleTransitionState>({
+    selected: undefined,
+    phase: undefined,
+    monthDirection: 0,
+  });
 
-// Writable atom for the month direction (-1 = prev, 0 = none, 1 = next)
-export const monthDirectionAtom: Atom.Writable<MonthDirection> = Atom.make<MonthDirection>(0);
+// Derived atom for the selected day
+export const selectedAtom: Atom.Atom<
+  | {
+      readonly day: DateTime.Zoned;
+      readonly month: DateTime.Zoned;
+    }
+  | undefined
+> = Atom.map(scheduleTransitionAtom, (state) => state.selected);
+
+// Derived atom for the phase
+export const phaseAtom: Atom.Atom<TransitionPhase | undefined> = Atom.map(
+  scheduleTransitionAtom,
+  (state) => state.phase,
+);
+
+// Derived atom for month direction
+export const monthDirectionAtom: Atom.Atom<MonthDirection> = Atom.map(
+  scheduleTransitionAtom,
+  (state) => state.monthDirection,
+);
+
+// Derived atom for checking if transitioning to daily view
+export const isTransitioningToDailyAtom: Atom.Atom<boolean> = Atom.map(
+  scheduleTransitionAtom,
+  (state) => state.phase === "to-daily",
+);
+
+// Derived atom for checking if transitioning to calendar view
+export const isTransitioningToCalendarAtom: Atom.Atom<boolean> = Atom.map(
+  scheduleTransitionAtom,
+  (state) => state.phase === "to-calendar",
+);
+
+// Derived atom for calendar locked state (transitioning in either direction)
+export const isCalendarLockedAtom: Atom.Atom<boolean> = Atom.map(
+  scheduleTransitionAtom,
+  (state) => state.phase === "to-daily" || state.phase === "to-calendar",
+);
 
 // Hook for reading the selected day transition state
-export function useScheduleSelectedDay() {
-  return useAtomValue(selectedDayAtom);
+export function useScheduleSelected() {
+  return useAtomValue(selectedAtom);
 }
 
-export function useSetScheduleSelectedDay() {
-  return useAtomSet(selectedDayAtom);
+// Hook for reading the phase
+export function useSchedulePhase() {
+  return useAtomValue(phaseAtom);
+}
+
+// Hook for setting the schedule transition state (operates on combined atom)
+export function useSetScheduleTransitionState() {
+  return useAtomSet(scheduleTransitionAtom);
 }
 
 // Hook for reading the month direction
@@ -47,50 +98,89 @@ export function useScheduleMonthDirection() {
   return useAtomValue(monthDirectionAtom);
 }
 
+// Hook for setting month direction
 export function useSetScheduleMonthDirection() {
-  return useAtomSet(monthDirectionAtom);
+  const setState = useSetScheduleTransitionState();
+  return useCallback(
+    (direction: MonthDirection) => {
+      setState((prev) => ({ ...prev, monthDirection: direction }));
+    },
+    [setState],
+  );
 }
 
-// Hook for transition actions
-export function useScheduleTransitionActions() {
-  const setSelectedDay = useSetScheduleSelectedDay();
-  const setMonthDirection = useSetScheduleMonthDirection();
-
-  const startDailyTransition = useCallback(
-    (day: DateTime.Zoned, sourceMonth: DateTime.Zoned) => {
-      setMonthDirection(0);
-      setSelectedDay({
-        day,
-        sourceMonth,
+// Hook for starting daily transition
+export function useStartDailyTransition() {
+  const setState = useSetScheduleTransitionState();
+  return useCallback(
+    (day: DateTime.Zoned, month: DateTime.Zoned) => {
+      setState({
+        selected: { day, month },
         phase: "to-daily",
+        monthDirection: 0,
       });
     },
-    [setMonthDirection, setSelectedDay],
+    [setState],
   );
+}
 
-  const startCalendarTransition = useCallback(() => {
-    setMonthDirection(0);
-    setSelectedDay((prev) =>
-      prev === null
-        ? null
-        : {
+// Hook for starting calendar transition
+export function useStartCalendarTransition() {
+  const setState = useSetScheduleTransitionState();
+  return useCallback(() => {
+    setState((prev) =>
+      prev.selected !== undefined
+        ? {
             ...prev,
             phase: "to-calendar",
-          },
+            monthDirection: 0,
+          }
+        : prev,
     );
-  }, [setMonthDirection, setSelectedDay]);
+  }, [setState]);
+}
 
-  const clearSelectedDay = useCallback(() => {
-    setSelectedDay(null);
-  }, [setSelectedDay]);
+// Hook for clearing schedule transition state
+export function useClearScheduleTransitionState() {
+  const setState = useSetScheduleTransitionState();
+  return useCallback(() => {
+    setState({
+      selected: undefined,
+      phase: undefined,
+      monthDirection: 0,
+    });
+  }, [setState]);
+}
+
+// Combined hook for transition actions (for convenience)
+export function useScheduleTransitionActions() {
+  const startDailyTransition = useStartDailyTransition();
+  const startCalendarTransition = useStartCalendarTransition();
+  const clearScheduleTransitionState = useClearScheduleTransitionState();
 
   return useMemo(
     () => ({
       startDailyTransition,
       startCalendarTransition,
-      clearSelectedDay,
+      clearScheduleTransitionState,
     }),
-    [startDailyTransition, startCalendarTransition, clearSelectedDay],
+    [startDailyTransition, startCalendarTransition, clearScheduleTransitionState],
+  );
+}
+
+// Hook for derived transition states
+export function useScheduleTransitionStates() {
+  const isTransitioningToDaily = useAtomValue(isTransitioningToDailyAtom);
+  const isTransitioningToCalendar = useAtomValue(isTransitioningToCalendarAtom);
+  const isCalendarLocked = useAtomValue(isCalendarLockedAtom);
+
+  return useMemo(
+    () => ({
+      isTransitioningToDaily,
+      isTransitioningToCalendar,
+      isCalendarLocked,
+    }),
+    [isTransitioningToDaily, isTransitioningToCalendar, isCalendarLocked],
   );
 }
 

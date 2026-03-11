@@ -7,9 +7,8 @@ import { useAllChannels, getAllChannelsAtom } from "#/lib/schedule";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 import {
   morphLayoutTransition,
-  useScheduleSelectedDay,
+  useScheduleSelected,
   useScheduleTransitionActions,
-  useSetScheduleMonthDirection,
 } from "./_channelLayout/-transition";
 
 // Search params schema using Effect Schema
@@ -57,19 +56,17 @@ function RoutePresenceShell({
 }
 
 function ScheduleLayout() {
-  const selectedDay = useScheduleSelectedDay();
+  const selected = useScheduleSelected();
   const { guildId, channel } = Route.useParams();
-  const { clearSelectedDay } = useScheduleTransitionActions();
-  const setMonthDirection = useSetScheduleMonthDirection();
+  const { clearScheduleTransitionState } = useScheduleTransitionActions();
   const search = Route.useSearch();
 
   // Reset transition state when navigating between guilds/channels
   useLayoutEffect(() => {
     return () => {
-      clearSelectedDay();
-      setMonthDirection(0);
+      clearScheduleTransitionState();
     };
-  }, [guildId, channel, clearSelectedDay, setMonthDirection]);
+  }, [guildId, channel, clearScheduleTransitionState]);
   const childMatches = useChildMatches();
 
   // Extract view type from route path - explicit check for calendar vs daily
@@ -114,7 +111,7 @@ function ScheduleLayout() {
 
         <div className="relative">
           <AnimatePresence initial={false} mode="sync">
-            <RoutePresenceShell key={routeKey} shouldFadeIn={selectedDay === null}>
+            <RoutePresenceShell key={routeKey} shouldFadeIn={selected === undefined}>
               <Outlet />
             </RoutePresenceShell>
           </AnimatePresence>

@@ -13,11 +13,12 @@ import {
   calendarRestTransition,
   monthSlideTransition,
   morphLayoutTransition,
-  type SelectedDayTransition,
   useScheduleMonthDirection,
-  useScheduleSelectedDay,
-  useScheduleTransitionActions,
-  useSetScheduleMonthDirection,
+  useScheduleSelected,
+  useScheduleTransitionStates,
+  useSetScheduleTransitionState,
+  useStartDailyTransition,
+  useClearScheduleTransitionState,
 } from "./-transition";
 
 export const Route = createFileRoute(
@@ -110,7 +111,7 @@ function MonthPresenceShell({
 }: {
   children: React.ReactNode;
   direction: -1 | 0 | 1;
-  exitDirectionRef: React.MutableRefObject<-1 | 0 | 1>;
+  exitDirectionRef: React.RefObject<-1 | 0 | 1>;
 }) {
   const isPresent = useIsPresent();
 
@@ -149,7 +150,7 @@ function DayGridPresenceShell({
 }: {
   children: React.ReactNode;
   direction: -1 | 0 | 1;
-  exitDirectionRef: React.MutableRefObject<-1 | 0 | 1>;
+  exitDirectionRef: React.RefObject<-1 | 0 | 1>;
 }) {
   const isPresent = useIsPresent();
 
@@ -186,16 +187,14 @@ function CalendarPage() {
   const timeZone = useTimeZone();
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const selectedDay = useScheduleSelectedDay();
+  const selected = useScheduleSelected();
   const monthDirection = useScheduleMonthDirection();
-  const { clearSelectedDay } = useScheduleTransitionActions();
-  const setMonthDirection = useSetScheduleMonthDirection();
+  const { isTransitioningToDaily, isTransitioningToCalendar, isCalendarLocked } =
+    useScheduleTransitionStates();
+  const setState = useSetScheduleTransitionState();
   // Use timestamp to determine the month to display
   const currentDate = useZoned(timeZone, search.timestamp);
   const currentMonthKey = formatDayKey(DateTime.startOf(currentDate, "month"));
-  const isTransitioningToDaily = selectedDay?.phase === "to-daily";
-  const isReturningToCalendar = selectedDay?.phase === "to-calendar";
-  const isCalendarLocked = isTransitioningToDaily || isReturningToCalendar;
 
   const exitDirectionRef = useRef<-1 | 0 | 1>(0);
 
@@ -206,9 +205,8 @@ function CalendarPage() {
         : DateTime.add(currentDate, { months: 1 });
     const nextMonthStartZoned = DateTime.startOf(nextMonthZoned, "month");
 
-    clearSelectedDay();
+    setState({ selected: undefined, phase: undefined, monthDirection: direction });
     exitDirectionRef.current = direction;
-    setMonthDirection(direction);
 
     navigate({
       to: ".",
@@ -232,7 +230,7 @@ function CalendarPage() {
             exitDirectionRef={exitDirectionRef}
           >
             <motion.div
-              initial={isReturningToCalendar ? { opacity: 0 } : false}
+              initial={isTransitioningToCalendar ? { opacity: 0 } : false}
               animate={{ opacity: isTransitioningToDaily ? 0 : 1 }}
               transition={calendarRestTransition}
               style={{ pointerEvents: isCalendarLocked ? "none" : undefined }}
@@ -283,7 +281,7 @@ function CalendarPage() {
             direction={monthDirection}
             exitDirectionRef={exitDirectionRef}
           >
-            <CalendarGrid currentDate={currentDate} selectedDay={selectedDay} />
+            <CalendarGrid currentDate={currentDate} selected={selected} />
           </DayGridPresenceShell>
         </AnimatePresence>
       </div>
@@ -293,13 +291,16 @@ function CalendarPage() {
 
 interface CalendarGridProps {
   currentDate: DateTime.Zoned;
-  selectedDay: SelectedDayTransition | null;
+  selected: { readonly day: DateTime.Zoned; readonly month: DateTime.Zoned } | undefined;
 }
 
-function CalendarGrid({ currentDate, selectedDay }: CalendarGridProps) {
+function CalendarGrid({ currentDate, selected }: CalendarGridProps) {
   const { guildId, channel } = Route.useParams();
   const timeZone = useTimeZone();
-  const { clearSelectedDay, startDailyTransition } = useScheduleTransitionActions();
+  const { isTransitioningToDaily, isTransitioningToCalendar, isCalendarLocked } =
+    useScheduleTransitionStates();
+  const clearScheduleTransitionState = useClearScheduleTransitionState();
+  const startDailyTransition = useStartDailyTransition();
 
   const calendarDays = useMemo(() => {
     return getCalendarDays(currentDate);
@@ -323,26 +324,23 @@ function CalendarGrid({ currentDate, selectedDay }: CalendarGridProps) {
   });
 
   const currentMonth = useMemo(() => DateTime.startOf(currentDate, "month"), [currentDate]);
-  const isTransitioningToDaily = selectedDay?.phase === "to-daily";
-  const isReturningToCalendar = selectedDay?.phase === "to-calendar";
-  const isCalendarLocked = isTransitioningToDaily || isReturningToCalendar;
   const hasSelectedDayInMonth = useMemo(
     () =>
       calendarDays.some((day) => {
         return (
-          selectedDay !== null &&
-          DateTime.Equivalence(selectedDay.day, DateTime.startOf(day, "day")) &&
-          DateTime.Equivalence(selectedDay.sourceMonth, currentMonth)
+          selected &&
+          DateTime.Equivalence(selected.day, DateTime.startOf(day, "day")) &&
+          DateTime.Equivalence(selected.month, currentMonth)
         );
       }),
-    [calendarDays, currentMonth, selectedDay],
+    [calendarDays, currentMonth, selected],
   );
 
   useEffect(() => {
-    if (isReturningToCalendar && !hasSelectedDayInMonth) {
-      clearSelectedDay();
+    if (isTransitioningToCalendar && !hasSelectedDayInMonth) {
+      clearScheduleTransitionState();
     }
-  }, [clearSelectedDay, hasSelectedDayInMonth, isReturningToCalendar]);
+  }, [clearScheduleTransitionState, hasSelectedDayInMonth, isTransitioningToCalendar]);
 
   return (
     <div
@@ -355,20 +353,20 @@ function CalendarGrid({ currentDate, selectedDay }: CalendarGridProps) {
         const hasSchedule = HashSet.has(scheduledDays, dayKey);
         const sharedLayoutId = buildSharedDayLayoutId(day, currentDate);
         const isSelectedDay =
-          selectedDay !== null &&
-          DateTime.Equivalence(selectedDay.day, DateTime.startOf(day, "day")) &&
-          DateTime.Equivalence(selectedDay.sourceMonth, currentMonth);
+          selected &&
+          DateTime.Equivalence(selected.day, DateTime.startOf(day, "day")) &&
+          DateTime.Equivalence(selected.month, currentMonth);
 
         return (
           <motion.div
             key={sharedLayoutId}
             layoutId={sharedLayoutId}
             onLayoutAnimationComplete={() => {
-              if (isReturningToCalendar && isSelectedDay) {
-                clearSelectedDay();
+              if (isTransitioningToCalendar && isSelectedDay) {
+                clearScheduleTransitionState();
               }
             }}
-            initial={isReturningToCalendar && !isSelectedDay ? { opacity: 0 } : false}
+            initial={isTransitioningToCalendar && !isSelectedDay ? { opacity: 0 } : false}
             animate={{ opacity: isTransitioningToDaily && !isSelectedDay ? 0 : 1 }}
             transition={{
               ...calendarRestTransition,
