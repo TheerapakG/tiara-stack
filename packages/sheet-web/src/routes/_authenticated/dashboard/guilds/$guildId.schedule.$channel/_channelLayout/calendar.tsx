@@ -250,7 +250,7 @@ function CalendarPage() {
         animate={{ opacity: isTransitioningToDaily ? 0 : 1 }}
         transition={calendarRestTransition}
         style={{ pointerEvents: isCalendarLocked ? "none" : undefined }}
-        className={`relative ${isTransitioningToDaily ? "z-0" : "z-10"}`}
+        className={`relative bg-[#0f1615] ${isTransitioningToDaily ? "z-0" : "z-10"}`}
       >
         <div className="grid grid-cols-[auto_1fr_auto] items-center border-b border-[#33ccbb]/20 p-4">
           <Link
@@ -307,7 +307,7 @@ function CalendarPage() {
         ))}
       </motion.div>
 
-      <div className={`relative ${isTransitioningToDaily ? "z-10" : "z-0"}`}>
+      <div className={`relative ${isTransitioningToDaily ? "z-20" : "z-0"}`}>
         <AnimatePresence initial={false} mode="sync">
           {/* Day grid: slide up/down + cells handle morph + conditional fade */}
           <DayGridPresenceShell
