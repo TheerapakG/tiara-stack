@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { DateTime, Option, Effect, pipe, HashMap, Array, Duration } from "effect";
+
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 import {
   type SchedulePlayer,
@@ -21,7 +22,6 @@ import { currentUserAtom, useCurrentUser } from "#/lib/discord";
 import {
   buildSharedDayLayoutId,
   calendarRestTransition,
-  getMonthTimestamp,
   morphLayoutTransition,
   useScheduleSelectedDay,
   useScheduleTransitionActions,
@@ -57,12 +57,12 @@ function DailyPage() {
   const selectedDay = useScheduleSelectedDay();
   const { clearSelectedDay } = useScheduleTransitionActions();
   const currentDate = useZoned(timeZone, search.timestamp);
-  const currentDayTimestamp = DateTime.toEpochMillis(DateTime.startOf(currentDate, "day"));
-  const isMatchingTransitionDay = selectedDay?.dayTimestamp === currentDayTimestamp;
-  const sourceMonthTimestamp = isMatchingTransitionDay
-    ? selectedDay.sourceMonthTimestamp
-    : getMonthTimestamp(currentDate);
-  const sourceMonth = useZoned(timeZone, sourceMonthTimestamp);
+  const isMatchingTransitionDay =
+    selectedDay !== null &&
+    DateTime.Equivalence(selectedDay.day, DateTime.startOf(currentDate, "day"));
+  const sourceMonth = isMatchingTransitionDay
+    ? selectedDay.sourceMonth
+    : DateTime.startOf(currentDate, "month");
   const sharedLayoutId = isMatchingTransitionDay
     ? buildSharedDayLayoutId(currentDate, sourceMonth)
     : undefined;
@@ -87,7 +87,7 @@ function DailyPage() {
         exit={sharedLayoutId ? { opacity: 0 } : undefined}
         transition={calendarRestTransition}
       >
-        <DailyHeader sourceMonthTimestamp={sourceMonthTimestamp} />
+        <DailyHeader sourceMonth={sourceMonth} />
         <DailyScheduleContent />
       </motion.div>
     </motion.div>
@@ -95,7 +95,7 @@ function DailyPage() {
 }
 
 // Header component
-function DailyHeader({ sourceMonthTimestamp }: { sourceMonthTimestamp: number }) {
+function DailyHeader({ sourceMonth }: { sourceMonth: DateTime.Zoned }) {
   const { channel, guildId } = Route.useParams();
   const { startCalendarTransition } = useScheduleTransitionActions();
 
@@ -105,7 +105,7 @@ function DailyHeader({ sourceMonthTimestamp }: { sourceMonthTimestamp: number })
         className="flex items-center gap-2 text-[#33ccbb] hover:text-white transition-colors"
         to="/dashboard/guilds/$guildId/schedule/$channel/calendar"
         params={{ guildId, channel }}
-        search={{ timestamp: sourceMonthTimestamp }}
+        search={{ timestamp: DateTime.toEpochMillis(sourceMonth) }}
         onClick={() => {
           startCalendarTransition();
         }}

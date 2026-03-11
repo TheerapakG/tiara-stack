@@ -1,12 +1,15 @@
 import { createFileRoute, Outlet, Link, useChildMatches } from "@tanstack/react-router";
 import { Schema, pipe, Effect, Array, Option } from "effect";
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from "motion/react";
+import { useLayoutEffect } from "react";
+
 import { useAllChannels, getAllChannelsAtom } from "#/lib/schedule";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 import {
-  ScheduleTransitionProvider,
   morphLayoutTransition,
   useScheduleSelectedDay,
+  useScheduleTransitionActions,
+  useSetScheduleMonthDirection,
 } from "./_channelLayout/-transition";
 
 // Search params schema using Effect Schema
@@ -54,19 +57,19 @@ function RoutePresenceShell({
 }
 
 function ScheduleLayout() {
-  const { guildId, channel } = Route.useParams();
-
-  return (
-    <ScheduleTransitionProvider key={`${guildId}-${channel}`}>
-      <ScheduleLayoutContent />
-    </ScheduleTransitionProvider>
-  );
-}
-
-function ScheduleLayoutContent() {
   const selectedDay = useScheduleSelectedDay();
   const { guildId, channel } = Route.useParams();
+  const { clearSelectedDay } = useScheduleTransitionActions();
+  const setMonthDirection = useSetScheduleMonthDirection();
   const search = Route.useSearch();
+
+  // Reset transition state when navigating between guilds/channels
+  useLayoutEffect(() => {
+    return () => {
+      clearSelectedDay();
+      setMonthDirection(0);
+    };
+  }, [guildId, channel, clearSelectedDay, setMonthDirection]);
   const childMatches = useChildMatches();
 
   // Extract view type from route path - explicit check for calendar vs daily

@@ -1,4 +1,4 @@
-import { DateTime, Effect, Option, Match } from "effect";
+import { DateTime, Effect, Option, Match, Hash } from "effect";
 import { useMemo } from "react";
 
 export const makeZoned = (timeZone: DateTime.TimeZone, timestamp?: number) =>
@@ -26,3 +26,6 @@ export const useZoned = (timeZone: DateTime.TimeZone, timestamp?: number) => {
   );
   return zoned;
 };
+
+export const dateTimeId = (dateTime: DateTime.Zoned) =>
+  Hash.array([DateTime.toEpochMillis(dateTime), zoneId(dateTime.zone)]);

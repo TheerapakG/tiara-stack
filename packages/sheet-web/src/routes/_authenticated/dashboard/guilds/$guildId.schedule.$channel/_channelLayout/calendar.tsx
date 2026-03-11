@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import { DateTime, HashSet, Effect, Array } from "effect";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
+
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 import { useScheduledDays, scheduledDaysAtom, formatDayKey } from "#/lib/schedule";
 import { getServerTimeZone, useTimeZone } from "#/hooks/useTimeZone";
@@ -10,12 +11,13 @@ import { makeZoned, useZoned } from "#/lib/date";
 import {
   buildSharedDayLayoutId,
   calendarRestTransition,
-  getMonthTimestamp,
   monthSlideTransition,
   morphLayoutTransition,
+  type SelectedDayTransition,
   useScheduleMonthDirection,
   useScheduleSelectedDay,
   useScheduleTransitionActions,
+  useSetScheduleMonthDirection,
 } from "./-transition";
 
 export const Route = createFileRoute(
@@ -186,7 +188,8 @@ function CalendarPage() {
   const navigate = useNavigate();
   const selectedDay = useScheduleSelectedDay();
   const monthDirection = useScheduleMonthDirection();
-  const { clearSelectedDay, setMonthDirection } = useScheduleTransitionActions();
+  const { clearSelectedDay } = useScheduleTransitionActions();
+  const setMonthDirection = useSetScheduleMonthDirection();
   // Use timestamp to determine the month to display
   const currentDate = useZoned(timeZone, search.timestamp);
   const currentMonthKey = formatDayKey(DateTime.startOf(currentDate, "month"));
@@ -280,7 +283,7 @@ function CalendarPage() {
             direction={monthDirection}
             exitDirectionRef={exitDirectionRef}
           >
-            <CalendarGrid currentDate={currentDate} />
+            <CalendarGrid currentDate={currentDate} selectedDay={selectedDay} />
           </DayGridPresenceShell>
         </AnimatePresence>
       </div>
@@ -290,12 +293,12 @@ function CalendarPage() {
 
 interface CalendarGridProps {
   currentDate: DateTime.Zoned;
+  selectedDay: SelectedDayTransition | null;
 }
 
-function CalendarGrid({ currentDate }: CalendarGridProps) {
+function CalendarGrid({ currentDate, selectedDay }: CalendarGridProps) {
   const { guildId, channel } = Route.useParams();
   const timeZone = useTimeZone();
-  const selectedDay = useScheduleSelectedDay();
   const { clearSelectedDay, startDailyTransition } = useScheduleTransitionActions();
 
   const calendarDays = useMemo(() => {
@@ -319,21 +322,20 @@ function CalendarGrid({ currentDate }: CalendarGridProps) {
     rangeEnd,
   });
 
-  const currentMonthTimestamp = getMonthTimestamp(currentDate);
+  const currentMonth = useMemo(() => DateTime.startOf(currentDate, "month"), [currentDate]);
   const isTransitioningToDaily = selectedDay?.phase === "to-daily";
   const isReturningToCalendar = selectedDay?.phase === "to-calendar";
   const isCalendarLocked = isTransitioningToDaily || isReturningToCalendar;
   const hasSelectedDayInMonth = useMemo(
     () =>
       calendarDays.some((day) => {
-        const dayTimestamp = DateTime.toEpochMillis(DateTime.startOf(day, "day"));
-
         return (
-          selectedDay?.dayTimestamp === dayTimestamp &&
-          selectedDay?.sourceMonthTimestamp === currentMonthTimestamp
+          selectedDay !== null &&
+          DateTime.Equivalence(selectedDay.day, DateTime.startOf(day, "day")) &&
+          DateTime.Equivalence(selectedDay.sourceMonth, currentMonth)
         );
       }),
-    [calendarDays, currentMonthTimestamp, selectedDay],
+    [calendarDays, currentMonth, selectedDay],
   );
 
   useEffect(() => {
@@ -351,11 +353,11 @@ function CalendarGrid({ currentDate }: CalendarGridProps) {
         const isCurrentMonth = isSameMonth(day, currentDate);
         const dayKey = formatDayKey(day);
         const hasSchedule = HashSet.has(scheduledDays, dayKey);
-        const dayTimestamp = DateTime.toEpochMillis(DateTime.startOf(day, "day"));
         const sharedLayoutId = buildSharedDayLayoutId(day, currentDate);
         const isSelectedDay =
-          selectedDay?.dayTimestamp === dayTimestamp &&
-          selectedDay?.sourceMonthTimestamp === currentMonthTimestamp;
+          selectedDay !== null &&
+          DateTime.Equivalence(selectedDay.day, DateTime.startOf(day, "day")) &&
+          DateTime.Equivalence(selectedDay.sourceMonth, currentMonth);
 
         return (
           <motion.div
@@ -383,9 +385,9 @@ function CalendarGrid({ currentDate }: CalendarGridProps) {
             <Link
               to="/dashboard/guilds/$guildId/schedule/$channel/daily"
               params={{ guildId, channel }}
-              search={{ timestamp: dayTimestamp }}
+              search={{ timestamp: DateTime.toEpochMillis(day) }}
               onClick={() => {
-                startDailyTransition(dayTimestamp, currentMonthTimestamp);
+                startDailyTransition(DateTime.startOf(day, "day"), currentMonth);
               }}
               className={`
                 h-14 p-1 flex flex-col items-center justify-center
