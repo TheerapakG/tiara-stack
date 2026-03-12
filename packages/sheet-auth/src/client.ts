@@ -25,6 +25,14 @@ export class TokenVerificationError extends Schema.TaggedError<TokenVerification
 }) {}
 
 /**
+ * Error type for account retrieval failures
+ */
+export class AccountError extends Schema.TaggedError<AccountError>("AccountError")("AccountError", {
+  message: Schema.String,
+  cause: Schema.optional(Schema.Unknown),
+}) {}
+
+/**
  * Error type for Discord access token retrieval failures
  */
 export class DiscordAccessTokenError extends Schema.TaggedError<DiscordAccessTokenError>(
@@ -219,7 +227,7 @@ export function getToken(client: SheetAuthClient, headers?: Headers | HeadersIni
 }
 
 // =============================================================================
-// 5. Token Verification
+// 6. Token Verification
 // =============================================================================
 
 /**
@@ -289,7 +297,76 @@ export function verifyToken(
 }
 
 // =============================================================================
-// 5. Discord Access Token
+// 7. Account
+// =============================================================================
+
+export class Account extends Schema.TaggedClass<Account>()("Account", {
+  scopes: Schema.Array(Schema.String),
+  userId: Schema.String,
+  accountId: Schema.String,
+  providerId: Schema.String,
+  createdAt: Schema.DateTimeUtcFromNumber,
+  updatedAt: Schema.DateTimeUtcFromNumber,
+}) {}
+
+/**
+ * Get account using the Better Auth client.
+ *
+ * @param client - Better Auth client instance
+ * @param providerIds - Provider IDs to filter by
+ * @param headers - Headers for authentication
+ * @returns Effect with the account
+ */
+export function getAccount(
+  client: SheetAuthClient,
+  providerIds: string[],
+  headers?: Headers | HeadersInit,
+): Effect.Effect<Account, AccountError> {
+  return Effect.gen(function* () {
+    const accounts = yield* Effect.tryPromise({
+      try: async () =>
+        await client.listAccounts({
+          fetchOptions: {
+            headers,
+          },
+        }),
+      catch: (error) =>
+        new AccountError({
+          message: error instanceof Error ? error.message : String(error),
+          cause: error,
+        }),
+    });
+
+    if (accounts.error) {
+      return yield* Effect.fail(
+        new AccountError({
+          message: accounts.error.message || "Failed to get accounts",
+        }),
+      );
+    }
+
+    const account = accounts.data?.find((account) => providerIds.includes(account.providerId));
+    if (!account) {
+      return yield* Effect.fail(
+        new AccountError({
+          message: "Account not found",
+        }),
+      );
+    }
+
+    return Account.make({
+      scopes: account.scopes,
+      userId: account.userId,
+      accountId: account.accountId,
+      providerId: account.providerId,
+      createdAt: DateTime.unsafeFromDate(account.createdAt),
+      updatedAt: DateTime.unsafeFromDate(account.updatedAt),
+    });
+  });
+}
+
+// =============================================================================
+// 8. Discord Access Token
 // =============================================================================
 
 /**
