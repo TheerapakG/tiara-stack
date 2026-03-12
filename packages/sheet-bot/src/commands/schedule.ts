@@ -203,6 +203,7 @@ const makeListSubCommand = Effect.gen(function* () {
                     ],
               )
               .toJSON(),
+            (yield* embedService.makeWebScheduleEmbed()).toJSON(),
           ],
         },
       });

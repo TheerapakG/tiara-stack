@@ -138,6 +138,7 @@ const makeListSubCommand = Effect.gen(function* () {
           .setTitle(`Day ${day} Filled Slots~`)
           .setDescription(filledSlots)
           .toJSON(),
+        (yield* embedService.makeWebScheduleEmbed()).toJSON(),
       ];
 
       yield* command.editReply({

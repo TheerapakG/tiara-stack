@@ -19,6 +19,14 @@ export class EmbedService extends Effect.Service<EmbedService>()("EmbedService",
               }),
           ),
         ),
+      makeWebScheduleEmbed: () =>
+        Effect.succeed(
+          new EmbedBuilder({
+            description:
+              "📅 **Preview**: View your schedule online at <https://schedule.theerapakg.moe/>",
+            color: 0x5865f2,
+          }),
+        ),
     };
   }),
   accessors: true,
