@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { DateTime, HashSet, Effect, Array } from "effect";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 
@@ -17,6 +17,7 @@ import {
   useScheduleSelected,
   useScheduleTransitionStates,
 } from "./-transition";
+import { useLocked } from "#/hooks/useLocked";
 
 export const Route = createFileRoute(
   "/_authenticated/dashboard/guilds/$guildId/schedule/$channel/_channelLayout/calendar",
@@ -105,24 +106,21 @@ function isSameMonth(a: DateTime.Zoned, b: DateTime.Zoned): boolean {
 function SlidingTextInner({
   text,
   direction,
-  exitDirectionRef,
   className,
 }: {
   text: string;
   direction: -1 | 0 | 1;
-  exitDirectionRef: React.RefObject<-1 | 0 | 1>;
   className?: string;
 }) {
   const isPresent = useIsPresent();
+  const exitDirection = useLocked(direction);
 
   return (
     <motion.span
       initial={direction === 0 ? false : { y: direction > 0 ? "100%" : "-100%", opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       exit={
-        exitDirectionRef.current === 0
-          ? undefined
-          : { y: exitDirectionRef.current > 0 ? "-100%" : "100%", opacity: 0 }
+        exitDirection === 0 ? undefined : { y: exitDirection > 0 ? "-100%" : "100%", opacity: 0 }
       }
       transition={monthSlideTransition}
       className={className}
@@ -137,24 +135,16 @@ function SlidingTextInner({
 function SlidingText({
   text,
   direction,
-  exitDirectionRef,
   className,
 }: {
   text: string;
   direction: -1 | 0 | 1;
-  exitDirectionRef: React.RefObject<-1 | 0 | 1>;
   className?: string;
 }) {
   return (
     <div className="relative h-[1lh] overflow-hidden">
       <AnimatePresence initial={false} mode="sync">
-        <SlidingTextInner
-          key={text}
-          text={text}
-          direction={direction}
-          exitDirectionRef={exitDirectionRef}
-          className={className}
-        />
+        <SlidingTextInner key={text} text={text} direction={direction} className={className} />
       </AnimatePresence>
     </div>
   );
@@ -163,15 +153,14 @@ function SlidingText({
 function DayGridPresenceShell({
   children,
   direction,
-  exitDirectionRef,
   onEnterComplete,
 }: {
   children: React.ReactNode;
   direction: -1 | 0 | 1;
-  exitDirectionRef: React.RefObject<-1 | 0 | 1>;
   onEnterComplete?: () => void;
 }) {
   const isPresent = useIsPresent();
+  const exitDirection = useLocked(direction);
 
   return (
     <motion.div
@@ -185,12 +174,7 @@ function DayGridPresenceShell({
       }
       animate={{ y: 0, opacity: 1 }}
       exit={
-        exitDirectionRef.current === 0
-          ? undefined
-          : {
-              y: exitDirectionRef.current > 0 ? "-100%" : "100%",
-              opacity: 0,
-            }
+        exitDirection === 0 ? undefined : { y: exitDirection > 0 ? "-100%" : "100%", opacity: 0 }
       }
       transition={monthSlideTransition}
       className={isPresent ? "relative w-full" : "absolute inset-0 w-full"}
@@ -225,8 +209,6 @@ function CalendarPage() {
   const currentDate = useZonedOrNow(timeZone, search.timestamp);
   const currentMonthKey = formatDayKey(DateTime.startOf(currentDate, "month"));
 
-  const exitDirectionRef = useRef<-1 | 0 | 1>(0);
-
   // Pre-computed timestamps for prev/next month navigation
   const prevMonthTimestamp = useMemo(
     () =>
@@ -240,11 +222,6 @@ function CalendarPage() {
       DateTime.toEpochMillis(DateTime.startOf(DateTime.add(currentDate, { months: 1 }), "month")),
     [currentDate],
   );
-
-  const handleMonthClick = (direction: -1 | 1) => {
-    // URL provides direction via fromTimestamp, just set exit direction for animation cleanup
-    exitDirectionRef.current = direction;
-  };
 
   const { month, year } = getMonthYearParts(currentDate);
   const weekDays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -276,22 +253,13 @@ function CalendarPage() {
               search: { timestamp: prevMonthTimestamp },
               unmaskOnReload: true,
             }}
-            onClick={() => handleMonthClick(-1)}
             className="justify-self-start p-2 text-[#33ccbb] transition-colors hover:bg-[#33ccbb]/10"
           >
             <ChevronLeft className="h-5 w-5" />
           </Link>
           <h3 className="flex items-center justify-center gap-2 text-center text-lg font-black tracking-tight">
-            <SlidingText
-              text={month}
-              direction={monthDirection}
-              exitDirectionRef={exitDirectionRef}
-            />
-            <SlidingText
-              text={year}
-              direction={monthDirection}
-              exitDirectionRef={exitDirectionRef}
-            />
+            <SlidingText text={month} direction={monthDirection} />
+            <SlidingText text={year} direction={monthDirection} />
           </h3>
           <Link
             to="."
@@ -309,7 +277,6 @@ function CalendarPage() {
               search: { timestamp: nextMonthTimestamp },
               unmaskOnReload: true,
             }}
-            onClick={() => handleMonthClick(1)}
             className="justify-self-end p-2 text-[#33ccbb] transition-colors hover:bg-[#33ccbb]/10"
           >
             <ChevronRight className="h-5 w-5" />
@@ -339,7 +306,6 @@ function CalendarPage() {
           <DayGridPresenceShell
             key={`grid-${currentMonthKey}`}
             direction={monthDirection}
-            exitDirectionRef={exitDirectionRef}
             onEnterComplete={() => {
               // Clear from param after month slide completes
               if (monthDirection !== 0) {
