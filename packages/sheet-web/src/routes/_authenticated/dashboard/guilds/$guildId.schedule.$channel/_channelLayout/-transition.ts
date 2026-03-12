@@ -1,7 +1,10 @@
-import { DateTime } from "effect";
-import { Atom, useAtomSet, useAtomValue } from "@effect-atom/atom-react";
-import { useCallback, useMemo } from "react";
+import { DateTime, Array, Option, pipe } from "effect";
+import { useMemo, useCallback } from "react";
+import { useChildMatches, useNavigate } from "@tanstack/react-router";
 import { formatDayKey } from "#/lib/schedule";
+import { useZonedOrNow, useZonedOrUndefined } from "#/lib/date";
+import { useTimeZone } from "#/hooks/useTimeZone";
+import type { ScheduleSearchParams } from "../_channelLayout";
 
 export const morphLayoutTransition = {
   duration: 0.35,
@@ -22,166 +25,132 @@ export type MonthDirection = -1 | 0 | 1;
 
 export type TransitionPhase = "to-daily" | "to-calendar";
 
-export interface ScheduleTransitionState {
-  readonly selected?: {
-    readonly day: DateTime.Zoned;
-    readonly month: DateTime.Zoned;
-  };
-  readonly phase?: TransitionPhase;
-  readonly monthDirection: MonthDirection;
+export type ViewType = "calendar" | "daily" | "default";
+
+// Hook to get the current view type from route matches
+export function useCurrentView(): ViewType {
+  const childMatches = useChildMatches();
+
+  return useMemo(() => {
+    return pipe(
+      Array.head(childMatches),
+      Option.map((match) => {
+        if (match.routeId.includes("/daily")) return "daily" as const;
+        if (match.routeId.includes("/calendar")) return "calendar" as const;
+        return "default" as const;
+      }),
+      Option.getOrElse(() => "default" as const),
+    );
+  }, [childMatches]);
 }
-
-// Combined singular atom for all schedule transition state
-const scheduleTransitionAtom: Atom.Writable<ScheduleTransitionState> =
-  Atom.make<ScheduleTransitionState>({
-    selected: undefined,
-    phase: undefined,
-    monthDirection: 0,
-  });
-
-// Derived atom for the selected day
-export const selectedAtom: Atom.Atom<
-  | {
-      readonly day: DateTime.Zoned;
-      readonly month: DateTime.Zoned;
-    }
-  | undefined
-> = Atom.map(scheduleTransitionAtom, (state) => state.selected);
-
-// Derived atom for the phase
-export const phaseAtom: Atom.Atom<TransitionPhase | undefined> = Atom.map(
-  scheduleTransitionAtom,
-  (state) => state.phase,
-);
-
-// Derived atom for month direction
-export const monthDirectionAtom: Atom.Atom<MonthDirection> = Atom.map(
-  scheduleTransitionAtom,
-  (state) => state.monthDirection,
-);
-
-// Derived atom for checking if transitioning to daily view
-export const isTransitioningToDailyAtom: Atom.Atom<boolean> = Atom.map(
-  scheduleTransitionAtom,
-  (state) => state.phase === "to-daily",
-);
-
-// Derived atom for checking if transitioning to calendar view
-export const isTransitioningToCalendarAtom: Atom.Atom<boolean> = Atom.map(
-  scheduleTransitionAtom,
-  (state) => state.phase === "to-calendar",
-);
-
-// Derived atom for calendar locked state (transitioning in either direction)
-export const isCalendarLockedAtom: Atom.Atom<boolean> = Atom.map(
-  scheduleTransitionAtom,
-  (state) => state.phase === "to-daily" || state.phase === "to-calendar",
-);
 
 // Hook for reading the selected day transition state
-export function useScheduleSelected() {
-  return useAtomValue(selectedAtom);
-}
+// Fully derived from URL search params
+export function useScheduleSelected(search: ScheduleSearchParams) {
+  const timeZone = useTimeZone();
 
-// Hook for reading the phase
-export function useSchedulePhase() {
-  return useAtomValue(phaseAtom);
-}
+  const timestamp = useZonedOrUndefined(timeZone, search.timestamp);
+  const fromTimestamp = useZonedOrUndefined(timeZone, search.from?.timestamp);
 
-// Hook for setting the schedule transition state (operates on combined atom)
-export function useSetScheduleTransitionState() {
-  return useAtomSet(scheduleTransitionAtom);
+  return useMemo(() => {
+    if (!search.from || !timestamp || !fromTimestamp) {
+      return undefined;
+    }
+
+    if (search.from.view === "calendar") {
+      // Calendar → Daily: timestamp=day, from.timestamp=month
+      return { day: timestamp, month: DateTime.startOf(fromTimestamp, "month") };
+    } else {
+      // Daily → Calendar: timestamp=month, from.timestamp=day
+      return { day: fromTimestamp, month: DateTime.startOf(timestamp, "month") };
+    }
+    // Use primitive deps to avoid recomputation when search object is recreated
+  }, [search.from?.view, search.from?.timestamp, timestamp, fromTimestamp]);
 }
 
 // Hook for reading the month direction
-export function useScheduleMonthDirection() {
-  return useAtomValue(monthDirectionAtom);
+// Fully derived from URL search params by comparing current timestamp with from.timestamp
+// Only applies when coming from calendar view
+export function useScheduleMonthDirection(search: ScheduleSearchParams) {
+  const timeZone = useTimeZone();
+
+  const currentDate = useZonedOrNow(timeZone, search.timestamp);
+  const fromDate = useZonedOrNow(timeZone, search.from?.timestamp);
+
+  return useMemo(() => {
+    // Only derive direction when explicitly coming from calendar view
+    if (search.from?.view !== "calendar") {
+      return 0 as const;
+    }
+
+    const currentMonthStart = DateTime.toEpochMillis(DateTime.startOf(currentDate, "month"));
+    const fromMonthStart = DateTime.toEpochMillis(DateTime.startOf(fromDate, "month"));
+
+    if (fromMonthStart < currentMonthStart) {
+      return 1 as const; // Forward (next month)
+    } else if (fromMonthStart > currentMonthStart) {
+      return -1 as const; // Backward (prev month)
+    }
+    return 0 as const;
+  }, [search.from?.view, currentDate, fromDate]);
 }
 
-// Hook for setting month direction
-export function useSetScheduleMonthDirection() {
-  const setState = useSetScheduleTransitionState();
-  return useCallback(
-    (direction: MonthDirection) => {
-      setState((prev) => ({ ...prev, monthDirection: direction }));
-    },
-    [setState],
-  );
-}
+// Hook for reading the transition phase
+// Derived by comparing current view with from.view from URL
+export function useSchedulePhase(
+  search: ScheduleSearchParams,
+  currentView: ViewType,
+): TransitionPhase | undefined {
+  return useMemo(() => {
+    const fromView = search.from?.view;
 
-// Hook for starting daily transition
-export function useStartDailyTransition() {
-  const setState = useSetScheduleTransitionState();
-  return useCallback(
-    (day: DateTime.Zoned, month: DateTime.Zoned) => {
-      setState({
-        selected: { day, month },
-        phase: "to-daily",
-        monthDirection: 0,
-      });
-    },
-    [setState],
-  );
-}
+    // No transition if no from param or view matches
+    if (!fromView || fromView === currentView) {
+      return undefined;
+    }
 
-// Hook for starting calendar transition
-export function useStartCalendarTransition() {
-  const setState = useSetScheduleTransitionState();
-  return useCallback(() => {
-    setState((prev) =>
-      prev.selected !== undefined
-        ? {
-            ...prev,
-            phase: "to-calendar",
-            monthDirection: 0,
-          }
-        : prev,
-    );
-  }, [setState]);
-}
+    // Transition from calendar to daily
+    if (fromView === "calendar" && currentView === "daily") {
+      return "to-daily";
+    }
 
-// Hook for clearing schedule transition state
-export function useClearScheduleTransitionState() {
-  const setState = useSetScheduleTransitionState();
-  return useCallback(() => {
-    setState({
-      selected: undefined,
-      phase: undefined,
-      monthDirection: 0,
-    });
-  }, [setState]);
-}
+    // Transition from daily to calendar
+    if (fromView === "daily" && currentView === "calendar") {
+      return "to-calendar";
+    }
 
-// Combined hook for transition actions (for convenience)
-export function useScheduleTransitionActions() {
-  const startDailyTransition = useStartDailyTransition();
-  const startCalendarTransition = useStartCalendarTransition();
-  const clearScheduleTransitionState = useClearScheduleTransitionState();
-
-  return useMemo(
-    () => ({
-      startDailyTransition,
-      startCalendarTransition,
-      clearScheduleTransitionState,
-    }),
-    [startDailyTransition, startCalendarTransition, clearScheduleTransitionState],
-  );
+    return undefined;
+  }, [search.from?.view, currentView]);
 }
 
 // Hook for derived transition states
-export function useScheduleTransitionStates() {
-  const isTransitioningToDaily = useAtomValue(isTransitioningToDailyAtom);
-  const isTransitioningToCalendar = useAtomValue(isTransitioningToCalendarAtom);
-  const isCalendarLocked = useAtomValue(isCalendarLockedAtom);
+// All derived from URL without atoms
+export function useScheduleTransitionStates(search: ScheduleSearchParams, currentView: ViewType) {
+  const phase = useSchedulePhase(search, currentView);
+  const navigate = useNavigate();
 
-  return useMemo(
-    () => ({
+  const clearScheduleTransitionState = useCallback(() => {
+    // Navigate to the same route but without the 'from' param to clear transition state
+    // Use replace: true to avoid pushing a duplicate history entry
+    navigate({
+      to: ".",
+      search: { timestamp: search.timestamp },
+      replace: true,
+    });
+  }, [navigate, search.timestamp]);
+
+  return useMemo(() => {
+    const isTransitioningToDaily = phase === "to-daily";
+    const isTransitioningToCalendar = phase === "to-calendar";
+    const isCalendarLocked = isTransitioningToDaily || isTransitioningToCalendar;
+
+    return {
       isTransitioningToDaily,
       isTransitioningToCalendar,
       isCalendarLocked,
-    }),
-    [isTransitioningToDaily, isTransitioningToCalendar, isCalendarLocked],
-  );
+      clearScheduleTransitionState,
+    };
+  }, [phase, clearScheduleTransitionState]);
 }
 
 export function buildSharedDayLayoutId(day: DateTime.Zoned, displayedMonth: DateTime.Zoned) {

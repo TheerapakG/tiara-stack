@@ -1,13 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import { DateTime, HashSet, Effect, Array } from "effect";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 import { useScheduledDays, scheduledDaysAtom, formatDayKey } from "#/lib/schedule";
 import { getServerTimeZone, useTimeZone } from "#/hooks/useTimeZone";
-import { makeZoned, useZoned } from "#/lib/date";
+import { makeZonedOrNow, useZonedOrNow } from "#/lib/date";
 import {
   buildSharedDayLayoutId,
   calendarRestTransition,
@@ -16,9 +16,6 @@ import {
   useScheduleMonthDirection,
   useScheduleSelected,
   useScheduleTransitionStates,
-  useSetScheduleTransitionState,
-  useStartDailyTransition,
-  useClearScheduleTransitionState,
 } from "./-transition";
 
 export const Route = createFileRoute(
@@ -29,7 +26,7 @@ export const Route = createFileRoute(
   loaderDeps: ({ search }) => ({ timestamp: search.timestamp }),
   loader: async ({ context, params, deps }) => {
     const timeZone = getServerTimeZone(); // Match useTimeZone behavior during SSR
-    const currentDate = await Effect.runPromise(makeZoned(timeZone, deps.timestamp));
+    const currentDate = await Effect.runPromise(makeZonedOrNow(timeZone, deps.timestamp));
 
     const monthStartZoned = DateTime.startOf(currentDate, "month");
     const monthEndZoned = DateTime.endOf(currentDate, "month");
@@ -142,17 +139,15 @@ function SlidingText({
   direction,
   exitDirectionRef,
   className,
-  onExitComplete,
 }: {
   text: string;
   direction: -1 | 0 | 1;
   exitDirectionRef: React.RefObject<-1 | 0 | 1>;
   className?: string;
-  onExitComplete?: () => void;
 }) {
   return (
     <div className="relative h-[1lh] overflow-hidden">
-      <AnimatePresence initial={false} mode="sync" onExitComplete={onExitComplete}>
+      <AnimatePresence initial={false} mode="sync">
         <SlidingTextInner
           key={text}
           text={text}
@@ -169,10 +164,12 @@ function DayGridPresenceShell({
   children,
   direction,
   exitDirectionRef,
+  onEnterComplete,
 }: {
   children: React.ReactNode;
   direction: -1 | 0 | 1;
   exitDirectionRef: React.RefObject<-1 | 0 | 1>;
+  onEnterComplete?: () => void;
 }) {
   const isPresent = useIsPresent();
 
@@ -198,6 +195,13 @@ function DayGridPresenceShell({
       transition={monthSlideTransition}
       className={isPresent ? "relative w-full" : "absolute inset-0 w-full"}
       style={{ pointerEvents: isPresent ? undefined : "none" }}
+      onAnimationComplete={() => {
+        // Only fire onEnterComplete for enter animations (when isPresent is true)
+        // Exit animations also trigger onAnimationComplete, which would cause double invocation
+        if (isPresent && onEnterComplete) {
+          onEnterComplete();
+        }
+      }}
     >
       {children}
     </motion.div>
@@ -209,13 +213,16 @@ function CalendarPage() {
   const timeZone = useTimeZone();
   const search = Route.useSearch();
 
-  const selected = useScheduleSelected();
-  const monthDirection = useScheduleMonthDirection();
-  const { isTransitioningToDaily, isTransitioningToCalendar, isCalendarLocked } =
-    useScheduleTransitionStates();
-  const setState = useSetScheduleTransitionState();
+  const selected = useScheduleSelected(search);
+  const monthDirection = useScheduleMonthDirection(search);
+  const {
+    isTransitioningToDaily,
+    isTransitioningToCalendar,
+    isCalendarLocked,
+    clearScheduleTransitionState,
+  } = useScheduleTransitionStates(search, "calendar");
   // Use timestamp to determine the month to display
-  const currentDate = useZoned(timeZone, search.timestamp);
+  const currentDate = useZonedOrNow(timeZone, search.timestamp);
   const currentMonthKey = formatDayKey(DateTime.startOf(currentDate, "month"));
 
   const exitDirectionRef = useRef<-1 | 0 | 1>(0);
@@ -235,7 +242,7 @@ function CalendarPage() {
   );
 
   const handleMonthClick = (direction: -1 | 1) => {
-    setState({ selected: undefined, phase: undefined, monthDirection: direction });
+    // URL provides direction via fromTimestamp, just set exit direction for animation cleanup
     exitDirectionRef.current = direction;
   };
 
@@ -256,7 +263,19 @@ function CalendarPage() {
           <Link
             to="."
             params={{ guildId, channel }}
-            search={{ timestamp: prevMonthTimestamp }}
+            search={{
+              timestamp: prevMonthTimestamp,
+              from: {
+                view: "calendar",
+                timestamp: DateTime.toEpochMillis(DateTime.startOf(currentDate, "month")),
+              },
+            }}
+            mask={{
+              to: "/dashboard/guilds/$guildId/schedule/$channel/calendar",
+              params: { guildId, channel },
+              search: { timestamp: prevMonthTimestamp },
+              unmaskOnReload: true,
+            }}
             onClick={() => handleMonthClick(-1)}
             className="justify-self-start p-2 text-[#33ccbb] transition-colors hover:bg-[#33ccbb]/10"
           >
@@ -267,11 +286,6 @@ function CalendarPage() {
               text={month}
               direction={monthDirection}
               exitDirectionRef={exitDirectionRef}
-              onExitComplete={() => {
-                if (monthDirection !== 0) {
-                  setState((prev) => ({ ...prev, monthDirection: 0 }));
-                }
-              }}
             />
             <SlidingText
               text={year}
@@ -282,7 +296,19 @@ function CalendarPage() {
           <Link
             to="."
             params={{ guildId, channel }}
-            search={{ timestamp: nextMonthTimestamp }}
+            search={{
+              timestamp: nextMonthTimestamp,
+              from: {
+                view: "calendar",
+                timestamp: DateTime.toEpochMillis(DateTime.startOf(currentDate, "month")),
+              },
+            }}
+            mask={{
+              to: "/dashboard/guilds/$guildId/schedule/$channel/calendar",
+              params: { guildId, channel },
+              search: { timestamp: nextMonthTimestamp },
+              unmaskOnReload: true,
+            }}
             onClick={() => handleMonthClick(1)}
             className="justify-self-end p-2 text-[#33ccbb] transition-colors hover:bg-[#33ccbb]/10"
           >
@@ -314,6 +340,12 @@ function CalendarPage() {
             key={`grid-${currentMonthKey}`}
             direction={monthDirection}
             exitDirectionRef={exitDirectionRef}
+            onEnterComplete={() => {
+              // Clear from param after month slide completes
+              if (monthDirection !== 0) {
+                clearScheduleTransitionState();
+              }
+            }}
           >
             <CalendarGrid currentDate={currentDate} selected={selected} />
           </DayGridPresenceShell>
@@ -331,10 +363,13 @@ interface CalendarGridProps {
 function CalendarGrid({ currentDate, selected }: CalendarGridProps) {
   const { guildId, channel } = Route.useParams();
   const timeZone = useTimeZone();
-  const { isTransitioningToDaily, isTransitioningToCalendar, isCalendarLocked } =
-    useScheduleTransitionStates();
-  const clearScheduleTransitionState = useClearScheduleTransitionState();
-  const startDailyTransition = useStartDailyTransition();
+  const search = Route.useSearch();
+  const {
+    isTransitioningToDaily,
+    isTransitioningToCalendar,
+    isCalendarLocked,
+    clearScheduleTransitionState,
+  } = useScheduleTransitionStates(search, "calendar");
 
   const calendarDays = useMemo(() => {
     return getCalendarDays(currentDate);
@@ -358,23 +393,6 @@ function CalendarGrid({ currentDate, selected }: CalendarGridProps) {
   });
 
   const currentMonth = useMemo(() => DateTime.startOf(currentDate, "month"), [currentDate]);
-  const hasSelectedDayInMonth = useMemo(
-    () =>
-      calendarDays.some((day) => {
-        return (
-          selected &&
-          DateTime.Equivalence(selected.day, DateTime.startOf(day, "day")) &&
-          DateTime.Equivalence(selected.month, currentMonth)
-        );
-      }),
-    [calendarDays, currentMonth, selected],
-  );
-
-  useEffect(() => {
-    if (isTransitioningToCalendar && !hasSelectedDayInMonth) {
-      clearScheduleTransitionState();
-    }
-  }, [clearScheduleTransitionState, hasSelectedDayInMonth, isTransitioningToCalendar]);
 
   return (
     <div
@@ -417,9 +435,15 @@ function CalendarGrid({ currentDate, selected }: CalendarGridProps) {
             <Link
               to="/dashboard/guilds/$guildId/schedule/$channel/daily"
               params={{ guildId, channel }}
-              search={{ timestamp: DateTime.toEpochMillis(day) }}
-              onClick={() => {
-                startDailyTransition(DateTime.startOf(day, "day"), currentMonth);
+              search={{
+                timestamp: DateTime.toEpochMillis(day),
+                from: { view: "calendar", timestamp: DateTime.toEpochMillis(currentMonth) },
+              }}
+              mask={{
+                to: "/dashboard/guilds/$guildId/schedule/$channel/daily",
+                params: { guildId, channel },
+                search: { timestamp: DateTime.toEpochMillis(day) },
+                unmaskOnReload: true,
               }}
               className={`
                 h-14 p-1 flex flex-col items-center justify-center

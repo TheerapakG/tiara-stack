@@ -17,14 +17,13 @@ import {
 import { Sheet } from "sheet-apis/schema";
 import { eventConfigAtom, useEventConfig } from "#/lib/sheet";
 import { useTimeZone } from "#/hooks/useTimeZone";
-import { useZoned } from "#/lib/date";
+import { useZonedOrNow } from "#/lib/date";
 import { currentUserAtom, useCurrentUser } from "#/lib/discord";
 import {
   buildSharedDayLayoutId,
   calendarRestTransition,
   morphLayoutTransition,
   useScheduleSelected,
-  useScheduleTransitionActions,
 } from "./-transition";
 
 // Virtualizer constants
@@ -54,9 +53,8 @@ export const Route = createFileRoute(
 function DailyPage() {
   const timeZone = useTimeZone();
   const search = Route.useSearch();
-  const selected = useScheduleSelected();
-  const { clearScheduleTransitionState } = useScheduleTransitionActions();
-  const currentDate = useZoned(timeZone, search.timestamp);
+  const selected = useScheduleSelected(search);
+  const currentDate = useZonedOrNow(timeZone, search.timestamp);
   const sourceMonth = useMemo(
     () =>
       selected && DateTime.Equivalence(selected.day, DateTime.startOf(currentDate, "day"))
@@ -68,12 +66,6 @@ function DailyPage() {
     selected && DateTime.Equivalence(selected.day, DateTime.startOf(currentDate, "day"))
       ? buildSharedDayLayoutId(currentDate, sourceMonth)
       : undefined;
-
-  useEffect(() => {
-    return () => {
-      clearScheduleTransitionState();
-    };
-  }, [clearScheduleTransitionState]);
 
   return (
     <motion.div
@@ -89,7 +81,7 @@ function DailyPage() {
         exit={sharedLayoutId ? { opacity: 0 } : undefined}
         transition={calendarRestTransition}
       >
-        <DailyHeader sourceMonth={sourceMonth} />
+        <DailyHeader sourceMonth={sourceMonth} currentDate={currentDate} />
         <DailyScheduleContent />
       </motion.div>
     </motion.div>
@@ -97,9 +89,14 @@ function DailyPage() {
 }
 
 // Header component
-function DailyHeader({ sourceMonth }: { sourceMonth: DateTime.Zoned }) {
+function DailyHeader({
+  sourceMonth,
+  currentDate,
+}: {
+  sourceMonth: DateTime.Zoned;
+  currentDate: DateTime.Zoned;
+}) {
   const { channel, guildId } = Route.useParams();
-  const { startCalendarTransition } = useScheduleTransitionActions();
 
   return (
     <div className="flex items-center justify-between px-6 py-4 border-b border-[#33ccbb]/20 bg-[#0f1615]">
@@ -107,9 +104,15 @@ function DailyHeader({ sourceMonth }: { sourceMonth: DateTime.Zoned }) {
         className="flex items-center gap-2 text-[#33ccbb] hover:text-white transition-colors"
         to="/dashboard/guilds/$guildId/schedule/$channel/calendar"
         params={{ guildId, channel }}
-        search={{ timestamp: DateTime.toEpochMillis(sourceMonth) }}
-        onClick={() => {
-          startCalendarTransition();
+        search={{
+          timestamp: DateTime.toEpochMillis(sourceMonth),
+          from: { view: "daily", timestamp: DateTime.toEpochMillis(currentDate) },
+        }}
+        mask={{
+          to: "/dashboard/guilds/$guildId/schedule/$channel/calendar",
+          params: { guildId, channel },
+          search: { timestamp: DateTime.toEpochMillis(sourceMonth) },
+          unmaskOnReload: true,
         }}
       >
         <ChevronLeft className="w-4 h-4" />
@@ -126,12 +129,12 @@ function DailyScheduleContent() {
   const search = Route.useSearch();
   const parentRef = useRef<HTMLDivElement>(null);
 
-  const currentDate = useZoned(timeZone, search.timestamp);
+  const currentDate = useZonedOrNow(timeZone, search.timestamp);
 
   // Load schedules and eventConfig
   const allSchedules = useGuildSchedule(guildId);
   const eventConfig = useEventConfig(guildId);
-  const startTimeZoned = useZoned(timeZone, DateTime.toEpochMillis(eventConfig.startTime));
+  const startTimeZoned = useZonedOrNow(timeZone, DateTime.toEpochMillis(eventConfig.startTime));
 
   const channelSchedules = useMemo(
     () => allSchedules.filter((s) => s.channel === channel && Option.isSome(s.hour)),

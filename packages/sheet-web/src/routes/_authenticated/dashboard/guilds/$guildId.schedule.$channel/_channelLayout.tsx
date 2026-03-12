@@ -1,20 +1,23 @@
-import { createFileRoute, Outlet, Link, useChildMatches } from "@tanstack/react-router";
-import { Schema, pipe, Effect, Array, Option } from "effect";
+import { createFileRoute, Outlet, Link } from "@tanstack/react-router";
+import { Schema, pipe, Effect } from "effect";
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from "motion/react";
-import { useLayoutEffect } from "react";
 
 import { useAllChannels, getAllChannelsAtom } from "#/lib/schedule";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 import {
   morphLayoutTransition,
   useScheduleSelected,
-  useScheduleTransitionActions,
+  useCurrentView,
 } from "./_channelLayout/-transition";
 
 // Search params schema using Effect Schema
 // Timestamp in milliseconds for the selected date
+// From track transition origin for animations
 const ScheduleSearchSchema = Schema.Struct({
   timestamp: Schema.Number,
+  from: Schema.optional(
+    Schema.Struct({ view: Schema.Literal("calendar", "daily"), timestamp: Schema.Number }),
+  ),
 });
 
 export type ScheduleSearchParams = typeof ScheduleSearchSchema.Type;
@@ -56,30 +59,11 @@ function RoutePresenceShell({
 }
 
 function ScheduleLayout() {
-  const selected = useScheduleSelected();
   const { guildId, channel } = Route.useParams();
-  const { clearScheduleTransitionState } = useScheduleTransitionActions();
   const search = Route.useSearch();
+  const selected = useScheduleSelected(search);
 
-  // Reset transition state when navigating between guilds/channels
-  useLayoutEffect(() => {
-    return () => {
-      clearScheduleTransitionState();
-    };
-  }, [guildId, channel, clearScheduleTransitionState]);
-  const childMatches = useChildMatches();
-
-  // Extract view type from route path - explicit check for calendar vs daily
-  const viewType = pipe(
-    Array.head(childMatches),
-    Option.map((match) => {
-      // Check routeId explicitly for calendar or daily segment
-      if (match.routeId.includes("/daily")) return "daily";
-      if (match.routeId.includes("/calendar")) return "calendar";
-      return "default";
-    }),
-    Option.getOrElse(() => "default"),
-  );
+  const viewType = useCurrentView();
   const routeKey = viewType === "daily" ? "daily" : "calendar";
 
   const channels = useAllChannels(guildId);
