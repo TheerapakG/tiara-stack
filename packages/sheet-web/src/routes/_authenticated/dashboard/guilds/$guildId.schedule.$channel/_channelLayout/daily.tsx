@@ -17,7 +17,7 @@ import {
 import { Sheet } from "sheet-apis/schema";
 import { eventConfigAtom, useEventConfig } from "#/lib/sheet";
 import { useTimeZone } from "#/hooks/useTimeZone";
-import { useZonedOrNow } from "#/lib/date";
+import { useZonedOrNow } from "#/hooks/useDateTimeZoned";
 import { currentUserAtom, useCurrentUser } from "#/lib/discord";
 import {
   buildSharedDayLayoutId,
@@ -62,10 +62,7 @@ function DailyPage() {
         : DateTime.startOf(currentDate, "month"),
     [selected, currentDate],
   );
-  const sharedLayoutId =
-    selected && DateTime.Equivalence(selected.day, DateTime.startOf(currentDate, "day"))
-      ? buildSharedDayLayoutId(currentDate, sourceMonth)
-      : undefined;
+  const sharedLayoutId = buildSharedDayLayoutId(currentDate, sourceMonth);
 
   return (
     <motion.div
@@ -76,9 +73,9 @@ function DailyPage() {
       className="border border-[#33ccbb]/20 bg-[#0a0f0e]"
     >
       <motion.div
-        initial={sharedLayoutId ? { opacity: 0 } : false}
+        initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        exit={sharedLayoutId ? { opacity: 0 } : undefined}
+        exit={{ opacity: 0 }}
         transition={calendarRestTransition}
       >
         <DailyHeader sourceMonth={sourceMonth} currentDate={currentDate} />

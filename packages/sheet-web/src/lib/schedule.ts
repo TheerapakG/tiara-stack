@@ -20,7 +20,7 @@ import {
 import { RequestError, ResponseError } from "#/lib/error";
 import { eventConfigAtom } from "#/lib/sheet";
 import { useMemo } from "react";
-import { zoneId } from "#/lib/date";
+import { zoneId } from "#/hooks/useDateTimeZoned";
 
 // Re-export types from sheet-apis
 export type ScheduleResult = Sheet.PopulatedScheduleResult;

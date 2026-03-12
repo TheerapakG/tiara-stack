@@ -6,8 +6,9 @@ import { AnimatePresence, motion, useIsPresent } from "motion/react";
 
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 import { useScheduledDays, scheduledDaysAtom, formatDayKey } from "#/lib/schedule";
+import { useCalendarDays, calendarDaysAtom } from "#/lib/calendar";
 import { getServerTimeZone, useTimeZone } from "#/hooks/useTimeZone";
-import { makeZonedOrNow, useZonedOrNow } from "#/lib/date";
+import { makeZonedOrNow, useZonedOrNow } from "#/hooks/useDateTimeZoned";
 import {
   buildSharedDayLayoutId,
   calendarRestTransition,
@@ -29,10 +30,14 @@ export const Route = createFileRoute(
     const timeZone = getServerTimeZone(); // Match useTimeZone behavior during SSR
     const currentDate = await Effect.runPromise(makeZonedOrNow(timeZone, deps.timestamp));
 
-    const monthStartZoned = DateTime.startOf(currentDate, "month");
-    const monthEndZoned = DateTime.endOf(currentDate, "month");
-    const calendarStart = DateTime.startOf(monthStartZoned, "week", { weekStartsOn: 0 });
-    const calendarEnd = DateTime.endOf(monthEndZoned, "week", { weekStartsOn: 0 });
+    const calendarDays = await Effect.runPromise(
+      ensureResultAtomData(context.atomRegistry, calendarDaysAtom(currentDate)).pipe(
+        Effect.catchAll(() => Effect.die("Failed to load calendar days")),
+      ),
+    );
+
+    const rangeStart = Array.headNonEmpty(calendarDays).day;
+    const rangeEnd = DateTime.endOf(Array.lastNonEmpty(calendarDays).day, "day");
 
     await Effect.runPromise(
       ensureResultAtomData(
@@ -41,33 +46,13 @@ export const Route = createFileRoute(
           guildId: params.guildId,
           channel: params.channel,
           timeZone,
-          rangeStart: calendarStart,
-          rangeEnd: calendarEnd,
+          rangeStart,
+          rangeEnd,
         }),
       ).pipe(Effect.catchAll(() => Effect.succeed(HashSet.empty<string>()))),
     );
   },
 });
-
-// Helper to get all days in a calendar grid (including padding days from prev/next month)
-function getCalendarDays(dateTime: DateTime.Zoned) {
-  const monthStart = DateTime.startOf(dateTime, "month");
-  const monthEnd = DateTime.endOf(dateTime, "month");
-  const calendarStart = DateTime.startOf(monthStart, "week", { weekStartsOn: 0 });
-  // calendarEnd is the last moment of the day (e.g., 23:59:59.999), while current
-  // starts at midnight (00:00:00) each day. This ensures the last day is included
-  // regardless of whether DateTime.between is inclusive or exclusive on the maximum.
-  const calendarEnd = DateTime.endOf(monthEnd, "week", { weekStartsOn: 0 });
-
-  const days: DateTime.Zoned[] = [];
-  let current = calendarStart;
-
-  while (DateTime.between(current, { minimum: calendarStart, maximum: calendarEnd })) {
-    days.push(current);
-    current = DateTime.add(current, { days: 1 });
-  }
-  return days as [DateTime.Zoned, ...DateTime.Zoned[]];
-}
 
 // Get month name and year separately for animated display
 function getMonthYearParts(dateTime: DateTime.Zoned): { month: string; year: string } {
@@ -93,13 +78,6 @@ function getMonthYearParts(dateTime: DateTime.Zoned): { month: string; year: str
 function formatDayOfMonth(dateTime: DateTime.Zoned): string {
   const parts = DateTime.toParts(dateTime);
   return String(parts.day);
-}
-
-// Check if two dates are in the same month
-function isSameMonth(a: DateTime.Zoned, b: DateTime.Zoned): boolean {
-  const partsA = DateTime.toParts(a);
-  const partsB = DateTime.toParts(b);
-  return partsA.year === partsB.year && partsA.month === partsB.month;
 }
 
 // Inner component that handles positioning based on presence state
@@ -337,15 +315,13 @@ function CalendarGrid({ currentDate, selected }: CalendarGridProps) {
     clearScheduleTransitionState,
   } = useScheduleTransitionStates(search, "calendar");
 
-  const calendarDays = useMemo(() => {
-    return getCalendarDays(currentDate);
-  }, [currentDate]);
+  const calendarDays = useCalendarDays(currentDate);
 
   // Get the date range for the calendar view in milliseconds
-  const rangeStart = useMemo(() => Array.headNonEmpty(calendarDays), [calendarDays]);
+  const rangeStart = useMemo(() => Array.headNonEmpty(calendarDays).day, [calendarDays]);
 
   const rangeEnd = useMemo(
-    () => DateTime.endOf(Array.lastNonEmpty(calendarDays), "day"),
+    () => DateTime.endOf(Array.lastNonEmpty(calendarDays).day, "day"),
     [calendarDays],
   );
 
@@ -365,11 +341,10 @@ function CalendarGrid({ currentDate, selected }: CalendarGridProps) {
       className="grid grid-cols-7"
       style={{ pointerEvents: isCalendarLocked ? "none" : undefined }}
     >
-      {calendarDays.map((day) => {
-        const isCurrentMonth = isSameMonth(day, currentDate);
+      {calendarDays.map(({ day, isInMonth }) => {
         const dayKey = formatDayKey(day);
         const hasSchedule = HashSet.has(scheduledDays, dayKey);
-        const sharedLayoutId = buildSharedDayLayoutId(day, currentDate);
+        const sharedLayoutId = buildSharedDayLayoutId(day, currentMonth);
         const isSelectedDay =
           selected &&
           DateTime.Equivalence(selected.day, DateTime.startOf(day, "day")) &&
@@ -393,7 +368,7 @@ function CalendarGrid({ currentDate, selected }: CalendarGridProps) {
             style={{ pointerEvents: isCalendarLocked ? "none" : undefined }}
             className={`
               border-r border-b border-[#33ccbb]/10 last:border-r-0
-              ${isCurrentMonth ? "text-white" : "text-white/30"}
+              ${isInMonth ? "text-white" : "text-white/30"}
               ${hasSchedule ? "bg-[#33ccbb]/5" : ""}
               ${isSelectedDay ? "relative z-20" : ""}
             `}
@@ -414,7 +389,7 @@ function CalendarGrid({ currentDate, selected }: CalendarGridProps) {
               className={`
                 h-14 p-1 flex flex-col items-center justify-center
                 transition-colors
-                ${isCurrentMonth ? "hover:bg-[#33ccbb]/10" : ""}
+                ${isInMonth ? "hover:bg-[#33ccbb]/10" : ""}
               `}
             >
               <span className="text-sm font-medium">{formatDayOfMonth(day)}</span>

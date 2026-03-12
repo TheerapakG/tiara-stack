@@ -2,7 +2,7 @@ import { DateTime, Array, Option, pipe } from "effect";
 import { useMemo, useCallback } from "react";
 import { useChildMatches, useNavigate } from "@tanstack/react-router";
 import { formatDayKey } from "#/lib/schedule";
-import { useZonedOrNow, useZonedOrUndefined } from "#/lib/date";
+import { useZonedOrNow, useZonedOrUndefined } from "#/hooks/useDateTimeZoned";
 import { useTimeZone } from "#/hooks/useTimeZone";
 import type { ScheduleSearchParams } from "../_channelLayout";
 
