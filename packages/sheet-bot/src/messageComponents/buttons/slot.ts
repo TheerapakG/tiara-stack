@@ -2,13 +2,14 @@ import { Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
 import { Array, Chunk, Effect, Layer, Number, Option, Order, pipe, String } from "effect";
 import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { makeButton, makeButtonData, makeMessageComponent } from "dfx-discord-utils/utils";
 import {
-  MessageComponentHelper,
-  makeButton,
-  makeButtonData,
-  makeMessageComponent,
-} from "dfx-discord-utils/utils";
-import { EmbedService, FormatService, MessageSlotService, ScheduleService } from "@/services";
+  EmbedService,
+  FormatService,
+  MessageSlotService,
+  ScheduleService,
+  SheetApisRequestContext,
+} from "@/services";
 import { Interaction } from "dfx-discord-utils/utils";
 import { ButtonStyle, MessageFlags } from "discord-api-types/v10";
 
@@ -90,32 +91,34 @@ const makeSlotButtonHandler = Effect.gen(function* () {
 
   return yield* makeButton(
     slotButtonData.toJSON(),
-    Effect.fn("makeSlotButtonHandler")(function* (msgHelper: MessageComponentHelper) {
-      yield* msgHelper.deferReply({ flags: MessageFlags.Ephemeral });
+    SheetApisRequestContext.asInteractionUser(
+      Effect.fn("slotButton")(function* (msgHelper) {
+        yield* msgHelper.deferReply({ flags: MessageFlags.Ephemeral });
 
-      const guild = yield* Interaction.guild();
-      const message = yield* Interaction.message();
+        const guild = yield* Interaction.guild();
+        const message = yield* Interaction.message();
 
-      const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
-      const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
+        const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
+        const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
 
-      const messageSlotData = yield* messageSlotService.getMessageSlotData(messageId);
+        const messageSlotData = yield* messageSlotService.getMessageSlotData(messageId);
 
-      const slotMessage = yield* slotHelper.getSlotMessage(guildId, messageSlotData.day);
+        const slotMessage = yield* slotHelper.getSlotMessage(guildId, messageSlotData.day);
 
-      const embeds = [
-        (yield* embedService.makeBaseEmbedBuilder())
-          .setTitle(slotMessage.open.title)
-          .setDescription(slotMessage.open.description)
-          .toJSON(),
-        (yield* embedService.makeBaseEmbedBuilder())
-          .setTitle(slotMessage.filled.title)
-          .setDescription(slotMessage.filled.description)
-          .toJSON(),
-      ];
+        const embeds = [
+          (yield* embedService.makeBaseEmbedBuilder())
+            .setTitle(slotMessage.open.title)
+            .setDescription(slotMessage.open.description)
+            .toJSON(),
+          (yield* embedService.makeBaseEmbedBuilder())
+            .setTitle(slotMessage.filled.title)
+            .setDescription(slotMessage.filled.description)
+            .toJSON(),
+        ];
 
-      yield* msgHelper.editReply({ payload: { embeds } });
-    }),
+        yield* msgHelper.editReply({ payload: { embeds } });
+      }),
+    ),
   );
 });
 

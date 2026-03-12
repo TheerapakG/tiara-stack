@@ -8,8 +8,12 @@ import {
   HttpClientResponse,
   UrlParams,
 } from "@effect/platform";
-import { Cache, Duration, Effect, Exit, Ref, pipe, Schedule, Schema } from "effect";
+import { Interaction } from "dfx-discord-utils";
+import { DiscordInteraction } from "dfx/Interactions/context";
+import { Cache, Data, Duration, Effect, Exit, Ref, pipe, Schedule, Schema, Context } from "effect";
 import { Api } from "sheet-apis/api";
+
+const DISCORD_BOT_USER_ID_SENTINEL = "discord_bot_user";
 
 interface CachedToken {
   readonly token: string;
@@ -52,6 +56,48 @@ const exchangeClientCredentials = (
     ),
   );
 };
+
+type SheetApisRequester = Data.TaggedEnum<{
+  Bot: {};
+  DiscordUser: { readonly discordUserId: string };
+}>;
+export const SheetApisRequester = Data.taggedEnum<SheetApisRequester>();
+
+export class SheetApisRequestContext extends Context.Tag("SheetApisRequestContext")<
+  SheetApisRequestContext,
+  {
+    requester: SheetApisRequester;
+  }
+>() {
+  static asBot = <Args extends any[], A, E, R>(
+    fn: (...args: Args) => Effect.Effect<A, E, R>,
+  ): ((...args: Args) => Effect.Effect<A, E, Exclude<R, SheetApisRequestContext>>) =>
+    Effect.fn("SheetApisRequestContext.asBot")(function* (...args: Args) {
+      const sheetApisRequestContext = SheetApisRequestContext.of({
+        requester: SheetApisRequester.Bot(),
+      });
+
+      return yield* fn(...args).pipe(
+        Effect.provideService(SheetApisRequestContext, sheetApisRequestContext),
+      );
+    });
+
+  static asInteractionUser = <Args extends any[], A, E, R>(
+    fn: (...args: Args) => Effect.Effect<A, E, R>,
+  ): ((
+    ...args: Args
+  ) => Effect.Effect<A, E, DiscordInteraction | Exclude<R, SheetApisRequestContext>>) =>
+    Effect.fn("SheetApisRequestContext.asInteractionUser")(function* (...args: Args) {
+      const interactionUser = yield* Interaction.user();
+      const sheetApisRequestContext = SheetApisRequestContext.of({
+        requester: SheetApisRequester.DiscordUser({ discordUserId: interactionUser.id }),
+      });
+
+      return yield* fn(...args).pipe(
+        Effect.provideService(SheetApisRequestContext, sheetApisRequestContext),
+      );
+    });
+}
 
 export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApisClient", {
   scoped: pipe(
@@ -96,16 +142,29 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApi
           }),
       }),
     ),
-    Effect.bind("client", ({ tokenCache, baseUrl }) =>
-      HttpApiClient.make(Api, {
-        transformClient: HttpClient.mapRequestEffect((request) =>
-          pipe(
-            // Future: extract discordUserId from request context for per-user impersonation
-            tokenCache.get("dummy_discord_user_id"),
-            Effect.map(({ token }) => HttpClientRequest.bearerToken(request, token)),
-            Effect.catchAll(() => Effect.succeed(request)),
+    Effect.let("httpClientWithToken", ({ httpClient, tokenCache }) =>
+      HttpClient.mapRequestEffect(httpClient, (request) =>
+        SheetApisRequestContext.pipe(
+          Effect.map(({ requester }) => requester),
+          Effect.flatMap(
+            SheetApisRequester.$match({
+              Bot: () => tokenCache.get(DISCORD_BOT_USER_ID_SENTINEL),
+              DiscordUser: ({ discordUserId }) => tokenCache.get(discordUserId),
+            }),
+          ),
+          Effect.map(({ token }) => HttpClientRequest.bearerToken(request, token)),
+          Effect.catchAll((err) =>
+            pipe(
+              Effect.logWarning(`Failed to get auth token, proceeding unauthenticated: ${err}`),
+              Effect.as(request),
+            ),
           ),
         ),
+      ),
+    ),
+    Effect.bind("client", ({ httpClientWithToken, baseUrl }) =>
+      HttpApiClient.makeWith(Api, {
+        httpClient: httpClientWithToken,
         baseUrl,
       }),
     ),

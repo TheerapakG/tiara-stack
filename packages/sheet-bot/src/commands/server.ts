@@ -6,7 +6,12 @@ import { GuildsCache } from "dfx-discord-utils/discord";
 import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
-import { PermissionService, GuildConfigService, EmbedService } from "../services";
+import {
+  PermissionService,
+  GuildConfigService,
+  EmbedService,
+  SheetApisRequestContext,
+} from "../services";
 import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
 
 const makeListConfigSubCommand = Effect.gen(function* () {
@@ -415,13 +420,14 @@ const makeServerCommand = Effect.gen(function* () {
           InteractionContextType.Guild,
           InteractionContextType.PrivateChannel,
         ),
-    (command) =>
+    SheetApisRequestContext.asInteractionUser((command) =>
       command.subCommands({
         list_config: listConfigSubCommand.handler,
         add: addCommandGroup.handler,
         remove: removeCommandGroup.handler,
         set: setCommandGroup.handler,
       }),
+    ),
   );
 });
 

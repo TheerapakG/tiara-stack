@@ -6,7 +6,13 @@ import { Array, Effect, Function, Layer, Number, Option, Order, pipe } from "eff
 import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
-import { EmbedService, GuildConfigService, PermissionService, PlayerService } from "../services";
+import {
+  EmbedService,
+  GuildConfigService,
+  PermissionService,
+  PlayerService,
+  SheetApisRequestContext,
+} from "../services";
 import { Sheet } from "sheet-apis/schema";
 
 const makeListSubCommand = Effect.gen(function* () {
@@ -154,10 +160,11 @@ const makeTeamCommand = Effect.gen(function* () {
           InteractionContextType.PrivateChannel,
         )
         .addSubcommand(() => listSubCommand.data),
-    (command) =>
+    SheetApisRequestContext.asInteractionUser((command) =>
       command.subCommands({
         list: listSubCommand.handler,
       }),
+    ),
   );
 });
 

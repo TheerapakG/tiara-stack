@@ -7,7 +7,12 @@ import { Effect, Layer, Option, pipe } from "effect";
 import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
-import { EmbedService, GuildConfigService, PermissionService } from "../services";
+import {
+  EmbedService,
+  GuildConfigService,
+  PermissionService,
+  SheetApisRequestContext,
+} from "../services";
 import { GuildConfig } from "sheet-apis/schema";
 
 const configFields = (
@@ -283,12 +288,13 @@ const makeChannelCommand = Effect.gen(function* () {
         .addSubcommand(() => listConfigSubCommand.data)
         .addSubcommand(() => setSubCommand.data)
         .addSubcommand(() => unsetSubCommand.data),
-    (command) =>
+    SheetApisRequestContext.asInteractionUser((command) =>
       command.subCommands({
         list_config: listConfigSubCommand.handler,
         set: setSubCommand.handler,
         unset: unsetSubCommand.handler,
       }),
+    ),
   );
 });
 

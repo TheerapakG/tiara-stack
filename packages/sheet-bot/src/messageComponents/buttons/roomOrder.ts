@@ -3,10 +3,14 @@ import { InteractionsRegistry } from "dfx/gateway";
 import { bold, inlineCode, time, TimestampStyles } from "@discordjs/formatters";
 import { Array, Effect, HashSet, Layer, Option, pipe } from "effect";
 import { MessageRoomOrder } from "sheet-apis/schema";
-import { ConverterService, FormatService, MessageRoomOrderService } from "@/services";
+import {
+  ConverterService,
+  FormatService,
+  MessageRoomOrderService,
+  SheetApisRequestContext,
+} from "@/services";
 import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import {
-  MessageComponentHelper,
   makeButton,
   makeButtonData,
   makeMessageActionRowData,
@@ -125,27 +129,30 @@ const makeRoomOrderPreviousButtonHandler = Effect.gen(function* () {
   const roomOrderHelper = yield* RoomOrderHelper;
   const messageRoomOrderService = yield* MessageRoomOrderService;
 
-  return yield* makeButton(previousButtonData.toJSON(), (msgHelper: MessageComponentHelper) =>
-    Effect.gen(function* () {
-      yield* msgHelper.deferUpdate({ flags: MessageFlags.Ephemeral });
+  return yield* makeButton(
+    previousButtonData.toJSON(),
+    SheetApisRequestContext.asInteractionUser(
+      Effect.fn("roomOrderPreviousButton")(function* (msgHelper) {
+        yield* msgHelper.deferUpdate({ flags: MessageFlags.Ephemeral });
 
-      const guild = yield* Interaction.guild();
-      const message = yield* Interaction.message();
+        const guild = yield* Interaction.guild();
+        const message = yield* Interaction.message();
 
-      const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
-      const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
+        const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
+        const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
 
-      const decrementedRank =
-        yield* messageRoomOrderService.decrementMessageRoomOrderRank(messageId);
+        const decrementedRank =
+          yield* messageRoomOrderService.decrementMessageRoomOrderRank(messageId);
 
-      const reply = yield* roomOrderHelper.roomOrderInteractionGetReply(
-        guildId,
-        messageId,
-        decrementedRank,
-      );
+        const reply = yield* roomOrderHelper.roomOrderInteractionGetReply(
+          guildId,
+          messageId,
+          decrementedRank,
+        );
 
-      yield* msgHelper.editReply({ payload: reply });
-    }),
+        yield* msgHelper.editReply({ payload: reply });
+      }),
+    ),
   );
 });
 
@@ -153,27 +160,30 @@ const makeRoomOrderNextButtonHandler = Effect.gen(function* () {
   const roomOrderHelper = yield* RoomOrderHelper;
   const messageRoomOrderService = yield* MessageRoomOrderService;
 
-  return yield* makeButton(nextButtonData.toJSON(), (msgHelper: MessageComponentHelper) =>
-    Effect.gen(function* () {
-      yield* msgHelper.deferUpdate({ flags: MessageFlags.Ephemeral });
+  return yield* makeButton(
+    nextButtonData.toJSON(),
+    SheetApisRequestContext.asInteractionUser(
+      Effect.fn("roomOrderNextButton")(function* (msgHelper) {
+        yield* msgHelper.deferUpdate({ flags: MessageFlags.Ephemeral });
 
-      const guild = yield* Interaction.guild();
-      const message = yield* Interaction.message();
+        const guild = yield* Interaction.guild();
+        const message = yield* Interaction.message();
 
-      const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
-      const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
+        const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
+        const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
 
-      const incrementedRank =
-        yield* messageRoomOrderService.incrementMessageRoomOrderRank(messageId);
+        const incrementedRank =
+          yield* messageRoomOrderService.incrementMessageRoomOrderRank(messageId);
 
-      const reply = yield* roomOrderHelper.roomOrderInteractionGetReply(
-        guildId,
-        messageId,
-        incrementedRank,
-      );
+        const reply = yield* roomOrderHelper.roomOrderInteractionGetReply(
+          guildId,
+          messageId,
+          incrementedRank,
+        );
 
-      yield* msgHelper.editReply({ payload: reply });
-    }),
+        yield* msgHelper.editReply({ payload: reply });
+      }),
+    ),
   );
 });
 
@@ -181,40 +191,43 @@ const makeRoomOrderSendButtonHandler = Effect.gen(function* () {
   const roomOrderHelper = yield* RoomOrderHelper;
   const messageRoomOrderService = yield* MessageRoomOrderService;
 
-  return yield* makeButton(sendButtonData.toJSON(), (msgHelper: MessageComponentHelper) =>
-    Effect.gen(function* () {
-      yield* msgHelper.deferUpdate({ flags: MessageFlags.Ephemeral });
+  return yield* makeButton(
+    sendButtonData.toJSON(),
+    SheetApisRequestContext.asInteractionUser(
+      Effect.fn("roomOrderSendButton")(function* (msgHelper) {
+        yield* msgHelper.deferUpdate({ flags: MessageFlags.Ephemeral });
 
-      const guild = yield* Interaction.guild();
-      const message = yield* Interaction.message();
+        const guild = yield* Interaction.guild();
+        const message = yield* Interaction.message();
 
-      const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
-      const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
+        const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
+        const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
 
-      const messageRoomOrderData = yield* messageRoomOrderService.getMessageRoomOrder(messageId);
+        const messageRoomOrderData = yield* messageRoomOrderService.getMessageRoomOrder(messageId);
 
-      const reply = yield* roomOrderHelper.roomOrderInteractionGetReply(
-        guildId,
-        messageId,
-        messageRoomOrderData,
-      );
+        const reply = yield* roomOrderHelper.roomOrderInteractionGetReply(
+          guildId,
+          messageId,
+          messageRoomOrderData,
+        );
 
-      yield* pipe(
-        message,
-        Effect.transposeMapOption((m) =>
-          msgHelper.rest.createMessage(m.channel_id, {
-            content: reply.content,
-          }),
-        ),
-      );
+        yield* pipe(
+          message,
+          Effect.transposeMapOption((m) =>
+            msgHelper.rest.createMessage(m.channel_id, {
+              content: reply.content,
+            }),
+          ),
+        );
 
-      yield* msgHelper.editReply({
-        payload: {
-          content: "sent room order!",
-          components: [],
-        },
-      });
-    }),
+        yield* msgHelper.editReply({
+          payload: {
+            content: "sent room order!",
+            components: [],
+          },
+        });
+      }),
+    ),
   );
 });
 

@@ -10,6 +10,7 @@ import {
   GuildConfigService,
   PermissionService,
   ScreenshotService,
+  SheetApisRequestContext,
 } from "../services";
 
 const makeScreenshotCommand = Effect.gen(function* () {
@@ -43,52 +44,56 @@ const makeScreenshotCommand = Effect.gen(function* () {
           InteractionContextType.Guild,
           InteractionContextType.PrivateChannel,
         ),
-    Effect.fn("screenshot")(function* (command) {
-      yield* command.deferReply();
+    SheetApisRequestContext.asInteractionUser(
+      Effect.fn("screenshot")(function* (command) {
+        yield* command.deferReply();
 
-      const serverId = command.optionValueOptional("server_id");
-      const interactionGuildId = (yield* Interaction.guild()).pipe(Option.map((guild) => guild.id));
-      const guildId = pipe(
-        serverId,
-        Option.orElse(() => interactionGuildId),
-        Option.getOrThrow,
-      );
+        const serverId = command.optionValueOptional("server_id");
+        const interactionGuildId = (yield* Interaction.guild()).pipe(
+          Option.map((guild) => guild.id),
+        );
+        const guildId = pipe(
+          serverId,
+          Option.orElse(() => interactionGuildId),
+          Option.getOrThrow,
+        );
 
-      const channelName = command.optionValue("channel_name");
-      const day = command.optionValue("day");
+        const channelName = command.optionValue("channel_name");
+        const day = command.optionValue("day");
 
-      yield* Effect.firstSuccessOf([
-        permissionService.checkInteractionUserApplicationOwner(),
-        pipe(
-          permissionService.checkInteractionUserGuildRoles(
-            yield* guildConfigService
-              .getGuildManagerRoles(guildId)
-              .pipe(Effect.map(Array.map((role) => role.roleId))),
-            guildId,
+        yield* Effect.firstSuccessOf([
+          permissionService.checkInteractionUserApplicationOwner(),
+          pipe(
+            permissionService.checkInteractionUserGuildRoles(
+              yield* guildConfigService
+                .getGuildManagerRoles(guildId)
+                .pipe(Effect.map(Array.map((role) => role.roleId))),
+              guildId,
+            ),
+            Effect.catchTag("PermissionError", () =>
+              Effect.fail(new Error("You can only take screenshots as a manager")),
+            ),
           ),
-          Effect.catchTag("PermissionError", () =>
-            Effect.fail(new Error("You can only take screenshots as a manager")),
-          ),
-        ),
-      ]);
+        ]);
 
-      const screenshot = yield* screenshotService.getScreenshot(guildId, channelName, day);
+        const screenshot = yield* screenshotService.getScreenshot(guildId, channelName, day);
 
-      yield* command.editReplyWithFiles(
-        [new File([Buffer.from(screenshot)], "screenshot.png", { type: "image/png" })],
-        {
-          payload: {
-            attachments: [
-              {
-                id: "0",
-                description: `Day ${day}'s schedule screenshot`,
-                filename: "screenshot.png",
-              },
-            ],
+        yield* command.editReplyWithFiles(
+          [new File([Buffer.from(screenshot)], "screenshot.png", { type: "image/png" })],
+          {
+            payload: {
+              attachments: [
+                {
+                  id: "0",
+                  description: `Day ${day}'s schedule screenshot`,
+                  filename: "screenshot.png",
+                },
+              ],
+            },
           },
-        },
-      );
-    }),
+        );
+      }),
+    ),
   );
 });
 

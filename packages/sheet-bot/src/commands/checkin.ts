@@ -17,6 +17,7 @@ import {
   MessageCheckinService,
   PermissionService,
   ScheduleService,
+  SheetApisRequestContext,
 } from "../services";
 import { checkinButtonData } from "../messageComponents/buttons/checkin";
 import { makeMessageActionRowData } from "dfx-discord-utils/utils";
@@ -249,10 +250,11 @@ const makeCheckinCommand = Effect.gen(function* () {
           InteractionContextType.PrivateChannel,
         )
         .addSubcommand(() => manualSubCommand.data),
-    (command) =>
+    SheetApisRequestContext.asInteractionUser((command) =>
       command.subCommands({
         manual: manualSubCommand.handler,
       }),
+    ),
   );
 });
 

@@ -31,6 +31,7 @@ import {
   PlayerService,
   ScheduleService,
   SheetApisClient,
+  SheetApisRequestContext,
 } from "../services";
 import { Sheet } from "sheet-apis/schema";
 import { Array as ArrayUtils } from "typhoon-core/utils";
@@ -332,10 +333,11 @@ const makeRoomOrderCommand = Effect.gen(function* () {
           InteractionContextType.PrivateChannel,
         )
         .addSubcommand(() => manualSubCommand.data),
-    (command) =>
+    SheetApisRequestContext.asInteractionUser((command) =>
       command.subCommands({
         manual: manualSubCommand.handler,
       }),
+    ),
   );
 });
 

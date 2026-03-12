@@ -12,6 +12,7 @@ import {
   GuildConfigService,
   PermissionService,
   ScheduleService,
+  SheetApisRequestContext,
 } from "../services";
 import { MembersCache, RolesCache } from "dfx-discord-utils/discord";
 import { GuildMemberUtils } from "dfx-discord-utils/utils";
@@ -200,10 +201,11 @@ const makeKickoutCommand = Effect.gen(function* () {
           InteractionContextType.PrivateChannel,
         )
         .addSubcommand(() => manualSubCommand.data),
-    (command) =>
+    SheetApisRequestContext.asInteractionUser((command) =>
       command.subCommands({
         manual: manualSubCommand.handler,
       }),
+    ),
   );
 });
 

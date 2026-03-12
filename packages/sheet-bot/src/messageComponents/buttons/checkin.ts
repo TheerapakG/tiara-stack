@@ -5,13 +5,12 @@ import { ButtonStyle, MessageFlags } from "discord-api-types/v10";
 import { Array, Effect, Layer, Option, pipe } from "effect";
 import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import {
-  MessageComponentHelper,
   makeButton,
   makeButtonData,
   makeMessageActionRowData,
   makeMessageComponent,
 } from "dfx-discord-utils/utils";
-import { MessageCheckinService } from "@/services";
+import { MessageCheckinService, SheetApisRequestContext } from "@/services";
 import { GuildMemberUtils } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 
@@ -27,62 +26,71 @@ const makeCheckinButtonHandler = Effect.gen(function* () {
   const messageCheckinService = yield* MessageCheckinService;
   const guildMemberUtils = yield* GuildMemberUtils;
 
-  return yield* makeButton(checkinButtonData.toJSON(), (helper: MessageComponentHelper) =>
-    Effect.gen(function* () {
-      yield* helper.deferReply({ flags: MessageFlags.Ephemeral });
+  return yield* makeButton(
+    checkinButtonData.toJSON(),
+    SheetApisRequestContext.asInteractionUser(
+      Effect.fn("checkinButton")(function* (helper) {
+        yield* helper.deferReply({ flags: MessageFlags.Ephemeral });
 
-      const guild = yield* Interaction.guild();
-      const user = yield* Interaction.user();
-      const message = yield* Interaction.message();
+        const guild = yield* Interaction.guild();
+        const user = yield* Interaction.user();
+        const message = yield* Interaction.message();
 
-      const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
-      const userId = user.id;
-      const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
-      const messageChannelId = Option.map(message, (m) => m.channel_id).pipe(Option.getOrThrow);
+        const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
+        const userId = user.id;
+        const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
+        const messageChannelId = Option.map(message, (m) => m.channel_id).pipe(Option.getOrThrow);
 
-      yield* messageCheckinService.setMessageCheckinMemberCheckinAt(messageId, userId, Date.now());
+        yield* messageCheckinService.setMessageCheckinMemberCheckinAt(
+          messageId,
+          userId,
+          Date.now(),
+        );
 
-      // Give user immediate feedback first (ephemeral confirmation)
-      yield* helper.editReply({
-        payload: {
-          content: "You have been checked in!",
-        },
-      });
+        // Give user immediate feedback first (ephemeral confirmation)
+        yield* helper.editReply({
+          payload: {
+            content: "You have been checked in!",
+          },
+        });
 
-      const messageCheckinData = yield* messageCheckinService.getMessageCheckinData(messageId);
+        const messageCheckinData = yield* messageCheckinService.getMessageCheckinData(messageId);
 
-      const checkedInMembers = yield* messageCheckinService.getMessageCheckinMembers(messageId);
+        const checkedInMembers = yield* messageCheckinService.getMessageCheckinMembers(messageId);
 
-      const checkedInMentions = pipe(
-        checkedInMembers,
-        Array.filter((m) => Option.isSome(m.checkinAt)),
-        Array.map((m) => userMention(m.memberId)),
-      );
+        const checkedInMentions = pipe(
+          checkedInMembers,
+          Array.filter((m) => Option.isSome(m.checkinAt)),
+          Array.map((m) => userMention(m.memberId)),
+        );
 
-      const content = pipe(
-        checkedInMentions,
-        Array.match({
-          onNonEmpty: (mentions) =>
-            `${messageCheckinData.initialMessage}\n\nChecked in: ${mentions.join(" ")}`,
-          onEmpty: () => messageCheckinData.initialMessage,
-        }),
-      );
+        const content = pipe(
+          checkedInMentions,
+          Array.match({
+            onNonEmpty: (mentions) =>
+              `${messageCheckinData.initialMessage}\n\nChecked in: ${mentions.join(" ")}`,
+            onEmpty: () => messageCheckinData.initialMessage,
+          }),
+        );
 
-      // Edit the original message using REST API (use the message's actual channel)
-      yield* helper.rest.updateMessage(messageChannelId, messageId, {
-        content,
-        components: [makeMessageActionRowData((b) => b.setComponents(checkinButtonData)).toJSON()],
-      });
+        // Edit the original message using REST API (use the message's actual channel)
+        yield* helper.rest.updateMessage(messageChannelId, messageId, {
+          content,
+          components: [
+            makeMessageActionRowData((b) => b.setComponents(checkinButtonData)).toJSON(),
+          ],
+        });
 
-      // Send notification to the running channel
-      yield* helper.rest.createMessage(messageCheckinData.channelId, {
-        content: `${userMention(userId)} has checked in!`,
-      });
+        // Send notification to the running channel
+        yield* helper.rest.createMessage(messageCheckinData.channelId, {
+          content: `${userMention(userId)} has checked in!`,
+        });
 
-      yield* Effect.transposeMapOption(messageCheckinData.roleId, (roleId) =>
-        guildMemberUtils.addRoles(guildId, userId, [roleId]),
-      );
-    }),
+        yield* Effect.transposeMapOption(messageCheckinData.roleId, (roleId) =>
+          guildMemberUtils.addRoles(guildId, userId, [roleId]),
+        );
+      }),
+    ),
   );
 });
 

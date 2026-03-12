@@ -23,6 +23,7 @@ import {
   GuildConfigService,
   MessageCheckinService,
   ScheduleService,
+  SheetApisRequestContext,
   SheetService,
 } from "../services";
 import { ActionRowBuilder } from "dfx-discord-utils/utils";
@@ -303,39 +304,44 @@ const processGuild = (guildId: string) =>
 
 export const AutoCheckinTaskLive = Layer.scopedDiscard(
   pipe(
-    Effect.gen(function* () {
-      yield* Effect.log("running auto check-in task...");
+    SheetApisRequestContext.asBot(
+      Effect.fn("autoCheckinTask", { attributes: { task: "autoCheckin" } })(
+        function* () {
+          yield* Effect.log("running auto check-in task...");
 
-      const guildConfigs = yield* GuildConfigService.getAutoCheckinGuilds();
+          const guildConfigs = yield* GuildConfigService.getAutoCheckinGuilds();
 
-      const totalSent = yield* pipe(
-        guildConfigs,
-        Effect.forEach(
-          (guildConfig) =>
-            pipe(
-              processGuild(guildConfig.guildId),
-              Effect.provide(
-                Layer.mergeAll(
-                  DiscordGatewayLayer,
-                  ConverterService.Default,
-                  EmbedService.Default,
-                  FormatService.Default,
-                  MessageCheckinService.Default,
-                  ScheduleService.Default,
-                  SheetService.Default,
+          const totalSent = yield* pipe(
+            guildConfigs,
+            Effect.forEach(
+              (guildConfig) =>
+                pipe(
+                  processGuild(guildConfig.guildId),
+                  Effect.provide(
+                    Layer.mergeAll(
+                      DiscordGatewayLayer,
+                      ConverterService.Default,
+                      EmbedService.Default,
+                      FormatService.Default,
+                      MessageCheckinService.Default,
+                      ScheduleService.Default,
+                      SheetService.Default,
+                    ),
+                  ),
+                  Effect.catchAll((err) => pipe(Effect.logError(err), Effect.as(0))),
                 ),
-              ),
-              Effect.catchAll((err) => pipe(Effect.logError(err), Effect.as(0))),
+              { concurrency: "unbounded" },
             ),
-          { concurrency: "unbounded" },
-        ),
-        Effect.map((counts) => counts.reduce((acc: number, n: number) => acc + n, 0)),
-      );
+            Effect.map((counts) => counts.reduce((acc: number, n: number) => acc + n, 0)),
+          );
 
-      yield* Effect.log(
-        `sent ${totalSent} check-in message(s) across all ${guildConfigs.length} guilds`,
-      );
-    }),
+          yield* Effect.log(
+            `sent ${totalSent} check-in message(s) across all ${guildConfigs.length} guilds`,
+          );
+        },
+        Effect.annotateLogs({ task: "autoCheckin" }),
+      ),
+    )(),
     Effect.schedule(
       Schedule.cron(
         Cron.make({
@@ -348,8 +354,6 @@ export const AutoCheckinTaskLive = Layer.scopedDiscard(
         }),
       ),
     ),
-    Effect.withSpan("AutoCheckinTask", { attributes: { task: "autoCheckin" } }),
-    Effect.annotateLogs({ task: "autoCheckin" }),
     Effect.forkDaemon,
   ),
 ).pipe(Layer.provide(Layer.mergeAll(GuildConfigService.Default, SheetService.Default)));

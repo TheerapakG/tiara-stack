@@ -16,6 +16,7 @@ import {
   MessageSlotService,
   PermissionService,
   ScheduleService,
+  SheetApisRequestContext,
 } from "../services";
 import { slotButtonData } from "../messageComponents/buttons/slot";
 
@@ -247,11 +248,12 @@ const makeSlotCommand = Effect.gen(function* () {
         )
         .addSubcommand(() => listSubCommand.data)
         .addSubcommand(() => buttonSubCommand.data),
-    (command) =>
+    SheetApisRequestContext.asInteractionUser((command) =>
       command.subCommands({
         list: listSubCommand.handler,
         button: buttonSubCommand.handler,
       }),
+    ),
   );
 });
 

@@ -10,7 +10,13 @@ import { Array, Effect, Layer, Match, Option, pipe, String } from "effect";
 import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
-import { EmbedService, GuildConfigService, PermissionService, ScheduleService } from "../services";
+import {
+  EmbedService,
+  GuildConfigService,
+  PermissionService,
+  ScheduleService,
+  SheetApisRequestContext,
+} from "../services";
 
 const formatHourRanges = (hours: readonly number[]): string => {
   if (Array.isEmptyReadonlyArray(hours)) return "None";
@@ -229,10 +235,11 @@ const makeScheduleCommand = Effect.gen(function* () {
           InteractionContextType.PrivateChannel,
         )
         .addSubcommand(() => listSubCommand.data),
-    (command) =>
+    SheetApisRequestContext.asInteractionUser((command) =>
       command.subCommands({
         list: listSubCommand.handler,
       }),
+    ),
   );
 });
 

@@ -1,5 +1,4 @@
 import {
-  Context,
   Deferred,
   Effect,
   Exit,
@@ -16,30 +15,34 @@ const ScopedCacheTypeId = Symbol.for("typhoon/ScopedCache");
 
 export type ScopedCacheTypeId = typeof ScopedCacheTypeId;
 
-export interface Variance<in Key, out Value, out Error = never> {
+export interface Variance<in Key, out Value, out Error, out Environment> {
   readonly [ScopedCacheTypeId]: {
     readonly _Key: Types.Contravariant<Key>;
     readonly _Value: Types.Covariant<Value>;
     readonly _Error: Types.Covariant<Error>;
+    readonly _Environment: Types.Covariant<Environment>;
   };
 }
 
-const scopedCacheVariance: <Key, Value, Error = never>() => Variance<
+const scopedCacheVariance: <Key, Value, Error, Environment>() => Variance<
   Key,
   Value,
-  Error
+  Error,
+  Environment
 >[ScopedCacheTypeId] = () => ({
   _Key: Function.identity,
   _Value: Function.identity,
   _Error: Function.identity,
+  _Environment: Function.identity,
 });
 
-export interface ScopedCache<in Key, out Value, out Error = never> extends Variance<
+export interface ScopedCache<in Key, out Value, out Error, out Environment> extends Variance<
   Key,
   Value,
-  Error
+  Error,
+  Environment
 > {
-  get(key: Key): Effect.Effect<Value, Error, Scope.Scope>;
+  get(key: Key): Effect.Effect<Value, Error, Environment | Scope.Scope>;
 }
 
 interface CachedEntry<Key, Value, Error> {
@@ -49,8 +52,13 @@ interface CachedEntry<Key, Value, Error> {
   readonly ownerCount: MutableRef.MutableRef<number>;
 }
 
-class ScopedCacheImpl<Key, Value, Error, Environment> implements ScopedCache<Key, Value, Error> {
-  readonly [ScopedCacheTypeId] = scopedCacheVariance<Key, Value, Error>();
+class ScopedCacheImpl<Key, Value, Error, Environment> implements ScopedCache<
+  Key,
+  Value,
+  Error,
+  Environment
+> {
+  readonly [ScopedCacheTypeId] = scopedCacheVariance<Key, Value, Error, Environment>();
 
   private readonly cache: MutableHashMap.MutableHashMap<
     Key,
@@ -59,10 +67,9 @@ class ScopedCacheImpl<Key, Value, Error, Environment> implements ScopedCache<Key
 
   constructor(
     readonly lookup: (key: Key) => Effect.Effect<Value, Error, Environment | Scope.Scope>,
-    readonly context: Context.Context<Environment>,
   ) {}
 
-  get(key: Key): Effect.Effect<Value, Error, Scope.Scope> {
+  get(key: Key): Effect.Effect<Value, Error, Environment | Scope.Scope> {
     return pipe(
       Effect.sync(() => MutableHashMap.get(this.cache, key)),
       Effect.flatMap(
@@ -106,25 +113,37 @@ class ScopedCacheImpl<Key, Value, Error, Environment> implements ScopedCache<Key
 
   private startComputation(
     key: Key,
-  ): Effect.Effect<Deferred.Deferred<CachedEntry<Key, Value, Error>, never>, never, Scope.Scope> {
+  ): Effect.Effect<
+    Deferred.Deferred<CachedEntry<Key, Value, Error>, never>,
+    never,
+    Environment | Scope.Scope
+  > {
     return pipe(
       Deferred.make<CachedEntry<Key, Value, Error>, never>(),
       Effect.tap((deferred) =>
         pipe(
           Effect.sync(() => MutableHashMap.set(this.cache, key, deferred)),
-          Effect.tap(() => Deferred.complete(deferred, this.computeEntry(key))),
+          Effect.tap(() =>
+            Effect.uninterruptibleMask((restore) =>
+              Effect.flatMap(Effect.exit(restore(this.computeEntry(key))), (exit) =>
+                Deferred.done(deferred, exit),
+              ),
+            ),
+          ),
           Effect.onInterrupt(() => Effect.sync(() => MutableHashMap.remove(this.cache, key))),
         ),
       ),
     );
   }
 
-  private computeEntry(key: Key): Effect.Effect<CachedEntry<Key, Value, Error>, never> {
+  private computeEntry(
+    key: Key,
+  ): Effect.Effect<CachedEntry<Key, Value, Error>, never, Environment> {
     return pipe(
       Effect.Do,
       Effect.bind("innerScope", () => Scope.make()),
       Effect.bind("exit", ({ innerScope }) =>
-        pipe(this.lookup(key), Effect.provide(this.context), Scope.extend(innerScope), Effect.exit),
+        pipe(this.lookup(key), Scope.extend(innerScope), Effect.exit),
       ),
       Effect.map(({ exit, innerScope }) => ({
         key,
@@ -136,14 +155,11 @@ class ScopedCacheImpl<Key, Value, Error, Environment> implements ScopedCache<Key
   }
 }
 
-export type Lookup<Key, Value, Error = never, Environment = never> = (
+export type Lookup<Key, Value, Error, Environment> = (
   key: Key,
 ) => Effect.Effect<Value, Error, Environment | Scope.Scope>;
 
-export const make = <Key, Value, Error = never, Environment = never>(options: {
+export const make = <Key, Value, Error, Environment>(options: {
   readonly lookup: Lookup<Key, Value, Error, Environment>;
-}): Effect.Effect<ScopedCache<Key, Value, Error>, never, Environment> =>
-  pipe(
-    Effect.context<Environment>(),
-    Effect.map((context) => new ScopedCacheImpl(options.lookup, context)),
-  );
+}): Effect.Effect<ScopedCache<Key, Value, Error, Environment>, never, never> =>
+  Effect.succeed(new ScopedCacheImpl(options.lookup));
