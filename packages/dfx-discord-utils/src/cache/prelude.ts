@@ -6,7 +6,42 @@ import * as Effect from "effect/Effect";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import type { ReverseLookupCacheDriver } from "./driver";
-import { makeWithReverseLookup, type ReverseLookupCache } from "./cache";
+import { make, makeWithReverseLookup, type ReverseLookupCache, type SimpleCache } from "./cache";
+import type { DiscordChannel, DiscordGuild, DiscordEmoji } from "@/discord/schema";
+
+import { CacheApiClient } from "@/discord/cacheApiClient";
+
+// Member type with pending optional (Discord only includes it when Membership Screening is enabled)
+export type GuildMemberWithOptionalPending = Omit<
+  Discord.GuildMemberResponse,
+  "deaf" | "flags" | "joined_at" | "mute" | "pending"
+> & {
+  pending?: boolean;
+};
+
+// Guild type with relaxed fields (allows unknown future values)
+export type GuildWithRelaxedFeatures = Omit<
+  DiscordGuild,
+  | "features"
+  | "preferred_locale"
+  | "region"
+  | "afk_timeout"
+  | "widget_enabled"
+  | "max_members"
+  | "max_video_channel_users"
+  | "max_stage_video_channel_users"
+  | "premium_subscription_count"
+> & {
+  features: readonly string[];
+  preferred_locale: string;
+  region?: string | null | undefined;
+  afk_timeout: number;
+  widget_enabled?: boolean | undefined;
+  max_members?: number | undefined;
+  max_video_channel_users?: number | undefined;
+  max_stage_video_channel_users?: number | undefined;
+  premium_subscription_count?: number | undefined;
+};
 
 export type ReverseLookupCacheOp<T> =
   | ReverseLookupCacheOp.Create<T>
@@ -132,14 +167,15 @@ export const opsWithReverseLookup = <E, T>({
 
 // Channels reverse lookup cache prelude
 export const channelsWithReverseLookup = <RM, EM, E>(
-  makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, Discord.GetChannel200>, EM, RM>,
+  makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, DiscordChannel>, EM, RM>,
 ): Effect.Effect<
   ReverseLookupCache<
     E,
     DiscordRESTError,
     DiscordRESTError,
     Cache.CacheMissError,
-    Discord.GetChannel200
+    DiscordChannel,
+    false
   >,
   EM,
   RM | DiscordGateway | DiscordREST | Scope.Scope
@@ -153,10 +189,10 @@ export const channelsWithReverseLookup = <RM, EM, E>(
       driver,
       id: (c) => Effect.succeed([(c as Discord.GuildChannelResponse).guild_id, c.id]),
       ops: opsWithReverseLookup({
-        id: (c: Discord.GetChannel200) => c.id,
+        id: (c: DiscordChannel) => c.id,
         fromParent: Stream.map(gateway.fromDispatch("GUILD_CREATE"), (g) => [
           g.id,
-          [...g.channels, ...g.threads] as Discord.GetChannel200[],
+          [...g.channels, ...g.threads] as DiscordChannel[],
         ]),
         create: Stream.merge(
           gateway.fromDispatch("CHANNEL_CREATE"),
@@ -197,7 +233,8 @@ export const rolesWithReverseLookup = <RM, EM, E>(
     Cache.CacheMissError,
     DiscordRESTError,
     Cache.CacheMissError,
-    Discord.GuildRoleResponse
+    Discord.GuildRoleResponse,
+    false
   >,
   EM,
   RM | DiscordGateway | DiscordREST | Scope.Scope
@@ -262,7 +299,8 @@ export const membersWithReverseLookup = <RM, EM, E>(
     Cache.CacheMissError,
     DiscordRESTError,
     Cache.CacheMissError,
-    Omit<Discord.GuildMemberResponse, "deaf" | "flags" | "joined_at" | "mute">
+    Omit<Discord.GuildMemberResponse, "deaf" | "flags" | "joined_at" | "mute">,
+    false
   >,
   EM,
   RM | DiscordGateway | DiscordREST | Scope.Scope
@@ -312,12 +350,16 @@ export const membersWithReverseLookup = <RM, EM, E>(
     });
   });
 
+// ============================================================================
+// Cache View Preludes (readonly, no gateway, dies on miss)
+// ============================================================================
+
 // Cache view reverse lookup cache prelude
 export const cacheViewWithReverseLookup = <T, RM, EM, E>(
   id: (a: T) => string,
   makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, T>, EM, RM>,
 ): Effect.Effect<
-  ReverseLookupCache<E, Cache.CacheMissError, Cache.CacheMissError, Cache.CacheMissError, T>,
+  ReverseLookupCache<E, Cache.CacheMissError, Cache.CacheMissError, Cache.CacheMissError, T, true>,
   EM,
   RM | Scope.Scope
 > =>
@@ -360,11 +402,12 @@ export const cacheViewWithReverseLookup = <T, RM, EM, E>(
             id,
           }),
         ),
+      readonly: true,
     });
   });
 
 export const channelsCacheViewWithReverseLookup = <RM, EM, E>(
-  makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, Discord.GetChannel200>, EM, RM>,
+  makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, DiscordChannel>, EM, RM>,
 ) => cacheViewWithReverseLookup((c) => c.id, makeDriver);
 
 export const rolesCacheViewWithReverseLookup = <RM, EM, E>(
@@ -386,19 +429,271 @@ export const membersCacheViewWithReverseLookup = <RM, EM, E>(
 export const cacheView = <T, RM, EM, E>(
   id: (a: T) => string,
   makeDriver: Effect.Effect<CacheDriver<E, T>, EM, RM>,
-): Effect.Effect<Cache.Cache<E, Cache.CacheMissError, T>, EM, RM | Scope.Scope> =>
+): Effect.Effect<SimpleCache<E, Cache.CacheMissError, T, true>, EM, RM | Scope.Scope> =>
   Effect.gen(function* () {
     const driver = yield* makeDriver;
 
-    return yield* Cache.make({
+    return yield* make({
       driver,
-      id: (a: T) => id(a),
+      id,
       onMiss: (id) => Effect.fail(new Cache.CacheMissError({ cacheName: "CacheView", id })),
       ops: Stream.never,
+      readonly: true,
     });
   });
 
 // Guilds cache view prelude - uses CacheDriver (not ReverseLookupCacheDriver) since guilds don't have parent relationships
 export const guildsCacheView = <RM, EM, E>(
-  makeDriver: Effect.Effect<CacheDriver<E, Discord.GuildResponse>, EM, RM>,
+  makeDriver: Effect.Effect<CacheDriver<E, DiscordGuild>, EM, RM>,
 ) => cacheView((g) => g.id, makeDriver);
+
+// ============================================================================
+// API View Preludes (readonly, no gateway, uses our HTTP API on miss)
+// ============================================================================
+
+// Channels API view prelude (readonly, no gateway, uses HTTP API on miss)
+export const channelsApiViewWithReverseLookup = <RM, EM, E>(
+  makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, DiscordChannel>, EM, RM>,
+): Effect.Effect<
+  ReverseLookupCache<
+    E,
+    Cache.CacheMissError,
+    Cache.CacheMissError,
+    Cache.CacheMissError,
+    DiscordChannel,
+    true
+  >,
+  EM,
+  RM | Scope.Scope | CacheApiClient
+> =>
+  Effect.gen(function* () {
+    const driver = yield* makeDriver;
+    const client = yield* CacheApiClient;
+
+    return yield* makeWithReverseLookup({
+      driver,
+      id: (_) =>
+        Effect.fail(
+          new Cache.CacheMissError({ cacheName: "ChannelsApiViewReverseLookup/id", id: _.id }),
+        ),
+      ops: opsWithReverseLookup({
+        id: (c: DiscordChannel) => c.id,
+        fromParent: Stream.never,
+        create: Stream.never,
+        update: Stream.never,
+        remove: Stream.never,
+        parentRemove: Stream.never,
+        resourceRemove: Stream.never,
+      }),
+      onMiss: (parentId, resourceId) =>
+        client.cache.getChannel({ path: { parentId, resourceId } }).pipe(
+          Effect.map((r) => r.value),
+          Effect.mapError(
+            () =>
+              new Cache.CacheMissError({
+                cacheName: "ChannelsApiViewReverseLookup",
+                id: resourceId,
+              }),
+          ),
+        ),
+      onParentMiss: (parentId) =>
+        client.cache.getChannelsForParent({ path: { parentId } }).pipe(
+          Effect.map((entries) => entries.map((e) => [e.resourceId, e.value] as const)),
+          Effect.mapError(
+            () =>
+              new Cache.CacheMissError({
+                cacheName: "ChannelsApiViewReverseLookup",
+                id: parentId,
+              }),
+          ),
+        ),
+      onResourceMiss: (resourceId) =>
+        client.cache.getChannelsForResource({ path: { resourceId } }).pipe(
+          Effect.map((entries) => entries.map((e) => [e.parentId, e.value] as const)),
+          Effect.mapError(
+            () =>
+              new Cache.CacheMissError({
+                cacheName: "ChannelsApiViewReverseLookup",
+                id: resourceId,
+              }),
+          ),
+        ),
+      readonly: true,
+    });
+  });
+
+// Roles API view prelude (readonly, no gateway, uses HTTP API on miss)
+export const rolesApiViewWithReverseLookup = <RM, EM, E>(
+  makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, Discord.GuildRoleResponse>, EM, RM>,
+): Effect.Effect<
+  ReverseLookupCache<
+    E,
+    Cache.CacheMissError,
+    Cache.CacheMissError,
+    Cache.CacheMissError,
+    Discord.GuildRoleResponse,
+    true
+  >,
+  EM,
+  RM | Scope.Scope | CacheApiClient
+> =>
+  Effect.gen(function* () {
+    const driver = yield* makeDriver;
+    const client = yield* CacheApiClient;
+
+    return yield* makeWithReverseLookup({
+      driver,
+      id: (_) =>
+        Effect.fail(
+          new Cache.CacheMissError({ cacheName: "RolesApiViewReverseLookup/id", id: _.id }),
+        ),
+      ops: opsWithReverseLookup({
+        id: (r: Discord.GuildRoleResponse) => r.id,
+        fromParent: Stream.never,
+        create: Stream.never,
+        update: Stream.never,
+        remove: Stream.never,
+        parentRemove: Stream.never,
+        resourceRemove: Stream.never,
+      }),
+      onMiss: (parentId, resourceId) =>
+        client.cache.getRole({ path: { parentId, resourceId } }).pipe(
+          Effect.map((r) => r.value),
+          Effect.mapError(
+            () =>
+              new Cache.CacheMissError({
+                cacheName: "RolesApiViewReverseLookup",
+                id: resourceId,
+              }),
+          ),
+        ),
+      onParentMiss: (parentId) =>
+        client.cache.getRolesForParent({ path: { parentId } }).pipe(
+          Effect.map((entries) => entries.map((e) => [e.resourceId, e.value] as const)),
+          Effect.mapError(
+            () =>
+              new Cache.CacheMissError({
+                cacheName: "RolesApiViewReverseLookup",
+                id: parentId,
+              }),
+          ),
+        ),
+      onResourceMiss: (resourceId) =>
+        client.cache.getRolesForResource({ path: { resourceId } }).pipe(
+          Effect.map((entries) => entries.map((e) => [e.parentId, e.value] as const)),
+          Effect.mapError(
+            () =>
+              new Cache.CacheMissError({
+                cacheName: "RolesApiViewReverseLookup",
+                id: resourceId,
+              }),
+          ),
+        ),
+      readonly: true,
+    });
+  });
+
+// Members API view prelude (readonly, no gateway, uses HTTP API on miss)
+export const membersApiViewWithReverseLookup = <RM, EM, E>(
+  makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, GuildMemberWithOptionalPending>, EM, RM>,
+): Effect.Effect<
+  ReverseLookupCache<
+    E,
+    Cache.CacheMissError,
+    Cache.CacheMissError,
+    Cache.CacheMissError,
+    GuildMemberWithOptionalPending,
+    true
+  >,
+  EM,
+  RM | Scope.Scope | CacheApiClient
+> =>
+  Effect.gen(function* () {
+    const driver = yield* makeDriver;
+    const client = yield* CacheApiClient;
+
+    return yield* makeWithReverseLookup({
+      driver,
+      id: (_) =>
+        Effect.fail(
+          new Cache.CacheMissError({
+            cacheName: "MembersApiViewReverseLookup/id",
+            id: _.user.id,
+          }),
+        ),
+      ops: opsWithReverseLookup({
+        id: (m: GuildMemberWithOptionalPending) => m.user.id,
+        fromParent: Stream.never,
+        create: Stream.never,
+        update: Stream.never,
+        remove: Stream.never,
+        parentRemove: Stream.never,
+        resourceRemove: Stream.never,
+      }),
+      onMiss: (parentId, resourceId) =>
+        client.cache.getMember({ path: { parentId, resourceId } }).pipe(
+          Effect.map((r) => r.value),
+          Effect.mapError(
+            () =>
+              new Cache.CacheMissError({
+                cacheName: "MembersApiViewReverseLookup",
+                id: resourceId,
+              }),
+          ),
+        ),
+      onParentMiss: (parentId) =>
+        client.cache.getMembersForParent({ path: { parentId } }).pipe(
+          Effect.map((entries) => entries.map((e) => [e.resourceId, e.value] as const)),
+          Effect.mapError(
+            () =>
+              new Cache.CacheMissError({
+                cacheName: "MembersApiViewReverseLookup",
+                id: parentId,
+              }),
+          ),
+        ),
+      onResourceMiss: (resourceId) =>
+        client.cache.getMembersForResource({ path: { resourceId } }).pipe(
+          Effect.map((entries) => entries.map((e) => [e.parentId, e.value] as const)),
+          Effect.mapError(
+            () =>
+              new Cache.CacheMissError({
+                cacheName: "MembersApiViewReverseLookup",
+                id: resourceId,
+              }),
+          ),
+        ),
+      readonly: true,
+    });
+  });
+
+// Guilds API view prelude (readonly, no gateway, uses HTTP API on miss)
+export const guildsApiView = <RM, EM, E>(
+  makeDriver: Effect.Effect<CacheDriver<E, GuildWithRelaxedFeatures>, EM, RM>,
+): Effect.Effect<
+  SimpleCache<E, Cache.CacheMissError, GuildWithRelaxedFeatures, true>,
+  EM,
+  RM | Scope.Scope | CacheApiClient
+> =>
+  Effect.gen(function* () {
+    const driver = yield* makeDriver;
+    const client = yield* CacheApiClient;
+
+    return yield* make({
+      driver,
+      id: (g: GuildWithRelaxedFeatures) => g.id,
+      onMiss: (id) =>
+        client.cache.getGuild({ path: { resourceId: id } }).pipe(
+          Effect.map((r) => r.value),
+          Effect.mapError(
+            () =>
+              new Cache.CacheMissError({
+                cacheName: "GuildsApiView",
+                id,
+              }),
+          ),
+        ),
+      ops: Stream.never,
+      readonly: true,
+    });
+  });

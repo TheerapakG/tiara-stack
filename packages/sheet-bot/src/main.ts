@@ -18,8 +18,9 @@ import { CheckinButtonLive } from "./messageComponents/buttons/checkin";
 import { RoomOrderButtonLive } from "./messageComponents/buttons/roomOrder";
 import { SlotButtonLive } from "./messageComponents/buttons/slot";
 import { AutoCheckinTaskLive } from "./tasks";
+import { HttpLive } from "./http";
 
-const MainLive = Layer.mergeAll(
+const BotLive = Layer.mergeAll(
   ChannelCommandLive,
   CheckinCommandLive,
   KickoutCommandLive,
@@ -35,7 +36,9 @@ const MainLive = Layer.mergeAll(
   AutoCheckinTaskLive,
 );
 
-MainLive.pipe(
+// Combined layer for both bot and HTTP server
+// They share the same Unstorage layer for cache access
+const SharedLive = Layer.mergeAll(BotLive, HttpLive).pipe(
   Layer.provide(Layer.mergeAll(DiscordConfigLayer, UnstorageLayer)),
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
@@ -43,6 +46,9 @@ MainLive.pipe(
   Layer.provide(PlatformConfigProvider.layerDotEnvAdd(".env")),
   Layer.provide(NodeContext.layer),
   Layer.provide(NodeHttpClient.layer),
+);
+
+SharedLive.pipe(
   Layer.launch,
   NodeRuntime.runMain({
     disablePrettyLogger: true,
