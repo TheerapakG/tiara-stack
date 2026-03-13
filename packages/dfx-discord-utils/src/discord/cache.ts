@@ -12,6 +12,10 @@ import {
   membersWithReverseLookup,
   rolesWithReverseLookup,
   channelsWithReverseLookup,
+  guildsApiCacheView,
+  membersApiCacheViewWithReverseLookup,
+  rolesApiCacheViewWithReverseLookup,
+  channelsApiCacheViewWithReverseLookup,
   unstorageDriver,
   unstorageWithReverseLookupDriver,
 } from "@/cache";
@@ -108,3 +112,43 @@ export class ChannelsCacheView extends Effect.Service<ChannelsCacheView>()("Chan
     ),
   ),
 }) {}
+
+export class GuildsApiCacheView extends Effect.Service<GuildsApiCacheView>()("GuildsApiCacheView", {
+  scoped: pipe(
+    Unstorage.prefixed("guilds:"),
+    Effect.andThen((storage) => guildsApiCacheView(unstorageDriver({ storage }))),
+  ),
+}) {}
+
+export class MembersApiCacheView extends Effect.Service<MembersApiCacheView>()(
+  "MembersApiCacheView",
+  {
+    scoped: pipe(
+      Unstorage.prefixed("members:"),
+      Effect.andThen((storage) =>
+        membersApiCacheViewWithReverseLookup(unstorageWithReverseLookupDriver({ storage })),
+      ),
+    ),
+  },
+) {}
+
+export class RolesApiCacheView extends Effect.Service<RolesApiCacheView>()("RolesApiCacheView", {
+  scoped: pipe(
+    Unstorage.prefixed("roles:"),
+    Effect.andThen((storage) =>
+      rolesApiCacheViewWithReverseLookup(unstorageWithReverseLookupDriver({ storage })),
+    ),
+  ),
+}) {}
+
+export class ChannelsApiCacheView extends Effect.Service<ChannelsApiCacheView>()(
+  "ChannelsApiCacheView",
+  {
+    scoped: pipe(
+      Unstorage.prefixed("channels:"),
+      Effect.andThen((storage) =>
+        channelsApiCacheViewWithReverseLookup(unstorageWithReverseLookupDriver({ storage })),
+      ),
+    ),
+  },
+) {}

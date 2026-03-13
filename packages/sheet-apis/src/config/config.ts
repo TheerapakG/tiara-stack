@@ -9,4 +9,5 @@ export const config = {
     Schema.split(",").pipe(Schema.compose(Schema.Array(Schema.Trim))),
   ),
   redisUrl: Schema.Config("REDIS_URL", Schema.Redacted(Schema.String)),
+  cacheApiBaseUrl: Schema.Config("CACHE_API_BASE_URL", Schema.String),
 };

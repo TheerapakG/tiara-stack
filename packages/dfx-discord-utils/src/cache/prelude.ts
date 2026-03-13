@@ -7,9 +7,8 @@ import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import type { ReverseLookupCacheDriver } from "./driver";
 import { make, makeWithReverseLookup, type ReverseLookupCache, type SimpleCache } from "./cache";
-import type { DiscordChannel, DiscordGuild, DiscordEmoji } from "@/discord/schema";
-
 import { CacheApiClient } from "@/discord/cacheApiClient";
+import type { DiscordChannel, DiscordGuild } from "@/discord/schema";
 
 // Member type with pending optional (Discord only includes it when Membership Screening is enabled)
 export type GuildMemberWithOptionalPending = Omit<
@@ -452,7 +451,7 @@ export const guildsCacheView = <RM, EM, E>(
 // ============================================================================
 
 // Channels API view prelude (readonly, no gateway, uses HTTP API on miss)
-export const channelsApiViewWithReverseLookup = <RM, EM, E>(
+export const channelsApiCacheViewWithReverseLookup = <RM, EM, E>(
   makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, DiscordChannel>, EM, RM>,
 ): Effect.Effect<
   ReverseLookupCache<
@@ -523,7 +522,7 @@ export const channelsApiViewWithReverseLookup = <RM, EM, E>(
   });
 
 // Roles API view prelude (readonly, no gateway, uses HTTP API on miss)
-export const rolesApiViewWithReverseLookup = <RM, EM, E>(
+export const rolesApiCacheViewWithReverseLookup = <RM, EM, E>(
   makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, Discord.GuildRoleResponse>, EM, RM>,
 ): Effect.Effect<
   ReverseLookupCache<
@@ -594,7 +593,7 @@ export const rolesApiViewWithReverseLookup = <RM, EM, E>(
   });
 
 // Members API view prelude (readonly, no gateway, uses HTTP API on miss)
-export const membersApiViewWithReverseLookup = <RM, EM, E>(
+export const membersApiCacheViewWithReverseLookup = <RM, EM, E>(
   makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, GuildMemberWithOptionalPending>, EM, RM>,
 ): Effect.Effect<
   ReverseLookupCache<
@@ -668,7 +667,7 @@ export const membersApiViewWithReverseLookup = <RM, EM, E>(
   });
 
 // Guilds API view prelude (readonly, no gateway, uses HTTP API on miss)
-export const guildsApiView = <RM, EM, E>(
+export const guildsApiCacheView = <RM, EM, E>(
   makeDriver: Effect.Effect<CacheDriver<E, GuildWithRelaxedFeatures>, EM, RM>,
 ): Effect.Effect<
   SimpleCache<E, Cache.CacheMissError, GuildWithRelaxedFeatures, true>,

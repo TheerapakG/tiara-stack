@@ -1,6 +1,7 @@
 import { HttpApiBuilder, HttpApiSwagger, HttpMiddleware, HttpServer } from "@effect/platform";
 import { NodeHttpClient, NodeHttpServer } from "@effect/platform-node";
 import { Effect, Layer, pipe, Redacted } from "effect";
+import { Unstorage } from "dfx-discord-utils/discord";
 import { createServer } from "http";
 import { Api } from "./api";
 import { config } from "./config";
@@ -16,13 +17,7 @@ import { PlayerLive } from "./handlers/player";
 import { ScreenshotLive } from "./handlers/screenshot";
 import { ScheduleLive } from "./handlers/schedule";
 import { DiscordLive } from "./handlers/discord";
-import {
-  Unstorage,
-  GuildsCacheView,
-  RolesCacheView,
-  MembersCacheView,
-  ChannelsCacheView,
-} from "./services/cache";
+import { CacheLive } from "./services/cache";
 
 const ApiLive = Layer.provide(HttpApiBuilder.api(Api), [
   CalcLive,
@@ -53,12 +48,7 @@ const UnstorageLayer = pipe(Unstorage.PrefixedLive("discord:"), Layer.provide(Re
 
 // Discord cache layer - requires Redis to share cache with sheet-bot
 // These services consume the Unstorage context provided by UnstorageLayer
-export const CacheLive = Layer.mergeAll(
-  GuildsCacheView.Default,
-  RolesCacheView.Default,
-  MembersCacheView.Default,
-  ChannelsCacheView.Default,
-).pipe(Layer.provide(UnstorageLayer));
+const CacheWithUnstorageLive = CacheLive.pipe(Layer.provide(UnstorageLayer));
 
 // Helper to check if origin matches trusted origins (supports wildcards like http://localhost:*)
 // * matches single hostname segment only (e.g., *.example.com matches a.example.com but not a.b.example.com)
@@ -96,6 +86,7 @@ export const HttpLive = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
   Layer.provide(HttpApiBuilder.middlewareOpenApi()),
   Layer.provide(MiddlewareCorsLive),
   Layer.provide(ApiLive),
+  Layer.provide(CacheWithUnstorageLive),
   Layer.provide(NodeHttpClient.layer),
   HttpServer.withLogAddress,
   Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 })),

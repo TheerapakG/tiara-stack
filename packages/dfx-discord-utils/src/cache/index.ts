@@ -18,10 +18,10 @@ export {
   membersCacheViewWithReverseLookup,
   cacheView,
   guildsCacheView,
-  channelsApiViewWithReverseLookup,
-  rolesApiViewWithReverseLookup,
-  membersApiViewWithReverseLookup,
-  guildsApiView,
+  channelsApiCacheViewWithReverseLookup,
+  rolesApiCacheViewWithReverseLookup,
+  membersApiCacheViewWithReverseLookup,
+  guildsApiCacheView,
 } from "./prelude";
 export type { Cache } from "dfx/Cache";
 export { make, makeWithReverseLookup, type ReverseLookupCache, type SimpleCache } from "./cache";

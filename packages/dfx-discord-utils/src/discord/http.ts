@@ -1,5 +1,5 @@
 import { HttpApiBuilder } from "@effect/platform";
-import { Effect, Layer, pipe } from "effect";
+import { Effect, Layer } from "effect";
 import { DiscordCacheApi } from "./api";
 import { GuildsCache, ChannelsCache, RolesCache, MembersCache } from "./cache";
 import { CacheNotFoundError } from "./schema";
