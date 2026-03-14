@@ -565,7 +565,12 @@ export const makeSubCommandGroup = Effect.fnUntraced(function* <
   data: (builder: SubCommandGroupBuilder) => SubCommandGroupBuilder<A>,
   handler: (commandHelper: WrappedCommandHelper<A>) => Effect.Effect<unknown, E, R>,
 ) {
-  const forkedHandler = yield* makeForkedCommandHandler(handler);
+  const builtData = data(new SubCommandGroupBuilder());
+  const forkedHandler = yield* makeForkedCommandHandler(
+    Effect.fn("makeSubCommandGroup.forkedHandler", {
+      attributes: { subCommandGroup: builtData.builder.name },
+    })(handler),
+  );
   return {
     data: data(new SubCommandGroupBuilder()),
     handler: forkedHandler,
@@ -584,9 +589,14 @@ export const makeSubCommand = Effect.fnUntraced(function* <
     >,
   ) => Effect.Effect<unknown, E, R>,
 ) {
-  const forkedHandler = yield* makeForkedCommandHandler(handler);
+  const builtData = data(new SubCommandBuilder());
+  const forkedHandler = yield* makeForkedCommandHandler(
+    Effect.fn("makeSubCommand.forkedHandler", {
+      attributes: { subCommand: builtData.builder.name },
+    })(handler),
+  );
   return {
-    data: data(new SubCommandBuilder()),
+    data: builtData,
     handler: forkedHandler,
   };
 });
@@ -601,17 +611,20 @@ export const makeCommand = Effect.fnUntraced(function* <
   ) => CommandBuilder<A> | CommandOptionsOnlyBuilder<A> | CommandSubCommandsOnlyBuilder<A>,
   handler: (commandHelper: WrappedCommandHelper<A>) => Effect.Effect<unknown, E, R>,
 ) {
+  const builtData = data(new CommandBuilder());
   const rest = yield* DiscordREST;
   const application = yield* DiscordApplication;
   const forkedHandler = yield* makeForkedCommandHandler(
-    Effect.fnUntraced(function* (commandHelper: WrappedCommandHelper<A>) {
-      yield* handler(commandHelper);
-      yield* Effect.sleep(2500);
-      yield* commandHelper.reply({ content: "The command did not set a response in time." });
-    }),
+    Effect.fn("makeCommand.forkedHandler", { attributes: { command: builtData.builder.name } })(
+      function* (commandHelper: WrappedCommandHelper<A>) {
+        yield* handler(commandHelper);
+        yield* Effect.sleep(2500);
+        yield* commandHelper.reply({ content: "The command did not set a response in time." });
+      },
+    ),
   );
   return {
-    data: data(new CommandBuilder()).toJSON(),
+    data: builtData.toJSON(),
     handler: Effect.fnUntraced(function* (commandHelper: CommandHelper<A>) {
       const wrappedCommandHelper = yield* wrapCommandHelper(commandHelper, rest, application);
       yield* forkedHandler(wrappedCommandHelper);
