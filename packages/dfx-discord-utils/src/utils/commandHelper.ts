@@ -606,7 +606,8 @@ export const makeCommand = Effect.fnUntraced(function* <
   const forkedHandler = yield* makeForkedCommandHandler(
     Effect.fnUntraced(function* (commandHelper: WrappedCommandHelper<A>) {
       yield* handler(commandHelper);
-      yield* commandHelper.reply({ content: "The command did not set a response." });
+      yield* Effect.sleep(2500);
+      yield* commandHelper.reply({ content: "The command did not set a response in time." });
     }),
   );
   return {
