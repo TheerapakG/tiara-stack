@@ -2,6 +2,8 @@ import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 import { Suspense } from "react";
 import { Effect } from "effect";
 import { Discord } from "sheet-apis/schema";
+import { Avatar, AvatarImage, AvatarFallback } from "#/components/ui/avatar";
+import { Skeleton } from "#/components/ui/skeleton";
 import { currentUserGuildsAtom, useCurrentUserGuilds } from "#/lib/discord";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 
@@ -12,9 +14,9 @@ type DiscordGuildType = typeof Discord.DiscordGuild.Type;
 function GuildSidebarFallback() {
   return (
     <div className="flex flex-col gap-3 items-center w-full">
-      <div className="w-12 h-12 bg-[#33ccbb]/10 animate-pulse rounded-lg" />
-      <div className="w-12 h-12 bg-[#33ccbb]/10 animate-pulse rounded-lg" />
-      <div className="w-12 h-12 bg-[#33ccbb]/10 animate-pulse rounded-lg" />
+      <Skeleton className="w-12 h-12 rounded-lg bg-[#33ccbb]/20" />
+      <Skeleton className="w-12 h-12 rounded-lg bg-[#33ccbb]/20" />
+      <Skeleton className="w-12 h-12 rounded-lg bg-[#33ccbb]/20" />
     </div>
   );
 }
@@ -28,16 +30,22 @@ function GuildIcon({ guild }: { guild: DiscordGuildType }) {
     <Link
       to="/dashboard/guilds/$guildId/schedule"
       params={{ guildId: guild.id }}
-      className="w-12 h-12 rounded-lg bg-[#0f1615] border border-[#33ccbb]/30 flex items-center justify-center overflow-hidden hover:border-[#33ccbb] transition-colors cursor-pointer"
+      className="block"
       title={guild.name}
     >
-      {iconUrl ? (
-        <img src={iconUrl} alt={guild.name} className="w-full h-full object-cover" />
-      ) : (
-        <span className="text-[#33ccbb] font-black text-sm">
-          {guild.name.slice(0, 2).toUpperCase()}
-        </span>
-      )}
+      <Avatar className="w-12 h-12 rounded-lg border border-[#33ccbb]/30 hover:border-[#33ccbb] transition-colors after:rounded-lg">
+        {iconUrl ? (
+          <AvatarImage src={iconUrl} alt={guild.name} className="rounded-lg object-cover" />
+        ) : null}
+        <AvatarFallback delay={0} className="relative rounded-lg bg-[#0f1615] text-[#33ccbb]">
+          {iconUrl && (
+            <Skeleton className="absolute inset-0 size-full rounded-lg bg-[#33ccbb]/20" />
+          )}
+          <span className="relative z-10 font-black text-sm">
+            {guild.name.slice(0, 2).toUpperCase()}
+          </span>
+        </AvatarFallback>
+      </Avatar>
     </Link>
   );
 }

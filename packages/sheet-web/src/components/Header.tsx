@@ -3,6 +3,8 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Menu, X, LayoutDashboard, LogOut, User as UserIcon } from "lucide-react";
 import { Button } from "#/components/ui/button";
+import { Avatar, AvatarImage, AvatarFallback } from "#/components/ui/avatar";
+import { Skeleton } from "#/components/ui/skeleton";
 import { useSignOut, useSignInWithSocialProvider, useSession } from "#/lib/auth";
 import { Option } from "effect";
 
@@ -23,22 +25,19 @@ function AuthSection() {
           DASHBOARD
         </Link>
         <div className="flex items-center gap-3">
-          {session.user.image ? (
-            <img
-              src={session.user.image}
-              alt={session.user.name || "User"}
-              className="w-10 h-10 rounded-full border-2 border-[#33ccbb] object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-[#33ccbb] flex items-center justify-center">
-              <span className="text-[#0a0f0e] font-bold text-sm">
+          <Avatar size="lg" className="border-2 border-[#33ccbb]">
+            {session.user.image ? (
+              <AvatarImage src={session.user.image} alt={session.user.name || "User"} />
+            ) : null}
+            <AvatarFallback delay={0} className="relative bg-[#33ccbb] text-[#0a0f0e]">
+              {session.user.image && (
+                <Skeleton className="absolute inset-0 size-full rounded-full bg-[#33ccbb]/50" />
+              )}
+              <span className="font-bold text-sm relative z-10">
                 {session.user.name?.charAt(0).toUpperCase() || "U"}
               </span>
-            </div>
-          )}
+            </AvatarFallback>
+          </Avatar>
           <span className="text-sm font-medium text-white hidden md:inline">
             {session.user.name || "User"}
           </span>
@@ -74,20 +73,17 @@ function MobileAuthSection({ onNavigate }: { onNavigate: () => void }) {
     onSome: (session) => (
       <div className="pt-4 border-t border-[#33ccbb]/20 space-y-4">
         <div className="flex items-center gap-3 mb-4">
-          {session.user.image ? (
-            <img
-              src={session.user.image}
-              alt={session.user.name || "User"}
-              className="w-12 h-12 rounded-full border-2 border-[#33ccbb] object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-          ) : (
-            <div className="w-12 h-12 rounded-full bg-[#33ccbb] flex items-center justify-center">
-              <UserIcon className="w-6 h-6 text-[#0a0f0e]" />
-            </div>
-          )}
+          <Avatar className="size-12 border-2 border-[#33ccbb]">
+            {session.user.image ? (
+              <AvatarImage src={session.user.image} alt={session.user.name || "User"} />
+            ) : null}
+            <AvatarFallback delay={0} className="relative bg-[#33ccbb] text-[#0a0f0e]">
+              {session.user.image && (
+                <Skeleton className="absolute inset-0 size-full rounded-full bg-[#33ccbb]/50" />
+              )}
+              <UserIcon className="w-6 h-6 relative z-10" />
+            </AvatarFallback>
+          </Avatar>
           <span className="text-lg font-bold text-white">{session.user.name || "User"}</span>
         </div>
         <Link
