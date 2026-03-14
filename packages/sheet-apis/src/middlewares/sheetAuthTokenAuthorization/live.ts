@@ -1,20 +1,15 @@
 import { Effect, Layer, pipe, Redacted } from "effect";
-import { verifyToken, createSheetAuthClient } from "sheet-auth/client";
+import { verifyToken } from "sheet-auth/client";
+import { SheetAuthClient } from "@/services";
 import { SheetAuthTokenAuthorization } from "./tag";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
-import { config } from "../../config";
 
 export const SheetAuthTokenAuthorizationLive = Layer.effect(
   SheetAuthTokenAuthorization,
   pipe(
     Effect.Do,
-    Effect.bind("issuer", () =>
-      Effect.map(config.sheetAuthIssuer, (url) => url.replace(/\/$/, "")),
-    ),
-    Effect.map(({ issuer }) => {
-      // Create Better Auth client with jwtClient plugin for token verification
-      const authClient = createSheetAuthClient(issuer);
-
+    Effect.bind("authClient", () => SheetAuthClient),
+    Effect.map(({ authClient }) => {
       return SheetAuthTokenAuthorization.of({
         sheetAuthToken: (token) =>
           pipe(
@@ -24,6 +19,7 @@ export const SheetAuthTokenAuthorizationLive = Layer.effect(
               // Use Better Auth client separately to get Discord info if needed
               userId: result.payload.sub,
               email: result.payload.email,
+              permissions: result.payload.permissions,
               token: Redacted.value(token),
             })),
             Effect.mapError(
@@ -40,4 +36,4 @@ export const SheetAuthTokenAuthorizationLive = Layer.effect(
       });
     }),
   ),
-);
+).pipe(Layer.provide(SheetAuthClient.Default));

@@ -7,3 +7,4 @@ export * from "./monitor";
 export * from "./player";
 export * from "./screenshot";
 export * from "./schedule";
+export * from "./sheetAuthClient";

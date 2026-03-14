@@ -3,6 +3,6 @@ import { Schema } from "effect";
 
 export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
   "Unauthorized",
-  { message: Schema.String, cause: Schema.Unknown },
+  { message: Schema.String, cause: Schema.optional(Schema.Unknown) },
   HttpApiSchema.annotations({ status: 401 }),
 ) {}

@@ -1,6 +1,7 @@
 import { HttpApiMiddleware, HttpApiSecurity, OpenApi } from "@effect/platform";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
 import { Context } from "effect";
+import type { Permission } from "sheet-auth/client";
 
 /**
  * SheetAuthUser context - contains user info from verified JWT token
@@ -25,6 +26,8 @@ export class SheetAuthUser extends Context.Tag("SheetAuthUser")<
     userId: string;
     /** User email from JWT claims */
     email?: string;
+    /** User permissions from JWT claims */
+    permissions?: Permission[];
     /** Raw JWT token for bearer authentication to other services */
     token: string;
   }

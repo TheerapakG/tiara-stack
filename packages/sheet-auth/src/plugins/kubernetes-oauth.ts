@@ -2,10 +2,11 @@ import { createRemoteJWKSet, customFetch, jwtVerify } from "jose";
 import { readFileSync } from "fs";
 import type { BetterAuthPlugin, DBAdapter } from "better-auth";
 import { createAuthEndpoint, signJWT } from "better-auth/plugins";
-import { Schema } from "effect";
+import { Schema, Predicate } from "effect";
 
 const KUBERNETES_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token";
 const KUBERNETES_JWKS_URL = "https://kubernetes.default.svc.cluster.local/openid/v1/jwks";
+const DISCORD_BOT_USER_ID_SENTINEL = "discord_bot_user";
 
 function readKubernetesToken(): string {
   try {
@@ -206,6 +207,11 @@ export function kubernetesOAuth(options: KubernetesOAuthOptions): BetterAuthPlug
                 sub: user.id as string,
                 iat: Math.floor(Date.now() / 1000),
                 exp: Math.floor(expiresAt.getTime() / 1000),
+                permissions: [
+                  ctx.body.discord_user_id === DISCORD_BOT_USER_ID_SENTINEL
+                    ? "bot:manage_guild"
+                    : undefined,
+                ].filter(Predicate.isNotUndefined),
               },
             });
 

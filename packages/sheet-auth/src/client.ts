@@ -46,11 +46,14 @@ export class DiscordAccessTokenError extends Schema.TaggedError<DiscordAccessTok
 // 2. Types
 // =============================================================================
 
+export type Permission = "bot:manage_guild";
+
 export interface TokenVerificationResult {
   payload: {
     sub: string;
     email?: string;
     name?: string;
+    permissions?: Permission[];
     [key: string]: unknown;
   };
 }
@@ -287,10 +290,11 @@ export function verifyToken(
 
     return {
       payload: {
+        ...payload,
         sub: userId,
         email: payload.email as string | undefined,
         name: payload.name as string | undefined,
-        ...payload,
+        permissions: payload.permissions as Permission[] | undefined,
       },
     };
   });

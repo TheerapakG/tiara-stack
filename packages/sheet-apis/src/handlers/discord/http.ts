@@ -4,8 +4,8 @@ import { Effect, Layer, pipe, Schema, Record, Struct } from "effect";
 import { Api } from "@/api";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { Discord } from "@/schema";
-import { config } from "@/config";
-import { createSheetAuthClient, getDiscordAccessToken } from "sheet-auth/client";
+import { SheetAuthClient } from "@/services";
+import { getDiscordAccessToken } from "sheet-auth/client";
 import { GuildsApiCacheView } from "dfx-discord-utils/discord";
 
 // Minimal guild from Discord API for checking membership
@@ -16,12 +16,10 @@ const DiscordMyGuild = Schema.Struct({
 export const DiscordLive = HttpApiBuilder.group(Api, "discord", (handlers) =>
   pipe(
     Effect.all({
-      authIssuer: config.sheetAuthIssuer,
+      authClient: SheetAuthClient,
       guildsCache: GuildsApiCacheView,
     }),
-    Effect.map(({ authIssuer, guildsCache }) => {
-      const authClient = createSheetAuthClient(authIssuer.replace(/\/$/, ""));
-
+    Effect.map(({ authClient, guildsCache }) => {
       return handlers
         .handle("getCurrentUser", () =>
           Effect.gen(function* () {
@@ -155,4 +153,4 @@ export const DiscordLive = HttpApiBuilder.group(Api, "discord", (handlers) =>
         );
     }),
   ),
-).pipe(Layer.provide(SheetAuthTokenAuthorizationLive));
+).pipe(Layer.provide(Layer.mergeAll(SheetAuthClient.Default, SheetAuthTokenAuthorizationLive)));
