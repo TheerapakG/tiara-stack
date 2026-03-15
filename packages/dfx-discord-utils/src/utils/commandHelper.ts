@@ -399,25 +399,31 @@ export class WrappedCommandHelper<A> {
         Record.get(commands_, subcommand.name),
       );
 
+      const options: ReadonlyArray<
+        Discord.APIApplicationCommandInteractionDataOption<
+          (typeof Discord.InteractionTypes)["APPLICATION_COMMAND"]
+        >
+      > = Option.map(wrapped.subcommand, (subcommand) =>
+        "options" in subcommand && subcommand.options ? subcommand.options : [],
+      ).pipe(Option.getOrElse(() => []));
+
       return yield* Option.match(command, {
         onSome: (command) =>
           command(
             new WrappedCommandHelper(
               wrapped.helper,
               Array.findFirst(
-                wrapped.options,
+                options,
                 (option) => option.type === Discord.ApplicationCommandOptionType.SUB_COMMAND_GROUP,
               ).pipe(
                 Option.orElse(() =>
                   Array.findFirst(
-                    wrapped.options,
+                    options,
                     (option) => option.type === Discord.ApplicationCommandOptionType.SUB_COMMAND,
                   ),
                 ),
               ),
-              Option.map(wrapped.subcommand, (subcommand) =>
-                "options" in subcommand && subcommand.options ? subcommand.options : [],
-              ).pipe(Option.getOrElse(() => [])),
+              options,
               wrapped.rest,
               wrapped.application,
               wrapped.response,
