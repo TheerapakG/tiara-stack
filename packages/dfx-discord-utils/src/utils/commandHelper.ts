@@ -214,8 +214,16 @@ type CommandChannelValue<A, N> = CommandWithName<
 export class WrappedCommandHelper<A> {
   constructor(
     readonly helper: CommandHelper<A>,
-    private readonly subcommandGroupOptionName: Option.Option<string>,
-    private readonly subcommandOptionName: Option.Option<string>,
+    private readonly subcommand: Option.Option<
+      Discord.APIApplicationCommandInteractionDataOption<
+        (typeof Discord.InteractionTypes)["APPLICATION_COMMAND"]
+      >
+    >,
+    private readonly options: ReadonlyArray<
+      Discord.APIApplicationCommandInteractionDataOption<
+        (typeof Discord.InteractionTypes)["APPLICATION_COMMAND"]
+      >
+    >,
     readonly rest: DiscordRestService,
     private readonly application: Discord.PrivateApplicationResponse,
     readonly response: Deferred.Deferred<{
@@ -385,27 +393,31 @@ export class WrappedCommandHelper<A> {
     const commands_ = commands as Record<string, any>;
 
     return Effect.fnUntraced(function* (wrapped: WrappedCommandHelper<A>) {
-      yield* Effect.log(
-        wrapped.subcommandGroupOptionName,
-        wrapped.subcommandOptionName,
-        Object.keys(commands_),
+      yield* Effect.log(wrapped.subcommand, Object.keys(commands_));
+
+      const command = Option.flatMap(wrapped.subcommand, (subcommand) =>
+        Record.get(commands_, subcommand.name),
       );
 
-      const name = wrapped.subcommandGroupOptionName.pipe(
-        Option.orElse(() => wrapped.subcommandOptionName),
-      );
-
-      const command = Option.flatMap(name, (name) => Record.get(commands_, name));
-
-      return Option.match(command, {
+      return yield* Option.match(command, {
         onSome: (command) =>
           command(
             new WrappedCommandHelper(
               wrapped.helper,
-              Option.none(),
-              wrapped.subcommandGroupOptionName.pipe(
-                Option.flatMap(() => wrapped.subcommandOptionName),
+              Array.findFirst(
+                wrapped.options,
+                (option) => option.type === Discord.ApplicationCommandOptionType.SUB_COMMAND_GROUP,
+              ).pipe(
+                Option.orElse(() =>
+                  Array.findFirst(
+                    wrapped.options,
+                    (option) => option.type === Discord.ApplicationCommandOptionType.SUB_COMMAND,
+                  ),
+                ),
               ),
+              Option.map(wrapped.subcommand, (subcommand) =>
+                "options" in subcommand && subcommand.options ? subcommand.options : [],
+              ).pipe(Option.getOrElse(() => [])),
               wrapped.rest,
               wrapped.application,
               wrapped.response,
@@ -413,7 +425,7 @@ export class WrappedCommandHelper<A> {
           ),
         onNone: () => new SubCommandNotFound({ data: wrapped.data }),
       });
-    })(this);
+    })(this) as any;
   }
 
   get optionsMap() {
@@ -502,11 +514,15 @@ export const wrapCommandHelper = Effect.fnUntraced(function* <A>(
     Array.findFirst(
       "options" in helper.data ? (helper.data.options ?? []) : [],
       (option) => option.type === Discord.ApplicationCommandOptionType.SUB_COMMAND_GROUP,
-    ).pipe(Option.map((option) => option.name)),
-    Array.findFirst(
-      "options" in helper.data ? (helper.data.options ?? []) : [],
-      (option) => option.type === Discord.ApplicationCommandOptionType.SUB_COMMAND,
-    ).pipe(Option.map((option) => option.name)),
+    ).pipe(
+      Option.orElse(() =>
+        Array.findFirst(
+          "options" in helper.data ? (helper.data.options ?? []) : [],
+          (option) => option.type === Discord.ApplicationCommandOptionType.SUB_COMMAND,
+        ),
+      ),
+    ),
+    "options" in helper.data ? (helper.data.options ?? []) : [],
     rest,
     application,
     response,
