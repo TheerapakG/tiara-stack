@@ -7,7 +7,7 @@ import {
   type DiscordApplicationCommand,
   type DiscordInteraction,
 } from "dfx/Interactions/context";
-import { Array, Deferred, Effect, FiberMap, Option, pipe } from "effect";
+import { Array, Deferred, Effect, FiberMap, Option, pipe, Record } from "effect";
 import { DiscordApplication } from "../discord/gateway";
 import {
   CommandBuilder,
@@ -384,66 +384,36 @@ export class WrappedCommandHelper<A> {
   > {
     const commands_ = commands as Record<string, any>;
 
-    return pipe(
-      this.subcommandGroupOptionName,
-      Option.match({
-        onSome: (name) =>
-          Effect.mapError(
-            Array.findFirst(
-              "options" in this.data ? (this.data.options ?? []) : [],
-              (option) =>
-                option.type === Discord.ApplicationCommandOptionType.SUB_COMMAND_GROUP &&
-                option.name === name &&
-                !!commands_[name],
-            ),
-            () => new SubCommandNotFound({ data: this.data }),
-          ).pipe(
-            Effect.flatMap((command) =>
-              commands_[command.name](
-                new WrappedCommandHelper(
-                  this.helper,
-                  Option.none(),
-                  this.subcommandOptionName,
-                  this.rest,
-                  this.application,
-                  this.response,
-                ),
+    return Effect.fnUntraced(function* (wrapped: WrappedCommandHelper<A>) {
+      yield* Effect.log(
+        wrapped.subcommandGroupOptionName,
+        wrapped.subcommandOptionName,
+        Object.keys(commands_),
+      );
+
+      const name = wrapped.subcommandGroupOptionName.pipe(
+        Option.orElse(() => wrapped.subcommandOptionName),
+      );
+
+      const command = Option.flatMap(name, (name) => Record.get(commands_, name));
+
+      return Option.match(command, {
+        onSome: (command) =>
+          command(
+            new WrappedCommandHelper(
+              wrapped.helper,
+              Option.none(),
+              wrapped.subcommandGroupOptionName.pipe(
+                Option.flatMap(() => wrapped.subcommandOptionName),
               ),
+              wrapped.rest,
+              wrapped.application,
+              wrapped.response,
             ),
           ),
-        onNone: () =>
-          pipe(
-            this.subcommandOptionName,
-            Option.match({
-              onSome: (name) =>
-                Effect.mapError(
-                  Array.findFirst(
-                    "options" in this.data ? (this.data.options ?? []) : [],
-                    (option) =>
-                      option.type === Discord.ApplicationCommandOptionType.SUB_COMMAND &&
-                      option.name === name &&
-                      !!commands_[name],
-                  ),
-                  () => new SubCommandNotFound({ data: this.data }),
-                ).pipe(
-                  Effect.flatMap((command) =>
-                    commands_[command.name](
-                      new WrappedCommandHelper(
-                        this.helper,
-                        Option.none(),
-                        Option.none(),
-                        this.rest,
-                        this.application,
-                        this.response,
-                      ),
-                    ),
-                  ),
-                ),
-              onNone: () => new SubCommandNotFound({ data: this.data }),
-            }),
-          ),
-      }),
-    ) as any;
+        onNone: () => new SubCommandNotFound({ data: wrapped.data }),
+      });
+    })(this);
   }
 
   get optionsMap() {
@@ -572,7 +542,7 @@ export const makeSubCommandGroup = Effect.fnUntraced(function* <
     })(handler),
   );
   return {
-    data: data(new SubCommandGroupBuilder()),
+    data: builtData,
     handler: forkedHandler,
   };
 });
