@@ -68,15 +68,6 @@ const makeListSubCommand = Effect.gen(function* () {
         Option.getOrThrow,
       );
 
-      // Check if user is app owner or has ManageGuild permission
-      yield* Effect.firstSuccessOf([
-        permissionService.checkInteractionUserApplicationOwner(),
-        permissionService.checkInteractionUserGuildPermissions(
-          Discord.Permissions.ManageGuild,
-          guildId,
-        ),
-      ]);
-
       const day = command.optionValue("day");
 
       yield* command.deferReply({ flags: isEphemeral ? MessageFlags.Ephemeral : undefined });
@@ -84,14 +75,17 @@ const makeListSubCommand = Effect.gen(function* () {
       const managerRoles = yield* guildConfigService.getGuildManagerRoles(guildId);
 
       yield* pipe(
-        permissionService.checkInteractionUserGuildRoles(
-          managerRoles.map((role) => role.roleId),
-          guildId,
-        ),
+        Effect.firstSuccessOf([
+          permissionService.checkInteractionUserApplicationOwner(),
+          permissionService.checkInteractionUserGuildRoles(
+            managerRoles.map((role) => role.roleId),
+            guildId,
+          ),
+        ]),
         Effect.unless(() => isEphemeral),
       );
 
-      const daySchedule = yield* scheduleService.dayPopulatedSchedules(guildId, day);
+      const daySchedule = yield* scheduleService.dayPopulatedFillerSchedules(guildId, day);
 
       const filteredSchedules = pipe(
         daySchedule,
