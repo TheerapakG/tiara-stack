@@ -158,7 +158,6 @@ const AuthLive = HttpApiBuilder.group(Api, "auth", (handlers) =>
         origin: (origin) => (isOriginAllowed(origin, allowedOrigins) ? origin : null),
         allowHeaders: ["Content-Type", "Authorization", "b3", "traceparent", "tracestate"],
         allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
-        exposeHeaders: ["Content-Length"],
         maxAge: 600,
         credentials: true,
       }),

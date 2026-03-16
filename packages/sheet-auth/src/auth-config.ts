@@ -8,6 +8,7 @@ import { createSecondaryStorage } from "./storage";
 import type { Driver } from "unstorage";
 import { kubernetesOAuth } from "./plugins/kubernetes-oauth";
 import * as schema from "./schema";
+import { sessionToken } from "./plugins/session-token";
 
 interface CreateAuthOptions {
   postgresUrl: string;
@@ -59,6 +60,7 @@ export function authConfig({
     },
     plugins: [
       bearer(),
+      sessionToken(),
       jwt(),
       oauthProvider({
         loginPage: "/sign-in",
