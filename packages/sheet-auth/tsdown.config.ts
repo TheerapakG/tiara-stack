@@ -7,7 +7,12 @@ export default defineConfig([
       index: fileURLToPath(new URL("./src/index.ts", import.meta.url)),
       client: fileURLToPath(new URL("./src/client.ts", import.meta.url)),
       schema: fileURLToPath(new URL("./src/schema.ts", import.meta.url)),
-      plugins: fileURLToPath(new URL("./src/plugins/index.ts", import.meta.url)),
+      "plugins/kubernetes-oauth/index": fileURLToPath(
+        new URL("./src/plugins/kubernetes-oauth/index.ts", import.meta.url),
+      ),
+      "plugins/kubernetes-oauth/client": fileURLToPath(
+        new URL("./src/plugins/kubernetes-oauth/client.ts", import.meta.url),
+      ),
     },
     sourcemap: true,
     dts: {

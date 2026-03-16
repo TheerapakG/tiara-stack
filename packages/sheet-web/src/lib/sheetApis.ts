@@ -1,10 +1,10 @@
 import { AtomHttpApi, Registry } from "@effect-atom/atom-react";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "@effect/platform";
 import { Api } from "sheet-apis/api";
-import { Effect, Function, Layer, Option, pipe } from "effect";
+import { Effect, Function, Layer, Option, pipe, Redacted } from "effect";
 import { getRequest, getRequestHeaders } from "@tanstack/react-start/server";
 import { createIsomorphicFn } from "@tanstack/react-start";
-import { sessionJwtAtom } from "#/lib/auth";
+import { sessionAtom } from "#/lib/auth";
 import { sheetApisBaseUrlAtom } from "#/lib/configAtoms";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 
@@ -22,13 +22,13 @@ const AuthClientLive = Effect.gen(function* () {
     httpClient,
     Effect.fnUntraced(function* (request) {
       const registry = yield* Registry.AtomRegistry;
-      const { baseUrl, jwt } = yield* Effect.all({
+      const { baseUrl, session } = yield* Effect.all({
         baseUrl: ensureResultAtomData(registry, sheetApisBaseUrlAtom, { revalidateIfStale: true }),
-        jwt: ensureResultAtomData(registry, sessionJwtAtom, { revalidateIfStale: true }),
+        session: ensureResultAtomData(registry, sessionAtom, { revalidateIfStale: true }),
       }).pipe(
         Effect.match({
-          onFailure: () => ({ baseUrl: Option.none(), jwt: Option.none() }),
-          onSuccess: ({ baseUrl, jwt }) => ({ baseUrl: Option.some(baseUrl), jwt }),
+          onFailure: () => ({ baseUrl: Option.none(), session: Option.none() }),
+          onSuccess: ({ baseUrl, session }) => ({ baseUrl: Option.some(baseUrl), session }),
         }),
       );
 
@@ -40,8 +40,11 @@ const AuthClientLive = Effect.gen(function* () {
           onSome: (baseUrl) => HttpClientRequest.prependUrl(baseUrl.href),
           onNone: () => Function.identity<HttpClientRequest.HttpClientRequest>,
         }),
-        Option.match(jwt, {
-          onSome: (token) => HttpClientRequest.bearerToken(token),
+        Option.match(session, {
+          onSome: (session) =>
+            session.token
+              ? HttpClientRequest.bearerToken(Redacted.value(session.token))
+              : Function.identity<HttpClientRequest.HttpClientRequest>,
           onNone: () => Function.identity<HttpClientRequest.HttpClientRequest>,
         }),
         HttpClientRequest.setHeaders(headers),

@@ -1,39 +1,19 @@
-import { Effect, Layer, pipe, Redacted } from "effect";
-import { verifyToken } from "sheet-auth/client";
-import { SheetAuthClient } from "@/services";
+import { Effect, Layer, pipe } from "effect";
+import { type SheetAuthClient as SheetAuthClientValue } from "sheet-auth/client";
+import { SheetAuthClient } from "../../services/sheetAuthClient";
+import { makeSheetAuthTokenAuthorization } from "./shared";
 import { SheetAuthTokenAuthorization } from "./tag";
-import { Unauthorized } from "@/schemas/middlewares/unauthorized";
 
-export const SheetAuthTokenAuthorizationLive = Layer.effect(
+export const SheetAuthTokenAuthorizationLiveLayer = Layer.effect(
   SheetAuthTokenAuthorization,
   pipe(
-    Effect.Do,
-    Effect.bind("authClient", () => SheetAuthClient),
-    Effect.map(({ authClient }) => {
-      return SheetAuthTokenAuthorization.of({
-        sheetAuthToken: (token) =>
-          pipe(
-            verifyToken(authClient, Redacted.value(token)),
-            Effect.map((result) => ({
-              // Return userId from sub claim and the raw token
-              // Use Better Auth client separately to get Discord info if needed
-              userId: result.payload.sub,
-              email: result.payload.email,
-              permissions: result.payload.permissions,
-              token,
-            })),
-            Effect.mapError(
-              (error) =>
-                new Unauthorized({
-                  message: `Invalid sheet-auth token: ${error.message}`,
-                  cause: error.cause,
-                }),
-            ),
-            Effect.withSpan("SheetAuthTokenAuthorization.sheetAuthToken", {
-              captureStackTrace: true,
-            }),
-          ),
-      });
-    }),
+    SheetAuthClient,
+    Effect.flatMap((authClient: SheetAuthClientValue) =>
+      makeSheetAuthTokenAuthorization(authClient),
+    ),
   ),
-).pipe(Layer.provide(SheetAuthClient.Default));
+);
+
+export const SheetAuthTokenAuthorizationLive = SheetAuthTokenAuthorizationLiveLayer.pipe(
+  Layer.provide(SheetAuthClient.Default),
+);

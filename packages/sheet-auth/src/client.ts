@@ -1,7 +1,6 @@
-import { DateTime, Effect, Option, Redacted, Schema } from "effect";
+import { DateTime, Deferred, Effect, Option, Redacted, Runtime, Schema } from "effect";
 import { createAuthClient } from "better-auth/client";
-import { jwtClient } from "better-auth/client/plugins";
-import { jwtVerify, createLocalJWKSet } from "jose";
+import { kubernetesOAuthClient, Permission } from "./plugins/kubernetes-oauth/client";
 
 // =============================================================================
 // 1. Errors
@@ -46,21 +45,31 @@ export class DiscordAccessTokenError extends Schema.TaggedError<DiscordAccessTok
   cause: Schema.optional(Schema.Unknown),
 }) {}
 
+/**
+ * Error type for Kubernetes OAuth sign in failures
+ */
+export class KubernetesOAuthSignInError extends Schema.TaggedError<KubernetesOAuthSignInError>(
+  "KubernetesOAuthSignInError",
+)("KubernetesOAuthSignInError", {
+  statusText: Schema.String,
+  message: Schema.String,
+  cause: Schema.optional(Schema.Unknown),
+}) {}
+
+/**
+ * Error type for Kubernetes OAuth implicit permissions retrieval failures
+ */
+export class KubernetesOAuthImplicitPermissionsError extends Schema.TaggedError<KubernetesOAuthImplicitPermissionsError>(
+  "KubernetesOAuthImplicitPermissionsError",
+)("KubernetesOAuthImplicitPermissionsError", {
+  statusText: Schema.String,
+  message: Schema.String,
+  cause: Schema.optional(Schema.Unknown),
+}) {}
+
 // =============================================================================
 // 2. Types
 // =============================================================================
-
-export type Permission = "bot:manage_guild";
-
-export interface TokenVerificationResult {
-  payload: {
-    sub: string;
-    email?: string;
-    name?: string;
-    permissions?: Permission[];
-    [key: string]: unknown;
-  };
-}
 
 export type SheetAuthClientOption = ReturnType<typeof SheetAuthClientOption>;
 export type SheetAuthClient = ReturnType<typeof createSheetAuthClient>;
@@ -76,7 +85,7 @@ const SheetAuthClientOption = (baseURL: string) => {
     fetchOptions: {
       credentials: "include" as const,
     },
-    plugins: [jwtClient()],
+    plugins: [kubernetesOAuthClient()],
   };
 };
 
@@ -84,7 +93,7 @@ const SheetAuthClientOption = (baseURL: string) => {
  * Create a Better Auth client for stateless authentication.
  *
  * This client is used to call Better Auth APIs from services.
- * The JWT token is passed via the Authorization header in fetchOptions.
+ * The session token is passed via the Authorization header in fetchOptions.
  *
  * @param baseURL - Base URL of the auth server
  * @returns Better Auth client instance
@@ -93,12 +102,12 @@ const SheetAuthClientOption = (baseURL: string) => {
  * ```typescript
  * const client = createSheetAuthClient("https://auth.example.com");
  *
- * // Use with bearer token (from JWT)
+ * // Use with bearer token (from session token)
  * const { data } = await client.getAccessToken({
  *   providerId: "discord",
  *   fetchOptions: {
  *     headers: {
- *       Authorization: `Bearer ${jwtToken}`,
+ *       Authorization: `Bearer ${sessionToken}`,
  *     },
  *   },
  * });
@@ -132,6 +141,7 @@ export class Session extends Schema.TaggedClass<Session>()("Session", {
       userAgent: Schema.optional(Schema.NullOr(Schema.String)),
     }),
   ),
+  token: Schema.UndefinedOr(Schema.Redacted(Schema.String)),
 }) {}
 
 /**
@@ -145,11 +155,20 @@ export function getSession(
   headers?: Headers | HeadersInit,
 ): Effect.Effect<Option.Option<Session>, SessionResponseError> {
   return Effect.gen(function* () {
+    const runtime = yield* Effect.runtime();
+    const tokenDeferred = yield* Deferred.make<string | undefined>();
     const session = yield* Effect.tryPromise({
       try: async () =>
         await client.getSession({
           fetchOptions: {
             headers,
+            onSuccess: async (ctx) => {
+              const token = ctx.response.headers.get("set-auth-token");
+              await Runtime.runPromise(
+                runtime,
+                Deferred.succeed(tokenDeferred, token ?? undefined),
+              );
+            },
           },
         }),
       catch: (error) =>
@@ -170,6 +189,8 @@ export function getSession(
       );
       return Option.none();
     }
+
+    const token = yield* tokenDeferred;
 
     return Option.fromNullable(session.data).pipe(
       Option.map((data) =>
@@ -193,6 +214,7 @@ export function getSession(
                 userAgent: data.session.userAgent,
               }
             : undefined,
+          token: token ? Redacted.make(token) : undefined,
         }),
       ),
     );
@@ -200,123 +222,7 @@ export function getSession(
 }
 
 // =============================================================================
-// 5. Token
-// =============================================================================
-
-/**
- * Get the token using the Better Auth client.
- *
- * @param client - Better Auth client instance
- * @returns Effect with the token
- */
-export function getToken(client: SheetAuthClient, headers?: Headers | HeadersInit) {
-  return Effect.gen(function* () {
-    const token = yield* Effect.tryPromise({
-      try: async () =>
-        await client.token({
-          fetchOptions: {
-            headers,
-          },
-        }),
-      catch: (error) =>
-        new SessionResponseError({
-          statusText: "GET_TOKEN_FAILED",
-          message: `GET_TOKEN_FAILED: ${error instanceof Error ? error.message : "Failed to get token"}`,
-          cause: error,
-        }),
-    });
-
-    if (token.error) {
-      yield* Effect.fail(
-        new SessionResponseError({
-          statusText: token.error.statusText,
-          message: `${token.error.statusText}: ${token.error.message || "Failed to get token"}`,
-          cause: token.error,
-        }),
-      );
-      return Option.none();
-    }
-
-    return Option.some(token.data.token);
-  });
-}
-
-// =============================================================================
-// 6. Token Verification
-// =============================================================================
-
-/**
- * Verify a JWT token using Better Auth's client to fetch JWKS,
- * then verify the token locally with jose.
- *
- * Returns standard JWT claims (sub, email, name).
- * To get Discord user ID, use the Better Auth client separately.
- *
- * @param client - Better Auth client instance (with jwtClient plugin)
- * @param token - JWT token to verify
- * @returns Effect with verification result containing standard claims
- */
-export function verifyToken(
-  client: SheetAuthClient,
-  token: string,
-): Effect.Effect<TokenVerificationResult, TokenVerificationError> {
-  return Effect.gen(function* () {
-    // Fetch JWKS using the client
-    const jwksData = yield* Effect.tryPromise({
-      try: async () => {
-        const result = await client.jwks();
-
-        if (result.error) {
-          throw new Error(result.error.message || "Failed to fetch JWKS");
-        }
-
-        return result.data;
-      },
-      catch: (error) =>
-        new TokenVerificationError({
-          statusText: "FETCH_JWKS_FAILED",
-          message: `FETCH_JWKS_FAILED: ${error instanceof Error ? error.message : "Failed to fetch JWKS"}`,
-          cause: error,
-        }),
-    });
-
-    // Verify the token using jose with the fetched JWKS
-    const { payload } = yield* Effect.tryPromise({
-      try: async () => {
-        const JWKS = createLocalJWKSet(jwksData);
-        return await jwtVerify(token, JWKS);
-      },
-      catch: (error) =>
-        new TokenVerificationError({
-          statusText: "TOKEN_VERIFICATION_FAILED",
-          message: `TOKEN_VERIFICATION_FAILED: ${error instanceof Error ? error.message : "Token verification failed"}`,
-          cause: error,
-        }),
-    });
-
-    const userId = payload.sub as string | undefined;
-
-    if (!userId) {
-      return yield* new TokenVerificationError({
-        statusText: "TOKEN_MISSING_SUB_CLAIM",
-        message: "TOKEN_MISSING_SUB_CLAIM: Token missing sub claim",
-      });
-    }
-
-    return {
-      payload: {
-        ...payload,
-        sub: userId,
-        email: payload.email as string | undefined,
-        name: payload.name as string | undefined,
-        permissions: payload.permissions as Permission[] | undefined,
-      },
-    };
-  });
-}
-
-// =============================================================================
-// 7. Account
+// 5. Account
 // =============================================================================
 
 export class Account extends Schema.TaggedClass<Account>()("Account", {
@@ -389,7 +295,7 @@ export function getAccount(
 }
 
 // =============================================================================
-// 8. Discord Access Token
+// 6. Discord Access Token
 // =============================================================================
 
 /**
@@ -399,10 +305,10 @@ export function getAccount(
  * - Returns the current access token if valid
  * - Automatically refreshes the token if expired
  *
- * The JWT token is passed via the Authorization header for authentication.
+ * The session token is passed via the Authorization header for authentication.
  *
  * @param client - Better Auth client instance
- * @param jwtToken - JWT bearer token for authentication
+ * @param headers - Headers for authentication
  * @returns Effect with the access token
  */
 export function getDiscordAccessToken(
@@ -448,5 +354,117 @@ export function getDiscordAccessToken(
     }
 
     return { accessToken: Redacted.make(accessToken.data.accessToken) };
+  });
+}
+
+// =============================================================================
+// 7. Create Kubernetes OAuth Session
+// =============================================================================
+
+export function createKubernetesOAuthSession(
+  client: SheetAuthClient,
+  discordUserId: string,
+  kubernetesToken: string,
+  headers?: Headers | HeadersInit,
+): Effect.Effect<Session, KubernetesOAuthSignInError> {
+  return Effect.gen(function* () {
+    const runtime = yield* Effect.runtime();
+    const tokenDeferred = yield* Deferred.make<string | undefined>();
+
+    const response = yield* Effect.tryPromise({
+      try: async () =>
+        await client.kubernetesOauth.createSession({
+          discord_user_id: discordUserId,
+          token: kubernetesToken,
+          fetchOptions: {
+            headers,
+            onSuccess: async (ctx) => {
+              const token = ctx.response.headers.get("set-auth-token");
+              await Runtime.runPromise(
+                runtime,
+                Deferred.succeed(tokenDeferred, token ?? undefined),
+              );
+            },
+          },
+        }),
+      catch: (error) =>
+        new KubernetesOAuthSignInError({
+          statusText: "KUBERNETES_OAUTH_SIGN_IN_FAILED",
+          message: `KUBERNETES_OAUTH_SIGN_IN_FAILED: ${error instanceof Error ? error.message : "Failed to sign in with Kubernetes OAuth"}`,
+          cause: error,
+        }),
+    });
+
+    if (response.error) {
+      return yield* Effect.fail(
+        new KubernetesOAuthSignInError({
+          statusText: response.error.statusText,
+          message: `${response.error.statusText}: ${response.error.message || "Failed to sign in with Kubernetes OAuth"}`,
+          cause: response.error,
+        }),
+      );
+    }
+
+    const token = yield* tokenDeferred;
+    return Session.make({
+      user: {
+        createdAt: DateTime.unsafeFromDate(response.data.user.createdAt),
+        updatedAt: DateTime.unsafeFromDate(response.data.user.updatedAt),
+        email: response.data.user.email,
+        emailVerified: response.data.user.emailVerified,
+        name: response.data.user.name,
+        image: response.data.user.image,
+      },
+      session: response.data.session
+        ? {
+            createdAt: DateTime.unsafeFromDate(response.data.session.createdAt),
+            updatedAt: DateTime.unsafeFromDate(response.data.session.updatedAt),
+            userId: response.data.session.userId,
+            expiresAt: DateTime.unsafeFromDate(response.data.session.expiresAt),
+            token: response.data.session.token,
+            ipAddress: response.data.session.ipAddress,
+            userAgent: response.data.session.userAgent,
+          }
+        : undefined,
+      token: token ? Redacted.make(token) : undefined,
+    });
+  });
+}
+
+// =============================================================================
+// 8. Kubernetes OAuth Implicit Permissions
+// =============================================================================
+
+export function getKubernetesOAuthImplicitPermissions(
+  client: SheetAuthClient,
+  headers?: Headers | HeadersInit,
+): Effect.Effect<{ permissions: Permission[] }, KubernetesOAuthImplicitPermissionsError> {
+  return Effect.gen(function* () {
+    const permissions = yield* Effect.tryPromise({
+      try: async () =>
+        await client.kubernetesOauth.getImplicitPermissions({
+          fetchOptions: {
+            headers,
+          },
+        }),
+      catch: (error) =>
+        new KubernetesOAuthImplicitPermissionsError({
+          statusText: "GET_KUBERNETES_OAUTH_IMPLICIT_PERMISSIONS_FAILED",
+          message: `GET_KUBERNETES_OAUTH_IMPLICIT_PERMISSIONS_FAILED: ${error instanceof Error ? error.message : "Failed to get Kubernetes OAuth implicit permissions"}`,
+          cause: error,
+        }),
+    });
+
+    if (permissions.error) {
+      return yield* Effect.fail(
+        new KubernetesOAuthImplicitPermissionsError({
+          statusText: permissions.error.statusText,
+          message: `${permissions.error.statusText}: ${permissions.error.message || "Failed to get Kubernetes OAuth implicit permissions"}`,
+          cause: permissions.error,
+        }),
+      );
+    }
+
+    return { permissions: permissions.data?.permissions ?? [] };
   });
 }

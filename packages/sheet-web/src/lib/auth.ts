@@ -3,7 +3,7 @@ import { createIsomorphicFn, getRouterInstance } from "@tanstack/react-start";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { Duration, Effect, Schema } from "effect";
 import { Reactivity } from "@effect/experimental";
-import { createSheetAuthClient, getSession, getToken, Session } from "sheet-auth/client";
+import { createSheetAuthClient, getSession, Session } from "sheet-auth/client";
 import { appBaseUrlAtom, authBaseUrlAtom } from "#/lib/configAtoms";
 import { runtimeAtom } from "#/lib/runtime";
 import { useCallback } from "react";
@@ -55,30 +55,6 @@ export const useSession = () => {
   return result.value;
 };
 
-export const sessionJwtAtom = Atom.make(
-  Effect.fnUntraced(function* (get) {
-    return yield* Effect.gen(function* () {
-      const authClient = yield* get.result(authClientAtom);
-      return yield* getToken(authClient, getRequestHeadersFn());
-    }).pipe(Effect.catchAll(() => Effect.succeedNone));
-  }),
-).pipe(
-  Atom.setIdleTTL(Duration.minutes(5)),
-  Atom.serializable({
-    key: "jwt",
-    schema: Result.Schema({ success: Schema.Option(Schema.String) }),
-  }),
-  Atom.withReactivity(["jwt"]),
-);
-
-export const useSessionJwt = () => {
-  const result = useAtomSuspense(sessionJwtAtom, {
-    suspendOnWaiting: false,
-    includeFailure: false,
-  });
-  return result.value;
-};
-
 // Sign out function atom
 export const signOut = runtimeAtom.fn(
   Effect.fnUntraced(function* (_, ctx: Atom.FnContext) {
@@ -89,10 +65,7 @@ export const signOut = runtimeAtom.fn(
       catch: () => new Error("Failed to sign out"),
     });
 
-    yield* Effect.all({
-      session: Reactivity.invalidate(["session"]),
-      jwt: Reactivity.invalidate(["jwt"]),
-    });
+    yield* Reactivity.invalidate(["session"]);
 
     const router = yield* Effect.promise(() => Promise.resolve(getRouterInstance()));
     router.invalidate();

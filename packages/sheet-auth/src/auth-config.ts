@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { jwt } from "better-auth/plugins";
+import { bearer } from "better-auth/plugins";
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -58,7 +58,7 @@ export function authConfig({
       },
     },
     plugins: [
-      jwt(),
+      bearer(),
       oauthProvider({
         loginPage: "/sign-in",
         consentPage: "/consent",

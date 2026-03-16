@@ -1,6 +1,6 @@
 import { HttpApiMiddleware, HttpApiSecurity, OpenApi } from "@effect/platform";
-import { Unauthorized } from "@/schemas/middlewares/unauthorized";
-import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
+import { Unauthorized } from "../../schemas/middlewares/unauthorized";
+import { SheetAuthUser } from "../../schemas/middlewares/sheetAuthUser";
 
 export class SheetAuthTokenAuthorization extends HttpApiMiddleware.Tag<SheetAuthTokenAuthorization>()(
   "SheetAuthTokenAuthorization",

@@ -1,61 +1,24 @@
 import { config } from "@/config";
-import {
-  FileSystem,
-  HttpApiClient,
-  HttpBody,
-  HttpClient,
-  HttpClientRequest,
-  HttpClientResponse,
-  UrlParams,
-} from "@effect/platform";
+import { FileSystem, HttpApiClient, HttpClient, HttpClientRequest } from "@effect/platform";
 import { Interaction } from "dfx-discord-utils";
 import { DiscordInteraction } from "dfx/Interactions/context";
-import { Cache, Data, Duration, Effect, Exit, Ref, pipe, Schedule, Schema, Context } from "effect";
+import {
+  Cache,
+  Data,
+  Duration,
+  Effect,
+  Exit,
+  Ref,
+  pipe,
+  Schedule,
+  Context,
+  DateTime,
+  Redacted,
+} from "effect";
+import { createKubernetesOAuthSession } from "sheet-auth/client";
+import { DISCORD_BOT_USER_ID_SENTINEL } from "sheet-auth/plugins/kubernetes-oauth";
 import { Api } from "sheet-apis/api";
-
-const DISCORD_BOT_USER_ID_SENTINEL = "discord_bot_user";
-
-interface CachedToken {
-  readonly token: string;
-  readonly expiresIn: number;
-}
-
-const TokenResponseSchema = Schema.Struct({
-  token: Schema.String,
-  expires_in: Schema.Number,
-});
-
-const exchangeClientCredentials = (
-  httpClient: HttpClient.HttpClient,
-  tokenEndpoint: string,
-  k8sToken: string,
-  discordUserId: string,
-): Effect.Effect<CachedToken, Error> => {
-  return pipe(
-    HttpClientRequest.post(tokenEndpoint),
-    HttpClientRequest.setBody(
-      HttpBody.urlParams(
-        UrlParams.fromInput({
-          token: k8sToken,
-          discord_user_id: discordUserId,
-        }),
-      ),
-    ),
-    (request) => httpClient.execute(request),
-    Effect.flatMap(HttpClientResponse.filterStatusOk),
-    Effect.flatMap(HttpClientResponse.schemaBodyJson(TokenResponseSchema)),
-    Effect.map((response) => ({
-      token: response.token,
-      expiresIn: response.expires_in,
-    })),
-    Effect.catchAll((error) =>
-      pipe(
-        Effect.logError(error),
-        Effect.andThen(() => Effect.fail(new Error(`Failed to exchange token: ${error}`))),
-      ),
-    ),
-  );
-};
+import { SheetAuthClient } from "./sheetAuthClient";
 
 type SheetApisRequester = Data.TaggedEnum<{
   Bot: {};
@@ -103,12 +66,9 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApi
   scoped: pipe(
     Effect.all({
       fs: FileSystem.FileSystem,
+      sheetAuthClient: SheetAuthClient,
       httpClient: HttpClient.HttpClient,
       k8sTokenRef: Ref.make(""),
-      tokenEndpoint: pipe(
-        config.sheetAuthIssuer,
-        Effect.map((issuer) => `${issuer.replace(/\/$/, "")}/kubernetes-oauth/token`),
-      ),
       baseUrl: config.sheetApisBaseUrl,
     }),
     Effect.tap(({ fs, k8sTokenRef }) =>
@@ -124,21 +84,33 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApi
         ),
       ),
     ),
-    Effect.bind("tokenCache", ({ httpClient, tokenEndpoint, k8sTokenRef }) =>
+    Effect.bind("tokenCache", ({ sheetAuthClient, k8sTokenRef }) =>
       Cache.makeWith({
         capacity: Infinity,
         lookup: (discordUserId: string) =>
-          pipe(
-            Ref.get(k8sTokenRef),
-            Effect.flatMap((k8sToken) =>
-              exchangeClientCredentials(httpClient, tokenEndpoint, k8sToken, discordUserId),
-            ),
-          ),
-        // Set TTL based on token's expires_in (minus 60 second buffer for safety)
+          Effect.gen(function* () {
+            const k8sToken = yield* Ref.get(k8sTokenRef);
+            const session = yield* createKubernetesOAuthSession(
+              sheetAuthClient,
+              discordUserId,
+              k8sToken,
+            ).pipe(Effect.catchAll(() => Effect.succeed(undefined)));
+            const now = yield* DateTime.now;
+            const timeToLive = session?.session?.expiresAt
+              ? DateTime.distanceDuration(now, session.session.expiresAt).pipe(
+                  Duration.subtract(Duration.seconds(60)),
+                )
+              : Duration.minutes(1);
+
+            return {
+              token: session?.token,
+              timeToLive,
+            };
+          }),
         timeToLive: (exit) =>
           Exit.match(exit, {
             onFailure: () => Duration.minutes(1),
-            onSuccess: (token) => Duration.seconds(token.expiresIn - 60),
+            onSuccess: ({ timeToLive }) => timeToLive,
           }),
       }),
     ),
@@ -152,7 +124,9 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApi
               DiscordUser: ({ discordUserId }) => tokenCache.get(discordUserId),
             }),
           ),
-          Effect.map(({ token }) => HttpClientRequest.bearerToken(request, token)),
+          Effect.map(({ token }) =>
+            token ? HttpClientRequest.bearerToken(request, Redacted.value(token)) : request,
+          ),
           Effect.catchAll((err) =>
             pipe(
               Effect.logWarning(`Failed to get auth token, proceeding unauthenticated: ${err}`),
@@ -173,4 +147,5 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApi
     })),
   ),
   accessors: true,
+  dependencies: [SheetAuthClient.Default],
 }) {}
