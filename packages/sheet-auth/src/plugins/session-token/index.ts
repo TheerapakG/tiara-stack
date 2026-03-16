@@ -11,10 +11,7 @@ export const sessionToken = () => {
             return true;
           },
           handler: createAuthMiddleware(async (ctx) => {
-            const sessionCookieToken = await ctx.getSignedCookie(
-              ctx.context.authCookies.sessionToken.name,
-              ctx.context.secret,
-            );
+            const sessionCookieToken = ctx.getCookie(ctx.context.authCookies.sessionToken.name);
 
             if (!sessionCookieToken) {
               return null;
