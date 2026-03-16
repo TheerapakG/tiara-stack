@@ -16,7 +16,7 @@ export const guildConfig = {
     ({ args: { scriptId } }) =>
       builder.configGuild.where("scriptId", "=", scriptId).where("deletedAt", "IS", null).one(),
   ),
-  getGuildManagerRoles: defineQuery(
+  getGuildMonitorRoles: defineQuery(
     pipe(Schema.Struct({ guildId: Schema.String }), Schema.standardSchemaV1),
     ({ args: { guildId } }) =>
       builder.configGuildManagerRole.where("guildId", "=", guildId).where("deletedAt", "IS", null),

@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 
-export class GuildConfigManagerRole extends Schema.TaggedClass<GuildConfigManagerRole>()(
-  "GuildConfigManagerRole",
+export class GuildConfigMonitorRole extends Schema.TaggedClass<GuildConfigMonitorRole>()(
+  "GuildConfigMonitorRole",
   {
     guildId: Schema.String,
     roleId: Schema.String,

@@ -39,7 +39,7 @@ const makeListConfigSubCommand = Effect.gen(function* () {
 
       const guild = yield* guildsCache.get(guildId);
       const guildConfig = yield* guildConfigService.getGuildConfigByGuildId(guildId);
-      const managerRoles = yield* guildConfigService.getGuildManagerRoles(guildId);
+      const monitorRoles = yield* guildConfigService.getGuildMonitorRoles(guildId);
 
       const sheetId = pipe(
         guildConfig.sheetId,
@@ -63,9 +63,9 @@ const makeListConfigSubCommand = Effect.gen(function* () {
                   `Sheet id: ${sheetId}`,
                   `Script id: ${scriptId}`,
                   `Auto check-in: ${autoCheckin ? "Enabled" : "Disabled"}`,
-                  `Manager roles: ${
-                    managerRoles.length > 0
-                      ? managerRoles.map((role) => roleMention(role.roleId)).join(", ")
+                  `Monitor roles: ${
+                    monitorRoles.length > 0
+                      ? monitorRoles.map((role) => roleMention(role.roleId)).join(", ")
                       : "None"
                   }`,
                 ].join("\n"),
@@ -78,7 +78,7 @@ const makeListConfigSubCommand = Effect.gen(function* () {
   );
 });
 
-const makeAddManagerRoleSubCommand = Effect.gen(function* () {
+const makeAddMonitorRoleSubCommand = Effect.gen(function* () {
   const embedService = yield* EmbedService;
   const guildConfigService = yield* GuildConfigService;
   const permissionService = yield* PermissionService;
@@ -87,15 +87,15 @@ const makeAddManagerRoleSubCommand = Effect.gen(function* () {
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
       builder
-        .setName("manager_role")
-        .setDescription("Add a manager role for the server")
+        .setName("monitor_role")
+        .setDescription("Add a monitor role for the server")
         .addRoleOption((builder) =>
           builder.setName("role").setDescription("The role to add").setRequired(true),
         )
         .addStringOption((builder) =>
-          builder.setName("server_id").setDescription("The server id to add the manager role to"),
+          builder.setName("server_id").setDescription("The server id to add the monitor role to"),
         ),
-    Effect.fn("server.add.manager_role")(function* (command) {
+    Effect.fn("server.add.monitor_role")(function* (command) {
       yield* command.deferReply();
 
       const serverId = command.optionValueOptional("server_id");
@@ -107,7 +107,7 @@ const makeAddManagerRoleSubCommand = Effect.gen(function* () {
       const guild = yield* guildsCache.get(guildId);
       const role = command.optionRoleValue("role");
 
-      yield* guildConfigService.addGuildManagerRole(guildId, role.id);
+      yield* guildConfigService.addGuildMonitorRole(guildId, role.id);
 
       yield* command.editReply({
         payload: {
@@ -115,7 +115,7 @@ const makeAddManagerRoleSubCommand = Effect.gen(function* () {
             (yield* embedService.makeBaseEmbedBuilder())
               .setTitle(`Success!`)
               .setDescription(
-                `${roleMention(role.id)} is now a manager role for ${escapeMarkdown(guild.name)}`,
+                `${roleMention(role.id)} is now a monitor role for ${escapeMarkdown(guild.name)}`,
               )
               .toJSON(),
           ],
@@ -126,22 +126,22 @@ const makeAddManagerRoleSubCommand = Effect.gen(function* () {
 });
 
 const makeAddCommandGroup = Effect.gen(function* () {
-  const addManagerRoleSubCommand = yield* makeAddManagerRoleSubCommand;
+  const addMonitorRoleSubCommand = yield* makeAddMonitorRoleSubCommand;
 
   return yield* CommandHelper.makeSubCommandGroup(
     (builder) =>
       builder
         .setName("add")
         .setDescription("Add a config to the server")
-        .addSubcommand(() => addManagerRoleSubCommand.data),
+        .addSubcommand(() => addMonitorRoleSubCommand.data),
     (command) =>
       command.subCommands({
-        manager_role: addManagerRoleSubCommand.handler,
+        monitor_role: addMonitorRoleSubCommand.handler,
       }),
   );
 });
 
-const makeRemoveManagerRoleSubCommand = Effect.gen(function* () {
+const makeRemoveMonitorRoleSubCommand = Effect.gen(function* () {
   const embedService = yield* EmbedService;
   const guildConfigService = yield* GuildConfigService;
   const permissionService = yield* PermissionService;
@@ -150,17 +150,17 @@ const makeRemoveManagerRoleSubCommand = Effect.gen(function* () {
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
       builder
-        .setName("manager_role")
-        .setDescription("Remove a manager role from the server")
+        .setName("monitor_role")
+        .setDescription("Remove a monitor role from the server")
         .addRoleOption((builder) =>
           builder.setName("role").setDescription("The role to remove").setRequired(true),
         )
         .addStringOption((builder) =>
           builder
             .setName("server_id")
-            .setDescription("The server id to remove the manager role from"),
+            .setDescription("The server id to remove the monitor role from"),
         ),
-    Effect.fn("server.remove.manager_role")(function* (command) {
+    Effect.fn("server.remove.monitor_role")(function* (command) {
       yield* command.deferReply();
 
       const serverId = command.optionValueOptional("server_id");
@@ -172,7 +172,7 @@ const makeRemoveManagerRoleSubCommand = Effect.gen(function* () {
       const guild = yield* guildsCache.get(guildId);
       const role = command.optionRoleValue("role");
 
-      yield* guildConfigService.removeGuildManagerRole(guildId, role.id);
+      yield* guildConfigService.removeGuildMonitorRole(guildId, role.id);
 
       yield* command.editReply({
         payload: {
@@ -180,7 +180,7 @@ const makeRemoveManagerRoleSubCommand = Effect.gen(function* () {
             (yield* embedService.makeBaseEmbedBuilder())
               .setTitle(`Success!`)
               .setDescription(
-                `${roleMention(role.id)} is no longer a manager role for ${escapeMarkdown(guild.name)}`,
+                `${roleMention(role.id)} is no longer a monitor role for ${escapeMarkdown(guild.name)}`,
               )
               .toJSON(),
           ],
@@ -191,17 +191,17 @@ const makeRemoveManagerRoleSubCommand = Effect.gen(function* () {
 });
 
 const makeRemoveCommandGroup = Effect.gen(function* () {
-  const removeManagerRoleSubCommand = yield* makeRemoveManagerRoleSubCommand;
+  const removeMonitorRoleSubCommand = yield* makeRemoveMonitorRoleSubCommand;
 
   return yield* CommandHelper.makeSubCommandGroup(
     (builder) =>
       builder
         .setName("remove")
         .setDescription("Remove a config from the server")
-        .addSubcommand(() => removeManagerRoleSubCommand.data),
+        .addSubcommand(() => removeMonitorRoleSubCommand.data),
     (command) =>
       command.subCommands({
-        manager_role: removeManagerRoleSubCommand.handler,
+        monitor_role: removeMonitorRoleSubCommand.handler,
       }),
   );
 });

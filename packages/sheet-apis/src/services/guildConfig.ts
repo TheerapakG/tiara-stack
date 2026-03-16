@@ -6,7 +6,7 @@ import { catchParseErrorAsValidationError } from "typhoon-core/error";
 import { ZeroService } from "typhoon-core/services";
 import { ZeroLive } from "./zero";
 import { type Schema as ZeroSchema } from "sheet-db-schema/zero";
-import { GuildChannelConfig, GuildConfig, GuildConfigManagerRole } from "@/schemas/guildConfig";
+import { GuildChannelConfig, GuildConfig, GuildConfigMonitorRole } from "@/schemas/guildConfig";
 
 export class GuildConfigService extends Effect.Service<GuildConfigService>()("GuildConfigService", {
   effect: pipe(
@@ -87,61 +87,61 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
             captureStackTrace: true,
           }),
         ),
-      getGuildManagerRoles: (guildId: string) =>
+      getGuildMonitorRoles: (guildId: string) =>
         pipe(
-          ZeroService.run(queries.guildConfig.getGuildManagerRoles({ guildId }), {
+          ZeroService.run(queries.guildConfig.getGuildMonitorRoles({ guildId }), {
             type: "complete",
           }),
           Effect.provide(zeroContext),
-          Effect.flatMap(Schema.decode(Schema.Array(DefaultTaggedClass(GuildConfigManagerRole)))),
+          Effect.flatMap(Schema.decode(Schema.Array(DefaultTaggedClass(GuildConfigMonitorRole)))),
           catchParseErrorAsValidationError,
-          Effect.withSpan("GuildConfigService.getGuildManagerRoles", {
+          Effect.withSpan("GuildConfigService.getGuildMonitorRoles", {
             captureStackTrace: true,
           }),
         ),
-      addGuildManagerRole: (guildId: string, roleId: string) =>
+      addGuildMonitorRole: (guildId: string, roleId: string) =>
         pipe(
-          ZeroService.mutate(mutators.guildConfig.addGuildManagerRole({ guildId, roleId })),
+          ZeroService.mutate(mutators.guildConfig.addGuildMonitorRole({ guildId, roleId })),
           Effect.andThen((mutation) => mutation.server()),
           Effect.andThen(
-            ZeroService.run(queries.guildConfig.getGuildManagerRoles({ guildId }), {
+            ZeroService.run(queries.guildConfig.getGuildMonitorRoles({ guildId }), {
               type: "complete",
             }),
           ),
           Effect.provide(zeroContext),
-          Effect.flatMap(Schema.decode(Schema.Array(DefaultTaggedClass(GuildConfigManagerRole)))),
+          Effect.flatMap(Schema.decode(Schema.Array(DefaultTaggedClass(GuildConfigMonitorRole)))),
           catchParseErrorAsValidationError,
           Effect.map(Array.findFirst((role) => role.roleId === roleId)),
           Effect.flatMap(
             Option.match({
               onSome: Effect.succeed,
-              onNone: () => Effect.die(makeDBQueryError("Failed to add guild manager role")),
+              onNone: () => Effect.die(makeDBQueryError("Failed to add guild monitor role")),
             }),
           ),
-          Effect.withSpan("GuildConfigService.addGuildManagerRole", {
+          Effect.withSpan("GuildConfigService.addGuildMonitorRole", {
             captureStackTrace: true,
           }),
         ),
-      removeGuildManagerRole: (guildId: string, roleId: string) =>
+      removeGuildMonitorRole: (guildId: string, roleId: string) =>
         pipe(
-          ZeroService.mutate(mutators.guildConfig.removeGuildManagerRole({ guildId, roleId })),
+          ZeroService.mutate(mutators.guildConfig.removeGuildMonitorRole({ guildId, roleId })),
           Effect.andThen((mutation) => mutation.server()),
           Effect.andThen(
-            ZeroService.run(queries.guildConfig.getGuildManagerRoles({ guildId }), {
+            ZeroService.run(queries.guildConfig.getGuildMonitorRoles({ guildId }), {
               type: "complete",
             }),
           ),
           Effect.provide(zeroContext),
-          Effect.flatMap(Schema.decode(Schema.Array(DefaultTaggedClass(GuildConfigManagerRole)))),
+          Effect.flatMap(Schema.decode(Schema.Array(DefaultTaggedClass(GuildConfigMonitorRole)))),
           catchParseErrorAsValidationError,
           Effect.map(Array.findFirst((role) => role.roleId === roleId)),
           Effect.flatMap(
             Option.match({
               onSome: Effect.succeed,
-              onNone: () => Effect.die(makeDBQueryError("Failed to remove guild manager role")),
+              onNone: () => Effect.die(makeDBQueryError("Failed to remove guild monitor role")),
             }),
           ),
-          Effect.withSpan("GuildConfigService.removeGuildManagerRole", {
+          Effect.withSpan("GuildConfigService.removeGuildMonitorRole", {
             captureStackTrace: true,
           }),
         ),

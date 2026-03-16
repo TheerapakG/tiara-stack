@@ -27,19 +27,19 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
             payload: { guildId, config },
           }),
       ),
-      getGuildManagerRoles: Effect.fn("GuildConfigService.getGuildManagerRoles")(
+      getGuildMonitorRoles: Effect.fn("GuildConfigService.getGuildMonitorRoles")(
         (guildId: string) =>
-          sheetApisClient.get().guildConfig.getGuildManagerRoles({ urlParams: { guildId } }),
+          sheetApisClient.get().guildConfig.getGuildMonitorRoles({ urlParams: { guildId } }),
       ),
-      addGuildManagerRole: Effect.fn("GuildConfigService.addGuildManagerRole")(
+      addGuildMonitorRole: Effect.fn("GuildConfigService.addGuildMonitorRole")(
         (guildId: string, roleId: string) =>
-          sheetApisClient.get().guildConfig.addGuildManagerRole({ payload: { guildId, roleId } }),
+          sheetApisClient.get().guildConfig.addGuildMonitorRole({ payload: { guildId, roleId } }),
       ),
-      removeGuildManagerRole: Effect.fn("GuildConfigService.removeGuildManagerRole")(
+      removeGuildMonitorRole: Effect.fn("GuildConfigService.removeGuildMonitorRole")(
         (guildId: string, roleId: string) =>
           sheetApisClient
             .get()
-            .guildConfig.removeGuildManagerRole({ payload: { guildId, roleId } }),
+            .guildConfig.removeGuildMonitorRole({ payload: { guildId, roleId } }),
       ),
       upsertGuildChannelConfig: Effect.fn("GuildConfigService.upsertGuildChannelConfig")(
         (

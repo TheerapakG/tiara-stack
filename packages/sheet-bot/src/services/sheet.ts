@@ -44,21 +44,21 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
             .get()
             .sheet.getChannelFillerSchedules({ urlParams: { guildId, channel } }),
       ),
-      // Manager schedules - full access, requires manager authorization
-      getAllManagerSchedules: Effect.fn("Sheet.getAllManagerSchedules")((guildId: string) =>
-        sheetApisClient.get().sheetManager.getAllManagerSchedules({ urlParams: { guildId } }),
+      // Monitor schedules - full access, requires monitor authorization
+      getAllMonitorSchedules: Effect.fn("Sheet.getAllMonitorSchedules")((guildId: string) =>
+        sheetApisClient.get().sheetMonitor.getAllMonitorSchedules({ urlParams: { guildId } }),
       ),
-      getDayManagerSchedules: Effect.fn("Sheet.getDayManagerSchedules")(
+      getDayMonitorSchedules: Effect.fn("Sheet.getDayMonitorSchedules")(
         (guildId: string, day: number) =>
           sheetApisClient
             .get()
-            .sheetManager.getDayManagerSchedules({ urlParams: { guildId, day } }),
+            .sheetMonitor.getDayMonitorSchedules({ urlParams: { guildId, day } }),
       ),
-      getChannelManagerSchedules: Effect.fn("Sheet.getChannelManagerSchedules")(
+      getChannelMonitorSchedules: Effect.fn("Sheet.getChannelMonitorSchedules")(
         (guildId: string, channel: string) =>
           sheetApisClient
             .get()
-            .sheetManager.getChannelManagerSchedules({ urlParams: { guildId, channel } }),
+            .sheetMonitor.getChannelMonitorSchedules({ urlParams: { guildId, channel } }),
       ),
     })),
     Effect.flatMap((sheetMethods) =>
@@ -98,16 +98,16 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
           lookup: ({ guildId, channel }: { guildId: string; channel: string }) =>
             sheetMethods.getChannelFillerSchedules(guildId, channel),
         }),
-        getAllManagerSchedulesCache: ScopedCache.make({
-          lookup: sheetMethods.getAllManagerSchedules,
+        getAllMonitorSchedulesCache: ScopedCache.make({
+          lookup: sheetMethods.getAllMonitorSchedules,
         }),
-        getDayManagerSchedulesCache: ScopedCache.make({
+        getDayMonitorSchedulesCache: ScopedCache.make({
           lookup: ({ guildId, day }: { guildId: string; day: number }) =>
-            sheetMethods.getDayManagerSchedules(guildId, day),
+            sheetMethods.getDayMonitorSchedules(guildId, day),
         }),
-        getChannelManagerSchedulesCache: ScopedCache.make({
+        getChannelMonitorSchedulesCache: ScopedCache.make({
           lookup: ({ guildId, channel }: { guildId: string; channel: string }) =>
-            sheetMethods.getChannelManagerSchedules(guildId, channel),
+            sheetMethods.getChannelMonitorSchedules(guildId, channel),
         }),
       }),
     ),
@@ -126,12 +126,12 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
         caches.getDayFillerSchedulesCache.get(Data.struct({ guildId, day })),
       getChannelFillerSchedules: (guildId: string, channel: string) =>
         caches.getChannelFillerSchedulesCache.get(Data.struct({ guildId, channel })),
-      // Manager schedules
-      getAllManagerSchedules: (guildId: string) => caches.getAllManagerSchedulesCache.get(guildId),
-      getDayManagerSchedules: (guildId: string, day: number) =>
-        caches.getDayManagerSchedulesCache.get(Data.struct({ guildId, day })),
-      getChannelManagerSchedules: (guildId: string, channel: string) =>
-        caches.getChannelManagerSchedulesCache.get(Data.struct({ guildId, channel })),
+      // Monitor schedules
+      getAllMonitorSchedules: (guildId: string) => caches.getAllMonitorSchedulesCache.get(guildId),
+      getDayMonitorSchedules: (guildId: string, day: number) =>
+        caches.getDayMonitorSchedulesCache.get(Data.struct({ guildId, day })),
+      getChannelMonitorSchedules: (guildId: string, channel: string) =>
+        caches.getChannelMonitorSchedulesCache.get(Data.struct({ guildId, channel })),
     })),
   ),
   dependencies: [SheetApisClient.Default],

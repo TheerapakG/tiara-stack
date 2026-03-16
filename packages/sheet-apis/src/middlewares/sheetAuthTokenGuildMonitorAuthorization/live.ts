@@ -51,16 +51,16 @@ export const SheetAuthTokenGuildMonitorAuthorizationLive = Layer.effect(
               () => new Unauthorized({ message: "User is not a member of the guild" }),
             ),
           );
-          const roles = yield* guildConfigService.getGuildManagerRoles(guildId).pipe(
+          const roles = yield* guildConfigService.getGuildMonitorRoles(guildId).pipe(
             Effect.tapError(Effect.logError),
             Effect.mapError(
-              () => new Unauthorized({ message: "Failed to retrieve guild manager roles" }),
+              () => new Unauthorized({ message: "Failed to retrieve guild monitor roles" }),
             ),
           );
 
           if (roles.length === 0) {
             return yield* Effect.fail(
-              new Unauthorized({ message: "No manager roles configured for this guild" }),
+              new Unauthorized({ message: "No monitor roles configured for this guild" }),
             );
           }
 
@@ -70,7 +70,7 @@ export const SheetAuthTokenGuildMonitorAuthorizationLive = Layer.effect(
               HashSet.fromIterable(roles.map((role) => role.roleId)),
             ).pipe(HashSet.size) === 0
           ) {
-            return yield* Effect.fail(new Unauthorized({ message: "User is not a guild manager" }));
+            return yield* Effect.fail(new Unauthorized({ message: "User is not a guild monitor" }));
           }
 
           return user;

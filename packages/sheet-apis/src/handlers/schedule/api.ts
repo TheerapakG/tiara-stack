@@ -17,7 +17,7 @@ const ScheduleError = Schema.Union(
   QueryResultError,
 );
 
-const ScheduleManagerError = Schema.Union(
+const ScheduleMonitorError = Schema.Union(
   GoogleSheetsError,
   ParserFieldError,
   SheetConfigError,
@@ -58,34 +58,34 @@ export class ScheduleApi extends HttpApiGroup.make("schedule")
   .annotate(OpenApi.Title, "Schedule")
   .annotate(OpenApi.Description, "Populated schedule data endpoints") {}
 
-export class ScheduleManagerApi extends HttpApiGroup.make("scheduleManager")
+export class ScheduleMonitorApi extends HttpApiGroup.make("scheduleMonitor")
   .add(
     HttpApiEndpoint.get(
-      "getAllPopulatedManagerSchedules",
-      "/schedule/getAllPopulatedManagerSchedules",
+      "getAllPopulatedMonitorSchedules",
+      "/schedule/getAllPopulatedMonitorSchedules",
     )
       .setUrlParams(Schema.Struct({ guildId: Schema.String }))
       .addSuccess(Schema.Array(PopulatedScheduleResult))
-      .addError(ScheduleManagerError),
+      .addError(ScheduleMonitorError),
   )
   .add(
     HttpApiEndpoint.get(
-      "getDayPopulatedManagerSchedules",
-      "/schedule/getDayPopulatedManagerSchedules",
+      "getDayPopulatedMonitorSchedules",
+      "/schedule/getDayPopulatedMonitorSchedules",
     )
       .setUrlParams(Schema.Struct({ guildId: Schema.String, day: Schema.NumberFromString }))
       .addSuccess(Schema.Array(PopulatedScheduleResult))
-      .addError(ScheduleManagerError),
+      .addError(ScheduleMonitorError),
   )
   .add(
     HttpApiEndpoint.get(
-      "getChannelPopulatedManagerSchedules",
-      "/schedule/getChannelPopulatedManagerSchedules",
+      "getChannelPopulatedMonitorSchedules",
+      "/schedule/getChannelPopulatedMonitorSchedules",
     )
       .setUrlParams(Schema.Struct({ guildId: Schema.String, channel: Schema.String }))
       .addSuccess(Schema.Array(PopulatedScheduleResult))
-      .addError(ScheduleManagerError),
+      .addError(ScheduleMonitorError),
   )
   .middleware(SheetAuthTokenGuildMonitorAuthorization)
-  .annotate(OpenApi.Title, "Schedule Manager")
-  .annotate(OpenApi.Description, "Manager-only populated schedule data endpoints") {}
+  .annotate(OpenApi.Title, "Schedule Monitor")
+  .annotate(OpenApi.Description, "Monitor-only populated schedule data endpoints") {}

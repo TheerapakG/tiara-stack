@@ -28,7 +28,7 @@ export const guildConfig = {
         deletedAt: null,
       }),
   ),
-  addGuildManagerRole: defineMutator(
+  addGuildMonitorRole: defineMutator(
     pipe(
       Schema.Struct({
         guildId: Schema.String,
@@ -43,7 +43,7 @@ export const guildConfig = {
         deletedAt: null,
       }),
   ),
-  removeGuildManagerRole: defineMutator(
+  removeGuildMonitorRole: defineMutator(
     pipe(
       Schema.Struct({
         guildId: Schema.String,

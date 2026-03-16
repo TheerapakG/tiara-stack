@@ -418,7 +418,7 @@ export class FormatService extends Effect.Service<FormatService>()("FormatServic
             Effect.map(
               ({ checkinMessage, emptySlotMessage, playersMessage, lookupFailedMessage }) => ({
                 checkinMessage,
-                managerCheckinMessage: pipe(
+                monitorCheckinMessage: pipe(
                   checkinMessage,
                   Option.match({
                     onSome: () =>

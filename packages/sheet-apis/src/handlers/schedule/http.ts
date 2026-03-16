@@ -66,7 +66,7 @@ export const ScheduleLive = HttpApiBuilder.group(Api, "schedule", (handlers) =>
   ),
 );
 
-export const ScheduleManagerLive = HttpApiBuilder.group(Api, "scheduleManager", (handlers) =>
+export const ScheduleMonitorLive = HttpApiBuilder.group(Api, "scheduleMonitor", (handlers) =>
   pipe(
     Effect.all({
       scheduleService: ScheduleService,
@@ -74,13 +74,13 @@ export const ScheduleManagerLive = HttpApiBuilder.group(Api, "scheduleManager", 
     }),
     Effect.map(({ scheduleService, guildConfigService }) =>
       handlers
-        .handle("getAllPopulatedManagerSchedules", ({ urlParams }) =>
+        .handle("getAllPopulatedMonitorSchedules", ({ urlParams }) =>
           pipe(
             getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
             Effect.flatMap((sheetId) => scheduleService.getAllPopulatedSchedules(sheetId)),
           ),
         )
-        .handle("getDayPopulatedManagerSchedules", ({ urlParams }) =>
+        .handle("getDayPopulatedMonitorSchedules", ({ urlParams }) =>
           pipe(
             getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
             Effect.flatMap((sheetId) =>
@@ -88,7 +88,7 @@ export const ScheduleManagerLive = HttpApiBuilder.group(Api, "scheduleManager", 
             ),
           ),
         )
-        .handle("getChannelPopulatedManagerSchedules", ({ urlParams }) =>
+        .handle("getChannelPopulatedMonitorSchedules", ({ urlParams }) =>
           pipe(
             getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
             Effect.flatMap((sheetId) =>

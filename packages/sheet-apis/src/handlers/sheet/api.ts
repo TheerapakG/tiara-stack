@@ -24,7 +24,7 @@ const SheetError = Schema.Union(
   QueryResultError,
 );
 
-const SheetManagerError = Schema.Union(
+const SheetMonitorError = Schema.Union(
   GoogleSheetsError,
   ParserFieldError,
   SheetConfigError,
@@ -104,25 +104,25 @@ export class SheetApi extends HttpApiGroup.make("sheet")
   .annotate(OpenApi.Title, "Sheet")
   .annotate(OpenApi.Description, "Sheet data endpoints") {}
 
-export class SheetManagerApi extends HttpApiGroup.make("sheetManager")
+export class SheetMonitorApi extends HttpApiGroup.make("sheetMonitor")
   .add(
-    HttpApiEndpoint.get("getAllManagerSchedules", "/sheet/getAllManagerSchedules")
+    HttpApiEndpoint.get("getAllMonitorSchedules", "/sheet/getAllMonitorSchedules")
       .setUrlParams(Schema.Struct({ guildId: Schema.String }))
       .addSuccess(Schema.Array(Schema.Union(BreakSchedule, Schedule)))
-      .addError(SheetManagerError),
+      .addError(SheetMonitorError),
   )
   .add(
-    HttpApiEndpoint.get("getDayManagerSchedules", "/sheet/getDayManagerSchedules")
+    HttpApiEndpoint.get("getDayMonitorSchedules", "/sheet/getDayMonitorSchedules")
       .setUrlParams(Schema.Struct({ guildId: Schema.String, day: Schema.NumberFromString }))
       .addSuccess(Schema.Array(Schema.Union(BreakSchedule, Schedule)))
-      .addError(SheetManagerError),
+      .addError(SheetMonitorError),
   )
   .add(
-    HttpApiEndpoint.get("getChannelManagerSchedules", "/sheet/getChannelManagerSchedules")
+    HttpApiEndpoint.get("getChannelMonitorSchedules", "/sheet/getChannelMonitorSchedules")
       .setUrlParams(Schema.Struct({ guildId: Schema.String, channel: Schema.String }))
       .addSuccess(Schema.Array(Schema.Union(BreakSchedule, Schedule)))
-      .addError(SheetManagerError),
+      .addError(SheetMonitorError),
   )
   .middleware(SheetAuthTokenGuildMonitorAuthorization)
-  .annotate(OpenApi.Title, "Sheet Manager")
-  .annotate(OpenApi.Description, "Sheet manager-only data endpoints") {}
+  .annotate(OpenApi.Title, "Sheet Monitor")
+  .annotate(OpenApi.Description, "Sheet monitor-only data endpoints") {}

@@ -46,14 +46,14 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
         .handle("upsertGuildConfig", ({ payload }) =>
           guildConfigService.upsertGuildConfig(payload.guildId, payload.config),
         )
-        .handle("getGuildManagerRoles", ({ urlParams }) =>
-          guildConfigService.getGuildManagerRoles(urlParams.guildId),
+        .handle("getGuildMonitorRoles", ({ urlParams }) =>
+          guildConfigService.getGuildMonitorRoles(urlParams.guildId),
         )
-        .handle("addGuildManagerRole", ({ payload }) =>
-          guildConfigService.addGuildManagerRole(payload.guildId, payload.roleId),
+        .handle("addGuildMonitorRole", ({ payload }) =>
+          guildConfigService.addGuildMonitorRole(payload.guildId, payload.roleId),
         )
-        .handle("removeGuildManagerRole", ({ payload }) =>
-          guildConfigService.removeGuildManagerRole(payload.guildId, payload.roleId),
+        .handle("removeGuildMonitorRole", ({ payload }) =>
+          guildConfigService.removeGuildMonitorRole(payload.guildId, payload.roleId),
         )
         .handle("upsertGuildChannelConfig", ({ payload }) =>
           guildConfigService.upsertGuildChannelConfig(

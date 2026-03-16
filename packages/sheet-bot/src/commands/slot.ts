@@ -72,13 +72,13 @@ const makeListSubCommand = Effect.gen(function* () {
 
       yield* command.deferReply({ flags: isEphemeral ? MessageFlags.Ephemeral : undefined });
 
-      const managerRoles = yield* guildConfigService.getGuildManagerRoles(guildId);
+      const monitorRoles = yield* guildConfigService.getGuildMonitorRoles(guildId);
 
       yield* pipe(
         Effect.firstSuccessOf([
           permissionService.checkInteractionUserApplicationOwner(),
           permissionService.checkInteractionUserGuildRoles(
-            managerRoles.map((role) => role.roleId),
+            monitorRoles.map((role) => role.roleId),
             guildId,
           ),
         ]),
@@ -181,10 +181,10 @@ const makeButtonSubCommand = Effect.gen(function* () {
         ),
       ]);
 
-      const managerRoles = yield* guildConfigService.getGuildManagerRoles(guildId);
+      const monitorRoles = yield* guildConfigService.getGuildMonitorRoles(guildId);
 
       yield* permissionService.checkInteractionUserGuildRoles(
-        managerRoles.map((role) => role.roleId),
+        monitorRoles.map((role) => role.roleId),
         guildId,
       );
 

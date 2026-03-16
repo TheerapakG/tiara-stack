@@ -66,12 +66,12 @@ const makeScreenshotCommand = Effect.gen(function* () {
           pipe(
             permissionService.checkInteractionUserGuildRoles(
               yield* guildConfigService
-                .getGuildManagerRoles(guildId)
+                .getGuildMonitorRoles(guildId)
                 .pipe(Effect.map(Array.map((role) => role.roleId))),
               guildId,
             ),
             Effect.catchTag("PermissionError", () =>
-              Effect.fail(new Error("You can only take screenshots as a manager")),
+              Effect.fail(new Error("You can only take screenshots as a monitor")),
             ),
           ),
         ]);

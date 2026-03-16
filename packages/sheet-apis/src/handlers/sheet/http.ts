@@ -115,7 +115,7 @@ export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
   ),
 );
 
-export const SheetManagerLive = HttpApiBuilder.group(Api, "sheetManager", (handlers) =>
+export const SheetMonitorLive = HttpApiBuilder.group(Api, "sheetMonitor", (handlers) =>
   pipe(
     Effect.all({
       sheetService: SheetService,
@@ -123,19 +123,19 @@ export const SheetManagerLive = HttpApiBuilder.group(Api, "sheetManager", (handl
     }),
     Effect.map(({ sheetService, guildConfigService }) =>
       handlers
-        .handle("getAllManagerSchedules", ({ urlParams }) =>
+        .handle("getAllMonitorSchedules", ({ urlParams }) =>
           pipe(
             getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
             Effect.flatMap((sheetId) => sheetService.getAllSchedules(sheetId)),
           ),
         )
-        .handle("getDayManagerSchedules", ({ urlParams }) =>
+        .handle("getDayMonitorSchedules", ({ urlParams }) =>
           pipe(
             getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
             Effect.flatMap((sheetId) => sheetService.getDaySchedules(sheetId, urlParams.day)),
           ),
         )
-        .handle("getChannelManagerSchedules", ({ urlParams }) =>
+        .handle("getChannelMonitorSchedules", ({ urlParams }) =>
           pipe(
             getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
             Effect.flatMap((sheetId) =>

@@ -1,7 +1,7 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "@effect/platform";
 import { Schema } from "effect";
 import { ValidationError, QueryResultError, ArgumentError } from "typhoon-core/error";
-import { GuildChannelConfig, GuildConfig, GuildConfigManagerRole } from "@/schemas/guildConfig";
+import { GuildChannelConfig, GuildConfig, GuildConfigMonitorRole } from "@/schemas/guildConfig";
 import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthorization/tag";
 
 export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
@@ -46,35 +46,35 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
       .addError(Schema.Union(ValidationError, QueryResultError)),
   )
   .add(
-    HttpApiEndpoint.get("getGuildManagerRoles", "/guildConfig/getGuildManagerRoles")
+    HttpApiEndpoint.get("getGuildMonitorRoles", "/guildConfig/getGuildMonitorRoles")
       .setUrlParams(
         Schema.Struct({
           guildId: Schema.String,
         }),
       )
-      .addSuccess(Schema.Array(GuildConfigManagerRole))
+      .addSuccess(Schema.Array(GuildConfigMonitorRole))
       .addError(Schema.Union(ValidationError, QueryResultError)),
   )
   .add(
-    HttpApiEndpoint.post("addGuildManagerRole", "/guildConfig/addGuildManagerRole")
+    HttpApiEndpoint.post("addGuildMonitorRole", "/guildConfig/addGuildMonitorRole")
       .setPayload(
         Schema.Struct({
           guildId: Schema.String,
           roleId: Schema.String,
         }),
       )
-      .addSuccess(GuildConfigManagerRole)
+      .addSuccess(GuildConfigMonitorRole)
       .addError(Schema.Union(ValidationError, QueryResultError)),
   )
   .add(
-    HttpApiEndpoint.post("removeGuildManagerRole", "/guildConfig/removeGuildManagerRole")
+    HttpApiEndpoint.post("removeGuildMonitorRole", "/guildConfig/removeGuildMonitorRole")
       .setPayload(
         Schema.Struct({
           guildId: Schema.String,
           roleId: Schema.String,
         }),
       )
-      .addSuccess(GuildConfigManagerRole)
+      .addSuccess(GuildConfigMonitorRole)
       .addError(Schema.Union(ValidationError, QueryResultError)),
   )
   .add(

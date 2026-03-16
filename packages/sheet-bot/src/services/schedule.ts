@@ -22,22 +22,22 @@ export class ScheduleService extends Effect.Service<ScheduleService>()("Schedule
             .get()
             .schedule.getChannelPopulatedFillerSchedules({ urlParams: { guildId, channel } }),
       ),
-      // Manager populated schedules - full access, requires manager authorization
-      allPopulatedManagerSchedules: Effect.fn("Schedule.allPopulatedManagerSchedules")(
+      // Monitor populated schedules - full access, requires monitor authorization
+      allPopulatedMonitorSchedules: Effect.fn("Schedule.allPopulatedMonitorSchedules")(
         (guildId: string) =>
           sheetApisClient
             .get()
-            .scheduleManager.getAllPopulatedManagerSchedules({ urlParams: { guildId } }),
+            .scheduleMonitor.getAllPopulatedMonitorSchedules({ urlParams: { guildId } }),
       ),
-      dayPopulatedManagerSchedules: Effect.fn("Schedule.dayPopulatedManagerSchedules")(
+      dayPopulatedMonitorSchedules: Effect.fn("Schedule.dayPopulatedMonitorSchedules")(
         (guildId: string, day: number) =>
           sheetApisClient
             .get()
-            .scheduleManager.getDayPopulatedManagerSchedules({ urlParams: { guildId, day } }),
+            .scheduleMonitor.getDayPopulatedMonitorSchedules({ urlParams: { guildId, day } }),
       ),
-      channelPopulatedManagerSchedules: Effect.fn("Schedule.channelPopulatedManagerSchedules")(
+      channelPopulatedMonitorSchedules: Effect.fn("Schedule.channelPopulatedMonitorSchedules")(
         (guildId: string, channel: string) =>
-          sheetApisClient.get().scheduleManager.getChannelPopulatedManagerSchedules({
+          sheetApisClient.get().scheduleMonitor.getChannelPopulatedMonitorSchedules({
             urlParams: { guildId, channel },
           }),
       ),

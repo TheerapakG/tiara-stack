@@ -41,7 +41,7 @@ const makeListSubCommand = Effect.gen(function* () {
         Option.orElse(() => interactionGuildId),
         Option.getOrThrow,
       );
-      const managerRoles = yield* guildConfigService.getGuildManagerRoles(guildId);
+      const monitorRoles = yield* guildConfigService.getGuildMonitorRoles(guildId);
 
       yield* Effect.firstSuccessOf([
         permissionService.checkInteractionUserApplicationOwner(),
@@ -57,7 +57,7 @@ const makeListSubCommand = Effect.gen(function* () {
       if (interactionUser.id !== targetUser.id) {
         const canView = yield* pipe(
           permissionService.checkInteractionUserGuildRoles(
-            managerRoles.map((role) => role.roleId),
+            monitorRoles.map((role) => role.roleId),
             guildId,
           ),
           Effect.catchTag("PermissionError", () => Effect.succeed(false)),

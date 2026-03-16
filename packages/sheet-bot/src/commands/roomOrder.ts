@@ -77,12 +77,12 @@ const makeManualSubCommand = Effect.gen(function* () {
         Option.getOrUndefined(serverId),
       );
 
-      const managerRoles = yield* guildConfigService.getGuildManagerRoles(guildId);
+      const monitorRoles = yield* guildConfigService.getGuildMonitorRoles(guildId);
 
       yield* Effect.firstSuccessOf([
         permissionService.checkInteractionUserApplicationOwner(),
         permissionService.checkInteractionUserGuildRoles(
-          managerRoles.map((role) => role.roleId),
+          monitorRoles.map((role) => role.roleId),
           guildId,
         ),
       ]);
@@ -131,7 +131,7 @@ const makeManualSubCommand = Effect.gen(function* () {
 
       const channelName = pipe(runningChannel.name, Option.getOrThrow);
 
-      const schedules = yield* scheduleService.channelPopulatedManagerSchedules(
+      const schedules = yield* scheduleService.channelPopulatedMonitorSchedules(
         guildId,
         channelName,
       );

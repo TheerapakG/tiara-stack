@@ -159,7 +159,7 @@ const processChannel = Effect.fn("processChannel")(function* (
     () => runningChannel.channelId,
   );
 
-  const channelSchedules = yield* ScheduleService.channelPopulatedManagerSchedules(
+  const channelSchedules = yield* ScheduleService.channelPopulatedMonitorSchedules(
     guildId,
     channelName,
   );
@@ -240,7 +240,7 @@ const processChannel = Effect.fn("processChannel")(function* (
   const monitorInfo = getMonitorInfo(currentScheduleOption);
 
   const embedDescriptionParts = [
-    formatResult.managerCheckinMessage,
+    formatResult.monitorCheckinMessage,
     ...pipe(
       monitorInfo.failure,
       Option.match({
@@ -280,7 +280,7 @@ const processGuild = (guildId: string) =>
       Effect.flatMap((dt) => ConverterService.convertDateTimeToHour(guildId, dt)),
     );
 
-    const allSchedules = yield* SheetService.getAllManagerSchedules(guildId);
+    const allSchedules = yield* SheetService.getAllMonitorSchedules(guildId);
 
     const channelNames: string[] = pipe(
       allSchedules,
