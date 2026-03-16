@@ -1,4 +1,4 @@
-import { DateTime, Effect, Option, Schema } from "effect";
+import { DateTime, Effect, Option, Redacted, Schema } from "effect";
 import { createAuthClient } from "better-auth/client";
 import { jwtClient } from "better-auth/client/plugins";
 import { jwtVerify, createLocalJWKSet } from "jose";
@@ -10,6 +10,7 @@ import { jwtVerify, createLocalJWKSet } from "jose";
 export class SessionResponseError extends Schema.TaggedError<SessionResponseError>(
   "SessionResponseError",
 )("SessionResponseError", {
+  statusText: Schema.String,
   message: Schema.String,
   cause: Schema.optional(Schema.Unknown),
 }) {}
@@ -20,6 +21,7 @@ export class SessionResponseError extends Schema.TaggedError<SessionResponseErro
 export class TokenVerificationError extends Schema.TaggedError<TokenVerificationError>(
   "TokenVerificationError",
 )("TokenVerificationError", {
+  statusText: Schema.String,
   message: Schema.String,
   cause: Schema.optional(Schema.Unknown),
 }) {}
@@ -28,6 +30,7 @@ export class TokenVerificationError extends Schema.TaggedError<TokenVerification
  * Error type for account retrieval failures
  */
 export class AccountError extends Schema.TaggedError<AccountError>("AccountError")("AccountError", {
+  statusText: Schema.String,
   message: Schema.String,
   cause: Schema.optional(Schema.Unknown),
 }) {}
@@ -38,6 +41,7 @@ export class AccountError extends Schema.TaggedError<AccountError>("AccountError
 export class DiscordAccessTokenError extends Schema.TaggedError<DiscordAccessTokenError>(
   "DiscordAccessTokenError",
 )("DiscordAccessTokenError", {
+  statusText: Schema.String,
   message: Schema.String,
   cause: Schema.optional(Schema.Unknown),
 }) {}
@@ -150,14 +154,18 @@ export function getSession(
         }),
       catch: (error) =>
         new SessionResponseError({
-          message: error instanceof Error ? error.message : "Failed to get session",
+          statusText: "GET_SESSION_FAILED",
+          message: `GET_SESSION_FAILED: ${error instanceof Error ? error.message : "Failed to get session"}`,
+          cause: error,
         }),
     });
 
     if (session.error) {
       yield* Effect.fail(
         new SessionResponseError({
-          message: session.error.message || "Failed to get session",
+          statusText: session.error.statusText,
+          message: `${session.error.statusText}: ${session.error.message || "Failed to get session"}`,
+          cause: session.error,
         }),
       );
       return Option.none();
@@ -212,14 +220,18 @@ export function getToken(client: SheetAuthClient, headers?: Headers | HeadersIni
         }),
       catch: (error) =>
         new SessionResponseError({
-          message: error instanceof Error ? error.message : "Failed to get token",
+          statusText: "GET_TOKEN_FAILED",
+          message: `GET_TOKEN_FAILED: ${error instanceof Error ? error.message : "Failed to get token"}`,
+          cause: error,
         }),
     });
 
     if (token.error) {
       yield* Effect.fail(
         new SessionResponseError({
-          message: token.error.message || "Failed to get token",
+          statusText: token.error.statusText,
+          message: `${token.error.statusText}: ${token.error.message || "Failed to get token"}`,
+          cause: token.error,
         }),
       );
       return Option.none();
@@ -262,7 +274,8 @@ export function verifyToken(
       },
       catch: (error) =>
         new TokenVerificationError({
-          message: error instanceof Error ? error.message : "Failed to fetch JWKS",
+          statusText: "FETCH_JWKS_FAILED",
+          message: `FETCH_JWKS_FAILED: ${error instanceof Error ? error.message : "Failed to fetch JWKS"}`,
           cause: error,
         }),
     });
@@ -275,7 +288,8 @@ export function verifyToken(
       },
       catch: (error) =>
         new TokenVerificationError({
-          message: error instanceof Error ? error.message : "Token verification failed",
+          statusText: "TOKEN_VERIFICATION_FAILED",
+          message: `TOKEN_VERIFICATION_FAILED: ${error instanceof Error ? error.message : "Token verification failed"}`,
           cause: error,
         }),
     });
@@ -284,7 +298,8 @@ export function verifyToken(
 
     if (!userId) {
       return yield* new TokenVerificationError({
-        message: "Token missing sub claim",
+        statusText: "TOKEN_MISSING_SUB_CLAIM",
+        message: "TOKEN_MISSING_SUB_CLAIM: Token missing sub claim",
       });
     }
 
@@ -336,7 +351,8 @@ export function getAccount(
         }),
       catch: (error) =>
         new AccountError({
-          message: error instanceof Error ? error.message : String(error),
+          statusText: "GET_ACCOUNTS_FAILED",
+          message: `GET_ACCOUNTS_FAILED: ${error instanceof Error ? error.message : String(error)}`,
           cause: error,
         }),
     });
@@ -344,7 +360,9 @@ export function getAccount(
     if (accounts.error) {
       return yield* Effect.fail(
         new AccountError({
-          message: accounts.error.message || "Failed to get accounts",
+          statusText: accounts.error.statusText,
+          message: `${accounts.error.statusText}: ${accounts.error.message || "Failed to get accounts"}`,
+          cause: accounts.error,
         }),
       );
     }
@@ -353,7 +371,8 @@ export function getAccount(
     if (!account) {
       return yield* Effect.fail(
         new AccountError({
-          message: "Account not found",
+          statusText: "ACCOUNT_NOT_FOUND",
+          message: "ACCOUNT_NOT_FOUND: Account not found",
         }),
       );
     }
@@ -389,36 +408,45 @@ export function getAccount(
 export function getDiscordAccessToken(
   client: SheetAuthClient,
   headers?: Headers | HeadersInit,
-): Effect.Effect<{ accessToken: string }, DiscordAccessTokenError> {
-  return Effect.tryPromise({
-    try: async () => {
-      const result = await client.getAccessToken({
-        providerId: "discord",
-        fetchOptions: {
-          headers,
-        },
-      });
+): Effect.Effect<{ accessToken: Redacted.Redacted<string> }, DiscordAccessTokenError> {
+  return Effect.gen(function* () {
+    const accessToken = yield* Effect.tryPromise({
+      try: async () =>
+        await client.getAccessToken({
+          providerId: "discord",
+          fetchOptions: {
+            headers,
+          },
+        }),
+      catch: (error) =>
+        error instanceof DiscordAccessTokenError
+          ? error
+          : new DiscordAccessTokenError({
+              statusText: "GET_DISCORD_ACCESS_TOKEN_FAILED",
+              message: `GET_DISCORD_ACCESS_TOKEN_FAILED: ${error instanceof Error ? error.message : "Failed to get Discord access token"}`,
+              cause: error,
+            }),
+    });
 
-      if (result.error) {
-        throw new DiscordAccessTokenError({
-          message: result.error.message || "Failed to get Discord access token",
-        });
-      }
+    if (accessToken.error) {
+      return yield* Effect.fail(
+        new DiscordAccessTokenError({
+          statusText: accessToken.error.statusText,
+          message: `${accessToken.error.statusText}: ${accessToken.error.message || "Failed to get Discord access token"}`,
+          cause: accessToken.error,
+        }),
+      );
+    }
 
-      if (!result.data?.accessToken) {
-        throw new DiscordAccessTokenError({
-          message: "No Discord access token returned from Better Auth",
-        });
-      }
+    if (!accessToken.data?.accessToken) {
+      return yield* Effect.fail(
+        new DiscordAccessTokenError({
+          statusText: "NO_DISCORD_ACCESS_TOKEN",
+          message: "NO_DISCORD_ACCESS_TOKEN: No Discord access token returned from Better Auth",
+        }),
+      );
+    }
 
-      return { accessToken: result.data.accessToken };
-    },
-    catch: (error) =>
-      error instanceof DiscordAccessTokenError
-        ? error
-        : new DiscordAccessTokenError({
-            message: error instanceof Error ? error.message : String(error),
-            cause: error,
-          }),
+    return { accessToken: Redacted.make(accessToken.data.accessToken) };
   });
 }

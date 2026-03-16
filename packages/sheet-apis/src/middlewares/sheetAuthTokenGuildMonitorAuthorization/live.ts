@@ -1,5 +1,5 @@
 import { HttpServerRequest } from "@effect/platform";
-import { Effect, HashSet, Layer, pipe, Schema } from "effect";
+import { Effect, HashSet, Layer, pipe, Redacted, Schema } from "effect";
 import { MembersApiCacheView } from "dfx-discord-utils/discord";
 import { getAccount } from "sheet-auth/client";
 import { GuildConfigService, SheetAuthClient } from "@/services";
@@ -35,7 +35,7 @@ export const SheetAuthTokenGuildMonitorAuthorizationLive = Layer.effect(
           );
 
           const account = yield* getAccount(authClient, ["discord", "kubernetes:discord"], {
-            Authorization: `Bearer ${user.token}`,
+            Authorization: `Bearer ${Redacted.value(user.token)}`,
           }).pipe(
             Effect.mapError(
               (error) =>

@@ -20,7 +20,7 @@ export const SheetAuthTokenAuthorizationLive = Layer.effect(
               userId: result.payload.sub,
               email: result.payload.email,
               permissions: result.payload.permissions,
-              token: Redacted.value(token),
+              token,
             })),
             Effect.mapError(
               (error) =>

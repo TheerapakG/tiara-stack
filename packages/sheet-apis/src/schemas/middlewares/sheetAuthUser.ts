@@ -1,4 +1,4 @@
-import { Context } from "effect";
+import { Context, Redacted } from "effect";
 import type { Permission } from "sheet-auth/client";
 
 export class SheetAuthUser extends Context.Tag("SheetAuthUser")<
@@ -11,6 +11,6 @@ export class SheetAuthUser extends Context.Tag("SheetAuthUser")<
     /** User permissions from JWT claims */
     permissions?: Permission[];
     /** Raw JWT token for bearer authentication to other services */
-    token: string;
+    token: Redacted.Redacted<string>;
   }
 >() {}

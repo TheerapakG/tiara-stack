@@ -1,6 +1,6 @@
 import { HttpApiBuilder, HttpServerRequest } from "@effect/platform";
 import { catchParseErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
-import { Effect, Layer, pipe, Schema, Record, Struct } from "effect";
+import { Effect, Layer, pipe, Schema, Record, Struct, Redacted } from "effect";
 import { Api } from "@/api";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { Discord } from "@/schema";
@@ -48,7 +48,7 @@ export const DiscordLive = HttpApiBuilder.group(Api, "discord", (handlers) =>
               Effect.promise(() =>
                 fetch("https://discord.com/api/v10/users/@me", {
                   headers: {
-                    Authorization: `Bearer ${tokenResult.accessToken}`,
+                    Authorization: `Bearer ${Redacted.value(tokenResult.accessToken)}`,
                   },
                 }),
               ),
@@ -103,7 +103,7 @@ export const DiscordLive = HttpApiBuilder.group(Api, "discord", (handlers) =>
               Effect.promise(() =>
                 fetch("https://discord.com/api/v10/users/@me/guilds", {
                   headers: {
-                    Authorization: `Bearer ${tokenResult.accessToken}`,
+                    Authorization: `Bearer ${Redacted.value(tokenResult.accessToken)}`,
                   },
                 }),
               ),
