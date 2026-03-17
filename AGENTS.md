@@ -2,18 +2,15 @@
 
 This monorepo contains the following packages:
 
+> **Note:** For the complete project structure and architecture diagrams, see the [README.md](./README.md).
+
 ## Core Infrastructure Packages
 
 ### `typhoon-core` (packages/typhoon-core)
 
-Core framework for building RPC-like communication systems with WebSocket support.
+Shared utilities library providing Effect.js integration for Rocicorp Zero, schema transformation helpers, standardized error types, and common utilities used across the monorepo.
 
-- **Main export** (`packages/typhoon-core/src/index.ts`): Exports Schema, Utils, Error, Services modules
-- **Sub-exports** (`packages/typhoon-core/src/*`): Each subdirectory can be imported as `typhoon-core/<module-name>`
-- **Schema** (`packages/typhoon-core/src/schema`): Schema definitions including array lookup, key order lookup, and tuple/struct conversions
-- **Utils** (`packages/typhoon-core/src/utils`): Utility functions and data structures
-- **Error** (`packages/typhoon-core/src/error`): Error handling utilities
-- **Services** (`packages/typhoon-core/src/services`): Core service implementations
+**Dependencies**: `@rocicorp/zero`, `@standard-schema/spec` (peer: `effect`)
 
 ## Application Packages
 
@@ -21,209 +18,121 @@ Core framework for building RPC-like communication systems with WebSocket suppor
 
 Backend API server for Google Sheets integration using Effect's HttpApiBuilder, providing HTTP API handlers for sheet operations, calculations, guild configuration, and message management.
 
-- **Main entry** (`packages/sheet-apis/src/index.ts`): Server entry point that launches the HTTP API server
-- **HTTP** (`packages/sheet-apis/src/http.ts`): HTTP server configuration with all handler groups
-- **API** (`packages/sheet-apis/src/api.ts`): API definitions using HttpApiBuilder
-- **Metrics** (`packages/sheet-apis/src/metrics.ts`): OpenTelemetry metrics configuration
-- **Traces** (`packages/sheet-apis/src/traces.ts`): OpenTelemetry traces configuration
-- **Handlers** (`packages/sheet-apis/src/handlers`): HTTP API handler implementations for:
-  - Calc: Sheet calculation operations
-  - GuildConfig: Discord guild configuration management
-  - Health: Health check endpoint
-  - MessageCheckin: Check-in message handling
-  - MessageRoomOrder: Room ordering message handling
-  - MessageSlot: Slot message handling
-  - Monitor: Monitoring and observability
-  - Player: Player data management
-  - Schedule: Scheduling operations
-  - Screenshot: Screenshot generation
-  - Sheet: Google Sheets operations
-- **Services** (`packages/sheet-apis/src/services`): Business logic services:
-  - calc.ts: Calculation service
-  - google/: Google Sheets API integration
-  - guildConfig.ts: Guild configuration service
-  - messageCheckin.ts: Check-in message service
-  - messageRoomOrder.ts: Room order message service
-  - messageSlot.ts: Slot message service
-  - monitor.ts: Monitoring service
-  - player.ts: Player data service
-  - schedule.ts: Scheduling service
-  - screenshot.ts: Screenshot service
-  - sheet.ts: Google Sheets operations service
-  - sheetConfig.ts: Sheet configuration service
-  - zero.ts: Zero sync service
-- **Schemas** (`packages/sheet-apis/src/schemas`): Protocol buffer schema definitions
-- **Config** (`packages/sheet-apis/src/config.ts`): Configuration management
+**Dependencies**: Effect ecosystem, `@googleapis/sheets`, `@rocicorp/zero`, Playwright, `sheet-db-schema`, `sheet-auth`, `typhoon-core`, `dfx`, `dfx-discord-utils`
 
 ### `sheet-db-server` (packages/sheet-db-server)
 
 Database server providing Zero (real-time sync) HTTP API for the sheet database schema using Rocicorp Zero.
 
-- **Main entry** (`packages/sheet-db-server/src/index.ts`): Server entry point that launches the HTTP API server
-- **HTTP** (`packages/sheet-db-server/src/http.ts`): HTTP server configuration with Zero handler group
-- **API** (`packages/sheet-db-server/src/api.ts`): API definitions using HttpApiBuilder
-- **Metrics** (`packages/sheet-db-server/src/metrics.ts`): OpenTelemetry metrics configuration
-- **Traces** (`packages/sheet-db-server/src/traces.ts`): OpenTelemetry traces configuration
-- **Handlers** (`packages/sheet-db-server/src/handlers`): HTTP API handler implementations for:
-  - Zero: Real-time sync handlers for query and mutate requests using Rocicorp Zero
-- **Services** (`packages/sheet-db-server/src/services`): Database service layer
-
-### `sheet-bot` (packages/sheet-bot)
-
-Discord bot application that integrates with sheet-apis to provide Discord commands and interactions.
-
-- **Main export** (`packages/sheet-bot/src/index.ts`): Bot entry point that initializes Discord bot with commands and handlers
-- **register** (`packages/sheet-bot/src/register.ts`): Discord command registration script
-- **Bot** (`packages/sheet-bot/src/bot`): Discord bot implementation
-- **Commands** (`packages/sheet-bot/src/commands`): Discord slash command handlers
-- **Services** (`packages/sheet-bot/src/services`): Business logic services for guild, member, collection, message, channel, and interaction management
-- **MessageComponents** (`packages/sheet-bot/src/messageComponents`): Discord message component handlers (buttons, etc.)
-- **Types** (`packages/sheet-bot/src/types`): Type definitions for handlers and errors
-- **Config** (`packages/sheet-bot/src/config`): Configuration management
-- **Utils** (`packages/sheet-bot/src/utils`): Utility functions
-- **Tasks** (`packages/sheet-bot/src/tasks`): Background task implementations including auto-checkin
-
-### `sheet-formulas` (packages/sheet-formulas)
-
-Google Apps Script formulas library for performing calculations and operations on Google Sheets.
-
-- **Main export** (`packages/sheet-formulas/src/index.ts`): Exports formula functions
-- **Formulas** (`packages/sheet-formulas/src/formulas.ts`): Formula implementations for parsing players, calculating stats, and performing sheet operations
+**Dependencies**: Effect ecosystem, `@rocicorp/zero`, `drizzle-orm`, `postgres`, `sheet-db-schema`, `typhoon-core`
 
 ### `sheet-db-schema` (packages/sheet-db-schema)
 
-Database schema definitions using Drizzle ORM for PostgreSQL.
+Database schema definitions using Drizzle ORM for PostgreSQL with Zero integration.
 
-- **Main export** (`packages/sheet-db-schema/src/schema.ts`): Exports Drizzle table definitions:
-  - configGuild: Guild configuration table
-  - configGuildManagerRole: Guild manager role configuration
-  - configGuildChannel: Guild channel configuration
-  - messageSlot: Message slot tracking
-  - messageCheckin: Check-in message tracking
-  - messageCheckinMember: Member check-in records
-  - messageRoomOrder: Room order message tracking
-  - messageRoomOrderEntry: Room order entry records
-- **Zero** (`packages/sheet-db-schema/src/zero`): Rocicorp Zero schema definitions:
-  - queries: Zero query definitions
-  - mutators: Zero mutator definitions
+**Dependencies**: `@rocicorp/zero`, `drizzle-orm`, `drizzle-zero`, `postgres`, `typhoon-core`, `effect`
 
-### `vibecord` (packages/vibecord)
+### `sheet-auth` (packages/sheet-auth)
 
-Discord bot application for VibeCord, providing workspace and session management with ACP (Agent Client Protocol) integration.
+Authentication service using BetterAuth for Discord OAuth, JWT tokens, and Kubernetes OAuth integration.
 
-- **Main export** (`packages/vibecord/src/index.ts`): Exports package name and version
-- **register** (`packages/vibecord/src/register.ts`): Discord command registration script
-- **Bot** (`packages/vibecord/src/bot`): Discord bot implementation with Gateway event handling
-- **Commands** (`packages/vibecord/src/commands`): Discord slash command handlers including workspace and session management
-- **ACP** (`packages/vibecord/src/acp`): OpenCode Agent Client Protocol integration
-- **DB** (`packages/vibecord/src/db`): Database service layer using Drizzle ORM with SQLite
-- **Config** (`packages/vibecord/src/config`): Configuration management
-- **Utils** (`packages/vibecord/src/utils`): Utility functions
+**Dependencies**: Effect ecosystem, `better-auth`, `@better-auth/oauth-provider`, `hono`, `@hono/node-server`, `drizzle-orm`, `postgres`, `ioredis`, `unstorage`, `jose`
+
+**Peer Dependencies**: `@better-fetch/fetch`, `@standard-schema/spec`, `nanostores`
+
+**Exports**: `.`, `./client`, `./schema`, `./server`, `./plugins/kubernetes-oauth`, `./plugins/kubernetes-oauth/client`
 
 ### `sheet-web` (packages/sheet-web)
 
 Web application for the sheet system built with TanStack Start, providing a dashboard for guild management, scheduling, and calendar views.
 
-- **Main entry** (`packages/sheet-web/src/router.tsx`): TanStack Router configuration
-- **Routes** (`packages/sheet-web/src/routes`): Application routes:
-  - `_authenticated`: Protected routes requiring authentication
-  - `dashboard`: Main dashboard with guilds list and shift management
-  - `dashboard/guilds`: Guild management routes with schedule and channel views
-  - `index`: Landing page
-- **Components** (`packages/sheet-web/src/components`): React components:
-  - `ui/`: shadcn/ui component library (50+ UI components)
-  - `Background.tsx`: Background component
-  - `Header.tsx`: Header component
-- **Hooks** (`packages/sheet-web/src/hooks`): Custom React hooks for mobile detection and timezone handling
-- **Lib** (`packages/sheet-web/src/lib`): Utility libraries:
-  - `auth.tsx`: Authentication context and hooks
-  - `sheetApis.ts`: Sheet APIs integration
-  - `atomRegistry.ts`: Atom registry for state management
-  - `config.ts`, `configAtoms.ts`: Configuration management
-  - `discord.ts`: Discord integration utilities
-  - `schedule.ts`: Schedule utilities
-  - `date.ts`: Date handling utilities
-  - `error.ts`: Error types for HTTP error handling
-  - `runtime.ts`: Runtime utilities and environment configuration
-  - `sheet.ts`: Sheet-related utilities and atoms
-  - `utils.ts`: General utilities (CSS class merging, etc.)
+**Dependencies**: TanStack Start/React ecosystem, Effect, `better-auth`, `sheet-apis`, `sheet-auth`, `start-atom`, `typhoon-core`, shadcn/ui components, Recharts
 
-### `sheet-auth` (packages/sheet-auth)
+### `sheet-bot` (packages/sheet-bot)
 
-Authentication service using BetterAuth for Discord OAuth and Kubernetes OAuth integration.
+Discord bot application that integrates with sheet-apis to provide Discord commands and interactions.
 
-- **Main export** (`packages/sheet-auth/src/index.ts`): Exports auth config, schema, and plugins
-- **Auth Config** (`packages/sheet-auth/src/auth-config.ts`): BetterAuth configuration with:
-  - Discord OAuth provider (identify, guilds scopes)
-  - JWT plugin
-  - OAuth provider for external clients
-  - Kubernetes OAuth plugin
-- **Schema** (`packages/sheet-auth/src/schema.ts`): Database schema for auth tables
-- **Plugins** (`packages/sheet-auth/src/plugins`): Authentication plugins:
-  - `kubernetes-oauth.ts`: Kubernetes service account OAuth provider
-- **Server** (`packages/sheet-auth/src/server.ts`): HTTP server handlers for auth endpoints
-- **Client** (`packages/sheet-auth/src/client.ts`): Client-side authentication utilities
-- **Storage** (`packages/sheet-auth/src/storage.ts`): Secondary storage implementation using unstorage
-- **Config** (`packages/sheet-auth/src/config.ts`): Environment configuration
-- **Metrics/Traces** (`packages/sheet-auth/src/metrics.ts`, `packages/sheet-auth/src/traces.ts`): OpenTelemetry configuration
+**Dependencies**: Effect ecosystem, `dfx`, `dfx-discord-utils`, `discord-api-types`, `@discordjs/builders`, `ts-mixer`, `handlebars`, `sheet-apis`, `sheet-auth`, `sheet-db-schema`, `typhoon-core`
+
+### `sheet-formulas` (packages/sheet-formulas)
+
+Google Apps Script formulas library for performing calculations and operations on Google Sheets. Deployed as a Google Apps Script project.
+
+**Dependencies**: Effect, `@effect/platform`, `effect-platform-apps-script`, `sheet-apis`, `typhoon-core`
+
+### `vibecord` (packages/vibecord)
+
+Discord bot application for VibeCord, providing workspace and session management with ACP (Agent Client Protocol) integration.
+
+**Dependencies**: `discord.js`, `drizzle-orm`, `@effect/sql-drizzle`, `better-sqlite3`, `@opencode-ai/sdk`, `simple-git`, `diff`, `c12`, `effect`
+
+**Database Scripts**: `db:generate`, `db:migrate`, `db:push`, `db:studio`
 
 ## Utility Packages
 
 ### `bob` (packages/bob)
 
-Configuration builder utility library for building type-safe configuration objects with validation.
+Configuration builder utility library for building type-safe configuration objects with validation using Standard Schema.
 
-- **Main export** (`packages/bob/src/builder/index.ts`): Exports configBuilderBuilder function and ConfigBuilder/ConfigBuilderBuilder classes for creating type-safe configuration builders with Standard Schema validation
+**Dependencies**: `@standard-schema/spec`
+
+**Dev Dependencies**: `arktype` (for testing)
 
 ### `dfx-discord-utils` (packages/dfx-discord-utils)
 
 Discord utilities library extending dfx (Discord Effect) with caching, command builders, and interaction helpers.
 
-- **Main export** (`packages/dfx-discord-utils/src/index.ts`): Exports Discord and utils modules
-- **Discord** (`packages/dfx-discord-utils/src/discord`): Discord-specific utilities:
-  - `config.ts`: Configuration utilities
-  - `gateway.ts`: Gateway handling
-  - `cache.ts`: Discord cache implementation
-- **Cache** (`packages/dfx-discord-utils/src/cache`): Caching utilities:
-  - `driver.ts`: `ReverseLookupCacheDriver` interface and factory for building cache drivers
-  - `unstorage.ts`: Unstorage driver integration
-  - `prelude.ts`: Cache operations with reverse lookup
-  - `cache.ts`: Reverse lookup cache implementation
-- **Utils** (`packages/dfx-discord-utils/src/utils`): Utility functions:
-  - `commandBuilder.ts`: Discord slash command builders
-  - `commandHelper.ts`: Command helper functions
-  - `guildMember.ts`: Guild member utilities
-  - `interaction.ts`: Interaction helpers
-  - `messageComponentBuilder.ts`: Message component builders
-  - `messageComponentHelper.ts`: Message component helpers
+**Dependencies**: `@discordjs/builders`, `discord-api-types`, `ts-mixer`, `unstorage`
+
+**Peer Dependencies**: `effect`, `@effect/platform`, `@effect/platform-node`, `dfx`
 
 ### `effect-platform-apps-script` (packages/effect-platform-apps-script)
 
 Effect Platform HTTP client implementation for Google Apps Script environment.
 
-- **Main export** (`packages/effect-platform-apps-script/src/index.ts`): Exports HttpClient for Apps Script
-- **HttpClient** (`packages/effect-platform-apps-script/src/HttpClient.ts`): HTTP client implementation using Google Apps Script's `UrlFetchApp` for making HTTP requests within the Apps Script environment
+**Peer Dependencies**: `effect`, `@effect/platform`
+
+**Dev Dependencies**: `@types/google-apps-script`
 
 ### `start-atom` (packages/start-atom)
 
 Integration library connecting TanStack Start with Effect Atom for server-side rendering (SSR) compatible state management.
 
-- **Main export** (`packages/start-atom/src/index.tsx`): Exports setupStartAtomIntegration and setupStartAtomCoreIntegration
-- **Core** (`packages/start-atom/src/start-atom-core.ts`): Core integration logic:
-  - Server-side atom dehydration to streams
-  - Client-side atom hydration from streams
-  - TanStack Router integration for SSR state management
+**Dependencies**: `@effect-atom/atom-react`, `@tanstack/router-core`
 
-## Scripts
+**Peer Dependencies**: `effect`, `react`, `@tanstack/react-router`, `@tanstack/react-start`, `@tanstack/router-core`
 
-There are two workspace-level scripts defined in package.json.
-The "build" script invokes nx to build all the packages.
-The "format:apply" script invokes nx to apply the prettier formatter across all the packages.
-The "checks" script invokes nx to run linter, formatter, and type checkers in all the packages.
+## Workspace Scripts
+
+The following workspace-level scripts are defined in `package.json`:
+
+- **`build`**: `nx run-many -t build --output-style=stream` - Builds all packages using Nx
+- **`checks`**: `nx run-many -t format,lint,typecheck,test --output-style=stream` - Runs format check, lint, typecheck, and tests across all packages
+- **`format:apply`**: `nx run-many -t format:apply --output-style=stream` - Applies formatting across all packages
+
 Run these scripts using `pnpm -w <script>`, replacing `<script>` with the script you want to run.
-Run `pnpm -w format:apply` every time after you finished proposing a change to correctly format all the code.
 
-# Guidelines on Graphite Commit Messages For This Project
+Run `pnpm -w format:apply` every time after you finish proposing a change to correctly format all the code.
+
+## Package Scripts
+
+Each package has the following standard scripts:
+
+- **`build`**: Compiles TypeScript and creates distribution bundles
+- **`format`**: Checks code formatting (oxfmt)
+- **`format:apply`**: Applies code formatting (oxfmt)
+- **`lint`**: Runs linter (oxlint)
+- **`typecheck`**: Runs TypeScript type checking (tsgo)
+- **`test`**: Runs tests (vitest) - where applicable
+
+Database-related packages (`sheet-auth`, `vibecord`) have additional scripts:
+
+- **`db:generate`**: Generates Drizzle migrations
+- **`db:migrate`**: Runs Drizzle migrations
+- **`db:push`**: Pushes schema changes to database
+- **`db:studio`**: Opens Drizzle Studio (vibecord only)
+
+## Guidelines on Graphite Commit Messages For This Project
 
 We use Graphite for managing stacked pull requests. The following guidelines are to be followed for `gt create` and `gt modify` commands.
 
@@ -264,12 +173,65 @@ We use Graphite for managing stacked pull requests. The following guidelines are
   - `gt modify -c -m "subject" -m "line1\nline2\n..."`
     This supplies commit message in a bad format.
 
-# Guidelines on Library Usages
+## Guidelines on Library Usages
 
-## Effect.ts
+### Effect.ts
 
 This project utilizes the Effect library for composability and type-safety. The version of the library being used is 3.19.8. The project prefers using the "pipe" syntax (with "do simulation" to combat excessive nesting) over the "generator" syntax. Use Effect/Schema for runtime validation except existing code use other validation library, or otherwise stated.
 
-## Arktype
+### Arktype
 
 This project utilizes the ArkType library for runtime type validation in some limited case. The version of the library being used is 2.1.19.
+
+## Package Dependency Graph
+
+```
+sheet-web
+  ├─ sheet-apis
+  ├─ sheet-auth
+  ├─ start-atom
+  └─ typhoon-core
+
+sheet-bot
+  ├─ sheet-apis
+  ├─ sheet-auth
+  ├─ sheet-db-schema
+  ├─ typhoon-core
+  └─ dfx-discord-utils
+
+sheet-apis
+  ├─ sheet-db-schema
+  ├─ sheet-auth
+  ├─ typhoon-core
+  └─ dfx-discord-utils
+
+sheet-db-server
+  ├─ sheet-db-schema
+  └─ typhoon-core
+
+sheet-formulas
+  ├─ sheet-apis
+  ├─ effect-platform-apps-script
+  └─ typhoon-core
+
+sheet-db-schema
+  └─ typhoon-core
+
+dfx-discord-utils
+  (peer dependencies: effect, dfx)
+
+start-atom
+  (peer dependencies: effect, react, @tanstack/react-router)
+
+effect-platform-apps-script
+  (peer dependencies: effect, @effect/platform)
+
+bob
+  (no workspace dependencies)
+
+typhoon-core
+  (peer dependency: effect)
+
+vibecord
+  (standalone, no workspace dependencies)
+```
