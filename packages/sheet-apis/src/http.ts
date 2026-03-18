@@ -11,6 +11,7 @@ import { GuildConfigLive } from "./handlers/guildConfig";
 import { MessageCheckinLive } from "./handlers/messageCheckin";
 import { MessageRoomOrderLive } from "./handlers/messageRoomOrder";
 import { MessageSlotLive } from "./handlers/messageSlot";
+import { PermissionsLive } from "./handlers/permissions";
 import { SheetLive, SheetMonitorLive } from "./handlers/sheet";
 import { MonitorLive } from "./handlers/monitor";
 import { PlayerLive } from "./handlers/player";
@@ -26,6 +27,7 @@ const ApiLive = Layer.provide(HttpApiBuilder.api(Api), [
   MessageCheckinLive,
   MessageRoomOrderLive,
   MessageSlotLive,
+  PermissionsLive,
   SheetLive,
   SheetMonitorLive,
   MonitorLive,

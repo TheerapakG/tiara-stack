@@ -1,6 +1,7 @@
 import { HttpServerRequest } from "@effect/platform";
-import { MembersApiCacheView } from "dfx-discord-utils/discord";
+import { Discord, Perms } from "dfx";
 import { Cache, Duration, Effect, Exit, Option, pipe, Redacted } from "effect";
+import type { MembersApiCacheView, RolesApiCacheView } from "dfx-discord-utils/discord";
 import {
   getAccount,
   getKubernetesOAuthImplicitPermissions,
@@ -63,10 +64,17 @@ const getOptionalGuildId = pipe(
 // Resolve guild-scoped permissions for requests that include `guildId`.
 // Endpoints can then introspect these permissions to decide how to handle
 // monitor-specific access without re-running guild membership checks.
+const appendPermission = (
+  permissions: ReadonlyArray<Permission>,
+  permission: Permission,
+): Permission[] =>
+  permissions.includes(permission) ? [...permissions] : [...permissions, permission];
+
 const resolvePermissions = (
   authorization: CachedAuthorization,
   guildConfigService: GuildConfigService,
   membersCache: MembersApiCacheView,
+  rolesCache: RolesApiCacheView,
 ): Effect.Effect<Permission[]> =>
   Effect.gen(function* () {
     const maybeGuildId = yield* getOptionalGuildId;
@@ -74,18 +82,13 @@ const resolvePermissions = (
       return authorization.permissions;
     }
 
-    if (authorization.permissions.includes("bot:monitor_guild")) {
+    const needsMonitorPermission = !authorization.permissions.includes("monitor_guild");
+    const needsManagePermission = !authorization.permissions.includes("manage_guild");
+    if (!needsMonitorPermission && !needsManagePermission) {
       return authorization.permissions;
     }
 
     const guildId = maybeGuildId.value;
-    const maybeMonitorRoles = yield* guildConfigService
-      .getGuildMonitorRoles(guildId)
-      .pipe(Effect.tapError(Effect.logError), Effect.option);
-    if (Option.isNone(maybeMonitorRoles) || maybeMonitorRoles.value.length === 0) {
-      return authorization.permissions;
-    }
-
     const maybeMember = yield* membersCache
       .get(guildId, authorization.accountId)
       .pipe(Effect.tapError(Effect.logError), Effect.option);
@@ -93,22 +96,54 @@ const resolvePermissions = (
       return authorization.permissions;
     }
 
-    const monitorRoleIds = new Set(maybeMonitorRoles.value.map((role) => role.roleId));
-    if (!maybeMember.value.roles.some((roleId) => monitorRoleIds.has(roleId))) {
-      return authorization.permissions;
+    let permissions = [...authorization.permissions];
+
+    if (needsMonitorPermission) {
+      const maybeMonitorRoles = yield* guildConfigService
+        .getGuildMonitorRoles(guildId)
+        .pipe(Effect.tapError(Effect.logError), Effect.option);
+      if (Option.isSome(maybeMonitorRoles) && maybeMonitorRoles.value.length > 0) {
+        const monitorRoleIds = new Set(maybeMonitorRoles.value.map((role) => role.roleId));
+        if (maybeMember.value.roles.some((roleId) => monitorRoleIds.has(roleId))) {
+          permissions = appendPermission(permissions, "monitor_guild");
+        }
+      }
     }
 
-    // Guard against duplicates if implicit permissions ever start including
-    // `user:monitor_guild` in the future.
-    return authorization.permissions.includes("user:monitor_guild")
-      ? authorization.permissions
-      : [...authorization.permissions, "user:monitor_guild"];
+    if (needsManagePermission) {
+      const maybeRoles = yield* rolesCache
+        .getForParent(guildId)
+        .pipe(Effect.tapError(Effect.logError), Effect.option);
+      if (Option.isSome(maybeRoles)) {
+        const memberWithMetadata = maybeMember.value as typeof maybeMember.value & {
+          flags?: number;
+          joined_at?: string;
+        };
+        const memberForPermissionCheck = {
+          ...maybeMember.value,
+          flags: memberWithMetadata.flags ?? 0,
+          joined_at: memberWithMetadata.joined_at ?? "",
+          mute: false,
+          deaf: false,
+          pending: maybeMember.value.pending ?? false,
+        };
+        const resolvedUserPermissions = Perms.forMember([...maybeRoles.value.values()])(
+          memberForPermissionCheck,
+        );
+        if (Perms.has(Discord.Permissions.ManageGuild)(resolvedUserPermissions)) {
+          permissions = appendPermission(permissions, "manage_guild");
+        }
+      }
+    }
+
+    return permissions;
   });
 
 export const makeSheetAuthTokenAuthorization = (
   authClient: SheetAuthClientValue,
   guildConfigService: GuildConfigService,
   membersCache: MembersApiCacheView,
+  rolesCache: RolesApiCacheView,
 ): Effect.Effect<SheetAuthTokenAuthorization["Type"]> =>
   Effect.gen(function* () {
     const authorizationCache = yield* Cache.makeWith({
@@ -125,7 +160,7 @@ export const makeSheetAuthTokenAuthorization = (
         pipe(
           authorizationCache.get(token),
           Effect.flatMap((authorization) =>
-            resolvePermissions(authorization, guildConfigService, membersCache).pipe(
+            resolvePermissions(authorization, guildConfigService, membersCache, rolesCache).pipe(
               Effect.map((permissions) => ({
                 userId: authorization.userId,
                 permissions,

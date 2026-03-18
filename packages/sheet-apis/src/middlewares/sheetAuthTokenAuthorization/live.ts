@@ -1,5 +1,5 @@
 import { Effect, Layer, pipe } from "effect";
-import { MembersApiCacheView } from "dfx-discord-utils/discord";
+import { MembersApiCacheView, RolesApiCacheView } from "dfx-discord-utils/discord";
 import { type SheetAuthClient as SheetAuthClientValue } from "sheet-auth/client";
 import { GuildConfigService } from "../../services/guildConfig";
 import { SheetAuthClient } from "../../services/sheetAuthClient";
@@ -13,12 +13,14 @@ export const SheetAuthTokenAuthorizationLiveLayer = Layer.effect(
       authClient: SheetAuthClient,
       guildConfigService: GuildConfigService,
       membersCache: MembersApiCacheView,
+      rolesCache: RolesApiCacheView,
     }),
-    Effect.flatMap(({ authClient, guildConfigService, membersCache }) =>
+    Effect.flatMap(({ authClient, guildConfigService, membersCache, rolesCache }) =>
       makeSheetAuthTokenAuthorization(
         authClient as SheetAuthClientValue,
         guildConfigService,
         membersCache,
+        rolesCache,
       ),
     ),
   ),

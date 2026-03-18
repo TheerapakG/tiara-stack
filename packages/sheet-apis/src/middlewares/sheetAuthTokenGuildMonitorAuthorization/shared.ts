@@ -4,7 +4,7 @@ import { SheetAuthTokenAuthorization } from "../sheetAuthTokenAuthorization/tag"
 import { SheetAuthTokenGuildMonitorAuthorization } from "./tag";
 
 const hasMonitorPermission = (permissions: ReadonlyArray<string>) =>
-  permissions.includes("bot:monitor_guild") || permissions.includes("user:monitor_guild");
+  permissions.includes("monitor_guild");
 
 export const makeSheetAuthTokenGuildMonitorAuthorization = (
   sheetAuthTokenAuthorization: SheetAuthTokenAuthorization["Type"],

@@ -1,6 +1,7 @@
 import { BetterAuthClientPlugin } from "better-auth";
 import type { kubernetesOAuth } from "./index";
-export type { Permission } from "./index";
+export { PermissionValues } from "./shared";
+export type { Permission } from "./shared";
 
 export const kubernetesOAuthClient = () => {
   return {

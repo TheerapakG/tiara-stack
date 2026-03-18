@@ -5,6 +5,7 @@ import { GuildConfigApi } from "./handlers/guildConfig/api";
 import { MessageCheckinApi } from "./handlers/messageCheckin/api";
 import { MessageRoomOrderApi } from "./handlers/messageRoomOrder/api";
 import { MessageSlotApi } from "./handlers/messageSlot/api";
+import { PermissionsApi } from "./handlers/permissions/api";
 import { SheetApi, SheetMonitorApi } from "./handlers/sheet/api";
 import { MonitorApi } from "./handlers/monitor/api";
 import { PlayerApi } from "./handlers/player/api";
@@ -19,6 +20,7 @@ export class Api extends HttpApi.make("api")
   .add(MessageCheckinApi)
   .add(MessageRoomOrderApi)
   .add(MessageSlotApi)
+  .add(PermissionsApi)
   .add(SheetApi)
   .add(SheetMonitorApi)
   .add(MonitorApi)

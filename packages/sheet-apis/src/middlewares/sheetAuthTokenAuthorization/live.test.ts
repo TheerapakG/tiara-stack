@@ -1,5 +1,6 @@
 import { HttpServerRequest } from "@effect/platform";
-import type { MembersApiCacheView } from "dfx-discord-utils/discord";
+import { Discord } from "dfx";
+import type { MembersApiCacheView, RolesApiCacheView } from "dfx-discord-utils/discord";
 import { beforeEach, describe, expect, it } from "@effect/vitest";
 import { Cause, DateTime, Duration, Effect, Redacted, TestClock } from "effect";
 import { Account } from "sheet-auth/client";
@@ -7,13 +8,19 @@ import type { GuildConfigService } from "../../services";
 import { vi } from "vitest";
 import { makeSheetAuthTokenAuthorization } from "./shared";
 
-const { getAccountMock, getImplicitPermissionsMock, getGuildMonitorRolesMock, membersGetMock } =
-  vi.hoisted(() => ({
-    getAccountMock: vi.fn(),
-    getImplicitPermissionsMock: vi.fn(),
-    getGuildMonitorRolesMock: vi.fn(),
-    membersGetMock: vi.fn(),
-  }));
+const {
+  getAccountMock,
+  getImplicitPermissionsMock,
+  getGuildMonitorRolesMock,
+  membersGetMock,
+  rolesGetForParentMock,
+} = vi.hoisted(() => ({
+  getAccountMock: vi.fn(),
+  getImplicitPermissionsMock: vi.fn(),
+  getGuildMonitorRolesMock: vi.fn(),
+  membersGetMock: vi.fn(),
+  rolesGetForParentMock: vi.fn(),
+}));
 
 vi.mock("sheet-auth/client", async () => {
   const actual = await vi.importActual<typeof import("sheet-auth/client")>("sheet-auth/client");
@@ -32,11 +39,17 @@ const fakeGuildConfigService = {
 const fakeMembersCache = {
   get: membersGetMock,
 } as unknown as MembersApiCacheView;
+const fakeRolesCache = {
+  getForParent: rolesGetForParentMock,
+} as unknown as RolesApiCacheView;
 
 const makeAuthorization = () =>
-  makeSheetAuthTokenAuthorization(fakeAuthClient, fakeGuildConfigService, fakeMembersCache).pipe(
-    Effect.map((service) => service.sheetAuthToken),
-  );
+  makeSheetAuthTokenAuthorization(
+    fakeAuthClient,
+    fakeGuildConfigService,
+    fakeMembersCache,
+    fakeRolesCache,
+  ).pipe(Effect.map((service) => service.sheetAuthToken));
 
 const withSearchParams = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
@@ -58,6 +71,18 @@ const makeAccount = Effect.fnUntraced(function* (userId: string) {
   });
 });
 
+const makeMember = (roles: string[]) =>
+  ({
+    roles,
+    user: { id: "account-user-1" },
+  }) as const;
+
+const makeRole = (id: string, permissions: bigint | string) =>
+  ({
+    id,
+    permissions: permissions.toString(),
+  }) as const;
+
 describe("SheetAuthTokenAuthorizationLive", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -67,7 +92,7 @@ describe("SheetAuthTokenAuthorizationLive", () => {
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(
-        Effect.succeed({ permissions: ["bot:monitor_guild"] }),
+        Effect.succeed({ permissions: ["bot", "monitor_guild", "manage_guild"] }),
       );
 
       const sheetAuthToken = yield* makeAuthorization();
@@ -78,7 +103,7 @@ describe("SheetAuthTokenAuthorizationLive", () => {
 
       expect(first).toEqual({
         userId: "user-1",
-        permissions: ["bot:monitor_guild"],
+        permissions: ["bot", "monitor_guild", "manage_guild"],
         token,
       });
       expect(second).toEqual(first);
@@ -86,14 +111,12 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       expect(getImplicitPermissionsMock).toHaveBeenCalledTimes(1);
     }));
 
-  it("short-circuits guild lookups when bot monitor permission is present", () =>
+  it("short-circuits guild lookups when base permissions already contain guild capabilities", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(
-        Effect.succeed({ permissions: ["bot:monitor_guild"] }),
+        Effect.succeed({ permissions: ["bot", "monitor_guild", "manage_guild"] }),
       );
-      getGuildMonitorRolesMock.mockReturnValue(Effect.succeed([{ roleId: "role-1" }]));
-      membersGetMock.mockReturnValue(Effect.succeed({ roles: ["role-1"] }));
 
       const sheetAuthToken = yield* makeAuthorization();
       const token = Redacted.make("token-1");
@@ -103,6 +126,7 @@ describe("SheetAuthTokenAuthorizationLive", () => {
 
       expect(getGuildMonitorRolesMock).not.toHaveBeenCalled();
       expect(membersGetMock).not.toHaveBeenCalled();
+      expect(rolesGetForParentMock).not.toHaveBeenCalled();
     }));
 
   it("uses distinct cache entries for distinct tokens", () =>
@@ -140,8 +164,6 @@ describe("SheetAuthTokenAuthorizationLive", () => {
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
-      getGuildMonitorRolesMock.mockReturnValue(Effect.succeed([{ roleId: "role-1" }]));
-      membersGetMock.mockReturnValue(Effect.succeed({ roles: ["role-1"] }));
 
       const sheetAuthToken = yield* makeAuthorization();
       const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {});
@@ -149,45 +171,72 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       expect(result.permissions).toEqual([]);
       expect(getGuildMonitorRolesMock).not.toHaveBeenCalled();
       expect(membersGetMock).not.toHaveBeenCalled();
+      expect(rolesGetForParentMock).not.toHaveBeenCalled();
     }));
 
-  it("adds user monitor permission when the member has a configured monitor role", () =>
+  it("adds monitor permission when the member has a configured monitor role", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
       getGuildMonitorRolesMock.mockReturnValue(Effect.succeed([{ roleId: "role-1" }]));
-      membersGetMock.mockReturnValue(Effect.succeed({ roles: ["role-1", "role-2"] }));
+      membersGetMock.mockReturnValue(Effect.succeed(makeMember(["role-1", "role-2"])));
+      rolesGetForParentMock.mockReturnValue(Effect.succeed(new Map()));
 
       const sheetAuthToken = yield* makeAuthorization();
       const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
         guildId: "guild-1",
       });
 
-      expect(result.permissions).toEqual(["user:monitor_guild"]);
+      expect(result.permissions).toEqual(["monitor_guild"]);
       expect(getGuildMonitorRolesMock).toHaveBeenCalledWith("guild-1");
       expect(membersGetMock).toHaveBeenCalledWith("guild-1", "account-user-1");
     }));
 
-  it("does not add user monitor permission when the member is not a monitor", () =>
-    Effect.gen(function* () {
-      getAccountMock.mockReturnValue(makeAccount("user-1"));
-      getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
-      getGuildMonitorRolesMock.mockReturnValue(Effect.succeed([{ roleId: "role-1" }]));
-      membersGetMock.mockReturnValue(Effect.succeed({ roles: ["role-2"] }));
-
-      const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
-        guildId: "guild-1",
-      });
-
-      expect(result.permissions).toEqual([]);
-    }));
-
-  it("skips user monitor permission when no monitor roles are configured", () =>
+  it("adds manage guild permission when the member has manage guild", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
       getGuildMonitorRolesMock.mockReturnValue(Effect.succeed([]));
+      membersGetMock.mockReturnValue(Effect.succeed(makeMember(["role-2"])));
+      rolesGetForParentMock.mockReturnValue(
+        Effect.succeed(new Map([["role-2", makeRole("role-2", Discord.Permissions.ManageGuild)]])),
+      );
+
+      const sheetAuthToken = yield* makeAuthorization();
+      const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
+        guildId: "guild-1",
+      });
+
+      expect(result.permissions).toEqual(["manage_guild"]);
+    }));
+
+  it("derives monitor and manage guild permissions together", () =>
+    Effect.gen(function* () {
+      getAccountMock.mockReturnValue(makeAccount("user-1"));
+      getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
+      getGuildMonitorRolesMock.mockReturnValue(Effect.succeed([{ roleId: "role-1" }]));
+      membersGetMock.mockReturnValue(Effect.succeed(makeMember(["role-1", "role-2"])));
+      rolesGetForParentMock.mockReturnValue(
+        Effect.succeed(new Map([["role-2", makeRole("role-2", Discord.Permissions.ManageGuild)]])),
+      );
+
+      const sheetAuthToken = yield* makeAuthorization();
+      const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
+        guildId: "guild-1",
+      });
+
+      expect(result.permissions).toEqual(["monitor_guild", "manage_guild"]);
+    }));
+
+  it("does not add derived permissions when the member is not a monitor and lacks manage guild", () =>
+    Effect.gen(function* () {
+      getAccountMock.mockReturnValue(makeAccount("user-1"));
+      getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
+      getGuildMonitorRolesMock.mockReturnValue(Effect.succeed([{ roleId: "role-1" }]));
+      membersGetMock.mockReturnValue(Effect.succeed(makeMember(["role-2"])));
+      rolesGetForParentMock.mockReturnValue(
+        Effect.succeed(new Map([["role-2", makeRole("role-2", 0n)]])),
+      );
 
       const sheetAuthToken = yield* makeAuthorization();
       const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
@@ -195,10 +244,28 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       });
 
       expect(result.permissions).toEqual([]);
-      expect(membersGetMock).not.toHaveBeenCalled();
     }));
 
-  it("skips user monitor permission when member lookup fails", () =>
+  it("skips monitor permission when no monitor roles are configured", () =>
+    Effect.gen(function* () {
+      getAccountMock.mockReturnValue(makeAccount("user-1"));
+      getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
+      getGuildMonitorRolesMock.mockReturnValue(Effect.succeed([]));
+      membersGetMock.mockReturnValue(Effect.succeed(makeMember(["role-2"])));
+      rolesGetForParentMock.mockReturnValue(
+        Effect.succeed(new Map([["role-2", makeRole("role-2", 0n)]])),
+      );
+
+      const sheetAuthToken = yield* makeAuthorization();
+      const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
+        guildId: "guild-1",
+      });
+
+      expect(result.permissions).toEqual([]);
+      expect(membersGetMock).toHaveBeenCalledWith("guild-1", "account-user-1");
+    }));
+
+  it("skips derived permissions when member lookup fails", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
@@ -211,24 +278,44 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       });
 
       expect(result.permissions).toEqual([]);
+      expect(rolesGetForParentMock).not.toHaveBeenCalled();
     }));
 
-  it("skips user monitor permission when guild monitor role lookup fails", () =>
+  it("skips monitor permission when guild monitor role lookup fails", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
       getGuildMonitorRolesMock.mockReturnValue(Effect.fail(new Error("role lookup failed")));
+      membersGetMock.mockReturnValue(Effect.succeed(makeMember(["role-1", "role-2"])));
+      rolesGetForParentMock.mockReturnValue(
+        Effect.succeed(new Map([["role-2", makeRole("role-2", Discord.Permissions.ManageGuild)]])),
+      );
 
       const sheetAuthToken = yield* makeAuthorization();
       const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
         guildId: "guild-1",
       });
 
-      expect(result.permissions).toEqual([]);
-      expect(membersGetMock).not.toHaveBeenCalled();
+      expect(result.permissions).toEqual(["manage_guild"]);
     }));
 
-  it("does not cache guild-scoped monitor permission across requests", () =>
+  it("skips manage guild permission when role lookup fails", () =>
+    Effect.gen(function* () {
+      getAccountMock.mockReturnValue(makeAccount("user-1"));
+      getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
+      getGuildMonitorRolesMock.mockReturnValue(Effect.succeed([{ roleId: "role-1" }]));
+      membersGetMock.mockReturnValue(Effect.succeed(makeMember(["role-1", "role-2"])));
+      rolesGetForParentMock.mockReturnValue(Effect.fail(new Error("roles lookup failed")));
+
+      const sheetAuthToken = yield* makeAuthorization();
+      const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
+        guildId: "guild-1",
+      });
+
+      expect(result.permissions).toEqual(["monitor_guild"]);
+    }));
+
+  it("does not cache guild-scoped permissions across requests", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
@@ -239,8 +326,15 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       );
       membersGetMock.mockImplementation((guildId: string) =>
         guildId === "guild-1"
-          ? Effect.succeed({ roles: ["role-1"] })
-          : Effect.succeed({ roles: ["role-3"] }),
+          ? Effect.succeed(makeMember(["role-1"]))
+          : Effect.succeed(makeMember(["role-3"])),
+      );
+      rolesGetForParentMock.mockImplementation((guildId: string) =>
+        guildId === "guild-1"
+          ? Effect.succeed(
+              new Map([["role-1", makeRole("role-1", Discord.Permissions.ManageGuild)]]),
+            )
+          : Effect.succeed(new Map([["role-3", makeRole("role-3", 0n)]])),
       );
 
       const sheetAuthToken = yield* makeAuthorization();
@@ -249,12 +343,13 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       const first = yield* withSearchParams(sheetAuthToken(token), { guildId: "guild-1" });
       const second = yield* withSearchParams(sheetAuthToken(token), { guildId: "guild-2" });
 
-      expect(first.permissions).toEqual(["user:monitor_guild"]);
+      expect(first.permissions).toEqual(["monitor_guild", "manage_guild"]);
       expect(second.permissions).toEqual([]);
       expect(getAccountMock).toHaveBeenCalledTimes(1);
       expect(getImplicitPermissionsMock).toHaveBeenCalledTimes(1);
       expect(getGuildMonitorRolesMock).toHaveBeenCalledTimes(2);
       expect(membersGetMock).toHaveBeenCalledTimes(2);
+      expect(rolesGetForParentMock).toHaveBeenCalledTimes(2);
     }));
 
   it("maps account failures to Unauthorized", () =>

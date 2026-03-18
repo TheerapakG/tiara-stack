@@ -20,16 +20,26 @@ const authorize = (permissions: Permission[]) =>
   });
 
 describe("SheetAuthTokenGuildMonitorAuthorizationLive", () => {
-  it("allows bot monitor permission", () =>
+  it("allows monitor permission", () =>
     Effect.gen(function* () {
-      const result = yield* authorize(["bot:monitor_guild"]);
-      expect(result.permissions).toEqual(["bot:monitor_guild"]);
+      const result = yield* authorize(["monitor_guild"]);
+      expect(result.permissions).toEqual(["monitor_guild"]);
     }));
 
-  it("allows user monitor permission", () =>
+  it("rejects bot identity without monitor permission", () =>
     Effect.gen(function* () {
-      const result = yield* authorize(["user:monitor_guild"]);
-      expect(result.permissions).toEqual(["user:monitor_guild"]);
+      const exit = yield* Effect.exit(authorize(["bot"]));
+
+      expect(exit._tag).toBe("Failure");
+      if (exit._tag === "Failure") {
+        const failure = Cause.failureOption(exit.cause);
+        expect(failure._tag).toBe("Some");
+        if (failure._tag === "Some") {
+          expect((failure.value as { message: string }).message).toContain(
+            "User is not a guild monitor",
+          );
+        }
+      }
     }));
 
   it("rejects when no monitor permission is present", () =>
