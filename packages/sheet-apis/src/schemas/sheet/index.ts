@@ -3,6 +3,13 @@ export { RawMonitor } from "./rawMonitor";
 export { RawSchedulePlayer } from "./rawSchedulePlayer";
 export { Team } from "./team";
 export { BreakSchedule, Schedule, makeSchedule } from "./schedule";
+export {
+  ScheduleView,
+  ScheduleResponse,
+  PopulatedScheduleResponse,
+  getMaximumScheduleView,
+  getEffectiveScheduleView,
+} from "./scheduleView";
 export { Monitor, PartialIdMonitor, PartialNameMonitor } from "./monitor";
 export { Player, PartialIdPlayer, PartialNamePlayer } from "./player";
 export { PlayerTeam } from "./playerTeam";

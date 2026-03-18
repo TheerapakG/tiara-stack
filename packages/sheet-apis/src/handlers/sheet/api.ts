@@ -11,10 +11,8 @@ import {
   ScheduleConfig,
   TeamConfig,
 } from "@/schemas/sheetConfig";
-import { RawPlayer, RawMonitor, Team, BreakSchedule, Schedule } from "@/schemas/sheet";
+import { RawPlayer, RawMonitor, Team, ScheduleResponse, ScheduleView } from "@/schemas/sheet";
 import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthorization/tag";
-import { SheetAuthTokenGuildMonitorAuthorization } from "@/middlewares/sheetAuthTokenGuildMonitorAuthorization/tag";
-import { Unauthorized } from "@/schemas/middlewares/unauthorized";
 
 const SheetError = Schema.Union(
   GoogleSheetsError,
@@ -24,14 +22,7 @@ const SheetError = Schema.Union(
   QueryResultError,
 );
 
-const SheetMonitorError = Schema.Union(
-  GoogleSheetsError,
-  ParserFieldError,
-  SheetConfigError,
-  ValidationError,
-  QueryResultError,
-  Unauthorized,
-);
+const ScheduleViewUrlParam = Schema.optional(ScheduleView);
 
 export class SheetApi extends HttpApiGroup.make("sheet")
   .add(
@@ -53,21 +44,33 @@ export class SheetApi extends HttpApiGroup.make("sheet")
       .addError(SheetError),
   )
   .add(
-    HttpApiEndpoint.get("getAllFillerSchedules", "/sheet/getAllFillerSchedules")
-      .setUrlParams(Schema.Struct({ guildId: Schema.String }))
-      .addSuccess(Schema.Array(Schema.Union(BreakSchedule, Schedule)))
+    HttpApiEndpoint.get("getAllSchedules", "/sheet/getAllSchedules")
+      .setUrlParams(Schema.Struct({ guildId: Schema.String, view: ScheduleViewUrlParam }))
+      .addSuccess(ScheduleResponse)
       .addError(SheetError),
   )
   .add(
-    HttpApiEndpoint.get("getDayFillerSchedules", "/sheet/getDayFillerSchedules")
-      .setUrlParams(Schema.Struct({ guildId: Schema.String, day: Schema.NumberFromString }))
-      .addSuccess(Schema.Array(Schema.Union(BreakSchedule, Schedule)))
+    HttpApiEndpoint.get("getDaySchedules", "/sheet/getDaySchedules")
+      .setUrlParams(
+        Schema.Struct({
+          guildId: Schema.String,
+          day: Schema.NumberFromString,
+          view: ScheduleViewUrlParam,
+        }),
+      )
+      .addSuccess(ScheduleResponse)
       .addError(SheetError),
   )
   .add(
-    HttpApiEndpoint.get("getChannelFillerSchedules", "/sheet/getChannelFillerSchedules")
-      .setUrlParams(Schema.Struct({ guildId: Schema.String, channel: Schema.String }))
-      .addSuccess(Schema.Array(Schema.Union(BreakSchedule, Schedule)))
+    HttpApiEndpoint.get("getChannelSchedules", "/sheet/getChannelSchedules")
+      .setUrlParams(
+        Schema.Struct({
+          guildId: Schema.String,
+          channel: Schema.String,
+          view: ScheduleViewUrlParam,
+        }),
+      )
+      .addSuccess(ScheduleResponse)
       .addError(SheetError),
   )
   .add(
@@ -103,26 +106,3 @@ export class SheetApi extends HttpApiGroup.make("sheet")
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Sheet")
   .annotate(OpenApi.Description, "Sheet data endpoints") {}
-
-export class SheetMonitorApi extends HttpApiGroup.make("sheetMonitor")
-  .add(
-    HttpApiEndpoint.get("getAllMonitorSchedules", "/sheet/getAllMonitorSchedules")
-      .setUrlParams(Schema.Struct({ guildId: Schema.String }))
-      .addSuccess(Schema.Array(Schema.Union(BreakSchedule, Schedule)))
-      .addError(SheetMonitorError),
-  )
-  .add(
-    HttpApiEndpoint.get("getDayMonitorSchedules", "/sheet/getDayMonitorSchedules")
-      .setUrlParams(Schema.Struct({ guildId: Schema.String, day: Schema.NumberFromString }))
-      .addSuccess(Schema.Array(Schema.Union(BreakSchedule, Schedule)))
-      .addError(SheetMonitorError),
-  )
-  .add(
-    HttpApiEndpoint.get("getChannelMonitorSchedules", "/sheet/getChannelMonitorSchedules")
-      .setUrlParams(Schema.Struct({ guildId: Schema.String, channel: Schema.String }))
-      .addSuccess(Schema.Array(Schema.Union(BreakSchedule, Schedule)))
-      .addError(SheetMonitorError),
-  )
-  .middleware(SheetAuthTokenGuildMonitorAuthorization)
-  .annotate(OpenApi.Title, "Sheet Monitor")
-  .annotate(OpenApi.Description, "Sheet monitor-only data endpoints") {}

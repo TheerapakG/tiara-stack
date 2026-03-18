@@ -12,11 +12,11 @@ import { MessageCheckinLive } from "./handlers/messageCheckin";
 import { MessageRoomOrderLive } from "./handlers/messageRoomOrder";
 import { MessageSlotLive } from "./handlers/messageSlot";
 import { PermissionsLive } from "./handlers/permissions";
-import { SheetLive, SheetMonitorLive } from "./handlers/sheet";
+import { SheetLive } from "./handlers/sheet";
 import { MonitorLive } from "./handlers/monitor";
 import { PlayerLive } from "./handlers/player";
 import { ScreenshotLive } from "./handlers/screenshot";
-import { ScheduleLive, ScheduleMonitorLive } from "./handlers/schedule";
+import { ScheduleLive } from "./handlers/schedule";
 import { DiscordLive } from "./handlers/discord";
 import { CacheLive } from "./services/cache";
 
@@ -29,12 +29,10 @@ const ApiLive = Layer.provide(HttpApiBuilder.api(Api), [
   MessageSlotLive,
   PermissionsLive,
   SheetLive,
-  SheetMonitorLive,
   MonitorLive,
   PlayerLive,
   ScreenshotLive,
   ScheduleLive,
-  ScheduleMonitorLive,
   DiscordLive,
 ]);
 

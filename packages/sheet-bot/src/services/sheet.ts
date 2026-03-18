@@ -32,33 +32,45 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
       ),
       // Filler schedules - filtered by visible, with fill/overfill/standby/runners cleared
       getAllFillerSchedules: Effect.fn("Sheet.getAllFillerSchedules")((guildId: string) =>
-        sheetApisClient.get().sheet.getAllFillerSchedules({ urlParams: { guildId } }),
+        sheetApisClient
+          .get()
+          .sheet.getAllSchedules({ urlParams: { guildId, view: "filler" } })
+          .pipe(Effect.map(({ schedules }) => schedules)),
       ),
       getDayFillerSchedules: Effect.fn("Sheet.getDayFillerSchedules")(
         (guildId: string, day: number) =>
-          sheetApisClient.get().sheet.getDayFillerSchedules({ urlParams: { guildId, day } }),
+          sheetApisClient
+            .get()
+            .sheet.getDaySchedules({ urlParams: { guildId, day, view: "filler" } })
+            .pipe(Effect.map(({ schedules }) => schedules)),
       ),
       getChannelFillerSchedules: Effect.fn("Sheet.getChannelFillerSchedules")(
         (guildId: string, channel: string) =>
           sheetApisClient
             .get()
-            .sheet.getChannelFillerSchedules({ urlParams: { guildId, channel } }),
+            .sheet.getChannelSchedules({ urlParams: { guildId, channel, view: "filler" } })
+            .pipe(Effect.map(({ schedules }) => schedules)),
       ),
       // Monitor schedules - full access, requires monitor authorization
       getAllMonitorSchedules: Effect.fn("Sheet.getAllMonitorSchedules")((guildId: string) =>
-        sheetApisClient.get().sheetMonitor.getAllMonitorSchedules({ urlParams: { guildId } }),
+        sheetApisClient
+          .get()
+          .sheet.getAllSchedules({ urlParams: { guildId, view: "monitor" } })
+          .pipe(Effect.map(({ schedules }) => schedules)),
       ),
       getDayMonitorSchedules: Effect.fn("Sheet.getDayMonitorSchedules")(
         (guildId: string, day: number) =>
           sheetApisClient
             .get()
-            .sheetMonitor.getDayMonitorSchedules({ urlParams: { guildId, day } }),
+            .sheet.getDaySchedules({ urlParams: { guildId, day, view: "monitor" } })
+            .pipe(Effect.map(({ schedules }) => schedules)),
       ),
       getChannelMonitorSchedules: Effect.fn("Sheet.getChannelMonitorSchedules")(
         (guildId: string, channel: string) =>
           sheetApisClient
             .get()
-            .sheetMonitor.getChannelMonitorSchedules({ urlParams: { guildId, channel } }),
+            .sheet.getChannelSchedules({ urlParams: { guildId, channel, view: "monitor" } })
+            .pipe(Effect.map(({ schedules }) => schedules)),
       ),
     })),
     Effect.flatMap((sheetMethods) =>

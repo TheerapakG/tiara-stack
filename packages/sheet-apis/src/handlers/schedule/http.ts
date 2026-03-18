@@ -4,7 +4,12 @@ import { Api } from "@/api";
 import { ScheduleService } from "@/services/schedule";
 import { GuildConfigService } from "@/services/guildConfig";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
-import { SheetAuthTokenGuildMonitorAuthorizationLive } from "@/middlewares/sheetAuthTokenGuildMonitorAuthorization/live";
+import {
+  getEffectiveScheduleView,
+  getMaximumScheduleView,
+  type ScheduleView,
+} from "@/schemas/sheet";
+import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
 
 const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigService) =>
   pipe(
@@ -24,6 +29,14 @@ const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigS
     ),
   );
 
+const resolveScheduleView = (requestedView?: ScheduleView) =>
+  pipe(
+    SheetAuthUser,
+    Effect.map((user) =>
+      getEffectiveScheduleView(getMaximumScheduleView(user.permissions), requestedView),
+    ),
+  );
+
 export const ScheduleLive = HttpApiBuilder.group(Api, "schedule", (handlers) =>
   pipe(
     Effect.all({
@@ -32,25 +45,45 @@ export const ScheduleLive = HttpApiBuilder.group(Api, "schedule", (handlers) =>
     }),
     Effect.map(({ scheduleService, guildConfigService }) =>
       handlers
-        .handle("getAllPopulatedFillerSchedules", ({ urlParams }) =>
+        .handle("getAllPopulatedSchedules", ({ urlParams }) =>
           pipe(
-            getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-            Effect.flatMap((sheetId) => scheduleService.getAllPopulatedFillerSchedules(sheetId)),
-          ),
-        )
-        .handle("getDayPopulatedFillerSchedules", ({ urlParams }) =>
-          pipe(
-            getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-            Effect.flatMap((sheetId) =>
-              scheduleService.getDayPopulatedFillerSchedules(sheetId, urlParams.day),
+            Effect.all({
+              sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
+              view: resolveScheduleView(urlParams.view),
+            }),
+            Effect.flatMap(({ sheetId, view }) =>
+              (view === "monitor"
+                ? scheduleService.getAllPopulatedSchedules(sheetId)
+                : scheduleService.getAllPopulatedFillerSchedules(sheetId)
+              ).pipe(Effect.map((schedules) => ({ schedules, view }))),
             ),
           ),
         )
-        .handle("getChannelPopulatedFillerSchedules", ({ urlParams }) =>
+        .handle("getDayPopulatedSchedules", ({ urlParams }) =>
           pipe(
-            getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-            Effect.flatMap((sheetId) =>
-              scheduleService.getChannelPopulatedFillerSchedules(sheetId, urlParams.channel),
+            Effect.all({
+              sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
+              view: resolveScheduleView(urlParams.view),
+            }),
+            Effect.flatMap(({ sheetId, view }) =>
+              (view === "monitor"
+                ? scheduleService.getDayPopulatedSchedules(sheetId, urlParams.day)
+                : scheduleService.getDayPopulatedFillerSchedules(sheetId, urlParams.day)
+              ).pipe(Effect.map((schedules) => ({ schedules, view }))),
+            ),
+          ),
+        )
+        .handle("getChannelPopulatedSchedules", ({ urlParams }) =>
+          pipe(
+            Effect.all({
+              sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
+              view: resolveScheduleView(urlParams.view),
+            }),
+            Effect.flatMap(({ sheetId, view }) =>
+              (view === "monitor"
+                ? scheduleService.getChannelPopulatedSchedules(sheetId, urlParams.channel)
+                : scheduleService.getChannelPopulatedFillerSchedules(sheetId, urlParams.channel)
+              ).pipe(Effect.map((schedules) => ({ schedules, view }))),
             ),
           ),
         ),
@@ -62,48 +95,6 @@ export const ScheduleLive = HttpApiBuilder.group(Api, "schedule", (handlers) =>
       ScheduleService.Default,
       GuildConfigService.Default,
       SheetAuthTokenAuthorizationLive,
-    ),
-  ),
-);
-
-export const ScheduleMonitorLive = HttpApiBuilder.group(Api, "scheduleMonitor", (handlers) =>
-  pipe(
-    Effect.all({
-      scheduleService: ScheduleService,
-      guildConfigService: GuildConfigService,
-    }),
-    Effect.map(({ scheduleService, guildConfigService }) =>
-      handlers
-        .handle("getAllPopulatedMonitorSchedules", ({ urlParams }) =>
-          pipe(
-            getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-            Effect.flatMap((sheetId) => scheduleService.getAllPopulatedSchedules(sheetId)),
-          ),
-        )
-        .handle("getDayPopulatedMonitorSchedules", ({ urlParams }) =>
-          pipe(
-            getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-            Effect.flatMap((sheetId) =>
-              scheduleService.getDayPopulatedSchedules(sheetId, urlParams.day),
-            ),
-          ),
-        )
-        .handle("getChannelPopulatedMonitorSchedules", ({ urlParams }) =>
-          pipe(
-            getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-            Effect.flatMap((sheetId) =>
-              scheduleService.getChannelPopulatedSchedules(sheetId, urlParams.channel),
-            ),
-          ),
-        ),
-    ),
-  ),
-).pipe(
-  Layer.provide(
-    Layer.mergeAll(
-      ScheduleService.Default,
-      GuildConfigService.Default,
-      SheetAuthTokenGuildMonitorAuthorizationLive,
     ),
   ),
 );

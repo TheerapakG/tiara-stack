@@ -6,11 +6,11 @@ import { MessageCheckinApi } from "./handlers/messageCheckin/api";
 import { MessageRoomOrderApi } from "./handlers/messageRoomOrder/api";
 import { MessageSlotApi } from "./handlers/messageSlot/api";
 import { PermissionsApi } from "./handlers/permissions/api";
-import { SheetApi, SheetMonitorApi } from "./handlers/sheet/api";
+import { SheetApi } from "./handlers/sheet/api";
 import { MonitorApi } from "./handlers/monitor/api";
 import { PlayerApi } from "./handlers/player/api";
 import { ScreenshotApi } from "./handlers/screenshot/api";
-import { ScheduleApi, ScheduleMonitorApi } from "./handlers/schedule/api";
+import { ScheduleApi } from "./handlers/schedule/api";
 import { DiscordApi } from "./handlers/discord/api";
 
 export class Api extends HttpApi.make("api")
@@ -22,11 +22,9 @@ export class Api extends HttpApi.make("api")
   .add(MessageSlotApi)
   .add(PermissionsApi)
   .add(SheetApi)
-  .add(SheetMonitorApi)
   .add(MonitorApi)
   .add(PlayerApi)
   .add(ScreenshotApi)
   .add(ScheduleApi)
-  .add(ScheduleMonitorApi)
   .add(DiscordApi)
   .annotate(OpenApi.Title, "Sheet APIs") {}
