@@ -168,10 +168,9 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
           ),
           Effect.andThen((mutation) => mutation.server()),
           Effect.andThen(
-            ZeroService.run(
-              queries.guildConfig.getGuildRunningChannelById({ guildId, channelId }),
-              { type: "complete" },
-            ),
+            ZeroService.run(queries.guildConfig.getGuildChannelById({ guildId, channelId }), {
+              type: "complete",
+            }),
           ),
           Effect.provide(zeroContext),
           Effect.flatMap(
@@ -190,12 +189,17 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
             captureStackTrace: true,
           }),
         ),
-      getGuildRunningChannelById: (params: { guildId: string; channelId: string }) =>
+      getGuildChannelById: (params: {
+        guildId: string;
+        channelId: string;
+        running?: boolean | undefined;
+      }) =>
         pipe(
           ZeroService.run(
-            queries.guildConfig.getGuildRunningChannelById({
+            queries.guildConfig.getGuildChannelById({
               guildId: params.guildId,
               channelId: params.channelId,
+              ...(typeof params.running === "undefined" ? {} : { running: params.running }),
             }),
             { type: "complete" },
           ),
@@ -206,16 +210,21 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
             ),
           ),
           catchParseErrorAsValidationError,
-          Effect.withSpan("GuildConfigService.getGuildRunningChannelById", {
+          Effect.withSpan("GuildConfigService.getGuildChannelById", {
             captureStackTrace: true,
           }),
         ),
-      getGuildRunningChannelByName: (params: { guildId: string; channelName: string }) =>
+      getGuildChannelByName: (params: {
+        guildId: string;
+        channelName: string;
+        running?: boolean | undefined;
+      }) =>
         pipe(
           ZeroService.run(
-            queries.guildConfig.getGuildRunningChannelByName({
+            queries.guildConfig.getGuildChannelByName({
               guildId: params.guildId,
               channelName: params.channelName,
+              ...(typeof params.running === "undefined" ? {} : { running: params.running }),
             }),
             { type: "complete" },
           ),
@@ -226,7 +235,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
             ),
           ),
           catchParseErrorAsValidationError,
-          Effect.withSpan("GuildConfigService.getGuildRunningChannelByName", {
+          Effect.withSpan("GuildConfigService.getGuildChannelByName", {
             captureStackTrace: true,
           }),
         ),

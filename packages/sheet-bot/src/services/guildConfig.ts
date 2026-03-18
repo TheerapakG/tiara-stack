@@ -64,17 +64,25 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
         (scriptId: string) =>
           sheetApisClient.get().guildConfig.getGuildConfigByScriptId({ urlParams: { scriptId } }),
       ),
-      getGuildRunningChannelById: Effect.fn("GuildConfigService.getGuildRunningChannelById")(
-        (guildId: string, channelId: string) =>
-          sheetApisClient
-            .get()
-            .guildConfig.getGuildRunningChannelById({ urlParams: { guildId, channelId } }),
+      getGuildChannelById: Effect.fn("GuildConfigService.getGuildChannelById")(
+        (guildId: string, channelId: string, running?: boolean | undefined) =>
+          sheetApisClient.get().guildConfig.getGuildChannelById({
+            urlParams: {
+              guildId,
+              channelId,
+              ...(typeof running === "undefined" ? {} : { running }),
+            },
+          }),
       ),
-      getGuildRunningChannelByName: Effect.fn("GuildConfigService.getGuildRunningChannelByName")(
-        (guildId: string, channelName: string) =>
-          sheetApisClient
-            .get()
-            .guildConfig.getGuildRunningChannelByName({ urlParams: { guildId, channelName } }),
+      getGuildChannelByName: Effect.fn("GuildConfigService.getGuildChannelByName")(
+        (guildId: string, channelName: string, running?: boolean | undefined) =>
+          sheetApisClient.get().guildConfig.getGuildChannelByName({
+            urlParams: {
+              guildId,
+              channelName,
+              ...(typeof running === "undefined" ? {} : { running }),
+            },
+          }),
       ),
     })),
   ),

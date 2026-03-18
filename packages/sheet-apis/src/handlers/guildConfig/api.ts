@@ -95,22 +95,24 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
       .addError(Schema.Union(ValidationError, QueryResultError)),
   )
   .add(
-    HttpApiEndpoint.get("getGuildRunningChannelById", "/guildConfig/getGuildRunningChannelById")
+    HttpApiEndpoint.get("getGuildChannelById", "/guildConfig/getGuildChannelById")
       .setUrlParams(
         Schema.Struct({
           guildId: Schema.String,
           channelId: Schema.String,
+          running: Schema.optional(Schema.BooleanFromString),
         }),
       )
       .addSuccess(GuildChannelConfig)
       .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
   )
   .add(
-    HttpApiEndpoint.get("getGuildRunningChannelByName", "/guildConfig/getGuildRunningChannelByName")
+    HttpApiEndpoint.get("getGuildChannelByName", "/guildConfig/getGuildChannelByName")
       .setUrlParams(
         Schema.Struct({
           guildId: Schema.String,
           channelName: Schema.String,
+          running: Schema.optional(Schema.BooleanFromString),
         }),
       )
       .addSuccess(GuildChannelConfig)

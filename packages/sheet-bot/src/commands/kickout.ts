@@ -93,7 +93,7 @@ const makeManualSubCommand = Effect.gen(function* () {
       const runningChannel = yield* channelNameOption.pipe(
         Option.match({
           onSome: (channelName) =>
-            guildConfigService.getGuildRunningChannelByName(guildId, channelName),
+            guildConfigService.getGuildChannelByName(guildId, channelName, true),
           onNone: () =>
             Interaction.channel().pipe(
               Effect.flatMap((channel) =>
@@ -101,7 +101,7 @@ const makeManualSubCommand = Effect.gen(function* () {
                   Option.map((c) => c.id),
                   Option.match({
                     onSome: (channelId) =>
-                      guildConfigService.getGuildRunningChannelById(guildId, channelId),
+                      guildConfigService.getGuildChannelById(guildId, channelId, true),
                     onNone: () => Effect.fail(new Error("Channel not found in interaction")),
                   }),
                 ),

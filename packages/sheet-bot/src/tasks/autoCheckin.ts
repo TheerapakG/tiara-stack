@@ -149,9 +149,10 @@ const processChannel = Effect.fn("processChannel")(function* (
   hour: number,
   channelName: string,
 ) {
-  const runningChannel = yield* GuildConfigService.getGuildRunningChannelByName(
+  const runningChannel = yield* GuildConfigService.getGuildChannelByName(
     guildId,
     channelName,
+    true,
   );
 
   const checkinChannelId = Option.getOrElse(

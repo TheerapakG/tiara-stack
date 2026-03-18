@@ -74,7 +74,7 @@ const makeListConfigSubCommand = Effect.gen(function* () {
         Option.getOrThrow,
       );
 
-      const config = yield* guildConfigService.getGuildRunningChannelById(guildId, channelId);
+      const config = yield* guildConfigService.getGuildChannelById(guildId, channelId);
 
       yield* command.editReply({
         payload: {

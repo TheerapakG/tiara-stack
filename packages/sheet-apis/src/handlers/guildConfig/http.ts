@@ -62,11 +62,12 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
             payload.config,
           ),
         )
-        .handle("getGuildRunningChannelById", ({ urlParams }) =>
+        .handle("getGuildChannelById", ({ urlParams }) =>
           pipe(
-            guildConfigService.getGuildRunningChannelById({
+            guildConfigService.getGuildChannelById({
               guildId: urlParams.guildId,
               channelId: urlParams.channelId,
+              running: urlParams.running,
             }),
             Effect.flatMap(
               Option.match({
@@ -74,18 +75,21 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
                 onNone: () =>
                   Effect.fail(
                     makeArgumentError(
-                      "Cannot get running channel by id, the guild or the channel id might not be registered",
+                      typeof urlParams.running === "undefined"
+                        ? "Cannot get channel by id, the guild or the channel id might not be registered"
+                        : "Cannot get channel by id, the guild or the channel id might not be registered or does not match the specified running status",
                     ),
                   ),
               }),
             ),
           ),
         )
-        .handle("getGuildRunningChannelByName", ({ urlParams }) =>
+        .handle("getGuildChannelByName", ({ urlParams }) =>
           pipe(
-            guildConfigService.getGuildRunningChannelByName({
+            guildConfigService.getGuildChannelByName({
               guildId: urlParams.guildId,
               channelName: urlParams.channelName,
+              running: urlParams.running,
             }),
             Effect.flatMap(
               Option.match({
@@ -93,7 +97,9 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
                 onNone: () =>
                   Effect.fail(
                     makeArgumentError(
-                      "Cannot get running channel by name, the guild or the channel name might not be registered",
+                      typeof urlParams.running === "undefined"
+                        ? "Cannot get channel by name, the guild or the channel name might not be registered"
+                        : "Cannot get channel by name, the guild or the channel name might not be registered or does not match the specified running status",
                     ),
                   ),
               }),

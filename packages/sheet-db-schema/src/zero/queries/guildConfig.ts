@@ -21,30 +21,40 @@ export const guildConfig = {
     ({ args: { guildId } }) =>
       builder.configGuildManagerRole.where("guildId", "=", guildId).where("deletedAt", "IS", null),
   ),
-  getGuildRunningChannelById: defineQuery(
+  getGuildChannelById: defineQuery(
     pipe(
-      Schema.Struct({ guildId: Schema.String, channelId: Schema.String }),
+      Schema.Struct({
+        guildId: Schema.String,
+        channelId: Schema.String,
+        running: Schema.optional(Schema.Boolean),
+      }),
       Schema.standardSchemaV1,
     ),
-    ({ args: { guildId, channelId } }) =>
-      builder.configGuildChannel
+    ({ args: { guildId, channelId, running } }) => {
+      const query = builder.configGuildChannel
         .where("guildId", "=", guildId)
         .where("channelId", "=", channelId)
-        .where("running", "=", true)
-        .where("deletedAt", "IS", null)
-        .one(),
+        .where("deletedAt", "IS", null);
+
+      return (typeof running === "undefined" ? query : query.where("running", "=", running)).one();
+    },
   ),
-  getGuildRunningChannelByName: defineQuery(
+  getGuildChannelByName: defineQuery(
     pipe(
-      Schema.Struct({ guildId: Schema.String, channelName: Schema.String }),
+      Schema.Struct({
+        guildId: Schema.String,
+        channelName: Schema.String,
+        running: Schema.optional(Schema.Boolean),
+      }),
       Schema.standardSchemaV1,
     ),
-    ({ args: { guildId, channelName } }) =>
-      builder.configGuildChannel
+    ({ args: { guildId, channelName, running } }) => {
+      const query = builder.configGuildChannel
         .where("guildId", "=", guildId)
         .where("name", "=", channelName)
-        .where("running", "=", true)
-        .where("deletedAt", "IS", null)
-        .one(),
+        .where("deletedAt", "IS", null);
+
+      return (typeof running === "undefined" ? query : query.where("running", "=", running)).one();
+    },
   ),
 };
