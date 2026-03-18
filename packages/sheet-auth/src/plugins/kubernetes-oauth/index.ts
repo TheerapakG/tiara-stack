@@ -11,7 +11,7 @@ const KUBERNETES_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/tok
 const KUBERNETES_JWKS_URL = "https://kubernetes.default.svc.cluster.local/openid/v1/jwks";
 export const DISCORD_BOT_USER_ID_SENTINEL = "discord_bot_user";
 
-export type Permission = "bot:manage_guild";
+export type Permission = "bot:monitor_guild" | "user:monitor_guild";
 
 function readKubernetesToken(): string {
   try {
@@ -203,7 +203,7 @@ export function kubernetesOAuth(options: KubernetesOAuthOptions) {
             (account) => account.providerId === "kubernetes:discord",
           );
           if (kubernetesAccount?.accountId === DISCORD_BOT_USER_ID_SENTINEL) {
-            permissions.push("bot:manage_guild");
+            permissions.push("bot:monitor_guild");
           }
 
           return ctx.json({
