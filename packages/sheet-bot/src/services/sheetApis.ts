@@ -125,7 +125,9 @@ export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApi
             }),
           ),
           Effect.map(({ token }) =>
-            token ? HttpClientRequest.bearerToken(request, Redacted.value(token)) : request,
+            token
+              ? HttpClientRequest.bearerToken(request, encodeURIComponent(Redacted.value(token)))
+              : request,
           ),
           Effect.catchAll((err) =>
             pipe(

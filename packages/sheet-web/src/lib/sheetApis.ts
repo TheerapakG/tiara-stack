@@ -43,7 +43,7 @@ const AuthClientLive = Effect.gen(function* () {
         Option.match(session, {
           onSome: (session) =>
             session.token
-              ? HttpClientRequest.bearerToken(Redacted.value(session.token))
+              ? HttpClientRequest.bearerToken(encodeURIComponent(Redacted.value(session.token)))
               : Function.identity<HttpClientRequest.HttpClientRequest>,
           onNone: () => Function.identity<HttpClientRequest.HttpClientRequest>,
         }),
