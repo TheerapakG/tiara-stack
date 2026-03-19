@@ -17,8 +17,9 @@ import {
 import { Sheet } from "sheet-apis/schema";
 import { eventConfigAtom, useEventConfig } from "#/lib/sheet";
 import { useTimeZone } from "#/hooks/useTimeZone";
-import { useZonedOrNow } from "#/hooks/useDateTimeZoned";
+import { useCurrentDateTime, useZonedOrNow } from "#/hooks/useDateTimeZoned";
 import { currentUserAtom, useCurrentUser } from "#/lib/discord";
+import { cn } from "#/lib/utils";
 import {
   buildSharedDayLayoutId,
   calendarRestTransition,
@@ -125,8 +126,14 @@ function DailyScheduleContent() {
   const timeZone = useTimeZone();
   const search = Route.useSearch();
   const parentRef = useRef<HTMLDivElement>(null);
+  const currentDateTime = useCurrentDateTime();
 
   const currentDate = useZonedOrNow(timeZone, search.timestamp);
+  const liveNow = useMemo(
+    () => DateTime.setZone(currentDateTime, timeZone),
+    [currentDateTime, timeZone],
+  );
+  const currentHourKey = useMemo(() => DateTime.startOf(liveNow, "hour"), [liveNow]);
 
   // Load schedules and eventConfig
   const allSchedules = useGuildSchedule(guildId);
@@ -295,6 +302,7 @@ function DailyScheduleContent() {
                 maxHour={maxScheduleHour}
                 dayByScheduleHour={dayByScheduleHour}
                 currentUserId={currentUserId}
+                currentHourKey={currentHourKey}
               />
             </div>
           );
@@ -311,6 +319,7 @@ interface BreakRowProps {
   isScheduleDayBoundary: boolean;
   dateTimeParts: DateTime.DateTime.Parts;
   isDateTimeBoundary: boolean;
+  isCurrentHour: boolean;
 }
 
 function BreakRow({
@@ -319,22 +328,45 @@ function BreakRow({
   isScheduleDayBoundary,
   dateTimeParts,
   isDateTimeBoundary,
+  isCurrentHour,
 }: BreakRowProps) {
   return (
-    <div className="grid grid-cols-[140px_1fr] border-b border-[#33ccbb]/10 last:border-b-0 opacity-40">
+    <div
+      className={cn(
+        "grid grid-cols-[140px_1fr] border-b border-[#33ccbb]/10 last:border-b-0",
+        isCurrentHour ? "bg-[#33ccbb]" : "opacity-40",
+      )}
+    >
       {/* Left Side - Hour */}
       <div
-        className={`border-r border-[#33ccbb]/10 p-3 h-[44px] flex flex-col items-end justify-center bg-[#0f1615]/50 ${
-          isDateTimeBoundary ? "border-t-2 border-t-[#33ccbb]/40" : ""
-        }`}
+        className={cn(
+          "border-r p-3 h-[44px] flex flex-col items-end justify-center",
+          isCurrentHour
+            ? "border-[#041311]/15 bg-[#2fc0b2]"
+            : "border-[#33ccbb]/10 bg-[#0f1615]/50",
+          isDateTimeBoundary &&
+            (isCurrentHour
+              ? "border-t-2 border-t-[#041311]/15"
+              : "border-t-2 border-t-[#33ccbb]/40"),
+        )}
       >
         {Option.isSome(scheduleDay) && isScheduleDayBoundary && (
-          <span className="text-[9px] font-bold text-[#33ccbb]/60 uppercase tracking-wider leading-none">
+          <span
+            className={cn(
+              "text-[9px] font-bold uppercase tracking-wider leading-none",
+              isCurrentHour ? "text-[#041311]/65" : "text-[#33ccbb]/60",
+            )}
+          >
             Day {scheduleDay.value}
           </span>
         )}
         {Option.isSome(scheduleHour) && (
-          <span className="text-sm font-bold text-[#33ccbb]/80 tabular-nums leading-none">
+          <span
+            className={cn(
+              "text-sm font-bold tabular-nums leading-none",
+              isCurrentHour ? "text-[#041311]" : "text-[#33ccbb]/80",
+            )}
+          >
             {scheduleHour.value}
           </span>
         )}
@@ -342,23 +374,42 @@ function BreakRow({
 
       {/* Right Side - Date + Break */}
       <div
-        className={`p-3 h-[44px] flex items-center gap-4 ${
-          isDateTimeBoundary ? "border-t-2 border-t-[#33ccbb]/40" : ""
-        }`}
+        className={cn(
+          "p-3 h-[44px] flex items-center gap-4",
+          isDateTimeBoundary &&
+            (isCurrentHour
+              ? "border-t-2 border-t-[#041311]/15"
+              : "border-t-2 border-t-[#33ccbb]/40"),
+        )}
       >
         {/* Actual Date Marker */}
         <div className="w-20 shrink-0">
           {isDateTimeBoundary ? (
             <div className="flex flex-col leading-tight">
-              <span className="text-xs font-black text-white tabular-nums">
+              <span
+                className={cn(
+                  "text-xs font-black tabular-nums",
+                  isCurrentHour ? "text-[#041311]" : "text-white",
+                )}
+              >
                 {dateTimeParts.day}
               </span>
-              <span className="text-[9px] font-bold text-[#33ccbb] uppercase tracking-wider">
+              <span
+                className={cn(
+                  "text-[9px] font-bold uppercase tracking-wider",
+                  isCurrentHour ? "text-[#041311]/70" : "text-[#33ccbb]",
+                )}
+              >
                 {dateTimeParts.month}/{dateTimeParts.year}
               </span>
             </div>
           ) : (
-            <span className="text-xs font-bold text-white/40 tabular-nums">
+            <span
+              className={cn(
+                "text-xs font-bold tabular-nums",
+                isCurrentHour ? "text-[#041311]/80" : "text-white/40",
+              )}
+            >
               {String(dateTimeParts.hours).padStart(2, "0")}:00
             </span>
           )}
@@ -367,8 +418,20 @@ function BreakRow({
         {/* Break Content */}
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[#33ccbb]/30" />
-            <span className="text-sm text-white/40 font-medium italic">Break</span>
+            <div
+              className={cn(
+                "w-2 h-2 rounded-full",
+                isCurrentHour ? "bg-[#041311]/35" : "bg-[#33ccbb]/30",
+              )}
+            />
+            <span
+              className={cn(
+                "text-sm font-medium italic",
+                isCurrentHour ? "text-[#041311]/80" : "text-white/40",
+              )}
+            >
+              Break
+            </span>
           </div>
         </div>
       </div>
@@ -385,6 +448,7 @@ interface ScheduleHourRowProps {
   dateTimeParts: DateTime.DateTime.Parts;
   isDateTimeBoundary: boolean;
   currentUserId: string | undefined;
+  isCurrentHour: boolean;
 }
 
 function ScheduleHourRow({
@@ -395,22 +459,45 @@ function ScheduleHourRow({
   dateTimeParts,
   isDateTimeBoundary,
   currentUserId,
+  isCurrentHour,
 }: ScheduleHourRowProps) {
   return (
-    <div className="grid grid-cols-[140px_1fr] border-b border-[#33ccbb]/10 last:border-b-0">
+    <div
+      className={cn(
+        "grid grid-cols-[140px_1fr] border-b border-[#33ccbb]/10 last:border-b-0",
+        isCurrentHour && "bg-[#33ccbb]",
+      )}
+    >
       {/* Left Side - Schedule Day + Hour */}
       <div
-        className={`border-r border-[#33ccbb]/10 p-3 h-[44px] flex flex-col items-end justify-center bg-[#0f1615]/50 ${
-          isDateTimeBoundary ? "border-t-2 border-t-[#33ccbb]/40" : ""
-        }`}
+        className={cn(
+          "border-r p-3 h-[44px] flex flex-col items-end justify-center",
+          isCurrentHour
+            ? "border-[#041311]/15 bg-[#2fc0b2]"
+            : "border-[#33ccbb]/10 bg-[#0f1615]/50",
+          isDateTimeBoundary &&
+            (isCurrentHour
+              ? "border-t-2 border-t-[#041311]/15"
+              : "border-t-2 border-t-[#33ccbb]/40"),
+        )}
       >
         {Option.isSome(scheduleDay) && isScheduleDayBoundary && (
-          <span className="text-[9px] font-bold text-[#33ccbb]/60 uppercase tracking-wider leading-none">
+          <span
+            className={cn(
+              "text-[9px] font-bold uppercase tracking-wider leading-none",
+              isCurrentHour ? "text-[#041311]/65" : "text-[#33ccbb]/60",
+            )}
+          >
             Day {scheduleDay.value}
           </span>
         )}
         {Option.isSome(scheduleHour) && (
-          <span className="text-sm font-bold text-[#33ccbb]/80 tabular-nums leading-none">
+          <span
+            className={cn(
+              "text-sm font-bold tabular-nums leading-none",
+              isCurrentHour ? "text-[#041311]" : "text-[#33ccbb]/80",
+            )}
+          >
             {scheduleHour.value}
           </span>
         )}
@@ -418,23 +505,42 @@ function ScheduleHourRow({
 
       {/* Right Side - Actual Date + Hour */}
       <div
-        className={`p-3 h-[44px] flex items-center gap-4 ${
-          isDateTimeBoundary ? "border-t-2 border-t-[#33ccbb]/40" : ""
-        }`}
+        className={cn(
+          "p-3 h-[44px] flex items-center gap-4",
+          isDateTimeBoundary &&
+            (isCurrentHour
+              ? "border-t-2 border-t-[#041311]/15"
+              : "border-t-2 border-t-[#33ccbb]/40"),
+        )}
       >
         {/* Actual Date Marker */}
         <div className="w-20 shrink-0">
           {isDateTimeBoundary ? (
             <div className="flex flex-col leading-tight">
-              <span className="text-xs font-black text-white tabular-nums">
+              <span
+                className={cn(
+                  "text-xs font-black tabular-nums",
+                  isCurrentHour ? "text-[#041311]" : "text-white",
+                )}
+              >
                 {dateTimeParts.day}
               </span>
-              <span className="text-[9px] font-bold text-[#33ccbb] uppercase tracking-wider">
+              <span
+                className={cn(
+                  "text-[9px] font-bold uppercase tracking-wider",
+                  isCurrentHour ? "text-[#041311]/70" : "text-[#33ccbb]",
+                )}
+              >
                 {dateTimeParts.month}/{dateTimeParts.year}
               </span>
             </div>
           ) : (
-            <span className="text-xs font-bold text-white/40 tabular-nums">
+            <span
+              className={cn(
+                "text-xs font-bold tabular-nums",
+                isCurrentHour ? "text-[#041311]/80" : "text-white/40",
+              )}
+            >
               {String(dateTimeParts.hours).padStart(2, "0")}:00
             </span>
           )}
@@ -443,7 +549,12 @@ function ScheduleHourRow({
         {/* Schedule Content */}
         <div className="flex-1 space-y-2">
           {schedules.map((schedule, idx) => (
-            <ScheduleRow key={idx} schedule={schedule} currentUserId={currentUserId} />
+            <ScheduleRow
+              key={idx}
+              schedule={schedule}
+              currentUserId={currentUserId}
+              isCurrentHour={isCurrentHour}
+            />
           ))}
         </div>
       </div>
@@ -461,6 +572,7 @@ type RowData =
       isScheduleDayBoundary: boolean;
       dateTimeParts: DateTime.DateTime.Parts;
       isDateTimeBoundary: boolean;
+      isCurrentHour: boolean;
     }
   | {
       type: "schedule";
@@ -471,6 +583,7 @@ type RowData =
       isScheduleDayBoundary: boolean;
       dateTimeParts: DateTime.DateTime.Parts;
       isDateTimeBoundary: boolean;
+      isCurrentHour: boolean;
     };
 
 interface DateBlockProps {
@@ -481,6 +594,7 @@ interface DateBlockProps {
   maxHour: number;
   dayByScheduleHour: HashMap.HashMap<number, number>;
   currentUserId: string | undefined;
+  currentHourKey: DateTime.Zoned;
 }
 
 function DateBlock({
@@ -491,6 +605,7 @@ function DateBlock({
   maxHour,
   dayByScheduleHour,
   currentUserId,
+  currentHourKey,
 }: DateBlockProps) {
   // Build rows using dayByScheduleHour lookup for schedule day
   const rows = useMemo(
@@ -505,6 +620,7 @@ function DateBlock({
           );
           const dateTimeParts = DateTime.toParts(dateTimeHour);
           const isDateTimeBoundary = index === 0;
+          const isCurrentHour = DateTime.Equivalence(dateTimeHour, currentHourKey);
 
           // Compute schedule hour from datetime using computeScheduleHour
           const scheduleHour = computeScheduleHour(startTimeZoned, dateTimeHour, maxHour);
@@ -534,6 +650,7 @@ function DateBlock({
               isScheduleDayBoundary,
               dateTimeParts,
               isDateTimeBoundary,
+              isCurrentHour,
             }),
             onNonEmpty: (schedules): RowData => ({
               type: "schedule",
@@ -544,11 +661,12 @@ function DateBlock({
               isScheduleDayBoundary,
               dateTimeParts,
               isDateTimeBoundary,
+              isCurrentHour,
             }),
           });
         }),
       ),
-    [date, schedulesByDateTime, startTimeZoned, maxHour, dayByScheduleHour],
+    [date, schedulesByDateTime, startTimeZoned, maxHour, dayByScheduleHour, currentHourKey],
   );
 
   return (
@@ -564,6 +682,7 @@ function DateBlock({
               isScheduleDayBoundary={row.isScheduleDayBoundary}
               dateTimeParts={row.dateTimeParts}
               isDateTimeBoundary={row.isDateTimeBoundary}
+              isCurrentHour={row.isCurrentHour}
             />
           ) : (
             <ScheduleHourRow
@@ -575,6 +694,7 @@ function DateBlock({
               dateTimeParts={row.dateTimeParts}
               isDateTimeBoundary={row.isDateTimeBoundary}
               currentUserId={currentUserId}
+              isCurrentHour={row.isCurrentHour}
             />
           ),
         )}
@@ -587,9 +707,11 @@ function DateBlock({
 function ScheduleRow({
   schedule,
   currentUserId,
+  isCurrentHour,
 }: {
   schedule: Sheet.PopulatedSchedule;
   currentUserId: string | undefined;
+  isCurrentHour: boolean;
 }) {
   const fills = schedule.fills.filter(Option.isSome).map((f: { value: SchedulePlayer }) => f.value);
 
@@ -600,7 +722,12 @@ function ScheduleRow({
   return (
     <div className="flex flex-wrap items-center gap-1">
       {fills.map((fill: SchedulePlayer, idx: number) => (
-        <PlayerBadge key={idx} player={fill} currentUserId={currentUserId} />
+        <PlayerBadge
+          key={idx}
+          player={fill}
+          currentUserId={currentUserId}
+          isCurrentHour={isCurrentHour}
+        />
       ))}
     </div>
   );
@@ -610,9 +737,11 @@ function ScheduleRow({
 function PlayerBadge({
   player,
   currentUserId,
+  isCurrentHour,
 }: {
   player: SchedulePlayer;
   currentUserId: string | undefined;
+  isCurrentHour: boolean;
 }) {
   const isCurrentUser =
     currentUserId !== undefined &&
@@ -622,19 +751,35 @@ function PlayerBadge({
   return (
     <span
       className={`text-xs ${
-        isCurrentUser
-          ? player.enc
-            ? "font-bold text-[#33ccbb]"
-            : "text-[#33ccbb]"
-          : player.enc
-            ? "font-bold text-white"
-            : "text-white/80"
+        isCurrentHour
+          ? isCurrentUser
+            ? player.enc
+              ? "font-black text-[#041311]"
+              : "text-[#07211d] underline decoration-[#07211d]/45 underline-offset-2"
+            : player.enc
+              ? "font-bold text-[#041311]"
+              : "text-[#041311]/80"
+          : isCurrentUser
+            ? player.enc
+              ? "font-bold text-[#33ccbb]"
+              : "text-[#33ccbb]"
+            : player.enc
+              ? "font-bold text-white"
+              : "text-white/80"
       }`}
     >
       {player.player.name}
       {player.enc && (
         <span
-          className={`ml-1 text-[10px] ${isCurrentUser ? "text-[#33ccbb]/70" : "text-white/50"}`}
+          className={`ml-1 text-[10px] ${
+            isCurrentHour
+              ? isCurrentUser
+                ? "text-[#07211d]/65"
+                : "text-[#041311]/60"
+              : isCurrentUser
+                ? "text-[#33ccbb]/70"
+                : "text-white/50"
+          }`}
         >
           (encore)
         </span>

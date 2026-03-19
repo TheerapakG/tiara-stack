@@ -1,5 +1,5 @@
 import { DateTime, Effect, Option, Match, Hash } from "effect";
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 
 export const makeZonedOrNow = (timeZone: DateTime.TimeZone, timestamp?: number) =>
   Option.fromNullable(timestamp).pipe(
@@ -41,6 +41,40 @@ export const useZonedOrUndefined = (timeZone: DateTime.TimeZone, timestamp?: num
   );
   return zoned;
 };
+
+let cachedCurrentDateTime = Effect.runSync(DateTime.now);
+
+const getCurrentDateTimeSnapshot = () => cachedCurrentDateTime;
+const getCurrentEpochMillis = () => DateTime.toEpochMillis(Effect.runSync(DateTime.now));
+
+const subscribeToCurrentDateTime = (onStoreChange: () => void) => {
+  let intervalId: number | undefined;
+  const notify = () => {
+    cachedCurrentDateTime = Effect.runSync(DateTime.now);
+    onStoreChange();
+  };
+  const timeoutId = window.setTimeout(
+    () => {
+      notify();
+      intervalId = window.setInterval(notify, 60_000);
+    },
+    60_000 - (getCurrentEpochMillis() % 60_000),
+  );
+
+  return () => {
+    window.clearTimeout(timeoutId);
+    if (intervalId !== undefined) {
+      window.clearInterval(intervalId);
+    }
+  };
+};
+
+export const useCurrentDateTime = () =>
+  useSyncExternalStore(
+    subscribeToCurrentDateTime,
+    getCurrentDateTimeSnapshot,
+    getCurrentDateTimeSnapshot,
+  );
 
 export const dateTimeId = (dateTime: DateTime.Zoned) =>
   Hash.array([DateTime.toEpochMillis(dateTime), zoneId(dateTime.zone)]);
