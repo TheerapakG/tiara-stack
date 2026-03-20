@@ -8,7 +8,7 @@ import { ensureResultAtomData } from "#/lib/atomRegistry";
 import { useScheduledDays, scheduledDaysAtom, formatDayKey } from "#/lib/schedule";
 import { useCalendarDays, calendarDaysAtom } from "#/lib/calendar";
 import { getServerTimeZone, useTimeZone } from "#/hooks/useTimeZone";
-import { makeZonedOrNow, useZonedOrNow } from "#/hooks/useDateTimeZoned";
+import { makeZoned, useZoned } from "#/hooks/useDateTimeZoned";
 import {
   buildSharedDayLayoutId,
   calendarRestTransition,
@@ -28,7 +28,7 @@ export const Route = createFileRoute(
   loaderDeps: ({ search }) => ({ timestamp: search.timestamp }),
   loader: async ({ context, params, deps }) => {
     const timeZone = getServerTimeZone(); // Match useTimeZone behavior during SSR
-    const currentDate = await Effect.runPromise(makeZonedOrNow(timeZone, deps.timestamp));
+    const currentDate = makeZoned(timeZone, deps.timestamp);
 
     const calendarDays = await Effect.runPromise(
       ensureResultAtomData(context.atomRegistry, calendarDaysAtom(currentDate)).pipe(
@@ -184,7 +184,7 @@ function CalendarPage() {
     clearScheduleTransitionState,
   } = useScheduleTransitionStates(search, "calendar");
   // Use timestamp to determine the month to display
-  const currentDate = useZonedOrNow(timeZone, search.timestamp);
+  const currentDate = useZoned(timeZone, search.timestamp);
   const currentMonthKey = formatDayKey(DateTime.startOf(currentDate, "month"));
 
   // Pre-computed timestamps for prev/next month navigation

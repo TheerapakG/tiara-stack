@@ -2,7 +2,7 @@ import { DateTime, Array, Option, pipe } from "effect";
 import { useMemo, useCallback } from "react";
 import { useChildMatches, useNavigate } from "@tanstack/react-router";
 import { formatDayKey } from "#/lib/schedule";
-import { useZonedOrNow, useZonedOrUndefined } from "#/hooks/useDateTimeZoned";
+import { useZoned, useZonedOptional } from "#/hooks/useDateTimeZoned";
 import { useTimeZone } from "#/hooks/useTimeZone";
 import type { ScheduleSearchParams } from "../_channelLayout";
 
@@ -49,11 +49,11 @@ export function useCurrentView(): ViewType {
 export function useScheduleSelected(search: ScheduleSearchParams) {
   const timeZone = useTimeZone();
 
-  const timestamp = useZonedOrUndefined(timeZone, search.timestamp);
-  const fromTimestamp = useZonedOrUndefined(timeZone, search.from?.timestamp);
+  const timestamp = useZoned(timeZone, search.timestamp);
+  const fromTimestamp = useZonedOptional(timeZone, search.from?.timestamp);
 
   return useMemo(() => {
-    if (!search.from || !timestamp || !fromTimestamp) {
+    if (!search.from || !fromTimestamp) {
       return undefined;
     }
 
@@ -74,12 +74,16 @@ export function useScheduleSelected(search: ScheduleSearchParams) {
 export function useScheduleMonthDirection(search: ScheduleSearchParams) {
   const timeZone = useTimeZone();
 
-  const currentDate = useZonedOrNow(timeZone, search.timestamp);
-  const fromDate = useZonedOrNow(timeZone, search.from?.timestamp);
+  const currentDate = useZoned(timeZone, search.timestamp);
+  const fromDate = useZonedOptional(timeZone, search.from?.timestamp);
 
   return useMemo(() => {
     // Only derive direction when explicitly coming from calendar view
     if (search.from?.view !== "calendar") {
+      return 0 as const;
+    }
+
+    if (!fromDate) {
       return 0 as const;
     }
 
@@ -134,7 +138,7 @@ export function useScheduleTransitionStates(search: ScheduleSearchParams, curren
     // Use replace: true to avoid pushing a duplicate history entry
     navigate({
       to: ".",
-      search: { timestamp: search.timestamp },
+      search: { timestamp: DateTime.toEpochMillis(search.timestamp) },
       replace: true,
     });
   }, [navigate, search.timestamp]);

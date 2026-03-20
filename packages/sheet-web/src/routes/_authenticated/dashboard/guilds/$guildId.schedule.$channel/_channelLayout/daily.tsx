@@ -16,8 +16,9 @@ import {
 } from "#/lib/schedule";
 import { Sheet } from "sheet-apis/schema";
 import { eventConfigAtom, useEventConfig } from "#/lib/sheet";
+import { useNowByHour } from "#/lib/dateTime";
 import { useTimeZone } from "#/hooks/useTimeZone";
-import { useCurrentDateTime, useZonedOrNow } from "#/hooks/useDateTimeZoned";
+import { useZoned } from "#/hooks/useDateTimeZoned";
 import { currentUserAtom, useCurrentUser } from "#/lib/discord";
 import { cn } from "#/lib/utils";
 import {
@@ -55,7 +56,7 @@ function DailyPage() {
   const timeZone = useTimeZone();
   const search = Route.useSearch();
   const selected = useScheduleSelected(search);
-  const currentDate = useZonedOrNow(timeZone, search.timestamp);
+  const currentDate = useZoned(timeZone, search.timestamp);
   const sourceMonth = useMemo(
     () =>
       selected && DateTime.Equivalence(selected.day, DateTime.startOf(currentDate, "day"))
@@ -126,19 +127,14 @@ function DailyScheduleContent() {
   const timeZone = useTimeZone();
   const search = Route.useSearch();
   const parentRef = useRef<HTMLDivElement>(null);
-  const currentDateTime = useCurrentDateTime();
+  const currentHourKey = useNowByHour(timeZone);
 
-  const currentDate = useZonedOrNow(timeZone, search.timestamp);
-  const liveNow = useMemo(
-    () => DateTime.setZone(currentDateTime, timeZone),
-    [currentDateTime, timeZone],
-  );
-  const currentHourKey = useMemo(() => DateTime.startOf(liveNow, "hour"), [liveNow]);
+  const currentDate = useZoned(timeZone, search.timestamp);
 
   // Load schedules and eventConfig
   const allSchedules = useGuildSchedule(guildId);
   const eventConfig = useEventConfig(guildId);
-  const startTimeZoned = useZonedOrNow(timeZone, DateTime.toEpochMillis(eventConfig.startTime));
+  const startTimeZoned = useZoned(timeZone, eventConfig.startTime);
 
   const channelSchedules = useMemo(
     () => allSchedules.filter((s) => s.channel === channel && Option.isSome(s.hour)),
@@ -594,7 +590,7 @@ interface DateBlockProps {
   maxHour: number;
   dayByScheduleHour: HashMap.HashMap<number, number>;
   currentUserId: string | undefined;
-  currentHourKey: DateTime.Zoned;
+  currentHourKey: DateTime.DateTime;
 }
 
 function DateBlock({
