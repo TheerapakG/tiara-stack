@@ -25,10 +25,10 @@ export const Route = createFileRoute(
 )({
   component: CalendarPage,
   ssr: "data-only", // Prevent component SSR to avoid timezone-based content flash
-  loaderDeps: ({ search }) => ({ timestamp: search.timestamp }),
+  loaderDeps: ({ search }) => ({ timestamp: DateTime.toEpochMillis(search.timestamp) }),
   loader: async ({ context, params, deps }) => {
     const timeZone = getServerTimeZone(); // Match useTimeZone behavior during SSR
-    const currentDate = makeZoned(timeZone, deps.timestamp);
+    const currentDate = makeZoned(timeZone, DateTime.unsafeMake(deps.timestamp));
 
     const calendarDays = await Effect.runPromise(
       ensureResultAtomData(context.atomRegistry, calendarDaysAtom(currentDate)).pipe(
