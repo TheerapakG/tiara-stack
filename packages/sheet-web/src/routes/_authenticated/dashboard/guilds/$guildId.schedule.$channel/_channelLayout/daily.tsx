@@ -57,15 +57,16 @@ function DailyPage() {
   const timeZone = useTimeZone();
   const search = Route.useSearch();
   const selected = useScheduleSelected(search);
-  const currentDate = useZoned(timeZone, useDateTime(search.timestamp));
+  const currentDate = useDateTime(search.timestamp);
+  const currentDateZoned = useZoned(timeZone, currentDate);
   const sourceMonth = useMemo(
     () =>
-      selected && DateTime.Equivalence(selected.day, DateTime.startOf(currentDate, "day"))
+      selected && DateTime.Equivalence(selected.day, DateTime.startOf(currentDateZoned, "day"))
         ? selected.month
-        : DateTime.startOf(currentDate, "month"),
-    [selected, currentDate],
+        : DateTime.startOf(currentDateZoned, "month"),
+    [selected, currentDateZoned],
   );
-  const sharedLayoutId = buildSharedDayLayoutId(currentDate, sourceMonth);
+  const sharedLayoutId = buildSharedDayLayoutId(currentDateZoned, sourceMonth);
 
   return (
     <motion.div
@@ -81,7 +82,7 @@ function DailyPage() {
         exit={{ opacity: 0 }}
         transition={calendarRestTransition}
       >
-        <DailyHeader sourceMonth={sourceMonth} currentDate={currentDate} />
+        <DailyHeader sourceMonth={sourceMonth} currentDateZoned={currentDateZoned} />
         <DailyScheduleContent />
       </motion.div>
     </motion.div>
@@ -91,10 +92,10 @@ function DailyPage() {
 // Header component
 function DailyHeader({
   sourceMonth,
-  currentDate,
+  currentDateZoned,
 }: {
   sourceMonth: DateTime.Zoned;
-  currentDate: DateTime.Zoned;
+  currentDateZoned: DateTime.Zoned;
 }) {
   const { channel, guildId } = Route.useParams();
 
@@ -106,7 +107,7 @@ function DailyHeader({
         params={{ guildId, channel }}
         search={{
           timestamp: DateTime.toEpochMillis(sourceMonth),
-          from: { view: "daily", timestamp: DateTime.toEpochMillis(currentDate) },
+          from: { view: "daily", timestamp: DateTime.toEpochMillis(currentDateZoned) },
         }}
         mask={{
           to: "/dashboard/guilds/$guildId/schedule/$channel/calendar",
@@ -130,7 +131,8 @@ function DailyScheduleContent() {
   const parentRef = useRef<HTMLDivElement>(null);
   const currentHourKey = useNowByHour(timeZone);
 
-  const currentDate = useZoned(timeZone, useDateTime(search.timestamp));
+  const currentDate = useDateTime(search.timestamp);
+  const currentDateZoned = useZoned(timeZone, currentDate);
 
   // Load schedules and eventConfig
   const allSchedules = useGuildSchedule(guildId);
@@ -198,7 +200,10 @@ function DailyScheduleContent() {
     );
   }, [populatedChannelSchedules, startTimeZoned]);
 
-  const currentDateKey = useMemo(() => DateTime.startOf(currentDate, "day"), [currentDate]);
+  const currentDateKey = useMemo(
+    () => DateTime.startOf(currentDateZoned, "day"),
+    [currentDateZoned],
+  );
 
   // Get current user for highlighting
   const currentUser = useCurrentUser();
