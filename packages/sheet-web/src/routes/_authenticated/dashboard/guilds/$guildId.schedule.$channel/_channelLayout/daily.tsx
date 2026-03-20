@@ -28,6 +28,7 @@ import {
   morphLayoutTransition,
   useScheduleSelected,
 } from "./-transition";
+import { classifyDailyHourSchedules, getDailyHourSchedules } from "./-dailyRows";
 
 // Virtualizer constants
 const ESTIMATE_SIZE = 23 + 24 * 44;
@@ -159,20 +160,20 @@ function DailyScheduleContent() {
     return hours.length > 0 ? Math.max(...hours) : 0;
   }, [channelSchedules]);
 
-  const populatedChannelSchedules = useMemo(
-    () =>
-      channelSchedules.filter(
-        (s): s is Sheet.PopulatedSchedule => s._tag === "PopulatedSchedule" && s.visible,
-      ),
+  const visibleChannelSchedules = useMemo(
+    () => channelSchedules.filter((schedule) => schedule.visible),
     [channelSchedules],
   );
 
-  // Group schedules by date -> DateTime -> PopulatedSchedule[]
+  // Group schedules by date -> DateTime -> populated schedule variants[]
   const schedulesByDate = useMemo(() => {
     return pipe(
-      populatedChannelSchedules,
+      visibleChannelSchedules,
       Array.reduce(
-        HashMap.empty<DateTime.Zoned, HashMap.HashMap<DateTime.Zoned, Sheet.PopulatedSchedule[]>>(),
+        HashMap.empty<
+          DateTime.Zoned,
+          HashMap.HashMap<DateTime.Zoned, Sheet.PopulatedScheduleResult[]>
+        >(),
         (acc, schedule) => {
           const scheduleDateTime = computeScheduleDateTime(startTimeZoned, schedule.hour);
           const dateKey = DateTime.startOf(scheduleDateTime, "day");
@@ -198,7 +199,7 @@ function DailyScheduleContent() {
         },
       ),
     );
-  }, [populatedChannelSchedules, startTimeZoned]);
+  }, [visibleChannelSchedules, startTimeZoned]);
 
   const currentDateKey = useMemo(
     () => DateTime.startOf(currentDateZoned, "day"),
@@ -228,7 +229,7 @@ function DailyScheduleContent() {
       );
       const data = HashMap.get(schedulesByDate, dateKey);
       const schedulesByDateTime = Option.getOrElse(data, () =>
-        HashMap.empty<DateTime.Zoned, Sheet.PopulatedSchedule[]>(),
+        HashMap.empty<DateTime.Zoned, Sheet.PopulatedScheduleResult[]>(),
       );
 
       return { dateKey, schedulesByDateTime };
@@ -590,7 +591,7 @@ type RowData =
 
 interface DateBlockProps {
   date: DateTime.Zoned;
-  schedulesByDateTime: HashMap.HashMap<DateTime.Zoned, Sheet.PopulatedSchedule[]>;
+  schedulesByDateTime: HashMap.HashMap<DateTime.Zoned, Sheet.PopulatedScheduleResult[]>;
   isActive: boolean;
   startTimeZoned: DateTime.Zoned;
   maxHour: number;
@@ -610,7 +611,7 @@ function DateBlock({
   currentHourKey,
 }: DateBlockProps) {
   // Build rows using dayByScheduleHour lookup for schedule day
-  const rows = useMemo(
+  const rows: RowData[] = useMemo(
     () =>
       pipe(
         Array.range(0, 23),
@@ -643,8 +644,10 @@ function DateBlock({
               Option.getOrElse(() => true),
             );
 
-          return Array.match(hourSchedules, {
-            onEmpty: (): RowData => ({
+          const rowType = classifyDailyHourSchedules(hourSchedules);
+
+          if (rowType === "break") {
+            return {
               type: "break",
               key: dateHour,
               scheduleHour,
@@ -653,19 +656,24 @@ function DateBlock({
               dateTimeParts,
               isDateTimeBoundary,
               isCurrentHour,
-            }),
-            onNonEmpty: (schedules): RowData => ({
-              type: "schedule",
-              key: dateHour,
-              schedules,
-              scheduleHour,
-              scheduleDay,
-              isScheduleDayBoundary,
-              dateTimeParts,
-              isDateTimeBoundary,
-              isCurrentHour,
-            }),
-          });
+            };
+          }
+
+          const schedules = getDailyHourSchedules(
+            hourSchedules,
+          ) as Array.NonEmptyReadonlyArray<Sheet.PopulatedSchedule>;
+
+          return {
+            type: "schedule",
+            key: dateHour,
+            schedules,
+            scheduleHour,
+            scheduleDay,
+            isScheduleDayBoundary,
+            dateTimeParts,
+            isDateTimeBoundary,
+            isCurrentHour,
+          };
         }),
       ),
     [date, schedulesByDateTime, startTimeZoned, maxHour, dayByScheduleHour, currentHourKey],
