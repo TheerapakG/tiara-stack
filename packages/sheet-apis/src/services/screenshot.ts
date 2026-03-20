@@ -1,31 +1,34 @@
-import { Array, Effect, Option, pipe } from "effect";
+import { Array, Effect, HashMap, Option, pipe } from "effect";
 import { HttpClient } from "@effect/platform";
 import { chromium } from "playwright";
 import { SheetService } from "./sheet";
 import { joinURL, withQuery } from "ufo";
 import { Struct as StructUtils } from "typhoon-core/utils";
 import { makeUnknownError } from "typhoon-core/error";
+import { GoogleSheets } from "./google/sheets";
 
 export class ScreenshotService extends Effect.Service<ScreenshotService>()("ScreenshotService", {
   effect: pipe(
     Effect.all(
       {
+        googleSheets: GoogleSheets,
         sheetService: SheetService,
         httpClient: HttpClient.HttpClient,
       },
       { concurrency: "unbounded" },
     ),
-    Effect.map(({ sheetService, httpClient }) => ({
+    Effect.map(({ googleSheets, sheetService, httpClient }) => ({
       getScreenshot: (sheetId: string, channel: string, day: number) =>
         pipe(
           Effect.Do,
           Effect.bindAll(
             () => ({
+              sheetGids: googleSheets.getSheetGids(sheetId),
               scheduleConfigs: sheetService.getScheduleConfig(sheetId),
             }),
             { concurrency: "unbounded" },
           ),
-          Effect.map(({ scheduleConfigs }) => {
+          Effect.map(({ sheetGids, scheduleConfigs }) => {
             const filteredConfig = pipe(
               scheduleConfigs,
               Array.map(
@@ -35,9 +38,14 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()("Scre
               Array.filter((a) => a.channel === channel && a.day === day),
               Array.head,
             );
-            return { filteredConfig };
+            const sheetGid = filteredConfig.pipe(
+              Option.flatMap((a) => a.sheet),
+              Option.flatMap((a) => HashMap.get(sheetGids, a)),
+              Option.flatten,
+            );
+            return { filteredConfig, sheetGid };
           }),
-          Effect.flatMap(({ filteredConfig }) => {
+          Effect.flatMap(({ filteredConfig, sheetGid }) => {
             if (Option.isNone(filteredConfig)) {
               return Effect.fail(
                 makeUnknownError(
@@ -46,17 +54,29 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()("Scre
                 ),
               );
             }
+            if (Option.isNone(sheetGid)) {
+              return Effect.fail(
+                makeUnknownError(
+                  "Could not generate screenshot URL",
+                  new Error("Missing sheet GID"),
+                ),
+              );
+            }
             const config = filteredConfig.value;
-            // Use empty gid to show default sheet - the range should still work
             const url = withQuery(
-              joinURL("https://docs.google.com/spreadsheets/d", `/${sheetId}`, `/htmlembed/sheet`),
+              joinURL("https://docs.google.com/spreadsheets/d", `/${sheetId}`, `/htmlembed`),
               {
-                gid: "",
+                single: true,
+                gid: sheetGid.value,
                 range: config.screenshotRange,
+                widget: false,
+                chrome: false,
+                headers: false,
               },
             );
             return Effect.succeed({ url, config });
           }),
+          Effect.tap(({ url }) => Effect.log(`Screenshot URL: ${url}`)),
           Effect.bind("css", () =>
             pipe(
               httpClient.get(
@@ -103,6 +123,6 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()("Scre
         ),
     })),
   ),
-  dependencies: [SheetService.Default],
+  dependencies: [GoogleSheets.Default, SheetService.Default],
   accessors: true,
 }) {}
