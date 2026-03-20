@@ -2,6 +2,7 @@ import { DateTime, Array, Option, pipe } from "effect";
 import { useMemo, useCallback } from "react";
 import { useChildMatches, useNavigate } from "@tanstack/react-router";
 import { formatDayKey } from "#/lib/schedule";
+import { makeDateTime, useDateTime } from "#/hooks/useDateTime";
 import { useZoned, useZonedOptional } from "#/hooks/useDateTimeZoned";
 import { useTimeZone } from "#/hooks/useTimeZone";
 import type { ScheduleSearchParams } from "../_channelLayout";
@@ -48,9 +49,15 @@ export function useCurrentView(): ViewType {
 // Fully derived from URL search params
 export function useScheduleSelected(search: ScheduleSearchParams) {
   const timeZone = useTimeZone();
+  const timestamp = useDateTime(search.timestamp);
+  const fromDateTime = search.from?.timestamp !== undefined ? search.from.timestamp : undefined;
+  const fromTimestampDateTime = useMemo(
+    () => (fromDateTime !== undefined ? makeDateTime(fromDateTime) : undefined),
+    [fromDateTime],
+  );
 
-  const timestamp = useZoned(timeZone, search.timestamp);
-  const fromTimestamp = useZonedOptional(timeZone, search.from?.timestamp);
+  const zonedTimestamp = useZoned(timeZone, timestamp);
+  const fromTimestamp = useZonedOptional(timeZone, fromTimestampDateTime);
 
   return useMemo(() => {
     if (!search.from || !fromTimestamp) {
@@ -59,13 +66,13 @@ export function useScheduleSelected(search: ScheduleSearchParams) {
 
     if (search.from.view === "calendar") {
       // Calendar → Daily: timestamp=day, from.timestamp=month
-      return { day: timestamp, month: DateTime.startOf(fromTimestamp, "month") };
+      return { day: zonedTimestamp, month: DateTime.startOf(fromTimestamp, "month") };
     } else {
       // Daily → Calendar: timestamp=month, from.timestamp=day
-      return { day: fromTimestamp, month: DateTime.startOf(timestamp, "month") };
+      return { day: fromTimestamp, month: DateTime.startOf(zonedTimestamp, "month") };
     }
     // Use primitive deps to avoid recomputation when search object is recreated
-  }, [search.from?.view, search.from?.timestamp, timestamp, fromTimestamp]);
+  }, [search.from?.view, search.from?.timestamp, zonedTimestamp, fromTimestamp]);
 }
 
 // Hook for reading the month direction
@@ -73,9 +80,15 @@ export function useScheduleSelected(search: ScheduleSearchParams) {
 // Only applies when coming from calendar view
 export function useScheduleMonthDirection(search: ScheduleSearchParams) {
   const timeZone = useTimeZone();
+  const timestamp = useDateTime(search.timestamp);
+  const fromDateTime = search.from?.timestamp !== undefined ? search.from.timestamp : undefined;
+  const fromTimestampDateTime = useMemo(
+    () => (fromDateTime !== undefined ? makeDateTime(fromDateTime) : undefined),
+    [fromDateTime],
+  );
 
-  const currentDate = useZoned(timeZone, search.timestamp);
-  const fromDate = useZonedOptional(timeZone, search.from?.timestamp);
+  const currentDate = useZoned(timeZone, timestamp);
+  const fromDate = useZonedOptional(timeZone, fromTimestampDateTime);
 
   return useMemo(() => {
     // Only derive direction when explicitly coming from calendar view
@@ -138,7 +151,7 @@ export function useScheduleTransitionStates(search: ScheduleSearchParams, curren
     // Use replace: true to avoid pushing a duplicate history entry
     navigate({
       to: ".",
-      search: { timestamp: DateTime.toEpochMillis(search.timestamp) },
+      search: { timestamp: search.timestamp },
       replace: true,
     });
   }, [navigate, search.timestamp]);

@@ -17,6 +17,7 @@ import {
 import { Sheet } from "sheet-apis/schema";
 import { eventConfigAtom, useEventConfig } from "#/lib/sheet";
 import { useNowByHour } from "#/lib/dateTime";
+import { useDateTime } from "#/hooks/useDateTime";
 import { useTimeZone } from "#/hooks/useTimeZone";
 import { useZoned } from "#/hooks/useDateTimeZoned";
 import { currentUserAtom, useCurrentUser } from "#/lib/discord";
@@ -56,7 +57,7 @@ function DailyPage() {
   const timeZone = useTimeZone();
   const search = Route.useSearch();
   const selected = useScheduleSelected(search);
-  const currentDate = useZoned(timeZone, search.timestamp);
+  const currentDate = useZoned(timeZone, useDateTime(search.timestamp));
   const sourceMonth = useMemo(
     () =>
       selected && DateTime.Equivalence(selected.day, DateTime.startOf(currentDate, "day"))
@@ -129,7 +130,7 @@ function DailyScheduleContent() {
   const parentRef = useRef<HTMLDivElement>(null);
   const currentHourKey = useNowByHour(timeZone);
 
-  const currentDate = useZoned(timeZone, search.timestamp);
+  const currentDate = useZoned(timeZone, useDateTime(search.timestamp));
 
   // Load schedules and eventConfig
   const allSchedules = useGuildSchedule(guildId);

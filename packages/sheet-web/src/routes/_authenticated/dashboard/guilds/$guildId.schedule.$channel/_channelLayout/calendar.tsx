@@ -19,19 +19,21 @@ import {
   useScheduleTransitionStates,
 } from "./-transition";
 import { useLocked } from "#/hooks/useLocked";
+import { makeDateTime, useDateTime } from "#/hooks/useDateTime";
 
 export const Route = createFileRoute(
   "/_authenticated/dashboard/guilds/$guildId/schedule/$channel/_channelLayout/calendar",
 )({
   component: CalendarPage,
   ssr: "data-only", // Prevent component SSR to avoid timezone-based content flash
-  loaderDeps: ({ search }) => ({ timestamp: DateTime.toEpochMillis(search.timestamp) }),
+  loaderDeps: ({ search }) => ({ timestamp: search.timestamp }),
   loader: async ({ context, params, deps }) => {
     const timeZone = getServerTimeZone(); // Match useTimeZone behavior during SSR
-    const currentDate = makeZoned(timeZone, DateTime.unsafeMake(deps.timestamp));
+    const currentDate = makeDateTime(deps.timestamp);
+    const currentDateZoned = makeZoned(timeZone, currentDate);
 
     const calendarDays = await Effect.runPromise(
-      ensureResultAtomData(context.atomRegistry, calendarDaysAtom(currentDate)).pipe(
+      ensureResultAtomData(context.atomRegistry, calendarDaysAtom(currentDateZoned)).pipe(
         Effect.catchAll(() => Effect.die("Failed to load calendar days")),
       ),
     );
@@ -184,24 +186,27 @@ function CalendarPage() {
     clearScheduleTransitionState,
   } = useScheduleTransitionStates(search, "calendar");
   // Use timestamp to determine the month to display
-  const currentDate = useZoned(timeZone, search.timestamp);
-  const currentMonthKey = formatDayKey(DateTime.startOf(currentDate, "month"));
+  const currentDate = useDateTime(search.timestamp);
+  const currentDateZoned = useZoned(timeZone, currentDate);
+  const currentMonthKey = formatDayKey(DateTime.startOf(currentDateZoned, "month"));
 
   // Pre-computed timestamps for prev/next month navigation
   const prevMonthTimestamp = useMemo(
     () =>
       DateTime.toEpochMillis(
-        DateTime.startOf(DateTime.subtract(currentDate, { months: 1 }), "month"),
+        DateTime.startOf(DateTime.subtract(currentDateZoned, { months: 1 }), "month"),
       ),
-    [currentDate],
+    [currentDateZoned],
   );
   const nextMonthTimestamp = useMemo(
     () =>
-      DateTime.toEpochMillis(DateTime.startOf(DateTime.add(currentDate, { months: 1 }), "month")),
-    [currentDate],
+      DateTime.toEpochMillis(
+        DateTime.startOf(DateTime.add(currentDateZoned, { months: 1 }), "month"),
+      ),
+    [currentDateZoned],
   );
 
-  const { month, year } = getMonthYearParts(currentDate);
+  const { month, year } = getMonthYearParts(currentDateZoned);
   const weekDays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
   return (
@@ -222,7 +227,7 @@ function CalendarPage() {
               timestamp: prevMonthTimestamp,
               from: {
                 view: "calendar",
-                timestamp: DateTime.toEpochMillis(DateTime.startOf(currentDate, "month")),
+                timestamp: DateTime.toEpochMillis(DateTime.startOf(currentDateZoned, "month")),
               },
             }}
             mask={{
@@ -246,7 +251,7 @@ function CalendarPage() {
               timestamp: nextMonthTimestamp,
               from: {
                 view: "calendar",
-                timestamp: DateTime.toEpochMillis(DateTime.startOf(currentDate, "month")),
+                timestamp: DateTime.toEpochMillis(DateTime.startOf(currentDateZoned, "month")),
               },
             }}
             mask={{
@@ -291,7 +296,7 @@ function CalendarPage() {
               }
             }}
           >
-            <CalendarGrid currentDate={currentDate} selected={selected} />
+            <CalendarGrid currentDateZoned={currentDateZoned} selected={selected} />
           </DayGridPresenceShell>
         </AnimatePresence>
       </div>
@@ -300,11 +305,11 @@ function CalendarPage() {
 }
 
 interface CalendarGridProps {
-  currentDate: DateTime.Zoned;
+  currentDateZoned: DateTime.Zoned;
   selected: { readonly day: DateTime.Zoned; readonly month: DateTime.Zoned } | undefined;
 }
 
-function CalendarGrid({ currentDate, selected }: CalendarGridProps) {
+function CalendarGrid({ currentDateZoned, selected }: CalendarGridProps) {
   const { guildId, channel } = Route.useParams();
   const timeZone = useTimeZone();
   const search = Route.useSearch();
@@ -315,7 +320,7 @@ function CalendarGrid({ currentDate, selected }: CalendarGridProps) {
     clearScheduleTransitionState,
   } = useScheduleTransitionStates(search, "calendar");
 
-  const calendarDays = useCalendarDays(currentDate);
+  const calendarDays = useCalendarDays(currentDateZoned);
 
   // Get the date range for the calendar view in milliseconds
   const rangeStart = useMemo(() => Array.headNonEmpty(calendarDays).day, [calendarDays]);
@@ -334,7 +339,10 @@ function CalendarGrid({ currentDate, selected }: CalendarGridProps) {
     rangeEnd,
   });
 
-  const currentMonth = useMemo(() => DateTime.startOf(currentDate, "month"), [currentDate]);
+  const currentMonth = useMemo(
+    () => DateTime.startOf(currentDateZoned, "month"),
+    [currentDateZoned],
+  );
 
   return (
     <div

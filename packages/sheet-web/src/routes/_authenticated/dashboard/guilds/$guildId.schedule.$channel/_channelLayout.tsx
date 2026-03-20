@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, Link } from "@tanstack/react-router";
-import { Schema, pipe, Effect, DateTime } from "effect";
+import { Schema, pipe, Effect } from "effect";
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from "motion/react";
 
 import { useAllChannels, getAllChannelsAtom } from "#/lib/schedule";
@@ -14,11 +14,11 @@ import {
 // Timestamp in milliseconds for the selected date
 // From track transition origin for animations
 const ScheduleSearchSchema = Schema.Struct({
-  timestamp: Schema.DateTimeUtcFromNumber,
+  timestamp: Schema.Number,
   from: Schema.optional(
     Schema.Struct({
       view: Schema.Literal("calendar", "daily"),
-      timestamp: Schema.DateTimeUtcFromNumber,
+      timestamp: Schema.Number,
     }),
   ),
 });
@@ -82,7 +82,7 @@ function ScheduleLayout() {
                 key={ch}
                 to="."
                 params={(prev) => ({ ...prev, channel: ch })}
-                search={{ timestamp: DateTime.toEpochMillis(search.timestamp) }}
+                search={{ timestamp: search.timestamp }}
                 activeOptions={{ includeSearch: false, exact: false }}
                 className={`
                   px-3 py-1.5 text-xs font-bold tracking-wide whitespace-nowrap transition-colors

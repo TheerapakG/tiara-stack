@@ -4,14 +4,14 @@ import { getAllChannelsAtom } from "#/lib/schedule";
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 
 const ScheduleSearchSchema = Schema.Struct({
-  timestamp: Schema.optional(Schema.DateTimeUtcFromNumber),
+  timestamp: Schema.optional(Schema.Number),
 });
 
 export const Route = createFileRoute("/_authenticated/dashboard/guilds/$guildId/schedule")({
   component: ScheduleRedirect,
   validateSearch: pipe(ScheduleSearchSchema, Schema.standardSchemaV1),
   beforeLoad: async ({ params, search, context }) => {
-    if (search.timestamp) {
+    if (search.timestamp !== undefined) {
       return;
     }
 
