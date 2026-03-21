@@ -20,11 +20,13 @@ import {
 } from "./-transition";
 import { useLocked } from "#/hooks/useLocked";
 import { makeDateTime, useDateTime } from "#/hooks/useDateTime";
+import { cn } from "#/lib/utils";
 
 export const Route = createFileRoute(
   "/_authenticated/dashboard/guilds/$guildId/schedule/$channel/_channelLayout/calendar",
 )({
   component: CalendarPage,
+  pendingComponent: CalendarPendingPage,
   ssr: "data-only", // Prevent component SSR to avoid timezone-based content flash
   loaderDeps: ({ search }) => ({ timestamp: search.timestamp }),
   loader: async ({ context, params, deps }) => {
@@ -55,6 +57,144 @@ export const Route = createFileRoute(
     );
   },
 });
+
+function CalendarPendingPage() {
+  const { guildId, channel } = Route.useParams();
+  const timeZone = useTimeZone();
+  const search = Route.useSearch();
+  const selected = useScheduleSelected(search);
+  const currentDate = useDateTime(search.timestamp);
+  const currentDateZoned = useZoned(timeZone, currentDate);
+  const currentMonth = DateTime.startOf(currentDateZoned, "month");
+  const prevMonthTimestamp = DateTime.toEpochMillis(
+    DateTime.startOf(DateTime.subtract(currentDateZoned, { months: 1 }), "month"),
+  );
+  const nextMonthTimestamp = DateTime.toEpochMillis(
+    DateTime.startOf(DateTime.add(currentDateZoned, { months: 1 }), "month"),
+  );
+  const selectedLayoutId = selected
+    ? buildSharedDayLayoutId(selected.day, selected.month)
+    : undefined;
+
+  return (
+    <div className="relative overflow-hidden border border-[#33ccbb]/20 bg-[#0f1615]">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={calendarRestTransition}
+      >
+        <div className="grid grid-cols-[auto_1fr_auto] items-center border-b border-[#33ccbb]/20 p-4">
+          <Link
+            to="."
+            params={{ guildId, channel }}
+            search={{
+              timestamp: prevMonthTimestamp,
+              from: {
+                view: "calendar",
+                timestamp: DateTime.toEpochMillis(DateTime.startOf(currentDateZoned, "month")),
+              },
+            }}
+            mask={{
+              to: "/dashboard/guilds/$guildId/schedule/$channel/calendar",
+              params: { guildId, channel },
+              search: { timestamp: prevMonthTimestamp },
+              unmaskOnReload: true,
+            }}
+            className="grid h-9 w-9 place-items-center text-[#33ccbb] transition-colors hover:bg-[#33ccbb]/10"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Link>
+          <div className="mx-auto h-6 w-36 rounded bg-[#33ccbb]/10" />
+          <Link
+            to="."
+            params={{ guildId, channel }}
+            search={{
+              timestamp: nextMonthTimestamp,
+              from: {
+                view: "calendar",
+                timestamp: DateTime.toEpochMillis(DateTime.startOf(currentDateZoned, "month")),
+              },
+            }}
+            mask={{
+              to: "/dashboard/guilds/$guildId/schedule/$channel/calendar",
+              params: { guildId, channel },
+              search: { timestamp: nextMonthTimestamp },
+              unmaskOnReload: true,
+            }}
+            className="justify-self-end grid h-9 w-9 place-items-center text-[#33ccbb] transition-colors hover:bg-[#33ccbb]/10"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-7 border-b border-[#33ccbb]/20">
+          {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((day) => (
+            <div
+              key={day}
+              className="p-3 text-center text-xs font-bold tracking-wider text-[#33ccbb]/60"
+            >
+              {day}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7">
+          {Array.makeBy(42, (index) => {
+            const day = DateTime.add(DateTime.startOf(currentMonth, "week", { weekStartsOn: 0 }), {
+              days: index,
+            });
+            const layoutId =
+              selected &&
+              DateTime.Equivalence(selected.day, DateTime.startOf(day, "day")) &&
+              DateTime.Equivalence(selected.month, currentMonth)
+                ? selectedLayoutId
+                : undefined;
+
+            return (
+              <motion.div
+                key={index}
+                layoutId={layoutId}
+                transition={{
+                  layout: morphLayoutTransition,
+                }}
+                className="h-14 border-r border-b border-[#33ccbb]/10 last:border-r-0"
+              >
+                <Link
+                  to="/dashboard/guilds/$guildId/schedule/$channel/daily"
+                  params={{ guildId, channel }}
+                  search={{
+                    timestamp: DateTime.toEpochMillis(day),
+                    from: { view: "calendar", timestamp: DateTime.toEpochMillis(currentMonth) },
+                  }}
+                  mask={{
+                    to: "/dashboard/guilds/$guildId/schedule/$channel/daily",
+                    params: { guildId, channel },
+                    search: { timestamp: DateTime.toEpochMillis(day) },
+                    unmaskOnReload: true,
+                  }}
+                  className={cn(
+                    "flex h-full flex-col items-center justify-center gap-1 transition-colors",
+                    layoutId !== undefined && selectedLayoutId === layoutId
+                      ? "bg-[#33ccbb]/12"
+                      : "",
+                  )}
+                >
+                  <div className="h-4 w-4 rounded bg-[#33ccbb]/10" />
+                  <div
+                    className={cn(
+                      "h-1.5 rounded-full bg-[#33ccbb]/20",
+                      index % 5 === 0 ? "w-4" : "w-1.5",
+                    )}
+                  />
+                </Link>
+              </motion.div>
+            );
+          })}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
 
 // Get month name and year separately for animated display
 function getMonthYearParts(dateTime: DateTime.Zoned): { month: string; year: string } {

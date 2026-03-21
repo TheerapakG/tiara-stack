@@ -39,6 +39,7 @@ export const Route = createFileRoute(
   "/_authenticated/dashboard/guilds/$guildId/schedule/$channel/_channelLayout/daily",
 )({
   component: DailyPage,
+  pendingComponent: DailyPendingPage,
   ssr: "data-only",
   loader: async ({ context, params }) => {
     await Effect.runPromise(
@@ -53,6 +54,101 @@ export const Route = createFileRoute(
     );
   },
 });
+
+function DailyPendingPage() {
+  const { guildId, channel } = Route.useParams();
+  const timeZone = useTimeZone();
+  const search = Route.useSearch();
+  const selected = useScheduleSelected(search);
+  const currentDate = useDateTime(search.timestamp);
+  const currentDateZoned = useZoned(timeZone, currentDate);
+  const sourceMonth = useMemo(
+    () =>
+      selected && DateTime.Equivalence(selected.day, DateTime.startOf(currentDateZoned, "day"))
+        ? selected.month
+        : DateTime.startOf(currentDateZoned, "month"),
+    [selected, currentDateZoned],
+  );
+  const sharedLayoutId = buildSharedDayLayoutId(currentDateZoned, sourceMonth);
+
+  return (
+    <motion.div
+      layoutId={sharedLayoutId}
+      transition={{
+        layout: morphLayoutTransition,
+      }}
+      className="border border-[#33ccbb]/20 bg-[#0a0f0e]"
+    >
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={calendarRestTransition}
+      >
+        <div className="flex items-center justify-between border-b border-[#33ccbb]/20 bg-[#0f1615] px-6 py-4">
+          <Link
+            className="flex items-center gap-2 text-[#33ccbb] transition-colors hover:text-white"
+            to="/dashboard/guilds/$guildId/schedule/$channel/calendar"
+            params={{ guildId, channel }}
+            search={{
+              timestamp: DateTime.toEpochMillis(sourceMonth),
+              from: { view: "daily", timestamp: DateTime.toEpochMillis(currentDateZoned) },
+            }}
+            mask={{
+              to: "/dashboard/guilds/$guildId/schedule/$channel/calendar",
+              params: { guildId, channel },
+              search: { timestamp: DateTime.toEpochMillis(sourceMonth) },
+              unmaskOnReload: true,
+            }}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <div className="h-4 w-36 rounded bg-[#33ccbb]/12" />
+          </Link>
+        </div>
+        <div className="space-y-4 px-6 py-5">
+          <div className="grid gap-3">
+            {Array.makeBy(5, (index) => (
+              <div
+                key={index}
+                className="overflow-hidden rounded border border-[#33ccbb]/12 bg-[#0f1615]"
+              >
+                <div className="border-b border-[#33ccbb]/10 px-4 py-3">
+                  <div
+                    className={cn(
+                      "h-4 rounded bg-[#33ccbb]/10",
+                      index === 0 ? "w-40" : index % 2 === 0 ? "w-28" : "w-32",
+                    )}
+                  />
+                </div>
+                <div className="space-y-3 px-4 py-4">
+                  {Array.makeBy(index === 0 ? 4 : 3, (rowIndex) => (
+                    <div key={rowIndex} className="flex items-center gap-3">
+                      <div className="h-8 w-14 rounded bg-[#33ccbb]/10" />
+                      <div className="flex-1 space-y-2">
+                        <div
+                          className={cn(
+                            "h-3 rounded bg-white/8",
+                            rowIndex % 3 === 0 ? "w-11/12" : rowIndex % 3 === 1 ? "w-3/4" : "w-5/6",
+                          )}
+                        />
+                        <div
+                          className={cn(
+                            "h-3 rounded bg-[#33ccbb]/8",
+                            rowIndex % 2 === 0 ? "w-1/2" : "w-2/3",
+                          )}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 function DailyPage() {
   const timeZone = useTimeZone();
