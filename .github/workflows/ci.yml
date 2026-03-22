@@ -21,17 +21,11 @@ jobs:
         uses: withgraphite/graphite-ci-action@main
         with:
           graphite_token: ${{ secrets.GRAPHITE_TOKEN }}
-  ci:
+
+  workspace_ci:
     needs: optimize_ci
     if: needs.optimize_ci.outputs.skip != 'true' || needs.optimize_ci.result != 'success'
-    strategy:
-      matrix:
-        package: [sheet-db-server, sheet-apis, sheet-bot, sheet-auth, sheet-web]
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./packages/${{ matrix.package }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,8 +50,75 @@ jobs:
       - name: Run Checks
         run: pnpm nx run-many -t format,lint,typecheck --output-style=stream
 
-      - name: Build container image
-        run: docker build -t registry.digitalocean.com/${{ secrets.REGISTRY_NAME }}/${{ matrix.package }}:$(echo $GITHUB_SHA | head -c7) .
+      - name: Upload Docker build artifact (sheet-db-server)
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-dist-sheet-db-server
+          path: packages/sheet-db-server/dist.tar.zst
+          if-no-files-found: error
+
+      - name: Upload Docker build artifact (sheet-apis)
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-dist-sheet-apis
+          path: packages/sheet-apis/dist.tar.zst
+          if-no-files-found: error
+
+      - name: Upload Docker build artifact (sheet-bot)
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-dist-sheet-bot
+          path: packages/sheet-bot/dist.tar.zst
+          if-no-files-found: error
+
+      - name: Upload Docker build artifact (sheet-auth)
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-dist-sheet-auth
+          path: packages/sheet-auth/dist.tar.zst
+          if-no-files-found: error
+
+      - name: Upload Docker build artifact (sheet-web)
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-dist-sheet-web
+          path: packages/sheet-web/dist.tar.zst
+          if-no-files-found: error
+
+  docker_images:
+    needs: workspace_ci
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: sheet-db-server
+            cache_mode: max
+          - package: sheet-apis
+            cache_mode: min
+          - package: sheet-bot
+            cache_mode: max
+          - package: sheet-auth
+            cache_mode: max
+          - package: sheet-web
+            cache_mode: max
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Docker build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-dist-${{ matrix.package }}
+          path: ./packages/${{ matrix.package }}
+
+      - name: Set image tag
+        id: vars
+        shell: bash
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Install doctl
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
@@ -69,13 +130,19 @@ jobs:
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
         run: doctl registry login --expiry-seconds 1200
 
-      - name: Push image to DigitalOcean Container Registry
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
-        run: docker push registry.digitalocean.com/${{ secrets.REGISTRY_NAME }}/${{ matrix.package }}:$(echo $GITHUB_SHA | head -c7)
+      - name: Build container image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./packages/${{ matrix.package }}
+          file: ./packages/${{ matrix.package }}/Dockerfile
+          push: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/master' }}
+          tags: registry.digitalocean.com/${{ secrets.REGISTRY_NAME }}/${{ matrix.package }}:${{ steps.vars.outputs.tag }}
+          cache-from: type=gha,scope=${{ matrix.package }}
+          cache-to: type=gha,mode=${{ matrix.cache_mode }},scope=${{ matrix.package }}
 
       - name: Update deployment file
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
-        run: TAG=$(echo $GITHUB_SHA | head -c7) && sed -i 's|<IMAGE>|registry.digitalocean.com/${{ secrets.REGISTRY_NAME }}/${{ matrix.package }}:'${TAG}'|' $GITHUB_WORKSPACE/k8s/${{ matrix.package }}/deployment.yaml
+        run: sed -i 's|<IMAGE>|registry.digitalocean.com/${{ secrets.REGISTRY_NAME }}/${{ matrix.package }}:${{ steps.vars.outputs.tag }}|' $GITHUB_WORKSPACE/k8s/${{ matrix.package }}/deployment.yaml
 
       - name: Save DigitalOcean kubeconfig with short-lived credentials
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
