@@ -1,11 +1,26 @@
 import { PlayerTeam } from "@/schemas/sheet";
 import { Room } from "@/schemas/sheet/room";
-import { Array, Chunk, Data, Effect, Function, HashSet, Option, pipe, Stream } from "effect";
+import {
+  Array,
+  Chunk,
+  Data,
+  Effect,
+  Function,
+  HashSet,
+  Option,
+  String,
+  pipe,
+  Stream,
+} from "effect";
 
 export class CalcConfig extends Data.TaggedClass("CalcConfig")<{
   healNeeded: number;
   considerEnc: boolean;
 }> {}
+
+const samePlayerReference = (left: PlayerTeam, right: PlayerTeam) =>
+  Option.getEquivalence(String.Equivalence)(left.playerId, right.playerId) &&
+  Option.getEquivalence(String.Equivalence)(left.playerName, right.playerName);
 
 const filterFixedTeams = (playerTeams: PlayerTeam[]) =>
   pipe(
@@ -113,6 +128,7 @@ const cartesianHeadTeams = (teams: ReadonlyArray<PlayerTeam>) =>
         Array.make(
           new PlayerTeam({
             type: "Placeholder",
+            playerId: Option.none(),
             playerName: Option.some("Placeholder"),
             teamName: "Placeholder",
             lead: 0,
@@ -125,7 +141,7 @@ const cartesianHeadTeams = (teams: ReadonlyArray<PlayerTeam>) =>
     }),
   );
 
-const cartesianTeams = (
+export const cartesianTeams = (
   playerTeams: Array.NonEmptyReadonlyArray<ReadonlyArray<PlayerTeam>>,
 ): readonly PlayerTeam[][] =>
   pipe(
@@ -149,8 +165,7 @@ const cartesianTeams = (
                   (headTeam) =>
                     !pipe(
                       product,
-                      Array.map((t) => t.playerName),
-                      Array.contains(headTeam.playerName),
+                      Array.some((team) => samePlayerReference(team, headTeam)),
                     ),
                 ),
                 Array.match({
@@ -159,6 +174,7 @@ const cartesianTeams = (
                       Array.make(
                         new PlayerTeam({
                           type: "Placeholder",
+                          playerId: Array.headNonEmpty(headTeams).playerId,
                           playerName: Array.headNonEmpty(headTeams).playerName,
                           teamName: pipe(
                             Array.headNonEmpty(headTeams).playerName,
@@ -210,10 +226,28 @@ const filterConfigRooms = (config: CalcConfig) => (rooms: Chunk.Chunk<Room>) =>
 const filterBestRooms = (rooms: Chunk.Chunk<Room>) =>
   pipe(
     Stream.fromIterable(rooms),
-    Stream.mapAccum(0, (bestEffectValue, room) => [
-      Math.max(bestEffectValue, room.effectValue),
-      room.effectValue > bestEffectValue ? Option.some(room) : Option.none(),
-    ]),
+    Stream.mapAccum(Option.none<number>(), (bestEffectValue, room) => {
+      const shouldKeep = pipe(
+        bestEffectValue,
+        Option.match({
+          onNone: () => true,
+          onSome: (currentBest) => room.effectValue > currentBest,
+        }),
+      );
+
+      return [
+        Option.some(
+          pipe(
+            bestEffectValue,
+            Option.match({
+              onNone: () => room.effectValue,
+              onSome: (currentBest) => Math.max(currentBest, room.effectValue),
+            }),
+          ),
+        ),
+        shouldKeep ? Option.some(room) : Option.none(),
+      ];
+    }),
     Stream.filter(Option.isSome),
     Stream.map(({ value }) => value),
     Stream.runCollect,

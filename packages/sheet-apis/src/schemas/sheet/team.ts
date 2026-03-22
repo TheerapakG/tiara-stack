@@ -2,6 +2,7 @@ import { Number, Option, Order, Schema, String } from "effect";
 
 export class Team extends Schema.TaggedClass<Team>()("Team", {
   type: Schema.String,
+  playerId: Schema.OptionFromNullOr(Schema.String),
   playerName: Schema.OptionFromNullOr(Schema.String),
   teamName: Schema.OptionFromNullOr(Schema.String),
   tags: Schema.Array(Schema.String),

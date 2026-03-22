@@ -527,6 +527,7 @@ const teamParser = (
           Array.map((config) =>
             Team.make({
               type: teamConfig.name,
+              playerId: Option.none(),
               ...config,
             }),
           ),

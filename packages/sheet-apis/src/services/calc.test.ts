@@ -1,0 +1,149 @@
+import { describe, expect, it } from "@effect/vitest";
+import { Chunk, Effect, HashSet, Option, pipe } from "effect";
+import { CalcConfig, CalcService, cartesianTeams } from "./calc";
+import { PlayerTeam } from "@/schemas/sheet";
+
+const makePlayerTeam = ({
+  playerId,
+  playerName,
+  teamName,
+  lead = 10,
+  backline = 10,
+  talent = 10,
+}: {
+  playerId: Option.Option<string>;
+  playerName: Option.Option<string>;
+  teamName: string;
+  lead?: number;
+  backline?: number;
+  talent?: number;
+}) =>
+  new PlayerTeam({
+    type: "Test",
+    playerId,
+    playerName,
+    teamName,
+    lead,
+    backline,
+    talent,
+    tags: HashSet.empty(),
+  });
+
+describe("CalcService", () => {
+  it("dedupes only when player id and player name both match", () => {
+    const slotA = [
+      makePlayerTeam({
+        playerId: Option.some("player-1"),
+        playerName: Option.some("Alice"),
+        teamName: "A1",
+      }),
+      makePlayerTeam({
+        playerId: Option.some("player-2"),
+        playerName: Option.some("Shared"),
+        teamName: "A2",
+      }),
+      makePlayerTeam({
+        playerId: Option.some("player-3"),
+        playerName: Option.some("Alias A"),
+        teamName: "A3",
+      }),
+      makePlayerTeam({
+        playerId: Option.some("player-4"),
+        playerName: Option.some("Same"),
+        teamName: "A4",
+      }),
+    ];
+    const slotB = [
+      makePlayerTeam({
+        playerId: Option.some("player-5"),
+        playerName: Option.some("Bob"),
+        teamName: "B1",
+      }),
+      makePlayerTeam({
+        playerId: Option.some("player-6"),
+        playerName: Option.some("Shared"),
+        teamName: "B2",
+      }),
+      makePlayerTeam({
+        playerId: Option.some("player-3"),
+        playerName: Option.some("Alias B"),
+        teamName: "B3",
+      }),
+      makePlayerTeam({
+        playerId: Option.some("player-4"),
+        playerName: Option.some("Same"),
+        teamName: "B4",
+      }),
+    ];
+
+    const rooms = cartesianTeams([slotA, slotB]);
+
+    const roomTeams = rooms.map((room) => room.map((team) => team.teamName));
+
+    expect(rooms).toHaveLength(15);
+    expect(roomTeams).toContainEqual(["A1", "B1"]);
+    expect(roomTeams).toContainEqual(["A2", "B2"]);
+    expect(roomTeams).toContainEqual(["A3", "B3"]);
+    expect(roomTeams).not.toContainEqual(["A4", "B4"]);
+  });
+
+  it("keeps the lowest talent room for a given effect value and orders results by effect descending", () =>
+    pipe(
+      CalcService.calc(new CalcConfig({ healNeeded: 0, considerEnc: false }), [
+        [
+          makePlayerTeam({
+            playerId: Option.some("player-1"),
+            playerName: Option.some("Alice"),
+            teamName: "Low Talent Same Effect",
+            lead: 10,
+            backline: 10,
+            talent: 1,
+          }),
+          makePlayerTeam({
+            playerId: Option.some("player-2"),
+            playerName: Option.some("Beatrice"),
+            teamName: "High Talent Same Effect",
+            lead: 10,
+            backline: 10,
+            talent: 5,
+          }),
+          makePlayerTeam({
+            playerId: Option.some("player-3"),
+            playerName: Option.some("Celine"),
+            teamName: "Highest Effect",
+            lead: 20,
+            backline: 20,
+            talent: 8,
+          }),
+        ],
+        [
+          makePlayerTeam({
+            playerId: Option.some("player-4"),
+            playerName: Option.some("Dana"),
+            teamName: "Anchor",
+            lead: 0,
+            backline: 0,
+            talent: 0,
+          }),
+        ],
+      ]),
+      Effect.provide(CalcService.Default),
+      Effect.tap((rooms) =>
+        Effect.sync(() => {
+          const roomArray = Chunk.toArray(rooms);
+
+          expect(roomArray).toHaveLength(2);
+          expect(roomArray[0]?.effectValue).toBe(20);
+          expect(roomArray[0]?.talent).toBe(8);
+          expect(roomArray[1]?.effectValue).toBe(10);
+          expect(roomArray[1]?.talent).toBe(1);
+          expect(
+            Chunk.toArray(roomArray[1]?.teams ?? Chunk.empty()).map((team) => team.teamName),
+          ).toContain("Low Talent Same Effect");
+          expect(
+            Chunk.toArray(roomArray[1]?.teams ?? Chunk.empty()).map((team) => team.teamName),
+          ).not.toContain("High Talent Same Effect");
+        }),
+      ),
+    ));
+});

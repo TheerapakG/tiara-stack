@@ -4,6 +4,7 @@ import { Option, pipe, String } from "effect";
 
 export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
   type: Schema.String,
+  playerId: Schema.OptionFromNullOr(Schema.String),
   playerName: Schema.OptionFromNullOr(Schema.String),
   teamName: Schema.String,
   lead: Schema.Number,
@@ -25,6 +26,7 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
     return (playerTeam: PlayerTeam) =>
       new PlayerTeam({
         type: playerTeam.type,
+        playerId: playerTeam.playerId,
         playerName: playerTeam.playerName,
         teamName: playerTeam.teamName,
         lead: playerTeam.lead,
@@ -42,6 +44,7 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
     return Option.some(
       new PlayerTeam({
         type: team.type,
+        playerId: team.playerId,
         playerName: team.playerName,
         teamName: team.teamName.value,
         lead: team.lead,

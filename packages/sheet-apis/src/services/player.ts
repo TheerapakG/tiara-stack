@@ -2,8 +2,14 @@ import { Array, Data, Effect, Function, HashMap, Option, pipe } from "effect";
 import { upperFirst } from "scule";
 import { Array as ArrayUtils } from "typhoon-core/utils";
 import { SheetService } from "./sheet";
-import { Player, PartialIdPlayer, PartialNamePlayer } from "@/schemas/sheet";
+import { Player, PartialIdPlayer, PartialNamePlayer, Team } from "@/schemas/sheet";
 import { ScopedCache } from "typhoon-core/utils";
+
+const attachPlayerId = (playerId: string) => (team: Team) =>
+  Team.make({
+    ...team,
+    playerId: Option.some(playerId),
+  });
 
 export class PlayerService extends Effect.Service<PlayerService>()("PlayerService", {
   scoped: pipe(
@@ -119,6 +125,7 @@ export class PlayerService extends Effect.Service<PlayerService>()("PlayerServic
                           Array.filter((team) =>
                             Option.exists(team.playerName, (pn) => pn === player.name),
                           ),
+                          Array.map(attachPlayerId(player.id)),
                         ),
                       ),
                       Array.flatten,
@@ -155,6 +162,7 @@ export class PlayerService extends Effect.Service<PlayerService>()("PlayerServic
                           Array.filter((team) =>
                             Option.exists(team.playerName, (pn) => pn === player.name),
                           ),
+                          Array.map(attachPlayerId(player.id)),
                         ),
                       ),
                       Array.flatten,
