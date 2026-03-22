@@ -29,7 +29,7 @@ import {
 import { ActionRowBuilder } from "dfx-discord-utils/utils";
 import { Sheet } from "sheet-apis/schema";
 
-const autoCheckinPreviewNotice = "Sent automatically via auto check-in (preview; may have bugs).";
+const autoCheckinNotice = "Sent automatically via auto check-in.";
 
 // Formatter helpers for auto check-in formatting logic
 const formatChannelString = (
@@ -52,8 +52,8 @@ const formatChannelString = (
     }),
   );
 
-const formatPreviewContent = (content: string): string =>
-  [content, subtext(autoCheckinPreviewNotice)].join("\n");
+const formatCheckinContent = (content: string): string =>
+  [content, subtext(autoCheckinNotice)].join("\n");
 
 const getFillIds = (
   schedule: Option.Option<Sheet.PopulatedSchedule | Sheet.PopulatedBreakSchedule>,
@@ -202,7 +202,7 @@ const processChannel = Effect.fn("processChannel")(function* (
       onSome: (checkinMessage) =>
         pipe(
           discordRest.createMessage(checkinChannelId, {
-            content: formatPreviewContent(checkinMessage),
+            content: formatCheckinContent(checkinMessage),
             components: [new ActionRowBuilder().addComponent(checkinButtonData).toJSON()],
           }),
           Effect.flatMap((messageResult) =>
@@ -212,7 +212,7 @@ const processChannel = Effect.fn("processChannel")(function* (
                 onNone: () =>
                   Effect.all([
                     MessageCheckinService.upsertMessageCheckinData(messageResult.id, {
-                      initialMessage: formatPreviewContent(checkinMessage),
+                      initialMessage: formatCheckinContent(checkinMessage),
                       hour,
                       channelId: runningChannel.channelId,
                       roleId: Option.getOrNull(runningChannel.roleId),
@@ -222,7 +222,7 @@ const processChannel = Effect.fn("processChannel")(function* (
                 onSome: (fillIds) =>
                   Effect.all([
                     MessageCheckinService.upsertMessageCheckinData(messageResult.id, {
-                      initialMessage: formatPreviewContent(checkinMessage),
+                      initialMessage: formatCheckinContent(checkinMessage),
                       hour,
                       channelId: runningChannel.channelId,
                       roleId: Option.getOrNull(runningChannel.roleId),
@@ -249,7 +249,7 @@ const processChannel = Effect.fn("processChannel")(function* (
         onNone: () => [],
       }),
     ),
-    subtext(autoCheckinPreviewNotice),
+    subtext(autoCheckinNotice),
   ];
 
   const embed = yield* EmbedService.makeBaseEmbedBuilder().pipe(
