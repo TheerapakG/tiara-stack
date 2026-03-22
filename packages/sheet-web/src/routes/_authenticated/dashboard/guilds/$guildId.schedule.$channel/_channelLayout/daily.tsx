@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { DateTime, Option, Effect, pipe, HashMap, Array, Duration } from "effect";
@@ -34,6 +34,8 @@ import { classifyDailyHourSchedules, getDailyHourSchedules } from "./-dailyRows"
 const ESTIMATE_SIZE = 23 + 24 * 44;
 const INITIAL_START_OFFSET = -10;
 const INITIAL_END_OFFSET = 10;
+const TOP_EDGE_THRESHOLD = 3;
+const BOTTOM_EDGE_THRESHOLD = 3;
 
 export const Route = createFileRoute(
   "/_authenticated/dashboard/guilds/$guildId/schedule/$channel/_channelLayout/daily",
@@ -311,6 +313,12 @@ function DailyScheduleContent() {
     startOffset: INITIAL_START_OFFSET,
     endOffset: INITIAL_END_OFFSET,
   });
+  const pendingPrependAnchorRef = useRef<{
+    scrollHeight: number;
+    scrollTop: number;
+  } | null>(null);
+  const isPrependingRef = useRef(false);
+  const isAppendingRef = useRef(false);
 
   // Generate virtual days based on range around target
   const virtualDays = useMemo(() => {
@@ -341,6 +349,26 @@ function DailyScheduleContent() {
     overscan: 3,
   });
 
+  useLayoutEffect(() => {
+    const pendingPrependAnchor = pendingPrependAnchorRef.current;
+    if (!pendingPrependAnchor) {
+      isPrependingRef.current = false;
+      return;
+    }
+
+    const scrollElement = parentRef.current;
+    if (!scrollElement) {
+      pendingPrependAnchorRef.current = null;
+      isPrependingRef.current = false;
+      return;
+    }
+
+    scrollElement.scrollTop =
+      pendingPrependAnchor.scrollTop +
+      (scrollElement.scrollHeight - pendingPrependAnchor.scrollHeight);
+    pendingPrependAnchorRef.current = null;
+  }, [dayOffsetRange.startOffset]);
+
   // Extend range when scrolling near edges (bidirectional infinite scroll)
   useEffect(() => {
     const virtualItems = virtualizer.getVirtualItems();
@@ -350,19 +378,37 @@ function DailyScheduleContent() {
     const lastItem = Array.last(virtualItems);
 
     // Extend backward when scrolling near the top
-    if (Option.isSome(firstItem) && firstItem.value.index < 3) {
+    const isNearTop = Option.isSome(firstItem) && firstItem.value.index < TOP_EDGE_THRESHOLD;
+    if (isNearTop && !isPrependingRef.current) {
+      const scrollElement = parentRef.current;
+      isPrependingRef.current = true;
+      pendingPrependAnchorRef.current = scrollElement
+        ? {
+            scrollHeight: scrollElement.scrollHeight,
+            scrollTop: scrollElement.scrollTop,
+          }
+        : null;
       setDayOffsetRange((prev) => ({
         ...prev,
         startOffset: prev.startOffset + INITIAL_START_OFFSET,
       }));
     }
+    if (!isNearTop) {
+      isPrependingRef.current = false;
+    }
 
     // Extend forward when scrolling near the bottom
-    if (Option.isSome(lastItem) && lastItem.value.index >= virtualDays.length - 3) {
+    const isNearBottom =
+      Option.isSome(lastItem) && lastItem.value.index >= virtualDays.length - BOTTOM_EDGE_THRESHOLD;
+    if (isNearBottom && !isAppendingRef.current) {
+      isAppendingRef.current = true;
       setDayOffsetRange((prev) => ({
         ...prev,
         endOffset: prev.endOffset + INITIAL_END_OFFSET,
       }));
+    }
+    if (!isNearBottom) {
+      isAppendingRef.current = false;
     }
   }, [virtualizer.getVirtualItems(), virtualDays.length]);
 
