@@ -2,11 +2,13 @@ import type { HttpClientError } from "@effect/platform/HttpClientError";
 import { Discord, DiscordREST, Ix } from "dfx";
 import type { DiscordRESTError } from "dfx/DiscordREST";
 import { DiscordRestService } from "dfx/DiscordREST";
+import { MessageFlags } from "discord-api-types/v10";
 
 // Re-export types to ensure they're available in generated d.ts files
 export type { HttpClientError, DiscordRESTError };
 import { Deferred, Effect, FiberMap, pipe } from "effect";
 import { DiscordApplication } from "../discord/gateway";
+import { formatErrorResponse, makeDiscordErrorMessageResponse } from "./errorResponse";
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -14,7 +16,11 @@ import {
 } from "./messageComponentBuilder";
 import { DiscordInteraction } from "dfx/Interactions/context";
 
+type AcknowledgementState = "none" | "replied" | "updated" | "deferred-reply" | "deferred-update";
+
 export class MessageComponentHelper {
+  private acknowledgementState: AcknowledgementState = "none";
+
   constructor(
     readonly rest: DiscordRestService,
     private readonly application: Discord.PrivateApplicationResponse,
@@ -25,63 +31,152 @@ export class MessageComponentHelper {
   ) {}
 
   reply(payload?: Discord.IncomingWebhookInteractionRequest) {
-    return Deferred.succeed(this.response, {
-      files: [],
-      payload: {
-        type: Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: payload,
-      },
-    });
+    return Effect.sync(() => {
+      this.acknowledgementState = "replied";
+    }).pipe(
+      Effect.zipRight(
+        Deferred.succeed(this.response, {
+          files: [],
+          payload: {
+            type: Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: payload,
+          },
+        }),
+      ),
+    );
   }
 
   replyWithFiles(files: ReadonlyArray<File>, response?: Discord.IncomingWebhookInteractionRequest) {
-    return Deferred.succeed(this.response, {
-      files,
-      payload: {
-        type: Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: response,
-      },
-    });
+    return Effect.sync(() => {
+      this.acknowledgementState = "replied";
+    }).pipe(
+      Effect.zipRight(
+        Deferred.succeed(this.response, {
+          files,
+          payload: {
+            type: Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: response,
+          },
+        }),
+      ),
+    );
   }
 
   update(payload?: Discord.IncomingWebhookInteractionRequest) {
-    return Deferred.succeed(this.response, {
-      files: [],
-      payload: {
-        type: Discord.InteractionCallbackTypes.UPDATE_MESSAGE,
-        data: payload,
-      },
-    });
+    return Effect.sync(() => {
+      this.acknowledgementState = "updated";
+    }).pipe(
+      Effect.zipRight(
+        Deferred.succeed(this.response, {
+          files: [],
+          payload: {
+            type: Discord.InteractionCallbackTypes.UPDATE_MESSAGE,
+            data: payload,
+          },
+        }),
+      ),
+    );
   }
 
   updateWithFiles(files: ReadonlyArray<File>, payload?: Discord.IncomingWebhookInteractionRequest) {
-    return Deferred.succeed(this.response, {
-      files,
-      payload: {
-        type: Discord.InteractionCallbackTypes.UPDATE_MESSAGE,
-        data: payload,
-      },
-    });
+    return Effect.sync(() => {
+      this.acknowledgementState = "updated";
+    }).pipe(
+      Effect.zipRight(
+        Deferred.succeed(this.response, {
+          files,
+          payload: {
+            type: Discord.InteractionCallbackTypes.UPDATE_MESSAGE,
+            data: payload,
+          },
+        }),
+      ),
+    );
   }
 
   deferReply(response?: Discord.IncomingWebhookInteractionRequest) {
-    return Deferred.succeed(this.response, {
-      files: [],
-      payload: {
-        type: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-        data: response,
-      },
-    });
+    return Effect.sync(() => {
+      this.acknowledgementState = "deferred-reply";
+    }).pipe(
+      Effect.zipRight(
+        Deferred.succeed(this.response, {
+          files: [],
+          payload: {
+            type: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+            data: response,
+          },
+        }),
+      ),
+    );
   }
 
   deferUpdate(response?: Discord.IncomingWebhookInteractionRequest) {
-    return Deferred.succeed(this.response, {
-      files: [],
-      payload: {
-        type: Discord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE,
-        data: response,
-      },
-    });
+    return Effect.sync(() => {
+      this.acknowledgementState = "deferred-update";
+    }).pipe(
+      Effect.zipRight(
+        Deferred.succeed(this.response, {
+          files: [],
+          payload: {
+            type: Discord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE,
+            data: response,
+          },
+        }),
+      ),
+    );
+  }
+
+  respondWithError(error: unknown): Effect.Effect<unknown, DiscordRESTError, DiscordInteraction> {
+    const rendered = makeDiscordErrorMessageResponse(
+      "Interaction failed",
+      formatErrorResponse(error),
+    );
+    const payload: Discord.IncomingWebhookRequestPartial = {
+      content: rendered.content,
+      flags: MessageFlags.Ephemeral,
+    };
+
+    if (this.acknowledgementState === "deferred-reply") {
+      return rendered.files.length === 0
+        ? this.editReply({ payload: { content: rendered.content } })
+        : this.editReplyWithFiles(rendered.files, { payload: { content: rendered.content } });
+    }
+
+    if (this.acknowledgementState === "deferred-update") {
+      return this.editReply({ payload: {} }).pipe(
+        Effect.zipRight(this.followUp(payload, rendered.files)),
+      );
+    }
+
+    if (this.acknowledgementState !== "none") {
+      return this.followUp(payload, rendered.files);
+    }
+
+    return Effect.flatMap(
+      rendered.files.length === 0
+        ? this.reply(payload)
+        : this.replyWithFiles(rendered.files, payload),
+      (sent) => (sent ? Effect.void : this.followUp(payload, rendered.files)),
+    );
+  }
+
+  private followUp(
+    payload: Discord.IncomingWebhookRequestPartial,
+    files: ReadonlyArray<File>,
+  ): Effect.Effect<Discord.MessageResponse, DiscordRESTError, DiscordInteraction> {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const command = this;
+
+    return Ix.Interaction.pipe(
+      Effect.flatMap((context) => {
+        const request = command.rest.executeWebhook(command.application.id, context.token, {
+          params: { wait: true },
+          payload,
+        });
+
+        return files.length === 0 ? request : command.rest.withFiles(files)(request);
+      }),
+    );
   }
 
   editReply(response: {
@@ -170,7 +265,20 @@ export const makeButton = Effect.fnUntraced(function* <E = never, R = never>(
   const application = yield* DiscordApplication;
   const forkedHandler = yield* makeForkedMessageComponentHandler(
     Effect.fnUntraced(function* (helper: MessageComponentHelper) {
-      yield* handler(helper);
+      const shouldRunFallback = yield* handler(helper).pipe(
+        Effect.as(true),
+        Effect.catchAllCause((cause) =>
+          Effect.logError(cause).pipe(
+            Effect.zipRight(helper.respondWithError(cause)),
+            Effect.as(false),
+          ),
+        ),
+      );
+
+      if (!shouldRunFallback) {
+        return;
+      }
+
       yield* helper.reply({ content: "The button did not set a response." });
     }),
   );

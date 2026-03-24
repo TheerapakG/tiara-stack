@@ -2,6 +2,7 @@ import type { HttpClientError } from "@effect/platform/HttpClientError";
 import { Discord, DiscordREST, Ix } from "dfx";
 import type { DiscordRESTError } from "dfx/DiscordREST";
 import { CommandHelper } from "dfx/Interactions/commandHelper";
+import { MessageFlags } from "discord-api-types/v10";
 import {
   SubCommandNotFound,
   type DiscordApplicationCommand,
@@ -9,6 +10,7 @@ import {
 } from "dfx/Interactions/context";
 import { Array, Deferred, Effect, FiberMap, Option, pipe, Record } from "effect";
 import { DiscordApplication } from "../discord/gateway";
+import { formatErrorResponse, makeDiscordErrorMessageResponse } from "./errorResponse";
 import {
   CommandBuilder,
   CommandOptionsOnlyBuilder,
@@ -211,7 +213,11 @@ type CommandChannelValue<A, N> = CommandWithName<
   ? Discord.GuildChannelResponse
   : string;
 
+type AcknowledgementState = "none" | "replied" | "deferred-reply";
+
 export class WrappedCommandHelper<A> {
+  private acknowledgementState: AcknowledgementState = "none";
+
   constructor(
     readonly helper: CommandHelper<A>,
     private readonly subcommand: Option.Option<
@@ -439,33 +445,95 @@ export class WrappedCommandHelper<A> {
   }
 
   reply(payload?: Discord.IncomingWebhookInteractionRequest) {
-    return Deferred.succeed(this.response, {
-      files: [],
-      payload: {
-        type: Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: payload,
-      },
-    });
+    return Effect.sync(() => {
+      this.acknowledgementState = "replied";
+    }).pipe(
+      Effect.zipRight(
+        Deferred.succeed(this.response, {
+          files: [],
+          payload: {
+            type: Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: payload,
+          },
+        }),
+      ),
+    );
   }
 
   replyWithFiles(files: ReadonlyArray<File>, response?: Discord.IncomingWebhookInteractionRequest) {
-    return Deferred.succeed(this.response, {
-      files,
-      payload: {
-        type: Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: response,
-      },
-    });
+    return Effect.sync(() => {
+      this.acknowledgementState = "replied";
+    }).pipe(
+      Effect.zipRight(
+        Deferred.succeed(this.response, {
+          files,
+          payload: {
+            type: Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: response,
+          },
+        }),
+      ),
+    );
   }
 
   deferReply(response?: Discord.IncomingWebhookInteractionRequest) {
-    return Deferred.succeed(this.response, {
-      files: [],
-      payload: {
-        type: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-        data: response,
-      },
-    });
+    return Effect.sync(() => {
+      this.acknowledgementState = "deferred-reply";
+    }).pipe(
+      Effect.zipRight(
+        Deferred.succeed(this.response, {
+          files: [],
+          payload: {
+            type: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+            data: response,
+          },
+        }),
+      ),
+    );
+  }
+
+  respondWithError(error: unknown): Effect.Effect<unknown, DiscordRESTError, DiscordInteraction> {
+    const rendered = makeDiscordErrorMessageResponse("Command failed", formatErrorResponse(error));
+    const payload: Discord.IncomingWebhookRequestPartial = {
+      content: rendered.content,
+      flags: MessageFlags.Ephemeral,
+    };
+
+    if (this.acknowledgementState === "deferred-reply") {
+      return rendered.files.length === 0
+        ? this.editReply({ payload: { content: rendered.content } })
+        : this.editReplyWithFiles(rendered.files, { payload: { content: rendered.content } });
+    }
+
+    if (this.acknowledgementState === "replied") {
+      return this.followUp(payload, rendered.files);
+    }
+
+    return Effect.flatMap(
+      rendered.files.length === 0
+        ? this.reply(payload)
+        : this.replyWithFiles(rendered.files, payload),
+      (sent) => (sent ? Effect.void : this.followUp(payload, rendered.files)),
+    );
+  }
+
+  private followUp(
+    payload: Discord.IncomingWebhookRequestPartial,
+    files: ReadonlyArray<File>,
+  ): Effect.Effect<Discord.MessageResponse, DiscordRESTError, DiscordInteraction> {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const command = this;
+
+    return Ix.Interaction.pipe(
+      Effect.flatMap((context) => {
+        const request = command.rest.executeWebhook(command.application.id, context.token, {
+          params: { wait: true },
+          payload,
+        });
+
+        return files.length === 0 ? request : command.rest.withFiles(files)(request);
+      }),
+    );
   }
 
   editReply(response: {
@@ -561,7 +629,26 @@ export const makeSubCommandGroup = Effect.fnUntraced(function* <
   const forkedHandler = yield* makeForkedCommandHandler(
     Effect.fn("makeSubCommandGroup.forkedHandler", {
       attributes: { subCommandGroup: builtData.builder.name },
-    })(handler),
+    })(function* (commandHelper: WrappedCommandHelper<A>) {
+      const shouldRunFallback = yield* handler(commandHelper).pipe(
+        Effect.as(true),
+        Effect.catchAllCause((cause) =>
+          Effect.logError(cause).pipe(
+            Effect.zipRight(commandHelper.respondWithError(cause)),
+            Effect.as(false),
+          ),
+        ),
+      );
+
+      if (!shouldRunFallback) {
+        return;
+      }
+
+      yield* Effect.sleep(2500);
+      yield* commandHelper.reply({
+        content: "The subcommand group did not set a response in time.",
+      });
+    }),
   );
   return {
     data: builtData,
@@ -585,7 +672,24 @@ export const makeSubCommand = Effect.fnUntraced(function* <
   const forkedHandler = yield* makeForkedCommandHandler(
     Effect.fn("makeSubCommand.forkedHandler", {
       attributes: { subCommand: builtData.builder.name },
-    })(handler),
+    })(function* (commandHelper: WrappedCommandHelper<A>) {
+      const shouldRunFallback = yield* handler(commandHelper).pipe(
+        Effect.as(true),
+        Effect.catchAllCause((cause) =>
+          Effect.logError(cause).pipe(
+            Effect.zipRight(commandHelper.respondWithError(cause)),
+            Effect.as(false),
+          ),
+        ),
+      );
+
+      if (!shouldRunFallback) {
+        return;
+      }
+
+      yield* Effect.sleep(2500);
+      yield* commandHelper.reply({ content: "The subcommand did not set a response in time." });
+    }),
   );
   return {
     data: builtData,
@@ -609,7 +713,20 @@ export const makeCommand = Effect.fnUntraced(function* <
   const forkedHandler = yield* makeForkedCommandHandler(
     Effect.fn("makeCommand.forkedHandler", { attributes: { command: builtData.builder.name } })(
       function* (commandHelper: WrappedCommandHelper<A>) {
-        yield* handler(commandHelper);
+        const shouldRunFallback = yield* handler(commandHelper).pipe(
+          Effect.as(true),
+          Effect.catchAllCause((cause) =>
+            Effect.logError(cause).pipe(
+              Effect.zipRight(commandHelper.respondWithError(cause)),
+              Effect.as(false),
+            ),
+          ),
+        );
+
+        if (!shouldRunFallback) {
+          return;
+        }
+
         yield* Effect.sleep(2500);
         yield* commandHelper.reply({ content: "The command did not set a response in time." });
       },
