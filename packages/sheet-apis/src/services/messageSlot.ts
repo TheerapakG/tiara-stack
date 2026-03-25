@@ -32,9 +32,25 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()("Me
             captureStackTrace: true,
           }),
         ),
-      upsertMessageSlotData: (messageId: string, day: number) =>
+      upsertMessageSlotData: (
+        messageId: string,
+        data: {
+          day: number;
+          guildId: string | null;
+          messageChannelId: string | null;
+          createdByUserId: string | null;
+        },
+      ) =>
         pipe(
-          ZeroService.mutate(mutators.messageSlot.upsertMessageSlotData({ messageId, day })),
+          ZeroService.mutate(
+            mutators.messageSlot.upsertMessageSlotData({
+              messageId,
+              day: data.day,
+              guildId: data.guildId,
+              messageChannelId: data.messageChannelId,
+              createdByUserId: data.createdByUserId,
+            }),
+          ),
           Effect.andThen((mutation) => mutation.server()),
           Effect.andThen(
             ZeroService.run(queries.messageSlot.getMessageSlotData({ messageId }), {

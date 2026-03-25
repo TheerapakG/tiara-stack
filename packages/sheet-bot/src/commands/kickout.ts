@@ -50,21 +50,8 @@ const makeManualSubCommand = Effect.gen(function* () {
         Option.getOrThrow,
       );
 
-      const monitorRoles = yield* guildConfigService.getGuildMonitorRoles(guildId);
-
-      yield* Effect.all({
-        isOwnerOrInGuild: permissionService
-          .checkInteractionUserApplicationOwner()
-          .pipe(
-            Effect.catchTag("PermissionError", () =>
-              permissionService.checkInteractionInGuild(Option.getOrUndefined(serverId)),
-            ),
-          ),
-        hasMonitorRole: permissionService.checkInteractionUserGuildRoles(
-          monitorRoles.map((role) => role.roleId),
-          guildId,
-        ),
-      });
+      // Keep this check in the bot because the command still removes Discord roles directly.
+      yield* permissionService.checkInteractionUserMonitorGuild(guildId);
 
       const date = yield* DateTime.now;
       const minute = DateTime.getPart(date, "minutes");

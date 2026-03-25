@@ -1,3 +1,4 @@
+export * from "./checkin";
 export * from "./converter";
 export * from "./embed";
 export * from "./format";
@@ -8,6 +9,7 @@ export * from "./messageSlot";
 export * from "./monitor";
 export * from "./permission";
 export * from "./player";
+export * from "./roomOrder";
 export * from "./schedule";
 export * from "./screenshot";
 export * from "./sheetApis";

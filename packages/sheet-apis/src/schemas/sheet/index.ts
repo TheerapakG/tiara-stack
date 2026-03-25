@@ -7,6 +7,8 @@ export {
   ScheduleView,
   ScheduleResponse,
   PopulatedScheduleResponse,
+  PlayerDayScheduleSummary,
+  PlayerDayScheduleResponse,
   getMaximumScheduleView,
   getEffectiveScheduleView,
 } from "./scheduleView";

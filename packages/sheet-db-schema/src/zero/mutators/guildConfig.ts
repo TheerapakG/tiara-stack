@@ -13,7 +13,6 @@ export const guildConfig = {
     pipe(
       Schema.Struct({
         guildId: Schema.String,
-        scriptId: Schema.optional(Schema.NullOr(Schema.String)),
         sheetId: Schema.optional(Schema.NullOr(Schema.String)),
         autoCheckin: Schema.optional(Schema.NullOr(Schema.Boolean)),
       }),
@@ -22,7 +21,6 @@ export const guildConfig = {
     async ({ tx, args }) =>
       await tx.mutate.configGuild.upsert({
         guildId: args.guildId,
-        scriptId: args.scriptId,
         sheetId: args.sheetId,
         autoCheckin: args.autoCheckin,
         deletedAt: null,

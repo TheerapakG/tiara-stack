@@ -6,20 +6,19 @@ import {
   InteractionContextType,
   MessageFlags,
 } from "discord-api-types/v10";
-import { Array, Effect, Layer, Match, Option, pipe, String } from "effect";
+import { Effect, Layer, Option, pipe } from "effect";
 import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import {
   EmbedService,
-  GuildConfigService,
   PermissionService,
   ScheduleService,
   SheetApisRequestContext,
 } from "../services";
 
 const formatHourRanges = (hours: readonly number[]): string => {
-  if (Array.isEmptyReadonlyArray(hours)) return "None";
+  if (hours.length === 0) return "None";
   const sorted = [...hours].sort((a, b) => a - b);
   const ranges: { start: number; end: number }[] = [];
   for (const h of sorted) {
@@ -39,7 +38,6 @@ const formatHourRanges = (hours: readonly number[]): string => {
 
 const makeListSubCommand = Effect.gen(function* () {
   const embedService = yield* EmbedService;
-  const guildConfigService = yield* GuildConfigService;
   const permissionService = yield* PermissionService;
   const scheduleService = yield* ScheduleService;
 
@@ -68,8 +66,6 @@ const makeListSubCommand = Effect.gen(function* () {
         Option.getOrThrow,
       );
 
-      const monitorRoles = yield* guildConfigService.getGuildMonitorRoles(guildId);
-
       const day = command.optionValue("day");
       const interactionUser = yield* Interaction.user();
 
@@ -83,111 +79,7 @@ const makeListSubCommand = Effect.gen(function* () {
         Option.getOrElse(() => interactionUser),
       );
 
-      if (interactionUser.id !== targetUser.id) {
-        const canView = yield* pipe(
-          permissionService.checkInteractionUserGuildRoles(
-            monitorRoles.map((role) => role.roleId),
-            guildId,
-          ),
-          Effect.catchTag("PermissionError", () => Effect.succeed(false)),
-        );
-
-        if (!canView) {
-          yield* command.editReply({
-            payload: {
-              content: "You can only get your own schedule in the current server",
-            },
-          });
-          return;
-        }
-      }
-
-      const daySchedules = yield* scheduleService.dayPopulatedFillerSchedules(guildId, day);
-
-      const filteredSchedules = pipe(
-        daySchedules,
-        Array.filterMap((scheduleItem) =>
-          pipe(
-            scheduleItem.hour,
-            Option.map(() => scheduleItem),
-            Option.flatMap((scheduleItem) =>
-              pipe(
-                Match.value(scheduleItem),
-                Match.tagsExhaustive({
-                  PopulatedBreakSchedule: () => Option.none(),
-                  PopulatedSchedule: (s) => Option.some(s),
-                }),
-              ),
-            ),
-          ),
-        ),
-      );
-
-      const invisible = pipe(
-        filteredSchedules,
-        Array.some(({ visible }) => !visible),
-      );
-
-      const fillHours = pipe(
-        filteredSchedules,
-        Array.filter((scheduleItem) =>
-          pipe(
-            scheduleItem.fills,
-            Array.getSomes,
-            Array.some((fill) =>
-              pipe(
-                Match.value(fill.player),
-                Match.tagsExhaustive({
-                  Player: (player) => String.Equivalence(player.id, targetUser.id),
-                  PartialNamePlayer: () => false,
-                }),
-              ),
-            ),
-          ),
-        ),
-        Array.map((scheduleItem) => scheduleItem.hour),
-        Array.getSomes,
-      );
-
-      const overfillHours = pipe(
-        filteredSchedules,
-        Array.filter((scheduleItem) =>
-          pipe(
-            scheduleItem.overfills,
-            Array.some((overfill) =>
-              pipe(
-                Match.value(overfill.player),
-                Match.tagsExhaustive({
-                  Player: (player) => String.Equivalence(player.id, targetUser.id),
-                  PartialNamePlayer: () => false,
-                }),
-              ),
-            ),
-          ),
-        ),
-        Array.map((scheduleItem) => scheduleItem.hour),
-        Array.getSomes,
-      );
-
-      const standbyHours = pipe(
-        filteredSchedules,
-        Array.filter((scheduleItem) =>
-          pipe(
-            scheduleItem.standbys,
-            Array.some((standby) =>
-              pipe(
-                Match.value(standby.player),
-                Match.tagsExhaustive({
-                  Player: (player) => String.Equivalence(player.id, targetUser.id),
-                  PartialNamePlayer: () => false,
-                }),
-              ),
-            ),
-          ),
-        ),
-        Array.map((scheduleItem) => scheduleItem.hour),
-        Array.getSomes,
-      );
+      const { schedule } = yield* scheduleService.dayPlayerSchedule(guildId, day, targetUser.id);
 
       yield* command.editReply({
         payload: {
@@ -195,17 +87,17 @@ const makeListSubCommand = Effect.gen(function* () {
             (yield* embedService.makeBaseEmbedBuilder())
               .setTitle(`${escapeMarkdown(targetUser.username)}'s Schedule for Day ${day}`)
               .setDescription(
-                invisible
+                schedule.invisible
                   ? "It is kinda foggy around here... This schedule is not visible to you yet."
                   : null,
               )
               .addFields(
-                invisible
+                schedule.invisible
                   ? []
                   : [
-                      { name: "Fill", value: formatHourRanges(fillHours) },
-                      { name: "Overfill", value: formatHourRanges(overfillHours) },
-                      { name: "Standby", value: formatHourRanges(standbyHours) },
+                      { name: "Fill", value: formatHourRanges(schedule.fillHours) },
+                      { name: "Overfill", value: formatHourRanges(schedule.overfillHours) },
+                      { name: "Standby", value: formatHourRanges(schedule.standbyHours) },
                     ],
               )
               .toJSON(),
@@ -260,7 +152,6 @@ export const ScheduleCommandLive = Layer.scopedDiscard(
   Layer.provide(
     Layer.mergeAll(
       DiscordGatewayLayer,
-      GuildConfigService.Default,
       PermissionService.Default,
       EmbedService.Default,
       ScheduleService.Default,

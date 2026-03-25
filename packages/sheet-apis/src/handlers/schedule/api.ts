@@ -4,7 +4,11 @@ import { ValidationError, QueryResultError } from "typhoon-core/error";
 import { GoogleSheetsError } from "@/schemas/google";
 import { ParserFieldError } from "@/schemas/sheet/error";
 import { SheetConfigError } from "@/schemas/sheetConfig";
-import { PopulatedScheduleResponse, ScheduleView } from "@/schemas/sheet";
+import {
+  PlayerDayScheduleResponse,
+  PopulatedScheduleResponse,
+  ScheduleView,
+} from "@/schemas/sheet";
 import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthorization/tag";
 
 const ScheduleError = Schema.Union(
@@ -46,6 +50,19 @@ export class ScheduleApi extends HttpApiGroup.make("schedule")
         }),
       )
       .addSuccess(PopulatedScheduleResponse)
+      .addError(ScheduleError),
+  )
+  .add(
+    HttpApiEndpoint.get("getDayPlayerSchedule", "/schedule/getDayPlayerSchedule")
+      .setUrlParams(
+        Schema.Struct({
+          guildId: Schema.String,
+          day: Schema.NumberFromString,
+          userId: Schema.String,
+          view: ScheduleViewUrlParam,
+        }),
+      )
+      .addSuccess(PlayerDayScheduleResponse)
       .addError(ScheduleError),
   )
   .middleware(SheetAuthTokenAuthorization)

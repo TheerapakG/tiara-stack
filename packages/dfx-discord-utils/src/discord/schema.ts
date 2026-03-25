@@ -423,6 +423,17 @@ export const DiscordGuild = Schema.Struct({
 
 export type DiscordGuild = typeof DiscordGuild.Type;
 
+export const DiscordApplicationOwner = Schema.Struct({
+  id: Schema.String,
+});
+
+export const DiscordApplicationSchema = Schema.Struct({
+  id: Schema.String,
+  owner: DiscordApplicationOwner,
+});
+
+export type DiscordApplicationSchema = typeof DiscordApplicationSchema.Type;
+
 // ============================================================================
 // Cache Entry Schemas (for API responses)
 // ============================================================================
@@ -464,6 +475,10 @@ export const RoleValueSchema = Schema.Struct({
 
 export const MemberValueSchema = Schema.Struct({
   value: DiscordMember,
+});
+
+export const ApplicationValueSchema = Schema.Struct({
+  ownerId: Schema.String,
 });
 
 // Size response

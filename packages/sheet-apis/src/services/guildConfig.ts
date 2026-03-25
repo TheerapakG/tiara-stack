@@ -28,7 +28,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
             captureStackTrace: true,
           }),
         ),
-      getGuildConfigByGuildId: (guildId: string) =>
+      getGuildConfig: (guildId: string) =>
         pipe(
           ZeroService.run(queries.guildConfig.getGuildConfigByGuildId({ guildId }), {
             type: "complete",
@@ -38,28 +38,13 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
             Schema.decode(Schema.OptionFromNullishOr(DefaultTaggedClass(GuildConfig), undefined)),
           ),
           catchParseErrorAsValidationError,
-          Effect.withSpan("GuildConfigService.getGuildConfigByGuildId", {
-            captureStackTrace: true,
-          }),
-        ),
-      getGuildConfigByScriptId: (scriptId: string) =>
-        pipe(
-          ZeroService.run(queries.guildConfig.getGuildConfigByScriptId({ scriptId }), {
-            type: "complete",
-          }),
-          Effect.provide(zeroContext),
-          Effect.flatMap(
-            Schema.decode(Schema.OptionFromNullishOr(DefaultTaggedClass(GuildConfig), undefined)),
-          ),
-          catchParseErrorAsValidationError,
-          Effect.withSpan("GuildConfigService.getGuildConfigByScriptId", {
+          Effect.withSpan("GuildConfigService.getGuildConfig", {
             captureStackTrace: true,
           }),
         ),
       upsertGuildConfig: (
         guildId: string,
         config: {
-          scriptId?: string | null | undefined;
           sheetId?: string | null | undefined;
           autoCheckin?: boolean | null | undefined;
         },
@@ -96,6 +81,22 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
           Effect.flatMap(Schema.decode(Schema.Array(DefaultTaggedClass(GuildConfigMonitorRole)))),
           catchParseErrorAsValidationError,
           Effect.withSpan("GuildConfigService.getGuildMonitorRoles", {
+            captureStackTrace: true,
+          }),
+        ),
+      getGuildChannels: (params: { guildId: string; running?: boolean | undefined }) =>
+        pipe(
+          ZeroService.run(
+            queries.guildConfig.getGuildChannels({
+              guildId: params.guildId,
+              ...(typeof params.running === "undefined" ? {} : { running: params.running }),
+            }),
+            { type: "complete" },
+          ),
+          Effect.provide(zeroContext),
+          Effect.flatMap(Schema.decode(Schema.Array(DefaultTaggedClass(GuildChannelConfig)))),
+          catchParseErrorAsValidationError,
+          Effect.withSpan("GuildConfigService.getGuildChannels", {
             captureStackTrace: true,
           }),
         ),

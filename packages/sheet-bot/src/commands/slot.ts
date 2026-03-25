@@ -1,4 +1,4 @@
-import { Discord, Ix } from "dfx";
+import { Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
 import {
   ApplicationIntegrationType,
@@ -12,7 +12,6 @@ import { Interaction, makeMessageActionRowData } from "dfx-discord-utils/utils";
 import {
   EmbedService,
   FormatService,
-  GuildConfigService,
   MessageSlotService,
   PermissionService,
   ScheduleService,
@@ -23,7 +22,6 @@ import { slotButtonData } from "../messageComponents/buttons/slot";
 const makeListSubCommand = Effect.gen(function* () {
   const embedService = yield* EmbedService;
   const formatService = yield* FormatService;
-  const guildConfigService = yield* GuildConfigService;
   const permissionService = yield* PermissionService;
   const scheduleService = yield* ScheduleService;
 
@@ -72,16 +70,9 @@ const makeListSubCommand = Effect.gen(function* () {
 
       yield* command.deferReply({ flags: isEphemeral ? MessageFlags.Ephemeral : undefined });
 
-      const monitorRoles = yield* guildConfigService.getGuildMonitorRoles(guildId);
-
+      // Keep this check in the bot because persistent vs ephemeral access is still a bot policy.
       yield* pipe(
-        Effect.firstSuccessOf([
-          permissionService.checkInteractionUserApplicationOwner(),
-          permissionService.checkInteractionUserGuildRoles(
-            monitorRoles.map((role) => role.roleId),
-            guildId,
-          ),
-        ]),
+        permissionService.checkInteractionUserMonitorGuild(guildId),
         Effect.unless(() => isEphemeral),
       );
 
@@ -146,7 +137,6 @@ const makeListSubCommand = Effect.gen(function* () {
 });
 
 const makeButtonSubCommand = Effect.gen(function* () {
-  const guildConfigService = yield* GuildConfigService;
   const messageSlotService = yield* MessageSlotService;
   const permissionService = yield* PermissionService;
 
@@ -172,21 +162,8 @@ const makeButtonSubCommand = Effect.gen(function* () {
         Option.getOrThrow,
       );
 
-      // Check if user is app owner or has ManageGuild permission
-      yield* Effect.firstSuccessOf([
-        permissionService.checkInteractionUserApplicationOwner(),
-        permissionService.checkInteractionUserGuildPermissions(
-          Discord.Permissions.ManageGuild,
-          guildId,
-        ),
-      ]);
-
-      const monitorRoles = yield* guildConfigService.getGuildMonitorRoles(guildId);
-
-      yield* permissionService.checkInteractionUserGuildRoles(
-        monitorRoles.map((role) => role.roleId),
-        guildId,
-      );
+      // Keep this check in the bot because the command still creates a persistent Discord message.
+      yield* permissionService.checkInteractionUserMonitorGuild(guildId);
 
       yield* command.deferReply({ flags: MessageFlags.Ephemeral });
 
@@ -210,7 +187,12 @@ const makeButtonSubCommand = Effect.gen(function* () {
         components: [makeMessageActionRowData((b) => b.setComponents(slotButtonData)).toJSON()],
       });
 
-      yield* messageSlotService.upsertMessageSlotData(messageResult.id, day);
+      yield* messageSlotService.upsertMessageSlotData(messageResult.id, {
+        day,
+        guildId,
+        messageChannelId: channelId,
+        createdByUserId: (yield* Interaction.user()).id,
+      });
 
       yield* command.editReply({
         payload: {
@@ -272,7 +254,6 @@ export const SlotCommandLive = Layer.scopedDiscard(
       ScheduleService.Default,
       FormatService.Default,
       EmbedService.Default,
-      GuildConfigService.Default,
       MessageSlotService.Default,
     ),
   ),

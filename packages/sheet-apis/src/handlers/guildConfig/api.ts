@@ -11,20 +11,10 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
       .addError(Schema.Union(ValidationError, QueryResultError)),
   )
   .add(
-    HttpApiEndpoint.get("getGuildConfigByGuildId", "/guildConfig/getGuildConfigByGuildId")
+    HttpApiEndpoint.get("getGuildConfig", "/guildConfig/getGuildConfig")
       .setUrlParams(
         Schema.Struct({
           guildId: Schema.String,
-        }),
-      )
-      .addSuccess(GuildConfig)
-      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
-  )
-  .add(
-    HttpApiEndpoint.get("getGuildConfigByScriptId", "/guildConfig/getGuildConfigByScriptId")
-      .setUrlParams(
-        Schema.Struct({
-          scriptId: Schema.String,
         }),
       )
       .addSuccess(GuildConfig)
@@ -36,7 +26,6 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
         Schema.Struct({
           guildId: Schema.String,
           config: Schema.Struct({
-            scriptId: Schema.optional(Schema.NullOr(Schema.String)),
             sheetId: Schema.optional(Schema.NullOr(Schema.String)),
             autoCheckin: Schema.optional(Schema.NullOr(Schema.Boolean)),
           }),
@@ -53,6 +42,17 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
         }),
       )
       .addSuccess(Schema.Array(GuildConfigMonitorRole))
+      .addError(Schema.Union(ValidationError, QueryResultError)),
+  )
+  .add(
+    HttpApiEndpoint.get("getGuildChannels", "/guildConfig/getGuildChannels")
+      .setUrlParams(
+        Schema.Struct({
+          guildId: Schema.String,
+          running: Schema.optional(Schema.BooleanFromString),
+        }),
+      )
+      .addSuccess(Schema.Array(GuildChannelConfig))
       .addError(Schema.Union(ValidationError, QueryResultError)),
   )
   .add(

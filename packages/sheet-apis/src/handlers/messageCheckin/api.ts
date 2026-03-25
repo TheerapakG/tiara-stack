@@ -25,6 +25,9 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
             hour: Schema.Number,
             channelId: Schema.String,
             roleId: Schema.optional(Schema.NullOr(Schema.String)),
+            guildId: Schema.NullOr(Schema.String),
+            messageChannelId: Schema.NullOr(Schema.String),
+            createdByUserId: Schema.NullOr(Schema.String),
           }),
         }),
       )
@@ -39,7 +42,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
         }),
       )
       .addSuccess(Schema.Array(MessageCheckinMember))
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
   )
   .add(
     HttpApiEndpoint.post("addMessageCheckinMembers", "/messageCheckin/addMessageCheckinMembers")
@@ -50,7 +53,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
         }),
       )
       .addSuccess(Schema.Array(MessageCheckinMember))
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
   )
   .add(
     HttpApiEndpoint.post(
@@ -65,7 +68,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
         }),
       )
       .addSuccess(MessageCheckinMember)
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
   )
   .add(
     HttpApiEndpoint.post("removeMessageCheckinMember", "/messageCheckin/removeMessageCheckinMember")
@@ -76,7 +79,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
         }),
       )
       .addSuccess(MessageCheckinMember)
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
   )
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Message Checkin")

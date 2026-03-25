@@ -3,6 +3,7 @@ export * as SheetConfig from "./schemas/sheetConfig";
 export * as MessageSlot from "./schemas/messageSlot";
 export * as MessageRoomOrder from "./schemas/messageRoomOrder";
 export * as MessageCheckin from "./schemas/messageCheckin";
+export * as Checkin from "./schemas/checkin";
 export * as GuildConfig from "./schemas/guildConfig";
 export * as Discord from "./schemas/discord";
 export * as Permissions from "./schemas/permissions";

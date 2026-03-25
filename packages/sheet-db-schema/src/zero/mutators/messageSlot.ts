@@ -14,6 +14,9 @@ export const messageSlot = {
       Schema.Struct({
         messageId: Schema.String,
         day: Schema.Number,
+        guildId: Schema.NullOr(Schema.String),
+        messageChannelId: Schema.NullOr(Schema.String),
+        createdByUserId: Schema.NullOr(Schema.String),
       }),
       Schema.standardSchemaV1,
     ),
@@ -21,6 +24,9 @@ export const messageSlot = {
       await tx.mutate.messageSlot.upsert({
         messageId: args.messageId,
         day: args.day,
+        guildId: args.guildId,
+        messageChannelId: args.messageChannelId,
+        createdByUserId: args.createdByUserId,
         deletedAt: null,
       }),
   ),

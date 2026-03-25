@@ -22,6 +22,9 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
               hour: number;
               rank: number;
               monitor: string | null | undefined;
+              guildId: string | null;
+              messageChannelId: string | null;
+              createdByUserId: string | null;
             },
           ) =>
             sheetApisClient.get().messageRoomOrder.upsertMessageRoomOrder({

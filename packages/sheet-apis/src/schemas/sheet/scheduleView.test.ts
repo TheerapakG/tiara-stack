@@ -4,6 +4,8 @@ import {
   ScheduleView,
   ScheduleResponse,
   PopulatedScheduleResponse,
+  PlayerDayScheduleSummary,
+  PlayerDayScheduleResponse,
   getEffectiveScheduleView,
   getMaximumScheduleView,
 } from "./scheduleView";
@@ -29,13 +31,35 @@ describe("PopulatedScheduleResponse", () => {
   });
 });
 
+describe("PlayerDayScheduleSummary", () => {
+  it("PlayerDayScheduleSummary generates json schema", () => {
+    const schema = JSONSchema.make(PlayerDayScheduleSummary);
+    expect(schema).toBeDefined();
+  });
+});
+
+describe("PlayerDayScheduleResponse", () => {
+  it("PlayerDayScheduleResponse generates json schema", () => {
+    const schema = JSONSchema.make(PlayerDayScheduleResponse);
+    expect(schema).toBeDefined();
+  });
+});
+
 describe("getMaximumScheduleView", () => {
+  it("returns monitor for bot users", () => {
+    expect(getMaximumScheduleView(["bot"], "guild-1")).toBe("monitor");
+  });
+
+  it("returns monitor for app owners", () => {
+    expect(getMaximumScheduleView(["app_owner"], "guild-1")).toBe("monitor");
+  });
+
   it("returns monitor for monitor users", () => {
-    expect(getMaximumScheduleView(["monitor_guild"])).toBe("monitor");
+    expect(getMaximumScheduleView(["monitor_guild:guild-1"], "guild-1")).toBe("monitor");
   });
 
   it("returns filler without monitor permission", () => {
-    expect(getMaximumScheduleView(["manage_guild"])).toBe("filler");
+    expect(getMaximumScheduleView(["manage_guild:guild-1"], "guild-1")).toBe("filler");
   });
 });
 

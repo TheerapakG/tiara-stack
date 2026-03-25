@@ -43,6 +43,9 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
             hour: number;
             channelId: string;
             roleId?: string | null | undefined;
+            guildId: string | null;
+            messageChannelId: string | null;
+            createdByUserId: string | null;
           },
         ) =>
           pipe(
@@ -53,6 +56,9 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
                 hour: data.hour,
                 channelId: data.channelId,
                 roleId: data.roleId,
+                guildId: data.guildId,
+                messageChannelId: data.messageChannelId,
+                createdByUserId: data.createdByUserId,
               }),
             ),
             Effect.andThen((mutation) => mutation.server()),

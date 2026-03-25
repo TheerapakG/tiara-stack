@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import type { Permission } from "sheet-auth/plugins/kubernetes-oauth/client";
+import type { Permission } from "@/schemas/permissions";
 import { BreakSchedule, Schedule } from "./schedule";
 import { PopulatedScheduleResult } from "./populatedSchedule";
 
@@ -21,8 +21,31 @@ export const PopulatedScheduleResponse = Schema.Struct({
 
 export type PopulatedScheduleResponse = Schema.Schema.Type<typeof PopulatedScheduleResponse>;
 
-export const getMaximumScheduleView = (permissions: ReadonlyArray<Permission>): ScheduleView =>
-  permissions.includes("monitor_guild") ? "monitor" : "filler";
+export const PlayerDayScheduleSummary = Schema.Struct({
+  fillHours: Schema.Array(Schema.Number),
+  overfillHours: Schema.Array(Schema.Number),
+  standbyHours: Schema.Array(Schema.Number),
+  invisible: Schema.Boolean,
+});
+
+export type PlayerDayScheduleSummary = Schema.Schema.Type<typeof PlayerDayScheduleSummary>;
+
+export const PlayerDayScheduleResponse = Schema.Struct({
+  view: ScheduleView,
+  schedule: PlayerDayScheduleSummary,
+});
+
+export type PlayerDayScheduleResponse = Schema.Schema.Type<typeof PlayerDayScheduleResponse>;
+
+export const getMaximumScheduleView = (
+  permissions: ReadonlyArray<Permission>,
+  guildId: string,
+): ScheduleView =>
+  permissions.includes("bot") ||
+  permissions.includes("app_owner") ||
+  permissions.includes(`monitor_guild:${guildId}`)
+    ? "monitor"
+    : "filler";
 
 export const getEffectiveScheduleView = (
   maximumView: ScheduleView,

@@ -8,7 +8,7 @@ import {
 import { Effect, Layer } from "effect";
 import { config } from "@/config";
 
-const CacheApiClientLive = Layer.unwrapEffect(
+export const CacheApiClientLive = Layer.unwrapEffect(
   Effect.gen(function* () {
     const cacheApiBaseUrl = yield* config.cacheApiBaseUrl;
     return CacheApiClient.Live(cacheApiBaseUrl);

@@ -1,6 +1,7 @@
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, OpenApi } from "@effect/platform";
 import { Schema } from "effect";
 import {
+  ApplicationValueSchema,
   GuildValueSchema,
   ChannelValueSchema,
   RoleValueSchema,
@@ -29,6 +30,9 @@ export class CacheApi extends HttpApiGroup.make("cache")
       .setPath(Schema.Struct({ resourceId: ResourceIdParam }))
       .addSuccess(GuildValueSchema)
       .addError(CacheNotFoundError),
+  )
+  .add(
+    HttpApiEndpoint.get("getApplication", "/cache/application").addSuccess(ApplicationValueSchema),
   )
   .add(HttpApiEndpoint.get("getGuildSize", "/cache/guilds/size").addSuccess(CacheSizeSchema))
   // Reverse lookup cache endpoints - get specific resource

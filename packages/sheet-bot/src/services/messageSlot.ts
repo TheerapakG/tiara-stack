@@ -9,9 +9,17 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()("Me
         sheetApisClient.get().messageSlot.getMessageSlotData({ urlParams: { messageId } }),
       ),
       upsertMessageSlotData: Effect.fn("MessageSlotService.upsertMessageSlotData")(
-        (messageId: string, day: number) =>
+        (
+          messageId: string,
+          data: {
+            day: number;
+            guildId: string | null;
+            messageChannelId: string | null;
+            createdByUserId: string | null;
+          },
+        ) =>
           sheetApisClient.get().messageSlot.upsertMessageSlotData({
-            payload: { messageId, day },
+            payload: { messageId, data },
           }),
       ),
     })),

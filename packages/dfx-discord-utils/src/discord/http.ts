@@ -2,6 +2,7 @@ import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer } from "effect";
 import { DiscordCacheApi } from "./api";
 import { GuildsCache, ChannelsCache, RolesCache, MembersCache } from "./cache";
+import { DiscordApplication } from "./gateway";
 import { CacheNotFoundError } from "./schema";
 
 // Helper to convert a ReadonlyMap to CacheEntries array
@@ -51,13 +52,15 @@ const handleSizeError = <A>(
 
 export const CacheLive = HttpApiBuilder.group(DiscordCacheApi, "cache", (handlers) =>
   Effect.all({
+    application: DiscordApplication,
     guildsCache: GuildsCache,
     channelsCache: ChannelsCache,
     rolesCache: RolesCache,
     membersCache: MembersCache,
   }).pipe(
-    Effect.map(({ guildsCache, channelsCache, rolesCache, membersCache }) =>
+    Effect.map(({ application, guildsCache, channelsCache, rolesCache, membersCache }) =>
       handlers
+        .handle("getApplication", () => Effect.succeed({ ownerId: application.owner.id }))
         // Guild cache endpoints
         .handle("getGuild", ({ path: { resourceId } }) =>
           handleCacheError(
@@ -206,6 +209,7 @@ export const CacheLive = HttpApiBuilder.group(DiscordCacheApi, "cache", (handler
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
+      DiscordApplication.Default,
       GuildsCache.Default,
       ChannelsCache.Default,
       RolesCache.Default,

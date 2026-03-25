@@ -1,13 +1,14 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Array, Effect, HashMap, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
+import { requireMonitorGuild } from "@/middlewares/authorization";
 import { MonitorService } from "@/services/monitor";
 import { GuildConfigService } from "@/services/guildConfig";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 
 const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigService) =>
   pipe(
-    guildConfigService.getGuildConfigByGuildId(guildId),
+    guildConfigService.getGuildConfig(guildId),
     Effect.flatMap(
       Option.match({
         onSome: (guildConfig) =>
@@ -32,35 +33,47 @@ export const MonitorLive = HttpApiBuilder.group(Api, "monitor", (handlers) =>
     Effect.map(({ monitorService, guildConfigService }) =>
       handlers
         .handle("getMonitorMaps", ({ urlParams }) =>
-          pipe(
-            getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-            Effect.flatMap((sheetId) => monitorService.getMonitorMaps(sheetId)),
-            Effect.map((monitorMaps) => ({
-              idToMonitor: Array.fromIterable(HashMap.entries(monitorMaps.idToMonitor)).map(
-                ([key, value]) => ({
-                  key,
-                  value: Array.fromIterable(value),
-                }),
+          requireMonitorGuild(urlParams.guildId).pipe(
+            Effect.andThen(
+              pipe(
+                getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
+                Effect.flatMap((sheetId) => monitorService.getMonitorMaps(sheetId)),
+                Effect.map((monitorMaps) => ({
+                  idToMonitor: Array.fromIterable(HashMap.entries(monitorMaps.idToMonitor)).map(
+                    ([key, value]) => ({
+                      key,
+                      value: Array.fromIterable(value),
+                    }),
+                  ),
+                  nameToMonitor: Array.fromIterable(HashMap.entries(monitorMaps.nameToMonitor)).map(
+                    ([key, value]) => ({
+                      key,
+                      value: { name: value.name, monitors: Array.fromIterable(value.monitors) },
+                    }),
+                  ),
+                })),
               ),
-              nameToMonitor: Array.fromIterable(HashMap.entries(monitorMaps.nameToMonitor)).map(
-                ([key, value]) => ({
-                  key,
-                  value: { name: value.name, monitors: Array.fromIterable(value.monitors) },
-                }),
-              ),
-            })),
+            ),
           ),
         )
         .handle("getByIds", ({ urlParams }) =>
-          pipe(
-            getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-            Effect.flatMap((sheetId) => monitorService.getByIds(sheetId, urlParams.ids)),
+          requireMonitorGuild(urlParams.guildId).pipe(
+            Effect.andThen(
+              pipe(
+                getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
+                Effect.flatMap((sheetId) => monitorService.getByIds(sheetId, urlParams.ids)),
+              ),
+            ),
           ),
         )
         .handle("getByNames", ({ urlParams }) =>
-          pipe(
-            getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-            Effect.flatMap((sheetId) => monitorService.getByNames(sheetId, urlParams.names)),
+          requireMonitorGuild(urlParams.guildId).pipe(
+            Effect.andThen(
+              pipe(
+                getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
+                Effect.flatMap((sheetId) => monitorService.getByNames(sheetId, urlParams.names)),
+              ),
+            ),
           ),
         ),
     ),

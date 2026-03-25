@@ -6,6 +6,7 @@ import { createServer } from "http";
 import { Api } from "./api";
 import { config } from "./config";
 import { CalcLive } from "./handlers/calc";
+import { CheckinLive } from "./handlers/checkin";
 import { HealthLive } from "./handlers/health";
 import { GuildConfigLive } from "./handlers/guildConfig";
 import { MessageCheckinLive } from "./handlers/messageCheckin";
@@ -15,13 +16,15 @@ import { PermissionsLive } from "./handlers/permissions";
 import { SheetLive } from "./handlers/sheet";
 import { MonitorLive } from "./handlers/monitor";
 import { PlayerLive } from "./handlers/player";
+import { RoomOrderLive } from "./handlers/roomOrder";
 import { ScreenshotLive } from "./handlers/screenshot";
 import { ScheduleLive } from "./handlers/schedule";
 import { DiscordLive } from "./handlers/discord";
-import { CacheLive } from "./services/cache";
+import { CacheApiClientLive, CacheLive } from "./services/cache";
 
 const ApiLive = Layer.provide(HttpApiBuilder.api(Api), [
   CalcLive,
+  CheckinLive,
   HealthLive,
   GuildConfigLive,
   MessageCheckinLive,
@@ -31,6 +34,7 @@ const ApiLive = Layer.provide(HttpApiBuilder.api(Api), [
   SheetLive,
   MonitorLive,
   PlayerLive,
+  RoomOrderLive,
   ScreenshotLive,
   ScheduleLive,
   DiscordLive,
@@ -89,6 +93,7 @@ export const HttpLive = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
   Layer.provide(MiddlewareCorsLive),
   Layer.provide(ApiLive),
   Layer.provide(CacheWithUnstorageLive),
+  Layer.provide(CacheApiClientLive),
   Layer.provide(NodeHttpClient.layer),
   HttpServer.withLogAddress,
   Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 })),

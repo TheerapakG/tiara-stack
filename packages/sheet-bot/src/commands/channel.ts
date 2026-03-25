@@ -1,5 +1,4 @@
 import { channelMention, escapeMarkdown, roleMention } from "@discordjs/formatters";
-import { Discord } from "dfx";
 import { Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
 import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
@@ -7,12 +6,7 @@ import { Effect, Layer, Option, pipe } from "effect";
 import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
-import {
-  EmbedService,
-  GuildConfigService,
-  PermissionService,
-  SheetApisRequestContext,
-} from "../services";
+import { EmbedService, GuildConfigService, SheetApisRequestContext } from "../services";
 import { GuildConfig } from "sheet-apis/schema";
 
 const configFields = (
@@ -45,10 +39,24 @@ const configFields = (
   },
 ];
 
+const resolveGuildId = (serverId?: string) =>
+  Effect.gen(function* () {
+    const interactionGuild = yield* Interaction.guild();
+
+    return yield* pipe(
+      Option.fromNullable(serverId).pipe(
+        Option.orElse(() => interactionGuild.pipe(Option.map((guild) => guild.id))),
+      ),
+      Option.match({
+        onSome: Effect.succeed,
+        onNone: () => Effect.fail(new Error("Guild not found in interaction or command options")),
+      }),
+    );
+  });
+
 const makeListConfigSubCommand = Effect.gen(function* () {
   const embedService = yield* EmbedService;
   const guildConfigService = yield* GuildConfigService;
-  const permissionService = yield* PermissionService;
 
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
@@ -62,10 +70,7 @@ const makeListConfigSubCommand = Effect.gen(function* () {
       yield* command.deferReply();
 
       const serverId = command.optionValueOptional("server_id");
-      const { guildId } = yield* permissionService.checkInteractionUserGuildPermissions(
-        Discord.Permissions.ManageGuild,
-        Option.getOrUndefined(serverId),
-      );
+      const guildId = yield* resolveGuildId(Option.getOrUndefined(serverId));
 
       const interactionChannel = yield* Interaction.channel();
       const channelId = pipe(
@@ -93,7 +98,6 @@ const makeListConfigSubCommand = Effect.gen(function* () {
 const makeSetSubCommand = Effect.gen(function* () {
   const embedService = yield* EmbedService;
   const guildConfigService = yield* GuildConfigService;
-  const permissionService = yield* PermissionService;
 
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
@@ -124,10 +128,7 @@ const makeSetSubCommand = Effect.gen(function* () {
       yield* command.deferReply();
 
       const serverId = command.optionValueOptional("server_id");
-      const { guildId } = yield* permissionService.checkInteractionUserGuildPermissions(
-        Discord.Permissions.ManageGuild,
-        Option.getOrUndefined(serverId),
-      );
+      const guildId = yield* resolveGuildId(Option.getOrUndefined(serverId));
 
       const channelOption = command.optionChannelValueOptional("channel");
       const running = command.optionValueOptional("running");
@@ -181,7 +182,6 @@ const makeSetSubCommand = Effect.gen(function* () {
 const makeUnsetSubCommand = Effect.gen(function* () {
   const embedService = yield* EmbedService;
   const guildConfigService = yield* GuildConfigService;
-  const permissionService = yield* PermissionService;
 
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
@@ -212,10 +212,7 @@ const makeUnsetSubCommand = Effect.gen(function* () {
       yield* command.deferReply();
 
       const serverId = command.optionValueOptional("server_id");
-      const { guildId } = yield* permissionService.checkInteractionUserGuildPermissions(
-        Discord.Permissions.ManageGuild,
-        Option.getOrUndefined(serverId),
-      );
+      const guildId = yield* resolveGuildId(Option.getOrUndefined(serverId));
 
       const running = command.optionValueOptional("running");
       const channelOption = command.optionChannelValueOptional("channel");
@@ -313,11 +310,6 @@ export const ChannelCommandLive = Layer.scopedDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(
-      DiscordGatewayLayer,
-      PermissionService.Default,
-      GuildConfigService.Default,
-      EmbedService.Default,
-    ),
+    Layer.mergeAll(DiscordGatewayLayer, GuildConfigService.Default, EmbedService.Default),
   ),
 );

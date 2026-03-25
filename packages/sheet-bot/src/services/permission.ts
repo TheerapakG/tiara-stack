@@ -1,8 +1,7 @@
 import { Data, Effect, Option, pipe } from "effect";
-import { DiscordREST, Perms } from "dfx";
-import { GuildsCache, RolesCache } from "dfx-discord-utils/discord";
-import { DiscordApplication, DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import { Interaction } from "dfx-discord-utils/utils";
+import { SheetApisClient } from "./sheetApis";
 
 export class PermissionError extends Data.TaggedError("PermissionError")<{
   readonly message: string;
@@ -14,12 +13,38 @@ export class PermissionError extends Data.TaggedError("PermissionError")<{
   }
 }
 
+const resolveGuildId = (guildId?: string) =>
+  Effect.gen(function* () {
+    const resolvedInteractionGuildId = (yield* Interaction.guild()).pipe(
+      Option.map((guild) => guild.id),
+    );
+    const resolvedGuildId = Option.fromNullable(guildId).pipe(
+      Option.orElse(() => resolvedInteractionGuildId),
+    );
+
+    return yield* pipe(
+      resolvedGuildId,
+      Option.match({
+        onSome: Effect.succeed,
+        onNone: () =>
+          Effect.fail(new PermissionError("Interaction guild or provided guild not found")),
+      }),
+    );
+  });
+
 export class PermissionService extends Effect.Service<PermissionService>()("PermissionService", {
   effect: Effect.gen(function* () {
-    const rest = yield* DiscordREST;
-    const application = yield* DiscordApplication;
-    const guildsCache = yield* GuildsCache;
-    const rolesCache = yield* RolesCache;
+    const sheetApisClient = yield* SheetApisClient;
+
+    const getCurrentUserPermissions = Effect.fn("PermissionService.getCurrentUserPermissions")(
+      (guildId?: string) =>
+        sheetApisClient
+          .get()
+          .permissions.getCurrentUserPermissions({
+            urlParams: typeof guildId === "undefined" ? {} : { guildId },
+          })
+          .pipe(Effect.map(({ permissions }) => permissions)),
+    );
 
     return {
       checkInteractionInGuild: Effect.fn("PermissionService.checkInteractionUserInGuild")(
@@ -46,96 +71,27 @@ export class PermissionService extends Effect.Service<PermissionService>()("Perm
         "PermissionService.checkInteractionUserApplicationOwner",
       )(function* () {
         const resolvedUserId = (yield* Interaction.user()).id;
+        const permissions = yield* getCurrentUserPermissions();
 
-        return resolvedUserId === application.owner.id
+        return permissions.includes("app_owner")
           ? yield* Effect.succeed({
               userId: resolvedUserId,
             })
           : yield* Effect.fail(new PermissionError("User is not the owner of the application"));
       }),
-      checkInteractionUserGuildOwner: Effect.fn("PermissionService.checkInteractionUserGuildOwner")(
-        function* (guildId?: string) {
-          const resolvedUserId = (yield* Interaction.user()).id;
-          const resolvedInteractionGuildId = (yield* Interaction.guild()).pipe(
-            Option.map((guild) => guild.id),
-          );
-          const resolvedGuildId = Option.fromNullable(guildId).pipe(
-            Option.orElse(() => resolvedInteractionGuildId),
-          );
-          const resolvedGuild = yield* Effect.transposeMapOption(resolvedGuildId, guildsCache.get);
-
-          return Option.isSome(resolvedGuild)
-            ? resolvedUserId === resolvedGuild.value.owner_id
-              ? yield* Effect.succeed({
-                  userId: resolvedUserId,
-                  guild: resolvedGuild.value,
-                })
-              : yield* Effect.fail(new PermissionError("User is not the owner of the guild"))
-            : yield* Effect.fail(new PermissionError("Guild not found"));
-        },
-      ),
-      checkInteractionUserGuildPermissions: Effect.fn(
-        "PermissionService.checkInteractionUserGuildPermissions",
-      )(function* (permissions: string | bigint, guildId?: string) {
+      checkInteractionUserMonitorGuild: Effect.fn(
+        "PermissionService.checkInteractionUserMonitorGuild",
+      )(function* (guildId?: string) {
         const resolvedUserId = (yield* Interaction.user()).id;
-        const resolvedInteractionGuildId = (yield* Interaction.guild()).pipe(
-          Option.map((guild) => guild.id),
-        );
-        const resolvedGuildId = Option.fromNullable(guildId).pipe(
-          Option.orElse(() => resolvedInteractionGuildId),
-        );
+        const resolvedGuildId = yield* resolveGuildId(guildId);
+        const permissions = yield* getCurrentUserPermissions(resolvedGuildId);
 
-        const resolvedUserPermissions = guildId
-          ? Option.some<string | bigint>(
-              Perms.forMember([...(yield* rolesCache.getForParent(guildId)).values()])(
-                yield* pipe(
-                  rest.getGuildMember(guildId, resolvedUserId),
-                  Effect.catchTag("ErrorResponse", () =>
-                    Effect.fail(new PermissionError("User is not in the guild")),
-                  ),
-                ),
-              ),
-            )
-          : (yield* Interaction.member()).pipe(Option.map((member) => member.permissions));
-
-        return Option.isSome(resolvedGuildId) &&
-          Option.isSome(resolvedUserPermissions) &&
-          Perms.has(permissions)(resolvedUserPermissions.value)
-          ? yield* Effect.succeed({ userId: resolvedUserId, guildId: resolvedGuildId.value })
-          : yield* Effect.fail(new PermissionError("User does not have permissions"));
+        return permissions.some((permission) => permission === `monitor_guild:${resolvedGuildId}`)
+          ? yield* Effect.succeed({ userId: resolvedUserId, guildId: resolvedGuildId })
+          : yield* Effect.fail(new PermissionError("User does not have monitor guild permission"));
       }),
-      checkInteractionUserGuildRoles: Effect.fn("PermissionService.checkInteractionUserGuildRoles")(
-        function* (roles: string[], guildId?: string) {
-          const resolvedUserId = (yield* Interaction.user()).id;
-          const resolvedInteractionGuildId = (yield* Interaction.guild()).pipe(
-            Option.map((guild) => guild.id),
-          );
-          const resolvedGuildId = Option.fromNullable(guildId).pipe(
-            Option.orElse(() => resolvedInteractionGuildId),
-          );
-          const resolvedUserRoles = Option.isSome(resolvedGuildId)
-            ? Option.some<readonly string[]>(
-                (yield* pipe(
-                  rest.getGuildMember(resolvedGuildId.value, resolvedUserId),
-                  Effect.catchTag("ErrorResponse", () =>
-                    Effect.fail(new PermissionError("User is not in the guild")),
-                  ),
-                )).roles,
-              )
-            : Option.none();
-
-          return Option.isSome(resolvedGuildId) &&
-            Option.isSome(resolvedUserRoles) &&
-            resolvedUserRoles.value.some((role) => roles.includes(role))
-            ? yield* Effect.succeed({
-                userId: resolvedUserId,
-                guildId: resolvedGuildId.value,
-              })
-            : yield* Effect.fail(new PermissionError("User does not have roles"));
-        },
-      ),
     };
   }),
   accessors: true,
-  dependencies: [DiscordGatewayLayer, GuildsCache.Default, RolesCache.Default],
+  dependencies: [DiscordGatewayLayer, SheetApisClient.Default],
 }) {}

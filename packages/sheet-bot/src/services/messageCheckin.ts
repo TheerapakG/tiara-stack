@@ -21,6 +21,9 @@ export class MessageCheckinService extends Effect.Service<MessageCheckinService>
               hour: number;
               channelId: string;
               roleId: string | null | undefined;
+              guildId: string | null;
+              messageChannelId: string | null;
+              createdByUserId: string | null;
             },
           ) =>
             sheetApisClient.get().messageCheckin.upsertMessageCheckinData({

@@ -14,7 +14,7 @@ import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
 
 const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigService) =>
   pipe(
-    guildConfigService.getGuildConfigByGuildId(guildId),
+    guildConfigService.getGuildConfig(guildId),
     Effect.flatMap(
       Option.match({
         onSome: (guildConfig) =>
@@ -30,11 +30,11 @@ const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigS
     ),
   );
 
-const resolveScheduleView = (requestedView?: ScheduleView) =>
+const resolveScheduleView = (guildId: string, requestedView?: ScheduleView) =>
   pipe(
     SheetAuthUser,
     Effect.map((user) =>
-      getEffectiveScheduleView(getMaximumScheduleView(user.permissions), requestedView),
+      getEffectiveScheduleView(getMaximumScheduleView(user.permissions, guildId), requestedView),
     ),
   );
 
@@ -69,7 +69,7 @@ export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
           pipe(
             Effect.all({
               sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-              view: resolveScheduleView(urlParams.view),
+              view: resolveScheduleView(urlParams.guildId, urlParams.view),
             }),
             Effect.flatMap(({ sheetId, view }) =>
               (view === "monitor"
@@ -83,7 +83,7 @@ export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
           pipe(
             Effect.all({
               sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-              view: resolveScheduleView(urlParams.view),
+              view: resolveScheduleView(urlParams.guildId, urlParams.view),
             }),
             Effect.flatMap(({ sheetId, view }) =>
               (view === "monitor"
@@ -97,7 +97,7 @@ export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
           pipe(
             Effect.all({
               sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-              view: resolveScheduleView(urlParams.view),
+              view: resolveScheduleView(urlParams.guildId, urlParams.view),
             }),
             Effect.flatMap(({ sheetId, view }) =>
               (view === "monitor"

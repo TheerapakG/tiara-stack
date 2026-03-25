@@ -8,7 +8,9 @@ import {
   PopulatedSchedulePlayer,
   PopulatedScheduleMonitor,
   PopulatedSchedule,
+  type PopulatedScheduleResult,
   Player,
+  type PlayerDayScheduleSummary,
   PartialNamePlayer,
   Monitor,
   PartialNameMonitor,
@@ -132,6 +134,70 @@ const buildResolutionMaps = (
   }
 
   return { playerMap, monitorMap };
+};
+
+const schedulePlayerMatchesUser = (
+  schedulePlayer: PopulatedSchedulePlayer,
+  userId: string,
+): boolean =>
+  Match.value(schedulePlayer.player).pipe(
+    Match.tagsExhaustive({
+      Player: (player) => player.id === userId,
+      PartialNamePlayer: () => false,
+    }),
+  );
+
+const sortHours = (hours: ReadonlyArray<number>): number[] =>
+  [...hours]
+    .sort((a, b) => a - b)
+    .filter((hour, index, sorted) => index === 0 || hour !== sorted[index - 1]);
+
+export const summarizeDayPlayerSchedule = (
+  schedules: ReadonlyArray<PopulatedScheduleResult>,
+  userId: string,
+): PlayerDayScheduleSummary => {
+  // Filler schedule inputs are already visibility-filtered by
+  // `get*PopulatedFillerSchedules`, so a hidden populated schedule here only
+  // appears on monitor-view paths and should mark the day as invisible.
+  let invisible = false;
+  const fillHours: number[] = [];
+  const overfillHours: number[] = [];
+  const standbyHours: number[] = [];
+
+  for (const schedule of schedules) {
+    if (schedule._tag === "PopulatedSchedule" && !schedule.visible) {
+      invisible = true;
+    }
+
+    if (schedule._tag !== "PopulatedSchedule" || Option.isNone(schedule.hour)) {
+      continue;
+    }
+
+    const hour = schedule.hour.value;
+
+    if (
+      schedule.fills.some(
+        (fill) => Option.isSome(fill) && schedulePlayerMatchesUser(fill.value, userId),
+      )
+    ) {
+      fillHours.push(hour);
+    }
+
+    if (schedule.overfills.some((overfill) => schedulePlayerMatchesUser(overfill, userId))) {
+      overfillHours.push(hour);
+    }
+
+    if (schedule.standbys.some((standby) => schedulePlayerMatchesUser(standby, userId))) {
+      standbyHours.push(hour);
+    }
+  }
+
+  return {
+    fillHours: sortHours(fillHours),
+    overfillHours: sortHours(overfillHours),
+    standbyHours: sortHours(standbyHours),
+    invisible,
+  };
 };
 
 export class ScheduleService extends Effect.Service<ScheduleService>()("ScheduleService", {

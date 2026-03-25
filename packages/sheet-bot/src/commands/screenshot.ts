@@ -5,17 +5,9 @@ import { Effect, Layer, Option, pipe, Array } from "effect";
 import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
-import {
-  EmbedService,
-  GuildConfigService,
-  PermissionService,
-  ScreenshotService,
-  SheetApisRequestContext,
-} from "../services";
+import { EmbedService, ScreenshotService, SheetApisRequestContext } from "../services";
 
 const makeScreenshotCommand = Effect.gen(function* () {
-  const guildConfigService = yield* GuildConfigService;
-  const permissionService = yield* PermissionService;
   const screenshotService = yield* ScreenshotService;
 
   return yield* CommandHelper.makeCommand(
@@ -61,21 +53,6 @@ const makeScreenshotCommand = Effect.gen(function* () {
         const channelName = command.optionValue("channel_name");
         const day = command.optionValue("day");
 
-        yield* Effect.firstSuccessOf([
-          permissionService.checkInteractionUserApplicationOwner(),
-          pipe(
-            permissionService.checkInteractionUserGuildRoles(
-              yield* guildConfigService
-                .getGuildMonitorRoles(guildId)
-                .pipe(Effect.map(Array.map((role) => role.roleId))),
-              guildId,
-            ),
-            Effect.catchTag("PermissionError", () =>
-              Effect.fail(new Error("You can only take screenshots as a monitor")),
-            ),
-          ),
-        ]);
-
         const screenshot = yield* screenshotService.getScreenshot(guildId, channelName, day);
 
         yield* command.editReplyWithFiles(
@@ -112,12 +89,6 @@ export const ScreenshotCommandLive = Layer.scopedDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(
-      DiscordGatewayLayer,
-      PermissionService.Default,
-      GuildConfigService.Default,
-      EmbedService.Default,
-      ScreenshotService.Default,
-    ),
+    Layer.mergeAll(DiscordGatewayLayer, EmbedService.Default, ScreenshotService.Default),
   ),
 );

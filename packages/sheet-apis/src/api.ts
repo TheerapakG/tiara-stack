@@ -1,5 +1,6 @@
 import { HttpApi, OpenApi } from "@effect/platform";
 import { CalcApi } from "./handlers/calc/api";
+import { CheckinApi } from "./handlers/checkin/api";
 import { HealthApi } from "./handlers/health/api";
 import { GuildConfigApi } from "./handlers/guildConfig/api";
 import { MessageCheckinApi } from "./handlers/messageCheckin/api";
@@ -9,12 +10,14 @@ import { PermissionsApi } from "./handlers/permissions/api";
 import { SheetApi } from "./handlers/sheet/api";
 import { MonitorApi } from "./handlers/monitor/api";
 import { PlayerApi } from "./handlers/player/api";
+import { RoomOrderApi } from "./handlers/roomOrder/api";
 import { ScreenshotApi } from "./handlers/screenshot/api";
 import { ScheduleApi } from "./handlers/schedule/api";
 import { DiscordApi } from "./handlers/discord/api";
 
 export class Api extends HttpApi.make("api")
   .add(CalcApi)
+  .add(CheckinApi)
   .add(HealthApi)
   .add(GuildConfigApi)
   .add(MessageCheckinApi)
@@ -24,6 +27,7 @@ export class Api extends HttpApi.make("api")
   .add(SheetApi)
   .add(MonitorApi)
   .add(PlayerApi)
+  .add(RoomOrderApi)
   .add(ScreenshotApi)
   .add(ScheduleApi)
   .add(DiscordApi)

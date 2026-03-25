@@ -2,8 +2,49 @@ import { HttpApiBuilder } from "@effect/platform";
 import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
-import { MessageRoomOrderService } from "@/services/messageRoomOrder";
+import { requireBot, requireMonitorGuild } from "@/middlewares/authorization";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
+import { MessageRoomOrder } from "@/schemas/messageRoomOrder";
+import { GuildConfigService } from "@/services/guildConfig";
+import { MessageRoomOrderService } from "@/services/messageRoomOrder";
+
+const missingMessageRoomOrderError = () =>
+  makeArgumentError("Cannot get message room order, the message might not be registered");
+
+const getRequiredMessageRoomOrderRecord = (
+  messageRoomOrderService: MessageRoomOrderService,
+  messageId: string,
+) =>
+  messageRoomOrderService.getMessageRoomOrder(messageId).pipe(
+    Effect.flatMap(
+      Option.match({
+        onSome: Effect.succeed,
+        onNone: () => Effect.fail(missingMessageRoomOrderError()),
+      }),
+    ),
+  );
+
+const requireRoomOrderMonitorAccess = (record: MessageRoomOrder) =>
+  Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
+    ? requireMonitorGuild(record.guildId.value)
+    : requireBot("Legacy message room order records are restricted to the bot");
+
+const requireRoomOrderUpsertAccess = (
+  messageRoomOrderService: MessageRoomOrderService,
+  messageId: string,
+  guildId?: string,
+) =>
+  messageRoomOrderService.getMessageRoomOrder(messageId).pipe(
+    Effect.flatMap(
+      Option.match({
+        onNone: () =>
+          typeof guildId === "string"
+            ? requireMonitorGuild(guildId)
+            : requireBot("Legacy message room order records are restricted to the bot"),
+        onSome: requireRoomOrderMonitorAccess,
+      }),
+    ),
+  );
 
 export const MessageRoomOrderLive = HttpApiBuilder.group(Api, "messageRoomOrder", (handlers) =>
   pipe(
@@ -13,60 +54,116 @@ export const MessageRoomOrderLive = HttpApiBuilder.group(Api, "messageRoomOrder"
     Effect.map(({ messageRoomOrderService }) =>
       handlers
         .handle("getMessageRoomOrder", ({ urlParams }) =>
-          pipe(
-            messageRoomOrderService.getMessageRoomOrder(urlParams.messageId),
-            Effect.flatMap(
-              Option.match({
-                onSome: (order) => Effect.succeed(order),
-                onNone: () =>
-                  Effect.fail(
-                    makeArgumentError(
-                      "Cannot get message room order, the message might not be registered",
-                    ),
-                  ),
-              }),
+          getRequiredMessageRoomOrderRecord(messageRoomOrderService, urlParams.messageId).pipe(
+            Effect.flatMap((record) =>
+              requireRoomOrderMonitorAccess(record).pipe(Effect.andThen(Effect.succeed(record))),
             ),
           ),
         )
         .handle("upsertMessageRoomOrder", ({ payload }) =>
-          messageRoomOrderService.upsertMessageRoomOrder(payload.messageId, payload.data),
+          requireRoomOrderUpsertAccess(
+            messageRoomOrderService,
+            payload.messageId,
+            typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
+          ).pipe(
+            Effect.andThen(
+              messageRoomOrderService.upsertMessageRoomOrder(payload.messageId, payload.data),
+            ),
+          ),
         )
         .handle("decrementMessageRoomOrderRank", ({ payload }) =>
-          messageRoomOrderService.decrementMessageRoomOrderRank(payload.messageId),
+          getRequiredMessageRoomOrderRecord(messageRoomOrderService, payload.messageId).pipe(
+            Effect.flatMap((record) =>
+              requireRoomOrderMonitorAccess(record).pipe(
+                Effect.andThen(
+                  messageRoomOrderService.decrementMessageRoomOrderRank(payload.messageId),
+                ),
+              ),
+            ),
+          ),
         )
         .handle("incrementMessageRoomOrderRank", ({ payload }) =>
-          messageRoomOrderService.incrementMessageRoomOrderRank(payload.messageId),
+          getRequiredMessageRoomOrderRecord(messageRoomOrderService, payload.messageId).pipe(
+            Effect.flatMap((record) =>
+              requireRoomOrderMonitorAccess(record).pipe(
+                Effect.andThen(
+                  messageRoomOrderService.incrementMessageRoomOrderRank(payload.messageId),
+                ),
+              ),
+            ),
+          ),
         )
         .handle("getMessageRoomOrderEntry", ({ urlParams }) =>
-          messageRoomOrderService.getMessageRoomOrderEntry(
-            urlParams.messageId,
-            Number(urlParams.rank),
+          getRequiredMessageRoomOrderRecord(messageRoomOrderService, urlParams.messageId).pipe(
+            Effect.flatMap((record) =>
+              requireRoomOrderMonitorAccess(record).pipe(
+                Effect.andThen(
+                  messageRoomOrderService.getMessageRoomOrderEntry(
+                    urlParams.messageId,
+                    Number(urlParams.rank),
+                  ),
+                ),
+              ),
+            ),
           ),
         )
         .handle("getMessageRoomOrderRange", ({ urlParams }) =>
-          pipe(
-            messageRoomOrderService.getMessageRoomOrderRange(urlParams.messageId),
-            Effect.flatMap(
-              Option.match({
-                onSome: (range) => Effect.succeed(range),
-                onNone: () =>
-                  Effect.fail(
-                    makeArgumentError(
-                      "Cannot get message room order range, the message might not be registered",
+          getRequiredMessageRoomOrderRecord(messageRoomOrderService, urlParams.messageId).pipe(
+            Effect.flatMap((record) =>
+              requireRoomOrderMonitorAccess(record).pipe(
+                Effect.andThen(
+                  pipe(
+                    messageRoomOrderService.getMessageRoomOrderRange(urlParams.messageId),
+                    Effect.flatMap(
+                      Option.match({
+                        onSome: (range) => Effect.succeed(range),
+                        onNone: () =>
+                          Effect.fail(
+                            makeArgumentError(
+                              "Cannot get message room order range, the message might not be registered",
+                            ),
+                          ),
+                      }),
                     ),
                   ),
-              }),
+                ),
+              ),
             ),
           ),
         )
         .handle("upsertMessageRoomOrderEntry", ({ payload }) =>
-          messageRoomOrderService.upsertMessageRoomOrderEntry(payload.messageId, payload.entries),
+          getRequiredMessageRoomOrderRecord(messageRoomOrderService, payload.messageId).pipe(
+            Effect.flatMap((record) =>
+              requireRoomOrderMonitorAccess(record).pipe(
+                Effect.andThen(
+                  messageRoomOrderService.upsertMessageRoomOrderEntry(
+                    payload.messageId,
+                    payload.entries,
+                  ),
+                ),
+              ),
+            ),
+          ),
         )
         .handle("removeMessageRoomOrderEntry", ({ payload }) =>
-          messageRoomOrderService.removeMessageRoomOrderEntry(payload.messageId),
+          getRequiredMessageRoomOrderRecord(messageRoomOrderService, payload.messageId).pipe(
+            Effect.flatMap((record) =>
+              requireRoomOrderMonitorAccess(record).pipe(
+                Effect.andThen(
+                  messageRoomOrderService.removeMessageRoomOrderEntry(payload.messageId),
+                ),
+              ),
+            ),
+          ),
         ),
     ),
   ),
 ).pipe(
-  Layer.provide(Layer.mergeAll(MessageRoomOrderService.Default, SheetAuthTokenAuthorizationLive)),
+  Layer.provide(
+    Layer.mergeAll(
+      MessageRoomOrderService.Default,
+      GuildConfigService.Default,
+      SheetAuthTokenAuthorizationLive,
+    ),
+  ),
 );

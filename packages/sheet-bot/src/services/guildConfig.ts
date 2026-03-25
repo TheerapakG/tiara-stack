@@ -10,15 +10,13 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
       getAutoCheckinGuilds: Effect.fn("GuildConfigService.getAutoCheckinGuilds")(() =>
         sheetApisClient.get().guildConfig.getAutoCheckinGuilds(),
       ),
-      getGuildConfigByGuildId: Effect.fn("GuildConfigService.getGuildConfigByGuildId")(
-        (guildId: string) =>
-          sheetApisClient.get().guildConfig.getGuildConfigByGuildId({ urlParams: { guildId } }),
+      getGuildConfig: Effect.fn("GuildConfigService.getGuildConfig")((guildId: string) =>
+        sheetApisClient.get().guildConfig.getGuildConfig({ urlParams: { guildId } }),
       ),
       upsertGuildConfig: Effect.fn("GuildConfigService.upsertGuildConfig")(
         (
           guildId: string,
           config: {
-            scriptId?: string | null | undefined;
             sheetId?: string | null | undefined;
             autoCheckin?: boolean | null | undefined;
           },
@@ -30,6 +28,15 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
       getGuildMonitorRoles: Effect.fn("GuildConfigService.getGuildMonitorRoles")(
         (guildId: string) =>
           sheetApisClient.get().guildConfig.getGuildMonitorRoles({ urlParams: { guildId } }),
+      ),
+      getGuildChannels: Effect.fn("GuildConfigService.getGuildChannels")(
+        (guildId: string, running?: boolean | undefined) =>
+          sheetApisClient.get().guildConfig.getGuildChannels({
+            urlParams: {
+              guildId,
+              ...(typeof running === "undefined" ? {} : { running }),
+            },
+          }),
       ),
       addGuildMonitorRole: Effect.fn("GuildConfigService.addGuildMonitorRole")(
         (guildId: string, roleId: string) =>
@@ -59,10 +66,6 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
               config,
             },
           }),
-      ),
-      getGuildConfigByScriptId: Effect.fn("GuildConfigService.getGuildConfigByScriptId")(
-        (scriptId: string) =>
-          sheetApisClient.get().guildConfig.getGuildConfigByScriptId({ urlParams: { scriptId } }),
       ),
       getGuildChannelById: Effect.fn("GuildConfigService.getGuildChannelById")(
         (guildId: string, channelId: string, running?: boolean | undefined) =>

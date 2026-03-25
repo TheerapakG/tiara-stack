@@ -20,7 +20,12 @@ export class MessageSlotApi extends HttpApiGroup.make("messageSlot")
       .setPayload(
         Schema.Struct({
           messageId: Schema.String,
-          day: Schema.Number,
+          data: Schema.Struct({
+            day: Schema.Number,
+            guildId: Schema.NullOr(Schema.String),
+            messageChannelId: Schema.NullOr(Schema.String),
+            createdByUserId: Schema.NullOr(Schema.String),
+          }),
         }),
       )
       .addSuccess(MessageSlot)

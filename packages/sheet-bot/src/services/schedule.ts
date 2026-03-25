@@ -44,6 +44,12 @@ export class ScheduleService extends Effect.Service<ScheduleService>()("Schedule
             .schedule.getDayPopulatedSchedules({ urlParams: { guildId, day, view: "monitor" } })
             .pipe(Effect.map(({ schedules }) => schedules)),
       ),
+      dayPlayerSchedule: Effect.fn("Schedule.dayPlayerSchedule")(
+        (guildId: string, day: number, userId: string) =>
+          sheetApisClient.get().schedule.getDayPlayerSchedule({
+            urlParams: { guildId, day, userId, view: "monitor" },
+          }),
+      ),
       channelPopulatedMonitorSchedules: Effect.fn("Schedule.channelPopulatedMonitorSchedules")(
         (guildId: string, channel: string) =>
           sheetApisClient

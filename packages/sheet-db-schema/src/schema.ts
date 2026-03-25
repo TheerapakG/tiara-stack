@@ -14,7 +14,6 @@ export const configGuild = pgTable(
   "config_guild",
   {
     guildId: varchar("guild_id").primaryKey(),
-    scriptId: varchar("script_id"),
     sheetId: varchar("sheet_id"),
     autoCheckin: boolean("auto_checkin"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
@@ -24,10 +23,7 @@ export const configGuild = pgTable(
       .$onUpdate(() => new Date()),
     deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
   },
-  (table) => [
-    index("config_guild_script_id_idx").on(table.scriptId),
-    index("config_guild_sheet_id_idx").on(table.sheetId),
-  ],
+  (table) => [index("config_guild_sheet_id_idx").on(table.sheetId)],
 );
 
 export const configGuildManagerRole = pgTable(
@@ -70,6 +66,9 @@ export const configGuildChannel = pgTable(
 export const messageSlot = pgTable("message_slot", {
   messageId: varchar("message_id").primaryKey(),
   day: integer("day").notNull(),
+  guildId: varchar("guild_id"),
+  messageChannelId: varchar("message_channel_id"),
+  createdByUserId: varchar("created_by_user_id"),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
     .defaultNow()
@@ -84,6 +83,9 @@ export const messageCheckin = pgTable("message_checkin", {
   hour: integer("hour").notNull(),
   channelId: varchar("channel_id").notNull(),
   roleId: varchar("role_id"),
+  guildId: varchar("guild_id"),
+  messageChannelId: varchar("message_channel_id"),
+  createdByUserId: varchar("created_by_user_id"),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
     .defaultNow()
@@ -115,6 +117,9 @@ export const messageRoomOrder = pgTable("message_room_order", {
   hour: integer("hour").notNull(),
   rank: integer("rank").notNull(),
   monitor: varchar("monitor"),
+  guildId: varchar("guild_id"),
+  messageChannelId: varchar("message_channel_id"),
+  createdByUserId: varchar("created_by_user_id"),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
     .defaultNow()

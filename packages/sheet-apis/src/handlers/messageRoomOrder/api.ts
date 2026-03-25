@@ -30,6 +30,9 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
             hour: Schema.Number,
             rank: Schema.Number,
             monitor: Schema.optional(Schema.NullOr(Schema.String)),
+            guildId: Schema.NullOr(Schema.String),
+            messageChannelId: Schema.NullOr(Schema.String),
+            createdByUserId: Schema.NullOr(Schema.String),
           }),
         }),
       )
@@ -47,7 +50,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
         }),
       )
       .addSuccess(MessageRoomOrder)
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
   )
   .add(
     HttpApiEndpoint.post(
@@ -60,7 +63,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
         }),
       )
       .addSuccess(MessageRoomOrder)
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
   )
   .add(
     HttpApiEndpoint.get("getMessageRoomOrderEntry", "/messageRoomOrder/getMessageRoomOrderEntry")
@@ -71,7 +74,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
         }),
       )
       .addSuccess(Schema.Array(MessageRoomOrderEntry))
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
   )
   .add(
     HttpApiEndpoint.get("getMessageRoomOrderRange", "/messageRoomOrder/getMessageRoomOrderRange")
@@ -104,7 +107,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
         }),
       )
       .addSuccess(Schema.Array(MessageRoomOrderEntry))
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
   )
   .add(
     HttpApiEndpoint.post(
@@ -117,7 +120,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
         }),
       )
       .addSuccess(Schema.Array(MessageRoomOrderEntry))
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
   )
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Message Room Order")

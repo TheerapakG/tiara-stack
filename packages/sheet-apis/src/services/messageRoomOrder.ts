@@ -104,6 +104,9 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             hour: number;
             rank: number;
             monitor?: string | null | undefined;
+            guildId: string | null;
+            messageChannelId: string | null;
+            createdByUserId: string | null;
           },
         ) =>
           pipe(
@@ -115,6 +118,9 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                 hour: data.hour,
                 rank: data.rank,
                 monitor: data.monitor,
+                guildId: data.guildId,
+                messageChannelId: data.messageChannelId,
+                createdByUserId: data.createdByUserId,
               }),
             ),
             Effect.andThen((mutation) => mutation.server()),

@@ -11,15 +11,26 @@ export const guildConfig = {
     ({ args: { guildId } }) =>
       builder.configGuild.where("guildId", "=", guildId).where("deletedAt", "IS", null).one(),
   ),
-  getGuildConfigByScriptId: defineQuery(
-    pipe(Schema.Struct({ scriptId: Schema.String }), Schema.standardSchemaV1),
-    ({ args: { scriptId } }) =>
-      builder.configGuild.where("scriptId", "=", scriptId).where("deletedAt", "IS", null).one(),
-  ),
   getGuildMonitorRoles: defineQuery(
     pipe(Schema.Struct({ guildId: Schema.String }), Schema.standardSchemaV1),
     ({ args: { guildId } }) =>
       builder.configGuildManagerRole.where("guildId", "=", guildId).where("deletedAt", "IS", null),
+  ),
+  getGuildChannels: defineQuery(
+    pipe(
+      Schema.Struct({
+        guildId: Schema.String,
+        running: Schema.optional(Schema.Boolean),
+      }),
+      Schema.standardSchemaV1,
+    ),
+    ({ args: { guildId, running } }) => {
+      const query = builder.configGuildChannel
+        .where("guildId", "=", guildId)
+        .where("deletedAt", "IS", null);
+
+      return typeof running === "undefined" ? query : query.where("running", "=", running);
+    },
   ),
   getGuildChannelById: defineQuery(
     pipe(

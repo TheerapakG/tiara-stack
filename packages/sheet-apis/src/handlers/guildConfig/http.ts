@@ -2,6 +2,7 @@ import { HttpApiBuilder } from "@effect/platform";
 import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
+import { requireBot, requireManageGuild } from "@/middlewares/authorization";
 import { GuildConfigService } from "@/services/guildConfig";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 
@@ -12,57 +13,73 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
     }),
     Effect.map(({ guildConfigService }) =>
       handlers
-        .handle("getAutoCheckinGuilds", () => guildConfigService.getAutoCheckinGuilds())
-        .handle("getGuildConfigByGuildId", ({ urlParams }) =>
-          pipe(
-            guildConfigService.getGuildConfigByGuildId(urlParams.guildId),
-            Effect.flatMap(
-              Option.match({
-                onSome: (config) => Effect.succeed(config),
-                onNone: () =>
-                  Effect.fail(
-                    makeArgumentError("Cannot get guild config, the guild might not be registered"),
-                  ),
-              }),
-            ),
-          ),
+        .handle("getAutoCheckinGuilds", () =>
+          requireBot().pipe(Effect.andThen(guildConfigService.getAutoCheckinGuilds())),
         )
-        .handle("getGuildConfigByScriptId", ({ urlParams }) =>
-          pipe(
-            guildConfigService.getGuildConfigByScriptId(urlParams.scriptId),
-            Effect.flatMap(
-              Option.match({
-                onSome: (config) => Effect.succeed(config),
-                onNone: () =>
-                  Effect.fail(
-                    makeArgumentError(
-                      "Cannot get guild config by script id, the script id might not be registered",
-                    ),
-                  ),
-              }),
+        .handle("getGuildConfig", ({ urlParams }) =>
+          requireManageGuild(urlParams.guildId).pipe(
+            Effect.andThen(
+              pipe(
+                guildConfigService.getGuildConfig(urlParams.guildId),
+                Effect.flatMap(
+                  Option.match({
+                    onSome: (config) => Effect.succeed(config),
+                    onNone: () =>
+                      Effect.fail(
+                        makeArgumentError(
+                          "Cannot get guild config, the guild might not be registered",
+                        ),
+                      ),
+                  }),
+                ),
+              ),
             ),
           ),
         )
         .handle("upsertGuildConfig", ({ payload }) =>
-          guildConfigService.upsertGuildConfig(payload.guildId, payload.config),
+          requireManageGuild(payload.guildId).pipe(
+            Effect.andThen(guildConfigService.upsertGuildConfig(payload.guildId, payload.config)),
+          ),
         )
         .handle("getGuildMonitorRoles", ({ urlParams }) =>
+          // Monitor role IDs are intentionally readable by any authenticated caller;
+          // they are guild role definitions consumed by the authorization layer itself.
           guildConfigService.getGuildMonitorRoles(urlParams.guildId),
         )
+        .handle("getGuildChannels", ({ urlParams }) =>
+          // Channel listings are intentionally available to any authenticated caller;
+          // only the guild sheet binding in `getGuildConfig` remains manage-gated.
+          guildConfigService.getGuildChannels({
+            guildId: urlParams.guildId,
+            ...(typeof urlParams.running === "undefined" ? {} : { running: urlParams.running }),
+          }),
+        )
         .handle("addGuildMonitorRole", ({ payload }) =>
-          guildConfigService.addGuildMonitorRole(payload.guildId, payload.roleId),
+          requireManageGuild(payload.guildId).pipe(
+            Effect.andThen(guildConfigService.addGuildMonitorRole(payload.guildId, payload.roleId)),
+          ),
         )
         .handle("removeGuildMonitorRole", ({ payload }) =>
-          guildConfigService.removeGuildMonitorRole(payload.guildId, payload.roleId),
+          requireManageGuild(payload.guildId).pipe(
+            Effect.andThen(
+              guildConfigService.removeGuildMonitorRole(payload.guildId, payload.roleId),
+            ),
+          ),
         )
         .handle("upsertGuildChannelConfig", ({ payload }) =>
-          guildConfigService.upsertGuildChannelConfig(
-            payload.guildId,
-            payload.channelId,
-            payload.config,
+          requireManageGuild(payload.guildId).pipe(
+            Effect.andThen(
+              guildConfigService.upsertGuildChannelConfig(
+                payload.guildId,
+                payload.channelId,
+                payload.config,
+              ),
+            ),
           ),
         )
         .handle("getGuildChannelById", ({ urlParams }) =>
+          // Channel read endpoints are intentionally available to any authenticated caller;
+          // only the guild sheet binding in `getGuildConfig` remains manage-gated.
           pipe(
             guildConfigService.getGuildChannelById({
               guildId: urlParams.guildId,
@@ -85,6 +102,8 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
           ),
         )
         .handle("getGuildChannelByName", ({ urlParams }) =>
+          // Channel read endpoints are intentionally available to any authenticated caller;
+          // only the guild sheet binding in `getGuildConfig` remains manage-gated.
           pipe(
             guildConfigService.getGuildChannelByName({
               guildId: urlParams.guildId,

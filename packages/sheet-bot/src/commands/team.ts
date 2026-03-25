@@ -8,7 +8,6 @@ import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import {
   EmbedService,
-  GuildConfigService,
   PermissionService,
   PlayerService,
   SheetApisRequestContext,
@@ -17,7 +16,6 @@ import { Sheet } from "sheet-apis/schema";
 
 const makeListSubCommand = Effect.gen(function* () {
   const embedService = yield* EmbedService;
-  const guildConfigService = yield* GuildConfigService;
   const permissionService = yield* PermissionService;
   const playerService = yield* PlayerService;
 
@@ -41,7 +39,6 @@ const makeListSubCommand = Effect.gen(function* () {
         Option.orElse(() => interactionGuildId),
         Option.getOrThrow,
       );
-      const monitorRoles = yield* guildConfigService.getGuildMonitorRoles(guildId);
 
       yield* Effect.firstSuccessOf([
         permissionService.checkInteractionUserApplicationOwner(),
@@ -53,25 +50,6 @@ const makeListSubCommand = Effect.gen(function* () {
         Option.map(({ user }) => user),
         Option.getOrElse(() => interactionUser),
       );
-
-      if (interactionUser.id !== targetUser.id) {
-        const canView = yield* pipe(
-          permissionService.checkInteractionUserGuildRoles(
-            monitorRoles.map((role) => role.roleId),
-            guildId,
-          ),
-          Effect.catchTag("PermissionError", () => Effect.succeed(false)),
-        );
-
-        if (!canView) {
-          yield* command.editReply({
-            payload: {
-              content: "You can only get your own teams in the current server",
-            },
-          });
-          return;
-        }
-      }
 
       const teams = yield* playerService.getTeamsById(guildId, [targetUser.id]);
 
@@ -186,7 +164,6 @@ export const TeamCommandLive = Layer.scopedDiscard(
     Layer.mergeAll(
       DiscordGatewayLayer,
       PermissionService.Default,
-      GuildConfigService.Default,
       PlayerService.Default,
       EmbedService.Default,
     ),
