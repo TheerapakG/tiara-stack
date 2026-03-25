@@ -821,6 +821,9 @@ importers:
         specifier: ^3.19.8
         version: 3.19.15
     devDependencies:
+      '@effect/vitest':
+        specifier: ^0.27.0
+        version: 0.27.0(effect@3.19.15)(vitest@4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.10.9)(jiti@2.6.1)(jsdom@27.4.0(@noble/hashes@2.0.1))(lightningcss@1.31.1)(tsx@4.20.6))
       '@typescript/native-preview':
         specifier: latest
         version: 7.0.0-dev.20260307.1
@@ -839,6 +842,9 @@ importers:
       tsdown:
         specifier: ^0.16.4
         version: 0.16.4(@typescript/native-preview@7.0.0-dev.20260307.1)(ms@2.1.3)(typescript@5.9.3)
+      vitest:
+        specifier: ^4.0.18
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.10.9)(jiti@2.6.1)(jsdom@27.4.0(@noble/hashes@2.0.1))(lightningcss@1.31.1)(tsx@4.20.6)
 
   packages/vibecord:
     dependencies:
@@ -7968,6 +7974,11 @@ snapshots:
       effect: 3.19.15
       uuid: 11.1.0
 
+  '@effect/vitest@0.27.0(effect@3.19.15)(vitest@4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.10.9)(jiti@2.6.1)(jsdom@27.4.0(@noble/hashes@2.0.1))(lightningcss@1.31.1)(tsx@4.20.6))':
+    dependencies:
+      effect: 3.19.15
+      vitest: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.10.9)(jiti@2.6.1)(jsdom@27.4.0(@noble/hashes@2.0.1))(lightningcss@1.31.1)(tsx@4.20.6)
+
   '@effect/vitest@0.27.0(effect@3.19.15)(vitest@4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.7.2)(jiti@2.6.1)(jsdom@27.4.0(@noble/hashes@2.0.1))(lightningcss@1.31.1)(tsx@4.20.6))':
     dependencies:
       effect: 3.19.15
@@ -10882,7 +10893,6 @@ snapshots:
       magic-string: 0.30.21
     optionalDependencies:
       vite: 7.3.1(@types/node@24.10.9)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.20.6)
-    optional: true
 
   '@vitest/mocker@4.0.18(vite@7.3.1(@types/node@24.7.2)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.20.6))':
     dependencies:
@@ -13975,7 +13985,6 @@ snapshots:
       jiti: 2.6.1
       lightningcss: 1.31.1
       tsx: 4.20.6
-    optional: true
 
   vite@7.3.1(@types/node@24.7.2)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.20.6):
     dependencies:
@@ -14113,7 +14122,6 @@ snapshots:
       - terser
       - tsx
       - yaml
-    optional: true
 
   vitest@4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.7.2)(jiti@2.6.1)(jsdom@27.4.0(@noble/hashes@2.0.1))(lightningcss@1.31.1)(tsx@4.20.6):
     dependencies:

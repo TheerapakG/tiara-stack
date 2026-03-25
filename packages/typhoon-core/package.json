@@ -24,6 +24,8 @@
     "format": "oxfmt --check",
     "format:apply": "oxfmt",
     "lint": "oxlint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsgo --noEmit",
     "build": "tsdown -c tsdown.config.ts"
   },
@@ -32,12 +34,14 @@
     "@standard-schema/spec": "^1.0.0"
   },
   "devDependencies": {
+    "@effect/vitest": "^0.27.0",
     "@typescript/native-preview": "latest",
     "glob": "^11.0.3",
     "oxfmt": "^0.26.0",
     "oxlint": "^1.41.0",
     "pathe": "^2.0.3",
-    "tsdown": "^0.16.4"
+    "tsdown": "^0.16.4",
+    "vitest": "^4.0.18"
   },
   "peerDependencies": {
     "effect": "^3.19.8"
