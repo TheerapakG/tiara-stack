@@ -1,4 +1,4 @@
-import { HttpServerRequest } from "@effect/platform";
+import { HttpRouter, HttpServerRequest } from "@effect/platform";
 import { Discord } from "dfx";
 import type { MembersApiCacheView, RolesApiCacheView } from "dfx-discord-utils/discord";
 import { beforeEach, describe, expect, it } from "@effect/vitest";
@@ -49,6 +49,11 @@ const fakeRolesCache = {
   getForParent: rolesGetForParentMock,
 } as unknown as RolesApiCacheView;
 
+const routeContext = {
+  params: {},
+  route: {},
+} as unknown as HttpRouter.RouteContext;
+
 const makeAuthorization = () =>
   makeSheetAuthTokenAuthorization(
     fakeAuthClient,
@@ -58,40 +63,32 @@ const makeAuthorization = () =>
     fakeRolesCache,
   ).pipe(Effect.map((service) => service.sheetAuthToken));
 
-const withSearchParams = <A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-  searchParams?: Readonly<Record<string, string | Array<string>>>,
-) =>
-  searchParams === undefined
-    ? effect
-    : effect.pipe(Effect.provideService(HttpServerRequest.ParsedSearchParams, searchParams));
-
-const withRequest = <A, E, R>(
+const provideRequestContext = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
   options?: {
     readonly searchParams?: Readonly<Record<string, string | Array<string>>>;
     readonly payload?: unknown;
     readonly method?: string;
   },
-) => {
-  const withMaybeSearchParams = withSearchParams(effect, options?.searchParams);
-  if (typeof options?.payload === "undefined") {
-    return withMaybeSearchParams;
-  }
+): Effect.Effect<A, E> => {
+  const request =
+    typeof options?.payload === "undefined"
+      ? HttpServerRequest.fromWeb(new Request("http://localhost/test", { method: "GET" }))
+      : HttpServerRequest.fromWeb(
+          new Request("http://localhost/test", {
+            method: options.method ?? "POST",
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(options.payload),
+          }),
+        );
 
-  const request = HttpServerRequest.fromWeb(
-    new Request("http://localhost/test", {
-      method: options.method ?? "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(options.payload),
-    }),
-  );
-
-  return withMaybeSearchParams.pipe(
+  return effect.pipe(
+    Effect.provideService(HttpServerRequest.ParsedSearchParams, options?.searchParams ?? {}),
     Effect.provideService(HttpServerRequest.HttpServerRequest, request),
-  );
+    Effect.provideService(HttpRouter.RouteContext, routeContext),
+  ) as Effect.Effect<A, E>;
 };
 
 const makeAccount = Effect.fnUntraced(function* (userId: string) {
@@ -122,9 +119,12 @@ describe("SheetAuthTokenAuthorizationLive", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getOwnerIdMock.mockReturnValue(Effect.succeed(Option.none()));
+    getGuildMonitorRolesMock.mockReturnValue(Effect.succeed([]));
+    membersGetMock.mockReturnValue(Effect.fail(new Error("member lookup failed")));
+    rolesGetForParentMock.mockReturnValue(Effect.fail(new Error("roles lookup failed")));
   });
 
-  it("caches base authorization lookup for the same token", () =>
+  it.scoped("caches base authorization lookup for the same token", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(
@@ -136,8 +136,12 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       const sheetAuthToken = yield* makeAuthorization();
       const token = Redacted.make("token-1");
 
-      const first = yield* withSearchParams(sheetAuthToken(token), { guildId: "guild-1" });
-      const second = yield* withSearchParams(sheetAuthToken(token), { guildId: "guild-1" });
+      const first = yield* provideRequestContext(sheetAuthToken(token), {
+        searchParams: { guildId: "guild-1" },
+      });
+      const second = yield* provideRequestContext(sheetAuthToken(token), {
+        searchParams: { guildId: "guild-1" },
+      });
 
       expect(first).toEqual({
         accountId: "account-user-1",
@@ -151,45 +155,53 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       expect(membersGetMock).not.toHaveBeenCalled();
       expect(getGuildMonitorRolesMock).not.toHaveBeenCalled();
       expect(rolesGetForParentMock).not.toHaveBeenCalled();
-    }));
+    }),
+  );
 
-  it("skips guild lookups for bot accounts even when implicit permissions include guild roles", () =>
-    Effect.gen(function* () {
-      getAccountMock.mockReturnValue(makeAccount("user-1"));
-      getImplicitPermissionsMock.mockReturnValue(
-        Effect.succeed({
-          permissions: [
-            "bot",
-            "monitor_guild:guild-1",
-            "manage_guild:guild-1",
-            "monitor_guild:guild-2",
-            "manage_guild:guild-2",
-          ],
-        }),
-      );
+  it.scoped(
+    "skips guild lookups for bot accounts even when implicit permissions include guild roles",
+    () =>
+      Effect.gen(function* () {
+        getAccountMock.mockReturnValue(makeAccount("user-1"));
+        getImplicitPermissionsMock.mockReturnValue(
+          Effect.succeed({
+            permissions: [
+              "bot",
+              "monitor_guild:guild-1",
+              "manage_guild:guild-1",
+              "monitor_guild:guild-2",
+              "manage_guild:guild-2",
+            ],
+          }),
+        );
 
-      const sheetAuthToken = yield* makeAuthorization();
-      const token = Redacted.make("token-1");
+        const sheetAuthToken = yield* makeAuthorization();
+        const token = Redacted.make("token-1");
 
-      const first = yield* withSearchParams(sheetAuthToken(token), { guildId: "guild-1" });
-      const second = yield* withSearchParams(sheetAuthToken(token), { guildId: "guild-2" });
+        const first = yield* provideRequestContext(sheetAuthToken(token), {
+          searchParams: { guildId: "guild-1" },
+        });
+        const second = yield* provideRequestContext(sheetAuthToken(token), {
+          searchParams: { guildId: "guild-2" },
+        });
 
-      expect(first.permissions).toEqual(["bot", "user:user-1"]);
-      expect(second.permissions).toEqual(["bot", "user:user-1"]);
-      expect(membersGetMock).not.toHaveBeenCalled();
-      expect(getGuildMonitorRolesMock).not.toHaveBeenCalled();
-      expect(rolesGetForParentMock).not.toHaveBeenCalled();
-    }));
+        expect(first.permissions).toEqual(["bot", "user:user-1"]);
+        expect(second.permissions).toEqual(["bot", "user:user-1"]);
+        expect(membersGetMock).not.toHaveBeenCalled();
+        expect(getGuildMonitorRolesMock).not.toHaveBeenCalled();
+        expect(rolesGetForParentMock).not.toHaveBeenCalled();
+      }),
+  );
 
-  it("appends app owner, monitor guild, and manage guild for the application owner", () =>
+  it.scoped("appends app owner, monitor guild, and manage guild for the application owner", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("owner-user"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
       getOwnerIdMock.mockReturnValue(Effect.succeed(Option.some("owner-user")));
 
       const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
-        guildId: "guild-1",
+      const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")), {
+        searchParams: { guildId: "guild-1" },
       });
 
       expect(result.permissions).toEqual([
@@ -202,23 +214,25 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       expect(getGuildMonitorRolesMock).not.toHaveBeenCalled();
       expect(membersGetMock).not.toHaveBeenCalled();
       expect(rolesGetForParentMock).not.toHaveBeenCalled();
-    }));
+    }),
+  );
 
-  it("does not fail authorization when owner lookup fails", () =>
+  it.scoped("does not fail authorization when owner lookup fails", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
       getOwnerIdMock.mockReturnValue(Effect.fail(new Error("owner lookup failed")));
 
       const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
-        guildId: "guild-1",
+      const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")), {
+        searchParams: { guildId: "guild-1" },
       });
 
       expect(result.permissions).toEqual(["user:user-1"]);
-    }));
+    }),
+  );
 
-  it("uses distinct cache entries for distinct tokens", () =>
+  it.scoped("uses distinct cache entries for distinct tokens", () =>
     Effect.gen(function* () {
       getAccountMock
         .mockReturnValueOnce(makeAccount("user-1"))
@@ -227,43 +241,46 @@ describe("SheetAuthTokenAuthorizationLive", () => {
 
       const sheetAuthToken = yield* makeAuthorization();
 
-      const first = yield* sheetAuthToken(Redacted.make("token-1"));
-      const second = yield* sheetAuthToken(Redacted.make("token-2"));
+      const first = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")));
+      const second = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-2")));
 
       expect(first.userId).toBe("user-1");
       expect(second.userId).toBe("user-2");
       expect(getAccountMock).toHaveBeenCalledTimes(2);
       expect(getImplicitPermissionsMock).toHaveBeenCalledTimes(2);
-    }));
+    }),
+  );
 
-  it("falls back to empty permissions when implicit permission lookup fails", () =>
+  it.scoped("falls back to empty permissions when implicit permission lookup fails", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.fail(new Error("boom")));
 
       const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* sheetAuthToken(Redacted.make("token-1"));
+      const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")));
 
       expect(result.permissions).toEqual(["user:user-1"]);
       expect(getAccountMock).toHaveBeenCalledTimes(1);
       expect(getImplicitPermissionsMock).toHaveBeenCalledTimes(1);
-    }));
+    }),
+  );
 
-  it("returns only base permissions when the request has no guildId", () =>
+  it.scoped("returns only base permissions when the request has no guildId", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
 
       const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {});
+      const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")));
 
       expect(result.permissions).toEqual(["user:user-1"]);
       expect(getGuildMonitorRolesMock).not.toHaveBeenCalled();
       expect(membersGetMock).not.toHaveBeenCalled();
       expect(rolesGetForParentMock).not.toHaveBeenCalled();
-    }));
+    }),
+  );
 
-  it("derives monitor permission from a top-level payload guildId", () =>
+  it.scoped("derives monitor permission from a top-level payload guildId", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
@@ -272,7 +289,7 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       rolesGetForParentMock.mockReturnValue(Effect.succeed(new Map()));
 
       const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* withRequest(sheetAuthToken(Redacted.make("token-1")), {
+      const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")), {
         payload: { guildId: "guild-1" },
       });
 
@@ -283,9 +300,10 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       ]);
       expect(getGuildMonitorRolesMock).toHaveBeenCalledWith("guild-1");
       expect(membersGetMock).toHaveBeenCalledWith("guild-1", "account-user-1");
-    }));
+    }),
+  );
 
-  it("derives manage guild permission from a top-level payload guildId", () =>
+  it.scoped("derives manage guild permission from a top-level payload guildId", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
@@ -296,7 +314,7 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       );
 
       const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* withRequest(sheetAuthToken(Redacted.make("token-1")), {
+      const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")), {
         payload: { guildId: "guild-1" },
       });
 
@@ -305,9 +323,10 @@ describe("SheetAuthTokenAuthorizationLive", () => {
         "member_guild:guild-1",
         "manage_guild:guild-1",
       ]);
-    }));
+    }),
+  );
 
-  it("prefers search params guildId over payload guildId", () =>
+  it.scoped("prefers search params guildId over payload guildId", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
@@ -320,7 +339,7 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       rolesGetForParentMock.mockReturnValue(Effect.succeed(new Map()));
 
       const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* withRequest(sheetAuthToken(Redacted.make("token-1")), {
+      const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")), {
         searchParams: { guildId: "guild-1" },
         payload: { guildId: "guild-2" },
       });
@@ -332,15 +351,16 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       ]);
       expect(getGuildMonitorRolesMock).toHaveBeenCalledWith("guild-1");
       expect(membersGetMock).toHaveBeenCalledWith("guild-1", "account-user-1");
-    }));
+    }),
+  );
 
-  it("returns only base permissions when the payload has no guildId", () =>
+  it.scoped("returns only base permissions when the payload has no guildId", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
 
       const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* withRequest(sheetAuthToken(Redacted.make("token-1")), {
+      const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")), {
         payload: { roleId: "role-1" },
       });
 
@@ -348,9 +368,10 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       expect(getGuildMonitorRolesMock).not.toHaveBeenCalled();
       expect(membersGetMock).not.toHaveBeenCalled();
       expect(rolesGetForParentMock).not.toHaveBeenCalled();
-    }));
+    }),
+  );
 
-  it("does not consume the JSON payload when deriving guildId from the request body", () =>
+  it.scoped("does not consume the JSON payload when deriving guildId from the request body", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
@@ -371,7 +392,9 @@ describe("SheetAuthTokenAuthorizationLive", () => {
 
       const sheetAuthToken = yield* makeAuthorization();
       const result = yield* sheetAuthToken(Redacted.make("token-1")).pipe(
+        Effect.provideService(HttpServerRequest.ParsedSearchParams, {}),
         Effect.provideService(HttpServerRequest.HttpServerRequest, request),
+        Effect.provideService(HttpRouter.RouteContext, routeContext),
       );
       const bodyAfterAuthorization = yield* request.json;
 
@@ -381,9 +404,10 @@ describe("SheetAuthTokenAuthorizationLive", () => {
         "monitor_guild:guild-1",
       ]);
       expect(bodyAfterAuthorization).toEqual(payload);
-    }));
+    }),
+  );
 
-  it("adds monitor permission when the member has a configured monitor role", () =>
+  it.scoped("adds monitor permission when the member has a configured monitor role", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
@@ -392,16 +416,21 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       rolesGetForParentMock.mockReturnValue(Effect.succeed(new Map()));
 
       const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
-        guildId: "guild-1",
+      const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")), {
+        searchParams: { guildId: "guild-1" },
       });
 
-      expect(result.permissions).toEqual(["user:user-1", "monitor_guild:guild-1"]);
+      expect(result.permissions).toEqual([
+        "user:user-1",
+        "member_guild:guild-1",
+        "monitor_guild:guild-1",
+      ]);
       expect(getGuildMonitorRolesMock).toHaveBeenCalledWith("guild-1");
       expect(membersGetMock).toHaveBeenCalledWith("guild-1", "account-user-1");
-    }));
+    }),
+  );
 
-  it("adds manage guild permission when the member has manage guild", () =>
+  it.scoped("adds manage guild permission when the member has manage guild", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
@@ -412,14 +441,19 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       );
 
       const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
-        guildId: "guild-1",
+      const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")), {
+        searchParams: { guildId: "guild-1" },
       });
 
-      expect(result.permissions).toEqual(["user:user-1", "manage_guild:guild-1"]);
-    }));
+      expect(result.permissions).toEqual([
+        "user:user-1",
+        "member_guild:guild-1",
+        "manage_guild:guild-1",
+      ]);
+    }),
+  );
 
-  it("derives monitor and manage guild permissions together", () =>
+  it.scoped("derives monitor and manage guild permissions together", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
@@ -430,36 +464,41 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       );
 
       const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
-        guildId: "guild-1",
+      const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")), {
+        searchParams: { guildId: "guild-1" },
       });
 
       expect(result.permissions).toEqual([
         "user:user-1",
+        "member_guild:guild-1",
         "monitor_guild:guild-1",
         "manage_guild:guild-1",
       ]);
-    }));
+    }),
+  );
 
-  it("does not add derived permissions when the member is not a monitor and lacks manage guild", () =>
-    Effect.gen(function* () {
-      getAccountMock.mockReturnValue(makeAccount("user-1"));
-      getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
-      getGuildMonitorRolesMock.mockReturnValue(Effect.succeed([{ roleId: "role-1" }]));
-      membersGetMock.mockReturnValue(Effect.succeed(makeMember(["role-2"])));
-      rolesGetForParentMock.mockReturnValue(
-        Effect.succeed(new Map([["role-2", makeRole("role-2", 0n)]])),
-      );
+  it.scoped(
+    "does not add derived permissions when the member is not a monitor and lacks manage guild",
+    () =>
+      Effect.gen(function* () {
+        getAccountMock.mockReturnValue(makeAccount("user-1"));
+        getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
+        getGuildMonitorRolesMock.mockReturnValue(Effect.succeed([{ roleId: "role-1" }]));
+        membersGetMock.mockReturnValue(Effect.succeed(makeMember(["role-2"])));
+        rolesGetForParentMock.mockReturnValue(
+          Effect.succeed(new Map([["role-2", makeRole("role-2", 0n)]])),
+        );
 
-      const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
-        guildId: "guild-1",
-      });
+        const sheetAuthToken = yield* makeAuthorization();
+        const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")), {
+          searchParams: { guildId: "guild-1" },
+        });
 
-      expect(result.permissions).toEqual(["user:user-1"]);
-    }));
+        expect(result.permissions).toEqual(["user:user-1", "member_guild:guild-1"]);
+      }),
+  );
 
-  it("skips monitor permission when no monitor roles are configured", () =>
+  it.scoped("skips monitor permission when no monitor roles are configured", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
@@ -470,15 +509,16 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       );
 
       const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
-        guildId: "guild-1",
+      const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")), {
+        searchParams: { guildId: "guild-1" },
       });
 
-      expect(result.permissions).toEqual(["user:user-1"]);
+      expect(result.permissions).toEqual(["user:user-1", "member_guild:guild-1"]);
       expect(membersGetMock).toHaveBeenCalledWith("guild-1", "account-user-1");
-    }));
+    }),
+  );
 
-  it("skips derived permissions when member lookup fails", () =>
+  it.scoped("skips derived permissions when member lookup fails", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
@@ -486,15 +526,16 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       membersGetMock.mockReturnValue(Effect.fail(new Error("member lookup failed")));
 
       const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
-        guildId: "guild-1",
+      const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")), {
+        searchParams: { guildId: "guild-1" },
       });
 
       expect(result.permissions).toEqual(["user:user-1"]);
       expect(rolesGetForParentMock).not.toHaveBeenCalled();
-    }));
+    }),
+  );
 
-  it("skips monitor permission when guild monitor role lookup fails", () =>
+  it.scoped("skips monitor permission when guild monitor role lookup fails", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
@@ -505,14 +546,19 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       );
 
       const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
-        guildId: "guild-1",
+      const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")), {
+        searchParams: { guildId: "guild-1" },
       });
 
-      expect(result.permissions).toEqual(["user:user-1", "manage_guild:guild-1"]);
-    }));
+      expect(result.permissions).toEqual([
+        "user:user-1",
+        "member_guild:guild-1",
+        "manage_guild:guild-1",
+      ]);
+    }),
+  );
 
-  it("skips manage guild permission when role lookup fails", () =>
+  it.scoped("skips manage guild permission when role lookup fails", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
@@ -521,14 +567,19 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       rolesGetForParentMock.mockReturnValue(Effect.fail(new Error("roles lookup failed")));
 
       const sheetAuthToken = yield* makeAuthorization();
-      const result = yield* withSearchParams(sheetAuthToken(Redacted.make("token-1")), {
-        guildId: "guild-1",
+      const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")), {
+        searchParams: { guildId: "guild-1" },
       });
 
-      expect(result.permissions).toEqual(["user:user-1", "monitor_guild:guild-1"]);
-    }));
+      expect(result.permissions).toEqual([
+        "user:user-1",
+        "member_guild:guild-1",
+        "monitor_guild:guild-1",
+      ]);
+    }),
+  );
 
-  it("does not cache guild-scoped permissions across requests", () =>
+  it.scoped("does not cache guild-scoped permissions across requests", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
@@ -553,29 +604,37 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       const sheetAuthToken = yield* makeAuthorization();
       const token = Redacted.make("token-1");
 
-      const first = yield* withSearchParams(sheetAuthToken(token), { guildId: "guild-1" });
-      const second = yield* withSearchParams(sheetAuthToken(token), { guildId: "guild-2" });
+      const first = yield* provideRequestContext(sheetAuthToken(token), {
+        searchParams: { guildId: "guild-1" },
+      });
+      const second = yield* provideRequestContext(sheetAuthToken(token), {
+        searchParams: { guildId: "guild-2" },
+      });
 
       expect(first.permissions).toEqual([
         "user:user-1",
+        "member_guild:guild-1",
         "monitor_guild:guild-1",
         "manage_guild:guild-1",
       ]);
-      expect(second.permissions).toEqual(["user:user-1"]);
+      expect(second.permissions).toEqual(["user:user-1", "member_guild:guild-2"]);
       expect(getAccountMock).toHaveBeenCalledTimes(1);
       expect(getImplicitPermissionsMock).toHaveBeenCalledTimes(1);
       expect(getGuildMonitorRolesMock).toHaveBeenCalledTimes(2);
       expect(membersGetMock).toHaveBeenCalledTimes(2);
       expect(rolesGetForParentMock).toHaveBeenCalledTimes(2);
-    }));
+    }),
+  );
 
-  it("maps account failures to Unauthorized", () =>
+  it.scoped("maps account failures to Unauthorized", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(Effect.fail(new Error("ACCOUNT_NOT_FOUND")));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
 
       const sheetAuthToken = yield* makeAuthorization();
-      const exit = yield* Effect.exit(sheetAuthToken(Redacted.make("token-1")));
+      const exit = yield* Effect.exit(
+        provideRequestContext(sheetAuthToken(Redacted.make("token-1"))),
+      );
 
       expect(exit._tag).toBe("Failure");
       if (exit._tag === "Failure") {
@@ -587,9 +646,10 @@ describe("SheetAuthTokenAuthorizationLive", () => {
           );
         }
       }
-    }));
+    }),
+  );
 
-  it("expires successful cache entries after 30 seconds", () =>
+  it.scoped("expires successful cache entries after 30 seconds", () =>
     Effect.gen(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
@@ -597,15 +657,16 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       const sheetAuthToken = yield* makeAuthorization();
       const token = Redacted.make("token-1");
 
-      yield* sheetAuthToken(token);
+      yield* provideRequestContext(sheetAuthToken(token));
       yield* TestClock.adjust(Duration.seconds(31));
-      yield* sheetAuthToken(token);
+      yield* provideRequestContext(sheetAuthToken(token));
 
       expect(getAccountMock).toHaveBeenCalledTimes(2);
       expect(getImplicitPermissionsMock).toHaveBeenCalledTimes(2);
-    }));
+    }),
+  );
 
-  it("retries failed lookups after the failure ttl", () =>
+  it.scoped("retries failed lookups after the failure ttl", () =>
     Effect.gen(function* () {
       getAccountMock
         .mockReturnValueOnce(Effect.fail(new Error("ACCOUNT_NOT_FOUND")))
@@ -615,11 +676,12 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       const sheetAuthToken = yield* makeAuthorization();
       const token = Redacted.make("token-1");
 
-      yield* Effect.exit(sheetAuthToken(token));
+      yield* Effect.exit(provideRequestContext(sheetAuthToken(token)));
       yield* TestClock.adjust(Duration.seconds(2));
-      const result = yield* sheetAuthToken(token);
+      const result = yield* provideRequestContext(sheetAuthToken(token));
 
       expect(result.userId).toBe("user-1");
       expect(getAccountMock).toHaveBeenCalledTimes(2);
-    }));
+    }),
+  );
 });
