@@ -1,6 +1,6 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer } from "effect";
-import { DiscordCacheApi } from "./api";
+import { DiscordApi } from "./api";
 import { GuildsCache, ChannelsCache, RolesCache, MembersCache } from "./cache";
 import { DiscordApplication } from "./gateway";
 import { CacheNotFoundError } from "./schema";
@@ -50,17 +50,32 @@ const handleSizeError = <A>(
     Effect.orDie,
   );
 
-export const CacheLive = HttpApiBuilder.group(DiscordCacheApi, "cache", (handlers) =>
+const CacheDependenciesLive = Layer.mergeAll(
+  GuildsCache.Default,
+  ChannelsCache.Default,
+  RolesCache.Default,
+  MembersCache.Default,
+);
+
+export const ApplicationLive = HttpApiBuilder.group(DiscordApi, "application", (handlers) =>
   Effect.all({
     application: DiscordApplication,
+  }).pipe(
+    Effect.map(({ application }) =>
+      handlers.handle("getApplication", () => Effect.succeed({ ownerId: application.owner.id })),
+    ),
+  ),
+).pipe(Layer.provide(DiscordApplication.Default));
+
+export const CacheLive = HttpApiBuilder.group(DiscordApi, "cache", (handlers) =>
+  Effect.all({
     guildsCache: GuildsCache,
     channelsCache: ChannelsCache,
     rolesCache: RolesCache,
     membersCache: MembersCache,
   }).pipe(
-    Effect.map(({ application, guildsCache, channelsCache, rolesCache, membersCache }) =>
+    Effect.map(({ guildsCache, channelsCache, rolesCache, membersCache }) =>
       handlers
-        .handle("getApplication", () => Effect.succeed({ ownerId: application.owner.id }))
         // Guild cache endpoints
         .handle("getGuild", ({ path: { resourceId } }) =>
           handleCacheError(
@@ -206,17 +221,10 @@ export const CacheLive = HttpApiBuilder.group(DiscordCacheApi, "cache", (handler
         ),
     ),
   ),
-).pipe(
-  Layer.provide(
-    Layer.mergeAll(
-      DiscordApplication.Default,
-      GuildsCache.Default,
-      ChannelsCache.Default,
-      RolesCache.Default,
-      MembersCache.Default,
-    ),
-  ),
-);
+).pipe(Layer.provide(CacheDependenciesLive));
 
 // Layer that provides the full API handlers
-export const DiscordCacheApiLive = Layer.provide(HttpApiBuilder.api(DiscordCacheApi), [CacheLive]);
+export const DiscordApiLive = Layer.provide(HttpApiBuilder.api(DiscordApi), [
+  ApplicationLive,
+  CacheLive,
+]);

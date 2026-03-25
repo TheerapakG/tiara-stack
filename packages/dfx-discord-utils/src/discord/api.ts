@@ -22,6 +22,11 @@ export const ResourceIdParam = Schema.String;
 // This ensures `/resource/*` and `/size` endpoints remain reachable despite appearing after
 // dynamic routes in the registration order.
 
+export class ApplicationApi extends HttpApiGroup.make("application")
+  .add(HttpApiEndpoint.get("getApplication", "/application").addSuccess(ApplicationValueSchema))
+  .annotate(OpenApi.Title, "Application")
+  .annotate(OpenApi.Description, "Discord application metadata API") {}
+
 // Cache API Group
 export class CacheApi extends HttpApiGroup.make("cache")
   // Guild cache endpoints (simple cache - only resourceId needed)
@@ -30,9 +35,6 @@ export class CacheApi extends HttpApiGroup.make("cache")
       .setPath(Schema.Struct({ resourceId: ResourceIdParam }))
       .addSuccess(GuildValueSchema)
       .addError(CacheNotFoundError),
-  )
-  .add(
-    HttpApiEndpoint.get("getApplication", "/cache/application").addSuccess(ApplicationValueSchema),
   )
   .add(HttpApiEndpoint.get("getGuildSize", "/cache/guilds/size").addSuccess(CacheSizeSchema))
   // Reverse lookup cache endpoints - get specific resource
@@ -129,8 +131,8 @@ export class CacheApi extends HttpApiGroup.make("cache")
   .annotate(OpenApi.Title, "Cache")
   .annotate(OpenApi.Description, "Discord cache lookup API") {}
 
-// Full API including the cache group - for users who want a standalone cache server
-export class DiscordCacheApi extends HttpApi.make("discord-cache")
+export class DiscordApi extends HttpApi.make("discord")
+  .add(ApplicationApi)
   .add(CacheApi)
-  .annotate(OpenApi.Title, "Discord Cache API")
-  .annotate(OpenApi.Description, "HTTP API for Discord cache lookups") {}
+  .annotate(OpenApi.Title, "Discord API")
+  .annotate(OpenApi.Description, "HTTP API for Discord application metadata and cache lookups") {}

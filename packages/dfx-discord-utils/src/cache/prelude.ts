@@ -7,7 +7,7 @@ import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import type { ReverseLookupCacheDriver } from "./driver";
 import { make, makeWithReverseLookup, type ReverseLookupCache, type SimpleCache } from "./cache";
-import { CacheApiClient } from "@/discord/cacheApiClient";
+import { DiscordApiClient } from "@/discord/discordApiClient";
 import type { DiscordChannel, DiscordGuild } from "@/discord/schema";
 
 // Member type with pending optional (Discord only includes it when Membership Screening is enabled)
@@ -463,11 +463,11 @@ export const channelsApiCacheViewWithReverseLookup = <RM, EM, E>(
     true
   >,
   EM,
-  RM | Scope.Scope | CacheApiClient
+  RM | Scope.Scope | DiscordApiClient
 > =>
   Effect.gen(function* () {
     const driver = yield* makeDriver;
-    const client = yield* CacheApiClient;
+    const client = yield* DiscordApiClient;
 
     return yield* makeWithReverseLookup({
       driver,
@@ -534,11 +534,11 @@ export const rolesApiCacheViewWithReverseLookup = <RM, EM, E>(
     true
   >,
   EM,
-  RM | Scope.Scope | CacheApiClient
+  RM | Scope.Scope | DiscordApiClient
 > =>
   Effect.gen(function* () {
     const driver = yield* makeDriver;
-    const client = yield* CacheApiClient;
+    const client = yield* DiscordApiClient;
 
     return yield* makeWithReverseLookup({
       driver,
@@ -605,11 +605,11 @@ export const membersApiCacheViewWithReverseLookup = <RM, EM, E>(
     true
   >,
   EM,
-  RM | Scope.Scope | CacheApiClient
+  RM | Scope.Scope | DiscordApiClient
 > =>
   Effect.gen(function* () {
     const driver = yield* makeDriver;
-    const client = yield* CacheApiClient;
+    const client = yield* DiscordApiClient;
 
     return yield* makeWithReverseLookup({
       driver,
@@ -672,11 +672,11 @@ export const guildsApiCacheView = <RM, EM, E>(
 ): Effect.Effect<
   SimpleCache<E, Cache.CacheMissError, GuildWithRelaxedFeatures, true>,
   EM,
-  RM | Scope.Scope | CacheApiClient
+  RM | Scope.Scope | DiscordApiClient
 > =>
   Effect.gen(function* () {
     const driver = yield* makeDriver;
-    const client = yield* CacheApiClient;
+    const client = yield* DiscordApiClient;
 
     return yield* make({
       driver,

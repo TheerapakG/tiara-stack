@@ -3,15 +3,15 @@ import {
   RolesApiCacheView,
   MembersApiCacheView,
   ChannelsApiCacheView,
-  CacheApiClient,
+  DiscordApiClient,
 } from "dfx-discord-utils/discord";
 import { Effect, Layer } from "effect";
 import { config } from "@/config";
 
-export const CacheApiClientLive = Layer.unwrapEffect(
+export const DiscordApiClientLive = Layer.unwrapEffect(
   Effect.gen(function* () {
     const cacheApiBaseUrl = yield* config.cacheApiBaseUrl;
-    return CacheApiClient.Live(cacheApiBaseUrl);
+    return DiscordApiClient.Live(cacheApiBaseUrl);
   }),
 );
 
@@ -20,4 +20,4 @@ export const CacheLive = Layer.mergeAll(
   RolesApiCacheView.Default,
   MembersApiCacheView.Default,
   ChannelsApiCacheView.Default,
-).pipe(Layer.provide(CacheApiClientLive));
+).pipe(Layer.provide(DiscordApiClientLive));

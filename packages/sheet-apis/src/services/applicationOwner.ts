@@ -1,10 +1,5 @@
-import { HttpClient, HttpClientRequest } from "@effect/platform";
-import { Cache, Duration, Effect, Exit, Option, Schema } from "effect";
-import { config } from "@/config";
-
-const ApplicationOwnerResponse = Schema.Struct({
-  ownerId: Schema.String,
-});
+import { Cache, Duration, Effect, Exit, Option } from "effect";
+import { DiscordApiClient } from "dfx-discord-utils/discord";
 
 const SUCCESS_TTL = Duration.hours(6);
 const FAILURE_TTL = Duration.minutes(1);
@@ -13,18 +8,14 @@ export class ApplicationOwnerResolver extends Effect.Service<ApplicationOwnerRes
   "ApplicationOwnerResolver",
   {
     effect: Effect.all({
-      cacheApiBaseUrl: config.cacheApiBaseUrl,
-      httpClient: HttpClient.HttpClient,
+      discordApiClient: DiscordApiClient,
     }).pipe(
-      Effect.flatMap(({ cacheApiBaseUrl, httpClient }) =>
+      Effect.flatMap(({ discordApiClient }) =>
         Effect.gen(function* () {
           const application = yield* Cache.makeWith({
             capacity: 1,
             lookup: (): Effect.Effect<Option.Option<string>> =>
-              HttpClientRequest.get(new URL("/cache/application", cacheApiBaseUrl)).pipe(
-                httpClient.execute,
-                Effect.flatMap((response) => response.json),
-                Effect.flatMap(Schema.decodeUnknown(ApplicationOwnerResponse)),
+              discordApiClient.application.getApplication().pipe(
                 Effect.map((application) => Option.some(application.ownerId)),
                 Effect.catchAll(() => Effect.succeed(Option.none<string>())),
               ),
