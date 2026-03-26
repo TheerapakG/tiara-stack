@@ -37,13 +37,13 @@ const makeCheckinButtonHandler = Effect.gen(function* () {
         const message = yield* Interaction.message();
 
         const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
-        const userId = user.id;
+        const accountId = user.id;
         const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
         const messageChannelId = Option.map(message, (m) => m.channel_id).pipe(Option.getOrThrow);
 
         yield* messageCheckinService.setMessageCheckinMemberCheckinAt(
           messageId,
-          userId,
+          accountId,
           Date.now(),
         );
 
@@ -83,11 +83,11 @@ const makeCheckinButtonHandler = Effect.gen(function* () {
 
         // Send notification to the running channel
         yield* helper.rest.createMessage(messageCheckinData.channelId, {
-          content: `${userMention(userId)} has checked in!`,
+          content: `${userMention(accountId)} has checked in!`,
         });
 
         yield* Effect.transposeMapOption(messageCheckinData.roleId, (roleId) =>
-          guildMemberUtils.addRoles(guildId, userId, [roleId]),
+          guildMemberUtils.addRoles(guildId, accountId, [roleId]),
         );
       }),
     ),

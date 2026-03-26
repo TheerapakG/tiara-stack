@@ -8,13 +8,13 @@ import { Discord } from "dfx";
 import { Cause, Effect, Redacted } from "effect";
 import {
   getGuildMonitorAccessLevel,
-  hasUserPermission,
+  hasDiscordAccountPermission,
   requireBot,
+  requireDiscordAccountId,
+  requireDiscordAccountIdOrMonitorGuild,
   requireGuildMember,
   requireManageGuild,
   requireMonitorGuild,
-  requireUserId,
-  requireUserIdOrMonitorGuild,
   resolveManageGuildScopedPermissions,
   resolveUserGuildPermissions,
 } from "./authorization";
@@ -27,11 +27,14 @@ type TestPermission =
   | `member_guild:${string}`
   | `monitor_guild:${string}`
   | `manage_guild:${string}`
-  | `user:${string}`;
+  | `account:discord:${string}`;
 
-const makeUser = (permissions: ReadonlyArray<TestPermission>) => ({
-  accountId: "account-1",
-  userId: "user-1",
+const makeUser = (
+  permissions: ReadonlyArray<TestPermission>,
+  identity = { accountId: "discord-account-1", userId: "better-auth-user-1" },
+) => ({
+  accountId: identity.accountId,
+  userId: identity.userId,
   permissions: [...permissions],
   token: Redacted.make("token"),
 });
@@ -39,7 +42,8 @@ const makeUser = (permissions: ReadonlyArray<TestPermission>) => ({
 const withUser = <A, E, R>(
   permissions: ReadonlyArray<TestPermission>,
   effect: Effect.Effect<A, E, R>,
-) => effect.pipe(Effect.provideService(SheetAuthUser, makeUser(permissions)));
+  identity?: { accountId: string; userId: string },
+) => effect.pipe(Effect.provideService(SheetAuthUser, makeUser(permissions, identity)));
 
 const makeMember = (roles: string[]) =>
   ({
@@ -87,10 +91,14 @@ const liveGuildServices =
     );
 
 describe("authorization middleware helpers", () => {
-  it.effect("matches exact dynamic user permission", () =>
+  it.effect("matches exact discord account permission", () =>
     Effect.gen(function* () {
-      expect(hasUserPermission(["user:user-1"], "user-1")).toBe(true);
-      expect(hasUserPermission(["user:user-1"], "user-2")).toBe(false);
+      expect(
+        hasDiscordAccountPermission(["account:discord:discord-account-1"], "discord-account-1"),
+      ).toBe(true);
+      expect(
+        hasDiscordAccountPermission(["account:discord:discord-account-1"], "discord-account-2"),
+      ).toBe(false);
     }),
   );
 
@@ -208,14 +216,17 @@ describe("authorization middleware helpers", () => {
     ),
   );
 
-  it.effect("allows self access with matching user permission", () =>
+  it.effect("allows self access with matching discord account permission", () =>
     Effect.gen(function* () {
-      yield* withUser(["user:user-1"], requireUserId("user-1"));
+      yield* withUser(
+        ["account:discord:discord-account-1"],
+        requireDiscordAccountId("discord-account-1"),
+      );
     }),
   );
 
   it.effect("allows self-or-monitor access with resolved monitor permission", () =>
-    withUser([], requireUserIdOrMonitorGuild("guild-1", "user-2")).pipe(
+    withUser([], requireDiscordAccountIdOrMonitorGuild("guild-1", "discord-account-2")).pipe(
       liveGuildServices({
         member: makeMember(["role-1"]),
         monitorRoleIds: ["role-1"],
@@ -309,9 +320,32 @@ describe("authorization middleware helpers", () => {
     }),
   );
 
-  it.effect("rejects mismatched user permission", () =>
+  it.effect("rejects mismatched discord account permission", () =>
     Effect.gen(function* () {
-      const exit = yield* Effect.exit(withUser(["user:user-1"], requireUserId("user-2")));
+      const exit = yield* Effect.exit(
+        withUser(
+          ["account:discord:discord-account-1"],
+          requireDiscordAccountId("discord-account-2"),
+        ),
+      );
+
+      expect(exit._tag).toBe("Failure");
+      if (exit._tag === "Failure") {
+        const failure = Cause.failureOption(exit.cause);
+        expect(failure._tag).toBe("Some");
+      }
+    }),
+  );
+
+  it.effect("rejects better-auth user id when only discord account permission is present", () =>
+    Effect.gen(function* () {
+      const exit = yield* Effect.exit(
+        withUser(
+          ["account:discord:discord-account-1"],
+          requireDiscordAccountId("better-auth-user-1"),
+          { accountId: "discord-account-1", userId: "better-auth-user-1" },
+        ),
+      );
 
       expect(exit._tag).toBe("Failure");
       if (exit._tag === "Failure") {

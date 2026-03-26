@@ -58,7 +58,7 @@ export class ScheduleApi extends HttpApiGroup.make("schedule")
         Schema.Struct({
           guildId: Schema.String,
           day: Schema.NumberFromString,
-          userId: Schema.String,
+          accountId: Schema.String,
           view: ScheduleViewUrlParam,
         }),
       )

@@ -7,7 +7,7 @@ import {
   requireBot,
   requireGuildMember,
   requireMonitorGuild,
-  requireUserId,
+  requireDiscordAccountId,
 } from "@/middlewares/authorization";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { MessageCheckin, MessageCheckinMember } from "@/schemas/messageCheckin";
@@ -74,7 +74,7 @@ const resolveCheckinReadAccess = (
             ? Effect.succeed<CheckinReadAccess>({ _tag: "monitor" })
             : messageCheckinService.getMessageCheckinMembers(messageId).pipe(
                 Effect.flatMap((members) =>
-                  requireRecordedParticipant(members, user.userId).pipe(
+                  requireRecordedParticipant(members, user.accountId).pipe(
                     Effect.as<CheckinReadAccess>({
                       _tag: "participant",
                       members,
@@ -121,7 +121,7 @@ const requireCheckinMutationAccess = (
           // monitors can add members, but only the recorded participant can update/remove that member.
           // `guildId` is record-derived here, so `requireGuildMember` usually falls back
           // to a live membership lookup instead of using a request-scoped shortcut.
-          requireUserId(memberId).pipe(
+          requireDiscordAccountId(memberId).pipe(
             Effect.andThen(requireGuildMember(guildId)),
             Effect.andThen(messageCheckinService.getMessageCheckinMembers(messageId)),
             Effect.flatMap((members) => requireRecordedParticipant(members, memberId)),

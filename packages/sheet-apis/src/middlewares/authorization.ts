@@ -19,8 +19,10 @@ export const hasGuildPermission = (
   guildId: string,
 ) => permissions.includes(`${prefix}:${guildId}`);
 
-export const hasUserPermission = (permissions: ReadonlyArray<Permission>, userId: string) =>
-  permissions.includes(`user:${userId}`);
+export const hasDiscordAccountPermission = (
+  permissions: ReadonlyArray<Permission>,
+  accountId: string,
+) => permissions.includes(`account:discord:${accountId}`);
 
 const requirePermissions = (
   permissions: ReadonlyArray<Permission>,
@@ -350,7 +352,10 @@ export const requireBot = (message = "User is not the bot") =>
     ),
   );
 
-export const requireUserId = (userId: string, message = "User does not have access to this user") =>
+export const requireDiscordAccountId = (
+  accountId: string,
+  message = "User does not have access to this user",
+) =>
   SheetAuthUser.pipe(
     Effect.flatMap((user) =>
       requirePermissions(
@@ -358,22 +363,22 @@ export const requireUserId = (userId: string, message = "User does not have acce
         (permissions) =>
           hasPermission(permissions, "bot") ||
           hasPermission(permissions, "app_owner") ||
-          hasUserPermission(permissions, userId),
+          hasDiscordAccountPermission(permissions, accountId),
         message,
       ),
     ),
   );
 
-export const requireUserIdOrMonitorGuild = (
+export const requireDiscordAccountIdOrMonitorGuild = (
   guildId: string,
-  userId: string,
+  accountId: string,
   message = "User does not have access to this user",
 ) =>
   SheetAuthUser.pipe(
     Effect.flatMap((user) =>
       hasPermission(user.permissions, "bot") ||
       hasPermission(user.permissions, "app_owner") ||
-      hasUserPermission(user.permissions, userId)
+      hasDiscordAccountPermission(user.permissions, accountId)
         ? Effect.void
         : requireMonitorGuild(guildId, message),
     ),

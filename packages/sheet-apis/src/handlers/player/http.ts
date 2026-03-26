@@ -1,7 +1,10 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Array, Effect, HashMap, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
-import { requireMonitorGuild, requireUserIdOrMonitorGuild } from "@/middlewares/authorization";
+import {
+  requireDiscordAccountIdOrMonitorGuild,
+  requireMonitorGuild,
+} from "@/middlewares/authorization";
 import { PlayerService } from "@/services/player";
 import { GuildConfigService } from "@/services/guildConfig";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
@@ -59,7 +62,7 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
         .handle("getByIds", ({ urlParams }) => {
           const auth =
             urlParams.ids.length === 1
-              ? requireUserIdOrMonitorGuild(urlParams.guildId, urlParams.ids[0])
+              ? requireDiscordAccountIdOrMonitorGuild(urlParams.guildId, urlParams.ids[0])
               : requireMonitorGuild(urlParams.guildId);
 
           return auth.pipe(
@@ -84,7 +87,7 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
         .handle("getTeamsByIds", ({ urlParams }) => {
           const auth =
             urlParams.ids.length === 1
-              ? requireUserIdOrMonitorGuild(urlParams.guildId, urlParams.ids[0])
+              ? requireDiscordAccountIdOrMonitorGuild(urlParams.guildId, urlParams.ids[0])
               : requireMonitorGuild(urlParams.guildId);
 
           return auth.pipe(

@@ -2,8 +2,10 @@ import { Schema } from "effect";
 export const BasePermissionValues = ["bot", "app_owner"] as const;
 export const PermissionValues = BasePermissionValues;
 
-export const UserPermission = Schema.String.pipe(
-  Schema.filter((value): value is `user:${string}` => value.startsWith("user:")),
+export const DiscordAccountPermission = Schema.String.pipe(
+  Schema.filter((value): value is `account:discord:${string}` =>
+    value.startsWith("account:discord:"),
+  ),
 );
 
 export const MemberGuildPermission = Schema.String.pipe(
@@ -20,7 +22,7 @@ export const ManageGuildPermission = Schema.String.pipe(
 
 export const Permission = Schema.Union(
   Schema.Literal(...BasePermissionValues),
-  UserPermission,
+  DiscordAccountPermission,
   MemberGuildPermission,
   MonitorGuildPermission,
   ManageGuildPermission,

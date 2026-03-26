@@ -47,11 +47,11 @@ const provideRequestContext = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.
     Effect.provideService(HttpRouter.RouteContext, routeContext),
   ) as Effect.Effect<A, E>;
 
-const makeAccount = Effect.fnUntraced(function* (userId: string) {
+const makeAccount = Effect.fnUntraced(function* (userId: string, accountId = `discord-${userId}`) {
   const now = yield* DateTime.now;
   return Account.make({
     userId,
-    accountId: `account-${userId}`,
+    accountId,
     providerId: "discord",
     scopes: [],
     createdAt: now,
@@ -81,9 +81,9 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       const second = yield* provideRequestContext(sheetAuthToken(token));
 
       expect(first).toEqual({
-        accountId: "account-user-1",
+        accountId: "discord-user-1",
         userId: "user-1",
-        permissions: ["bot", "user:user-1"],
+        permissions: ["bot", "account:discord:discord-user-1"],
         token,
       });
       expect(second).toEqual(first);
@@ -115,21 +115,21 @@ describe("SheetAuthTokenAuthorizationLive", () => {
         const first = yield* provideRequestContext(sheetAuthToken(token));
         const second = yield* provideRequestContext(sheetAuthToken(token));
 
-        expect(first.permissions).toEqual(["bot", "user:user-1"]);
-        expect(second.permissions).toEqual(["bot", "user:user-1"]);
+        expect(first.permissions).toEqual(["bot", "account:discord:discord-user-1"]);
+        expect(second.permissions).toEqual(["bot", "account:discord:discord-user-1"]);
       }),
   );
 
   it.scoped("appends app owner without deriving guild permissions", () =>
     Effect.gen(function* () {
-      getAccountMock.mockReturnValue(makeAccount("owner-user"));
+      getAccountMock.mockReturnValue(makeAccount("owner-user", "discord-owner"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
-      getOwnerIdMock.mockReturnValue(Effect.succeed(Option.some("owner-user")));
+      getOwnerIdMock.mockReturnValue(Effect.succeed(Option.some("discord-owner")));
 
       const sheetAuthToken = yield* makeAuthorization();
       const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")));
 
-      expect(result.permissions).toEqual(["user:owner-user", "app_owner"]);
+      expect(result.permissions).toEqual(["account:discord:discord-owner", "app_owner"]);
     }),
   );
 
@@ -142,7 +142,7 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       const sheetAuthToken = yield* makeAuthorization();
       const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")));
 
-      expect(result.permissions).toEqual(["user:user-1"]);
+      expect(result.permissions).toEqual(["account:discord:discord-user-1"]);
     }),
   );
 
@@ -173,7 +173,7 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       const sheetAuthToken = yield* makeAuthorization();
       const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")));
 
-      expect(result.permissions).toEqual(["user:user-1"]);
+      expect(result.permissions).toEqual(["account:discord:discord-user-1"]);
       expect(getAccountMock).toHaveBeenCalledTimes(1);
       expect(getImplicitPermissionsMock).toHaveBeenCalledTimes(1);
     }),
@@ -187,7 +187,7 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       const sheetAuthToken = yield* makeAuthorization();
       const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")));
 
-      expect(result.permissions).toEqual(["user:user-1"]);
+      expect(result.permissions).toEqual(["account:discord:discord-user-1"]);
     }),
   );
 

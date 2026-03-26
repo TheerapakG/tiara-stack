@@ -62,12 +62,15 @@ const resolveCachedAuthorization = (
 const hasPermission = (permissions: ReadonlyArray<Permission>, permission: Permission) =>
   permissions.includes(permission);
 
-const resolveBasePermissions = (
+const resolveBaseAuthorizationPermissions = (
   authorization: CachedAuthorization,
   applicationOwnerResolver: ApplicationOwnerResolver,
 ): Effect.Effect<Permission[]> =>
   Effect.gen(function* () {
-    let permissions = appendPermission(authorization.permissions, `user:${authorization.userId}`);
+    let permissions = appendPermission(
+      authorization.permissions,
+      `account:discord:${authorization.accountId}`,
+    );
 
     if (hasPermission(permissions, "bot")) {
       return permissions;
@@ -77,7 +80,7 @@ const resolveBasePermissions = (
       Effect.tapError(Effect.logError),
       Effect.orElseSucceed(() => Option.none<string>()),
     );
-    if (Option.isSome(maybeOwnerId) && maybeOwnerId.value === authorization.userId) {
+    if (Option.isSome(maybeOwnerId) && maybeOwnerId.value === authorization.accountId) {
       permissions = appendPermission(permissions, "app_owner");
     }
 
@@ -103,7 +106,7 @@ export const makeSheetAuthTokenAuthorization = (
         pipe(
           authorizationCache.get(token),
           Effect.flatMap((authorization) =>
-            resolveBasePermissions(authorization, applicationOwnerResolver).pipe(
+            resolveBaseAuthorizationPermissions(authorization, applicationOwnerResolver).pipe(
               Effect.map((permissions) => ({
                 accountId: authorization.accountId,
                 userId: authorization.userId,

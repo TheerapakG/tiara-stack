@@ -108,7 +108,7 @@ export const ScheduleLive = HttpApiBuilder.group(Api, "schedule", (handlers) =>
               );
 
               return (
-                resolvedUser.userId === urlParams.userId ||
+                resolvedUser.accountId === urlParams.accountId ||
                 hasPermission(resolvedUser.permissions, "bot") ||
                 hasPermission(resolvedUser.permissions, "app_owner") ||
                 hasGuildPermission(resolvedUser.permissions, "monitor_guild", urlParams.guildId)
@@ -125,7 +125,7 @@ export const ScheduleLive = HttpApiBuilder.group(Api, "schedule", (handlers) =>
                   ).pipe(
                     Effect.map((schedules) => ({
                       view,
-                      schedule: summarizeDayPlayerSchedule(schedules, urlParams.userId),
+                      schedule: summarizeDayPlayerSchedule(schedules, urlParams.accountId),
                     })),
                   ),
                 ),

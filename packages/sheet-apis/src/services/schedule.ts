@@ -138,11 +138,11 @@ const buildResolutionMaps = (
 
 const schedulePlayerMatchesUser = (
   schedulePlayer: PopulatedSchedulePlayer,
-  userId: string,
+  accountId: string,
 ): boolean =>
   Match.value(schedulePlayer.player).pipe(
     Match.tagsExhaustive({
-      Player: (player) => player.id === userId,
+      Player: (player) => player.id === accountId,
       PartialNamePlayer: () => false,
     }),
   );
@@ -154,7 +154,7 @@ const sortHours = (hours: ReadonlyArray<number>): number[] =>
 
 export const summarizeDayPlayerSchedule = (
   schedules: ReadonlyArray<PopulatedScheduleResult>,
-  userId: string,
+  accountId: string,
 ): PlayerDayScheduleSummary => {
   // Filler schedule inputs are already visibility-filtered by
   // `get*PopulatedFillerSchedules`, so a hidden populated schedule here only
@@ -177,17 +177,17 @@ export const summarizeDayPlayerSchedule = (
 
     if (
       schedule.fills.some(
-        (fill) => Option.isSome(fill) && schedulePlayerMatchesUser(fill.value, userId),
+        (fill) => Option.isSome(fill) && schedulePlayerMatchesUser(fill.value, accountId),
       )
     ) {
       fillHours.push(hour);
     }
 
-    if (schedule.overfills.some((overfill) => schedulePlayerMatchesUser(overfill, userId))) {
+    if (schedule.overfills.some((overfill) => schedulePlayerMatchesUser(overfill, accountId))) {
       overfillHours.push(hour);
     }
 
-    if (schedule.standbys.some((standby) => schedulePlayerMatchesUser(standby, userId))) {
+    if (schedule.standbys.some((standby) => schedulePlayerMatchesUser(standby, accountId))) {
       standbyHours.push(hour);
     }
   }

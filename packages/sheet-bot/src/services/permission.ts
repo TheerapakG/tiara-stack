@@ -70,24 +70,24 @@ export class PermissionService extends Effect.Service<PermissionService>()("Perm
       checkInteractionUserApplicationOwner: Effect.fn(
         "PermissionService.checkInteractionUserApplicationOwner",
       )(function* () {
-        const resolvedUserId = (yield* Interaction.user()).id;
+        const resolvedAccountId = (yield* Interaction.user()).id;
         const permissions = yield* getCurrentUserPermissions();
 
         return permissions.includes("app_owner")
           ? yield* Effect.succeed({
-              userId: resolvedUserId,
+              accountId: resolvedAccountId,
             })
           : yield* Effect.fail(new PermissionError("User is not the owner of the application"));
       }),
       checkInteractionUserMonitorGuild: Effect.fn(
         "PermissionService.checkInteractionUserMonitorGuild",
       )(function* (guildId?: string) {
-        const resolvedUserId = (yield* Interaction.user()).id;
+        const resolvedAccountId = (yield* Interaction.user()).id;
         const resolvedGuildId = yield* resolveGuildId(guildId);
         const permissions = yield* getCurrentUserPermissions(resolvedGuildId);
 
         return permissions.some((permission) => permission === `monitor_guild:${resolvedGuildId}`)
-          ? yield* Effect.succeed({ userId: resolvedUserId, guildId: resolvedGuildId })
+          ? yield* Effect.succeed({ accountId: resolvedAccountId, guildId: resolvedGuildId })
           : yield* Effect.fail(new PermissionError("User does not have monitor guild permission"));
       }),
     };
