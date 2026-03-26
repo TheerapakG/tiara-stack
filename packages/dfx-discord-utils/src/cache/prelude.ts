@@ -295,7 +295,7 @@ export const membersWithReverseLookup = <RM, EM, E>(
 ): Effect.Effect<
   ReverseLookupCache<
     E,
-    Cache.CacheMissError,
+    DiscordRESTError | Cache.CacheMissError,
     DiscordRESTError,
     Cache.CacheMissError,
     Omit<Discord.GuildMemberResponse, "deaf" | "flags" | "joined_at" | "mute">,
@@ -328,13 +328,7 @@ export const membersWithReverseLookup = <RM, EM, E>(
         parentRemove: Stream.map(gateway.fromDispatch("GUILD_DELETE"), (g) => g.id),
         resourceRemove: Stream.never,
       }),
-      onMiss: (_, id) =>
-        Effect.fail(
-          new Cache.CacheMissError({
-            cacheName: "MembersReverseLookupCache",
-            id,
-          }),
-        ),
+      onMiss: (guildId, id) => rest.getGuildMember(guildId, id),
       onParentMiss: (guildId) =>
         rest
           .listGuildMembers(guildId)
