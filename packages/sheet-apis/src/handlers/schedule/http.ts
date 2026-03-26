@@ -4,7 +4,7 @@ import { Api } from "@/api";
 import {
   hasGuildPermission,
   hasPermission,
-  provideCurrentMonitorGuildUser,
+  provideCurrentGuildUser,
 } from "@/middlewares/authorization";
 import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
@@ -40,7 +40,7 @@ export const ScheduleLive = HttpApiBuilder.group(Api, "schedule", (handlers) =>
     Effect.map(({ scheduleService, guildConfigService }) =>
       handlers
         .handle("getAllPopulatedSchedules", ({ urlParams }) =>
-          provideCurrentMonitorGuildUser(
+          provideCurrentGuildUser(
             urlParams.guildId,
             Effect.all({
               sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
@@ -62,7 +62,7 @@ export const ScheduleLive = HttpApiBuilder.group(Api, "schedule", (handlers) =>
           ),
         )
         .handle("getDayPopulatedSchedules", ({ urlParams }) =>
-          provideCurrentMonitorGuildUser(
+          provideCurrentGuildUser(
             urlParams.guildId,
             Effect.all({
               sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
@@ -84,7 +84,7 @@ export const ScheduleLive = HttpApiBuilder.group(Api, "schedule", (handlers) =>
           ),
         )
         .handle("getChannelPopulatedSchedules", ({ urlParams }) =>
-          provideCurrentMonitorGuildUser(
+          provideCurrentGuildUser(
             urlParams.guildId,
             Effect.all({
               sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
@@ -106,7 +106,7 @@ export const ScheduleLive = HttpApiBuilder.group(Api, "schedule", (handlers) =>
           ),
         )
         .handle("getDayPlayerSchedule", ({ urlParams }) =>
-          provideCurrentMonitorGuildUser(
+          provideCurrentGuildUser(
             urlParams.guildId,
             SheetAuthGuildUser.pipe(
               Effect.flatMap((resolvedUser) => {

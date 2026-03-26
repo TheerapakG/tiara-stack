@@ -3,8 +3,7 @@ import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import {
-  provideCurrentMemberGuildUser,
-  provideCurrentMonitorGuildUser,
+  provideCurrentGuildUser,
   requireBot,
   requireGuildMember,
   requireMonitorGuild,
@@ -40,11 +39,11 @@ const requireMessageSlotUpsertAccess = (
       Option.match({
         onNone: () =>
           typeof guildId === "string"
-            ? provideCurrentMonitorGuildUser(guildId, requireMonitorGuild(guildId))
+            ? provideCurrentGuildUser(guildId, requireMonitorGuild(guildId))
             : requireLegacyMessageSlotBotAccess(),
         onSome: (record) =>
           Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-            ? provideCurrentMonitorGuildUser(
+            ? provideCurrentGuildUser(
                 record.guildId.value,
                 requireMonitorGuild(record.guildId.value),
               )
@@ -64,7 +63,7 @@ export const MessageSlotLive = HttpApiBuilder.group(Api, "messageSlot", (handler
           getRequiredMessageSlotRecord(messageSlotService, urlParams.messageId).pipe(
             Effect.flatMap((record) =>
               Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-                ? provideCurrentMemberGuildUser(
+                ? provideCurrentGuildUser(
                     record.guildId.value,
                     requireGuildMember(record.guildId.value).pipe(
                       Effect.andThen(Effect.succeed(record)),

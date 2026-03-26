@@ -1,7 +1,7 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
-import { provideCurrentMonitorGuildUser } from "@/middlewares/authorization";
+import { provideCurrentGuildUser } from "@/middlewares/authorization";
 import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
 import { BreakSchedule, Schedule } from "@/schemas/sheet";
 import { withScheduleHourWindow } from "@/services/hourWindow";
@@ -62,7 +62,7 @@ export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
           ),
         )
         .handle("getAllSchedules", ({ urlParams }) =>
-          provideCurrentMonitorGuildUser(
+          provideCurrentGuildUser(
             urlParams.guildId,
             Effect.all({
               sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
@@ -91,7 +91,7 @@ export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
           ),
         )
         .handle("getDaySchedules", ({ urlParams }) =>
-          provideCurrentMonitorGuildUser(
+          provideCurrentGuildUser(
             urlParams.guildId,
             Effect.all({
               sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
@@ -120,7 +120,7 @@ export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
           ),
         )
         .handle("getChannelSchedules", ({ urlParams }) =>
-          provideCurrentMonitorGuildUser(
+          provideCurrentGuildUser(
             urlParams.guildId,
             Effect.all({
               sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),

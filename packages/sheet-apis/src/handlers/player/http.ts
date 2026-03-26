@@ -2,7 +2,7 @@ import { HttpApiBuilder } from "@effect/platform";
 import { Array, Effect, HashMap, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import {
-  provideCurrentMonitorGuildUser,
+  provideCurrentGuildUser,
   requireDiscordAccountIdOrMonitorGuild,
   requireMonitorGuild,
 } from "@/middlewares/authorization";
@@ -37,7 +37,7 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
     Effect.map(({ playerService, guildConfigService }) =>
       handlers
         .handle("getPlayerMaps", ({ urlParams }) =>
-          provideCurrentMonitorGuildUser(
+          provideCurrentGuildUser(
             urlParams.guildId,
             requireMonitorGuild(urlParams.guildId).pipe(
               Effect.andThen(
@@ -69,7 +69,7 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
               ? requireDiscordAccountIdOrMonitorGuild(urlParams.guildId, urlParams.ids[0])
               : requireMonitorGuild(urlParams.guildId);
 
-          return provideCurrentMonitorGuildUser(
+          return provideCurrentGuildUser(
             urlParams.guildId,
             auth.pipe(
               Effect.andThen(
@@ -82,7 +82,7 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
           );
         })
         .handle("getByNames", ({ urlParams }) =>
-          provideCurrentMonitorGuildUser(
+          provideCurrentGuildUser(
             urlParams.guildId,
             requireMonitorGuild(urlParams.guildId).pipe(
               Effect.andThen(
@@ -100,7 +100,7 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
               ? requireDiscordAccountIdOrMonitorGuild(urlParams.guildId, urlParams.ids[0])
               : requireMonitorGuild(urlParams.guildId);
 
-          return provideCurrentMonitorGuildUser(
+          return provideCurrentGuildUser(
             urlParams.guildId,
             auth.pipe(
               Effect.andThen(
@@ -118,7 +118,7 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
           );
         })
         .handle("getTeamsByNames", ({ urlParams }) =>
-          provideCurrentMonitorGuildUser(
+          provideCurrentGuildUser(
             urlParams.guildId,
             requireMonitorGuild(urlParams.guildId).pipe(
               Effect.andThen(

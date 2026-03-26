@@ -1,7 +1,7 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Array, Effect, HashMap, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
-import { provideCurrentMonitorGuildUser, requireMonitorGuild } from "@/middlewares/authorization";
+import { provideCurrentGuildUser, requireMonitorGuild } from "@/middlewares/authorization";
 import { MonitorService } from "@/services/monitor";
 import { GuildConfigService } from "@/services/guildConfig";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
@@ -33,7 +33,7 @@ export const MonitorLive = HttpApiBuilder.group(Api, "monitor", (handlers) =>
     Effect.map(({ monitorService, guildConfigService }) =>
       handlers
         .handle("getMonitorMaps", ({ urlParams }) =>
-          provideCurrentMonitorGuildUser(
+          provideCurrentGuildUser(
             urlParams.guildId,
             requireMonitorGuild(urlParams.guildId).pipe(
               Effect.andThen(
@@ -60,7 +60,7 @@ export const MonitorLive = HttpApiBuilder.group(Api, "monitor", (handlers) =>
           ),
         )
         .handle("getByIds", ({ urlParams }) =>
-          provideCurrentMonitorGuildUser(
+          provideCurrentGuildUser(
             urlParams.guildId,
             requireMonitorGuild(urlParams.guildId).pipe(
               Effect.andThen(
@@ -73,7 +73,7 @@ export const MonitorLive = HttpApiBuilder.group(Api, "monitor", (handlers) =>
           ),
         )
         .handle("getByNames", ({ urlParams }) =>
-          provideCurrentMonitorGuildUser(
+          provideCurrentGuildUser(
             urlParams.guildId,
             requireMonitorGuild(urlParams.guildId).pipe(
               Effect.andThen(

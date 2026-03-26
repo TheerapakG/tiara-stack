@@ -16,7 +16,6 @@ import {
   requireGuildMember,
   requireManageGuild,
   requireMonitorGuild,
-  resolveManageGuildScopedPermissions,
   resolveSheetAuthGuildUser,
 } from "./authorization";
 import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
@@ -159,24 +158,9 @@ describe("authorization middleware helpers", () => {
   );
 
   it.effect("resolves monitor and manage permissions from live guild data", () =>
-    resolveManageGuildScopedPermissions(
-      makeUser([]),
-      "guild-1",
-      {
-        get: () => Effect.succeed(makeMember(["role-1", "role-2"])),
-      } as unknown as MembersApiCacheView,
-      {
-        getGuildMonitorRoles: () => Effect.succeed([{ roleId: "role-1" }]),
-      } as unknown as GuildConfigService,
-      {
-        getForParent: () =>
-          Effect.succeed(
-            new Map([["role-2", makeRole("role-2", Discord.Permissions.ManageGuild)]]),
-          ),
-      } as unknown as RolesApiCacheView,
-    ).pipe(
-      Effect.map((permissions) => {
-        expect(resolvedPermissionValues(permissions)).toEqual(
+    resolveSheetAuthGuildUser(makeUser([]), "guild-1").pipe(
+      Effect.map((user) => {
+        expect(resolvedPermissionValues(user.permissions)).toEqual(
           permissionValues([
             "member_guild:guild-1",
             "monitor_guild:guild-1",
@@ -184,7 +168,52 @@ describe("authorization middleware helpers", () => {
           ]),
         );
       }),
+      liveGuildServices({
+        member: makeMember(["role-1", "role-2"]),
+        monitorRoleIds: ["role-1"],
+        roleMap: new Map([["role-2", makeRole("role-2", Discord.Permissions.ManageGuild)]]),
+      }),
     ),
+  );
+
+  it.effect("resolves manage permission even when monitor permission already exists", () =>
+    resolveSheetAuthGuildUser(makeUser(["monitor_guild:guild-1"]), "guild-1").pipe(
+      Effect.map((user) => {
+        expect(resolvedPermissionValues(user.permissions)).toEqual(
+          permissionValues([
+            "member_guild:guild-1",
+            "monitor_guild:guild-1",
+            "manage_guild:guild-1",
+          ]),
+        );
+      }),
+      liveGuildServices({
+        member: makeMember(["role-1", "role-2"]),
+        monitorRoleIds: ["role-1"],
+        roleMap: new Map([["role-2", makeRole("role-2", Discord.Permissions.ManageGuild)]]),
+      }),
+    ),
+  );
+
+  it.effect(
+    "resolves member and monitor permissions even when manage permission already exists",
+    () =>
+      resolveSheetAuthGuildUser(makeUser(["manage_guild:guild-1"]), "guild-1").pipe(
+        Effect.map((user) => {
+          expect(resolvedPermissionValues(user.permissions)).toEqual(
+            permissionValues([
+              "member_guild:guild-1",
+              "monitor_guild:guild-1",
+              "manage_guild:guild-1",
+            ]),
+          );
+        }),
+        liveGuildServices({
+          member: makeMember(["role-1", "role-2"]),
+          monitorRoleIds: ["role-1"],
+          roleMap: new Map([["role-2", makeRole("role-2", Discord.Permissions.ManageGuild)]]),
+        }),
+      ),
   );
 
   it.effect("does not leak resolved permissions across guilds", () =>
@@ -415,6 +444,9 @@ describe("authorization middleware helpers", () => {
       Effect.provideService(GuildConfigService, {
         getGuildMonitorRoles: () => Effect.succeed([{ roleId: "role-1" }]),
       } as unknown as GuildConfigService),
+      Effect.provideService(RolesApiCacheView, {
+        getForParent: () => Effect.succeed(new Map()),
+      } as unknown as RolesApiCacheView),
     ),
   );
 

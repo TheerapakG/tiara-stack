@@ -94,201 +94,95 @@ const makeSheetAuthGuildUser = (
   token: user.token,
 });
 
-export const resolveMemberGuildScopedPermissions = (
+const getOptionalMonitorRoleIds = (guildId: string, guildConfigService: GuildConfigService) =>
+  guildConfigService
+    .getGuildMonitorRoles(guildId)
+    .pipe(
+      Effect.tapError(Effect.logError),
+      Effect.option,
+      Effect.map(
+        Option.map(
+          (monitorRoles) => new Set(monitorRoles.map((role) => role.roleId)) as ReadonlySet<string>,
+        ),
+      ),
+    );
+
+const getOptionalGuildRoles = (guildId: string, rolesCache: RolesApiCacheView) =>
+  rolesCache.getForParent(guildId).pipe(Effect.tapError(Effect.logError), Effect.option);
+
+const resolveGuildScopedPermissions = (
   user: SheetAuthUser["Type"],
   guildId: string,
-  membersCache: MembersApiCacheView,
-): Effect.Effect<ResolvedGuildPermissions> =>
+): Effect.Effect<
+  ResolvedGuildPermissions,
+  never,
+  MembersApiCacheView | GuildConfigService | RolesApiCacheView
+> =>
   Effect.gen(function* () {
     if (hasPermission(user.permissions, "bot") || hasPermission(user.permissions, "app_owner")) {
       return {
-        permissions: appendPermissions(user.permissions, [`member_guild:${guildId}`]),
+        permissions: appendPermissions(user.permissions, [
+          `member_guild:${guildId}`,
+          `monitor_guild:${guildId}`,
+          `manage_guild:${guildId}`,
+        ]),
         maybeMember: Option.none(),
       } satisfies ResolvedGuildPermissions;
     }
 
-    const memberPermission = `member_guild:${guildId}` as const;
-    const needsMemberPermission = !HashSet.has(user.permissions, memberPermission);
-    // We still hydrate maybeMember even when member_guild is already present so
-    // downstream monitor/manage resolution can inspect live Discord roles.
-    const maybeMember = yield* getOptionalGuildMember(guildId, user.accountId, membersCache);
+    const { membersCache, guildConfigService, rolesCache } = yield* Effect.all({
+      membersCache: MembersApiCacheView,
+      guildConfigService: GuildConfigService,
+      rolesCache: RolesApiCacheView,
+    });
 
-    if (!needsMemberPermission) {
-      return {
-        permissions: user.permissions,
-        maybeMember,
-      } satisfies ResolvedGuildPermissions;
+    const [maybeMember, maybeMonitorRoleIds, maybeRoles] = yield* Effect.all(
+      [
+        getOptionalGuildMember(guildId, user.accountId, membersCache),
+        getOptionalMonitorRoleIds(guildId, guildConfigService),
+        getOptionalGuildRoles(guildId, rolesCache),
+      ],
+      { concurrency: "unbounded" },
+    );
+
+    let permissions = user.permissions;
+
+    if (Option.isSome(maybeMember)) {
+      permissions = appendPermission(permissions, `member_guild:${guildId}`);
     }
 
-    if (Option.isNone(maybeMember)) {
-      return {
-        permissions: user.permissions,
-        maybeMember,
-      } satisfies ResolvedGuildPermissions;
+    if (
+      Option.isSome(maybeMember) &&
+      Option.isSome(maybeMonitorRoleIds) &&
+      maybeMonitorRoleIds.value.size > 0 &&
+      hasMonitorGuildPermission(maybeMember.value, maybeMonitorRoleIds.value)
+    ) {
+      permissions = appendPermission(permissions, `monitor_guild:${guildId}`);
+    }
+
+    if (
+      Option.isSome(maybeMember) &&
+      Option.isSome(maybeRoles) &&
+      hasManageGuildPermission(maybeMember.value, maybeRoles.value)
+    ) {
+      permissions = appendPermission(permissions, `manage_guild:${guildId}`);
     }
 
     return {
-      permissions: appendPermission(user.permissions, memberPermission),
+      permissions,
       maybeMember,
     } satisfies ResolvedGuildPermissions;
   });
 
-export const resolveMonitorGuildScopedPermissions = (
-  user: SheetAuthUser["Type"],
-  guildId: string,
-  membersCache: MembersApiCacheView,
-  guildConfigService: GuildConfigService,
-): Effect.Effect<ResolvedGuildPermissions> =>
-  resolveMemberGuildScopedPermissions(user, guildId, membersCache).pipe(
-    Effect.flatMap(({ permissions, maybeMember }) => {
-      if (hasPermission(user.permissions, "bot") || hasPermission(user.permissions, "app_owner")) {
-        return Effect.succeed({
-          permissions: appendPermissions(permissions, [`monitor_guild:${guildId}`]),
-          maybeMember,
-        } satisfies ResolvedGuildPermissions);
-      }
-
-      const monitorPermission = `monitor_guild:${guildId}` as const;
-      if (HashSet.has(permissions, monitorPermission)) {
-        return Effect.succeed({
-          permissions,
-          maybeMember,
-        } satisfies ResolvedGuildPermissions);
-      }
-
-      if (!HashSet.has(permissions, `member_guild:${guildId}`)) {
-        return Effect.succeed({
-          permissions,
-          maybeMember,
-        } satisfies ResolvedGuildPermissions);
-      }
-
-      return guildConfigService.getGuildMonitorRoles(guildId).pipe(
-        Effect.tapError(Effect.logError),
-        Effect.option,
-        Effect.flatMap((maybeMonitorRoles) => {
-          if (Option.isNone(maybeMonitorRoles) || maybeMonitorRoles.value.length === 0) {
-            return Effect.succeed({
-              permissions,
-              maybeMember,
-            } satisfies ResolvedGuildPermissions);
-          }
-
-          const monitorRoleIds = new Set(maybeMonitorRoles.value.map((role) => role.roleId));
-          return Option.match(maybeMember, {
-            onNone: () =>
-              Effect.succeed({
-                permissions,
-                maybeMember,
-              } satisfies ResolvedGuildPermissions),
-            onSome: (member) =>
-              Effect.succeed({
-                permissions: hasMonitorGuildPermission(member, monitorRoleIds)
-                  ? appendPermission(permissions, monitorPermission)
-                  : permissions,
-                maybeMember: Option.some(member),
-              } satisfies ResolvedGuildPermissions),
-          });
-        }),
-      );
-    }),
-  );
-
-export const resolveManageGuildScopedPermissions = (
-  user: SheetAuthUser["Type"],
-  guildId: string,
-  membersCache: MembersApiCacheView,
-  guildConfigService: GuildConfigService,
-  rolesCache: RolesApiCacheView,
-): Effect.Effect<PermissionSet> =>
-  resolveMonitorGuildScopedPermissions(user, guildId, membersCache, guildConfigService).pipe(
-    Effect.flatMap(({ permissions, maybeMember }) => {
-      if (hasPermission(user.permissions, "bot") || hasPermission(user.permissions, "app_owner")) {
-        return Effect.succeed(appendPermissions(permissions, [`manage_guild:${guildId}`]));
-      }
-
-      const managePermission = `manage_guild:${guildId}` as const;
-      if (HashSet.has(permissions, managePermission)) {
-        return Effect.succeed(permissions);
-      }
-
-      if (!HashSet.has(permissions, `member_guild:${guildId}`)) {
-        return Effect.succeed(permissions);
-      }
-
-      return rolesCache.getForParent(guildId).pipe(
-        Effect.tapError(Effect.logError),
-        Effect.option,
-        Effect.flatMap((maybeRoles) =>
-          Option.match(maybeMember, {
-            onNone: () => Effect.succeed(permissions),
-            onSome: (member) =>
-              Option.match(maybeRoles, {
-                onNone: () => Effect.succeed(permissions),
-                onSome: (roles) =>
-                  Effect.succeed(
-                    hasManageGuildPermission(member, roles)
-                      ? appendPermission(permissions, managePermission)
-                      : permissions,
-                  ),
-              }),
-          }),
-        ),
-      );
-    }),
-  );
-
-export const resolveMemberGuildUser = (user: SheetAuthUser["Type"], guildId: string) =>
-  MembersApiCacheView.pipe(
-    Effect.flatMap((membersCache) =>
-      resolveMemberGuildScopedPermissions(user, guildId, membersCache).pipe(
-        Effect.map(({ permissions }) => makeSheetAuthGuildUser(user, guildId, permissions)),
-      ),
-    ),
-  );
-
-export const resolveMonitorGuildUser = (user: SheetAuthUser["Type"], guildId: string) =>
-  Effect.all({
-    membersCache: MembersApiCacheView,
-    guildConfigService: GuildConfigService,
-  }).pipe(
-    Effect.flatMap(({ membersCache, guildConfigService }) =>
-      resolveMonitorGuildScopedPermissions(user, guildId, membersCache, guildConfigService).pipe(
-        Effect.map(({ permissions }) => makeSheetAuthGuildUser(user, guildId, permissions)),
-      ),
-    ),
-  );
-
-export const resolveManageGuildUser = (user: SheetAuthUser["Type"], guildId: string) =>
-  Effect.all({
-    membersCache: MembersApiCacheView,
-    guildConfigService: GuildConfigService,
-    rolesCache: RolesApiCacheView,
-  }).pipe(
-    Effect.flatMap(({ membersCache, guildConfigService, rolesCache }) =>
-      resolveManageGuildScopedPermissions(
-        user,
-        guildId,
-        membersCache,
-        guildConfigService,
-        rolesCache,
-      ).pipe(Effect.map((permissions) => makeSheetAuthGuildUser(user, guildId, permissions))),
-    ),
-  );
-
 export const resolveSheetAuthGuildUser = (user: SheetAuthUser["Type"], guildId: string) =>
-  resolveManageGuildUser(user, guildId);
+  resolveGuildScopedPermissions(user, guildId).pipe(
+    Effect.map(({ permissions }) => makeSheetAuthGuildUser(user, guildId, permissions)),
+  );
 
-export const resolveCurrentMonitorGuildUser = (guildId: string) =>
-  SheetAuthUser.pipe(Effect.flatMap((user) => resolveMonitorGuildUser(user, guildId)));
+export const resolveCurrentGuildUser = (guildId: string) =>
+  SheetAuthUser.pipe(Effect.flatMap((user) => resolveSheetAuthGuildUser(user, guildId)));
 
-export const resolveCurrentManageGuildUser = (guildId: string) =>
-  SheetAuthUser.pipe(Effect.flatMap((user) => resolveManageGuildUser(user, guildId)));
-
-export const resolveCurrentMemberGuildUser = (guildId: string) =>
-  SheetAuthUser.pipe(Effect.flatMap((user) => resolveMemberGuildUser(user, guildId)));
-
-const provideCurrentGuildUser = <A, E, R, R2>(
+const provideResolvedGuildUser = <A, E, R, R2>(
   resolvedGuildUser: Effect.Effect<SheetAuthGuildUser["Type"], never, R2>,
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, E, Exclude<R | R2, SheetAuthGuildUser>> =>
@@ -298,20 +192,8 @@ const provideCurrentGuildUser = <A, E, R, R2>(
     // but TypeScript does not remove the requirement from R automatically.
   ) as Effect.Effect<A, E, Exclude<R | R2, SheetAuthGuildUser>>;
 
-export const provideCurrentMonitorGuildUser = <A, E, R>(
-  guildId: string,
-  effect: Effect.Effect<A, E, R>,
-) => provideCurrentGuildUser(resolveCurrentMonitorGuildUser(guildId), effect);
-
-export const provideCurrentManageGuildUser = <A, E, R>(
-  guildId: string,
-  effect: Effect.Effect<A, E, R>,
-) => provideCurrentGuildUser(resolveCurrentManageGuildUser(guildId), effect);
-
-export const provideCurrentMemberGuildUser = <A, E, R>(
-  guildId: string,
-  effect: Effect.Effect<A, E, R>,
-) => provideCurrentGuildUser(resolveCurrentMemberGuildUser(guildId), effect);
+export const provideCurrentGuildUser = <A, E, R>(guildId: string, effect: Effect.Effect<A, E, R>) =>
+  provideResolvedGuildUser(resolveCurrentGuildUser(guildId), effect);
 
 const getRequiredCurrentGuildUser = (guildId: string) =>
   SheetAuthGuildUser.pipe(
@@ -327,7 +209,7 @@ const getRequiredCurrentGuildUser = (guildId: string) =>
   );
 
 export const getGuildMonitorAccessLevel = (user: SheetAuthUser["Type"], guildId: string) =>
-  resolveMonitorGuildUser(user, guildId).pipe(
+  resolveSheetAuthGuildUser(user, guildId).pipe(
     Effect.map((resolvedUser) =>
       hasGuildPermission(resolvedUser.permissions, "monitor_guild", guildId)
         ? ("monitor" as const)

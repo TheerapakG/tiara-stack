@@ -3,7 +3,7 @@ import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import {
-  provideCurrentManageGuildUser,
+  provideCurrentGuildUser,
   requireBot,
   requireManageGuild,
 } from "@/middlewares/authorization";
@@ -21,7 +21,7 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
           requireBot().pipe(Effect.andThen(guildConfigService.getAutoCheckinGuilds())),
         )
         .handle("getGuildConfig", ({ urlParams }) =>
-          provideCurrentManageGuildUser(
+          provideCurrentGuildUser(
             urlParams.guildId,
             requireManageGuild(urlParams.guildId).pipe(
               Effect.andThen(
@@ -44,7 +44,7 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
           ),
         )
         .handle("upsertGuildConfig", ({ payload }) =>
-          provideCurrentManageGuildUser(
+          provideCurrentGuildUser(
             payload.guildId,
             requireManageGuild(payload.guildId).pipe(
               Effect.andThen(guildConfigService.upsertGuildConfig(payload.guildId, payload.config)),
@@ -65,7 +65,7 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
           }),
         )
         .handle("addGuildMonitorRole", ({ payload }) =>
-          provideCurrentManageGuildUser(
+          provideCurrentGuildUser(
             payload.guildId,
             requireManageGuild(payload.guildId).pipe(
               Effect.andThen(
@@ -75,7 +75,7 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
           ),
         )
         .handle("removeGuildMonitorRole", ({ payload }) =>
-          provideCurrentManageGuildUser(
+          provideCurrentGuildUser(
             payload.guildId,
             requireManageGuild(payload.guildId).pipe(
               Effect.andThen(
@@ -85,7 +85,7 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
           ),
         )
         .handle("upsertGuildChannelConfig", ({ payload }) =>
-          provideCurrentManageGuildUser(
+          provideCurrentGuildUser(
             payload.guildId,
             requireManageGuild(payload.guildId).pipe(
               Effect.andThen(

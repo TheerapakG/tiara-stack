@@ -4,12 +4,11 @@ import { Effect, HashSet, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import {
   getGuildMonitorAccessLevel,
-  provideCurrentMemberGuildUser,
-  provideCurrentMonitorGuildUser,
+  provideCurrentGuildUser,
   requireBot,
+  requireDiscordAccountId,
   requireGuildMember,
   requireMonitorGuild,
-  requireDiscordAccountId,
 } from "@/middlewares/authorization";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { MessageCheckin, MessageCheckinMember } from "@/schemas/messageCheckin";
@@ -99,11 +98,11 @@ const requireCheckinUpsertAccess = (
       Option.match({
         onNone: () =>
           typeof guildId === "string"
-            ? provideCurrentMonitorGuildUser(guildId, requireMonitorGuild(guildId))
+            ? provideCurrentGuildUser(guildId, requireMonitorGuild(guildId))
             : requireLegacyMessageCheckinBotAccess(),
         onSome: (record) =>
           Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-            ? provideCurrentMonitorGuildUser(
+            ? provideCurrentGuildUser(
                 record.guildId.value,
                 requireMonitorGuild(record.guildId.value),
               )
@@ -125,7 +124,7 @@ const requireCheckinMutationAccess = (
         : // Non-legacy check-in mutations remain self-service for regular users:
           // monitors can add members, but only the recorded participant can update/remove that member.
           requireDiscordAccountId(memberId).pipe(
-            Effect.andThen(provideCurrentMemberGuildUser(guildId, requireGuildMember(guildId))),
+            Effect.andThen(provideCurrentGuildUser(guildId, requireGuildMember(guildId))),
             Effect.andThen(messageCheckinService.getMessageCheckinMembers(messageId)),
             Effect.flatMap((members) => requireRecordedParticipant(members, memberId)),
           ),
@@ -192,7 +191,7 @@ export const MessageCheckinLive = HttpApiBuilder.group(Api, "messageCheckin", (h
           getRequiredMessageCheckinRecord(messageCheckinService, payload.messageId).pipe(
             Effect.flatMap((record) =>
               Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-                ? provideCurrentMonitorGuildUser(
+                ? provideCurrentGuildUser(
                     record.guildId.value,
                     requireMonitorGuild(record.guildId.value).pipe(
                       Effect.andThen(
