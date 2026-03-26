@@ -9,6 +9,7 @@ const makeBreakSchedule = () =>
     day: 1,
     visible: true,
     hour: Option.some(1),
+    hourWindow: Option.none(),
   });
 
 const makeSchedule = (fills: readonly Option.Option<Sheet.PopulatedSchedulePlayer>[]) =>
@@ -17,6 +18,7 @@ const makeSchedule = (fills: readonly Option.Option<Sheet.PopulatedSchedulePlaye
     day: 1,
     visible: true,
     hour: Option.some(1),
+    hourWindow: Option.none(),
     fills,
     overfills: [],
     standbys: [],

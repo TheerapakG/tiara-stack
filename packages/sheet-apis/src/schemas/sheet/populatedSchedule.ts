@@ -3,6 +3,7 @@ import { Player, PartialNamePlayer } from "./player";
 import { Monitor, PartialNameMonitor } from "./monitor";
 import { RawSchedulePlayer } from "./rawSchedulePlayer";
 import { Schedule } from "./schedule";
+import { ScheduleHourWindow } from "./hourWindow";
 
 // Player wrapper with resolved player and enc flag
 export class PopulatedSchedulePlayer extends Schema.TaggedClass<PopulatedSchedulePlayer>()(
@@ -29,6 +30,7 @@ export class PopulatedSchedule extends Schema.TaggedClass<PopulatedSchedule>()(
     day: Schema.Number,
     visible: Schema.Boolean,
     hour: Schema.OptionFromNullOr(Schema.Number),
+    hourWindow: Schema.OptionFromNullOr(ScheduleHourWindow),
     fills: pipe(
       Schema.Array(Schema.OptionFromNullOr(PopulatedSchedulePlayer)),
       Schema.itemsCount(5),
@@ -51,6 +53,7 @@ export class PopulatedBreakSchedule extends Schema.TaggedClass<PopulatedBreakSch
     day: Schema.Number,
     visible: Schema.Boolean,
     hour: Schema.OptionFromNullOr(Schema.Number),
+    hourWindow: Schema.OptionFromNullOr(ScheduleHourWindow),
   },
 ) {}
 
@@ -165,6 +168,7 @@ export const toPopulatedSchedule = (
     day: schedule.day,
     visible: schedule.visible,
     hour: schedule.hour,
+    hourWindow: schedule.hourWindow,
     fills,
     overfills,
     standbys,

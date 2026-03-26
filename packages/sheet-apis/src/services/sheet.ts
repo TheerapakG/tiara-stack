@@ -915,6 +915,7 @@ const filterSchedulesForFiller = (schedules: Array<BreakSchedule | Schedule>) =>
                   day: s.day,
                   visible: s.visible,
                   hour: s.hour,
+                  hourWindow: s.hourWindow,
                   fills: Array.makeBy(5, () => Option.none()),
                   overfills: [],
                   standbys: [],

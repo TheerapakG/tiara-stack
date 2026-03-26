@@ -40,6 +40,7 @@ const makeSchedule = ({
     day: 1,
     visible,
     hour: Option.fromNullable(hour),
+    hourWindow: Option.none(),
     fills: Array.makeBy(5, (index) => Option.fromNullable(fills[index])),
     overfills,
     standbys,
@@ -72,6 +73,7 @@ describe("summarizeDayPlayerSchedule", () => {
         day: 1,
         visible: true,
         hour: Option.some(1),
+        hourWindow: Option.none(),
       }),
       makeSchedule({
         hour: null,

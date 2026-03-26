@@ -2,7 +2,10 @@ import { Array, Effect, HashMap, Match, Option, pipe } from "effect";
 import { SheetService } from "./sheet";
 import { PlayerService } from "./player";
 import { MonitorService } from "./monitor";
+import { SheetConfigService } from "./sheetConfig";
+import { withScheduleHourWindow } from "./hourWindow";
 import {
+  BreakSchedule,
   Schedule,
   PopulatedBreakSchedule,
   PopulatedSchedulePlayer,
@@ -92,6 +95,7 @@ const populateSchedule = (
     day: schedule.day,
     visible: schedule.visible,
     hour: schedule.hour,
+    hourWindow: schedule.hourWindow,
     fills,
     overfills,
     standbys,
@@ -134,6 +138,44 @@ const buildResolutionMaps = (
   }
 
   return { playerMap, monitorMap };
+};
+
+const populateScheduleResult = (
+  schedule: BreakSchedule | Schedule,
+  playerMap: Map<string, Array.NonEmptyArray<Player | PartialNamePlayer>>,
+  monitorMap: Map<string, Array.NonEmptyArray<Monitor | PartialNameMonitor>>,
+): PopulatedScheduleResult =>
+  Match.value(schedule).pipe(
+    Match.tagsExhaustive({
+      BreakSchedule: (breakSchedule) =>
+        PopulatedBreakSchedule.make({
+          channel: breakSchedule.channel,
+          day: breakSchedule.day,
+          visible: breakSchedule.visible,
+          hour: breakSchedule.hour,
+          hourWindow: breakSchedule.hourWindow,
+        }),
+      Schedule: (currentSchedule) => populateSchedule(currentSchedule, playerMap, monitorMap),
+    }),
+  );
+
+const toPopulatedSchedules = (
+  schedules: ReadonlyArray<BreakSchedule | Schedule>,
+  startTime: Effect.Effect.Success<ReturnType<SheetConfigService["getEventConfig"]>>["startTime"],
+  playerMaps: {
+    nameToPlayer: HashMap.HashMap<string, { name: string; players: Array.NonEmptyArray<Player> }>;
+  },
+  monitorMaps: {
+    nameToMonitor: HashMap.HashMap<string, { name: string; monitors: ReadonlyArray<Monitor> }>;
+  },
+): ReadonlyArray<PopulatedScheduleResult> => {
+  const { playerMap, monitorMap } = buildResolutionMaps(playerMaps, monitorMaps);
+
+  return pipe(
+    schedules,
+    Array.map((schedule) => withScheduleHourWindow(startTime, schedule)),
+    Array.map((schedule) => populateScheduleResult(schedule, playerMap, monitorMap)),
+  );
 };
 
 const schedulePlayerMatchesUser = (
@@ -206,7 +248,8 @@ export class ScheduleService extends Effect.Service<ScheduleService>()("Schedule
     Effect.bind("sheetService", () => SheetService),
     Effect.bind("playerService", () => PlayerService),
     Effect.bind("monitorService", () => MonitorService),
-    Effect.map(({ sheetService, playerService, monitorService }) => {
+    Effect.bind("sheetConfigService", () => SheetConfigService),
+    Effect.map(({ sheetService, playerService, monitorService, sheetConfigService }) => {
       return {
         getAllPopulatedSchedules: (sheetId: string) =>
           pipe(
@@ -214,25 +257,13 @@ export class ScheduleService extends Effect.Service<ScheduleService>()("Schedule
             Effect.bind("schedules", () => sheetService.getAllSchedules(sheetId)),
             Effect.bind("playerMaps", () => playerService.getPlayerMaps(sheetId)),
             Effect.bind("monitorMaps", () => monitorService.getMonitorMaps(sheetId)),
-            Effect.map(({ schedules, playerMaps, monitorMaps }) => {
-              const { playerMap, monitorMap } = buildResolutionMaps(playerMaps, monitorMaps);
-
-              return pipe(
+            Effect.bind("eventConfig", () => sheetConfigService.getEventConfig(sheetId)),
+            Effect.map(({ schedules, playerMaps, monitorMaps, eventConfig }) => {
+              return toPopulatedSchedules(
                 schedules,
-                Array.map((schedule) =>
-                  Match.value(schedule).pipe(
-                    Match.tagsExhaustive({
-                      BreakSchedule: (breakSchedule) =>
-                        PopulatedBreakSchedule.make({
-                          channel: breakSchedule.channel,
-                          day: breakSchedule.day,
-                          visible: breakSchedule.visible,
-                          hour: breakSchedule.hour,
-                        }),
-                      Schedule: (s) => populateSchedule(s, playerMap, monitorMap),
-                    }),
-                  ),
-                ),
+                eventConfig.startTime,
+                playerMaps,
+                monitorMaps,
               );
             }),
             Effect.withSpan("ScheduleService.getAllPopulatedSchedules", {
@@ -245,25 +276,13 @@ export class ScheduleService extends Effect.Service<ScheduleService>()("Schedule
             Effect.bind("schedules", () => sheetService.getDaySchedules(sheetId, day)),
             Effect.bind("playerMaps", () => playerService.getPlayerMaps(sheetId)),
             Effect.bind("monitorMaps", () => monitorService.getMonitorMaps(sheetId)),
-            Effect.map(({ schedules, playerMaps, monitorMaps }) => {
-              const { playerMap, monitorMap } = buildResolutionMaps(playerMaps, monitorMaps);
-
-              return pipe(
+            Effect.bind("eventConfig", () => sheetConfigService.getEventConfig(sheetId)),
+            Effect.map(({ schedules, playerMaps, monitorMaps, eventConfig }) => {
+              return toPopulatedSchedules(
                 schedules,
-                Array.map((schedule) =>
-                  Match.value(schedule).pipe(
-                    Match.tagsExhaustive({
-                      BreakSchedule: (breakSchedule) =>
-                        PopulatedBreakSchedule.make({
-                          channel: breakSchedule.channel,
-                          day: breakSchedule.day,
-                          visible: breakSchedule.visible,
-                          hour: breakSchedule.hour,
-                        }),
-                      Schedule: (s) => populateSchedule(s, playerMap, monitorMap),
-                    }),
-                  ),
-                ),
+                eventConfig.startTime,
+                playerMaps,
+                monitorMaps,
               );
             }),
             Effect.withSpan("ScheduleService.getDayPopulatedSchedules", {
@@ -276,25 +295,13 @@ export class ScheduleService extends Effect.Service<ScheduleService>()("Schedule
             Effect.bind("schedules", () => sheetService.getChannelSchedules(sheetId, channel)),
             Effect.bind("playerMaps", () => playerService.getPlayerMaps(sheetId)),
             Effect.bind("monitorMaps", () => monitorService.getMonitorMaps(sheetId)),
-            Effect.map(({ schedules, playerMaps, monitorMaps }) => {
-              const { playerMap, monitorMap } = buildResolutionMaps(playerMaps, monitorMaps);
-
-              return pipe(
+            Effect.bind("eventConfig", () => sheetConfigService.getEventConfig(sheetId)),
+            Effect.map(({ schedules, playerMaps, monitorMaps, eventConfig }) => {
+              return toPopulatedSchedules(
                 schedules,
-                Array.map((schedule) =>
-                  Match.value(schedule).pipe(
-                    Match.tagsExhaustive({
-                      BreakSchedule: (breakSchedule) =>
-                        PopulatedBreakSchedule.make({
-                          channel: breakSchedule.channel,
-                          day: breakSchedule.day,
-                          visible: breakSchedule.visible,
-                          hour: breakSchedule.hour,
-                        }),
-                      Schedule: (s) => populateSchedule(s, playerMap, monitorMap),
-                    }),
-                  ),
-                ),
+                eventConfig.startTime,
+                playerMaps,
+                monitorMaps,
               );
             }),
             Effect.withSpan("ScheduleService.getChannelPopulatedSchedules", {
@@ -308,25 +315,13 @@ export class ScheduleService extends Effect.Service<ScheduleService>()("Schedule
             Effect.bind("schedules", () => sheetService.getAllFillerSchedules(sheetId)),
             Effect.bind("playerMaps", () => playerService.getPlayerMaps(sheetId)),
             Effect.bind("monitorMaps", () => monitorService.getMonitorMaps(sheetId)),
-            Effect.map(({ schedules, playerMaps, monitorMaps }) => {
-              const { playerMap, monitorMap } = buildResolutionMaps(playerMaps, monitorMaps);
-
-              return pipe(
+            Effect.bind("eventConfig", () => sheetConfigService.getEventConfig(sheetId)),
+            Effect.map(({ schedules, playerMaps, monitorMaps, eventConfig }) => {
+              return toPopulatedSchedules(
                 schedules,
-                Array.map((schedule) =>
-                  Match.value(schedule).pipe(
-                    Match.tagsExhaustive({
-                      BreakSchedule: (breakSchedule) =>
-                        PopulatedBreakSchedule.make({
-                          channel: breakSchedule.channel,
-                          day: breakSchedule.day,
-                          visible: breakSchedule.visible,
-                          hour: breakSchedule.hour,
-                        }),
-                      Schedule: (s) => populateSchedule(s, playerMap, monitorMap),
-                    }),
-                  ),
-                ),
+                eventConfig.startTime,
+                playerMaps,
+                monitorMaps,
               );
             }),
             Effect.withSpan("ScheduleService.getAllPopulatedFillerSchedules", {
@@ -339,25 +334,13 @@ export class ScheduleService extends Effect.Service<ScheduleService>()("Schedule
             Effect.bind("schedules", () => sheetService.getDayFillerSchedules(sheetId, day)),
             Effect.bind("playerMaps", () => playerService.getPlayerMaps(sheetId)),
             Effect.bind("monitorMaps", () => monitorService.getMonitorMaps(sheetId)),
-            Effect.map(({ schedules, playerMaps, monitorMaps }) => {
-              const { playerMap, monitorMap } = buildResolutionMaps(playerMaps, monitorMaps);
-
-              return pipe(
+            Effect.bind("eventConfig", () => sheetConfigService.getEventConfig(sheetId)),
+            Effect.map(({ schedules, playerMaps, monitorMaps, eventConfig }) => {
+              return toPopulatedSchedules(
                 schedules,
-                Array.map((schedule) =>
-                  Match.value(schedule).pipe(
-                    Match.tagsExhaustive({
-                      BreakSchedule: (breakSchedule) =>
-                        PopulatedBreakSchedule.make({
-                          channel: breakSchedule.channel,
-                          day: breakSchedule.day,
-                          visible: breakSchedule.visible,
-                          hour: breakSchedule.hour,
-                        }),
-                      Schedule: (s) => populateSchedule(s, playerMap, monitorMap),
-                    }),
-                  ),
-                ),
+                eventConfig.startTime,
+                playerMaps,
+                monitorMaps,
               );
             }),
             Effect.withSpan("ScheduleService.getDayPopulatedFillerSchedules", {
@@ -372,25 +355,13 @@ export class ScheduleService extends Effect.Service<ScheduleService>()("Schedule
             ),
             Effect.bind("playerMaps", () => playerService.getPlayerMaps(sheetId)),
             Effect.bind("monitorMaps", () => monitorService.getMonitorMaps(sheetId)),
-            Effect.map(({ schedules, playerMaps, monitorMaps }) => {
-              const { playerMap, monitorMap } = buildResolutionMaps(playerMaps, monitorMaps);
-
-              return pipe(
+            Effect.bind("eventConfig", () => sheetConfigService.getEventConfig(sheetId)),
+            Effect.map(({ schedules, playerMaps, monitorMaps, eventConfig }) => {
+              return toPopulatedSchedules(
                 schedules,
-                Array.map((schedule) =>
-                  Match.value(schedule).pipe(
-                    Match.tagsExhaustive({
-                      BreakSchedule: (breakSchedule) =>
-                        PopulatedBreakSchedule.make({
-                          channel: breakSchedule.channel,
-                          day: breakSchedule.day,
-                          visible: breakSchedule.visible,
-                          hour: breakSchedule.hour,
-                        }),
-                      Schedule: (s) => populateSchedule(s, playerMap, monitorMap),
-                    }),
-                  ),
-                ),
+                eventConfig.startTime,
+                playerMaps,
+                monitorMaps,
               );
             }),
             Effect.withSpan("ScheduleService.getChannelPopulatedFillerSchedules", {
@@ -401,5 +372,10 @@ export class ScheduleService extends Effect.Service<ScheduleService>()("Schedule
     }),
   ),
   accessors: true,
-  dependencies: [SheetService.Default, PlayerService.Default, MonitorService.Default],
+  dependencies: [
+    SheetService.Default,
+    PlayerService.Default,
+    MonitorService.Default,
+    SheetConfigService.Default,
+  ],
 }) {}

@@ -464,23 +464,27 @@ export class CheckinService extends Effect.Service<CheckinService>()("CheckinSer
         );
 
         const hourString = `for **hour ${hour}**`;
-        const timeStampString = yield* pipe(
-          pipe(
-            eventConfig,
-            Option.match({
-              onSome: Effect.succeed,
-              onNone: () => sheetConfigService.getEventConfig(sheetId),
-            }),
-          ),
-          Effect.map((eventConfig) =>
-            pipe(
-              eventConfig.startTime,
-              DateTime.addDuration(Duration.hours(hour - 1)),
-              formatRelativeDiscordTime,
-            ),
-          ),
-          Effect.catchAll(() => Effect.succeed("")),
+        const scheduleHourWindow = pipe(
+          schedule,
+          Option.flatMap((currentSchedule) => currentSchedule.hourWindow),
         );
+        const timeStampString = Option.isSome(scheduleHourWindow)
+          ? formatRelativeDiscordTime(scheduleHourWindow.value.start)
+          : yield* pipe(
+              eventConfig,
+              Option.match({
+                onSome: Effect.succeed,
+                onNone: () => sheetConfigService.getEventConfig(sheetId),
+              }),
+              Effect.map((eventConfig) =>
+                pipe(
+                  eventConfig.startTime,
+                  DateTime.addDuration(Duration.hours(hour - 1)),
+                  formatRelativeDiscordTime,
+                ),
+              ),
+              Effect.catchAll(() => Effect.succeed("")),
+            );
 
         const channelString = formatChannelString(
           runningChannel.roleId,

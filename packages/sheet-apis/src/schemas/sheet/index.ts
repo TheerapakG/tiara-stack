@@ -2,6 +2,7 @@ export { RawPlayer } from "./rawPlayer";
 export { RawMonitor } from "./rawMonitor";
 export { RawSchedulePlayer } from "./rawSchedulePlayer";
 export { Team } from "./team";
+export { ScheduleHourWindow } from "./hourWindow";
 export { BreakSchedule, Schedule, makeSchedule } from "./schedule";
 export {
   ScheduleView,

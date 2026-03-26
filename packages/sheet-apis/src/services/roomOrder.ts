@@ -332,7 +332,12 @@ export class RoomOrderService extends Effect.Service<RoomOrderService>()("RoomOr
         );
 
         const firstRankEntries = entries.filter((entry) => entry.rank === 0);
-        const { start, end } = yield* deriveHourWindow(sheetService, sheetId, hour);
+        const { start, end } = yield* pipe(
+          currentScheduleEntry,
+          Option.flatMap((schedule) => schedule.hourWindow),
+          Option.map((hourWindow) => Effect.succeed(hourWindow)),
+          Option.getOrElse(() => deriveHourWindow(sheetService, sheetId, hour)),
+        );
 
         return new RoomOrderGenerateResult({
           content: buildContent(

@@ -10,7 +10,6 @@ import {
   type SchedulePlayer,
   guildScheduleAtom,
   useGuildSchedule,
-  computeScheduleDateTime,
   computeScheduleHour,
   formatDayKey,
 } from "#/lib/schedule";
@@ -237,7 +236,6 @@ function DailyScheduleContent() {
   const allSchedules = useGuildSchedule(guildId);
   const eventConfig = useEventConfig(guildId);
   const startTimeZoned = useZoned(timeZone, eventConfig.startTime);
-
   const channelSchedules = useMemo(
     () => allSchedules.filter((s) => s.channel === channel && Option.isSome(s.hour)),
     [allSchedules, channel],
@@ -273,7 +271,11 @@ function DailyScheduleContent() {
           HashMap.HashMap<DateTime.Zoned, Sheet.PopulatedScheduleResult[]>
         >(),
         (acc, schedule) => {
-          const scheduleDateTime = computeScheduleDateTime(startTimeZoned, schedule.hour);
+          if (Option.isNone(schedule.hourWindow)) {
+            return acc;
+          }
+
+          const scheduleDateTime = DateTime.setZone(schedule.hourWindow.value.start, timeZone);
           const dateKey = DateTime.startOf(scheduleDateTime, "day");
 
           return HashMap.modifyAt(
@@ -297,7 +299,7 @@ function DailyScheduleContent() {
         },
       ),
     );
-  }, [visibleChannelSchedules, startTimeZoned]);
+  }, [timeZone, visibleChannelSchedules]);
 
   const currentDateKey = useMemo(
     () => DateTime.startOf(currentDateZoned, "day"),

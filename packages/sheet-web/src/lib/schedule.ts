@@ -18,7 +18,6 @@ import {
   ValidationError,
 } from "typhoon-core/error";
 import { RequestError, ResponseError } from "#/lib/error";
-import { eventConfigAtom } from "#/lib/sheet";
 import { useMemo } from "react";
 import { zoneId } from "#/hooks/useDateTimeZoned";
 
@@ -177,34 +176,35 @@ const _scheduledDaysAtom = Atom.family((params: ScheduledDaysParams) =>
   Atom.make(
     Effect.fnUntraced(function* (get) {
       const { guildId, channel, timeZone, rangeStart, rangeEnd } = params;
-      const { schedules, eventConfig } = yield* Effect.all(
-        {
-          schedules: get.result(guildScheduleAtom(guildId)),
-          eventConfig: get.result(eventConfigAtom(guildId)),
-        },
-        { concurrency: "unbounded" },
-      );
-
-      const startTimeZoned = DateTime.setZone(eventConfig.startTime, timeZone);
+      const schedules = yield* get.result(guildScheduleAtom(guildId));
 
       const isInChannel = (s: Sheet.PopulatedScheduleResult) =>
         Predicate.isTagged("PopulatedSchedule")(s) && s.channel === channel && s.visible;
 
       const isInRange = (s: Sheet.PopulatedScheduleResult) => {
-        const scheduleDateTime = computeScheduleDateTime(startTimeZoned, s.hour);
-        return DateTime.between(scheduleDateTime, { minimum: rangeStart, maximum: rangeEnd });
+        return pipe(
+          s.hourWindow,
+          Option.exists((hourWindow) =>
+            DateTime.between(DateTime.setZone(hourWindow.start, timeZone), {
+              minimum: rangeStart,
+              maximum: rangeEnd,
+            }),
+          ),
+        );
       };
 
       const getDayKey = (s: Sheet.PopulatedScheduleResult) => {
-        const scheduleDateTime = computeScheduleDateTime(startTimeZoned, s.hour);
-        return formatDayKey(scheduleDateTime);
+        return pipe(
+          s.hourWindow,
+          Option.map((hourWindow) => formatDayKey(DateTime.setZone(hourWindow.start, timeZone))),
+        );
       };
 
       const scheduledDays = pipe(
         schedules,
         Array.filter(isInChannel),
         Array.filter(isInRange),
-        Array.map(getDayKey),
+        Array.filterMap(getDayKey),
         HashSet.fromIterable,
       );
 
@@ -245,17 +245,6 @@ export const useScheduledDays = (params: ScheduledDaysParams) => {
   return result.value;
 };
 
-// Compute the actual date for a schedule day/hour relative to startTime
-// startTime is DateTime.Zoned, returns DateTime.Zoned
-// Note: hour field is cumulative across days
-export const computeScheduleDateTime = (
-  startTime: DateTime.Zoned,
-  hour: Option.Option<number>,
-): DateTime.Zoned => {
-  const hourValue = Option.getOrElse(hour, () => 1);
-  return DateTime.add(startTime, { hours: hourValue - 1 });
-};
-
 export const computeScheduleHour = (
   startTime: DateTime.Zoned,
   dateTime: DateTime.Zoned,
@@ -268,19 +257,4 @@ export const computeScheduleHour = (
   if (hours > maxHour) return Option.none();
 
   return Option.some(hours);
-};
-
-// Filter schedules that fall within a specific date (in the target timezone)
-export const filterSchedulesByDate = (
-  schedules: readonly Sheet.PopulatedScheduleResult[],
-  startTime: DateTime.Zoned,
-  targetDate: DateTime.Zoned,
-): readonly Sheet.PopulatedScheduleResult[] => {
-  const targetDayStart = DateTime.startOf(targetDate, "day");
-  const targetDayEnd = DateTime.endOf(targetDate, "day");
-
-  return schedules.filter((schedule) => {
-    const scheduleDateTime = computeScheduleDateTime(startTime, schedule.hour);
-    return DateTime.between(scheduleDateTime, { minimum: targetDayStart, maximum: targetDayEnd });
-  });
 };

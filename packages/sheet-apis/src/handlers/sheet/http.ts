@@ -6,7 +6,9 @@ import { SheetService } from "@/services/sheet";
 import { SheetConfigService } from "@/services/sheetConfig";
 import { GuildConfigService } from "@/services/guildConfig";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
+import { BreakSchedule, Schedule } from "@/schemas/sheet";
 import { resolveScheduleViewFromPermissions } from "../schedule/shared";
+import { withScheduleHourWindow } from "@/services/hourWindow";
 
 const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigService) =>
   pipe(
@@ -25,6 +27,11 @@ const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigS
       }),
     ),
   );
+
+const withScheduleHourWindows = (
+  schedules: ReadonlyArray<BreakSchedule | Schedule>,
+  startTime: Effect.Effect.Success<ReturnType<SheetConfigService["getEventConfig"]>>["startTime"],
+) => schedules.map((schedule) => withScheduleHourWindow(startTime, schedule));
 
 export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
   pipe(
@@ -65,11 +72,18 @@ export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
                 urlParams.guildId,
                 urlParams.view,
               );
-              return (
-                view === "monitor"
-                  ? sheetService.getAllSchedules(sheetId)
-                  : sheetService.getAllFillerSchedules(sheetId)
-              ).pipe(Effect.map((schedules) => ({ schedules, view })));
+              return Effect.all({
+                schedules:
+                  view === "monitor"
+                    ? sheetService.getAllSchedules(sheetId)
+                    : sheetService.getAllFillerSchedules(sheetId),
+                eventConfig: sheetConfigService.getEventConfig(sheetId),
+              }).pipe(
+                Effect.map(({ schedules, eventConfig }) => ({
+                  schedules: withScheduleHourWindows(schedules, eventConfig.startTime),
+                  view,
+                })),
+              );
             }),
           ),
         )
@@ -85,11 +99,18 @@ export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
                 urlParams.guildId,
                 urlParams.view,
               );
-              return (
-                view === "monitor"
-                  ? sheetService.getDaySchedules(sheetId, urlParams.day)
-                  : sheetService.getDayFillerSchedules(sheetId, urlParams.day)
-              ).pipe(Effect.map((schedules) => ({ schedules, view })));
+              return Effect.all({
+                schedules:
+                  view === "monitor"
+                    ? sheetService.getDaySchedules(sheetId, urlParams.day)
+                    : sheetService.getDayFillerSchedules(sheetId, urlParams.day),
+                eventConfig: sheetConfigService.getEventConfig(sheetId),
+              }).pipe(
+                Effect.map(({ schedules, eventConfig }) => ({
+                  schedules: withScheduleHourWindows(schedules, eventConfig.startTime),
+                  view,
+                })),
+              );
             }),
           ),
         )
@@ -105,11 +126,18 @@ export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
                 urlParams.guildId,
                 urlParams.view,
               );
-              return (
-                view === "monitor"
-                  ? sheetService.getChannelSchedules(sheetId, urlParams.channel)
-                  : sheetService.getChannelFillerSchedules(sheetId, urlParams.channel)
-              ).pipe(Effect.map((schedules) => ({ schedules, view })));
+              return Effect.all({
+                schedules:
+                  view === "monitor"
+                    ? sheetService.getChannelSchedules(sheetId, urlParams.channel)
+                    : sheetService.getChannelFillerSchedules(sheetId, urlParams.channel),
+                eventConfig: sheetConfigService.getEventConfig(sheetId),
+              }).pipe(
+                Effect.map(({ schedules, eventConfig }) => ({
+                  schedules: withScheduleHourWindows(schedules, eventConfig.startTime),
+                  view,
+                })),
+              );
             }),
           ),
         )
