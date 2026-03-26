@@ -142,7 +142,7 @@ We use Graphite for managing stacked pull requests. The following guidelines are
   - When working in a git worktree (vibecord session)
     - Check if the branch name follows `<username>/<branch-name>` format
     - If the branch name does NOT follow the format, rename it: `git branch -m <username>/<new-branch-name>`
-    - Track with trunk: `gt track master`
+    - Track with trunk: `gt track --parent master`
     - Use `gt modify -c` for all commits (do NOT use `gt create`)
 - For the rest of the commits, use `gt modify -c`.
 - When you create the commits on a new branch
@@ -177,7 +177,7 @@ We use Graphite for managing stacked pull requests. The following guidelines are
 
 ### Effect.ts
 
-This project utilizes the Effect library for composability and type-safety. The version of the library being used is 3.19.8. The project prefers using the "pipe" syntax (with "do simulation" to combat excessive nesting) over the "generator" syntax. Use Effect/Schema for runtime validation except existing code use other validation library, or otherwise stated.
+This project utilizes the Effect library for composability and type-safety. The version of the library being used is 3.19.8. Use Effect/Schema for runtime validation except existing code use other validation library, or otherwise stated.
 
 ### Arktype
 
