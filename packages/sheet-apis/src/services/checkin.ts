@@ -29,6 +29,7 @@ import { ScheduleService } from "./schedule";
 import { SheetConfigService } from "./sheetConfig";
 
 type Weighted<A> = { value: A; weight: number };
+const SLOTS_PER_ROW = 5;
 
 const checkinMessageTemplates: Array.NonEmptyReadonlyArray<Weighted<string>> = [
   {
@@ -353,6 +354,41 @@ const getMonitorInfo = (schedule: Option.Option<PopulatedScheduleResult>) =>
     }),
   );
 
+export const makeMonitorCheckinMessage = ({
+  initialMessage,
+  empty,
+  emptySlotMessage,
+  playersMessage,
+  lookupFailedMessage,
+}: {
+  initialMessage: string | null;
+  empty: number;
+  emptySlotMessage: string;
+  playersMessage: string;
+  lookupFailedMessage: Option.Option<string>;
+}) =>
+  initialMessage
+    ? pipe(
+        [
+          Option.some("Check-in message sent!"),
+          Option.some(emptySlotMessage),
+          Option.some(playersMessage),
+          lookupFailedMessage,
+        ],
+        Array.getSomes,
+        Array.join("\n"),
+      )
+    : pipe(
+        [
+          Option.some("No check-in message sent, no new players to check in"),
+          empty > 0 && empty < SLOTS_PER_ROW
+            ? Option.some(emptySlotMessage)
+            : Option.none<string>(),
+        ],
+        Array.getSomes,
+        Array.join("\n"),
+      );
+
 const formatChannelString = (
   roleId: Option.Option<string>,
   channelId: string,
@@ -480,12 +516,12 @@ export class CheckinService extends Effect.Service<CheckinService>()("CheckinSer
             pipe(
               Match.value(schedule),
               Match.tagsExhaustive({
-                PopulatedBreakSchedule: () => 5,
+                PopulatedBreakSchedule: () => SLOTS_PER_ROW,
                 PopulatedSchedule: (schedule) => PopulatedSchedule.empty(schedule),
               }),
             ),
           ),
-          Option.getOrElse(() => 5),
+          Option.getOrElse(() => SLOTS_PER_ROW),
         );
 
         const emptySlotMessage = `${empty > 0 ? `+${empty}` : "No"} empty slot${empty > 1 ? "s" : ""}`;
@@ -493,18 +529,13 @@ export class CheckinService extends Effect.Service<CheckinService>()("CheckinSer
         const lookupFailedMessage = getLookupFailedMessage(schedule);
         const monitorInfo = getMonitorInfo(schedule);
 
-        const monitorCheckinMessage = initialMessage
-          ? pipe(
-              [
-                Option.some("Check-in message sent!"),
-                Option.some(emptySlotMessage),
-                Option.some(playersMessage),
-                lookupFailedMessage,
-              ],
-              Array.getSomes,
-              Array.join("\n"),
-            )
-          : "No check-in message sent, no players changed";
+        const monitorCheckinMessage = makeMonitorCheckinMessage({
+          initialMessage,
+          empty,
+          emptySlotMessage,
+          playersMessage,
+          lookupFailedMessage,
+        });
 
         return new CheckinGenerateResult({
           hour,
