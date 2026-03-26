@@ -4,8 +4,8 @@ import {
   getKubernetesOAuthImplicitPermissions,
   type SheetAuthClient as SheetAuthClientValue,
 } from "sheet-auth/client";
-import type { Permission } from "@/schemas/permissions";
-import { appendPermission } from "../authorization";
+import type { Permission, PermissionSet } from "@/schemas/permissions";
+import { appendPermission, hasPermission, permissionSetFromIterable } from "../authorization";
 import type { ApplicationOwnerResolver } from "../../services/applicationOwner";
 import { Unauthorized } from "../../schemas/middlewares/unauthorized";
 import { SheetAuthTokenAuthorization } from "./tag";
@@ -16,7 +16,7 @@ const FAILURE_TTL = Duration.seconds(1);
 interface CachedAuthorization {
   userId: string;
   accountId: string;
-  permissions: Permission[];
+  permissions: PermissionSet;
 }
 
 const makeUnauthorized = (message: string, cause?: unknown) =>
@@ -54,18 +54,15 @@ const resolveCachedAuthorization = (
       userId: account.userId,
       accountId: account.accountId,
       permissions: permissions.permissions.some((permission) => permission === "bot")
-        ? (["bot"] satisfies Extract<Permission, "bot">[])
-        : ([] satisfies Extract<Permission, "bot">[]),
+        ? permissionSetFromIterable(["bot"] satisfies Extract<Permission, "bot">[])
+        : permissionSetFromIterable([] as Permission[]),
     };
   });
-
-const hasPermission = (permissions: ReadonlyArray<Permission>, permission: Permission) =>
-  permissions.includes(permission);
 
 const resolveBaseAuthorizationPermissions = (
   authorization: CachedAuthorization,
   applicationOwnerResolver: ApplicationOwnerResolver,
-): Effect.Effect<Permission[]> =>
+): Effect.Effect<PermissionSet> =>
   Effect.gen(function* () {
     let permissions = appendPermission(
       authorization.permissions,

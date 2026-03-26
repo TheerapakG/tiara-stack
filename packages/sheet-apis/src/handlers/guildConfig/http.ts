@@ -2,7 +2,11 @@ import { HttpApiBuilder } from "@effect/platform";
 import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
-import { requireBot, requireManageGuild } from "@/middlewares/authorization";
+import {
+  provideCurrentManageGuildUser,
+  requireBot,
+  requireManageGuild,
+} from "@/middlewares/authorization";
 import { GuildConfigService } from "@/services/guildConfig";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 
@@ -17,28 +21,34 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
           requireBot().pipe(Effect.andThen(guildConfigService.getAutoCheckinGuilds())),
         )
         .handle("getGuildConfig", ({ urlParams }) =>
-          requireManageGuild(urlParams.guildId).pipe(
-            Effect.andThen(
-              pipe(
-                guildConfigService.getGuildConfig(urlParams.guildId),
-                Effect.flatMap(
-                  Option.match({
-                    onSome: (config) => Effect.succeed(config),
-                    onNone: () =>
-                      Effect.fail(
-                        makeArgumentError(
-                          "Cannot get guild config, the guild might not be registered",
+          provideCurrentManageGuildUser(
+            urlParams.guildId,
+            requireManageGuild(urlParams.guildId).pipe(
+              Effect.andThen(
+                pipe(
+                  guildConfigService.getGuildConfig(urlParams.guildId),
+                  Effect.flatMap(
+                    Option.match({
+                      onSome: (config) => Effect.succeed(config),
+                      onNone: () =>
+                        Effect.fail(
+                          makeArgumentError(
+                            "Cannot get guild config, the guild might not be registered",
+                          ),
                         ),
-                      ),
-                  }),
+                    }),
+                  ),
                 ),
               ),
             ),
           ),
         )
         .handle("upsertGuildConfig", ({ payload }) =>
-          requireManageGuild(payload.guildId).pipe(
-            Effect.andThen(guildConfigService.upsertGuildConfig(payload.guildId, payload.config)),
+          provideCurrentManageGuildUser(
+            payload.guildId,
+            requireManageGuild(payload.guildId).pipe(
+              Effect.andThen(guildConfigService.upsertGuildConfig(payload.guildId, payload.config)),
+            ),
           ),
         )
         .handle("getGuildMonitorRoles", ({ urlParams }) =>
@@ -55,24 +65,35 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
           }),
         )
         .handle("addGuildMonitorRole", ({ payload }) =>
-          requireManageGuild(payload.guildId).pipe(
-            Effect.andThen(guildConfigService.addGuildMonitorRole(payload.guildId, payload.roleId)),
+          provideCurrentManageGuildUser(
+            payload.guildId,
+            requireManageGuild(payload.guildId).pipe(
+              Effect.andThen(
+                guildConfigService.addGuildMonitorRole(payload.guildId, payload.roleId),
+              ),
+            ),
           ),
         )
         .handle("removeGuildMonitorRole", ({ payload }) =>
-          requireManageGuild(payload.guildId).pipe(
-            Effect.andThen(
-              guildConfigService.removeGuildMonitorRole(payload.guildId, payload.roleId),
+          provideCurrentManageGuildUser(
+            payload.guildId,
+            requireManageGuild(payload.guildId).pipe(
+              Effect.andThen(
+                guildConfigService.removeGuildMonitorRole(payload.guildId, payload.roleId),
+              ),
             ),
           ),
         )
         .handle("upsertGuildChannelConfig", ({ payload }) =>
-          requireManageGuild(payload.guildId).pipe(
-            Effect.andThen(
-              guildConfigService.upsertGuildChannelConfig(
-                payload.guildId,
-                payload.channelId,
-                payload.config,
+          provideCurrentManageGuildUser(
+            payload.guildId,
+            requireManageGuild(payload.guildId).pipe(
+              Effect.andThen(
+                guildConfigService.upsertGuildChannelConfig(
+                  payload.guildId,
+                  payload.channelId,
+                  payload.config,
+                ),
               ),
             ),
           ),

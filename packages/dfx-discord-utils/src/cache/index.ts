@@ -7,6 +7,8 @@ export {
   type UnstorageWithReverseLookupOpts,
 } from "./unstorage";
 export {
+  type CachedGuildMember,
+  type CachedGuild,
   opsWithReverseLookup,
   type OptsWithReverseLookupOptions,
   type ReverseLookupCacheOp,

@@ -4,11 +4,12 @@ import { Api } from "@/api";
 import {
   hasGuildPermission,
   hasPermission,
-  resolveCurrentMonitorGuildUser,
+  provideCurrentMonitorGuildUser,
 } from "@/middlewares/authorization";
+import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
-import { ScheduleService, summarizeDayPlayerSchedule } from "@/services/schedule";
 import { GuildConfigService } from "@/services/guildConfig";
+import { ScheduleService, summarizeDayPlayerSchedule } from "@/services/schedule";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { resolveScheduleViewFromPermissions } from "./shared";
 
@@ -39,98 +40,107 @@ export const ScheduleLive = HttpApiBuilder.group(Api, "schedule", (handlers) =>
     Effect.map(({ scheduleService, guildConfigService }) =>
       handlers
         .handle("getAllPopulatedSchedules", ({ urlParams }) =>
-          pipe(
+          provideCurrentMonitorGuildUser(
+            urlParams.guildId,
             Effect.all({
               sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-              resolvedUser: resolveCurrentMonitorGuildUser(urlParams.guildId),
-            }),
-            Effect.flatMap(({ sheetId, resolvedUser }) => {
-              const view = resolveScheduleViewFromPermissions(
-                resolvedUser.permissions,
-                urlParams.guildId,
-                urlParams.view,
-              );
-              return (
-                view === "monitor"
-                  ? scheduleService.getAllPopulatedSchedules(sheetId)
-                  : scheduleService.getAllPopulatedFillerSchedules(sheetId)
-              ).pipe(Effect.map((schedules) => ({ schedules, view })));
-            }),
+              resolvedUser: SheetAuthGuildUser,
+            }).pipe(
+              Effect.flatMap(({ sheetId, resolvedUser }) => {
+                const view = resolveScheduleViewFromPermissions(
+                  resolvedUser.permissions,
+                  urlParams.guildId,
+                  urlParams.view,
+                );
+                return (
+                  view === "monitor"
+                    ? scheduleService.getAllPopulatedSchedules(sheetId)
+                    : scheduleService.getAllPopulatedFillerSchedules(sheetId)
+                ).pipe(Effect.map((schedules) => ({ schedules, view })));
+              }),
+            ),
           ),
         )
         .handle("getDayPopulatedSchedules", ({ urlParams }) =>
-          pipe(
+          provideCurrentMonitorGuildUser(
+            urlParams.guildId,
             Effect.all({
               sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-              resolvedUser: resolveCurrentMonitorGuildUser(urlParams.guildId),
-            }),
-            Effect.flatMap(({ sheetId, resolvedUser }) => {
-              const view = resolveScheduleViewFromPermissions(
-                resolvedUser.permissions,
-                urlParams.guildId,
-                urlParams.view,
-              );
-              return (
-                view === "monitor"
-                  ? scheduleService.getDayPopulatedSchedules(sheetId, urlParams.day)
-                  : scheduleService.getDayPopulatedFillerSchedules(sheetId, urlParams.day)
-              ).pipe(Effect.map((schedules) => ({ schedules, view })));
-            }),
+              resolvedUser: SheetAuthGuildUser,
+            }).pipe(
+              Effect.flatMap(({ sheetId, resolvedUser }) => {
+                const view = resolveScheduleViewFromPermissions(
+                  resolvedUser.permissions,
+                  urlParams.guildId,
+                  urlParams.view,
+                );
+                return (
+                  view === "monitor"
+                    ? scheduleService.getDayPopulatedSchedules(sheetId, urlParams.day)
+                    : scheduleService.getDayPopulatedFillerSchedules(sheetId, urlParams.day)
+                ).pipe(Effect.map((schedules) => ({ schedules, view })));
+              }),
+            ),
           ),
         )
         .handle("getChannelPopulatedSchedules", ({ urlParams }) =>
-          pipe(
+          provideCurrentMonitorGuildUser(
+            urlParams.guildId,
             Effect.all({
               sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-              resolvedUser: resolveCurrentMonitorGuildUser(urlParams.guildId),
-            }),
-            Effect.flatMap(({ sheetId, resolvedUser }) => {
-              const view = resolveScheduleViewFromPermissions(
-                resolvedUser.permissions,
-                urlParams.guildId,
-                urlParams.view,
-              );
-              return (
-                view === "monitor"
-                  ? scheduleService.getChannelPopulatedSchedules(sheetId, urlParams.channel)
-                  : scheduleService.getChannelPopulatedFillerSchedules(sheetId, urlParams.channel)
-              ).pipe(Effect.map((schedules) => ({ schedules, view })));
-            }),
+              resolvedUser: SheetAuthGuildUser,
+            }).pipe(
+              Effect.flatMap(({ sheetId, resolvedUser }) => {
+                const view = resolveScheduleViewFromPermissions(
+                  resolvedUser.permissions,
+                  urlParams.guildId,
+                  urlParams.view,
+                );
+                return (
+                  view === "monitor"
+                    ? scheduleService.getChannelPopulatedSchedules(sheetId, urlParams.channel)
+                    : scheduleService.getChannelPopulatedFillerSchedules(sheetId, urlParams.channel)
+                ).pipe(Effect.map((schedules) => ({ schedules, view })));
+              }),
+            ),
           ),
         )
         .handle("getDayPlayerSchedule", ({ urlParams }) =>
-          resolveCurrentMonitorGuildUser(urlParams.guildId).pipe(
-            Effect.flatMap((resolvedUser) => {
-              const view = resolveScheduleViewFromPermissions(
-                resolvedUser.permissions,
-                urlParams.guildId,
-                urlParams.view,
-              );
+          provideCurrentMonitorGuildUser(
+            urlParams.guildId,
+            SheetAuthGuildUser.pipe(
+              Effect.flatMap((resolvedUser) => {
+                const view = resolveScheduleViewFromPermissions(
+                  resolvedUser.permissions,
+                  urlParams.guildId,
+                  urlParams.view,
+                );
 
-              return (
-                resolvedUser.accountId === urlParams.accountId ||
-                hasPermission(resolvedUser.permissions, "bot") ||
-                hasPermission(resolvedUser.permissions, "app_owner") ||
-                hasGuildPermission(resolvedUser.permissions, "monitor_guild", urlParams.guildId)
-                  ? Effect.void
-                  : Effect.fail(
-                      new Unauthorized({ message: "User does not have access to this user" }),
-                    )
-              ).pipe(
-                Effect.andThen(getSheetIdFromGuildId(urlParams.guildId, guildConfigService)),
-                Effect.flatMap((sheetId) =>
-                  (view === "monitor"
-                    ? scheduleService.getDayPopulatedSchedules(sheetId, urlParams.day)
-                    : scheduleService.getDayPopulatedFillerSchedules(sheetId, urlParams.day)
-                  ).pipe(
-                    Effect.map((schedules) => ({
-                      view,
-                      schedule: summarizeDayPlayerSchedule(schedules, urlParams.accountId),
-                    })),
+                return (
+                  resolvedUser.accountId === urlParams.accountId ||
+                  hasPermission(resolvedUser.permissions, "bot") ||
+                  hasPermission(resolvedUser.permissions, "app_owner") ||
+                  hasGuildPermission(resolvedUser.permissions, "monitor_guild", urlParams.guildId)
+                    ? Effect.void
+                    : Effect.fail(
+                        new Unauthorized({ message: "User does not have access to this user" }),
+                      )
+                ).pipe(
+                  Effect.andThen(getSheetIdFromGuildId(urlParams.guildId, guildConfigService)),
+                  Effect.flatMap((sheetId) =>
+                    (view === "monitor"
+                      ? scheduleService.getDayPopulatedSchedules(sheetId, urlParams.day)
+                      : scheduleService.getDayPopulatedFillerSchedules(sheetId, urlParams.day)
+                    ).pipe(
+                      Effect.map((schedules) => ({
+                        view,
+                        schedule: summarizeDayPlayerSchedule(schedules, urlParams.accountId),
+                      })),
+                    ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
         ),
     ),

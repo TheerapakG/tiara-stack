@@ -5,10 +5,11 @@ import {
   RolesApiCacheView,
 } from "dfx-discord-utils/discord";
 import { Discord } from "dfx";
-import { Cause, Effect, Redacted } from "effect";
+import { Cause, Effect, HashSet, Redacted } from "effect";
 import {
   getGuildMonitorAccessLevel,
   hasDiscordAccountPermission,
+  permissionSetFromIterable,
   requireBot,
   requireDiscordAccountId,
   requireDiscordAccountIdOrMonitorGuild,
@@ -16,8 +17,9 @@ import {
   requireManageGuild,
   requireMonitorGuild,
   resolveManageGuildScopedPermissions,
-  resolveUserGuildPermissions,
+  resolveSheetAuthGuildUser,
 } from "./authorization";
+import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
 import { GuildConfigService } from "@/services/guildConfig";
 
@@ -35,15 +37,34 @@ const makeUser = (
 ) => ({
   accountId: identity.accountId,
   userId: identity.userId,
-  permissions: [...permissions],
+  permissions: permissionSetFromIterable(permissions),
   token: Redacted.make("token"),
 });
+
+const permissionValues = (permissions: Iterable<TestPermission>) =>
+  Array.from(HashSet.toValues(permissionSetFromIterable(permissions))).sort();
+
+const resolvedPermissionValues = (permissions: ReturnType<typeof permissionSetFromIterable>) =>
+  Array.from(HashSet.toValues(permissions)).sort();
 
 const withUser = <A, E, R>(
   permissions: ReadonlyArray<TestPermission>,
   effect: Effect.Effect<A, E, R>,
   identity?: { accountId: string; userId: string },
 ) => effect.pipe(Effect.provideService(SheetAuthUser, makeUser(permissions, identity)));
+
+const withGuildUser = <A, E, R>(
+  permissions: ReadonlyArray<TestPermission>,
+  guildId: string,
+  effect: Effect.Effect<A, E, R>,
+  identity?: { accountId: string; userId: string },
+) =>
+  effect.pipe(
+    Effect.provideService(SheetAuthGuildUser, {
+      ...makeUser(permissions, identity),
+      guildId,
+    }),
+  ) as Effect.Effect<A, E, Exclude<R, SheetAuthGuildUser>>;
 
 const makeMember = (roles: string[]) =>
   ({
@@ -94,32 +115,44 @@ describe("authorization middleware helpers", () => {
   it.effect("matches exact discord account permission", () =>
     Effect.gen(function* () {
       expect(
-        hasDiscordAccountPermission(["account:discord:discord-account-1"], "discord-account-1"),
+        hasDiscordAccountPermission(
+          permissionSetFromIterable(["account:discord:discord-account-1"]),
+          "discord-account-1",
+        ),
       ).toBe(true);
       expect(
-        hasDiscordAccountPermission(["account:discord:discord-account-1"], "discord-account-2"),
+        hasDiscordAccountPermission(
+          permissionSetFromIterable(["account:discord:discord-account-1"]),
+          "discord-account-2",
+        ),
       ).toBe(false);
     }),
   );
 
   it.effect("resolves full guild permissions for app owner without live lookups", () =>
-    resolveUserGuildPermissions(makeUser(["app_owner"]), "guild-1").pipe(
+    resolveSheetAuthGuildUser(makeUser(["app_owner"]), "guild-1").pipe(
       Effect.map((user) => {
-        expect(user.permissions).toEqual([
-          "app_owner",
-          "member_guild:guild-1",
-          "monitor_guild:guild-1",
-          "manage_guild:guild-1",
-        ]);
+        expect(user.guildId).toBe("guild-1");
+        expect(resolvedPermissionValues(user.permissions)).toEqual(
+          permissionValues([
+            "app_owner",
+            "member_guild:guild-1",
+            "monitor_guild:guild-1",
+            "manage_guild:guild-1",
+          ]),
+        );
       }),
       liveGuildServices(),
     ),
   );
 
   it.effect("resolves guild member permission from live membership", () =>
-    resolveUserGuildPermissions(makeUser([]), "guild-1").pipe(
+    resolveSheetAuthGuildUser(makeUser([]), "guild-1").pipe(
       Effect.map((user) => {
-        expect(user.permissions).toEqual(["member_guild:guild-1"]);
+        expect(user.guildId).toBe("guild-1");
+        expect(resolvedPermissionValues(user.permissions)).toEqual(
+          permissionValues(["member_guild:guild-1"]),
+        );
       }),
       liveGuildServices({ member: makeMember([]) }),
     ),
@@ -143,23 +176,31 @@ describe("authorization middleware helpers", () => {
       } as unknown as RolesApiCacheView,
     ).pipe(
       Effect.map((permissions) => {
-        expect(permissions).toEqual([
-          "member_guild:guild-1",
-          "monitor_guild:guild-1",
-          "manage_guild:guild-1",
-        ]);
+        expect(resolvedPermissionValues(permissions)).toEqual(
+          permissionValues([
+            "member_guild:guild-1",
+            "monitor_guild:guild-1",
+            "manage_guild:guild-1",
+          ]),
+        );
       }),
     ),
   );
 
   it.effect("does not leak resolved permissions across guilds", () =>
     Effect.all({
-      guild1: resolveUserGuildPermissions(makeUser([]), "guild-1"),
-      guild2: resolveUserGuildPermissions(makeUser([]), "guild-2"),
+      guild1: resolveSheetAuthGuildUser(makeUser([]), "guild-1"),
+      guild2: resolveSheetAuthGuildUser(makeUser([]), "guild-2"),
     }).pipe(
       Effect.map(({ guild1, guild2 }) => {
-        expect(guild1.permissions).toEqual(["member_guild:guild-1", "monitor_guild:guild-1"]);
-        expect(guild2.permissions).toEqual(["member_guild:guild-2"]);
+        expect(guild1.guildId).toBe("guild-1");
+        expect(guild2.guildId).toBe("guild-2");
+        expect(resolvedPermissionValues(guild1.permissions)).toEqual(
+          permissionValues(["member_guild:guild-1", "monitor_guild:guild-1"]),
+        );
+        expect(resolvedPermissionValues(guild2.permissions)).toEqual(
+          permissionValues(["member_guild:guild-2"]),
+        );
       }),
       Effect.provideService(MembersApiCacheView, {
         get: (guildId: string) =>
@@ -178,9 +219,10 @@ describe("authorization middleware helpers", () => {
   );
 
   it.effect("degrades safely when guild lookups fail", () =>
-    resolveUserGuildPermissions(makeUser([]), "guild-1").pipe(
+    resolveSheetAuthGuildUser(makeUser([]), "guild-1").pipe(
       Effect.map((user) => {
-        expect(user.permissions).toEqual([]);
+        expect(user.guildId).toBe("guild-1");
+        expect(resolvedPermissionValues(user.permissions)).toEqual([]);
       }),
       liveGuildServices({
         memberError: new Error("member lookup failed"),
@@ -191,29 +233,31 @@ describe("authorization middleware helpers", () => {
   );
 
   it.effect("allows manage guild access with a resolved manage permission", () =>
-    withUser([], requireManageGuild("guild-1")).pipe(
-      liveGuildServices({
-        member: makeMember(["role-2"]),
-        roleMap: new Map([["role-2", makeRole("role-2", Discord.Permissions.ManageGuild)]]),
-      }),
-    ),
+    withGuildUser(["manage_guild:guild-1"], "guild-1", requireManageGuild("guild-1")),
   );
 
   it.effect("allows guild access shortcuts for app owner", () =>
     Effect.gen(function* () {
-      yield* withUser(["app_owner"], requireGuildMember("guild-1")).pipe(liveGuildServices());
-      yield* withUser(["app_owner"], requireMonitorGuild("guild-1")).pipe(liveGuildServices());
-      yield* withUser(["app_owner"], requireManageGuild("guild-1")).pipe(liveGuildServices());
+      yield* withGuildUser(
+        ["app_owner", "member_guild:guild-1"],
+        "guild-1",
+        requireGuildMember("guild-1"),
+      );
+      yield* withGuildUser(
+        ["app_owner", "monitor_guild:guild-1"],
+        "guild-1",
+        requireMonitorGuild("guild-1"),
+      );
+      yield* withGuildUser(
+        ["app_owner", "manage_guild:guild-1"],
+        "guild-1",
+        requireManageGuild("guild-1"),
+      );
     }),
   );
 
   it.effect("allows monitor guild access with a resolved monitor permission", () =>
-    withUser([], requireMonitorGuild("guild-1")).pipe(
-      liveGuildServices({
-        member: makeMember(["role-1"]),
-        monitorRoleIds: ["role-1"],
-      }),
-    ),
+    withGuildUser(["monitor_guild:guild-1"], "guild-1", requireMonitorGuild("guild-1")),
   );
 
   it.effect("allows self access with matching discord account permission", () =>
@@ -226,44 +270,41 @@ describe("authorization middleware helpers", () => {
   );
 
   it.effect("allows self-or-monitor access with resolved monitor permission", () =>
-    withUser([], requireDiscordAccountIdOrMonitorGuild("guild-1", "discord-account-2")).pipe(
-      liveGuildServices({
-        member: makeMember(["role-1"]),
-        monitorRoleIds: ["role-1"],
-      }),
+    withGuildUser(
+      ["monitor_guild:guild-1"],
+      "guild-1",
+      requireDiscordAccountIdOrMonitorGuild("guild-1", "discord-account-2"),
     ),
   );
 
   it.effect("allows guild member access from membership service", () =>
-    withUser([], requireGuildMember("guild-1")).pipe(
-      liveGuildServices({
-        member: makeMember([]),
-      }),
-    ),
+    withGuildUser(["member_guild:guild-1"], "guild-1", requireGuildMember("guild-1")),
   );
 
-  it.effect("does not allow access using a member_guild permission for a different guild", () =>
+  it.effect("dies when provided SheetAuthGuildUser is for a different guild", () =>
     Effect.gen(function* () {
       const exit = yield* Effect.exit(
-        withUser(["member_guild:guild-2"], requireGuildMember("guild-1")).pipe(liveGuildServices()),
+        withGuildUser(["member_guild:guild-2"], "guild-2", requireGuildMember("guild-1")),
       );
 
       expect(exit._tag).toBe("Failure");
+      if (exit._tag === "Failure") {
+        const defect = Cause.dieOption(exit.cause);
+        expect(defect._tag).toBe("Some");
+      }
     }),
   );
 
-  it.effect("allows guild member access with a matching scoped permission", () =>
+  it.effect("uses SheetAuthGuildUser context for guild membership checks", () =>
     Effect.gen(function* () {
-      yield* withUser(["member_guild:guild-1"], requireGuildMember("guild-1")).pipe(
-        liveGuildServices(),
-      );
+      yield* withGuildUser(["member_guild:guild-1"], "guild-1", requireGuildMember("guild-1"));
     }),
   );
 
   it.effect("rejects monitor-only access without guild membership", () =>
     Effect.gen(function* () {
       const exit = yield* Effect.exit(
-        withUser([], requireGuildMember("guild-1")).pipe(liveGuildServices()),
+        withGuildUser(["monitor_guild:guild-1"], "guild-1", requireGuildMember("guild-1")),
       );
 
       expect(exit._tag).toBe("Failure");
@@ -271,13 +312,11 @@ describe("authorization middleware helpers", () => {
   );
 
   it.effect(
-    "does not trust monitor_guild without a matching live monitor role in the target guild",
+    "does not allow monitor_guild permission for a different guild to satisfy requireMonitorGuild",
     () =>
       Effect.gen(function* () {
         const exit = yield* Effect.exit(
-          withUser(["monitor_guild:guild-2"], requireMonitorGuild("guild-1")).pipe(
-            liveGuildServices(),
-          ),
+          withGuildUser(["monitor_guild:guild-2"], "guild-1", requireMonitorGuild("guild-1")),
         );
 
         expect(exit._tag).toBe("Failure");
@@ -287,23 +326,23 @@ describe("authorization middleware helpers", () => {
   it.effect("rejects manage-only access without guild membership", () =>
     Effect.gen(function* () {
       const exit = yield* Effect.exit(
-        withUser(["manage_guild:guild-1"], requireGuildMember("guild-1")).pipe(liveGuildServices()),
+        withGuildUser(["manage_guild:guild-1"], "guild-1", requireGuildMember("guild-1")),
       );
 
       expect(exit._tag).toBe("Failure");
     }),
   );
 
-  it.effect("rejects guild member access on membership miss", () =>
+  it.effect("dies when SheetAuthGuildUser is not provided for guild checks", () =>
     Effect.gen(function* () {
       const exit = yield* Effect.exit(
-        withUser([], requireGuildMember("guild-1")).pipe(liveGuildServices()),
+        withUser([], requireGuildMember("guild-1")) as Effect.Effect<void, never, never>,
       );
 
       expect(exit._tag).toBe("Failure");
       if (exit._tag === "Failure") {
-        const failure = Cause.failureOption(exit.cause);
-        expect(failure._tag).toBe("Some");
+        const defect = Cause.dieOption(exit.cause);
+        expect(defect._tag).toBe("Some");
       }
     }),
   );
@@ -377,5 +416,15 @@ describe("authorization middleware helpers", () => {
         getGuildMonitorRoles: () => Effect.succeed([{ roleId: "role-1" }]),
       } as unknown as GuildConfigService),
     ),
+  );
+
+  it.effect("uses SheetAuthGuildUser context for self-or-monitor checks", () =>
+    Effect.gen(function* () {
+      yield* withGuildUser(
+        ["monitor_guild:guild-1"],
+        "guild-1",
+        requireDiscordAccountIdOrMonitorGuild("guild-1", "discord-account-2"),
+      );
+    }),
   );
 });

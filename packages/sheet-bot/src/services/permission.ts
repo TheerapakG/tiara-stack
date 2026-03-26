@@ -1,4 +1,4 @@
-import { Data, Effect, Option, pipe } from "effect";
+import { Data, Effect, HashSet, Option, pipe } from "effect";
 import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import { Interaction } from "dfx-discord-utils/utils";
 import { SheetApisClient } from "./sheetApis";
@@ -43,7 +43,8 @@ export class PermissionService extends Effect.Service<PermissionService>()("Perm
           .permissions.getCurrentUserPermissions({
             urlParams: typeof guildId === "undefined" ? {} : { guildId },
           })
-          .pipe(Effect.map(({ permissions }) => permissions)),
+          // The generated client still exposes the decoded payload as an array here.
+          .pipe(Effect.map(({ permissions }) => HashSet.fromIterable(permissions))),
     );
 
     return {
@@ -73,7 +74,7 @@ export class PermissionService extends Effect.Service<PermissionService>()("Perm
         const resolvedAccountId = (yield* Interaction.user()).id;
         const permissions = yield* getCurrentUserPermissions();
 
-        return permissions.includes("app_owner")
+        return HashSet.has(permissions, "app_owner")
           ? yield* Effect.succeed({
               accountId: resolvedAccountId,
             })
@@ -86,7 +87,7 @@ export class PermissionService extends Effect.Service<PermissionService>()("Perm
         const resolvedGuildId = yield* resolveGuildId(guildId);
         const permissions = yield* getCurrentUserPermissions(resolvedGuildId);
 
-        return permissions.some((permission) => permission === `monitor_guild:${resolvedGuildId}`)
+        return HashSet.has(permissions, `monitor_guild:${resolvedGuildId}`)
           ? yield* Effect.succeed({ accountId: resolvedAccountId, guildId: resolvedGuildId })
           : yield* Effect.fail(new PermissionError("User does not have monitor guild permission"));
       }),

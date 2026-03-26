@@ -1,7 +1,7 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
-import { requireMonitorGuild } from "@/middlewares/authorization";
+import { provideCurrentMonitorGuildUser, requireMonitorGuild } from "@/middlewares/authorization";
 import { ScreenshotService } from "@/services/screenshot";
 import { GuildConfigService } from "@/services/guildConfig";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
@@ -32,12 +32,15 @@ export const ScreenshotLive = HttpApiBuilder.group(Api, "screenshot", (handlers)
     }),
     Effect.map(({ screenshotService, guildConfigService }) =>
       handlers.handle("getScreenshot", ({ urlParams }) =>
-        requireMonitorGuild(urlParams.guildId).pipe(
-          Effect.andThen(
-            pipe(
-              getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-              Effect.flatMap((sheetId) =>
-                screenshotService.getScreenshot(sheetId, urlParams.channel, urlParams.day),
+        provideCurrentMonitorGuildUser(
+          urlParams.guildId,
+          requireMonitorGuild(urlParams.guildId).pipe(
+            Effect.andThen(
+              pipe(
+                getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
+                Effect.flatMap((sheetId) =>
+                  screenshotService.getScreenshot(sheetId, urlParams.channel, urlParams.day),
+                ),
               ),
             ),
           ),

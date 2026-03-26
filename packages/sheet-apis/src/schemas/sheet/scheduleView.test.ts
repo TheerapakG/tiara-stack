@@ -1,5 +1,6 @@
 import { JSONSchema } from "effect";
 import { describe, expect, it } from "@effect/vitest";
+import { permissionSetFromIterable } from "@/middlewares/authorization";
 import {
   ScheduleView,
   ScheduleResponse,
@@ -47,19 +48,25 @@ describe("PlayerDayScheduleResponse", () => {
 
 describe("getMaximumScheduleView", () => {
   it("returns monitor for bot users", () => {
-    expect(getMaximumScheduleView(["bot"], "guild-1")).toBe("monitor");
+    expect(getMaximumScheduleView(permissionSetFromIterable(["bot"]), "guild-1")).toBe("monitor");
   });
 
   it("returns monitor for app owners", () => {
-    expect(getMaximumScheduleView(["app_owner"], "guild-1")).toBe("monitor");
+    expect(getMaximumScheduleView(permissionSetFromIterable(["app_owner"]), "guild-1")).toBe(
+      "monitor",
+    );
   });
 
   it("returns monitor for monitor users", () => {
-    expect(getMaximumScheduleView(["monitor_guild:guild-1"], "guild-1")).toBe("monitor");
+    expect(
+      getMaximumScheduleView(permissionSetFromIterable(["monitor_guild:guild-1"]), "guild-1"),
+    ).toBe("monitor");
   });
 
   it("returns filler without monitor permission", () => {
-    expect(getMaximumScheduleView(["manage_guild:guild-1"], "guild-1")).toBe("filler");
+    expect(
+      getMaximumScheduleView(permissionSetFromIterable(["manage_guild:guild-1"]), "guild-1"),
+    ).toBe("filler");
   });
 });
 

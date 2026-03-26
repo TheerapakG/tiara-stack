@@ -1,7 +1,7 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer, pipe } from "effect";
 import { Api } from "@/api";
-import { requireMonitorGuild } from "@/middlewares/authorization";
+import { provideCurrentMonitorGuildUser, requireMonitorGuild } from "@/middlewares/authorization";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { GuildConfigService } from "@/services/guildConfig";
 import { RoomOrderService } from "@/services/roomOrder";
@@ -13,8 +13,11 @@ export const RoomOrderLive = HttpApiBuilder.group(Api, "roomOrder", (handlers) =
     }),
     Effect.map(({ roomOrderService }) =>
       handlers.handle("generate", ({ payload }) =>
-        requireMonitorGuild(payload.guildId).pipe(
-          Effect.andThen(roomOrderService.generate(payload)),
+        provideCurrentMonitorGuildUser(
+          payload.guildId,
+          requireMonitorGuild(payload.guildId).pipe(
+            Effect.andThen(roomOrderService.generate(payload)),
+          ),
         ),
       ),
     ),

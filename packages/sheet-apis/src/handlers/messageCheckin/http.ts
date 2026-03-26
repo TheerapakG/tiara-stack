@@ -1,9 +1,11 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { makeArgumentError } from "typhoon-core/error";
-import { Effect, Layer, Option, pipe } from "effect";
+import { Effect, HashSet, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import {
   getGuildMonitorAccessLevel,
+  provideCurrentMemberGuildUser,
+  provideCurrentMonitorGuildUser,
   requireBot,
   requireGuildMember,
   requireMonitorGuild,
@@ -97,11 +99,14 @@ const requireCheckinUpsertAccess = (
       Option.match({
         onNone: () =>
           typeof guildId === "string"
-            ? requireMonitorGuild(guildId)
+            ? provideCurrentMonitorGuildUser(guildId, requireMonitorGuild(guildId))
             : requireLegacyMessageCheckinBotAccess(),
         onSome: (record) =>
           Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-            ? requireMonitorGuild(record.guildId.value)
+            ? provideCurrentMonitorGuildUser(
+                record.guildId.value,
+                requireMonitorGuild(record.guildId.value),
+              )
             : requireLegacyMessageCheckinBotAccess(),
       }),
     ),
@@ -115,14 +120,12 @@ const requireCheckinMutationAccess = (
 ) =>
   SheetAuthUser.pipe(
     Effect.flatMap((user) =>
-      user.permissions.includes("bot") || user.permissions.includes("app_owner")
+      HashSet.has(user.permissions, "bot") || HashSet.has(user.permissions, "app_owner")
         ? Effect.void
         : // Non-legacy check-in mutations remain self-service for regular users:
           // monitors can add members, but only the recorded participant can update/remove that member.
-          // `guildId` is record-derived here, so `requireGuildMember` usually falls back
-          // to a live membership lookup instead of using a request-scoped shortcut.
           requireDiscordAccountId(memberId).pipe(
-            Effect.andThen(requireGuildMember(guildId)),
+            Effect.andThen(provideCurrentMemberGuildUser(guildId, requireGuildMember(guildId))),
             Effect.andThen(messageCheckinService.getMessageCheckinMembers(messageId)),
             Effect.flatMap((members) => requireRecordedParticipant(members, memberId)),
           ),
@@ -189,11 +192,14 @@ export const MessageCheckinLive = HttpApiBuilder.group(Api, "messageCheckin", (h
           getRequiredMessageCheckinRecord(messageCheckinService, payload.messageId).pipe(
             Effect.flatMap((record) =>
               Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-                ? requireMonitorGuild(record.guildId.value).pipe(
-                    Effect.andThen(
-                      messageCheckinService.addMessageCheckinMembers(
-                        payload.messageId,
-                        payload.memberIds,
+                ? provideCurrentMonitorGuildUser(
+                    record.guildId.value,
+                    requireMonitorGuild(record.guildId.value).pipe(
+                      Effect.andThen(
+                        messageCheckinService.addMessageCheckinMembers(
+                          payload.messageId,
+                          payload.memberIds,
+                        ),
                       ),
                     ),
                   )

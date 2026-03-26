@@ -1,4 +1,4 @@
-import type { Permission } from "@/schemas/permissions";
+import type { PermissionSet } from "@/schemas/permissions";
 import {
   getEffectiveScheduleView,
   getMaximumScheduleView,
@@ -6,7 +6,7 @@ import {
 } from "@/schemas/sheet";
 
 export const resolveScheduleViewFromPermissions = (
-  permissions: ReadonlyArray<Permission>,
+  permissions: PermissionSet,
   guildId: string,
   requestedView?: ScheduleView,
 ) => getEffectiveScheduleView(getMaximumScheduleView(permissions, guildId), requestedView);

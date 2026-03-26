@@ -1,5 +1,5 @@
-import { Schema } from "effect";
-import type { Permission } from "@/schemas/permissions";
+import { HashSet, Schema } from "effect";
+import type { PermissionSet } from "@/schemas/permissions";
 import { BreakSchedule, Schedule } from "./schedule";
 import { PopulatedScheduleResult } from "./populatedSchedule";
 
@@ -37,13 +37,10 @@ export const PlayerDayScheduleResponse = Schema.Struct({
 
 export type PlayerDayScheduleResponse = Schema.Schema.Type<typeof PlayerDayScheduleResponse>;
 
-export const getMaximumScheduleView = (
-  permissions: ReadonlyArray<Permission>,
-  guildId: string,
-): ScheduleView =>
-  permissions.includes("bot") ||
-  permissions.includes("app_owner") ||
-  permissions.includes(`monitor_guild:${guildId}`)
+export const getMaximumScheduleView = (permissions: PermissionSet, guildId: string): ScheduleView =>
+  HashSet.has(permissions, "bot") ||
+  HashSet.has(permissions, "app_owner") ||
+  HashSet.has(permissions, `monitor_guild:${guildId}`)
     ? "monitor"
     : "filler";
 

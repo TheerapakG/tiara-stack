@@ -2,6 +2,7 @@ import { HttpApiBuilder } from "@effect/platform";
 import { Array, Effect, HashMap, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import {
+  provideCurrentMonitorGuildUser,
   requireDiscordAccountIdOrMonitorGuild,
   requireMonitorGuild,
 } from "@/middlewares/authorization";
@@ -36,25 +37,28 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
     Effect.map(({ playerService, guildConfigService }) =>
       handlers
         .handle("getPlayerMaps", ({ urlParams }) =>
-          requireMonitorGuild(urlParams.guildId).pipe(
-            Effect.andThen(
-              pipe(
-                getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-                Effect.flatMap((sheetId) => playerService.getPlayerMaps(sheetId)),
-                Effect.map((playerMaps) => ({
-                  nameToPlayer: Array.fromIterable(HashMap.entries(playerMaps.nameToPlayer)).map(
-                    ([key, value]) => ({
-                      key,
-                      value: { name: value.name, players: Array.fromIterable(value.players) },
-                    }),
-                  ),
-                  idToPlayer: Array.fromIterable(HashMap.entries(playerMaps.idToPlayer)).map(
-                    ([key, value]) => ({
-                      key,
-                      value: Array.fromIterable(value),
-                    }),
-                  ),
-                })),
+          provideCurrentMonitorGuildUser(
+            urlParams.guildId,
+            requireMonitorGuild(urlParams.guildId).pipe(
+              Effect.andThen(
+                pipe(
+                  getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
+                  Effect.flatMap((sheetId) => playerService.getPlayerMaps(sheetId)),
+                  Effect.map((playerMaps) => ({
+                    nameToPlayer: Array.fromIterable(HashMap.entries(playerMaps.nameToPlayer)).map(
+                      ([key, value]) => ({
+                        key,
+                        value: { name: value.name, players: Array.fromIterable(value.players) },
+                      }),
+                    ),
+                    idToPlayer: Array.fromIterable(HashMap.entries(playerMaps.idToPlayer)).map(
+                      ([key, value]) => ({
+                        key,
+                        value: Array.fromIterable(value),
+                      }),
+                    ),
+                  })),
+                ),
               ),
             ),
           ),
@@ -65,21 +69,27 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
               ? requireDiscordAccountIdOrMonitorGuild(urlParams.guildId, urlParams.ids[0])
               : requireMonitorGuild(urlParams.guildId);
 
-          return auth.pipe(
-            Effect.andThen(
-              pipe(
-                getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-                Effect.flatMap((sheetId) => playerService.getByIds(sheetId, urlParams.ids)),
+          return provideCurrentMonitorGuildUser(
+            urlParams.guildId,
+            auth.pipe(
+              Effect.andThen(
+                pipe(
+                  getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
+                  Effect.flatMap((sheetId) => playerService.getByIds(sheetId, urlParams.ids)),
+                ),
               ),
             ),
           );
         })
         .handle("getByNames", ({ urlParams }) =>
-          requireMonitorGuild(urlParams.guildId).pipe(
-            Effect.andThen(
-              pipe(
-                getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-                Effect.flatMap((sheetId) => playerService.getByNames(sheetId, urlParams.names)),
+          provideCurrentMonitorGuildUser(
+            urlParams.guildId,
+            requireMonitorGuild(urlParams.guildId).pipe(
+              Effect.andThen(
+                pipe(
+                  getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
+                  Effect.flatMap((sheetId) => playerService.getByNames(sheetId, urlParams.names)),
+                ),
               ),
             ),
           ),
@@ -90,14 +100,17 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
               ? requireDiscordAccountIdOrMonitorGuild(urlParams.guildId, urlParams.ids[0])
               : requireMonitorGuild(urlParams.guildId);
 
-          return auth.pipe(
-            Effect.andThen(
-              pipe(
-                getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-                Effect.flatMap((sheetId) =>
-                  Effect.map(
-                    playerService.getTeamsByIds(sheetId, urlParams.ids),
-                    (teams) => [teams] as const,
+          return provideCurrentMonitorGuildUser(
+            urlParams.guildId,
+            auth.pipe(
+              Effect.andThen(
+                pipe(
+                  getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
+                  Effect.flatMap((sheetId) =>
+                    Effect.map(
+                      playerService.getTeamsByIds(sheetId, urlParams.ids),
+                      (teams) => [teams] as const,
+                    ),
                   ),
                 ),
               ),
@@ -105,14 +118,17 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
           );
         })
         .handle("getTeamsByNames", ({ urlParams }) =>
-          requireMonitorGuild(urlParams.guildId).pipe(
-            Effect.andThen(
-              pipe(
-                getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-                Effect.flatMap((sheetId) =>
-                  Effect.map(
-                    playerService.getTeamsByNames(sheetId, urlParams.names),
-                    (teams) => [teams] as const,
+          provideCurrentMonitorGuildUser(
+            urlParams.guildId,
+            requireMonitorGuild(urlParams.guildId).pipe(
+              Effect.andThen(
+                pipe(
+                  getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
+                  Effect.flatMap((sheetId) =>
+                    Effect.map(
+                      playerService.getTeamsByNames(sheetId, urlParams.names),
+                      (teams) => [teams] as const,
+                    ),
                   ),
                 ),
               ),

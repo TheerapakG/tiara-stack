@@ -30,6 +30,10 @@ export const Permission = Schema.Union(
 
 export type Permission = Schema.Schema.Type<typeof Permission>;
 
+export const PermissionSet = Schema.HashSet(Permission);
+
+export type PermissionSet = Schema.Schema.Type<typeof PermissionSet>;
+
 export const CurrentUserPermissions = Schema.Struct({
-  permissions: Schema.Array(Permission),
+  permissions: PermissionSet,
 });

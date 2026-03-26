@@ -11,7 +11,7 @@ import { DiscordApiClient } from "@/discord/discordApiClient";
 import type { DiscordChannel, DiscordGuild } from "@/discord/schema";
 
 // Member type with pending optional (Discord only includes it when Membership Screening is enabled)
-export type GuildMemberWithOptionalPending = Omit<
+export type CachedGuildMember = Omit<
   Discord.GuildMemberResponse,
   "deaf" | "flags" | "joined_at" | "mute" | "pending"
 > & {
@@ -19,7 +19,7 @@ export type GuildMemberWithOptionalPending = Omit<
 };
 
 // Guild type with relaxed fields (allows unknown future values)
-export type GuildWithRelaxedFeatures = Omit<
+export type CachedGuild = Omit<
   DiscordGuild,
   | "features"
   | "preferred_locale"
@@ -594,14 +594,14 @@ export const rolesApiCacheViewWithReverseLookup = <RM, EM, E>(
 
 // Members API view prelude (readonly, no gateway, uses HTTP API on miss)
 export const membersApiCacheViewWithReverseLookup = <RM, EM, E>(
-  makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, GuildMemberWithOptionalPending>, EM, RM>,
+  makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, CachedGuildMember>, EM, RM>,
 ): Effect.Effect<
   ReverseLookupCache<
     E,
     Cache.CacheMissError,
     Cache.CacheMissError,
     Cache.CacheMissError,
-    GuildMemberWithOptionalPending,
+    CachedGuildMember,
     true
   >,
   EM,
@@ -621,7 +621,7 @@ export const membersApiCacheViewWithReverseLookup = <RM, EM, E>(
           }),
         ),
       ops: opsWithReverseLookup({
-        id: (m: GuildMemberWithOptionalPending) => m.user.id,
+        id: (m: CachedGuildMember) => m.user.id,
         fromParent: Stream.never,
         create: Stream.never,
         update: Stream.never,
@@ -668,9 +668,9 @@ export const membersApiCacheViewWithReverseLookup = <RM, EM, E>(
 
 // Guilds API view prelude (readonly, no gateway, uses HTTP API on miss)
 export const guildsApiCacheView = <RM, EM, E>(
-  makeDriver: Effect.Effect<CacheDriver<E, GuildWithRelaxedFeatures>, EM, RM>,
+  makeDriver: Effect.Effect<CacheDriver<E, CachedGuild>, EM, RM>,
 ): Effect.Effect<
-  SimpleCache<E, Cache.CacheMissError, GuildWithRelaxedFeatures, true>,
+  SimpleCache<E, Cache.CacheMissError, CachedGuild, true>,
   EM,
   RM | Scope.Scope | DiscordApiClient
 > =>
@@ -680,7 +680,7 @@ export const guildsApiCacheView = <RM, EM, E>(
 
     return yield* make({
       driver,
-      id: (g: GuildWithRelaxedFeatures) => g.id,
+      id: (g: CachedGuild) => g.id,
       onMiss: (id) =>
         client.cache.getGuild({ path: { resourceId: id } }).pipe(
           Effect.map((r) => r.value),

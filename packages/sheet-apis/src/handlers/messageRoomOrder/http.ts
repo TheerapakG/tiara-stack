@@ -2,7 +2,11 @@ import { HttpApiBuilder } from "@effect/platform";
 import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
-import { requireBot, requireMonitorGuild } from "@/middlewares/authorization";
+import {
+  provideCurrentMonitorGuildUser,
+  requireBot,
+  requireMonitorGuild,
+} from "@/middlewares/authorization";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { MessageRoomOrder } from "@/schemas/messageRoomOrder";
 import { GuildConfigService } from "@/services/guildConfig";
@@ -26,7 +30,10 @@ const getRequiredMessageRoomOrderRecord = (
 
 const requireRoomOrderMonitorAccess = (record: MessageRoomOrder) =>
   Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-    ? requireMonitorGuild(record.guildId.value)
+    ? provideCurrentMonitorGuildUser(
+        record.guildId.value,
+        requireMonitorGuild(record.guildId.value),
+      )
     : requireBot("Legacy message room order records are restricted to the bot");
 
 const requireRoomOrderUpsertAccess = (
@@ -39,7 +46,7 @@ const requireRoomOrderUpsertAccess = (
       Option.match({
         onNone: () =>
           typeof guildId === "string"
-            ? requireMonitorGuild(guildId)
+            ? provideCurrentMonitorGuildUser(guildId, requireMonitorGuild(guildId))
             : requireBot("Legacy message room order records are restricted to the bot"),
         onSome: requireRoomOrderMonitorAccess,
       }),

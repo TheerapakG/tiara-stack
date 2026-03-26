@@ -1,7 +1,7 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer, pipe } from "effect";
 import { Api } from "@/api";
-import { requireMonitorGuild } from "@/middlewares/authorization";
+import { provideCurrentMonitorGuildUser, requireMonitorGuild } from "@/middlewares/authorization";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { CheckinService } from "@/services/checkin";
 import { GuildConfigService } from "@/services/guildConfig";
@@ -13,7 +13,12 @@ export const CheckinLive = HttpApiBuilder.group(Api, "checkin", (handlers) =>
     }),
     Effect.map(({ checkinService }) =>
       handlers.handle("generate", ({ payload }) =>
-        requireMonitorGuild(payload.guildId).pipe(Effect.andThen(checkinService.generate(payload))),
+        provideCurrentMonitorGuildUser(
+          payload.guildId,
+          requireMonitorGuild(payload.guildId).pipe(
+            Effect.andThen(checkinService.generate(payload)),
+          ),
+        ),
       ),
     ),
   ),

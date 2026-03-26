@@ -2,7 +2,13 @@ import { HttpApiBuilder } from "@effect/platform";
 import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
-import { requireBot, requireGuildMember, requireMonitorGuild } from "@/middlewares/authorization";
+import {
+  provideCurrentMemberGuildUser,
+  provideCurrentMonitorGuildUser,
+  requireBot,
+  requireGuildMember,
+  requireMonitorGuild,
+} from "@/middlewares/authorization";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { MessageSlot } from "@/schemas/messageSlot";
 import { GuildConfigService } from "@/services/guildConfig";
@@ -34,11 +40,14 @@ const requireMessageSlotUpsertAccess = (
       Option.match({
         onNone: () =>
           typeof guildId === "string"
-            ? requireMonitorGuild(guildId)
+            ? provideCurrentMonitorGuildUser(guildId, requireMonitorGuild(guildId))
             : requireLegacyMessageSlotBotAccess(),
         onSome: (record) =>
           Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-            ? requireMonitorGuild(record.guildId.value)
+            ? provideCurrentMonitorGuildUser(
+                record.guildId.value,
+                requireMonitorGuild(record.guildId.value),
+              )
             : requireLegacyMessageSlotBotAccess(),
       }),
     ),
@@ -55,8 +64,11 @@ export const MessageSlotLive = HttpApiBuilder.group(Api, "messageSlot", (handler
           getRequiredMessageSlotRecord(messageSlotService, urlParams.messageId).pipe(
             Effect.flatMap((record) =>
               Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-                ? requireGuildMember(record.guildId.value).pipe(
-                    Effect.andThen(Effect.succeed(record)),
+                ? provideCurrentMemberGuildUser(
+                    record.guildId.value,
+                    requireGuildMember(record.guildId.value).pipe(
+                      Effect.andThen(Effect.succeed(record)),
+                    ),
                   )
                 : requireLegacyMessageSlotBotAccess().pipe(Effect.andThen(Effect.succeed(record))),
             ),

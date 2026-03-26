@@ -1,7 +1,8 @@
 import { HttpRouter, HttpServerRequest } from "@effect/platform";
 import { beforeEach, describe, expect, it } from "@effect/vitest";
-import { Cause, DateTime, Duration, Effect, Option, Redacted, TestClock } from "effect";
+import { Cause, DateTime, Duration, Effect, HashSet, Option, Redacted, TestClock } from "effect";
 import { Account } from "sheet-auth/client";
+import { permissionSetFromIterable } from "../authorization";
 import type { ApplicationOwnerResolver } from "../../services/applicationOwner";
 import { vi } from "vitest";
 import { makeSheetAuthTokenAuthorization } from "./shared";
@@ -59,6 +60,9 @@ const makeAccount = Effect.fnUntraced(function* (userId: string, accountId = `di
   });
 });
 
+const permissionValues = (permissions: ReturnType<typeof permissionSetFromIterable>) =>
+  Array.from(HashSet.toValues(permissions)).sort();
+
 describe("SheetAuthTokenAuthorizationLive", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -80,12 +84,13 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       const first = yield* provideRequestContext(sheetAuthToken(token));
       const second = yield* provideRequestContext(sheetAuthToken(token));
 
-      expect(first).toEqual({
-        accountId: "discord-user-1",
-        userId: "user-1",
-        permissions: ["bot", "account:discord:discord-user-1"],
-        token,
-      });
+      expect(first.accountId).toBe("discord-user-1");
+      expect(first.userId).toBe("user-1");
+      expect(first.token).toBe(token);
+      expect(permissionValues(first.permissions)).toEqual([
+        "account:discord:discord-user-1",
+        "bot",
+      ]);
       expect(second).toEqual(first);
       expect(getAccountMock).toHaveBeenCalledTimes(1);
       expect(getImplicitPermissionsMock).toHaveBeenCalledTimes(1);
@@ -115,8 +120,14 @@ describe("SheetAuthTokenAuthorizationLive", () => {
         const first = yield* provideRequestContext(sheetAuthToken(token));
         const second = yield* provideRequestContext(sheetAuthToken(token));
 
-        expect(first.permissions).toEqual(["bot", "account:discord:discord-user-1"]);
-        expect(second.permissions).toEqual(["bot", "account:discord:discord-user-1"]);
+        expect(permissionValues(first.permissions)).toEqual([
+          "account:discord:discord-user-1",
+          "bot",
+        ]);
+        expect(permissionValues(second.permissions)).toEqual([
+          "account:discord:discord-user-1",
+          "bot",
+        ]);
       }),
   );
 
@@ -129,7 +140,10 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       const sheetAuthToken = yield* makeAuthorization();
       const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")));
 
-      expect(result.permissions).toEqual(["account:discord:discord-owner", "app_owner"]);
+      expect(permissionValues(result.permissions)).toEqual([
+        "account:discord:discord-owner",
+        "app_owner",
+      ]);
     }),
   );
 
@@ -142,7 +156,7 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       const sheetAuthToken = yield* makeAuthorization();
       const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")));
 
-      expect(result.permissions).toEqual(["account:discord:discord-user-1"]);
+      expect(permissionValues(result.permissions)).toEqual(["account:discord:discord-user-1"]);
     }),
   );
 
@@ -173,7 +187,7 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       const sheetAuthToken = yield* makeAuthorization();
       const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")));
 
-      expect(result.permissions).toEqual(["account:discord:discord-user-1"]);
+      expect(permissionValues(result.permissions)).toEqual(["account:discord:discord-user-1"]);
       expect(getAccountMock).toHaveBeenCalledTimes(1);
       expect(getImplicitPermissionsMock).toHaveBeenCalledTimes(1);
     }),
@@ -187,7 +201,7 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       const sheetAuthToken = yield* makeAuthorization();
       const result = yield* provideRequestContext(sheetAuthToken(Redacted.make("token-1")));
 
-      expect(result.permissions).toEqual(["account:discord:discord-user-1"]);
+      expect(permissionValues(result.permissions)).toEqual(["account:discord:discord-user-1"]);
     }),
   );
 

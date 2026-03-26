@@ -1,14 +1,15 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
-import { resolveCurrentMonitorGuildUser } from "@/middlewares/authorization";
-import { SheetService } from "@/services/sheet";
-import { SheetConfigService } from "@/services/sheetConfig";
-import { GuildConfigService } from "@/services/guildConfig";
-import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
+import { provideCurrentMonitorGuildUser } from "@/middlewares/authorization";
+import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
 import { BreakSchedule, Schedule } from "@/schemas/sheet";
-import { resolveScheduleViewFromPermissions } from "../schedule/shared";
 import { withScheduleHourWindow } from "@/services/hourWindow";
+import { GuildConfigService } from "@/services/guildConfig";
+import { SheetConfigService } from "@/services/sheetConfig";
+import { SheetService } from "@/services/sheet";
+import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
+import { resolveScheduleViewFromPermissions } from "../schedule/shared";
 
 const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigService) =>
   pipe(
@@ -61,84 +62,90 @@ export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
           ),
         )
         .handle("getAllSchedules", ({ urlParams }) =>
-          pipe(
+          provideCurrentMonitorGuildUser(
+            urlParams.guildId,
             Effect.all({
               sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-              resolvedUser: resolveCurrentMonitorGuildUser(urlParams.guildId),
-            }),
-            Effect.flatMap(({ sheetId, resolvedUser }) => {
-              const view = resolveScheduleViewFromPermissions(
-                resolvedUser.permissions,
-                urlParams.guildId,
-                urlParams.view,
-              );
-              return Effect.all({
-                schedules:
-                  view === "monitor"
-                    ? sheetService.getAllSchedules(sheetId)
-                    : sheetService.getAllFillerSchedules(sheetId),
-                eventConfig: sheetConfigService.getEventConfig(sheetId),
-              }).pipe(
-                Effect.map(({ schedules, eventConfig }) => ({
-                  schedules: withScheduleHourWindows(schedules, eventConfig.startTime),
-                  view,
-                })),
-              );
-            }),
+              resolvedUser: SheetAuthGuildUser,
+            }).pipe(
+              Effect.flatMap(({ sheetId, resolvedUser }) => {
+                const view = resolveScheduleViewFromPermissions(
+                  resolvedUser.permissions,
+                  urlParams.guildId,
+                  urlParams.view,
+                );
+                return Effect.all({
+                  schedules:
+                    view === "monitor"
+                      ? sheetService.getAllSchedules(sheetId)
+                      : sheetService.getAllFillerSchedules(sheetId),
+                  eventConfig: sheetConfigService.getEventConfig(sheetId),
+                }).pipe(
+                  Effect.map(({ schedules, eventConfig }) => ({
+                    schedules: withScheduleHourWindows(schedules, eventConfig.startTime),
+                    view,
+                  })),
+                );
+              }),
+            ),
           ),
         )
         .handle("getDaySchedules", ({ urlParams }) =>
-          pipe(
+          provideCurrentMonitorGuildUser(
+            urlParams.guildId,
             Effect.all({
               sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-              resolvedUser: resolveCurrentMonitorGuildUser(urlParams.guildId),
-            }),
-            Effect.flatMap(({ sheetId, resolvedUser }) => {
-              const view = resolveScheduleViewFromPermissions(
-                resolvedUser.permissions,
-                urlParams.guildId,
-                urlParams.view,
-              );
-              return Effect.all({
-                schedules:
-                  view === "monitor"
-                    ? sheetService.getDaySchedules(sheetId, urlParams.day)
-                    : sheetService.getDayFillerSchedules(sheetId, urlParams.day),
-                eventConfig: sheetConfigService.getEventConfig(sheetId),
-              }).pipe(
-                Effect.map(({ schedules, eventConfig }) => ({
-                  schedules: withScheduleHourWindows(schedules, eventConfig.startTime),
-                  view,
-                })),
-              );
-            }),
+              resolvedUser: SheetAuthGuildUser,
+            }).pipe(
+              Effect.flatMap(({ sheetId, resolvedUser }) => {
+                const view = resolveScheduleViewFromPermissions(
+                  resolvedUser.permissions,
+                  urlParams.guildId,
+                  urlParams.view,
+                );
+                return Effect.all({
+                  schedules:
+                    view === "monitor"
+                      ? sheetService.getDaySchedules(sheetId, urlParams.day)
+                      : sheetService.getDayFillerSchedules(sheetId, urlParams.day),
+                  eventConfig: sheetConfigService.getEventConfig(sheetId),
+                }).pipe(
+                  Effect.map(({ schedules, eventConfig }) => ({
+                    schedules: withScheduleHourWindows(schedules, eventConfig.startTime),
+                    view,
+                  })),
+                );
+              }),
+            ),
           ),
         )
         .handle("getChannelSchedules", ({ urlParams }) =>
-          pipe(
+          provideCurrentMonitorGuildUser(
+            urlParams.guildId,
             Effect.all({
               sheetId: getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-              resolvedUser: resolveCurrentMonitorGuildUser(urlParams.guildId),
-            }),
-            Effect.flatMap(({ sheetId, resolvedUser }) => {
-              const view = resolveScheduleViewFromPermissions(
-                resolvedUser.permissions,
-                urlParams.guildId,
-                urlParams.view,
-              );
-              return Effect.all({
-                schedules:
-                  view === "monitor"
-                    ? sheetService.getChannelSchedules(sheetId, urlParams.channel)
-                    : sheetService.getChannelFillerSchedules(sheetId, urlParams.channel),
-                eventConfig: sheetConfigService.getEventConfig(sheetId),
-              }).pipe(
-                Effect.map(({ schedules, eventConfig }) => ({
-                  schedules: withScheduleHourWindows(schedules, eventConfig.startTime),
-                  view,
-                })),
-              );
-            }),
+              resolvedUser: SheetAuthGuildUser,
+            }).pipe(
+              Effect.flatMap(({ sheetId, resolvedUser }) => {
+                const view = resolveScheduleViewFromPermissions(
+                  resolvedUser.permissions,
+                  urlParams.guildId,
+                  urlParams.view,
+                );
+                return Effect.all({
+                  schedules:
+                    view === "monitor"
+                      ? sheetService.getChannelSchedules(sheetId, urlParams.channel)
+                      : sheetService.getChannelFillerSchedules(sheetId, urlParams.channel),
+                  eventConfig: sheetConfigService.getEventConfig(sheetId),
+                }).pipe(
+                  Effect.map(({ schedules, eventConfig }) => ({
+                    schedules: withScheduleHourWindows(schedules, eventConfig.startTime),
+                    view,
+                  })),
+                );
+              }),
+            ),
           ),
         )
         .handle("getRangesConfig", ({ urlParams }) =>
