@@ -4,8 +4,10 @@ import {
   MembersApiCacheView,
   RolesApiCacheView,
 } from "dfx-discord-utils/discord";
+import { Discord } from "dfx";
 import { Cause, Effect, Redacted } from "effect";
 import {
+  getGuildMonitorAccessLevel,
   hasUserPermission,
   requireBot,
   requireGuildMember,
@@ -13,62 +15,75 @@ import {
   requireMonitorGuild,
   requireUserId,
   requireUserIdOrMonitorGuild,
+  resolveManageGuildScopedPermissions,
+  resolveUserGuildPermissions,
 } from "./authorization";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
 import { GuildConfigService } from "@/services/guildConfig";
 
-const defaultMembersApiCacheView = {
-  get: () => Effect.fail(new CacheNotFoundError({ message: "not needed" })),
-} as unknown as MembersApiCacheView;
+type TestPermission =
+  | "bot"
+  | "app_owner"
+  | `member_guild:${string}`
+  | `monitor_guild:${string}`
+  | `manage_guild:${string}`
+  | `user:${string}`;
 
-const defaultGuildConfigService = {
-  getGuildMonitorRoles: () => Effect.succeed([{ roleId: "role-1" }]),
-} as unknown as GuildConfigService;
+const makeUser = (permissions: ReadonlyArray<TestPermission>) => ({
+  accountId: "account-1",
+  userId: "user-1",
+  permissions: [...permissions],
+  token: Redacted.make("token"),
+});
 
-const defaultRolesApiCacheView = {
-  getForParent: () => Effect.fail(new CacheNotFoundError({ message: "not needed" })),
-} as unknown as RolesApiCacheView;
-
-const withPermissions = <A, E, R>(
-  permissions: Array<
-    | "bot"
-    | "app_owner"
-    | `member_guild:${string}`
-    | `monitor_guild:${string}`
-    | `manage_guild:${string}`
-    | `user:${string}`
-  >,
+const withUser = <A, E, R>(
+  permissions: ReadonlyArray<TestPermission>,
   effect: Effect.Effect<A, E, R>,
-) =>
-  effect.pipe(
-    Effect.provideService(SheetAuthUser, {
-      accountId: "account-1",
-      userId: "user-1",
-      permissions,
-      token: Redacted.make("token"),
-    }),
-  );
+) => effect.pipe(Effect.provideService(SheetAuthUser, makeUser(permissions)));
 
-const provideAuthorizationServices =
+const makeMember = (roles: string[]) =>
+  ({
+    roles,
+    user: { id: "account-1" },
+  }) as const;
+
+const makeRole = (id: string, permissions: bigint | string) =>
+  ({
+    id,
+    permissions: permissions.toString(),
+  }) as const;
+
+const liveGuildServices =
   (options?: {
-    readonly membersApiCacheView?: MembersApiCacheView;
-    readonly guildConfigService?: GuildConfigService;
-    readonly rolesApiCacheView?: RolesApiCacheView;
+    readonly member?: ReturnType<typeof makeMember>;
+    readonly monitorRoleIds?: ReadonlyArray<string>;
+    readonly roleMap?: ReadonlyMap<string, ReturnType<typeof makeRole>>;
+    readonly memberError?: unknown;
+    readonly monitorRolesError?: unknown;
+    readonly rolesError?: unknown;
   }) =>
   <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
-      Effect.provideService(
-        MembersApiCacheView,
-        options?.membersApiCacheView ?? defaultMembersApiCacheView,
-      ),
-      Effect.provideService(
-        GuildConfigService,
-        options?.guildConfigService ?? defaultGuildConfigService,
-      ),
-      Effect.provideService(
-        RolesApiCacheView,
-        options?.rolesApiCacheView ?? defaultRolesApiCacheView,
-      ),
+      Effect.provideService(MembersApiCacheView, {
+        get: () =>
+          options?.memberError
+            ? Effect.fail(options.memberError)
+            : typeof options?.member === "undefined"
+              ? Effect.fail(new CacheNotFoundError({ message: "not found" }))
+              : Effect.succeed(options.member),
+      } as unknown as MembersApiCacheView),
+      Effect.provideService(GuildConfigService, {
+        getGuildMonitorRoles: () =>
+          options?.monitorRolesError
+            ? Effect.fail(options.monitorRolesError)
+            : Effect.succeed((options?.monitorRoleIds ?? []).map((roleId) => ({ roleId }))),
+      } as unknown as GuildConfigService),
+      Effect.provideService(RolesApiCacheView, {
+        getForParent: () =>
+          options?.rolesError
+            ? Effect.fail(options.rolesError)
+            : Effect.succeed(new Map(options?.roleMap ?? [])),
+      } as unknown as RolesApiCacheView),
     );
 
 describe("authorization middleware helpers", () => {
@@ -79,73 +94,147 @@ describe("authorization middleware helpers", () => {
     }),
   );
 
-  it.effect("allows manage guild access with manage_guild", () =>
-    Effect.gen(function* () {
-      yield* withPermissions(["manage_guild:guild-1"], requireManageGuild("guild-1")).pipe(
-        provideAuthorizationServices(),
-      );
-    }),
+  it.effect("resolves full guild permissions for app owner without live lookups", () =>
+    resolveUserGuildPermissions(makeUser(["app_owner"]), "guild-1").pipe(
+      Effect.map((user) => {
+        expect(user.permissions).toEqual([
+          "app_owner",
+          "member_guild:guild-1",
+          "monitor_guild:guild-1",
+          "manage_guild:guild-1",
+        ]);
+      }),
+      liveGuildServices(),
+    ),
+  );
+
+  it.effect("resolves guild member permission from live membership", () =>
+    resolveUserGuildPermissions(makeUser([]), "guild-1").pipe(
+      Effect.map((user) => {
+        expect(user.permissions).toEqual(["member_guild:guild-1"]);
+      }),
+      liveGuildServices({ member: makeMember([]) }),
+    ),
+  );
+
+  it.effect("resolves monitor and manage permissions from live guild data", () =>
+    resolveManageGuildScopedPermissions(
+      makeUser([]),
+      "guild-1",
+      {
+        get: () => Effect.succeed(makeMember(["role-1", "role-2"])),
+      } as unknown as MembersApiCacheView,
+      {
+        getGuildMonitorRoles: () => Effect.succeed([{ roleId: "role-1" }]),
+      } as unknown as GuildConfigService,
+      {
+        getForParent: () =>
+          Effect.succeed(
+            new Map([["role-2", makeRole("role-2", Discord.Permissions.ManageGuild)]]),
+          ),
+      } as unknown as RolesApiCacheView,
+    ).pipe(
+      Effect.map((permissions) => {
+        expect(permissions).toEqual([
+          "member_guild:guild-1",
+          "monitor_guild:guild-1",
+          "manage_guild:guild-1",
+        ]);
+      }),
+    ),
+  );
+
+  it.effect("does not leak resolved permissions across guilds", () =>
+    Effect.all({
+      guild1: resolveUserGuildPermissions(makeUser([]), "guild-1"),
+      guild2: resolveUserGuildPermissions(makeUser([]), "guild-2"),
+    }).pipe(
+      Effect.map(({ guild1, guild2 }) => {
+        expect(guild1.permissions).toEqual(["member_guild:guild-1", "monitor_guild:guild-1"]);
+        expect(guild2.permissions).toEqual(["member_guild:guild-2"]);
+      }),
+      Effect.provideService(MembersApiCacheView, {
+        get: (guildId: string) =>
+          guildId === "guild-1"
+            ? Effect.succeed(makeMember(["role-1"]))
+            : Effect.succeed(makeMember([])),
+      } as unknown as MembersApiCacheView),
+      Effect.provideService(GuildConfigService, {
+        getGuildMonitorRoles: (guildId: string) =>
+          Effect.succeed(guildId === "guild-1" ? [{ roleId: "role-1" }] : []),
+      } as unknown as GuildConfigService),
+      Effect.provideService(RolesApiCacheView, {
+        getForParent: () => Effect.succeed(new Map()),
+      } as unknown as RolesApiCacheView),
+    ),
+  );
+
+  it.effect("degrades safely when guild lookups fail", () =>
+    resolveUserGuildPermissions(makeUser([]), "guild-1").pipe(
+      Effect.map((user) => {
+        expect(user.permissions).toEqual([]);
+      }),
+      liveGuildServices({
+        memberError: new Error("member lookup failed"),
+        monitorRolesError: new Error("monitor roles lookup failed"),
+        rolesError: new Error("roles lookup failed"),
+      }),
+    ),
+  );
+
+  it.effect("allows manage guild access with a resolved manage permission", () =>
+    withUser([], requireManageGuild("guild-1")).pipe(
+      liveGuildServices({
+        member: makeMember(["role-2"]),
+        roleMap: new Map([["role-2", makeRole("role-2", Discord.Permissions.ManageGuild)]]),
+      }),
+    ),
   );
 
   it.effect("allows guild access shortcuts for app owner", () =>
     Effect.gen(function* () {
-      yield* withPermissions(["app_owner"], requireGuildMember("guild-1")).pipe(
-        provideAuthorizationServices(),
-      );
-      yield* withPermissions(["app_owner"], requireMonitorGuild("guild-1")).pipe(
-        provideAuthorizationServices(),
-      );
-      yield* withPermissions(["app_owner"], requireManageGuild("guild-1")).pipe(
-        provideAuthorizationServices(),
-      );
+      yield* withUser(["app_owner"], requireGuildMember("guild-1")).pipe(liveGuildServices());
+      yield* withUser(["app_owner"], requireMonitorGuild("guild-1")).pipe(liveGuildServices());
+      yield* withUser(["app_owner"], requireManageGuild("guild-1")).pipe(liveGuildServices());
     }),
   );
 
-  it.effect("allows monitor guild access with monitor_guild", () =>
-    Effect.gen(function* () {
-      yield* withPermissions(["monitor_guild:guild-1"], requireMonitorGuild("guild-1")).pipe(
-        provideAuthorizationServices(),
-      );
-    }),
+  it.effect("allows monitor guild access with a resolved monitor permission", () =>
+    withUser([], requireMonitorGuild("guild-1")).pipe(
+      liveGuildServices({
+        member: makeMember(["role-1"]),
+        monitorRoleIds: ["role-1"],
+      }),
+    ),
   );
 
   it.effect("allows self access with matching user permission", () =>
     Effect.gen(function* () {
-      yield* withPermissions(["user:user-1"], requireUserId("user-1"));
+      yield* withUser(["user:user-1"], requireUserId("user-1"));
     }),
   );
 
-  it.effect("allows self-or-monitor access with monitor permission", () =>
-    Effect.gen(function* () {
-      yield* withPermissions(
-        ["monitor_guild:guild-1"],
-        requireUserIdOrMonitorGuild("guild-1", "user-2"),
-      ).pipe(provideAuthorizationServices());
-    }),
+  it.effect("allows self-or-monitor access with resolved monitor permission", () =>
+    withUser([], requireUserIdOrMonitorGuild("guild-1", "user-2")).pipe(
+      liveGuildServices({
+        member: makeMember(["role-1"]),
+        monitorRoleIds: ["role-1"],
+      }),
+    ),
   );
 
   it.effect("allows guild member access from membership service", () =>
-    Effect.gen(function* () {
-      yield* withPermissions([], requireGuildMember("guild-1")).pipe(
-        provideAuthorizationServices({
-          membersApiCacheView: {
-            get: () => Effect.succeed({ roles: [] }),
-          } as unknown as MembersApiCacheView,
-        }),
-      );
-    }),
+    withUser([], requireGuildMember("guild-1")).pipe(
+      liveGuildServices({
+        member: makeMember([]),
+      }),
+    ),
   );
 
-  it.effect("does not trust member_guild without a matching live membership lookup", () =>
+  it.effect("does not allow access using a member_guild permission for a different guild", () =>
     Effect.gen(function* () {
       const exit = yield* Effect.exit(
-        withPermissions(["member_guild:guild-2"], requireGuildMember("guild-1")).pipe(
-          provideAuthorizationServices({
-            membersApiCacheView: {
-              get: () => Effect.fail(new CacheNotFoundError({ message: "not found" })),
-            } as unknown as MembersApiCacheView,
-          }),
-        ),
+        withUser(["member_guild:guild-2"], requireGuildMember("guild-1")).pipe(liveGuildServices()),
       );
 
       expect(exit._tag).toBe("Failure");
@@ -154,31 +243,8 @@ describe("authorization middleware helpers", () => {
 
   it.effect("allows guild member access with a matching scoped permission", () =>
     Effect.gen(function* () {
-      yield* withPermissions(["member_guild:guild-1"], requireGuildMember("guild-1")).pipe(
-        provideAuthorizationServices(),
-      );
-    }),
-  );
-
-  it.effect("allows guild monitor access from live membership and configured monitor roles", () =>
-    Effect.gen(function* () {
-      yield* withPermissions([], requireMonitorGuild("guild-1")).pipe(
-        provideAuthorizationServices({
-          membersApiCacheView: {
-            get: () => Effect.succeed({ roles: ["role-1"] }),
-          } as unknown as MembersApiCacheView,
-          guildConfigService: {
-            getGuildMonitorRoles: () => Effect.succeed([{ roleId: "role-1" }]),
-          } as unknown as GuildConfigService,
-        }),
-      );
-    }),
-  );
-
-  it.effect("allows guild monitor access with a matching scoped permission", () =>
-    Effect.gen(function* () {
-      yield* withPermissions(["monitor_guild:guild-1"], requireMonitorGuild("guild-1")).pipe(
-        provideAuthorizationServices(),
+      yield* withUser(["member_guild:guild-1"], requireGuildMember("guild-1")).pipe(
+        liveGuildServices(),
       );
     }),
   );
@@ -186,13 +252,7 @@ describe("authorization middleware helpers", () => {
   it.effect("rejects monitor-only access without guild membership", () =>
     Effect.gen(function* () {
       const exit = yield* Effect.exit(
-        withPermissions(["monitor_guild:guild-1"], requireGuildMember("guild-1")).pipe(
-          provideAuthorizationServices({
-            membersApiCacheView: {
-              get: () => Effect.fail(new CacheNotFoundError({ message: "not found" })),
-            } as unknown as MembersApiCacheView,
-          }),
-        ),
+        withUser([], requireGuildMember("guild-1")).pipe(liveGuildServices()),
       );
 
       expect(exit._tag).toBe("Failure");
@@ -204,15 +264,8 @@ describe("authorization middleware helpers", () => {
     () =>
       Effect.gen(function* () {
         const exit = yield* Effect.exit(
-          withPermissions(["monitor_guild:guild-2"], requireMonitorGuild("guild-1")).pipe(
-            provideAuthorizationServices({
-              membersApiCacheView: {
-                get: () => Effect.fail(new CacheNotFoundError({ message: "not found" })),
-              } as unknown as MembersApiCacheView,
-              guildConfigService: {
-                getGuildMonitorRoles: () => Effect.succeed([{ roleId: "role-1" }]),
-              } as unknown as GuildConfigService,
-            }),
+          withUser(["monitor_guild:guild-2"], requireMonitorGuild("guild-1")).pipe(
+            liveGuildServices(),
           ),
         );
 
@@ -223,13 +276,7 @@ describe("authorization middleware helpers", () => {
   it.effect("rejects manage-only access without guild membership", () =>
     Effect.gen(function* () {
       const exit = yield* Effect.exit(
-        withPermissions(["manage_guild:guild-1"], requireGuildMember("guild-1")).pipe(
-          provideAuthorizationServices({
-            membersApiCacheView: {
-              get: () => Effect.fail(new CacheNotFoundError({ message: "not found" })),
-            } as unknown as MembersApiCacheView,
-          }),
-        ),
+        withUser(["manage_guild:guild-1"], requireGuildMember("guild-1")).pipe(liveGuildServices()),
       );
 
       expect(exit._tag).toBe("Failure");
@@ -239,13 +286,7 @@ describe("authorization middleware helpers", () => {
   it.effect("rejects guild member access on membership miss", () =>
     Effect.gen(function* () {
       const exit = yield* Effect.exit(
-        withPermissions([], requireGuildMember("guild-1")).pipe(
-          provideAuthorizationServices({
-            membersApiCacheView: {
-              get: () => Effect.fail(new CacheNotFoundError({ message: "not found" })),
-            } as unknown as MembersApiCacheView,
-          }),
-        ),
+        withUser([], requireGuildMember("guild-1")).pipe(liveGuildServices()),
       );
 
       expect(exit._tag).toBe("Failure");
@@ -258,7 +299,7 @@ describe("authorization middleware helpers", () => {
 
   it.effect("rejects missing bot permission for bot-only routes", () =>
     Effect.gen(function* () {
-      const exit = yield* Effect.exit(withPermissions(["manage_guild:guild-1"], requireBot()));
+      const exit = yield* Effect.exit(withUser(["manage_guild:guild-1"], requireBot()));
 
       expect(exit._tag).toBe("Failure");
       if (exit._tag === "Failure") {
@@ -270,7 +311,7 @@ describe("authorization middleware helpers", () => {
 
   it.effect("rejects mismatched user permission", () =>
     Effect.gen(function* () {
-      const exit = yield* Effect.exit(withPermissions(["user:user-1"], requireUserId("user-2")));
+      const exit = yield* Effect.exit(withUser(["user:user-1"], requireUserId("user-2")));
 
       expect(exit._tag).toBe("Failure");
       if (exit._tag === "Failure") {
@@ -278,5 +319,29 @@ describe("authorization middleware helpers", () => {
         expect(failure._tag).toBe("Some");
       }
     }),
+  );
+
+  it.effect("reports monitor access level for monitor, member, and non-member", () =>
+    Effect.gen(function* () {
+      const monitor = yield* getGuildMonitorAccessLevel(makeUser([]), "guild-monitor");
+      const member = yield* getGuildMonitorAccessLevel(makeUser([]), "guild-member");
+      const none = yield* getGuildMonitorAccessLevel(makeUser([]), "guild-none");
+
+      expect(monitor).toBe("monitor");
+      expect(member).toBe("member");
+      expect(none).toBe("none");
+    }).pipe(
+      Effect.provideService(MembersApiCacheView, {
+        get: (guildId: string) =>
+          guildId === "guild-monitor"
+            ? Effect.succeed(makeMember(["role-1"]))
+            : guildId === "guild-member"
+              ? Effect.succeed(makeMember([]))
+              : Effect.fail(new CacheNotFoundError({ message: "not found" })),
+      } as unknown as MembersApiCacheView),
+      Effect.provideService(GuildConfigService, {
+        getGuildMonitorRoles: () => Effect.succeed([{ roleId: "role-1" }]),
+      } as unknown as GuildConfigService),
+    ),
   );
 });

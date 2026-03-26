@@ -1,11 +1,9 @@
 import { HttpApiBuilder } from "@effect/platform";
-import { MembersApiCacheView } from "dfx-discord-utils/discord";
 import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import {
   getGuildMonitorAccessLevel,
-  hasGuildPermission,
   requireBot,
   requireGuildMember,
   requireMonitorGuild,
@@ -46,20 +44,12 @@ const requireRecordedParticipant = (
     ? Effect.void
     : Effect.fail(new Unauthorized({ message }));
 
-const getCheckinAccessLevel = (
-  user: SheetAuthUser["Type"],
-  guildId: string,
-  membersCache: MembersApiCacheView,
-  guildConfigService: GuildConfigService,
-) =>
-  // `member_guild:${guildId}` proves membership for this request, but we still
-  // retry the live monitor-role check so monitors are not downgraded to
-  // participant access when middleware guild-config resolution was transiently unavailable.
-  getGuildMonitorAccessLevel(user, guildId, membersCache, guildConfigService).pipe(
+const getCheckinAccessLevel = (user: SheetAuthUser["Type"], guildId: string) =>
+  getGuildMonitorAccessLevel(user, guildId).pipe(
     Effect.flatMap((accessLevel) =>
       accessLevel === "monitor"
         ? Effect.succeed<"monitor" | "participant">("monitor")
-        : accessLevel === "member" || hasGuildPermission(user.permissions, "member_guild", guildId)
+        : accessLevel === "member"
           ? Effect.succeed<"monitor" | "participant">("participant")
           : Effect.fail(new Unauthorized({ message: "User is not a member of this guild" })),
     ),
@@ -74,15 +64,11 @@ const resolveCheckinReadAccess = (
   messageId: string,
   guildId: string,
 ) =>
-  Effect.all({
-    user: SheetAuthUser,
-    membersCache: MembersApiCacheView,
-    guildConfigService: GuildConfigService,
-  }).pipe(
-    Effect.flatMap(({ user, membersCache, guildConfigService }) =>
+  SheetAuthUser.pipe(
+    Effect.flatMap((user) =>
       // Participant reads still need the current member list because that is
       // the authoritative recorded-participant check available in this pass.
-      getCheckinAccessLevel(user, guildId, membersCache, guildConfigService).pipe(
+      getCheckinAccessLevel(user, guildId).pipe(
         Effect.flatMap((accessLevel) =>
           accessLevel === "monitor"
             ? Effect.succeed<CheckinReadAccess>({ _tag: "monitor" })

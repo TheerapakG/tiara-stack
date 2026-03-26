@@ -1,15 +1,12 @@
-import { Discord, Perms } from "dfx";
 import { Cache, Duration, Effect, Exit, Option, pipe, Redacted } from "effect";
-import type { MembersApiCacheView, RolesApiCacheView } from "dfx-discord-utils/discord";
 import {
   getAccount,
   getKubernetesOAuthImplicitPermissions,
   type SheetAuthClient as SheetAuthClientValue,
 } from "sheet-auth/client";
 import type { Permission } from "@/schemas/permissions";
-import type { GuildConfigService } from "../../services/guildConfig";
+import { appendPermission } from "../authorization";
 import type { ApplicationOwnerResolver } from "../../services/applicationOwner";
-import { getOptionalGuildId } from "../requestGuildId";
 import { Unauthorized } from "../../schemas/middlewares/unauthorized";
 import { SheetAuthTokenAuthorization } from "./tag";
 
@@ -62,29 +59,12 @@ const resolveCachedAuthorization = (
     };
   });
 
-// Resolve guild-scoped permissions for requests that include `guildId`.
-// Endpoints can then introspect these permissions to decide how to handle
-// monitor-specific access without re-running guild membership checks.
-const appendPermission = (
-  permissions: ReadonlyArray<Permission>,
-  permission: Permission,
-): Permission[] =>
-  permissions.includes(permission) ? [...permissions] : [...permissions, permission];
-
-const appendPermissions = (
-  permissions: ReadonlyArray<Permission>,
-  nextPermissions: ReadonlyArray<Permission>,
-): Permission[] => nextPermissions.reduce(appendPermission, [...permissions]);
-
 const hasPermission = (permissions: ReadonlyArray<Permission>, permission: Permission) =>
   permissions.includes(permission);
 
-const resolvePermissions = (
+const resolveBasePermissions = (
   authorization: CachedAuthorization,
   applicationOwnerResolver: ApplicationOwnerResolver,
-  guildConfigService: GuildConfigService,
-  membersCache: MembersApiCacheView,
-  rolesCache: RolesApiCacheView,
 ): Effect.Effect<Permission[]> =>
   Effect.gen(function* () {
     let permissions = appendPermission(authorization.permissions, `user:${authorization.userId}`);
@@ -99,79 +79,6 @@ const resolvePermissions = (
     );
     if (Option.isSome(maybeOwnerId) && maybeOwnerId.value === authorization.userId) {
       permissions = appendPermission(permissions, "app_owner");
-      const maybeGuildId = yield* getOptionalGuildId;
-      return Option.isSome(maybeGuildId)
-        ? appendPermissions(permissions, [
-            `member_guild:${maybeGuildId.value}`,
-            `monitor_guild:${maybeGuildId.value}`,
-            `manage_guild:${maybeGuildId.value}`,
-          ])
-        : permissions;
-    }
-
-    const maybeGuildId = yield* getOptionalGuildId;
-    if (Option.isNone(maybeGuildId)) {
-      return permissions;
-    }
-
-    const memberPermission = `member_guild:${maybeGuildId.value}` as const;
-    const monitorPermission = `monitor_guild:${maybeGuildId.value}` as const;
-    const managePermission = `manage_guild:${maybeGuildId.value}` as const;
-    const needsMemberPermission = !permissions.includes(memberPermission);
-    const needsMonitorPermission = !permissions.includes(monitorPermission);
-    const needsManagePermission = !permissions.includes(managePermission);
-    if (!needsMemberPermission && !needsMonitorPermission && !needsManagePermission) {
-      return permissions;
-    }
-
-    const guildId = maybeGuildId.value;
-    const maybeMember = yield* membersCache
-      .get(guildId, authorization.accountId)
-      .pipe(Effect.tapError(Effect.logError), Effect.option);
-    if (Option.isNone(maybeMember)) {
-      return permissions;
-    }
-
-    if (needsMemberPermission) {
-      permissions = appendPermission(permissions, memberPermission);
-    }
-
-    if (needsMonitorPermission) {
-      const maybeMonitorRoles = yield* guildConfigService
-        .getGuildMonitorRoles(guildId)
-        .pipe(Effect.tapError(Effect.logError), Effect.option);
-      if (Option.isSome(maybeMonitorRoles) && maybeMonitorRoles.value.length > 0) {
-        const monitorRoleIds = new Set(maybeMonitorRoles.value.map((role) => role.roleId));
-        if (maybeMember.value.roles.some((roleId) => monitorRoleIds.has(roleId))) {
-          permissions = appendPermission(permissions, monitorPermission);
-        }
-      }
-    }
-
-    if (needsManagePermission) {
-      const maybeRoles = yield* rolesCache
-        .getForParent(guildId)
-        .pipe(Effect.tapError(Effect.logError), Effect.option);
-      if (Option.isSome(maybeRoles)) {
-        const memberWithMetadata = maybeMember.value as typeof maybeMember.value & {
-          flags?: number;
-          joined_at?: string;
-        };
-        const memberForPermissionCheck = {
-          ...maybeMember.value,
-          flags: memberWithMetadata.flags ?? 0,
-          joined_at: memberWithMetadata.joined_at ?? "",
-          mute: false,
-          deaf: false,
-          pending: maybeMember.value.pending ?? false,
-        };
-        const resolvedUserPermissions = Perms.forMember([...maybeRoles.value.values()])(
-          memberForPermissionCheck,
-        );
-        if (Perms.has(Discord.Permissions.ManageGuild)(resolvedUserPermissions)) {
-          permissions = appendPermission(permissions, managePermission);
-        }
-      }
     }
 
     return permissions;
@@ -180,9 +87,6 @@ const resolvePermissions = (
 export const makeSheetAuthTokenAuthorization = (
   authClient: SheetAuthClientValue,
   applicationOwnerResolver: ApplicationOwnerResolver,
-  guildConfigService: GuildConfigService,
-  membersCache: MembersApiCacheView,
-  rolesCache: RolesApiCacheView,
 ): Effect.Effect<SheetAuthTokenAuthorization["Type"]> =>
   Effect.gen(function* () {
     const authorizationCache = yield* Cache.makeWith({
@@ -199,13 +103,7 @@ export const makeSheetAuthTokenAuthorization = (
         pipe(
           authorizationCache.get(token),
           Effect.flatMap((authorization) =>
-            resolvePermissions(
-              authorization,
-              applicationOwnerResolver,
-              guildConfigService,
-              membersCache,
-              rolesCache,
-            ).pipe(
+            resolveBasePermissions(authorization, applicationOwnerResolver).pipe(
               Effect.map((permissions) => ({
                 accountId: authorization.accountId,
                 userId: authorization.userId,
