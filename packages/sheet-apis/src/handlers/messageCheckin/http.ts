@@ -2,10 +2,10 @@ import { HttpApiBuilder } from "@effect/platform";
 import { makeArgumentError } from "typhoon-core/error";
 import { Effect, HashSet, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
+import { getModernMessageGuildId } from "@/handlers/message/shared";
 import {
   getGuildMonitorAccessLevel,
   provideCurrentGuildUser,
-  requireBot,
   requireDiscordAccountId,
   requireGuildMember,
   requireMonitorGuild,
@@ -20,6 +20,12 @@ import { MessageCheckinService } from "@/services/messageCheckin";
 const missingMessageCheckinError = () =>
   makeArgumentError("Cannot get message checkin data, the message might not be registered");
 
+export const LEGACY_MESSAGE_CHECKIN_ACCESS_ERROR =
+  "Legacy message check-in records are no longer accessible";
+
+export const denyLegacyMessageCheckinAccess = () =>
+  Effect.fail(new Unauthorized({ message: LEGACY_MESSAGE_CHECKIN_ACCESS_ERROR }));
+
 const getRequiredMessageCheckinRecord = (
   messageCheckinService: MessageCheckinService,
   messageId: string,
@@ -32,9 +38,6 @@ const getRequiredMessageCheckinRecord = (
       }),
     ),
   );
-
-const requireLegacyMessageCheckinBotAccess = () =>
-  requireBot("Legacy message check-in records are restricted to the bot");
 
 const requireRecordedParticipant = (
   members: ReadonlyArray<MessageCheckinMember>,
@@ -88,7 +91,7 @@ const resolveCheckinReadAccess = (
     ),
   );
 
-const requireCheckinUpsertAccess = (
+export const requireCheckinUpsertAccess = (
   messageCheckinService: MessageCheckinService,
   messageId: string,
   guildId?: string,
@@ -99,19 +102,18 @@ const requireCheckinUpsertAccess = (
         onNone: () =>
           typeof guildId === "string"
             ? provideCurrentGuildUser(guildId, requireMonitorGuild(guildId))
-            : requireLegacyMessageCheckinBotAccess(),
+            : denyLegacyMessageCheckinAccess(),
         onSome: (record) =>
-          Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-            ? provideCurrentGuildUser(
-                record.guildId.value,
-                requireMonitorGuild(record.guildId.value),
-              )
-            : requireLegacyMessageCheckinBotAccess(),
+          Option.match(getModernMessageGuildId(record), {
+            onSome: (resolvedGuildId) =>
+              provideCurrentGuildUser(resolvedGuildId, requireMonitorGuild(resolvedGuildId)),
+            onNone: denyLegacyMessageCheckinAccess,
+          }),
       }),
     ),
   );
 
-const requireCheckinMutationAccess = (
+export const requireCheckinMutationAccess = (
   messageCheckinService: MessageCheckinService,
   messageId: string,
   guildId: string,
@@ -131,6 +133,70 @@ const requireCheckinMutationAccess = (
     ),
   );
 
+export const requireMessageCheckinReadAccess = (
+  messageCheckinService: MessageCheckinService,
+  messageId: string,
+) =>
+  getRequiredMessageCheckinRecord(messageCheckinService, messageId).pipe(
+    Effect.flatMap((record) =>
+      Option.match(getModernMessageGuildId(record), {
+        onSome: (guildId) =>
+          resolveCheckinReadAccess(messageCheckinService, messageId, guildId).pipe(
+            Effect.as(record),
+          ),
+        onNone: denyLegacyMessageCheckinAccess,
+      }),
+    ),
+  );
+
+export const requireMessageCheckinMembersReadAccess = (
+  messageCheckinService: MessageCheckinService,
+  messageId: string,
+) =>
+  getRequiredMessageCheckinRecord(messageCheckinService, messageId).pipe(
+    Effect.flatMap((record) =>
+      Option.match(getModernMessageGuildId(record), {
+        onSome: (guildId) =>
+          resolveCheckinReadAccess(messageCheckinService, messageId, guildId).pipe(
+            Effect.flatMap((access) =>
+              access._tag === "monitor"
+                ? messageCheckinService.getMessageCheckinMembers(messageId)
+                : Effect.succeed(access.members),
+            ),
+          ),
+        onNone: denyLegacyMessageCheckinAccess,
+      }),
+    ),
+  );
+
+export const requireMessageCheckinParticipantMutationAccess = (
+  messageCheckinService: MessageCheckinService,
+  messageId: string,
+  memberId: string,
+) =>
+  getRequiredMessageCheckinRecord(messageCheckinService, messageId).pipe(
+    Effect.flatMap((record) =>
+      Option.match(getModernMessageGuildId(record), {
+        onSome: (guildId) =>
+          requireCheckinMutationAccess(messageCheckinService, messageId, guildId, memberId),
+        onNone: denyLegacyMessageCheckinAccess,
+      }),
+    ),
+  );
+
+export const requireMessageCheckinMonitorMutationAccess = (
+  messageCheckinService: MessageCheckinService,
+  messageId: string,
+) =>
+  getRequiredMessageCheckinRecord(messageCheckinService, messageId).pipe(
+    Effect.flatMap((record) =>
+      Option.match(getModernMessageGuildId(record), {
+        onSome: (guildId) => provideCurrentGuildUser(guildId, requireMonitorGuild(guildId)),
+        onNone: denyLegacyMessageCheckinAccess,
+      }),
+    ),
+  );
+
 export const MessageCheckinLive = HttpApiBuilder.group(Api, "messageCheckin", (handlers) =>
   pipe(
     Effect.all({
@@ -139,19 +205,7 @@ export const MessageCheckinLive = HttpApiBuilder.group(Api, "messageCheckin", (h
     Effect.map(({ messageCheckinService }) =>
       handlers
         .handle("getMessageCheckinData", ({ urlParams }) =>
-          getRequiredMessageCheckinRecord(messageCheckinService, urlParams.messageId).pipe(
-            Effect.flatMap((record) =>
-              Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-                ? resolveCheckinReadAccess(
-                    messageCheckinService,
-                    urlParams.messageId,
-                    record.guildId.value,
-                  ).pipe(Effect.as(record))
-                : requireLegacyMessageCheckinBotAccess().pipe(
-                    Effect.andThen(Effect.succeed(record)),
-                  ),
-            ),
-          ),
+          requireMessageCheckinReadAccess(messageCheckinService, urlParams.messageId),
         )
         .handle("upsertMessageCheckinData", ({ payload }) =>
           requireCheckinUpsertAccess(
@@ -165,109 +219,38 @@ export const MessageCheckinLive = HttpApiBuilder.group(Api, "messageCheckin", (h
           ),
         )
         .handle("getMessageCheckinMembers", ({ urlParams }) =>
-          getRequiredMessageCheckinRecord(messageCheckinService, urlParams.messageId).pipe(
-            Effect.flatMap((record) =>
-              Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-                ? resolveCheckinReadAccess(
-                    messageCheckinService,
-                    urlParams.messageId,
-                    record.guildId.value,
-                  ).pipe(
-                    Effect.flatMap((access) =>
-                      access._tag === "monitor"
-                        ? messageCheckinService.getMessageCheckinMembers(urlParams.messageId)
-                        : Effect.succeed(access.members),
-                    ),
-                  )
-                : requireLegacyMessageCheckinBotAccess().pipe(
-                    Effect.andThen(
-                      messageCheckinService.getMessageCheckinMembers(urlParams.messageId),
-                    ),
-                  ),
-            ),
-          ),
+          requireMessageCheckinMembersReadAccess(messageCheckinService, urlParams.messageId),
         )
         .handle("addMessageCheckinMembers", ({ payload }) =>
-          getRequiredMessageCheckinRecord(messageCheckinService, payload.messageId).pipe(
-            Effect.flatMap((record) =>
-              Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-                ? provideCurrentGuildUser(
-                    record.guildId.value,
-                    requireMonitorGuild(record.guildId.value).pipe(
-                      Effect.andThen(
-                        messageCheckinService.addMessageCheckinMembers(
-                          payload.messageId,
-                          payload.memberIds,
-                        ),
-                      ),
-                    ),
-                  )
-                : requireLegacyMessageCheckinBotAccess().pipe(
-                    Effect.andThen(
-                      messageCheckinService.addMessageCheckinMembers(
-                        payload.messageId,
-                        payload.memberIds,
-                      ),
-                    ),
-                  ),
+          requireMessageCheckinMonitorMutationAccess(messageCheckinService, payload.messageId).pipe(
+            Effect.andThen(
+              messageCheckinService.addMessageCheckinMembers(payload.messageId, payload.memberIds),
             ),
           ),
         )
         .handle("setMessageCheckinMemberCheckinAt", ({ payload }) =>
-          getRequiredMessageCheckinRecord(messageCheckinService, payload.messageId).pipe(
-            Effect.flatMap((record) =>
-              Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-                ? requireCheckinMutationAccess(
-                    messageCheckinService,
-                    payload.messageId,
-                    record.guildId.value,
-                    payload.memberId,
-                  ).pipe(
-                    Effect.andThen(
-                      messageCheckinService.setMessageCheckinMemberCheckinAt(
-                        payload.messageId,
-                        payload.memberId,
-                        payload.checkinAt,
-                      ),
-                    ),
-                  )
-                : requireLegacyMessageCheckinBotAccess().pipe(
-                    Effect.andThen(
-                      messageCheckinService.setMessageCheckinMemberCheckinAt(
-                        payload.messageId,
-                        payload.memberId,
-                        payload.checkinAt,
-                      ),
-                    ),
-                  ),
+          requireMessageCheckinParticipantMutationAccess(
+            messageCheckinService,
+            payload.messageId,
+            payload.memberId,
+          ).pipe(
+            Effect.andThen(
+              messageCheckinService.setMessageCheckinMemberCheckinAt(
+                payload.messageId,
+                payload.memberId,
+                payload.checkinAt,
+              ),
             ),
           ),
         )
         .handle("removeMessageCheckinMember", ({ payload }) =>
-          getRequiredMessageCheckinRecord(messageCheckinService, payload.messageId).pipe(
-            Effect.flatMap((record) =>
-              Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-                ? requireCheckinMutationAccess(
-                    messageCheckinService,
-                    payload.messageId,
-                    record.guildId.value,
-                    payload.memberId,
-                  ).pipe(
-                    Effect.andThen(
-                      messageCheckinService.removeMessageCheckinMember(
-                        payload.messageId,
-                        payload.memberId,
-                      ),
-                    ),
-                  )
-                : requireLegacyMessageCheckinBotAccess().pipe(
-                    Effect.andThen(
-                      messageCheckinService.removeMessageCheckinMember(
-                        payload.messageId,
-                        payload.memberId,
-                      ),
-                    ),
-                  ),
+          requireMessageCheckinParticipantMutationAccess(
+            messageCheckinService,
+            payload.messageId,
+            payload.memberId,
+          ).pipe(
+            Effect.andThen(
+              messageCheckinService.removeMessageCheckinMember(payload.messageId, payload.memberId),
             ),
           ),
         ),

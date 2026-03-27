@@ -2,9 +2,9 @@ import { HttpApiBuilder } from "@effect/platform";
 import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
+import { getModernMessageGuildId } from "@/handlers/message/shared";
 import {
   provideCurrentGuildUser,
-  requireBot,
   requireGuildMember,
   requireMonitorGuild,
 } from "@/middlewares/authorization";
@@ -12,9 +12,16 @@ import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAut
 import { MessageSlot } from "@/schemas/messageSlot";
 import { GuildConfigService } from "@/services/guildConfig";
 import { MessageSlotService } from "@/services/messageSlot";
+import { Unauthorized } from "@/schemas/middlewares/unauthorized";
 
 const missingMessageSlotError = () =>
   makeArgumentError("Cannot get message slot data, the message might not be registered");
+
+export const LEGACY_MESSAGE_SLOT_ACCESS_ERROR =
+  "Legacy message slot records are no longer accessible";
+
+export const denyLegacyMessageSlotAccess = () =>
+  Effect.fail(new Unauthorized({ message: LEGACY_MESSAGE_SLOT_ACCESS_ERROR }));
 
 const getRequiredMessageSlotRecord = (messageSlotService: MessageSlotService, messageId: string) =>
   messageSlotService.getMessageSlotData(messageId).pipe(
@@ -26,10 +33,7 @@ const getRequiredMessageSlotRecord = (messageSlotService: MessageSlotService, me
     ),
   );
 
-const requireLegacyMessageSlotBotAccess = () =>
-  requireBot("Legacy message slot records are restricted to the bot");
-
-const requireMessageSlotUpsertAccess = (
+export const requireMessageSlotUpsertAccess = (
   messageSlotService: MessageSlotService,
   messageId: string,
   guildId?: string,
@@ -40,14 +44,30 @@ const requireMessageSlotUpsertAccess = (
         onNone: () =>
           typeof guildId === "string"
             ? provideCurrentGuildUser(guildId, requireMonitorGuild(guildId))
-            : requireLegacyMessageSlotBotAccess(),
+            : denyLegacyMessageSlotAccess(),
         onSome: (record) =>
-          Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-            ? provideCurrentGuildUser(
-                record.guildId.value,
-                requireMonitorGuild(record.guildId.value),
-              )
-            : requireLegacyMessageSlotBotAccess(),
+          Option.match(getModernMessageGuildId(record), {
+            onSome: (resolvedGuildId) =>
+              provideCurrentGuildUser(resolvedGuildId, requireMonitorGuild(resolvedGuildId)),
+            onNone: denyLegacyMessageSlotAccess,
+          }),
+      }),
+    ),
+  );
+
+export const requireMessageSlotReadAccess = (
+  messageSlotService: MessageSlotService,
+  messageId: string,
+) =>
+  getRequiredMessageSlotRecord(messageSlotService, messageId).pipe(
+    Effect.flatMap((record) =>
+      Option.match(getModernMessageGuildId(record), {
+        onSome: (guildId) =>
+          provideCurrentGuildUser(
+            guildId,
+            requireGuildMember(guildId).pipe(Effect.andThen(Effect.succeed(record))),
+          ),
+        onNone: denyLegacyMessageSlotAccess,
       }),
     ),
   );
@@ -60,18 +80,7 @@ export const MessageSlotLive = HttpApiBuilder.group(Api, "messageSlot", (handler
     Effect.map(({ messageSlotService }) =>
       handlers
         .handle("getMessageSlotData", ({ urlParams }) =>
-          getRequiredMessageSlotRecord(messageSlotService, urlParams.messageId).pipe(
-            Effect.flatMap((record) =>
-              Option.isSome(record.guildId) && Option.isSome(record.messageChannelId)
-                ? provideCurrentGuildUser(
-                    record.guildId.value,
-                    requireGuildMember(record.guildId.value).pipe(
-                      Effect.andThen(Effect.succeed(record)),
-                    ),
-                  )
-                : requireLegacyMessageSlotBotAccess().pipe(Effect.andThen(Effect.succeed(record))),
-            ),
-          ),
+          requireMessageSlotReadAccess(messageSlotService, urlParams.messageId),
         )
         .handle("upsertMessageSlotData", ({ payload }) =>
           requireMessageSlotUpsertAccess(
