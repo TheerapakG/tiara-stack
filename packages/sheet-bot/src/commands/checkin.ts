@@ -1,12 +1,12 @@
 import { Effect, Layer, Option, pipe } from "effect";
-import { Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
 import {
   ApplicationIntegrationType,
   InteractionContextType,
   MessageFlags,
 } from "discord-api-types/v10";
-import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { Ix } from "dfx/index";
+import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import { CheckinService, MessageCheckinService, SheetApisRequestContext } from "../services";
@@ -160,6 +160,6 @@ export const CheckinCommandLive = Layer.scopedDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(DiscordGatewayLayer, CheckinService.Default, MessageCheckinService.Default),
+    Layer.mergeAll(DiscordGatewayLayerLive, CheckinService.Default, MessageCheckinService.Default),
   ),
 );

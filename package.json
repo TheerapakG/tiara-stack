@@ -3,15 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "checks": "nx run-many -t format,lint,typecheck,test --output-style=stream",
-    "format:apply": "nx run-many -t format:apply --output-style=stream",
-    "build": "nx run-many -t build --output-style=stream"
+    "checks": "vp run -r format && vp run -r lint && vp run -r test",
+    "format:apply": "vp run -r format:apply",
+    "build": "vp run -r build",
+    "prepare": "vp config"
   },
   "devDependencies": {
-    "nx": "19.7.4",
-    "oxfmt": "^0.26.0",
-    "oxlint": "^1.41.0"
+    "vite-plus": "catalog:"
   },
+  "packageManager": "pnpm@10.33.0",
   "pnpm": {
     "onlyBuiltDependencies": [
       "@rocicorp/zero-sqlite3",

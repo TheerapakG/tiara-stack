@@ -70,12 +70,9 @@ flowchart TB
     Schema -.->|"Uses"| Core
 ```
 
-
-
 ## Package Structure
 
 ### Core Infrastructure
-
 
 | Package                       | Description                                        | Tech Stack               |
 | ----------------------------- | -------------------------------------------------- | ------------------------ |
@@ -85,9 +82,7 @@ flowchart TB
 | `effect-platform-apps-script` | Effect HTTP client for Apps Script                 | Effect Platform          |
 | `start-atom`                  | TanStack Start + Effect Atom integration           | Effect Atom              |
 
-
 ### Application Services
-
 
 | Package           | Description                               | Tech Stack                            |
 | ----------------- | ----------------------------------------- | ------------------------------------- |
@@ -98,15 +93,12 @@ flowchart TB
 | `sheet-bot`       | Discord bot for sheet integration         | dfx, Effect.ts, Handlebars            |
 | `vibecord`        | Workspace/session management bot          | discord.js, SQLite, @opencode-ai/sdk  |
 
-
 ### Data & Integration
-
 
 | Package           | Description                             | Tech Stack                    |
 | ----------------- | --------------------------------------- | ----------------------------- |
 | `sheet-db-schema` | PostgreSQL schema with Zero integration | Drizzle ORM, drizzle-zero     |
 | `sheet-formulas`  | Google Apps Script formulas library     | Effect.ts, Google Apps Script |
-
 
 ## Service Interactions
 
@@ -146,37 +138,46 @@ sequenceDiagram
     Bot->>Discord: Send Messages
 ```
 
-
-
 ### Data Flow
 
 1. **Web Application** (`sheet-web`)
-  - Authenticates via `sheet-auth` using Discord OAuth
-  - Makes API calls to `sheet-apis` for sheet operations
-  - Uses `start-atom` for SSR-compatible state management
+
+- Authenticates via `sheet-auth` using Discord OAuth
+- Makes API calls to `sheet-apis` for sheet operations
+- Uses `start-atom` for SSR-compatible state management
+
 2. **Discord Bot** (`sheet-bot`)
-  - Receives commands via Discord Gateway
-  - Calls `sheet-apis` for backend operations
-  - Uses `dfx-discord-utils` for caching and command building
-  - Manages guild configurations and check-ins
+
+- Receives commands via Discord Gateway
+- Calls `sheet-apis` for backend operations
+- Uses `dfx-discord-utils` for caching and command building
+- Manages guild configurations and check-ins
+
 3. **API Server** (`sheet-apis`)
-  - Handles HTTP requests from web and bot clients
-  - Integrates with Google Sheets via @googleapis/sheets and Playwright
-  - Queries PostgreSQL via `sheet-db-server` using Zero protocol
-  - Provides OpenTelemetry metrics and tracing
+
+- Handles HTTP requests from web and bot clients
+- Integrates with Google Sheets via @googleapis/sheets and Playwright
+- Queries PostgreSQL via `sheet-db-server` using Zero protocol
+- Provides OpenTelemetry metrics and tracing
+
 4. **Database Server** (`sheet-db-server`)
-  - Provides real-time sync using Rocicorp Zero
-  - Manages PostgreSQL schema via Drizzle ORM
-  - Handles query and mutation requests
+
+- Provides real-time sync using Rocicorp Zero
+- Manages PostgreSQL schema via Drizzle ORM
+- Handles query and mutation requests
+
 5. **VibeCord Bot** (`vibecord`)
-  - Standalone Discord bot with SQLite database
-  - Manages workspaces and sessions
-  - Integrates with OpenCode Agent Client Protocol
-  - Independent from sheet-services
+
+- Standalone Discord bot with SQLite database
+- Manages workspaces and sessions
+- Integrates with OpenCode Agent Client Protocol
+- Independent from sheet-services
+
 6. **Apps Script** (`sheet-formulas`)
-  - Runs within Google Sheets environment
-  - Makes HTTP calls to `sheet-apis`
-  - Uses `effect-platform-apps-script` for HTTP client
+
+- Runs within Google Sheets environment
+- Makes HTTP calls to `sheet-apis`
+- Uses `effect-platform-apps-script` for HTTP client
 
 ## Key Technologies
 

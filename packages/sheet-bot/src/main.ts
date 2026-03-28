@@ -36,10 +36,12 @@ const BotLive = Layer.mergeAll(
   AutoCheckinTaskLive,
 );
 
+const RuntimeDependencies = Layer.mergeAll(DiscordConfigLayer, UnstorageLayer);
+
 // Combined layer for both bot and HTTP server
 // They share the same Unstorage layer for cache access
 const SharedLive = Layer.mergeAll(BotLive, HttpLive).pipe(
-  Layer.provide(Layer.mergeAll(DiscordConfigLayer, UnstorageLayer)),
+  Layer.provide(RuntimeDependencies),
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
   Layer.provide(Logger.logFmt),

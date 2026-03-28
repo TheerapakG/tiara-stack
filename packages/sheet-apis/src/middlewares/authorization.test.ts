@@ -1,9 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import {
-  CacheNotFoundError,
-  MembersApiCacheView,
-  RolesApiCacheView,
-} from "dfx-discord-utils/discord";
+import { MembersApiCacheView, RolesApiCacheView } from "dfx-discord-utils/discord/cache";
+import { CacheNotFoundError } from "dfx-discord-utils/discord/schema";
 import { Discord } from "dfx";
 import { Cause, Effect, HashSet, Redacted } from "effect";
 import {

@@ -1,10 +1,5 @@
-import {
-  GuildsApiCacheView,
-  RolesApiCacheView,
-  MembersApiCacheView,
-  ChannelsApiCacheView,
-  DiscordApiClient,
-} from "dfx-discord-utils/discord";
+import { ApiCacheViewsLive } from "dfx-discord-utils/discord/cache";
+import { DiscordApiClient } from "dfx-discord-utils/discord";
 import { Effect, Layer } from "effect";
 import { config } from "@/config";
 
@@ -15,9 +10,4 @@ export const DiscordApiClientLive = Layer.unwrapEffect(
   }),
 );
 
-export const CacheLive = Layer.mergeAll(
-  GuildsApiCacheView.Default,
-  RolesApiCacheView.Default,
-  MembersApiCacheView.Default,
-  ChannelsApiCacheView.Default,
-).pipe(Layer.provide(DiscordApiClientLive));
+export const CachesLive = ApiCacheViewsLive.pipe(Layer.provide(DiscordApiClientLive));

@@ -1,6 +1,7 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
+import { catchParseErrorAsValidationError } from "typhoon-core/error";
 import { provideCurrentGuildUser } from "@/middlewares/authorization";
 import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
 import { BreakSchedule, Schedule } from "@/schemas/sheet";
@@ -47,19 +48,19 @@ export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
           pipe(
             getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
             Effect.flatMap((sheetId) => sheetService.getPlayers(sheetId)),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getMonitors", ({ urlParams }) =>
           pipe(
             getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
             Effect.flatMap((sheetId) => sheetService.getMonitors(sheetId)),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getTeams", ({ urlParams }) =>
           pipe(
             getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
             Effect.flatMap((sheetId) => sheetService.getTeams(sheetId)),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getAllSchedules", ({ urlParams }) =>
           provideCurrentGuildUser(
@@ -88,7 +89,7 @@ export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
                 );
               }),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getDaySchedules", ({ urlParams }) =>
           provideCurrentGuildUser(
@@ -117,7 +118,7 @@ export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
                 );
               }),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getChannelSchedules", ({ urlParams }) =>
           provideCurrentGuildUser(
@@ -146,37 +147,37 @@ export const SheetLive = HttpApiBuilder.group(Api, "sheet", (handlers) =>
                 );
               }),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getRangesConfig", ({ urlParams }) =>
           pipe(
             getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
             Effect.flatMap((sheetId) => sheetConfigService.getRangesConfig(sheetId)),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getTeamConfig", ({ urlParams }) =>
           pipe(
             getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
             Effect.flatMap((sheetId) => sheetConfigService.getTeamConfig(sheetId)),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getEventConfig", ({ urlParams }) =>
           pipe(
             getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
             Effect.flatMap((sheetId) => sheetConfigService.getEventConfig(sheetId)),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getScheduleConfig", ({ urlParams }) =>
           pipe(
             getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
             Effect.flatMap((sheetId) => sheetConfigService.getScheduleConfig(sheetId)),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getRunnerConfig", ({ urlParams }) =>
           pipe(
             getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
             Effect.flatMap((sheetId) => sheetConfigService.getRunnerConfig(sheetId)),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         ),
     ),
   ),

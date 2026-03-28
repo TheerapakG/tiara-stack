@@ -1,7 +1,7 @@
-import { Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
+import { Ix } from "dfx/index";
 import { Array, Chunk, Effect, Layer, Number, Option, Order, pipe, String } from "effect";
-import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
 import { makeButton, makeButtonData, makeMessageComponent } from "dfx-discord-utils/utils";
 import {
   EmbedService,
@@ -13,81 +13,70 @@ import {
 import { Interaction } from "dfx-discord-utils/utils";
 import { ButtonStyle, MessageFlags } from "discord-api-types/v10";
 
-class SlotHelper extends Effect.Service<SlotHelper>()("SlotHelper", {
-  effect: pipe(
-    Effect.all({
-      scheduleService: ScheduleService,
-      formatService: FormatService,
-    }),
-    Effect.map(({ scheduleService, formatService }) => ({
-      getSlotMessage: Effect.fn("SlotHelper.getSlotMessage")(function* (
-        guildId: string,
-        day: number,
-      ) {
-        const daySchedule = yield* scheduleService.dayPopulatedFillerSchedules(guildId, day);
-
-        const filteredSchedules = pipe(
-          daySchedule,
-          Array.filterMap((s) =>
-            pipe(
-              s.hour,
-              Option.map(() => s),
-            ),
-          ),
-        );
-
-        const sortedSchedules = pipe(
-          filteredSchedules,
-          Array.sortBy(Order.mapInput(Option.getOrder(Number.Order), (s) => s.hour)),
-        );
-
-        const openSlots = yield* pipe(
-          sortedSchedules,
-          Effect.forEach((s) => formatService.formatOpenSlot(guildId, s)),
-          Effect.map(Chunk.fromIterable),
-          Effect.map(Chunk.dedupeAdjacent),
-          Effect.map(Chunk.join("\n")),
-          Effect.map((description) =>
-            String.Equivalence(description, String.empty) ? "All Filled :3" : description,
-          ),
-        );
-
-        const filledSlots = yield* pipe(
-          sortedSchedules,
-          Effect.forEach((s) => formatService.formatFilledSlot(guildId, s)),
-          Effect.map(Chunk.fromIterable),
-          Effect.map(Chunk.dedupeAdjacent),
-          Effect.map(Chunk.join("\n")),
-          Effect.map((description) =>
-            String.Equivalence(description, String.empty) ? "All Open :3" : description,
-          ),
-        );
-
-        return {
-          open: {
-            title: `Day ${day} Open Slots~`,
-            description: openSlots,
-          },
-          filled: {
-            title: `Day ${day} Filled Slots~`,
-            description: filledSlots,
-          },
-        };
-      }),
-    })),
-  ),
-  dependencies: [ScheduleService.Default, FormatService.Default],
-  accessors: true,
-}) {}
-
 export const slotButtonData = makeButtonData((b) =>
   b.setCustomId("interaction:slot").setLabel("Open slots").setStyle(ButtonStyle.Primary),
 );
 
 const makeSlotButtonHandler = Effect.gen(function* () {
-  const slotHelper = yield* SlotHelper;
-  const messageSlotService = yield* MessageSlotService;
   const embedService = yield* EmbedService;
+  const formatService = yield* FormatService;
+  const messageSlotService = yield* MessageSlotService;
+  const scheduleService = yield* ScheduleService;
+
+  const getSlotMessage = Effect.fn("slotButton.getSlotMessage")(function* (
+    guildId: string,
+    day: number,
+  ) {
+    const daySchedule = yield* scheduleService.dayPopulatedFillerSchedules(guildId, day);
+
+    const filteredSchedules = pipe(
+      daySchedule,
+      Array.filterMap((schedule) =>
+        pipe(
+          schedule.hour,
+          Option.map(() => schedule),
+        ),
+      ),
+    );
+
+    const sortedSchedules = pipe(
+      filteredSchedules,
+      Array.sortBy(Order.mapInput(Option.getOrder(Number.Order), ({ hour }) => hour)),
+    );
+
+    const openSlots = yield* pipe(
+      sortedSchedules,
+      Effect.forEach((schedule) => formatService.formatOpenSlot(guildId, schedule)),
+      Effect.map(Chunk.fromIterable),
+      Effect.map(Chunk.dedupeAdjacent),
+      Effect.map(Chunk.join("\n")),
+      Effect.map((description) =>
+        String.Equivalence(description, String.empty) ? "All Filled :3" : description,
+      ),
+    );
+
+    const filledSlots = yield* pipe(
+      sortedSchedules,
+      Effect.forEach((schedule) => formatService.formatFilledSlot(guildId, schedule)),
+      Effect.map(Chunk.fromIterable),
+      Effect.map(Chunk.dedupeAdjacent),
+      Effect.map(Chunk.join("\n")),
+      Effect.map((description) =>
+        String.Equivalence(description, String.empty) ? "All Open :3" : description,
+      ),
+    );
+
+    return {
+      open: {
+        title: `Day ${day} Open Slots~`,
+        description: openSlots,
+      },
+      filled: {
+        title: `Day ${day} Filled Slots~`,
+        description: filledSlots,
+      },
+    };
+  });
 
   return yield* makeButton(
     slotButtonData.toJSON(),
@@ -103,7 +92,7 @@ const makeSlotButtonHandler = Effect.gen(function* () {
 
         const messageSlotData = yield* messageSlotService.getMessageSlotData(messageId);
 
-        const slotMessage = yield* slotHelper.getSlotMessage(guildId, messageSlotData.day);
+        const slotMessage = yield* getSlotMessage(guildId, messageSlotData.day);
 
         const embeds = [
           (yield* embedService.makeBaseEmbedBuilder())
@@ -138,12 +127,11 @@ export const SlotButtonLive = Layer.scopedDiscard(
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
-      DiscordGatewayLayer,
+      DiscordGatewayLayerLive,
       MessageSlotService.Default,
       ScheduleService.Default,
       FormatService.Default,
       EmbedService.Default,
-      SlotHelper.Default,
     ),
   ),
 );

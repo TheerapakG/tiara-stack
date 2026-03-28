@@ -1,6 +1,7 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer, pipe } from "effect";
 import { Api } from "@/api";
+import { catchParseErrorAsValidationError } from "typhoon-core/error";
 import { provideCurrentGuildUser, requireMonitorGuild } from "@/middlewares/authorization";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { GuildConfigService } from "@/services/guildConfig";
@@ -18,7 +19,7 @@ export const RoomOrderLive = HttpApiBuilder.group(Api, "roomOrder", (handlers) =
           requireMonitorGuild(payload.guildId).pipe(
             Effect.andThen(roomOrderService.generate(payload)),
           ),
-        ),
+        ).pipe(catchParseErrorAsValidationError),
       ),
     ),
   ),

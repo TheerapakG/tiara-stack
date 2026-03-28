@@ -2,11 +2,13 @@ import type { HttpClientError } from "@effect/platform/HttpClientError";
 import { Discord, DiscordREST, Ix } from "dfx";
 import type { DiscordRESTError } from "dfx/DiscordREST";
 import { DiscordRestService } from "dfx/DiscordREST";
+import type { MessageComponent as DfxMessageComponent } from "dfx/Interactions/definitions";
+import type { DiscordMessageComponent } from "dfx/Interactions/context";
 import { MessageFlags } from "discord-api-types/v10";
 
 // Re-export types to ensure they're available in generated d.ts files
 export type { HttpClientError, DiscordRESTError };
-import { Deferred, Effect, FiberMap, pipe } from "effect";
+import { Deferred, Effect, FiberMap, pipe, Scope } from "effect";
 import { DiscordApplication } from "../discord/gateway";
 import { formatErrorResponse, makeDiscordErrorMessageResponse } from "./errorResponse";
 import {
@@ -257,7 +259,21 @@ export const makeMessageActionRowData = <
   ) => ActionRowBuilder<MessageActionRowComponentBuilder, A>,
 ) => data(new ActionRowBuilder());
 
-export const makeButton = Effect.fnUntraced(function* <E = never, R = never>(
+type MessageComponentEnv<R> = Exclude<
+  R,
+  DiscordInteraction | DiscordMessageComponent | Scope.Scope
+>;
+
+type BuiltMessageComponent<E, R> = {
+  readonly data: { readonly custom_id: string };
+  readonly handler: Effect.Effect<
+    Discord.CreateInteractionResponseRequest,
+    E,
+    DiscordInteraction | R
+  >;
+};
+
+const makeButtonInternal = Effect.fnUntraced(function* <E = never, R = never>(
   data: { readonly custom_id: string },
   handler: (messageComponentHelper: MessageComponentHelper) => Effect.Effect<unknown, E, R>,
 ) {
@@ -282,7 +298,7 @@ export const makeButton = Effect.fnUntraced(function* <E = never, R = never>(
       yield* helper.reply({ content: "The button did not set a response." });
     }),
   );
-  return {
+  const builtMessageComponent: BuiltMessageComponent<E, R> = {
     data,
     handler: Effect.gen(function* () {
       const helper = yield* makeMessageComponentHelper(rest, application);
@@ -294,9 +310,14 @@ export const makeButton = Effect.fnUntraced(function* <E = never, R = never>(
       };
     }),
   };
+
+  return builtMessageComponent;
 });
+
+export const makeButton = makeButtonInternal;
 
 export const makeMessageComponent = <E = never, R = never>(
   data: { readonly custom_id: string },
   handler: Effect.Effect<Discord.CreateInteractionResponseRequest, E, R>,
-) => Ix.messageComponent(Ix.id(data.custom_id), handler);
+): DfxMessageComponent<MessageComponentEnv<R>, E> =>
+  Ix.messageComponent(Ix.id(data.custom_id), handler);

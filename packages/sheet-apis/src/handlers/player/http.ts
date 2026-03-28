@@ -1,6 +1,7 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Array, Effect, HashMap, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
+import { catchParseErrorAsValidationError } from "typhoon-core/error";
 import {
   provideCurrentGuildUser,
   requireDiscordAccountIdOrMonitorGuild,
@@ -61,7 +62,7 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
                 ),
               ),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getByIds", ({ urlParams }) => {
           const auth =
@@ -79,7 +80,7 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
                 ),
               ),
             ),
-          );
+          ).pipe(catchParseErrorAsValidationError);
         })
         .handle("getByNames", ({ urlParams }) =>
           provideCurrentGuildUser(
@@ -92,7 +93,7 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
                 ),
               ),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getTeamsByIds", ({ urlParams }) => {
           const auth =
@@ -115,7 +116,7 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
                 ),
               ),
             ),
-          );
+          ).pipe(catchParseErrorAsValidationError);
         })
         .handle("getTeamsByNames", ({ urlParams }) =>
           provideCurrentGuildUser(
@@ -133,7 +134,7 @@ export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
                 ),
               ),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         ),
     ),
   ),

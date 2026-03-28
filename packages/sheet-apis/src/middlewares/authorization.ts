@@ -1,8 +1,5 @@
-import {
-  CacheNotFoundError,
-  MembersApiCacheView,
-  RolesApiCacheView,
-} from "dfx-discord-utils/discord";
+import { MembersApiCacheView, RolesApiCacheView } from "dfx-discord-utils/discord/cache";
+import { CacheNotFoundError } from "dfx-discord-utils/discord/schema";
 import type { CachedGuildMember } from "dfx-discord-utils/cache";
 import { Discord, Perms } from "dfx";
 import { Effect, HashSet, Option } from "effect";

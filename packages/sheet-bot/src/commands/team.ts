@@ -1,9 +1,9 @@
 import { escapeMarkdown } from "@discordjs/formatters";
-import { Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
 import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
+import { Ix } from "dfx/index";
 import { Array, Effect, Function, Layer, Number, Option, Order, pipe } from "effect";
-import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import {
@@ -162,7 +162,7 @@ export const TeamCommandLive = Layer.scopedDiscard(
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
-      DiscordGatewayLayer,
+      DiscordGatewayLayerLive,
       PermissionService.Default,
       PlayerService.Default,
       EmbedService.Default,

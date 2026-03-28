@@ -1,5 +1,5 @@
 import { HttpApiBuilder } from "@effect/platform";
-import { makeArgumentError } from "typhoon-core/error";
+import { catchParseErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
 import { Effect, HashSet, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
@@ -205,54 +205,72 @@ export const MessageCheckinLive = HttpApiBuilder.group(Api, "messageCheckin", (h
     Effect.map(({ messageCheckinService }) =>
       handlers
         .handle("getMessageCheckinData", ({ urlParams }) =>
-          requireMessageCheckinReadAccess(messageCheckinService, urlParams.messageId),
+          requireMessageCheckinReadAccess(messageCheckinService, urlParams.messageId).pipe(
+            catchParseErrorAsValidationError,
+          ),
         )
         .handle("upsertMessageCheckinData", ({ payload }) =>
           requireCheckinUpsertAccess(
             messageCheckinService,
             payload.messageId,
             typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
-          ).pipe(
-            Effect.andThen(
-              messageCheckinService.upsertMessageCheckinData(payload.messageId, payload.data),
-            ),
-          ),
+          )
+            .pipe(
+              Effect.andThen(
+                messageCheckinService.upsertMessageCheckinData(payload.messageId, payload.data),
+              ),
+            )
+            .pipe(catchParseErrorAsValidationError),
         )
         .handle("getMessageCheckinMembers", ({ urlParams }) =>
-          requireMessageCheckinMembersReadAccess(messageCheckinService, urlParams.messageId),
+          requireMessageCheckinMembersReadAccess(messageCheckinService, urlParams.messageId).pipe(
+            catchParseErrorAsValidationError,
+          ),
         )
         .handle("addMessageCheckinMembers", ({ payload }) =>
-          requireMessageCheckinMonitorMutationAccess(messageCheckinService, payload.messageId).pipe(
-            Effect.andThen(
-              messageCheckinService.addMessageCheckinMembers(payload.messageId, payload.memberIds),
-            ),
-          ),
+          requireMessageCheckinMonitorMutationAccess(messageCheckinService, payload.messageId)
+            .pipe(
+              Effect.andThen(
+                messageCheckinService.addMessageCheckinMembers(
+                  payload.messageId,
+                  payload.memberIds,
+                ),
+              ),
+            )
+            .pipe(catchParseErrorAsValidationError),
         )
         .handle("setMessageCheckinMemberCheckinAt", ({ payload }) =>
           requireMessageCheckinParticipantMutationAccess(
             messageCheckinService,
             payload.messageId,
             payload.memberId,
-          ).pipe(
-            Effect.andThen(
-              messageCheckinService.setMessageCheckinMemberCheckinAt(
-                payload.messageId,
-                payload.memberId,
-                payload.checkinAt,
+          )
+            .pipe(
+              Effect.andThen(
+                messageCheckinService.setMessageCheckinMemberCheckinAt(
+                  payload.messageId,
+                  payload.memberId,
+                  payload.checkinAt,
+                ),
               ),
-            ),
-          ),
+            )
+            .pipe(catchParseErrorAsValidationError),
         )
         .handle("removeMessageCheckinMember", ({ payload }) =>
           requireMessageCheckinParticipantMutationAccess(
             messageCheckinService,
             payload.messageId,
             payload.memberId,
-          ).pipe(
-            Effect.andThen(
-              messageCheckinService.removeMessageCheckinMember(payload.messageId, payload.memberId),
-            ),
-          ),
+          )
+            .pipe(
+              Effect.andThen(
+                messageCheckinService.removeMessageCheckinMember(
+                  payload.messageId,
+                  payload.memberId,
+                ),
+              ),
+            )
+            .pipe(catchParseErrorAsValidationError),
         ),
     ),
   ),

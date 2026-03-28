@@ -1,9 +1,18 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer } from "effect";
 import { DiscordApi } from "./api";
-import { GuildsCache, ChannelsCache, RolesCache, MembersCache } from "./cache";
+import {
+  GuildsCache,
+  ChannelsCache,
+  RolesCache,
+  MembersCache,
+  CachesLive,
+  Unstorage,
+} from "./cache";
 import { DiscordApplication } from "./gateway";
 import { CacheNotFoundError } from "./schema";
+import { Api } from "@effect/platform/HttpApi";
+import { DiscordConfig } from "dfx";
 
 // Helper to convert a ReadonlyMap to CacheEntries array
 const mapToEntries = <A>(map: ReadonlyMap<string, A>, parentId: string) =>
@@ -50,13 +59,6 @@ const handleSizeError = <A>(
     Effect.orDie,
   );
 
-const CacheDependenciesLive = Layer.mergeAll(
-  GuildsCache.Default,
-  ChannelsCache.Default,
-  RolesCache.Default,
-  MembersCache.Default,
-);
-
 export const ApplicationLive = HttpApiBuilder.group(DiscordApi, "application", (handlers) =>
   Effect.all({
     application: DiscordApplication,
@@ -67,7 +69,7 @@ export const ApplicationLive = HttpApiBuilder.group(DiscordApi, "application", (
   ),
 ).pipe(Layer.provide(DiscordApplication.Default));
 
-export const CacheLive = HttpApiBuilder.group(DiscordApi, "cache", (handlers) =>
+export const CacheApiLive = HttpApiBuilder.group(DiscordApi, "cache", (handlers) =>
   Effect.all({
     guildsCache: GuildsCache,
     channelsCache: ChannelsCache,
@@ -221,10 +223,8 @@ export const CacheLive = HttpApiBuilder.group(DiscordApi, "cache", (handlers) =>
         ),
     ),
   ),
-).pipe(Layer.provide(CacheDependenciesLive));
+).pipe(Layer.provide(CachesLive));
 
 // Layer that provides the full API handlers
-export const DiscordApiLive = Layer.provide(HttpApiBuilder.api(DiscordApi), [
-  ApplicationLive,
-  CacheLive,
-]);
+export const DiscordApiLive: Layer.Layer<Api, never, DiscordConfig.DiscordConfig | Unstorage> =
+  Layer.provide(HttpApiBuilder.api(DiscordApi), [ApplicationLive, CacheApiLive]);

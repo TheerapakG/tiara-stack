@@ -1,6 +1,7 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
+import { catchParseErrorAsValidationError } from "typhoon-core/error";
 import { provideCurrentGuildUser, requireMonitorGuild } from "@/middlewares/authorization";
 import { ScreenshotService } from "@/services/screenshot";
 import { GuildConfigService } from "@/services/guildConfig";
@@ -44,7 +45,7 @@ export const ScreenshotLive = HttpApiBuilder.group(Api, "screenshot", (handlers)
               ),
             ),
           ),
-        ),
+        ).pipe(catchParseErrorAsValidationError),
       ),
     ),
   ),

@@ -1,6 +1,7 @@
 import type { HttpClientError } from "@effect/platform/HttpClientError";
 import { Discord, DiscordREST, Ix } from "dfx";
 import type { DiscordRESTError } from "dfx/DiscordREST";
+import { GlobalApplicationCommand, GuildApplicationCommand } from "dfx/Interactions/definitions";
 import { CommandHelper } from "dfx/Interactions/commandHelper";
 import { MessageFlags } from "discord-api-types/v10";
 import {
@@ -8,7 +9,7 @@ import {
   type DiscordApplicationCommand,
   type DiscordInteraction,
 } from "dfx/Interactions/context";
-import { Array, Deferred, Effect, FiberMap, Option, pipe, Record } from "effect";
+import { Array, Deferred, Effect, FiberMap, Option, pipe, Record, Scope } from "effect";
 import { DiscordApplication } from "../discord/gateway";
 import { formatErrorResponse, makeDiscordErrorMessageResponse } from "./errorResponse";
 import {
@@ -746,6 +747,15 @@ export const makeCommand = Effect.fnUntraced(function* <
   };
 });
 
+export type GlobalCommand<E, R> = GlobalApplicationCommand<
+  Exclude<R, DiscordApplicationCommand | DiscordInteraction | Scope.Scope>,
+  E
+>;
+export type GuildCommand<E, R> = GuildApplicationCommand<
+  Exclude<R, DiscordApplicationCommand | DiscordInteraction | Scope.Scope>,
+  E
+>;
+
 export const makeGlobalCommand = <
   const A extends Discord.ApplicationCommandCreateRequest,
   E = never,
@@ -755,7 +765,7 @@ export const makeGlobalCommand = <
   handler: (
     commandHelper: CommandHelper<A>,
   ) => Effect.Effect<Discord.CreateInteractionResponseRequest, E, R>,
-) => Ix.global(data, handler);
+): GlobalCommand<E, R> => Ix.global(data, handler);
 
 export const makeGuildCommand = <
   const A extends Discord.ApplicationCommandCreateRequest,
@@ -766,4 +776,4 @@ export const makeGuildCommand = <
   handler: (
     commandHelper: CommandHelper<A>,
   ) => Effect.Effect<Discord.CreateInteractionResponseRequest, E, R>,
-) => Ix.guild(data, handler);
+): GuildCommand<E, R> => Ix.guild(data, handler);

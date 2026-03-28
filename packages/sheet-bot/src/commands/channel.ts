@@ -1,13 +1,13 @@
 import { channelMention, escapeMarkdown, roleMention } from "@discordjs/formatters";
-import { Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
 import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
 import { Effect, Layer, Option, pipe } from "effect";
-import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import { EmbedService, GuildConfigService, SheetApisRequestContext } from "../services";
 import { GuildConfig } from "sheet-apis/schema";
+import { Ix } from "dfx/index";
 
 const configFields = (
   config: GuildConfig.GuildChannelConfig,
@@ -310,6 +310,6 @@ export const ChannelCommandLive = Layer.scopedDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(DiscordGatewayLayer, GuildConfigService.Default, EmbedService.Default),
+    Layer.mergeAll(DiscordGatewayLayerLive, GuildConfigService.Default, EmbedService.Default),
   ),
 );

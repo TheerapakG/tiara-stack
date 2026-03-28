@@ -1,12 +1,12 @@
-import { Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
 import {
   ApplicationIntegrationType,
   InteractionContextType,
   MessageFlags,
 } from "discord-api-types/v10";
+import { Ix } from "dfx/index";
 import { Effect, Layer, Option, pipe } from "effect";
-import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import { MessageRoomOrderService, RoomOrderService, SheetApisRequestContext } from "../services";
@@ -141,6 +141,10 @@ export const RoomOrderCommandLive = Layer.scopedDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(DiscordGatewayLayer, RoomOrderService.Default, MessageRoomOrderService.Default),
+    Layer.mergeAll(
+      DiscordGatewayLayerLive,
+      RoomOrderService.Default,
+      MessageRoomOrderService.Default,
+    ),
   ),
 );

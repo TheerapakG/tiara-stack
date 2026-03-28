@@ -1,7 +1,8 @@
 import type { HttpClientError } from "@effect/platform";
 import type { DiscordRESTError } from "dfx/DiscordREST";
-import { Effect, pipe } from "effect";
+import { Effect, Layer, pipe } from "effect";
 import { DiscordREST } from "dfx";
+import { DiscordConfig } from "dfx";
 import { DiscordGatewayLayer } from "../discord/gateway";
 
 // Import HttpClientError to ensure it's available in the type definitions
@@ -20,7 +21,7 @@ export interface GuildMemberUtilsService {
   ) => Effect.Effect<void[], DiscordRESTError, never>;
 }
 
-const GuildMemberUtilsBase = Effect.Service<GuildMemberUtilsService>()("GuildMemberUtils", {
+export class GuildMemberUtils extends Effect.Service<GuildMemberUtils>()("GuildMemberUtils", {
   effect: pipe(
     DiscordREST,
     Effect.map((rest) => ({
@@ -43,9 +44,13 @@ const GuildMemberUtilsBase = Effect.Service<GuildMemberUtilsService>()("GuildMem
         );
       }),
     })),
-  ),
+  ) as Effect.Effect<GuildMemberUtilsService, never, DiscordREST>,
   accessors: true,
-  dependencies: [DiscordGatewayLayer],
-});
+  dependencies: [DiscordGatewayLayer] as const,
+}) {}
 
-export class GuildMemberUtils extends GuildMemberUtilsBase {}
+export const GuildMemberUtilsLive: Layer.Layer<
+  GuildMemberUtils,
+  never,
+  DiscordConfig.DiscordConfig
+> = GuildMemberUtils.Default;

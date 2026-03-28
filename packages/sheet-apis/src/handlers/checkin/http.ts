@@ -1,6 +1,7 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer, pipe } from "effect";
 import { Api } from "@/api";
+import { catchParseErrorAsValidationError } from "typhoon-core/error";
 import { provideCurrentGuildUser, requireMonitorGuild } from "@/middlewares/authorization";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { CheckinService } from "@/services/checkin";
@@ -18,7 +19,7 @@ export const CheckinLive = HttpApiBuilder.group(Api, "checkin", (handlers) =>
           requireMonitorGuild(payload.guildId).pipe(
             Effect.andThen(checkinService.generate(payload)),
           ),
-        ),
+        ).pipe(catchParseErrorAsValidationError),
       ),
     ),
   ),

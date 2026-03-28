@@ -1,9 +1,9 @@
-import { Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
 import { userMention } from "@discordjs/formatters";
 import { ButtonStyle, MessageFlags } from "discord-api-types/v10";
+import { Ix } from "dfx/index";
 import { Array, Effect, Layer, Option, pipe } from "effect";
-import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
 import {
   makeButton,
   makeButtonData,
@@ -11,7 +11,7 @@ import {
   makeMessageComponent,
 } from "dfx-discord-utils/utils";
 import { MessageCheckinService, SheetApisRequestContext } from "@/services";
-import { GuildMemberUtils } from "dfx-discord-utils/utils";
+import { GuildMemberUtils, GuildMemberUtilsLive } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 
 export const checkinButtonData = makeButtonData((b) =>
@@ -114,6 +114,6 @@ export const CheckinButtonLive = Layer.scopedDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(DiscordGatewayLayer, MessageCheckinService.Default, GuildMemberUtils.Default),
+    Layer.mergeAll(DiscordGatewayLayerLive, MessageCheckinService.Default, GuildMemberUtilsLive),
   ),
 );

@@ -1,9 +1,9 @@
 import { escapeMarkdown, roleMention } from "@discordjs/formatters";
-import { Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
+import { Ix } from "dfx/index";
 import { Effect, Either, Layer, Option, pipe } from "effect";
-import { GuildsCache } from "dfx-discord-utils/discord";
-import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
+import { GuildsCache, GuildsCacheLive } from "dfx-discord-utils/discord/cache";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { GuildConfigService, EmbedService, SheetApisRequestContext } from "../services";
 import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
@@ -428,8 +428,8 @@ export const ServerCommandLive = Layer.scopedDiscard(
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
-      DiscordGatewayLayer,
-      GuildsCache.Default,
+      DiscordGatewayLayerLive,
+      GuildsCacheLive,
       GuildConfigService.Default,
       EmbedService.Default,
     ),

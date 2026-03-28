@@ -121,7 +121,7 @@ async function createPlaceholderUserWithDiscord(adapter: InternalAdapter, discor
  * This plugin adds support for client_credentials grant type using
  * Kubernetes ServiceAccount tokens as the authentication mechanism.
  */
-export function kubernetesOAuth(options: KubernetesOAuthOptions) {
+const makeKubernetesOAuth = (options: KubernetesOAuthOptions) => {
   return {
     id: "kubernetes-oauth",
     endpoints: {
@@ -212,4 +212,6 @@ export function kubernetesOAuth(options: KubernetesOAuthOptions) {
       ),
     },
   } satisfies BetterAuthPlugin;
-}
+};
+
+export const kubernetesOAuth: typeof makeKubernetesOAuth = makeKubernetesOAuth;

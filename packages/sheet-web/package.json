@@ -6,13 +6,12 @@
     "#/*": "./src/*"
   },
   "scripts": {
-    "format": "oxfmt --check",
-    "format:apply": "oxfmt",
-    "lint": "oxlint .",
-    "typecheck": "tsgo --noEmit",
-    "dev": "vite dev --port 3001",
-    "build": "vite build && tar -acf dist.tar.zst ./.output",
-    "preview": "vite preview"
+    "format": "vp fmt --check",
+    "format:apply": "vp fmt",
+    "lint": "vp lint src",
+    "dev": "vp dev --port 3001",
+    "build": "vp build && tar -acf dist.tar.zst ./.output",
+    "preview": "vp preview"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
@@ -71,10 +70,8 @@
     "@vitejs/plugin-react": "^5.0.4",
     "babel-plugin-react-compiler": "^1.0.0",
     "jsdom": "^27.0.0",
-    "oxfmt": "^0.26.0",
-    "oxlint": "^1.41.0",
-    "vite": "^7.3.1",
-    "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.0.18"
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
   }
 }

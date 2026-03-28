@@ -30,25 +30,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Setup node.js
-        uses: actions/setup-node@v4
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
         with:
           node-version: "22"
-          cache: "pnpm"
+          cache: true
 
       - name: Install Dependencies
-        run: pnpm install
+        run: vp install
 
       - name: Run Build
-        run: pnpm nx run-many -t build --output-style=stream
+        run: vp run -r build
 
       - name: Run Checks
-        run: pnpm nx run-many -t format,lint,typecheck --output-style=stream
+        run: vp check
 
       - name: Upload Docker build artifact (sheet-db-server)
         uses: actions/upload-artifact@v4

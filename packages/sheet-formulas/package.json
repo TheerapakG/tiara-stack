@@ -13,11 +13,10 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "format": "oxfmt --check",
-    "format:apply": "oxfmt",
-    "lint": "oxlint .",
-    "typecheck": "tsgo --noEmit",
-    "build": "tsdown -c tsdown.config.ts"
+    "format": "vp fmt --check",
+    "format:apply": "vp fmt",
+    "lint": "vp lint src",
+    "build": "vp pack"
   },
   "dependencies": {
     "@effect/platform": "^0.94.2",
@@ -31,9 +30,7 @@
     "@types/google-apps-script": "^1.0.99",
     "@types/node": "^24.7.2",
     "@typescript/native-preview": "latest",
-    "oxfmt": "^0.26.0",
-    "oxlint": "^1.41.0",
     "pathe": "^2.0.3",
-    "tsdown": "^0.16.4"
+    "vite-plus": "catalog:"
   }
 }

@@ -30,7 +30,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
           sheetApisClient.get().guildConfig.getGuildMonitorRoles({ urlParams: { guildId } }),
       ),
       getGuildChannels: Effect.fn("GuildConfigService.getGuildChannels")(
-        (guildId: string, running?: boolean | undefined) =>
+        (guildId: string, running?: boolean) =>
           sheetApisClient.get().guildConfig.getGuildChannels({
             urlParams: {
               guildId,
@@ -68,7 +68,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
           }),
       ),
       getGuildChannelById: Effect.fn("GuildConfigService.getGuildChannelById")(
-        (guildId: string, channelId: string, running?: boolean | undefined) =>
+        (guildId: string, channelId: string, running?: boolean) =>
           sheetApisClient.get().guildConfig.getGuildChannelById({
             urlParams: {
               guildId,
@@ -78,7 +78,7 @@ export class GuildConfigService extends Effect.Service<GuildConfigService>()("Gu
           }),
       ),
       getGuildChannelByName: Effect.fn("GuildConfigService.getGuildChannelByName")(
-        (guildId: string, channelName: string, running?: boolean | undefined) =>
+        (guildId: string, channelName: string, running?: boolean) =>
           sheetApisClient.get().guildConfig.getGuildChannelByName({
             urlParams: {
               guildId,

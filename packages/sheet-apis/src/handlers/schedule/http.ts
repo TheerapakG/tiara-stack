@@ -1,6 +1,7 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
+import { catchParseErrorAsValidationError } from "typhoon-core/error";
 import {
   hasGuildPermission,
   hasPermission,
@@ -59,7 +60,7 @@ export const ScheduleLive = HttpApiBuilder.group(Api, "schedule", (handlers) =>
                 ).pipe(Effect.map((schedules) => ({ schedules, view })));
               }),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getDayPopulatedSchedules", ({ urlParams }) =>
           provideCurrentGuildUser(
@@ -81,7 +82,7 @@ export const ScheduleLive = HttpApiBuilder.group(Api, "schedule", (handlers) =>
                 ).pipe(Effect.map((schedules) => ({ schedules, view })));
               }),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getChannelPopulatedSchedules", ({ urlParams }) =>
           provideCurrentGuildUser(
@@ -103,7 +104,7 @@ export const ScheduleLive = HttpApiBuilder.group(Api, "schedule", (handlers) =>
                 ).pipe(Effect.map((schedules) => ({ schedules, view })));
               }),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getDayPlayerSchedule", ({ urlParams }) =>
           provideCurrentGuildUser(
@@ -141,7 +142,7 @@ export const ScheduleLive = HttpApiBuilder.group(Api, "schedule", (handlers) =>
                 );
               }),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         ),
     ),
   ),

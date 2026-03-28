@@ -1,8 +1,5 @@
-import {
-  CacheNotFoundError,
-  MembersApiCacheView,
-  RolesApiCacheView,
-} from "dfx-discord-utils/discord";
+import { MembersApiCacheView, RolesApiCacheView } from "dfx-discord-utils/discord/cache";
+import { CacheNotFoundError } from "dfx-discord-utils/discord/schema";
 import { Effect, HashSet, Redacted } from "effect";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
 import { GuildConfigService } from "@/services/guildConfig";

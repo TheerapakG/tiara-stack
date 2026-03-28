@@ -1,5 +1,5 @@
 import { HttpApiBuilder } from "@effect/platform";
-import { makeArgumentError } from "typhoon-core/error";
+import { catchParseErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
@@ -80,18 +80,22 @@ export const MessageSlotLive = HttpApiBuilder.group(Api, "messageSlot", (handler
     Effect.map(({ messageSlotService }) =>
       handlers
         .handle("getMessageSlotData", ({ urlParams }) =>
-          requireMessageSlotReadAccess(messageSlotService, urlParams.messageId),
+          requireMessageSlotReadAccess(messageSlotService, urlParams.messageId).pipe(
+            catchParseErrorAsValidationError,
+          ),
         )
         .handle("upsertMessageSlotData", ({ payload }) =>
           requireMessageSlotUpsertAccess(
             messageSlotService,
             payload.messageId,
             typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
-          ).pipe(
-            Effect.andThen(
-              messageSlotService.upsertMessageSlotData(payload.messageId, payload.data),
-            ),
-          ),
+          )
+            .pipe(
+              Effect.andThen(
+                messageSlotService.upsertMessageSlotData(payload.messageId, payload.data),
+              ),
+            )
+            .pipe(catchParseErrorAsValidationError),
         ),
     ),
   ),

@@ -1,6 +1,6 @@
 import { Data, Effect, HashSet, Option, pipe } from "effect";
-import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import { Interaction } from "dfx-discord-utils/utils";
+import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
 import { SheetApisClient } from "./sheetApis";
 
 export class PermissionError extends Data.TaggedError("PermissionError")<{
@@ -94,5 +94,5 @@ export class PermissionService extends Effect.Service<PermissionService>()("Perm
     };
   }),
   accessors: true,
-  dependencies: [DiscordGatewayLayer, SheetApisClient.Default],
+  dependencies: [DiscordGatewayLayerLive, SheetApisClient.Default],
 }) {}

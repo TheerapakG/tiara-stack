@@ -1,6 +1,7 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Array, Effect, HashMap, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
+import { catchParseErrorAsValidationError } from "typhoon-core/error";
 import { provideCurrentGuildUser, requireMonitorGuild } from "@/middlewares/authorization";
 import { MonitorService } from "@/services/monitor";
 import { GuildConfigService } from "@/services/guildConfig";
@@ -57,7 +58,7 @@ export const MonitorLive = HttpApiBuilder.group(Api, "monitor", (handlers) =>
                 ),
               ),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getByIds", ({ urlParams }) =>
           provideCurrentGuildUser(
@@ -70,7 +71,7 @@ export const MonitorLive = HttpApiBuilder.group(Api, "monitor", (handlers) =>
                 ),
               ),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getByNames", ({ urlParams }) =>
           provideCurrentGuildUser(
@@ -83,7 +84,7 @@ export const MonitorLive = HttpApiBuilder.group(Api, "monitor", (handlers) =>
                 ),
               ),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         ),
     ),
   ),

@@ -1,8 +1,8 @@
-import { Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
 import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
-import { Effect, Layer, Option, pipe, Array } from "effect";
-import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { Ix } from "dfx/index";
+import { Effect, Layer, Option, pipe } from "effect";
+import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import { EmbedService, ScreenshotService, SheetApisRequestContext } from "../services";
@@ -89,6 +89,6 @@ export const ScreenshotCommandLive = Layer.scopedDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(DiscordGatewayLayer, EmbedService.Default, ScreenshotService.Default),
+    Layer.mergeAll(DiscordGatewayLayerLive, EmbedService.Default, ScreenshotService.Default),
   ),
 );

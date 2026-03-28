@@ -1,7 +1,8 @@
 import { HttpApiBuilder } from "@effect/platform";
-import { makeArgumentError } from "typhoon-core/error";
+
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
+import { catchParseErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
 import {
   provideCurrentGuildUser,
   requireBot,
@@ -18,7 +19,10 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
     Effect.map(({ guildConfigService }) =>
       handlers
         .handle("getAutoCheckinGuilds", () =>
-          requireBot().pipe(Effect.andThen(guildConfigService.getAutoCheckinGuilds())),
+          requireBot().pipe(
+            Effect.andThen(guildConfigService.getAutoCheckinGuilds()),
+            catchParseErrorAsValidationError,
+          ),
         )
         .handle("getGuildConfig", ({ urlParams }) =>
           provideCurrentGuildUser(
@@ -41,7 +45,7 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
                 ),
               ),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("upsertGuildConfig", ({ payload }) =>
           provideCurrentGuildUser(
@@ -49,20 +53,24 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
             requireManageGuild(payload.guildId).pipe(
               Effect.andThen(guildConfigService.upsertGuildConfig(payload.guildId, payload.config)),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getGuildMonitorRoles", ({ urlParams }) =>
           // Monitor role IDs are intentionally readable by any authenticated caller;
           // they are guild role definitions consumed by the authorization layer itself.
-          guildConfigService.getGuildMonitorRoles(urlParams.guildId),
+          guildConfigService
+            .getGuildMonitorRoles(urlParams.guildId)
+            .pipe(catchParseErrorAsValidationError),
         )
         .handle("getGuildChannels", ({ urlParams }) =>
           // Channel listings are intentionally available to any authenticated caller;
           // only the guild sheet binding in `getGuildConfig` remains manage-gated.
-          guildConfigService.getGuildChannels({
-            guildId: urlParams.guildId,
-            ...(typeof urlParams.running === "undefined" ? {} : { running: urlParams.running }),
-          }),
+          guildConfigService
+            .getGuildChannels({
+              guildId: urlParams.guildId,
+              ...(typeof urlParams.running === "undefined" ? {} : { running: urlParams.running }),
+            })
+            .pipe(catchParseErrorAsValidationError),
         )
         .handle("addGuildMonitorRole", ({ payload }) =>
           provideCurrentGuildUser(
@@ -72,7 +80,7 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
                 guildConfigService.addGuildMonitorRole(payload.guildId, payload.roleId),
               ),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("removeGuildMonitorRole", ({ payload }) =>
           provideCurrentGuildUser(
@@ -82,7 +90,7 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
                 guildConfigService.removeGuildMonitorRole(payload.guildId, payload.roleId),
               ),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("upsertGuildChannelConfig", ({ payload }) =>
           provideCurrentGuildUser(
@@ -96,7 +104,7 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
                 ),
               ),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getGuildChannelById", ({ urlParams }) =>
           // Channel read endpoints are intentionally available to any authenticated caller;
@@ -120,7 +128,7 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
                   ),
               }),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         )
         .handle("getGuildChannelByName", ({ urlParams }) =>
           // Channel read endpoints are intentionally available to any authenticated caller;
@@ -144,7 +152,7 @@ export const GuildConfigLive = HttpApiBuilder.group(Api, "guildConfig", (handler
                   ),
               }),
             ),
-          ),
+          ).pipe(catchParseErrorAsValidationError),
         ),
     ),
   ),

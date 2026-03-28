@@ -1,8 +1,8 @@
 import { channelMention, subtext, userMention } from "@discordjs/formatters";
 import { Array, DateTime, Effect, Layer, Option, Schedule, Cron, pipe } from "effect";
 import { DiscordREST } from "dfx";
-import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import { checkinButtonData } from "../messageComponents/buttons/checkin";
+import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
 import {
   CheckinService,
   ConverterService,
@@ -156,7 +156,7 @@ export const AutoCheckinTaskLive = Layer.scopedDiscard(
                   processGuild(guildConfig.guildId),
                   Effect.provide(
                     Layer.mergeAll(
-                      DiscordGatewayLayer,
+                      DiscordGatewayLayerLive,
                       CheckinService.Default,
                       ConverterService.Default,
                       EmbedService.Default,

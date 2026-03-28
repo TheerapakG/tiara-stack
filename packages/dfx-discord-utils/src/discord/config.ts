@@ -1,12 +1,14 @@
 import { DiscordConfig, Intents } from "dfx";
-import { Config, Redacted } from "effect";
+import { Config, ConfigError, Layer, Redacted } from "effect";
 
 export interface DiscordConfigOptions {
   token: Config.Config<Redacted.Redacted<string>>;
   intents?: Config.Config<number>;
 }
 
-export const makeDiscordConfigLayer = (options: DiscordConfigOptions) =>
+export const makeDiscordConfigLayer = (
+  options: DiscordConfigOptions,
+): Layer.Layer<DiscordConfig.DiscordConfig, ConfigError.ConfigError, never> =>
   DiscordConfig.layerConfig({
     token: options.token,
     gateway: {

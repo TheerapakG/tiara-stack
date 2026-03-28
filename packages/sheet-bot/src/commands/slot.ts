@@ -1,12 +1,12 @@
-import { Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
 import {
   ApplicationIntegrationType,
   InteractionContextType,
   MessageFlags,
 } from "discord-api-types/v10";
+import { Ix } from "dfx/index";
 import { Array, Chunk, Effect, Layer, Number, Option, Order, pipe, Schema, String } from "effect";
-import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
+import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction, makeMessageActionRowData } from "dfx-discord-utils/utils";
 import {
@@ -249,7 +249,7 @@ export const SlotCommandLive = Layer.scopedDiscard(
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
-      DiscordGatewayLayer,
+      DiscordGatewayLayerLive,
       PermissionService.Default,
       ScheduleService.Default,
       FormatService.Default,

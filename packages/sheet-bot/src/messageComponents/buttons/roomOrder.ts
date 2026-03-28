@@ -1,7 +1,8 @@
-import { Ix } from "dfx";
 import { InteractionsRegistry } from "dfx/gateway";
 import { bold, inlineCode, time, TimestampStyles } from "@discordjs/formatters";
+import { Ix } from "dfx/index";
 import { Array, Effect, HashSet, Layer, Option, pipe } from "effect";
+import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
 import { MessageRoomOrder } from "sheet-apis/schema";
 import {
   ConverterService,
@@ -9,7 +10,6 @@ import {
   MessageRoomOrderService,
   SheetApisRequestContext,
 } from "@/services";
-import { DiscordGatewayLayer } from "dfx-discord-utils/discord";
 import {
   makeButton,
   makeButtonData,
@@ -49,85 +49,71 @@ export const roomOrderActionRow = (range: { minRank: number; maxRank: number }, 
     ),
   );
 
-class RoomOrderHelper extends Effect.Service<RoomOrderHelper>()("RoomOrderHelper", {
-  effect: pipe(
-    Effect.all({
-      messageRoomOrderService: MessageRoomOrderService,
-      converterService: ConverterService,
-      formatService: FormatService,
-    }),
-    Effect.map(({ messageRoomOrderService, converterService, formatService }) => ({
-      roomOrderInteractionGetReply: Effect.fn("RoomOrderHelper.roomOrderInteractionGetReply")(
-        (guildId: string, messageId: string, messageRoomOrder: MessageRoomOrder.MessageRoomOrder) =>
-          Effect.gen(function* () {
-            const messageRoomOrderRange =
-              yield* messageRoomOrderService.getMessageRoomOrderRange(messageId);
-
-            const messageRoomOrderEntry = yield* messageRoomOrderService.getMessageRoomOrderEntry(
-              messageId,
-              messageRoomOrder.rank.toString(),
-            );
-
-            const { start, end } = yield* pipe(
-              converterService.convertHourToHourWindow(guildId, messageRoomOrder.hour),
-              Effect.flatMap(formatService.formatHourWindow),
-            );
-
-            const roomOrderContent = [
-              `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.LongDateShortTime)} - ${time(end, TimestampStyles.LongDateShortTime)}`,
-              ...Option.match(messageRoomOrder.monitor, {
-                onNone: () => [],
-                onSome: (monitor) => [`${inlineCode("Monitor:")} ${monitor}`],
-              }),
-              "",
-              ...messageRoomOrderEntry.map(({ team, tags, position, effectValue }) => {
-                const hasTiererTag = tags.includes("tierer");
-                const effectParts = hasTiererTag
-                  ? []
-                  : pipe(
-                      [
-                        Option.some(formatEffectValue(effectValue)),
-                        tags.includes("enc") ? Option.some("enc") : Option.none(),
-                        tags.includes("avoid_enc") ? Option.some("avoid enc") : Option.none(),
-                      ],
-                      Array.getSomes,
-                    );
-
-                const effectStr = effectParts.length > 0 ? ` (${effectParts.join(", ")})` : "";
-                return `${inlineCode(`P${position + 1}:`)}  ${team}${effectStr}`;
-              }),
-              "",
-              `${inlineCode("In:")} ${pipe(
-                HashSet.fromIterable(messageRoomOrder.fills),
-                HashSet.difference(HashSet.fromIterable(messageRoomOrder.previousFills)),
-                HashSet.toValues,
-                (arr) => (arr.length > 0 ? arr.join(", ") : "(none)"),
-              )}`,
-              `${inlineCode("Out:")} ${pipe(
-                HashSet.fromIterable(messageRoomOrder.previousFills),
-                HashSet.difference(HashSet.fromIterable(messageRoomOrder.fills)),
-                HashSet.toValues,
-                (arr) => (arr.length > 0 ? arr.join(", ") : "(none)"),
-              )}`,
-            ].join("\n");
-
-            return {
-              content: roomOrderContent,
-              components: [
-                roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank).toJSON(),
-              ],
-            };
-          }),
-      ),
-    })),
-  ),
-  dependencies: [MessageRoomOrderService.Default, ConverterService.Default, FormatService.Default],
-  accessors: true,
-}) {}
-
 const makeRoomOrderPreviousButtonHandler = Effect.gen(function* () {
-  const roomOrderHelper = yield* RoomOrderHelper;
+  const converterService = yield* ConverterService;
+  const formatService = yield* FormatService;
   const messageRoomOrderService = yield* MessageRoomOrderService;
+
+  const roomOrderInteractionGetReply = Effect.fn("roomOrderPreviousButton.getReply")(
+    (guildId: string, messageId: string, messageRoomOrder: MessageRoomOrder.MessageRoomOrder) =>
+      Effect.gen(function* () {
+        const messageRoomOrderRange =
+          yield* messageRoomOrderService.getMessageRoomOrderRange(messageId);
+
+        const messageRoomOrderEntry = yield* messageRoomOrderService.getMessageRoomOrderEntry(
+          messageId,
+          messageRoomOrder.rank.toString(),
+        );
+
+        const { start, end } = yield* pipe(
+          converterService.convertHourToHourWindow(guildId, messageRoomOrder.hour),
+          Effect.flatMap(formatService.formatHourWindow),
+        );
+
+        const roomOrderContent = [
+          `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.LongDateShortTime)} - ${time(end, TimestampStyles.LongDateShortTime)}`,
+          ...Option.match(messageRoomOrder.monitor, {
+            onNone: () => [],
+            onSome: (monitor) => [`${inlineCode("Monitor:")} ${monitor}`],
+          }),
+          "",
+          ...messageRoomOrderEntry.map(({ team, tags, position, effectValue }) => {
+            const hasTiererTag = tags.includes("tierer");
+            const effectParts = hasTiererTag
+              ? []
+              : pipe(
+                  [
+                    Option.some(formatEffectValue(effectValue)),
+                    tags.includes("enc") ? Option.some("enc") : Option.none(),
+                    tags.includes("avoid_enc") ? Option.some("avoid enc") : Option.none(),
+                  ],
+                  Array.getSomes,
+                );
+
+            const effectStr = effectParts.length > 0 ? ` (${effectParts.join(", ")})` : "";
+            return `${inlineCode(`P${position + 1}:`)}  ${team}${effectStr}`;
+          }),
+          "",
+          `${inlineCode("In:")} ${pipe(
+            HashSet.fromIterable(messageRoomOrder.fills),
+            HashSet.difference(HashSet.fromIterable(messageRoomOrder.previousFills)),
+            HashSet.toValues,
+            (arr) => (arr.length > 0 ? arr.join(", ") : "(none)"),
+          )}`,
+          `${inlineCode("Out:")} ${pipe(
+            HashSet.fromIterable(messageRoomOrder.previousFills),
+            HashSet.difference(HashSet.fromIterable(messageRoomOrder.fills)),
+            HashSet.toValues,
+            (arr) => (arr.length > 0 ? arr.join(", ") : "(none)"),
+          )}`,
+        ].join("\n");
+
+        return {
+          content: roomOrderContent,
+          components: [roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank).toJSON()],
+        };
+      }),
+  );
 
   return yield* makeButton(
     previousButtonData.toJSON(),
@@ -144,11 +130,7 @@ const makeRoomOrderPreviousButtonHandler = Effect.gen(function* () {
         const decrementedRank =
           yield* messageRoomOrderService.decrementMessageRoomOrderRank(messageId);
 
-        const reply = yield* roomOrderHelper.roomOrderInteractionGetReply(
-          guildId,
-          messageId,
-          decrementedRank,
-        );
+        const reply = yield* roomOrderInteractionGetReply(guildId, messageId, decrementedRank);
 
         yield* msgHelper.editReply({ payload: reply });
       }),
@@ -157,8 +139,70 @@ const makeRoomOrderPreviousButtonHandler = Effect.gen(function* () {
 });
 
 const makeRoomOrderNextButtonHandler = Effect.gen(function* () {
-  const roomOrderHelper = yield* RoomOrderHelper;
+  const converterService = yield* ConverterService;
+  const formatService = yield* FormatService;
   const messageRoomOrderService = yield* MessageRoomOrderService;
+
+  const roomOrderInteractionGetReply = Effect.fn("roomOrderNextButton.getReply")(
+    (guildId: string, messageId: string, messageRoomOrder: MessageRoomOrder.MessageRoomOrder) =>
+      Effect.gen(function* () {
+        const messageRoomOrderRange =
+          yield* messageRoomOrderService.getMessageRoomOrderRange(messageId);
+
+        const messageRoomOrderEntry = yield* messageRoomOrderService.getMessageRoomOrderEntry(
+          messageId,
+          messageRoomOrder.rank.toString(),
+        );
+
+        const { start, end } = yield* pipe(
+          converterService.convertHourToHourWindow(guildId, messageRoomOrder.hour),
+          Effect.flatMap(formatService.formatHourWindow),
+        );
+
+        const roomOrderContent = [
+          `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.LongDateShortTime)} - ${time(end, TimestampStyles.LongDateShortTime)}`,
+          ...Option.match(messageRoomOrder.monitor, {
+            onNone: () => [],
+            onSome: (monitor) => [`${inlineCode("Monitor:")} ${monitor}`],
+          }),
+          "",
+          ...messageRoomOrderEntry.map(({ team, tags, position, effectValue }) => {
+            const hasTiererTag = tags.includes("tierer");
+            const effectParts = hasTiererTag
+              ? []
+              : pipe(
+                  [
+                    Option.some(formatEffectValue(effectValue)),
+                    tags.includes("enc") ? Option.some("enc") : Option.none(),
+                    tags.includes("avoid_enc") ? Option.some("avoid enc") : Option.none(),
+                  ],
+                  Array.getSomes,
+                );
+
+            const effectStr = effectParts.length > 0 ? ` (${effectParts.join(", ")})` : "";
+            return `${inlineCode(`P${position + 1}:`)}  ${team}${effectStr}`;
+          }),
+          "",
+          `${inlineCode("In:")} ${pipe(
+            HashSet.fromIterable(messageRoomOrder.fills),
+            HashSet.difference(HashSet.fromIterable(messageRoomOrder.previousFills)),
+            HashSet.toValues,
+            (arr) => (arr.length > 0 ? arr.join(", ") : "(none)"),
+          )}`,
+          `${inlineCode("Out:")} ${pipe(
+            HashSet.fromIterable(messageRoomOrder.previousFills),
+            HashSet.difference(HashSet.fromIterable(messageRoomOrder.fills)),
+            HashSet.toValues,
+            (arr) => (arr.length > 0 ? arr.join(", ") : "(none)"),
+          )}`,
+        ].join("\n");
+
+        return {
+          content: roomOrderContent,
+          components: [roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank).toJSON()],
+        };
+      }),
+  );
 
   return yield* makeButton(
     nextButtonData.toJSON(),
@@ -175,11 +219,7 @@ const makeRoomOrderNextButtonHandler = Effect.gen(function* () {
         const incrementedRank =
           yield* messageRoomOrderService.incrementMessageRoomOrderRank(messageId);
 
-        const reply = yield* roomOrderHelper.roomOrderInteractionGetReply(
-          guildId,
-          messageId,
-          incrementedRank,
-        );
+        const reply = yield* roomOrderInteractionGetReply(guildId, messageId, incrementedRank);
 
         yield* msgHelper.editReply({ payload: reply });
       }),
@@ -188,8 +228,70 @@ const makeRoomOrderNextButtonHandler = Effect.gen(function* () {
 });
 
 const makeRoomOrderSendButtonHandler = Effect.gen(function* () {
-  const roomOrderHelper = yield* RoomOrderHelper;
+  const converterService = yield* ConverterService;
+  const formatService = yield* FormatService;
   const messageRoomOrderService = yield* MessageRoomOrderService;
+
+  const roomOrderInteractionGetReply = Effect.fn("roomOrderSendButton.getReply")(
+    (guildId: string, messageId: string, messageRoomOrder: MessageRoomOrder.MessageRoomOrder) =>
+      Effect.gen(function* () {
+        const messageRoomOrderRange =
+          yield* messageRoomOrderService.getMessageRoomOrderRange(messageId);
+
+        const messageRoomOrderEntry = yield* messageRoomOrderService.getMessageRoomOrderEntry(
+          messageId,
+          messageRoomOrder.rank.toString(),
+        );
+
+        const { start, end } = yield* pipe(
+          converterService.convertHourToHourWindow(guildId, messageRoomOrder.hour),
+          Effect.flatMap(formatService.formatHourWindow),
+        );
+
+        const roomOrderContent = [
+          `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.LongDateShortTime)} - ${time(end, TimestampStyles.LongDateShortTime)}`,
+          ...Option.match(messageRoomOrder.monitor, {
+            onNone: () => [],
+            onSome: (monitor) => [`${inlineCode("Monitor:")} ${monitor}`],
+          }),
+          "",
+          ...messageRoomOrderEntry.map(({ team, tags, position, effectValue }) => {
+            const hasTiererTag = tags.includes("tierer");
+            const effectParts = hasTiererTag
+              ? []
+              : pipe(
+                  [
+                    Option.some(formatEffectValue(effectValue)),
+                    tags.includes("enc") ? Option.some("enc") : Option.none(),
+                    tags.includes("avoid_enc") ? Option.some("avoid enc") : Option.none(),
+                  ],
+                  Array.getSomes,
+                );
+
+            const effectStr = effectParts.length > 0 ? ` (${effectParts.join(", ")})` : "";
+            return `${inlineCode(`P${position + 1}:`)}  ${team}${effectStr}`;
+          }),
+          "",
+          `${inlineCode("In:")} ${pipe(
+            HashSet.fromIterable(messageRoomOrder.fills),
+            HashSet.difference(HashSet.fromIterable(messageRoomOrder.previousFills)),
+            HashSet.toValues,
+            (arr) => (arr.length > 0 ? arr.join(", ") : "(none)"),
+          )}`,
+          `${inlineCode("Out:")} ${pipe(
+            HashSet.fromIterable(messageRoomOrder.previousFills),
+            HashSet.difference(HashSet.fromIterable(messageRoomOrder.fills)),
+            HashSet.toValues,
+            (arr) => (arr.length > 0 ? arr.join(", ") : "(none)"),
+          )}`,
+        ].join("\n");
+
+        return {
+          content: roomOrderContent,
+          components: [roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank).toJSON()],
+        };
+      }),
+  );
 
   return yield* makeButton(
     sendButtonData.toJSON(),
@@ -205,11 +307,7 @@ const makeRoomOrderSendButtonHandler = Effect.gen(function* () {
 
         const messageRoomOrderData = yield* messageRoomOrderService.getMessageRoomOrder(messageId);
 
-        const reply = yield* roomOrderHelper.roomOrderInteractionGetReply(
-          guildId,
-          messageId,
-          messageRoomOrderData,
-        );
+        const reply = yield* roomOrderInteractionGetReply(guildId, messageId, messageRoomOrderData);
 
         yield* pipe(
           message,
@@ -256,18 +354,17 @@ export const RoomOrderButtonLive = Layer.scopedDiscard(
     const nextButton = yield* makeRoomOrderNextButton;
     const sendButton = yield* makeRoomOrderSendButton;
 
-    yield* registry.register(
-      Ix.builder.add(previousButton).add(nextButton).add(sendButton).catchAllCause(Effect.log),
-    );
+    yield* registry.register(Ix.builder.add(previousButton).catchAllCause(Effect.log));
+    yield* registry.register(Ix.builder.add(nextButton).catchAllCause(Effect.log));
+    yield* registry.register(Ix.builder.add(sendButton).catchAllCause(Effect.log));
   }),
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
-      DiscordGatewayLayer,
+      DiscordGatewayLayerLive,
       MessageRoomOrderService.Default,
       ConverterService.Default,
       FormatService.Default,
-      RoomOrderHelper.Default,
     ),
   ),
 );

@@ -1,7 +1,7 @@
 import { HttpRouter, HttpServerRequest } from "@effect/platform";
 import { beforeEach, describe, expect, it } from "@effect/vitest";
 import { Cause, DateTime, Duration, Effect, HashSet, Option, Redacted, TestClock } from "effect";
-import { Account } from "sheet-auth/client";
+import type { Account } from "sheet-auth/model";
 import { permissionSetFromIterable } from "../authorization";
 import type { ApplicationOwnerResolver } from "../../services/applicationOwner";
 import { vi } from "vitest";
@@ -50,14 +50,15 @@ const provideRequestContext = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.
 
 const makeAccount = Effect.fnUntraced(function* (userId: string, accountId = `discord-${userId}`) {
   const now = yield* DateTime.now;
-  return Account.make({
+  return {
+    _tag: "Account",
     userId,
     accountId,
     providerId: "discord",
     scopes: [],
     createdAt: now,
     updatedAt: now,
-  });
+  } satisfies Account;
 });
 
 const permissionValues = (permissions: ReturnType<typeof permissionSetFromIterable>) =>

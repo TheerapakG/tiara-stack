@@ -1,5 +1,6 @@
 import { DateTime, Deferred, Effect, Option, Redacted, Runtime, Schema } from "effect";
 import { createAuthClient } from "better-auth/client";
+import { Account, Session } from "./model";
 import { kubernetesOAuthClient, Permission } from "./plugins/kubernetes-oauth/client";
 
 // =============================================================================
@@ -71,23 +72,11 @@ export class KubernetesOAuthImplicitPermissionsError extends Schema.TaggedError<
 // 2. Types
 // =============================================================================
 
-export type SheetAuthClientOption = ReturnType<typeof SheetAuthClientOption>;
 export type SheetAuthClient = ReturnType<typeof createSheetAuthClient>;
 
 // =============================================================================
 // 3. Client Factory
 // =============================================================================
-
-const SheetAuthClientOption = (baseURL: string) => {
-  return {
-    baseURL,
-    basePath: "/",
-    fetchOptions: {
-      credentials: "include" as const,
-    },
-    plugins: [kubernetesOAuthClient()],
-  };
-};
 
 /**
  * Create a Better Auth client for stateless authentication.
@@ -114,35 +103,15 @@ const SheetAuthClientOption = (baseURL: string) => {
  * ```
  */
 export function createSheetAuthClient(baseURL: string) {
-  return createAuthClient(SheetAuthClientOption(baseURL));
+  return createAuthClient({
+    baseURL,
+    basePath: "/",
+    fetchOptions: {
+      credentials: "include" as const,
+    },
+    plugins: [kubernetesOAuthClient()],
+  });
 }
-
-// =============================================================================
-// 4. Session
-// =============================================================================
-
-export class Session extends Schema.TaggedClass<Session>()("Session", {
-  user: Schema.Struct({
-    createdAt: Schema.DateTimeUtcFromNumber,
-    updatedAt: Schema.DateTimeUtcFromNumber,
-    email: Schema.String,
-    emailVerified: Schema.Boolean,
-    name: Schema.String,
-    image: Schema.optional(Schema.NullOr(Schema.String)),
-  }),
-  session: Schema.UndefinedOr(
-    Schema.Struct({
-      createdAt: Schema.DateTimeUtcFromNumber,
-      updatedAt: Schema.DateTimeUtcFromNumber,
-      userId: Schema.String,
-      expiresAt: Schema.DateTimeUtcFromNumber,
-      token: Schema.String,
-      ipAddress: Schema.optional(Schema.NullOr(Schema.String)),
-      userAgent: Schema.optional(Schema.NullOr(Schema.String)),
-    }),
-  ),
-  token: Schema.UndefinedOr(Schema.Redacted(Schema.String)),
-}) {}
 
 /**
  * Get the session using the Better Auth client.
@@ -220,19 +189,6 @@ export function getSession(
     );
   });
 }
-
-// =============================================================================
-// 5. Account
-// =============================================================================
-
-export class Account extends Schema.TaggedClass<Account>()("Account", {
-  scopes: Schema.Array(Schema.String),
-  userId: Schema.String,
-  accountId: Schema.String,
-  providerId: Schema.String,
-  createdAt: Schema.DateTimeUtcFromNumber,
-  updatedAt: Schema.DateTimeUtcFromNumber,
-}) {}
 
 /**
  * Get account using the Better Auth client.

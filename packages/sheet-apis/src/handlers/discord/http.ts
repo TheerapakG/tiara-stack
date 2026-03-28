@@ -6,7 +6,7 @@ import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAut
 import { Discord } from "@/schema";
 import { SheetAuthClient } from "@/services";
 import { getDiscordAccessToken } from "sheet-auth/client";
-import { GuildsApiCacheView } from "dfx-discord-utils/discord";
+import { GuildsApiCacheView } from "dfx-discord-utils/discord/cache";
 
 // Minimal guild from Discord API for checking membership
 const DiscordMyGuild = Schema.Struct({

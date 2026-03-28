@@ -1,7 +1,7 @@
-import { BetterAuthPlugin } from "better-auth";
+import type { BetterAuthPlugin } from "better-auth";
 import { createAuthMiddleware } from "better-auth/plugins";
 
-export const sessionToken = () => {
+const makeSessionToken = () => {
   return {
     id: "session-token",
     hooks: {
@@ -34,3 +34,5 @@ export const sessionToken = () => {
     },
   } satisfies BetterAuthPlugin;
 };
+
+export const sessionToken: typeof makeSessionToken = makeSessionToken;

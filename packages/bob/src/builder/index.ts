@@ -6,20 +6,20 @@ type Simplify<A> = {
   ? B
   : never;
 
-type ConfigBuilderConfigKeyIsOptional<Key extends string> =
-  Key extends `${string}?` ? true : false;
+type ConfigBuilderConfigKeyIsOptional<Key extends string> = Key extends `${string}?` ? true : false;
 
 const configBuilderConfigKeyIsOptional = <Key extends string>(
-  key: Key
+  key: Key,
 ): ConfigBuilderConfigKeyIsOptional<Key> => {
   return key.endsWith("?") as ConfigBuilderConfigKeyIsOptional<Key>;
 };
 
-type ConfigBuilderConfigKeyGetBaseKey<Key extends string> =
-  Key extends `${infer Base}?` ? Base & string : Key;
+type ConfigBuilderConfigKeyGetBaseKey<Key extends string> = Key extends `${infer Base}?`
+  ? Base & string
+  : Key;
 
 const configBuilderConfigKeyGetBaseKey = <Key extends string>(
-  key: Key
+  key: Key,
 ): ConfigBuilderConfigKeyGetBaseKey<Key> => {
   return key.replace("?", "") as ConfigBuilderConfigKeyGetBaseKey<Key>;
 };
@@ -32,44 +32,31 @@ type ConfigBuilderConfigEntry<
   optional: Optional;
 };
 
-type InferConfigBuilderConfigEntryValidator<
-  Entry extends ConfigBuilderConfigEntry,
-> = Entry["validator"] extends infer T
-  ? T extends StandardSchemaV1
-    ? T
-    : never
-  : never;
+type InferConfigBuilderConfigEntryValidator<Entry extends ConfigBuilderConfigEntry> =
+  Entry["validator"] extends infer T ? (T extends StandardSchemaV1 ? T : never) : never;
 
-type InferConfigBuilderConfigEntryOptional<
-  Entry extends ConfigBuilderConfigEntry,
-> = Entry["optional"] extends infer T ? (T extends boolean ? T : never) : never;
+type InferConfigBuilderConfigEntryOptional<Entry extends ConfigBuilderConfigEntry> =
+  Entry["optional"] extends infer T ? (T extends boolean ? T : never) : never;
 
 type ConfigBuilderConfig = {
   [key: string]: ConfigBuilderConfigEntry;
 };
 
-type InferConfigBuilderConfigKeys<Config extends ConfigBuilderConfig> =
-  keyof Config;
+type InferConfigBuilderConfigKeys<Config extends ConfigBuilderConfig> = keyof Config;
 
-type InferConfigBuilderOptionalConfigKeys<Config extends ConfigBuilderConfig> =
-  keyof {
-    [K in keyof Config as InferConfigBuilderConfigEntryOptional<
-      Config[K]
-    > extends true
-      ? K
-      : never]: Config[K];
-  } &
-    string;
+type InferConfigBuilderOptionalConfigKeys<Config extends ConfigBuilderConfig> = keyof {
+  [K in keyof Config as InferConfigBuilderConfigEntryOptional<Config[K]> extends true
+    ? K
+    : never]: Config[K];
+} &
+  string;
 
-type InferConfigBuilderRequiredConfigKeys<Config extends ConfigBuilderConfig> =
-  keyof {
-    [K in keyof Config as InferConfigBuilderConfigEntryOptional<
-      Config[K]
-    > extends false
-      ? K
-      : never]: Config[K];
-  } &
-    string;
+type InferConfigBuilderRequiredConfigKeys<Config extends ConfigBuilderConfig> = keyof {
+  [K in keyof Config as InferConfigBuilderConfigEntryOptional<Config[K]> extends false
+    ? K
+    : never]: Config[K];
+} &
+  string;
 
 type InferConfigBuilderConfigIn<Config extends ConfigBuilderConfig> = Simplify<
   {
@@ -117,7 +104,7 @@ const addConfigBuilderConfigEntry = <
 >(
   config: Config,
   key: Key extends Keys ? never : Key,
-  entry: Entry
+  entry: Entry,
 ): AddConfigBuilderConfigEntry<Config, Key, Entry> => {
   return {
     ...config,
@@ -148,7 +135,7 @@ const addConfigBuilderCollectedConfigEntry = <
 >(
   config: Config,
   key: Key,
-  entry: Entry
+  entry: Entry,
 ): AddConfigBuilderCollectedConfigEntry<Config, Key, Entry> => {
   return {
     ...config,
@@ -166,23 +153,12 @@ type ConfigBuilderContext<
 };
 
 type InferConfigBuilderContextConfig<Ctx extends ConfigBuilderContext> =
-  Ctx["config"] extends infer T
-    ? T extends ConfigBuilderConfig
-      ? T
-      : never
-    : never;
+  Ctx["config"] extends infer T ? (T extends ConfigBuilderConfig ? T : never) : never;
 
-type InferConfigBuilderContextCollectedConfig<
-  Ctx extends ConfigBuilderContext,
-> = Ctx["collected"] extends infer T
-  ? T extends ConfigBuilderCollectedConfig
-    ? T
-    : never
-  : never;
+type InferConfigBuilderContextCollectedConfig<Ctx extends ConfigBuilderContext> =
+  Ctx["collected"] extends infer T ? (T extends ConfigBuilderCollectedConfig ? T : never) : never;
 
-type InferSimplifiedConfigBuilderContextCollectedConfig<
-  Ctx extends ConfigBuilderContext,
-> =
+type InferSimplifiedConfigBuilderContextCollectedConfig<Ctx extends ConfigBuilderContext> =
   Simplify<Ctx["collected"]> extends infer T
     ? T extends ConfigBuilderCollectedConfig
       ? T
@@ -198,9 +174,7 @@ type AddConfigBuilderContextCollectedConfigEntry<
     InferConfigBuilderContextCollectedConfig<Ctx>,
     Key,
     StandardSchemaV1.InferOutput<
-      InferConfigBuilderConfigEntryValidator<
-        InferConfigBuilderContextConfig<Ctx>[Key]
-      >
+      InferConfigBuilderConfigEntryValidator<InferConfigBuilderContextConfig<Ctx>[Key]>
     >
   >;
   issues: StandardSchemaV1.Issue[];
@@ -217,10 +191,8 @@ const addConfigBuilderContextCollectedConfigEntry = <
   ctx: Ctx,
   key: Key,
   entry: StandardSchemaV1.Result<
-    InferConfigBuilderConfigEntryValidator<
-      InferConfigBuilderContextConfig<Ctx>[Key]
-    >
-  >
+    InferConfigBuilderConfigEntryValidator<InferConfigBuilderContextConfig<Ctx>[Key]>
+  >,
 ): AddConfigBuilderContextCollectedConfigEntry<Ctx, Key> => {
   if (ctx.issues.length > 0) {
     return {
@@ -228,7 +200,7 @@ const addConfigBuilderContextCollectedConfigEntry = <
       collected: addConfigBuilderCollectedConfigEntry(
         ctx.collected,
         key,
-        entry.issues ? entry.issues : entry.value
+        entry.issues ? entry.issues : entry.value,
       ),
       issues: ctx.issues,
     } as AddConfigBuilderContextCollectedConfigEntry<Ctx, Key>;
@@ -236,11 +208,7 @@ const addConfigBuilderContextCollectedConfigEntry = <
   if (entry.issues) {
     return {
       config: ctx.config as InferConfigBuilderContextConfig<Ctx>,
-      collected: addConfigBuilderCollectedConfigEntry(
-        ctx.collected,
-        key,
-        entry.issues
-      ),
+      collected: addConfigBuilderCollectedConfigEntry(ctx.collected, key, entry.issues),
       issues: [
         ...ctx.issues,
         ...entry.issues.map((issue) => ({
@@ -252,34 +220,28 @@ const addConfigBuilderContextCollectedConfigEntry = <
   }
   return {
     config: ctx.config as InferConfigBuilderContextConfig<Ctx>,
-    collected: addConfigBuilderCollectedConfigEntry(
-      ctx.collected,
-      key,
-      entry.value
-    ),
+    collected: addConfigBuilderCollectedConfigEntry(ctx.collected, key, entry.value),
     issues: [],
   } as AddConfigBuilderContextCollectedConfigEntry<Ctx, Key>;
 };
 
 class ConfigBuilder<
   Ctx extends ConfigBuilderContext,
-  Config extends
-    InferConfigBuilderContextConfig<Ctx> = InferConfigBuilderContextConfig<Ctx>,
-  Collected extends
-    InferConfigBuilderContextCollectedConfig<Ctx> = InferConfigBuilderContextCollectedConfig<Ctx>,
-  Keys extends
-    InferConfigBuilderConfigKeys<Config> = InferConfigBuilderConfigKeys<Config>,
-  OptionalKeys extends
-    InferConfigBuilderOptionalConfigKeys<Config> = InferConfigBuilderOptionalConfigKeys<Config>,
-  RequiredKeys extends
-    InferConfigBuilderRequiredConfigKeys<Config> = InferConfigBuilderRequiredConfigKeys<Config>,
-  ValidKeys extends Exclude<Keys, keyof Collected> & string = Exclude<
-    Keys,
+  Config extends InferConfigBuilderContextConfig<Ctx> = InferConfigBuilderContextConfig<Ctx>,
+  Collected extends InferConfigBuilderContextCollectedConfig<Ctx> =
+    InferConfigBuilderContextCollectedConfig<Ctx>,
+  Keys extends InferConfigBuilderConfigKeys<Config> = InferConfigBuilderConfigKeys<Config>,
+  OptionalKeys extends InferConfigBuilderOptionalConfigKeys<Config> =
+    InferConfigBuilderOptionalConfigKeys<Config>,
+  RequiredKeys extends InferConfigBuilderRequiredConfigKeys<Config> =
+    InferConfigBuilderRequiredConfigKeys<Config>,
+  ValidKeys extends Exclude<Keys, keyof Collected> & string = Exclude<Keys, keyof Collected> &
+    string,
+  ValidRequiredKeys extends Exclude<RequiredKeys, keyof Collected> & string = Exclude<
+    RequiredKeys,
     keyof Collected
   > &
     string,
-  ValidRequiredKeys extends Exclude<RequiredKeys, keyof Collected> &
-    string = Exclude<RequiredKeys, keyof Collected> & string,
 > {
   public inferIn: InferConfigBuilderConfigIn<Config> =
     undefined as InferConfigBuilderConfigIn<Config>;
@@ -295,21 +257,12 @@ class ConfigBuilder<
   set<
     Key extends ValidKeys,
     Input extends StandardSchemaV1.InferInput<
-      InferConfigBuilderConfigEntryValidator<
-        InferConfigBuilderContextConfig<Ctx>[Key]
-      >
+      InferConfigBuilderConfigEntryValidator<InferConfigBuilderContextConfig<Ctx>[Key]>
     >,
-  >(
-    key: Key,
-    input: Input
-  ): ConfigBuilder<AddConfigBuilderContextCollectedConfigEntry<Ctx, Key>> {
+  >(key: Key, input: Input): ConfigBuilder<AddConfigBuilderContextCollectedConfigEntry<Ctx, Key>> {
     const validator = this.ctx.config[key].validator as StandardSchemaV1<
-      StandardSchemaV1.InferInput<
-        InferConfigBuilderConfigEntryValidator<Config[Keys]>
-      >,
-      StandardSchemaV1.InferOutput<
-        InferConfigBuilderConfigEntryValidator<Config[Keys]>
-      >
+      StandardSchemaV1.InferInput<InferConfigBuilderConfigEntryValidator<Config[Keys]>>,
+      StandardSchemaV1.InferOutput<InferConfigBuilderConfigEntryValidator<Config[Keys]>>
     >;
     const parsedInput = validator["~standard"].validate(input);
 
@@ -318,7 +271,7 @@ class ConfigBuilder<
     }
 
     return ConfigBuilder.make(
-      addConfigBuilderContextCollectedConfigEntry(this.ctx, key, parsedInput)
+      addConfigBuilderContextCollectedConfigEntry(this.ctx, key, parsedInput),
     );
   }
 
@@ -328,11 +281,11 @@ class ConfigBuilder<
     const requiredConfigKeys = new Set(
       Object.entries(this.ctx.config)
         .filter(([_, { optional }]) => !optional)
-        .map(([key]) => key)
+        .map(([key]) => key),
     );
     const collectedKeys = new Set(Object.keys(this.ctx.collected));
     const requiredKeys = new Set(
-      [...requiredConfigKeys].filter((x) => !collectedKeys.has(x))
+      [...requiredConfigKeys].filter((x) => !collectedKeys.has(x)),
     ) as Set<RequiredKeys>;
 
     if (requiredKeys.size > 0) {
@@ -354,41 +307,25 @@ class ConfigBuilder<
   }
 }
 
-type ConfigBuilderBuilderContext<
-  Config extends ConfigBuilderConfig = ConfigBuilderConfig,
-> = {
+type ConfigBuilderBuilderContext<Config extends ConfigBuilderConfig = ConfigBuilderConfig> = {
   config: Config;
 };
 
-type InferConfigBuilderBuilderContextConfig<
-  Ctx extends ConfigBuilderBuilderContext,
-> = Ctx["config"] extends infer T
-  ? T extends ConfigBuilderConfig
-    ? T
-    : never
-  : never;
+type InferConfigBuilderBuilderContextConfig<Ctx extends ConfigBuilderBuilderContext> =
+  Ctx["config"] extends infer T ? (T extends ConfigBuilderConfig ? T : never) : never;
 
-type InferSimplifiedConfigBuilderBuilderContextConfig<
-  Ctx extends ConfigBuilderBuilderContext,
-> =
-  Simplify<Ctx["config"]> extends infer T
-    ? T extends ConfigBuilderConfig
-      ? T
-      : never
-    : never;
+type InferSimplifiedConfigBuilderBuilderContextConfig<Ctx extends ConfigBuilderBuilderContext> =
+  Simplify<Ctx["config"]> extends infer T ? (T extends ConfigBuilderConfig ? T : never) : never;
 
 type MakeConfigBuilderContext<Ctx extends ConfigBuilderBuilderContext> =
-  ConfigBuilderContext<
-    InferSimplifiedConfigBuilderBuilderContextConfig<Ctx>,
-    {}
-  > extends infer T
+  ConfigBuilderContext<InferSimplifiedConfigBuilderBuilderContextConfig<Ctx>, {}> extends infer T
     ? T extends ConfigBuilderContext
       ? T
       : never
     : never;
 
 const makeConfigBuilderContext = <Ctx extends ConfigBuilderBuilderContext>(
-  ctx: Ctx
+  ctx: Ctx,
 ): MakeConfigBuilderContext<Ctx> => {
   return {
     config: ctx.config as InferConfigBuilderBuilderContextConfig<Ctx>,
@@ -402,11 +339,7 @@ type AddConfigBuilderBuilderContextEntry<
   Key extends string,
   Entry extends ConfigBuilderConfigEntry,
 > = Omit<Ctx, "config"> & {
-  config: AddConfigBuilderConfigEntry<
-    InferConfigBuilderBuilderContextConfig<Ctx>,
-    Key,
-    Entry
-  >;
+  config: AddConfigBuilderConfigEntry<InferConfigBuilderBuilderContextConfig<Ctx>, Key, Entry>;
 } extends infer T
   ? T extends ConfigBuilderBuilderContext
     ? T
@@ -417,41 +350,35 @@ const addConfigBuilderBuilderContextEntry = <
   Ctx extends ConfigBuilderBuilderContext,
   Key extends string,
   Entry extends ConfigBuilderConfigEntry,
-  Config extends
-    InferConfigBuilderBuilderContextConfig<Ctx> = InferConfigBuilderBuilderContextConfig<Ctx>,
+  Config extends InferConfigBuilderBuilderContextConfig<Ctx> =
+    InferConfigBuilderBuilderContextConfig<Ctx>,
   Keys extends keyof Config = keyof Config,
 >(
   ctx: Ctx,
   key: Key extends Keys ? never : Key,
-  entry: Entry
+  entry: Entry,
 ): AddConfigBuilderBuilderContextEntry<Ctx, Key, Entry> => {
   return {
     ...ctx,
-    config: addConfigBuilderConfigEntry<Config, Key, Entry, Keys>(
-      ctx.config as Config,
-      key,
-      entry
-    ),
+    config: addConfigBuilderConfigEntry<Config, Key, Entry, Keys>(ctx.config as Config, key, entry),
   } as AddConfigBuilderBuilderContextEntry<Ctx, Key, Entry>;
 };
 
 class ConfigBuilderBuilder<
   Ctx extends ConfigBuilderBuilderContext,
-  Config extends
-    InferConfigBuilderBuilderContextConfig<Ctx> = InferConfigBuilderBuilderContextConfig<Ctx>,
+  Config extends InferConfigBuilderBuilderContextConfig<Ctx> =
+    InferConfigBuilderBuilderContextConfig<Ctx>,
   Keys extends keyof Config = keyof Config,
 > {
   constructor(private readonly ctx: Ctx) {}
 
-  static make<Ctx extends ConfigBuilderBuilderContext>(
-    ctx: Ctx
-  ): ConfigBuilderBuilder<Ctx> {
+  static make<Ctx extends ConfigBuilderBuilderContext>(ctx: Ctx): ConfigBuilderBuilder<Ctx> {
     return new ConfigBuilderBuilder(ctx);
   }
 
   entry<Key extends string, Validator extends StandardSchemaV1>(
     key: ConfigBuilderConfigKeyGetBaseKey<Key> extends Keys ? never : Key,
-    validator: Validator
+    validator: Validator,
   ): ConfigBuilderBuilder<
     AddConfigBuilderBuilderContextEntry<
       Ctx,
@@ -463,15 +390,15 @@ class ConfigBuilderBuilder<
       addConfigBuilderBuilderContextEntry(
         this.ctx,
         configBuilderConfigKeyGetBaseKey<Key>(
-          key
+          key,
         ) as ConfigBuilderConfigKeyGetBaseKey<Key> extends Keys
           ? never
           : ConfigBuilderConfigKeyGetBaseKey<Key>,
         {
           validator,
           optional: configBuilderConfigKeyIsOptional(key),
-        }
-      )
+        },
+      ),
     );
   }
 

@@ -1,5 +1,5 @@
 import { Effect, Layer, Redacted, pipe } from "effect";
-import { Unstorage } from "dfx-discord-utils/discord";
+import { Unstorage } from "dfx-discord-utils/discord/cache";
 import { config } from "@/config";
 
 export const UnstorageLayer = pipe(
