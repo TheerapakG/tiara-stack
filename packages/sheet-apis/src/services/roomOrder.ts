@@ -134,6 +134,7 @@ const deriveHourWindow = (sheetService: SheetService, sheetId: string, hour: num
 
 const toTeamWithPlayer = (player: Player, team: Team) =>
   new Team({
+    // Team is a pure data class (effect Data.Class); all fields are own-enumerable properties — spread is safe
     ...team,
     playerId: Option.some(player.id),
   });
@@ -288,6 +289,7 @@ export class RoomOrderService extends Effect.Service<RoomOrderService>()("RoomOr
                   .map(
                     (team) =>
                       new Team({
+                        // Team is a pure data class (effect Data.Class); all fields are own-enumerable properties — spread is safe
                         ...team,
                         tags: pipe(
                           team.tags,

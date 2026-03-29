@@ -7,6 +7,7 @@ import { ScopedCache } from "typhoon-core/utils";
 
 const attachPlayerId = (playerId: string) => (team: Team) =>
   Team.make({
+    // Team is a pure data class (effect Data.Class); all fields are own-enumerable properties — spread is safe
     ...team,
     playerId: Option.some(playerId),
   });
