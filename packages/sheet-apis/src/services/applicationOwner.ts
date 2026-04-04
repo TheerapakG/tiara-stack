@@ -1,6 +1,6 @@
 import { Cache, Duration, Effect, Exit, Layer, Option, ServiceMap } from "effect";
 import { DiscordApiClient } from "dfx-discord-utils/discord";
-import { discordLayer } from "@/services";
+import { discordLayer } from "@/services/discord";
 
 const SUCCESS_TTL = Duration.hours(6);
 const FAILURE_TTL = Duration.minutes(1);
