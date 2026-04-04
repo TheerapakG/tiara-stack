@@ -1,2 +1,2 @@
 export { CalcApi } from "./api";
-export { CalcLive } from "./http";
+export { calcLayer } from "./http";

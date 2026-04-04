@@ -1,2 +1,2 @@
 export { MonitorApi } from "./api";
-export { MonitorLive } from "./http";
+export { monitorLayer } from "./http";

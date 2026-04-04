@@ -18,7 +18,7 @@ export const messageSlot = {
         messageChannelId: Schema.NullOr(Schema.String),
         createdByUserId: Schema.NullOr(Schema.String),
       }),
-      Schema.standardSchemaV1,
+      Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) =>
       await tx.mutate.messageSlot.upsert({

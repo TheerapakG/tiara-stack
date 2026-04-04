@@ -22,6 +22,26 @@
       "types": "./dist/discord/cache.d.mts",
       "default": "./dist/discord/cache.mjs"
     },
+    "./discord/cache/shared": {
+      "types": "./dist/discord/cache/shared.d.mts",
+      "default": "./dist/discord/cache/shared.mjs"
+    },
+    "./discord/cache/guilds": {
+      "types": "./dist/discord/cache/guilds.d.mts",
+      "default": "./dist/discord/cache/guilds.mjs"
+    },
+    "./discord/cache/roles": {
+      "types": "./dist/discord/cache/roles.d.mts",
+      "default": "./dist/discord/cache/roles.mjs"
+    },
+    "./discord/cache/members": {
+      "types": "./dist/discord/cache/members.d.mts",
+      "default": "./dist/discord/cache/members.mjs"
+    },
+    "./discord/cache/channels": {
+      "types": "./dist/discord/cache/channels.d.mts",
+      "default": "./dist/discord/cache/channels.mjs"
+    },
     "./discord/schema": {
       "types": "./dist/discord/schema.d.mts",
       "default": "./dist/discord/schema.mjs"
@@ -44,6 +64,8 @@
     "format": "vp fmt --check",
     "format:apply": "vp fmt",
     "lint": "vp lint src",
+    "test": "vp test run",
+    "test:watch": "vp test",
     "build": "vp pack"
   },
   "dependencies": {
@@ -54,15 +76,13 @@
   },
   "devDependencies": {
     "@typescript/native-preview": "latest",
-    "dfx": "^0.127.0",
     "glob": "^11.0.3",
     "pathe": "^2.0.3",
     "vite-plus": "catalog:"
   },
   "peerDependencies": {
-    "@effect/platform": "^0.94.2",
-    "@effect/platform-node": "^0.104.1",
-    "dfx": "^0.127.0",
-    "effect": "^3.19.8"
+    "@effect/platform-node": "catalog:",
+    "dfx": "catalog:",
+    "effect": "catalog:"
   }
 }

@@ -1,59 +1,59 @@
 import { Zero } from "@rocicorp/zero";
-import { Effect, Match, pipe, Layer, Runtime } from "effect";
-import { FileSystem } from "@effect/platform";
+import { readFile } from "node:fs/promises";
+import { Effect, Layer, Match, pipe } from "effect";
 import { type Schema, schema, mutators } from "sheet-db-schema/zero";
 import { ZeroService as BaseZeroService } from "typhoon-core/services";
 import { config } from "@/config";
 
-const getAuth = () =>
-  pipe(
-    FileSystem.FileSystem,
-    Effect.andThen((fs) => fs.readFileString("/var/run/secrets/tokens/zero-cache-token", "utf-8")),
-  );
+const getAuth = Effect.fn("zero.getAuth")(function* () {
+  return yield* Effect.promise(() => readFile("/var/run/secrets/tokens/zero-cache-token", "utf-8"));
+});
 
 const makeZero = () =>
-  pipe(
-    Effect.all({
-      auth: getAuth(),
-      zeroCacheServer: config.zeroCacheServer,
-      zeroCacheUserId: config.zeroCacheUserId,
-    }),
-    Effect.bindAll(({ auth, zeroCacheServer, zeroCacheUserId }) => ({
-      zero: Effect.succeed(
-        new Zero({
-          server: zeroCacheServer,
-          userID: zeroCacheUserId,
-          auth,
-          schema,
-          mutators,
-        }),
-      ),
-      runtime: Effect.runtime<FileSystem.FileSystem>(),
-    })),
-    Effect.tap(({ zero, runtime }) =>
-      pipe(
-        Effect.succeed(
-          zero.connection.state.subscribe((state) =>
-            pipe(
-              Match.value(state),
-              Match.when({ name: "needs-auth" }, () =>
-                pipe(
-                  getAuth(),
-                  Effect.flatMap((auth) =>
-                    Effect.tryPromise(() => zero.connection.connect({ auth })),
-                  ),
+  Effect.gen(function* () {
+    const auth = yield* getAuth();
+    const zeroCacheServer = yield* config.zeroCacheServer;
+    const zeroCacheUserId = yield* config.zeroCacheUserId;
+    const services = yield* Effect.services();
+    const zero = new Zero({
+      server: zeroCacheServer,
+      userID: zeroCacheUserId,
+      auth,
+      schema,
+      mutators,
+    });
+
+    yield* Effect.acquireRelease(
+      Effect.sync(() =>
+        zero.connection.state.subscribe((state) =>
+          pipe(
+            Match.value(state),
+            Match.when({ name: "needs-auth" }, () =>
+              pipe(
+                getAuth(),
+                Effect.flatMap((auth) =>
+                  Effect.tryPromise(() => zero.connection.connect({ auth })),
                 ),
               ),
-              Match.orElse(() => Effect.void),
-              Runtime.runFork(runtime),
             ),
+            Match.orElse(() => Effect.void),
+            Effect.provideServices(services),
+            Effect.runFork,
           ),
         ),
-        Effect.acquireRelease((unsubscribe) => Effect.sync(unsubscribe)),
       ),
-    ),
-    Effect.map(({ zero }) => zero),
-  );
+      (unsubscribe) => Effect.sync(unsubscribe),
+    );
 
-export const ZeroTag = BaseZeroService.ZeroService<Schema, undefined, {}>();
-export const ZeroLive = pipe(makeZero(), Effect.andThen(BaseZeroService.make), Layer.scopedContext);
+    return zero;
+  });
+
+export class ZeroService extends BaseZeroService.ZeroService<Schema, undefined, unknown>() {
+  static layer = Layer.effect(
+    ZeroService,
+    Effect.gen({ self: this }, function* () {
+      const zero = yield* makeZero();
+      return yield* this.make(zero);
+    }),
+  );
+}

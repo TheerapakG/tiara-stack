@@ -4,7 +4,7 @@ import { builder } from "../schema";
 
 export const messageRoomOrder = {
   getMessageRoomOrder: defineQuery(
-    pipe(Schema.Struct({ messageId: Schema.String }), Schema.standardSchemaV1),
+    pipe(Schema.Struct({ messageId: Schema.String }), Schema.toStandardSchemaV1),
     ({ args: { messageId } }) =>
       builder.messageRoomOrder
         .where("messageId", "=", messageId)
@@ -12,7 +12,10 @@ export const messageRoomOrder = {
         .one(),
   ),
   getMessageRoomOrderEntry: defineQuery(
-    pipe(Schema.Struct({ messageId: Schema.String, rank: Schema.Number }), Schema.standardSchemaV1),
+    pipe(
+      Schema.Struct({ messageId: Schema.String, rank: Schema.Number }),
+      Schema.toStandardSchemaV1,
+    ),
     ({ args: { messageId, rank } }) =>
       builder.messageRoomOrderEntry
         .where("messageId", "=", messageId)
@@ -21,7 +24,7 @@ export const messageRoomOrder = {
         .orderBy("position", "asc"),
   ),
   getMessageRoomOrderRange: defineQuery(
-    pipe(Schema.Struct({ messageId: Schema.String }), Schema.standardSchemaV1),
+    pipe(Schema.Struct({ messageId: Schema.String }), Schema.toStandardSchemaV1),
     ({ args: { messageId } }) =>
       builder.messageRoomOrderEntry
         .where("messageId", "=", messageId)

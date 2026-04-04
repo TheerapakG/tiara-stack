@@ -1,10 +1,10 @@
-import { JSONSchema } from "effect";
+import { Schema } from "effect";
 import { describe, expect, it } from "@effect/vitest";
 import { SheetConfigError } from "./sheetConfigError";
 
 describe("SheetConfigError", () => {
   it("SheetConfigError generates json schema", () => {
-    const schema = JSONSchema.make(SheetConfigError);
+    const schema = Schema.toJsonSchemaDocument(SheetConfigError);
     expect(schema).toBeDefined();
   });
 });

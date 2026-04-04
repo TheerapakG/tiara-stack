@@ -1,45 +1,48 @@
 import { Schema } from "effect";
 
-export const VideoQualityMode = Schema.Union(Schema.Literal(1, 2), Schema.Number);
+export const VideoQualityMode = Schema.Union([Schema.Literals([1, 2]), Schema.Number]);
 export type VideoQualityMode = typeof VideoQualityMode.Type;
 
-export const ThreadAutoArchiveDuration = Schema.Union(
-  Schema.Literal(60, 1440, 4320, 10080),
+export const ThreadAutoArchiveDuration = Schema.Union([
+  Schema.Literals([60, 1440, 4320, 10080]),
   Schema.Number,
-);
+]);
 export type ThreadAutoArchiveDuration = typeof ThreadAutoArchiveDuration.Type;
 
-export const ForumLayout = Schema.Union(Schema.Literal(0, 1, 2), Schema.Number);
+export const ForumLayout = Schema.Union([Schema.Literals([0, 1, 2]), Schema.Number]);
 export type ForumLayout = typeof ForumLayout.Type;
 
-export const ThreadSearchTagSetting = Schema.Union(
-  Schema.Literal("match_all", "match_some"),
+export const ThreadSearchTagSetting = Schema.Union([
+  Schema.Literals(["match_all", "match_some"]),
   Schema.String,
-);
+]);
 export type ThreadSearchTagSetting = typeof ThreadSearchTagSetting.Type;
 
-export const VerificationLevels = Schema.Union(Schema.Literal(0, 1, 2, 3, 4), Schema.Number);
+export const VerificationLevels = Schema.Union([Schema.Literals([0, 1, 2, 3, 4]), Schema.Number]);
 export type VerificationLevels = typeof VerificationLevels.Type;
 
-export const UserNotificationSettings = Schema.Union(Schema.Literal(0, 1), Schema.Number);
+export const UserNotificationSettings = Schema.Union([Schema.Literals([0, 1]), Schema.Number]);
 export type UserNotificationSettings = typeof UserNotificationSettings.Type;
 
-export const GuildMFALevel = Schema.Union(Schema.Literal(0, 1), Schema.Number);
+export const GuildMFALevel = Schema.Union([Schema.Literals([0, 1]), Schema.Number]);
 export type GuildMFALevel = typeof GuildMFALevel.Type;
 
-export const GuildExplicitContentFilterTypes = Schema.Union(Schema.Literal(0, 1, 2), Schema.Number);
+export const GuildExplicitContentFilterTypes = Schema.Union([
+  Schema.Literals([0, 1, 2]),
+  Schema.Number,
+]);
 export type GuildExplicitContentFilterTypes = typeof GuildExplicitContentFilterTypes.Type;
 
-export const PremiumGuildTiers = Schema.Union(Schema.Literal(0, 1, 2, 3), Schema.Number);
+export const PremiumGuildTiers = Schema.Union([Schema.Literals([0, 1, 2, 3]), Schema.Number]);
 export type PremiumGuildTiers = typeof PremiumGuildTiers.Type;
 
-export const GuildNSFWContentLevel = Schema.Union(Schema.Literal(0, 1, 2, 3), Schema.Number);
+export const GuildNSFWContentLevel = Schema.Union([Schema.Literals([0, 1, 2, 3]), Schema.Number]);
 export type GuildNSFWContentLevel = typeof GuildNSFWContentLevel.Type;
 
-export const StickerFormatTypes = Schema.Union(Schema.Literal(1, 2, 3, 4), Schema.Number);
+export const StickerFormatTypes = Schema.Union([Schema.Literals([1, 2, 3, 4]), Schema.Number]);
 export type StickerFormatTypes = typeof StickerFormatTypes.Type;
 
-export const AvailableLocalesEnum = Schema.Union(
+export const AvailableLocalesEnum = Schema.Union([
   Schema.Literal("id"),
   Schema.Literal("da"),
   Schema.Literal("de"),
@@ -75,10 +78,10 @@ export const AvailableLocalesEnum = Schema.Union(
   Schema.Literal("ar"),
   Schema.Literal("he"),
   Schema.String,
-);
+]);
 export type AvailableLocalesEnum = typeof AvailableLocalesEnum.Type;
 
-export const GuildFeature = Schema.Union(
+export const GuildFeature = Schema.Union([
   Schema.Literal("ANIMATED_BANNER"),
   Schema.Literal("ANIMATED_ICON"),
   Schema.Literal("APPLICATION_COMMAND_PERMISSIONS_V2"),
@@ -107,5 +110,5 @@ export const GuildFeature = Schema.Union(
   Schema.Literal("VIP_REGIONS"),
   Schema.Literal("WELCOME_SCREEN_ENABLED"),
   Schema.String,
-);
+]);
 export type GuildFeature = typeof GuildFeature.Type;

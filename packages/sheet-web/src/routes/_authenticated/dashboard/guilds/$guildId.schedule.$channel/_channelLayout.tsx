@@ -17,7 +17,7 @@ const ScheduleSearchSchema = Schema.Struct({
   timestamp: Schema.Number,
   from: Schema.optional(
     Schema.Struct({
-      view: Schema.Literal("calendar", "daily"),
+      view: Schema.Literals(["calendar", "daily"]),
       timestamp: Schema.Number,
     }),
   ),
@@ -28,12 +28,12 @@ export type ScheduleSearchParams = typeof ScheduleSearchSchema.Type;
 export const Route = createFileRoute(
   "/_authenticated/dashboard/guilds/$guildId/schedule/$channel/_channelLayout",
 )({
-  validateSearch: pipe(ScheduleSearchSchema, Schema.standardSchemaV1),
+  validateSearch: pipe(ScheduleSearchSchema, Schema.toStandardSchemaV1),
   component: ScheduleLayout,
   loader: async ({ context, params }) => {
     await Effect.runPromise(
       ensureResultAtomData(context.atomRegistry, getAllChannelsAtom(params.guildId)).pipe(
-        Effect.catchAll(() => Effect.succeed([])),
+        Effect.catch(() => Effect.succeed([])),
       ),
     );
   },

@@ -1,54 +1,53 @@
-import { Array, Function, Option, pipe, Schema, Types } from "effect";
+import { Array, Option, pipe, Schema, SchemaGetter } from "effect";
 
-const OptionArrayToOptionTupleTypeId: typeof Schema.TypeId = Schema.TypeId;
-export { OptionArrayToOptionTupleTypeId };
+type ReadonlyTupleOf_<
+  T,
+  N extends number,
+  R extends ReadonlyArray<unknown>,
+> = `${N}` extends `-${number}`
+  ? never
+  : R["length"] extends N
+    ? R
+    : ReadonlyTupleOf_<T, N, [T, ...R]>;
+type ReadonlyTupleOf<N extends number, T> = N extends N
+  ? number extends N
+    ? ReadonlyArray<T>
+    : ReadonlyTupleOf_<T, N, []>
+  : never;
 
-type OptionArrayToOptionTupleSchema<
-  Count extends number,
-  Value extends Schema.Schema.Any,
-> = Schema.transform<
-  Schema.Array$<Schema.OptionFromSelf<Schema.SchemaClass<Schema.Schema.Encoded<Value>>>>,
-  Schema.Tuple<Types.TupleOf<Count, Schema.OptionFromSelf<Value>>>
+type OptionArrayToOptionTupleSchema<Count extends number, Value extends Schema.Top> = Schema.Codec<
+  ReadonlyTupleOf<Count, Option.Option<Schema.Schema.Type<Value>>>,
+  ReadonlyArray<Option.Option<Schema.Codec.Encoded<Value>>>,
+  Schema.Codec.DecodingServices<Value>,
+  Schema.Codec.EncodingServices<Value>
 > & {
   readonly count: Count;
   readonly value: Value;
 };
 
-const makeOptionArrayToOptionTupleClass = <
+export const OptionArrayToOptionTupleSchema = <
   const Count extends number,
-  const Value extends Schema.Schema.Any,
+  const Value extends Schema.Top,
 >(
   count: Count,
   value: Value,
 ) => {
-  const ArraySchema = Schema.Array(Schema.OptionFromSelf(Schema.encodedSchema(value)));
+  const ArraySchema = Schema.Array(Schema.Option(Schema.toEncoded(value)));
   const TupleSchema = Schema.Tuple(
-    ...(Array.makeBy(count, () => Schema.OptionFromSelf(value)) as Types.TupleOf<
-      Count,
-      Schema.OptionFromSelf<Value>
-    >),
+    Array.makeBy(count, () => Schema.Option(value)) as ReadonlyTupleOf<Count, Schema.Option<Value>>,
   );
 
-  return class extends Schema.transform(ArraySchema, TupleSchema, {
-    strict: true,
-    decode: (array) =>
-      pipe(
-        TupleSchema.elements,
-        Array.map((_, index) => pipe(Array.get(array, index), Option.flatten)),
-      ) as unknown as Schema.Schema.Encoded<typeof TupleSchema>,
-    encode: Function.identity,
-  }) {
-    static count = count;
-    static value = value;
-  } as unknown as OptionArrayToOptionTupleSchema<Count, Value>;
+  const schema = ArraySchema.pipe(
+    Schema.decodeTo(TupleSchema, {
+      decode: SchemaGetter.transform(
+        (array) =>
+          Array.makeBy(count, (index) =>
+            pipe(Array.get(array, index), Option.flatten),
+          ) as unknown as Schema.Tuple.Encoded<ReadonlyTupleOf<Count, Schema.Option<Value>>>,
+      ),
+      encode: SchemaGetter.passthrough(),
+    }),
+  ) as unknown as OptionArrayToOptionTupleSchema<Count, Value>;
+
+  return Object.assign(schema, { count, value });
 };
-
-const OptionArrayToOptionTupleSchema = <
-  const Count extends number,
-  const Value extends Schema.Schema.Any,
->(
-  count: Count,
-  value: Value,
-): OptionArrayToOptionTupleSchema<Count, Value> => makeOptionArrayToOptionTupleClass(count, value);
-
-export { OptionArrayToOptionTupleSchema };

@@ -16,7 +16,7 @@ export const guildConfig = {
         sheetId: Schema.optional(Schema.NullOr(Schema.String)),
         autoCheckin: Schema.optional(Schema.NullOr(Schema.Boolean)),
       }),
-      Schema.standardSchemaV1,
+      Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) =>
       await tx.mutate.configGuild.upsert({
@@ -32,7 +32,7 @@ export const guildConfig = {
         guildId: Schema.String,
         roleId: Schema.String,
       }),
-      Schema.standardSchemaV1,
+      Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) =>
       await tx.mutate.configGuildManagerRole.upsert({
@@ -47,7 +47,7 @@ export const guildConfig = {
         guildId: Schema.String,
         roleId: Schema.String,
       }),
-      Schema.standardSchemaV1,
+      Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) =>
       await tx.mutate.configGuildManagerRole.update({
@@ -66,7 +66,7 @@ export const guildConfig = {
         roleId: Schema.optional(Schema.NullOr(Schema.String)),
         checkinChannelId: Schema.optional(Schema.NullOr(Schema.String)),
       }),
-      Schema.standardSchemaV1,
+      Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) =>
       await tx.mutate.configGuildChannel.upsert({

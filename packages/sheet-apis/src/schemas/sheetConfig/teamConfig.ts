@@ -35,6 +35,8 @@ export class TeamConfig extends Schema.TaggedClass<TeamConfig>()("TeamConfig", {
   sheet: Schema.OptionFromNullOr(Schema.String),
   playerNameRange: Schema.OptionFromNullOr(Schema.String),
   teamNameRange: Schema.OptionFromNullOr(Schema.String),
-  isvConfig: Schema.OptionFromNullOr(Schema.Union(TeamIsvSplitConfig, TeamIsvCombinedConfig)),
-  tagsConfig: Schema.OptionFromNullOr(Schema.Union(TeamTagsConstantsConfig, TeamTagsRangesConfig)),
+  isvConfig: Schema.OptionFromNullOr(Schema.Union([TeamIsvSplitConfig, TeamIsvCombinedConfig])),
+  tagsConfig: Schema.OptionFromNullOr(
+    Schema.Union([TeamTagsConstantsConfig, TeamTagsRangesConfig]),
+  ),
 }) {}

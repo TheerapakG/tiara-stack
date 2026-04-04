@@ -1,18 +1,11 @@
-import { HttpApiBuilder } from "@effect/platform";
-import { Effect, Layer } from "effect";
+import { HttpApiBuilder, HttpApiGroup } from "effect/unstable/httpapi";
+import { HttpClientError } from "effect/unstable/http";
+import { Effect, Layer, Predicate } from "effect";
 import { DiscordApi } from "./api";
-import {
-  GuildsCache,
-  ChannelsCache,
-  RolesCache,
-  MembersCache,
-  CachesLive,
-  Unstorage,
-} from "./cache";
+import { GuildsCache, ChannelsCache, RolesCache, MembersCache } from "./cache";
 import { DiscordApplication } from "./gateway";
 import { CacheNotFoundError } from "./schema";
-import { Api } from "@effect/platform/HttpApi";
-import { DiscordConfig } from "dfx";
+import { Discord, DiscordConfig } from "dfx";
 
 // Helper to convert a ReadonlyMap to CacheEntries array
 const mapToEntries = <A>(map: ReadonlyMap<string, A>, parentId: string) =>
@@ -31,8 +24,7 @@ const resourceMapToEntries = <A>(map: ReadonlyMap<string, A>, resourceId: string
   }));
 
 // Helper to check if error is CacheMissError
-const isCacheMissError = (err: unknown): err is { _tag: "CacheMissError" } =>
-  typeof err === "object" && err !== null && "_tag" in err && err._tag === "CacheMissError";
+const isCacheMissError = Predicate.isTagged("CacheMissError");
 
 // Helper to handle cache errors - converts CacheMissError to CacheNotFoundError, re-throws others as defects
 const handleCacheError = <A>(
@@ -40,7 +32,7 @@ const handleCacheError = <A>(
   notFoundMessage: string,
 ): Effect.Effect<A, CacheNotFoundError, never> =>
   effect.pipe(
-    Effect.catchAll((err) => {
+    Effect.catch((err) => {
       if (isCacheMissError(err)) {
         return Effect.fail(new CacheNotFoundError({ message: notFoundMessage }));
       }
@@ -59,27 +51,31 @@ const handleSizeError = <A>(
     Effect.orDie,
   );
 
-export const ApplicationLive = HttpApiBuilder.group(DiscordApi, "application", (handlers) =>
-  Effect.all({
-    application: DiscordApplication,
-  }).pipe(
-    Effect.map(({ application }) =>
-      handlers.handle("getApplication", () => Effect.succeed({ ownerId: application.owner.id })),
-    ),
-  ),
-).pipe(Layer.provide(DiscordApplication.Default));
+export const applicationLayer = HttpApiBuilder.group(
+  DiscordApi,
+  "application",
+  Effect.fnUntraced(function* (handlers) {
+    const application = yield* DiscordApplication;
 
-export const CacheApiLive = HttpApiBuilder.group(DiscordApi, "cache", (handlers) =>
-  Effect.all({
-    guildsCache: GuildsCache,
-    channelsCache: ChannelsCache,
-    rolesCache: RolesCache,
-    membersCache: MembersCache,
-  }).pipe(
-    Effect.map(({ guildsCache, channelsCache, rolesCache, membersCache }) =>
+    return handlers.handle("getApplication", () =>
+      Effect.succeed({ ownerId: application.owner.id }),
+    );
+  }),
+).pipe(Layer.provide(DiscordApplication.layer));
+
+export const cacheApiLayer = HttpApiBuilder.group(
+  DiscordApi,
+  "cache",
+  Effect.fnUntraced(function* (handlers) {
+    const guildsCache = yield* GuildsCache;
+    const channelsCache = yield* ChannelsCache;
+    const rolesCache = yield* RolesCache;
+    const membersCache = yield* MembersCache;
+
+    return (
       handlers
         // Guild cache endpoints
-        .handle("getGuild", ({ path: { resourceId } }) =>
+        .handle("getGuild", ({ params: { resourceId } }) =>
           handleCacheError(
             guildsCache.get(resourceId).pipe(Effect.map((value) => ({ value }))),
             `Guild ${resourceId} not found`,
@@ -92,28 +88,28 @@ export const CacheApiLive = HttpApiBuilder.group(DiscordApi, "cache", (handlers)
           ),
         )
         // Channel cache endpoints - get specific resource
-        .handle("getChannel", ({ path: { parentId, resourceId } }) =>
+        .handle("getChannel", ({ params: { parentId, resourceId } }) =>
           handleCacheError(
             channelsCache.get(parentId, resourceId).pipe(Effect.map((value) => ({ value }))),
             `Channel ${resourceId} in guild ${parentId} not found`,
           ),
         )
         // Role cache endpoints - get specific resource
-        .handle("getRole", ({ path: { parentId, resourceId } }) =>
+        .handle("getRole", ({ params: { parentId, resourceId } }) =>
           handleCacheError(
             rolesCache.get(parentId, resourceId).pipe(Effect.map((value) => ({ value }))),
             `Role ${resourceId} in guild ${parentId} not found`,
           ),
         )
         // Member cache endpoints - get specific resource
-        .handle("getMember", ({ path: { parentId, resourceId } }) =>
+        .handle("getMember", ({ params: { parentId, resourceId } }) =>
           handleCacheError(
             membersCache.get(parentId, resourceId).pipe(Effect.map((value) => ({ value }))),
             `Member ${resourceId} in guild ${parentId} not found`,
           ),
         )
         // Channel cache endpoints - get all for parent
-        .handle("getChannelsForParent", ({ path: { parentId } }) =>
+        .handle("getChannelsForParent", ({ params: { parentId } }) =>
           handleCacheError(
             channelsCache
               .getForParent(parentId)
@@ -122,7 +118,7 @@ export const CacheApiLive = HttpApiBuilder.group(DiscordApi, "cache", (handlers)
           ),
         )
         // Role cache endpoints - get all for parent
-        .handle("getRolesForParent", ({ path: { parentId } }) =>
+        .handle("getRolesForParent", ({ params: { parentId } }) =>
           handleCacheError(
             rolesCache
               .getForParent(parentId)
@@ -131,7 +127,7 @@ export const CacheApiLive = HttpApiBuilder.group(DiscordApi, "cache", (handlers)
           ),
         )
         // Member cache endpoints - get all for parent
-        .handle("getMembersForParent", ({ path: { parentId } }) =>
+        .handle("getMembersForParent", ({ params: { parentId } }) =>
           handleCacheError(
             membersCache
               .getForParent(parentId)
@@ -140,7 +136,7 @@ export const CacheApiLive = HttpApiBuilder.group(DiscordApi, "cache", (handlers)
           ),
         )
         // Channel cache endpoints - get all for resource (cross-parent lookup)
-        .handle("getChannelsForResource", ({ path: { resourceId } }) =>
+        .handle("getChannelsForResource", ({ params: { resourceId } }) =>
           handleCacheError(
             channelsCache
               .getForResource(resourceId)
@@ -149,7 +145,7 @@ export const CacheApiLive = HttpApiBuilder.group(DiscordApi, "cache", (handlers)
           ),
         )
         // Role cache endpoints - get all for resource (cross-parent lookup)
-        .handle("getRolesForResource", ({ path: { resourceId } }) =>
+        .handle("getRolesForResource", ({ params: { resourceId } }) =>
           handleCacheError(
             rolesCache
               .getForResource(resourceId)
@@ -158,7 +154,7 @@ export const CacheApiLive = HttpApiBuilder.group(DiscordApi, "cache", (handlers)
           ),
         )
         // Member cache endpoints - get all for resource (cross-parent lookup)
-        .handle("getMembersForResource", ({ path: { resourceId } }) =>
+        .handle("getMembersForResource", ({ params: { resourceId } }) =>
           handleCacheError(
             membersCache
               .getForResource(resourceId)
@@ -185,46 +181,50 @@ export const CacheApiLive = HttpApiBuilder.group(DiscordApi, "cache", (handlers)
             "Failed to get members size",
           ),
         )
-        .handle("getChannelsSizeForParent", ({ path: { parentId } }) =>
+        .handle("getChannelsSizeForParent", ({ params: { parentId } }) =>
           handleSizeError(
             channelsCache.sizeForParent(parentId).pipe(Effect.map((size) => ({ size }))),
-            `Failed to get channels size for guild ${parentId}`,
+            "Failed to get channels size for guild ${parentId}",
           ),
         )
-        .handle("getRolesSizeForParent", ({ path: { parentId } }) =>
+        .handle("getRolesSizeForParent", ({ params: { parentId } }) =>
           handleSizeError(
             rolesCache.sizeForParent(parentId).pipe(Effect.map((size) => ({ size }))),
-            `Failed to get roles size for guild ${parentId}`,
+            "Failed to get roles size for guild ${parentId}",
           ),
         )
-        .handle("getMembersSizeForParent", ({ path: { parentId } }) =>
+        .handle("getMembersSizeForParent", ({ params: { parentId } }) =>
           handleSizeError(
             membersCache.sizeForParent(parentId).pipe(Effect.map((size) => ({ size }))),
-            `Failed to get members size for guild ${parentId}`,
+            "Failed to get members size for guild ${parentId}",
           ),
         )
-        .handle("getChannelsSizeForResource", ({ path: { resourceId } }) =>
+        .handle("getChannelsSizeForResource", ({ params: { resourceId } }) =>
           handleSizeError(
             channelsCache.sizeForResource(resourceId).pipe(Effect.map((size) => ({ size }))),
-            `Failed to get channels size for resource ${resourceId}`,
+            "Failed to get channels size for resource ${resourceId}",
           ),
         )
-        .handle("getRolesSizeForResource", ({ path: { resourceId } }) =>
+        .handle("getRolesSizeForResource", ({ params: { resourceId } }) =>
           handleSizeError(
             rolesCache.sizeForResource(resourceId).pipe(Effect.map((size) => ({ size }))),
             `Failed to get roles size for resource ${resourceId}`,
           ),
         )
-        .handle("getMembersSizeForResource", ({ path: { resourceId } }) =>
+        .handle("getMembersSizeForResource", ({ params: { resourceId } }) =>
           handleSizeError(
             membersCache.sizeForResource(resourceId).pipe(Effect.map((size) => ({ size }))),
             `Failed to get members size for resource ${resourceId}`,
           ),
-        ),
-    ),
-  ),
-).pipe(Layer.provide(CachesLive));
+        )
+    );
+  }),
+);
 
-// Layer that provides the full API handlers
-export const DiscordApiLive: Layer.Layer<Api, never, DiscordConfig.DiscordConfig | Unstorage> =
-  Layer.provide(HttpApiBuilder.api(DiscordApi), [ApplicationLive, CacheApiLive]);
+export const discordApiLayer: Layer.Layer<
+  HttpApiGroup.ApiGroup<"discord", "application"> | HttpApiGroup.ApiGroup<"discord", "cache">,
+  | Discord.DiscordRestError<"RatelimitedResponse", Discord.RatelimitedResponse>
+  | Discord.DiscordRestError<"ErrorResponse", Discord.ErrorResponse>
+  | HttpClientError.HttpClientError,
+  DiscordConfig.DiscordConfig | ChannelsCache | GuildsCache | MembersCache | RolesCache
+> = Layer.merge(applicationLayer, cacheApiLayer);

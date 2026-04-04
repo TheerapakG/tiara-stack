@@ -1,23 +1,15 @@
-import { Effect, Layer, pipe } from "effect";
-import { type SheetAuthClient as SheetAuthClientValue } from "sheet-auth/client";
+import { Effect, Layer } from "effect";
 import { ApplicationOwnerResolver } from "../../services/applicationOwner";
 import { SheetAuthClient } from "../../services/sheetAuthClient";
 import { makeSheetAuthTokenAuthorization } from "./shared";
 import { SheetAuthTokenAuthorization } from "./tag";
 
-export const SheetAuthTokenAuthorizationLiveLayer = Layer.effect(
+export const SheetAuthTokenAuthorizationLive = Layer.effect(
   SheetAuthTokenAuthorization,
-  pipe(
-    Effect.all({
-      authClient: SheetAuthClient,
-      applicationOwnerResolver: ApplicationOwnerResolver,
-    }),
-    Effect.flatMap(({ authClient, applicationOwnerResolver }) =>
-      makeSheetAuthTokenAuthorization(authClient as SheetAuthClientValue, applicationOwnerResolver),
-    ),
-  ),
-);
+  Effect.gen(function* () {
+    const authClient = yield* SheetAuthClient;
+    const applicationOwnerResolver = yield* ApplicationOwnerResolver;
 
-export const SheetAuthTokenAuthorizationLive = SheetAuthTokenAuthorizationLiveLayer.pipe(
-  Layer.provide(Layer.mergeAll(SheetAuthClient.Default, ApplicationOwnerResolver.Default)),
-);
+    return yield* makeSheetAuthTokenAuthorization(authClient, applicationOwnerResolver);
+  }),
+).pipe(Layer.provide([SheetAuthClient.layer, ApplicationOwnerResolver.layer]));

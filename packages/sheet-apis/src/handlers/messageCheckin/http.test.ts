@@ -10,8 +10,13 @@ import {
 } from "./http";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
 import { MessageCheckin, MessageCheckinMember } from "@/schemas/messageCheckin";
-import type { MessageCheckinService } from "@/services/messageCheckin";
+import { MessageCheckinService } from "@/services";
 import { getFailure, liveGuildServices, withUser } from "@/test-utils/guildTestHelpers";
+
+type MessageCheckinAccessService = Pick<
+  typeof MessageCheckinService.Service,
+  "getMessageCheckinData" | "getMessageCheckinMembers"
+>;
 
 const makeMessageCheckinRecord = (overrides?: {
   readonly guildId?: string | null;
@@ -27,8 +32,8 @@ const makeMessageCheckinRecord = (overrides?: {
     hour: 1,
     channelId: "channel-1",
     roleId: Option.none(),
-    guildId: Option.fromNullable(guildId),
-    messageChannelId: Option.fromNullable(messageChannelId),
+    guildId: Option.fromNullishOr(guildId),
+    messageChannelId: Option.fromNullishOr(messageChannelId),
     createdByUserId: Option.some("creator-1"),
     createdAt: Option.none(),
     updatedAt: Option.none(),
@@ -51,9 +56,9 @@ const makeMessageCheckinService = (options?: {
   readonly members?: ReadonlyArray<MessageCheckinMember>;
 }) =>
   ({
-    getMessageCheckinData: () => Effect.succeed(Option.fromNullable(options?.record)),
+    getMessageCheckinData: () => Effect.succeed(Option.fromNullishOr(options?.record)),
     getMessageCheckinMembers: () => Effect.succeed([...(options?.members ?? [])]),
-  }) as unknown as MessageCheckinService;
+  }) satisfies MessageCheckinAccessService;
 
 describe("messageCheckin legacy access", () => {
   it.effect("denies legacy reads for bot users", () =>

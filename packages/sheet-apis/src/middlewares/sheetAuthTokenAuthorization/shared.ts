@@ -1,17 +1,18 @@
-import { Cache, Duration, Effect, Exit, Option, pipe, Redacted } from "effect";
+import { Cache, Duration, Effect, Exit, Option, Redacted, ServiceMap } from "effect";
 import {
   getAccount,
   getKubernetesOAuthImplicitPermissions,
   type SheetAuthClient as SheetAuthClientValue,
 } from "sheet-auth/client";
 import type { Permission, PermissionSet } from "@/schemas/permissions";
+import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
 import { appendPermission, hasPermission, permissionSetFromIterable } from "../authorization";
-import type { ApplicationOwnerResolver } from "../../services/applicationOwner";
 import { Unauthorized } from "../../schemas/middlewares/unauthorized";
 import { SheetAuthTokenAuthorization } from "./tag";
 
 const SUCCESS_TTL = Duration.seconds(30);
 const FAILURE_TTL = Duration.seconds(1);
+const sheetAuthUserTag = SheetAuthUser as ServiceMap.Reference<(typeof SheetAuthUser)["Type"]>;
 
 interface CachedAuthorization {
   userId: string;
@@ -28,7 +29,7 @@ const makeUnauthorized = (message: string, cause?: unknown) =>
 const resolveCachedAuthorization = (
   authClient: SheetAuthClientValue,
   token: Redacted.Redacted<string>,
-): Effect.Effect<CachedAuthorization, Unauthorized> =>
+) =>
   Effect.gen(function* () {
     const authorizationHeaders = {
       Authorization: `Bearer ${Redacted.value(token)}`,
@@ -37,12 +38,12 @@ const resolveCachedAuthorization = (
     const { account, permissions } = yield* Effect.all({
       account: getAccount(authClient, ["discord", "kubernetes:discord"], authorizationHeaders),
       permissions: getKubernetesOAuthImplicitPermissions(authClient, authorizationHeaders).pipe(
-        Effect.catchAll(() => Effect.succeed({ permissions: [] })),
+        Effect.catch(() => Effect.succeed({ permissions: [] as string[] })),
       ),
     }).pipe(Effect.mapError((error) => makeUnauthorized(error.message, error.cause)));
 
     const discardedPermissions = permissions.permissions.filter(
-      (permission) => permission !== "bot",
+      (permission: string) => permission !== "bot",
     );
     if (discardedPermissions.length > 0) {
       yield* Effect.logWarning(
@@ -53,7 +54,7 @@ const resolveCachedAuthorization = (
     return {
       userId: account.userId,
       accountId: account.accountId,
-      permissions: permissions.permissions.some((permission) => permission === "bot")
+      permissions: permissions.permissions.some((permission: string) => permission === "bot")
         ? permissionSetFromIterable(["bot"] satisfies Extract<Permission, "bot">[])
         : permissionSetFromIterable([] as Permission[]),
     };
@@ -61,8 +62,10 @@ const resolveCachedAuthorization = (
 
 const resolveBaseAuthorizationPermissions = (
   authorization: CachedAuthorization,
-  applicationOwnerResolver: ApplicationOwnerResolver,
-): Effect.Effect<PermissionSet> =>
+  applicationOwnerResolver: {
+    getOwnerId: () => Effect.Effect<Option.Option<string>, never, never>;
+  },
+) =>
   Effect.gen(function* () {
     let permissions = appendPermission(
       authorization.permissions,
@@ -86,8 +89,10 @@ const resolveBaseAuthorizationPermissions = (
 
 export const makeSheetAuthTokenAuthorization = (
   authClient: SheetAuthClientValue,
-  applicationOwnerResolver: ApplicationOwnerResolver,
-): Effect.Effect<SheetAuthTokenAuthorization["Type"]> =>
+  applicationOwnerResolver: {
+    getOwnerId: () => Effect.Effect<Option.Option<string>, never, never>;
+  },
+) =>
   Effect.gen(function* () {
     const authorizationCache = yield* Cache.makeWith({
       capacity: Infinity,
@@ -98,23 +103,33 @@ export const makeSheetAuthTokenAuthorization = (
       }),
     });
 
+    const sheetAuthToken = ((httpEffect, { credential }) =>
+      Effect.gen(function* () {
+        const authorization = yield* Cache.get(authorizationCache, credential);
+        const permissions = yield* resolveBaseAuthorizationPermissions(
+          authorization,
+          applicationOwnerResolver,
+        );
+
+        const authorizedHttpEffect = Effect.provideService(
+          httpEffect as unknown as Effect.Effect<unknown, never, typeof sheetAuthUserTag>,
+          sheetAuthUserTag,
+          {
+            accountId: authorization.accountId,
+            userId: authorization.userId,
+            permissions,
+            token: credential,
+          },
+        ) as unknown as Effect.Effect<unknown, never, never>;
+
+        return yield* Effect.withSpan(
+          authorizedHttpEffect,
+          "SheetAuthTokenAuthorization.sheetAuthToken",
+          { captureStackTrace: true },
+        );
+      })) as ReturnType<typeof SheetAuthTokenAuthorization.of>["sheetAuthToken"];
+
     return SheetAuthTokenAuthorization.of({
-      sheetAuthToken: (token) =>
-        pipe(
-          authorizationCache.get(token),
-          Effect.flatMap((authorization) =>
-            resolveBaseAuthorizationPermissions(authorization, applicationOwnerResolver).pipe(
-              Effect.map((permissions) => ({
-                accountId: authorization.accountId,
-                userId: authorization.userId,
-                permissions,
-                token,
-              })),
-            ),
-          ),
-          Effect.withSpan("SheetAuthTokenAuthorization.sheetAuthToken", {
-            captureStackTrace: true,
-          }),
-        ),
+      sheetAuthToken,
     });
   });

@@ -5,8 +5,8 @@ export class GuildConfigMonitorRole extends Schema.TaggedClass<GuildConfigMonito
   {
     guildId: Schema.String,
     roleId: Schema.String,
-    createdAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromNumber),
-    updatedAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromNumber),
-    deletedAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromNumber),
+    createdAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromMillis),
+    updatedAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromMillis),
+    deletedAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromMillis),
   },
 ) {}

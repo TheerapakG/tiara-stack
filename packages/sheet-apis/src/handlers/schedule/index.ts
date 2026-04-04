@@ -1,2 +1,2 @@
 export { ScheduleApi } from "./api";
-export { ScheduleLive } from "./http";
+export { scheduleLayer } from "./http";

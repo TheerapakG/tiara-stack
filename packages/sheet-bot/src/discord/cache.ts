@@ -1,15 +1,17 @@
-import { Effect, Layer, Redacted, pipe } from "effect";
-import { Unstorage } from "dfx-discord-utils/discord/cache";
+import { Effect, Layer, Redacted } from "effect";
+import { Unstorage, cachesLayer as discordCachesLayer } from "dfx-discord-utils/discord/cache";
 import { config } from "@/config";
+import { discordConfigLayer } from "./config";
 
-export const UnstorageLayer = pipe(
-  Unstorage.PrefixedLive("discord:"),
-  Layer.provide(
-    Layer.unwrapEffect(
-      Effect.gen(function* () {
-        const redisUrl = yield* config.redisUrl;
-        return Unstorage.RedisLive({ url: Redacted.value(redisUrl) });
-      }),
-    ),
-  ),
+const redisLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const redisUrl = yield* config.redisUrl;
+    return Unstorage.redisLayer({ url: Redacted.value(redisUrl) });
+  }),
+);
+
+const prefixedUnstorageLayer = Unstorage.prefixedLayer("discord:").pipe(Layer.provide(redisLayer));
+
+export const cachesLayer = discordCachesLayer.pipe(
+  Layer.provide([prefixedUnstorageLayer, discordConfigLayer]),
 );

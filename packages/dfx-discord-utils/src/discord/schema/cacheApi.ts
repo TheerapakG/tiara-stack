@@ -1,4 +1,3 @@
-import { HttpApiSchema } from "@effect/platform";
 import { Schema } from "effect";
 import { DiscordChannel } from "./channel";
 import { DiscordGuild } from "./guild";
@@ -51,13 +50,13 @@ export const CacheSizeSchema = Schema.Struct({
   size: Schema.Number,
 });
 
-export class CacheNotFoundError extends Schema.TaggedError<CacheNotFoundError>()(
+export class CacheNotFoundError extends Schema.TaggedErrorClass<CacheNotFoundError>()(
   "CacheNotFoundError",
   { message: Schema.String },
-  HttpApiSchema.annotations({ status: 404 }),
+  { httpApiStatus: 404 },
 ) {}
 
-export class CacheReadonlyError extends Schema.TaggedError<CacheReadonlyError>()(
+export class CacheReadonlyError extends Schema.TaggedErrorClass<CacheReadonlyError>()(
   "CacheReadonlyError",
   { message: Schema.String },
 ) {}

@@ -1,4 +1,4 @@
-import { Registry } from "@effect-atom/atom-react";
+import { AtomRegistry } from "effect/unstable/reactivity";
 import { HeadContent, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
@@ -15,7 +15,7 @@ import { ensureResultAtomData } from "#/lib/atomRegistry";
 import { sessionAtom } from "#/lib/auth";
 
 interface RouterContext {
-  atomRegistry: Registry.Registry;
+  atomRegistry: AtomRegistry.AtomRegistry;
 }
 
 // Error fallback component for root route

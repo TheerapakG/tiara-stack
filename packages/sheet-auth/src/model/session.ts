@@ -2,8 +2,8 @@ import { Schema } from "effect";
 
 const SessionData = {
   user: Schema.Struct({
-    createdAt: Schema.DateTimeUtcFromNumber,
-    updatedAt: Schema.DateTimeUtcFromNumber,
+    createdAt: Schema.DateTimeUtcFromMillis,
+    updatedAt: Schema.DateTimeUtcFromMillis,
     email: Schema.String,
     emailVerified: Schema.Boolean,
     name: Schema.String,
@@ -11,10 +11,10 @@ const SessionData = {
   }),
   session: Schema.UndefinedOr(
     Schema.Struct({
-      createdAt: Schema.DateTimeUtcFromNumber,
-      updatedAt: Schema.DateTimeUtcFromNumber,
+      createdAt: Schema.DateTimeUtcFromMillis,
+      updatedAt: Schema.DateTimeUtcFromMillis,
       userId: Schema.String,
-      expiresAt: Schema.DateTimeUtcFromNumber,
+      expiresAt: Schema.DateTimeUtcFromMillis,
       token: Schema.String,
       ipAddress: Schema.optional(Schema.NullOr(Schema.String)),
       userAgent: Schema.optional(Schema.NullOr(Schema.String)),
@@ -23,14 +23,4 @@ const SessionData = {
   token: Schema.UndefinedOr(Schema.Redacted(Schema.String)),
 };
 
-const SessionTaggedClass: Schema.TaggedClass<
-  Session,
-  "Session",
-  {
-    readonly _tag: Schema.tag<"Session">;
-  } & {
-    readonly [K in keyof typeof SessionData]: (typeof SessionData)[K];
-  }
-> = Schema.TaggedClass<Session>()("Session", SessionData);
-
-export class Session extends SessionTaggedClass {}
+export class Session extends Schema.TaggedClass<Session>()("Session", SessionData) {}

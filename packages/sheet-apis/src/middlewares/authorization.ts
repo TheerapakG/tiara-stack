@@ -1,4 +1,5 @@
-import { MembersApiCacheView, RolesApiCacheView } from "dfx-discord-utils/discord/cache";
+import { MembersApiCacheView } from "dfx-discord-utils/discord/cache/members";
+import { RolesApiCacheView } from "dfx-discord-utils/discord/cache/roles";
 import { CacheNotFoundError } from "dfx-discord-utils/discord/schema";
 import type { CachedGuildMember } from "dfx-discord-utils/cache";
 import { Discord, Perms } from "dfx";
@@ -7,7 +8,10 @@ import type { Permission, PermissionSet } from "@/schemas/permissions";
 import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
-import { GuildConfigService } from "@/services/guildConfig";
+import { GuildConfigService } from "@/services";
+
+type SheetAuthUserType = (typeof SheetAuthUser)["Type"];
+type SheetAuthGuildUserType = (typeof SheetAuthGuildUser)["Type"];
 
 export const permissionSetFromIterable = (permissions: Iterable<Permission>): PermissionSet =>
   HashSet.fromIterable(permissions);
@@ -59,11 +63,13 @@ const hasMonitorGuildPermission = (
 const getOptionalGuildMember = (
   guildId: string,
   accountId: string,
-  membersCache: MembersApiCacheView,
+  membersCache: {
+    get: (guildId: string, accountId: string) => Effect.Effect<CachedGuildMember, unknown>;
+  },
 ) =>
   membersCache.get(guildId, accountId).pipe(
     Effect.map(Option.some),
-    Effect.catchAll((error) => {
+    Effect.catch((error) => {
       if (error instanceof CacheNotFoundError) {
         return Effect.succeed(Option.none());
       }
@@ -80,10 +86,10 @@ interface ResolvedGuildPermissions {
 }
 
 const makeSheetAuthGuildUser = (
-  user: SheetAuthUser["Type"],
+  user: SheetAuthUserType,
   guildId: string,
   permissions: PermissionSet,
-): SheetAuthGuildUser["Type"] => ({
+): SheetAuthGuildUserType => ({
   accountId: user.accountId,
   userId: user.userId,
   guildId,
@@ -91,7 +97,14 @@ const makeSheetAuthGuildUser = (
   token: user.token,
 });
 
-const getOptionalMonitorRoleIds = (guildId: string, guildConfigService: GuildConfigService) =>
+const getOptionalMonitorRoleIds = (
+  guildId: string,
+  guildConfigService: {
+    getGuildMonitorRoles: (
+      guildId: string,
+    ) => Effect.Effect<ReadonlyArray<{ roleId: string }>, unknown>;
+  },
+) =>
   guildConfigService
     .getGuildMonitorRoles(guildId)
     .pipe(
@@ -104,17 +117,16 @@ const getOptionalMonitorRoleIds = (guildId: string, guildConfigService: GuildCon
       ),
     );
 
-const getOptionalGuildRoles = (guildId: string, rolesCache: RolesApiCacheView) =>
-  rolesCache.getForParent(guildId).pipe(Effect.tapError(Effect.logError), Effect.option);
-
-const resolveGuildScopedPermissions = (
-  user: SheetAuthUser["Type"],
+const getOptionalGuildRoles = (
   guildId: string,
-): Effect.Effect<
-  ResolvedGuildPermissions,
-  never,
-  MembersApiCacheView | GuildConfigService | RolesApiCacheView
-> =>
+  rolesCache: {
+    getForParent: (
+      guildId: string,
+    ) => Effect.Effect<ReadonlyMap<string, Discord.GuildRoleResponse>, unknown>;
+  },
+) => rolesCache.getForParent(guildId).pipe(Effect.tapError(Effect.logError), Effect.option);
+
+const resolveGuildScopedPermissions = (user: SheetAuthUserType, guildId: string) =>
   Effect.gen(function* () {
     if (hasPermission(user.permissions, "bot") || hasPermission(user.permissions, "app_owner")) {
       return {
@@ -127,11 +139,9 @@ const resolveGuildScopedPermissions = (
       } satisfies ResolvedGuildPermissions;
     }
 
-    const { membersCache, guildConfigService, rolesCache } = yield* Effect.all({
-      membersCache: MembersApiCacheView,
-      guildConfigService: GuildConfigService,
-      rolesCache: RolesApiCacheView,
-    });
+    const membersCache = yield* MembersApiCacheView;
+    const guildConfigService = yield* GuildConfigService;
+    const rolesCache = yield* RolesApiCacheView;
 
     const [maybeMember, maybeMonitorRoleIds, maybeRoles] = yield* Effect.all(
       [
@@ -171,41 +181,44 @@ const resolveGuildScopedPermissions = (
     } satisfies ResolvedGuildPermissions;
   });
 
-export const resolveSheetAuthGuildUser = (user: SheetAuthUser["Type"], guildId: string) =>
+export const resolveSheetAuthGuildUser = (user: SheetAuthUserType, guildId: string) =>
   resolveGuildScopedPermissions(user, guildId).pipe(
     Effect.map(({ permissions }) => makeSheetAuthGuildUser(user, guildId, permissions)),
   );
 
 export const resolveCurrentGuildUser = (guildId: string) =>
-  SheetAuthUser.pipe(Effect.flatMap((user) => resolveSheetAuthGuildUser(user, guildId)));
+  Effect.gen(function* () {
+    const user = yield* SheetAuthUser;
+    return yield* resolveSheetAuthGuildUser(user, guildId);
+  });
 
 const provideResolvedGuildUser = <A, E, R, R2>(
-  resolvedGuildUser: Effect.Effect<SheetAuthGuildUser["Type"], never, R2>,
+  resolvedGuildUser: Effect.Effect<SheetAuthGuildUserType, never, R2>,
   effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E, Exclude<R | R2, SheetAuthGuildUser>> =>
+): Effect.Effect<A, E, Exclude<R | R2, typeof SheetAuthGuildUser>> =>
   resolvedGuildUser.pipe(
     Effect.flatMap((user) => effect.pipe(Effect.provideService(SheetAuthGuildUser, user))),
     // Safe cast: provideService satisfies SheetAuthGuildUser for downstream effects,
     // but TypeScript does not remove the requirement from R automatically.
-  ) as Effect.Effect<A, E, Exclude<R | R2, SheetAuthGuildUser>>;
+  ) as Effect.Effect<A, E, Exclude<R | R2, typeof SheetAuthGuildUser>>;
 
 export const provideCurrentGuildUser = <A, E, R>(guildId: string, effect: Effect.Effect<A, E, R>) =>
   provideResolvedGuildUser(resolveCurrentGuildUser(guildId), effect);
 
 const getRequiredCurrentGuildUser = (guildId: string) =>
-  SheetAuthGuildUser.pipe(
-    Effect.flatMap((user) =>
-      user.guildId === guildId
-        ? Effect.succeed(user)
-        : Effect.die(
-            new Error(
-              `SheetAuthGuildUser guild mismatch: expected ${guildId}, received ${user.guildId}`,
-            ),
-          ),
-    ),
-  );
+  Effect.gen(function* () {
+    const user = yield* SheetAuthGuildUser;
 
-export const getGuildMonitorAccessLevel = (user: SheetAuthUser["Type"], guildId: string) =>
+    if (user.guildId === guildId) {
+      return user;
+    }
+
+    return yield* Effect.die(
+      new Error(`SheetAuthGuildUser guild mismatch: expected ${guildId}, received ${user.guildId}`),
+    );
+  });
+
+export const getGuildMonitorAccessLevel = (user: SheetAuthUserType, guildId: string) =>
   resolveSheetAuthGuildUser(user, guildId).pipe(
     Effect.map((resolvedUser) =>
       hasGuildPermission(resolvedUser.permissions, "monitor_guild", guildId)
@@ -245,32 +258,32 @@ export const requireMonitorGuild = (
 ) => requireResolvedGuildPermission(guildId, "monitor", message);
 
 export const requireBot = (message = "User is not the bot") =>
-  SheetAuthUser.pipe(
-    Effect.flatMap((user) =>
-      requirePermissions(
-        user.permissions,
-        (permissions) => hasPermission(permissions, "bot"),
-        message,
-      ),
-    ),
-  );
+  Effect.gen(function* () {
+    const user = yield* SheetAuthUser;
+
+    return yield* requirePermissions(
+      user.permissions,
+      (permissions) => hasPermission(permissions, "bot"),
+      message,
+    );
+  });
 
 export const requireDiscordAccountId = (
   accountId: string,
   message = "User does not have access to this user",
 ) =>
-  SheetAuthUser.pipe(
-    Effect.flatMap((user) =>
-      requirePermissions(
-        user.permissions,
-        (permissions) =>
-          hasPermission(permissions, "bot") ||
-          hasPermission(permissions, "app_owner") ||
-          hasDiscordAccountPermission(permissions, accountId),
-        message,
-      ),
-    ),
-  );
+  Effect.gen(function* () {
+    const user = yield* SheetAuthUser;
+
+    return yield* requirePermissions(
+      user.permissions,
+      (permissions) =>
+        hasPermission(permissions, "bot") ||
+        hasPermission(permissions, "app_owner") ||
+        hasDiscordAccountPermission(permissions, accountId),
+      message,
+    );
+  });
 
 export const requireDiscordAccountIdOrMonitorGuild = (
   guildId: string,

@@ -1,14 +1,12 @@
-import { Atom } from "@effect-atom/atom-react";
-import { PlatformConfigProvider } from "@effect/platform";
-import { NodeContext } from "@effect/platform-node";
+import { Atom } from "effect/unstable/reactivity";
+import { NodeFileSystem } from "@effect/platform-node";
 import { createServerFn, createIsomorphicFn } from "@tanstack/react-start";
 import { Layer, ConfigProvider, Effect } from "effect";
 import { authBaseUrlConfig, appBaseUrlConfig, sheetApisBaseUrlConfig } from "#/lib/config";
 
 // Server-side: Load config directly from .env file
-const serverConfigLayer = Layer.provide(
-  PlatformConfigProvider.layerDotEnvAdd(".env"),
-  NodeContext.layer,
+const serverConfigLayer = ConfigProvider.layerAdd(ConfigProvider.fromDotEnv()).pipe(
+  Layer.provide(NodeFileSystem.layer),
 );
 
 // Server function to fetch config from server-side env
@@ -44,11 +42,11 @@ const getConfigServerFn = createServerFn({ method: "GET" }).handler(() =>
 const fetchConfigLayer = Effect.gen(function* () {
   const config = yield* Effect.tryPromise(() => getConfigServerFn()).pipe(
     Effect.tapError((error) => Effect.logError("Failed to fetch config from server:", error)),
-    Effect.catchAll(() => Effect.succeed({} as Record<string, string | null>)),
+    Effect.catch(() => Effect.succeed({} as Record<string, string | null>)),
   );
 
-  return Layer.setConfigProvider(ConfigProvider.fromJson(config));
-}).pipe(Layer.unwrapEffect);
+  return ConfigProvider.layer(ConfigProvider.fromUnknown(config));
+}).pipe(Layer.unwrap);
 
 // Create a config layer from server function (client) or directly from env (server)
 const EnvConfigLive = createIsomorphicFn()

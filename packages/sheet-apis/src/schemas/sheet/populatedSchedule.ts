@@ -5,11 +5,14 @@ import { RawSchedulePlayer } from "./rawSchedulePlayer";
 import { Schedule } from "./schedule";
 import { ScheduleHourWindow } from "./hourWindow";
 
+const PopulatedSchedulePlayerOrPartial = Schema.Union([Player, PartialNamePlayer]);
+const PopulatedScheduleMonitorOrPartial = Schema.Union([Monitor, PartialNameMonitor]);
+
 // Player wrapper with resolved player and enc flag
 export class PopulatedSchedulePlayer extends Schema.TaggedClass<PopulatedSchedulePlayer>()(
   "PopulatedSchedulePlayer",
   {
-    player: Schema.Union(Player, PartialNamePlayer),
+    player: PopulatedSchedulePlayerOrPartial,
     enc: Schema.Boolean,
   },
 ) {}
@@ -18,7 +21,7 @@ export class PopulatedSchedulePlayer extends Schema.TaggedClass<PopulatedSchedul
 export class PopulatedScheduleMonitor extends Schema.TaggedClass<PopulatedScheduleMonitor>()(
   "PopulatedScheduleMonitor",
   {
-    monitor: Schema.Union(Monitor, PartialNameMonitor),
+    monitor: PopulatedScheduleMonitorOrPartial,
   },
 ) {}
 
@@ -31,9 +34,8 @@ export class PopulatedSchedule extends Schema.TaggedClass<PopulatedSchedule>()(
     visible: Schema.Boolean,
     hour: Schema.OptionFromNullOr(Schema.Number),
     hourWindow: Schema.OptionFromNullOr(ScheduleHourWindow),
-    fills: pipe(
-      Schema.Array(Schema.OptionFromNullOr(PopulatedSchedulePlayer)),
-      Schema.itemsCount(5),
+    fills: Schema.Array(Schema.OptionFromNullOr(PopulatedSchedulePlayer)).check(
+      Schema.isLengthBetween(5, 5),
     ),
     overfills: Schema.Array(PopulatedSchedulePlayer),
     standbys: Schema.Array(PopulatedSchedulePlayer),
@@ -59,7 +61,7 @@ export class PopulatedBreakSchedule extends Schema.TaggedClass<PopulatedBreakSch
 
 // Union type for all populated schedule results
 export type PopulatedScheduleResult = PopulatedBreakSchedule | PopulatedSchedule;
-export const PopulatedScheduleResult = Schema.Union(PopulatedBreakSchedule, PopulatedSchedule);
+export const PopulatedScheduleResult = Schema.Union([PopulatedBreakSchedule, PopulatedSchedule]);
 
 // Helper type for player resolution map
 type PlayerResolutionMap = HashMap.HashMap<string, Array.NonEmptyArray<Player | PartialNamePlayer>>;
@@ -79,7 +81,7 @@ const getPlayerFromMap = (
   if (Option.isSome(result)) {
     return result.value;
   }
-  return Array.make(PartialNamePlayer.make({ name }));
+  return Array.make(PartialNamePlayer.makeUnsafe({ name }));
 };
 
 // Helper function to get monitor from map
@@ -91,7 +93,7 @@ const getMonitorFromMap = (
   if (Option.isSome(result)) {
     return result.value;
   }
-  return Array.make(PartialNameMonitor.make({ name }));
+  return Array.make(PartialNameMonitor.makeUnsafe({ name }));
 };
 
 // Creates a PopulatedSchedulePlayer from raw player data and resolved player
@@ -99,7 +101,7 @@ const makePopulatedSchedulePlayer = (
   rawPlayer: RawSchedulePlayer,
   resolvedPlayers: Array.NonEmptyArray<Player | PartialNamePlayer>,
 ): PopulatedSchedulePlayer =>
-  PopulatedSchedulePlayer.make({
+  PopulatedSchedulePlayer.makeUnsafe({
     player: Array.headNonEmpty(resolvedPlayers),
     enc: rawPlayer.enc,
   });
@@ -109,7 +111,7 @@ const makePopulatedScheduleMonitor = (
   monitorName: string,
   resolvedMonitors: Array.NonEmptyArray<Monitor | PartialNameMonitor>,
 ): PopulatedScheduleMonitor =>
-  PopulatedScheduleMonitor.make({
+  PopulatedScheduleMonitor.makeUnsafe({
     monitor: Array.headNonEmpty(resolvedMonitors),
   });
 
@@ -163,7 +165,7 @@ export const toPopulatedSchedule = (
     ),
   );
 
-  return PopulatedSchedule.make({
+  return PopulatedSchedule.makeUnsafe({
     channel: schedule.channel,
     day: schedule.day,
     visible: schedule.visible,

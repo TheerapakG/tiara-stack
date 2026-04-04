@@ -1,8 +1,8 @@
-import { Schema } from "effect";
+import { Config, Schema } from "effect";
 
 export const config = {
-  discordToken: Schema.Config("DISCORD_TOKEN", Schema.Redacted(Schema.String)),
-  redisUrl: Schema.Config("REDIS_URL", Schema.Redacted(Schema.String)),
-  sheetApisBaseUrl: Schema.Config("SHEET_APIS_BASE_URL", Schema.String),
-  sheetAuthIssuer: Schema.Config("SHEET_AUTH_ISSUER", Schema.String),
+  discordToken: Config.schema(Schema.Redacted(Schema.String), "DISCORD_TOKEN"),
+  redisUrl: Config.schema(Schema.Redacted(Schema.String), "REDIS_URL"),
+  sheetApisBaseUrl: Config.schema(Schema.String, "SHEET_APIS_BASE_URL"),
+  sheetAuthIssuer: Config.schema(Schema.String, "SHEET_AUTH_ISSUER"),
 };

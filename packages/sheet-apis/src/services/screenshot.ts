@@ -1,5 +1,5 @@
-import { Array, Effect, HashMap, Option, pipe } from "effect";
-import { HttpClient } from "@effect/platform";
+import { Array, Effect, HashMap, Layer, Option, ServiceMap, pipe } from "effect";
+import { HttpClient } from "effect/unstable/http";
 import { chromium } from "playwright";
 import { SheetService } from "./sheet";
 import { joinURL, withQuery } from "ufo";
@@ -7,92 +7,79 @@ import { Struct as StructUtils } from "typhoon-core/utils";
 import { makeUnknownError } from "typhoon-core/error";
 import { GoogleSheets } from "./google/sheets";
 
-export class ScreenshotService extends Effect.Service<ScreenshotService>()("ScreenshotService", {
-  effect: pipe(
-    Effect.all(
-      {
-        googleSheets: GoogleSheets,
-        sheetService: SheetService,
-        httpClient: HttpClient.HttpClient,
-      },
-      { concurrency: "unbounded" },
-    ),
-    Effect.map(({ googleSheets, sheetService, httpClient }) => ({
-      getScreenshot: (sheetId: string, channel: string, day: number) =>
-        pipe(
-          Effect.Do,
-          Effect.bindAll(
-            () => ({
-              sheetGids: googleSheets.getSheetGids(sheetId),
-              scheduleConfigs: sheetService.getScheduleConfig(sheetId),
-            }),
+export class ScreenshotService extends ServiceMap.Service<ScreenshotService>()(
+  "ScreenshotService",
+  {
+    make: Effect.gen(function* () {
+      const googleSheets = yield* GoogleSheets;
+      const sheetService = yield* SheetService;
+      const httpClient = yield* HttpClient.HttpClient;
+
+      return {
+        getScreenshot: Effect.fn("ScreenshotService.getScreenshot")(function* (
+          sheetId: string,
+          channel: string,
+          day: number,
+        ) {
+          const [sheetGids, scheduleConfigs] = yield* Effect.all(
+            [googleSheets.getSheetGids(sheetId), sheetService.getScheduleConfig(sheetId)],
             { concurrency: "unbounded" },
-          ),
-          Effect.map(({ sheetGids, scheduleConfigs }) => {
-            const filteredConfig = pipe(
-              scheduleConfigs,
-              Array.map(
-                StructUtils.GetSomeFields.getSomeFields(["channel", "day", "screenshotRange"]),
-              ),
-              Array.getSomes,
-              Array.filter((a) => a.channel === channel && a.day === day),
-              Array.head,
-            );
-            const sheetGid = filteredConfig.pipe(
-              Option.flatMap((a) => a.sheet),
-              Option.flatMap((a) => HashMap.get(sheetGids, a)),
-              Option.flatten,
-            );
-            return { filteredConfig, sheetGid };
-          }),
-          Effect.flatMap(({ filteredConfig, sheetGid }) => {
-            if (Option.isNone(filteredConfig)) {
-              return Effect.fail(
-                makeUnknownError(
-                  "Could not generate screenshot URL",
-                  new Error("Missing schedule config"),
-                ),
-              );
-            }
-            if (Option.isNone(sheetGid)) {
-              return Effect.fail(
-                makeUnknownError(
-                  "Could not generate screenshot URL",
-                  new Error("Missing sheet GID"),
-                ),
-              );
-            }
-            const config = filteredConfig.value;
-            const url = withQuery(
-              joinURL("https://docs.google.com/spreadsheets/d", `/${sheetId}`, `/htmlembed`),
-              {
-                single: true,
-                gid: sheetGid.value,
-                range: config.screenshotRange,
-                widget: false,
-                chrome: false,
-                headers: false,
-              },
-            );
-            return Effect.succeed({ url, config });
-          }),
-          Effect.tap(({ url }) => Effect.log(`Screenshot URL: ${url}`)),
-          Effect.bind("css", () =>
-            pipe(
-              httpClient.get(
-                withQuery("https://fonts.googleapis.com/css2", {
-                  family: ["Lexend:wght@100..900", "Pacifico"],
-                  display: "swap",
-                }),
-              ),
-              Effect.flatMap((response) => response.text),
-              Effect.catchAll((error) => Effect.fail(makeUnknownError("Error getting CSS", error))),
-              Effect.map((css) =>
-                css.replace(/font-family: '([^']+)';/g, `font-family: 'docs-$1';`),
-              ),
+          );
+          const filteredConfig = pipe(
+            scheduleConfigs,
+            Array.map(
+              StructUtils.GetSomeFields.getSomeFields(["channel", "day", "screenshotRange"]),
             ),
-          ),
-          Effect.flatMap(({ url, css }) =>
+            Array.getSomes,
+            Array.filter((a) => a.channel === channel && a.day === day),
+            Array.head,
+          );
+          const sheetGid = pipe(
+            filteredConfig,
+            Option.flatMap((a) => a.sheet),
+            Option.flatMap((a) => HashMap.get(sheetGids, a)),
+            Option.flatten,
+          );
+
+          if (Option.isNone(filteredConfig)) {
+            return yield* Effect.fail(
+              makeUnknownError(
+                "Could not generate screenshot URL",
+                new Error("Missing schedule config"),
+              ),
+            );
+          }
+          if (Option.isNone(sheetGid)) {
+            return yield* Effect.fail(
+              makeUnknownError("Could not generate screenshot URL", new Error("Missing sheet GID")),
+            );
+          }
+
+          const url = withQuery(
+            joinURL("https://docs.google.com/spreadsheets/d", `/${sheetId}`, `/htmlembed`),
+            {
+              single: true,
+              gid: sheetGid.value,
+              range: filteredConfig.value.screenshotRange,
+              widget: false,
+              chrome: false,
+              headers: false,
+            },
+          );
+          yield* Effect.log(`Screenshot URL: ${url}`);
+          const css = yield* pipe(
+            httpClient.get(
+              withQuery("https://fonts.googleapis.com/css2", {
+                family: ["Lexend:wght@100..900", "Pacifico"],
+                display: "swap",
+              }),
+            ),
+            Effect.flatMap((response) => response.text),
+            Effect.catch((error) => Effect.fail(makeUnknownError("Error getting CSS", error))),
+            Effect.map((css) => css.replace(/font-family: '([^']+)';/g, `font-family: 'docs-$1';`)),
+          );
+
+          return yield* pipe(
             Effect.tryPromise({
               try: async () => {
                 const browser = await chromium.launch();
@@ -116,13 +103,15 @@ export class ScreenshotService extends Effect.Service<ScreenshotService>()("Scre
               },
               catch: (error) => makeUnknownError("Error getting screenshot", error),
             }),
-          ),
-          Effect.withSpan("ScreenshotService.getScreenshot", {
-            captureStackTrace: true,
-          }),
-        ),
-    })),
-  ),
-  dependencies: [GoogleSheets.Default, SheetService.Default],
-  accessors: true,
-}) {}
+            Effect.withSpan("ScreenshotService.getScreenshot"),
+          );
+        }),
+      };
+    }),
+  },
+) {
+  static layer = Layer.effect(ScreenshotService, this.make).pipe(
+    Layer.provide(GoogleSheets.layer),
+    Layer.provide(SheetService.layer),
+  );
+}

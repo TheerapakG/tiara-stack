@@ -1,54 +1,46 @@
-import { DiscordConfig } from "dfx";
-import { Effect, Layer, pipe } from "effect";
+import { Effect, Layer, ServiceMap } from "effect";
 import {
   channelsApiCacheViewWithReverseLookup,
   channelsCacheViewWithReverseLookup,
   channelsWithReverseLookup,
   unstorageWithReverseLookupDriver,
 } from "@/cache";
-import { DiscordApiClient } from "../discordApiClient";
-import { DiscordGatewayLayer } from "../gateway";
+import { discordGatewayLayer } from "../gateway";
 import { Unstorage } from "./shared";
 
-export class ChannelsCache extends Effect.Service<ChannelsCache>()("ChannelsCache", {
-  scoped: pipe(
-    Unstorage.prefixed("channels:"),
-    Effect.andThen((storage) =>
-      channelsWithReverseLookup(unstorageWithReverseLookupDriver({ storage })),
-    ),
-  ),
-  dependencies: [DiscordGatewayLayer] as const,
-}) {}
+export class ChannelsCache extends ServiceMap.Service<ChannelsCache>()("ChannelsCache", {
+  make: Effect.gen(function* () {
+    const storage = yield* Unstorage.prefixed("channels:");
+    return yield* channelsWithReverseLookup(unstorageWithReverseLookupDriver({ storage }));
+  }),
+}) {
+  static layer = Layer.effect(ChannelsCache, this.make).pipe(Layer.provide(discordGatewayLayer));
+}
 
-export const ChannelsCacheLive: Layer.Layer<
-  ChannelsCache,
-  never,
-  DiscordConfig.DiscordConfig | Unstorage
-> = ChannelsCache.Default;
+export class ChannelsCacheView extends ServiceMap.Service<ChannelsCacheView>()(
+  "ChannelsCacheView",
+  {
+    make: Effect.gen(function* () {
+      const storage = yield* Unstorage.prefixed("channels:");
+      return yield* channelsCacheViewWithReverseLookup(
+        unstorageWithReverseLookupDriver({ storage }),
+      );
+    }),
+  },
+) {
+  static layer = Layer.effect(ChannelsCacheView, this.make);
+}
 
-export class ChannelsCacheView extends Effect.Service<ChannelsCacheView>()("ChannelsCacheView", {
-  scoped: pipe(
-    Unstorage.prefixed("channels:"),
-    Effect.andThen((storage) =>
-      channelsCacheViewWithReverseLookup(unstorageWithReverseLookupDriver({ storage })),
-    ),
-  ),
-}) {}
-
-export class ChannelsApiCacheView extends Effect.Service<ChannelsApiCacheView>()(
+export class ChannelsApiCacheView extends ServiceMap.Service<ChannelsApiCacheView>()(
   "ChannelsApiCacheView",
   {
-    scoped: pipe(
-      Unstorage.prefixed("channels:"),
-      Effect.andThen((storage) =>
-        channelsApiCacheViewWithReverseLookup(unstorageWithReverseLookupDriver({ storage })),
-      ),
-    ),
+    make: Effect.gen(function* () {
+      const storage = yield* Unstorage.prefixed("channels:");
+      return yield* channelsApiCacheViewWithReverseLookup(
+        unstorageWithReverseLookupDriver({ storage }),
+      );
+    }),
   },
-) {}
-
-export const ChannelsApiCacheViewLive: Layer.Layer<
-  ChannelsApiCacheView,
-  never,
-  DiscordApiClient | Unstorage
-> = ChannelsApiCacheView.Default;
+) {
+  static layer = Layer.effect(ChannelsApiCacheView, this.make);
+}

@@ -1,10 +1,10 @@
-import { JSONSchema } from "effect";
+import { Schema } from "effect";
 import { describe, expect, it } from "@effect/vitest";
 import { GuildConfig } from "./guildConfig";
 
 describe("GuildConfig", () => {
   it("GuildConfig generates json schema", () => {
-    const schema = JSONSchema.make(GuildConfig);
+    const schema = Schema.toJsonSchemaDocument(GuildConfig);
     expect(schema).toBeDefined();
   });
 });

@@ -10,7 +10,7 @@ export class MessageRoomOrder extends Schema.TaggedClass<MessageRoomOrder>()("Me
   guildId: Schema.OptionFromNullOr(Schema.String),
   messageChannelId: Schema.OptionFromNullOr(Schema.String),
   createdByUserId: Schema.OptionFromNullOr(Schema.String),
-  createdAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromNumber),
-  updatedAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromNumber),
-  deletedAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromNumber),
+  createdAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromMillis),
+  updatedAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromMillis),
+  deletedAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromMillis),
 }) {}

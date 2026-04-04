@@ -133,7 +133,7 @@ const makeKubernetesOAuth = (options: KubernetesOAuthOptions) => {
           body: Schema.Struct({
             token: Schema.String,
             discord_user_id: Schema.String,
-          }).pipe(Schema.standardSchemaV1),
+          }).pipe(Schema.toStandardSchemaV1),
           metadata: {
             allowedMediaTypes: ["application/x-www-form-urlencoded", "application/json"],
           },

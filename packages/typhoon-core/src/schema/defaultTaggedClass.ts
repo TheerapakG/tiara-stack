@@ -1,11 +1,10 @@
-import { Option, pipe, Schema } from "effect";
+import { pipe, Schema, SchemaAST, SchemaGetter, Struct } from "effect";
 
-type TaggedClass = Schema.Schema.Any & {
-  readonly _tag: string;
-  readonly fields: Schema.Struct.Fields & { _tag: Schema.tag<any> };
+type TaggedClass = Schema.Top & {
+  readonly fields: Schema.Struct.Fields & { _tag: Schema.tag<SchemaAST.LiteralValue> };
 };
 
-type Tag<Tagged extends TaggedClass> = Tagged["_tag"];
+type Tag<Tagged extends TaggedClass> = Schema.Schema.Type<Tagged["fields"]["_tag"]>;
 type Fields<Tagged extends TaggedClass> = Tagged["fields"];
 
 type DefaultTaggedClassType<Tagged extends TaggedClass> = Schema.Schema.Type<Tagged>;
@@ -13,45 +12,31 @@ type DefaultTaggedClassEncoded<Tagged extends TaggedClass> = Schema.Struct.Encod
   Omit<Fields<Tagged>, "_tag">
 > &
   Schema.Struct.Encoded<{
-    _tag: Schema.PropertySignature<":", Tag<Tagged>, never, "?:", Tag<Tagged>, false, never>;
+    _tag: Schema.optional<Schema.Literal<Tag<Tagged>>>;
   }> extends infer B
   ? B
   : never;
-type DefaultTaggedClassContext<Tagged extends TaggedClass> = Schema.Schema.Context<Tagged>;
-type DefaultTaggedClass<Tagged extends TaggedClass> = Schema.Schema<
+type DefaultTaggedClass<Tagged extends TaggedClass> = Schema.Codec<
   DefaultTaggedClassType<Tagged>,
   DefaultTaggedClassEncoded<Tagged>,
-  DefaultTaggedClassContext<Tagged>
+  Schema.Codec.DecodingServices<Tagged>,
+  Schema.Codec.EncodingServices<Tagged>
 >;
 
 export const DefaultTaggedClass = <Tagged extends TaggedClass>(
   taggedClass: Tagged,
 ): DefaultTaggedClass<Tagged> =>
   pipe(
-    pipe(
-      Schema.Struct(taggedClass.fields).omit("_tag"),
-      Schema.encodedSchema,
-      Schema.extend(
-        Schema.Struct({
-          _tag: Schema.optionalToRequired(
-            Schema.Literal(taggedClass._tag),
-            Schema.Literal(taggedClass._tag),
-            {
-              decode: Option.getOrElse(() => taggedClass._tag),
-              encode: (value) => Option.some(value),
-            },
-          ),
-        }),
-      ),
-    ) as unknown as Schema.Schema<
-      Schema.Struct.Encoded<Fields<Tagged>>,
-      DefaultTaggedClassEncoded<Tagged>
-    >,
-    Schema.compose(
-      taggedClass as Schema.Schema<
-        DefaultTaggedClassType<Tagged>,
-        Schema.Struct.Encoded<Fields<Tagged>>,
-        DefaultTaggedClassContext<Tagged>
-      >,
+    Schema.Struct(taggedClass.fields).mapFields(
+      Struct.assign({
+        _tag: Schema.optional(Schema.Literal(taggedClass.fields._tag.schema.literal)).pipe(
+          Schema.withDecodingDefault(() => taggedClass.fields._tag.schema.literal),
+        ),
+      }),
     ),
-  ) as DefaultTaggedClass<Tagged>;
+    Schema.toEncoded,
+    Schema.decodeTo(taggedClass, {
+      decode: SchemaGetter.passthrough(),
+      encode: SchemaGetter.passthroughSupertype(),
+    }),
+  ) as unknown as DefaultTaggedClass<Tagged>;

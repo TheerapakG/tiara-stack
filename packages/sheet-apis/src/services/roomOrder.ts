@@ -1,26 +1,31 @@
-import {
-  Array,
-  Chunk,
-  DateTime,
-  Duration,
-  Effect,
-  Either,
-  HashMap,
-  HashSet,
-  Match,
-  Number,
-  Option,
-  pipe,
-} from "effect";
+import { Chunk, DateTime, Duration, Effect, Layer, Option, ServiceMap, pipe } from "effect";
 import { makeArgumentError } from "typhoon-core/error";
-import { Array as ArrayUtils } from "typhoon-core/utils";
 import { GuildConfigService } from "./guildConfig";
 import { ScheduleService } from "./schedule";
 import { CalcConfig, CalcService } from "./calc";
 import { SheetService } from "./sheet";
 import { GeneratedRoomOrderEntry, RoomOrderGenerateResult } from "@/schemas/roomOrder";
 import { MessageRoomOrderRange } from "@/schemas/messageRoomOrder";
-import { Player, PlayerTeam, Team } from "@/schemas/sheet";
+import {
+  Player,
+  PlayerTeam,
+  Team,
+  type PopulatedSchedulePlayer,
+  type PopulatedScheduleResult,
+} from "@/schemas/sheet";
+
+type GuildConfigServiceApi = Effect.Success<typeof GuildConfigService.make>;
+type SheetServiceApi = Effect.Success<typeof SheetService.make>;
+
+const isPlayer = (player: PopulatedSchedulePlayer["player"]): player is Player =>
+  player._tag === "Player";
+
+const getFills = (
+  schedule: PopulatedScheduleResult | undefined,
+): ReadonlyArray<PopulatedSchedulePlayer> =>
+  schedule && schedule._tag === "PopulatedSchedule"
+    ? schedule.fills.flatMap((fill) => (Option.isSome(fill) ? [fill.value] : []))
+    : [];
 
 const formatEffectValue = (effectValue: number): string => {
   const rounded = Math.round(effectValue * 10) / 10;
@@ -31,9 +36,8 @@ const formatEffectValue = (effectValue: number): string => {
 const formatDiscordTimestamp = (dateTime: DateTime.DateTime): string =>
   `<t:${Math.floor(DateTime.toEpochMillis(dateTime) / 1000)}:f>`;
 
-const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigService) =>
-  pipe(
-    guildConfigService.getGuildConfig(guildId),
+const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigServiceApi) =>
+  guildConfigService.getGuildConfig(guildId).pipe(
     Effect.flatMap(
       Option.match({
         onSome: (guildConfig) =>
@@ -57,11 +61,8 @@ const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigS
 
 const requireRunningChannel = Effect.fn("RoomOrderService.requireRunningChannel")(function* (
   guildId: string,
-  payload: {
-    channelId?: string | undefined;
-    channelName?: string | undefined;
-  },
-  guildConfigService: GuildConfigService,
+  payload: { channelId?: string | undefined; channelName?: string | undefined },
+  guildConfigService: GuildConfigServiceApi,
 ) {
   const maybeChannel =
     typeof payload.channelId === "string"
@@ -96,35 +97,23 @@ const requireRunningChannel = Effect.fn("RoomOrderService.requireRunningChannel"
 
 const deriveHour = Effect.fn("RoomOrderService.deriveHour")(function* (
   payload: { hour?: number | undefined },
-  sheetService: SheetService,
+  sheetService: SheetServiceApi,
   sheetId: string,
 ) {
   if (typeof payload.hour === "number") {
     return payload.hour;
   }
 
-  const dateTime = yield* pipe(
-    DateTime.now,
-    Effect.map(DateTime.addDuration(Duration.minutes(20))),
-  );
+  const dateTime = yield* DateTime.now.pipe(Effect.map(DateTime.addDuration(Duration.minutes(20))));
   const eventConfig = yield* sheetService.getEventConfig(sheetId);
-  const distance = DateTime.distanceDurationEither(
+  const distance = DateTime.distance(
     eventConfig.startTime,
     pipe(dateTime, DateTime.startOf("hour")),
   );
-
-  return pipe(
-    distance,
-    Either.match({
-      onRight: Duration.toHours,
-      onLeft: (duration) => pipe(duration, Duration.toHours, Number.negate),
-    }),
-    Math.floor,
-    Number.increment,
-  );
+  return Math.floor(Duration.toHours(distance)) + 1;
 });
 
-const deriveHourWindow = (sheetService: SheetService, sheetId: string, hour: number) =>
+const deriveHourWindow = (sheetService: SheetServiceApi, sheetId: string, hour: number) =>
   sheetService.getEventConfig(sheetId).pipe(
     Effect.map((eventConfig) => ({
       start: pipe(eventConfig.startTime, DateTime.addDuration(Duration.hours(hour - 1))),
@@ -133,8 +122,7 @@ const deriveHourWindow = (sheetService: SheetService, sheetId: string, hour: num
   );
 
 const toTeamWithPlayer = (player: Player, team: Team) =>
-  new Team({
-    // Team is a pure data class (effect Data.Class); all fields are own-enumerable properties — spread is safe
+  Team.makeUnsafe({
     ...team,
     playerId: Option.some(player.id),
   });
@@ -147,8 +135,11 @@ const buildContent = (
   previousFills: ReadonlyArray<string>,
   fills: ReadonlyArray<string>,
   entries: ReadonlyArray<GeneratedRoomOrderEntry>,
-) =>
-  [
+) => {
+  const inPlayers = [...new Set(fills.filter((fill) => !previousFills.includes(fill)))];
+  const outPlayers = [...new Set(previousFills.filter((fill) => !fills.includes(fill)))];
+
+  return [
     `**Hour ${hour}** ${formatDiscordTimestamp(start)} - ${formatDiscordTimestamp(end)}`,
     ...(monitor === null ? [] : [`\`Monitor:\` ${monitor}`]),
     "",
@@ -156,35 +147,23 @@ const buildContent = (
       const hasTiererTag = tags.includes("tierer");
       const effectParts = hasTiererTag
         ? []
-        : pipe(
-            [
-              Option.some(formatEffectValue(effectValue)),
-              tags.includes("enc") ? Option.some("enc") : Option.none(),
-              tags.includes("avoid_enc") ? Option.some("avoid enc") : Option.none(),
-            ],
-            Array.getSomes,
-          );
+        : [
+            formatEffectValue(effectValue),
+            ...(tags.includes("enc") ? ["enc"] : []),
+            ...(tags.includes("avoid_enc") ? ["avoid enc"] : []),
+          ];
 
       const effectStr = effectParts.length > 0 ? ` (${effectParts.join(", ")})` : "";
       return `\`P${position + 1}:\`  ${team}${effectStr}`;
     }),
     "",
-    `\`In:\` ${pipe(
-      HashSet.fromIterable(fills),
-      HashSet.difference(HashSet.fromIterable(previousFills)),
-      HashSet.toValues,
-      (arr) => (arr.length > 0 ? arr.join(", ") : "(none)"),
-    )}`,
-    `\`Out:\` ${pipe(
-      HashSet.fromIterable(previousFills),
-      HashSet.difference(HashSet.fromIterable(fills)),
-      HashSet.toValues,
-      (arr) => (arr.length > 0 ? arr.join(", ") : "(none)"),
-    )}`,
+    `\`In:\` ${inPlayers.length > 0 ? inPlayers.join(", ") : "(none)"}`,
+    `\`Out:\` ${outPlayers.length > 0 ? outPlayers.join(", ") : "(none)"}`,
   ].join("\n");
+};
 
-export class RoomOrderService extends Effect.Service<RoomOrderService>()("RoomOrderService", {
-  effect: Effect.gen(function* () {
+export class RoomOrderService extends ServiceMap.Service<RoomOrderService>()("RoomOrderService", {
+  make: Effect.gen(function* () {
     const calcService = yield* CalcService;
     const guildConfigService = yield* GuildConfigService;
     const scheduleService = yield* ScheduleService;
@@ -206,106 +185,57 @@ export class RoomOrderService extends Effect.Service<RoomOrderService>()("RoomOr
         const sheetId = yield* getSheetIdFromGuildId(payload.guildId, guildConfigService);
         const hour = yield* deriveHour(payload, sheetService, sheetId);
         const healNeeded = payload.healNeeded ?? 0;
-        const channelName = pipe(
-          runningChannel.name,
-          Option.match({
-            onSome: (value) => value,
-            onNone: () => "",
-          }),
-        );
+        const channelName = Option.getOrElse(runningChannel.name, () => "");
 
         const schedules = yield* scheduleService.getChannelPopulatedSchedules(sheetId, channelName);
-        const schedulesByHour = pipe(
-          schedules,
-          Array.filterMap((schedule) =>
-            pipe(
-              schedule.hour,
-              Option.map((resolvedHour) => ({ hour: resolvedHour, schedule })),
-            ),
-          ),
-          ArrayUtils.Collect.toHashMapByKey("hour"),
-          HashMap.map(({ schedule }) => schedule),
-        );
+        const schedulesByHour = new Map<number, PopulatedScheduleResult>();
+        for (const schedule of schedules) {
+          if (Option.isSome(schedule.hour)) {
+            schedulesByHour.set(schedule.hour.value, schedule);
+          }
+        }
 
-        const previousScheduleEntry = HashMap.get(schedulesByHour, hour - 1);
-        const currentScheduleEntry = HashMap.get(schedulesByHour, hour);
+        const previousSchedule = schedulesByHour.get(hour - 1);
+        const currentSchedule = schedulesByHour.get(hour);
 
-        const previousFills = pipe(
-          previousScheduleEntry,
-          Option.map((schedule) =>
-            Match.value(schedule).pipe(
-              Match.tagsExhaustive({
-                PopulatedBreakSchedule: () => [],
-                PopulatedSchedule: (populatedSchedule) => populatedSchedule.fills,
-              }),
-            ),
-          ),
-          Option.getOrElse(() => []),
-          Array.getSomes,
-        );
-
-        const fills = pipe(
-          currentScheduleEntry,
-          Option.map((schedule) =>
-            Match.value(schedule).pipe(
-              Match.tagsExhaustive({
-                PopulatedBreakSchedule: () => [],
-                PopulatedSchedule: (populatedSchedule) => populatedSchedule.fills,
-              }),
-            ),
-          ),
-          Option.getOrElse(() => []),
-          Array.getSomes,
-        );
+        const previousFills = getFills(previousSchedule);
+        const fills = getFills(currentSchedule);
 
         const previousFillNames = previousFills.map((fill) => fill.player.name);
         const fillNames = fills.map((fill) => fill.player.name);
         const runnerNames = fillNames;
-        const monitor = pipe(
-          currentScheduleEntry,
-          Option.flatMap((schedule) =>
-            Match.value(schedule).pipe(
-              Match.tagsExhaustive({
-                PopulatedBreakSchedule: () => Option.none<string>(),
-                PopulatedSchedule: (populatedSchedule) =>
-                  pipe(
-                    populatedSchedule.monitor,
-                    Option.map((resolvedMonitor) => resolvedMonitor.monitor.name),
-                  ),
-              }),
-            ),
-          ),
-          Option.getOrNull,
-        );
+        const monitor =
+          currentSchedule &&
+          currentSchedule._tag === "PopulatedSchedule" &&
+          Option.isSome(currentSchedule.monitor)
+            ? currentSchedule.monitor.value.monitor.name
+            : null;
 
         const allTeams = yield* sheetService.getTeams(sheetId);
-        const playerTeams = fills.map((fill) =>
-          Match.value(fill.player).pipe(
-            Match.tagsExhaustive({
-              Player: (player) =>
-                allTeams
-                  .filter((team) => Option.exists(team.playerName, (name) => name === player.name))
-                  .map((team) => toTeamWithPlayer(player, team))
-                  .map(
-                    (team) =>
-                      new Team({
-                        // Team is a pure data class (effect Data.Class); all fields are own-enumerable properties — spread is safe
-                        ...team,
-                        tags: pipe(
-                          team.tags,
-                          (tags) =>
-                            tags.includes("tierer_hint") && runnerNames.includes(fill.player.name)
-                              ? Array.append(tags, "tierer")
-                              : tags,
-                          (tags) => (fill.enc ? Array.append(tags, "encable") : tags),
-                        ),
-                      }),
-                  )
-                  .flatMap((team) => pipe(PlayerTeam.fromTeam(false, team), Option.toArray)),
-              PartialNamePlayer: () => [] as PlayerTeam[],
-            }),
-          ),
-        );
+        const playerTeams = fills.map((fill) => {
+          if (!isPlayer(fill.player)) {
+            return [] as PlayerTeam[];
+          }
+          const player = fill.player;
+
+          return allTeams
+            .filter((team) => Option.exists(team.playerName, (name) => name === player.name))
+            .map((team) => toTeamWithPlayer(player, team))
+            .map((team) =>
+              Team.makeUnsafe({
+                ...team,
+                tags: pipe(
+                  team.tags,
+                  (tags) =>
+                    tags.includes("tierer_hint") && runnerNames.includes(player.name)
+                      ? [...tags, "tierer"]
+                      : [...tags],
+                  (tags) => (fill.enc ? [...tags, "encable"] : tags),
+                ),
+              }),
+            )
+            .flatMap((team) => Option.toArray(PlayerTeam.fromTeam(false, team)));
+        });
 
         const rooms = yield* calcService.calc(
           new CalcConfig({ healNeeded, considerEnc: true }),
@@ -319,29 +249,26 @@ export class RoomOrderService extends Effect.Service<RoomOrderService>()("RoomOr
           );
         }
 
-        const entries = roomOrders.flatMap((room, rank) =>
-          Chunk.toArray(room.teams).map(
-            (entry, position) =>
-              new GeneratedRoomOrderEntry({
-                rank,
-                position,
-                hour,
-                team: entry.teamName,
-                tags: Array.fromIterable(entry.tags),
-                effectValue: PlayerTeam.getEffectValue(entry),
-              }),
+        const entries = roomOrders.flatMap((room: any, rank) =>
+          Chunk.toArray(room.teams).map((entry: any, position) =>
+            GeneratedRoomOrderEntry.makeUnsafe({
+              rank,
+              position,
+              hour,
+              team: entry.teamName,
+              tags: Array.from(entry.tags),
+              effectValue: PlayerTeam.getEffectValue(entry),
+            }),
           ),
         );
 
         const firstRankEntries = entries.filter((entry) => entry.rank === 0);
-        const { start, end } = yield* pipe(
-          currentScheduleEntry,
-          Option.flatMap((schedule) => schedule.hourWindow),
-          Option.map((hourWindow) => Effect.succeed(hourWindow)),
-          Option.getOrElse(() => deriveHourWindow(sheetService, sheetId, hour)),
-        );
+        const { start, end } =
+          currentSchedule && Option.isSome(currentSchedule.hourWindow)
+            ? currentSchedule.hourWindow.value
+            : yield* deriveHourWindow(sheetService, sheetId, hour);
 
-        return new RoomOrderGenerateResult({
+        return RoomOrderGenerateResult.makeUnsafe({
           content: buildContent(
             hour,
             start,
@@ -351,7 +278,7 @@ export class RoomOrderService extends Effect.Service<RoomOrderService>()("RoomOr
             fillNames,
             firstRankEntries,
           ),
-          range: new MessageRoomOrderRange({
+          range: MessageRoomOrderRange.makeUnsafe({
             minRank: 0,
             maxRank: roomOrders.length - 1,
           }),
@@ -365,11 +292,11 @@ export class RoomOrderService extends Effect.Service<RoomOrderService>()("RoomOr
       }),
     };
   }),
-  dependencies: [
-    CalcService.Default,
-    GuildConfigService.Default,
-    ScheduleService.Default,
-    SheetService.Default,
-  ],
-  accessors: true,
-}) {}
+}) {
+  static layer = Layer.effect(RoomOrderService, this.make).pipe(
+    Layer.provide(CalcService.layer),
+    Layer.provide(GuildConfigService.layer),
+    Layer.provide(ScheduleService.layer),
+    Layer.provide(SheetService.layer),
+  );
+}

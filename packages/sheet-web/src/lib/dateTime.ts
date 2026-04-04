@@ -1,14 +1,15 @@
-import { Atom, useAtomSuspense } from "@effect-atom/atom-react";
+import { useAtomSuspense } from "@effect/atom-react";
+import { Atom } from "effect/unstable/reactivity";
 import { Cron, DateTime, Effect, Schedule, Stream } from "effect";
 
 export const nowByMinute = Atom.family((timeZone: DateTime.TimeZone) =>
   Atom.make(
-    Stream.repeatEffectWithSchedule(
+    Stream.fromEffectSchedule(
       DateTime.nowInCurrentZone.pipe(
         Effect.map(DateTime.startOf("minute")),
         DateTime.withCurrentZone(timeZone),
       ),
-      Schedule.once.pipe(
+      Schedule.recurs(0).pipe(
         Schedule.andThen(
           Schedule.cron(
             Cron.make({
@@ -36,12 +37,12 @@ export const useNowByMinute = (timeZone: DateTime.TimeZone) => {
 
 export const nowByHour = Atom.family((timeZone: DateTime.TimeZone) =>
   Atom.make(
-    Stream.repeatEffectWithSchedule(
+    Stream.fromEffectSchedule(
       DateTime.nowInCurrentZone.pipe(
         Effect.map(DateTime.startOf("hour")),
         DateTime.withCurrentZone(timeZone),
       ),
-      Schedule.once.pipe(
+      Schedule.recurs(0).pipe(
         Schedule.andThen(
           Schedule.cron(
             Cron.make({

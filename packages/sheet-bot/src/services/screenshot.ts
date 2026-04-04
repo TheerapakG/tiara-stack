@@ -1,22 +1,31 @@
-import { Effect, pipe } from "effect";
+import { Effect, Layer, ServiceMap } from "effect";
 import { SheetApisClient } from "./sheetApis";
 
-export class ScreenshotService extends Effect.Service<ScreenshotService>()("ScreenshotService", {
-  effect: pipe(
-    Effect.all({ sheetApisClient: SheetApisClient }),
-    Effect.map(({ sheetApisClient }) => ({
-      getScreenshot: Effect.fn("ScreenshotService.getScreenshot")(
-        (guildId: string, channel: string, day: number) =>
-          sheetApisClient.get().screenshot.getScreenshot({
-            urlParams: {
+export class ScreenshotService extends ServiceMap.Service<ScreenshotService>()(
+  "ScreenshotService",
+  {
+    make: Effect.gen(function* () {
+      const sheetApisClient = yield* SheetApisClient;
+
+      return {
+        getScreenshot: Effect.fn("ScreenshotService.getScreenshot")(function* (
+          guildId: string,
+          channel: string,
+          day: number,
+        ) {
+          return yield* sheetApisClient.get().screenshot.getScreenshot({
+            query: {
               guildId,
               channel,
               day,
             },
-          }),
-      ),
-    })),
-  ),
-  dependencies: [SheetApisClient.Default],
-  accessors: true,
-}) {}
+          });
+        }),
+      };
+    }),
+  },
+) {
+  static layer = Layer.effect(ScreenshotService, this.make).pipe(
+    Layer.provide(SheetApisClient.layer),
+  );
+}

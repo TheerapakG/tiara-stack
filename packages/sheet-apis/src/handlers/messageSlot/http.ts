@@ -1,6 +1,6 @@
-import { HttpApiBuilder } from "@effect/platform";
-import { catchParseErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
-import { Effect, Layer, Option, pipe } from "effect";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { catchSchemaErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
+import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
 import {
@@ -9,8 +9,7 @@ import {
   requireMonitorGuild,
 } from "@/middlewares/authorization";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
-import { GuildConfigService } from "@/services/guildConfig";
-import { MessageSlotService } from "@/services/messageSlot";
+import { MessageSlotService } from "@/services";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
 
 const missingMessageSlotError = () =>
@@ -22,7 +21,12 @@ export const LEGACY_MESSAGE_SLOT_ACCESS_ERROR =
 export const denyLegacyMessageSlotAccess = () =>
   Effect.fail(new Unauthorized({ message: LEGACY_MESSAGE_SLOT_ACCESS_ERROR }));
 
-const getRequiredMessageSlotRecord = (messageSlotService: MessageSlotService, messageId: string) =>
+type MessageSlotAccessService = Pick<typeof MessageSlotService.Service, "getMessageSlotData">;
+
+const getRequiredMessageSlotRecord = (
+  messageSlotService: MessageSlotAccessService,
+  messageId: string,
+) =>
   messageSlotService.getMessageSlotData(messageId).pipe(
     Effect.flatMap(
       Option.match({
@@ -33,7 +37,7 @@ const getRequiredMessageSlotRecord = (messageSlotService: MessageSlotService, me
   );
 
 export const requireMessageSlotUpsertAccess = (
-  messageSlotService: MessageSlotService,
+  messageSlotService: MessageSlotAccessService,
   messageId: string,
   guildId?: string,
 ) =>
@@ -55,7 +59,7 @@ export const requireMessageSlotUpsertAccess = (
   );
 
 export const requireMessageSlotReadAccess = (
-  messageSlotService: MessageSlotService,
+  messageSlotService: MessageSlotAccessService,
   messageId: string,
 ) =>
   getRequiredMessageSlotRecord(messageSlotService, messageId).pipe(
@@ -71,39 +75,30 @@ export const requireMessageSlotReadAccess = (
     ),
   );
 
-export const MessageSlotLive = HttpApiBuilder.group(Api, "messageSlot", (handlers) =>
-  pipe(
-    Effect.all({
-      messageSlotService: MessageSlotService,
-    }),
-    Effect.map(({ messageSlotService }) =>
-      handlers
-        .handle("getMessageSlotData", ({ urlParams }) =>
-          requireMessageSlotReadAccess(messageSlotService, urlParams.messageId).pipe(
-            catchParseErrorAsValidationError,
-          ),
-        )
-        .handle("upsertMessageSlotData", ({ payload }) =>
-          requireMessageSlotUpsertAccess(
-            messageSlotService,
-            payload.messageId,
-            typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
-          )
-            .pipe(
-              Effect.andThen(
-                messageSlotService.upsertMessageSlotData(payload.messageId, payload.data),
-              ),
-            )
-            .pipe(catchParseErrorAsValidationError),
+export const messageSlotLayer = HttpApiBuilder.group(
+  Api,
+  "messageSlot",
+  Effect.fn(function* (handlers) {
+    const messageSlotService = yield* MessageSlotService;
+
+    return handlers
+      .handle("getMessageSlotData", ({ query }) =>
+        requireMessageSlotReadAccess(messageSlotService, query.messageId).pipe(
+          catchSchemaErrorAsValidationError,
         ),
-    ),
-  ),
-).pipe(
-  Layer.provide(
-    Layer.mergeAll(
-      MessageSlotService.Default,
-      GuildConfigService.Default,
-      SheetAuthTokenAuthorizationLive,
-    ),
-  ),
-);
+      )
+      .handle("upsertMessageSlotData", ({ payload }) =>
+        requireMessageSlotUpsertAccess(
+          messageSlotService,
+          payload.messageId,
+          typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
+        )
+          .pipe(
+            Effect.andThen(
+              messageSlotService.upsertMessageSlotData(payload.messageId, payload.data),
+            ),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
+      );
+  }),
+).pipe(Layer.provide([MessageSlotService.layer, SheetAuthTokenAuthorizationLive]));

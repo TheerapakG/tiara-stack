@@ -9,7 +9,7 @@ const ScheduleSearchSchema = Schema.Struct({
 
 export const Route = createFileRoute("/_authenticated/dashboard/guilds/$guildId/schedule")({
   component: ScheduleRedirect,
-  validateSearch: pipe(ScheduleSearchSchema, Schema.standardSchemaV1),
+  validateSearch: pipe(ScheduleSearchSchema, Schema.toStandardSchemaV1),
   beforeLoad: async ({ params, search, context }) => {
     if (search.timestamp !== undefined) {
       return;
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/_authenticated/dashboard/guilds/$guildId/
     const channels = await Effect.runPromise(
       ensureResultAtomData(context.atomRegistry, getAllChannelsAtom(params.guildId), {
         revalidateIfStale: true,
-      }).pipe(Effect.catchAll(() => Effect.succeed([]))),
+      }).pipe(Effect.catch(() => Effect.succeed([]))),
     );
 
     const defaultChannel = Array.head(channels);

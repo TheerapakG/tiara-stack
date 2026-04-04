@@ -1,4 +1,4 @@
-import { JSONSchema } from "effect";
+import { Schema } from "effect";
 import { describe, expect, it } from "@effect/vitest";
 import { permissionSetFromIterable } from "@/middlewares/authorization";
 import {
@@ -13,35 +13,35 @@ import {
 
 describe("ScheduleView", () => {
   it("ScheduleView generates json schema", () => {
-    const schema = JSONSchema.make(ScheduleView);
+    const schema = Schema.toJsonSchemaDocument(ScheduleView);
     expect(schema).toBeDefined();
   });
 });
 
 describe("ScheduleResponse", () => {
   it("ScheduleResponse generates json schema", () => {
-    const schema = JSONSchema.make(ScheduleResponse);
+    const schema = Schema.toJsonSchemaDocument(ScheduleResponse);
     expect(schema).toBeDefined();
   });
 });
 
 describe("PopulatedScheduleResponse", () => {
   it("PopulatedScheduleResponse generates json schema", () => {
-    const schema = JSONSchema.make(PopulatedScheduleResponse);
+    const schema = Schema.toJsonSchemaDocument(PopulatedScheduleResponse);
     expect(schema).toBeDefined();
   });
 });
 
 describe("PlayerDayScheduleSummary", () => {
   it("PlayerDayScheduleSummary generates json schema", () => {
-    const schema = JSONSchema.make(PlayerDayScheduleSummary);
+    const schema = Schema.toJsonSchemaDocument(PlayerDayScheduleSummary);
     expect(schema).toBeDefined();
   });
 });
 
 describe("PlayerDayScheduleResponse", () => {
   it("PlayerDayScheduleResponse generates json schema", () => {
-    const schema = JSONSchema.make(PlayerDayScheduleResponse);
+    const schema = Schema.toJsonSchemaDocument(PlayerDayScheduleResponse);
     expect(schema).toBeDefined();
   });
 });

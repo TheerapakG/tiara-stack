@@ -1,9 +1,9 @@
-import { HttpApiBuilder } from "@effect/platform";
-import { Effect, DateTime, pipe } from "effect";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { DateTime, Effect, pipe } from "effect";
 import { Api } from "@/api";
 
-export const HealthLive = HttpApiBuilder.group(Api, "health", (handlers) =>
-  handlers
+export const healthLayer = HttpApiBuilder.group(Api, "health", (handlers) => {
+  return handlers
     .handle("live", () =>
       pipe(
         DateTime.now,
@@ -15,5 +15,5 @@ export const HealthLive = HttpApiBuilder.group(Api, "health", (handlers) =>
         DateTime.now,
         Effect.map((timestamp) => ({ status: "ok" as const, timestamp })),
       ),
-    ),
-);
+    );
+});

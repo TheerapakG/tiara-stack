@@ -1,2 +1,2 @@
 export { HealthApi } from "./api";
-export { HealthLive } from "./http";
+export { healthLayer } from "./http";

@@ -1,31 +1,40 @@
-import { Effect, pipe } from "effect";
+import { Effect, Layer, ServiceMap } from "effect";
 import { SheetApisClient } from "./sheetApis";
 
-export class PlayerService extends Effect.Service<PlayerService>()("PlayerService", {
-  effect: pipe(
-    Effect.all({ sheetApisClient: SheetApisClient }),
-    Effect.map(({ sheetApisClient }) => ({
-      getPlayerMaps: Effect.fn("Player.getPlayerMaps")((guildId: string) =>
-        sheetApisClient.get().player.getPlayerMaps({ urlParams: { guildId } }),
-      ),
-      getPlayerById: Effect.fn("Player.getPlayerById")(
-        (guildId: string, ids: ReadonlyArray<string>) =>
-          sheetApisClient.get().player.getByIds({ urlParams: { guildId, ids } }),
-      ),
-      getPlayerByName: Effect.fn("Player.getPlayerByName")(
-        (guildId: string, names: ReadonlyArray<string>) =>
-          sheetApisClient.get().player.getByNames({ urlParams: { guildId, names } }),
-      ),
-      getTeamsById: Effect.fn("Player.getTeamsById")(
-        (guildId: string, ids: ReadonlyArray<string>) =>
-          sheetApisClient.get().player.getTeamsByIds({ urlParams: { guildId, ids } }),
-      ),
-      getTeamsByName: Effect.fn("Player.getTeamsByName")(
-        (guildId: string, names: ReadonlyArray<string>) =>
-          sheetApisClient.get().player.getTeamsByNames({ urlParams: { guildId, names } }),
-      ),
-    })),
-  ),
-  dependencies: [SheetApisClient.Default],
-  accessors: true,
-}) {}
+export class PlayerService extends ServiceMap.Service<PlayerService>()("PlayerService", {
+  make: Effect.gen(function* () {
+    const sheetApisClient = yield* SheetApisClient;
+
+    return {
+      getPlayerMaps: Effect.fn("Player.getPlayerMaps")(function* (guildId: string) {
+        return yield* sheetApisClient.get().player.getPlayerMaps({ query: { guildId } });
+      }),
+      getPlayerById: Effect.fn("Player.getPlayerById")(function* (
+        guildId: string,
+        ids: ReadonlyArray<string>,
+      ) {
+        return yield* sheetApisClient.get().player.getByIds({ query: { guildId, ids } });
+      }),
+      getPlayerByName: Effect.fn("Player.getPlayerByName")(function* (
+        guildId: string,
+        names: ReadonlyArray<string>,
+      ) {
+        return yield* sheetApisClient.get().player.getByNames({ query: { guildId, names } });
+      }),
+      getTeamsById: Effect.fn("Player.getTeamsById")(function* (
+        guildId: string,
+        ids: ReadonlyArray<string>,
+      ) {
+        return yield* sheetApisClient.get().player.getTeamsByIds({ query: { guildId, ids } });
+      }),
+      getTeamsByName: Effect.fn("Player.getTeamsByName")(function* (
+        guildId: string,
+        names: ReadonlyArray<string>,
+      ) {
+        return yield* sheetApisClient.get().player.getTeamsByNames({ query: { guildId, names } });
+      }),
+    };
+  }),
+}) {
+  static layer = Layer.effect(PlayerService, this.make).pipe(Layer.provide(SheetApisClient.layer));
+}

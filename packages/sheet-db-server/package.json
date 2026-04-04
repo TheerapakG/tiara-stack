@@ -27,22 +27,15 @@
     "build": "vp pack && tar -acf dist.tar.zst ./dist"
   },
   "dependencies": {
-    "@effect/cluster": "^0.56.1",
-    "@effect/experimental": "^0.58.0",
-    "@effect/opentelemetry": "^0.61.0",
-    "@effect/platform": "^0.94.2",
-    "@effect/platform-node": "^0.104.1",
-    "@effect/rpc": "^0.73.0",
-    "@effect/sql": "^0.49.0",
-    "@effect/workflow": "^0.16.0",
+    "@effect/opentelemetry": "catalog:",
+    "@effect/platform-node": "catalog:",
     "@opentelemetry/exporter-prometheus": "^0.207.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.207.0",
     "@opentelemetry/sdk-metrics": "^2.2.0",
     "@opentelemetry/sdk-trace-base": "^2.2.0",
     "@rocicorp/zero": "^0.25.9",
-    "c12": "^3.3.3",
     "drizzle-orm": "^0.45.1",
-    "effect": "^3.19.8",
+    "effect": "catalog:",
     "postgres": "^3.4.7",
     "sheet-db-schema": "workspace:*",
     "typhoon-core": "workspace:*"
@@ -51,7 +44,6 @@
     "@types/node": "^24.7.2",
     "@types/pg": "^8.16.0",
     "@typescript/native-preview": "latest",
-    "dotenv": "^17.2.3",
     "glob": "^11.0.1",
     "pathe": "^2.0.3",
     "vite-plus": "catalog:"

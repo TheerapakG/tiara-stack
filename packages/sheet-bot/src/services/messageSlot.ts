@@ -1,15 +1,21 @@
-import { Effect, pipe } from "effect";
+import { Effect, Layer, ServiceMap } from "effect";
 import { SheetApisClient } from "./sheetApis";
 
-export class MessageSlotService extends Effect.Service<MessageSlotService>()("MessageSlotService", {
-  effect: pipe(
-    Effect.all({ sheetApisClient: SheetApisClient }),
-    Effect.map(({ sheetApisClient }) => ({
-      getMessageSlotData: Effect.fn("MessageSlotService.getMessageSlotData")((messageId: string) =>
-        sheetApisClient.get().messageSlot.getMessageSlotData({ urlParams: { messageId } }),
-      ),
-      upsertMessageSlotData: Effect.fn("MessageSlotService.upsertMessageSlotData")(
-        (
+export class MessageSlotService extends ServiceMap.Service<MessageSlotService>()(
+  "MessageSlotService",
+  {
+    make: Effect.gen(function* () {
+      const sheetApisClient = yield* SheetApisClient;
+
+      return {
+        getMessageSlotData: Effect.fn("MessageSlotService.getMessageSlotData")(function* (
+          messageId: string,
+        ) {
+          return yield* sheetApisClient.get().messageSlot.getMessageSlotData({
+            query: { messageId },
+          });
+        }),
+        upsertMessageSlotData: Effect.fn("MessageSlotService.upsertMessageSlotData")(function* (
           messageId: string,
           data: {
             day: number;
@@ -17,13 +23,16 @@ export class MessageSlotService extends Effect.Service<MessageSlotService>()("Me
             messageChannelId: string | null;
             createdByUserId: string | null;
           },
-        ) =>
-          sheetApisClient.get().messageSlot.upsertMessageSlotData({
+        ) {
+          return yield* sheetApisClient.get().messageSlot.upsertMessageSlotData({
             payload: { messageId, data },
-          }),
-      ),
-    })),
-  ),
-  dependencies: [SheetApisClient.Default],
-  accessors: true,
-}) {}
+          });
+        }),
+      };
+    }),
+  },
+) {
+  static layer = Layer.effect(MessageSlotService, this.make).pipe(
+    Layer.provide(SheetApisClient.layer),
+  );
+}

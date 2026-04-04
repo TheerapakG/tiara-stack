@@ -14,6 +14,15 @@ const filePaths = [
 
 const directEntries = {
   "discord/cache": fileURLToPath(new URL("./src/discord/cache/index.ts", import.meta.url)),
+  "discord/cache/shared": fileURLToPath(new URL("./src/discord/cache/shared.ts", import.meta.url)),
+  "discord/cache/guilds": fileURLToPath(new URL("./src/discord/cache/guilds.ts", import.meta.url)),
+  "discord/cache/roles": fileURLToPath(new URL("./src/discord/cache/roles.ts", import.meta.url)),
+  "discord/cache/members": fileURLToPath(
+    new URL("./src/discord/cache/members.ts", import.meta.url),
+  ),
+  "discord/cache/channels": fileURLToPath(
+    new URL("./src/discord/cache/channels.ts", import.meta.url),
+  ),
   "discord/schema": fileURLToPath(new URL("./src/discord/schema/index.ts", import.meta.url)),
   "discord/gateway": fileURLToPath(new URL("./src/discord/gateway.ts", import.meta.url)),
 };

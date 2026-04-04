@@ -1,13 +1,15 @@
-import { HttpApiBuilder } from "@effect/platform";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
-import { catchParseErrorAsValidationError } from "typhoon-core/error";
+import { catchSchemaErrorAsValidationError } from "typhoon-core/error";
 import { provideCurrentGuildUser, requireMonitorGuild } from "@/middlewares/authorization";
-import { ScreenshotService } from "@/services/screenshot";
-import { GuildConfigService } from "@/services/guildConfig";
+import { ScreenshotService, GuildConfigService } from "@/services";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 
-const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigService) =>
+const getSheetIdFromGuildId = (
+  guildId: string,
+  guildConfigService: typeof GuildConfigService.Service,
+) =>
   pipe(
     guildConfigService.getGuildConfig(guildId),
     Effect.flatMap(
@@ -25,36 +27,33 @@ const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigS
     ),
   );
 
-export const ScreenshotLive = HttpApiBuilder.group(Api, "screenshot", (handlers) =>
-  pipe(
-    Effect.all({
-      screenshotService: ScreenshotService,
-      guildConfigService: GuildConfigService,
-    }),
-    Effect.map(({ screenshotService, guildConfigService }) =>
-      handlers.handle("getScreenshot", ({ urlParams }) =>
-        provideCurrentGuildUser(
-          urlParams.guildId,
-          requireMonitorGuild(urlParams.guildId).pipe(
-            Effect.andThen(
-              pipe(
-                getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-                Effect.flatMap((sheetId) =>
-                  screenshotService.getScreenshot(sheetId, urlParams.channel, urlParams.day),
-                ),
+export const screenshotLayer = HttpApiBuilder.group(
+  Api,
+  "screenshot",
+  Effect.fn(function* (handlers) {
+    const screenshotService = yield* ScreenshotService;
+    const guildConfigService = yield* GuildConfigService;
+
+    return handlers.handle("getScreenshot", ({ query }) =>
+      provideCurrentGuildUser(
+        query.guildId,
+        requireMonitorGuild(query.guildId).pipe(
+          Effect.andThen(
+            pipe(
+              getSheetIdFromGuildId(query.guildId, guildConfigService),
+              Effect.flatMap((sheetId) =>
+                screenshotService.getScreenshot(sheetId, query.channel, query.day),
               ),
             ),
           ),
-        ).pipe(catchParseErrorAsValidationError),
-      ),
-    ),
-  ),
+        ),
+      ).pipe(catchSchemaErrorAsValidationError),
+    );
+  }),
 ).pipe(
-  Layer.provide(
-    Layer.mergeAll(
-      ScreenshotService.Default,
-      GuildConfigService.Default,
-      SheetAuthTokenAuthorizationLive,
-    ),
-  ),
+  Layer.provide([
+    ScreenshotService.layer,
+    GuildConfigService.layer,
+    SheetAuthTokenAuthorizationLive,
+  ]),
 );

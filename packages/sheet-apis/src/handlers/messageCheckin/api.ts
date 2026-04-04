@@ -1,4 +1,4 @@
-import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "@effect/platform";
+import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
 import { ValidationError, QueryResultError, ArgumentError } from "typhoon-core/error";
 import { MessageCheckin, MessageCheckinMember } from "@/schemas/messageCheckin";
@@ -6,80 +6,79 @@ import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthori
 
 export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
   .add(
-    HttpApiEndpoint.get("getMessageCheckinData", "/messageCheckin/getMessageCheckinData")
-      .setUrlParams(
-        Schema.Struct({
-          messageId: Schema.String,
-        }),
-      )
-      .addSuccess(MessageCheckin)
-      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
+    HttpApiEndpoint.get("getMessageCheckinData", "/messageCheckin/getMessageCheckinData", {
+      query: Schema.Struct({
+        messageId: Schema.String,
+      }),
+      success: MessageCheckin,
+      error: [ValidationError, QueryResultError, ArgumentError],
+    }),
   )
   .add(
-    HttpApiEndpoint.post("upsertMessageCheckinData", "/messageCheckin/upsertMessageCheckinData")
-      .setPayload(
-        Schema.Struct({
-          messageId: Schema.String,
-          data: Schema.Struct({
-            initialMessage: Schema.String,
-            hour: Schema.Number,
-            channelId: Schema.String,
-            roleId: Schema.optional(Schema.NullOr(Schema.String)),
-            guildId: Schema.NullOr(Schema.String),
-            messageChannelId: Schema.NullOr(Schema.String),
-            createdByUserId: Schema.NullOr(Schema.String),
-          }),
+    HttpApiEndpoint.post("upsertMessageCheckinData", "/messageCheckin/upsertMessageCheckinData", {
+      payload: Schema.Struct({
+        messageId: Schema.String,
+        data: Schema.Struct({
+          initialMessage: Schema.String,
+          hour: Schema.Number,
+          channelId: Schema.String,
+          roleId: Schema.optional(Schema.NullOr(Schema.String)),
+          guildId: Schema.NullOr(Schema.String),
+          messageChannelId: Schema.NullOr(Schema.String),
+          createdByUserId: Schema.NullOr(Schema.String),
         }),
-      )
-      .addSuccess(MessageCheckin)
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+      }),
+      success: MessageCheckin,
+      error: [ValidationError, QueryResultError],
+    }),
   )
   .add(
-    HttpApiEndpoint.get("getMessageCheckinMembers", "/messageCheckin/getMessageCheckinMembers")
-      .setUrlParams(
-        Schema.Struct({
-          messageId: Schema.String,
-        }),
-      )
-      .addSuccess(Schema.Array(MessageCheckinMember))
-      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
+    HttpApiEndpoint.get("getMessageCheckinMembers", "/messageCheckin/getMessageCheckinMembers", {
+      query: Schema.Struct({
+        messageId: Schema.String,
+      }),
+      success: Schema.Array(MessageCheckinMember),
+      error: [ValidationError, QueryResultError, ArgumentError],
+    }),
   )
   .add(
-    HttpApiEndpoint.post("addMessageCheckinMembers", "/messageCheckin/addMessageCheckinMembers")
-      .setPayload(
-        Schema.Struct({
-          messageId: Schema.String,
-          memberIds: Schema.Array(Schema.String),
-        }),
-      )
-      .addSuccess(Schema.Array(MessageCheckinMember))
-      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
+    HttpApiEndpoint.post("addMessageCheckinMembers", "/messageCheckin/addMessageCheckinMembers", {
+      payload: Schema.Struct({
+        messageId: Schema.String,
+        memberIds: Schema.Array(Schema.String),
+      }),
+      success: Schema.Array(MessageCheckinMember),
+      error: [ValidationError, QueryResultError, ArgumentError],
+    }),
   )
   .add(
     HttpApiEndpoint.post(
       "setMessageCheckinMemberCheckinAt",
       "/messageCheckin/setMessageCheckinMemberCheckinAt",
-    )
-      .setPayload(
-        Schema.Struct({
+      {
+        payload: Schema.Struct({
           messageId: Schema.String,
           memberId: Schema.String,
           checkinAt: Schema.Number,
         }),
-      )
-      .addSuccess(MessageCheckinMember)
-      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
+        success: MessageCheckinMember,
+        error: [ValidationError, QueryResultError, ArgumentError],
+      },
+    ),
   )
   .add(
-    HttpApiEndpoint.post("removeMessageCheckinMember", "/messageCheckin/removeMessageCheckinMember")
-      .setPayload(
-        Schema.Struct({
+    HttpApiEndpoint.post(
+      "removeMessageCheckinMember",
+      "/messageCheckin/removeMessageCheckinMember",
+      {
+        payload: Schema.Struct({
           messageId: Schema.String,
           memberId: Schema.String,
         }),
-      )
-      .addSuccess(MessageCheckinMember)
-      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
+        success: MessageCheckinMember,
+        error: [ValidationError, QueryResultError, ArgumentError],
+      },
+    ),
   )
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Message Checkin")

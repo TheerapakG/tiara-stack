@@ -1,4 +1,4 @@
-import { HttpServerRequest } from "@effect/platform";
+import { HttpServerRequest } from "effect/unstable/http";
 import { Effect, Option, pipe } from "effect";
 
 export const getOptionalGuildIdFromSearchParams = pipe(
@@ -35,7 +35,7 @@ export const getOptionalGuildIdFromPayload = pipe(
               ? Option.some(body.guildId)
               : Option.none<string>(),
           ),
-          Effect.catchAll(() => Effect.succeed(Option.none<string>())),
+          Effect.catch(() => Effect.succeed(Option.none<string>())),
         );
       },
     }),

@@ -11,8 +11,9 @@ import {
   DateTime,
   Duration,
   String,
+  SchemaGetter,
 } from "effect";
-import { HttpApiClient } from "@effect/platform";
+import { HttpApiClient } from "effect/unstable/httpapi";
 import { Api } from "sheet-apis/api";
 import { Sheet } from "sheet-apis/schema";
 import { layer as AppsScriptHttpClientLayer } from "effect-platform-apps-script";
@@ -25,12 +26,12 @@ function getClient(url: string) {
   });
 }
 
-const cellValueValidator = Schema.Union(
+const cellValueValidator = Schema.Union([
   Schema.String,
   Schema.Number,
   Schema.Boolean,
-  Schema.DateFromSelf,
-);
+  Schema.Date,
+]);
 type CellValue = typeof cellValueValidator.Type;
 
 const calcConfigValidator = Schema.Struct({
@@ -42,14 +43,13 @@ const calcConfigValidator = Schema.Struct({
 function parsePlayers(players: CellValue[][]) {
   return pipe(
     players,
-    Schema.decodeUnknown(
+    Schema.decodeUnknownEffect(
       Schema.Array(
         pipe(
-          Schema.Tuple(Schema.String, Schema.Boolean),
-          Schema.transform(Schema.Struct({ name: Schema.String, encable: Schema.Boolean }), {
-            strict: true,
-            decode: ([name, encable]) => ({ name, encable }),
-            encode: ({ name, encable }) => [name, encable] as const,
+          Schema.Tuple([Schema.String, Schema.Boolean]),
+          Schema.decodeTo(Schema.Struct({ name: Schema.String, encable: Schema.Boolean }), {
+            decode: SchemaGetter.transform(([name, encable]) => ({ name, encable })),
+            encode: SchemaGetter.transform(({ name, encable }) => [name, encable] as const),
           }),
         ),
       ),
@@ -60,15 +60,14 @@ function parsePlayers(players: CellValue[][]) {
 function parseFixedTeams(fixedTeams: CellValue[][]) {
   return pipe(
     fixedTeams,
-    Schema.decodeUnknown(
+    Schema.decodeUnknownEffect(
       pipe(
-        Schema.Array(Schema.Tuple(Schema.String, Schema.Boolean)),
-        Schema.transform(
+        Schema.Array(Schema.Tuple([Schema.String, Schema.Boolean])),
+        Schema.decodeTo(
           Schema.Array(Schema.Struct({ name: Schema.String, heal: Schema.Boolean })),
           {
-            strict: true,
-            decode: Array.map(([name, heal]) => ({ name, heal })),
-            encode: Array.map(({ name, heal }) => [name, heal] as const),
+            decode: SchemaGetter.transform(Array.map(([name, heal]) => ({ name, heal }))),
+            encode: SchemaGetter.transform(Array.map(({ name, heal }) => [name, heal] as const)),
           },
         ),
       ),
@@ -93,39 +92,44 @@ export function theeCalc(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
     pipe(
       Effect.all(
         {
-          settingSheet: Option.fromNullable(
+          settingSheet: Option.fromNullishOr(
             SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SETTING_SHEET_NAME),
-          ),
+          ).asEffect(),
         },
         { concurrency: "unbounded" },
       ),
       Effect.bind("hour", () =>
-        pipe(calcSheet.getRange("D23").getValue(), Schema.decodeUnknown(Schema.Number)),
+        pipe(calcSheet.getRange("D23").getValue(), Schema.decodeUnknownEffect(Schema.Number)),
       ),
-      Effect.tap(() => calcSheet.getRange(`AX30:CC`).clearContent()),
-      Effect.tap(({ hour }) => calcSheet.getRange(`AX30:AY30`).setValues([[hour, "calculating"]])),
+      Effect.tap(() => Effect.sync(() => calcSheet.getRange(`AX30:CC`).clearContent())),
+      Effect.tap(({ hour }) =>
+        Effect.sync(() => calcSheet.getRange(`AX30:AY30`).setValues([[hour, "calculating"]])),
+      ),
       Effect.andThen(({ hour, settingSheet }) =>
         pipe(
           Effect.Do,
           Effect.bind("url", () =>
-            pipe(settingSheet.getRange("AI8").getValue(), Schema.decodeUnknown(Schema.String)),
+            pipe(
+              settingSheet.getRange("AI8").getValue(),
+              Schema.decodeUnknownEffect(Schema.String),
+            ),
           ),
           Effect.bind("config", () =>
             pipe(
               calcSheet.getRange("U30:V32").getValues(),
-              Schema.decodeUnknown(
-                Schema.Array(Schema.Tuple(cellValueValidator, cellValueValidator)),
+              Schema.decodeUnknownEffect(
+                Schema.Array(Schema.Tuple([cellValueValidator, cellValueValidator])),
               ),
               Effect.map(HashMap.fromIterable),
               Effect.flatMap((config) =>
                 pipe(
                   Effect.Do,
-                  Effect.bind("cc", () => HashMap.get(config, "cc")),
-                  Effect.bind("considerEnc", () => HashMap.get(config, "consider_enc")),
-                  Effect.bind("healNeeded", () => HashMap.get(config, "heal_needed")),
+                  Effect.bind("cc", () => HashMap.get(config, "cc").asEffect()),
+                  Effect.bind("considerEnc", () => HashMap.get(config, "consider_enc").asEffect()),
+                  Effect.bind("healNeeded", () => HashMap.get(config, "heal_needed").asEffect()),
                 ),
               ),
-              Effect.flatMap(Schema.decodeUnknown(calcConfigValidator)),
+              Effect.flatMap(Schema.decodeUnknownEffect(calcConfigValidator)),
             ),
           ),
           Effect.bind("players", () =>
@@ -142,70 +146,79 @@ export function theeCalc(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
               parseFixedTeams,
             ),
           ),
-          Effect.tapBoth({
-            onFailure: (e) =>
-              pipe(
-                Effect.logError(e),
-                Effect.andThen(() =>
+          Effect.tapError((e) =>
+            pipe(
+              Effect.logError(e),
+              Effect.andThen(
+                Effect.sync(() =>
                   calcSheet.getRange(`AX30:AY30`).setValues([[hour, "sheet value error"]]),
                 ),
               ),
-            onSuccess: ({ url, config, players, fixedTeams }) =>
-              pipe(
-                Effect.Do,
-                Effect.bind("client", () => getClient(url)),
-                Effect.tap(() => Effect.log("calc.sheet")),
-                Effect.bind("result", ({ client }) =>
-                  client.calc.calcSheet({
-                    payload: {
-                      sheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
-                      config,
-                      players,
-                      fixedTeams,
-                    },
-                  }),
-                ),
-                Effect.map(({ result }) =>
-                  result.map((r) => [
-                    Sheet.Room.avgTalent(r),
-                    Sheet.Room.avgEffectValue(r),
-                    ...pipe(
-                      r.teams,
-                      Chunk.toArray,
-                      Array.map((team) => [
-                        team.teamName,
-                        team.lead,
-                        team.backline,
-                        Sheet.PlayerTeam.getEffectValue(team),
-                        team.talent,
-                        pipe(team.tags, Array.join(", ")),
-                      ]),
-                    ).flat(),
-                  ]),
-                ),
-                Effect.tapBoth({
-                  onFailure: (e) =>
-                    pipe(
-                      Effect.logError(e),
-                      Effect.andThen(() =>
-                        calcSheet.getRange(`AX30:AY30`).setValues([[hour, e.message]]),
-                      ),
-                    ),
-                  onSuccess: (result) =>
-                    pipe(
-                      Effect.log(result),
-                      Effect.andThen(() => calcSheet.getRange(`AX30:AY30`).setValues([[hour, ""]])),
-                      Effect.andThen(() =>
-                        result.length > 0
-                          ? calcSheet.getRange(`AX31:CC${result.length + 30}`).setValues(result)
-                          : undefined,
-                      ),
-                    ),
+            ),
+          ),
+          Effect.tap(({ url, config, players, fixedTeams }) =>
+            pipe(
+              Effect.Do,
+              Effect.bind("client", () => getClient(url)),
+              Effect.tap(() => Effect.log("calc.sheet")),
+              Effect.bind("result", ({ client }) =>
+                client.calc.calcSheet({
+                  payload: {
+                    sheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
+                    config,
+                    players,
+                    fixedTeams,
+                  },
                 }),
               ),
-          }),
+              Effect.map(({ result }) =>
+                result.map((r) => [
+                  Sheet.Room.avgTalent(r),
+                  Sheet.Room.avgEffectValue(r),
+                  ...pipe(
+                    r.teams,
+                    Chunk.toArray,
+                    Array.map((team) => [
+                      team.teamName,
+                      team.lead,
+                      team.backline,
+                      Sheet.PlayerTeam.getEffectValue(team),
+                      team.talent,
+                      pipe(team.tags, Array.join(", ")),
+                    ]),
+                  ).flat(),
+                ]),
+              ),
+              Effect.tapError((e) =>
+                pipe(
+                  Effect.logError(e),
+                  Effect.andThen(
+                    Effect.sync(() =>
+                      calcSheet.getRange(`AX30:AY30`).setValues([[hour, e.message]]),
+                    ),
+                  ),
+                ),
+              ),
+              Effect.tap((result) =>
+                pipe(
+                  Effect.log(result),
+                  Effect.andThen(
+                    Effect.sync(() => calcSheet.getRange(`AX30:AY30`).setValues([[hour, ""]])),
+                  ),
+                  Effect.andThen(
+                    Effect.sync(() =>
+                      result.length > 0
+                        ? calcSheet.getRange(`AX31:CC${result.length + 30}`).setValues(result)
+                        : undefined,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
+      Effect.asVoid,
       Effect.provide(AppsScriptHttpClientLayer),
     ),
   );
@@ -250,24 +263,26 @@ export function TZSHORTSTAMPS(start: CellValue, tzs: CellValue[][], hours: CellV
       Effect.bind("start", () =>
         pipe(
           start,
-          Schema.decodeUnknown(
+          Schema.decodeUnknownEffect(
             pipe(
               Schema.Number,
-              Schema.transform(Schema.Number, {
-                strict: true,
-                decode: Number.multiply(1000),
-                encode: Number.unsafeDivide(1000),
+              Schema.decodeTo(Schema.Number, {
+                decode: SchemaGetter.transform(Number.multiply(1000)),
+                encode: SchemaGetter.transform(Number.divideUnsafe(1000)),
               }),
-              Schema.compose(Schema.DateTimeUtcFromNumber),
+              Schema.decodeTo(Schema.DateTimeUtcFromMillis, {
+                decode: SchemaGetter.passthrough(),
+                encode: SchemaGetter.passthrough(),
+              }),
             ),
           ),
         ),
       ),
       Effect.bind("tzs", () =>
-        pipe(tzs, Array.flatten, Schema.decodeUnknown(Schema.Array(Schema.String))),
+        pipe(tzs, Array.flatten, Schema.decodeUnknownEffect(Schema.Array(Schema.String))),
       ),
       Effect.bind("hours", () =>
-        pipe(hours, Array.flatten, Schema.decodeUnknown(Schema.Array(Schema.Number))),
+        pipe(hours, Array.flatten, Schema.decodeUnknownEffect(Schema.Array(Schema.Number))),
       ),
       Effect.andThen(({ start, tzs, hours }) =>
         pipe(
@@ -290,7 +305,7 @@ export function TZSHORTSTAMPS(start: CellValue, tzs: CellValue[][], hours: CellV
                       Option.let("startTimeTzHours", ({ startTimeTz }) =>
                         pipe(
                           startTimeTz,
-                          DateTime.getPart("hours"),
+                          DateTime.getPart("hour"),
                           (n) => n.toString(),
                           String.padStart(2, "0"),
                         ),
@@ -298,7 +313,7 @@ export function TZSHORTSTAMPS(start: CellValue, tzs: CellValue[][], hours: CellV
                       Option.let("startTimeTzMinutes", ({ startTimeTz }) =>
                         pipe(
                           startTimeTz,
-                          DateTime.getPart("minutes"),
+                          DateTime.getPart("minute"),
                           (n) => n.toString(),
                           String.padStart(2, "0"),
                         ),
@@ -327,24 +342,26 @@ export function TZLONGSTAMPS(start: CellValue, tzs: CellValue[][], hours: CellVa
       Effect.bind("start", () =>
         pipe(
           start,
-          Schema.decodeUnknown(
+          Schema.decodeUnknownEffect(
             pipe(
               Schema.Number,
-              Schema.transform(Schema.Number, {
-                strict: true,
-                decode: Number.multiply(1000),
-                encode: Number.unsafeDivide(1000),
+              Schema.decodeTo(Schema.Number, {
+                decode: SchemaGetter.transform(Number.multiply(1000)),
+                encode: SchemaGetter.transform(Number.divideUnsafe(1000)),
               }),
-              Schema.compose(Schema.DateTimeUtcFromNumber),
+              Schema.decodeTo(Schema.DateTimeUtcFromMillis, {
+                decode: SchemaGetter.passthrough(),
+                encode: SchemaGetter.passthrough(),
+              }),
             ),
           ),
         ),
       ),
       Effect.bind("tzs", () =>
-        pipe(tzs, Array.flatten, Schema.decodeUnknown(Schema.Array(Schema.String))),
+        pipe(tzs, Array.flatten, Schema.decodeUnknownEffect(Schema.Array(Schema.String))),
       ),
       Effect.bind("hours", () =>
-        pipe(hours, Array.flatten, Schema.decodeUnknown(Schema.Array(Schema.Number))),
+        pipe(hours, Array.flatten, Schema.decodeUnknownEffect(Schema.Array(Schema.Number))),
       ),
       Effect.andThen(({ start, tzs, hours }) =>
         pipe(
@@ -369,7 +386,7 @@ export function TZLONGSTAMPS(start: CellValue, tzs: CellValue[][], hours: CellVa
                       Option.let("startTimeTzHours", ({ startTimeTz }) =>
                         pipe(
                           startTimeTz,
-                          DateTime.getPart("hours"),
+                          DateTime.getPart("hour"),
                           (n) => n.toString(),
                           String.padStart(2, "0"),
                         ),
@@ -377,7 +394,7 @@ export function TZLONGSTAMPS(start: CellValue, tzs: CellValue[][], hours: CellVa
                       Option.let("startTimeTzMinutes", ({ startTimeTz }) =>
                         pipe(
                           startTimeTz,
-                          DateTime.getPart("minutes"),
+                          DateTime.getPart("minute"),
                           (n) => n.toString(),
                           String.padStart(2, "0"),
                         ),
@@ -385,7 +402,7 @@ export function TZLONGSTAMPS(start: CellValue, tzs: CellValue[][], hours: CellVa
                       Option.let("endTimeTzHours", ({ endTimeTz }) =>
                         pipe(
                           endTimeTz,
-                          DateTime.getPart("hours"),
+                          DateTime.getPart("hour"),
                           (n) => n.toString(),
                           String.padStart(2, "0"),
                         ),
@@ -393,7 +410,7 @@ export function TZLONGSTAMPS(start: CellValue, tzs: CellValue[][], hours: CellVa
                       Option.let("endTimeTzMinutes", ({ endTimeTz }) =>
                         pipe(
                           endTimeTz,
-                          DateTime.getPart("minutes"),
+                          DateTime.getPart("minute"),
                           (n) => n.toString(),
                           String.padStart(2, "0"),
                         ),
@@ -441,24 +458,26 @@ export function tzLongStamps({
     pipe(
       Effect.all(
         {
-          settingSheet: Option.fromNullable(
+          settingSheet: Option.fromNullishOr(
             SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SETTING_SHEET_NAME),
-          ),
+          ).asEffect(),
         },
         { concurrency: "unbounded" },
       ),
       Effect.bind("start", ({ settingSheet }) =>
         pipe(
           settingSheet.getRange("O8").getValue(),
-          Schema.decodeUnknown(
+          Schema.decodeUnknownEffect(
             pipe(
               Schema.Number,
-              Schema.transform(Schema.Number, {
-                strict: true,
-                decode: Number.multiply(1000),
-                encode: Number.unsafeDivide(1000),
+              Schema.decodeTo(Schema.Number, {
+                decode: SchemaGetter.transform(Number.multiply(1000)),
+                encode: SchemaGetter.transform(Number.divideUnsafe(1000)),
               }),
-              Schema.compose(Schema.DateTimeUtcFromNumber),
+              Schema.decodeTo(Schema.DateTimeUtcFromMillis, {
+                decode: SchemaGetter.passthrough(),
+                encode: SchemaGetter.passthrough(),
+              }),
             ),
           ),
         ),
@@ -466,7 +485,7 @@ export function tzLongStamps({
       Effect.bind("tzsLookup", ({ settingSheet }) =>
         pipe(
           settingSheet.getRange("AJ8:AK").getValues(),
-          Schema.decodeUnknown(Schema.Array(Schema.Tuple(Schema.String, Schema.String))),
+          Schema.decodeUnknownEffect(Schema.Array(Schema.Tuple([Schema.String, Schema.String]))),
           Effect.map(HashMap.fromIterable),
         ),
       ),
@@ -474,7 +493,7 @@ export function tzLongStamps({
         pipe(
           sheet.getRange(`${tzsColumnStart}${tzsRow}:${tzsColumnEnd}${tzsRow}`).getValues(),
           Array.flatten,
-          Schema.decodeUnknown(Schema.Array(Schema.String)),
+          Schema.decodeUnknownEffect(Schema.Array(Schema.String)),
           Effect.map(
             Array.map((tz) =>
               pipe(
@@ -489,7 +508,7 @@ export function tzLongStamps({
         pipe(
           sheet.getRange(`${hoursColumn}${hoursRowStart}:${hoursColumn}${hoursRowEnd}`).getValues(),
           Array.flatten,
-          Schema.decodeUnknown(Schema.Array(Schema.Number)),
+          Schema.decodeUnknownEffect(Schema.Array(Schema.Number)),
         ),
       ),
       Effect.andThen(({ start, tzs, hours }) =>
@@ -509,7 +528,7 @@ export function tzLongStamps({
                   Option.let("startTimeTzHours", ({ startTimeTz }) =>
                     pipe(
                       startTimeTz,
-                      DateTime.getPart("hours"),
+                      DateTime.getPart("hour"),
                       (n) => n.toString(),
                       String.padStart(2, "0"),
                     ),
@@ -517,7 +536,7 @@ export function tzLongStamps({
                   Option.let("startTimeTzMinutes", ({ startTimeTz }) =>
                     pipe(
                       startTimeTz,
-                      DateTime.getPart("minutes"),
+                      DateTime.getPart("minute"),
                       (n) => n.toString(),
                       String.padStart(2, "0"),
                     ),
@@ -525,7 +544,7 @@ export function tzLongStamps({
                   Option.let("endTimeTzHours", ({ endTimeTz }) =>
                     pipe(
                       endTimeTz,
-                      DateTime.getPart("hours"),
+                      DateTime.getPart("hour"),
                       (n) => n.toString(),
                       String.padStart(2, "0"),
                     ),
@@ -533,7 +552,7 @@ export function tzLongStamps({
                   Option.let("endTimeTzMinutes", ({ endTimeTz }) =>
                     pipe(
                       endTimeTz,
-                      DateTime.getPart("minutes"),
+                      DateTime.getPart("minute"),
                       (n) => n.toString(),
                       String.padStart(2, "0"),
                     ),
@@ -550,9 +569,11 @@ export function tzLongStamps({
         ),
       ),
       Effect.andThen((result) =>
-        sheet
-          .getRange(`${tzsColumnStart}${hoursRowStart}:${tzsColumnEnd}${hoursRowEnd}`)
-          .setValues(result),
+        Effect.sync(() =>
+          sheet
+            .getRange(`${tzsColumnStart}${hoursRowStart}:${tzsColumnEnd}${hoursRowEnd}`)
+            .setValues(result),
+        ),
       ),
     ),
   );

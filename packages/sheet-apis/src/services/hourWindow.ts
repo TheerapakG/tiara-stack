@@ -8,7 +8,7 @@ export const deriveScheduleHourWindow = (
   pipe(
     hour,
     Option.map((value) =>
-      ScheduleHourWindow.make({
+      ScheduleHourWindow.makeUnsafe({
         start: pipe(startTime, DateTime.addDuration(Duration.hours(value - 1))),
         end: pipe(startTime, DateTime.addDuration(Duration.hours(value))),
       }),
@@ -20,14 +20,14 @@ export const withScheduleHourWindow = (
   schedule: BreakSchedule | Schedule,
 ): BreakSchedule | Schedule =>
   schedule._tag === "BreakSchedule"
-    ? BreakSchedule.make({
+    ? BreakSchedule.makeUnsafe({
         channel: schedule.channel,
         day: schedule.day,
         visible: schedule.visible,
         hour: schedule.hour,
         hourWindow: deriveScheduleHourWindow(startTime, schedule.hour),
       })
-    : Schedule.make({
+    : Schedule.makeUnsafe({
         channel: schedule.channel,
         day: schedule.day,
         visible: schedule.visible,

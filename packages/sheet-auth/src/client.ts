@@ -1,4 +1,4 @@
-import { DateTime, Deferred, Effect, Option, Redacted, Runtime, Schema } from "effect";
+import { DateTime, Deferred, Effect, Option, Redacted, Schema } from "effect";
 import { createAuthClient } from "better-auth/client";
 import { Account, Session } from "./model";
 import { kubernetesOAuthClient, Permission } from "./plugins/kubernetes-oauth/client";
@@ -7,7 +7,7 @@ import { kubernetesOAuthClient, Permission } from "./plugins/kubernetes-oauth/cl
 // 1. Errors
 // =============================================================================
 
-export class SessionResponseError extends Schema.TaggedError<SessionResponseError>(
+export class SessionResponseError extends Schema.TaggedErrorClass<SessionResponseError>(
   "SessionResponseError",
 )("SessionResponseError", {
   statusText: Schema.String,
@@ -18,7 +18,7 @@ export class SessionResponseError extends Schema.TaggedError<SessionResponseErro
 /**
  * Error type for token verification failures
  */
-export class TokenVerificationError extends Schema.TaggedError<TokenVerificationError>(
+export class TokenVerificationError extends Schema.TaggedErrorClass<TokenVerificationError>(
   "TokenVerificationError",
 )("TokenVerificationError", {
   statusText: Schema.String,
@@ -29,16 +29,19 @@ export class TokenVerificationError extends Schema.TaggedError<TokenVerification
 /**
  * Error type for account retrieval failures
  */
-export class AccountError extends Schema.TaggedError<AccountError>("AccountError")("AccountError", {
-  statusText: Schema.String,
-  message: Schema.String,
-  cause: Schema.optional(Schema.Unknown),
-}) {}
+export class AccountError extends Schema.TaggedErrorClass<AccountError>("AccountError")(
+  "AccountError",
+  {
+    statusText: Schema.String,
+    message: Schema.String,
+    cause: Schema.optional(Schema.Unknown),
+  },
+) {}
 
 /**
  * Error type for Discord access token retrieval failures
  */
-export class DiscordAccessTokenError extends Schema.TaggedError<DiscordAccessTokenError>(
+export class DiscordAccessTokenError extends Schema.TaggedErrorClass<DiscordAccessTokenError>(
   "DiscordAccessTokenError",
 )("DiscordAccessTokenError", {
   statusText: Schema.String,
@@ -49,7 +52,7 @@ export class DiscordAccessTokenError extends Schema.TaggedError<DiscordAccessTok
 /**
  * Error type for Kubernetes OAuth sign in failures
  */
-export class KubernetesOAuthSignInError extends Schema.TaggedError<KubernetesOAuthSignInError>(
+export class KubernetesOAuthSignInError extends Schema.TaggedErrorClass<KubernetesOAuthSignInError>(
   "KubernetesOAuthSignInError",
 )("KubernetesOAuthSignInError", {
   statusText: Schema.String,
@@ -60,7 +63,7 @@ export class KubernetesOAuthSignInError extends Schema.TaggedError<KubernetesOAu
 /**
  * Error type for Kubernetes OAuth implicit permissions retrieval failures
  */
-export class KubernetesOAuthImplicitPermissionsError extends Schema.TaggedError<KubernetesOAuthImplicitPermissionsError>(
+export class KubernetesOAuthImplicitPermissionsError extends Schema.TaggedErrorClass<KubernetesOAuthImplicitPermissionsError>(
   "KubernetesOAuthImplicitPermissionsError",
 )("KubernetesOAuthImplicitPermissionsError", {
   statusText: Schema.String,
@@ -124,7 +127,6 @@ export function getSession(
   headers?: Headers | HeadersInit,
 ): Effect.Effect<Option.Option<Session>, SessionResponseError> {
   return Effect.gen(function* () {
-    const runtime = yield* Effect.runtime();
     const tokenDeferred = yield* Deferred.make<string | undefined>();
     const session = yield* Effect.tryPromise({
       try: async () =>
@@ -133,10 +135,7 @@ export function getSession(
             headers,
             onSuccess: async (ctx) => {
               const token = ctx.response.headers.get("set-auth-token");
-              await Runtime.runPromise(
-                runtime,
-                Deferred.succeed(tokenDeferred, token ?? undefined),
-              );
+              await Effect.runPromise(Deferred.succeed(tokenDeferred, token ?? undefined));
             },
           },
         }),
@@ -159,14 +158,14 @@ export function getSession(
       return Option.none();
     }
 
-    const token = yield* tokenDeferred;
+    const token = yield* Deferred.await(tokenDeferred);
 
-    return Option.fromNullable(session.data).pipe(
+    return Option.fromNullishOr(session.data).pipe(
       Option.map((data) =>
-        Session.make({
+        Session.makeUnsafe({
           user: {
-            createdAt: DateTime.unsafeFromDate(data.user.createdAt),
-            updatedAt: DateTime.unsafeFromDate(data.user.updatedAt),
+            createdAt: DateTime.fromDateUnsafe(data.user.createdAt),
+            updatedAt: DateTime.fromDateUnsafe(data.user.updatedAt),
             email: data.user.email,
             emailVerified: data.user.emailVerified,
             name: data.user.name,
@@ -174,10 +173,10 @@ export function getSession(
           },
           session: data.session
             ? {
-                createdAt: DateTime.unsafeFromDate(data.session.createdAt),
-                updatedAt: DateTime.unsafeFromDate(data.session.updatedAt),
+                createdAt: DateTime.fromDateUnsafe(data.session.createdAt),
+                updatedAt: DateTime.fromDateUnsafe(data.session.updatedAt),
                 userId: data.session.userId,
-                expiresAt: DateTime.unsafeFromDate(data.session.expiresAt),
+                expiresAt: DateTime.fromDateUnsafe(data.session.expiresAt),
                 token: data.session.token,
                 ipAddress: data.session.ipAddress,
                 userAgent: data.session.userAgent,
@@ -239,13 +238,13 @@ export function getAccount(
       );
     }
 
-    return Account.make({
+    return Account.makeUnsafe({
       scopes: account.scopes,
       userId: account.userId,
       accountId: account.accountId,
       providerId: account.providerId,
-      createdAt: DateTime.unsafeFromDate(account.createdAt),
-      updatedAt: DateTime.unsafeFromDate(account.updatedAt),
+      createdAt: DateTime.fromDateUnsafe(account.createdAt),
+      updatedAt: DateTime.fromDateUnsafe(account.updatedAt),
     });
   });
 }
@@ -324,7 +323,6 @@ export function createKubernetesOAuthSession(
   headers?: Headers | HeadersInit,
 ): Effect.Effect<Session, KubernetesOAuthSignInError> {
   return Effect.gen(function* () {
-    const runtime = yield* Effect.runtime();
     const tokenDeferred = yield* Deferred.make<string | undefined>();
 
     const response = yield* Effect.tryPromise({
@@ -336,10 +334,7 @@ export function createKubernetesOAuthSession(
             headers,
             onSuccess: async (ctx) => {
               const token = ctx.response.headers.get("set-auth-token");
-              await Runtime.runPromise(
-                runtime,
-                Deferred.succeed(tokenDeferred, token ?? undefined),
-              );
+              await Effect.runPromise(Deferred.succeed(tokenDeferred, token ?? undefined));
             },
           },
         }),
@@ -361,11 +356,11 @@ export function createKubernetesOAuthSession(
       );
     }
 
-    const token = yield* tokenDeferred;
-    return Session.make({
+    const token = yield* Deferred.await(tokenDeferred);
+    return Session.makeUnsafe({
       user: {
-        createdAt: DateTime.unsafeFromDate(response.data.user.createdAt),
-        updatedAt: DateTime.unsafeFromDate(response.data.user.updatedAt),
+        createdAt: DateTime.fromDateUnsafe(response.data.user.createdAt),
+        updatedAt: DateTime.fromDateUnsafe(response.data.user.updatedAt),
         email: response.data.user.email,
         emailVerified: response.data.user.emailVerified,
         name: response.data.user.name,
@@ -373,10 +368,10 @@ export function createKubernetesOAuthSession(
       },
       session: response.data.session
         ? {
-            createdAt: DateTime.unsafeFromDate(response.data.session.createdAt),
-            updatedAt: DateTime.unsafeFromDate(response.data.session.updatedAt),
+            createdAt: DateTime.fromDateUnsafe(response.data.session.createdAt),
+            updatedAt: DateTime.fromDateUnsafe(response.data.session.updatedAt),
             userId: response.data.session.userId,
-            expiresAt: DateTime.unsafeFromDate(response.data.session.expiresAt),
+            expiresAt: DateTime.fromDateUnsafe(response.data.session.expiresAt),
             token: response.data.session.token,
             ipAddress: response.data.session.ipAddress,
             userAgent: response.data.session.userAgent,

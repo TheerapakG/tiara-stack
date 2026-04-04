@@ -1,34 +1,36 @@
-import {
-  Array,
-  DateTime,
-  Duration,
-  Effect,
-  HashMap,
-  HashSet,
-  Match,
-  Number,
-  Option,
-  Random,
-  pipe,
-} from "effect";
+import { DateTime, Duration, Effect, Layer, Option, Random, ServiceMap, pipe } from "effect";
 import { makeArgumentError } from "typhoon-core/error";
-import { Array as ArrayUtils } from "typhoon-core/utils";
 import { CheckinGenerateResult } from "@/schemas/checkin";
 import {
+  Player,
+  PopulatedScheduleMonitor,
   PopulatedSchedule,
   PopulatedSchedulePlayer,
   type PopulatedScheduleResult,
-  PartialNameMonitor,
   Monitor,
+  PartialNameMonitor,
+  PartialNamePlayer,
 } from "@/schemas/sheet";
 import { GuildConfigService } from "./guildConfig";
 import { ScheduleService } from "./schedule";
 import { SheetConfigService } from "./sheetConfig";
 
+type GuildConfigServiceApi = Effect.Success<typeof GuildConfigService.make>;
+type SheetConfigServiceApi = Effect.Success<typeof SheetConfigService.make>;
+type EventConfig = Effect.Success<ReturnType<SheetConfigServiceApi["getEventConfig"]>>;
+
 type Weighted<A> = { value: A; weight: number };
 const SLOTS_PER_ROW = 5;
 
-const checkinMessageTemplates: Array.NonEmptyReadonlyArray<Weighted<string>> = [
+const isPopulatedSchedule = (schedule: PopulatedScheduleResult): schedule is PopulatedSchedule =>
+  schedule._tag === "PopulatedSchedule";
+
+const isPlayer = (player: Player | PartialNamePlayer): player is Player => player._tag === "Player";
+
+const isMonitor = (monitor: Monitor | PartialNameMonitor): monitor is Monitor =>
+  monitor._tag === "Monitor";
+
+const checkinMessageTemplates: [Weighted<string>, ...Weighted<string>[]] = [
   {
     value:
       "{{mentionsString}} Press the button below to check in, and {{channelString}} {{hourString}} {{timeStampString}}",
@@ -66,45 +68,22 @@ const checkinMessageTemplates: Array.NonEmptyReadonlyArray<Weighted<string>> = [
   },
 ];
 
-const pickWeighted = <A>(items: Array.NonEmptyReadonlyArray<Weighted<A>>) =>
-  pipe(
-    Effect.Do,
-    Effect.bind("accumItems", () =>
-      pipe(
-        items,
-        Array.scan({ value: Option.none<A>(), weight: 0 }, (s, { value, weight }) => ({
-          value: Option.some(value),
-          weight: s.weight + weight,
-        })),
-        Array.filterMap(({ value, weight }) =>
-          pipe(
-            value,
-            Option.map((value) => ({ value, weight })),
-          ),
-        ),
-        Array.match({
-          onEmpty: () => Effect.die("pickWeighted: impossible"),
-          onNonEmpty: (items) => Effect.succeed(items),
-        }),
-      ),
-    ),
-    Effect.bind("random", ({ accumItems }) =>
-      Random.nextRange(
-        0,
-        pipe(accumItems, Array.lastNonEmpty, ({ weight }) => weight),
-      ),
-    ),
-    Effect.flatMap(({ accumItems, random }) =>
-      pipe(
-        accumItems,
-        Array.findFirst(({ weight }) => random < weight),
-        Option.match({
-          onSome: ({ value }) => Effect.succeed(value),
-          onNone: () => Effect.die("pickWeighted: impossible"),
-        }),
-      ),
-    ),
-  );
+const pickWeighted = Effect.fn("CheckinService.pickWeighted")(function* <A>(
+  items: readonly Weighted<A>[],
+) {
+  const totalWeight = items.reduce((total, item) => total + item.weight, 0);
+  const random = yield* Random.nextBetween(0, totalWeight);
+  let accumulatedWeight = 0;
+
+  for (const item of items) {
+    accumulatedWeight += item.weight;
+    if (random < accumulatedWeight) {
+      return item.value;
+    }
+  }
+
+  return items[items.length - 1]!.value;
+});
 
 const renderTemplate = (template: string, context: Record<string, string>) =>
   template.replace(/\{\{\{?(\w+)\}?\}\}/g, (match, key: string) => context[key] ?? match);
@@ -113,12 +92,10 @@ const formatRelativeDiscordTime = (dateTime: DateTime.DateTime) =>
   `<t:${Math.floor(DateTime.toEpochMillis(dateTime) / 1000)}:R>`;
 
 const formatUserMention = (userId: string) => `<@${userId}>`;
-
 const formatChannelMention = (channelId: string) => `<#${channelId}>`;
 
-const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigService) =>
-  pipe(
-    guildConfigService.getGuildConfig(guildId),
+const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigServiceApi) =>
+  guildConfigService.getGuildConfig(guildId).pipe(
     Effect.flatMap(
       Option.match({
         onSome: (guildConfig) =>
@@ -142,11 +119,8 @@ const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigS
 
 const requireRunningChannel = Effect.fn("CheckinService.requireRunningChannel")(function* (
   guildId: string,
-  payload: {
-    channelId?: string | undefined;
-    channelName?: string | undefined;
-  },
-  guildConfigService: GuildConfigService,
+  payload: { channelId?: string | undefined; channelName?: string | undefined },
+  guildConfigService: GuildConfigServiceApi,
 ) {
   const maybeChannel =
     typeof payload.channelId === "string"
@@ -181,37 +155,25 @@ const requireRunningChannel = Effect.fn("CheckinService.requireRunningChannel")(
 
 const deriveHour = Effect.fn("CheckinService.deriveHour")(function* (
   payload: { hour?: number | undefined },
-  sheetConfigService: SheetConfigService,
+  sheetConfigService: SheetConfigServiceApi,
   sheetId: string,
 ) {
   if (typeof payload.hour === "number") {
     return {
       hour: payload.hour,
-      eventConfig:
-        Option.none<Effect.Effect.Success<ReturnType<typeof sheetConfigService.getEventConfig>>>(),
+      eventConfig: Option.none<EventConfig>(),
     };
   }
 
-  const dateTime = yield* pipe(
-    DateTime.now,
-    Effect.map(DateTime.addDuration(Duration.minutes(20))),
-  );
+  const dateTime = yield* DateTime.now.pipe(Effect.map(DateTime.addDuration(Duration.minutes(20))));
   const eventConfig = yield* sheetConfigService.getEventConfig(sheetId);
-  const distance = DateTime.distanceDurationEither(
+  const distance = DateTime.distance(
     eventConfig.startTime,
     pipe(dateTime, DateTime.startOf("hour")),
   );
 
   return {
-    hour: pipe(
-      distance,
-      Match.value,
-      Match.when({ _tag: "Left" }, ({ left }) => pipe(left, Duration.toHours, Number.negate)),
-      Match.when({ _tag: "Right" }, ({ right }) => Duration.toHours(right)),
-      Match.exhaustive,
-      Math.floor,
-      Number.increment,
-    ),
+    hour: Math.floor(Duration.toHours(distance)) + 1,
     eventConfig: Option.some(eventConfig),
   };
 });
@@ -219,137 +181,73 @@ const deriveHour = Effect.fn("CheckinService.deriveHour")(function* (
 const getSchedulePlayers = (
   schedule: Option.Option<PopulatedScheduleResult>,
   toValue: (player: PopulatedSchedulePlayer) => string,
-) =>
-  pipe(
-    schedule,
-    Option.map((schedule) =>
-      pipe(
-        Match.value(schedule),
-        Match.tagsExhaustive({
-          PopulatedBreakSchedule: () => [],
-          PopulatedSchedule: (schedule) => schedule.fills,
-        }),
-      ),
-    ),
-    Option.getOrElse(() => []),
-    Array.getSomes,
-    Array.map(toValue),
-  );
+) => {
+  if (Option.isNone(schedule) || !isPopulatedSchedule(schedule.value)) {
+    return [] as string[];
+  }
+  return schedule.value.fills.flatMap((fill) => (Option.isSome(fill) ? [toValue(fill.value)] : []));
+};
 
 const schedulePlayerToMentionOrName = (schedulePlayer: PopulatedSchedulePlayer) =>
-  pipe(
-    Match.value(schedulePlayer.player),
-    Match.tagsExhaustive({
-      Player: (player) => formatUserMention(player.id),
-      PartialNamePlayer: (player) => player.name,
-    }),
-  );
+  isPlayer(schedulePlayer.player)
+    ? formatUserMention(schedulePlayer.player.id)
+    : schedulePlayer.player.name;
 
 const schedulePlayerToUserId = (schedulePlayer: PopulatedSchedulePlayer) =>
-  pipe(
-    Match.value(schedulePlayer.player),
-    Match.tagsExhaustive({
-      Player: (player) => Option.some(player.id),
-      PartialNamePlayer: () => Option.none<string>(),
-    }),
-  );
+  isPlayer(schedulePlayer.player) ? Option.some(schedulePlayer.player.id) : Option.none<string>();
 
-const getFillIds = (schedule: Option.Option<PopulatedScheduleResult>) =>
-  pipe(
-    schedule,
-    Option.map((schedule) =>
-      pipe(
-        Match.value(schedule),
-        Match.tagsExhaustive({
-          PopulatedBreakSchedule: () => [],
-          PopulatedSchedule: (schedule) => schedule.fills,
-        }),
-      ),
-    ),
-    Option.getOrElse(() => []),
-    Array.getSomes,
-    Array.map(schedulePlayerToUserId),
-    Array.getSomes,
-    HashSet.fromIterable,
-    HashSet.toValues,
-  );
+const getFillIds = (schedule: Option.Option<PopulatedScheduleResult>) => [
+  ...new Set(
+    getSchedulePlayers(schedule, (player) =>
+      Option.getOrElse(schedulePlayerToUserId(player), () => ""),
+    ).filter(Boolean),
+  ),
+];
 
-const getLookupFailedMessage = (schedule: Option.Option<PopulatedScheduleResult>) =>
-  pipe(
-    schedule,
-    Option.map((schedule) =>
-      pipe(
-        Match.value(schedule),
-        Match.tagsExhaustive({
-          PopulatedBreakSchedule: () => [],
-          PopulatedSchedule: (schedule) => schedule.fills,
-        }),
-      ),
-    ),
-    Option.getOrElse(() => []),
-    Array.getSomes,
-    Array.map((player) =>
-      pipe(
-        Match.value(player.player),
-        Match.tagsExhaustive({
-          Player: () => Option.none<string>(),
-          PartialNamePlayer: (player) => Option.some(player.name),
-        }),
-      ),
-    ),
-    Array.getSomes,
-    Option.liftPredicate(Array.isNonEmptyArray),
-    Option.map(
-      (partialPlayers) =>
-        `Cannot look up Discord ID for ${Array.join(partialPlayers, ", ")}. They would need to check in manually.`,
-    ),
-  );
+const getLookupFailedMessage = (schedule: Option.Option<PopulatedScheduleResult>) => {
+  if (Option.isNone(schedule) || !isPopulatedSchedule(schedule.value)) {
+    return Option.none<string>();
+  }
 
-const getMonitorInfo = (schedule: Option.Option<PopulatedScheduleResult>) =>
-  pipe(
-    schedule,
-    Option.match({
-      onNone: () => ({
-        monitorUserId: null as string | null,
+  const partialPlayers = schedule.value.fills.flatMap((fill) => {
+    if (Option.isNone(fill)) return [];
+    return isPlayer(fill.value.player) ? [] : [fill.value.player.name];
+  });
+
+  return partialPlayers.length > 0
+    ? Option.some(
+        `Cannot look up Discord ID for ${partialPlayers.join(", ")}. They would need to check in manually.`,
+      )
+    : Option.none();
+};
+
+const getMonitorInfo = (schedule: Option.Option<PopulatedScheduleResult>) => {
+  if (Option.isNone(schedule) || schedule.value._tag === "PopulatedBreakSchedule") {
+    return {
+      monitorUserId: null as string | null,
+      monitorFailureMessage: null as string | null,
+    };
+  }
+
+  const populatedSchedule = schedule.value;
+  if (Option.isNone(populatedSchedule.monitor)) {
+    return {
+      monitorUserId: null as string | null,
+      monitorFailureMessage: "Cannot ping monitor: monitor not assigned for this hour.",
+    };
+  }
+
+  const populatedMonitor: PopulatedScheduleMonitor = populatedSchedule.monitor.value;
+  return isMonitor(populatedMonitor.monitor)
+    ? {
+        monitorUserId: populatedMonitor.monitor.id,
         monitorFailureMessage: null as string | null,
-      }),
-      onSome: (schedule) =>
-        pipe(
-          Match.value(schedule),
-          Match.tagsExhaustive({
-            PopulatedBreakSchedule: () => ({
-              monitorUserId: null as string | null,
-              monitorFailureMessage: null as string | null,
-            }),
-            PopulatedSchedule: (schedule) =>
-              pipe(
-                schedule.monitor,
-                Option.match({
-                  onNone: () => ({
-                    monitorUserId: null as string | null,
-                    monitorFailureMessage:
-                      "Cannot ping monitor: monitor not assigned for this hour.",
-                  }),
-                  onSome: (populatedMonitor) =>
-                    pipe(
-                      Match.value(populatedMonitor.monitor),
-                      Match.tagsExhaustive({
-                        Monitor: (monitorData: Monitor) => ({
-                          monitorUserId: monitorData.id,
-                          monitorFailureMessage: null as string | null,
-                        }),
-                        PartialNameMonitor: (monitorData: PartialNameMonitor) => ({
-                          monitorUserId: null as string | null,
-                          monitorFailureMessage: `Cannot ping monitor: monitor "${monitorData.name}" is missing a Discord ID in the sheet.`,
-                        }),
-                      }),
-                    ),
-                }),
-              ),
-          }),
-        ),
-    }),
-  );
+      }
+    : {
+        monitorUserId: null as string | null,
+        monitorFailureMessage: `Cannot ping monitor: monitor "${populatedMonitor.monitor.name}" is missing a Discord ID in the sheet.`,
+      };
+};
 
 export const makeMonitorCheckinMessage = ({
   initialMessage,
@@ -365,49 +263,34 @@ export const makeMonitorCheckinMessage = ({
   lookupFailedMessage: Option.Option<string>;
 }) =>
   initialMessage
-    ? pipe(
-        [
-          Option.some("Check-in message sent!"),
-          Option.some(emptySlotMessage),
-          Option.some(playersMessage),
-          lookupFailedMessage,
-        ],
-        Array.getSomes,
-        Array.join("\n"),
-      )
-    : pipe(
-        [
-          Option.some("No check-in message sent, no new players to check in"),
-          empty > 0 && empty < SLOTS_PER_ROW
-            ? Option.some(emptySlotMessage)
-            : Option.none<string>(),
-        ],
-        Array.getSomes,
-        Array.join("\n"),
-      );
+    ? [
+        "Check-in message sent!",
+        emptySlotMessage,
+        playersMessage,
+        ...Option.toArray(lookupFailedMessage),
+      ].join("\n")
+    : [
+        "No check-in message sent, no new players to check in",
+        ...(empty > 0 && empty < SLOTS_PER_ROW ? [emptySlotMessage] : []),
+      ].join("\n");
 
 const formatChannelString = (
   roleId: Option.Option<string>,
   channelId: string,
   channelName: Option.Option<string>,
 ) =>
-  pipe(
-    roleId,
-    Option.match({
-      onSome: () =>
-        pipe(
-          channelName,
-          Option.map((name) => `head to ${name}`),
-          Option.getOrElse(
-            () => "await further instructions from the monitor on where the running channel is",
-          ),
+  Option.isSome(roleId)
+    ? pipe(
+        channelName,
+        Option.map((name) => `head to ${name}`),
+        Option.getOrElse(
+          () => "await further instructions from the monitor on where the running channel is",
         ),
-      onNone: () => `head to ${formatChannelMention(channelId)}`,
-    }),
-  );
+      )
+    : `head to ${formatChannelMention(channelId)}`;
 
-export class CheckinService extends Effect.Service<CheckinService>()("CheckinService", {
-  effect: Effect.gen(function* () {
+export class CheckinService extends ServiceMap.Service<CheckinService>()("CheckinService", {
+  make: Effect.gen(function* () {
     const guildConfigService = yield* GuildConfigService;
     const scheduleService = yield* ScheduleService;
     const sheetConfigService = yield* SheetConfigService;
@@ -427,43 +310,34 @@ export class CheckinService extends Effect.Service<CheckinService>()("CheckinSer
         );
         const sheetId = yield* getSheetIdFromGuildId(payload.guildId, guildConfigService);
         const { hour, eventConfig } = yield* deriveHour(payload, sheetConfigService, sheetId);
-        const channelName = pipe(
-          runningChannel.name,
-          Option.getOrElse(() => ""),
-        );
-
+        const channelName = Option.getOrElse(runningChannel.name, () => "");
         const schedules = yield* scheduleService.getChannelPopulatedSchedules(sheetId, channelName);
 
-        const schedulesByHour = pipe(
-          schedules,
-          Array.filterMap((schedule) =>
-            pipe(
-              schedule.hour,
-              Option.map((hour) => ({ hour, schedule })),
-            ),
-          ),
-          ArrayUtils.Collect.toHashMapByKey("hour"),
-          HashMap.map(({ schedule }) => schedule),
-        );
+        const schedulesByHour = new Map<number, PopulatedScheduleResult>();
+        for (const schedule of schedules) {
+          if (Option.isSome(schedule.hour)) {
+            schedulesByHour.set(schedule.hour.value, schedule);
+          }
+        }
 
-        const prevSchedule = HashMap.get(schedulesByHour, hour - 1);
-        const schedule = HashMap.get(schedulesByHour, hour);
+        const prevSchedule = schedulesByHour.has(hour - 1)
+          ? Option.some(schedulesByHour.get(hour - 1)!)
+          : Option.none<PopulatedScheduleResult>();
+        const schedule = schedulesByHour.has(hour)
+          ? Option.some(schedulesByHour.get(hour)!)
+          : Option.none<PopulatedScheduleResult>();
+
         const prevFills = getSchedulePlayers(prevSchedule, schedulePlayerToMentionOrName);
         const fills = getSchedulePlayers(schedule, schedulePlayerToMentionOrName);
-        const fillIds = getFillIds(schedule);
-        const mentionsString = pipe(
-          HashSet.fromIterable(fills),
-          HashSet.difference(HashSet.fromIterable(prevFills)),
-          HashSet.toValues,
-          Option.some,
-          Option.filter(Array.isNonEmptyArray),
-          Option.map(Array.join(" ")),
-        );
+        const fillIds = getFillIds(schedule) as readonly string[];
+        const mentions = [...new Set(fills.filter((fill) => !prevFills.includes(fill)))];
+        const mentionsString =
+          mentions.length > 0 ? Option.some(mentions.join(" ")) : Option.none<string>();
 
         const hourString = `for **hour ${hour}**`;
         const scheduleHourWindow = pipe(
           schedule,
-          Option.flatMap((currentSchedule) => currentSchedule.hourWindow),
+          Option.flatMap((currentSchedule) => currentSchedule.hourWindow as Option.Option<any>),
         );
         const timeStampString = Option.isSome(scheduleHourWindow)
           ? formatRelativeDiscordTime(scheduleHourWindow.value.start)
@@ -473,14 +347,15 @@ export class CheckinService extends Effect.Service<CheckinService>()("CheckinSer
                 onSome: Effect.succeed,
                 onNone: () => sheetConfigService.getEventConfig(sheetId),
               }),
-              Effect.map((eventConfig) =>
-                pipe(
-                  eventConfig.startTime,
-                  DateTime.addDuration(Duration.hours(hour - 1)),
-                  formatRelativeDiscordTime,
+              Effect.map((resolvedEventConfig) =>
+                formatRelativeDiscordTime(
+                  pipe(
+                    resolvedEventConfig.startTime,
+                    DateTime.addDuration(Duration.hours(hour - 1)),
+                  ),
                 ),
               ),
-              Effect.catchAll(() => Effect.succeed("")),
+              Effect.catch(() => Effect.succeed("")),
             );
 
         const channelString = formatChannelString(
@@ -491,7 +366,7 @@ export class CheckinService extends Effect.Service<CheckinService>()("CheckinSer
 
         const template = yield* pipe(
           payload.template,
-          Option.fromNullable,
+          Option.fromNullishOr,
           Option.match({
             onSome: Effect.succeed,
             onNone: () => pickWeighted(checkinMessageTemplates),
@@ -500,9 +375,9 @@ export class CheckinService extends Effect.Service<CheckinService>()("CheckinSer
 
         const initialMessage = pipe(
           mentionsString,
-          Option.map((mentionsString) =>
+          Option.map((resolvedMentionsString) =>
             renderTemplate(template, {
-              mentionsString,
+              mentionsString: resolvedMentionsString,
               channelString,
               hourString,
               timeStampString,
@@ -511,34 +386,16 @@ export class CheckinService extends Effect.Service<CheckinService>()("CheckinSer
           Option.getOrNull,
         );
 
-        const empty = pipe(
-          schedule,
-          Option.map((schedule) =>
-            pipe(
-              Match.value(schedule),
-              Match.tagsExhaustive({
-                PopulatedBreakSchedule: () => SLOTS_PER_ROW,
-                PopulatedSchedule: (schedule) => PopulatedSchedule.empty(schedule),
-              }),
-            ),
-          ),
-          Option.getOrElse(() => SLOTS_PER_ROW),
-        );
-
+        const empty =
+          Option.isSome(schedule) && schedule.value._tag === "PopulatedSchedule"
+            ? PopulatedSchedule.empty(schedule.value)
+            : SLOTS_PER_ROW;
         const emptySlotMessage = `${empty > 0 ? `+${empty}` : "No"} empty slot${empty > 1 ? "s" : ""}`;
-        const playersMessage = `Players: ${Array.join(fills, " ")}`;
+        const playersMessage = `Players: ${fills.join(" ")}`;
         const lookupFailedMessage = getLookupFailedMessage(schedule);
         const monitorInfo = getMonitorInfo(schedule);
 
-        const monitorCheckinMessage = makeMonitorCheckinMessage({
-          initialMessage,
-          empty,
-          emptySlotMessage,
-          playersMessage,
-          lookupFailedMessage,
-        });
-
-        return new CheckinGenerateResult({
+        return CheckinGenerateResult.makeUnsafe({
           hour,
           runningChannelId: runningChannel.channelId,
           checkinChannelId: Option.getOrElse(
@@ -547,7 +404,13 @@ export class CheckinService extends Effect.Service<CheckinService>()("CheckinSer
           ),
           roleId: Option.getOrNull(runningChannel.roleId),
           initialMessage,
-          monitorCheckinMessage,
+          monitorCheckinMessage: makeMonitorCheckinMessage({
+            initialMessage,
+            empty,
+            emptySlotMessage,
+            playersMessage,
+            lookupFailedMessage,
+          }),
           monitorUserId: monitorInfo.monitorUserId,
           monitorFailureMessage: monitorInfo.monitorFailureMessage,
           fillIds,
@@ -555,6 +418,10 @@ export class CheckinService extends Effect.Service<CheckinService>()("CheckinSer
       }),
     };
   }),
-  dependencies: [GuildConfigService.Default, ScheduleService.Default, SheetConfigService.Default],
-  accessors: true,
-}) {}
+}) {
+  static layer = Layer.effect(CheckinService, this.make).pipe(
+    Layer.provide(GuildConfigService.layer),
+    Layer.provide(ScheduleService.layer),
+    Layer.provide(SheetConfigService.layer),
+  );
+}

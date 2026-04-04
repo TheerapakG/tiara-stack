@@ -1,2 +1,2 @@
 export { ScreenshotApi } from "./api";
-export { ScreenshotLive } from "./http";
+export { screenshotLayer } from "./http";

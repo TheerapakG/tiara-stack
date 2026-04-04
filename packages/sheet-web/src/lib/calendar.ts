@@ -1,5 +1,6 @@
-import { Array, Chunk, DateTime, Duration, Effect, Schema, Stream } from "effect";
-import { Atom, Result, useAtomSuspense } from "@effect-atom/atom-react";
+import { Array, DateTime, Duration, Effect, Schema, Stream } from "effect";
+import { useAtomSuspense } from "@effect/atom-react";
+import { Atom, AsyncResult } from "effect/unstable/reactivity";
 import { useMemo } from "react";
 
 // Normalize date to month start for consistent atom family keys
@@ -33,7 +34,7 @@ const _calendarDaysAtom = Atom.family((dateTime: DateTime.Zoned) =>
         Stream.runCollect,
       );
 
-      const daysArray = yield* Array.match(Chunk.toReadonlyArray(days), {
+      const daysArray = yield* Array.match(days, {
         onEmpty: () => Effect.die("calendar days is empty, this should never happen"),
         onNonEmpty: (days) => Effect.succeed(days),
       });
@@ -44,7 +45,7 @@ const _calendarDaysAtom = Atom.family((dateTime: DateTime.Zoned) =>
     Atom.setIdleTTL(Duration.hours(1)),
     Atom.serializable({
       key: `calendarDays.${monthKey(dateTime)}`,
-      schema: Result.Schema({
+      schema: AsyncResult.Schema({
         success: Schema.NonEmptyArray(
           Schema.Struct({
             day: Schema.DateTimeZoned,

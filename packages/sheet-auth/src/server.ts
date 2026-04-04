@@ -1,22 +1,18 @@
+import { HttpServer, HttpServerRequest, HttpRouter } from "effect/unstable/http";
 import {
   HttpApi,
   HttpApiBuilder,
   HttpApiEndpoint,
   HttpApiGroup,
   HttpApiSwagger,
-  HttpMiddleware,
-  HttpServer,
-  HttpServerRequest,
-  PlatformConfigProvider,
-} from "@effect/platform";
+} from "effect/unstable/httpapi";
 import {
-  NodeHttpClient,
-  NodeContext,
+  NodeFileSystem,
   NodeHttpServer,
   NodeHttpServerRequest,
   NodeRuntime,
 } from "@effect/platform-node";
-import { Context, Effect, Layer, Logger, Option, Redacted } from "effect";
+import { ConfigProvider, Effect, Layer, Logger, Option, Redacted, ServiceMap } from "effect";
 import { getRequestListener } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { createServer } from "http";
@@ -39,7 +35,7 @@ const Api = HttpApi.make("sheet-auth")
       .add(HttpApiEndpoint.get("get", "/*"))
       .add(HttpApiEndpoint.post("post", "/*"))
       .add(HttpApiEndpoint.put("put", "/*"))
-      .add(HttpApiEndpoint.del("delete", "/*"))
+      .add(HttpApiEndpoint.delete("delete", "/*"))
       .add(HttpApiEndpoint.patch("patch", "/*"))
       .add(HttpApiEndpoint.head("head", "/*"))
       .add(HttpApiEndpoint.options("options", "/*")),
@@ -61,7 +57,7 @@ type HandlerParams = {
 interface AuthWithOAuthProvider extends AuthWithCleanup {}
 
 // Auth service tag to share auth instance between route groups
-class AuthService extends Context.Tag("AuthService")<AuthService, AuthWithOAuthProvider>() {}
+class AuthService extends ServiceMap.Service<AuthService, AuthWithOAuthProvider>()("AuthService") {}
 
 // Helper to create a forwarder from a web handler
 const createForwarder =
@@ -76,7 +72,7 @@ const createForwarder =
     });
 
 // Layer that creates the auth instance and provides it as a service
-const AuthServiceLive = Layer.scoped(
+const authServiceLayer = Layer.effect(
   AuthService,
   Effect.gen(function* () {
     const discordClientId = yield* config.discordClientId;
@@ -113,12 +109,10 @@ const AuthServiceLive = Layer.scoped(
         Effect.promise(() => auth.close()),
         Effect.promise(() => auth.closeStorage()),
       ]).pipe(
-        Effect.tapBoth({
-          onFailure: (error) =>
-            Effect.sync(() => console.error("Failed to close connections:", error)),
-          onSuccess: () => Effect.sync(() => console.log("Connections closed")),
-        }),
-        Effect.orElse(() => Effect.void),
+        Effect.tap(() => Effect.sync(() => console.log("Connections closed"))),
+        Effect.tapError((error) =>
+          Effect.sync(() => console.error("Failed to close connections:", error)),
+        ),
       ),
     );
 
@@ -145,7 +139,7 @@ function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
 }
 
 // Auth handler group - forwards all requests to Better Auth
-const AuthLive = HttpApiBuilder.group(Api, "auth", (handlers) =>
+const authLayer = HttpApiBuilder.group(Api, "auth", (handlers) =>
   Effect.gen(function* () {
     const auth = yield* AuthService;
     const trustedOrigins = [...(yield* config.trustedOrigins)];
@@ -178,11 +172,11 @@ const AuthLive = HttpApiBuilder.group(Api, "auth", (handlers) =>
       .handle("head", forward)
       .handle("options", forward);
   }),
-);
+).pipe(Layer.provide(authServiceLayer));
 
 // Well-known handler group - handles SERVER_ONLY metadata endpoints
 // by wrapping the helper functions with getRequestListener
-const WellKnownLive = HttpApiBuilder.group(Api, "well-known", (handlers) =>
+const wellKnownLayer = HttpApiBuilder.group(Api, "well-known", (handlers) =>
   Effect.gen(function* () {
     const auth = yield* AuthService;
 
@@ -200,15 +194,13 @@ const WellKnownLive = HttpApiBuilder.group(Api, "well-known", (handlers) =>
       .handle("oauthAuthServer", createForwarder(oauthAuthServerHandler))
       .handle("openidConfig", createForwarder(openIdConfigHandler));
   }),
+).pipe(Layer.provide(authServiceLayer));
+
+const apiLayer = Layer.provide(HttpApiBuilder.layer(Api), [authLayer, wellKnownLayer]).pipe(
+  Layer.merge(HttpApiSwagger.layer(Api)),
 );
 
-const ApiLive = Layer.provide(HttpApiBuilder.api(Api), Layer.merge(AuthLive, WellKnownLive));
-
-const HttpLive = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
-  Layer.provide(HttpApiSwagger.layer()),
-  Layer.provide(ApiLive),
-  Layer.provide(AuthServiceLive),
-  Layer.provide(NodeHttpClient.layer),
+const HttpLive = HttpRouter.serve(apiLayer).pipe(
   HttpServer.withLogAddress,
   Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 })),
 );
@@ -216,9 +208,10 @@ const HttpLive = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
 HttpLive.pipe(
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
-  Layer.provide(Logger.logFmt),
-  Layer.provide(PlatformConfigProvider.layerDotEnvAdd(".env")),
-  Layer.provide(NodeContext.layer),
+  Layer.provide(Logger.layer([Logger.consoleLogFmt])),
+  Layer.provide(
+    ConfigProvider.layerAdd(ConfigProvider.fromDotEnv()).pipe(Layer.provide(NodeFileSystem.layer)),
+  ),
   Layer.launch,
-  NodeRuntime.runMain({ disablePrettyLogger: true }),
+  NodeRuntime.runMain(),
 );

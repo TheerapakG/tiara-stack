@@ -1,20 +1,12 @@
-import { DiscordConfig } from "dfx";
+import { Discord, DiscordConfig } from "dfx";
 import { Layer } from "effect";
+import { HttpClientError } from "effect/unstable/http";
+import { ChannelsApiCacheView, ChannelsCache } from "./channels";
+import { GuildsApiCacheView, GuildsCache } from "./guilds";
+import { MembersApiCacheView, MembersCache } from "./members";
+import { RolesApiCacheView, RolesCache } from "./roles";
+import { Unstorage } from "./shared";
 import { DiscordApiClient } from "../discordApiClient";
-import {
-  ChannelsApiCacheView,
-  ChannelsApiCacheViewLive,
-  ChannelsCache,
-  ChannelsCacheLive,
-} from "./channels";
-import { GuildsApiCacheView, GuildsApiCacheViewLive, GuildsCache, GuildsCacheLive } from "./guilds";
-import {
-  MembersApiCacheView,
-  MembersApiCacheViewLive,
-  MembersCache,
-  MembersCacheLive,
-} from "./members";
-import { RolesApiCacheView, RolesApiCacheViewLive, RolesCache, RolesCacheLive } from "./roles";
 
 export * from "./shared";
 export * from "./guilds";
@@ -22,19 +14,21 @@ export * from "./roles";
 export * from "./members";
 export * from "./channels";
 
-export const CachesLive: Layer.Layer<
+export const cachesLayer: Layer.Layer<
   GuildsCache | RolesCache | MembersCache | ChannelsCache,
-  never,
-  DiscordConfig.DiscordConfig | import("./shared").Unstorage
-> = Layer.mergeAll(GuildsCacheLive, RolesCacheLive, MembersCacheLive, ChannelsCacheLive);
+  | Discord.DiscordRestError<"ErrorResponse", Discord.ErrorResponse>
+  | Discord.DiscordRestError<"RatelimitedResponse", Discord.RatelimitedResponse>
+  | HttpClientError.HttpClientError,
+  DiscordConfig.DiscordConfig | Unstorage
+> = Layer.mergeAll(GuildsCache.layer, RolesCache.layer, MembersCache.layer, ChannelsCache.layer);
 
-export const ApiCacheViewsLive: Layer.Layer<
+export const apiCacheViewsLayer: Layer.Layer<
   GuildsApiCacheView | RolesApiCacheView | MembersApiCacheView | ChannelsApiCacheView,
   never,
-  DiscordApiClient | import("./shared").Unstorage
+  DiscordApiClient | Unstorage
 > = Layer.mergeAll(
-  GuildsApiCacheViewLive,
-  RolesApiCacheViewLive,
-  MembersApiCacheViewLive,
-  ChannelsApiCacheViewLive,
+  GuildsApiCacheView.layer,
+  RolesApiCacheView.layer,
+  MembersApiCacheView.layer,
+  ChannelsApiCacheView.layer,
 );

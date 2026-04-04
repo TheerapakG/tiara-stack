@@ -19,7 +19,20 @@ import {
 } from "@/schemas/sheet";
 import { regex } from "arkregex";
 import { type sheets_v4 } from "@googleapis/sheets";
-import { Array, Data, Effect, HashMap, Match, Number, Option, pipe, Schema, String } from "effect";
+import {
+  Array,
+  Data,
+  Effect,
+  HashMap,
+  Layer,
+  Match,
+  Number,
+  Option,
+  pipe,
+  Schema,
+  ServiceMap,
+  String,
+} from "effect";
 import { upperFirst } from "scule";
 import { TupleToStructValueSchema } from "typhoon-core/schema";
 import { Array as ArrayUtils, ScopedCache, Struct as StructUtils } from "typhoon-core/utils";
@@ -32,6 +45,13 @@ class ConfigField<Range> extends Data.TaggedClass("ConfigField")<{
   field: string;
 }> {}
 
+const makeParserFieldError = <Range>(configField: ConfigField<Range>) =>
+  ParserFieldError.makeUnsafe({
+    message: `Error getting ${configField.field}, no config field found`,
+    range: configField.range,
+    field: configField.field,
+  });
+
 const getConfigFieldValueRange =
   <Range>(configField: ConfigField<Range>) =>
   (sheet: HashMap.HashMap<ConfigField<Range>, sheets_v4.Schema$ValueRange>) =>
@@ -40,17 +60,10 @@ const getConfigFieldValueRange =
       HashMap.get(configField),
       Option.match({
         onSome: Effect.succeed,
-        onNone: () =>
-          Effect.fail(
-            new ParserFieldError({
-              message: `Error getting ${configField.field}, no config field found`,
-              range: configField.range,
-              field: configField.field,
-            }),
-          ),
+        onNone: () => Effect.fail(makeParserFieldError(configField)),
       }),
       (e) => Effect.suspend(() => e),
-      Effect.withSpan("getConfigFieldValueRange", { captureStackTrace: true }),
+      Effect.withSpan("getConfigFieldValueRange"),
     );
 
 const getConfigFieldRowData =
@@ -61,17 +74,10 @@ const getConfigFieldRowData =
       HashMap.get(configField),
       Option.match({
         onSome: Effect.succeed,
-        onNone: () =>
-          Effect.fail(
-            new ParserFieldError({
-              message: `Error getting ${configField.field}, no config field found`,
-              range: configField.range,
-              field: configField.field,
-            }),
-          ),
+        onNone: () => Effect.fail(makeParserFieldError(configField)),
       }),
       (e) => Effect.suspend(() => e),
-      Effect.withSpan("getConfigFieldRowData", { captureStackTrace: true }),
+      Effect.withSpan("getConfigFieldRowData"),
     );
 
 const playerParser = ([userIds, userSheetNames]: sheets_v4.Schema$ValueRange[]) =>
@@ -79,8 +85,8 @@ const playerParser = ([userIds, userSheetNames]: sheets_v4.Schema$ValueRange[]) 
     GoogleSheets.parseValueRanges(
       [userIds, userSheetNames],
       pipe(
-        TupleToStructValueSchema(["id", "name"], GoogleSheets.rowToCellSchema),
-        Schema.compose(
+        TupleToStructValueSchema(["id", "name"] as const, GoogleSheets.rowToCellSchema),
+        Schema.decodeTo(
           Schema.Struct({
             id: GoogleSheets.cellToStringSchema,
             name: GoogleSheets.cellToStringSchema,
@@ -88,21 +94,20 @@ const playerParser = ([userIds, userSheetNames]: sheets_v4.Schema$ValueRange[]) 
         ),
       ),
     ),
-    Effect.map(Array.getRights),
+    Effect.map(Array.getSuccesses),
     Effect.map(
-      Array.map(
-        (config, index) =>
-          new RawPlayer({
-            index,
-            id: config.id,
-            name: pipe(
-              config.name,
-              Option.map((name) => upperFirst(name)),
-            ),
-          }),
+      Array.map((config, index) =>
+        RawPlayer.makeUnsafe({
+          index,
+          id: config.id,
+          name: pipe(
+            config.name,
+            Option.map((name) => upperFirst(name)),
+          ),
+        }),
       ),
     ),
-    Effect.withSpan("playerParser", { captureStackTrace: true }),
+    Effect.withSpan("playerParser"),
   );
 
 const monitorParser = ([monitorIds, monitorNames]: sheets_v4.Schema$ValueRange[]) =>
@@ -110,8 +115,8 @@ const monitorParser = ([monitorIds, monitorNames]: sheets_v4.Schema$ValueRange[]
     GoogleSheets.parseValueRanges(
       [monitorIds, monitorNames],
       pipe(
-        TupleToStructValueSchema(["id", "name"], GoogleSheets.rowToCellSchema),
-        Schema.compose(
+        TupleToStructValueSchema(["id", "name"] as const, GoogleSheets.rowToCellSchema),
+        Schema.decodeTo(
           Schema.Struct({
             id: GoogleSheets.cellToStringSchema,
             name: GoogleSheets.cellToStringSchema,
@@ -119,21 +124,20 @@ const monitorParser = ([monitorIds, monitorNames]: sheets_v4.Schema$ValueRange[]
         ),
       ),
     ),
-    Effect.map(Array.getRights),
+    Effect.map(Array.getSuccesses),
     Effect.map(
-      Array.map(
-        (config, index) =>
-          new RawMonitor({
-            index,
-            id: config.id,
-            name: pipe(
-              config.name,
-              Option.map((name) => upperFirst(name)),
-            ),
-          }),
+      Array.map((config, index) =>
+        RawMonitor.makeUnsafe({
+          index,
+          id: config.id,
+          name: pipe(
+            config.name,
+            Option.map((name) => upperFirst(name)),
+          ),
+        }),
       ),
     ),
-    Effect.withSpan("monitorParser", { captureStackTrace: true }),
+    Effect.withSpan("monitorParser"),
   );
 
 class TeamConfigRange extends Data.TaggedClass("TeamConfigRange")<{
@@ -210,8 +214,11 @@ const teamBaseParser = (
       GoogleSheets.parseValueRanges(
         valueRanges,
         pipe(
-          TupleToStructValueSchema(["playerName", "teamName"], GoogleSheets.rowToCellSchema),
-          Schema.compose(
+          TupleToStructValueSchema(
+            ["playerName", "teamName"] as const,
+            GoogleSheets.rowToCellSchema,
+          ),
+          Schema.decodeTo(
             Schema.Struct({
               playerName: GoogleSheets.cellToStringSchema,
               teamName: GoogleSheets.cellToStringSchema,
@@ -287,8 +294,11 @@ const teamSplitIsvParser = (
       GoogleSheets.parseValueRanges(
         valueRanges,
         pipe(
-          TupleToStructValueSchema(["lead", "backline", "talent"], GoogleSheets.rowToCellSchema),
-          Schema.compose(
+          TupleToStructValueSchema(
+            ["lead", "backline", "talent"] as const,
+            GoogleSheets.rowToCellSchema,
+          ),
+          Schema.decodeTo(
             Schema.Struct({
               lead: GoogleSheets.cellToNumberSchema,
               backline: GoogleSheets.cellToNumberSchema,
@@ -337,8 +347,8 @@ const teamCombinedIsvParser = (
       GoogleSheets.parseValueRanges(
         valueRanges,
         pipe(
-          TupleToStructValueSchema(["isv"], GoogleSheets.rowToCellSchema),
-          Schema.compose(
+          TupleToStructValueSchema(["isv"] as const, GoogleSheets.rowToCellSchema),
+          Schema.decodeTo(
             Schema.Struct({
               isv: GoogleSheets.cellToStringSchema,
             }),
@@ -367,19 +377,19 @@ const teamCombinedIsvParser = (
       Effect.forEach((isv) =>
         pipe(
           isv,
-          Schema.decode(
+          Schema.decodeUnknownEffect(
             Schema.Struct({
               lead: GoogleSheets.cellToNumberSchema,
               backline: GoogleSheets.cellToNumberSchema,
               talent: GoogleSheets.cellToNumberSchema,
             }),
           ),
-          Effect.either,
+          Effect.option,
         ),
       ),
     ),
     Effect.map(
-      ArrayUtils.WithDefault.wrapEither({
+      ArrayUtils.WithDefault.wrapOption({
         default: () => ({
           lead: Option.none<number>(),
           backline: Option.none<number>(),
@@ -414,8 +424,8 @@ const teamRangesTagsParser = (
       GoogleSheets.parseValueRanges(
         valueRanges,
         pipe(
-          TupleToStructValueSchema(["tags"], GoogleSheets.rowToCellSchema),
-          Schema.compose(
+          TupleToStructValueSchema(["tags"] as const, GoogleSheets.rowToCellSchema),
+          Schema.decodeTo(
             Schema.Struct({
               tags: GoogleSheets.cellToStringArraySchema,
             }),
@@ -441,47 +451,47 @@ const teamRangesTagsParser = (
   );
 
 const teamRanges = (teamConfigValues: FilteredTeamConfigValue[]) =>
-  pipe(
-    teamConfigValues,
-    Array.reduce(HashMap.empty<TeamConfigField, Option.Option<string>>(), (acc, a) => {
-      const range = teamBaseRange(a);
-      return pipe(
-        acc,
-        HashMap.set(range.playerName.field, range.playerName.range),
-        HashMap.set(range.teamName.field, range.teamName.range),
-        (map) =>
-          pipe(
-            Match.value(a.isvConfig),
-            Match.tagsExhaustive({
-              TeamIsvSplitConfig: (cfg) => {
-                const range = teamSplitIsvRange(a, cfg);
-                return pipe(
-                  map,
-                  HashMap.set(range.lead.field, range.lead.range),
-                  HashMap.set(range.backline.field, range.backline.range),
-                  HashMap.set(range.talent.field, range.talent.range),
-                );
-              },
-              TeamIsvCombinedConfig: (cfg) => {
-                const range = teamCombinedIsvRange(a, cfg);
-                return pipe(map, HashMap.set(range.isv.field, range.isv.range));
-              },
-            }),
-          ),
-        (map) =>
-          pipe(
-            Match.value(a.tagsConfig),
-            Match.tagsExhaustive({
-              TeamTagsConstantsConfig: () => map,
-              TeamTagsRangesConfig: (cfg) => {
-                const range = teamRangesTagsRange(a, cfg);
-                return pipe(map, HashMap.set(range.tags.field, range.tags.range));
-              },
-            }),
-          ),
-      );
+  HashMap.fromIterable(
+    teamConfigValues.flatMap((teamConfigValue) => {
+      const entries: [TeamConfigField, string][] = [];
+      const baseRange = teamBaseRange(teamConfigValue);
+      const isvConfig = teamConfigValue.isvConfig;
+      const tagsConfig = teamConfigValue.tagsConfig;
+
+      if (Option.isSome(baseRange.playerName.range)) {
+        entries.push([baseRange.playerName.field, baseRange.playerName.range.value]);
+      }
+      if (Option.isSome(baseRange.teamName.range)) {
+        entries.push([baseRange.teamName.field, baseRange.teamName.range.value]);
+      }
+
+      if (isvConfig._tag === "TeamIsvSplitConfig") {
+        const isvRange = teamSplitIsvRange(teamConfigValue, isvConfig);
+        if (Option.isSome(isvRange.lead.range)) {
+          entries.push([isvRange.lead.field, isvRange.lead.range.value]);
+        }
+        if (Option.isSome(isvRange.backline.range)) {
+          entries.push([isvRange.backline.field, isvRange.backline.range.value]);
+        }
+        if (Option.isSome(isvRange.talent.range)) {
+          entries.push([isvRange.talent.field, isvRange.talent.range.value]);
+        }
+      } else {
+        const isvRange = teamCombinedIsvRange(teamConfigValue, isvConfig);
+        if (Option.isSome(isvRange.isv.range)) {
+          entries.push([isvRange.isv.field, isvRange.isv.range.value]);
+        }
+      }
+
+      if (tagsConfig._tag === "TeamTagsRangesConfig") {
+        const tagsRange = teamRangesTagsRange(teamConfigValue, tagsConfig);
+        if (Option.isSome(tagsRange.tags.range)) {
+          entries.push([tagsRange.tags.field, tagsRange.tags.range.value]);
+        }
+      }
+
+      return entries;
     }),
-    HashMap.filterMap((a, _) => a),
   );
 
 const teamParser = (
@@ -491,51 +501,56 @@ const teamParser = (
   pipe(
     teamConfigValues,
     Effect.forEach((teamConfig) =>
-      pipe(
-        Effect.all({
-          base: teamBaseParser(teamConfig, sheet),
-          isv: pipe(
-            Match.value(teamConfig.isvConfig),
-            Match.tagsExhaustive({
-              TeamIsvSplitConfig: (cfg) => teamSplitIsvParser(teamConfig, cfg, sheet),
-              TeamIsvCombinedConfig: (cfg) => teamCombinedIsvParser(teamConfig, cfg, sheet),
-            }),
-          ),
-          tags: pipe(
-            Match.value(teamConfig.tagsConfig),
-            Match.tagsExhaustive({
-              TeamTagsConstantsConfig: (cfg) =>
-                Effect.succeed(
-                  pipe(
-                    [],
-                    ArrayUtils.WithDefault.wrap<{ tags: readonly string[] }[]>({
-                      default: () => ({ tags: cfg.tags }),
-                    }),
-                  ),
-                ),
-              TeamTagsRangesConfig: (cfg) => teamRangesTagsParser(teamConfig, cfg, sheet),
-            }),
-          ),
-        }),
-        Effect.map(({ base, isv, tags }) =>
-          pipe(base, ArrayUtils.WithDefault.zip(isv), ArrayUtils.WithDefault.zip(tags)),
-        ),
-        Effect.map(ArrayUtils.WithDefault.toArray),
-        Effect.map(Array.map(StructUtils.GetSomeFields.getSomeFields(["lead", "backline"]))),
-        Effect.map(Array.getSomes),
-        Effect.map(
+      Effect.gen(function* () {
+        const isvConfig = teamConfig.isvConfig;
+        const tagsConfig = teamConfig.tagsConfig;
+        const base = yield* teamBaseParser(teamConfig, sheet);
+        const isv = yield* isvConfig._tag === "TeamIsvSplitConfig"
+          ? teamSplitIsvParser(teamConfig, isvConfig, sheet)
+          : teamCombinedIsvParser(teamConfig, isvConfig, sheet);
+        const tags = yield* (() => {
+          if (tagsConfig._tag === "TeamTagsConstantsConfig") {
+            return Effect.succeed(
+              ArrayUtils.WithDefault.wrap<ReadonlyArray<{ tags: readonly string[] }>>({
+                default: () => ({ tags: tagsConfig.tags }),
+              })([]),
+            );
+          }
+          return teamRangesTagsParser(teamConfig, tagsConfig, sheet);
+        })();
+
+        return pipe(
+          base,
+          ArrayUtils.WithDefault.zip(isv),
+          ArrayUtils.WithDefault.zip(tags),
+          ArrayUtils.WithDefault.toArray,
           Array.map((config) =>
-            Team.make({
-              type: teamConfig.name,
-              playerId: Option.none(),
-              ...config,
-            }),
+            Option.all({
+              playerName: config.playerName,
+              teamName: config.teamName,
+              lead: config.lead,
+              backline: config.backline,
+            }).pipe(
+              Option.map(({ playerName, teamName, lead, backline }) =>
+                Team.makeUnsafe({
+                  type: teamConfig.name,
+                  playerId: Option.none(),
+                  playerName: Option.some(playerName),
+                  teamName: Option.some(teamName),
+                  tags: [...config.tags],
+                  lead,
+                  backline,
+                  talent: config.talent,
+                }),
+              ),
+            ),
           ),
-        ),
-      ),
+          Array.getSomes,
+        );
+      }),
     ),
     Effect.map(Array.flatten),
-    Effect.withSpan("teamParser", { captureStackTrace: true }),
+    Effect.withSpan("teamParser"),
   );
 
 class ScheduleConfigRange extends Data.TaggedClass("ScheduleConfigRange")<{
@@ -617,22 +632,32 @@ const scheduleRange = (scheduleConfigValue: FilteredScheduleConfigValue) => ({
 });
 
 const scheduleRanges = (scheduleConfigValues: FilteredScheduleConfigValue[]) =>
-  pipe(
-    scheduleConfigValues,
-    Array.reduce(HashMap.empty<ScheduleConfigField, Option.Option<string>>(), (acc, a) => {
-      const range = scheduleRange(a);
-      return pipe(
-        acc,
-        HashMap.set(range.hours.field, range.hours.range),
-        HashMap.set(range.fills.field, range.fills.range),
-        HashMap.set(range.overfills.field, range.overfills.range),
-        HashMap.set(range.standbys.field, range.standbys.range),
-        HashMap.set(range.breaks.field, range.breaks.range),
-        HashMap.set(range.monitor.field, range.monitor.range),
-        HashMap.set(range.visible.field, range.visible.range),
-      );
+  HashMap.fromIterable(
+    scheduleConfigValues.flatMap((scheduleConfigValue) => {
+      const range = scheduleRange(scheduleConfigValue);
+      const entries: [ScheduleConfigField, string][] = [];
+
+      if (Option.isSome(range.hours.range))
+        entries.push([range.hours.field, range.hours.range.value]);
+      if (Option.isSome(range.fills.range))
+        entries.push([range.fills.field, range.fills.range.value]);
+      if (Option.isSome(range.overfills.range)) {
+        entries.push([range.overfills.field, range.overfills.range.value]);
+      }
+      if (Option.isSome(range.standbys.range)) {
+        entries.push([range.standbys.field, range.standbys.range.value]);
+      }
+      if (Option.isSome(range.breaks.range))
+        entries.push([range.breaks.field, range.breaks.range.value]);
+      if (Option.isSome(range.monitor.range)) {
+        entries.push([range.monitor.field, range.monitor.range.value]);
+      }
+      if (Option.isSome(range.visible.range)) {
+        entries.push([range.visible.field, range.visible.range.value]);
+      }
+
+      return entries;
     }),
-    HashMap.filterMap((a, _) => a),
   );
 
 const runnersInFills =
@@ -685,31 +710,31 @@ const baseScheduleParser = (
         rowDatas,
         pipe(
           TupleToStructValueSchema(
-            ["hour", "fills", "overfills", "standbys", "breakHour", "visible"],
-            Schema.typeSchema(GoogleSheets.rowDataSchema),
+            ["hour", "fills", "overfills", "standbys", "breakHour", "visible"] as const,
+            Schema.toType(GoogleSheets.rowDataSchema),
           ),
-          Schema.compose(
+          Schema.decodeTo(
             Schema.Struct({
               hour: pipe(
                 GoogleSheets.rowDataToCellSchema,
-                Schema.compose(GoogleSheets.cellToNumberSchema),
+                Schema.decodeTo(GoogleSheets.cellToNumberSchema),
               ),
               fills: GoogleSheets.rowDataToRowSchema,
               overfills: pipe(
                 GoogleSheets.rowDataToCellSchema,
-                Schema.compose(GoogleSheets.cellToStringArraySchema),
+                Schema.decodeTo(GoogleSheets.cellToStringArraySchema),
               ),
               standbys: pipe(
                 GoogleSheets.rowDataToCellSchema,
-                Schema.compose(GoogleSheets.cellToStringArraySchema),
+                Schema.decodeTo(GoogleSheets.cellToStringArraySchema),
               ),
               breakHour: pipe(
                 GoogleSheets.rowDataToCellSchema,
-                Schema.compose(GoogleSheets.cellToBooleanSchema),
+                Schema.decodeTo(GoogleSheets.cellToBooleanSchema),
               ),
               visible: pipe(
                 GoogleSheets.rowDataToCellSchema,
-                Schema.compose(GoogleSheets.cellToBooleanSchema),
+                Schema.decodeTo(GoogleSheets.cellToBooleanSchema),
               ),
             }),
           ),
@@ -743,7 +768,7 @@ const scheduleMonitorParser = (
         [rowData],
         pipe(
           TupleToStructValueSchema(["monitor"], GoogleSheets.rowDataToCellSchema),
-          Schema.compose(
+          Schema.decodeTo(
             Schema.Struct({
               monitor: GoogleSheets.cellToStringSchema,
             }),
@@ -807,7 +832,7 @@ const scheduleParser = (
                     Array.get(fills, i),
                     Option.flatten,
                     Option.map((fill) =>
-                      RawSchedulePlayer.make({
+                      RawSchedulePlayer.makeUnsafe({
                         player: upperFirst(fill),
                         enc:
                           scheduleConfig.encType === "regex"
@@ -821,7 +846,7 @@ const scheduleParser = (
                   overfills,
                   Option.getOrElse(() => []),
                   Array.map((overfill) =>
-                    RawSchedulePlayer.make({
+                    RawSchedulePlayer.makeUnsafe({
                       player: upperFirst(overfill),
                       enc:
                         scheduleConfig.encType === "regex"
@@ -834,7 +859,7 @@ const scheduleParser = (
                   standbys,
                   Option.getOrElse(() => []),
                   Array.map((standby) =>
-                    RawSchedulePlayer.make({
+                    RawSchedulePlayer.makeUnsafe({
                       player: upperFirst(standby),
                       enc:
                         scheduleConfig.encType === "regex"
@@ -873,7 +898,7 @@ const scheduleParser = (
                 Option.getOrElse(() =>
                   pipe(
                     Match.value(scheduleConfig.breakRange),
-                    Match.when("auto", () => Array.isEmptyArray(config.runners)),
+                    Match.when("auto", () => config.runners.length === 0),
                     Match.orElse(() => false),
                   ),
                 ),
@@ -894,7 +919,7 @@ const scheduleParser = (
       ),
     ),
     Effect.map(Array.flatten),
-    Effect.withSpan("scheduleParser", { captureStackTrace: true }),
+    Effect.withSpan("scheduleParser"),
   );
 
 // Helper to filter schedules for fillers
@@ -910,7 +935,7 @@ const filterSchedulesForFiller = (schedules: Array<BreakSchedule | Schedule>) =>
           Schedule: (s) =>
             s.visible
               ? s // Keep visible schedules as-is
-              : Schedule.make({
+              : Schedule.makeUnsafe({
                   channel: s.channel,
                   day: s.day,
                   visible: s.visible,
@@ -927,401 +952,179 @@ const filterSchedulesForFiller = (schedules: Array<BreakSchedule | Schedule>) =>
     ),
   );
 
-export class SheetService extends Effect.Service<SheetService>()("SheetService", {
-  scoped: pipe(
-    Effect.all(
-      {
-        sheet: GoogleSheets,
-        sheetConfigService: SheetConfigService,
-      },
-      { concurrency: "unbounded" },
-    ),
-    Effect.map(({ sheet, sheetConfigService }) => ({
-      getRangesConfig: (sheetId: string) =>
+export class SheetService extends ServiceMap.Service<SheetService>()("SheetService", {
+  make: Effect.gen(function* () {
+    const sheet = yield* GoogleSheets;
+    const sheetConfigService = yield* SheetConfigService;
+
+    const getRangesConfig = (sheetId: string) =>
+      sheetConfigService
+        .getRangesConfig(sheetId)
+        .pipe(Effect.withSpan("SheetService.getRangesConfig"));
+    const getTeamConfig = (sheetId: string) =>
+      sheetConfigService.getTeamConfig(sheetId).pipe(Effect.withSpan("SheetService.getTeamConfig"));
+    const getEventConfig = (sheetId: string) =>
+      sheetConfigService
+        .getEventConfig(sheetId)
+        .pipe(Effect.withSpan("SheetService.getEventConfig"));
+    const getScheduleConfig = (sheetId: string) =>
+      sheetConfigService
+        .getScheduleConfig(sheetId)
+        .pipe(Effect.withSpan("SheetService.getScheduleConfig"));
+    const getRunnerConfig = (sheetId: string) =>
+      sheetConfigService
+        .getRunnerConfig(sheetId)
+        .pipe(Effect.withSpan("SheetService.getRunnerConfig"));
+
+    const getPlayers = (sheetId: string) =>
+      Effect.gen(function* () {
+        const rangesConfig = yield* sheetConfigService.getRangesConfig(sheetId);
+        const response = yield* sheet.get({
+          spreadsheetId: sheetId,
+          ranges: [rangesConfig.userIds, rangesConfig.userSheetNames],
+        });
+        return yield* playerParser(response.data.valueRanges ?? []);
+      }).pipe(Effect.withSpan("SheetService.getPlayers"));
+
+    const getMonitors = (sheetId: string) =>
+      Effect.gen(function* () {
+        const rangesConfig = yield* sheetConfigService.getRangesConfig(sheetId);
+        const ranges = Option.all({
+          ids: rangesConfig.monitorIds,
+          names: rangesConfig.monitorNames,
+        });
+        if (Option.isNone(ranges)) {
+          return [] as readonly RawMonitor[];
+        }
+        const response = yield* sheet.get({
+          spreadsheetId: sheetId,
+          ranges: [ranges.value.ids, ranges.value.names],
+        });
+        return yield* monitorParser(response.data.valueRanges ?? []);
+      }).pipe(Effect.withSpan("SheetService.getMonitors"));
+
+    const getTeams = (sheetId: string) =>
+      Effect.gen(function* () {
+        const teamConfigs = yield* sheetConfigService.getTeamConfig(sheetId);
+        const filteredTeamConfigValues = filterTeamConfigValues(teamConfigs);
+        const response = yield* sheet.getHashMap(
+          teamRanges(filteredTeamConfigValues) as HashMap.HashMap<TeamConfigField, string>,
+          {
+            spreadsheetId: sheetId,
+          },
+        );
+        return yield* teamParser(filteredTeamConfigValues, response);
+      }).pipe(Effect.withSpan("SheetService.getTeams"));
+
+    const getSchedulesForConfigs = (
+      sheetId: string,
+      filter: (
+        configs: ReturnType<typeof filterScheduleConfigValues>,
+      ) => ReturnType<typeof filterScheduleConfigValues>,
+    ) =>
+      Effect.gen(function* () {
+        const { scheduleConfigs, runnerConfig } = yield* Effect.all({
+          scheduleConfigs: sheetConfigService.getScheduleConfig(sheetId),
+          runnerConfig: sheetConfigService.getRunnerConfig(sheetId),
+        });
+        const filteredScheduleConfigs = filter(filterScheduleConfigValues(scheduleConfigs));
+        const response = yield* sheet.getRowDatasHashMap(
+          scheduleRanges(filteredScheduleConfigs) as HashMap.HashMap<ScheduleConfigField, string>,
+          {
+            spreadsheetId: sheetId,
+          },
+        );
+        return yield* scheduleParser(filteredScheduleConfigs, response, runnerConfig);
+      });
+
+    const getAllSchedules = (sheetId: string) =>
+      getSchedulesForConfigs(sheetId, (configs) => configs).pipe(
+        Effect.withSpan("SheetService.getAllSchedules"),
+      );
+    const getDaySchedules = (sheetId: string, day: number) =>
+      getSchedulesForConfigs(sheetId, (configs) =>
         pipe(
-          sheetConfigService.getRangesConfig(sheetId),
-          Effect.withSpan("SheetService.getRangesConfig", {
-            captureStackTrace: true,
-          }),
+          configs,
+          Array.filter((config) => Number.Equivalence(config.day, day)),
         ),
-      getTeamConfig: (sheetId: string) =>
+      ).pipe(Effect.withSpan("SheetService.getDaySchedules"));
+    const getChannelSchedules = (sheetId: string, channel: string) =>
+      getSchedulesForConfigs(sheetId, (configs) =>
         pipe(
-          sheetConfigService.getTeamConfig(sheetId),
-          Effect.withSpan("SheetService.getTeamConfig", {
-            captureStackTrace: true,
-          }),
+          configs,
+          Array.filter((config) => String.Equivalence(config.channel, channel)),
         ),
-      getEventConfig: (sheetId: string) =>
-        pipe(
-          sheetConfigService.getEventConfig(sheetId),
-          Effect.withSpan("SheetService.getEventConfig", {
-            captureStackTrace: true,
-          }),
-        ),
-      getScheduleConfig: (sheetId: string) =>
-        pipe(
-          sheetConfigService.getScheduleConfig(sheetId),
-          Effect.withSpan("SheetService.getScheduleConfig", {
-            captureStackTrace: true,
-          }),
-        ),
-      getRunnerConfig: (sheetId: string) =>
-        pipe(
-          sheetConfigService.getRunnerConfig(sheetId),
-          Effect.withSpan("SheetService.getRunnerConfig", {
-            captureStackTrace: true,
-          }),
-        ),
-      getPlayers: (sheetId: string) =>
-        pipe(
-          Effect.Do,
-          Effect.bind("rangesConfig", () => sheetConfigService.getRangesConfig(sheetId)),
-          Effect.bind("sheet", ({ rangesConfig }) =>
-            sheet.get({
-              spreadsheetId: sheetId,
-              ranges: [rangesConfig.userIds, rangesConfig.userSheetNames],
-            }),
-          ),
-          Effect.flatMap(({ sheet }) => playerParser(sheet.data.valueRanges ?? [])),
-          Effect.withSpan("SheetService.getPlayers", {
-            captureStackTrace: true,
-          }),
-        ),
-      getMonitors: (sheetId: string) =>
-        pipe(
-          Effect.Do,
-          Effect.bind("rangesConfig", () => sheetConfigService.getRangesConfig(sheetId)),
-          Effect.bind("ranges", ({ rangesConfig }) =>
-            Effect.succeed(
-              Option.all({ ids: rangesConfig.monitorIds, names: rangesConfig.monitorNames }),
-            ),
-          ),
-          Effect.flatMap(({ ranges }) =>
-            pipe(
-              ranges,
-              Option.match({
-                onNone: () => Effect.succeed([] as RawMonitor[]),
-                onSome: ({ ids, names }) =>
-                  pipe(
-                    sheet.get({
-                      spreadsheetId: sheetId,
-                      ranges: [ids, names],
-                    }),
-                    Effect.flatMap((response) => monitorParser(response.data.valueRanges ?? [])),
-                  ),
-              }),
-            ),
-          ),
-          Effect.provideService(GoogleSheets, sheet),
-          Effect.withSpan("SheetService.getMonitors", {
-            captureStackTrace: true,
-          }),
-        ),
-      getTeams: (sheetId: string) =>
-        pipe(
-          Effect.Do,
-          Effect.bind("teamConfigs", () => sheetConfigService.getTeamConfig(sheetId)),
-          Effect.let("filteredTeamConfigValues", ({ teamConfigs }) =>
-            filterTeamConfigValues(teamConfigs),
-          ),
-          Effect.let("ranges", ({ filteredTeamConfigValues }) =>
-            teamRanges(filteredTeamConfigValues),
-          ),
-          Effect.bind("sheet", ({ ranges }) =>
-            sheet.getHashMap(ranges, { spreadsheetId: sheetId }),
-          ),
-          Effect.flatMap(({ filteredTeamConfigValues, sheet }) =>
-            teamParser(filteredTeamConfigValues, sheet),
-          ),
-          Effect.provideService(GoogleSheets, sheet),
-          Effect.withSpan("SheetService.getTeams", {
-            captureStackTrace: true,
-          }),
-        ),
-      getAllSchedules: (sheetId: string) =>
-        pipe(
-          Effect.Do,
-          Effect.bindAll(
-            () => ({
-              scheduleConfigs: sheetConfigService.getScheduleConfig(sheetId),
-              runnerConfig: sheetConfigService.getRunnerConfig(sheetId),
-            }),
-            { concurrency: "unbounded" },
-          ),
-          Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
-            filterScheduleConfigValues(scheduleConfigs),
-          ),
-          Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
-            sheet.getRowDatasHashMap(scheduleRanges(filteredScheduleConfigs), {
-              spreadsheetId: sheetId,
-            }),
-          ),
-          Effect.bind("schedules", ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
-            scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
-          ),
-          Effect.map(({ schedules }) => schedules),
-          Effect.provideService(GoogleSheets, sheet),
-          Effect.withSpan("SheetService.getAllSchedules", {
-            captureStackTrace: true,
-          }),
-        ),
-      getDaySchedules: (sheetId: string, day: number) =>
-        pipe(
-          Effect.Do,
-          Effect.bindAll(
-            () => ({
-              scheduleConfigs: sheetConfigService.getScheduleConfig(sheetId),
-              runnerConfig: sheetConfigService.getRunnerConfig(sheetId),
-            }),
-            { concurrency: "unbounded" },
-          ),
-          Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
-            pipe(
-              scheduleConfigs,
-              filterScheduleConfigValues,
-              Array.filter((a) => Number.Equivalence(a.day, day)),
-            ),
-          ),
-          Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
-            sheet.getRowDatasHashMap(scheduleRanges(filteredScheduleConfigs), {
-              spreadsheetId: sheetId,
-            }),
-          ),
-          Effect.bind("schedules", ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
-            scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
-          ),
-          Effect.map(({ schedules }) => schedules),
-          Effect.provideService(GoogleSheets, sheet),
-          Effect.withSpan("SheetService.getDaySchedules", {
-            captureStackTrace: true,
-          }),
-        ),
-      getChannelSchedules: (sheetId: string, channel: string) =>
-        pipe(
-          Effect.Do,
-          Effect.bindAll(
-            () => ({
-              scheduleConfigs: sheetConfigService.getScheduleConfig(sheetId),
-              runnerConfig: sheetConfigService.getRunnerConfig(sheetId),
-            }),
-            { concurrency: "unbounded" },
-          ),
-          Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
-            pipe(
-              scheduleConfigs,
-              filterScheduleConfigValues,
-              Array.filter((a) => String.Equivalence(a.channel, channel)),
-            ),
-          ),
-          Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
-            sheet.getRowDatasHashMap(scheduleRanges(filteredScheduleConfigs), {
-              spreadsheetId: sheetId,
-            }),
-          ),
-          Effect.bind("schedules", ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
-            scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
-          ),
-          Effect.map(({ schedules }) => schedules),
-          Effect.provideService(GoogleSheets, sheet),
-          Effect.withSpan("SheetService.getChannelSchedules", {
-            captureStackTrace: true,
-          }),
-        ),
-      // Filler schedules - filtered by visible, with fill/overfill/standby/runners cleared
-      getAllFillerSchedules: (sheetId: string) =>
-        pipe(
-          Effect.Do,
-          Effect.bindAll(
-            () => ({
-              scheduleConfigs: sheetConfigService.getScheduleConfig(sheetId),
-              runnerConfig: sheetConfigService.getRunnerConfig(sheetId),
-            }),
-            { concurrency: "unbounded" },
-          ),
-          Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
-            filterScheduleConfigValues(scheduleConfigs),
-          ),
-          Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
-            sheet.getRowDatasHashMap(scheduleRanges(filteredScheduleConfigs), {
-              spreadsheetId: sheetId,
-            }),
-          ),
-          Effect.bind("schedules", ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
-            scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
-          ),
-          Effect.map(({ schedules }) => filterSchedulesForFiller(schedules)),
-          Effect.provideService(GoogleSheets, sheet),
-          Effect.withSpan("SheetService.getAllFillerSchedules", {
-            captureStackTrace: true,
-          }),
-        ),
-      getDayFillerSchedules: (sheetId: string, day: number) =>
-        pipe(
-          Effect.Do,
-          Effect.bindAll(
-            () => ({
-              scheduleConfigs: sheetConfigService.getScheduleConfig(sheetId),
-              runnerConfig: sheetConfigService.getRunnerConfig(sheetId),
-            }),
-            { concurrency: "unbounded" },
-          ),
-          Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
-            pipe(
-              scheduleConfigs,
-              filterScheduleConfigValues,
-              Array.filter((a) => Number.Equivalence(a.day, day)),
-            ),
-          ),
-          Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
-            sheet.getRowDatasHashMap(scheduleRanges(filteredScheduleConfigs), {
-              spreadsheetId: sheetId,
-            }),
-          ),
-          Effect.bind("schedules", ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
-            scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
-          ),
-          Effect.map(({ schedules }) => filterSchedulesForFiller(schedules)),
-          Effect.provideService(GoogleSheets, sheet),
-          Effect.withSpan("SheetService.getDayFillerSchedules", {
-            captureStackTrace: true,
-          }),
-        ),
-      getChannelFillerSchedules: (sheetId: string, channel: string) =>
-        pipe(
-          Effect.Do,
-          Effect.bindAll(
-            () => ({
-              scheduleConfigs: sheetConfigService.getScheduleConfig(sheetId),
-              runnerConfig: sheetConfigService.getRunnerConfig(sheetId),
-            }),
-            { concurrency: "unbounded" },
-          ),
-          Effect.let("filteredScheduleConfigs", ({ scheduleConfigs }) =>
-            pipe(
-              scheduleConfigs,
-              filterScheduleConfigValues,
-              Array.filter((a) => String.Equivalence(a.channel, channel)),
-            ),
-          ),
-          Effect.bind("sheet", ({ filteredScheduleConfigs }) =>
-            sheet.getRowDatasHashMap(scheduleRanges(filteredScheduleConfigs), {
-              spreadsheetId: sheetId,
-            }),
-          ),
-          Effect.bind("schedules", ({ filteredScheduleConfigs, sheet, runnerConfig }) =>
-            scheduleParser(filteredScheduleConfigs, sheet, runnerConfig),
-          ),
-          Effect.map(({ schedules }) => filterSchedulesForFiller(schedules)),
-          Effect.provideService(GoogleSheets, sheet),
-          Effect.withSpan("SheetService.getChannelFillerSchedules", {
-            captureStackTrace: true,
-          }),
-        ),
-    })),
-    Effect.flatMap(
-      ({
-        getRangesConfig,
-        getTeamConfig,
-        getEventConfig,
-        getScheduleConfig,
-        getRunnerConfig,
-        getPlayers,
-        getMonitors,
-        getTeams,
-        getAllSchedules,
-        getDaySchedules,
-        getChannelSchedules,
-        getAllFillerSchedules,
-        getDayFillerSchedules,
-        getChannelFillerSchedules,
-      }) =>
-        Effect.all({
-          getRangesConfigCache: ScopedCache.make({
-            lookup: getRangesConfig,
-          }),
-          getTeamConfigCache: ScopedCache.make({
-            lookup: getTeamConfig,
-          }),
-          getEventConfigCache: ScopedCache.make({
-            lookup: getEventConfig,
-          }),
-          getScheduleConfigCache: ScopedCache.make({
-            lookup: getScheduleConfig,
-          }),
-          getRunnerConfigCache: ScopedCache.make({
-            lookup: getRunnerConfig,
-          }),
-          getPlayersCache: ScopedCache.make({
-            lookup: getPlayers,
-          }),
-          getMonitorsCache: ScopedCache.make({
-            lookup: getMonitors,
-          }),
-          getTeamsCache: ScopedCache.make({
-            lookup: getTeams,
-          }),
-          getAllSchedulesCache: ScopedCache.make({
-            lookup: getAllSchedules,
-          }),
-          getDaySchedulesCache: ScopedCache.make({
-            lookup: ({ sheetId, day }: { sheetId: string; day: number }) =>
-              getDaySchedules(sheetId, day),
-          }),
-          getChannelSchedulesCache: ScopedCache.make({
-            lookup: ({ sheetId, channel }: { sheetId: string; channel: string }) =>
-              getChannelSchedules(sheetId, channel),
-          }),
-          getAllFillerSchedulesCache: ScopedCache.make({
-            lookup: getAllFillerSchedules,
-          }),
-          getDayFillerSchedulesCache: ScopedCache.make({
-            lookup: ({ sheetId, day }: { sheetId: string; day: number }) =>
-              getDayFillerSchedules(sheetId, day),
-          }),
-          getChannelFillerSchedulesCache: ScopedCache.make({
-            lookup: ({ sheetId, channel }: { sheetId: string; channel: string }) =>
-              getChannelFillerSchedules(sheetId, channel),
-          }),
-        }),
-    ),
-    Effect.map(
-      ({
-        getRangesConfigCache,
-        getTeamConfigCache,
-        getEventConfigCache,
-        getScheduleConfigCache,
-        getRunnerConfigCache,
-        getPlayersCache,
-        getMonitorsCache,
-        getTeamsCache,
-        getAllSchedulesCache,
-        getDaySchedulesCache,
-        getChannelSchedulesCache,
-        getAllFillerSchedulesCache,
-        getDayFillerSchedulesCache,
-        getChannelFillerSchedulesCache,
-      }) => ({
-        getRangesConfig: (sheetId: string) => getRangesConfigCache.get(sheetId),
-        getTeamConfig: (sheetId: string) => getTeamConfigCache.get(sheetId),
-        getEventConfig: (sheetId: string) => getEventConfigCache.get(sheetId),
-        getScheduleConfig: (sheetId: string) => getScheduleConfigCache.get(sheetId),
-        getRunnerConfig: (sheetId: string) => getRunnerConfigCache.get(sheetId),
-        getPlayers: (sheetId: string) => getPlayersCache.get(sheetId),
-        getMonitors: (sheetId: string) => getMonitorsCache.get(sheetId),
-        getTeams: (sheetId: string) => getTeamsCache.get(sheetId),
-        getAllSchedules: (sheetId: string) => getAllSchedulesCache.get(sheetId),
-        getDaySchedules: (sheetId: string, day: number) =>
-          getDaySchedulesCache.get(Data.struct({ sheetId, day })),
-        getChannelSchedules: (sheetId: string, channel: string) =>
-          getChannelSchedulesCache.get(Data.struct({ sheetId, channel })),
-        getAllFillerSchedules: (sheetId: string) => getAllFillerSchedulesCache.get(sheetId),
-        getDayFillerSchedules: (sheetId: string, day: number) =>
-          getDayFillerSchedulesCache.get(Data.struct({ sheetId, day })),
-        getChannelFillerSchedules: (sheetId: string, channel: string) =>
-          getChannelFillerSchedulesCache.get(Data.struct({ sheetId, channel })),
+      ).pipe(Effect.withSpan("SheetService.getChannelSchedules"));
+
+    const getAllFillerSchedules = (sheetId: string) =>
+      getAllSchedules(sheetId).pipe(
+        Effect.map(filterSchedulesForFiller),
+        Effect.withSpan("SheetService.getAllFillerSchedules"),
+      );
+    const getDayFillerSchedules = (sheetId: string, day: number) =>
+      getDaySchedules(sheetId, day).pipe(
+        Effect.map(filterSchedulesForFiller),
+        Effect.withSpan("SheetService.getDayFillerSchedules"),
+      );
+    const getChannelFillerSchedules = (sheetId: string, channel: string) =>
+      getChannelSchedules(sheetId, channel).pipe(
+        Effect.map(filterSchedulesForFiller),
+        Effect.withSpan("SheetService.getChannelFillerSchedules"),
+      );
+
+    const caches = yield* Effect.all({
+      getRangesConfigCache: ScopedCache.make({ lookup: getRangesConfig }),
+      getTeamConfigCache: ScopedCache.make({ lookup: getTeamConfig }),
+      getEventConfigCache: ScopedCache.make({ lookup: getEventConfig }),
+      getScheduleConfigCache: ScopedCache.make({ lookup: getScheduleConfig }),
+      getRunnerConfigCache: ScopedCache.make({ lookup: getRunnerConfig }),
+      getPlayersCache: ScopedCache.make({ lookup: getPlayers }),
+      getMonitorsCache: ScopedCache.make({ lookup: getMonitors }),
+      getTeamsCache: ScopedCache.make({ lookup: getTeams }),
+      getAllSchedulesCache: ScopedCache.make({ lookup: getAllSchedules }),
+      getDaySchedulesCache: ScopedCache.make({
+        lookup: ({ sheetId, day }: { sheetId: string; day: number }) =>
+          getDaySchedules(sheetId, day),
       }),
-    ),
-  ),
-  dependencies: [GoogleSheets.Default, SheetConfigService.Default],
-  accessors: true,
-}) {}
+      getChannelSchedulesCache: ScopedCache.make({
+        lookup: ({ sheetId, channel }: { sheetId: string; channel: string }) =>
+          getChannelSchedules(sheetId, channel),
+      }),
+      getAllFillerSchedulesCache: ScopedCache.make({ lookup: getAllFillerSchedules }),
+      getDayFillerSchedulesCache: ScopedCache.make({
+        lookup: ({ sheetId, day }: { sheetId: string; day: number }) =>
+          getDayFillerSchedules(sheetId, day),
+      }),
+      getChannelFillerSchedulesCache: ScopedCache.make({
+        lookup: ({ sheetId, channel }: { sheetId: string; channel: string }) =>
+          getChannelFillerSchedules(sheetId, channel),
+      }),
+    });
+
+    return {
+      getRangesConfig: (sheetId: string) => caches.getRangesConfigCache.get(sheetId),
+      getTeamConfig: (sheetId: string) => caches.getTeamConfigCache.get(sheetId),
+      getEventConfig: (sheetId: string) => caches.getEventConfigCache.get(sheetId),
+      getScheduleConfig: (sheetId: string) => caches.getScheduleConfigCache.get(sheetId),
+      getRunnerConfig: (sheetId: string) => caches.getRunnerConfigCache.get(sheetId),
+      getPlayers: (sheetId: string) => caches.getPlayersCache.get(sheetId),
+      getMonitors: (sheetId: string) => caches.getMonitorsCache.get(sheetId),
+      getTeams: (sheetId: string) => caches.getTeamsCache.get(sheetId),
+      getAllSchedules: (sheetId: string) => caches.getAllSchedulesCache.get(sheetId),
+      getDaySchedules: (sheetId: string, day: number) =>
+        caches.getDaySchedulesCache.get({ sheetId, day }),
+      getChannelSchedules: (sheetId: string, channel: string) =>
+        caches.getChannelSchedulesCache.get({ sheetId, channel }),
+      getAllFillerSchedules: (sheetId: string) => caches.getAllFillerSchedulesCache.get(sheetId),
+      getDayFillerSchedules: (sheetId: string, day: number) =>
+        caches.getDayFillerSchedulesCache.get({ sheetId, day }),
+      getChannelFillerSchedules: (sheetId: string, channel: string) =>
+        caches.getChannelFillerSchedulesCache.get({ sheetId, channel }),
+    };
+  }),
+}) {
+  static layer = Layer.effect(SheetService, this.make).pipe(
+    Layer.provide(SheetConfigService.layer),
+    Layer.provide(GoogleSheets.layer),
+  );
+}

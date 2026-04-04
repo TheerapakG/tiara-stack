@@ -5,14 +5,16 @@ import type { RegexContext } from "arkregex/internal/regex.ts";
 import {
   Array,
   Effect,
-  Either,
-  flow,
   Function,
   HashMap,
+  Layer,
   Option,
-  ParseResult,
   pipe,
+  Result,
   Schema,
+  SchemaGetter,
+  SchemaIssue,
+  ServiceMap,
   String,
   Types,
 } from "effect";
@@ -21,38 +23,30 @@ import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 import { GoogleSheetsError } from "@/schemas/google";
 import { GoogleAuthService } from "./auth";
 
+const tupleSchema = <Length extends number, S extends Schema.Top>(length: Length, schema: S) =>
+  Schema.Tuple(Array.makeBy(length, () => schema) as Types.TupleOf<Length, S>);
+
 const parseRowDatas = <
   Ranges extends Array.NonEmptyReadonlyArray<sheets_v4.Schema$RowData[]>,
   A,
-  R,
+  S extends Schema.Codec<
+    A,
+    Readonly<Types.TupleOf<Length, Schema.Schema.Type<typeof rowDataSchema>>>
+  >,
   Length extends Ranges["length"] = Ranges["length"],
 >(
   rowDatas: Ranges,
-  rowSchemas: Schema.Schema<
-    A,
-    Readonly<Types.TupleOf<Length, readonly Schema.Schema.Type<typeof rowDataCellSchema>[]>>,
-    R
-  >,
-): Effect.Effect<Either.Either<A, ParseResult.ParseError>[], never, R> => {
-  const rowSchema = Schema.Array(rowDataCellSchema);
-  const rowTupleSchema = Schema.Tuple(
-    ...(Array.makeBy(rowDatas.length, () => rowSchema) as Types.TupleOf<Length, typeof rowSchema>),
-  ) as unknown as Schema.Schema<
-    Types.TupleOf<Length, readonly Schema.Schema.Type<typeof rowDataCellSchema>[]>,
-    Types.TupleOf<Length, readonly Schema.Schema.Encoded<typeof rowDataCellSchema>[]>,
-    never
+  rowSchemas: S,
+) => {
+  const rowTupleSchema = tupleSchema(
+    rowDatas.length as Length,
+    rowDataSchema,
+  ) as unknown as Schema.Decoder<
+    Readonly<Types.TupleOf<Length, Schema.Schema.Type<typeof rowDataSchema>>>
   >;
-  const decodeSchema = pipe(rowTupleSchema, Schema.compose(rowSchemas)) as Schema.Schema<
-    A,
-    Types.TupleOf<Length, readonly Schema.Schema.Encoded<typeof rowDataCellSchema>[]>,
-    R
-  >;
-
-  return pipe(
-    rowDatas as Array.NonEmptyReadonlyArray<sheets_v4.Schema$RowData[]>,
-    Array.map(Array.map(({ values }) => values)),
-    Array.map(Array.map(Option.fromNullable)),
-    Array.map(Array.map(Option.getOrElse(() => []))),
+  const rows = pipe(
+    rowDatas,
+    Array.map((rows) => Array.map(rows, (row) => row.values ?? [])),
     Array.map(ArrayUtils.WithDefault.wrap<sheets_v4.Schema$CellData[][]>({ default: () => [] })),
     Array.map(ArrayUtils.WithDefault.map((row) => [row])),
     (ranges) =>
@@ -60,151 +54,150 @@ const parseRowDatas = <
         pipe(acc, ArrayUtils.WithDefault.zipArray(curr)),
       ),
     ArrayUtils.WithDefault.toArray,
-    Effect.forEach((rows) => pipe(rows, Schema.decodeUnknown(decodeSchema), Effect.either), {
-      concurrency: "unbounded",
-    }),
-    Effect.withSpan("parseRowDatas", { captureStackTrace: true }),
   );
+
+  return Effect.forEach(
+    rows,
+    (rows) =>
+      Effect.succeed(
+        pipe(
+          rows,
+          Schema.decodeUnknownResult(rowTupleSchema),
+          Result.flatMap(Schema.decodeResult(rowSchemas)),
+        ),
+      ),
+    { concurrency: "unbounded" },
+  ).pipe(Effect.withSpan("parseRowDatas"));
 };
 
 const parseValueRanges = <
   Ranges extends Array.NonEmptyReadonlyArray<sheets_v4.Schema$ValueRange>,
   A,
-  R,
+  S extends Schema.Codec<A, Readonly<Types.TupleOf<Length, readonly Option.Option<string>[]>>>,
   Length extends Ranges["length"] = Ranges["length"],
 >(
   valueRanges: Ranges,
-  rowSchemas: Schema.Schema<
-    A,
-    Readonly<Types.TupleOf<Length, readonly Option.Option<string>[]>>,
-    R
-  >,
-): Effect.Effect<Either.Either<A, ParseResult.ParseError>[], never, R> => {
-  const rowSchema = Schema.Array(Schema.OptionFromNonEmptyTrimmedString);
-  const rowTupleSchema = Schema.Tuple(
-    ...(Array.makeBy(valueRanges.length, () => rowSchema) as Types.TupleOf<
-      Length,
-      typeof rowSchema
-    >),
-  ) as unknown as Schema.Schema<
-    Types.TupleOf<Length, readonly Option.Option<string>[]>,
-    Types.TupleOf<Length, readonly string[]>,
-    never
+  rowSchemas: S,
+) => {
+  const rowTupleSchema = tupleSchema(valueRanges.length, rowSchema) as unknown as Schema.Decoder<
+    Readonly<Types.TupleOf<Length, readonly Option.Option<string>[]>>
   >;
-  const decodeSchema = pipe(rowTupleSchema, Schema.compose(rowSchemas)) as Schema.Schema<
-    A,
-    Types.TupleOf<Length, readonly string[]>,
-    R
-  >;
-
-  return pipe(
+  const rows = pipe(
     valueRanges,
-    Array.map(({ values }) => values),
-    Array.map(Option.fromNullable),
-    Array.map(Option.getOrElse(() => [])),
-    Array.map(ArrayUtils.WithDefault.wrap<any[][]>({ default: () => [] })),
+    Array.map(({ values }) => values ?? []),
+    Array.map(
+      ArrayUtils.WithDefault.wrap<unknown[][]>({
+        default: () => [],
+      }),
+    ),
+    Array.map(
+      ArrayUtils.WithDefault.map((row) =>
+        Array.map(row, (cell) =>
+          typeof cell === "string" ? Option.some(cell) : Option.fromNullishOr(cell?.toString()),
+        ),
+      ),
+    ),
     Array.map(ArrayUtils.WithDefault.map((row) => [row])),
     (ranges) =>
       Array.reduce(Array.tailNonEmpty(ranges), Array.headNonEmpty(ranges), (acc, curr) =>
         pipe(acc, ArrayUtils.WithDefault.zipArray(curr)),
       ),
     ArrayUtils.WithDefault.toArray,
-    Effect.forEach((rows) => pipe(rows, Schema.decodeUnknown(decodeSchema), Effect.either), {
-      concurrency: "unbounded",
-    }),
-    Effect.withSpan("parseValueRanges", { captureStackTrace: true }),
   );
+
+  return Effect.forEach(
+    rows,
+    (rows) =>
+      Effect.succeed(
+        pipe(
+          rows,
+          Schema.decodeUnknownResult(rowTupleSchema),
+          Result.flatMap(Schema.decodeResult(rowSchemas)),
+        ),
+      ),
+    { concurrency: "unbounded" },
+  ).pipe(Effect.withSpan("parseValueRanges"));
 };
 
-const tupleSchema = <const Length extends number, S extends Schema.Schema.Any>(
-  length: Length,
-  schema: S,
-) => Schema.Tuple(...(Array.makeBy(length, () => schema) as Types.TupleOf<Length, S>));
-
 const dataExecutionStatusSchema = Schema.Struct({
-  errorCode: Schema.optionalWith(Schema.String, { nullable: true, as: "Option" }),
-  errorMessage: Schema.optionalWith(Schema.String, { nullable: true, as: "Option" }),
-  lastRefreshTime: Schema.optionalWith(Schema.String, { nullable: true, as: "Option" }),
-  state: Schema.optionalWith(Schema.String, { nullable: true, as: "Option" }),
+  errorCode: Schema.OptionFromNullishOr(Schema.String),
+  errorMessage: Schema.OptionFromNullishOr(Schema.String),
+  lastRefreshTime: Schema.OptionFromNullishOr(Schema.String),
+  state: Schema.OptionFromNullishOr(Schema.String),
 });
 
 const extendedValueSchema = Schema.Struct({
-  boolValue: Schema.optionalWith(Schema.Boolean, { nullable: true, as: "Option" }),
-  errorValue: Schema.optionalWith(Schema.Any, { as: "Option" }),
-  formulaValue: Schema.optionalWith(Schema.String, { nullable: true, as: "Option" }),
-  numberValue: Schema.optionalWith(Schema.Number, { nullable: true, as: "Option" }),
-  stringValue: Schema.optionalWith(Schema.String, { nullable: true, as: "Option" }),
+  boolValue: Schema.OptionFromNullishOr(Schema.Boolean),
+  errorValue: Schema.OptionFromNullishOr(Schema.Any),
+  formulaValue: Schema.OptionFromNullishOr(Schema.String),
+  numberValue: Schema.OptionFromNullishOr(Schema.Number),
+  stringValue: Schema.OptionFromNullishOr(Schema.String),
 });
 
 const dataSourceFormulaSchema = Schema.Struct({
-  dataExecutionStatus: Schema.optionalWith(dataExecutionStatusSchema, { as: "Option" }),
-  dataSourceId: Schema.optionalWith(Schema.String, { nullable: true, as: "Option" }),
+  dataExecutionStatus: Schema.OptionFromNullishOr(dataExecutionStatusSchema),
+  dataSourceId: Schema.OptionFromNullishOr(Schema.String),
 });
 
 const dataSourceTableSchema = Schema.Struct({
-  columns: Schema.optionalWith(Schema.Array(Schema.Any), { as: "Option" }),
-  columnSelectionType: Schema.optionalWith(Schema.String, { nullable: true, as: "Option" }),
-  dataExecutionStatus: Schema.optionalWith(dataExecutionStatusSchema, { as: "Option" }),
-  dataSourceId: Schema.optionalWith(Schema.String, { nullable: true, as: "Option" }),
-  filterSpecs: Schema.optionalWith(Schema.Array(Schema.Any), { as: "Option" }),
-  rowLimit: Schema.optionalWith(Schema.Number, { nullable: true, as: "Option" }),
-  sortSpecs: Schema.optionalWith(Schema.Array(Schema.Any), { as: "Option" }),
+  columns: Schema.OptionFromNullishOr(Schema.Array(Schema.Any)),
+  columnSelectionType: Schema.OptionFromNullishOr(Schema.String),
+  dataExecutionStatus: Schema.OptionFromNullishOr(dataExecutionStatusSchema),
+  dataSourceId: Schema.OptionFromNullishOr(Schema.String),
+  filterSpecs: Schema.OptionFromNullishOr(Schema.Array(Schema.Any)),
+  rowLimit: Schema.OptionFromNullishOr(Schema.Number),
+  sortSpecs: Schema.OptionFromNullishOr(Schema.Array(Schema.Any)),
 });
 
 const rowDataCellSchema = Schema.Struct({
-  dataSourceFormula: Schema.optionalWith(dataSourceFormulaSchema, { as: "Option" }),
-  dataSourceTable: Schema.optionalWith(dataSourceTableSchema, { as: "Option" }),
-  dataValidation: Schema.optionalWith(Schema.Any, { as: "Option" }),
-  effectiveFormat: Schema.optionalWith(Schema.Any, { as: "Option" }),
-  effectiveValue: Schema.optionalWith(extendedValueSchema, { as: "Option" }),
-  formattedValue: Schema.optionalWith(Schema.String, { nullable: true, as: "Option" }),
-  hyperlink: Schema.optionalWith(Schema.String, { nullable: true, as: "Option" }),
-  note: Schema.optionalWith(Schema.String, { nullable: true, as: "Option" }),
-  pivotTable: Schema.optionalWith(Schema.Any, { as: "Option" }),
-  textFormatRuns: Schema.optionalWith(Schema.Array(Schema.Any), { as: "Option" }),
-  userEnteredFormat: Schema.optionalWith(Schema.Any, { as: "Option" }),
-  userEnteredValue: Schema.optionalWith(extendedValueSchema, { as: "Option" }),
+  dataSourceFormula: Schema.OptionFromNullishOr(dataSourceFormulaSchema),
+  dataSourceTable: Schema.OptionFromNullishOr(dataSourceTableSchema),
+  dataValidation: Schema.OptionFromNullishOr(Schema.Any),
+  effectiveFormat: Schema.OptionFromNullishOr(Schema.Any),
+  effectiveValue: Schema.OptionFromNullishOr(extendedValueSchema),
+  formattedValue: Schema.OptionFromNullishOr(Schema.String),
+  hyperlink: Schema.OptionFromNullishOr(Schema.String),
+  note: Schema.OptionFromNullishOr(Schema.String),
+  pivotTable: Schema.OptionFromNullishOr(Schema.Any),
+  textFormatRuns: Schema.OptionFromNullishOr(Schema.Array(Schema.Any)),
+  userEnteredFormat: Schema.OptionFromNullishOr(Schema.Any),
+  userEnteredValue: Schema.OptionFromNullishOr(extendedValueSchema),
 });
 const rowDataSchema = Schema.Array(rowDataCellSchema);
-const cellSchema = Schema.OptionFromSelf(Schema.String);
+const cellSchema = Schema.Option(Schema.String);
 const rowSchema = Schema.Array(cellSchema);
 
-const rowDataCellToCellSchema = pipe(
-  Schema.typeSchema(rowDataCellSchema),
-  Schema.transformOrFail(cellSchema, {
-    strict: true,
-    decode: (rowDataCell) => ParseResult.succeed(rowDataCell.formattedValue),
-    encode: (output, _, ast) =>
-      ParseResult.fail(
-        new ParseResult.Forbidden(ast, output, "Row data cell cannot be encoded to cell"),
-      ),
+const rowDataCellToCellSchema = Schema.toType(rowDataCellSchema).pipe(
+  Schema.decodeTo(cellSchema, {
+    decode: SchemaGetter.transform((rowDataCell) => rowDataCell.formattedValue),
+    encode: SchemaGetter.forbidden(() => "Row data cell cannot be encoded to cell"),
   }),
 );
 const rowDataToRowSchema = Schema.Array(rowDataCellToCellSchema);
-const rowToCellSchema = pipe(
-  rowSchema,
-  Schema.head,
-  Schema.transform(cellSchema, {
-    strict: true,
-    decode: Option.flatten,
-    encode: Option.some,
+const rowToCellSchema = rowSchema.pipe(
+  Schema.decodeTo(cellSchema, {
+    decode: SchemaGetter.transform((row) =>
+      pipe(
+        row,
+        Array.get(0),
+        Option.getOrElse(() => Option.none<string>()),
+      ),
+    ),
+    encode: SchemaGetter.transform((cell) => [cell]),
   }),
 );
-const rowDataToCellSchema = pipe(
-  Schema.Array(rowDataCellToCellSchema),
-  Schema.compose(rowToCellSchema),
-);
+const rowDataToCellSchema = rowDataToRowSchema.pipe(Schema.decodeTo(rowToCellSchema));
 
 const matchAll =
-  <Pattern extends string, Context extends RegexContext>(regex: Regex<Pattern, Context>) =>
+  <Pattern extends string, Context extends RegexContext>(value: Regex<Pattern, Context>) =>
   (str: string) => {
     const matches: RegexExecArray<
-      [Pattern, ...(typeof regex)["inferCaptures"]],
-      (typeof regex)["inferNamedCaptures"],
-      (typeof regex)["flags"]
+      [Pattern, ...(typeof value)["inferCaptures"]],
+      (typeof value)["inferNamedCaptures"],
+      (typeof value)["flags"]
     >[] = [];
     while (true) {
-      const match = regex.exec(str);
+      const match = value.exec(str);
       if (!match) break;
       matches.push(match);
     }
@@ -212,47 +205,63 @@ const matchAll =
   };
 
 const toStringSchema = Schema.Trim;
-const toNumberSchema = pipe(
-  Schema.String,
-  Schema.transform(Schema.String, {
-    strict: true,
-    decode: flow(
-      matchAll(regex("\\d+(?:\\.\\d+)?", "g")),
-      Array.head,
-      Option.map((match) => match[0]),
-      Option.getOrElse(() => ""),
-    ),
-    encode: Function.identity,
+const toNumberSchema = Schema.String.pipe(
+  Schema.decodeTo(Schema.Number, {
+    decode: SchemaGetter.transformOrFail((value) => {
+      const numeric = pipe(
+        value,
+        matchAll(regex("\\d+(?:\\.\\d+)?", "g")),
+        Array.head,
+        Option.map((match) => match[0]),
+        Option.flatMap((match) =>
+          Number.isNaN(Number.parseFloat(match))
+            ? Option.none()
+            : Option.some(Number.parseFloat(match)),
+        ),
+      );
+
+      return pipe(
+        numeric,
+        Option.match({
+          onSome: Effect.succeed,
+          onNone: () => Effect.fail(new SchemaIssue.InvalidValue(Option.some(value))),
+        }),
+      );
+    }),
+    encode: SchemaGetter.String(),
   }),
-  Schema.compose(Schema.NumberFromString),
 );
-const toBooleanSchema = pipe(
-  Schema.String,
-  Schema.transformOrFail(Schema.Literal("TRUE", "FALSE"), {
-    strict: true,
-    decode: (str) => ParseResult.decodeUnknown(Schema.Literal("TRUE", "FALSE"))(str),
-    encode: (str) => ParseResult.succeed(str),
+const toBooleanSchema = Schema.String.pipe(
+  Schema.decodeTo(Schema.Boolean, {
+    decode: SchemaGetter.transformOrFail((value) =>
+      value === "TRUE"
+        ? Effect.succeed(true)
+        : value === "FALSE"
+          ? Effect.succeed(false)
+          : Effect.fail(new SchemaIssue.InvalidValue(Option.some(value))),
+    ),
+    encode: SchemaGetter.transform((value) => (value ? "TRUE" : "FALSE")),
   }),
-  Schema.compose(Schema.transformLiterals(["TRUE", true], ["FALSE", false])),
 );
 const toLiteralSchema = <const Literals extends Array.NonEmptyReadonlyArray<string>>(
   literals: Literals,
 ) =>
-  pipe(
-    Schema.String,
-    Schema.transformOrFail(Schema.Literal(...literals), {
-      strict: true,
-      decode: (str) => ParseResult.decodeUnknown(Schema.Literal(...literals))(str),
-      encode: (str) => ParseResult.succeed(str),
+  Schema.String.pipe(
+    Schema.decodeTo(Schema.Literals(literals), {
+      decode: SchemaGetter.transformOrFail((value) =>
+        Array.contains(literals, value)
+          ? Effect.succeed(value as Literals[number])
+          : Effect.fail(new SchemaIssue.InvalidValue(Option.some(value))),
+      ),
+      encode: SchemaGetter.String(),
     }),
   );
-const toStringArraySchema = pipe(
-  Schema.split(","),
-  Schema.compose(Schema.Array(Schema.Trim)),
-  Schema.transform(Schema.Array(Schema.String), {
-    strict: true,
-    decode: Array.filter(String.isNonEmpty),
-    encode: Function.identity,
+const toStringArraySchema = Schema.String.pipe(
+  Schema.decodeTo(Schema.Array(Schema.Trim), {
+    decode: SchemaGetter.transform((value) =>
+      pipe(value.split(","), Array.map(String.trim), Array.filter(String.isNonEmpty)),
+    ),
+    encode: SchemaGetter.transform((value) => value.join(",")),
   }),
 );
 
@@ -271,15 +280,15 @@ const toRangeKey = (sheetTitle: string, startRow: number, startCol: number) =>
 const parseA1RangeKey = (range: string) =>
   pipe(
     /^(?:'((?:[^']|'')*)'|([^!]+))!(.+)$/u.exec(range),
-    Option.fromNullable,
+    Option.fromNullishOr,
     Option.flatMap(([, quoted, unquoted, reference]) =>
       pipe(
         reference.split(":").at(0),
-        Option.fromNullable,
+        Option.fromNullishOr,
         Option.flatMap((start) =>
           pipe(
             /^\$?([A-Za-z]+)\$?(\d+)$/u.exec(start),
-            Option.fromNullable,
+            Option.fromNullishOr,
             Option.map(([, col, row]) =>
               toRangeKey(
                 (quoted ?? unquoted ?? "").replace(/''/g, "'"),
@@ -296,45 +305,51 @@ const parseA1RangeKey = (range: string) =>
 const gridDataToKey = (sheetTitle: string, gridData: sheets_v4.Schema$GridData) =>
   toRangeKey(sheetTitle, (gridData.startRow ?? 0) + 1, (gridData.startColumn ?? 0) + 1);
 
-export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets", {
-  effect: pipe(
-    Effect.Do,
-    Effect.bind("auth", () => GoogleAuthService.getAuth()),
-    Effect.bind("sheets", ({ auth }) =>
-      Effect.try(() =>
+export class GoogleSheets extends ServiceMap.Service<GoogleSheets>()("GoogleSheets", {
+  make: Effect.gen(function* () {
+    const googleAuthService = yield* GoogleAuthService;
+    const auth = googleAuthService.getAuth();
+    const googleSheets = yield* Effect.try({
+      try: () =>
         sheets({
           version: "v4",
           auth,
         }),
-      ),
-    ),
-    Effect.map(({ sheets }) => ({
-      sheets,
-      getRowDatas: (params: sheets_v4.Params$Resource$Spreadsheets$Get, options?: MethodOptions) =>
-        pipe(
+      catch: (cause) =>
+        GoogleSheetsError.makeUnsafe({
+          message: "Failed to create Google Sheets client",
+          cause,
+        }),
+    });
+
+    return {
+      sheets: googleSheets,
+      getRowDatas: (
+        params: sheets_v4.Params$Resource$Spreadsheets$Get,
+        options?: MethodOptions,
+      ) => {
+        const response = pipe(
           Effect.tryPromise({
-            try: () => sheets.spreadsheets.get(params, options),
+            try: () => googleSheets.spreadsheets.get(params, options),
             catch: Function.identity,
           }),
-          Effect.catchAll((error) =>
-            pipe(
-              error,
-              Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
-              Effect.option,
-              Effect.flatMap((message) =>
-                Effect.fail(
-                  new GoogleSheetsError({
-                    message: pipe(
-                      message,
-                      Option.map((message) => message.message),
-                      Option.getOrElse(() => "An unknown error occurred"),
-                    ),
-                    cause: error,
-                  }),
+          Effect.catch((error) =>
+            Effect.fail(
+              GoogleSheetsError.makeUnsafe({
+                message: pipe(
+                  error,
+                  Schema.decodeUnknownResult(Schema.Struct({ message: Schema.String })),
+                  Result.map(({ message }) => message),
+                  Result.getOrElse(() => "An unknown error occurred"),
                 ),
-              ),
+                cause: error,
+              }),
             ),
           ),
+        );
+
+        return pipe(
+          response,
           Effect.map((sheet) =>
             pipe(
               sheet.data.sheets ?? [],
@@ -370,43 +385,37 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets",
             rowDatas.length === (params.ranges?.length ?? 0)
               ? Effect.succeed(rowDatas)
               : Effect.fail(
-                  new GoogleSheetsError({
+                  GoogleSheetsError.makeUnsafe({
                     message: "Row datas length does not match ranges length",
                     cause: undefined,
                   }),
                 ),
           ),
-          Effect.withSpan("GoogleSheets.getRowDatas", { captureStackTrace: true }),
-        ),
+          Effect.withSpan("GoogleSheets.getRowDatas"),
+        );
+      },
       get: (
         params: sheets_v4.Params$Resource$Spreadsheets$Values$Batchget,
         options?: MethodOptions,
       ) =>
-        pipe(
-          Effect.tryPromise({
-            try: () => sheets.spreadsheets.values.batchGet(params, options),
-            catch: Function.identity,
-          }),
-          Effect.catchAll((error) =>
-            pipe(
-              error,
-              Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
-              Effect.option,
-              Effect.flatMap((message) =>
-                Effect.fail(
-                  new GoogleSheetsError({
-                    message: pipe(
-                      message,
-                      Option.map((message) => message.message),
-                      Option.getOrElse(() => "An unknown error occurred"),
-                    ),
-                    cause: error,
-                  }),
+        Effect.tryPromise({
+          try: () => googleSheets.spreadsheets.values.batchGet(params, options),
+          catch: Function.identity,
+        }).pipe(
+          Effect.catch((error) =>
+            Effect.fail(
+              GoogleSheetsError.makeUnsafe({
+                message: pipe(
+                  error,
+                  Schema.decodeUnknownResult(Schema.Struct({ message: Schema.String })),
+                  Result.map(({ message }) => message),
+                  Result.getOrElse(() => "An unknown error occurred"),
                 ),
-              ),
+                cause: error,
+              }),
             ),
           ),
-          Effect.withSpan("GoogleSheets.get", { captureStackTrace: true }),
+          Effect.withSpan("GoogleSheets.get"),
         ),
       getHashMap: <K>(
         ranges: HashMap.HashMap<K, string>,
@@ -415,85 +424,73 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets",
       ) =>
         pipe(
           ranges,
-          Utils.hashMapPositional((ranges: readonly string[]) =>
-            pipe(
-              Effect.tryPromise({
-                try: () =>
-                  sheets.spreadsheets.values.batchGet(
-                    { ...params, ranges: Array.copy(ranges) },
-                    options,
-                  ),
-                catch: Function.identity,
-              }),
-              Effect.catchAll((error) =>
-                pipe(
-                  error,
-                  Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
-                  Effect.option,
-                  Effect.flatMap((message) =>
-                    Effect.fail(
-                      new GoogleSheetsError({
-                        message: pipe(
-                          message,
-                          Option.map((message) => message.message),
-                          Option.getOrElse(() => "An unknown error occurred"),
-                        ),
-                        cause: error,
-                      }),
+          Utils.hashMapPositional((orderedRanges: readonly string[]) =>
+            Effect.tryPromise({
+              try: () =>
+                googleSheets.spreadsheets.values.batchGet(
+                  { ...params, ranges: Array.copy(orderedRanges) },
+                  options,
+                ),
+              catch: Function.identity,
+            }).pipe(
+              Effect.catch((error) =>
+                Effect.fail(
+                  GoogleSheetsError.makeUnsafe({
+                    message: pipe(
+                      error,
+                      Schema.decodeUnknownResult(Schema.Struct({ message: Schema.String })),
+                      Result.map(({ message }) => message),
+                      Result.getOrElse(() => "An unknown error occurred"),
                     ),
-                  ),
+                    cause: error,
+                  }),
                 ),
               ),
-              Effect.map((sheet) => sheet.data.valueRanges ?? []),
+              Effect.map((response) => response.data.valueRanges ?? []),
             ),
           ),
-          Effect.withSpan("GoogleSheets.getHashMap", {
-            captureStackTrace: true,
-          }),
+          Effect.withSpan("GoogleSheets.getHashMap"),
         ),
       getRowDatasHashMap: <K>(
         ranges: HashMap.HashMap<K, string>,
         params?: Omit<sheets_v4.Params$Resource$Spreadsheets$Get, "ranges">,
         options?: MethodOptions,
-      ): Effect.Effect<HashMap.HashMap<K, sheets_v4.Schema$RowData[]>, GoogleSheetsError> =>
+      ) =>
         pipe(
           ranges,
-          Utils.hashMapPositional((ranges: readonly string[]) =>
-            pipe(
-              Effect.tryPromise({
-                try: () =>
-                  sheets.spreadsheets.get(
-                    {
-                      ...params,
-                      ranges: Array.copy(ranges),
-                      includeGridData: true,
-                    },
-                    options,
-                  ),
-                catch: Function.identity,
-              }),
-              Effect.catchAll((error) =>
-                pipe(
-                  error,
-                  Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
-                  Effect.option,
-                  Effect.flatMap((message) =>
-                    Effect.fail(
-                      new GoogleSheetsError({
-                        message: pipe(
-                          message,
-                          Option.map((message) => message.message),
-                          Option.getOrElse(() => "An unknown error occurred"),
-                        ),
-                        cause: error,
-                      }),
+          Utils.hashMapPositional((orderedRanges: readonly string[]) => {
+            const response = Effect.tryPromise({
+              try: () =>
+                googleSheets.spreadsheets.get(
+                  {
+                    ...params,
+                    ranges: Array.copy(orderedRanges),
+                    includeGridData: true,
+                  },
+                  options,
+                ),
+              catch: Function.identity,
+            }).pipe(
+              Effect.catch((error) =>
+                Effect.fail(
+                  GoogleSheetsError.makeUnsafe({
+                    message: pipe(
+                      error,
+                      Schema.decodeUnknownResult(Schema.Struct({ message: Schema.String })),
+                      Result.map(({ message }) => message),
+                      Result.getOrElse(() => "An unknown error occurred"),
                     ),
-                  ),
+                    cause: error,
+                  }),
                 ),
               ),
-              Effect.map((sheet) =>
+            );
+
+            return pipe(
+              response,
+              Effect.map((response) =>
                 pipe(
-                  sheet.data.sheets ?? [],
+                  response.data.sheets ?? [],
                   Array.map((sheet) => ({
                     sheet: sheet.properties?.title ?? "",
                     gridData: sheet.data ?? [],
@@ -502,17 +499,16 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets",
                     pipe(
                       gridData,
                       Array.map(
-                        (gridData) =>
-                          [gridDataToKey(sheet, gridData), gridData.rowData ?? []] as const,
+                        (data) => [gridDataToKey(sheet, data), data.rowData ?? []] as const,
                       ),
                     ),
                   ),
                   HashMap.fromIterable,
                 ),
               ),
-              Effect.map((map) =>
-                pipe(
-                  ranges,
+              Effect.flatMap((map) => {
+                const rowDatas = pipe(
+                  orderedRanges,
                   Array.map((range) =>
                     pipe(
                       range,
@@ -521,94 +517,79 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets",
                     ),
                   ),
                   Array.getSomes,
-                ),
-              ),
-              Effect.flatMap((rowDatas) =>
-                rowDatas.length === ranges.length
+                );
+
+                return rowDatas.length === orderedRanges.length
                   ? Effect.succeed(rowDatas)
                   : Effect.fail(
-                      new GoogleSheetsError({
+                      GoogleSheetsError.makeUnsafe({
                         message: "Row datas length does not match ranges length",
                         cause: undefined,
                       }),
-                    ),
-              ),
-            ),
-          ),
-          Effect.withSpan("GoogleSheets.getRowDatasHashMap", {
-            captureStackTrace: true,
+                    );
+              }),
+            );
           }),
+          Effect.withSpan("GoogleSheets.getRowDatasHashMap"),
         ),
       update: (
         params?: sheets_v4.Params$Resource$Spreadsheets$Values$Batchupdate,
         options?: MethodOptions,
       ) =>
-        pipe(
-          Effect.tryPromise({
-            try: () => sheets.spreadsheets.values.batchUpdate(params, options),
-            catch: Function.identity,
-          }),
-          Effect.catchAll((error) =>
-            pipe(
-              error,
-              Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
-              Effect.option,
-              Effect.flatMap((message) =>
-                Effect.fail(
-                  new GoogleSheetsError({
-                    message: pipe(
-                      message,
-                      Option.map((message) => message.message),
-                      Option.getOrElse(() => "An unknown error occurred"),
-                    ),
-                    cause: error,
-                  }),
+        Effect.tryPromise({
+          try: () => googleSheets.spreadsheets.values.batchUpdate(params, options),
+          catch: Function.identity,
+        }).pipe(
+          Effect.catch((error) =>
+            Effect.fail(
+              GoogleSheetsError.makeUnsafe({
+                message: pipe(
+                  error,
+                  Schema.decodeUnknownResult(Schema.Struct({ message: Schema.String })),
+                  Result.map(({ message }) => message),
+                  Result.getOrElse(() => "An unknown error occurred"),
                 ),
-              ),
+                cause: error,
+              }),
             ),
           ),
-          Effect.withSpan("GoogleSheets.update", { captureStackTrace: true }),
+          Effect.withSpan("GoogleSheets.update"),
         ),
       getSheetGids: (sheetId: string) =>
-        pipe(
-          Effect.tryPromise({
-            try: () => sheets.spreadsheets.get({ spreadsheetId: sheetId }),
-            catch: Function.identity,
-          }),
-          Effect.catchAll((error) =>
-            pipe(
-              error,
-              Schema.decodeUnknown(Schema.Struct({ message: Schema.String })),
-              Effect.option,
-              Effect.flatMap((message) =>
-                Effect.fail(
-                  new GoogleSheetsError({
-                    message: pipe(
-                      message,
-                      Option.map((message) => message.message),
-                      Option.getOrElse(() => "An unknown error occurred"),
-                    ),
-                    cause: error,
-                  }),
+        Effect.tryPromise({
+          try: () => googleSheets.spreadsheets.get({ spreadsheetId: sheetId }),
+          catch: Function.identity,
+        }).pipe(
+          Effect.catch((error) =>
+            Effect.fail(
+              GoogleSheetsError.makeUnsafe({
+                message: pipe(
+                  error,
+                  Schema.decodeUnknownResult(Schema.Struct({ message: Schema.String })),
+                  Result.map(({ message }) => message),
+                  Result.getOrElse(() => "An unknown error occurred"),
                 ),
-              ),
+                cause: error,
+              }),
             ),
           ),
-          Effect.map((sheet) => sheet.data.sheets ?? []),
-          Effect.map(Array.map((sheet) => sheet.properties)),
-          Effect.map(Array.map(Option.fromNullable)),
-          Effect.map(Array.getSomes),
-          Effect.map(ArrayUtils.Collect.toHashMapByKey("title")),
-          Effect.map(HashMap.map(({ sheetId }) => Option.fromNullable(sheetId))),
-          Effect.withSpan("GoogleSheets.getSheetGids", {
-            captureStackTrace: true,
-          }),
+          Effect.map((sheet) =>
+            pipe(
+              sheet.data.sheets ?? [],
+              Array.map((sheet) => sheet.properties),
+              Array.map(Option.fromNullishOr),
+              Array.getSomes,
+              ArrayUtils.Collect.toHashMapByKey("title"),
+              HashMap.map(({ sheetId }) => Option.fromNullishOr(sheetId)),
+            ),
+          ),
+          Effect.withSpan("GoogleSheets.getSheetGids"),
         ),
-    })),
-  ),
-  dependencies: [GoogleAuthService.Default],
-  accessors: true,
+    };
+  }),
 }) {
+  static layer = Layer.effect(GoogleSheets, this.make).pipe(Layer.provide(GoogleAuthService.layer));
+
   static parseRowDatas = parseRowDatas;
   static parseValueRanges = parseValueRanges;
 
@@ -621,15 +602,15 @@ export class GoogleSheets extends Effect.Service<GoogleSheets>()("GoogleSheets",
   static rowDataToRowSchema = rowDataToRowSchema;
   static rowDataToCellSchema = rowDataToCellSchema;
   static toStringSchema = toStringSchema;
-  static cellToStringSchema = Schema.OptionFromSelf(toStringSchema);
+  static cellToStringSchema = Schema.Option(toStringSchema);
   static toNumberSchema = toNumberSchema;
-  static cellToNumberSchema = Schema.OptionFromSelf(toNumberSchema);
+  static cellToNumberSchema = Schema.Option(toNumberSchema);
   static toBooleanSchema = toBooleanSchema;
-  static cellToBooleanSchema = Schema.OptionFromSelf(toBooleanSchema);
+  static cellToBooleanSchema = Schema.Option(toBooleanSchema);
   static toLiteralSchema = toLiteralSchema;
   static cellToLiteralSchema = <const Literals extends Array.NonEmptyReadonlyArray<string>>(
     literals: Literals,
-  ) => Schema.OptionFromSelf(toLiteralSchema(literals));
+  ) => Schema.Option(toLiteralSchema(literals));
   static toStringArraySchema = toStringArraySchema;
-  static cellToStringArraySchema = Schema.OptionFromSelf(toStringArraySchema);
+  static cellToStringArraySchema = Schema.Option(toStringArraySchema);
 }

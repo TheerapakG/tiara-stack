@@ -1,10 +1,10 @@
-import { JSONSchema } from "effect";
+import { Schema } from "effect";
 import { describe, expect, it } from "@effect/vitest";
 import { MessageRoomOrder } from "./messageRoomOrder";
 
 describe("MessageRoomOrder", () => {
   it("MessageRoomOrder generates json schema", () => {
-    const schema = JSONSchema.make(MessageRoomOrder);
+    const schema = Schema.toJsonSchemaDocument(MessageRoomOrder);
     expect(schema).toBeDefined();
   });
 });

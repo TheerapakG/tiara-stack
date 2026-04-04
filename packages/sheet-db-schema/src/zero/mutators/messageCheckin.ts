@@ -21,7 +21,7 @@ export const messageCheckin = {
         messageChannelId: Schema.NullOr(Schema.String),
         createdByUserId: Schema.NullOr(Schema.String),
       }),
-      Schema.standardSchemaV1,
+      Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) =>
       await tx.mutate.messageCheckin.upsert({
@@ -42,7 +42,7 @@ export const messageCheckin = {
         messageId: Schema.String,
         memberIds: Schema.Array(Schema.String),
       }),
-      Schema.standardSchemaV1,
+      Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) => {
       await Promise.all(
@@ -64,7 +64,7 @@ export const messageCheckin = {
         memberId: Schema.String,
         checkinAt: Schema.Number,
       }),
-      Schema.standardSchemaV1,
+      Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) =>
       await tx.mutate.messageCheckinMember.update({
@@ -79,7 +79,7 @@ export const messageCheckin = {
         messageId: Schema.String,
         memberId: Schema.String,
       }),
-      Schema.standardSchemaV1,
+      Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) =>
       await tx.mutate.messageCheckinMember.update({

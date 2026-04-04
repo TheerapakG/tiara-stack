@@ -1,4 +1,4 @@
-import { Array, Effect, HashMap, Option, Struct, pipe, Tuple, Types } from "effect";
+import { Array, Effect, HashMap, Option, Struct, pipe, Tuple, Record } from "effect";
 
 export const hashMapPositional =
   <In, Out, E, R>(f: (a: ReadonlyArray<In>) => Effect.Effect<ReadonlyArray<Out>, E, R>) =>
@@ -8,8 +8,8 @@ export const hashMapPositional =
     pipe(
       Effect.Do,
       Effect.let("entries", () => HashMap.toEntries(map)),
-      Effect.let("keys", ({ entries }) => pipe(entries, Array.map(Tuple.getFirst))),
-      Effect.let("values", ({ entries }) => pipe(entries, Array.map(Tuple.getSecond))),
+      Effect.let("keys", ({ entries }) => pipe(entries, Array.map(Tuple.get(0)))),
+      Effect.let("values", ({ entries }) => pipe(entries, Array.map(Tuple.get(1)))),
       Effect.bind("resultValues", ({ values }) => f(values)),
       Effect.map(
         ({ keys, resultValues }) =>
@@ -25,12 +25,17 @@ export const mapPositional =
   <T extends Record<string, In>>(map: T): Effect.Effect<Record<keyof T, Out>, E, R> =>
     pipe(
       Effect.Do,
-      Effect.let("entries", () => Struct.entries(map)),
-      Effect.let("keys", ({ entries }) => pipe(entries, Array.map(Tuple.getFirst))),
-      Effect.let("values", ({ entries }) => pipe(entries, Array.map(Tuple.getSecond))),
+      Effect.let("entries", () => Record.toEntries(map)),
+      Effect.let(
+        "keys",
+        ({ entries }) =>
+          pipe(entries, Array.map(Tuple.get(0))) as Array<keyof T & (string | symbol)>,
+      ),
+      Effect.let("values", ({ entries }) => pipe(entries, Array.map(Tuple.get(1)))),
       Effect.bind("resultValues", ({ values }) => f(values)),
-      Effect.map(({ keys, resultValues }) =>
-        pipe(Array.zip(keys, resultValues), Object.fromEntries),
+      Effect.map(
+        ({ keys, resultValues }) =>
+          pipe(Array.zip(keys, resultValues), Record.fromEntries) as Record<keyof T, Out>,
       ),
     );
 
@@ -65,11 +70,9 @@ export const arraySomesPositional =
     );
 
 export const keyPositional =
-  <In, Out, E, R, const Key extends keyof In>(
+  <In extends object, Out, E, R, const Key extends keyof In>(
     key: Key,
-    f: (
-      a: ReadonlyArray<Types.MatchRecord<In, In[Key] | undefined, In[Key]>>,
-    ) => Effect.Effect<ReadonlyArray<Out>, E, R>,
+    f: (a: ReadonlyArray<In[Key]>) => Effect.Effect<ReadonlyArray<Out>, E, R>,
   ) =>
   (
     array: ReadonlyArray<In>,

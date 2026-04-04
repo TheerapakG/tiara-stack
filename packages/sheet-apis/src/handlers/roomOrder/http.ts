@@ -1,34 +1,24 @@
-import { HttpApiBuilder } from "@effect/platform";
-import { Effect, Layer, pipe } from "effect";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { Effect, Layer } from "effect";
 import { Api } from "@/api";
-import { catchParseErrorAsValidationError } from "typhoon-core/error";
+import { catchSchemaErrorAsValidationError } from "typhoon-core/error";
 import { provideCurrentGuildUser, requireMonitorGuild } from "@/middlewares/authorization";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
-import { GuildConfigService } from "@/services/guildConfig";
-import { RoomOrderService } from "@/services/roomOrder";
+import { RoomOrderService } from "@/services";
 
-export const RoomOrderLive = HttpApiBuilder.group(Api, "roomOrder", (handlers) =>
-  pipe(
-    Effect.all({
-      roomOrderService: RoomOrderService,
-    }),
-    Effect.map(({ roomOrderService }) =>
-      handlers.handle("generate", ({ payload }) =>
-        provideCurrentGuildUser(
-          payload.guildId,
-          requireMonitorGuild(payload.guildId).pipe(
-            Effect.andThen(roomOrderService.generate(payload)),
-          ),
-        ).pipe(catchParseErrorAsValidationError),
-      ),
-    ),
-  ),
-).pipe(
-  Layer.provide(
-    Layer.mergeAll(
-      RoomOrderService.Default,
-      GuildConfigService.Default,
-      SheetAuthTokenAuthorizationLive,
-    ),
-  ),
-);
+export const roomOrderLayer = HttpApiBuilder.group(
+  Api,
+  "roomOrder",
+  Effect.fn(function* (handlers) {
+    const roomOrderService = yield* RoomOrderService;
+
+    return handlers.handle("generate", ({ payload }) =>
+      provideCurrentGuildUser(
+        payload.guildId,
+        requireMonitorGuild(payload.guildId).pipe(
+          Effect.andThen(roomOrderService.generate(payload)),
+        ),
+      ).pipe(catchSchemaErrorAsValidationError),
+    );
+  }),
+).pipe(Layer.provide([RoomOrderService.layer, SheetAuthTokenAuthorizationLive]));

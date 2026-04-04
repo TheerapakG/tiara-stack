@@ -2,6 +2,10 @@ import { Match, Number, Option, Order, pipe, Schema } from "effect";
 import { RawSchedulePlayer } from "./rawSchedulePlayer";
 import { ScheduleHourWindow } from "./hourWindow";
 
+const ScheduleFills = Schema.Array(Schema.OptionFromNullOr(RawSchedulePlayer)).check(
+  Schema.isLengthBetween(5, 5),
+);
+
 export class BreakSchedule extends Schema.TaggedClass<BreakSchedule>()("BreakSchedule", {
   channel: Schema.String,
   day: Schema.Number,
@@ -16,7 +20,7 @@ export class Schedule extends Schema.TaggedClass<Schedule>()("Schedule", {
   visible: Schema.Boolean,
   hour: Schema.OptionFromNullOr(Schema.Number),
   hourWindow: Schema.OptionFromNullOr(ScheduleHourWindow),
-  fills: pipe(Schema.Array(Schema.OptionFromNullOr(RawSchedulePlayer)), Schema.itemsCount(5)),
+  fills: ScheduleFills,
   overfills: Schema.Array(RawSchedulePlayer),
   standbys: Schema.Array(RawSchedulePlayer),
   runners: Schema.Array(RawSchedulePlayer),
@@ -54,7 +58,7 @@ export const makeSchedule = ({
   pipe(
     Match.value(breakHour),
     Match.when(true, () =>
-      BreakSchedule.make({
+      BreakSchedule.makeUnsafe({
         channel,
         day,
         visible,
@@ -63,7 +67,7 @@ export const makeSchedule = ({
       }),
     ),
     Match.when(false, () =>
-      Schedule.make({
+      Schedule.makeUnsafe({
         channel,
         day,
         visible,

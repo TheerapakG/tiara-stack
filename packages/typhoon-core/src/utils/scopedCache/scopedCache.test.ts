@@ -3,11 +3,12 @@ import { Effect, Exit, Scope } from "effect";
 import * as ScopedCache from "./scopedCache";
 
 describe("ScopedCache", () => {
-  it.effect("reuses the cached value while any acquired scope is still active", () => {
-    let lookupCount = 0;
-    let finalizedCount = 0;
+  it.effect(
+    "reuses the cached value while any acquired scope is still active",
+    Effect.fnUntraced(function* () {
+      let lookupCount = 0;
+      let finalizedCount = 0;
 
-    return Effect.gen(function* () {
       const cache = yield* ScopedCache.make({
         lookup: (key: string) =>
           Effect.acquireRelease(
@@ -18,8 +19,8 @@ describe("ScopedCache", () => {
 
       const scopeA = yield* Scope.make();
       const scopeB = yield* Scope.make();
-      const first = yield* Scope.extend(cache.get("alpha"), scopeA);
-      const second = yield* Scope.extend(cache.get("alpha"), scopeB);
+      const first = yield* Scope.provide(cache.get("alpha"), scopeA);
+      const second = yield* Scope.provide(cache.get("alpha"), scopeB);
 
       expect(lookupCount).toBe(1);
 
@@ -27,7 +28,7 @@ describe("ScopedCache", () => {
 
       expect(finalizedCount).toBe(0);
 
-      const third = yield* Scope.extend(cache.get("alpha"), scopeB);
+      const third = yield* Scope.provide(cache.get("alpha"), scopeB);
 
       expect(lookupCount).toBe(1);
       expect(finalizedCount).toBe(0);
@@ -40,14 +41,15 @@ describe("ScopedCache", () => {
         second: "alpha-1",
         third: "alpha-1",
       });
-    });
-  });
+    }),
+  );
 
-  it.effect("performs a new lookup after the last active scope expires", () => {
-    let lookupCount = 0;
-    let finalizedCount = 0;
+  it.effect(
+    "performs a new lookup after the last active scope expires",
+    Effect.fnUntraced(function* () {
+      let lookupCount = 0;
+      let finalizedCount = 0;
 
-    return Effect.gen(function* () {
       const cache = yield* ScopedCache.make({
         lookup: (key: string) =>
           Effect.acquireRelease(
@@ -57,7 +59,7 @@ describe("ScopedCache", () => {
       });
 
       const scopeA = yield* Scope.make();
-      const first = yield* Scope.extend(cache.get("alpha"), scopeA);
+      const first = yield* Scope.provide(cache.get("alpha"), scopeA);
 
       yield* Scope.close(scopeA, Exit.void);
 
@@ -65,7 +67,7 @@ describe("ScopedCache", () => {
       expect(finalizedCount).toBe(1);
 
       const scopeB = yield* Scope.make();
-      const second = yield* Scope.extend(cache.get("alpha"), scopeB);
+      const second = yield* Scope.provide(cache.get("alpha"), scopeB);
 
       expect(lookupCount).toBe(2);
 
@@ -76,6 +78,6 @@ describe("ScopedCache", () => {
         first: "alpha-1",
         second: "alpha-2",
       });
-    });
-  });
+    }),
+  );
 });

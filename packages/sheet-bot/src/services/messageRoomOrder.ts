@@ -1,20 +1,22 @@
-import { Effect, pipe } from "effect";
+import { Effect, Layer, ServiceMap } from "effect";
 import { SheetApisClient } from "./sheetApis";
 
-export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderService>()(
+export class MessageRoomOrderService extends ServiceMap.Service<MessageRoomOrderService>()(
   "MessageRoomOrderService",
   {
-    effect: pipe(
-      Effect.all({ sheetApisClient: SheetApisClient }),
-      Effect.map(({ sheetApisClient }) => ({
-        getMessageRoomOrder: Effect.fn("MessageRoomOrderService.getMessageRoomOrder")(
-          (messageId: string) =>
-            sheetApisClient
-              .get()
-              .messageRoomOrder.getMessageRoomOrder({ urlParams: { messageId } }),
-        ),
+    make: Effect.gen(function* () {
+      const sheetApisClient = yield* SheetApisClient;
+
+      return {
+        getMessageRoomOrder: Effect.fn("MessageRoomOrderService.getMessageRoomOrder")(function* (
+          messageId: string,
+        ) {
+          return yield* sheetApisClient.get().messageRoomOrder.getMessageRoomOrder({
+            query: { messageId },
+          });
+        }),
         upsertMessageRoomOrder: Effect.fn("MessageRoomOrderService.upsertMessageRoomOrder")(
-          (
+          function* (
             messageId: string,
             data: {
               previousFills: ReadonlyArray<string>;
@@ -26,65 +28,69 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
               messageChannelId: string | null;
               createdByUserId: string | null;
             },
-          ) =>
-            sheetApisClient.get().messageRoomOrder.upsertMessageRoomOrder({
+          ) {
+            return yield* sheetApisClient.get().messageRoomOrder.upsertMessageRoomOrder({
               payload: { messageId, data },
-            }),
+            });
+          },
         ),
         decrementMessageRoomOrderRank: Effect.fn(
           "MessageRoomOrderService.decrementMessageRoomOrderRank",
-        )((messageId: string) =>
-          sheetApisClient.get().messageRoomOrder.decrementMessageRoomOrderRank({
+        )(function* (messageId: string) {
+          return yield* sheetApisClient.get().messageRoomOrder.decrementMessageRoomOrderRank({
             payload: { messageId },
-          }),
-        ),
+          });
+        }),
         incrementMessageRoomOrderRank: Effect.fn(
           "MessageRoomOrderService.incrementMessageRoomOrderRank",
-        )((messageId: string) =>
-          sheetApisClient.get().messageRoomOrder.incrementMessageRoomOrderRank({
+        )(function* (messageId: string) {
+          return yield* sheetApisClient.get().messageRoomOrder.incrementMessageRoomOrderRank({
             payload: { messageId },
-          }),
-        ),
+          });
+        }),
         getMessageRoomOrderEntry: Effect.fn("MessageRoomOrderService.getMessageRoomOrderEntry")(
-          (messageId: string, rank: string) =>
-            sheetApisClient.get().messageRoomOrder.getMessageRoomOrderEntry({
-              urlParams: { messageId, rank },
-            }),
+          function* (messageId: string, rank: string) {
+            return yield* sheetApisClient.get().messageRoomOrder.getMessageRoomOrderEntry({
+              query: { messageId, rank },
+            });
+          },
         ),
         getMessageRoomOrderRange: Effect.fn("MessageRoomOrderService.getMessageRoomOrderRange")(
-          (messageId: string) =>
-            sheetApisClient
-              .get()
-              .messageRoomOrder.getMessageRoomOrderRange({ urlParams: { messageId } }),
+          function* (messageId: string) {
+            return yield* sheetApisClient.get().messageRoomOrder.getMessageRoomOrderRange({
+              query: { messageId },
+            });
+          },
         ),
         upsertMessageRoomOrderEntry: Effect.fn(
           "MessageRoomOrderService.upsertMessageRoomOrderEntry",
-        )(
-          (
-            messageId: string,
-            entries: ReadonlyArray<{
-              rank: number;
-              position: number;
-              hour: number;
-              team: string;
-              tags: ReadonlyArray<string>;
-              effectValue: number;
-            }>,
-          ) =>
-            sheetApisClient.get().messageRoomOrder.upsertMessageRoomOrderEntry({
-              payload: { messageId, entries },
-            }),
-        ),
+        )(function* (
+          messageId: string,
+          entries: ReadonlyArray<{
+            rank: number;
+            position: number;
+            hour: number;
+            team: string;
+            tags: ReadonlyArray<string>;
+            effectValue: number;
+          }>,
+        ) {
+          return yield* sheetApisClient.get().messageRoomOrder.upsertMessageRoomOrderEntry({
+            payload: { messageId, entries },
+          });
+        }),
         removeMessageRoomOrderEntry: Effect.fn(
           "MessageRoomOrderService.removeMessageRoomOrderEntry",
-        )((messageId: string) =>
-          sheetApisClient.get().messageRoomOrder.removeMessageRoomOrderEntry({
+        )(function* (messageId: string) {
+          return yield* sheetApisClient.get().messageRoomOrder.removeMessageRoomOrderEntry({
             payload: { messageId },
-          }),
-        ),
-      })),
-    ),
-    dependencies: [SheetApisClient.Default],
-    accessors: true,
+          });
+        }),
+      };
+    }),
   },
-) {}
+) {
+  static layer = Layer.effect(MessageRoomOrderService, this.make).pipe(
+    Layer.provide(SheetApisClient.layer),
+  );
+}

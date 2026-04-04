@@ -1,100 +1,83 @@
-import { Array, Context, Effect, Option, pipe, Schema } from "effect";
+import { Array, Effect, Layer, Option, ServiceMap, pipe, Schema } from "effect";
 import { mutators, queries } from "sheet-db-schema/zero";
-import { makeDBQueryError } from "typhoon-core/error";
+import { catchSchemaErrorAsValidationError, makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
-import { catchParseErrorAsValidationError } from "typhoon-core/error";
-import { ZeroService } from "typhoon-core/services";
-import { ZeroLive } from "./zero";
-import { type Schema as ZeroSchema } from "sheet-db-schema/zero";
+import { ZeroService } from "./zero";
 import {
   MessageRoomOrder,
   MessageRoomOrderEntry,
   MessageRoomOrderRange,
 } from "@/schemas/messageRoomOrder";
 
-export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderService>()(
+export class MessageRoomOrderService extends ServiceMap.Service<MessageRoomOrderService>()(
   "MessageRoomOrderService",
   {
-    effect: pipe(
-      Effect.Do,
-      Effect.bind("zeroContext", () =>
-        pipe(
-          Effect.context<ZeroService.ZeroService<ZeroSchema, any, any>>(),
-          Effect.map(Context.pick(ZeroService.ZeroService<ZeroSchema, any, any>())),
-        ),
-      ),
-      Effect.map(({ zeroContext }) => ({
+    make: Effect.gen(function* () {
+      const zeroService = yield* ZeroService;
+
+      return {
         getMessageRoomOrder: (messageId: string) =>
           pipe(
-            ZeroService.run(queries.messageRoomOrder.getMessageRoomOrder({ messageId }), {
+            zeroService.run(queries.messageRoomOrder.getMessageRoomOrder({ messageId }), {
               type: "complete",
             }),
-            Effect.provide(zeroContext),
             Effect.flatMap(
-              Schema.decode(
+              Schema.decodeEffect(
                 Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder), undefined),
               ),
             ),
-            catchParseErrorAsValidationError,
-            Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder", {
-              captureStackTrace: true,
-            }),
+            catchSchemaErrorAsValidationError,
+            Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder"),
           ),
         decrementMessageRoomOrderRank: (messageId: string) =>
           pipe(
-            ZeroService.mutate(
+            zeroService.mutate(
               mutators.messageRoomOrder.decrementMessageRoomOrderRank({ messageId }),
             ),
             Effect.andThen((mutation) => mutation.server()),
             Effect.andThen(
-              ZeroService.run(queries.messageRoomOrder.getMessageRoomOrder({ messageId }), {
+              zeroService.run(queries.messageRoomOrder.getMessageRoomOrder({ messageId }), {
                 type: "complete",
               }),
             ),
-            Effect.provide(zeroContext),
             Effect.flatMap(
-              Schema.decode(
+              Schema.decodeEffect(
                 Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder), undefined),
               ),
             ),
-            catchParseErrorAsValidationError,
+            catchSchemaErrorAsValidationError,
             Effect.flatMap(
               Option.match({
                 onSome: Effect.succeed,
                 onNone: () => Effect.die(makeDBQueryError("Failed to decrement room order rank")),
               }),
             ),
-            Effect.withSpan("MessageRoomOrderService.decrementMessageRoomOrderRank", {
-              captureStackTrace: true,
-            }),
+            Effect.withSpan("MessageRoomOrderService.decrementMessageRoomOrderRank"),
           ),
         incrementMessageRoomOrderRank: (messageId: string) =>
           pipe(
-            ZeroService.mutate(
+            zeroService.mutate(
               mutators.messageRoomOrder.incrementMessageRoomOrderRank({ messageId }),
             ),
             Effect.andThen((mutation) => mutation.server()),
             Effect.andThen(
-              ZeroService.run(queries.messageRoomOrder.getMessageRoomOrder({ messageId }), {
+              zeroService.run(queries.messageRoomOrder.getMessageRoomOrder({ messageId }), {
                 type: "complete",
               }),
             ),
-            Effect.provide(zeroContext),
             Effect.flatMap(
-              Schema.decode(
+              Schema.decodeEffect(
                 Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder), undefined),
               ),
             ),
-            catchParseErrorAsValidationError,
+            catchSchemaErrorAsValidationError,
             Effect.flatMap(
               Option.match({
                 onSome: Effect.succeed,
                 onNone: () => Effect.die(makeDBQueryError("Failed to increment room order rank")),
               }),
             ),
-            Effect.withSpan("MessageRoomOrderService.incrementMessageRoomOrderRank", {
-              captureStackTrace: true,
-            }),
+            Effect.withSpan("MessageRoomOrderService.incrementMessageRoomOrderRank"),
           ),
         upsertMessageRoomOrder: (
           messageId: string,
@@ -110,7 +93,7 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
           },
         ) =>
           pipe(
-            ZeroService.mutate(
+            zeroService.mutate(
               mutators.messageRoomOrder.upsertMessageRoomOrder({
                 messageId,
                 previousFills: data.previousFills,
@@ -125,47 +108,44 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ),
             Effect.andThen((mutation) => mutation.server()),
             Effect.andThen(
-              ZeroService.run(queries.messageRoomOrder.getMessageRoomOrder({ messageId }), {
+              zeroService.run(queries.messageRoomOrder.getMessageRoomOrder({ messageId }), {
                 type: "complete",
               }),
             ),
-            Effect.provide(zeroContext),
             Effect.flatMap(
-              Schema.decode(
+              Schema.decodeEffect(
                 Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder), undefined),
               ),
             ),
-            catchParseErrorAsValidationError,
+            catchSchemaErrorAsValidationError,
             Effect.flatMap(
               Option.match({
                 onSome: Effect.succeed,
                 onNone: () => Effect.die(makeDBQueryError("Failed to upsert message room order")),
               }),
             ),
-            Effect.withSpan("MessageRoomOrderService.upsertMessageRoomOrder", {
-              captureStackTrace: true,
-            }),
+            Effect.withSpan("MessageRoomOrderService.upsertMessageRoomOrder"),
           ),
         getMessageRoomOrderEntry: (messageId: string, rank: number) =>
           pipe(
-            ZeroService.run(
+            zeroService.run(
               queries.messageRoomOrder.getMessageRoomOrderEntry({ messageId, rank }),
               { type: "complete" },
             ),
-            Effect.provide(zeroContext),
-            Effect.flatMap(Schema.decode(Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)))),
-            catchParseErrorAsValidationError,
-            Effect.withSpan("MessageRoomOrderService.getMessageRoomOrderEntry", {
-              captureStackTrace: true,
-            }),
+            Effect.flatMap(
+              Schema.decodeEffect(Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry))),
+            ),
+            catchSchemaErrorAsValidationError,
+            Effect.withSpan("MessageRoomOrderService.getMessageRoomOrderEntry"),
           ),
         getMessageRoomOrderRange: (messageId: string) =>
           pipe(
-            ZeroService.run(queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }), {
+            zeroService.run(queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }), {
               type: "complete",
             }),
-            Effect.provide(zeroContext),
-            Effect.flatMap(Schema.decode(Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)))),
+            Effect.flatMap(
+              Schema.decodeEffect(Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry))),
+            ),
             Effect.map((entries: readonly MessageRoomOrderEntry[]) =>
               pipe(
                 entries,
@@ -185,15 +165,13 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
                         }),
                       ),
                     );
-                    return Option.some(new MessageRoomOrderRange({ minRank, maxRank }));
+                    return Option.some(MessageRoomOrderRange.makeUnsafe({ minRank, maxRank }));
                   },
                 }),
               ),
             ),
-            catchParseErrorAsValidationError,
-            Effect.withSpan("MessageRoomOrderService.getMessageRoomOrderRange", {
-              captureStackTrace: true,
-            }),
+            catchSchemaErrorAsValidationError,
+            Effect.withSpan("MessageRoomOrderService.getMessageRoomOrderRange"),
           ),
         upsertMessageRoomOrderEntry: (
           messageId: string,
@@ -207,44 +185,42 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
           }[],
         ) =>
           pipe(
-            ZeroService.mutate(
+            zeroService.mutate(
               mutators.messageRoomOrder.upsertMessageRoomOrderEntry({ messageId, entries }),
             ),
             Effect.andThen((mutation) => mutation.server()),
             Effect.andThen(
-              ZeroService.run(queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }), {
+              zeroService.run(queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }), {
                 type: "complete",
               }),
             ),
-            Effect.provide(zeroContext),
-            Effect.flatMap(Schema.decode(Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)))),
+            Effect.flatMap(
+              Schema.decodeEffect(Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry))),
+            ),
             Effect.map((entries: readonly MessageRoomOrderEntry[]) =>
               pipe(
                 entries,
-                Array.map(
-                  (entry) =>
-                    new MessageRoomOrderEntry({
-                      messageId,
-                      rank: entry.rank,
-                      position: entry.position,
-                      team: entry.team,
-                      tags: entry.tags,
-                      effectValue: entry.effectValue,
-                      createdAt: entry.createdAt,
-                      updatedAt: entry.updatedAt,
-                      deletedAt: entry.deletedAt,
-                    }),
+                Array.map((entry) =>
+                  MessageRoomOrderEntry.makeUnsafe({
+                    messageId,
+                    rank: entry.rank,
+                    position: entry.position,
+                    team: entry.team,
+                    tags: entry.tags,
+                    effectValue: entry.effectValue,
+                    createdAt: entry.createdAt,
+                    updatedAt: entry.updatedAt,
+                    deletedAt: entry.deletedAt,
+                  }),
                 ),
               ),
             ),
-            catchParseErrorAsValidationError,
-            Effect.withSpan("MessageRoomOrderService.upsertMessageRoomOrderEntry", {
-              captureStackTrace: true,
-            }),
+            catchSchemaErrorAsValidationError,
+            Effect.withSpan("MessageRoomOrderService.upsertMessageRoomOrderEntry"),
           ),
         removeMessageRoomOrderEntry: (messageId: string) =>
           pipe(
-            ZeroService.mutate(
+            zeroService.mutate(
               mutators.messageRoomOrder.removeMessageRoomOrderEntry({
                 messageId,
                 rank: 0,
@@ -253,39 +229,39 @@ export class MessageRoomOrderService extends Effect.Service<MessageRoomOrderServ
             ),
             Effect.andThen((mutation) => mutation.server()),
             Effect.andThen(
-              ZeroService.run(queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }), {
+              zeroService.run(queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }), {
                 type: "complete",
               }),
             ),
-            Effect.provide(zeroContext),
-            Effect.flatMap(Schema.decode(Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)))),
+            Effect.flatMap(
+              Schema.decodeEffect(Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry))),
+            ),
             Effect.map((entries: readonly MessageRoomOrderEntry[]) =>
               pipe(
                 entries,
-                Array.map(
-                  (entry) =>
-                    new MessageRoomOrderEntry({
-                      messageId,
-                      rank: entry.rank,
-                      position: entry.position,
-                      team: entry.team,
-                      tags: entry.tags,
-                      effectValue: entry.effectValue,
-                      createdAt: entry.createdAt,
-                      updatedAt: entry.updatedAt,
-                      deletedAt: entry.deletedAt,
-                    }),
+                Array.map((entry) =>
+                  MessageRoomOrderEntry.makeUnsafe({
+                    messageId,
+                    rank: entry.rank,
+                    position: entry.position,
+                    team: entry.team,
+                    tags: entry.tags,
+                    effectValue: entry.effectValue,
+                    createdAt: entry.createdAt,
+                    updatedAt: entry.updatedAt,
+                    deletedAt: entry.deletedAt,
+                  }),
                 ),
               ),
             ),
-            catchParseErrorAsValidationError,
-            Effect.withSpan("MessageRoomOrderService.removeMessageRoomOrderEntry", {
-              captureStackTrace: true,
-            }),
+            catchSchemaErrorAsValidationError,
+            Effect.withSpan("MessageRoomOrderService.removeMessageRoomOrderEntry"),
           ),
-      })),
-    ),
-    dependencies: [ZeroLive],
-    accessors: true,
+      };
+    }),
   },
-) {}
+) {
+  static layer = Layer.effect(MessageRoomOrderService, this.make).pipe(
+    Layer.provide(ZeroService.layer),
+  );
+}

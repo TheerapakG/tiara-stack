@@ -8,7 +8,7 @@ const ZeroQueryErrorData = Schema.Struct({
   details: Schema.optional(ReadonlyJSONValue),
 });
 
-export class ZeroQueryAppError extends Schema.TaggedError<ZeroQueryAppError>()(
+export class ZeroQueryAppError extends Schema.TaggedErrorClass<ZeroQueryAppError>()(
   "ZeroQueryAppError",
   ZeroQueryErrorData,
 ) {}
@@ -18,31 +18,31 @@ const ZeroQueryHttpErrorData = Schema.Struct({
   status: Schema.Number,
 });
 
-export class ZeroQueryHttpError extends Schema.TaggedError<ZeroQueryHttpError>()(
+export class ZeroQueryHttpError extends Schema.TaggedErrorClass<ZeroQueryHttpError>()(
   "ZeroQueryHttpError",
   ZeroQueryHttpErrorData,
 ) {}
 
-export class ZeroQueryZeroError extends Schema.TaggedError<ZeroQueryZeroError>()(
+export class ZeroQueryZeroError extends Schema.TaggedErrorClass<ZeroQueryZeroError>()(
   "ZeroQueryZeroError",
   ZeroQueryErrorData,
 ) {}
 
-export class ZeroQueryParseError extends Schema.TaggedError<ZeroQueryParseError>()(
+export class ZeroQueryParseError extends Schema.TaggedErrorClass<ZeroQueryParseError>()(
   "ZeroQueryParseError",
   ZeroQueryErrorData,
 ) {}
 
-export const ZeroQueryError = Schema.Union(
+export const ZeroQueryError = Schema.Union([
   ZeroQueryAppError,
   ZeroQueryHttpError,
   ZeroQueryZeroError,
   ZeroQueryParseError,
-);
+]);
 
 export type ZeroQueryError = Schema.Schema.Type<typeof ZeroQueryError>;
 
-export const RawZeroQueryError = Schema.Union(
+export const RawZeroQueryError = Schema.Union([
   Schema.Struct({
     error: Schema.Literal("app"),
     ...ZeroQueryErrorData.fields,
@@ -59,11 +59,11 @@ export const RawZeroQueryError = Schema.Union(
     error: Schema.Literal("parse"),
     ...ZeroQueryErrorData.fields,
   }),
-);
+]);
 
 export type RawZeroQueryError = Schema.Schema.Type<typeof RawZeroQueryError>;
 
-export class QueryResultAppError extends Schema.TaggedError<QueryResultAppError>()(
+export class QueryResultAppError extends Schema.TaggedErrorClass<QueryResultAppError>()(
   "QueryResultAppError",
   Schema.Struct({
     error: Schema.Literal("app"),
@@ -74,7 +74,7 @@ export class QueryResultAppError extends Schema.TaggedError<QueryResultAppError>
   }),
 ) {}
 
-export class QueryResultParseError extends Schema.TaggedError<QueryResultParseError>()(
+export class QueryResultParseError extends Schema.TaggedErrorClass<QueryResultParseError>()(
   "QueryResultParseError",
   Schema.Struct({
     error: Schema.Literal("parse"),
@@ -85,11 +85,11 @@ export class QueryResultParseError extends Schema.TaggedError<QueryResultParseEr
   }),
 ) {}
 
-export const QueryResultError = Schema.Union(QueryResultAppError, QueryResultParseError);
+export const QueryResultError = Schema.Union([QueryResultAppError, QueryResultParseError]);
 
 export type QueryResultError = Schema.Schema.Type<typeof QueryResultError>;
 
-export class MutatorResultAppError extends Schema.TaggedError<MutatorResultAppError>()(
+export class MutatorResultAppError extends Schema.TaggedErrorClass<MutatorResultAppError>()(
   "MutatorResultAppError",
   Schema.Struct({
     type: Schema.Literal("app"),
@@ -98,7 +98,7 @@ export class MutatorResultAppError extends Schema.TaggedError<MutatorResultAppEr
   }),
 ) {}
 
-export class MutatorResultZeroError extends Schema.TaggedError<MutatorResultZeroError>()(
+export class MutatorResultZeroError extends Schema.TaggedErrorClass<MutatorResultZeroError>()(
   "MutatorResultZeroError",
   Schema.Struct({
     type: Schema.Literal("zero"),
@@ -106,6 +106,6 @@ export class MutatorResultZeroError extends Schema.TaggedError<MutatorResultZero
   }),
 ) {}
 
-export const MutatorResultError = Schema.Union(MutatorResultAppError, MutatorResultZeroError);
+export const MutatorResultError = Schema.Union([MutatorResultAppError, MutatorResultZeroError]);
 
 export type MutatorResultError = Schema.Schema.Type<typeof MutatorResultError>;

@@ -1,228 +1,187 @@
-import { Array, Data, Effect, Function, HashMap, Option, pipe } from "effect";
+import { Effect, HashMap, Layer, Option, ServiceMap, pipe } from "effect";
 import { upperFirst } from "scule";
-import { Array as ArrayUtils } from "typhoon-core/utils";
 import { SheetService } from "./sheet";
 import { Player, PartialIdPlayer, PartialNamePlayer, Team } from "@/schemas/sheet";
 import { ScopedCache } from "typhoon-core/utils";
 
 const attachPlayerId = (playerId: string) => (team: Team) =>
-  Team.make({
-    // Team is a pure data class (effect Data.Class); all fields are own-enumerable properties — spread is safe
+  Team.makeUnsafe({
     ...team,
     playerId: Option.some(playerId),
   });
 
-export class PlayerService extends Effect.Service<PlayerService>()("PlayerService", {
-  scoped: pipe(
-    Effect.Do,
-    Effect.bind("sheetService", () => SheetService),
-    Effect.let(
-      "getPlayerMaps",
-      ({ sheetService }) =>
-        (sheetId: string) =>
-          pipe(
-            sheetService.getPlayers(sheetId),
-            Effect.map(
-              Array.map(({ index, id, name }) =>
-                Option.isSome(id) && Option.isSome(name)
-                  ? Option.some(
-                      new Player({
-                        index,
-                        id: id.value,
-                        name: name.value,
-                      }),
-                    )
-                  : Option.none(),
-              ),
-            ),
-            Effect.map(Array.getSomes),
-            Effect.map((players) => ({
-              privateNameToPlayer: pipe(players, ArrayUtils.Collect.toHashMapByKey("name")),
-              idToPlayer: pipe(players, ArrayUtils.Collect.toArrayHashMapByKey("id")),
-            })),
-            Effect.map(({ privateNameToPlayer, idToPlayer }) => ({
-              nameToPlayer: pipe(
-                privateNameToPlayer,
-                HashMap.map((player) => ({
-                  name: player.name,
-                  players: pipe(idToPlayer, HashMap.get(player.id)),
-                })),
-                HashMap.filterMap((a, _) =>
-                  pipe(
-                    a.players,
-                    Option.map((players) => ({ name: a.name, players })),
-                  ),
-                ),
-              ),
-              idToPlayer,
-            })),
-            Effect.withSpan("PlayerService.getPlayerMaps", {
-              captureStackTrace: true,
+type PlayerMaps = {
+  nameToPlayer: HashMap.HashMap<string, { name: string; players: [Player, ...Player[]] }>;
+  idToPlayer: HashMap.HashMap<string, [Player, ...Player[]]>;
+};
+
+export class PlayerService extends ServiceMap.Service<PlayerService>()("PlayerService", {
+  make: Effect.gen(function* () {
+    const sheetService = yield* SheetService;
+
+    const getPlayerMaps = Effect.fn("PlayerService.getPlayerMaps")(function* (sheetId: string) {
+      const rawPlayers = yield* sheetService.getPlayers(sheetId);
+      const players: Player[] = [];
+
+      for (const player of rawPlayers) {
+        if (Option.isSome(player.id) && Option.isSome(player.name)) {
+          players.push(
+            Player.makeUnsafe({
+              index: player.index,
+              id: player.id.value,
+              name: player.name.value,
             }),
+          );
+        }
+      }
+
+      const idGroups = new Map<string, [Player, ...Player[]]>();
+      const nameGroups = new Map<string, [Player, ...Player[]]>();
+
+      for (const player of players) {
+        const byId = idGroups.get(player.id);
+        if (byId) {
+          byId.push(player);
+        } else {
+          idGroups.set(player.id, [player]);
+        }
+
+        const byName = nameGroups.get(player.name);
+        if (byName) {
+          byName.push(player);
+        } else {
+          nameGroups.set(player.name, [player]);
+        }
+      }
+
+      return yield* Effect.succeed({
+        idToPlayer: HashMap.fromIterable(idGroups),
+        nameToPlayer: HashMap.fromIterable(
+          globalThis.Array.from(nameGroups, ([name, groupedPlayers]) => [
+            name,
+            { name, players: groupedPlayers },
+          ]),
+        ),
+      } satisfies PlayerMaps).pipe(Effect.withSpan("PlayerService.getPlayerMaps"));
+    });
+
+    const getByNames = Effect.fn("PlayerService.getByNames")(function* (
+      sheetId: string,
+      names: readonly string[],
+    ) {
+      const { nameToPlayer } = yield* getPlayerMaps(sheetId);
+      return yield* Effect.succeed(
+        names.map((name) => {
+          const normalizedName = upperFirst(name);
+          return pipe(
+            HashMap.get(nameToPlayer, normalizedName),
+            Option.map(
+              ({ players }) =>
+                players as [Player | PartialNamePlayer, ...(Player | PartialNamePlayer)[]],
+            ),
+            Option.getOrElse(
+              () => [PartialNamePlayer.makeUnsafe({ name: normalizedName })] as const,
+            ),
+          );
+        }),
+      ).pipe(Effect.withSpan("PlayerService.getByNames"));
+    });
+
+    const getByIds = Effect.fn("PlayerService.getByIds")(function* (
+      sheetId: string,
+      ids: readonly string[],
+    ) {
+      const { idToPlayer } = yield* getPlayerMaps(sheetId);
+      return yield* Effect.succeed(
+        ids.map((id) =>
+          pipe(
+            HashMap.get(idToPlayer, id),
+            Option.getOrElse(() => [PartialIdPlayer.makeUnsafe({ id })] as const),
           ),
-    ),
-    Effect.map(({ sheetService, getPlayerMaps }) => ({
-      getPlayerMaps,
+        ),
+      ).pipe(Effect.withSpan("PlayerService.getByIds"));
+    });
+
+    const getTeamsByNames = Effect.fn("PlayerService.getTeamsByNames")(function* (
+      sheetId: string,
+      names: readonly string[],
+    ) {
+      const teams = yield* sheetService.getTeams(sheetId);
+      const { nameToPlayer } = yield* getPlayerMaps(sheetId);
+      return yield* Effect.succeed(
+        names.flatMap((name) => {
+          const normalizedName = upperFirst(name);
+          return pipe(
+            HashMap.get(nameToPlayer, normalizedName),
+            Option.map(({ players }) =>
+              players.flatMap((player) =>
+                teams
+                  .filter((team) =>
+                    Option.exists(team.playerName, (playerName) => playerName === player.name),
+                  )
+                  .map(attachPlayerId(player.id)),
+              ),
+            ),
+            Option.getOrElse(() => [] as Team[]),
+          );
+        }),
+      ).pipe(Effect.withSpan("PlayerService.getTeamsByName"));
+    });
+
+    const getTeamsByIds = Effect.fn("PlayerService.getTeamsByIds")(function* (
+      sheetId: string,
+      ids: readonly string[],
+    ) {
+      const teams = yield* sheetService.getTeams(sheetId);
+      const { idToPlayer } = yield* getPlayerMaps(sheetId);
+      return yield* Effect.succeed(
+        ids.flatMap((id) =>
+          pipe(
+            HashMap.get(idToPlayer, id),
+            Option.map((players) =>
+              players.flatMap((player) =>
+                teams
+                  .filter((team) =>
+                    Option.exists(team.playerName, (playerName) => playerName === player.name),
+                  )
+                  .map(attachPlayerId(player.id)),
+              ),
+            ),
+            Option.getOrElse(() => [] as Team[]),
+          ),
+        ),
+      ).pipe(Effect.withSpan("PlayerService.getTeamsById"));
+    });
+
+    const getPlayerMapsCache = yield* ScopedCache.make({ lookup: getPlayerMaps });
+    const getByIdsCache = yield* ScopedCache.make({
+      lookup: ({ sheetId, ids }: { sheetId: string; ids: readonly string[] }) =>
+        getByIds(sheetId, ids),
+    });
+    const getByNamesCache = yield* ScopedCache.make({
+      lookup: ({ sheetId, names }: { sheetId: string; names: readonly string[] }) =>
+        getByNames(sheetId, names),
+    });
+    const getTeamsByIdsCache = yield* ScopedCache.make({
+      lookup: ({ sheetId, ids }: { sheetId: string; ids: readonly string[] }) =>
+        getTeamsByIds(sheetId, ids),
+    });
+    const getTeamsByNamesCache = yield* ScopedCache.make({
+      lookup: ({ sheetId, names }: { sheetId: string; names: readonly string[] }) =>
+        getTeamsByNames(sheetId, names),
+    });
+
+    return {
+      getPlayerMaps: (sheetId: string) => getPlayerMapsCache.get(sheetId),
+      getByIds: (sheetId: string, ids: readonly string[]) => getByIdsCache.get({ sheetId, ids }),
       getByNames: (sheetId: string, names: readonly string[]) =>
-        pipe(
-          Effect.Do,
-          Effect.bind("playerMaps", () => getPlayerMaps(sheetId)),
-          Effect.map(({ playerMaps: { nameToPlayer } }) =>
-            Array.map(names, (name) =>
-              pipe(
-                nameToPlayer,
-                HashMap.get(upperFirst(name)),
-                Option.map(
-                  ({ players }) => players as Array.NonEmptyArray<Player | PartialNamePlayer>,
-                ),
-                Option.getOrElse(() =>
-                  Array.make<Array.NonEmptyArray<Player | PartialNamePlayer>>(
-                    new PartialNamePlayer({ name: upperFirst(name) }),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Effect.withSpan("PlayerService.getByNames", {
-            captureStackTrace: true,
-          }),
-        ),
-      getByIds: (sheetId: string, ids: readonly string[]) =>
-        pipe(
-          Effect.Do,
-          Effect.bind("playerMaps", () => getPlayerMaps(sheetId)),
-          Effect.map(({ playerMaps: { idToPlayer } }) =>
-            Array.map(ids, (id) =>
-              pipe(
-                idToPlayer,
-                HashMap.get(id),
-                Option.getOrElse(() => Array.make(new PartialIdPlayer({ id }))),
-                Array.map(Function.identity),
-              ),
-            ),
-          ),
-          Effect.withSpan("PlayerService.getByIds", {
-            captureStackTrace: true,
-          }),
-        ),
-      getTeamsByNames: (sheetId: string, names: readonly string[]) =>
-        pipe(
-          Effect.Do,
-          Effect.bind("teams", () => sheetService.getTeams(sheetId)),
-          Effect.bind("playerMaps", () => getPlayerMaps(sheetId)),
-          Effect.map(({ teams, playerMaps: { nameToPlayer } }) =>
-            pipe(
-              names,
-              Array.map((name) =>
-                pipe(
-                  nameToPlayer,
-                  HashMap.get(upperFirst(name)),
-                  Option.map(({ players }) =>
-                    pipe(
-                      players,
-                      Array.map((player) =>
-                        pipe(
-                          teams,
-                          Array.filter((team) =>
-                            Option.exists(team.playerName, (pn) => pn === player.name),
-                          ),
-                          Array.map(attachPlayerId(player.id)),
-                        ),
-                      ),
-                      Array.flatten,
-                    ),
-                  ),
-                  Option.getOrElse(() => []),
-                ),
-              ),
-              Array.flatten,
-            ),
-          ),
-          Effect.withSpan("PlayerService.getTeamsByName", {
-            captureStackTrace: true,
-          }),
-        ),
+        getByNamesCache.get({ sheetId, names }),
       getTeamsByIds: (sheetId: string, ids: readonly string[]) =>
-        pipe(
-          Effect.Do,
-          Effect.bind("teams", () => sheetService.getTeams(sheetId)),
-          Effect.bind("playerMaps", () => getPlayerMaps(sheetId)),
-          Effect.map(({ teams, playerMaps: { idToPlayer } }) =>
-            pipe(
-              ids,
-              Array.map((id) =>
-                pipe(
-                  idToPlayer,
-                  HashMap.get(id),
-                  Option.map((players) =>
-                    pipe(
-                      players,
-                      Array.map((player) =>
-                        pipe(
-                          teams,
-                          Array.filter((team) =>
-                            Option.exists(team.playerName, (pn) => pn === player.name),
-                          ),
-                          Array.map(attachPlayerId(player.id)),
-                        ),
-                      ),
-                      Array.flatten,
-                    ),
-                  ),
-                  Option.getOrElse(() => []),
-                ),
-              ),
-              Array.flatten,
-            ),
-          ),
-          Effect.withSpan("PlayerService.getTeamsById", {
-            captureStackTrace: true,
-          }),
-        ),
-    })),
-    Effect.flatMap((playerMethods) =>
-      Effect.all({
-        getPlayerMapsCache: ScopedCache.make({
-          lookup: playerMethods.getPlayerMaps,
-        }),
-        getByIdsCache: ScopedCache.make({
-          lookup: ({ sheetId, ids }: { sheetId: string; ids: readonly string[] }) =>
-            playerMethods.getByIds(sheetId, ids),
-        }),
-        getByNamesCache: ScopedCache.make({
-          lookup: ({ sheetId, names }: { sheetId: string; names: readonly string[] }) =>
-            playerMethods.getByNames(sheetId, names),
-        }),
-        getTeamsByIdsCache: ScopedCache.make({
-          lookup: ({ sheetId, ids }: { sheetId: string; ids: readonly string[] }) =>
-            playerMethods.getTeamsByIds(sheetId, ids),
-        }),
-        getTeamsByNamesCache: ScopedCache.make({
-          lookup: ({ sheetId, names }: { sheetId: string; names: readonly string[] }) =>
-            playerMethods.getTeamsByNames(sheetId, names),
-        }),
-      }),
-    ),
-    Effect.map(
-      ({
-        getPlayerMapsCache,
-        getByIdsCache,
-        getByNamesCache,
-        getTeamsByIdsCache,
-        getTeamsByNamesCache,
-      }) => ({
-        getPlayerMaps: (sheetId: string) => getPlayerMapsCache.get(sheetId),
-        getByIds: (sheetId: string, ids: readonly string[]) =>
-          getByIdsCache.get(Data.struct({ sheetId, ids })),
-        getByNames: (sheetId: string, names: readonly string[]) =>
-          getByNamesCache.get(Data.struct({ sheetId, names })),
-        getTeamsByIds: (sheetId: string, ids: readonly string[]) =>
-          getTeamsByIdsCache.get(Data.struct({ sheetId, ids })),
-        getTeamsByNames: (sheetId: string, names: readonly string[]) =>
-          getTeamsByNamesCache.get(Data.struct({ sheetId, names })),
-      }),
-    ),
-  ),
-  dependencies: [SheetService.Default],
-  accessors: true,
-}) {}
+        getTeamsByIdsCache.get({ sheetId, ids }),
+      getTeamsByNames: (sheetId: string, names: readonly string[]) =>
+        getTeamsByNamesCache.get({ sheetId, names }),
+    };
+  }),
+}) {
+  static layer = Layer.effect(PlayerService, this.make).pipe(Layer.provide(SheetService.layer));
+}

@@ -3,13 +3,13 @@ import type { PermissionSet } from "@/schemas/permissions";
 import { BreakSchedule, Schedule } from "./schedule";
 import { PopulatedScheduleResult } from "./populatedSchedule";
 
-export const ScheduleView = Schema.Literal("filler", "monitor");
+export const ScheduleView = Schema.Literals(["filler", "monitor"]);
 
 export type ScheduleView = Schema.Schema.Type<typeof ScheduleView>;
 
 export const ScheduleResponse = Schema.Struct({
   view: ScheduleView,
-  schedules: Schema.Array(Schema.Union(BreakSchedule, Schedule)),
+  schedules: Schema.Array(Schema.Union([BreakSchedule, Schedule])),
 });
 
 export type ScheduleResponse = Schema.Schema.Type<typeof ScheduleResponse>;

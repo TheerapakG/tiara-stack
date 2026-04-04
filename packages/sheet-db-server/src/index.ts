@@ -7,9 +7,7 @@ import { TracesLive } from "./traces";
 HttpLive.pipe(
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
-  Layer.provide(Logger.logFmt),
+  Layer.provide(Logger.layer([Logger.consoleLogFmt])),
   Layer.launch,
-  NodeRuntime.runMain({
-    disablePrettyLogger: true,
-  }),
+  NodeRuntime.runMain(),
 );

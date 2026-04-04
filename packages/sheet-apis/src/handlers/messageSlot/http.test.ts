@@ -7,8 +7,10 @@ import {
 } from "./http";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
 import { MessageSlot } from "@/schemas/messageSlot";
-import type { MessageSlotService } from "@/services/messageSlot";
+import { MessageSlotService } from "@/services";
 import { getFailure, liveGuildServices, withUser } from "@/test-utils/guildTestHelpers";
+
+type MessageSlotAccessService = Pick<typeof MessageSlotService.Service, "getMessageSlotData">;
 
 const makeMessageSlotRecord = (overrides?: {
   readonly guildId?: string | null;
@@ -21,8 +23,8 @@ const makeMessageSlotRecord = (overrides?: {
   return new MessageSlot({
     messageId: "message-1",
     day: 1,
-    guildId: Option.fromNullable(guildId),
-    messageChannelId: Option.fromNullable(messageChannelId),
+    guildId: Option.fromNullishOr(guildId),
+    messageChannelId: Option.fromNullishOr(messageChannelId),
     createdByUserId: Option.some("creator-1"),
     createdAt: Option.none(),
     updatedAt: Option.none(),
@@ -32,8 +34,8 @@ const makeMessageSlotRecord = (overrides?: {
 
 const makeMessageSlotService = (record?: MessageSlot) =>
   ({
-    getMessageSlotData: () => Effect.succeed(Option.fromNullable(record)),
-  }) as unknown as MessageSlotService;
+    getMessageSlotData: () => Effect.succeed(Option.fromNullishOr(record)),
+  }) satisfies MessageSlotAccessService;
 
 describe("messageSlot legacy access", () => {
   it.effect("denies legacy reads for bot users", () =>

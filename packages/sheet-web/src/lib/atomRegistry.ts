@@ -1,29 +1,35 @@
-import { Atom, Registry, Result, scheduleTask } from "@effect-atom/atom-react";
+import { scheduleTask } from "@effect/atom-react";
+import { Atom, AtomRegistry, AsyncResult } from "effect/unstable/reactivity";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { Effect } from "effect";
 
 const atomRegistryScheduleTask = createIsomorphicFn()
-  .server((callback: () => void) => setTimeout(callback, 0))
+  .server((callback: () => void) => {
+    const timeout = setTimeout(callback, 0);
+    return () => clearTimeout(timeout);
+  })
   .client(scheduleTask);
 
 export const makeAtomRegistry = () =>
-  Registry.make({
+  AtomRegistry.make({
     scheduleTask: atomRegistryScheduleTask,
     defaultIdleTTL: 400,
   });
 
-const enum NodeFlags {
-  alive = 1 << 0,
-  initialized = 1 << 1,
-  waitingForValue = 1 << 2,
-}
+const NodeFlags = {
+  alive: 1, // 1 << 0
+  initialized: 2, // 1 << 1
+  waitingForValue: 4, // 1 << 2
+} as const;
+type NodeFlags = (typeof NodeFlags)[keyof typeof NodeFlags];
 
-const enum NodeState {
-  uninitialized = NodeFlags.alive | NodeFlags.waitingForValue,
-  stale = NodeFlags.alive | NodeFlags.initialized | NodeFlags.waitingForValue,
-  valid = NodeFlags.alive | NodeFlags.initialized,
-  removed = 0,
-}
+const NodeState = {
+  uninitialized: NodeFlags.alive | NodeFlags.waitingForValue,
+  stale: NodeFlags.alive | NodeFlags.initialized | NodeFlags.waitingForValue,
+  valid: NodeFlags.alive | NodeFlags.initialized,
+  removed: 0,
+} as const;
+type NodeState = number;
 
 interface Node<A> {
   readonly state: NodeState;
@@ -55,7 +61,7 @@ interface Registry {
 }
 
 const ensureAtomDataNode = <A>(
-  registry: Registry.Registry,
+  registry: AtomRegistry.AtomRegistry,
   atom: Atom.Atom<A>,
   options?: { revalidateIfStale?: boolean },
 ) => {
@@ -94,25 +100,25 @@ const ensureAtomDataNode = <A>(
 };
 
 export const ensureAtomData = <A>(
-  registry: Registry.Registry,
+  registry: AtomRegistry.AtomRegistry,
   atom: Atom.Atom<A>,
   options?: { revalidateIfStale?: boolean },
 ) => ensureAtomDataNode(registry, atom, options)._value;
 
 export const ensureResultAtomData = <A, E>(
-  registry: Registry.Registry,
-  atom: Atom.Atom<Result.Result<A, E>>,
+  registry: AtomRegistry.AtomRegistry,
+  atom: Atom.Atom<AsyncResult.AsyncResult<A, E>>,
   options?: { revalidateIfStale?: boolean },
 ): Effect.Effect<A, E> =>
-  Effect.async((resume) => {
+  Effect.callback((resume) => {
     const registryImpl = registry as unknown as Registry;
     const node = ensureAtomDataNode(registry, atom, options);
     if (node._value._tag !== "Initial") {
-      return resume(Result.toExit(node._value) as Effect.Effect<A, E>);
+      return resume(AsyncResult.toExit(node._value).asEffect() as Effect.Effect<A, E>);
     }
     const unsubscribe = node.subscribe(() => {
       if (node._value._tag !== "Initial") {
-        resume(Result.toExit(node._value) as Effect.Effect<A, E>);
+        resume(AsyncResult.toExit(node._value).asEffect() as Effect.Effect<A, E>);
         cancel();
       }
     });

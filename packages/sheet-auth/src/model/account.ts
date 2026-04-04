@@ -5,18 +5,8 @@ const AccountData = {
   userId: Schema.String,
   accountId: Schema.String,
   providerId: Schema.String,
-  createdAt: Schema.DateTimeUtcFromNumber,
-  updatedAt: Schema.DateTimeUtcFromNumber,
+  createdAt: Schema.DateTimeUtcFromMillis,
+  updatedAt: Schema.DateTimeUtcFromMillis,
 };
 
-const AccountTaggedClass: Schema.TaggedClass<
-  Account,
-  "Account",
-  {
-    readonly _tag: Schema.tag<"Account">;
-  } & {
-    readonly [K in keyof typeof AccountData]: (typeof AccountData)[K];
-  }
-> = Schema.TaggedClass<Account>()("Account", AccountData);
-
-export class Account extends AccountTaggedClass {}
+export class Account extends Schema.TaggedClass<Account>()("Account", AccountData) {}

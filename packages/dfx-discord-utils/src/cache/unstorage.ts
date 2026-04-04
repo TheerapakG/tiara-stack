@@ -52,7 +52,7 @@ const make = <T>(opts: UnstorageOpts): CacheDriver<never, T> => {
     get: (resourceId) =>
       Effect.promise(async () => {
         const value = (await prefixedStorage.getItem(resourceId)) as T | null;
-        return Option.fromNullable(value);
+        return Option.fromNullishOr(value);
       }),
 
     refreshTTL: () => Effect.void,
@@ -143,7 +143,7 @@ export const createWithParent = <T>({
           const existingIds = yield* getParentIds(parentId);
           existingIds.add(resourceId);
           yield* setParentIds(parentId, existingIds);
-        }).pipe(Effect.catchAllDefect((e) => Effect.logWarning("Cache set failed", e))),
+        }).pipe(Effect.catchDefect((e) => Effect.logWarning("Cache set failed", e))),
 
       delete: (parentId, resourceId) =>
         Effect.gen(function* () {
@@ -152,7 +152,7 @@ export const createWithParent = <T>({
           const existingIds = yield* getParentIds(parentId);
           existingIds.delete(resourceId);
           yield* setParentIds(parentId, existingIds);
-        }).pipe(Effect.catchAllDefect((e) => Effect.logWarning("Cache delete failed", e))),
+        }).pipe(Effect.catchDefect((e) => Effect.logWarning("Cache delete failed", e))),
 
       parentDelete: (parentId) =>
         Effect.gen(function* () {
@@ -164,7 +164,7 @@ export const createWithParent = <T>({
             effects.push(store.delete(id));
           }
           yield* Effect.all(effects, { concurrency: "unbounded", discard: true });
-        }).pipe(Effect.catchAllDefect((e) => Effect.logWarning("Cache parentDelete failed", e))),
+        }).pipe(Effect.catchDefect((e) => Effect.logWarning("Cache parentDelete failed", e))),
 
       run: Effect.never,
     });
@@ -234,7 +234,7 @@ export const createWithReverseLookup = <T>({
       get: (parentId, resourceId) =>
         Effect.promise(async () => {
           const value = (await prefixedStorage.getItem(`${parentId}:${resourceId}`)) as T | null;
-          return Option.fromNullable(value);
+          return Option.fromNullishOr(value);
         }),
 
       getForParent: (parentId) =>
@@ -316,7 +316,7 @@ export const createWithReverseLookup = <T>({
           const existingParentIds = yield* getResourceParentIds(resourceId);
           existingParentIds.add(parentId);
           yield* setResourceParentIds(resourceId, existingParentIds);
-        }).pipe(Effect.catchAllDefect((e) => Effect.logWarning("Cache set failed", e))),
+        }).pipe(Effect.catchDefect((e) => Effect.logWarning("Cache set failed", e))),
 
       delete: (parentId, resourceId) =>
         Effect.gen(function* () {
@@ -329,7 +329,7 @@ export const createWithReverseLookup = <T>({
           const existingParentIds = yield* getResourceParentIds(resourceId);
           existingParentIds.delete(parentId);
           yield* setResourceParentIds(resourceId, existingParentIds);
-        }).pipe(Effect.catchAllDefect((e) => Effect.logWarning("Cache delete failed", e))),
+        }).pipe(Effect.catchDefect((e) => Effect.logWarning("Cache delete failed", e))),
 
       parentDelete: (parentId) =>
         Effect.gen(function* () {
@@ -349,7 +349,7 @@ export const createWithReverseLookup = <T>({
             );
           }
           yield* Effect.all(effects, { concurrency: "unbounded", discard: true });
-        }).pipe(Effect.catchAllDefect((e) => Effect.logWarning("Cache parentDelete failed", e))),
+        }).pipe(Effect.catchDefect((e) => Effect.logWarning("Cache parentDelete failed", e))),
 
       resourceDelete: (resourceId) =>
         Effect.gen(function* () {
@@ -369,7 +369,7 @@ export const createWithReverseLookup = <T>({
             );
           }
           yield* Effect.all(effects, { concurrency: "unbounded", discard: true });
-        }).pipe(Effect.catchAllDefect((e) => Effect.logWarning("Cache resourceDelete failed", e))),
+        }).pipe(Effect.catchDefect((e) => Effect.logWarning("Cache resourceDelete failed", e))),
 
       refreshTTL: () => Effect.void,
 

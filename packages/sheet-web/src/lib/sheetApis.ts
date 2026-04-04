@@ -1,5 +1,5 @@
-import { AtomHttpApi, Registry } from "@effect-atom/atom-react";
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "@effect/platform";
+import { AtomHttpApi, AtomRegistry } from "effect/unstable/reactivity";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
 import { Api } from "sheet-apis/api";
 import { Effect, Function, Layer, Option, pipe, Redacted } from "effect";
 import { getRequest, getRequestHeaders } from "@tanstack/react-start/server";
@@ -21,7 +21,7 @@ const AuthClientLive = Effect.gen(function* () {
   return HttpClient.mapRequestEffect(
     httpClient,
     Effect.fnUntraced(function* (request) {
-      const registry = yield* Registry.AtomRegistry;
+      const registry = yield* AtomRegistry.AtomRegistry;
       const { baseUrl, session } = yield* Effect.all({
         baseUrl: ensureResultAtomData(registry, sheetApisBaseUrlAtom, { revalidateIfStale: true }),
         session: ensureResultAtomData(registry, sessionAtom, { revalidateIfStale: true }),
@@ -50,14 +50,14 @@ const AuthClientLive = Effect.gen(function* () {
         HttpClientRequest.setHeaders(headers),
       );
     }),
-  ) as HttpClient.HttpClient;
+  ) as unknown as HttpClient.HttpClient;
 }).pipe(
   Layer.effect(HttpClient.HttpClient),
   Layer.provide(FetchHttpClient.layer),
   Layer.provide(Layer.succeed(FetchHttpClient.RequestInit, { credentials: "include" })),
 );
 
-export class SheetApisClient extends AtomHttpApi.Tag<SheetApisClient>()("SheetApisClient", {
+export class SheetApisClient extends AtomHttpApi.Service<SheetApisClient>()("SheetApisClient", {
   api: Api,
   httpClient: AuthClientLive,
 }) {}

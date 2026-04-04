@@ -1,5 +1,6 @@
-import { Atom, Result, useAtomSuspense } from "@effect-atom/atom-react";
-import { Sheet, Google, SheetConfig, Middlewares } from "sheet-apis/schema";
+import { AsyncResult, Atom } from "effect/unstable/reactivity";
+import { useAtomSuspense } from "@effect/atom-react";
+import { Sheet, Google, SheetConfig } from "sheet-apis/schema";
 import { SheetApisClient } from "#/lib/sheetApis";
 import {
   Array,
@@ -10,14 +11,16 @@ import {
   Option,
   pipe,
   Predicate,
+  Result,
   Schema,
 } from "effect";
 import {
-  catchParseErrorAsValidationError,
-  QueryResultError,
+  catchSchemaErrorAsValidationError,
+  QueryResultAppError,
+  QueryResultParseError,
   ValidationError,
 } from "typhoon-core/error";
-import { RequestError, ResponseError } from "#/lib/error";
+import { RequestError } from "#/lib/error";
 import { useMemo } from "react";
 import { zoneId } from "#/hooks/useDateTimeZoned";
 
@@ -27,21 +30,57 @@ export type SchedulePlayer = Sheet.PopulatedSchedulePlayer;
 export type GuildScheduleResponse = Sheet.PopulatedScheduleResponse;
 export type ScheduleView = Sheet.ScheduleView;
 
-const GuildScheduleError = Schema.Union(
-  ValidationError,
-  QueryResultError,
-  Google.GoogleSheetsError,
-  Sheet.ParserFieldError,
-  SheetConfig.SheetConfigError,
-  Middlewares.Unauthorized,
-  RequestError,
-  ResponseError,
+const GuildScheduleErrorSchema = Schema.revealCodec(
+  Schema.Union([
+    ValidationError,
+    QueryResultAppError,
+    QueryResultParseError,
+    Google.GoogleSheetsError,
+    Sheet.ParserFieldError,
+    SheetConfig.SheetConfigError,
+    RequestError,
+  ]),
+);
+
+const GuildScheduleResponseAsyncResultSchema = Schema.revealCodec(
+  AsyncResult.Schema({
+    success: Sheet.PopulatedScheduleResponse,
+    error: GuildScheduleErrorSchema,
+  }),
+);
+
+const GuildSchedulesAsyncResultSchema = Schema.revealCodec(
+  AsyncResult.Schema({
+    success: Schema.Array(Sheet.PopulatedScheduleResult),
+    error: GuildScheduleErrorSchema,
+  }),
+);
+
+const GuildScheduleViewAsyncResultSchema = Schema.revealCodec(
+  AsyncResult.Schema({
+    success: Sheet.ScheduleView,
+    error: GuildScheduleErrorSchema,
+  }),
+);
+
+const GuildChannelsAsyncResultSchema = Schema.revealCodec(
+  AsyncResult.Schema({
+    success: Schema.Array(Schema.String),
+    error: GuildScheduleErrorSchema,
+  }),
+);
+
+const ScheduledDaysAsyncResultSchema = Schema.revealCodec(
+  AsyncResult.Schema({
+    success: Schema.HashSet(Schema.String),
+    error: GuildScheduleErrorSchema,
+  }),
 );
 
 // Private atom for fetching all schedules for a guild
 const _guildScheduleResponseAtom = Atom.family((guildId: string) =>
   SheetApisClient.query("schedule", "getAllPopulatedSchedules", {
-    urlParams: { guildId },
+    query: { guildId },
   }),
 );
 
@@ -50,10 +89,9 @@ export const guildScheduleResponseAtom = Atom.family((guildId: string) =>
   Atom.make(
     Effect.fnUntraced(function* (get) {
       return yield* get.result(_guildScheduleResponseAtom(guildId)).pipe(
-        catchParseErrorAsValidationError,
+        catchSchemaErrorAsValidationError,
         Effect.catchTags({
-          RequestError: (error) => Effect.fail(RequestError.make(error)),
-          ResponseError: (error) => Effect.fail(ResponseError.make(error)),
+          BadRequest: () => Effect.fail(RequestError.makeUnsafe({})),
         }),
       );
     }),
@@ -61,10 +99,7 @@ export const guildScheduleResponseAtom = Atom.family((guildId: string) =>
     Atom.setIdleTTL(Duration.infinity),
     Atom.serializable({
       key: `schedule.response.getAllPopulatedSchedules.${guildId}`,
-      schema: Result.Schema({
-        success: Sheet.PopulatedScheduleResponse,
-        error: GuildScheduleError,
-      }),
+      schema: GuildScheduleResponseAsyncResultSchema,
     }),
   ),
 );
@@ -80,10 +115,7 @@ export const guildScheduleAtom = Atom.family((guildId: string) =>
     Atom.setIdleTTL(Duration.infinity),
     Atom.serializable({
       key: `schedule.getAllPopulatedSchedules.${guildId}`,
-      schema: Result.Schema({
-        success: Schema.Array(Sheet.PopulatedScheduleResult),
-        error: GuildScheduleError,
-      }),
+      schema: GuildSchedulesAsyncResultSchema,
     }),
   ),
 );
@@ -98,10 +130,7 @@ export const guildScheduleViewAtom = Atom.family((guildId: string) =>
     Atom.setIdleTTL(Duration.infinity),
     Atom.serializable({
       key: `schedule.getAllPopulatedSchedules.view.${guildId}`,
-      schema: Result.Schema({
-        success: Sheet.ScheduleView,
-        error: GuildScheduleError,
-      }),
+      schema: GuildScheduleViewAsyncResultSchema,
     }),
   ),
 );
@@ -134,17 +163,14 @@ export const getAllChannelsAtom = Atom.family((guildId: string) =>
       );
       const channelArray = populatedSchedules.map((s) => s.channel);
       const channelSet = HashSet.fromIterable(channelArray);
-      const uniqueChannels = Array.fromIterable(HashSet.toValues(channelSet));
+      const uniqueChannels = Array.fromIterable(channelSet);
       return [...uniqueChannels].sort() as readonly string[];
     }),
   ).pipe(
     Atom.setIdleTTL(Duration.infinity),
     Atom.serializable({
       key: `schedule.derived.getAllChannels.${guildId}`,
-      schema: Result.Schema({
-        success: Schema.Array(Schema.String),
-        error: GuildScheduleError,
-      }),
+      schema: GuildChannelsAsyncResultSchema,
     }),
   ),
 );
@@ -197,6 +223,7 @@ const _scheduledDaysAtom = Atom.family((params: ScheduledDaysParams) =>
         return pipe(
           s.hourWindow,
           Option.map((hourWindow) => formatDayKey(DateTime.setZone(hourWindow.start, timeZone))),
+          Result.fromOption(() => undefined),
         );
       };
 
@@ -218,10 +245,7 @@ export const scheduledDaysAtom = Atom.family((params: ScheduledDaysParams) =>
     Atom.setIdleTTL(Duration.infinity),
     Atom.serializable({
       key: `schedule.derived.scheduledDays.${params.guildId}.${params.channel}.${zoneId(params.timeZone)}.${DateTime.toEpochMillis(params.rangeStart)}-${DateTime.toEpochMillis(params.rangeEnd)}`,
-      schema: Result.Schema({
-        success: Schema.HashSet(Schema.String),
-        error: GuildScheduleError,
-      }),
+      schema: ScheduledDaysAsyncResultSchema,
     }),
   ),
 );
@@ -251,7 +275,7 @@ export const computeScheduleHour = (
   maxHour: number,
 ): Option.Option<number> => {
   // Return none if dateTime is before startTime
-  if (DateTime.lessThan(dateTime, startTime)) return Option.none();
+  if (DateTime.isLessThan(dateTime, startTime)) return Option.none();
 
   const hours = Math.floor(Duration.toHours(DateTime.distance(startTime, dateTime))) + 1;
   if (hours > maxHour) return Option.none();

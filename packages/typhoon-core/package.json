@@ -33,14 +33,13 @@
     "@standard-schema/spec": "^1.0.0"
   },
   "devDependencies": {
-    "@effect/vitest": "^0.27.0",
+    "@effect/vitest": "catalog:",
     "@typescript/native-preview": "latest",
     "glob": "^11.0.3",
     "pathe": "^2.0.3",
-    "vite-plus": "catalog:",
-    "vitest": "catalog:"
+    "vite-plus": "catalog:"
   },
   "peerDependencies": {
-    "effect": "^3.19.8"
+    "effect": "catalog:"
   }
 }

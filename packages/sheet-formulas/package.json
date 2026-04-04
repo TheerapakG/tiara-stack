@@ -19,9 +19,8 @@
     "build": "vp pack"
   },
   "dependencies": {
-    "@effect/platform": "^0.94.2",
     "core-js": "^3.44.0",
-    "effect": "^3.19.8",
+    "effect": "catalog:",
     "effect-platform-apps-script": "workspace:*",
     "sheet-apis": "workspace:*",
     "typhoon-core": "workspace:*"

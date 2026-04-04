@@ -1,2 +1,2 @@
 export { MessageCheckinApi } from "./api";
-export { MessageCheckinLive } from "./http";
+export { messageCheckinLayer } from "./http";

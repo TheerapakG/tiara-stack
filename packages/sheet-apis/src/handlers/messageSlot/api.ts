@@ -1,4 +1,4 @@
-import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "@effect/platform";
+import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
 import { ValidationError, QueryResultError, ArgumentError } from "typhoon-core/error";
 import { MessageSlot } from "@/schemas/messageSlot";
@@ -6,30 +6,28 @@ import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthori
 
 export class MessageSlotApi extends HttpApiGroup.make("messageSlot")
   .add(
-    HttpApiEndpoint.get("getMessageSlotData", "/messageSlot/getMessageSlotData")
-      .setUrlParams(
-        Schema.Struct({
-          messageId: Schema.String,
-        }),
-      )
-      .addSuccess(MessageSlot)
-      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
+    HttpApiEndpoint.get("getMessageSlotData", "/messageSlot/getMessageSlotData", {
+      query: Schema.Struct({
+        messageId: Schema.String,
+      }),
+      success: MessageSlot,
+      error: [ValidationError, QueryResultError, ArgumentError],
+    }),
   )
   .add(
-    HttpApiEndpoint.post("upsertMessageSlotData", "/messageSlot/upsertMessageSlotData")
-      .setPayload(
-        Schema.Struct({
-          messageId: Schema.String,
-          data: Schema.Struct({
-            day: Schema.Number,
-            guildId: Schema.NullOr(Schema.String),
-            messageChannelId: Schema.NullOr(Schema.String),
-            createdByUserId: Schema.NullOr(Schema.String),
-          }),
+    HttpApiEndpoint.post("upsertMessageSlotData", "/messageSlot/upsertMessageSlotData", {
+      payload: Schema.Struct({
+        messageId: Schema.String,
+        data: Schema.Struct({
+          day: Schema.Number,
+          guildId: Schema.NullOr(Schema.String),
+          messageChannelId: Schema.NullOr(Schema.String),
+          createdByUserId: Schema.NullOr(Schema.String),
         }),
-      )
-      .addSuccess(MessageSlot)
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+      }),
+      success: MessageSlot,
+      error: [ValidationError, QueryResultError],
+    }),
   )
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Message Slot")

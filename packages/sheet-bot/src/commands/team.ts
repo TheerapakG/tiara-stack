@@ -3,7 +3,7 @@ import { InteractionsRegistry } from "dfx/gateway";
 import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
 import { Ix } from "dfx/index";
 import { Array, Effect, Function, Layer, Number, Option, Order, pipe } from "effect";
-import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
+import { discordGatewayLayer } from "../discord/gateway";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import {
@@ -13,6 +13,18 @@ import {
   SheetApisRequestContext,
 } from "../services";
 import { Sheet } from "sheet-apis/schema";
+
+const getInteractionGuildId = Effect.gen(function* () {
+  const interactionGuild = yield* Interaction.guild();
+  return pipe(
+    interactionGuild,
+    Option.map((guild) => (guild as { id: string }).id),
+  );
+});
+
+const getInteractionUser = Effect.gen(function* () {
+  return (yield* Interaction.user()) as { id: string; username: string };
+});
 
 const makeListSubCommand = Effect.gen(function* () {
   const embedService = yield* EmbedService;
@@ -32,7 +44,7 @@ const makeListSubCommand = Effect.gen(function* () {
         ),
     Effect.fn("team.list")(function* (command) {
       yield* command.deferReply();
-      const interactionGuildId = (yield* Interaction.guild()).pipe(Option.map((guild) => guild.id));
+      const interactionGuildId = yield* getInteractionGuildId;
       const serverId = command.optionValueOptional("server_id");
       const guildId = pipe(
         serverId,
@@ -40,14 +52,17 @@ const makeListSubCommand = Effect.gen(function* () {
         Option.getOrThrow,
       );
 
-      yield* Effect.firstSuccessOf([
-        permissionService.checkInteractionUserApplicationOwner(),
-        permissionService.checkInteractionInGuild(Option.getOrUndefined(serverId)),
-      ]);
+      yield* permissionService
+        .checkInteractionUserApplicationOwner()
+        .pipe(
+          Effect.catch(() =>
+            permissionService.checkInteractionInGuild(Option.getOrUndefined(serverId)),
+          ),
+        );
 
-      const interactionUser = yield* Interaction.user();
+      const interactionUser = yield* getInteractionUser;
       const targetUser = command.optionUserValueOptional("user").pipe(
-        Option.map(({ user }) => user),
+        Option.map(({ user }) => user as { id: string; username: string }),
         Option.getOrElse(() => interactionUser),
       );
 
@@ -59,7 +74,7 @@ const makeListSubCommand = Effect.gen(function* () {
         Array.filter((team) => !team.tags.includes("tierer_hint")),
         Array.sortWith(
           Function.identity,
-          Order.combine(Sheet.Team.byPlayerName, Order.reverse(Sheet.Team.byEffectValue)),
+          Order.combine(Sheet.Team.byPlayerName, Order.flip(Sheet.Team.byEffectValue)),
         ),
         Array.map((team) => ({
           teamName: team.teamName,
@@ -69,7 +84,7 @@ const makeListSubCommand = Effect.gen(function* () {
           talent: team.talent,
           effectValue: Sheet.Team.getEffectValue(team),
         })),
-        Array.filterMap((team) =>
+        Array.map((team) =>
           pipe(
             team.teamName,
             Option.map((teamName) => ({
@@ -85,6 +100,7 @@ const makeListSubCommand = Effect.gen(function* () {
             })),
           ),
         ),
+        Array.getSomes,
       );
 
       yield* command.editReply({
@@ -149,10 +165,10 @@ const makeTeamCommand = Effect.gen(function* () {
 const makeGlobalTeamCommand = Effect.gen(function* () {
   const teamCommand = yield* makeTeamCommand;
 
-  return CommandHelper.makeGlobalCommand(teamCommand.data, teamCommand.handler);
+  return CommandHelper.makeGlobalCommand(teamCommand.data, teamCommand.handler as never);
 });
 
-export const TeamCommandLive = Layer.scopedDiscard(
+export const teamCommandLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const registry = yield* InteractionsRegistry;
     const command = yield* makeGlobalTeamCommand;
@@ -162,10 +178,10 @@ export const TeamCommandLive = Layer.scopedDiscard(
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
-      DiscordGatewayLayerLive,
-      PermissionService.Default,
-      PlayerService.Default,
-      EmbedService.Default,
+      discordGatewayLayer,
+      PermissionService.layer,
+      PlayerService.layer,
+      EmbedService.layer,
     ),
   ),
 );

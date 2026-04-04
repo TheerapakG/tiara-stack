@@ -36,7 +36,7 @@ export const Route = createFileRoute(
 
     const calendarDays = await Effect.runPromise(
       ensureResultAtomData(context.atomRegistry, calendarDaysAtom(currentDateZoned)).pipe(
-        Effect.catchAll(() => Effect.die("Failed to load calendar days")),
+        Effect.catch(() => Effect.die("Failed to load calendar days")),
       ),
     );
 
@@ -53,7 +53,7 @@ export const Route = createFileRoute(
           rangeStart,
           rangeEnd,
         }),
-      ).pipe(Effect.catchAll(() => Effect.succeed(HashSet.empty<string>()))),
+      ).pipe(Effect.catch(() => Effect.succeed(HashSet.empty<string>()))),
     );
   },
 });

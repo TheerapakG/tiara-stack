@@ -9,8 +9,8 @@ export class MessageRoomOrderEntry extends Schema.TaggedClass<MessageRoomOrderEn
     team: Schema.String,
     tags: Schema.Array(Schema.String),
     effectValue: Schema.Number,
-    createdAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromNumber),
-    updatedAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromNumber),
-    deletedAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromNumber),
+    createdAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromMillis),
+    updatedAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromMillis),
+    deletedAt: Schema.OptionFromNullOr(Schema.DateTimeUtcFromMillis),
   },
 ) {}

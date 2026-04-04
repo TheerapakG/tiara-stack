@@ -2,9 +2,9 @@ import { channelMention, escapeMarkdown, roleMention } from "@discordjs/formatte
 import { InteractionsRegistry } from "dfx/gateway";
 import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
 import { Effect, Layer, Option, pipe } from "effect";
-import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
+import { discordGatewayLayer } from "../discord/gateway";
 import { EmbedService, GuildConfigService, SheetApisRequestContext } from "../services";
 import { GuildConfig } from "sheet-apis/schema";
 import { Ix } from "dfx/index";
@@ -39,20 +39,35 @@ const configFields = (
   },
 ];
 
-const resolveGuildId = (serverId?: string) =>
+const resolveGuildId = (serverId: Option.Option<string>): Effect.Effect<string, unknown, unknown> =>
   Effect.gen(function* () {
-    const interactionGuild = yield* Interaction.guild();
+    const explicitGuildId = Option.getOrUndefined(serverId);
+    if (typeof explicitGuildId === "string") {
+      return explicitGuildId;
+    }
 
-    return yield* pipe(
-      Option.fromNullable(serverId).pipe(
-        Option.orElse(() => interactionGuild.pipe(Option.map((guild) => guild.id))),
-      ),
-      Option.match({
-        onSome: Effect.succeed,
-        onNone: () => Effect.fail(new Error("Guild not found in interaction or command options")),
-      }),
+    const interactionGuild = yield* Interaction.guild();
+    const interactionGuildId = pipe(
+      interactionGuild,
+      Option.map((guild) => (guild as { id: string }).id),
+      Option.getOrUndefined,
     );
+    if (typeof interactionGuildId === "string") {
+      return interactionGuildId;
+    }
+
+    return yield* Effect.fail(new Error("Guild not found in interaction or command options"));
   });
+
+const getInteractionChannelId: Effect.Effect<Option.Option<string>, unknown, unknown> = Effect.gen(
+  function* () {
+    const interactionChannel = yield* Interaction.channel();
+    return pipe(
+      interactionChannel,
+      Option.map((channel) => (channel as { id: string }).id),
+    );
+  },
+);
 
 const makeListConfigSubCommand = Effect.gen(function* () {
   const embedService = yield* EmbedService;
@@ -70,16 +85,10 @@ const makeListConfigSubCommand = Effect.gen(function* () {
       yield* command.deferReply();
 
       const serverId = command.optionValueOptional("server_id");
-      const guildId = yield* resolveGuildId(Option.getOrUndefined(serverId));
+      const guildId: string = yield* resolveGuildId(serverId);
+      const channelId: string = Option.getOrThrow(yield* getInteractionChannelId);
 
-      const interactionChannel = yield* Interaction.channel();
-      const channelId = pipe(
-        interactionChannel,
-        Option.map((channel) => channel.id),
-        Option.getOrThrow,
-      );
-
-      const config = yield* guildConfigService.getGuildChannelById(guildId, channelId);
+      const config = yield* guildConfigService.getGuildChannelById(guildId, channelId as string);
 
       yield* command.editReply({
         payload: {
@@ -128,7 +137,7 @@ const makeSetSubCommand = Effect.gen(function* () {
       yield* command.deferReply();
 
       const serverId = command.optionValueOptional("server_id");
-      const guildId = yield* resolveGuildId(Option.getOrUndefined(serverId));
+      const guildId: string = yield* resolveGuildId(serverId);
 
       const channelOption = command.optionChannelValueOptional("channel");
       const running = command.optionValueOptional("running");
@@ -136,40 +145,40 @@ const makeSetSubCommand = Effect.gen(function* () {
       const role = command.optionRoleValueOptional("role");
       const checkinChannel = command.optionChannelValueOptional("checkin_channel");
 
-      const channelId = yield* pipe(
+      const channelId: string = yield* pipe(
         channelOption,
-        Option.map((c) => c.id),
+        Option.map((c) => (c as { id: string }).id),
         Option.match({
           onSome: Effect.succeed,
           onNone: () =>
             pipe(
-              Interaction.channel(),
-              Effect.flatMap((channel) =>
-                channel.pipe(
-                  Option.map((c) => c.id),
-                  Option.match({
-                    onSome: Effect.succeed,
-                    onNone: () => Effect.fail(new Error("Channel not found in interaction")),
-                  }),
-                ),
+              getInteractionChannelId,
+              Effect.map(
+                Option.getOrThrowWith(() => new Error("Channel not found in interaction")),
               ),
             ),
         }),
       );
 
-      const config = yield* guildConfigService.upsertGuildChannelConfig(guildId, channelId, {
-        ...(Option.isSome(running) ? { running: running.value } : {}),
-        ...(Option.isSome(name) ? { name: name.value } : {}),
-        ...(Option.isSome(role) ? { roleId: role.value.id } : {}),
-        ...(Option.isSome(checkinChannel) ? { checkinChannelId: checkinChannel.value.id } : {}),
-      });
+      const config = yield* guildConfigService.upsertGuildChannelConfig(
+        guildId,
+        channelId as string,
+        {
+          ...(Option.isSome(running) ? { running: running.value } : {}),
+          ...(Option.isSome(name) ? { name: name.value } : {}),
+          ...(Option.isSome(role) ? { roleId: (role.value as { id: string }).id } : {}),
+          ...(Option.isSome(checkinChannel)
+            ? { checkinChannelId: (checkinChannel.value as { id: string }).id }
+            : {}),
+        },
+      );
 
       yield* command.editReply({
         payload: {
           embeds: [
             (yield* embedService.makeBaseEmbedBuilder())
               .setTitle(`Success!`)
-              .setDescription(`${channelMention(channelId)} configuration updated`)
+              .setDescription(`${channelMention(channelId as string)} configuration updated`)
               .addFields(...configFields(config))
               .toJSON(),
           ],
@@ -212,7 +221,7 @@ const makeUnsetSubCommand = Effect.gen(function* () {
       yield* command.deferReply();
 
       const serverId = command.optionValueOptional("server_id");
-      const guildId = yield* resolveGuildId(Option.getOrUndefined(serverId));
+      const guildId: string = yield* resolveGuildId(serverId);
 
       const running = command.optionValueOptional("running");
       const channelOption = command.optionChannelValueOptional("channel");
@@ -220,40 +229,38 @@ const makeUnsetSubCommand = Effect.gen(function* () {
       const role = command.optionValueOptional("role");
       const checkinChannel = command.optionValueOptional("checkin_channel");
 
-      const channelId = yield* pipe(
+      const channelId: string = yield* pipe(
         channelOption,
-        Option.map((c) => c.id),
+        Option.map((c) => (c as { id: string }).id),
         Option.match({
           onSome: Effect.succeed,
           onNone: () =>
             pipe(
-              Interaction.channel(),
-              Effect.flatMap((channel) =>
-                channel.pipe(
-                  Option.map((c) => c.id),
-                  Option.match({
-                    onSome: Effect.succeed,
-                    onNone: () => Effect.fail(new Error("Channel not found in interaction")),
-                  }),
-                ),
+              getInteractionChannelId,
+              Effect.map(
+                Option.getOrThrowWith(() => new Error("Channel not found in interaction")),
               ),
             ),
         }),
       );
 
-      const config = yield* guildConfigService.upsertGuildChannelConfig(guildId, channelId, {
-        ...(Option.getOrUndefined(running) ? { running: null } : {}),
-        ...(Option.getOrUndefined(name) ? { name: null } : {}),
-        ...(Option.getOrUndefined(role) ? { roleId: null } : {}),
-        ...(Option.getOrUndefined(checkinChannel) ? { checkinChannelId: null } : {}),
-      });
+      const config = yield* guildConfigService.upsertGuildChannelConfig(
+        guildId,
+        channelId as string,
+        {
+          ...(Option.getOrUndefined(running) ? { running: null } : {}),
+          ...(Option.getOrUndefined(name) ? { name: null } : {}),
+          ...(Option.getOrUndefined(role) ? { roleId: null } : {}),
+          ...(Option.getOrUndefined(checkinChannel) ? { checkinChannelId: null } : {}),
+        },
+      );
 
       yield* command.editReply({
         payload: {
           embeds: [
             (yield* embedService.makeBaseEmbedBuilder())
               .setTitle(`Success!`)
-              .setDescription(`${channelMention(channelId)} configuration updated`)
+              .setDescription(`${channelMention(channelId as string)} configuration updated`)
               .addFields(...configFields(config))
               .toJSON(),
           ],
@@ -298,10 +305,10 @@ const makeChannelCommand = Effect.gen(function* () {
 const makeGlobalChannelCommand = Effect.gen(function* () {
   const channelCommand = yield* makeChannelCommand;
 
-  return CommandHelper.makeGlobalCommand(channelCommand.data, channelCommand.handler);
+  return CommandHelper.makeGlobalCommand(channelCommand.data, channelCommand.handler as never);
 });
 
-export const ChannelCommandLive = Layer.scopedDiscard(
+export const channelCommandLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const registry = yield* InteractionsRegistry;
     const command = yield* makeGlobalChannelCommand;
@@ -309,7 +316,5 @@ export const ChannelCommandLive = Layer.scopedDiscard(
     yield* registry.register(Ix.builder.add(command).catchAllCause(Effect.log));
   }),
 ).pipe(
-  Layer.provide(
-    Layer.mergeAll(DiscordGatewayLayerLive, GuildConfigService.Default, EmbedService.Default),
-  ),
+  Layer.provide(Layer.mergeAll(discordGatewayLayer, GuildConfigService.layer, EmbedService.layer)),
 );

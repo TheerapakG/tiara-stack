@@ -1,8 +1,9 @@
-import { MembersApiCacheView, RolesApiCacheView } from "dfx-discord-utils/discord/cache";
+import { MembersApiCacheView } from "dfx-discord-utils/discord/cache/members";
+import { RolesApiCacheView } from "dfx-discord-utils/discord/cache/roles";
 import { CacheNotFoundError } from "dfx-discord-utils/discord/schema";
 import { Effect, HashSet, Redacted } from "effect";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
-import { GuildConfigService } from "@/services/guildConfig";
+import { GuildConfigService } from "@/services";
 
 export type TestPermission =
   | "bot"
@@ -48,14 +49,17 @@ export const liveGuildServices =
                 user: { id: accountId },
               })
             : Effect.fail(new CacheNotFoundError({ message: "not found" })),
-      } as unknown as MembersApiCacheView),
+      } as unknown as typeof MembersApiCacheView.Service),
       Effect.provideService(GuildConfigService, {
         getGuildMonitorRoles: () =>
           Effect.succeed((options?.monitorRoleIds ?? []).map((roleId) => ({ roleId }))),
-      } as unknown as GuildConfigService),
+      } as unknown as Pick<
+        typeof GuildConfigService.Service,
+        "getGuildMonitorRoles"
+      > as typeof GuildConfigService.Service),
       Effect.provideService(RolesApiCacheView, {
         getForParent: () => Effect.succeed(new Map()),
-      } as unknown as RolesApiCacheView),
+      } as unknown as typeof RolesApiCacheView.Service),
     );
 
 export const getFailure = <A, E, R>(effect: Effect.Effect<A, E, R>) => effect.pipe(Effect.flip);

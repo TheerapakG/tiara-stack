@@ -1,2 +1,2 @@
 export { GuildConfigApi } from "./api";
-export { GuildConfigLive } from "./http";
+export { guildConfigLayer } from "./http";

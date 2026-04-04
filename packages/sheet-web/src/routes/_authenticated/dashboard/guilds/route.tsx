@@ -71,7 +71,7 @@ export const Route = createFileRoute("/_authenticated/dashboard/guilds")({
   loader: async ({ context }) => {
     await Effect.runPromise(
       ensureResultAtomData(context.atomRegistry, currentUserGuildsAtom).pipe(
-        Effect.catchAll(() => Effect.succeed([])),
+        Effect.catch(() => Effect.succeed([])),
       ),
     );
   },

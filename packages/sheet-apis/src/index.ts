@@ -1,18 +1,19 @@
-import { PlatformConfigProvider } from "@effect/platform";
-import { NodeContext, NodeRuntime } from "@effect/platform-node";
-import { Layer, Logger } from "effect";
-import { HttpLive } from "./http";
+import { NodeFileSystem, NodeRuntime } from "@effect/platform-node";
+import { ConfigProvider, Effect, Layer, Logger } from "effect";
+import { httpLayer } from "./http";
 import { MetricsLive } from "./metrics";
+import { GuildConfigService } from "./services/guildConfig";
 import { TracesLive } from "./traces";
 
-HttpLive.pipe(
+const main = httpLayer.pipe(
+  Layer.provide(GuildConfigService.layer),
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
-  Layer.provide(Logger.logFmt),
-  Layer.provide(PlatformConfigProvider.layerDotEnvAdd(".env")),
-  Layer.provide(NodeContext.layer),
+  Layer.provide(Logger.layer([Logger.consoleLogFmt])),
+  Layer.provide(
+    ConfigProvider.layerAdd(ConfigProvider.fromDotEnv()).pipe(Layer.provide(NodeFileSystem.layer)),
+  ),
   Layer.launch,
-  NodeRuntime.runMain({
-    disablePrettyLogger: true,
-  }),
 );
+
+NodeRuntime.runMain(main as Effect.Effect<never, unknown>);

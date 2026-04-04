@@ -3,7 +3,7 @@ import { DateTime, Option } from "effect";
 import { deriveScheduleHourWindow } from "./hourWindow";
 
 describe("deriveScheduleHourWindow", () => {
-  const startTime = DateTime.unsafeMake("2026-03-26T12:00:00.000Z");
+  const startTime = DateTime.makeUnsafe("2026-03-26T12:00:00.000Z");
 
   it("returns none when the schedule hour is missing", () => {
     expect(deriveScheduleHourWindow(startTime, Option.none())).toEqual(Option.none());
@@ -14,7 +14,7 @@ describe("deriveScheduleHourWindow", () => {
       Option.some({
         _tag: "ScheduleHourWindow",
         start: startTime,
-        end: DateTime.unsafeMake("2026-03-26T13:00:00.000Z"),
+        end: DateTime.makeUnsafe("2026-03-26T13:00:00.000Z"),
       }),
     );
   });
@@ -23,8 +23,8 @@ describe("deriveScheduleHourWindow", () => {
     expect(deriveScheduleHourWindow(startTime, Option.some(4))).toEqual(
       Option.some({
         _tag: "ScheduleHourWindow",
-        start: DateTime.unsafeMake("2026-03-26T15:00:00.000Z"),
-        end: DateTime.unsafeMake("2026-03-26T16:00:00.000Z"),
+        start: DateTime.makeUnsafe("2026-03-26T15:00:00.000Z"),
+        end: DateTime.makeUnsafe("2026-03-26T16:00:00.000Z"),
       }),
     );
   });

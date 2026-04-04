@@ -17,8 +17,6 @@ export {
 export type { CommandOptionsOnlyBuilder, CommandSubCommandsOnlyBuilder } from "./commandBuilder";
 export * as CommandHelper from "./commandHelper";
 export * as GuildMember from "./guildMember";
-export { GuildMemberUtils } from "./guildMember";
-export { GuildMemberUtilsLive } from "./guildMember";
 export { user, member, guild, channel, message } from "./interaction";
 
 // Also export as namespace for backwards compatibility

@@ -1,4 +1,4 @@
-import type { HttpClientError } from "@effect/platform/HttpClientError";
+import type { HttpClientError } from "effect/unstable/http";
 import { Discord, DiscordREST, Ix } from "dfx";
 import type { DiscordRESTError } from "dfx/DiscordREST";
 import { GlobalApplicationCommand, GuildApplicationCommand } from "dfx/Interactions/definitions";
@@ -307,8 +307,8 @@ export class WrappedCommandHelper<A> {
   ): Option.Option<CommandUserValue<A, N>> {
     return Option.flatten(
       this.helper.resolve(name, (id, data) => {
-        const user = Option.fromNullable(data.users?.[id]);
-        const member = Option.fromNullable(data.members?.[id]);
+        const user = Option.fromNullishOr(data.users?.[id]);
+        const member = Option.fromNullishOr(data.members?.[id]);
         return user.pipe(
           Option.map((user) => ({
             user,
@@ -337,9 +337,9 @@ export class WrappedCommandHelper<A> {
   ): Option.Option<CommandMentionableValue<A, N>> {
     return Option.flatten(
       this.helper.resolve(name, (id, data) => {
-        const role = Option.fromNullable(data.roles?.[id]);
-        const user = Option.fromNullable(data.users?.[id]);
-        const member = Option.fromNullable(data.members?.[id]);
+        const role = Option.fromNullishOr(data.roles?.[id]);
+        const user = Option.fromNullishOr(data.users?.[id]);
+        const member = Option.fromNullishOr(data.members?.[id]);
         return Option.orElse(role, () =>
           user.pipe(
             Option.map((user) => ({
@@ -390,12 +390,8 @@ export class WrappedCommandHelper<A> {
     commands: NER,
   ): Effect.Effect<
     unknown,
-    [ReturnType<NER[keyof NER]>] extends [{ [Effect.EffectTypeId]: { _E: (_: never) => infer E } }]
-      ? E
-      : never,
-    [ReturnType<NER[keyof NER]>] extends [{ [Effect.EffectTypeId]: { _R: (_: never) => infer R } }]
-      ? R
-      : DiscordInteraction | DiscordApplicationCommand
+    Effect.Error<ReturnType<NER[keyof NER]>>,
+    Effect.Services<ReturnType<NER[keyof NER]>>
   > {
     const commands_ = commands as Record<string, any>;
 
@@ -445,134 +441,125 @@ export class WrappedCommandHelper<A> {
     return this.helper.optionsMap;
   }
 
-  reply(payload?: Discord.IncomingWebhookInteractionRequest) {
-    return Effect.sync(() => {
+  reply = Effect.fn("WrappedCommandHelper.reply")(
+    { self: this },
+    function* (payload?: Discord.IncomingWebhookInteractionRequest) {
       this.acknowledgementState = "replied";
-    }).pipe(
-      Effect.zipRight(
-        Deferred.succeed(this.response, {
-          files: [],
-          payload: {
-            type: Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: payload,
-          },
-        }),
-      ),
-    );
-  }
+      return yield* Deferred.succeed(this.response, {
+        files: [],
+        payload: {
+          type: Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: payload,
+        },
+      });
+    },
+  );
 
-  replyWithFiles(files: ReadonlyArray<File>, response?: Discord.IncomingWebhookInteractionRequest) {
-    return Effect.sync(() => {
+  replyWithFiles = Effect.fn("WrappedCommandHelper.replyWithFiles")(
+    { self: this },
+    function* (files: ReadonlyArray<File>, response?: Discord.IncomingWebhookInteractionRequest) {
       this.acknowledgementState = "replied";
-    }).pipe(
-      Effect.zipRight(
-        Deferred.succeed(this.response, {
-          files,
-          payload: {
-            type: Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: response,
-          },
-        }),
-      ),
-    );
-  }
+      return yield* Deferred.succeed(this.response, {
+        files,
+        payload: {
+          type: Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: response,
+        },
+      });
+    },
+  );
 
-  deferReply(response?: Discord.IncomingWebhookInteractionRequest) {
-    return Effect.sync(() => {
+  deferReply = Effect.fn("WrappedCommandHelper.deferReply")(
+    { self: this },
+    function* (response?: Discord.IncomingWebhookInteractionRequest) {
       this.acknowledgementState = "deferred-reply";
-    }).pipe(
-      Effect.zipRight(
-        Deferred.succeed(this.response, {
-          files: [],
-          payload: {
-            type: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-            data: response,
-          },
-        }),
-      ),
-    );
-  }
+      return yield* Deferred.succeed(this.response, {
+        files: [],
+        payload: {
+          type: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+          data: response,
+        },
+      });
+    },
+  );
 
-  respondWithError(error: unknown): Effect.Effect<unknown, DiscordRESTError, DiscordInteraction> {
-    const rendered = makeDiscordErrorMessageResponse("Command failed", formatErrorResponse(error));
-    const payload: Discord.IncomingWebhookRequestPartial = {
-      content: rendered.content,
-      flags: MessageFlags.Ephemeral,
-    };
+  respondWithError = Effect.fn("WrappedCommandHelper.respondWithError")(
+    { self: this },
+    function* (error: unknown) {
+      const rendered = makeDiscordErrorMessageResponse(
+        "Command failed",
+        formatErrorResponse(error),
+      );
+      const payload: Discord.IncomingWebhookRequestPartial = {
+        content: rendered.content,
+        flags: MessageFlags.Ephemeral,
+      };
 
-    if (this.acknowledgementState === "deferred-reply") {
-      return rendered.files.length === 0
-        ? this.editReply({ payload: { content: rendered.content } })
-        : this.editReplyWithFiles(rendered.files, { payload: { content: rendered.content } });
-    }
+      if (this.acknowledgementState === "deferred-reply") {
+        return yield* rendered.files.length === 0
+          ? this.editReply({ payload: { content: rendered.content } })
+          : this.editReplyWithFiles(rendered.files, { payload: { content: rendered.content } });
+      }
 
-    if (this.acknowledgementState === "replied") {
-      return this.followUp(payload, rendered.files);
-    }
+      if (this.acknowledgementState === "replied") {
+        return yield* this.followUp(payload, rendered.files);
+      }
 
-    return Effect.flatMap(
-      rendered.files.length === 0
+      const sent = yield* rendered.files.length === 0
         ? this.reply(payload)
-        : this.replyWithFiles(rendered.files, payload),
-      (sent) => (sent ? Effect.void : this.followUp(payload, rendered.files)),
-    );
-  }
+        : this.replyWithFiles(rendered.files, payload);
+      if (!sent) {
+        return yield* this.followUp(payload, rendered.files);
+      }
+    },
+  );
 
-  private followUp(
-    payload: Discord.IncomingWebhookRequestPartial,
-    files: ReadonlyArray<File>,
-  ): Effect.Effect<Discord.MessageResponse, DiscordRESTError, DiscordInteraction> {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const command = this;
+  private followUp = Effect.fn("WrappedCommandHelper.followUp")(
+    { self: this },
+    function* (payload: Discord.IncomingWebhookRequestPartial, files: ReadonlyArray<File>) {
+      const interaction = yield* Ix.Interaction;
 
-    return Ix.Interaction.pipe(
-      Effect.flatMap((context) => {
-        const request = command.rest.executeWebhook(command.application.id, context.token, {
-          params: { wait: true },
-          payload,
-        });
+      const request = this.rest.executeWebhook(this.application.id, interaction.token, {
+        params: { wait: true },
+        payload,
+      });
 
-        return files.length === 0 ? request : command.rest.withFiles(files)(request);
-      }),
-    );
-  }
+      return files.length === 0 ? yield* request : yield* this.rest.withFiles(files)(request);
+    },
+  );
 
-  editReply(response: {
-    readonly params?: Discord.UpdateOriginalWebhookMessageParams;
-    readonly payload: Discord.IncomingWebhookUpdateRequestPartial;
-  }): Effect.Effect<Discord.MessageResponse, DiscordRESTError, DiscordInteraction> {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const command = this;
-
-    return Effect.gen(function* () {
+  editReply = Effect.fn("WrappedCommandHelper.editReply")(
+    { self: this },
+    function* (response: {
+      readonly params?: Discord.UpdateOriginalWebhookMessageParams;
+      readonly payload: Discord.IncomingWebhookUpdateRequestPartial;
+    }) {
       const context = yield* Ix.Interaction;
 
-      return yield* command.rest.updateOriginalWebhookMessage(
-        command.application.id,
+      return yield* this.rest.updateOriginalWebhookMessage(
+        this.application.id,
         context.token,
         response,
       );
-    });
-  }
-
-  editReplyWithFiles(
-    files: ReadonlyArray<File>,
-    response: {
-      readonly params?: Discord.UpdateOriginalWebhookMessageParams;
-      readonly payload: Discord.IncomingWebhookUpdateRequestPartial;
     },
-  ): Effect.Effect<Discord.MessageResponse, DiscordRESTError, DiscordInteraction> {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const command = this;
+  );
 
-    return Effect.gen(function* () {
+  editReplyWithFiles = Effect.fn("WrappedCommandHelper.editReplyWithFiles")(
+    { self: this },
+    function* (
+      files: ReadonlyArray<File>,
+      response: {
+        readonly params?: Discord.UpdateOriginalWebhookMessageParams;
+        readonly payload: Discord.IncomingWebhookUpdateRequestPartial;
+      },
+    ) {
       const context = yield* Ix.Interaction;
 
-      return yield* command.rest.withFiles(files)(
-        command.rest.updateOriginalWebhookMessage(command.application.id, context.token, response),
+      return yield* this.rest.withFiles(files)(
+        this.rest.updateOriginalWebhookMessage(this.application.id, context.token, response),
       );
-    });
-  }
+    },
+  );
 }
 
 export const wrapCommandHelper = Effect.fnUntraced(function* <A>(
@@ -633,9 +620,9 @@ export const makeSubCommandGroup = Effect.fnUntraced(function* <
     })(function* (commandHelper: WrappedCommandHelper<A>) {
       const shouldRunFallback = yield* handler(commandHelper).pipe(
         Effect.as(true),
-        Effect.catchAllCause((cause) =>
+        Effect.catchCause((cause) =>
           Effect.logError(cause).pipe(
-            Effect.zipRight(commandHelper.respondWithError(cause)),
+            Effect.andThen(commandHelper.respondWithError(cause)),
             Effect.as(false),
           ),
         ),
@@ -676,9 +663,9 @@ export const makeSubCommand = Effect.fnUntraced(function* <
     })(function* (commandHelper: WrappedCommandHelper<A>) {
       const shouldRunFallback = yield* handler(commandHelper).pipe(
         Effect.as(true),
-        Effect.catchAllCause((cause) =>
+        Effect.catchCause((cause) =>
           Effect.logError(cause).pipe(
-            Effect.zipRight(commandHelper.respondWithError(cause)),
+            Effect.andThen(commandHelper.respondWithError(cause)),
             Effect.as(false),
           ),
         ),
@@ -716,9 +703,9 @@ export const makeCommand = Effect.fnUntraced(function* <
       function* (commandHelper: WrappedCommandHelper<A>) {
         const shouldRunFallback = yield* handler(commandHelper).pipe(
           Effect.as(true),
-          Effect.catchAllCause((cause) =>
+          Effect.catchCause((cause) =>
             Effect.logError(cause).pipe(
-              Effect.zipRight(commandHelper.respondWithError(cause)),
+              Effect.andThen(commandHelper.respondWithError(cause)),
               Effect.as(false),
             ),
           ),
@@ -738,7 +725,7 @@ export const makeCommand = Effect.fnUntraced(function* <
     handler: Effect.fnUntraced(function* (commandHelper: CommandHelper<A>) {
       const wrappedCommandHelper = yield* wrapCommandHelper(commandHelper, rest, application);
       yield* forkedHandler(wrappedCommandHelper);
-      const { files, payload } = yield* wrappedCommandHelper.response;
+      const { files, payload } = yield* Deferred.await(wrappedCommandHelper.response);
       return {
         files,
         ...payload,

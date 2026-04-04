@@ -1,8 +1,10 @@
 import { describe, expect, it } from "@effect/vitest";
-import { MembersApiCacheView, RolesApiCacheView } from "dfx-discord-utils/discord/cache";
+import { MembersApiCacheView } from "dfx-discord-utils/discord/cache/members";
+import { RolesApiCacheView } from "dfx-discord-utils/discord/cache/roles";
 import { CacheNotFoundError } from "dfx-discord-utils/discord/schema";
+import type { CachedGuildMember } from "dfx-discord-utils/cache";
 import { Discord } from "dfx";
-import { Cause, Effect, HashSet, Redacted } from "effect";
+import { Cause, Effect, Redacted } from "effect";
 import {
   getGuildMonitorAccessLevel,
   hasDiscordAccountPermission,
@@ -17,7 +19,11 @@ import {
 } from "./authorization";
 import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
-import { GuildConfigService } from "@/services/guildConfig";
+import { GuildConfigService } from "@/services";
+
+type MembersApiCacheViewService = Effect.Success<typeof MembersApiCacheView.make>;
+type RolesApiCacheViewService = Effect.Success<typeof RolesApiCacheView.make>;
+type GuildConfigServiceApi = Effect.Success<typeof GuildConfigService.make>;
 
 type TestPermission =
   | "bot"
@@ -38,10 +44,10 @@ const makeUser = (
 });
 
 const permissionValues = (permissions: Iterable<TestPermission>) =>
-  Array.from(HashSet.toValues(permissionSetFromIterable(permissions))).sort();
+  Array.from(permissionSetFromIterable(permissions)).sort();
 
 const resolvedPermissionValues = (permissions: ReturnType<typeof permissionSetFromIterable>) =>
-  Array.from(HashSet.toValues(permissions)).sort();
+  Array.from(permissions).sort();
 
 const withUser = <A, E, R>(
   permissions: ReadonlyArray<TestPermission>,
@@ -60,19 +66,19 @@ const withGuildUser = <A, E, R>(
       ...makeUser(permissions, identity),
       guildId,
     }),
-  ) as Effect.Effect<A, E, Exclude<R, SheetAuthGuildUser>>;
+  ) as Effect.Effect<A, E, Exclude<R, typeof SheetAuthGuildUser>>;
 
 const makeMember = (roles: string[]) =>
   ({
     roles,
     user: { id: "account-1" },
-  }) as const;
+  }) as unknown as CachedGuildMember;
 
 const makeRole = (id: string, permissions: bigint | string) =>
   ({
     id,
     permissions: permissions.toString(),
-  }) as const;
+  }) as unknown as Discord.GuildRoleResponse;
 
 const liveGuildServices =
   (options?: {
@@ -86,25 +92,25 @@ const liveGuildServices =
   <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.provideService(MembersApiCacheView, {
-        get: () =>
+        get: (_guildId: string, _accountId: string) =>
           options?.memberError
             ? Effect.fail(options.memberError)
             : typeof options?.member === "undefined"
               ? Effect.fail(new CacheNotFoundError({ message: "not found" }))
               : Effect.succeed(options.member),
-      } as unknown as MembersApiCacheView),
+      } as unknown as MembersApiCacheViewService),
       Effect.provideService(GuildConfigService, {
         getGuildMonitorRoles: () =>
           options?.monitorRolesError
             ? Effect.fail(options.monitorRolesError)
             : Effect.succeed((options?.monitorRoleIds ?? []).map((roleId) => ({ roleId }))),
-      } as unknown as GuildConfigService),
+      } as unknown as GuildConfigServiceApi),
       Effect.provideService(RolesApiCacheView, {
         getForParent: () =>
           options?.rolesError
             ? Effect.fail(options.rolesError)
             : Effect.succeed(new Map(options?.roleMap ?? [])),
-      } as unknown as RolesApiCacheView),
+      } as unknown as RolesApiCacheViewService),
     );
 
 describe("authorization middleware helpers", () => {
@@ -229,18 +235,18 @@ describe("authorization middleware helpers", () => {
         );
       }),
       Effect.provideService(MembersApiCacheView, {
-        get: (guildId: string) =>
+        get: (guildId: string, _accountId: string) =>
           guildId === "guild-1"
             ? Effect.succeed(makeMember(["role-1"]))
             : Effect.succeed(makeMember([])),
-      } as unknown as MembersApiCacheView),
+      } as unknown as MembersApiCacheViewService),
       Effect.provideService(GuildConfigService, {
         getGuildMonitorRoles: (guildId: string) =>
           Effect.succeed(guildId === "guild-1" ? [{ roleId: "role-1" }] : []),
-      } as unknown as GuildConfigService),
+      } as unknown as GuildConfigServiceApi),
       Effect.provideService(RolesApiCacheView, {
         getForParent: () => Effect.succeed(new Map()),
-      } as unknown as RolesApiCacheView),
+      } as unknown as RolesApiCacheViewService),
     ),
   );
 
@@ -315,8 +321,7 @@ describe("authorization middleware helpers", () => {
 
       expect(exit._tag).toBe("Failure");
       if (exit._tag === "Failure") {
-        const defect = Cause.dieOption(exit.cause);
-        expect(defect._tag).toBe("Some");
+        expect(Cause.hasDies(exit.cause)).toBe(true);
       }
     }),
   );
@@ -367,8 +372,7 @@ describe("authorization middleware helpers", () => {
 
       expect(exit._tag).toBe("Failure");
       if (exit._tag === "Failure") {
-        const defect = Cause.dieOption(exit.cause);
-        expect(defect._tag).toBe("Some");
+        expect(Cause.hasDies(exit.cause)).toBe(true);
       }
     }),
   );
@@ -379,8 +383,7 @@ describe("authorization middleware helpers", () => {
 
       expect(exit._tag).toBe("Failure");
       if (exit._tag === "Failure") {
-        const failure = Cause.failureOption(exit.cause);
-        expect(failure._tag).toBe("Some");
+        expect(Cause.hasFails(exit.cause)).toBe(true);
       }
     }),
   );
@@ -396,8 +399,7 @@ describe("authorization middleware helpers", () => {
 
       expect(exit._tag).toBe("Failure");
       if (exit._tag === "Failure") {
-        const failure = Cause.failureOption(exit.cause);
-        expect(failure._tag).toBe("Some");
+        expect(Cause.hasFails(exit.cause)).toBe(true);
       }
     }),
   );
@@ -414,8 +416,7 @@ describe("authorization middleware helpers", () => {
 
       expect(exit._tag).toBe("Failure");
       if (exit._tag === "Failure") {
-        const failure = Cause.failureOption(exit.cause);
-        expect(failure._tag).toBe("Some");
+        expect(Cause.hasFails(exit.cause)).toBe(true);
       }
     }),
   );
@@ -431,19 +432,19 @@ describe("authorization middleware helpers", () => {
       expect(none).toBe("none");
     }).pipe(
       Effect.provideService(MembersApiCacheView, {
-        get: (guildId: string) =>
+        get: (guildId: string, _accountId: string) =>
           guildId === "guild-monitor"
             ? Effect.succeed(makeMember(["role-1"]))
             : guildId === "guild-member"
               ? Effect.succeed(makeMember([]))
               : Effect.fail(new CacheNotFoundError({ message: "not found" })),
-      } as unknown as MembersApiCacheView),
+      } as unknown as MembersApiCacheViewService),
       Effect.provideService(GuildConfigService, {
         getGuildMonitorRoles: () => Effect.succeed([{ roleId: "role-1" }]),
-      } as unknown as GuildConfigService),
+      } as unknown as GuildConfigServiceApi),
       Effect.provideService(RolesApiCacheView, {
         getForParent: () => Effect.succeed(new Map()),
-      } as unknown as RolesApiCacheView),
+      } as unknown as RolesApiCacheViewService),
     ),
   );
 

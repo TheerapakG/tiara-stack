@@ -1,4 +1,4 @@
-import { HttpApi, OpenApi } from "@effect/platform";
+import { HttpApi, OpenApi } from "effect/unstable/httpapi";
 import { CalcApi } from "./handlers/calc/api";
 import { CheckinApi } from "./handlers/checkin/api";
 import { HealthApi } from "./handlers/health/api";

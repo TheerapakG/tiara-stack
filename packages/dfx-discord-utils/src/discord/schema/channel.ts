@@ -9,7 +9,7 @@ import { DiscordUser } from "./user";
 
 export const ChannelPermissionOverwrite = Schema.Struct({
   id: Schema.String,
-  type: Schema.Literal(0, 1),
+  type: Schema.Literals([0, 1]),
   allow: Schema.String,
   deny: Schema.String,
 });
@@ -53,7 +53,7 @@ export const DiscordGroupDMChannel = Schema.Struct({
 
 export const DiscordGuildChannel = Schema.Struct({
   ...DiscordChannelBase,
-  type: Schema.Literal(0, 2, 4, 5, 13, 14, 15, 16),
+  type: Schema.Literals([0, 2, 4, 5, 13, 14, 15, 16]),
   guild_id: Schema.String,
   name: Schema.String,
   parent_id: Schema.optional(Schema.NullOr(Schema.String)),
@@ -70,7 +70,7 @@ export const DiscordGuildChannel = Schema.Struct({
   default_thread_rate_limit_per_user: Schema.optional(Schema.Number),
   available_tags: Schema.optional(Schema.Array(ForumTag)),
   default_reaction_emoji: Schema.optional(Schema.NullOr(DefaultReactionEmoji)),
-  default_sort_order: Schema.optional(Schema.NullOr(Schema.Literal(0, 1))),
+  default_sort_order: Schema.optional(Schema.NullOr(Schema.Literals([0, 1]))),
   default_forum_layout: Schema.optional(Schema.NullOr(ForumLayout)),
   default_tag_setting: Schema.optional(Schema.NullOr(ThreadSearchTagSetting)),
   permissions: Schema.optional(Schema.NullOr(Schema.String)),
@@ -78,7 +78,7 @@ export const DiscordGuildChannel = Schema.Struct({
 
 export const DiscordThread = Schema.Struct({
   ...DiscordChannelBase,
-  type: Schema.Literal(10, 11, 12),
+  type: Schema.Literals([10, 11, 12]),
   guild_id: Schema.String,
   name: Schema.String,
   parent_id: Schema.optional(Schema.NullOr(Schema.String)),
@@ -102,11 +102,11 @@ const UnknownChannel = Schema.Struct({
   type: Schema.Number,
 });
 
-export const DiscordChannel = Schema.Union(
+export const DiscordChannel = Schema.Union([
   DiscordDMChannel,
   DiscordGroupDMChannel,
   DiscordGuildChannel,
   DiscordThread,
   UnknownChannel,
-);
+]);
 export type DiscordChannel = typeof DiscordChannel.Type;

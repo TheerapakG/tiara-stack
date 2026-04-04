@@ -6,11 +6,32 @@ import {
 } from "discord-api-types/v10";
 import { Ix } from "dfx/index";
 import { Effect, Layer, Option, pipe } from "effect";
-import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
+import { discordGatewayLayer } from "../discord/gateway";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import { MessageRoomOrderService, RoomOrderService, SheetApisRequestContext } from "../services";
 import { roomOrderActionRow } from "../messageComponents/buttons";
+
+const getInteractionGuildId = Effect.gen(function* () {
+  const interactionGuild = yield* Interaction.guild();
+  return pipe(
+    interactionGuild,
+    Option.map((guild) => (guild as { id: string }).id),
+  );
+});
+
+const getInteractionChannelId = Effect.gen(function* () {
+  const interactionChannel = yield* Interaction.channel();
+  return pipe(
+    interactionChannel,
+    Option.map((channel) => (channel as { id: string }).id),
+  );
+});
+
+const getInteractionUserId = Effect.gen(function* () {
+  const interactionUser = yield* Interaction.user();
+  return (interactionUser as { id: string }).id;
+});
 
 const makeManualSubCommand = Effect.gen(function* () {
   const messageRoomOrderService = yield* MessageRoomOrderService;
@@ -35,28 +56,16 @@ const makeManualSubCommand = Effect.gen(function* () {
       yield* command.deferReply({ flags: MessageFlags.Ephemeral });
 
       const serverId = command.optionValueOptional("server_id");
-      const interactionUser = yield* Interaction.user();
-      const interactionGuild = yield* Interaction.guild();
       const guildId =
-        Option.getOrUndefined(serverId) ??
-        pipe(
-          interactionGuild,
-          Option.map((guild) => guild.id),
-          Option.getOrThrow,
-        );
+        Option.getOrUndefined(serverId) ?? Option.getOrThrow(yield* getInteractionGuildId);
 
       const channelNameOption = command.optionValueOptional("channel_name");
-      const interactionChannel = yield* Interaction.channel();
       const generated = yield* roomOrderService.generate({
         guildId,
         ...(Option.isSome(channelNameOption)
           ? { channelName: channelNameOption.value }
           : {
-              channelId: pipe(
-                interactionChannel,
-                Option.map((channel) => channel.id),
-                Option.getOrThrow,
-              ),
+              channelId: Option.getOrThrow(yield* getInteractionChannelId),
             }),
         ...pipe(
           command.optionValueOptional("hour"),
@@ -89,7 +98,7 @@ const makeManualSubCommand = Effect.gen(function* () {
         monitor: generated.monitor,
         guildId,
         messageChannelId: messageResult.channel_id,
-        createdByUserId: interactionUser.id,
+        createdByUserId: yield* getInteractionUserId,
       });
 
       yield* messageRoomOrderService.upsertMessageRoomOrderEntry(
@@ -129,10 +138,10 @@ const makeRoomOrderCommand = Effect.gen(function* () {
 const makeGlobalRoomOrderCommand = Effect.gen(function* () {
   const roomOrderCommand = yield* makeRoomOrderCommand;
 
-  return CommandHelper.makeGlobalCommand(roomOrderCommand.data, roomOrderCommand.handler);
+  return CommandHelper.makeGlobalCommand(roomOrderCommand.data, roomOrderCommand.handler as never);
 });
 
-export const RoomOrderCommandLive = Layer.scopedDiscard(
+export const roomOrderCommandLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const registry = yield* InteractionsRegistry;
     const command = yield* makeGlobalRoomOrderCommand;
@@ -141,10 +150,6 @@ export const RoomOrderCommandLive = Layer.scopedDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(
-      DiscordGatewayLayerLive,
-      RoomOrderService.Default,
-      MessageRoomOrderService.Default,
-    ),
+    Layer.mergeAll(discordGatewayLayer, RoomOrderService.layer, MessageRoomOrderService.layer),
   ),
 );

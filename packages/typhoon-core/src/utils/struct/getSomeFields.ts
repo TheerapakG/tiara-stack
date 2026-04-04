@@ -31,7 +31,7 @@ export const getSomeFields = Function.dual<
     fields: Array.NonEmptyReadonlyArray<F>,
   ) =>
     pipe(
-      Option.all(Struct.pick(a, ...fields) as Pick<OptionFields<A>, F>) as Option.Option<
+      Option.all(Struct.pick(a, fields) as Pick<OptionFields<A>, F>) as Option.Option<
         Pick<OptionFieldValues<A>, F>
       >,
       Option.map((v) => ({ ...a, ...v })),

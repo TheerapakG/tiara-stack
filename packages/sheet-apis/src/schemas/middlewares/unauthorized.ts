@@ -1,8 +1,6 @@
-import { HttpApiSchema } from "@effect/platform";
 import { Schema } from "effect";
 
-export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
-  "Unauthorized",
-  { message: Schema.String, cause: Schema.optional(Schema.Unknown) },
-  HttpApiSchema.annotations({ status: 401 }),
-) {}
+export class Unauthorized extends Schema.TaggedErrorClass<Unauthorized>()("Unauthorized", {
+  message: Schema.String,
+  cause: Schema.optional(Schema.Unknown),
+}) {}

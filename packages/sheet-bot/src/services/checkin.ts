@@ -1,24 +1,24 @@
-import { Effect, pipe } from "effect";
+import { Effect, Layer, ServiceMap } from "effect";
 import { SheetApisClient } from "./sheetApis";
 
-export class CheckinService extends Effect.Service<CheckinService>()("CheckinService", {
-  effect: pipe(
-    Effect.all({ sheetApisClient: SheetApisClient }),
-    Effect.map(({ sheetApisClient }) => ({
-      generate: Effect.fn("CheckinService.generate")(
-        (payload: {
-          guildId: string;
-          channelId?: string | undefined;
-          channelName?: string | undefined;
-          hour?: number | undefined;
-          template?: string | undefined;
-        }) =>
-          sheetApisClient.get().checkin.generate({
-            payload,
-          }),
-      ),
-    })),
-  ),
-  dependencies: [SheetApisClient.Default],
-  accessors: true,
-}) {}
+export class CheckinService extends ServiceMap.Service<CheckinService>()("CheckinService", {
+  make: Effect.gen(function* () {
+    const sheetApisClient = yield* SheetApisClient;
+
+    return {
+      generate: Effect.fn("CheckinService.generate")(function* (payload: {
+        guildId: string;
+        channelId?: string | undefined;
+        channelName?: string | undefined;
+        hour?: number | undefined;
+        template?: string | undefined;
+      }) {
+        return yield* sheetApisClient.get().checkin.generate({
+          payload,
+        });
+      }),
+    };
+  }),
+}) {
+  static layer = Layer.effect(CheckinService, this.make).pipe(Layer.provide(SheetApisClient.layer));
+}

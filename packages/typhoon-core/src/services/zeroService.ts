@@ -1,10 +1,11 @@
-import { Context, Effect, Match, pipe, Schema, Types } from "effect";
+import { Effect, Match, pipe, Schema, ServiceMap, Types } from "effect";
 import type {
   Zero,
   Schema as ZeroSchema,
   CustomMutatorDefs,
   QueryOrQueryRequest,
   RunOptions,
+  HumanReadable,
   MutateRequest,
   MutatorResultDetails,
   ErroredQuery,
@@ -29,48 +30,54 @@ interface Variance<out S extends ZeroSchema, out MD extends CustomMutatorDefs | 
 }
 
 /**
- * ZeroService provides access to a Zero instance.
+ * ZeroServiceTag provides access to a Zero instance.
  */
-export interface ZeroService<
+export interface ZeroServiceTag<
   S extends ZeroSchema,
   MD extends CustomMutatorDefs | undefined,
   C,
 > extends Variance<S, MD, C> {}
 
 /**
- * ZeroService provides access to a Zero instance.
+ * ZeroServiceTag provides access to a Zero instance.
  */
-export const ZeroService = <S extends ZeroSchema, MD extends CustomMutatorDefs | undefined, C>() =>
-  Context.GenericTag<ZeroService<S, MD, C>, Zero<S, MD, C>>("ZeroService");
-
-export const make = <S extends ZeroSchema, MD extends CustomMutatorDefs | undefined, C>(
-  zero: Zero<S, MD, C>,
-) => Context.make(ZeroService<S, MD, C>(), zero);
+export interface ZeroService<S extends ZeroSchema, MD extends CustomMutatorDefs | undefined, C> {
+  zero: Zero<S, MD, C>;
+  run: <TReturn>(
+    query: QueryOrQueryRequest<any, any, any, S, TReturn, C>,
+    runOptions?: RunOptions,
+  ) => Effect.Effect<
+    HumanReadable<TReturn>,
+    QueryResultAppError | QueryResultParseError | Schema.SchemaError,
+    never
+  >;
+  mutate: (request: MutateRequest<any, S, C, any>) => Effect.Effect<
+    {
+      client: () => Effect.Effect<
+        void | MutatorResultAppError | MutatorResultZeroError,
+        Schema.SchemaError,
+        never
+      >;
+      server: () => Effect.Effect<
+        void | MutatorResultAppError | MutatorResultZeroError,
+        Schema.SchemaError,
+        never
+      >;
+    },
+    never,
+    never
+  >;
+}
 
 const parseQueryErrorResultDetails = (error: ErroredQuery) =>
   pipe(
     error,
-    Schema.decode(
-      Schema.Union(
+    Schema.decodeEffect(
+      Schema.Union([
         DefaultTaggedClass(QueryResultAppError),
         DefaultTaggedClass(QueryResultParseError),
-      ),
+      ]),
     ),
-  );
-
-export const run = <S extends ZeroSchema, TReturn, C>(
-  query: QueryOrQueryRequest<any, any, any, S, TReturn, C>,
-  runOptions?: RunOptions,
-) =>
-  pipe(
-    ZeroService<S, any, C>(),
-    Effect.flatMap((zero) => Effect.tryPromise(() => zero.run(query, runOptions))),
-    Effect.catchAll((error) =>
-      pipe(error.error as ErroredQuery, parseQueryErrorResultDetails, Effect.merge, Effect.flip),
-    ),
-    // Note: Zero currently seems to have a bug where the promise returned by the query is rejected with the query result instead of an error.
-    // This would error with a ParseError instead of the actual error until Zero is fixed.
-    // TODO: Remove this note once Zero is fixed.
   );
 
 const parseMutatorResultDetails = (result: MutatorResultDetails) =>
@@ -81,30 +88,51 @@ const parseMutatorResultDetails = (result: MutatorResultDetails) =>
       error: (error) =>
         pipe(
           error.error,
-          Schema.decode(
-            Schema.Union(
+          Schema.decodeEffect(
+            Schema.Union([
               DefaultTaggedClass(MutatorResultAppError),
               DefaultTaggedClass(MutatorResultZeroError),
-            ),
+            ]),
           ),
         ),
     }),
   );
 
-export const mutate = <S extends ZeroSchema, C>(request: MutateRequest<any, S, C, any>) =>
-  pipe(
-    ZeroService<S, any, C>(),
-    Effect.map((zero) => zero.mutate(request)),
-    Effect.map(({ client, server }) => ({
-      client: () =>
-        pipe(
-          Effect.promise(() => client),
-          Effect.flatMap(parseMutatorResultDetails),
-        ),
-      server: () =>
-        pipe(
-          Effect.promise(() => server),
-          Effect.flatMap(parseMutatorResultDetails),
-        ),
-    })),
-  );
+/**
+ * ZeroService provides access to a Zero instance.
+ */
+export const ZeroService = <S extends ZeroSchema, MD extends CustomMutatorDefs | undefined, C>() =>
+  ServiceMap.Service<ZeroServiceTag<S, MD, C>, ZeroService<S, MD, C>>()("ZeroService", {
+    make: (zero: Zero<S, MD, C>) =>
+      Effect.succeed({
+        zero,
+        run: Effect.fn("ZeroService.run")(function* <TReturn>(
+          query: QueryOrQueryRequest<any, any, any, S, TReturn, C>,
+          runOptions?: RunOptions,
+        ) {
+          return yield* Effect.tryPromise({
+            try: () => zero.run(query, runOptions),
+            catch: (error) => error as ErroredQuery,
+          }).pipe(
+            Effect.catch((error) =>
+              parseQueryErrorResultDetails(error).pipe(Effect.flatMap(Effect.fail)),
+            ),
+          );
+        }),
+        mutate: Effect.fn("ZeroService.mutate")(function* (request: MutateRequest<any, S, C, any>) {
+          const { client, server } = yield* Effect.sync(() => zero.mutate(request));
+
+          return {
+            client: Effect.fn("ZeroService.mutate.client")(() =>
+              Effect.promise(() => client).pipe(Effect.flatMap(parseMutatorResultDetails)),
+            ),
+            server: Effect.fn("ZeroService.mutate.server")(() =>
+              pipe(
+                Effect.promise(() => server),
+                Effect.flatMap(parseMutatorResultDetails),
+              ),
+            ),
+          };
+        }),
+      }),
+  });

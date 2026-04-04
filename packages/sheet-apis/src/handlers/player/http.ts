@@ -1,17 +1,19 @@
-import { HttpApiBuilder } from "@effect/platform";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Array, Effect, HashMap, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
-import { catchParseErrorAsValidationError } from "typhoon-core/error";
+import { catchSchemaErrorAsValidationError } from "typhoon-core/error";
 import {
   provideCurrentGuildUser,
   requireDiscordAccountIdOrMonitorGuild,
   requireMonitorGuild,
 } from "@/middlewares/authorization";
-import { PlayerService } from "@/services/player";
-import { GuildConfigService } from "@/services/guildConfig";
+import { PlayerService, GuildConfigService } from "@/services";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 
-const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigService) =>
+const getSheetIdFromGuildId = (
+  guildId: string,
+  guildConfigService: typeof GuildConfigService.Service,
+) =>
   pipe(
     guildConfigService.getGuildConfig(guildId),
     Effect.flatMap(
@@ -29,121 +31,114 @@ const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigS
     ),
   );
 
-export const PlayerLive = HttpApiBuilder.group(Api, "player", (handlers) =>
-  pipe(
-    Effect.all({
-      playerService: PlayerService,
-      guildConfigService: GuildConfigService,
-    }),
-    Effect.map(({ playerService, guildConfigService }) =>
-      handlers
-        .handle("getPlayerMaps", ({ urlParams }) =>
-          provideCurrentGuildUser(
-            urlParams.guildId,
-            requireMonitorGuild(urlParams.guildId).pipe(
-              Effect.andThen(
-                pipe(
-                  getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-                  Effect.flatMap((sheetId) => playerService.getPlayerMaps(sheetId)),
-                  Effect.map((playerMaps) => ({
-                    nameToPlayer: Array.fromIterable(HashMap.entries(playerMaps.nameToPlayer)).map(
-                      ([key, value]) => ({
-                        key,
-                        value: { name: value.name, players: Array.fromIterable(value.players) },
-                      }),
-                    ),
-                    idToPlayer: Array.fromIterable(HashMap.entries(playerMaps.idToPlayer)).map(
-                      ([key, value]) => ({
-                        key,
-                        value: Array.fromIterable(value),
-                      }),
-                    ),
-                  })),
-                ),
-              ),
-            ),
-          ).pipe(catchParseErrorAsValidationError),
-        )
-        .handle("getByIds", ({ urlParams }) => {
-          const auth =
-            urlParams.ids.length === 1
-              ? requireDiscordAccountIdOrMonitorGuild(urlParams.guildId, urlParams.ids[0])
-              : requireMonitorGuild(urlParams.guildId);
+export const playerLayer = HttpApiBuilder.group(
+  Api,
+  "player",
+  Effect.fn(function* (handlers) {
+    const playerService = yield* PlayerService;
+    const guildConfigService = yield* GuildConfigService;
 
-          return provideCurrentGuildUser(
-            urlParams.guildId,
-            auth.pipe(
-              Effect.andThen(
-                pipe(
-                  getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-                  Effect.flatMap((sheetId) => playerService.getByIds(sheetId, urlParams.ids)),
-                ),
+    return handlers
+      .handle("getPlayerMaps", ({ query }) =>
+        provideCurrentGuildUser(
+          query.guildId,
+          requireMonitorGuild(query.guildId).pipe(
+            Effect.andThen(
+              pipe(
+                getSheetIdFromGuildId(query.guildId, guildConfigService),
+                Effect.flatMap((sheetId) => playerService.getPlayerMaps(sheetId)),
+                Effect.map((playerMaps) => ({
+                  nameToPlayer: Array.fromIterable(HashMap.entries(playerMaps.nameToPlayer)).map(
+                    ([key, value]) => ({
+                      key,
+                      value: { name: value.name, players: Array.fromIterable(value.players) },
+                    }),
+                  ),
+                  idToPlayer: Array.fromIterable(HashMap.entries(playerMaps.idToPlayer)).map(
+                    ([key, value]) => ({
+                      key,
+                      value: Array.fromIterable(value),
+                    }),
+                  ),
+                })),
               ),
             ),
-          ).pipe(catchParseErrorAsValidationError);
-        })
-        .handle("getByNames", ({ urlParams }) =>
-          provideCurrentGuildUser(
-            urlParams.guildId,
-            requireMonitorGuild(urlParams.guildId).pipe(
-              Effect.andThen(
-                pipe(
-                  getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-                  Effect.flatMap((sheetId) => playerService.getByNames(sheetId, urlParams.names)),
-                ),
-              ),
-            ),
-          ).pipe(catchParseErrorAsValidationError),
-        )
-        .handle("getTeamsByIds", ({ urlParams }) => {
-          const auth =
-            urlParams.ids.length === 1
-              ? requireDiscordAccountIdOrMonitorGuild(urlParams.guildId, urlParams.ids[0])
-              : requireMonitorGuild(urlParams.guildId);
+          ),
+        ).pipe(catchSchemaErrorAsValidationError),
+      )
+      .handle("getByIds", ({ query }) => {
+        const auth =
+          query.ids.length === 1
+            ? requireDiscordAccountIdOrMonitorGuild(query.guildId, query.ids[0])
+            : requireMonitorGuild(query.guildId);
 
-          return provideCurrentGuildUser(
-            urlParams.guildId,
-            auth.pipe(
-              Effect.andThen(
-                pipe(
-                  getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-                  Effect.flatMap((sheetId) =>
-                    Effect.map(
-                      playerService.getTeamsByIds(sheetId, urlParams.ids),
-                      (teams) => [teams] as const,
-                    ),
+        return provideCurrentGuildUser(
+          query.guildId,
+          auth.pipe(
+            Effect.andThen(
+              pipe(
+                getSheetIdFromGuildId(query.guildId, guildConfigService),
+                Effect.flatMap((sheetId) => playerService.getByIds(sheetId, query.ids)),
+              ),
+            ),
+          ),
+        ).pipe(catchSchemaErrorAsValidationError);
+      })
+      .handle("getByNames", ({ query }) =>
+        provideCurrentGuildUser(
+          query.guildId,
+          requireMonitorGuild(query.guildId).pipe(
+            Effect.andThen(
+              pipe(
+                getSheetIdFromGuildId(query.guildId, guildConfigService),
+                Effect.flatMap((sheetId) => playerService.getByNames(sheetId, query.names)),
+              ),
+            ),
+          ),
+        ).pipe(catchSchemaErrorAsValidationError),
+      )
+      .handle("getTeamsByIds", ({ query }) => {
+        const auth =
+          query.ids.length === 1
+            ? requireDiscordAccountIdOrMonitorGuild(query.guildId, query.ids[0])
+            : requireMonitorGuild(query.guildId);
+
+        return provideCurrentGuildUser(
+          query.guildId,
+          auth.pipe(
+            Effect.andThen(
+              pipe(
+                getSheetIdFromGuildId(query.guildId, guildConfigService),
+                Effect.flatMap((sheetId) =>
+                  Effect.map(
+                    playerService.getTeamsByIds(sheetId, query.ids),
+                    (teams) => [teams] as const,
                   ),
                 ),
               ),
             ),
-          ).pipe(catchParseErrorAsValidationError);
-        })
-        .handle("getTeamsByNames", ({ urlParams }) =>
-          provideCurrentGuildUser(
-            urlParams.guildId,
-            requireMonitorGuild(urlParams.guildId).pipe(
-              Effect.andThen(
-                pipe(
-                  getSheetIdFromGuildId(urlParams.guildId, guildConfigService),
-                  Effect.flatMap((sheetId) =>
-                    Effect.map(
-                      playerService.getTeamsByNames(sheetId, urlParams.names),
-                      (teams) => [teams] as const,
-                    ),
+          ),
+        ).pipe(catchSchemaErrorAsValidationError);
+      })
+      .handle("getTeamsByNames", ({ query }) =>
+        provideCurrentGuildUser(
+          query.guildId,
+          requireMonitorGuild(query.guildId).pipe(
+            Effect.andThen(
+              pipe(
+                getSheetIdFromGuildId(query.guildId, guildConfigService),
+                Effect.flatMap((sheetId) =>
+                  Effect.map(
+                    playerService.getTeamsByNames(sheetId, query.names),
+                    (teams) => [teams] as const,
                   ),
                 ),
               ),
             ),
-          ).pipe(catchParseErrorAsValidationError),
-        ),
-    ),
-  ),
+          ),
+        ).pipe(catchSchemaErrorAsValidationError),
+      );
+  }),
 ).pipe(
-  Layer.provide(
-    Layer.mergeAll(
-      PlayerService.Default,
-      GuildConfigService.Default,
-      SheetAuthTokenAuthorizationLive,
-    ),
-  ),
+  Layer.provide([PlayerService.layer, GuildConfigService.layer, SheetAuthTokenAuthorizationLive]),
 );

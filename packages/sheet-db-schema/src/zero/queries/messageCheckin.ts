@@ -4,7 +4,7 @@ import { builder } from "../schema";
 
 export const messageCheckin = {
   getMessageCheckinData: defineQuery(
-    pipe(Schema.Struct({ messageId: Schema.String }), Schema.standardSchemaV1),
+    pipe(Schema.Struct({ messageId: Schema.String }), Schema.toStandardSchemaV1),
     ({ args: { messageId } }) =>
       builder.messageCheckin
         .where("messageId", "=", messageId)
@@ -12,7 +12,7 @@ export const messageCheckin = {
         .one(),
   ),
   getMessageCheckinMembers: defineQuery(
-    pipe(Schema.Struct({ messageId: Schema.String }), Schema.standardSchemaV1),
+    pipe(Schema.Struct({ messageId: Schema.String }), Schema.toStandardSchemaV1),
     ({ args: { messageId } }) =>
       builder.messageCheckinMember
         .where("messageId", "=", messageId)

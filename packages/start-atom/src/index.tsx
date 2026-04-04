@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { RegistryContext } from "@effect-atom/atom-react";
+import { RegistryContext } from "@effect/atom-react";
 import { setupStartAtomCoreIntegration } from "./start-atom-core.js";
 import type { StartAtomOptions } from "./start-atom-core.js";
 import type { AnyRouter } from "@tanstack/react-router";

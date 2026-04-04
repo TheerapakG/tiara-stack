@@ -2,10 +2,18 @@ import { InteractionsRegistry } from "dfx/gateway";
 import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
 import { Ix } from "dfx/index";
 import { Effect, Layer, Option, pipe } from "effect";
-import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
+import { discordGatewayLayer } from "../discord/gateway";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import { EmbedService, ScreenshotService, SheetApisRequestContext } from "../services";
+
+const getInteractionGuildId = Effect.gen(function* () {
+  const interactionGuild = yield* Interaction.guild();
+  return pipe(
+    interactionGuild,
+    Option.map((guild) => (guild as { id: string }).id),
+  );
+});
 
 const makeScreenshotCommand = Effect.gen(function* () {
   const screenshotService = yield* ScreenshotService;
@@ -41,9 +49,7 @@ const makeScreenshotCommand = Effect.gen(function* () {
         yield* command.deferReply();
 
         const serverId = command.optionValueOptional("server_id");
-        const interactionGuildId = (yield* Interaction.guild()).pipe(
-          Option.map((guild) => guild.id),
-        );
+        const interactionGuildId = yield* getInteractionGuildId;
         const guildId = pipe(
           serverId,
           Option.orElse(() => interactionGuildId),
@@ -77,10 +83,13 @@ const makeScreenshotCommand = Effect.gen(function* () {
 const makeGlobalScreenshotCommand = Effect.gen(function* () {
   const screenshotCommand = yield* makeScreenshotCommand;
 
-  return CommandHelper.makeGlobalCommand(screenshotCommand.data, screenshotCommand.handler);
+  return CommandHelper.makeGlobalCommand(
+    screenshotCommand.data,
+    screenshotCommand.handler as never,
+  );
 });
 
-export const ScreenshotCommandLive = Layer.scopedDiscard(
+export const screenshotCommandLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const registry = yield* InteractionsRegistry;
     const command = yield* makeGlobalScreenshotCommand;
@@ -88,7 +97,5 @@ export const ScreenshotCommandLive = Layer.scopedDiscard(
     yield* registry.register(Ix.builder.add(command).catchAllCause(Effect.log));
   }),
 ).pipe(
-  Layer.provide(
-    Layer.mergeAll(DiscordGatewayLayerLive, EmbedService.Default, ScreenshotService.Default),
-  ),
+  Layer.provide(Layer.mergeAll(discordGatewayLayer, EmbedService.layer, ScreenshotService.layer)),
 );

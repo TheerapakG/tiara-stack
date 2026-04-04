@@ -4,7 +4,7 @@ import { createIsomorphicFn } from "@tanstack/react-start";
 
 const subscribe = () => () => {};
 
-export const getServerTimeZone = () => DateTime.zoneUnsafeMakeNamed("UTC");
+export const getServerTimeZone = () => DateTime.zoneMakeNamedUnsafe("UTC");
 
 export const getClientTimeZone = () => DateTime.zoneMakeLocal();
 

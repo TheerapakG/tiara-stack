@@ -1,58 +1,48 @@
-import { PlatformConfigProvider } from "@effect/platform";
-import { NodeRuntime, NodeContext, NodeHttpClient } from "@effect/platform-node";
-import { UnstorageLayer } from "./discord/cache";
-import { DiscordConfigLayer } from "./discord/config";
-import { Layer, Logger } from "effect";
+import { NodeFileSystem, NodeHttpClient, NodeRuntime } from "@effect/platform-node";
+import { ConfigProvider, Effect, Layer, Logger } from "effect";
+import { channelCommandLayer } from "./commands/channel";
+import { checkinCommandLayer } from "./commands/checkin";
+import { kickoutCommandLayer } from "./commands/kickout";
+import { roomOrderCommandLayer } from "./commands/roomOrder";
+import { scheduleCommandLayer } from "./commands/schedule";
+import { screenshotCommandLayer } from "./commands/screenshot";
+import { serverCommandLayer } from "./commands/server";
+import { slotCommandLayer } from "./commands/slot";
+import { teamCommandLayer } from "./commands/team";
+import { httpLayer } from "./http";
+import { checkinButtonLayer } from "./messageComponents/buttons/checkin";
+import { roomOrderButtonLayer } from "./messageComponents/buttons/roomOrder";
+import { slotButtonLayer } from "./messageComponents/buttons/slot";
 import { MetricsLive } from "./metrics";
+import { autoCheckinTaskLayer } from "./tasks";
 import { TracesLive } from "./traces";
-import { ChannelCommandLive } from "./commands/channel";
-import { CheckinCommandLive } from "./commands/checkin";
-import { KickoutCommandLive } from "./commands/kickout";
-import { RoomOrderCommandLive } from "./commands/roomOrder";
-import { ScreenshotCommandLive } from "./commands/screenshot";
-import { ScheduleCommandLive } from "./commands/schedule";
-import { ServerCommandLive } from "./commands/server";
-import { SlotCommandLive } from "./commands/slot";
-import { TeamCommandLive } from "./commands/team";
-import { CheckinButtonLive } from "./messageComponents/buttons/checkin";
-import { RoomOrderButtonLive } from "./messageComponents/buttons/roomOrder";
-import { SlotButtonLive } from "./messageComponents/buttons/slot";
-import { AutoCheckinTaskLive } from "./tasks";
-import { HttpLive } from "./http";
 
-const BotLive = Layer.mergeAll(
-  ChannelCommandLive,
-  CheckinCommandLive,
-  KickoutCommandLive,
-  RoomOrderCommandLive,
-  ScreenshotCommandLive,
-  ScheduleCommandLive,
-  ServerCommandLive,
-  SlotCommandLive,
-  TeamCommandLive,
-  CheckinButtonLive,
-  RoomOrderButtonLive,
-  SlotButtonLive,
-  AutoCheckinTaskLive,
+const botLayer = Layer.mergeAll(
+  channelCommandLayer,
+  checkinCommandLayer,
+  kickoutCommandLayer,
+  roomOrderCommandLayer,
+  screenshotCommandLayer,
+  scheduleCommandLayer,
+  serverCommandLayer,
+  slotCommandLayer,
+  teamCommandLayer,
+  checkinButtonLayer,
+  roomOrderButtonLayer,
+  slotButtonLayer,
+  autoCheckinTaskLayer,
 );
 
-const RuntimeDependencies = Layer.mergeAll(DiscordConfigLayer, UnstorageLayer);
-
-// Combined layer for both bot and HTTP server
-// They share the same Unstorage layer for cache access
-const SharedLive = Layer.mergeAll(BotLive, HttpLive).pipe(
-  Layer.provide(RuntimeDependencies),
+const main = Layer.mergeAll(botLayer, httpLayer).pipe(
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
-  Layer.provide(Logger.logFmt),
-  Layer.provide(PlatformConfigProvider.layerDotEnvAdd(".env")),
-  Layer.provide(NodeContext.layer),
-  Layer.provide(NodeHttpClient.layer),
+  Layer.provide(Logger.layer([Logger.consoleLogFmt])),
+  Layer.provide(NodeHttpClient.layerFetch),
+  Layer.provide(NodeFileSystem.layer),
+  Layer.provide(
+    ConfigProvider.layerAdd(ConfigProvider.fromDotEnv()).pipe(Layer.provide(NodeFileSystem.layer)),
+  ),
+  Layer.launch,
 );
 
-SharedLive.pipe(
-  Layer.launch,
-  NodeRuntime.runMain({
-    disablePrettyLogger: true,
-  }),
-);
+NodeRuntime.runMain(main as Effect.Effect<never, unknown>);

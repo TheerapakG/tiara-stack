@@ -1,104 +1,134 @@
-import { Array, pipe, Schema, Tuple, Types } from "effect";
+import { Array, pipe, Record, Schema, SchemaGetter, Struct, Tuple } from "effect";
 
-type StructHelper<
+type ReadonlyTupleOf_<
+  T,
+  N extends number,
+  R extends ReadonlyArray<unknown>,
+> = `${N}` extends `-${number}`
+  ? never
+  : R["length"] extends N
+    ? R
+    : ReadonlyTupleOf_<T, N, [T, ...R]>;
+type ReadonlyTupleOf<N extends number, T> = N extends N
+  ? number extends N
+    ? ReadonlyArray<T>
+    : ReadonlyTupleOf_<T, N, []>
+  : never;
+
+type StructSchemaHelper<
   A extends ReadonlyArray<string>,
-  B extends ReadonlyArray<Schema.Schema.Any>,
+  B extends ReadonlyArray<Schema.Top>,
 > = A extends readonly [infer AHead extends string, ...infer ATail extends ReadonlyArray<string>]
   ? B extends readonly [
-      infer BHead extends Schema.Schema.All,
-      ...infer BTail extends ReadonlyArray<Schema.Schema.Any>,
+      infer BHead extends Schema.Top,
+      ...infer BTail extends ReadonlyArray<Schema.Top>,
     ]
-    ? { [K in AHead]: BHead } & StructHelper<ATail, BTail>
+    ? { [K in AHead]: BHead } & StructSchemaHelper<ATail, BTail>
     : {}
   : {};
 
-type Struct<
+type StructSchema<
   Keys extends ReadonlyArray<string>,
-  Fields extends ReadonlyArray<Schema.Schema.Any>,
-> = StructHelper<Keys, Fields>;
+  Fields extends ReadonlyArray<Schema.Top>,
+> = StructSchemaHelper<Keys, Fields>;
 
-type EncodedFields<Fields extends ReadonlyArray<Schema.Schema.Any>> = Fields extends readonly [
-  infer Head extends Schema.Schema.Any,
-  ...infer Tail extends ReadonlyArray<Schema.Schema.Any>,
+type TupleFieldsSchema<Fields extends ReadonlyArray<Schema.Top>> = Fields extends readonly [
+  infer Head extends Schema.Top,
+  ...infer Tail extends ReadonlyArray<Schema.Top>,
 ]
-  ? [Schema.SchemaClass<Schema.Schema.Encoded<Head>>, ...EncodedFields<Tail>]
+  ? [Schema.toEncoded<Head>, ...TupleFieldsSchema<Tail>]
   : [];
+
+type EncodedTupleFields<Fields extends ReadonlyArray<Schema.Top>> = Fields extends readonly [
+  infer Head extends Schema.Top,
+  ...infer Tail extends ReadonlyArray<Schema.Top>,
+]
+  ? [Schema.Codec.Encoded<Head>, ...EncodedTupleFields<Tail>]
+  : [];
+
+interface StructGetter<S extends object> extends Struct.Lambda {
+  <Key extends keyof S>(key: Key): S[Key];
+  readonly "~lambda.out": this["~lambda.in"] extends keyof S ? S[this["~lambda.in"]] : never;
+}
+const structGetter = <S extends object>(struct: S) =>
+  Struct.lambda<StructGetter<S>>((key) => Struct.get(struct, key));
 
 type TupleToStructSchema<
   Keys extends ReadonlyArray<string>,
-  Fields extends Types.TupleOf<Keys["length"], Schema.Schema.Any>,
-> = Schema.transform<Schema.Tuple<EncodedFields<Fields>>, Schema.Struct<Struct<Keys, Fields>>> & {
+  Fields extends ReadonlyTupleOf<Keys["length"], Schema.Top>,
+> = Schema.Codec<Schema.Struct.Type<StructSchema<Keys, Fields>>, EncodedTupleFields<Fields>> & {
   readonly keys: Keys;
   readonly fields: Fields;
 };
 
-const makeTupleToStructClass = <
+export const TupleToStructSchema = <
   Keys extends ReadonlyArray<string>,
-  Fields extends Types.TupleOf<Keys["length"], Schema.Schema.Any>,
+  Fields extends ReadonlyTupleOf<Keys["length"], Schema.Top>,
 >(
   keys: Keys,
   fields: Fields,
-) => {
-  const TupleSchema = Schema.Tuple<EncodedFields<Fields>>(
-    ...(pipe(fields, Array.map(Schema.encodedSchema)) as EncodedFields<Fields>),
+): TupleToStructSchema<Keys, Fields> => {
+  const TupleSchema = Schema.Tuple(
+    pipe(fields, Tuple.map(Schema.toEncoded)) as TupleFieldsSchema<Fields>,
   );
   const StructSchema = Schema.Struct(
-    Object.fromEntries(Array.zip(keys, fields)) as Struct<Keys, Fields>,
+    Object.fromEntries(Array.zip(keys, fields)) as StructSchema<Keys, Fields>,
   );
 
-  return class extends Schema.transform(TupleSchema, StructSchema, {
-    strict: true,
-    decode: (tuple) => pipe(Array.zip(keys, tuple), Object.fromEntries),
-    encode: (struct) =>
-      pipe(
-        keys,
-        Tuple.map(
-          (key) => struct[key as keyof Schema.Struct.Encoded<Struct<Keys, Fields>>] as unknown,
-        ),
-      ) as Schema.Schema.Type<typeof TupleSchema>,
-  }) {
-    static keys = keys;
-    static fields = fields;
-  } as TupleToStructSchema<Keys, Fields>;
+  const schema = TupleSchema.pipe(
+    Schema.decodeTo(StructSchema, {
+      decode: SchemaGetter.transform(
+        (tuple) =>
+          pipe(Array.zip(keys, tuple), Record.fromEntries) as unknown as Schema.Struct.Encoded<
+            StructSchema<Keys, Fields>
+          >,
+      ),
+      encode: SchemaGetter.transform(
+        (struct) =>
+          pipe(keys, Tuple.map(structGetter(struct))) as unknown as Schema.Tuple.Type<
+            TupleFieldsSchema<Fields>
+          >,
+      ),
+    }),
+  ) as unknown as TupleToStructSchema<Keys, Fields>;
+
+  return Object.assign(schema, { keys, fields });
 };
 
-const TupleToStructSchema = <
-  const Keys extends ReadonlyArray<string>,
-  const Fields extends Types.TupleOf<Keys["length"], Schema.Schema.Any>,
->(
-  keys: Keys,
-  fields: Fields,
-): TupleToStructSchema<Keys, Fields> => makeTupleToStructClass(keys, fields);
-
-type StructValue<Keys extends ReadonlyArray<string>, Value extends Schema.Schema.Any> = {
+type StructValueSchema<Keys extends ReadonlyArray<string>, Value extends Schema.Top> = {
   [K in Keys[number]]: Value;
 };
 
-type EncodedValues<
+type TupleValuesSchema<
   Keys extends ReadonlyArray<string>,
-  Value extends Schema.Schema.Any,
-> = Types.TupleOf<Keys["length"], Schema.SchemaClass<Schema.Schema.Encoded<Value>>>;
+  Value extends Schema.Top,
+> = ReadonlyTupleOf<Keys["length"], Schema.toEncoded<Value>>;
+
+type EncodedTupleValues<
+  Keys extends ReadonlyArray<string>,
+  Value extends Schema.Top,
+> = ReadonlyTupleOf<Keys["length"], Schema.Codec.Encoded<Value>>;
 
 type TupleToStructValueSchema<
   Keys extends ReadonlyArray<string>,
-  Value extends Schema.Schema.Any,
-> = Schema.transform<
-  Schema.Tuple<EncodedValues<Keys, Value>>,
-  Schema.Struct<StructValue<Keys, Value>>
+  Value extends Schema.Top,
+> = Schema.Codec<
+  Schema.Struct.Type<StructValueSchema<Keys, Value>>,
+  EncodedTupleValues<Keys, Value>
 > & {
   readonly keys: Keys;
   readonly value: Value;
 };
 
-const makeTupleToStructValueClass = <
-  Keys extends ReadonlyArray<string>,
-  Value extends Schema.Schema.Any,
+export const TupleToStructValueSchema = <
+  const Keys extends ReadonlyArray<string>,
+  Value extends Schema.Top,
 >(
   keys: Keys,
   value: Value,
 ) => {
-  const TupleSchema = Schema.Tuple<EncodedValues<Keys, Value>>(
-    ...(Array.makeBy(keys.length, () => Schema.encodedSchema(value)) as EncodedValues<Keys, Value>),
+  const TupleSchema = Schema.Tuple(
+    Array.makeBy(keys.length, () => Schema.toEncoded(value)) as TupleValuesSchema<Keys, Value>,
   );
   const StructSchema = Schema.Struct(
     Object.fromEntries(
@@ -106,31 +136,25 @@ const makeTupleToStructValueClass = <
         keys,
         Array.map((key) => [key, value]),
       ),
-    ) as StructValue<Keys, Value>,
+    ) as StructValueSchema<Keys, Value>,
   );
 
-  return class extends Schema.transform(TupleSchema, StructSchema, {
-    strict: true,
-    decode: (tuple) => pipe(Array.zip(keys, tuple), Object.fromEntries),
-    encode: (struct) =>
-      pipe(
-        keys,
-        Tuple.map(
-          (key) => struct[key as keyof Schema.Struct.Encoded<StructValue<Keys, Value>>] as unknown,
-        ),
-      ) as Schema.Schema.Type<typeof TupleSchema>,
-  }) {
-    static keys = keys;
-    static value = value;
-  } as TupleToStructValueSchema<Keys, Value>;
+  const schema = TupleSchema.pipe(
+    Schema.decodeTo(StructSchema, {
+      decode: SchemaGetter.transform(
+        (tuple) =>
+          pipe(Array.zip(keys, tuple), Record.fromEntries) as unknown as Schema.Struct.Encoded<
+            StructValueSchema<Keys, Value>
+          >,
+      ),
+      encode: SchemaGetter.transform(
+        (struct) =>
+          pipe(keys, Tuple.map(structGetter(struct))) as unknown as Schema.Tuple.Type<
+            TupleValuesSchema<Keys, Value>
+          >,
+      ),
+    }),
+  ) as unknown as TupleToStructValueSchema<Keys, Value>;
+
+  return Object.assign(schema, { keys, value });
 };
-
-const TupleToStructValueSchema = <
-  const Keys extends ReadonlyArray<string>,
-  const Value extends Schema.Schema.Any,
->(
-  keys: Keys,
-  value: Value,
-): TupleToStructValueSchema<Keys, Value> => makeTupleToStructValueClass(keys, value);
-
-export { TupleToStructSchema, TupleToStructValueSchema };

@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-export class GoogleSheetsError extends Schema.TaggedError<GoogleSheetsError>()(
+export class GoogleSheetsError extends Schema.TaggedErrorClass<GoogleSheetsError>()(
   "GoogleSheetsError",
   {
     message: Schema.String,

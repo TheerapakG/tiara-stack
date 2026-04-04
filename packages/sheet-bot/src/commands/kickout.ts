@@ -3,10 +3,11 @@ import { InteractionsRegistry } from "dfx/gateway";
 import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
 import { Ix } from "dfx/index";
 import { Array, DateTime, Effect, Equal, Layer, Match, Option, Order, Number, pipe } from "effect";
-import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
-import { MembersCache, MembersCacheLive } from "dfx-discord-utils/discord/cache";
+import { discordGatewayLayer } from "../discord/gateway";
+import { MembersCache } from "dfx-discord-utils/discord/cache";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
+import { GuildMember } from "dfx-discord-utils/utils";
 import {
   ConverterService,
   EmbedService,
@@ -15,12 +16,28 @@ import {
   ScheduleService,
   SheetApisRequestContext,
 } from "../services";
-import { GuildMemberUtils, GuildMemberUtilsLive } from "dfx-discord-utils/utils";
+import { cachesLayer } from "../discord/cache";
+
+const getInteractionGuildId = Effect.gen(function* () {
+  const interactionGuild = yield* Interaction.guild();
+  return pipe(
+    interactionGuild,
+    Option.map((guild) => (guild as { id: string }).id),
+  );
+});
+
+const getInteractionChannelId = Effect.gen(function* () {
+  const interactionChannel = yield* Interaction.channel();
+  return pipe(
+    interactionChannel,
+    Option.map((channel) => (channel as { id: string }).id),
+  );
+});
 
 const makeManualSubCommand = Effect.gen(function* () {
   const converterService = yield* ConverterService;
   const guildConfigService = yield* GuildConfigService;
-  const guildMemberUtils = yield* GuildMemberUtils;
+  const guildMemberUtils = yield* GuildMember.GuildMemberUtils;
   const membersCache = yield* MembersCache;
   const permissionService = yield* PermissionService;
   const scheduleService = yield* ScheduleService;
@@ -43,7 +60,7 @@ const makeManualSubCommand = Effect.gen(function* () {
       yield* command.deferReply();
 
       const serverId = command.optionValueOptional("server_id");
-      const interactionGuildId = (yield* Interaction.guild()).pipe(Option.map((guild) => guild.id));
+      const interactionGuildId = yield* getInteractionGuildId;
       const guildId = pipe(
         serverId,
         Option.orElse(() => interactionGuildId),
@@ -54,7 +71,7 @@ const makeManualSubCommand = Effect.gen(function* () {
       yield* permissionService.checkInteractionUserMonitorGuild(guildId);
 
       const date = yield* DateTime.now;
-      const minute = DateTime.getPart(date, "minutes");
+      const minute = DateTime.getPart(date, "minute");
       if (minute >= 40) {
         yield* command.editReply({
           payload: {
@@ -82,16 +99,12 @@ const makeManualSubCommand = Effect.gen(function* () {
           onSome: (channelName) =>
             guildConfigService.getGuildChannelByName(guildId, channelName, true),
           onNone: () =>
-            Interaction.channel().pipe(
-              Effect.flatMap((channel) =>
-                channel.pipe(
-                  Option.map((c) => c.id),
-                  Option.match({
-                    onSome: (channelId) =>
-                      guildConfigService.getGuildChannelById(guildId, channelId, true),
-                    onNone: () => Effect.fail(new Error("Channel not found in interaction")),
-                  }),
-                ),
+            getInteractionChannelId.pipe(
+              Effect.map(
+                Option.getOrThrowWith(() => new Error("Channel not found in interaction")),
+              ),
+              Effect.flatMap((channelId) =>
+                guildConfigService.getGuildChannelById(guildId, channelId, true),
               ),
             ),
         }),
@@ -160,7 +173,7 @@ const makeManualSubCommand = Effect.gen(function* () {
       // Reply with the list of kicked out members
       yield* command.editReply({
         payload: {
-          content: pipe(removedMembers, Array.length, Order.greaterThan(Number.Order)(0))
+          content: pipe(removedMembers, Array.length, Order.isGreaterThan(Number.Order)(0))
             ? `Kicked out ${removedMembers.map((m) => userMention(m.user.id)).join(" ")}`
             : "No players to kick out",
           allowed_mentions: { parse: [] },
@@ -199,10 +212,10 @@ const makeKickoutCommand = Effect.gen(function* () {
 const makeGlobalKickoutCommand = Effect.gen(function* () {
   const kickoutCommand = yield* makeKickoutCommand;
 
-  return CommandHelper.makeGlobalCommand(kickoutCommand.data, kickoutCommand.handler);
+  return CommandHelper.makeGlobalCommand(kickoutCommand.data, kickoutCommand.handler as never);
 });
 
-export const KickoutCommandLive = Layer.scopedDiscard(
+export const kickoutCommandLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const registry = yield* InteractionsRegistry;
     const command = yield* makeGlobalKickoutCommand;
@@ -212,14 +225,14 @@ export const KickoutCommandLive = Layer.scopedDiscard(
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
-      DiscordGatewayLayerLive,
-      GuildMemberUtilsLive,
-      MembersCacheLive,
-      PermissionService.Default,
-      GuildConfigService.Default,
-      ScheduleService.Default,
-      ConverterService.Default,
-      EmbedService.Default,
+      discordGatewayLayer,
+      GuildMember.GuildMemberUtils.layer,
+      cachesLayer,
+      PermissionService.layer,
+      GuildConfigService.layer,
+      ScheduleService.layer,
+      ConverterService.layer,
+      EmbedService.layer,
     ),
   ),
 );

@@ -1,29 +1,47 @@
 import { InteractionsRegistry } from "dfx/gateway";
 import { bold, inlineCode, time, TimestampStyles } from "@discordjs/formatters";
+import { ButtonStyle, MessageFlags } from "discord-api-types/v10";
 import { Ix } from "dfx/index";
 import { Array, Effect, HashSet, Layer, Option, pipe } from "effect";
-import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
-import { MessageRoomOrder } from "sheet-apis/schema";
 import {
-  ConverterService,
-  FormatService,
-  MessageRoomOrderService,
-  SheetApisRequestContext,
-} from "@/services";
-import {
+  Interaction,
   makeButton,
   makeButtonData,
   makeMessageActionRowData,
   makeMessageComponent,
 } from "dfx-discord-utils/utils";
-import { Interaction } from "dfx-discord-utils/utils";
-import { ButtonStyle, MessageFlags } from "discord-api-types/v10";
+import { MessageRoomOrder } from "sheet-apis/schema";
+import { discordGatewayLayer } from "../../discord/gateway";
+import {
+  ConverterService,
+  HourWindow,
+  FormatService,
+  FormattedHourWindow,
+  MessageRoomOrderService,
+  SheetApisRequestContext,
+} from "@/services";
 
 const formatEffectValue = (effectValue: number): string => {
   const rounded = Math.round(effectValue * 10) / 10;
   const formatted = rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(1);
   return `+${formatted}%`;
 };
+
+const getInteractionGuildId = Effect.gen(function* () {
+  const interactionGuild = yield* Interaction.guild();
+  return pipe(
+    interactionGuild,
+    Option.map((guild) => (guild as { id: string }).id),
+  );
+});
+
+const getInteractionMessage = Effect.gen(function* () {
+  const interactionMessage = yield* Interaction.message();
+  return pipe(
+    interactionMessage,
+    Option.map((message) => message as { id: string; channel_id: string }),
+  );
+});
 
 const previousButtonData = makeButtonData((b) =>
   b
@@ -49,22 +67,53 @@ export const roomOrderActionRow = (range: { minRank: number; maxRank: number }, 
     ),
   );
 
-const makeRoomOrderPreviousButtonHandler = Effect.gen(function* () {
-  const converterService = yield* ConverterService;
-  const formatService = yield* FormatService;
-  const messageRoomOrderService = yield* MessageRoomOrderService;
+const renderDelta = (current: ReadonlyArray<string>, previous: ReadonlyArray<string>) => {
+  const values = globalThis.Array.from(
+    pipe(HashSet.fromIterable(current), HashSet.difference(HashSet.fromIterable(previous))),
+  );
+  return values.length > 0 ? values.join(", ") : "(none)";
+};
 
-  const roomOrderInteractionGetReply = Effect.fn("roomOrderPreviousButton.getReply")(
+const makeRoomOrderReply = (
+  converterService: {
+    convertHourToHourWindow: (
+      guildId: string,
+      hour: number,
+    ) => Effect.Effect<HourWindow, unknown, unknown>;
+  },
+  formatService: {
+    formatHourWindow: (
+      hourWindow: HourWindow,
+    ) => Effect.Effect<FormattedHourWindow, unknown, unknown>;
+  },
+  messageRoomOrderService: {
+    getMessageRoomOrderRange: (
+      messageId: string,
+    ) => Effect.Effect<{ minRank: number; maxRank: number }, unknown, unknown>;
+    getMessageRoomOrderEntry: (
+      messageId: string,
+      rank: string,
+    ) => Effect.Effect<
+      ReadonlyArray<{
+        team: string;
+        tags: ReadonlyArray<string>;
+        position: number;
+        effectValue: number;
+      }>,
+      unknown,
+      unknown
+    >;
+  },
+) =>
+  Effect.fn("roomOrderButton.getReply")(
     (guildId: string, messageId: string, messageRoomOrder: MessageRoomOrder.MessageRoomOrder) =>
       Effect.gen(function* () {
         const messageRoomOrderRange =
           yield* messageRoomOrderService.getMessageRoomOrderRange(messageId);
-
         const messageRoomOrderEntry = yield* messageRoomOrderService.getMessageRoomOrderEntry(
           messageId,
           messageRoomOrder.rank.toString(),
         );
-
         const { start, end } = yield* pipe(
           converterService.convertHourToHourWindow(guildId, messageRoomOrder.hour),
           Effect.flatMap(formatService.formatHourWindow),
@@ -94,18 +143,8 @@ const makeRoomOrderPreviousButtonHandler = Effect.gen(function* () {
             return `${inlineCode(`P${position + 1}:`)}  ${team}${effectStr}`;
           }),
           "",
-          `${inlineCode("In:")} ${pipe(
-            HashSet.fromIterable(messageRoomOrder.fills),
-            HashSet.difference(HashSet.fromIterable(messageRoomOrder.previousFills)),
-            HashSet.toValues,
-            (arr) => (arr.length > 0 ? arr.join(", ") : "(none)"),
-          )}`,
-          `${inlineCode("Out:")} ${pipe(
-            HashSet.fromIterable(messageRoomOrder.previousFills),
-            HashSet.difference(HashSet.fromIterable(messageRoomOrder.fills)),
-            HashSet.toValues,
-            (arr) => (arr.length > 0 ? arr.join(", ") : "(none)"),
-          )}`,
+          `${inlineCode("In:")} ${renderDelta(messageRoomOrder.fills, messageRoomOrder.previousFills)}`,
+          `${inlineCode("Out:")} ${renderDelta(messageRoomOrder.previousFills, messageRoomOrder.fills)}`,
         ].join("\n");
 
         return {
@@ -115,22 +154,35 @@ const makeRoomOrderPreviousButtonHandler = Effect.gen(function* () {
       }),
   );
 
+const makeRoomOrderPreviousButtonHandler = Effect.gen(function* () {
+  const converterService = yield* ConverterService;
+  const formatService = yield* FormatService;
+  const messageRoomOrderService = yield* MessageRoomOrderService;
+  const roomOrderReply = makeRoomOrderReply(
+    converterService,
+    formatService,
+    messageRoomOrderService,
+  );
+
   return yield* makeButton(
     previousButtonData.toJSON(),
     SheetApisRequestContext.asInteractionUser(
       Effect.fn("roomOrderPreviousButton")(function* (msgHelper) {
         yield* msgHelper.deferUpdate({ flags: MessageFlags.Ephemeral });
 
-        const guild = yield* Interaction.guild();
-        const message = yield* Interaction.message();
+        const guildId = Option.getOrThrowWith(
+          yield* getInteractionGuildId,
+          () => new Error("Guild not found in interaction"),
+        );
+        const message = Option.getOrThrowWith(
+          yield* getInteractionMessage,
+          () => new Error("Message not found in interaction"),
+        );
 
-        const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
-        const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
-
-        const decrementedRank =
-          yield* messageRoomOrderService.decrementMessageRoomOrderRank(messageId);
-
-        const reply = yield* roomOrderInteractionGetReply(guildId, messageId, decrementedRank);
+        const decrementedRank = yield* messageRoomOrderService.decrementMessageRoomOrderRank(
+          message.id,
+        );
+        const reply = yield* roomOrderReply(guildId, message.id, decrementedRank);
 
         yield* msgHelper.editReply({ payload: reply });
       }),
@@ -142,66 +194,10 @@ const makeRoomOrderNextButtonHandler = Effect.gen(function* () {
   const converterService = yield* ConverterService;
   const formatService = yield* FormatService;
   const messageRoomOrderService = yield* MessageRoomOrderService;
-
-  const roomOrderInteractionGetReply = Effect.fn("roomOrderNextButton.getReply")(
-    (guildId: string, messageId: string, messageRoomOrder: MessageRoomOrder.MessageRoomOrder) =>
-      Effect.gen(function* () {
-        const messageRoomOrderRange =
-          yield* messageRoomOrderService.getMessageRoomOrderRange(messageId);
-
-        const messageRoomOrderEntry = yield* messageRoomOrderService.getMessageRoomOrderEntry(
-          messageId,
-          messageRoomOrder.rank.toString(),
-        );
-
-        const { start, end } = yield* pipe(
-          converterService.convertHourToHourWindow(guildId, messageRoomOrder.hour),
-          Effect.flatMap(formatService.formatHourWindow),
-        );
-
-        const roomOrderContent = [
-          `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.LongDateShortTime)} - ${time(end, TimestampStyles.LongDateShortTime)}`,
-          ...Option.match(messageRoomOrder.monitor, {
-            onNone: () => [],
-            onSome: (monitor) => [`${inlineCode("Monitor:")} ${monitor}`],
-          }),
-          "",
-          ...messageRoomOrderEntry.map(({ team, tags, position, effectValue }) => {
-            const hasTiererTag = tags.includes("tierer");
-            const effectParts = hasTiererTag
-              ? []
-              : pipe(
-                  [
-                    Option.some(formatEffectValue(effectValue)),
-                    tags.includes("enc") ? Option.some("enc") : Option.none(),
-                    tags.includes("avoid_enc") ? Option.some("avoid enc") : Option.none(),
-                  ],
-                  Array.getSomes,
-                );
-
-            const effectStr = effectParts.length > 0 ? ` (${effectParts.join(", ")})` : "";
-            return `${inlineCode(`P${position + 1}:`)}  ${team}${effectStr}`;
-          }),
-          "",
-          `${inlineCode("In:")} ${pipe(
-            HashSet.fromIterable(messageRoomOrder.fills),
-            HashSet.difference(HashSet.fromIterable(messageRoomOrder.previousFills)),
-            HashSet.toValues,
-            (arr) => (arr.length > 0 ? arr.join(", ") : "(none)"),
-          )}`,
-          `${inlineCode("Out:")} ${pipe(
-            HashSet.fromIterable(messageRoomOrder.previousFills),
-            HashSet.difference(HashSet.fromIterable(messageRoomOrder.fills)),
-            HashSet.toValues,
-            (arr) => (arr.length > 0 ? arr.join(", ") : "(none)"),
-          )}`,
-        ].join("\n");
-
-        return {
-          content: roomOrderContent,
-          components: [roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank).toJSON()],
-        };
-      }),
+  const roomOrderReply = makeRoomOrderReply(
+    converterService,
+    formatService,
+    messageRoomOrderService,
   );
 
   return yield* makeButton(
@@ -210,16 +206,19 @@ const makeRoomOrderNextButtonHandler = Effect.gen(function* () {
       Effect.fn("roomOrderNextButton")(function* (msgHelper) {
         yield* msgHelper.deferUpdate({ flags: MessageFlags.Ephemeral });
 
-        const guild = yield* Interaction.guild();
-        const message = yield* Interaction.message();
+        const guildId = Option.getOrThrowWith(
+          yield* getInteractionGuildId,
+          () => new Error("Guild not found in interaction"),
+        );
+        const message = Option.getOrThrowWith(
+          yield* getInteractionMessage,
+          () => new Error("Message not found in interaction"),
+        );
 
-        const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
-        const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
-
-        const incrementedRank =
-          yield* messageRoomOrderService.incrementMessageRoomOrderRank(messageId);
-
-        const reply = yield* roomOrderInteractionGetReply(guildId, messageId, incrementedRank);
+        const incrementedRank = yield* messageRoomOrderService.incrementMessageRoomOrderRank(
+          message.id,
+        );
+        const reply = yield* roomOrderReply(guildId, message.id, incrementedRank);
 
         yield* msgHelper.editReply({ payload: reply });
       }),
@@ -231,66 +230,10 @@ const makeRoomOrderSendButtonHandler = Effect.gen(function* () {
   const converterService = yield* ConverterService;
   const formatService = yield* FormatService;
   const messageRoomOrderService = yield* MessageRoomOrderService;
-
-  const roomOrderInteractionGetReply = Effect.fn("roomOrderSendButton.getReply")(
-    (guildId: string, messageId: string, messageRoomOrder: MessageRoomOrder.MessageRoomOrder) =>
-      Effect.gen(function* () {
-        const messageRoomOrderRange =
-          yield* messageRoomOrderService.getMessageRoomOrderRange(messageId);
-
-        const messageRoomOrderEntry = yield* messageRoomOrderService.getMessageRoomOrderEntry(
-          messageId,
-          messageRoomOrder.rank.toString(),
-        );
-
-        const { start, end } = yield* pipe(
-          converterService.convertHourToHourWindow(guildId, messageRoomOrder.hour),
-          Effect.flatMap(formatService.formatHourWindow),
-        );
-
-        const roomOrderContent = [
-          `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.LongDateShortTime)} - ${time(end, TimestampStyles.LongDateShortTime)}`,
-          ...Option.match(messageRoomOrder.monitor, {
-            onNone: () => [],
-            onSome: (monitor) => [`${inlineCode("Monitor:")} ${monitor}`],
-          }),
-          "",
-          ...messageRoomOrderEntry.map(({ team, tags, position, effectValue }) => {
-            const hasTiererTag = tags.includes("tierer");
-            const effectParts = hasTiererTag
-              ? []
-              : pipe(
-                  [
-                    Option.some(formatEffectValue(effectValue)),
-                    tags.includes("enc") ? Option.some("enc") : Option.none(),
-                    tags.includes("avoid_enc") ? Option.some("avoid enc") : Option.none(),
-                  ],
-                  Array.getSomes,
-                );
-
-            const effectStr = effectParts.length > 0 ? ` (${effectParts.join(", ")})` : "";
-            return `${inlineCode(`P${position + 1}:`)}  ${team}${effectStr}`;
-          }),
-          "",
-          `${inlineCode("In:")} ${pipe(
-            HashSet.fromIterable(messageRoomOrder.fills),
-            HashSet.difference(HashSet.fromIterable(messageRoomOrder.previousFills)),
-            HashSet.toValues,
-            (arr) => (arr.length > 0 ? arr.join(", ") : "(none)"),
-          )}`,
-          `${inlineCode("Out:")} ${pipe(
-            HashSet.fromIterable(messageRoomOrder.previousFills),
-            HashSet.difference(HashSet.fromIterable(messageRoomOrder.fills)),
-            HashSet.toValues,
-            (arr) => (arr.length > 0 ? arr.join(", ") : "(none)"),
-          )}`,
-        ].join("\n");
-
-        return {
-          content: roomOrderContent,
-          components: [roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank).toJSON()],
-        };
-      }),
+  const roomOrderReply = makeRoomOrderReply(
+    converterService,
+    formatService,
+    messageRoomOrderService,
   );
 
   return yield* makeButton(
@@ -299,23 +242,26 @@ const makeRoomOrderSendButtonHandler = Effect.gen(function* () {
       Effect.fn("roomOrderSendButton")(function* (msgHelper) {
         yield* msgHelper.deferUpdate({ flags: MessageFlags.Ephemeral });
 
-        const guild = yield* Interaction.guild();
-        const message = yield* Interaction.message();
-
-        const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
-        const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
-
-        const messageRoomOrderData = yield* messageRoomOrderService.getMessageRoomOrder(messageId);
-
-        const reply = yield* roomOrderInteractionGetReply(guildId, messageId, messageRoomOrderData);
+        const guildId = Option.getOrThrowWith(
+          yield* getInteractionGuildId,
+          () => new Error("Guild not found in interaction"),
+        );
+        const message = Option.getOrThrowWith(
+          yield* getInteractionMessage,
+          () => new Error("Message not found in interaction"),
+        );
+        const messageRoomOrderData = yield* messageRoomOrderService.getMessageRoomOrder(message.id);
+        const reply = yield* roomOrderReply(guildId, message.id, messageRoomOrderData);
 
         yield* pipe(
-          message,
-          Effect.transposeMapOption((m) =>
-            msgHelper.rest.createMessage(m.channel_id, {
-              content: reply.content,
-            }),
-          ),
+          Option.some(message),
+          Option.match({
+            onSome: (interactionMessage) =>
+              msgHelper.rest.createMessage(interactionMessage.channel_id, {
+                content: reply.content,
+              }),
+            onNone: () => Effect.void,
+          }),
         );
 
         yield* msgHelper.editReply({
@@ -331,23 +277,20 @@ const makeRoomOrderSendButtonHandler = Effect.gen(function* () {
 
 const makeRoomOrderPreviousButton = Effect.gen(function* () {
   const button = yield* makeRoomOrderPreviousButtonHandler;
-
-  return makeMessageComponent(button.data, button.handler);
+  return makeMessageComponent(button.data, button.handler as never);
 });
 
 const makeRoomOrderNextButton = Effect.gen(function* () {
   const button = yield* makeRoomOrderNextButtonHandler;
-
-  return makeMessageComponent(button.data, button.handler);
+  return makeMessageComponent(button.data, button.handler as never);
 });
 
 const makeRoomOrderSendButton = Effect.gen(function* () {
   const button = yield* makeRoomOrderSendButtonHandler;
-
-  return makeMessageComponent(button.data, button.handler);
+  return makeMessageComponent(button.data, button.handler as never);
 });
 
-export const RoomOrderButtonLive = Layer.scopedDiscard(
+export const roomOrderButtonLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const registry = yield* InteractionsRegistry;
     const previousButton = yield* makeRoomOrderPreviousButton;
@@ -361,10 +304,10 @@ export const RoomOrderButtonLive = Layer.scopedDiscard(
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
-      DiscordGatewayLayerLive,
-      MessageRoomOrderService.Default,
-      ConverterService.Default,
-      FormatService.Default,
+      discordGatewayLayer,
+      MessageRoomOrderService.layer,
+      ConverterService.layer,
+      FormatService.layer,
     ),
   ),
 );

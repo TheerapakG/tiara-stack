@@ -1,31 +1,27 @@
-import { Context, Effect, Layer, pipe } from "effect";
-import { createStorage, prefixStorage, type Storage } from "unstorage";
+import { Effect, Layer, ServiceMap } from "effect";
+import { createStorage, CreateStorageOptions, prefixStorage, type Storage } from "unstorage";
 import { default as memoryDriver } from "unstorage/drivers/memory";
 import { default as redisDriver, RedisOptions } from "unstorage/drivers/redis";
 
-export class Unstorage extends Context.Tag("Unstorage")<Unstorage, Storage>() {
-  static RedisLive = (opts: RedisOptions) =>
-    Layer.succeed(Unstorage, createStorage({ driver: redisDriver(opts) }));
+export class Unstorage extends ServiceMap.Service<Unstorage, Storage>()("Unstorage") {
+  static layer = (storage: Storage) => Layer.succeed(Unstorage, storage);
 
-  static MemoryLive = Layer.succeed(Unstorage, createStorage({ driver: memoryDriver() }));
+  static createLayer = (opts?: CreateStorageOptions) => Unstorage.layer(createStorage(opts));
 
-  static prefixed = (prefix: string) =>
-    pipe(
-      Unstorage,
-      Effect.andThen((storage) => prefixStorage(storage, prefix)),
-    );
+  static redisLayer = (opts: RedisOptions) => Unstorage.createLayer({ driver: redisDriver(opts) });
 
-  static PrefixedLive = (prefix: string) =>
-    Layer.effectContext(
-      pipe(
-        Unstorage.prefixed(prefix),
-        Effect.andThen((storage) => Context.make(Unstorage, storage)),
-      ),
+  static memoryLayer = Unstorage.createLayer({ driver: memoryDriver() });
+
+  static prefixed = Effect.fn("Unstorage.prefixed")(function* (prefix: string) {
+    const storage = yield* Unstorage;
+    return prefixStorage(storage, prefix);
+  });
+
+  static prefixedLayer = (prefix: string) =>
+    Layer.effectServices(
+      Effect.gen(function* () {
+        const storage = yield* Unstorage.prefixed(prefix);
+        return ServiceMap.make(Unstorage, storage);
+      }),
     );
 }
-
-export const RedisUnstorageLive = (opts: RedisOptions): Layer.Layer<Unstorage> =>
-  Unstorage.RedisLive(opts);
-
-export const PrefixedUnstorageLive = (prefix: string): Layer.Layer<Unstorage, never, Unstorage> =>
-  Unstorage.PrefixedLive(prefix);

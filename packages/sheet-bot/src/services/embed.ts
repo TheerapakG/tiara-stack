@@ -1,9 +1,9 @@
-import { Effect, DateTime } from "effect";
+import { DateTime, Effect, Layer, ServiceMap } from "effect";
 import { EmbedBuilder } from "@discordjs/builders";
 import { DiscordApplication } from "dfx-discord-utils/discord";
 
-export class EmbedService extends Effect.Service<EmbedService>()("EmbedService", {
-  effect: Effect.gen(function* () {
+export class EmbedService extends ServiceMap.Service<EmbedService>()("EmbedService", {
+  make: Effect.gen(function* () {
     const application = yield* DiscordApplication;
 
     return {
@@ -29,6 +29,8 @@ export class EmbedService extends Effect.Service<EmbedService>()("EmbedService",
         ),
     };
   }),
-  accessors: true,
-  dependencies: [DiscordApplication.Default],
-}) {}
+}) {
+  static layer = Layer.effect(EmbedService, this.make).pipe(
+    Layer.provide(DiscordApplication.layer),
+  );
+}

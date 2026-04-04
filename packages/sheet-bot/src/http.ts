@@ -1,14 +1,20 @@
-import { HttpApiBuilder, HttpApiSwagger, HttpMiddleware, HttpServer } from "@effect/platform";
-import { NodeHttpClient, NodeHttpServer } from "@effect/platform-node";
-import { DiscordApiLive } from "dfx-discord-utils/discord";
+import { HttpRouter, HttpServer } from "effect/unstable/http";
+import { HttpApiSwagger } from "effect/unstable/httpapi";
+import { NodeHttpServer } from "@effect/platform-node";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { DiscordApi, discordApiLayer as baseDiscordApiLayer } from "dfx-discord-utils/discord";
 import { Layer } from "effect";
 import { createServer } from "http";
+import { cachesLayer } from "./discord/cache";
+import { discordConfigLayer } from "./discord/config";
 
-export const HttpLive = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
-  Layer.provide(HttpApiSwagger.layer()),
-  Layer.provide(HttpApiBuilder.middlewareOpenApi()),
-  Layer.provide(DiscordApiLive),
-  Layer.provide(NodeHttpClient.layer),
+const discordApiLayer = baseDiscordApiLayer.pipe(Layer.provide([discordConfigLayer, cachesLayer]));
+
+const apiLayer = Layer.provide(HttpApiBuilder.layer(DiscordApi), discordApiLayer).pipe(
+  Layer.merge(HttpApiSwagger.layer(DiscordApi)),
+);
+
+export const httpLayer = HttpRouter.serve(apiLayer).pipe(
   HttpServer.withLogAddress,
   Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 })),
 );

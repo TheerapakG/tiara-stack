@@ -8,9 +8,10 @@ import {
   Function,
   HashSet,
   Option,
+  Layer,
+  ServiceMap,
   String,
   pipe,
-  Stream,
 } from "effect";
 
 export class CalcConfig extends Data.TaggedClass("CalcConfig")<{
@@ -19,8 +20,8 @@ export class CalcConfig extends Data.TaggedClass("CalcConfig")<{
 }> {}
 
 const samePlayerReference = (left: PlayerTeam, right: PlayerTeam) =>
-  Option.getEquivalence(String.Equivalence)(left.playerId, right.playerId) &&
-  Option.getEquivalence(String.Equivalence)(left.playerName, right.playerName);
+  Option.makeEquivalence(String.Equivalence)(left.playerId, right.playerId) &&
+  Option.makeEquivalence(String.Equivalence)(left.playerName, right.playerName);
 
 const filterFixedTeams = (playerTeams: PlayerTeam[]) =>
   pipe(
@@ -38,7 +39,7 @@ const filterFixedTeams = (playerTeams: PlayerTeam[]) =>
   );
 
 const baseRoom = (teams: ReadonlyArray<PlayerTeam>) => {
-  return new Room({
+  return Room.makeUnsafe({
     enced: false,
     tiererEnced: false,
     healed: pipe(
@@ -110,7 +111,7 @@ const applyRoomEncAndDoormat = (roomTeam: Room) => {
       : t;
   });
 
-  return new Room({
+  return Room.makeUnsafe({
     enced: true,
     tiererEnced: tiererOverride,
     healed: roomTeam.healed,
@@ -212,7 +213,7 @@ const deriveRoomsFromCartesian =
       Effect.tap((derived) =>
         Effect.log(`Derived ${Chunk.size(derived)} rooms from cartesian product`),
       ),
-      Effect.withSpan("deriveRoomsFromCartesian", { captureStackTrace: true }),
+      Effect.withSpan("deriveRoomsFromCartesian"),
     );
 
 const filterConfigRooms = (config: CalcConfig) => (rooms: Chunk.Chunk<Room>) =>
@@ -220,57 +221,48 @@ const filterConfigRooms = (config: CalcConfig) => (rooms: Chunk.Chunk<Room>) =>
     rooms,
     Chunk.filter(({ healed }) => healed >= config.healNeeded),
     Effect.succeed,
-    Effect.withSpan("filterConfigRooms", { captureStackTrace: true }),
+    Effect.withSpan("filterConfigRooms"),
   );
 
 const filterBestRooms = (rooms: Chunk.Chunk<Room>) =>
-  pipe(
-    Stream.fromIterable(rooms),
-    Stream.mapAccum(Option.none<number>(), (bestEffectValue, room) => {
-      const shouldKeep = pipe(
-        bestEffectValue,
-        Option.match({
-          onNone: () => true,
-          onSome: (currentBest) => room.effectValue > currentBest,
+  Effect.sync(() => {
+    let bestEffectValue = Option.none<number>();
+    const bestRooms: Room[] = [];
+
+    for (const room of Chunk.toArray(rooms)) {
+      if (Option.isNone(bestEffectValue) || room.effectValue > bestEffectValue.value) {
+        bestEffectValue = Option.some(room.effectValue);
+        bestRooms.push(room);
+      }
+    }
+
+    return Chunk.fromIterable(bestRooms);
+  }).pipe(Effect.withSpan("filterBestRooms"));
+
+export class CalcService extends ServiceMap.Service<CalcService>()("CalcService", {
+  make: Effect.succeed({
+    calc: Effect.fn("CalcService.calc")(function* (
+      config: CalcConfig,
+      playerTeams: PlayerTeam[][],
+    ) {
+      const fixedTeams = yield* Effect.forEach(playerTeams, filterFixedTeams);
+      const rooms = yield* pipe(
+        fixedTeams,
+        Array.match({
+          onEmpty: () => Effect.succeed(Chunk.empty()),
+          onNonEmpty: deriveRoomsFromCartesian(config),
         }),
       );
-
-      return [
-        Option.some(
-          pipe(
-            bestEffectValue,
-            Option.match({
-              onNone: () => room.effectValue,
-              onSome: (currentBest) => Math.max(currentBest, room.effectValue),
-            }),
-          ),
-        ),
-        shouldKeep ? Option.some(room) : Option.none(),
-      ];
+      const configRooms = yield* filterConfigRooms(config)(rooms);
+      const bestRooms = yield* pipe(configRooms, Chunk.sort(Room.Order), filterBestRooms);
+      return yield* pipe(
+        bestRooms,
+        Chunk.reverse,
+        Effect.succeed,
+        Effect.withSpan("CalcService.calc"),
+      );
     }),
-    Stream.filter(Option.isSome),
-    Stream.map(({ value }) => value),
-    Stream.runCollect,
-    Effect.withSpan("filterBestRooms", { captureStackTrace: true }),
-  );
-
-export class CalcService extends Effect.Service<CalcService>()("CalcService", {
-  succeed: {
-    calc: (config: CalcConfig, playerTeams: PlayerTeam[][]) =>
-      pipe(
-        Effect.forEach(playerTeams, filterFixedTeams),
-        Effect.flatMap(
-          Array.match({
-            onEmpty: () => Effect.succeed(Chunk.empty()),
-            onNonEmpty: deriveRoomsFromCartesian(config),
-          }),
-        ),
-        Effect.flatMap(filterConfigRooms(config)),
-        Effect.map(Chunk.sort(Room.Order)),
-        Effect.flatMap(filterBestRooms),
-        Effect.map(Chunk.reverse),
-        Effect.withSpan("CalcService.calc", { captureStackTrace: true }),
-      ),
-  },
-  accessors: true,
-}) {}
+  }),
+}) {
+  static layer = Layer.effect(CalcService, this.make);
+}

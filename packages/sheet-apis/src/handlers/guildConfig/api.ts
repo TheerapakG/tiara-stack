@@ -1,122 +1,121 @@
-import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "@effect/platform";
-import { Schema } from "effect";
+import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
+import { Schema, SchemaGetter } from "effect";
 import { ValidationError, QueryResultError, ArgumentError } from "typhoon-core/error";
 import { GuildChannelConfig, GuildConfig, GuildConfigMonitorRole } from "@/schemas/guildConfig";
 import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthorization/tag";
 
+const BooleanFromString = Schema.Literals(["true", "false"]).pipe(
+  Schema.decodeTo(Schema.Boolean, {
+    decode: SchemaGetter.transform((value) => value === "true"),
+    encode: SchemaGetter.transform((value) => (value ? "true" : "false")),
+  }),
+);
+
 export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
   .add(
-    HttpApiEndpoint.get("getAutoCheckinGuilds", "/guildConfig/getAutoCheckinGuilds")
-      .addSuccess(Schema.Array(GuildConfig))
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+    HttpApiEndpoint.get("getAutoCheckinGuilds", "/guildConfig/getAutoCheckinGuilds", {
+      success: Schema.Array(GuildConfig),
+      error: [ValidationError, QueryResultError],
+    }),
   )
   .add(
-    HttpApiEndpoint.get("getGuildConfig", "/guildConfig/getGuildConfig")
-      .setUrlParams(
-        Schema.Struct({
-          guildId: Schema.String,
-        }),
-      )
-      .addSuccess(GuildConfig)
-      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
+    HttpApiEndpoint.get("getGuildConfig", "/guildConfig/getGuildConfig", {
+      query: Schema.Struct({
+        guildId: Schema.String,
+      }),
+      success: GuildConfig,
+      error: [ValidationError, QueryResultError, ArgumentError],
+    }),
   )
   .add(
-    HttpApiEndpoint.post("upsertGuildConfig", "/guildConfig/upsertGuildConfig")
-      .setPayload(
-        Schema.Struct({
-          guildId: Schema.String,
-          config: Schema.Struct({
-            sheetId: Schema.optional(Schema.NullOr(Schema.String)),
-            autoCheckin: Schema.optional(Schema.NullOr(Schema.Boolean)),
-          }),
+    HttpApiEndpoint.post("upsertGuildConfig", "/guildConfig/upsertGuildConfig", {
+      payload: Schema.Struct({
+        guildId: Schema.String,
+        config: Schema.Struct({
+          sheetId: Schema.optional(Schema.NullOr(Schema.String)),
+          autoCheckin: Schema.optional(Schema.NullOr(Schema.Boolean)),
         }),
-      )
-      .addSuccess(GuildConfig)
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+      }),
+      success: GuildConfig,
+      error: [ValidationError, QueryResultError],
+    }),
   )
   .add(
-    HttpApiEndpoint.get("getGuildMonitorRoles", "/guildConfig/getGuildMonitorRoles")
-      .setUrlParams(
-        Schema.Struct({
-          guildId: Schema.String,
-        }),
-      )
-      .addSuccess(Schema.Array(GuildConfigMonitorRole))
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+    HttpApiEndpoint.get("getGuildMonitorRoles", "/guildConfig/getGuildMonitorRoles", {
+      query: Schema.Struct({
+        guildId: Schema.String,
+      }),
+      success: Schema.Array(GuildConfigMonitorRole),
+      error: [ValidationError, QueryResultError],
+    }),
   )
   .add(
-    HttpApiEndpoint.get("getGuildChannels", "/guildConfig/getGuildChannels")
-      .setUrlParams(
-        Schema.Struct({
-          guildId: Schema.String,
-          running: Schema.optional(Schema.BooleanFromString),
-        }),
-      )
-      .addSuccess(Schema.Array(GuildChannelConfig))
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+    HttpApiEndpoint.get("getGuildChannels", "/guildConfig/getGuildChannels", {
+      query: Schema.Struct({
+        guildId: Schema.String,
+        running: Schema.optional(BooleanFromString),
+      }),
+      success: Schema.Array(GuildChannelConfig),
+      error: [ValidationError, QueryResultError],
+    }),
   )
   .add(
-    HttpApiEndpoint.post("addGuildMonitorRole", "/guildConfig/addGuildMonitorRole")
-      .setPayload(
-        Schema.Struct({
-          guildId: Schema.String,
-          roleId: Schema.String,
-        }),
-      )
-      .addSuccess(GuildConfigMonitorRole)
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+    HttpApiEndpoint.post("addGuildMonitorRole", "/guildConfig/addGuildMonitorRole", {
+      payload: Schema.Struct({
+        guildId: Schema.String,
+        roleId: Schema.String,
+      }),
+      success: GuildConfigMonitorRole,
+      error: [ValidationError, QueryResultError],
+    }),
   )
   .add(
-    HttpApiEndpoint.post("removeGuildMonitorRole", "/guildConfig/removeGuildMonitorRole")
-      .setPayload(
-        Schema.Struct({
-          guildId: Schema.String,
-          roleId: Schema.String,
-        }),
-      )
-      .addSuccess(GuildConfigMonitorRole)
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+    HttpApiEndpoint.post("removeGuildMonitorRole", "/guildConfig/removeGuildMonitorRole", {
+      payload: Schema.Struct({
+        guildId: Schema.String,
+        roleId: Schema.String,
+      }),
+      success: GuildConfigMonitorRole,
+      error: [ValidationError, QueryResultError],
+    }),
   )
   .add(
-    HttpApiEndpoint.post("upsertGuildChannelConfig", "/guildConfig/upsertGuildChannelConfig")
-      .setPayload(
-        Schema.Struct({
-          guildId: Schema.String,
-          channelId: Schema.String,
-          config: Schema.Struct({
-            name: Schema.optional(Schema.NullOr(Schema.String)),
-            running: Schema.optional(Schema.NullOr(Schema.Boolean)),
-            roleId: Schema.optional(Schema.NullOr(Schema.String)),
-            checkinChannelId: Schema.optional(Schema.NullOr(Schema.String)),
-          }),
+    HttpApiEndpoint.post("upsertGuildChannelConfig", "/guildConfig/upsertGuildChannelConfig", {
+      payload: Schema.Struct({
+        guildId: Schema.String,
+        channelId: Schema.String,
+        config: Schema.Struct({
+          name: Schema.optional(Schema.NullOr(Schema.String)),
+          running: Schema.optional(Schema.NullOr(Schema.Boolean)),
+          roleId: Schema.optional(Schema.NullOr(Schema.String)),
+          checkinChannelId: Schema.optional(Schema.NullOr(Schema.String)),
         }),
-      )
-      .addSuccess(GuildChannelConfig)
-      .addError(Schema.Union(ValidationError, QueryResultError)),
+      }),
+      success: GuildChannelConfig,
+      error: [ValidationError, QueryResultError],
+    }),
   )
   .add(
-    HttpApiEndpoint.get("getGuildChannelById", "/guildConfig/getGuildChannelById")
-      .setUrlParams(
-        Schema.Struct({
-          guildId: Schema.String,
-          channelId: Schema.String,
-          running: Schema.optional(Schema.BooleanFromString),
-        }),
-      )
-      .addSuccess(GuildChannelConfig)
-      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
+    HttpApiEndpoint.get("getGuildChannelById", "/guildConfig/getGuildChannelById", {
+      query: Schema.Struct({
+        guildId: Schema.String,
+        channelId: Schema.String,
+        running: Schema.optional(BooleanFromString),
+      }),
+      success: GuildChannelConfig,
+      error: [ValidationError, QueryResultError, ArgumentError],
+    }),
   )
   .add(
-    HttpApiEndpoint.get("getGuildChannelByName", "/guildConfig/getGuildChannelByName")
-      .setUrlParams(
-        Schema.Struct({
-          guildId: Schema.String,
-          channelName: Schema.String,
-          running: Schema.optional(Schema.BooleanFromString),
-        }),
-      )
-      .addSuccess(GuildChannelConfig)
-      .addError(Schema.Union(ValidationError, QueryResultError, ArgumentError)),
+    HttpApiEndpoint.get("getGuildChannelByName", "/guildConfig/getGuildChannelByName", {
+      query: Schema.Struct({
+        guildId: Schema.String,
+        channelName: Schema.String,
+        running: Schema.optional(BooleanFromString),
+      }),
+      success: GuildChannelConfig,
+      error: [ValidationError, QueryResultError, ArgumentError],
+    }),
   )
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Guild Config")

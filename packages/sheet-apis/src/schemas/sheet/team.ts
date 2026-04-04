@@ -13,11 +13,11 @@ export class Team extends Schema.TaggedClass<Team>()("Team", {
   static getEffectValue = ({ lead, backline }: Team) => lead + (backline - lead) / 5;
 
   static byPlayerName = Order.mapInput(
-    Option.getOrder(String.Order),
+    Option.makeOrder(String.Order),
     ({ playerName }: Team) => playerName,
   );
 
-  static byTalent = Order.mapInput(Option.getOrder(Number.Order), ({ talent }: Team) => talent);
+  static byTalent = Order.mapInput(Option.makeOrder(Number.Order), ({ talent }: Team) => talent);
 
   static byEffectValue = Order.mapInput(Number.Order, Team.getEffectValue);
 }

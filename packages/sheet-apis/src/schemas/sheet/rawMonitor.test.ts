@@ -1,10 +1,10 @@
-import { JSONSchema } from "effect";
+import { Schema } from "effect";
 import { describe, expect, it } from "@effect/vitest";
 import { RawMonitor } from "./rawMonitor";
 
 describe("RawMonitor", () => {
   it("RawMonitor generates json schema", () => {
-    const schema = JSONSchema.make(RawMonitor);
+    const schema = Schema.toJsonSchemaDocument(RawMonitor);
     expect(schema).toBeDefined();
   });
 });

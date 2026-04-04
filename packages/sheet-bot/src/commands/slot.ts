@@ -5,10 +5,10 @@ import {
   MessageFlags,
 } from "discord-api-types/v10";
 import { Ix } from "dfx/index";
-import { Array, Chunk, Effect, Layer, Number, Option, Order, pipe, Schema, String } from "effect";
-import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
-import { CommandHelper } from "dfx-discord-utils/utils";
-import { Interaction, makeMessageActionRowData } from "dfx-discord-utils/utils";
+import { Chunk, Effect, Layer, Option, Schema, String, pipe } from "effect";
+import { CommandHelper, Interaction, makeMessageActionRowData } from "dfx-discord-utils/utils";
+import { discordGatewayLayer } from "../discord/gateway";
+import { slotButtonData } from "../messageComponents/buttons/slot";
 import {
   EmbedService,
   FormatService,
@@ -17,7 +17,26 @@ import {
   ScheduleService,
   SheetApisRequestContext,
 } from "../services";
-import { slotButtonData } from "../messageComponents/buttons/slot";
+
+const getInteractionGuildId = Effect.gen(function* () {
+  const interactionGuild = yield* Interaction.guild();
+  return pipe(
+    interactionGuild,
+    Option.map((guild) => (guild as { id: string }).id),
+  );
+});
+
+const getInteractionChannelId = Effect.gen(function* () {
+  const interactionChannel = yield* Interaction.channel();
+  return pipe(
+    interactionChannel,
+    Option.map((channel) => (channel as { id: string }).id),
+  );
+});
+
+const getInteractionUserId = Effect.gen(function* () {
+  return ((yield* Interaction.user()) as { id: string }).id;
+});
 
 const makeListSubCommand = Effect.gen(function* () {
   const embedService = yield* EmbedService;
@@ -46,52 +65,33 @@ const makeListSubCommand = Effect.gen(function* () {
             ),
         ),
     Effect.fn("slot.list")(function* (command) {
-      const serverId = command.optionValueOptional("server_id");
-      const messageType = pipe(
-        command.optionValueOptional("message_type"),
-        Option.getOrElse(() => "ephemeral"),
-        Schema.decodeUnknown(Schema.Literal("persistent", "ephemeral")),
-      );
-
-      const isEphemeral = yield* pipe(
-        messageType,
-        Effect.map((type) => type === "ephemeral"),
-      );
-
-      // Get guildId from interaction or provided serverId
-      const interactionGuildId = (yield* Interaction.guild()).pipe(Option.map((guild) => guild.id));
+      const interactionGuildId = yield* getInteractionGuildId;
       const guildId = pipe(
-        serverId,
+        command.optionValueOptional("server_id"),
         Option.orElse(() => interactionGuildId),
-        Option.getOrThrow,
+        Option.getOrThrowWith(() => new Error("Guild not found in interaction or command options")),
       );
 
+      const messageType = yield* Schema.decodeUnknownEffect(
+        Schema.Literals(["persistent", "ephemeral"]),
+      )(Option.getOrElse(command.optionValueOptional("message_type"), () => "ephemeral"));
+
+      const isEphemeral = messageType === "ephemeral";
       const day = command.optionValue("day");
 
       yield* command.deferReply({ flags: isEphemeral ? MessageFlags.Ephemeral : undefined });
 
-      // Keep this check in the bot because persistent vs ephemeral access is still a bot policy.
-      yield* pipe(
-        permissionService.checkInteractionUserMonitorGuild(guildId),
-        Effect.unless(() => isEphemeral),
-      );
+      if (!isEphemeral) {
+        yield* permissionService.checkInteractionUserMonitorGuild(guildId);
+      }
 
       const daySchedule = yield* scheduleService.dayPopulatedFillerSchedules(guildId, day);
-
-      const filteredSchedules = pipe(
-        daySchedule,
-        Array.filterMap((schedule) =>
-          pipe(
-            schedule.hour,
-            Option.map(() => schedule),
-          ),
-        ),
-      );
-
-      const sortedSchedules = pipe(
-        filteredSchedules,
-        Array.sortBy(Order.mapInput(Option.getOrder(Number.Order), ({ hour }) => hour)),
-      );
+      const sortedSchedules: ReadonlyArray<(typeof daySchedule)[number]> = [...daySchedule]
+        .filter((schedule) => Option.isSome(schedule.hour))
+        .sort(
+          (left: (typeof daySchedule)[number], right: (typeof daySchedule)[number]) =>
+            Option.getOrThrow(left.hour) - Option.getOrThrow(right.hour),
+        );
 
       const openSlots = yield* pipe(
         sortedSchedules,
@@ -115,21 +115,19 @@ const makeListSubCommand = Effect.gen(function* () {
         ),
       );
 
-      const embeds = [
-        (yield* embedService.makeBaseEmbedBuilder())
-          .setTitle(`Day ${day} Open Slots~`)
-          .setDescription(openSlots)
-          .toJSON(),
-        (yield* embedService.makeBaseEmbedBuilder())
-          .setTitle(`Day ${day} Filled Slots~`)
-          .setDescription(filledSlots)
-          .toJSON(),
-        (yield* embedService.makeWebScheduleEmbed()).toJSON(),
-      ];
-
       yield* command.editReply({
         payload: {
-          embeds,
+          embeds: [
+            (yield* embedService.makeBaseEmbedBuilder())
+              .setTitle(`Day ${day} Open Slots~`)
+              .setDescription(openSlots)
+              .toJSON(),
+            (yield* embedService.makeBaseEmbedBuilder())
+              .setTitle(`Day ${day} Filled Slots~`)
+              .setDescription(filledSlots)
+              .toJSON(),
+            (yield* embedService.makeWebScheduleEmbed()).toJSON(),
+          ],
         },
       });
     }),
@@ -152,34 +150,20 @@ const makeButtonSubCommand = Effect.gen(function* () {
           option.setName("server_id").setDescription("The server to get the teams for"),
         ),
     Effect.fn("slot.button")(function* (command) {
-      const serverId = command.optionValueOptional("server_id");
-
-      // Get guildId from interaction or provided serverId
-      const interactionGuildId = (yield* Interaction.guild()).pipe(Option.map((guild) => guild.id));
+      const interactionGuildId = yield* getInteractionGuildId;
       const guildId = pipe(
-        serverId,
+        command.optionValueOptional("server_id"),
         Option.orElse(() => interactionGuildId),
-        Option.getOrThrow,
+        Option.getOrThrowWith(() => new Error("Guild not found in interaction or command options")),
       );
 
-      // Keep this check in the bot because the command still creates a persistent Discord message.
       yield* permissionService.checkInteractionUserMonitorGuild(guildId);
-
       yield* command.deferReply({ flags: MessageFlags.Ephemeral });
 
       const day = command.optionValue("day");
-
-      const channelId = yield* pipe(
-        Interaction.channel(),
-        Effect.flatMap((channel) =>
-          channel.pipe(
-            Option.map((c) => c.id),
-            Option.match({
-              onSome: Effect.succeed,
-              onNone: () => Effect.fail(new Error("Channel not found in interaction")),
-            }),
-          ),
-        ),
+      const channelId = Option.getOrThrowWith(
+        yield* getInteractionChannelId,
+        () => new Error("Channel not found in interaction"),
       );
 
       const messageResult = yield* command.rest.createMessage(channelId, {
@@ -191,7 +175,7 @@ const makeButtonSubCommand = Effect.gen(function* () {
         day,
         guildId,
         messageChannelId: channelId,
-        createdByUserId: (yield* Interaction.user()).id,
+        createdByUserId: yield* getInteractionUserId,
       });
 
       yield* command.editReply({
@@ -236,10 +220,10 @@ const makeSlotCommand = Effect.gen(function* () {
 const makeGlobalSlotCommand = Effect.gen(function* () {
   const slotCommand = yield* makeSlotCommand;
 
-  return CommandHelper.makeGlobalCommand(slotCommand.data, slotCommand.handler);
+  return CommandHelper.makeGlobalCommand(slotCommand.data, slotCommand.handler as never);
 });
 
-export const SlotCommandLive = Layer.scopedDiscard(
+export const slotCommandLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const registry = yield* InteractionsRegistry;
     const command = yield* makeGlobalSlotCommand;
@@ -249,12 +233,12 @@ export const SlotCommandLive = Layer.scopedDiscard(
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
-      DiscordGatewayLayerLive,
-      PermissionService.Default,
-      ScheduleService.Default,
-      FormatService.Default,
-      EmbedService.Default,
-      MessageSlotService.Default,
+      discordGatewayLayer,
+      PermissionService.layer,
+      ScheduleService.layer,
+      FormatService.layer,
+      EmbedService.layer,
+      MessageSlotService.layer,
     ),
   ),
 );

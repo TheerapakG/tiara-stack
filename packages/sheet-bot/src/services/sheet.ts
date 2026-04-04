@@ -1,129 +1,107 @@
-import { Data, Effect, pipe } from "effect";
+import { Data, Effect, Layer, ServiceMap } from "effect";
 import { ScopedCache } from "typhoon-core/utils";
 import { SheetApisClient } from "./sheetApis";
 
-export class SheetService extends Effect.Service<SheetService>()("SheetService", {
-  effect: pipe(
-    Effect.all({ sheetApisClient: SheetApisClient }),
-    Effect.map(({ sheetApisClient }) => ({
-      getRangesConfig: Effect.fn("Sheet.getRangesConfig")((guildId: string) =>
-        sheetApisClient.get().sheet.getRangesConfig({ urlParams: { guildId } }),
-      ),
-      getTeamConfig: Effect.fn("Sheet.getTeamConfig")((guildId: string) =>
-        sheetApisClient.get().sheet.getTeamConfig({ urlParams: { guildId } }),
-      ),
-      getMonitors: Effect.fn("Sheet.getMonitors")((guildId: string) =>
-        sheetApisClient.get().sheet.getMonitors({ urlParams: { guildId } }),
-      ),
-      getEventConfig: Effect.fn("Sheet.getEventConfig")((guildId: string) =>
-        sheetApisClient.get().sheet.getEventConfig({ urlParams: { guildId } }),
-      ),
-      getScheduleConfig: Effect.fn("Sheet.getScheduleConfig")((guildId: string) =>
-        sheetApisClient.get().sheet.getScheduleConfig({ urlParams: { guildId } }),
-      ),
-      getRunnerConfig: Effect.fn("Sheet.getRunnerConfig")((guildId: string) =>
-        sheetApisClient.get().sheet.getRunnerConfig({ urlParams: { guildId } }),
-      ),
-      getPlayers: Effect.fn("Sheet.getPlayers")((guildId: string) =>
-        sheetApisClient.get().sheet.getPlayers({ urlParams: { guildId } }),
-      ),
-      getTeams: Effect.fn("Sheet.getTeams")((guildId: string) =>
-        sheetApisClient.get().sheet.getTeams({ urlParams: { guildId } }),
-      ),
-      // Filler schedules - filtered by visible, with fill/overfill/standby/runners cleared
-      getAllFillerSchedules: Effect.fn("Sheet.getAllFillerSchedules")((guildId: string) =>
+class GuildDayKey extends Data.Class<{ guildId: string; day: number }> {}
+class GuildChannelKey extends Data.Class<{ guildId: string; channel: string }> {}
+
+export class SheetService extends ServiceMap.Service<SheetService>()("SheetService", {
+  make: Effect.gen(function* () {
+    const sheetApisClient = yield* SheetApisClient;
+
+    const getRangesConfig = Effect.fn("Sheet.getRangesConfig")((guildId: string) =>
+      sheetApisClient.get().sheet.getRangesConfig({ query: { guildId } }),
+    );
+    const getTeamConfig = Effect.fn("Sheet.getTeamConfig")((guildId: string) =>
+      sheetApisClient.get().sheet.getTeamConfig({ query: { guildId } }),
+    );
+    const getMonitors = Effect.fn("Sheet.getMonitors")((guildId: string) =>
+      sheetApisClient.get().sheet.getMonitors({ query: { guildId } }),
+    );
+    const getEventConfig = Effect.fn("Sheet.getEventConfig")((guildId: string) =>
+      sheetApisClient.get().sheet.getEventConfig({ query: { guildId } }),
+    );
+    const getScheduleConfig = Effect.fn("Sheet.getScheduleConfig")((guildId: string) =>
+      sheetApisClient.get().sheet.getScheduleConfig({ query: { guildId } }),
+    );
+    const getRunnerConfig = Effect.fn("Sheet.getRunnerConfig")((guildId: string) =>
+      sheetApisClient.get().sheet.getRunnerConfig({ query: { guildId } }),
+    );
+    const getPlayers = Effect.fn("Sheet.getPlayers")((guildId: string) =>
+      sheetApisClient.get().sheet.getPlayers({ query: { guildId } }),
+    );
+    const getTeams = Effect.fn("Sheet.getTeams")((guildId: string) =>
+      sheetApisClient.get().sheet.getTeams({ query: { guildId } }),
+    );
+    const getAllFillerSchedules = Effect.fn("Sheet.getAllFillerSchedules")((guildId: string) =>
+      sheetApisClient
+        .get()
+        .sheet.getAllSchedules({ query: { guildId, view: "filler" } })
+        .pipe(Effect.map(({ schedules }) => schedules)),
+    );
+    const getDayFillerSchedules = Effect.fn("Sheet.getDayFillerSchedules")(
+      (guildId: string, day: number) =>
         sheetApisClient
           .get()
-          .sheet.getAllSchedules({ urlParams: { guildId, view: "filler" } })
+          .sheet.getDaySchedules({ query: { guildId, day, view: "filler" } })
           .pipe(Effect.map(({ schedules }) => schedules)),
-      ),
-      getDayFillerSchedules: Effect.fn("Sheet.getDayFillerSchedules")(
-        (guildId: string, day: number) =>
-          sheetApisClient
-            .get()
-            .sheet.getDaySchedules({ urlParams: { guildId, day, view: "filler" } })
-            .pipe(Effect.map(({ schedules }) => schedules)),
-      ),
-      getChannelFillerSchedules: Effect.fn("Sheet.getChannelFillerSchedules")(
-        (guildId: string, channel: string) =>
-          sheetApisClient
-            .get()
-            .sheet.getChannelSchedules({ urlParams: { guildId, channel, view: "filler" } })
-            .pipe(Effect.map(({ schedules }) => schedules)),
-      ),
-      // Monitor schedules - full access, requires monitor authorization
-      getAllMonitorSchedules: Effect.fn("Sheet.getAllMonitorSchedules")((guildId: string) =>
+    );
+    const getChannelFillerSchedules = Effect.fn("Sheet.getChannelFillerSchedules")(
+      (guildId: string, channel: string) =>
         sheetApisClient
           .get()
-          .sheet.getAllSchedules({ urlParams: { guildId, view: "monitor" } })
+          .sheet.getChannelSchedules({ query: { guildId, channel, view: "filler" } })
           .pipe(Effect.map(({ schedules }) => schedules)),
-      ),
-      getDayMonitorSchedules: Effect.fn("Sheet.getDayMonitorSchedules")(
-        (guildId: string, day: number) =>
-          sheetApisClient
-            .get()
-            .sheet.getDaySchedules({ urlParams: { guildId, day, view: "monitor" } })
-            .pipe(Effect.map(({ schedules }) => schedules)),
-      ),
-      getChannelMonitorSchedules: Effect.fn("Sheet.getChannelMonitorSchedules")(
-        (guildId: string, channel: string) =>
-          sheetApisClient
-            .get()
-            .sheet.getChannelSchedules({ urlParams: { guildId, channel, view: "monitor" } })
-            .pipe(Effect.map(({ schedules }) => schedules)),
-      ),
-    })),
-    Effect.flatMap((sheetMethods) =>
-      Effect.all({
-        getRangesConfigCache: ScopedCache.make({
-          lookup: sheetMethods.getRangesConfig,
-        }),
-        getTeamConfigCache: ScopedCache.make({
-          lookup: sheetMethods.getTeamConfig,
-        }),
-        getMonitorsCache: ScopedCache.make({
-          lookup: sheetMethods.getMonitors,
-        }),
-        getEventConfigCache: ScopedCache.make({
-          lookup: sheetMethods.getEventConfig,
-        }),
-        getScheduleConfigCache: ScopedCache.make({
-          lookup: sheetMethods.getScheduleConfig,
-        }),
-        getRunnerConfigCache: ScopedCache.make({
-          lookup: sheetMethods.getRunnerConfig,
-        }),
-        getPlayersCache: ScopedCache.make({
-          lookup: sheetMethods.getPlayers,
-        }),
-        getTeamsCache: ScopedCache.make({
-          lookup: sheetMethods.getTeams,
-        }),
-        getAllFillerSchedulesCache: ScopedCache.make({
-          lookup: sheetMethods.getAllFillerSchedules,
-        }),
-        getDayFillerSchedulesCache: ScopedCache.make({
-          lookup: ({ guildId, day }: { guildId: string; day: number }) =>
-            sheetMethods.getDayFillerSchedules(guildId, day),
-        }),
-        getChannelFillerSchedulesCache: ScopedCache.make({
-          lookup: ({ guildId, channel }: { guildId: string; channel: string }) =>
-            sheetMethods.getChannelFillerSchedules(guildId, channel),
-        }),
-        getAllMonitorSchedulesCache: ScopedCache.make({
-          lookup: sheetMethods.getAllMonitorSchedules,
-        }),
-        getDayMonitorSchedulesCache: ScopedCache.make({
-          lookup: ({ guildId, day }: { guildId: string; day: number }) =>
-            sheetMethods.getDayMonitorSchedules(guildId, day),
-        }),
-        getChannelMonitorSchedulesCache: ScopedCache.make({
-          lookup: ({ guildId, channel }: { guildId: string; channel: string }) =>
-            sheetMethods.getChannelMonitorSchedules(guildId, channel),
-        }),
+    );
+    const getAllMonitorSchedules = Effect.fn("Sheet.getAllMonitorSchedules")((guildId: string) =>
+      sheetApisClient
+        .get()
+        .sheet.getAllSchedules({ query: { guildId, view: "monitor" } })
+        .pipe(Effect.map(({ schedules }) => schedules)),
+    );
+    const getDayMonitorSchedules = Effect.fn("Sheet.getDayMonitorSchedules")(
+      (guildId: string, day: number) =>
+        sheetApisClient
+          .get()
+          .sheet.getDaySchedules({ query: { guildId, day, view: "monitor" } })
+          .pipe(Effect.map(({ schedules }) => schedules)),
+    );
+    const getChannelMonitorSchedules = Effect.fn("Sheet.getChannelMonitorSchedules")(
+      (guildId: string, channel: string) =>
+        sheetApisClient
+          .get()
+          .sheet.getChannelSchedules({ query: { guildId, channel, view: "monitor" } })
+          .pipe(Effect.map(({ schedules }) => schedules)),
+    );
+
+    const caches = yield* Effect.all({
+      getRangesConfigCache: ScopedCache.make({ lookup: getRangesConfig }),
+      getTeamConfigCache: ScopedCache.make({ lookup: getTeamConfig }),
+      getMonitorsCache: ScopedCache.make({ lookup: getMonitors }),
+      getEventConfigCache: ScopedCache.make({ lookup: getEventConfig }),
+      getScheduleConfigCache: ScopedCache.make({ lookup: getScheduleConfig }),
+      getRunnerConfigCache: ScopedCache.make({ lookup: getRunnerConfig }),
+      getPlayersCache: ScopedCache.make({ lookup: getPlayers }),
+      getTeamsCache: ScopedCache.make({ lookup: getTeams }),
+      getAllFillerSchedulesCache: ScopedCache.make({ lookup: getAllFillerSchedules }),
+      getDayFillerSchedulesCache: ScopedCache.make({
+        lookup: ({ guildId, day }: GuildDayKey) => getDayFillerSchedules(guildId, day),
       }),
-    ),
-    Effect.map((caches) => ({
+      getChannelFillerSchedulesCache: ScopedCache.make({
+        lookup: ({ guildId, channel }: GuildChannelKey) =>
+          getChannelFillerSchedules(guildId, channel),
+      }),
+      getAllMonitorSchedulesCache: ScopedCache.make({ lookup: getAllMonitorSchedules }),
+      getDayMonitorSchedulesCache: ScopedCache.make({
+        lookup: ({ guildId, day }: GuildDayKey) => getDayMonitorSchedules(guildId, day),
+      }),
+      getChannelMonitorSchedulesCache: ScopedCache.make({
+        lookup: ({ guildId, channel }: GuildChannelKey) =>
+          getChannelMonitorSchedules(guildId, channel),
+      }),
+    });
+
+    return {
       getRangesConfig: (guildId: string) => caches.getRangesConfigCache.get(guildId),
       getTeamConfig: (guildId: string) => caches.getTeamConfigCache.get(guildId),
       getMonitors: (guildId: string) => caches.getMonitorsCache.get(guildId),
@@ -132,20 +110,18 @@ export class SheetService extends Effect.Service<SheetService>()("SheetService",
       getRunnerConfig: (guildId: string) => caches.getRunnerConfigCache.get(guildId),
       getPlayers: (guildId: string) => caches.getPlayersCache.get(guildId),
       getTeams: (guildId: string) => caches.getTeamsCache.get(guildId),
-      // Filler schedules
       getAllFillerSchedules: (guildId: string) => caches.getAllFillerSchedulesCache.get(guildId),
       getDayFillerSchedules: (guildId: string, day: number) =>
-        caches.getDayFillerSchedulesCache.get(Data.struct({ guildId, day })),
+        caches.getDayFillerSchedulesCache.get(new GuildDayKey({ guildId, day })),
       getChannelFillerSchedules: (guildId: string, channel: string) =>
-        caches.getChannelFillerSchedulesCache.get(Data.struct({ guildId, channel })),
-      // Monitor schedules
+        caches.getChannelFillerSchedulesCache.get(new GuildChannelKey({ guildId, channel })),
       getAllMonitorSchedules: (guildId: string) => caches.getAllMonitorSchedulesCache.get(guildId),
       getDayMonitorSchedules: (guildId: string, day: number) =>
-        caches.getDayMonitorSchedulesCache.get(Data.struct({ guildId, day })),
+        caches.getDayMonitorSchedulesCache.get(new GuildDayKey({ guildId, day })),
       getChannelMonitorSchedules: (guildId: string, channel: string) =>
-        caches.getChannelMonitorSchedulesCache.get(Data.struct({ guildId, channel })),
-    })),
-  ),
-  dependencies: [SheetApisClient.Default],
-  accessors: true,
-}) {}
+        caches.getChannelMonitorSchedulesCache.get(new GuildChannelKey({ guildId, channel })),
+    };
+  }),
+}) {
+  static layer = Layer.effect(SheetService, this.make).pipe(Layer.provide(SheetApisClient.layer));
+}

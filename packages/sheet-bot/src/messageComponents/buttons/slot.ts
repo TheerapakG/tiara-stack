@@ -1,7 +1,7 @@
 import { InteractionsRegistry } from "dfx/gateway";
 import { Ix } from "dfx/index";
 import { Array, Chunk, Effect, Layer, Number, Option, Order, pipe, String } from "effect";
-import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
+import { discordGatewayLayer } from "../../discord/gateway";
 import { makeButton, makeButtonData, makeMessageComponent } from "dfx-discord-utils/utils";
 import {
   EmbedService,
@@ -12,6 +12,22 @@ import {
 } from "@/services";
 import { Interaction } from "dfx-discord-utils/utils";
 import { ButtonStyle, MessageFlags } from "discord-api-types/v10";
+
+const getInteractionGuildId = Effect.gen(function* () {
+  const interactionGuild = yield* Interaction.guild();
+  return pipe(
+    interactionGuild,
+    Option.map((guild) => (guild as { id: string }).id),
+  );
+});
+
+const getInteractionMessageId = Effect.gen(function* () {
+  const interactionMessage = yield* Interaction.message();
+  return pipe(
+    interactionMessage,
+    Option.map((message) => (message as { id: string }).id),
+  );
+});
 
 export const slotButtonData = makeButtonData((b) =>
   b.setCustomId("interaction:slot").setLabel("Open slots").setStyle(ButtonStyle.Primary),
@@ -31,17 +47,12 @@ const makeSlotButtonHandler = Effect.gen(function* () {
 
     const filteredSchedules = pipe(
       daySchedule,
-      Array.filterMap((schedule) =>
-        pipe(
-          schedule.hour,
-          Option.map(() => schedule),
-        ),
-      ),
+      Array.filter((schedule) => Option.isSome(schedule.hour)),
     );
 
     const sortedSchedules = pipe(
       filteredSchedules,
-      Array.sortBy(Order.mapInput(Option.getOrder(Number.Order), ({ hour }) => hour)),
+      Array.sortBy(Order.mapInput(Option.makeOrder(Number.Order), ({ hour }) => hour)),
     );
 
     const openSlots = yield* pipe(
@@ -84,11 +95,8 @@ const makeSlotButtonHandler = Effect.gen(function* () {
       Effect.fn("slotButton")(function* (msgHelper) {
         yield* msgHelper.deferReply({ flags: MessageFlags.Ephemeral });
 
-        const guild = yield* Interaction.guild();
-        const message = yield* Interaction.message();
-
-        const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
-        const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
+        const guildId = Option.getOrThrow(yield* getInteractionGuildId);
+        const messageId = Option.getOrThrow(yield* getInteractionMessageId);
 
         const messageSlotData = yield* messageSlotService.getMessageSlotData(messageId);
 
@@ -114,10 +122,10 @@ const makeSlotButtonHandler = Effect.gen(function* () {
 const makeSlotButton = Effect.gen(function* () {
   const button = yield* makeSlotButtonHandler;
 
-  return makeMessageComponent(button.data, button.handler);
+  return makeMessageComponent(button.data, button.handler as never);
 });
 
-export const SlotButtonLive = Layer.scopedDiscard(
+export const slotButtonLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const registry = yield* InteractionsRegistry;
     const button = yield* makeSlotButton;
@@ -127,11 +135,11 @@ export const SlotButtonLive = Layer.scopedDiscard(
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
-      DiscordGatewayLayerLive,
-      MessageSlotService.Default,
-      ScheduleService.Default,
-      FormatService.Default,
-      EmbedService.Default,
+      discordGatewayLayer,
+      MessageSlotService.layer,
+      ScheduleService.layer,
+      FormatService.layer,
+      EmbedService.layer,
     ),
   ),
 );

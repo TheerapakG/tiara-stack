@@ -1,4 +1,4 @@
-import { Array, Data, Function, HashMap, Option, pipe, Struct, Tuple, Types } from "effect";
+import { Array, Function, HashMap, Option, pipe, Struct, Record, Tuple } from "effect";
 
 export const toHashMap =
   <A, B, K>({
@@ -23,7 +23,7 @@ export const toHashMap =
     );
 
 export const toHashMapByKeyWith =
-  <const K extends PropertyKey, A extends { [P in K]?: any }, B>({
+  <const K extends string | symbol, A extends { [P in K]?: any }, B>({
     key,
     valueInitializer,
     valueReducer,
@@ -32,29 +32,27 @@ export const toHashMapByKeyWith =
     valueInitializer: (a: A) => B;
     valueReducer: (b: NoInfer<B>, a: NoInfer<A>) => NoInfer<B>;
   }) =>
-  (a: ReadonlyArray<A>): HashMap.HashMap<Types.MatchRecord<A, A[K] | undefined, A[K]>, B> =>
-    toHashMap<A, B, Types.MatchRecord<A, A[K] | undefined, A[K]>>({
+  (a: ReadonlyArray<A>): HashMap.HashMap<A[K], B> =>
+    toHashMap<A, B, A[K]>({
       keyGetter: Struct.get(key),
       valueInitializer: valueInitializer,
       valueReducer: valueReducer,
     })(a);
 
 export const toHashMapByKey =
-  <const K extends PropertyKey>(key: K) =>
-  <A extends { [P in K]?: any }>(
-    a: ReadonlyArray<A>,
-  ): HashMap.HashMap<Types.MatchRecord<A, A[K] | undefined, A[K]>, A> =>
+  <const K extends string | symbol>(key: K) =>
+  <A extends { [P in K]?: any }>(a: ReadonlyArray<A>): HashMap.HashMap<A[K], A> =>
     toHashMapByKeyWith<K, A, A>({
       key,
       valueInitializer: Function.identity,
-      valueReducer: Function.untupled(Tuple.getSecond),
+      valueReducer: Function.untupled(Tuple.get(1)),
     })(a);
 
 export const toArrayHashMapByKey =
-  <const K extends PropertyKey>(key: K) =>
+  <const K extends string | symbol>(key: K) =>
   <A extends { [P in K]?: any }>(
     a: ReadonlyArray<A>,
-  ): HashMap.HashMap<Types.MatchRecord<A, A[K] | undefined, A[K]>, Array.NonEmptyArray<A>> =>
+  ): HashMap.HashMap<A[K], Array.NonEmptyArray<A>> =>
     toHashMapByKeyWith<K, A, Array.NonEmptyArray<A>>({
       key,
       valueInitializer: Array.make,
@@ -62,17 +60,17 @@ export const toArrayHashMapByKey =
     })(a);
 
 type MapStructKeyValues<
-  Keys extends Array.NonEmptyReadonlyArray<PropertyKey>,
+  Keys extends Array.NonEmptyReadonlyArray<string | symbol>,
   A extends { [P in Keys[number]]?: any },
 > = {
-  [K in Keys[number]]: Types.MatchRecord<A, A[K] | undefined, A[K]>;
+  [K in Keys[number]]: A[K];
 } extends infer B
   ? B
   : never;
 
 export const toHashMapByKeysWith =
   <
-    const Keys extends Array.NonEmptyReadonlyArray<PropertyKey>,
+    const Keys extends Array.NonEmptyReadonlyArray<string | symbol>,
     A extends { [P in Keys[number]]?: any },
     B,
   >({
@@ -89,27 +87,26 @@ export const toHashMapByKeysWith =
       keyGetter: (a) =>
         pipe(
           keys,
-          Array.map((key) => [key, pipe(a, Struct.get(key))]),
-          Object.fromEntries,
-          Data.struct,
+          Array.map((key) => [key, pipe(a, Struct.get(key))] as const),
+          Record.fromEntries,
         ) as unknown as MapStructKeyValues<Keys, A>,
       valueInitializer: valueInitializer,
       valueReducer: valueReducer,
     })(a);
 
 export const toHashMapByKeys =
-  <const Keys extends Array.NonEmptyReadonlyArray<PropertyKey>>(keys: Keys) =>
+  <const Keys extends Array.NonEmptyReadonlyArray<string | symbol>>(keys: Keys) =>
   <A extends { [P in Keys[number]]?: any }>(
     a: ReadonlyArray<A>,
   ): HashMap.HashMap<MapStructKeyValues<Keys, A>, A> =>
     toHashMapByKeysWith<Keys, A, A>({
       keys,
       valueInitializer: Function.identity,
-      valueReducer: Function.untupled(Tuple.getSecond),
+      valueReducer: Function.untupled(Tuple.get(1)),
     })(a);
 
 export const toArrayHashMapByKeys =
-  <const Keys extends Array.NonEmptyReadonlyArray<PropertyKey>>(keys: Keys) =>
+  <const Keys extends Array.NonEmptyReadonlyArray<string | symbol>>(keys: Keys) =>
   <A extends { [P in Keys[number]]?: any }>(
     a: ReadonlyArray<A>,
   ): HashMap.HashMap<MapStructKeyValues<Keys, A>, Array.NonEmptyArray<A>> =>

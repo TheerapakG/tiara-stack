@@ -3,7 +3,7 @@ import { userMention } from "@discordjs/formatters";
 import { ButtonStyle, MessageFlags } from "discord-api-types/v10";
 import { Ix } from "dfx/index";
 import { Array, Effect, Layer, Option, pipe } from "effect";
-import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
+import { discordGatewayLayer } from "../../discord/gateway";
 import {
   makeButton,
   makeButtonData,
@@ -11,8 +11,28 @@ import {
   makeMessageComponent,
 } from "dfx-discord-utils/utils";
 import { MessageCheckinService, SheetApisRequestContext } from "@/services";
-import { GuildMemberUtils, GuildMemberUtilsLive } from "dfx-discord-utils/utils";
+import { GuildMember } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
+
+const getInteractionGuildId = Effect.gen(function* () {
+  const interactionGuild = yield* Interaction.guild();
+  return pipe(
+    interactionGuild,
+    Option.map((guild) => (guild as { id: string }).id),
+  );
+});
+
+const getInteractionUser = Effect.gen(function* () {
+  return (yield* Interaction.user()) as { id: string };
+});
+
+const getInteractionMessage = Effect.gen(function* () {
+  const interactionMessage = yield* Interaction.message();
+  return pipe(
+    interactionMessage,
+    Option.map((message) => message as { id: string; channel_id: string }),
+  );
+});
 
 export const checkinButtonData = makeButtonData((b) =>
   b
@@ -24,7 +44,7 @@ export const checkinButtonData = makeButtonData((b) =>
 
 const makeCheckinButtonHandler = Effect.gen(function* () {
   const messageCheckinService = yield* MessageCheckinService;
-  const guildMemberUtils = yield* GuildMemberUtils;
+  const guildMemberUtils = yield* GuildMember.GuildMemberUtils;
 
   return yield* makeButton(
     checkinButtonData.toJSON(),
@@ -32,14 +52,12 @@ const makeCheckinButtonHandler = Effect.gen(function* () {
       Effect.fn("checkinButton")(function* (helper) {
         yield* helper.deferReply({ flags: MessageFlags.Ephemeral });
 
-        const guild = yield* Interaction.guild();
-        const user = yield* Interaction.user();
-        const message = yield* Interaction.message();
-
-        const guildId = Option.map(guild, (g) => g.id).pipe(Option.getOrThrow);
+        const guildId = Option.getOrThrow(yield* getInteractionGuildId);
+        const user = yield* getInteractionUser;
         const accountId = user.id;
-        const messageId = Option.map(message, (m) => m.id).pipe(Option.getOrThrow);
-        const messageChannelId = Option.map(message, (m) => m.channel_id).pipe(Option.getOrThrow);
+        const message = Option.getOrThrow(yield* getInteractionMessage);
+        const messageId = message.id;
+        const messageChannelId = message.channel_id;
 
         yield* messageCheckinService.setMessageCheckinMemberCheckinAt(
           messageId,
@@ -86,8 +104,12 @@ const makeCheckinButtonHandler = Effect.gen(function* () {
           content: `${userMention(accountId)} has checked in!`,
         });
 
-        yield* Effect.transposeMapOption(messageCheckinData.roleId, (roleId) =>
-          guildMemberUtils.addRoles(guildId, accountId, [roleId]),
+        yield* pipe(
+          messageCheckinData.roleId,
+          Option.match({
+            onSome: (roleId) => guildMemberUtils.addRoles(guildId, accountId, [roleId]),
+            onNone: () => Effect.void,
+          }),
         );
       }),
     ),
@@ -102,10 +124,10 @@ export const checkinButton = {
 const makeCheckinButton = Effect.gen(function* () {
   const button = yield* makeCheckinButtonHandler;
 
-  return makeMessageComponent(button.data, button.handler);
+  return makeMessageComponent(button.data, button.handler as never);
 });
 
-export const CheckinButtonLive = Layer.scopedDiscard(
+export const checkinButtonLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const registry = yield* InteractionsRegistry;
     const button = yield* makeCheckinButton;
@@ -114,6 +136,10 @@ export const CheckinButtonLive = Layer.scopedDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(DiscordGatewayLayerLive, MessageCheckinService.Default, GuildMemberUtilsLive),
+    Layer.mergeAll(
+      discordGatewayLayer,
+      MessageCheckinService.layer,
+      GuildMember.GuildMemberUtils.layer,
+    ),
   ),
 );

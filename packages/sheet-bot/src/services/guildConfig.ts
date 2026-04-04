@@ -1,94 +1,115 @@
-import { Effect, pipe } from "effect";
+import { Effect, Layer, ServiceMap } from "effect";
 import { SheetApisClient } from "./sheetApis";
 
-export class GuildConfigService extends Effect.Service<GuildConfigService>()("GuildConfigService", {
-  effect: pipe(
-    Effect.all({
-      sheetApisClient: SheetApisClient,
-    }),
-    Effect.map(({ sheetApisClient }) => ({
-      getAutoCheckinGuilds: Effect.fn("GuildConfigService.getAutoCheckinGuilds")(() =>
-        sheetApisClient.get().guildConfig.getAutoCheckinGuilds(),
-      ),
-      getGuildConfig: Effect.fn("GuildConfigService.getGuildConfig")((guildId: string) =>
-        sheetApisClient.get().guildConfig.getGuildConfig({ urlParams: { guildId } }),
-      ),
-      upsertGuildConfig: Effect.fn("GuildConfigService.upsertGuildConfig")(
-        (
+export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()(
+  "GuildConfigService",
+  {
+    make: Effect.gen(function* () {
+      const sheetApisClient = yield* SheetApisClient;
+
+      return {
+        getAutoCheckinGuilds: Effect.fn("GuildConfigService.getAutoCheckinGuilds")(function* () {
+          return yield* sheetApisClient.get().guildConfig.getAutoCheckinGuilds();
+        }),
+        getGuildConfig: Effect.fn("GuildConfigService.getGuildConfig")(function* (guildId: string) {
+          return yield* sheetApisClient.get().guildConfig.getGuildConfig({ query: { guildId } });
+        }),
+        upsertGuildConfig: Effect.fn("GuildConfigService.upsertGuildConfig")(function* (
           guildId: string,
           config: {
             sheetId?: string | null | undefined;
             autoCheckin?: boolean | null | undefined;
           },
-        ) =>
-          sheetApisClient.get().guildConfig.upsertGuildConfig({
+        ) {
+          return yield* sheetApisClient.get().guildConfig.upsertGuildConfig({
             payload: { guildId, config },
-          }),
-      ),
-      getGuildMonitorRoles: Effect.fn("GuildConfigService.getGuildMonitorRoles")(
-        (guildId: string) =>
-          sheetApisClient.get().guildConfig.getGuildMonitorRoles({ urlParams: { guildId } }),
-      ),
-      getGuildChannels: Effect.fn("GuildConfigService.getGuildChannels")(
-        (guildId: string, running?: boolean) =>
-          sheetApisClient.get().guildConfig.getGuildChannels({
-            urlParams: {
+          });
+        }),
+        getGuildMonitorRoles: Effect.fn("GuildConfigService.getGuildMonitorRoles")(function* (
+          guildId: string,
+        ) {
+          return yield* sheetApisClient.get().guildConfig.getGuildMonitorRoles({
+            query: { guildId },
+          });
+        }),
+        getGuildChannels: Effect.fn("GuildConfigService.getGuildChannels")(function* (
+          guildId: string,
+          running?: boolean,
+        ) {
+          return yield* sheetApisClient.get().guildConfig.getGuildChannels({
+            query: {
               guildId,
               ...(typeof running === "undefined" ? {} : { running }),
             },
-          }),
-      ),
-      addGuildMonitorRole: Effect.fn("GuildConfigService.addGuildMonitorRole")(
-        (guildId: string, roleId: string) =>
-          sheetApisClient.get().guildConfig.addGuildMonitorRole({ payload: { guildId, roleId } }),
-      ),
-      removeGuildMonitorRole: Effect.fn("GuildConfigService.removeGuildMonitorRole")(
-        (guildId: string, roleId: string) =>
-          sheetApisClient
-            .get()
-            .guildConfig.removeGuildMonitorRole({ payload: { guildId, roleId } }),
-      ),
-      upsertGuildChannelConfig: Effect.fn("GuildConfigService.upsertGuildChannelConfig")(
-        (
+          });
+        }),
+        addGuildMonitorRole: Effect.fn("GuildConfigService.addGuildMonitorRole")(function* (
+          guildId: string,
+          roleId: string,
+        ) {
+          return yield* sheetApisClient.get().guildConfig.addGuildMonitorRole({
+            payload: { guildId, roleId },
+          });
+        }),
+        removeGuildMonitorRole: Effect.fn("GuildConfigService.removeGuildMonitorRole")(function* (
+          guildId: string,
+          roleId: string,
+        ) {
+          return yield* sheetApisClient.get().guildConfig.removeGuildMonitorRole({
+            payload: { guildId, roleId },
+          });
+        }),
+        upsertGuildChannelConfig: Effect.fn("GuildConfigService.upsertGuildChannelConfig")(
+          function* (
+            guildId: string,
+            channelId: string,
+            config: {
+              name?: string | null | undefined;
+              running?: boolean | null | undefined;
+              roleId?: string | null | undefined;
+              checkinChannelId?: string | null | undefined;
+            },
+          ) {
+            return yield* sheetApisClient.get().guildConfig.upsertGuildChannelConfig({
+              payload: {
+                guildId,
+                channelId,
+                config,
+              },
+            });
+          },
+        ),
+        getGuildChannelById: Effect.fn("GuildConfigService.getGuildChannelById")(function* (
           guildId: string,
           channelId: string,
-          config: {
-            name?: string | null | undefined;
-            running?: boolean | null | undefined;
-            roleId?: string | null | undefined;
-            checkinChannelId?: string | null | undefined;
-          },
-        ) =>
-          sheetApisClient.get().guildConfig.upsertGuildChannelConfig({
-            payload: {
-              guildId,
-              channelId,
-              config,
-            },
-          }),
-      ),
-      getGuildChannelById: Effect.fn("GuildConfigService.getGuildChannelById")(
-        (guildId: string, channelId: string, running?: boolean) =>
-          sheetApisClient.get().guildConfig.getGuildChannelById({
-            urlParams: {
+          running?: boolean,
+        ) {
+          return yield* sheetApisClient.get().guildConfig.getGuildChannelById({
+            query: {
               guildId,
               channelId,
               ...(typeof running === "undefined" ? {} : { running }),
             },
-          }),
-      ),
-      getGuildChannelByName: Effect.fn("GuildConfigService.getGuildChannelByName")(
-        (guildId: string, channelName: string, running?: boolean) =>
-          sheetApisClient.get().guildConfig.getGuildChannelByName({
-            urlParams: {
+          });
+        }),
+        getGuildChannelByName: Effect.fn("GuildConfigService.getGuildChannelByName")(function* (
+          guildId: string,
+          channelName: string,
+          running?: boolean,
+        ) {
+          return yield* sheetApisClient.get().guildConfig.getGuildChannelByName({
+            query: {
               guildId,
               channelName,
               ...(typeof running === "undefined" ? {} : { running }),
             },
-          }),
-      ),
-    })),
-  ),
-  dependencies: [SheetApisClient.Default],
-  accessors: true,
-}) {}
+          });
+        }),
+      };
+    }),
+  },
+) {
+  static layer = Layer.effect(GuildConfigService, this.make).pipe(
+    Layer.provide(SheetApisClient.layer),
+  );
+}

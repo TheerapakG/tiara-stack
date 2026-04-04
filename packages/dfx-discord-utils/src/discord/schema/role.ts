@@ -2,8 +2,8 @@ import { Schema } from "effect";
 
 export const DiscordRoleColors = Schema.Struct({
   primary_color: Schema.Number,
-  secondary_color: Schema.optional(Schema.NullOr(Schema.Number)),
-  tertiary_color: Schema.optional(Schema.NullOr(Schema.Number)),
+  secondary_color: Schema.NullOr(Schema.Number),
+  tertiary_color: Schema.NullOr(Schema.Number),
 });
 
 export const DiscordRoleTags = Schema.Struct({
@@ -18,7 +18,7 @@ export const DiscordRoleTags = Schema.Struct({
 export const DiscordRole = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
-  description: Schema.optional(Schema.NullOr(Schema.String)),
+  description: Schema.NullOr(Schema.String),
   permissions: Schema.String,
   position: Schema.Number,
   color: Schema.Number,
@@ -26,8 +26,8 @@ export const DiscordRole = Schema.Struct({
   hoist: Schema.Boolean,
   managed: Schema.Boolean,
   mentionable: Schema.Boolean,
-  icon: Schema.optional(Schema.NullOr(Schema.String)),
-  unicode_emoji: Schema.optional(Schema.NullOr(Schema.String)),
+  icon: Schema.NullOr(Schema.String),
+  unicode_emoji: Schema.NullOr(Schema.String),
   tags: Schema.optional(DiscordRoleTags),
   flags: Schema.Number,
 });

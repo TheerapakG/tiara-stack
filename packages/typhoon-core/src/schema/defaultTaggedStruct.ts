@@ -1,4 +1,4 @@
-import { pipe, Schema, SchemaAST } from "effect";
+import { Schema, SchemaAST, Struct } from "effect";
 
 export const DefaultTaggedStruct = <
   Tag extends SchemaAST.LiteralValue,
@@ -7,14 +7,8 @@ export const DefaultTaggedStruct = <
   tag: Tag,
   fields: Fields,
 ) =>
-  Schema.Struct({
-    _tag: pipe(
-      Schema.Literal(tag),
-      Schema.optional,
-      Schema.withDefaults({
-        constructor: () => tag,
-        decoding: () => tag,
-      }),
-    ),
-    ...fields,
-  });
+  Schema.Struct(fields).mapFields(
+    Struct.assign({
+      _tag: Schema.optional(Schema.Literal(tag)).pipe(Schema.withDecodingDefault(() => tag)),
+    }),
+  );

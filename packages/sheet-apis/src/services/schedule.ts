@@ -1,4 +1,4 @@
-import { Array, Effect, HashMap, Match, Option, pipe } from "effect";
+import { Array, Effect, HashMap, Layer, Option, ServiceMap, pipe } from "effect";
 import { SheetService } from "./sheet";
 import { PlayerService } from "./player";
 import { MonitorService } from "./monitor";
@@ -19,78 +19,69 @@ import {
   PartialNameMonitor,
 } from "@/schemas/sheet";
 import { upperFirst } from "scule";
-import { Tuple } from "effect";
+
+type SheetConfigServiceApi = Effect.Success<typeof SheetConfigService.make>;
+type EventConfig = Effect.Success<ReturnType<SheetConfigServiceApi["getEventConfig"]>>;
+
+const isPlayer = (player: Player | PartialNamePlayer): player is Player => player._tag === "Player";
 
 const populateSchedule = (
   schedule: Schedule,
-  playerMap: Map<string, Array.NonEmptyArray<Player | PartialNamePlayer>>,
-  monitorMap: Map<string, Array.NonEmptyArray<Monitor | PartialNameMonitor>>,
+  playerMap: Map<string, [Player | PartialNamePlayer, ...(Player | PartialNamePlayer)[]]>,
+  monitorMap: Map<string, [Monitor | PartialNameMonitor, ...(Monitor | PartialNameMonitor)[]]>,
 ): PopulatedSchedule => {
-  // Resolve fills players
-  const fills = Array.makeBy(5, (i) =>
+  const resolvePlayers = (name: string) =>
+    playerMap.get(upperFirst(name)) ?? [PartialNamePlayer.makeUnsafe({ name: upperFirst(name) })];
+
+  const fills = Array.makeBy(5, (index) =>
     pipe(
-      schedule.fills,
-      Array.get(i),
-      Option.flatten,
-      Option.map((rawPlayer) => {
-        const players =
-          playerMap.get(upperFirst(rawPlayer.player)) ||
-          Array.make(new PartialNamePlayer({ name: upperFirst(rawPlayer.player) }));
-        return PopulatedSchedulePlayer.make({
-          player: Array.headNonEmpty(players),
-          enc: rawPlayer.enc,
-        });
-      }),
+      schedule.fills[index],
+      Option.flatMap((rawPlayer) =>
+        Option.some(
+          PopulatedSchedulePlayer.makeUnsafe({
+            player: resolvePlayers(rawPlayer.player)[0],
+            enc: rawPlayer.enc,
+          }),
+        ),
+      ),
     ),
   );
 
-  // Resolve overfills players
-  const overfills = schedule.overfills.map((rawPlayer) => {
-    const players =
-      playerMap.get(upperFirst(rawPlayer.player)) ||
-      Array.make(new PartialNamePlayer({ name: upperFirst(rawPlayer.player) }));
-    return PopulatedSchedulePlayer.make({
-      player: Array.headNonEmpty(players),
+  const overfills = schedule.overfills.map((rawPlayer) =>
+    PopulatedSchedulePlayer.makeUnsafe({
+      player: resolvePlayers(rawPlayer.player)[0],
       enc: rawPlayer.enc,
-    });
-  });
+    }),
+  );
 
-  // Resolve standbys players
-  const standbys = schedule.standbys.map((rawPlayer) => {
-    const players =
-      playerMap.get(upperFirst(rawPlayer.player)) ||
-      Array.make(new PartialNamePlayer({ name: upperFirst(rawPlayer.player) }));
-    return PopulatedSchedulePlayer.make({
-      player: Array.headNonEmpty(players),
+  const standbys = schedule.standbys.map((rawPlayer) =>
+    PopulatedSchedulePlayer.makeUnsafe({
+      player: resolvePlayers(rawPlayer.player)[0],
       enc: rawPlayer.enc,
-    });
-  });
+    }),
+  );
 
-  // Resolve runners players
-  const runners = schedule.runners.map((rawPlayer) => {
-    const players =
-      playerMap.get(upperFirst(rawPlayer.player)) ||
-      Array.make(new PartialNamePlayer({ name: upperFirst(rawPlayer.player) }));
-    return PopulatedSchedulePlayer.make({
-      player: Array.headNonEmpty(players),
+  const runners = schedule.runners.map((rawPlayer) =>
+    PopulatedSchedulePlayer.makeUnsafe({
+      player: resolvePlayers(rawPlayer.player)[0],
       enc: rawPlayer.enc,
-    });
-  });
+    }),
+  );
 
-  // Resolve monitor
   const monitor = pipe(
     schedule.monitor,
     Option.map((name) => {
-      const monitors =
-        monitorMap.get(upperFirst(name)) ||
-        Array.make(new PartialNameMonitor({ name: upperFirst(name) }));
-      return PopulatedScheduleMonitor.make({
-        monitor: Array.headNonEmpty(monitors),
+      const resolvedName = String(name);
+      const monitors = monitorMap.get(upperFirst(resolvedName)) ?? [
+        PartialNameMonitor.makeUnsafe({ name: upperFirst(resolvedName) }),
+      ];
+      return PopulatedScheduleMonitor.makeUnsafe({
+        monitor: monitors[0],
       });
     }),
   );
 
-  return PopulatedSchedule.make({
+  return PopulatedSchedule.makeUnsafe({
     channel: schedule.channel,
     day: schedule.day,
     visible: schedule.visible,
@@ -104,36 +95,35 @@ const populateSchedule = (
   });
 };
 
-// Helper function to build player and monitor maps
 const buildResolutionMaps = (
   playerMaps: {
-    nameToPlayer: HashMap.HashMap<string, { name: string; players: Array.NonEmptyArray<Player> }>;
+    nameToPlayer: HashMap.HashMap<string, { name: string; players: [Player, ...Player[]] }>;
   },
   monitorMaps: {
     nameToMonitor: HashMap.HashMap<string, { name: string; monitors: ReadonlyArray<Monitor> }>;
   },
 ) => {
-  const playerMap = new Map<string, Array.NonEmptyArray<Player | PartialNamePlayer>>();
-
-  const playerEntries = HashMap.toEntries(playerMaps.nameToPlayer);
-  for (const entry of playerEntries) {
-    const name: string = Tuple.getFirst(entry);
-    const entryValue: { readonly name: string; readonly players: Array.NonEmptyArray<Player> } =
-      Tuple.getSecond(entry);
-    const players: Array.NonEmptyArray<Player> = entryValue.players;
-    playerMap.set(name, players as Array.NonEmptyArray<Player | PartialNamePlayer>);
+  const playerMap = new Map<
+    string,
+    [Player | PartialNamePlayer, ...(Player | PartialNamePlayer)[]]
+  >();
+  for (const [name, entry] of HashMap.toEntries(playerMaps.nameToPlayer)) {
+    playerMap.set(
+      name,
+      entry.players as [Player | PartialNamePlayer, ...(Player | PartialNamePlayer)[]],
+    );
   }
 
-  const monitorMap = new Map<string, Array.NonEmptyArray<Monitor | PartialNameMonitor>>();
-
-  const monitorEntries = HashMap.toEntries(monitorMaps.nameToMonitor);
-  for (const entry of monitorEntries) {
-    const name: string = Tuple.getFirst(entry);
-    const entryValue: { readonly name: string; readonly monitors: ReadonlyArray<Monitor> } =
-      Tuple.getSecond(entry);
-    const monitors: ReadonlyArray<Monitor> = entryValue.monitors;
-    if (monitors.length > 0) {
-      monitorMap.set(name, monitors as Array.NonEmptyArray<Monitor | PartialNameMonitor>);
+  const monitorMap = new Map<
+    string,
+    [Monitor | PartialNameMonitor, ...(Monitor | PartialNameMonitor)[]]
+  >();
+  for (const [name, entry] of HashMap.toEntries(monitorMaps.nameToMonitor)) {
+    if (entry.monitors.length > 0) {
+      monitorMap.set(
+        name,
+        entry.monitors as [Monitor | PartialNameMonitor, ...(Monitor | PartialNameMonitor)[]],
+      );
     }
   }
 
@@ -142,52 +132,39 @@ const buildResolutionMaps = (
 
 const populateScheduleResult = (
   schedule: BreakSchedule | Schedule,
-  playerMap: Map<string, Array.NonEmptyArray<Player | PartialNamePlayer>>,
-  monitorMap: Map<string, Array.NonEmptyArray<Monitor | PartialNameMonitor>>,
+  playerMap: Map<string, [Player | PartialNamePlayer, ...(Player | PartialNamePlayer)[]]>,
+  monitorMap: Map<string, [Monitor | PartialNameMonitor, ...(Monitor | PartialNameMonitor)[]]>,
 ): PopulatedScheduleResult =>
-  Match.value(schedule).pipe(
-    Match.tagsExhaustive({
-      BreakSchedule: (breakSchedule) =>
-        PopulatedBreakSchedule.make({
-          channel: breakSchedule.channel,
-          day: breakSchedule.day,
-          visible: breakSchedule.visible,
-          hour: breakSchedule.hour,
-          hourWindow: breakSchedule.hourWindow,
-        }),
-      Schedule: (currentSchedule) => populateSchedule(currentSchedule, playerMap, monitorMap),
-    }),
-  );
+  schedule._tag === "BreakSchedule"
+    ? PopulatedBreakSchedule.makeUnsafe({
+        channel: schedule.channel,
+        day: schedule.day,
+        visible: schedule.visible,
+        hour: schedule.hour,
+        hourWindow: schedule.hourWindow,
+      })
+    : populateSchedule(schedule, playerMap, monitorMap);
 
 const toPopulatedSchedules = (
   schedules: ReadonlyArray<BreakSchedule | Schedule>,
-  startTime: Effect.Effect.Success<ReturnType<SheetConfigService["getEventConfig"]>>["startTime"],
+  startTime: EventConfig["startTime"],
   playerMaps: {
-    nameToPlayer: HashMap.HashMap<string, { name: string; players: Array.NonEmptyArray<Player> }>;
+    nameToPlayer: HashMap.HashMap<string, { name: string; players: [Player, ...Player[]] }>;
   },
   monitorMaps: {
     nameToMonitor: HashMap.HashMap<string, { name: string; monitors: ReadonlyArray<Monitor> }>;
   },
 ): ReadonlyArray<PopulatedScheduleResult> => {
   const { playerMap, monitorMap } = buildResolutionMaps(playerMaps, monitorMaps);
-
-  return pipe(
-    schedules,
-    Array.map((schedule) => withScheduleHourWindow(startTime, schedule)),
-    Array.map((schedule) => populateScheduleResult(schedule, playerMap, monitorMap)),
+  return schedules.map((schedule) =>
+    populateScheduleResult(withScheduleHourWindow(startTime, schedule), playerMap, monitorMap),
   );
 };
 
 const schedulePlayerMatchesUser = (
   schedulePlayer: PopulatedSchedulePlayer,
   accountId: string,
-): boolean =>
-  Match.value(schedulePlayer.player).pipe(
-    Match.tagsExhaustive({
-      Player: (player) => player.id === accountId,
-      PartialNamePlayer: () => false,
-    }),
-  );
+): boolean => (isPlayer(schedulePlayer.player) ? schedulePlayer.player.id === accountId : false);
 
 const sortHours = (hours: ReadonlyArray<number>): number[] =>
   [...hours]
@@ -198,25 +175,25 @@ export const summarizeDayPlayerSchedule = (
   schedules: ReadonlyArray<PopulatedScheduleResult>,
   accountId: string,
 ): PlayerDayScheduleSummary => {
-  // Filler schedule inputs are already visibility-filtered by
-  // `get*PopulatedFillerSchedules`, so a hidden populated schedule here only
-  // appears on monitor-view paths and should mark the day as invisible.
   let invisible = false;
   const fillHours: number[] = [];
   const overfillHours: number[] = [];
   const standbyHours: number[] = [];
 
   for (const schedule of schedules) {
-    if (schedule._tag === "PopulatedSchedule" && !schedule.visible) {
+    if (schedule._tag !== "PopulatedSchedule") {
+      continue;
+    }
+
+    if (!schedule.visible) {
       invisible = true;
     }
 
-    if (schedule._tag !== "PopulatedSchedule" || Option.isNone(schedule.hour)) {
+    if (Option.isNone(schedule.hour)) {
       continue;
     }
 
     const hour = schedule.hour.value;
-
     if (
       schedule.fills.some(
         (fill) => Option.isSome(fill) && schedulePlayerMatchesUser(fill.value, accountId),
@@ -224,11 +201,9 @@ export const summarizeDayPlayerSchedule = (
     ) {
       fillHours.push(hour);
     }
-
     if (schedule.overfills.some((overfill) => schedulePlayerMatchesUser(overfill, accountId))) {
       overfillHours.push(hour);
     }
-
     if (schedule.standbys.some((standby) => schedulePlayerMatchesUser(standby, accountId))) {
       standbyHours.push(hour);
     }
@@ -242,140 +217,80 @@ export const summarizeDayPlayerSchedule = (
   };
 };
 
-export class ScheduleService extends Effect.Service<ScheduleService>()("ScheduleService", {
-  effect: pipe(
-    Effect.Do,
-    Effect.bind("sheetService", () => SheetService),
-    Effect.bind("playerService", () => PlayerService),
-    Effect.bind("monitorService", () => MonitorService),
-    Effect.bind("sheetConfigService", () => SheetConfigService),
-    Effect.map(({ sheetService, playerService, monitorService, sheetConfigService }) => {
-      return {
-        getAllPopulatedSchedules: (sheetId: string) =>
-          pipe(
-            Effect.Do,
-            Effect.bind("schedules", () => sheetService.getAllSchedules(sheetId)),
-            Effect.bind("playerMaps", () => playerService.getPlayerMaps(sheetId)),
-            Effect.bind("monitorMaps", () => monitorService.getMonitorMaps(sheetId)),
-            Effect.bind("eventConfig", () => sheetConfigService.getEventConfig(sheetId)),
-            Effect.map(({ schedules, playerMaps, monitorMaps, eventConfig }) => {
-              return toPopulatedSchedules(
-                schedules,
-                eventConfig.startTime,
-                playerMaps,
-                monitorMaps,
-              );
-            }),
-            Effect.withSpan("ScheduleService.getAllPopulatedSchedules", {
-              captureStackTrace: true,
-            }),
-          ),
-        getDayPopulatedSchedules: (sheetId: string, day: number) =>
-          pipe(
-            Effect.Do,
-            Effect.bind("schedules", () => sheetService.getDaySchedules(sheetId, day)),
-            Effect.bind("playerMaps", () => playerService.getPlayerMaps(sheetId)),
-            Effect.bind("monitorMaps", () => monitorService.getMonitorMaps(sheetId)),
-            Effect.bind("eventConfig", () => sheetConfigService.getEventConfig(sheetId)),
-            Effect.map(({ schedules, playerMaps, monitorMaps, eventConfig }) => {
-              return toPopulatedSchedules(
-                schedules,
-                eventConfig.startTime,
-                playerMaps,
-                monitorMaps,
-              );
-            }),
-            Effect.withSpan("ScheduleService.getDayPopulatedSchedules", {
-              captureStackTrace: true,
-            }),
-          ),
-        getChannelPopulatedSchedules: (sheetId: string, channel: string) =>
-          pipe(
-            Effect.Do,
-            Effect.bind("schedules", () => sheetService.getChannelSchedules(sheetId, channel)),
-            Effect.bind("playerMaps", () => playerService.getPlayerMaps(sheetId)),
-            Effect.bind("monitorMaps", () => monitorService.getMonitorMaps(sheetId)),
-            Effect.bind("eventConfig", () => sheetConfigService.getEventConfig(sheetId)),
-            Effect.map(({ schedules, playerMaps, monitorMaps, eventConfig }) => {
-              return toPopulatedSchedules(
-                schedules,
-                eventConfig.startTime,
-                playerMaps,
-                monitorMaps,
-              );
-            }),
-            Effect.withSpan("ScheduleService.getChannelPopulatedSchedules", {
-              captureStackTrace: true,
-            }),
-          ),
-        // Filler populated schedules - filtered by visible, with fill/overfill/standby/runners cleared
-        getAllPopulatedFillerSchedules: (sheetId: string) =>
-          pipe(
-            Effect.Do,
-            Effect.bind("schedules", () => sheetService.getAllFillerSchedules(sheetId)),
-            Effect.bind("playerMaps", () => playerService.getPlayerMaps(sheetId)),
-            Effect.bind("monitorMaps", () => monitorService.getMonitorMaps(sheetId)),
-            Effect.bind("eventConfig", () => sheetConfigService.getEventConfig(sheetId)),
-            Effect.map(({ schedules, playerMaps, monitorMaps, eventConfig }) => {
-              return toPopulatedSchedules(
-                schedules,
-                eventConfig.startTime,
-                playerMaps,
-                monitorMaps,
-              );
-            }),
-            Effect.withSpan("ScheduleService.getAllPopulatedFillerSchedules", {
-              captureStackTrace: true,
-            }),
-          ),
-        getDayPopulatedFillerSchedules: (sheetId: string, day: number) =>
-          pipe(
-            Effect.Do,
-            Effect.bind("schedules", () => sheetService.getDayFillerSchedules(sheetId, day)),
-            Effect.bind("playerMaps", () => playerService.getPlayerMaps(sheetId)),
-            Effect.bind("monitorMaps", () => monitorService.getMonitorMaps(sheetId)),
-            Effect.bind("eventConfig", () => sheetConfigService.getEventConfig(sheetId)),
-            Effect.map(({ schedules, playerMaps, monitorMaps, eventConfig }) => {
-              return toPopulatedSchedules(
-                schedules,
-                eventConfig.startTime,
-                playerMaps,
-                monitorMaps,
-              );
-            }),
-            Effect.withSpan("ScheduleService.getDayPopulatedFillerSchedules", {
-              captureStackTrace: true,
-            }),
-          ),
-        getChannelPopulatedFillerSchedules: (sheetId: string, channel: string) =>
-          pipe(
-            Effect.Do,
-            Effect.bind("schedules", () =>
-              sheetService.getChannelFillerSchedules(sheetId, channel),
-            ),
-            Effect.bind("playerMaps", () => playerService.getPlayerMaps(sheetId)),
-            Effect.bind("monitorMaps", () => monitorService.getMonitorMaps(sheetId)),
-            Effect.bind("eventConfig", () => sheetConfigService.getEventConfig(sheetId)),
-            Effect.map(({ schedules, playerMaps, monitorMaps, eventConfig }) => {
-              return toPopulatedSchedules(
-                schedules,
-                eventConfig.startTime,
-                playerMaps,
-                monitorMaps,
-              );
-            }),
-            Effect.withSpan("ScheduleService.getChannelPopulatedFillerSchedules", {
-              captureStackTrace: true,
-            }),
-          ),
-      };
-    }),
-  ),
-  accessors: true,
-  dependencies: [
-    SheetService.Default,
-    PlayerService.Default,
-    MonitorService.Default,
-    SheetConfigService.Default,
-  ],
-}) {}
+export class ScheduleService extends ServiceMap.Service<ScheduleService>()("ScheduleService", {
+  make: Effect.gen(function* () {
+    const sheetService = yield* SheetService;
+    const playerService = yield* PlayerService;
+    const monitorService = yield* MonitorService;
+    const sheetConfigService = yield* SheetConfigService;
+
+    const toPopulated = Effect.fn("ScheduleService.toPopulated")(function* (
+      schedules: ReadonlyArray<BreakSchedule | Schedule>,
+      sheetId: string,
+    ) {
+      const playerMaps = yield* playerService.getPlayerMaps(sheetId);
+      const monitorMaps = yield* monitorService.getMonitorMaps(sheetId);
+      const eventConfig = yield* sheetConfigService.getEventConfig(sheetId);
+      return toPopulatedSchedules(schedules, eventConfig.startTime, playerMaps, monitorMaps);
+    });
+
+    return {
+      getAllPopulatedSchedules: Effect.fn("ScheduleService.getAllPopulatedSchedules")(function* (
+        sheetId: string,
+      ) {
+        const schedules = yield* sheetService.getAllSchedules(sheetId);
+        return yield* toPopulated(schedules, sheetId).pipe(
+          Effect.withSpan("ScheduleService.getAllPopulatedSchedules"),
+        );
+      }),
+      getDayPopulatedSchedules: Effect.fn("ScheduleService.getDayPopulatedSchedules")(function* (
+        sheetId: string,
+        day: number,
+      ) {
+        const schedules = yield* sheetService.getDaySchedules(sheetId, day);
+        return yield* toPopulated(schedules, sheetId).pipe(
+          Effect.withSpan("ScheduleService.getDayPopulatedSchedules"),
+        );
+      }),
+      getChannelPopulatedSchedules: Effect.fn("ScheduleService.getChannelPopulatedSchedules")(
+        function* (sheetId: string, channel: string) {
+          const schedules = yield* sheetService.getChannelSchedules(sheetId, channel);
+          return yield* toPopulated(schedules, sheetId).pipe(
+            Effect.withSpan("ScheduleService.getChannelPopulatedSchedules"),
+          );
+        },
+      ),
+      getAllPopulatedFillerSchedules: Effect.fn("ScheduleService.getAllPopulatedFillerSchedules")(
+        function* (sheetId: string) {
+          const schedules = yield* sheetService.getAllFillerSchedules(sheetId);
+          return yield* toPopulated(schedules, sheetId).pipe(
+            Effect.withSpan("ScheduleService.getAllPopulatedFillerSchedules"),
+          );
+        },
+      ),
+      getDayPopulatedFillerSchedules: Effect.fn("ScheduleService.getDayPopulatedFillerSchedules")(
+        function* (sheetId: string, day: number) {
+          const schedules = yield* sheetService.getDayFillerSchedules(sheetId, day);
+          return yield* toPopulated(schedules, sheetId).pipe(
+            Effect.withSpan("ScheduleService.getDayPopulatedFillerSchedules"),
+          );
+        },
+      ),
+      getChannelPopulatedFillerSchedules: Effect.fn(
+        "ScheduleService.getChannelPopulatedFillerSchedules",
+      )(function* (sheetId: string, channel: string) {
+        const schedules = yield* sheetService.getChannelFillerSchedules(sheetId, channel);
+        return yield* toPopulated(schedules, sheetId).pipe(
+          Effect.withSpan("ScheduleService.getChannelPopulatedFillerSchedules"),
+        );
+      }),
+    };
+  }),
+}) {
+  static layer = Layer.effect(ScheduleService, this.make).pipe(
+    Layer.provide(SheetService.layer),
+    Layer.provide(PlayerService.layer),
+    Layer.provide(MonitorService.layer),
+    Layer.provide(SheetConfigService.layer),
+  );
+}

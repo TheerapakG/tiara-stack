@@ -1,4 +1,4 @@
-import { Cause, Option } from "effect";
+import { Cause } from "effect";
 
 const DISCORD_MESSAGE_CONTENT_LIMIT = 2_000;
 const INLINE_ERROR_CONTENT_LIMIT = 1_800;
@@ -36,9 +36,7 @@ export interface DiscordErrorMessageResponse {
 export const formatErrorResponse = (error: unknown): FormattedErrorResponse => {
   const cause = Cause.isCause(error) ? error : Cause.fail(error);
   const fullText = Cause.pretty(cause).trim();
-  const summarySource = Cause.isCause(error)
-    ? Cause.failureOption(error).pipe(Option.getOrElse(() => error))
-    : error;
+  const summarySource = Cause.squash(cause);
   const summary = getSummaryFromUnknown(
     summarySource,
     firstMeaningfulLine(fullText) ?? "Unknown error",

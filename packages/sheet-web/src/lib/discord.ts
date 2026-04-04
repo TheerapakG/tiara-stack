@@ -1,24 +1,49 @@
-import { Atom, useAtomSuspense, Result } from "@effect-atom/atom-react";
+import { useAtomSuspense } from "@effect/atom-react";
+import { Atom, AsyncResult } from "effect/unstable/reactivity";
 import { SheetApisClient } from "#/lib/sheetApis";
 import { Duration, Effect, Schema } from "effect";
 import {
   ArgumentError,
-  catchParseErrorAsValidationError,
-  QueryResultError,
+  catchSchemaErrorAsValidationError,
+  QueryResultAppError,
+  QueryResultParseError,
   ValidationError,
 } from "typhoon-core/error";
-import { Discord, Middlewares } from "sheet-apis/schema";
-import { RequestError, ResponseError } from "#/lib/error";
+import { Discord } from "sheet-apis/schema";
+import { RequestError } from "#/lib/error";
 
 export const _currentUserAtom = SheetApisClient.query("discord", "getCurrentUser", {});
+
+const DiscordRequestErrorSchema = Schema.revealCodec(
+  Schema.Union([
+    ValidationError,
+    QueryResultAppError,
+    QueryResultParseError,
+    ArgumentError,
+    RequestError,
+  ]),
+);
+
+const CurrentUserAsyncResultSchema = Schema.revealCodec(
+  AsyncResult.Schema({
+    success: Discord.DiscordUser,
+    error: DiscordRequestErrorSchema,
+  }),
+);
+
+const CurrentUserGuildsAsyncResultSchema = Schema.revealCodec(
+  AsyncResult.Schema({
+    success: Schema.Array(Discord.DiscordGuild),
+    error: DiscordRequestErrorSchema,
+  }),
+);
 
 export const currentUserAtom = Atom.make(
   Effect.fnUntraced(function* (get) {
     return yield* get.result(_currentUserAtom).pipe(
-      catchParseErrorAsValidationError,
+      catchSchemaErrorAsValidationError,
       Effect.catchTags({
-        RequestError: (error) => Effect.fail(RequestError.make(error)),
-        ResponseError: (error) => Effect.fail(ResponseError.make(error)),
+        BadRequest: () => Effect.fail(RequestError.makeUnsafe({})),
       }),
     );
   }),
@@ -26,17 +51,7 @@ export const currentUserAtom = Atom.make(
   Atom.setIdleTTL(Duration.infinity),
   Atom.serializable({
     key: "discord.getCurrentUser",
-    schema: Result.Schema({
-      success: Discord.DiscordUser,
-      error: Schema.Union(
-        ValidationError,
-        QueryResultError,
-        ArgumentError,
-        Middlewares.Unauthorized,
-        RequestError,
-        ResponseError,
-      ),
-    }),
+    schema: CurrentUserAsyncResultSchema,
   }),
 );
 
@@ -54,10 +69,9 @@ export const _currentUserGuildsAtom = SheetApisClient.query("discord", "getCurre
 export const currentUserGuildsAtom = Atom.make(
   Effect.fnUntraced(function* (get) {
     return yield* get.result(_currentUserGuildsAtom).pipe(
-      catchParseErrorAsValidationError,
+      catchSchemaErrorAsValidationError,
       Effect.catchTags({
-        RequestError: (error) => Effect.fail(RequestError.make(error)),
-        ResponseError: (error) => Effect.fail(ResponseError.make(error)),
+        BadRequest: () => Effect.fail(RequestError.makeUnsafe({})),
       }),
     );
   }),
@@ -65,17 +79,7 @@ export const currentUserGuildsAtom = Atom.make(
   Atom.setIdleTTL(Duration.infinity),
   Atom.serializable({
     key: "discord.getCurrentUserGuilds",
-    schema: Result.Schema({
-      success: Schema.Array(Discord.DiscordGuild),
-      error: Schema.Union(
-        ValidationError,
-        QueryResultError,
-        ArgumentError,
-        Middlewares.Unauthorized,
-        RequestError,
-        ResponseError,
-      ),
-    }),
+    schema: CurrentUserGuildsAsyncResultSchema,
   }),
 );
 

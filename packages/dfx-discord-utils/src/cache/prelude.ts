@@ -479,7 +479,7 @@ export const channelsApiCacheViewWithReverseLookup = <RM, EM, E>(
         resourceRemove: Stream.never,
       }),
       onMiss: (parentId, resourceId) =>
-        client.cache.getChannel({ path: { parentId, resourceId } }).pipe(
+        client.cache.getChannel({ params: { parentId, resourceId } }).pipe(
           Effect.map((r) => r.value),
           Effect.mapError(
             () =>
@@ -490,7 +490,7 @@ export const channelsApiCacheViewWithReverseLookup = <RM, EM, E>(
           ),
         ),
       onParentMiss: (parentId) =>
-        client.cache.getChannelsForParent({ path: { parentId } }).pipe(
+        client.cache.getChannelsForParent({ params: { parentId } }).pipe(
           Effect.map((entries) => entries.map((e) => [e.resourceId, e.value] as const)),
           Effect.mapError(
             () =>
@@ -501,7 +501,7 @@ export const channelsApiCacheViewWithReverseLookup = <RM, EM, E>(
           ),
         ),
       onResourceMiss: (resourceId) =>
-        client.cache.getChannelsForResource({ path: { resourceId } }).pipe(
+        client.cache.getChannelsForResource({ params: { resourceId } }).pipe(
           Effect.map((entries) => entries.map((e) => [e.parentId, e.value] as const)),
           Effect.mapError(
             () =>
@@ -550,7 +550,7 @@ export const rolesApiCacheViewWithReverseLookup = <RM, EM, E>(
         resourceRemove: Stream.never,
       }),
       onMiss: (parentId, resourceId) =>
-        client.cache.getRole({ path: { parentId, resourceId } }).pipe(
+        client.cache.getRole({ params: { parentId, resourceId } }).pipe(
           Effect.map((r) => r.value),
           Effect.mapError(
             () =>
@@ -561,7 +561,7 @@ export const rolesApiCacheViewWithReverseLookup = <RM, EM, E>(
           ),
         ),
       onParentMiss: (parentId) =>
-        client.cache.getRolesForParent({ path: { parentId } }).pipe(
+        client.cache.getRolesForParent({ params: { parentId } }).pipe(
           Effect.map((entries) => entries.map((e) => [e.resourceId, e.value] as const)),
           Effect.mapError(
             () =>
@@ -572,7 +572,7 @@ export const rolesApiCacheViewWithReverseLookup = <RM, EM, E>(
           ),
         ),
       onResourceMiss: (resourceId) =>
-        client.cache.getRolesForResource({ path: { resourceId } }).pipe(
+        client.cache.getRolesForResource({ params: { resourceId } }).pipe(
           Effect.map((entries) => entries.map((e) => [e.parentId, e.value] as const)),
           Effect.mapError(
             () =>
@@ -624,7 +624,7 @@ export const membersApiCacheViewWithReverseLookup = <RM, EM, E>(
         resourceRemove: Stream.never,
       }),
       onMiss: (parentId, resourceId) =>
-        client.cache.getMember({ path: { parentId, resourceId } }).pipe(
+        client.cache.getMember({ params: { parentId, resourceId } }).pipe(
           Effect.map((r) => r.value),
           Effect.mapError(
             () =>
@@ -635,7 +635,7 @@ export const membersApiCacheViewWithReverseLookup = <RM, EM, E>(
           ),
         ),
       onParentMiss: (parentId) =>
-        client.cache.getMembersForParent({ path: { parentId } }).pipe(
+        client.cache.getMembersForParent({ params: { parentId } }).pipe(
           Effect.map((entries) => entries.map((e) => [e.resourceId, e.value] as const)),
           Effect.mapError(
             () =>
@@ -646,7 +646,7 @@ export const membersApiCacheViewWithReverseLookup = <RM, EM, E>(
           ),
         ),
       onResourceMiss: (resourceId) =>
-        client.cache.getMembersForResource({ path: { resourceId } }).pipe(
+        client.cache.getMembersForResource({ params: { resourceId } }).pipe(
           Effect.map((entries) => entries.map((e) => [e.parentId, e.value] as const)),
           Effect.mapError(
             () =>
@@ -676,7 +676,7 @@ export const guildsApiCacheView = <RM, EM, E>(
       driver,
       id: (g: CachedGuild) => g.id,
       onMiss: (id) =>
-        client.cache.getGuild({ path: { resourceId: id } }).pipe(
+        client.cache.getGuild({ params: { resourceId: id } }).pipe(
           Effect.map((r) => r.value),
           Effect.mapError(
             () =>

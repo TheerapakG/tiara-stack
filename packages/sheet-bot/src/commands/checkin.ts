@@ -6,12 +6,33 @@ import {
   MessageFlags,
 } from "discord-api-types/v10";
 import { Ix } from "dfx/index";
-import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
+import { discordGatewayLayer } from "../discord/gateway";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import { CheckinService, MessageCheckinService, SheetApisRequestContext } from "../services";
 import { checkinButtonData } from "../messageComponents/buttons/checkin";
 import { makeMessageActionRowData } from "dfx-discord-utils/utils";
+
+const getInteractionGuildId = Effect.gen(function* () {
+  const interactionGuild = yield* Interaction.guild();
+  return pipe(
+    interactionGuild,
+    Option.map((guild) => (guild as { id: string }).id),
+  );
+});
+
+const getInteractionChannelId = Effect.gen(function* () {
+  const interactionChannel = yield* Interaction.channel();
+  return pipe(
+    interactionChannel,
+    Option.map((channel) => (channel as { id: string }).id),
+  );
+});
+
+const getInteractionUserId = Effect.gen(function* () {
+  const interactionUser = yield* Interaction.user();
+  return (interactionUser as { id: string }).id;
+});
 
 const makeManualSubCommand = Effect.gen(function* () {
   const checkinService = yield* CheckinService;
@@ -40,30 +61,22 @@ const makeManualSubCommand = Effect.gen(function* () {
       yield* command.deferReply({ flags: MessageFlags.Ephemeral });
 
       const serverId = command.optionValueOptional("server_id");
-      const interactionGuild = yield* Interaction.guild();
-      const interactionUser = yield* Interaction.user();
-      const guildId = yield* pipe(
+      const interactionGuildId = yield* getInteractionGuildId;
+      const guildId = pipe(
         serverId,
-        Option.orElse(() => interactionGuild.pipe(Option.map((guild) => guild.id))),
-        Option.match({
-          onSome: Effect.succeed,
-          onNone: () => Effect.fail(new Error("This command must be run inside a server.")),
-        }),
+        Option.orElse(() => interactionGuildId),
+        Option.getOrThrowWith(() => new Error("This command must be run inside a server.")),
       );
       const templateOption = command.optionValueOptional("template");
 
       const channelNameOption = command.optionValueOptional("channel_name");
-      const interactionChannel = yield* Interaction.channel();
+      const interactionChannelId = Option.getOrThrow(yield* getInteractionChannelId);
       const generated = yield* checkinService.generate({
         guildId,
         ...(Option.isSome(channelNameOption)
           ? { channelName: channelNameOption.value }
           : {
-              channelId: pipe(
-                interactionChannel,
-                Option.map((channel) => channel.id),
-                Option.getOrThrow,
-              ),
+              channelId: interactionChannelId,
             }),
         ...pipe(
           command.optionValueOptional("hour"),
@@ -82,6 +95,7 @@ const makeManualSubCommand = Effect.gen(function* () {
       });
 
       if (generated.initialMessage !== null) {
+        const createdByUserId = yield* getInteractionUserId;
         const messageResult = yield* command.rest.createMessage(generated.checkinChannelId, {
           content: generated.initialMessage,
           components: [
@@ -98,12 +112,11 @@ const makeManualSubCommand = Effect.gen(function* () {
               roleId: generated.roleId,
               guildId,
               messageChannelId: generated.checkinChannelId,
-              createdByUserId: interactionUser.id,
+              createdByUserId,
             }),
-            pipe(
-              messageCheckinService.addMessageCheckinMembers(messageResult.id, generated.fillIds),
-              Effect.unless(() => generated.fillIds.length === 0),
-            ),
+            generated.fillIds.length === 0
+              ? Effect.void
+              : messageCheckinService.addMessageCheckinMembers(messageResult.id, generated.fillIds),
           ],
           { concurrency: "unbounded" },
         );
@@ -148,10 +161,10 @@ const makeCheckinCommand = Effect.gen(function* () {
 const makeGlobalCheckinCommand = Effect.gen(function* () {
   const checkinCommand = yield* makeCheckinCommand;
 
-  return CommandHelper.makeGlobalCommand(checkinCommand.data, checkinCommand.handler);
+  return CommandHelper.makeGlobalCommand(checkinCommand.data, checkinCommand.handler as never);
 });
 
-export const CheckinCommandLive = Layer.scopedDiscard(
+export const checkinCommandLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const registry = yield* InteractionsRegistry;
     const command = yield* makeGlobalCheckinCommand;
@@ -160,6 +173,6 @@ export const CheckinCommandLive = Layer.scopedDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(DiscordGatewayLayerLive, CheckinService.Default, MessageCheckinService.Default),
+    Layer.mergeAll(discordGatewayLayer, CheckinService.layer, MessageCheckinService.layer),
   ),
 );

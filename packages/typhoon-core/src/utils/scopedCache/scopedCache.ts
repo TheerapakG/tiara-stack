@@ -102,7 +102,7 @@ class ScopedCacheImpl<Key, Value, Error, Environment> implements ScopedCache<
                   Effect.andThen(() =>
                     Effect.sync(() => MutableHashMap.remove(this.cache, cachedEntry.key)),
                   ),
-                  Effect.when(() => count === 0),
+                  Effect.when(Effect.succeed(count === 0)),
                 ),
               ),
             ),
@@ -143,7 +143,7 @@ class ScopedCacheImpl<Key, Value, Error, Environment> implements ScopedCache<
       Effect.Do,
       Effect.bind("innerScope", () => Scope.make()),
       Effect.bind("exit", ({ innerScope }) =>
-        pipe(this.lookup(key), Scope.extend(innerScope), Effect.exit),
+        pipe(this.lookup(key), Scope.provide(innerScope), Effect.exit),
       ),
       Effect.map(({ exit, innerScope }) => ({
         key,

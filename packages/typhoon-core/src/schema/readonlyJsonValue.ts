@@ -4,27 +4,26 @@ import type {
   ReadonlyJSONObject as ZeroReadonlyJSONObject,
 } from "@rocicorp/zero";
 
-export const ReadonlyJSONValue = Schema.Union(
+export const ReadonlyJSONValue = Schema.Union([
   Schema.Null,
   Schema.String,
   Schema.Boolean,
   Schema.Number,
   Schema.Array(
-    Schema.suspend((): Schema.Schema<ZeroReadonlyJSONValue> => ReadonlyJSONValue).annotations({
+    Schema.suspend((): Schema.Codec<ZeroReadonlyJSONValue> => ReadonlyJSONValue).annotate({
       identifier: "ReadonlyJSONValue",
     }),
   ),
-  Schema.suspend((): Schema.Schema<ZeroReadonlyJSONObject> => ReadonlyJSONObject).annotations({
+  Schema.suspend((): Schema.Codec<ZeroReadonlyJSONObject> => ReadonlyJSONObject).annotate({
     identifier: "ReadonlyJSONObject",
   }),
-);
+]);
 
-const ReadonlyJSONObject = Schema.Record({
-  key: Schema.String,
-  value: Schema.Union(
-    Schema.suspend((): Schema.Schema<ZeroReadonlyJSONValue> => ReadonlyJSONValue).annotations({
+const ReadonlyJSONObject = Schema.Record(
+  Schema.String,
+  Schema.UndefinedOr(
+    Schema.suspend((): Schema.Codec<ZeroReadonlyJSONValue> => ReadonlyJSONValue).annotate({
       identifier: "ReadonlyJSONValue",
     }),
-    Schema.Undefined,
   ),
-});
+);

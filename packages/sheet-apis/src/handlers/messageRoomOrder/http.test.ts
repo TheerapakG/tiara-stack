@@ -7,8 +7,13 @@ import {
 } from "./http";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
 import { MessageRoomOrder } from "@/schemas/messageRoomOrder";
-import type { MessageRoomOrderService } from "@/services/messageRoomOrder";
+import { MessageRoomOrderService } from "@/services";
 import { getFailure, liveGuildServices, withUser } from "@/test-utils/guildTestHelpers";
+
+type MessageRoomOrderAccessService = Pick<
+  typeof MessageRoomOrderService.Service,
+  "getMessageRoomOrder"
+>;
 
 const makeMessageRoomOrderRecord = (overrides?: {
   readonly guildId?: string | null;
@@ -25,8 +30,8 @@ const makeMessageRoomOrderRecord = (overrides?: {
     fills: [],
     rank: 1,
     monitor: Option.none(),
-    guildId: Option.fromNullable(guildId),
-    messageChannelId: Option.fromNullable(messageChannelId),
+    guildId: Option.fromNullishOr(guildId),
+    messageChannelId: Option.fromNullishOr(messageChannelId),
     createdByUserId: Option.some("creator-1"),
     createdAt: Option.none(),
     updatedAt: Option.none(),
@@ -36,8 +41,8 @@ const makeMessageRoomOrderRecord = (overrides?: {
 
 const makeRoomOrderService = (record?: MessageRoomOrder) =>
   ({
-    getMessageRoomOrder: () => Effect.succeed(Option.fromNullable(record)),
-  }) as unknown as MessageRoomOrderService;
+    getMessageRoomOrder: () => Effect.succeed(Option.fromNullishOr(record)),
+  }) satisfies MessageRoomOrderAccessService;
 
 describe("messageRoomOrder legacy access", () => {
   it.effect("denies legacy record access via requireRoomOrderMonitorAccess", () =>

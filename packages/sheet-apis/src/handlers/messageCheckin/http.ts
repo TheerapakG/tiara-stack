@@ -1,6 +1,6 @@
-import { HttpApiBuilder } from "@effect/platform";
-import { catchParseErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
-import { Effect, HashSet, Layer, Option, pipe } from "effect";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { catchSchemaErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
+import { Effect, HashSet, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
 import {
@@ -14,8 +14,7 @@ import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAut
 import { MessageCheckinMember } from "@/schemas/messageCheckin";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
-import { GuildConfigService } from "@/services/guildConfig";
-import { MessageCheckinService } from "@/services/messageCheckin";
+import { MessageCheckinService } from "@/services";
 
 const missingMessageCheckinError = () =>
   makeArgumentError("Cannot get message checkin data, the message might not be registered");
@@ -26,8 +25,14 @@ export const LEGACY_MESSAGE_CHECKIN_ACCESS_ERROR =
 export const denyLegacyMessageCheckinAccess = () =>
   Effect.fail(new Unauthorized({ message: LEGACY_MESSAGE_CHECKIN_ACCESS_ERROR }));
 
+type MessageCheckinAccessService = Pick<
+  typeof MessageCheckinService.Service,
+  "getMessageCheckinData" | "getMessageCheckinMembers"
+>;
+type SheetAuthUserInstance = typeof SheetAuthUser.Type;
+
 const getRequiredMessageCheckinRecord = (
-  messageCheckinService: MessageCheckinService,
+  messageCheckinService: MessageCheckinAccessService,
   messageId: string,
 ) =>
   messageCheckinService.getMessageCheckinData(messageId).pipe(
@@ -48,7 +53,7 @@ const requireRecordedParticipant = (
     ? Effect.void
     : Effect.fail(new Unauthorized({ message }));
 
-const getCheckinAccessLevel = (user: SheetAuthUser["Type"], guildId: string) =>
+const getCheckinAccessLevel = (user: SheetAuthUserInstance, guildId: string) =>
   getGuildMonitorAccessLevel(user, guildId).pipe(
     Effect.flatMap((accessLevel) =>
       accessLevel === "monitor"
@@ -64,35 +69,33 @@ type CheckinReadAccess =
   | { readonly _tag: "participant"; readonly members: ReadonlyArray<MessageCheckinMember> };
 
 const resolveCheckinReadAccess = (
-  messageCheckinService: MessageCheckinService,
+  messageCheckinService: MessageCheckinAccessService,
   messageId: string,
   guildId: string,
 ) =>
-  SheetAuthUser.pipe(
-    Effect.flatMap((user) =>
-      // Participant reads still need the current member list because that is
-      // the authoritative recorded-participant check available in this pass.
-      getCheckinAccessLevel(user, guildId).pipe(
-        Effect.flatMap((accessLevel) =>
-          accessLevel === "monitor"
-            ? Effect.succeed<CheckinReadAccess>({ _tag: "monitor" })
-            : messageCheckinService.getMessageCheckinMembers(messageId).pipe(
-                Effect.flatMap((members) =>
-                  requireRecordedParticipant(members, user.accountId).pipe(
-                    Effect.as<CheckinReadAccess>({
-                      _tag: "participant",
-                      members,
-                    }),
-                  ),
+  Effect.gen(function* () {
+    const user = yield* SheetAuthUser;
+
+    return yield* getCheckinAccessLevel(user, guildId).pipe(
+      Effect.flatMap((accessLevel) =>
+        accessLevel === "monitor"
+          ? Effect.succeed<CheckinReadAccess>({ _tag: "monitor" })
+          : messageCheckinService.getMessageCheckinMembers(messageId).pipe(
+              Effect.flatMap((members) =>
+                requireRecordedParticipant(members, user.accountId).pipe(
+                  Effect.as<CheckinReadAccess>({
+                    _tag: "participant",
+                    members,
+                  }),
                 ),
               ),
-        ),
+            ),
       ),
-    ),
-  );
+    );
+  });
 
 export const requireCheckinUpsertAccess = (
-  messageCheckinService: MessageCheckinService,
+  messageCheckinService: MessageCheckinAccessService,
   messageId: string,
   guildId?: string,
 ) =>
@@ -114,27 +117,27 @@ export const requireCheckinUpsertAccess = (
   );
 
 export const requireCheckinMutationAccess = (
-  messageCheckinService: MessageCheckinService,
+  messageCheckinService: MessageCheckinAccessService,
   messageId: string,
   guildId: string,
   memberId: string,
 ) =>
-  SheetAuthUser.pipe(
-    Effect.flatMap((user) =>
-      HashSet.has(user.permissions, "bot") || HashSet.has(user.permissions, "app_owner")
-        ? Effect.void
-        : // Non-legacy check-in mutations remain self-service for regular users:
-          // monitors can add members, but only the recorded participant can update/remove that member.
-          requireDiscordAccountId(memberId).pipe(
-            Effect.andThen(provideCurrentGuildUser(guildId, requireGuildMember(guildId))),
-            Effect.andThen(messageCheckinService.getMessageCheckinMembers(messageId)),
-            Effect.flatMap((members) => requireRecordedParticipant(members, memberId)),
-          ),
-    ),
-  );
+  Effect.gen(function* () {
+    const user = yield* SheetAuthUser;
+
+    return yield* HashSet.has(user.permissions, "bot") || HashSet.has(user.permissions, "app_owner")
+      ? Effect.void
+      : // Non-legacy check-in mutations remain self-service for regular users:
+        // monitors can add members, but only the recorded participant can update/remove that member.
+        requireDiscordAccountId(memberId).pipe(
+          Effect.andThen(provideCurrentGuildUser(guildId, requireGuildMember(guildId))),
+          Effect.andThen(messageCheckinService.getMessageCheckinMembers(messageId)),
+          Effect.flatMap((members) => requireRecordedParticipant(members, memberId)),
+        );
+  });
 
 export const requireMessageCheckinReadAccess = (
-  messageCheckinService: MessageCheckinService,
+  messageCheckinService: MessageCheckinAccessService,
   messageId: string,
 ) =>
   getRequiredMessageCheckinRecord(messageCheckinService, messageId).pipe(
@@ -150,7 +153,7 @@ export const requireMessageCheckinReadAccess = (
   );
 
 export const requireMessageCheckinMembersReadAccess = (
-  messageCheckinService: MessageCheckinService,
+  messageCheckinService: MessageCheckinAccessService,
   messageId: string,
 ) =>
   getRequiredMessageCheckinRecord(messageCheckinService, messageId).pipe(
@@ -170,7 +173,7 @@ export const requireMessageCheckinMembersReadAccess = (
   );
 
 export const requireMessageCheckinParticipantMutationAccess = (
-  messageCheckinService: MessageCheckinService,
+  messageCheckinService: MessageCheckinAccessService,
   messageId: string,
   memberId: string,
 ) =>
@@ -185,7 +188,7 @@ export const requireMessageCheckinParticipantMutationAccess = (
   );
 
 export const requireMessageCheckinMonitorMutationAccess = (
-  messageCheckinService: MessageCheckinService,
+  messageCheckinService: MessageCheckinAccessService,
   messageId: string,
 ) =>
   getRequiredMessageCheckinRecord(messageCheckinService, messageId).pipe(
@@ -197,89 +200,74 @@ export const requireMessageCheckinMonitorMutationAccess = (
     ),
   );
 
-export const MessageCheckinLive = HttpApiBuilder.group(Api, "messageCheckin", (handlers) =>
-  pipe(
-    Effect.all({
-      messageCheckinService: MessageCheckinService,
-    }),
-    Effect.map(({ messageCheckinService }) =>
-      handlers
-        .handle("getMessageCheckinData", ({ urlParams }) =>
-          requireMessageCheckinReadAccess(messageCheckinService, urlParams.messageId).pipe(
-            catchParseErrorAsValidationError,
-          ),
-        )
-        .handle("upsertMessageCheckinData", ({ payload }) =>
-          requireCheckinUpsertAccess(
-            messageCheckinService,
-            payload.messageId,
-            typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
-          )
-            .pipe(
-              Effect.andThen(
-                messageCheckinService.upsertMessageCheckinData(payload.messageId, payload.data),
-              ),
-            )
-            .pipe(catchParseErrorAsValidationError),
-        )
-        .handle("getMessageCheckinMembers", ({ urlParams }) =>
-          requireMessageCheckinMembersReadAccess(messageCheckinService, urlParams.messageId).pipe(
-            catchParseErrorAsValidationError,
-          ),
-        )
-        .handle("addMessageCheckinMembers", ({ payload }) =>
-          requireMessageCheckinMonitorMutationAccess(messageCheckinService, payload.messageId)
-            .pipe(
-              Effect.andThen(
-                messageCheckinService.addMessageCheckinMembers(
-                  payload.messageId,
-                  payload.memberIds,
-                ),
-              ),
-            )
-            .pipe(catchParseErrorAsValidationError),
-        )
-        .handle("setMessageCheckinMemberCheckinAt", ({ payload }) =>
-          requireMessageCheckinParticipantMutationAccess(
-            messageCheckinService,
-            payload.messageId,
-            payload.memberId,
-          )
-            .pipe(
-              Effect.andThen(
-                messageCheckinService.setMessageCheckinMemberCheckinAt(
-                  payload.messageId,
-                  payload.memberId,
-                  payload.checkinAt,
-                ),
-              ),
-            )
-            .pipe(catchParseErrorAsValidationError),
-        )
-        .handle("removeMessageCheckinMember", ({ payload }) =>
-          requireMessageCheckinParticipantMutationAccess(
-            messageCheckinService,
-            payload.messageId,
-            payload.memberId,
-          )
-            .pipe(
-              Effect.andThen(
-                messageCheckinService.removeMessageCheckinMember(
-                  payload.messageId,
-                  payload.memberId,
-                ),
-              ),
-            )
-            .pipe(catchParseErrorAsValidationError),
+export const messageCheckinLayer = HttpApiBuilder.group(
+  Api,
+  "messageCheckin",
+  Effect.fn(function* (handlers) {
+    const messageCheckinService = yield* MessageCheckinService;
+
+    return handlers
+      .handle("getMessageCheckinData", ({ query }) =>
+        requireMessageCheckinReadAccess(messageCheckinService, query.messageId).pipe(
+          catchSchemaErrorAsValidationError,
         ),
-    ),
-  ),
-).pipe(
-  Layer.provide(
-    Layer.mergeAll(
-      MessageCheckinService.Default,
-      GuildConfigService.Default,
-      SheetAuthTokenAuthorizationLive,
-    ),
-  ),
-);
+      )
+      .handle("upsertMessageCheckinData", ({ payload }) =>
+        requireCheckinUpsertAccess(
+          messageCheckinService,
+          payload.messageId,
+          typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
+        )
+          .pipe(
+            Effect.andThen(
+              messageCheckinService.upsertMessageCheckinData(payload.messageId, payload.data),
+            ),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
+      )
+      .handle("getMessageCheckinMembers", ({ query }) =>
+        requireMessageCheckinMembersReadAccess(messageCheckinService, query.messageId).pipe(
+          catchSchemaErrorAsValidationError,
+        ),
+      )
+      .handle("addMessageCheckinMembers", ({ payload }) =>
+        requireMessageCheckinMonitorMutationAccess(messageCheckinService, payload.messageId)
+          .pipe(
+            Effect.andThen(
+              messageCheckinService.addMessageCheckinMembers(payload.messageId, payload.memberIds),
+            ),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
+      )
+      .handle("setMessageCheckinMemberCheckinAt", ({ payload }) =>
+        requireMessageCheckinParticipantMutationAccess(
+          messageCheckinService,
+          payload.messageId,
+          payload.memberId,
+        )
+          .pipe(
+            Effect.andThen(
+              messageCheckinService.setMessageCheckinMemberCheckinAt(
+                payload.messageId,
+                payload.memberId,
+                payload.checkinAt,
+              ),
+            ),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
+      )
+      .handle("removeMessageCheckinMember", ({ payload }) =>
+        requireMessageCheckinParticipantMutationAccess(
+          messageCheckinService,
+          payload.messageId,
+          payload.memberId,
+        )
+          .pipe(
+            Effect.andThen(
+              messageCheckinService.removeMessageCheckinMember(payload.messageId, payload.memberId),
+            ),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
+      );
+  }),
+).pipe(Layer.provide([MessageCheckinService.layer, SheetAuthTokenAuthorizationLive]));

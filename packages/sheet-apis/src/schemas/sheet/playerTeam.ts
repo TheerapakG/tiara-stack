@@ -16,15 +16,15 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
     playerTeam.lead + (playerTeam.backline - playerTeam.lead) / 5;
 
   static byPlayerName = Order.mapInput(
-    Option.getOrder(String.Order),
+    Option.makeOrder(String.Order),
     ({ playerName }: PlayerTeam) => playerName,
   );
-  static byTalent = Order.mapInput(Order.number, ({ talent }: PlayerTeam) => talent);
-  static byEffectValue = Order.mapInput(Order.number, PlayerTeam.getEffectValue);
+  static byTalent = Order.mapInput(Order.Number, ({ talent }: PlayerTeam) => talent);
+  static byEffectValue = Order.mapInput(Order.Number, PlayerTeam.getEffectValue);
 
   static addTags(tags: HashSet.HashSet<string>) {
     return (playerTeam: PlayerTeam) =>
-      new PlayerTeam({
+      PlayerTeam.makeUnsafe({
         type: playerTeam.type,
         playerId: playerTeam.playerId,
         playerName: playerTeam.playerName,
@@ -42,7 +42,7 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
     if (Option.isNone(team.teamName) || Option.isNone(talent)) return Option.none();
 
     return Option.some(
-      new PlayerTeam({
+      PlayerTeam.makeUnsafe({
         type: team.type,
         playerId: team.playerId,
         playerName: team.playerName,

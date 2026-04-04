@@ -1,43 +1,39 @@
-import { Schema } from "effect";
+import { Option, Schema, SchemaGetter } from "effect";
 import { OptionArrayToOptionTupleSchema } from "./optionArrayToOptionTuple";
 import { TupleToStructValueSchema } from "./tupleToStruct";
 
 type OptionArrayToOptionStructValueSchema<
   Keys extends ReadonlyArray<string>,
-  Value extends Schema.Schema.Any,
-> = Schema.transform<
-  OptionArrayToOptionTupleSchema<Keys["length"], Schema.SchemaClass<Schema.Schema.Encoded<Value>>>,
-  TupleToStructValueSchema<Keys, Schema.OptionFromSelf<Value>>
->;
+  Value extends Schema.Top,
+> = Schema.Codec<
+  Schema.Struct.Type<{
+    [K in Keys[number]]: Schema.Option<Value>;
+  }>,
+  ReadonlyArray<Option.Option<Schema.Codec.Encoded<Value>>>
+> & {
+  readonly keys: Keys;
+  readonly value: Value;
+};
 
-const makeOptionArrayToOptionStructValueClass = <
-  const Keys extends ReadonlyArray<string>,
-  const Value extends Schema.Schema.Any,
+export const OptionArrayToOptionStructValueSchema = <
+  Keys extends ReadonlyArray<string>,
+  Value extends Schema.Top,
 >(
   keys: Keys,
   value: Value,
 ) => {
   const optionArrayToOptionTupleSchema = OptionArrayToOptionTupleSchema(
     keys.length as Keys["length"],
-    Schema.encodedSchema(value),
+    Schema.toEncoded(value),
   );
-  const tupleToStructValueSchema = TupleToStructValueSchema(keys, Schema.OptionFromSelf(value));
+  const tupleToStructValueSchema = TupleToStructValueSchema(keys, Schema.Option(value));
 
-  return class extends Schema.compose(optionArrayToOptionTupleSchema, tupleToStructValueSchema, {
-    strict: false,
-  }) {
-    static keys = keys;
-    static value = value;
-  } as unknown as OptionArrayToOptionStructValueSchema<Keys, Value>;
+  const schema = optionArrayToOptionTupleSchema.pipe(
+    Schema.decodeTo(tupleToStructValueSchema, {
+      decode: SchemaGetter.passthrough(),
+      encode: SchemaGetter.passthroughSupertype(),
+    }),
+  ) as unknown as OptionArrayToOptionStructValueSchema<Keys, Value>;
+
+  return Object.assign(schema, { keys, value });
 };
-
-const OptionArrayToOptionStructValueSchema = <
-  const Keys extends ReadonlyArray<string>,
-  const Value extends Schema.Schema.Any,
->(
-  keys: Keys,
-  value: Value,
-): OptionArrayToOptionStructValueSchema<Keys, Value> =>
-  makeOptionArrayToOptionStructValueClass(keys, value);
-
-export { OptionArrayToOptionStructValueSchema };

@@ -1,16 +1,19 @@
-import { HttpApiMiddleware, HttpApiSecurity, OpenApi } from "@effect/platform";
+import { HttpApiMiddleware, HttpApiSecurity, OpenApi } from "effect/unstable/httpapi";
 import { Unauthorized } from "../../schemas/middlewares/unauthorized";
 import { SheetAuthUser } from "../../schemas/middlewares/sheetAuthUser";
 
-export class SheetAuthTokenAuthorization extends HttpApiMiddleware.Tag<SheetAuthTokenAuthorization>()(
-  "SheetAuthTokenAuthorization",
+export class SheetAuthTokenAuthorization extends HttpApiMiddleware.Service<
+  SheetAuthTokenAuthorization,
   {
-    provides: SheetAuthUser,
-    failure: Unauthorized,
-    security: {
-      sheetAuthToken: HttpApiSecurity.bearer.pipe(
-        HttpApiSecurity.annotate(OpenApi.Description, "Require sheet-auth token for authorization"),
-      ),
-    },
+    provides: typeof SheetAuthUser;
+    requires: never;
+  }
+>()("SheetAuthTokenAuthorization", {
+  requiredForClient: false,
+  error: Unauthorized,
+  security: {
+    sheetAuthToken: HttpApiSecurity.bearer.pipe(
+      HttpApiSecurity.annotate(OpenApi.Description, "Require sheet-auth token for authorization"),
+    ),
   },
-) {}
+}) {}

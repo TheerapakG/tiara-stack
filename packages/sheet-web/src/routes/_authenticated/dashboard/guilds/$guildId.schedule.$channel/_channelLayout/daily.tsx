@@ -557,7 +557,7 @@ function BreakRow({
                 isCurrentHour ? "text-[#041311]/80" : "text-white/40",
               )}
             >
-              {String(dateTimeParts.hours).padStart(2, "0")}:00
+              {String(dateTimeParts.hour).padStart(2, "0")}:00
             </span>
           )}
         </div>
@@ -688,7 +688,7 @@ function ScheduleHourRow({
                 isCurrentHour ? "text-[#041311]/80" : "text-white/40",
               )}
             >
-              {String(dateTimeParts.hours).padStart(2, "0")}:00
+              {String(dateTimeParts.hour).padStart(2, "0")}:00
             </span>
           )}
         </div>

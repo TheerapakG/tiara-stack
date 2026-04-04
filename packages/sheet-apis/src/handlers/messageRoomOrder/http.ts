@@ -1,17 +1,13 @@
-import { HttpApiBuilder } from "@effect/platform";
-import { MembersApiCacheView, RolesApiCacheView } from "dfx-discord-utils/discord/cache";
-import { makeArgumentError } from "typhoon-core/error";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { catchSchemaErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
-import { catchParseErrorAsValidationError } from "typhoon-core/error";
 import { provideCurrentGuildUser, requireMonitorGuild } from "@/middlewares/authorization";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { MessageRoomOrder } from "@/schemas/messageRoomOrder";
-import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
-import { GuildConfigService } from "@/services/guildConfig";
-import { MessageRoomOrderService } from "@/services/messageRoomOrder";
+import { MessageRoomOrderService } from "@/services";
 
 const missingMessageRoomOrderError = () =>
   makeArgumentError("Cannot get message room order, the message might not be registered");
@@ -22,8 +18,13 @@ export const LEGACY_MESSAGE_ROOM_ORDER_ACCESS_ERROR =
 export const denyLegacyMessageRoomOrderAccess = () =>
   Effect.fail(new Unauthorized({ message: LEGACY_MESSAGE_ROOM_ORDER_ACCESS_ERROR }));
 
+type MessageRoomOrderAccessService = Pick<
+  typeof MessageRoomOrderService.Service,
+  "getMessageRoomOrder"
+>;
+
 const getRequiredMessageRoomOrderRecord = (
-  messageRoomOrderService: MessageRoomOrderService,
+  messageRoomOrderService: MessageRoomOrderAccessService,
   messageId: string,
 ) =>
   messageRoomOrderService.getMessageRoomOrder(messageId).pipe(
@@ -35,20 +36,19 @@ const getRequiredMessageRoomOrderRecord = (
     ),
   );
 
-export const requireRoomOrderMonitorAccess = (
-  record: MessageRoomOrder,
-): Effect.Effect<
-  void,
-  Unauthorized,
-  MembersApiCacheView | RolesApiCacheView | GuildConfigService | SheetAuthUser
-> =>
-  Option.match(getModernMessageGuildId(record), {
-    onSome: (guildId) => provideCurrentGuildUser(guildId, requireMonitorGuild(guildId)),
-    onNone: denyLegacyMessageRoomOrderAccess,
+export const requireRoomOrderMonitorAccess = (record: MessageRoomOrder) =>
+  Effect.gen(function* () {
+    const guildId = Option.getOrElse(getModernMessageGuildId(record), () => null);
+
+    if (guildId === null) {
+      return yield* denyLegacyMessageRoomOrderAccess();
+    }
+
+    return yield* provideCurrentGuildUser(guildId, requireMonitorGuild(guildId));
   });
 
 export const requireRoomOrderUpsertAccess = (
-  messageRoomOrderService: MessageRoomOrderService,
+  messageRoomOrderService: MessageRoomOrderAccessService,
   messageId: string,
   guildId?: string,
 ) =>
@@ -64,140 +64,131 @@ export const requireRoomOrderUpsertAccess = (
     ),
   );
 
-export const MessageRoomOrderLive = HttpApiBuilder.group(Api, "messageRoomOrder", (handlers) =>
-  pipe(
-    Effect.all({
-      messageRoomOrderService: MessageRoomOrderService,
-    }),
-    Effect.map(({ messageRoomOrderService }) =>
-      handlers
-        .handle("getMessageRoomOrder", ({ urlParams }) =>
-          getRequiredMessageRoomOrderRecord(messageRoomOrderService, urlParams.messageId)
-            .pipe(
-              Effect.flatMap((record) =>
-                requireRoomOrderMonitorAccess(record).pipe(Effect.andThen(Effect.succeed(record))),
-              ),
-            )
-            .pipe(catchParseErrorAsValidationError),
-        )
-        .handle("upsertMessageRoomOrder", ({ payload }) =>
-          requireRoomOrderUpsertAccess(
-            messageRoomOrderService,
-            payload.messageId,
-            typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
+export const messageRoomOrderLayer = HttpApiBuilder.group(
+  Api,
+  "messageRoomOrder",
+  Effect.fn(function* (handlers) {
+    const messageRoomOrderService = yield* MessageRoomOrderService;
+
+    return handlers
+      .handle("getMessageRoomOrder", ({ query }) =>
+        getRequiredMessageRoomOrderRecord(messageRoomOrderService, query.messageId)
+          .pipe(
+            Effect.flatMap((record) =>
+              requireRoomOrderMonitorAccess(record).pipe(Effect.andThen(Effect.succeed(record))),
+            ),
           )
-            .pipe(
-              Effect.andThen(
-                messageRoomOrderService.upsertMessageRoomOrder(payload.messageId, payload.data),
-              ),
-            )
-            .pipe(catchParseErrorAsValidationError),
+          .pipe(catchSchemaErrorAsValidationError),
+      )
+      .handle("upsertMessageRoomOrder", ({ payload }) =>
+        requireRoomOrderUpsertAccess(
+          messageRoomOrderService,
+          payload.messageId,
+          typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
         )
-        .handle("decrementMessageRoomOrderRank", ({ payload }) =>
-          getRequiredMessageRoomOrderRecord(messageRoomOrderService, payload.messageId)
-            .pipe(
-              Effect.flatMap((record) =>
-                requireRoomOrderMonitorAccess(record).pipe(
-                  Effect.andThen(
-                    messageRoomOrderService.decrementMessageRoomOrderRank(payload.messageId),
+          .pipe(
+            Effect.andThen(
+              messageRoomOrderService.upsertMessageRoomOrder(payload.messageId, payload.data),
+            ),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
+      )
+      .handle("decrementMessageRoomOrderRank", ({ payload }) =>
+        getRequiredMessageRoomOrderRecord(messageRoomOrderService, payload.messageId)
+          .pipe(
+            Effect.flatMap((record) =>
+              requireRoomOrderMonitorAccess(record).pipe(
+                Effect.andThen(
+                  messageRoomOrderService.decrementMessageRoomOrderRank(payload.messageId),
+                ),
+              ),
+            ),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
+      )
+      .handle("incrementMessageRoomOrderRank", ({ payload }) =>
+        getRequiredMessageRoomOrderRecord(messageRoomOrderService, payload.messageId)
+          .pipe(
+            Effect.flatMap((record) =>
+              requireRoomOrderMonitorAccess(record).pipe(
+                Effect.andThen(
+                  messageRoomOrderService.incrementMessageRoomOrderRank(payload.messageId),
+                ),
+              ),
+            ),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
+      )
+      .handle("getMessageRoomOrderEntry", ({ query }) =>
+        getRequiredMessageRoomOrderRecord(messageRoomOrderService, query.messageId)
+          .pipe(
+            Effect.flatMap((record) =>
+              requireRoomOrderMonitorAccess(record).pipe(
+                Effect.andThen(
+                  messageRoomOrderService.getMessageRoomOrderEntry(
+                    query.messageId,
+                    Number(query.rank),
                   ),
                 ),
               ),
-            )
-            .pipe(catchParseErrorAsValidationError),
-        )
-        .handle("incrementMessageRoomOrderRank", ({ payload }) =>
-          getRequiredMessageRoomOrderRecord(messageRoomOrderService, payload.messageId)
-            .pipe(
-              Effect.flatMap((record) =>
-                requireRoomOrderMonitorAccess(record).pipe(
-                  Effect.andThen(
-                    messageRoomOrderService.incrementMessageRoomOrderRank(payload.messageId),
-                  ),
-                ),
-              ),
-            )
-            .pipe(catchParseErrorAsValidationError),
-        )
-        .handle("getMessageRoomOrderEntry", ({ urlParams }) =>
-          getRequiredMessageRoomOrderRecord(messageRoomOrderService, urlParams.messageId)
-            .pipe(
-              Effect.flatMap((record) =>
-                requireRoomOrderMonitorAccess(record).pipe(
-                  Effect.andThen(
-                    messageRoomOrderService.getMessageRoomOrderEntry(
-                      urlParams.messageId,
-                      Number(urlParams.rank),
-                    ),
-                  ),
-                ),
-              ),
-            )
-            .pipe(catchParseErrorAsValidationError),
-        )
-        .handle("getMessageRoomOrderRange", ({ urlParams }) =>
-          getRequiredMessageRoomOrderRecord(messageRoomOrderService, urlParams.messageId)
-            .pipe(
-              Effect.flatMap((record) =>
-                requireRoomOrderMonitorAccess(record).pipe(
-                  Effect.andThen(
-                    pipe(
-                      messageRoomOrderService.getMessageRoomOrderRange(urlParams.messageId),
-                      Effect.flatMap(
-                        Option.match({
-                          onSome: (range) => Effect.succeed(range),
-                          onNone: () =>
-                            Effect.fail(
-                              makeArgumentError(
-                                "Cannot get message room order range, the message might not be registered",
-                              ),
+            ),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
+      )
+      .handle("getMessageRoomOrderRange", ({ query }) =>
+        getRequiredMessageRoomOrderRecord(messageRoomOrderService, query.messageId)
+          .pipe(
+            Effect.flatMap((record) =>
+              requireRoomOrderMonitorAccess(record).pipe(
+                Effect.andThen(
+                  pipe(
+                    messageRoomOrderService.getMessageRoomOrderRange(query.messageId),
+                    Effect.flatMap(
+                      Option.match({
+                        onSome: (range) => Effect.succeed(range),
+                        onNone: () =>
+                          Effect.fail(
+                            makeArgumentError(
+                              "Cannot get message room order range, the message might not be registered",
                             ),
-                        }),
-                      ),
+                          ),
+                      }),
                     ),
                   ),
                 ),
               ),
-            )
-            .pipe(catchParseErrorAsValidationError),
-        )
-        .handle("upsertMessageRoomOrderEntry", ({ payload }) =>
-          getRequiredMessageRoomOrderRecord(messageRoomOrderService, payload.messageId)
-            .pipe(
-              Effect.flatMap((record) =>
-                requireRoomOrderMonitorAccess(record).pipe(
-                  Effect.andThen(
-                    messageRoomOrderService.upsertMessageRoomOrderEntry(
-                      payload.messageId,
-                      payload.entries,
-                    ),
+            ),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
+      )
+      .handle("upsertMessageRoomOrderEntry", ({ payload }) =>
+        getRequiredMessageRoomOrderRecord(messageRoomOrderService, payload.messageId)
+          .pipe(
+            Effect.flatMap((record) =>
+              requireRoomOrderMonitorAccess(record).pipe(
+                Effect.andThen(
+                  messageRoomOrderService.upsertMessageRoomOrderEntry(
+                    payload.messageId,
+                    payload.entries,
                   ),
                 ),
               ),
-            )
-            .pipe(catchParseErrorAsValidationError),
-        )
-        .handle("removeMessageRoomOrderEntry", ({ payload }) =>
-          getRequiredMessageRoomOrderRecord(messageRoomOrderService, payload.messageId)
-            .pipe(
-              Effect.flatMap((record) =>
-                requireRoomOrderMonitorAccess(record).pipe(
-                  Effect.andThen(
-                    messageRoomOrderService.removeMessageRoomOrderEntry(payload.messageId),
-                  ),
+            ),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
+      )
+      .handle("removeMessageRoomOrderEntry", ({ payload }) =>
+        getRequiredMessageRoomOrderRecord(messageRoomOrderService, payload.messageId)
+          .pipe(
+            Effect.flatMap((record) =>
+              requireRoomOrderMonitorAccess(record).pipe(
+                Effect.andThen(
+                  messageRoomOrderService.removeMessageRoomOrderEntry(payload.messageId),
                 ),
               ),
-            )
-            .pipe(catchParseErrorAsValidationError),
-        ),
-    ),
-  ),
-).pipe(
-  Layer.provide(
-    Layer.mergeAll(
-      MessageRoomOrderService.Default,
-      GuildConfigService.Default,
-      SheetAuthTokenAuthorizationLive,
-    ),
-  ),
-);
+            ),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
+      );
+  }),
+).pipe(Layer.provide([MessageRoomOrderService.layer, SheetAuthTokenAuthorizationLive]));

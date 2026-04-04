@@ -1,8 +1,8 @@
-import { Atom, Result, useAtomSet, useAtomSuspense } from "@effect-atom/atom-react";
+import { useAtomSet, useAtomSuspense } from "@effect/atom-react";
+import { AsyncResult, Atom, Reactivity } from "effect/unstable/reactivity";
 import { createIsomorphicFn, getRouterInstance } from "@tanstack/react-start";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import { Duration, Effect, Schema } from "effect";
-import { Reactivity } from "@effect/experimental";
 import { createSheetAuthClient, getSession } from "sheet-auth/client";
 import { Session } from "sheet-auth/model";
 import { appBaseUrlAtom, authBaseUrlAtom } from "#/lib/configAtoms";
@@ -35,13 +35,13 @@ export const sessionAtom = Atom.make(
     return yield* Effect.gen(function* () {
       const authClient = yield* get.result(authClientAtom);
       return yield* getSession(authClient, getRequestHeadersFn());
-    }).pipe(Effect.catchAll(() => Effect.succeedNone));
+    }).pipe(Effect.catch(() => Effect.succeedNone));
   }),
 ).pipe(
   Atom.setIdleTTL(Duration.minutes(5)),
   Atom.serializable({
     key: "session",
-    schema: Result.Schema({
+    schema: AsyncResult.Schema({
       success: Schema.Option(Session),
     }),
   }),

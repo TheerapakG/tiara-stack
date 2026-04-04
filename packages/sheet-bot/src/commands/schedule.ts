@@ -7,7 +7,7 @@ import {
 } from "discord-api-types/v10";
 import { Ix } from "dfx/index";
 import { Effect, Layer, Option, pipe } from "effect";
-import { DiscordGatewayLayerLive } from "dfx-discord-utils/discord";
+import { discordGatewayLayer } from "../discord/gateway";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import {
@@ -16,6 +16,18 @@ import {
   ScheduleService,
   SheetApisRequestContext,
 } from "../services";
+
+const getInteractionGuildId = Effect.gen(function* () {
+  const interactionGuild = yield* Interaction.guild();
+  return pipe(
+    interactionGuild,
+    Option.map((guild) => (guild as { id: string }).id),
+  );
+});
+
+const getInteractionUser = Effect.gen(function* () {
+  return (yield* Interaction.user()) as { id: string; username: string };
+});
 
 const formatHourRanges = (hours: readonly number[]): string => {
   if (hours.length === 0) return "None";
@@ -59,7 +71,7 @@ const makeListSubCommand = Effect.gen(function* () {
       yield* command.deferReply({ flags: MessageFlags.Ephemeral });
 
       const serverId = command.optionValueOptional("server_id");
-      const interactionGuildId = (yield* Interaction.guild()).pipe(Option.map((guild) => guild.id));
+      const interactionGuildId = yield* getInteractionGuildId;
       const guildId = pipe(
         serverId,
         Option.orElse(() => interactionGuildId),
@@ -67,15 +79,18 @@ const makeListSubCommand = Effect.gen(function* () {
       );
 
       const day = command.optionValue("day");
-      const interactionUser = yield* Interaction.user();
+      const interactionUser = yield* getInteractionUser;
 
-      yield* Effect.firstSuccessOf([
-        permissionService.checkInteractionUserApplicationOwner(),
-        permissionService.checkInteractionInGuild(Option.getOrUndefined(serverId)),
-      ]);
+      yield* permissionService
+        .checkInteractionUserApplicationOwner()
+        .pipe(
+          Effect.catch(() =>
+            permissionService.checkInteractionInGuild(Option.getOrUndefined(serverId)),
+          ),
+        );
 
       const targetUser = command.optionUserValueOptional("user").pipe(
-        Option.map(({ user }) => user),
+        Option.map(({ user }) => user as { id: string; username: string }),
         Option.getOrElse(() => interactionUser),
       );
 
@@ -138,10 +153,10 @@ const makeScheduleCommand = Effect.gen(function* () {
 const makeGlobalScheduleCommand = Effect.gen(function* () {
   const scheduleCommand = yield* makeScheduleCommand;
 
-  return CommandHelper.makeGlobalCommand(scheduleCommand.data, scheduleCommand.handler);
+  return CommandHelper.makeGlobalCommand(scheduleCommand.data, scheduleCommand.handler as never);
 });
 
-export const ScheduleCommandLive = Layer.scopedDiscard(
+export const scheduleCommandLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const registry = yield* InteractionsRegistry;
     const command = yield* makeGlobalScheduleCommand;
@@ -151,10 +166,10 @@ export const ScheduleCommandLive = Layer.scopedDiscard(
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
-      DiscordGatewayLayerLive,
-      PermissionService.Default,
-      EmbedService.Default,
-      ScheduleService.Default,
+      discordGatewayLayer,
+      PermissionService.layer,
+      EmbedService.layer,
+      ScheduleService.layer,
     ),
   ),
 );

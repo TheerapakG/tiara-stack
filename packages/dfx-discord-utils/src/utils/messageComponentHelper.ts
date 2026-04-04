@@ -1,13 +1,8 @@
-import type { HttpClientError } from "@effect/platform/HttpClientError";
 import { Discord, DiscordREST, Ix } from "dfx";
-import type { DiscordRESTError } from "dfx/DiscordREST";
 import { DiscordRestService } from "dfx/DiscordREST";
 import type { MessageComponent as DfxMessageComponent } from "dfx/Interactions/definitions";
 import type { DiscordMessageComponent } from "dfx/Interactions/context";
 import { MessageFlags } from "discord-api-types/v10";
-
-// Re-export types to ensure they're available in generated d.ts files
-export type { HttpClientError, DiscordRESTError };
 import { Deferred, Effect, FiberMap, pipe, Scope } from "effect";
 import { DiscordApplication } from "../discord/gateway";
 import { formatErrorResponse, makeDiscordErrorMessageResponse } from "./errorResponse";
@@ -32,191 +27,171 @@ export class MessageComponentHelper {
     }>,
   ) {}
 
-  reply(payload?: Discord.IncomingWebhookInteractionRequest) {
-    return Effect.sync(() => {
+  reply = Effect.fn("MessageComponentHelper.reply")(
+    { self: this },
+    function* (payload?: Discord.IncomingWebhookInteractionRequest) {
       this.acknowledgementState = "replied";
-    }).pipe(
-      Effect.zipRight(
-        Deferred.succeed(this.response, {
-          files: [],
-          payload: {
-            type: Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: payload,
-          },
-        }),
-      ),
-    );
-  }
+      return yield* Deferred.succeed(this.response, {
+        files: [],
+        payload: {
+          type: Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: payload,
+        },
+      });
+    },
+  );
 
-  replyWithFiles(files: ReadonlyArray<File>, response?: Discord.IncomingWebhookInteractionRequest) {
-    return Effect.sync(() => {
+  replyWithFiles = Effect.fn("MessageComponentHelper.replyWithFiles")(
+    { self: this },
+    function* (files: ReadonlyArray<File>, response?: Discord.IncomingWebhookInteractionRequest) {
       this.acknowledgementState = "replied";
-    }).pipe(
-      Effect.zipRight(
-        Deferred.succeed(this.response, {
-          files,
-          payload: {
-            type: Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: response,
-          },
-        }),
-      ),
-    );
-  }
+      return yield* Deferred.succeed(this.response, {
+        files,
+        payload: {
+          type: Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: response,
+        },
+      });
+    },
+  );
 
-  update(payload?: Discord.IncomingWebhookInteractionRequest) {
-    return Effect.sync(() => {
+  update = Effect.fn("MessageComponentHelper.update")(
+    { self: this },
+    function* (payload?: Discord.IncomingWebhookInteractionRequest) {
       this.acknowledgementState = "updated";
-    }).pipe(
-      Effect.zipRight(
-        Deferred.succeed(this.response, {
-          files: [],
-          payload: {
-            type: Discord.InteractionCallbackTypes.UPDATE_MESSAGE,
-            data: payload,
-          },
-        }),
-      ),
-    );
-  }
+      return yield* Deferred.succeed(this.response, {
+        files: [],
+        payload: {
+          type: Discord.InteractionCallbackTypes.UPDATE_MESSAGE,
+          data: payload,
+        },
+      });
+    },
+  );
 
-  updateWithFiles(files: ReadonlyArray<File>, payload?: Discord.IncomingWebhookInteractionRequest) {
-    return Effect.sync(() => {
+  updateWithFiles = Effect.fn("MessageComponentHelper.updateWithFiles")(
+    { self: this },
+    function* (files: ReadonlyArray<File>, payload?: Discord.IncomingWebhookInteractionRequest) {
       this.acknowledgementState = "updated";
-    }).pipe(
-      Effect.zipRight(
-        Deferred.succeed(this.response, {
-          files,
-          payload: {
-            type: Discord.InteractionCallbackTypes.UPDATE_MESSAGE,
-            data: payload,
-          },
-        }),
-      ),
-    );
-  }
+      return yield* Deferred.succeed(this.response, {
+        files,
+        payload: {
+          type: Discord.InteractionCallbackTypes.UPDATE_MESSAGE,
+          data: payload,
+        },
+      });
+    },
+  );
 
-  deferReply(response?: Discord.IncomingWebhookInteractionRequest) {
-    return Effect.sync(() => {
+  deferReply = Effect.fn("MessageComponentHelper.deferReply")(
+    { self: this },
+    function* (response?: Discord.IncomingWebhookInteractionRequest) {
       this.acknowledgementState = "deferred-reply";
-    }).pipe(
-      Effect.zipRight(
-        Deferred.succeed(this.response, {
-          files: [],
-          payload: {
-            type: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-            data: response,
-          },
-        }),
-      ),
-    );
-  }
+      return yield* Deferred.succeed(this.response, {
+        files: [],
+        payload: {
+          type: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+          data: response,
+        },
+      });
+    },
+  );
 
-  deferUpdate(response?: Discord.IncomingWebhookInteractionRequest) {
-    return Effect.sync(() => {
+  deferUpdate = Effect.fn("MessageComponentHelper.deferUpdate")(
+    { self: this },
+    function* (response?: Discord.IncomingWebhookInteractionRequest) {
       this.acknowledgementState = "deferred-update";
-    }).pipe(
-      Effect.zipRight(
-        Deferred.succeed(this.response, {
-          files: [],
-          payload: {
-            type: Discord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE,
-            data: response,
-          },
-        }),
-      ),
-    );
-  }
+      return yield* Deferred.succeed(this.response, {
+        files: [],
+        payload: {
+          type: Discord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE,
+          data: response,
+        },
+      });
+    },
+  );
 
-  respondWithError(error: unknown): Effect.Effect<unknown, DiscordRESTError, DiscordInteraction> {
-    const rendered = makeDiscordErrorMessageResponse(
-      "Interaction failed",
-      formatErrorResponse(error),
-    );
-    const payload: Discord.IncomingWebhookRequestPartial = {
-      content: rendered.content,
-      flags: MessageFlags.Ephemeral,
-    };
-
-    if (this.acknowledgementState === "deferred-reply") {
-      return rendered.files.length === 0
-        ? this.editReply({ payload: { content: rendered.content } })
-        : this.editReplyWithFiles(rendered.files, { payload: { content: rendered.content } });
-    }
-
-    if (this.acknowledgementState === "deferred-update") {
-      return this.editReply({ payload: {} }).pipe(
-        Effect.zipRight(this.followUp(payload, rendered.files)),
+  respondWithError = Effect.fn("MessageComponentHelper.respondWithError")(
+    { self: this },
+    function* (error: unknown) {
+      const rendered = makeDiscordErrorMessageResponse(
+        "Interaction failed",
+        formatErrorResponse(error),
       );
-    }
+      const payload: Discord.IncomingWebhookRequestPartial = {
+        content: rendered.content,
+        flags: MessageFlags.Ephemeral,
+      };
 
-    if (this.acknowledgementState !== "none") {
-      return this.followUp(payload, rendered.files);
-    }
+      if (this.acknowledgementState === "deferred-reply") {
+        return yield* rendered.files.length === 0
+          ? this.editReply({ payload: { content: rendered.content } })
+          : this.editReplyWithFiles(rendered.files, { payload: { content: rendered.content } });
+      }
 
-    return Effect.flatMap(
-      rendered.files.length === 0
+      if (this.acknowledgementState === "deferred-update") {
+        yield* this.editReply({ payload: {} });
+        return yield* this.followUp(payload, rendered.files);
+      }
+
+      if (this.acknowledgementState !== "none") {
+        return yield* this.followUp(payload, rendered.files);
+      }
+
+      const sent = yield* rendered.files.length === 0
         ? this.reply(payload)
-        : this.replyWithFiles(rendered.files, payload),
-      (sent) => (sent ? Effect.void : this.followUp(payload, rendered.files)),
-    );
-  }
+        : this.replyWithFiles(rendered.files, payload);
+      if (!sent) {
+        return yield* this.followUp(payload, rendered.files);
+      }
+    },
+  );
 
-  private followUp(
-    payload: Discord.IncomingWebhookRequestPartial,
-    files: ReadonlyArray<File>,
-  ): Effect.Effect<Discord.MessageResponse, DiscordRESTError, DiscordInteraction> {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const command = this;
+  private followUp = Effect.fn("MessageComponentHelper.followUp")(
+    { self: this },
+    function* (payload: Discord.IncomingWebhookRequestPartial, files: ReadonlyArray<File>) {
+      const context = yield* Ix.Interaction;
+      const request = this.rest.executeWebhook(this.application.id, context.token, {
+        params: { wait: true },
+        payload,
+      });
 
-    return Ix.Interaction.pipe(
-      Effect.flatMap((context) => {
-        const request = command.rest.executeWebhook(command.application.id, context.token, {
-          params: { wait: true },
-          payload,
-        });
+      return files.length === 0 ? yield* request : yield* this.rest.withFiles(files)(request);
+    },
+  );
 
-        return files.length === 0 ? request : command.rest.withFiles(files)(request);
-      }),
-    );
-  }
-
-  editReply(response: {
-    readonly params?: Discord.UpdateOriginalWebhookMessageParams;
-    readonly payload: Discord.IncomingWebhookUpdateRequestPartial;
-  }): Effect.Effect<Discord.MessageResponse, DiscordRESTError, DiscordInteraction> {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const command = this;
-
-    return Effect.gen(function* () {
+  editReply = Effect.fn("MessageComponentHelper.editReply")(
+    { self: this },
+    function* (response: {
+      readonly params?: Discord.UpdateOriginalWebhookMessageParams;
+      readonly payload: Discord.IncomingWebhookUpdateRequestPartial;
+    }) {
       const context = yield* Ix.Interaction;
 
-      return yield* command.rest.updateOriginalWebhookMessage(
-        command.application.id,
+      return yield* this.rest.updateOriginalWebhookMessage(
+        this.application.id,
         context.token,
         response,
       );
-    });
-  }
-
-  editReplyWithFiles(
-    files: ReadonlyArray<File>,
-    response: {
-      readonly params?: Discord.UpdateOriginalWebhookMessageParams;
-      readonly payload: Discord.IncomingWebhookUpdateRequestPartial;
     },
-  ): Effect.Effect<Discord.MessageResponse, DiscordRESTError, DiscordInteraction> {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const command = this;
+  );
 
-    return Effect.gen(function* () {
+  editReplyWithFiles = Effect.fn("MessageComponentHelper.editReplyWithFiles")(
+    { self: this },
+    function* (
+      files: ReadonlyArray<File>,
+      response: {
+        readonly params?: Discord.UpdateOriginalWebhookMessageParams;
+        readonly payload: Discord.IncomingWebhookUpdateRequestPartial;
+      },
+    ) {
       const context = yield* Ix.Interaction;
 
-      return yield* command.rest.withFiles(files)(
-        command.rest.updateOriginalWebhookMessage(command.application.id, context.token, response),
+      return yield* this.rest.withFiles(files)(
+        this.rest.updateOriginalWebhookMessage(this.application.id, context.token, response),
       );
-    });
-  }
+    },
+  );
 }
 
 export const makeMessageComponentHelper = Effect.fnUntraced(function* (
@@ -283,9 +258,9 @@ const makeButtonInternal = Effect.fnUntraced(function* <E = never, R = never>(
     Effect.fnUntraced(function* (helper: MessageComponentHelper) {
       const shouldRunFallback = yield* handler(helper).pipe(
         Effect.as(true),
-        Effect.catchAllCause((cause) =>
+        Effect.catchCause((cause) =>
           Effect.logError(cause).pipe(
-            Effect.zipRight(helper.respondWithError(cause)),
+            Effect.andThen(helper.respondWithError(cause)),
             Effect.as(false),
           ),
         ),
@@ -303,7 +278,7 @@ const makeButtonInternal = Effect.fnUntraced(function* <E = never, R = never>(
     handler: Effect.gen(function* () {
       const helper = yield* makeMessageComponentHelper(rest, application);
       yield* forkedHandler(helper);
-      const { files, payload } = yield* helper.response;
+      const { files, payload } = yield* Deferred.await(helper.response);
       return {
         files,
         ...payload,

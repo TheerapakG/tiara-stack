@@ -8,34 +8,31 @@ import type {
 } from "dfx/gateway";
 import { DiscordIxLive } from "dfx/gateway";
 import type { RateLimiter as RateLimiterService } from "dfx/RateLimit";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, ServiceMap } from "effect";
+import { HttpClientError } from "effect/unstable/http";
 
 export const DiscordLayer = DiscordIxLive.pipe(
-  Layer.provide(NodeHttpClient.layer),
+  Layer.provide(NodeHttpClient.layerFetch),
   Layer.provide(NodeSocket.layerWebSocketConstructor),
 );
 
-const DiscordApplicationBase = Effect.Service<Discord.PrivateApplicationResponse>()(
+export class DiscordApplication extends ServiceMap.Service<DiscordApplication>()(
   "DiscordApplication",
   {
-    effect: DiscordREST.pipe(
-      Effect.flatMap((_) => _.getMyApplication()),
-      Effect.orDie,
-    ),
-    dependencies: [DiscordLayer] as const,
+    make: Effect.gen(function* () {
+      const discordREST = yield* DiscordREST;
+      return yield* discordREST.getMyApplication();
+    }),
   },
-);
+) {
+  // Live layer - requires explicit base URL configuration
+  static layer = Layer.effect(DiscordApplication, this.make).pipe(Layer.provide(DiscordLayer));
+}
 
-export class DiscordApplication extends DiscordApplicationBase {}
-
-export const DiscordGatewayLayerLive: Layer.Layer<
-  | DiscordGatewayService
-  | DiscordRESTService
-  | InteractionsRegistryService
-  | RateLimiterService
-  | Discord.PrivateApplicationResponse,
-  never,
+export const discordGatewayLayer: Layer.Layer<
+  DiscordGatewayService | DiscordRESTService | InteractionsRegistryService | RateLimiterService,
+  | Discord.DiscordRestError<"ErrorResponse", Discord.ErrorResponse>
+  | Discord.DiscordRestError<"RatelimitedResponse", Discord.RatelimitedResponse>
+  | HttpClientError.HttpClientError,
   DiscordConfig.DiscordConfig
-> = Layer.merge(DiscordLayer, DiscordApplication.Default);
-
-export const DiscordGatewayLayer = DiscordGatewayLayerLive;
+> = Layer.merge(DiscordLayer, DiscordApplication.layer);

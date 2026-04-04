@@ -1,19 +1,23 @@
 import { config } from "@/config";
-import { FileSystem, HttpApiClient, HttpClient, HttpClientRequest } from "@effect/platform";
 import { Interaction } from "dfx-discord-utils";
 import { DiscordInteraction } from "dfx/Interactions/context";
+import { HttpClient, HttpClientRequest } from "effect/unstable/http";
+import { HttpApiClient } from "effect/unstable/httpapi";
 import {
   Cache,
   Data,
   Duration,
   Effect,
   Exit,
+  FileSystem,
   Ref,
   pipe,
   Schedule,
-  Context,
   DateTime,
+  Layer,
+  Option,
   Redacted,
+  ServiceMap,
 } from "effect";
 import { createKubernetesOAuthSession } from "sheet-auth/client";
 import { DISCORD_BOT_USER_ID_SENTINEL } from "sheet-auth/plugins/kubernetes-oauth";
@@ -26,128 +30,146 @@ type SheetApisRequester = Data.TaggedEnum<{
 }>;
 export const SheetApisRequester = Data.taggedEnum<SheetApisRequester>();
 
-export class SheetApisRequestContext extends Context.Tag("SheetApisRequestContext")<
-  SheetApisRequestContext,
+type SheetApisRequestContextType = {
+  requester: SheetApisRequester;
+};
+
+const sheetApisRequestContextTag = ServiceMap.Reference<SheetApisRequestContextType>(
+  "SheetApisRequestContext",
   {
-    requester: SheetApisRequester;
-  }
->() {
-  static asBot = <Args extends any[], A, E, R>(
-    fn: (...args: Args) => Effect.Effect<A, E, R>,
-  ): ((...args: Args) => Effect.Effect<A, E, Exclude<R, SheetApisRequestContext>>) =>
+    defaultValue: () => ({
+      requester: SheetApisRequester.Bot(),
+    }),
+  },
+) as ServiceMap.Reference<SheetApisRequestContextType> & {
+  readonly Type: SheetApisRequestContextType;
+};
+
+type SheetApisRequestContextTag = typeof sheetApisRequestContextTag;
+
+export const SheetApisRequestContext = Object.assign(sheetApisRequestContextTag, {
+  asBot: <Args extends any[], A, E, R>(fn: (...args: Args) => Effect.Effect<A, E, R>) =>
     Effect.fn("SheetApisRequestContext.asBot")(function* (...args: Args) {
-      const sheetApisRequestContext = SheetApisRequestContext.of({
+      const sheetApisRequestContext: SheetApisRequestContextType = {
         requester: SheetApisRequester.Bot(),
-      });
+      };
 
       return yield* fn(...args).pipe(
-        Effect.provideService(SheetApisRequestContext, sheetApisRequestContext),
+        Effect.provideService(sheetApisRequestContextTag, sheetApisRequestContext),
       );
-    });
+    }),
 
-  static asInteractionUser = <Args extends any[], A, E, R>(
-    fn: (...args: Args) => Effect.Effect<A, E, R>,
-  ): ((
-    ...args: Args
-  ) => Effect.Effect<A, E, DiscordInteraction | Exclude<R, SheetApisRequestContext>>) =>
+  asInteractionUser: <Args extends any[], A, E, R>(fn: (...args: Args) => Effect.Effect<A, E, R>) =>
     Effect.fn("SheetApisRequestContext.asInteractionUser")(function* (...args: Args) {
       const interactionUser = yield* Interaction.user();
-      const sheetApisRequestContext = SheetApisRequestContext.of({
-        requester: SheetApisRequester.DiscordUser({ discordUserId: interactionUser.id }),
-      });
+      const sheetApisRequestContext: SheetApisRequestContextType = {
+        requester: SheetApisRequester.DiscordUser({
+          discordUserId: (interactionUser as { id: string }).id,
+        }),
+      };
 
       return yield* fn(...args).pipe(
-        Effect.provideService(SheetApisRequestContext, sheetApisRequestContext),
+        Effect.provideService(sheetApisRequestContextTag, sheetApisRequestContext),
       );
-    });
-}
-
-export class SheetApisClient extends Effect.Service<SheetApisClient>()("SheetApisClient", {
-  scoped: pipe(
-    Effect.all({
-      fs: FileSystem.FileSystem,
-      sheetAuthClient: SheetAuthClient,
-      httpClient: HttpClient.HttpClient,
-      k8sTokenRef: Ref.make(""),
-      baseUrl: config.sheetApisBaseUrl,
     }),
-    Effect.tap(({ fs, k8sTokenRef }) =>
-      // Periodic K8s token refresh every 5 minutes
-      Effect.forkScoped(
-        pipe(
-          fs.readFileString("/var/run/secrets/tokens/sheet-auth-token", "utf-8"),
-          Effect.map((token) => token.trim()),
-          Effect.flatMap((token) => Ref.set(k8sTokenRef, token)),
-          Effect.retry({ schedule: Schedule.exponential("1 second"), times: 3 }),
-          Effect.catchAll(() => Effect.void),
-          Effect.repeat(Schedule.spaced("5 minutes")),
-        ),
-      ),
-    ),
-    Effect.bind("tokenCache", ({ sheetAuthClient, k8sTokenRef }) =>
-      Cache.makeWith({
-        capacity: Infinity,
-        lookup: (discordUserId: string) =>
-          Effect.gen(function* () {
-            const k8sToken = yield* Ref.get(k8sTokenRef);
-            const session = yield* createKubernetesOAuthSession(
-              sheetAuthClient,
-              discordUserId,
-              k8sToken,
-            ).pipe(Effect.catchAll(() => Effect.succeed(undefined)));
-            const now = yield* DateTime.now;
-            const timeToLive = session?.session?.expiresAt
-              ? DateTime.distanceDuration(now, session.session.expiresAt).pipe(
-                  Duration.subtract(Duration.seconds(60)),
-                )
-              : Duration.minutes(1);
+}) as SheetApisRequestContextTag & {
+  asBot: <Args extends any[], A, E, R>(
+    fn: (...args: Args) => Effect.Effect<A, E, R>,
+  ) => (...args: Args) => Effect.Effect<A, E, Exclude<R, SheetApisRequestContextTag>>;
+  asInteractionUser: <Args extends any[], A, E, R>(
+    fn: (...args: Args) => Effect.Effect<A, E, R>,
+  ) => (
+    ...args: Args
+  ) => Effect.Effect<A, E, DiscordInteraction | Exclude<R, SheetApisRequestContextTag>>;
+};
 
-            return {
-              token: session?.token,
-              timeToLive,
-            };
-          }),
-        timeToLive: (exit) =>
-          Exit.match(exit, {
-            onFailure: () => Duration.minutes(1),
-            onSuccess: ({ timeToLive }) => timeToLive,
-          }),
+export class SheetApisClient extends ServiceMap.Service<SheetApisClient>()("SheetApisClient", {
+  make: Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const sheetAuthClient = yield* SheetAuthClient;
+    const httpClient = yield* HttpClient.HttpClient;
+    const k8sTokenRef = yield* Ref.make("");
+    const baseUrl = yield* config.sheetApisBaseUrl;
+
+    yield* pipe(
+      fs.readFileString("/var/run/secrets/tokens/sheet-auth-token", "utf-8"),
+      Effect.map((token) => token.trim()),
+      Effect.flatMap((token) => Ref.set(k8sTokenRef, token)),
+      Effect.retry({ schedule: Schedule.exponential("1 second"), times: 3 }),
+      Effect.catch(() => Effect.void),
+      Effect.repeat(Schedule.spaced("5 minutes")),
+      Effect.forkScoped,
+    );
+
+    const tokenCache = yield* Cache.makeWith({
+      capacity: Infinity,
+      lookup: (discordUserId: string) =>
+        Effect.gen(function* () {
+          const k8sToken = yield* Ref.get(k8sTokenRef);
+          const session = yield* createKubernetesOAuthSession(
+            sheetAuthClient,
+            discordUserId,
+            k8sToken,
+          ).pipe(Effect.catch(() => Effect.succeed(undefined)));
+          const now = yield* DateTime.now;
+          const timeToLive = session?.session?.expiresAt
+            ? pipe(
+                DateTime.distance(now, session.session.expiresAt),
+                Duration.subtract(Duration.seconds(60)),
+              )
+            : Duration.minutes(1);
+
+          return {
+            token: session?.token,
+            timeToLive,
+          };
+        }),
+      timeToLive: Exit.match({
+        onFailure: () => Duration.minutes(1),
+        onSuccess: ({ timeToLive }) => timeToLive,
       }),
-    ),
-    Effect.let("httpClientWithToken", ({ httpClient, tokenCache }) =>
-      HttpClient.mapRequestEffect(httpClient, (request) =>
-        SheetApisRequestContext.pipe(
-          Effect.map(({ requester }) => requester),
-          Effect.flatMap(
-            SheetApisRequester.$match({
-              Bot: () => tokenCache.get(DISCORD_BOT_USER_ID_SENTINEL),
-              DiscordUser: ({ discordUserId }) => tokenCache.get(discordUserId),
-            }),
+    });
+
+    const httpClientWithToken = HttpClient.mapRequestEffect(httpClient, (request) =>
+      Effect.gen(function* () {
+        const { requester } = yield* Effect.serviceOption(sheetApisRequestContextTag).pipe(
+          Effect.map(
+            Option.getOrElse(
+              (): SheetApisRequestContextType => ({
+                requester: SheetApisRequester.Bot(),
+              }),
+            ),
           ),
-          Effect.map(({ token }) =>
-            token ? HttpClientRequest.bearerToken(request, Redacted.value(token)) : request,
-          ),
-          Effect.catchAll((err) =>
+        );
+        const { token } = yield* pipe(
+          requester._tag === "Bot"
+            ? Cache.get(tokenCache, DISCORD_BOT_USER_ID_SENTINEL)
+            : Cache.get(tokenCache, requester.discordUserId),
+          Effect.catch((err) =>
             pipe(
               Effect.logWarning(
                 `Failed to get auth token, proceeding unauthenticated: ${String(err)}`,
               ),
-              Effect.as(request),
+              Effect.as({ token: undefined }),
             ),
           ),
-        ),
-      ),
-    ),
-    Effect.bind("client", ({ httpClientWithToken, baseUrl }) =>
-      HttpApiClient.makeWith(Api, {
-        httpClient: httpClientWithToken,
-        baseUrl,
+        );
+
+        return token ? HttpClientRequest.bearerToken(request, Redacted.value(token)) : request;
       }),
-    ),
-    Effect.map(({ client }) => ({
+    ) as unknown as HttpClient.HttpClient;
+
+    const client = yield* HttpApiClient.makeWith(Api, {
+      httpClient: httpClientWithToken,
+      baseUrl,
+    });
+
+    return {
       get: () => client,
-    })),
-  ),
-  accessors: true,
-  dependencies: [SheetAuthClient.Default],
-}) {}
+    };
+  }),
+}) {
+  static layer = Layer.effect(SheetApisClient, this.make).pipe(
+    Layer.provide(SheetAuthClient.layer),
+  );
+}

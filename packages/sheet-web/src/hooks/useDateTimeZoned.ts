@@ -5,7 +5,7 @@ export const makeZoned = (timeZone: DateTime.TimeZone, timestamp: DateTime.DateT
   DateTime.setZone(timestamp, timeZone);
 
 export const makeZonedOptional = (timeZone: DateTime.TimeZone, timestamp?: DateTime.DateTime) =>
-  Option.fromNullable(timestamp).pipe(
+  Option.fromNullishOr(timestamp).pipe(
     Option.map(DateTime.setZone(timeZone)),
     Option.getOrUndefined,
   );

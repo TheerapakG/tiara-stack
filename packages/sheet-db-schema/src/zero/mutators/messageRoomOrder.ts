@@ -14,7 +14,7 @@ export const messageRoomOrder = {
       Schema.Struct({
         messageId: Schema.String,
       }),
-      Schema.standardSchemaV1,
+      Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) => {
       const messageRoomOrder = await tx.run(
@@ -35,7 +35,7 @@ export const messageRoomOrder = {
       Schema.Struct({
         messageId: Schema.String,
       }),
-      Schema.standardSchemaV1,
+      Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) => {
       const messageRoomOrder = await tx.run(
@@ -64,7 +64,7 @@ export const messageRoomOrder = {
         messageChannelId: Schema.NullOr(Schema.String),
         createdByUserId: Schema.NullOr(Schema.String),
       }),
-      Schema.standardSchemaV1,
+      Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) =>
       await tx.mutate.messageRoomOrder.upsert({
@@ -95,7 +95,7 @@ export const messageRoomOrder = {
           }),
         ),
       }),
-      Schema.standardSchemaV1,
+      Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) => {
       await Promise.all(
@@ -121,7 +121,7 @@ export const messageRoomOrder = {
         rank: Schema.Number,
         position: Schema.Number,
       }),
-      Schema.standardSchemaV1,
+      Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) =>
       await tx.mutate.messageRoomOrderEntry.update({

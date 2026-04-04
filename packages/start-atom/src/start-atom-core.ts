@@ -1,10 +1,10 @@
-import { Hydration, type Registry } from "@effect-atom/atom-react";
+import { Hydration, type AtomRegistry } from "effect/unstable/reactivity";
 import { isServer } from "@tanstack/router-core/isServer";
 import type { AnyRouter } from "@tanstack/react-router";
 
 export type StartAtomOptions<TRouter extends AnyRouter> = {
   router: TRouter;
-  registry: Registry.Registry;
+  registry: AtomRegistry.AtomRegistry;
 };
 
 export type DehydratedAtomState = {

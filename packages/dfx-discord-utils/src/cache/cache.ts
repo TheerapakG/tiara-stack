@@ -9,7 +9,7 @@ import type { ReverseLookupCacheOp } from "./prelude";
 import { CacheReadonlyError } from "@/discord/schema";
 
 const retryPolicy = Schedule.exponential("500 millis").pipe(
-  Schedule.union(Schedule.spaced("10 seconds")),
+  Schedule.andThen(Schedule.spaced("10 seconds")),
 );
 
 // Conditional type for put operation based on readonly flag
@@ -126,14 +126,14 @@ export const makeWithReverseLookup = <
         }
       }),
     ).pipe(
-      Effect.tapErrorCause((_) => Effect.logError("ops error, restarting", _)),
+      Effect.tapCause((_) => Effect.logError("ops error, restarting", _)),
       Effect.retry(retryPolicy),
       Effect.forkScoped,
       Effect.interruptible,
     );
 
     yield* driver.run.pipe(
-      Effect.tapErrorCause((_) => Effect.logError("cache driver error, restarting", _)),
+      Effect.tapCause((_) => Effect.logError("cache driver error, restarting", _)),
       Effect.retry(retryPolicy),
       Effect.forkScoped,
       Effect.interruptible,
@@ -357,14 +357,14 @@ export const make = <EOps, EDriver, EMiss, A, const ReadonlyValue extends boolea
         }
       }),
     ).pipe(
-      Effect.tapErrorCause((_) => Effect.logError("ops error, restarting", _)),
+      Effect.tapCause((_) => Effect.logError("ops error, restarting", _)),
       Effect.retry(retryPolicy),
       Effect.forkScoped,
       Effect.interruptible,
     );
 
     yield* driver.run.pipe(
-      Effect.tapErrorCause((_) => Effect.logError("cache driver error, restarting", _)),
+      Effect.tapCause((_) => Effect.logError("cache driver error, restarting", _)),
       Effect.retry(retryPolicy),
       Effect.forkScoped,
       Effect.interruptible,

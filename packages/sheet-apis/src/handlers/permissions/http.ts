@@ -1,22 +1,21 @@
-import { HttpApiBuilder } from "@effect/platform";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Effect, Layer } from "effect";
 import { Api } from "@/api";
 import { resolveSheetAuthGuildUser } from "@/middlewares/authorization";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
-import { GuildConfigService } from "@/services/guildConfig";
 
-export const PermissionsLive = HttpApiBuilder.group(Api, "permissions", (handlers) =>
-  handlers.handle("getCurrentUserPermissions", ({ urlParams }) =>
+export const permissionsLayer = HttpApiBuilder.group(Api, "permissions", (handlers) => {
+  return handlers.handle("getCurrentUserPermissions", ({ query }) =>
     Effect.gen(function* () {
       const user = yield* SheetAuthUser;
       const resolvedUser =
-        typeof urlParams.guildId === "string"
-          ? yield* resolveSheetAuthGuildUser(user, urlParams.guildId)
+        typeof query.guildId === "string"
+          ? yield* resolveSheetAuthGuildUser(user, query.guildId)
           : user;
       return {
         permissions: resolvedUser.permissions,
       };
     }),
-  ),
-).pipe(Layer.provide(Layer.mergeAll(GuildConfigService.Default, SheetAuthTokenAuthorizationLive)));
+  );
+}).pipe(Layer.provide([SheetAuthTokenAuthorizationLive]));
