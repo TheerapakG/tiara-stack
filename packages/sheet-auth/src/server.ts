@@ -217,13 +217,14 @@ const HttpLive = HttpRouter.serve(apiLayer).pipe(
 const configProviderLayer = Layer.unwrap(
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
-    const haveDotEnv = yield* fs.exists(".env");
-    if (haveDotEnv) {
-      return ConfigProvider.layerAdd(ConfigProvider.fromDotEnv({ path: ".env" })).pipe(
-        Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
-      );
-    }
-    return ConfigProvider.layer(ConfigProvider.fromEnv());
+    return yield* fs.readFileString(".env").pipe(
+      Effect.map((content) =>
+        ConfigProvider.layerAdd(ConfigProvider.fromDotEnvContents(content)).pipe(
+          Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+        ),
+      ),
+      Effect.catch(() => Effect.succeed(ConfigProvider.layer(ConfigProvider.fromEnv()))),
+    );
   }),
 ).pipe(Layer.provide(NodeFileSystem.layer));
 
