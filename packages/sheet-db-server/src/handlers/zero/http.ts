@@ -1,10 +1,24 @@
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { handleMutateRequest, handleQueryRequest } from "@rocicorp/zero/server";
-import { mustGetMutator, mustGetQuery } from "@rocicorp/zero";
+import { mustGetMutator, mustGetQuery, type ReadonlyJSONValue } from "@rocicorp/zero";
 import { Effect, Layer } from "effect";
 import { Api } from "@/api";
 import { queries, mutators, schema } from "sheet-db-schema/zero";
 import { DBService } from "@/services/db";
+
+const removeUndefinedFields = (obj: ReadonlyJSONValue | undefined): ReadonlyJSONValue => {
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefinedFields);
+  }
+  if (typeof obj === "object" && obj !== null) {
+    return Object.fromEntries(
+      Object.entries(obj)
+        .filter(([_, value]) => value !== undefined)
+        .map(([key, value]) => [key, removeUndefinedFields(value)]),
+    );
+  }
+  return obj !== undefined ? obj : null;
+};
 
 export const ZeroHttpLive = HttpApiBuilder.group(
   Api,
@@ -23,7 +37,7 @@ export const ZeroHttpLive = HttpApiBuilder.group(
             schema,
             payload,
           ),
-        ),
+        ).pipe(Effect.map(removeUndefinedFields)),
       )
       .handle("mutate", ({ query, payload }) =>
         Effect.promise(() =>
@@ -41,7 +55,7 @@ export const ZeroHttpLive = HttpApiBuilder.group(
             query,
             payload,
           ),
-        ),
+        ).pipe(Effect.map(removeUndefinedFields)),
       );
   }),
 ).pipe(Layer.provide(DBService.layer));
