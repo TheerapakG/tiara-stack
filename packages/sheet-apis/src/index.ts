@@ -1,18 +1,29 @@
 import { NodeFileSystem, NodeRuntime } from "@effect/platform-node";
-import { ConfigProvider, Effect, Layer, Logger } from "effect";
+import { ConfigProvider, Effect, FileSystem, Layer, Logger } from "effect";
 import { httpLayer } from "./http";
 import { MetricsLive } from "./metrics";
 import { GuildConfigService } from "./services/guildConfig";
 import { TracesLive } from "./traces";
+
+const configProviderLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const haveDotEnv = yield* fs.exists(".env");
+    if (haveDotEnv) {
+      return ConfigProvider.layerAdd(ConfigProvider.fromDotEnv({ path: ".env" })).pipe(
+        Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+      );
+    }
+    return ConfigProvider.layer(ConfigProvider.fromEnv());
+  }),
+).pipe(Layer.provide(NodeFileSystem.layer));
 
 const main = httpLayer.pipe(
   Layer.provide(GuildConfigService.layer),
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
   Layer.provide(Logger.layer([Logger.consoleLogFmt])),
-  Layer.provide(
-    ConfigProvider.layerAdd(ConfigProvider.fromDotEnv()).pipe(Layer.provide(NodeFileSystem.layer)),
-  ),
+  Layer.provide(configProviderLayer),
   Layer.launch,
 );
 

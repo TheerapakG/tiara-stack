@@ -1,13 +1,22 @@
 import { Atom } from "effect/unstable/reactivity";
 import { NodeFileSystem } from "@effect/platform-node";
 import { createServerFn, createIsomorphicFn } from "@tanstack/react-start";
-import { Layer, ConfigProvider, Effect } from "effect";
+import { Layer, ConfigProvider, Effect, FileSystem } from "effect";
 import { authBaseUrlConfig, appBaseUrlConfig, sheetApisBaseUrlConfig } from "#/lib/config";
 
 // Server-side: Load config directly from .env file
-const serverConfigLayer = ConfigProvider.layerAdd(ConfigProvider.fromDotEnv()).pipe(
-  Layer.provide(NodeFileSystem.layer),
-);
+const serverConfigLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const haveDotEnv = yield* fs.exists(".env");
+    if (haveDotEnv) {
+      return ConfigProvider.layerAdd(ConfigProvider.fromDotEnv({ path: ".env" })).pipe(
+        Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+      );
+    }
+    return ConfigProvider.layer(ConfigProvider.fromEnv());
+  }),
+).pipe(Layer.provide(NodeFileSystem.layer));
 
 // Server function to fetch config from server-side env
 const getConfigServerFn = createServerFn({ method: "GET" }).handler(() =>

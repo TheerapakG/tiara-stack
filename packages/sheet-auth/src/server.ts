@@ -12,7 +12,16 @@ import {
   NodeHttpServerRequest,
   NodeRuntime,
 } from "@effect/platform-node";
-import { ConfigProvider, Effect, Layer, Logger, Option, Redacted, ServiceMap } from "effect";
+import {
+  ConfigProvider,
+  Effect,
+  FileSystem,
+  Layer,
+  Logger,
+  Option,
+  Redacted,
+  ServiceMap,
+} from "effect";
 import { getRequestListener } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { createServer } from "http";
@@ -205,13 +214,24 @@ const HttpLive = HttpRouter.serve(apiLayer).pipe(
   Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 })),
 );
 
+const configProviderLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const haveDotEnv = yield* fs.exists(".env");
+    if (haveDotEnv) {
+      return ConfigProvider.layerAdd(ConfigProvider.fromDotEnv({ path: ".env" })).pipe(
+        Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+      );
+    }
+    return ConfigProvider.layer(ConfigProvider.fromEnv());
+  }),
+).pipe(Layer.provide(NodeFileSystem.layer));
+
 HttpLive.pipe(
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
   Layer.provide(Logger.layer([Logger.consoleLogFmt])),
-  Layer.provide(
-    ConfigProvider.layerAdd(ConfigProvider.fromDotEnv()).pipe(Layer.provide(NodeFileSystem.layer)),
-  ),
+  Layer.provide(configProviderLayer),
   Layer.launch,
   NodeRuntime.runMain(),
 );

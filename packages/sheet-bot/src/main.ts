@@ -1,5 +1,5 @@
 import { NodeFileSystem, NodeHttpClient, NodeRuntime } from "@effect/platform-node";
-import { ConfigProvider, Effect, Layer, Logger } from "effect";
+import { ConfigProvider, Effect, FileSystem, Layer, Logger } from "effect";
 import { channelCommandLayer } from "./commands/channel";
 import { checkinCommandLayer } from "./commands/checkin";
 import { kickoutCommandLayer } from "./commands/kickout";
@@ -33,15 +33,26 @@ const botLayer = Layer.mergeAll(
   autoCheckinTaskLayer,
 );
 
+const configProviderLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const haveDotEnv = yield* fs.exists(".env");
+    if (haveDotEnv) {
+      return ConfigProvider.layerAdd(ConfigProvider.fromDotEnv({ path: ".env" })).pipe(
+        Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+      );
+    }
+    return ConfigProvider.layer(ConfigProvider.fromEnv());
+  }),
+).pipe(Layer.provide(NodeFileSystem.layer));
+
 const main = Layer.mergeAll(botLayer, httpLayer).pipe(
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
   Layer.provide(Logger.layer([Logger.consoleLogFmt])),
   Layer.provide(NodeHttpClient.layerFetch),
   Layer.provide(NodeFileSystem.layer),
-  Layer.provide(
-    ConfigProvider.layerAdd(ConfigProvider.fromDotEnv()).pipe(Layer.provide(NodeFileSystem.layer)),
-  ),
+  Layer.provide(configProviderLayer),
   Layer.launch,
 );
 
