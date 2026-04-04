@@ -84,6 +84,7 @@ const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
           "overfillRange",
           "standbyRange",
           "screenshotRange",
+          "noteRange",
           "visibleCell",
           "draft",
         ],
@@ -102,6 +103,7 @@ const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
             overfillRange: GoogleSheets.cellToStringSchema,
             standbyRange: GoogleSheets.cellToStringSchema,
             screenshotRange: GoogleSheets.cellToStringSchema,
+            noteRange: GoogleSheets.cellToStringSchema,
             visibleCell: GoogleSheets.cellToStringSchema,
             draft: GoogleSheets.cellToStringSchema,
           }),
@@ -355,7 +357,7 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
       ) {
         const response = yield* googleSheets.get({
           spreadsheetId: sheetId,
-          ranges: ["'Thee's Sheet Settings'!Q8:AB"],
+          ranges: ["'Thee's Sheet Settings'!Q8:AD"],
         });
         const valueRanges = yield* getValueRangesOrFail(
           "Error getting schedule config, no value ranges found",
@@ -372,7 +374,7 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
       ) {
         const response = yield* googleSheets.get({
           spreadsheetId: sheetId,
-          ranges: ["'Thee's Sheet Settings'!AE8:AF"],
+          ranges: ["'Thee's Sheet Settings'!AF8:AG"],
         });
         const valueRanges = yield* getValueRangesOrFail(
           "Error getting runner config, no value ranges found",

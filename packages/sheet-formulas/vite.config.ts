@@ -1,5 +1,15 @@
 import { fileURLToPath } from "url";
-import { defineConfig } from "vite-plus";
+import { defineConfig, Rolldown } from "vite-plus";
+
+const bigIntRewrite = (): Rolldown.Plugin => ({
+  name: "bigIntRewrite",
+  transform(code, id) {
+    if (id.endsWith(".js") || id.endsWith(".ts")) {
+      return code.replace(/(^|\W)(\d+)n/g, "$1BigInt($2)");
+    }
+    return code;
+  },
+});
 
 export default defineConfig({
   pack: {
@@ -10,6 +20,7 @@ export default defineConfig({
     target: "es6",
     minify: true,
     deps: { alwaysBundle: [/^.*$/] },
+    plugins: [bigIntRewrite()],
   },
   lint: {
     ignorePatterns: ["dist"],

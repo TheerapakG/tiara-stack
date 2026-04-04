@@ -12,6 +12,7 @@ export class ScheduleConfig extends Schema.TaggedClass<ScheduleConfig>()("Schedu
   overfillRange: Schema.OptionFromNullOr(Schema.String),
   standbyRange: Schema.OptionFromNullOr(Schema.String),
   screenshotRange: Schema.OptionFromNullOr(Schema.String),
+  noteRange: Schema.OptionFromNullOr(Schema.String),
   visibleCell: Schema.OptionFromNullOr(Schema.String),
   draft: Schema.OptionFromNullOr(Schema.String),
 }) {}
