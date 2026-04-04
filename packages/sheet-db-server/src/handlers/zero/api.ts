@@ -5,13 +5,13 @@ import { ReadonlyJSONValue } from "typhoon-core/schema";
 export class ZeroApi extends HttpApiGroup.make("zero")
   .add(
     HttpApiEndpoint.post("query", "/zero/query", {
-      success: Schema.Unknown,
+      success: ReadonlyJSONValue,
       payload: ReadonlyJSONValue,
     }),
   )
   .add(
     HttpApiEndpoint.post("mutate", "/zero/mutate", {
-      success: Schema.Unknown,
+      success: ReadonlyJSONValue,
       query: Schema.Record(Schema.String, Schema.String),
       payload: ReadonlyJSONValue,
     }),

@@ -4,7 +4,7 @@ export class ParserFieldError extends Schema.TaggedErrorClass<ParserFieldError>(
   "ParserFieldError",
   {
     message: Schema.String,
-    range: Schema.Unknown,
+    range: Schema.UnknownFromJsonString,
     field: Schema.String,
   },
 ) {}
