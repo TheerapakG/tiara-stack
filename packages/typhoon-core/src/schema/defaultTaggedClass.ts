@@ -1,4 +1,5 @@
 import { pipe, Schema, SchemaAST, SchemaGetter, Struct } from "effect";
+import { DefaultTaggedStruct } from "./defaultTaggedStruct";
 
 type TaggedClass = Schema.Top & {
   readonly fields: Schema.Struct.Fields & { _tag: Schema.tag<SchemaAST.LiteralValue> };
@@ -27,14 +28,7 @@ export const DefaultTaggedClass = <Tagged extends TaggedClass>(
   taggedClass: Tagged,
 ): DefaultTaggedClass<Tagged> =>
   pipe(
-    Schema.Struct(taggedClass.fields).mapFields(
-      Struct.assign({
-        _tag: Schema.optional(Schema.Literal(taggedClass.fields._tag.schema.literal)).pipe(
-          Schema.withDecodingDefault(() => taggedClass.fields._tag.schema.literal),
-        ),
-      }),
-    ),
-    Schema.toEncoded,
+    DefaultTaggedStruct(taggedClass.fields._tag.schema.literal, taggedClass.fields),
     Schema.decodeTo(taggedClass, {
       decode: SchemaGetter.passthrough(),
       encode: SchemaGetter.passthroughSupertype(),
