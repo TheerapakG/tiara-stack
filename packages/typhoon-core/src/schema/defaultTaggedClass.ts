@@ -28,7 +28,10 @@ export const DefaultTaggedClass = <Tagged extends TaggedClass>(
   taggedClass: Tagged,
 ): DefaultTaggedClass<Tagged> =>
   pipe(
-    DefaultTaggedStruct(taggedClass.fields._tag.schema.literal, taggedClass.fields),
+    DefaultTaggedStruct(
+      taggedClass.fields._tag.schema.literal,
+      pipe(taggedClass.fields, Struct.map(Schema.toEncoded)),
+    ),
     Schema.decodeTo(taggedClass, {
       decode: SchemaGetter.passthrough(),
       encode: SchemaGetter.passthroughSupertype(),
