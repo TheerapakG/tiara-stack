@@ -18,9 +18,7 @@ export class MessageCheckinService extends ServiceMap.Service<MessageCheckinServ
               type: "complete",
             }),
             Effect.flatMap(
-              Schema.decodeEffect(
-                Schema.OptionFromNullishOr(DefaultTaggedClass(MessageCheckin), undefined),
-              ),
+              Schema.decodeEffect(Schema.OptionFromNullishOr(DefaultTaggedClass(MessageCheckin))),
             ),
             catchSchemaErrorAsValidationError,
             Effect.withSpan("MessageCheckinService.getMessageCheckinData"),
@@ -57,9 +55,7 @@ export class MessageCheckinService extends ServiceMap.Service<MessageCheckinServ
               }),
             ),
             Effect.flatMap(
-              Schema.decodeEffect(
-                Schema.OptionFromNullishOr(DefaultTaggedClass(MessageCheckin), undefined),
-              ),
+              Schema.decodeEffect(Schema.OptionFromNullishOr(DefaultTaggedClass(MessageCheckin))),
             ),
             catchSchemaErrorAsValidationError,
             Effect.flatMap(

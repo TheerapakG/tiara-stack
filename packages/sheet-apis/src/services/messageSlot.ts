@@ -18,9 +18,7 @@ export class MessageSlotService extends ServiceMap.Service<MessageSlotService>()
               type: "complete",
             }),
             Effect.flatMap(
-              Schema.decodeEffect(
-                Schema.OptionFromNullishOr(DefaultTaggedClass(MessageSlot), undefined),
-              ),
+              Schema.decodeEffect(Schema.OptionFromNullishOr(DefaultTaggedClass(MessageSlot))),
             ),
             catchSchemaErrorAsValidationError,
             Effect.withSpan("MessageSlotService.getMessageSlotData"),
@@ -51,9 +49,7 @@ export class MessageSlotService extends ServiceMap.Service<MessageSlotService>()
               }),
             ),
             Effect.flatMap(
-              Schema.decodeEffect(
-                Schema.OptionFromNullishOr(DefaultTaggedClass(MessageSlot), undefined),
-              ),
+              Schema.decodeEffect(Schema.OptionFromNullishOr(DefaultTaggedClass(MessageSlot))),
             ),
             catchSchemaErrorAsValidationError,
             Effect.flatMap(

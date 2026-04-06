@@ -22,9 +22,7 @@ export class MessageRoomOrderService extends ServiceMap.Service<MessageRoomOrder
               type: "complete",
             }),
             Effect.flatMap(
-              Schema.decodeEffect(
-                Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder), undefined),
-              ),
+              Schema.decodeEffect(Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder))),
             ),
             catchSchemaErrorAsValidationError,
             Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder"),
@@ -41,9 +39,7 @@ export class MessageRoomOrderService extends ServiceMap.Service<MessageRoomOrder
               }),
             ),
             Effect.flatMap(
-              Schema.decodeEffect(
-                Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder), undefined),
-              ),
+              Schema.decodeEffect(Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder))),
             ),
             catchSchemaErrorAsValidationError,
             Effect.flatMap(
@@ -66,9 +62,7 @@ export class MessageRoomOrderService extends ServiceMap.Service<MessageRoomOrder
               }),
             ),
             Effect.flatMap(
-              Schema.decodeEffect(
-                Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder), undefined),
-              ),
+              Schema.decodeEffect(Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder))),
             ),
             catchSchemaErrorAsValidationError,
             Effect.flatMap(
@@ -113,9 +107,7 @@ export class MessageRoomOrderService extends ServiceMap.Service<MessageRoomOrder
               }),
             ),
             Effect.flatMap(
-              Schema.decodeEffect(
-                Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder), undefined),
-              ),
+              Schema.decodeEffect(Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder))),
             ),
             catchSchemaErrorAsValidationError,
             Effect.flatMap(

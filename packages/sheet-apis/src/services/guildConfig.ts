@@ -25,9 +25,7 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
               type: "complete",
             }),
             Effect.flatMap(
-              Schema.decodeEffect(
-                Schema.OptionFromNullishOr(DefaultTaggedClass(GuildConfig), undefined),
-              ),
+              Schema.decodeEffect(Schema.OptionFromNullishOr(DefaultTaggedClass(GuildConfig))),
             ),
             catchSchemaErrorAsValidationError,
             Effect.withSpan("GuildConfigService.getGuildConfig"),
@@ -48,9 +46,7 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
               }),
             ),
             Effect.flatMap(
-              Schema.decodeEffect(
-                Schema.OptionFromNullishOr(DefaultTaggedClass(GuildConfig), undefined),
-              ),
+              Schema.decodeEffect(Schema.OptionFromNullishOr(DefaultTaggedClass(GuildConfig))),
             ),
             catchSchemaErrorAsValidationError,
             Effect.flatMap(
@@ -160,7 +156,7 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
             ),
             Effect.flatMap(
               Schema.decodeEffect(
-                Schema.OptionFromNullishOr(DefaultTaggedClass(GuildChannelConfig), undefined),
+                Schema.OptionFromNullishOr(DefaultTaggedClass(GuildChannelConfig)),
               ),
             ),
             catchSchemaErrorAsValidationError,
@@ -188,7 +184,7 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
             ),
             Effect.flatMap(
               Schema.decodeEffect(
-                Schema.OptionFromNullishOr(DefaultTaggedClass(GuildChannelConfig), undefined),
+                Schema.OptionFromNullishOr(DefaultTaggedClass(GuildChannelConfig)),
               ),
             ),
             catchSchemaErrorAsValidationError,
@@ -210,7 +206,7 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
             ),
             Effect.flatMap(
               Schema.decodeEffect(
-                Schema.OptionFromNullishOr(DefaultTaggedClass(GuildChannelConfig), undefined),
+                Schema.OptionFromNullishOr(DefaultTaggedClass(GuildChannelConfig)),
               ),
             ),
             catchSchemaErrorAsValidationError,

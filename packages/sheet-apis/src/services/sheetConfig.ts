@@ -263,9 +263,9 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
           Schema.Struct({
             userIds: Schema.String,
             userSheetNames: Schema.String,
-            userNotes: Schema.OptionFromNullishOr(Schema.String, undefined),
-            monitorIds: Schema.OptionFromNullishOr(Schema.String, undefined),
-            monitorNames: Schema.OptionFromNullishOr(Schema.String, undefined),
+            userNotes: Schema.NullishOr(Schema.String),
+            monitorIds: Schema.NullishOr(Schema.String),
+            monitorNames: Schema.NullishOr(Schema.String),
           }).pipe(
             Schema.encodeKeys({
               userIds: "User IDs",
