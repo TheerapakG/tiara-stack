@@ -236,7 +236,7 @@ export const replaceKeysFromHead =
                 (v) =>
                   pipe(
                     keys,
-                    Array.map((key) => [key, Option.map(v, Struct.get(key))] as const),
+                    Array.map((key) => [key, Option.flatMap(v, Struct.get(key as never))] as const),
                     Record.fromEntries,
                   ),
               ) as SimplifyObject<Pick<Infer<S>, Keys[number]>>,
