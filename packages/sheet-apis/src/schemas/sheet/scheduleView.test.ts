@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { describe, expect, it } from "@effect/vitest";
-import { permissionSetFromIterable } from "@/middlewares/authorization";
+import { permissionSetFromIterable } from "@/services/authorization";
 import {
   ScheduleView,
   ScheduleResponse,

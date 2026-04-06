@@ -7,10 +7,11 @@ import {
 } from "./http";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
 import { MessageSlot } from "@/schemas/messageSlot";
-import { MessageSlotService } from "@/services";
+import { AuthorizationService, MessageSlotService } from "@/services";
 import { getFailure, liveGuildServices, withUser } from "@/test-utils/guildTestHelpers";
 
 type MessageSlotAccessService = Pick<typeof MessageSlotService.Service, "getMessageSlotData">;
+type AuthorizationServiceApi = Effect.Success<typeof AuthorizationService.make>;
 
 const makeMessageSlotRecord = (overrides?: {
   readonly guildId?: string | null;
@@ -37,13 +38,26 @@ const makeMessageSlotService = (record?: MessageSlot) =>
     getMessageSlotData: () => Effect.succeed(Option.fromNullishOr(record)),
   }) satisfies MessageSlotAccessService;
 
+const withAuthorization = <A, E, R>(
+  f: (authorizationService: AuthorizationServiceApi) => Effect.Effect<A, E, R>,
+) =>
+  Effect.gen(function* () {
+    const authorizationService = yield* AuthorizationService.make;
+    return yield* f(authorizationService);
+  });
+
 describe("messageSlot legacy access", () => {
   it.effect("denies legacy reads for bot users", () =>
     Effect.gen(function* () {
       const error = yield* getFailure(
-        requireMessageSlotReadAccess(
-          makeMessageSlotService(makeMessageSlotRecord({ guildId: null, messageChannelId: null })),
-          "message-1",
+        withAuthorization((authorizationService) =>
+          requireMessageSlotReadAccess(
+            authorizationService,
+            makeMessageSlotService(
+              makeMessageSlotRecord({ guildId: null, messageChannelId: null }),
+            ),
+            "message-1",
+          ),
         ).pipe(withUser(["bot"]), liveGuildServices()),
       );
 
@@ -55,11 +69,14 @@ describe("messageSlot legacy access", () => {
   it.effect("denies partially legacy reads for regular users", () =>
     Effect.gen(function* () {
       const error = yield* getFailure(
-        requireMessageSlotReadAccess(
-          makeMessageSlotService(
-            makeMessageSlotRecord({ guildId: "guild-1", messageChannelId: null }),
+        withAuthorization((authorizationService) =>
+          requireMessageSlotReadAccess(
+            authorizationService,
+            makeMessageSlotService(
+              makeMessageSlotRecord({ guildId: "guild-1", messageChannelId: null }),
+            ),
+            "message-1",
           ),
-          "message-1",
         ).pipe(
           withUser([], { accountId: "discord-account-1", userId: "user-1" }),
           liveGuildServices(),
@@ -75,9 +92,14 @@ describe("messageSlot legacy access", () => {
     Effect.gen(function* () {
       let mutationCalls = 0;
       const error = yield* getFailure(
-        requireMessageSlotUpsertAccess(
-          makeMessageSlotService(makeMessageSlotRecord({ guildId: null, messageChannelId: null })),
-          "message-1",
+        withAuthorization((authorizationService) =>
+          requireMessageSlotUpsertAccess(
+            authorizationService,
+            makeMessageSlotService(
+              makeMessageSlotRecord({ guildId: null, messageChannelId: null }),
+            ),
+            "message-1",
+          ),
         ).pipe(
           Effect.andThen(
             Effect.sync(() => {
@@ -98,10 +120,13 @@ describe("messageSlot legacy access", () => {
   it.effect("denies creating a missing legacy slot record", () =>
     Effect.gen(function* () {
       const error = yield* getFailure(
-        requireMessageSlotUpsertAccess(makeMessageSlotService(), "message-1").pipe(
-          withUser(["bot"]),
-          liveGuildServices(),
-        ),
+        withAuthorization((authorizationService) =>
+          requireMessageSlotUpsertAccess(
+            authorizationService,
+            makeMessageSlotService(),
+            "message-1",
+          ),
+        ).pipe(withUser(["bot"]), liveGuildServices()),
       );
 
       expect(error).toBeInstanceOf(Unauthorized);
@@ -111,9 +136,12 @@ describe("messageSlot legacy access", () => {
 
   it.effect("allows modern reads for guild members", () =>
     Effect.gen(function* () {
-      const record = yield* requireMessageSlotReadAccess(
-        makeMessageSlotService(makeMessageSlotRecord()),
-        "message-1",
+      const record = yield* withAuthorization((authorizationService) =>
+        requireMessageSlotReadAccess(
+          authorizationService,
+          makeMessageSlotService(makeMessageSlotRecord()),
+          "message-1",
+        ),
       ).pipe(
         withUser([], { accountId: "discord-account-1", userId: "user-1" }),
         liveGuildServices({
@@ -129,7 +157,14 @@ describe("messageSlot legacy access", () => {
 
   it.effect("allows modern upsert for monitors", () =>
     Effect.gen(function* () {
-      yield* requireMessageSlotUpsertAccess(makeMessageSlotService(), "message-1", "guild-1").pipe(
+      yield* withAuthorization((authorizationService) =>
+        requireMessageSlotUpsertAccess(
+          authorizationService,
+          makeMessageSlotService(),
+          "message-1",
+          "guild-1",
+        ),
+      ).pipe(
         withUser([], { accountId: "discord-account-1", userId: "user-1" }),
         liveGuildServices({
           memberAccountId: "discord-account-1",
@@ -142,9 +177,12 @@ describe("messageSlot legacy access", () => {
 
   it.effect("allows modern upsert for monitors on an existing record", () =>
     Effect.gen(function* () {
-      yield* requireMessageSlotUpsertAccess(
-        makeMessageSlotService(makeMessageSlotRecord()),
-        "message-1",
+      yield* withAuthorization((authorizationService) =>
+        requireMessageSlotUpsertAccess(
+          authorizationService,
+          makeMessageSlotService(makeMessageSlotRecord()),
+          "message-1",
+        ),
       ).pipe(
         withUser([], { accountId: "discord-account-1", userId: "user-1" }),
         liveGuildServices({

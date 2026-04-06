@@ -6,16 +6,9 @@ import type { CachedGuildMember } from "dfx-discord-utils/cache";
 import { Discord } from "dfx";
 import { Cause, Effect, Redacted } from "effect";
 import {
-  getGuildMonitorAccessLevel,
+  AuthorizationService,
   hasDiscordAccountPermission,
   permissionSetFromIterable,
-  requireBot,
-  requireDiscordAccountId,
-  requireDiscordAccountIdOrMonitorGuild,
-  requireGuildMember,
-  requireManageGuild,
-  requireMonitorGuild,
-  resolveSheetAuthGuildUser,
 } from "./authorization";
 import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
@@ -24,6 +17,7 @@ import { GuildConfigService } from "@/services";
 type MembersApiCacheViewService = Effect.Success<typeof MembersApiCacheView.make>;
 type RolesApiCacheViewService = Effect.Success<typeof RolesApiCacheView.make>;
 type GuildConfigServiceApi = Effect.Success<typeof GuildConfigService.make>;
+type AuthorizationServiceApi = Effect.Success<typeof AuthorizationService.make>;
 
 type TestPermission =
   | "bot"
@@ -48,6 +42,46 @@ const permissionValues = (permissions: Iterable<TestPermission>) =>
 
 const resolvedPermissionValues = (permissions: ReturnType<typeof permissionSetFromIterable>) =>
   Array.from(permissions).sort();
+
+const withAuthorization = <A, E, R>(
+  f: (authorizationService: AuthorizationServiceApi) => Effect.Effect<A, E, R>,
+) =>
+  Effect.gen(function* () {
+    const authorizationService = yield* AuthorizationService.make;
+    return yield* f(authorizationService);
+  });
+
+const resolveSheetAuthGuildUser = (user: ReturnType<typeof makeUser>, guildId: string) =>
+  withAuthorization((authorizationService) =>
+    authorizationService.resolveSheetAuthGuildUser(user, guildId),
+  );
+
+const getGuildMonitorAccessLevel = (user: ReturnType<typeof makeUser>, guildId: string) =>
+  withAuthorization((authorizationService) =>
+    authorizationService.getGuildMonitorAccessLevel(user, guildId),
+  );
+
+const requireManageGuild = (guildId: string) =>
+  withAuthorization((authorizationService) => authorizationService.requireManageGuild(guildId));
+
+const requireMonitorGuild = (guildId: string) =>
+  withAuthorization((authorizationService) => authorizationService.requireMonitorGuild(guildId));
+
+const requireBot = () =>
+  withAuthorization((authorizationService) => authorizationService.requireBot());
+
+const requireDiscordAccountId = (accountId: string) =>
+  withAuthorization((authorizationService) =>
+    authorizationService.requireDiscordAccountId(accountId),
+  );
+
+const requireDiscordAccountIdOrMonitorGuild = (guildId: string, accountId: string) =>
+  withAuthorization((authorizationService) =>
+    authorizationService.requireDiscordAccountIdOrMonitorGuild(guildId, accountId),
+  );
+
+const requireGuildMember = (guildId: string) =>
+  withAuthorization((authorizationService) => authorizationService.requireGuildMember(guildId));
 
 const withUser = <A, E, R>(
   permissions: ReadonlyArray<TestPermission>,
@@ -113,7 +147,7 @@ const liveGuildServices =
       } as unknown as RolesApiCacheViewService),
     );
 
-describe("authorization middleware helpers", () => {
+describe("authorization service helpers", () => {
   it.effect("matches exact discord account permission", () =>
     Effect.sync(() => {
       expect(
@@ -265,7 +299,9 @@ describe("authorization middleware helpers", () => {
   );
 
   it.effect("allows manage guild access with a resolved manage permission", () =>
-    withGuildUser(["manage_guild:guild-1"], "guild-1", requireManageGuild("guild-1")),
+    withGuildUser(["manage_guild:guild-1"], "guild-1", requireManageGuild("guild-1")).pipe(
+      liveGuildServices(),
+    ),
   );
 
   it.effect("allows guild access shortcuts for app owner", () =>
@@ -274,22 +310,24 @@ describe("authorization middleware helpers", () => {
         ["app_owner", "member_guild:guild-1"],
         "guild-1",
         requireGuildMember("guild-1"),
-      );
+      ).pipe(liveGuildServices());
       yield* withGuildUser(
         ["app_owner", "monitor_guild:guild-1"],
         "guild-1",
         requireMonitorGuild("guild-1"),
-      );
+      ).pipe(liveGuildServices());
       yield* withGuildUser(
         ["app_owner", "manage_guild:guild-1"],
         "guild-1",
         requireManageGuild("guild-1"),
-      );
+      ).pipe(liveGuildServices());
     }),
   );
 
   it.effect("allows monitor guild access with a resolved monitor permission", () =>
-    withGuildUser(["monitor_guild:guild-1"], "guild-1", requireMonitorGuild("guild-1")),
+    withGuildUser(["monitor_guild:guild-1"], "guild-1", requireMonitorGuild("guild-1")).pipe(
+      liveGuildServices(),
+    ),
   );
 
   it.effect("allows self access with matching discord account permission", () =>
@@ -297,7 +335,7 @@ describe("authorization middleware helpers", () => {
       yield* withUser(
         ["account:discord:discord-account-1"],
         requireDiscordAccountId("discord-account-1"),
-      );
+      ).pipe(liveGuildServices());
     }),
   );
 
@@ -306,17 +344,21 @@ describe("authorization middleware helpers", () => {
       ["monitor_guild:guild-1"],
       "guild-1",
       requireDiscordAccountIdOrMonitorGuild("guild-1", "discord-account-2"),
-    ),
+    ).pipe(liveGuildServices()),
   );
 
   it.effect("allows guild member access from membership service", () =>
-    withGuildUser(["member_guild:guild-1"], "guild-1", requireGuildMember("guild-1")),
+    withGuildUser(["member_guild:guild-1"], "guild-1", requireGuildMember("guild-1")).pipe(
+      liveGuildServices(),
+    ),
   );
 
   it.effect("dies when provided SheetAuthGuildUser is for a different guild", () =>
     Effect.gen(function* () {
       const exit = yield* Effect.exit(
-        withGuildUser(["member_guild:guild-2"], "guild-2", requireGuildMember("guild-1")),
+        withGuildUser(["member_guild:guild-2"], "guild-2", requireGuildMember("guild-1")).pipe(
+          liveGuildServices(),
+        ),
       );
 
       expect(exit._tag).toBe("Failure");
@@ -328,14 +370,18 @@ describe("authorization middleware helpers", () => {
 
   it.effect("uses SheetAuthGuildUser context for guild membership checks", () =>
     Effect.gen(function* () {
-      yield* withGuildUser(["member_guild:guild-1"], "guild-1", requireGuildMember("guild-1"));
+      yield* withGuildUser(["member_guild:guild-1"], "guild-1", requireGuildMember("guild-1")).pipe(
+        liveGuildServices(),
+      );
     }),
   );
 
   it.effect("rejects monitor-only access without guild membership", () =>
     Effect.gen(function* () {
       const exit = yield* Effect.exit(
-        withGuildUser(["monitor_guild:guild-1"], "guild-1", requireGuildMember("guild-1")),
+        withGuildUser(["monitor_guild:guild-1"], "guild-1", requireGuildMember("guild-1")).pipe(
+          liveGuildServices(),
+        ),
       );
 
       expect(exit._tag).toBe("Failure");
@@ -347,7 +393,9 @@ describe("authorization middleware helpers", () => {
     () =>
       Effect.gen(function* () {
         const exit = yield* Effect.exit(
-          withGuildUser(["monitor_guild:guild-2"], "guild-1", requireMonitorGuild("guild-1")),
+          withGuildUser(["monitor_guild:guild-2"], "guild-1", requireMonitorGuild("guild-1")).pipe(
+            liveGuildServices(),
+          ),
         );
 
         expect(exit._tag).toBe("Failure");
@@ -357,7 +405,9 @@ describe("authorization middleware helpers", () => {
   it.effect("rejects manage-only access without guild membership", () =>
     Effect.gen(function* () {
       const exit = yield* Effect.exit(
-        withGuildUser(["manage_guild:guild-1"], "guild-1", requireGuildMember("guild-1")),
+        withGuildUser(["manage_guild:guild-1"], "guild-1", requireGuildMember("guild-1")).pipe(
+          liveGuildServices(),
+        ),
       );
 
       expect(exit._tag).toBe("Failure");
@@ -367,7 +417,11 @@ describe("authorization middleware helpers", () => {
   it.effect("dies when SheetAuthGuildUser is not provided for guild checks", () =>
     Effect.gen(function* () {
       const exit = yield* Effect.exit(
-        withUser([], requireGuildMember("guild-1")) as Effect.Effect<void, never, never>,
+        withUser([], requireGuildMember("guild-1")).pipe(liveGuildServices()) as Effect.Effect<
+          void,
+          never,
+          never
+        >,
       );
 
       expect(exit._tag).toBe("Failure");
@@ -379,7 +433,9 @@ describe("authorization middleware helpers", () => {
 
   it.effect("rejects missing bot permission for bot-only routes", () =>
     Effect.gen(function* () {
-      const exit = yield* Effect.exit(withUser(["manage_guild:guild-1"], requireBot()));
+      const exit = yield* Effect.exit(
+        withUser(["manage_guild:guild-1"], requireBot()).pipe(liveGuildServices()),
+      );
 
       expect(exit._tag).toBe("Failure");
       if (exit._tag === "Failure") {
@@ -394,7 +450,7 @@ describe("authorization middleware helpers", () => {
         withUser(
           ["account:discord:discord-account-1"],
           requireDiscordAccountId("discord-account-2"),
-        ),
+        ).pipe(liveGuildServices()),
       );
 
       expect(exit._tag).toBe("Failure");
@@ -411,7 +467,7 @@ describe("authorization middleware helpers", () => {
           ["account:discord:discord-account-1"],
           requireDiscordAccountId("better-auth-user-1"),
           { accountId: "discord-account-1", userId: "better-auth-user-1" },
-        ),
+        ).pipe(liveGuildServices()),
       );
 
       expect(exit._tag).toBe("Failure");
@@ -454,7 +510,7 @@ describe("authorization middleware helpers", () => {
         ["monitor_guild:guild-1"],
         "guild-1",
         requireDiscordAccountIdOrMonitorGuild("guild-1", "discord-account-2"),
-      );
+      ).pipe(liveGuildServices());
     }),
   );
 });

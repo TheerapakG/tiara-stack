@@ -2,11 +2,10 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstab
 import { beforeEach, describe, expect, it } from "@effect/vitest";
 import { TestClock } from "effect/testing";
 import { Cause, DateTime, Duration, Effect, Option, Redacted, Ref } from "effect";
-// @ts-expect-error vitest is available at test runtime even though the package tsconfig does not expose it
 import { vi } from "vitest";
 import type { Account } from "sheet-auth/model";
-import { permissionSetFromIterable } from "../authorization";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
+import { permissionSetFromIterable } from "@/services/authorization";
 import { makeSheetAuthTokenAuthorization } from "./shared";
 
 const { getAccountMock, getImplicitPermissionsMock, getOwnerIdMock } = vi.hoisted(() => ({

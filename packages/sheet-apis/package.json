@@ -56,7 +56,8 @@
     "dotenv": "^17.2.3",
     "glob": "^11.0.1",
     "pathe": "^2.0.3",
-    "vite-plus": "catalog:"
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@effect/opentelemetry": "catalog:",

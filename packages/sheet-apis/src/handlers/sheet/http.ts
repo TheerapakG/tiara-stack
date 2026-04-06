@@ -2,10 +2,10 @@ import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import { catchSchemaErrorAsValidationError } from "typhoon-core/error";
-import { provideCurrentGuildUser } from "@/middlewares/authorization";
 import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
 import { BreakSchedule, Schedule } from "@/schemas/sheet";
 import {
+  AuthorizationService,
   withScheduleHourWindow,
   GuildConfigService,
   SheetConfigService,
@@ -44,6 +44,7 @@ export const sheetLayer = HttpApiBuilder.group(
   Api,
   "sheet",
   Effect.fn(function* (handlers) {
+    const authorizationService = yield* AuthorizationService;
     const sheetService = yield* SheetService;
     const sheetConfigService = yield* SheetConfigService;
     const guildConfigService = yield* GuildConfigService;
@@ -68,82 +69,88 @@ export const sheetLayer = HttpApiBuilder.group(
         ).pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getAllSchedules", ({ query }) =>
-        provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
-            const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
-            const resolvedUser = yield* SheetAuthGuildUser;
-            const view = resolveScheduleViewFromPermissions(
-              resolvedUser.permissions,
-              query.guildId,
-              query.view,
-            );
-            const { schedules, eventConfig } = yield* Effect.all({
-              schedules:
-                view === "monitor"
-                  ? sheetService.getAllSchedules(sheetId)
-                  : sheetService.getAllFillerSchedules(sheetId),
-              eventConfig: sheetConfigService.getEventConfig(sheetId),
-            });
+        authorizationService
+          .provideCurrentGuildUser(
+            query.guildId,
+            Effect.gen(function* () {
+              const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+              const resolvedUser = yield* SheetAuthGuildUser;
+              const view = resolveScheduleViewFromPermissions(
+                resolvedUser.permissions,
+                query.guildId,
+                query.view,
+              );
+              const { schedules, eventConfig } = yield* Effect.all({
+                schedules:
+                  view === "monitor"
+                    ? sheetService.getAllSchedules(sheetId)
+                    : sheetService.getAllFillerSchedules(sheetId),
+                eventConfig: sheetConfigService.getEventConfig(sheetId),
+              });
 
-            return {
-              schedules: withScheduleHourWindows(schedules, eventConfig.startTime),
-              view,
-            };
-          }),
-        ).pipe(catchSchemaErrorAsValidationError),
+              return {
+                schedules: withScheduleHourWindows(schedules, eventConfig.startTime),
+                view,
+              };
+            }),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getDaySchedules", ({ query }) =>
-        provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
-            const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
-            const resolvedUser = yield* SheetAuthGuildUser;
-            const view = resolveScheduleViewFromPermissions(
-              resolvedUser.permissions,
-              query.guildId,
-              query.view,
-            );
-            const { schedules, eventConfig } = yield* Effect.all({
-              schedules:
-                view === "monitor"
-                  ? sheetService.getDaySchedules(sheetId, query.day)
-                  : sheetService.getDayFillerSchedules(sheetId, query.day),
-              eventConfig: sheetConfigService.getEventConfig(sheetId),
-            });
+        authorizationService
+          .provideCurrentGuildUser(
+            query.guildId,
+            Effect.gen(function* () {
+              const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+              const resolvedUser = yield* SheetAuthGuildUser;
+              const view = resolveScheduleViewFromPermissions(
+                resolvedUser.permissions,
+                query.guildId,
+                query.view,
+              );
+              const { schedules, eventConfig } = yield* Effect.all({
+                schedules:
+                  view === "monitor"
+                    ? sheetService.getDaySchedules(sheetId, query.day)
+                    : sheetService.getDayFillerSchedules(sheetId, query.day),
+                eventConfig: sheetConfigService.getEventConfig(sheetId),
+              });
 
-            return {
-              schedules: withScheduleHourWindows(schedules, eventConfig.startTime),
-              view,
-            };
-          }),
-        ).pipe(catchSchemaErrorAsValidationError),
+              return {
+                schedules: withScheduleHourWindows(schedules, eventConfig.startTime),
+                view,
+              };
+            }),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getChannelSchedules", ({ query }) =>
-        provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
-            const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
-            const resolvedUser = yield* SheetAuthGuildUser;
-            const view = resolveScheduleViewFromPermissions(
-              resolvedUser.permissions,
-              query.guildId,
-              query.view,
-            );
-            const { schedules, eventConfig } = yield* Effect.all({
-              schedules:
-                view === "monitor"
-                  ? sheetService.getChannelSchedules(sheetId, query.channel)
-                  : sheetService.getChannelFillerSchedules(sheetId, query.channel),
-              eventConfig: sheetConfigService.getEventConfig(sheetId),
-            });
+        authorizationService
+          .provideCurrentGuildUser(
+            query.guildId,
+            Effect.gen(function* () {
+              const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+              const resolvedUser = yield* SheetAuthGuildUser;
+              const view = resolveScheduleViewFromPermissions(
+                resolvedUser.permissions,
+                query.guildId,
+                query.view,
+              );
+              const { schedules, eventConfig } = yield* Effect.all({
+                schedules:
+                  view === "monitor"
+                    ? sheetService.getChannelSchedules(sheetId, query.channel)
+                    : sheetService.getChannelFillerSchedules(sheetId, query.channel),
+                eventConfig: sheetConfigService.getEventConfig(sheetId),
+              });
 
-            return {
-              schedules: withScheduleHourWindows(schedules, eventConfig.startTime),
-              view,
-            };
-          }),
-        ).pipe(catchSchemaErrorAsValidationError),
+              return {
+                schedules: withScheduleHourWindows(schedules, eventConfig.startTime),
+                view,
+              };
+            }),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getRangesConfig", ({ query }) =>
         pipe(
@@ -178,6 +185,7 @@ export const sheetLayer = HttpApiBuilder.group(
   }),
 ).pipe(
   Layer.provide([
+    AuthorizationService.layer,
     SheetService.layer,
     SheetConfigService.layer,
     GuildConfigService.layer,

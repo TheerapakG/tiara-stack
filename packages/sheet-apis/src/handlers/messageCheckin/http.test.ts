@@ -10,13 +10,14 @@ import {
 } from "./http";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
 import { MessageCheckin, MessageCheckinMember } from "@/schemas/messageCheckin";
-import { MessageCheckinService } from "@/services";
+import { AuthorizationService, MessageCheckinService } from "@/services";
 import { getFailure, liveGuildServices, withUser } from "@/test-utils/guildTestHelpers";
 
 type MessageCheckinAccessService = Pick<
   typeof MessageCheckinService.Service,
   "getMessageCheckinData" | "getMessageCheckinMembers"
 >;
+type AuthorizationServiceApi = Effect.Success<typeof AuthorizationService.make>;
 
 const makeMessageCheckinRecord = (overrides?: {
   readonly guildId?: string | null;
@@ -60,6 +61,14 @@ const makeMessageCheckinService = (options?: {
     getMessageCheckinMembers: () => Effect.succeed([...(options?.members ?? [])]),
   }) satisfies MessageCheckinAccessService;
 
+const withAuthorization = <A, E, R>(
+  f: (authorizationService: AuthorizationServiceApi) => Effect.Effect<A, E, R>,
+) =>
+  Effect.gen(function* () {
+    const authorizationService = yield* AuthorizationService.make;
+    return yield* f(authorizationService);
+  });
+
 describe("messageCheckin legacy access", () => {
   it.effect("denies legacy reads for bot users", () =>
     Effect.gen(function* () {
@@ -68,10 +77,9 @@ describe("messageCheckin legacy access", () => {
       });
 
       const error = yield* getFailure(
-        requireMessageCheckinReadAccess(service, "message-1").pipe(
-          withUser(["bot"]),
-          liveGuildServices(),
-        ),
+        withAuthorization((authorizationService) =>
+          requireMessageCheckinReadAccess(authorizationService, service, "message-1"),
+        ).pipe(withUser(["bot"]), liveGuildServices()),
       );
 
       expect(error).toBeInstanceOf(Unauthorized);
@@ -86,7 +94,9 @@ describe("messageCheckin legacy access", () => {
       });
 
       const error = yield* getFailure(
-        requireMessageCheckinReadAccess(service, "message-1").pipe(
+        withAuthorization((authorizationService) =>
+          requireMessageCheckinReadAccess(authorizationService, service, "message-1"),
+        ).pipe(
           withUser([], { accountId: "discord-account-1", userId: "user-1" }),
           liveGuildServices(),
         ),
@@ -104,10 +114,9 @@ describe("messageCheckin legacy access", () => {
       });
 
       const error = yield* getFailure(
-        requireMessageCheckinMembersReadAccess(service, "message-1").pipe(
-          withUser(["bot"]),
-          liveGuildServices(),
-        ),
+        withAuthorization((authorizationService) =>
+          requireMessageCheckinMembersReadAccess(authorizationService, service, "message-1"),
+        ).pipe(withUser(["bot"]), liveGuildServices()),
       );
 
       expect(error).toBeInstanceOf(Unauthorized);
@@ -123,7 +132,9 @@ describe("messageCheckin legacy access", () => {
       });
 
       const error = yield* getFailure(
-        requireMessageCheckinMonitorMutationAccess(service, "message-1").pipe(
+        withAuthorization((authorizationService) =>
+          requireMessageCheckinMonitorMutationAccess(authorizationService, service, "message-1"),
+        ).pipe(
           Effect.andThen(
             Effect.sync(() => {
               mutationCalls += 1;
@@ -148,10 +159,13 @@ describe("messageCheckin legacy access", () => {
       });
 
       const error = yield* getFailure(
-        requireMessageCheckinParticipantMutationAccess(
-          service,
-          "message-1",
-          "discord-account-1",
+        withAuthorization((authorizationService) =>
+          requireMessageCheckinParticipantMutationAccess(
+            authorizationService,
+            service,
+            "message-1",
+            "discord-account-1",
+          ),
         ).pipe(
           Effect.andThen(
             Effect.sync(() => {
@@ -174,10 +188,9 @@ describe("messageCheckin legacy access", () => {
       const service = makeMessageCheckinService();
 
       const error = yield* getFailure(
-        requireCheckinUpsertAccess(service, "message-1").pipe(
-          withUser(["bot"]),
-          liveGuildServices(),
-        ),
+        withAuthorization((authorizationService) =>
+          requireCheckinUpsertAccess(authorizationService, service, "message-1"),
+        ).pipe(withUser(["bot"]), liveGuildServices()),
       );
 
       expect(error).toBeInstanceOf(Unauthorized);
@@ -187,7 +200,14 @@ describe("messageCheckin legacy access", () => {
 
   it.effect("allows modern upsert for monitor access", () =>
     Effect.gen(function* () {
-      yield* requireCheckinUpsertAccess(makeMessageCheckinService(), "message-1", "guild-1").pipe(
+      yield* withAuthorization((authorizationService) =>
+        requireCheckinUpsertAccess(
+          authorizationService,
+          makeMessageCheckinService(),
+          "message-1",
+          "guild-1",
+        ),
+      ).pipe(
         withUser([], { accountId: "discord-account-1", userId: "user-1" }),
         liveGuildServices({
           memberAccountId: "discord-account-1",
@@ -200,11 +220,14 @@ describe("messageCheckin legacy access", () => {
 
   it.effect("allows modern monitor reads", () =>
     Effect.gen(function* () {
-      const record = yield* requireMessageCheckinReadAccess(
-        makeMessageCheckinService({
-          record: makeMessageCheckinRecord(),
-        }),
-        "message-1",
+      const record = yield* withAuthorization((authorizationService) =>
+        requireMessageCheckinReadAccess(
+          authorizationService,
+          makeMessageCheckinService({
+            record: makeMessageCheckinRecord(),
+          }),
+          "message-1",
+        ),
       ).pipe(
         withUser([], { accountId: "discord-account-1", userId: "user-1" }),
         liveGuildServices({
@@ -220,11 +243,14 @@ describe("messageCheckin legacy access", () => {
 
   it.effect("allows modern monitor to add members", () =>
     Effect.gen(function* () {
-      yield* requireMessageCheckinMonitorMutationAccess(
-        makeMessageCheckinService({
-          record: makeMessageCheckinRecord(),
-        }),
-        "message-1",
+      yield* withAuthorization((authorizationService) =>
+        requireMessageCheckinMonitorMutationAccess(
+          authorizationService,
+          makeMessageCheckinService({
+            record: makeMessageCheckinRecord(),
+          }),
+          "message-1",
+        ),
       ).pipe(
         withUser([], { accountId: "discord-account-1", userId: "user-1" }),
         liveGuildServices({
@@ -238,16 +264,19 @@ describe("messageCheckin legacy access", () => {
 
   it.effect("allows recorded participant mutations for modern records", () =>
     Effect.gen(function* () {
-      yield* requireMessageCheckinParticipantMutationAccess(
-        makeMessageCheckinService({
-          record: makeMessageCheckinRecord(),
-          members: [
-            makeMessageCheckinMember("discord-account-1"),
-            makeMessageCheckinMember("discord-account-2"),
-          ],
-        }),
-        "message-1",
-        "discord-account-1",
+      yield* withAuthorization((authorizationService) =>
+        requireMessageCheckinParticipantMutationAccess(
+          authorizationService,
+          makeMessageCheckinService({
+            record: makeMessageCheckinRecord(),
+            members: [
+              makeMessageCheckinMember("discord-account-1"),
+              makeMessageCheckinMember("discord-account-2"),
+            ],
+          }),
+          "message-1",
+          "discord-account-1",
+        ),
       ).pipe(
         withUser(["account:discord:discord-account-1"], {
           accountId: "discord-account-1",
@@ -264,15 +293,18 @@ describe("messageCheckin legacy access", () => {
 
   it.effect("allows participant self-read behavior for modern records", () =>
     Effect.gen(function* () {
-      const members = yield* requireMessageCheckinMembersReadAccess(
-        makeMessageCheckinService({
-          record: makeMessageCheckinRecord(),
-          members: [
-            makeMessageCheckinMember("discord-account-1"),
-            makeMessageCheckinMember("discord-account-2"),
-          ],
-        }),
-        "message-1",
+      const members = yield* withAuthorization((authorizationService) =>
+        requireMessageCheckinMembersReadAccess(
+          authorizationService,
+          makeMessageCheckinService({
+            record: makeMessageCheckinRecord(),
+            members: [
+              makeMessageCheckinMember("discord-account-1"),
+              makeMessageCheckinMember("discord-account-2"),
+            ],
+          }),
+          "message-1",
+        ),
       ).pipe(
         withUser([], { accountId: "discord-account-1", userId: "user-1" }),
         liveGuildServices({

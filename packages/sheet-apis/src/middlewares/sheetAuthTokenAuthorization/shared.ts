@@ -6,7 +6,11 @@ import {
 } from "sheet-auth/client";
 import type { Permission, PermissionSet } from "@/schemas/permissions";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
-import { appendPermission, hasPermission, permissionSetFromIterable } from "../authorization";
+import {
+  appendPermission,
+  hasPermission,
+  permissionSetFromIterable,
+} from "@/services/authorization";
 import { Unauthorized } from "../../schemas/middlewares/unauthorized";
 import { SheetAuthTokenAuthorization } from "./tag";
 

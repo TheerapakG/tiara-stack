@@ -6,6 +6,7 @@ import { joinURL, withQuery } from "ufo";
 import { Struct as StructUtils } from "typhoon-core/utils";
 import { makeUnknownError } from "typhoon-core/error";
 import { GoogleSheets } from "./google/sheets";
+import { NodeHttpClient } from "@effect/platform-node";
 
 export class ScreenshotService extends ServiceMap.Service<ScreenshotService>()(
   "ScreenshotService",
@@ -111,7 +112,6 @@ export class ScreenshotService extends ServiceMap.Service<ScreenshotService>()(
   },
 ) {
   static layer = Layer.effect(ScreenshotService, this.make).pipe(
-    Layer.provide(GoogleSheets.layer),
-    Layer.provide(SheetService.layer),
+    Layer.provide([GoogleSheets.layer, SheetService.layer, NodeHttpClient.layerFetch]),
   );
 }

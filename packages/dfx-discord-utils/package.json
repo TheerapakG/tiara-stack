@@ -78,7 +78,8 @@
     "@typescript/native-preview": "latest",
     "glob": "^11.0.3",
     "pathe": "^2.0.3",
-    "vite-plus": "catalog:"
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@effect/platform-node": "catalog:",

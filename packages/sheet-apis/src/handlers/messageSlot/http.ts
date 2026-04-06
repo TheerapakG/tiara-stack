@@ -3,13 +3,8 @@ import { catchSchemaErrorAsValidationError, makeArgumentError } from "typhoon-co
 import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
-import {
-  provideCurrentGuildUser,
-  requireGuildMember,
-  requireMonitorGuild,
-} from "@/middlewares/authorization";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
-import { MessageSlotService } from "@/services";
+import { AuthorizationService, MessageSlotService } from "@/services";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
 
 const missingMessageSlotError = () =>
@@ -37,6 +32,7 @@ const getRequiredMessageSlotRecord = (
   );
 
 export const requireMessageSlotUpsertAccess = (
+  authorizationService: typeof AuthorizationService.Service,
   messageSlotService: MessageSlotAccessService,
   messageId: string,
   guildId?: string,
@@ -46,12 +42,18 @@ export const requireMessageSlotUpsertAccess = (
       Option.match({
         onNone: () =>
           typeof guildId === "string"
-            ? provideCurrentGuildUser(guildId, requireMonitorGuild(guildId))
+            ? authorizationService.provideCurrentGuildUser(
+                guildId,
+                authorizationService.requireMonitorGuild(guildId),
+              )
             : denyLegacyMessageSlotAccess(),
         onSome: (record) =>
           Option.match(getModernMessageGuildId(record), {
             onSome: (resolvedGuildId) =>
-              provideCurrentGuildUser(resolvedGuildId, requireMonitorGuild(resolvedGuildId)),
+              authorizationService.provideCurrentGuildUser(
+                resolvedGuildId,
+                authorizationService.requireMonitorGuild(resolvedGuildId),
+              ),
             onNone: denyLegacyMessageSlotAccess,
           }),
       }),
@@ -59,6 +61,7 @@ export const requireMessageSlotUpsertAccess = (
   );
 
 export const requireMessageSlotReadAccess = (
+  authorizationService: typeof AuthorizationService.Service,
   messageSlotService: MessageSlotAccessService,
   messageId: string,
 ) =>
@@ -66,9 +69,11 @@ export const requireMessageSlotReadAccess = (
     Effect.flatMap((record) =>
       Option.match(getModernMessageGuildId(record), {
         onSome: (guildId) =>
-          provideCurrentGuildUser(
+          authorizationService.provideCurrentGuildUser(
             guildId,
-            requireGuildMember(guildId).pipe(Effect.andThen(Effect.succeed(record))),
+            authorizationService
+              .requireGuildMember(guildId)
+              .pipe(Effect.andThen(Effect.succeed(record))),
           ),
         onNone: denyLegacyMessageSlotAccess,
       }),
@@ -79,16 +84,20 @@ export const messageSlotLayer = HttpApiBuilder.group(
   Api,
   "messageSlot",
   Effect.fn(function* (handlers) {
+    const authorizationService = yield* AuthorizationService;
     const messageSlotService = yield* MessageSlotService;
 
     return handlers
       .handle("getMessageSlotData", ({ query }) =>
-        requireMessageSlotReadAccess(messageSlotService, query.messageId).pipe(
-          catchSchemaErrorAsValidationError,
-        ),
+        requireMessageSlotReadAccess(
+          authorizationService,
+          messageSlotService,
+          query.messageId,
+        ).pipe(catchSchemaErrorAsValidationError),
       )
       .handle("upsertMessageSlotData", ({ payload }) =>
         requireMessageSlotUpsertAccess(
+          authorizationService,
           messageSlotService,
           payload.messageId,
           typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
@@ -101,4 +110,10 @@ export const messageSlotLayer = HttpApiBuilder.group(
           .pipe(catchSchemaErrorAsValidationError),
       );
   }),
-).pipe(Layer.provide([MessageSlotService.layer, SheetAuthTokenAuthorizationLive]));
+).pipe(
+  Layer.provide([
+    AuthorizationService.layer,
+    MessageSlotService.layer,
+    SheetAuthTokenAuthorizationLive,
+  ]),
+);

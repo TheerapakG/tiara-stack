@@ -3,11 +3,10 @@ import { catchSchemaErrorAsValidationError, makeArgumentError } from "typhoon-co
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
-import { provideCurrentGuildUser, requireMonitorGuild } from "@/middlewares/authorization";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { MessageRoomOrder } from "@/schemas/messageRoomOrder";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
-import { MessageRoomOrderService } from "@/services";
+import { AuthorizationService, MessageRoomOrderService } from "@/services";
 
 const missingMessageRoomOrderError = () =>
   makeArgumentError("Cannot get message room order, the message might not be registered");
@@ -36,7 +35,10 @@ const getRequiredMessageRoomOrderRecord = (
     ),
   );
 
-export const requireRoomOrderMonitorAccess = (record: MessageRoomOrder) =>
+export const requireRoomOrderMonitorAccess = (
+  authorizationService: typeof AuthorizationService.Service,
+  record: MessageRoomOrder,
+) =>
   Effect.gen(function* () {
     const guildId = Option.getOrElse(getModernMessageGuildId(record), () => null);
 
@@ -44,10 +46,14 @@ export const requireRoomOrderMonitorAccess = (record: MessageRoomOrder) =>
       return yield* denyLegacyMessageRoomOrderAccess();
     }
 
-    return yield* provideCurrentGuildUser(guildId, requireMonitorGuild(guildId));
+    return yield* authorizationService.provideCurrentGuildUser(
+      guildId,
+      authorizationService.requireMonitorGuild(guildId),
+    );
   });
 
 export const requireRoomOrderUpsertAccess = (
+  authorizationService: typeof AuthorizationService.Service,
   messageRoomOrderService: MessageRoomOrderAccessService,
   messageId: string,
   guildId?: string,
@@ -57,9 +63,12 @@ export const requireRoomOrderUpsertAccess = (
       Option.match({
         onNone: () =>
           typeof guildId === "string"
-            ? provideCurrentGuildUser(guildId, requireMonitorGuild(guildId))
+            ? authorizationService.provideCurrentGuildUser(
+                guildId,
+                authorizationService.requireMonitorGuild(guildId),
+              )
             : denyLegacyMessageRoomOrderAccess(),
-        onSome: requireRoomOrderMonitorAccess,
+        onSome: (record) => requireRoomOrderMonitorAccess(authorizationService, record),
       }),
     ),
   );
@@ -68,6 +77,7 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
   Api,
   "messageRoomOrder",
   Effect.fn(function* (handlers) {
+    const authorizationService = yield* AuthorizationService;
     const messageRoomOrderService = yield* MessageRoomOrderService;
 
     return handlers
@@ -75,13 +85,16 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
         getRequiredMessageRoomOrderRecord(messageRoomOrderService, query.messageId)
           .pipe(
             Effect.flatMap((record) =>
-              requireRoomOrderMonitorAccess(record).pipe(Effect.andThen(Effect.succeed(record))),
+              requireRoomOrderMonitorAccess(authorizationService, record).pipe(
+                Effect.andThen(Effect.succeed(record)),
+              ),
             ),
           )
           .pipe(catchSchemaErrorAsValidationError),
       )
       .handle("upsertMessageRoomOrder", ({ payload }) =>
         requireRoomOrderUpsertAccess(
+          authorizationService,
           messageRoomOrderService,
           payload.messageId,
           typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
@@ -97,7 +110,7 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
         getRequiredMessageRoomOrderRecord(messageRoomOrderService, payload.messageId)
           .pipe(
             Effect.flatMap((record) =>
-              requireRoomOrderMonitorAccess(record).pipe(
+              requireRoomOrderMonitorAccess(authorizationService, record).pipe(
                 Effect.andThen(
                   messageRoomOrderService.decrementMessageRoomOrderRank(payload.messageId),
                 ),
@@ -110,7 +123,7 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
         getRequiredMessageRoomOrderRecord(messageRoomOrderService, payload.messageId)
           .pipe(
             Effect.flatMap((record) =>
-              requireRoomOrderMonitorAccess(record).pipe(
+              requireRoomOrderMonitorAccess(authorizationService, record).pipe(
                 Effect.andThen(
                   messageRoomOrderService.incrementMessageRoomOrderRank(payload.messageId),
                 ),
@@ -123,7 +136,7 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
         getRequiredMessageRoomOrderRecord(messageRoomOrderService, query.messageId)
           .pipe(
             Effect.flatMap((record) =>
-              requireRoomOrderMonitorAccess(record).pipe(
+              requireRoomOrderMonitorAccess(authorizationService, record).pipe(
                 Effect.andThen(
                   messageRoomOrderService.getMessageRoomOrderEntry(
                     query.messageId,
@@ -139,7 +152,7 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
         getRequiredMessageRoomOrderRecord(messageRoomOrderService, query.messageId)
           .pipe(
             Effect.flatMap((record) =>
-              requireRoomOrderMonitorAccess(record).pipe(
+              requireRoomOrderMonitorAccess(authorizationService, record).pipe(
                 Effect.andThen(
                   pipe(
                     messageRoomOrderService.getMessageRoomOrderRange(query.messageId),
@@ -165,7 +178,7 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
         getRequiredMessageRoomOrderRecord(messageRoomOrderService, payload.messageId)
           .pipe(
             Effect.flatMap((record) =>
-              requireRoomOrderMonitorAccess(record).pipe(
+              requireRoomOrderMonitorAccess(authorizationService, record).pipe(
                 Effect.andThen(
                   messageRoomOrderService.upsertMessageRoomOrderEntry(
                     payload.messageId,
@@ -181,7 +194,7 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
         getRequiredMessageRoomOrderRecord(messageRoomOrderService, payload.messageId)
           .pipe(
             Effect.flatMap((record) =>
-              requireRoomOrderMonitorAccess(record).pipe(
+              requireRoomOrderMonitorAccess(authorizationService, record).pipe(
                 Effect.andThen(
                   messageRoomOrderService.removeMessageRoomOrderEntry(payload.messageId),
                 ),
@@ -191,4 +204,10 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
           .pipe(catchSchemaErrorAsValidationError),
       );
   }),
-).pipe(Layer.provide([MessageRoomOrderService.layer, SheetAuthTokenAuthorizationLive]));
+).pipe(
+  Layer.provide([
+    AuthorizationService.layer,
+    MessageRoomOrderService.layer,
+    SheetAuthTokenAuthorizationLive,
+  ]),
+);

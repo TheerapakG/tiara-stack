@@ -2,7 +2,6 @@ import { NodeFileSystem, NodeRuntime } from "@effect/platform-node";
 import { ConfigProvider, Effect, FileSystem, Layer, Logger } from "effect";
 import { httpLayer } from "./http";
 import { MetricsLive } from "./metrics";
-import { GuildConfigService } from "./services/guildConfig";
 import { TracesLive } from "./traces";
 
 const configProviderLayer = Layer.unwrap(
@@ -19,13 +18,11 @@ const configProviderLayer = Layer.unwrap(
   }),
 ).pipe(Layer.provide(NodeFileSystem.layer));
 
-const main = httpLayer.pipe(
-  Layer.provide(GuildConfigService.layer),
+httpLayer.pipe(
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
   Layer.provide(Logger.layer([Logger.consoleLogFmt])),
   Layer.provide(configProviderLayer),
   Layer.launch,
+  NodeRuntime.runMain(),
 );
-
-NodeRuntime.runMain(main as Effect.Effect<never, unknown>);

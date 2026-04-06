@@ -3,18 +3,11 @@ import { catchSchemaErrorAsValidationError, makeArgumentError } from "typhoon-co
 import { Effect, HashSet, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
-import {
-  getGuildMonitorAccessLevel,
-  provideCurrentGuildUser,
-  requireDiscordAccountId,
-  requireGuildMember,
-  requireMonitorGuild,
-} from "@/middlewares/authorization";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { MessageCheckinMember } from "@/schemas/messageCheckin";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
-import { MessageCheckinService } from "@/services";
+import { AuthorizationService, MessageCheckinService } from "@/services";
 
 const missingMessageCheckinError = () =>
   makeArgumentError("Cannot get message checkin data, the message might not be registered");
@@ -53,22 +46,29 @@ const requireRecordedParticipant = (
     ? Effect.void
     : Effect.fail(new Unauthorized({ message }));
 
-const getCheckinAccessLevel = (user: SheetAuthUserInstance, guildId: string) =>
-  getGuildMonitorAccessLevel(user, guildId).pipe(
-    Effect.flatMap((accessLevel) =>
-      accessLevel === "monitor"
-        ? Effect.succeed<"monitor" | "participant">("monitor")
-        : accessLevel === "member"
-          ? Effect.succeed<"monitor" | "participant">("participant")
-          : Effect.fail(new Unauthorized({ message: "User is not a member of this guild" })),
-    ),
-  );
+const getCheckinAccessLevel = (
+  authorizationService: typeof AuthorizationService.Service,
+  user: SheetAuthUserInstance,
+  guildId: string,
+) =>
+  authorizationService
+    .getGuildMonitorAccessLevel(user, guildId)
+    .pipe(
+      Effect.flatMap((accessLevel) =>
+        accessLevel === "monitor"
+          ? Effect.succeed<"monitor" | "participant">("monitor")
+          : accessLevel === "member"
+            ? Effect.succeed<"monitor" | "participant">("participant")
+            : Effect.fail(new Unauthorized({ message: "User is not a member of this guild" })),
+      ),
+    );
 
 type CheckinReadAccess =
   | { readonly _tag: "monitor" }
   | { readonly _tag: "participant"; readonly members: ReadonlyArray<MessageCheckinMember> };
 
 const resolveCheckinReadAccess = (
+  authorizationService: typeof AuthorizationService.Service,
   messageCheckinService: MessageCheckinAccessService,
   messageId: string,
   guildId: string,
@@ -76,7 +76,7 @@ const resolveCheckinReadAccess = (
   Effect.gen(function* () {
     const user = yield* SheetAuthUser;
 
-    return yield* getCheckinAccessLevel(user, guildId).pipe(
+    return yield* getCheckinAccessLevel(authorizationService, user, guildId).pipe(
       Effect.flatMap((accessLevel) =>
         accessLevel === "monitor"
           ? Effect.succeed<CheckinReadAccess>({ _tag: "monitor" })
@@ -95,6 +95,7 @@ const resolveCheckinReadAccess = (
   });
 
 export const requireCheckinUpsertAccess = (
+  authorizationService: typeof AuthorizationService.Service,
   messageCheckinService: MessageCheckinAccessService,
   messageId: string,
   guildId?: string,
@@ -104,12 +105,18 @@ export const requireCheckinUpsertAccess = (
       Option.match({
         onNone: () =>
           typeof guildId === "string"
-            ? provideCurrentGuildUser(guildId, requireMonitorGuild(guildId))
+            ? authorizationService.provideCurrentGuildUser(
+                guildId,
+                authorizationService.requireMonitorGuild(guildId),
+              )
             : denyLegacyMessageCheckinAccess(),
         onSome: (record) =>
           Option.match(getModernMessageGuildId(record), {
             onSome: (resolvedGuildId) =>
-              provideCurrentGuildUser(resolvedGuildId, requireMonitorGuild(resolvedGuildId)),
+              authorizationService.provideCurrentGuildUser(
+                resolvedGuildId,
+                authorizationService.requireMonitorGuild(resolvedGuildId),
+              ),
             onNone: denyLegacyMessageCheckinAccess,
           }),
       }),
@@ -117,6 +124,7 @@ export const requireCheckinUpsertAccess = (
   );
 
 export const requireCheckinMutationAccess = (
+  authorizationService: typeof AuthorizationService.Service,
   messageCheckinService: MessageCheckinAccessService,
   messageId: string,
   guildId: string,
@@ -129,14 +137,20 @@ export const requireCheckinMutationAccess = (
       ? Effect.void
       : // Non-legacy check-in mutations remain self-service for regular users:
         // monitors can add members, but only the recorded participant can update/remove that member.
-        requireDiscordAccountId(memberId).pipe(
-          Effect.andThen(provideCurrentGuildUser(guildId, requireGuildMember(guildId))),
+        authorizationService.requireDiscordAccountId(memberId).pipe(
+          Effect.andThen(
+            authorizationService.provideCurrentGuildUser(
+              guildId,
+              authorizationService.requireGuildMember(guildId),
+            ),
+          ),
           Effect.andThen(messageCheckinService.getMessageCheckinMembers(messageId)),
           Effect.flatMap((members) => requireRecordedParticipant(members, memberId)),
         );
   });
 
 export const requireMessageCheckinReadAccess = (
+  authorizationService: typeof AuthorizationService.Service,
   messageCheckinService: MessageCheckinAccessService,
   messageId: string,
 ) =>
@@ -144,15 +158,19 @@ export const requireMessageCheckinReadAccess = (
     Effect.flatMap((record) =>
       Option.match(getModernMessageGuildId(record), {
         onSome: (guildId) =>
-          resolveCheckinReadAccess(messageCheckinService, messageId, guildId).pipe(
-            Effect.as(record),
-          ),
+          resolveCheckinReadAccess(
+            authorizationService,
+            messageCheckinService,
+            messageId,
+            guildId,
+          ).pipe(Effect.as(record)),
         onNone: denyLegacyMessageCheckinAccess,
       }),
     ),
   );
 
 export const requireMessageCheckinMembersReadAccess = (
+  authorizationService: typeof AuthorizationService.Service,
   messageCheckinService: MessageCheckinAccessService,
   messageId: string,
 ) =>
@@ -160,7 +178,12 @@ export const requireMessageCheckinMembersReadAccess = (
     Effect.flatMap((record) =>
       Option.match(getModernMessageGuildId(record), {
         onSome: (guildId) =>
-          resolveCheckinReadAccess(messageCheckinService, messageId, guildId).pipe(
+          resolveCheckinReadAccess(
+            authorizationService,
+            messageCheckinService,
+            messageId,
+            guildId,
+          ).pipe(
             Effect.flatMap((access) =>
               access._tag === "monitor"
                 ? messageCheckinService.getMessageCheckinMembers(messageId)
@@ -173,6 +196,7 @@ export const requireMessageCheckinMembersReadAccess = (
   );
 
 export const requireMessageCheckinParticipantMutationAccess = (
+  authorizationService: typeof AuthorizationService.Service,
   messageCheckinService: MessageCheckinAccessService,
   messageId: string,
   memberId: string,
@@ -181,20 +205,31 @@ export const requireMessageCheckinParticipantMutationAccess = (
     Effect.flatMap((record) =>
       Option.match(getModernMessageGuildId(record), {
         onSome: (guildId) =>
-          requireCheckinMutationAccess(messageCheckinService, messageId, guildId, memberId),
+          requireCheckinMutationAccess(
+            authorizationService,
+            messageCheckinService,
+            messageId,
+            guildId,
+            memberId,
+          ),
         onNone: denyLegacyMessageCheckinAccess,
       }),
     ),
   );
 
 export const requireMessageCheckinMonitorMutationAccess = (
+  authorizationService: typeof AuthorizationService.Service,
   messageCheckinService: MessageCheckinAccessService,
   messageId: string,
 ) =>
   getRequiredMessageCheckinRecord(messageCheckinService, messageId).pipe(
     Effect.flatMap((record) =>
       Option.match(getModernMessageGuildId(record), {
-        onSome: (guildId) => provideCurrentGuildUser(guildId, requireMonitorGuild(guildId)),
+        onSome: (guildId) =>
+          authorizationService.provideCurrentGuildUser(
+            guildId,
+            authorizationService.requireMonitorGuild(guildId),
+          ),
         onNone: denyLegacyMessageCheckinAccess,
       }),
     ),
@@ -204,16 +239,20 @@ export const messageCheckinLayer = HttpApiBuilder.group(
   Api,
   "messageCheckin",
   Effect.fn(function* (handlers) {
+    const authorizationService = yield* AuthorizationService;
     const messageCheckinService = yield* MessageCheckinService;
 
     return handlers
       .handle("getMessageCheckinData", ({ query }) =>
-        requireMessageCheckinReadAccess(messageCheckinService, query.messageId).pipe(
-          catchSchemaErrorAsValidationError,
-        ),
+        requireMessageCheckinReadAccess(
+          authorizationService,
+          messageCheckinService,
+          query.messageId,
+        ).pipe(catchSchemaErrorAsValidationError),
       )
       .handle("upsertMessageCheckinData", ({ payload }) =>
         requireCheckinUpsertAccess(
+          authorizationService,
           messageCheckinService,
           payload.messageId,
           typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
@@ -226,12 +265,18 @@ export const messageCheckinLayer = HttpApiBuilder.group(
           .pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getMessageCheckinMembers", ({ query }) =>
-        requireMessageCheckinMembersReadAccess(messageCheckinService, query.messageId).pipe(
-          catchSchemaErrorAsValidationError,
-        ),
+        requireMessageCheckinMembersReadAccess(
+          authorizationService,
+          messageCheckinService,
+          query.messageId,
+        ).pipe(catchSchemaErrorAsValidationError),
       )
       .handle("addMessageCheckinMembers", ({ payload }) =>
-        requireMessageCheckinMonitorMutationAccess(messageCheckinService, payload.messageId)
+        requireMessageCheckinMonitorMutationAccess(
+          authorizationService,
+          messageCheckinService,
+          payload.messageId,
+        )
           .pipe(
             Effect.andThen(
               messageCheckinService.addMessageCheckinMembers(payload.messageId, payload.memberIds),
@@ -241,6 +286,7 @@ export const messageCheckinLayer = HttpApiBuilder.group(
       )
       .handle("setMessageCheckinMemberCheckinAt", ({ payload }) =>
         requireMessageCheckinParticipantMutationAccess(
+          authorizationService,
           messageCheckinService,
           payload.messageId,
           payload.memberId,
@@ -258,6 +304,7 @@ export const messageCheckinLayer = HttpApiBuilder.group(
       )
       .handle("removeMessageCheckinMember", ({ payload }) =>
         requireMessageCheckinParticipantMutationAccess(
+          authorizationService,
           messageCheckinService,
           payload.messageId,
           payload.memberId,
@@ -270,4 +317,10 @@ export const messageCheckinLayer = HttpApiBuilder.group(
           .pipe(catchSchemaErrorAsValidationError),
       );
   }),
-).pipe(Layer.provide([MessageCheckinService.layer, SheetAuthTokenAuthorizationLive]));
+).pipe(
+  Layer.provide([
+    AuthorizationService.layer,
+    MessageCheckinService.layer,
+    SheetAuthTokenAuthorizationLive,
+  ]),
+);

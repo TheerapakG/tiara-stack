@@ -3,57 +3,64 @@ import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import { catchSchemaErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
-import {
-  provideCurrentGuildUser,
-  requireBot,
-  requireManageGuild,
-} from "@/middlewares/authorization";
 import { GuildConfigService } from "@/services";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
+import { AuthorizationService } from "@/services";
 
 export const guildConfigLayer = HttpApiBuilder.group(
   Api,
   "guildConfig",
   Effect.fn(function* (handlers) {
+    const authorizationService = yield* AuthorizationService;
     const guildConfigService = yield* GuildConfigService;
 
     return handlers
       .handle("getAutoCheckinGuilds", () =>
-        requireBot().pipe(
-          Effect.andThen(guildConfigService.getAutoCheckinGuilds()),
-          catchSchemaErrorAsValidationError,
-        ),
+        authorizationService
+          .requireBot()
+          .pipe(
+            Effect.andThen(guildConfigService.getAutoCheckinGuilds()),
+            catchSchemaErrorAsValidationError,
+          ),
       )
       .handle("getGuildConfig", ({ query }) =>
-        provideCurrentGuildUser(
-          query.guildId,
-          requireManageGuild(query.guildId).pipe(
-            Effect.andThen(
-              pipe(
-                guildConfigService.getGuildConfig(query.guildId),
-                Effect.flatMap(
-                  Option.match({
-                    onSome: (config) => Effect.succeed(config),
-                    onNone: () =>
-                      Effect.fail(
-                        makeArgumentError(
-                          "Cannot get guild config, the guild might not be registered",
+        authorizationService
+          .provideCurrentGuildUser(
+            query.guildId,
+            authorizationService.requireManageGuild(query.guildId).pipe(
+              Effect.andThen(
+                pipe(
+                  guildConfigService.getGuildConfig(query.guildId),
+                  Effect.flatMap(
+                    Option.match({
+                      onSome: (config) => Effect.succeed(config),
+                      onNone: () =>
+                        Effect.fail(
+                          makeArgumentError(
+                            "Cannot get guild config, the guild might not be registered",
+                          ),
                         ),
-                      ),
-                  }),
+                    }),
+                  ),
                 ),
               ),
             ),
-          ),
-        ).pipe(catchSchemaErrorAsValidationError),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
       )
       .handle("upsertGuildConfig", ({ payload }) =>
-        provideCurrentGuildUser(
-          payload.guildId,
-          requireManageGuild(payload.guildId).pipe(
-            Effect.andThen(guildConfigService.upsertGuildConfig(payload.guildId, payload.config)),
-          ),
-        ).pipe(catchSchemaErrorAsValidationError),
+        authorizationService
+          .provideCurrentGuildUser(
+            payload.guildId,
+            authorizationService
+              .requireManageGuild(payload.guildId)
+              .pipe(
+                Effect.andThen(
+                  guildConfigService.upsertGuildConfig(payload.guildId, payload.config),
+                ),
+              ),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getGuildMonitorRoles", ({ query }) =>
         guildConfigService
@@ -69,36 +76,50 @@ export const guildConfigLayer = HttpApiBuilder.group(
           .pipe(catchSchemaErrorAsValidationError),
       )
       .handle("addGuildMonitorRole", ({ payload }) =>
-        provideCurrentGuildUser(
-          payload.guildId,
-          requireManageGuild(payload.guildId).pipe(
-            Effect.andThen(guildConfigService.addGuildMonitorRole(payload.guildId, payload.roleId)),
-          ),
-        ).pipe(catchSchemaErrorAsValidationError),
+        authorizationService
+          .provideCurrentGuildUser(
+            payload.guildId,
+            authorizationService
+              .requireManageGuild(payload.guildId)
+              .pipe(
+                Effect.andThen(
+                  guildConfigService.addGuildMonitorRole(payload.guildId, payload.roleId),
+                ),
+              ),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
       )
       .handle("removeGuildMonitorRole", ({ payload }) =>
-        provideCurrentGuildUser(
-          payload.guildId,
-          requireManageGuild(payload.guildId).pipe(
-            Effect.andThen(
-              guildConfigService.removeGuildMonitorRole(payload.guildId, payload.roleId),
-            ),
-          ),
-        ).pipe(catchSchemaErrorAsValidationError),
+        authorizationService
+          .provideCurrentGuildUser(
+            payload.guildId,
+            authorizationService
+              .requireManageGuild(payload.guildId)
+              .pipe(
+                Effect.andThen(
+                  guildConfigService.removeGuildMonitorRole(payload.guildId, payload.roleId),
+                ),
+              ),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
       )
       .handle("upsertGuildChannelConfig", ({ payload }) =>
-        provideCurrentGuildUser(
-          payload.guildId,
-          requireManageGuild(payload.guildId).pipe(
-            Effect.andThen(
-              guildConfigService.upsertGuildChannelConfig(
-                payload.guildId,
-                payload.channelId,
-                payload.config,
+        authorizationService
+          .provideCurrentGuildUser(
+            payload.guildId,
+            authorizationService
+              .requireManageGuild(payload.guildId)
+              .pipe(
+                Effect.andThen(
+                  guildConfigService.upsertGuildChannelConfig(
+                    payload.guildId,
+                    payload.channelId,
+                    payload.config,
+                  ),
+                ),
               ),
-            ),
-          ),
-        ).pipe(catchSchemaErrorAsValidationError),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getGuildChannelById", ({ query }) =>
         pipe(
@@ -145,4 +166,10 @@ export const guildConfigLayer = HttpApiBuilder.group(
         ).pipe(catchSchemaErrorAsValidationError),
       );
   }),
-).pipe(Layer.provide([GuildConfigService.layer, SheetAuthTokenAuthorizationLive]));
+).pipe(
+  Layer.provide([
+    AuthorizationService.layer,
+    GuildConfigService.layer,
+    SheetAuthTokenAuthorizationLive,
+  ]),
+);

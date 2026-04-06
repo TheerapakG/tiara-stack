@@ -2,8 +2,7 @@ import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Array, Effect, HashMap, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import { catchSchemaErrorAsValidationError } from "typhoon-core/error";
-import { provideCurrentGuildUser, requireMonitorGuild } from "@/middlewares/authorization";
-import { GuildConfigService, MonitorService } from "@/services";
+import { AuthorizationService, GuildConfigService, MonitorService } from "@/services";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 
 const getSheetIdFromGuildId = (
@@ -31,64 +30,76 @@ export const monitorLayer = HttpApiBuilder.group(
   Api,
   "monitor",
   Effect.fn(function* (handlers) {
+    const authorizationService = yield* AuthorizationService;
     const monitorService = yield* MonitorService;
     const guildConfigService = yield* GuildConfigService;
 
     return handlers
       .handle("getMonitorMaps", ({ query }) =>
-        provideCurrentGuildUser(
-          query.guildId,
-          requireMonitorGuild(query.guildId).pipe(
-            Effect.andThen(
-              pipe(
-                getSheetIdFromGuildId(query.guildId, guildConfigService),
-                Effect.flatMap((sheetId) => monitorService.getMonitorMaps(sheetId)),
-                Effect.map((monitorMaps) => ({
-                  idToMonitor: Array.fromIterable(HashMap.entries(monitorMaps.idToMonitor)).map(
-                    ([key, value]) => ({
-                      key,
-                      value: Array.fromIterable(value),
-                    }),
-                  ),
-                  nameToMonitor: Array.fromIterable(HashMap.entries(monitorMaps.nameToMonitor)).map(
-                    ([key, value]) => ({
+        authorizationService
+          .provideCurrentGuildUser(
+            query.guildId,
+            authorizationService.requireMonitorGuild(query.guildId).pipe(
+              Effect.andThen(
+                pipe(
+                  getSheetIdFromGuildId(query.guildId, guildConfigService),
+                  Effect.flatMap((sheetId) => monitorService.getMonitorMaps(sheetId)),
+                  Effect.map((monitorMaps) => ({
+                    idToMonitor: Array.fromIterable(HashMap.entries(monitorMaps.idToMonitor)).map(
+                      ([key, value]) => ({
+                        key,
+                        value: Array.fromIterable(value),
+                      }),
+                    ),
+                    nameToMonitor: Array.fromIterable(
+                      HashMap.entries(monitorMaps.nameToMonitor),
+                    ).map(([key, value]) => ({
                       key,
                       value: { name: value.name, monitors: Array.fromIterable(value.monitors) },
-                    }),
-                  ),
-                })),
+                    })),
+                  })),
+                ),
               ),
             ),
-          ),
-        ).pipe(catchSchemaErrorAsValidationError),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getByIds", ({ query }) =>
-        provideCurrentGuildUser(
-          query.guildId,
-          requireMonitorGuild(query.guildId).pipe(
-            Effect.andThen(
-              pipe(
-                getSheetIdFromGuildId(query.guildId, guildConfigService),
-                Effect.flatMap((sheetId) => monitorService.getByIds(sheetId, query.ids)),
+        authorizationService
+          .provideCurrentGuildUser(
+            query.guildId,
+            authorizationService.requireMonitorGuild(query.guildId).pipe(
+              Effect.andThen(
+                pipe(
+                  getSheetIdFromGuildId(query.guildId, guildConfigService),
+                  Effect.flatMap((sheetId) => monitorService.getByIds(sheetId, query.ids)),
+                ),
               ),
             ),
-          ),
-        ).pipe(catchSchemaErrorAsValidationError),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getByNames", ({ query }) =>
-        provideCurrentGuildUser(
-          query.guildId,
-          requireMonitorGuild(query.guildId).pipe(
-            Effect.andThen(
-              pipe(
-                getSheetIdFromGuildId(query.guildId, guildConfigService),
-                Effect.flatMap((sheetId) => monitorService.getByNames(sheetId, query.names)),
+        authorizationService
+          .provideCurrentGuildUser(
+            query.guildId,
+            authorizationService.requireMonitorGuild(query.guildId).pipe(
+              Effect.andThen(
+                pipe(
+                  getSheetIdFromGuildId(query.guildId, guildConfigService),
+                  Effect.flatMap((sheetId) => monitorService.getByNames(sheetId, query.names)),
+                ),
               ),
             ),
-          ),
-        ).pipe(catchSchemaErrorAsValidationError),
+          )
+          .pipe(catchSchemaErrorAsValidationError),
       );
   }),
 ).pipe(
-  Layer.provide([MonitorService.layer, GuildConfigService.layer, SheetAuthTokenAuthorizationLive]),
+  Layer.provide([
+    AuthorizationService.layer,
+    MonitorService.layer,
+    GuildConfigService.layer,
+    SheetAuthTokenAuthorizationLive,
+  ]),
 );

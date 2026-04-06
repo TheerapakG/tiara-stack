@@ -1,4 +1,4 @@
-import { NodeHttpClient, NodeHttpServer } from "@effect/platform-node";
+import { NodeHttpServer } from "@effect/platform-node";
 import { HttpMiddleware, HttpRouter, HttpServer } from "effect/unstable/http";
 import { HttpApiBuilder, HttpApiSwagger } from "effect/unstable/httpapi";
 import { Effect, Layer } from "effect";
@@ -74,7 +74,6 @@ const ApiLayer = Layer.provide(HttpApiBuilder.layer(Api), [
 
 export const httpLayer = HttpRouter.serve(ApiLayer).pipe(
   Layer.provide(discordServiceLayer),
-  Layer.provide(NodeHttpClient.layerFetch),
   HttpServer.withLogAddress,
   Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 })),
 );

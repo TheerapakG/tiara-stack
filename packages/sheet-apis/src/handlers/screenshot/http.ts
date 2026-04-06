@@ -2,8 +2,7 @@ import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Effect, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import { catchSchemaErrorAsValidationError } from "typhoon-core/error";
-import { provideCurrentGuildUser, requireMonitorGuild } from "@/middlewares/authorization";
-import { ScreenshotService, GuildConfigService } from "@/services";
+import { AuthorizationService, ScreenshotService, GuildConfigService } from "@/services";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 
 const getSheetIdFromGuildId = (
@@ -31,27 +30,31 @@ export const screenshotLayer = HttpApiBuilder.group(
   Api,
   "screenshot",
   Effect.fn(function* (handlers) {
+    const authorizationService = yield* AuthorizationService;
     const screenshotService = yield* ScreenshotService;
     const guildConfigService = yield* GuildConfigService;
 
     return handlers.handle("getScreenshot", ({ query }) =>
-      provideCurrentGuildUser(
-        query.guildId,
-        requireMonitorGuild(query.guildId).pipe(
-          Effect.andThen(
-            pipe(
-              getSheetIdFromGuildId(query.guildId, guildConfigService),
-              Effect.flatMap((sheetId) =>
-                screenshotService.getScreenshot(sheetId, query.channel, query.day),
+      authorizationService
+        .provideCurrentGuildUser(
+          query.guildId,
+          authorizationService.requireMonitorGuild(query.guildId).pipe(
+            Effect.andThen(
+              pipe(
+                getSheetIdFromGuildId(query.guildId, guildConfigService),
+                Effect.flatMap((sheetId) =>
+                  screenshotService.getScreenshot(sheetId, query.channel, query.day),
+                ),
               ),
             ),
           ),
-        ),
-      ).pipe(catchSchemaErrorAsValidationError),
+        )
+        .pipe(catchSchemaErrorAsValidationError),
     );
   }),
 ).pipe(
   Layer.provide([
+    AuthorizationService.layer,
     ScreenshotService.layer,
     GuildConfigService.layer,
     SheetAuthTokenAuthorizationLive,
