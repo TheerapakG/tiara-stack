@@ -22,50 +22,12 @@ import {
   ServiceMap,
   String,
   Layer,
+  Record,
 } from "effect";
 import { DefaultTaggedClass, OptionArrayToOptionStructValueSchema } from "typhoon-core/schema";
 import { catchSchemaErrorAsValidationError } from "typhoon-core/error";
 import { ScopedCache } from "typhoon-core/utils";
 import { GoogleSheets } from "./google/sheets";
-
-const makeSheetConfigError = (message: string) =>
-  SheetConfigError.makeUnsafe({
-    message,
-  });
-
-const getValueRangesOrFail =
-  (message: string) => (valueRanges: sheets_v4.Schema$ValueRange[] | null | undefined) =>
-    pipe(
-      valueRanges,
-      Option.fromNullishOr,
-      Option.match({
-        onSome: Effect.succeed,
-        onNone: () => Effect.fail(makeSheetConfigError(message)),
-      }),
-    );
-
-const getEntriesOrFail =
-  (message: string) => (range: sheets_v4.Schema$ValueRange | null | undefined) =>
-    pipe(
-      range,
-      Option.fromNullishOr,
-      Option.flatMap((valueRange) => Option.fromNullishOr(valueRange.values)),
-      Option.match({
-        onSome: (entries) => Effect.succeed(Object.fromEntries(entries)),
-        onNone: () => Effect.fail(makeSheetConfigError(message)),
-      }),
-    );
-
-const getFirstRangeEntriesOrFail =
-  (message: string) => (valueRanges: sheets_v4.Schema$ValueRange[] | null | undefined) =>
-    pipe(
-      valueRanges,
-      Option.fromNullishOr,
-      Option.match({
-        onSome: (ranges) => getEntriesOrFail(message)(ranges[0]),
-        onNone: () => Effect.fail(makeSheetConfigError(message)),
-      }),
-    );
 
 const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
   GoogleSheets.parseValueRanges(
@@ -268,23 +230,6 @@ const runnerConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
     Effect.withSpan("runnerConfigParser"),
   );
 
-const rangesConfigSchema = Schema.Struct({
-  userIds: Schema.String,
-  userSheetNames: Schema.String,
-  userNotes: Schema.OptionFromNullishOr(Schema.String),
-  monitorIds: Schema.OptionFromNullishOr(Schema.String),
-  monitorNames: Schema.OptionFromNullishOr(Schema.String),
-}).pipe(Schema.decodeTo(DefaultTaggedClass(RangesConfig)));
-
-const eventConfigSchema = Schema.Struct({
-  startTime: Schema.NumberFromString.pipe(
-    Schema.decodeTo(Schema.Number, {
-      decode: SchemaGetter.transform((value) => value * 1000),
-      encode: SchemaGetter.transform((value) => value / 1000),
-    }),
-  ),
-}).pipe(Schema.decodeTo(DefaultTaggedClass(EventConfig)));
-
 export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()(
   "SheetConfigService",
   {
@@ -298,21 +243,40 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
           spreadsheetId: sheetId,
           ranges: ["'Thee's Sheet Settings'!B8:C"],
         });
-        const rawEntries = yield* getFirstRangeEntriesOrFail(
-          "Error getting ranges config, no value ranges found",
-        )(response.data.valueRanges);
-        const entries = {
-          userIds: rawEntries["User IDs"],
-          userSheetNames: rawEntries["User Sheet Names"],
-          userNotes: rawEntries["User Notes"],
-          monitorIds: rawEntries["Moni IDs"],
-          monitorNames: rawEntries["Moni Names"],
-        };
 
-        return yield* Schema.decodeUnknownEffect(rangesConfigSchema)(entries).pipe(
-          catchSchemaErrorAsValidationError,
-          Effect.withSpan("SheetConfigService.getRangesConfig"),
+        const range = yield* Option.fromNullishOr(response.data.valueRanges).pipe(
+          Option.flatMap(Array.get(0)),
+          Option.flatMapNullishOr((range) => range.values),
+          Option.match({
+            onSome: Effect.succeed,
+            onNone: () =>
+              Effect.fail(
+                new SheetConfigError({
+                  message: "Error getting ranges config, no value ranges found",
+                }),
+              ),
+          }),
         );
+        const rangeStruct = Record.fromEntries(range as [string, any][]);
+
+        return yield* Schema.decodeUnknownEffect(
+          Schema.Struct({
+            "User IDs": Schema.String,
+            "User Sheet Names": Schema.String,
+            "User Notes": Schema.OptionFromNullishOr(Schema.String, undefined),
+            "Moni IDs": Schema.OptionFromNullishOr(Schema.String, undefined),
+            "Moni Names": Schema.OptionFromNullishOr(Schema.String, undefined),
+          }).pipe(
+            Schema.encodeKeys({
+              "User IDs": "userIds",
+              "User Sheet Names": "userSheetNames",
+              "User Notes": "userNotes",
+              "Moni IDs": "monitorIds",
+              "Moni Names": "monitorNames",
+            }),
+            Schema.decodeTo(DefaultTaggedClass(RangesConfig)),
+          ),
+        )(rangeStruct).pipe(catchSchemaErrorAsValidationError);
       });
 
       const getTeamConfig = Effect.fn("SheetConfigService.getTeamConfig")(function* (
@@ -322,14 +286,19 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
           spreadsheetId: sheetId,
           ranges: ["'Thee's Sheet Settings'!E8:L"],
         });
-        const valueRanges = yield* getValueRangesOrFail(
-          "Error getting team config, no value ranges found",
-        )(response.data.valueRanges);
-
-        return yield* teamConfigParser(valueRanges).pipe(
-          catchSchemaErrorAsValidationError,
-          Effect.withSpan("SheetConfigService.getTeamConfig"),
+        const ranges = yield* Option.fromNullishOr(response.data.valueRanges).pipe(
+          Option.match({
+            onSome: Effect.succeed,
+            onNone: () =>
+              Effect.fail(
+                new SheetConfigError({
+                  message: "Error getting team config, no value ranges found",
+                }),
+              ),
+          }),
         );
+
+        return yield* teamConfigParser(ranges).pipe(catchSchemaErrorAsValidationError);
       });
 
       const getEventConfig = Effect.fn("SheetConfigService.getEventConfig")(function* (
@@ -339,17 +308,37 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
           spreadsheetId: sheetId,
           ranges: ["'Thee's Sheet Settings'!N8:O"],
         });
-        const rawEntries = yield* getFirstRangeEntriesOrFail(
-          "Error getting event config, no value ranges found",
-        )(response.data.valueRanges);
-        const entries = {
-          startTime: rawEntries["Start Time"],
-        };
 
-        return yield* Schema.decodeUnknownEffect(eventConfigSchema)(entries).pipe(
-          catchSchemaErrorAsValidationError,
-          Effect.withSpan("SheetConfigService.getEventConfig"),
+        const range = yield* Option.fromNullishOr(response.data.valueRanges).pipe(
+          Option.flatMap(Array.get(0)),
+          Option.flatMapNullishOr((range) => range.values),
+          Option.match({
+            onSome: Effect.succeed,
+            onNone: () =>
+              Effect.fail(
+                new SheetConfigError({
+                  message: "Error getting event config, no value ranges found",
+                }),
+              ),
+          }),
         );
+        const rangeStruct = Record.fromEntries(range as [string, any][]);
+
+        return yield* Schema.decodeUnknownEffect(
+          Schema.Struct({
+            "Start Time": Schema.NumberFromString.pipe(
+              Schema.decodeTo(Schema.Number, {
+                decode: SchemaGetter.transform((value) => value * 1000),
+                encode: SchemaGetter.transform((value) => value / 1000),
+              }),
+            ),
+          }).pipe(
+            Schema.encodeKeys({
+              "Start Time": "startTime",
+            }),
+            Schema.decodeTo(DefaultTaggedClass(EventConfig)),
+          ),
+        )(rangeStruct).pipe(catchSchemaErrorAsValidationError);
       });
 
       const getScheduleConfig = Effect.fn("SheetConfigService.getScheduleConfig")(function* (
@@ -359,14 +348,19 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
           spreadsheetId: sheetId,
           ranges: ["'Thee's Sheet Settings'!Q8:AD"],
         });
-        const valueRanges = yield* getValueRangesOrFail(
-          "Error getting schedule config, no value ranges found",
-        )(response.data.valueRanges);
-
-        return yield* scheduleConfigParser(valueRanges).pipe(
-          catchSchemaErrorAsValidationError,
-          Effect.withSpan("SheetConfigService.getScheduleConfig"),
+        const ranges = yield* Option.fromNullishOr(response.data.valueRanges).pipe(
+          Option.match({
+            onSome: Effect.succeed,
+            onNone: () =>
+              Effect.fail(
+                new SheetConfigError({
+                  message: "Error getting schedule config, no value ranges found",
+                }),
+              ),
+          }),
         );
+
+        return yield* scheduleConfigParser(ranges).pipe(catchSchemaErrorAsValidationError);
       });
 
       const getRunnerConfig = Effect.fn("SheetConfigService.getRunnerConfig")(function* (
@@ -376,14 +370,19 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
           spreadsheetId: sheetId,
           ranges: ["'Thee's Sheet Settings'!AF8:AG"],
         });
-        const valueRanges = yield* getValueRangesOrFail(
-          "Error getting runner config, no value ranges found",
-        )(response.data.valueRanges);
-
-        return yield* runnerConfigParser(valueRanges).pipe(
-          catchSchemaErrorAsValidationError,
-          Effect.withSpan("SheetConfigService.getRunnerConfig"),
+        const ranges = yield* Option.fromNullishOr(response.data.valueRanges).pipe(
+          Option.match({
+            onSome: Effect.succeed,
+            onNone: () =>
+              Effect.fail(
+                new SheetConfigError({
+                  message: "Error getting runner config, no value ranges found",
+                }),
+              ),
+          }),
         );
+
+        return yield* runnerConfigParser(ranges).pipe(catchSchemaErrorAsValidationError);
       });
 
       const {
