@@ -258,22 +258,21 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
           }),
         );
         const rangeStruct = Record.fromEntries(range as [string, any][]);
-        yield* Effect.log(rangeStruct);
 
         return yield* Schema.decodeUnknownEffect(
           Schema.Struct({
-            "User IDs": Schema.String,
-            "User Sheet Names": Schema.String,
-            "User Notes": Schema.OptionFromNullishOr(Schema.String, undefined),
-            "Moni IDs": Schema.OptionFromNullishOr(Schema.String, undefined),
-            "Moni Names": Schema.OptionFromNullishOr(Schema.String, undefined),
+            userIds: Schema.String,
+            userSheetNames: Schema.String,
+            userNotes: Schema.OptionFromNullishOr(Schema.String, undefined),
+            monitorIds: Schema.OptionFromNullishOr(Schema.String, undefined),
+            monitorNames: Schema.OptionFromNullishOr(Schema.String, undefined),
           }).pipe(
             Schema.encodeKeys({
-              "User IDs": "userIds",
-              "User Sheet Names": "userSheetNames",
-              "User Notes": "userNotes",
-              "Moni IDs": "monitorIds",
-              "Moni Names": "monitorNames",
+              userIds: "User IDs",
+              userSheetNames: "User Sheet Names",
+              userNotes: "User Notes",
+              monitorIds: "Moni IDs",
+              monitorNames: "Moni Names",
             }),
             Schema.decodeTo(DefaultTaggedClass(RangesConfig)),
           ),
@@ -327,7 +326,7 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
 
         return yield* Schema.decodeUnknownEffect(
           Schema.Struct({
-            "Start Time": Schema.NumberFromString.pipe(
+            startTime: Schema.NumberFromString.pipe(
               Schema.decodeTo(Schema.Number, {
                 decode: SchemaGetter.transform((value) => value * 1000),
                 encode: SchemaGetter.transform((value) => value / 1000),
@@ -335,7 +334,7 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
             ),
           }).pipe(
             Schema.encodeKeys({
-              "Start Time": "startTime",
+              startTime: "Start Time",
             }),
             Schema.decodeTo(DefaultTaggedClass(EventConfig)),
           ),
