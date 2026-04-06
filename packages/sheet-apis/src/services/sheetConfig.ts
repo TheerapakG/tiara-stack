@@ -258,6 +258,7 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
           }),
         );
         const rangeStruct = Record.fromEntries(range as [string, any][]);
+        yield* Effect.log(rangeStruct);
 
         return yield* Schema.decodeUnknownEffect(
           Schema.Struct({
