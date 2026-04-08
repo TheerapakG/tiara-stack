@@ -16,9 +16,10 @@ export const roomOrderLayer = HttpApiBuilder.group(
       authorizationService
         .provideCurrentGuildUser(
           payload.guildId,
-          authorizationService
-            .requireMonitorGuild(payload.guildId)
-            .pipe(Effect.andThen(roomOrderService.generate(payload))),
+          Effect.gen(function* () {
+            yield* authorizationService.requireMonitorGuild(payload.guildId);
+            return yield* roomOrderService.generate(payload);
+          }),
         )
         .pipe(catchSchemaErrorAsValidationError),
     );

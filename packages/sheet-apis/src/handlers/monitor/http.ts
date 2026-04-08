@@ -1,5 +1,5 @@
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { Array, Effect, HashMap, Layer, Option, pipe } from "effect";
+import { Array, Effect, HashMap, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { catchSchemaErrorAsValidationError } from "typhoon-core/error";
 import { AuthorizationService, GuildConfigService, MonitorService } from "@/services";
@@ -9,22 +9,19 @@ const getSheetIdFromGuildId = (
   guildId: string,
   guildConfigService: typeof GuildConfigService.Service,
 ) =>
-  pipe(
-    guildConfigService.getGuildConfig(guildId),
-    Effect.flatMap(
-      Option.match({
-        onSome: (guildConfig) =>
-          pipe(
-            guildConfig.sheetId,
-            Option.match({
-              onSome: Effect.succeed,
-              onNone: () => Effect.die(new Error(`sheetId not found for guildId: ${guildId}`)),
-            }),
-          ),
-        onNone: () => Effect.die(new Error(`Guild config not found for guildId: ${guildId}`)),
-      }),
-    ),
-  );
+  Effect.gen(function* () {
+    const guildConfig = yield* guildConfigService.getGuildConfig(guildId);
+
+    if (Option.isNone(guildConfig)) {
+      return yield* Effect.die(new Error(`Guild config not found for guildId: ${guildId}`));
+    }
+
+    if (Option.isNone(guildConfig.value.sheetId)) {
+      return yield* Effect.die(new Error(`sheetId not found for guildId: ${guildId}`));
+    }
+
+    return guildConfig.value.sheetId.value;
+  });
 
 export const monitorLayer = HttpApiBuilder.group(
   Api,
@@ -39,28 +36,26 @@ export const monitorLayer = HttpApiBuilder.group(
         authorizationService
           .provideCurrentGuildUser(
             query.guildId,
-            authorizationService.requireMonitorGuild(query.guildId).pipe(
-              Effect.andThen(
-                pipe(
-                  getSheetIdFromGuildId(query.guildId, guildConfigService),
-                  Effect.flatMap((sheetId) => monitorService.getMonitorMaps(sheetId)),
-                  Effect.map((monitorMaps) => ({
-                    idToMonitor: Array.fromIterable(HashMap.entries(monitorMaps.idToMonitor)).map(
-                      ([key, value]) => ({
-                        key,
-                        value: Array.fromIterable(value),
-                      }),
-                    ),
-                    nameToMonitor: Array.fromIterable(
-                      HashMap.entries(monitorMaps.nameToMonitor),
-                    ).map(([key, value]) => ({
-                      key,
-                      value: { name: value.name, monitors: Array.fromIterable(value.monitors) },
-                    })),
-                  })),
+            Effect.gen(function* () {
+              yield* authorizationService.requireMonitorGuild(query.guildId);
+              const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+              const monitorMaps = yield* monitorService.getMonitorMaps(sheetId);
+
+              return {
+                idToMonitor: Array.fromIterable(HashMap.entries(monitorMaps.idToMonitor)).map(
+                  ([key, value]) => ({
+                    key,
+                    value: Array.fromIterable(value),
+                  }),
                 ),
-              ),
-            ),
+                nameToMonitor: Array.fromIterable(HashMap.entries(monitorMaps.nameToMonitor)).map(
+                  ([key, value]) => ({
+                    key,
+                    value: { name: value.name, monitors: Array.fromIterable(value.monitors) },
+                  }),
+                ),
+              };
+            }),
           )
           .pipe(catchSchemaErrorAsValidationError),
       )
@@ -68,14 +63,11 @@ export const monitorLayer = HttpApiBuilder.group(
         authorizationService
           .provideCurrentGuildUser(
             query.guildId,
-            authorizationService.requireMonitorGuild(query.guildId).pipe(
-              Effect.andThen(
-                pipe(
-                  getSheetIdFromGuildId(query.guildId, guildConfigService),
-                  Effect.flatMap((sheetId) => monitorService.getByIds(sheetId, query.ids)),
-                ),
-              ),
-            ),
+            Effect.gen(function* () {
+              yield* authorizationService.requireMonitorGuild(query.guildId);
+              const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+              return yield* monitorService.getByIds(sheetId, query.ids);
+            }),
           )
           .pipe(catchSchemaErrorAsValidationError),
       )
@@ -83,14 +75,11 @@ export const monitorLayer = HttpApiBuilder.group(
         authorizationService
           .provideCurrentGuildUser(
             query.guildId,
-            authorizationService.requireMonitorGuild(query.guildId).pipe(
-              Effect.andThen(
-                pipe(
-                  getSheetIdFromGuildId(query.guildId, guildConfigService),
-                  Effect.flatMap((sheetId) => monitorService.getByNames(sheetId, query.names)),
-                ),
-              ),
-            ),
+            Effect.gen(function* () {
+              yield* authorizationService.requireMonitorGuild(query.guildId);
+              const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+              return yield* monitorService.getByNames(sheetId, query.names);
+            }),
           )
           .pipe(catchSchemaErrorAsValidationError),
       );

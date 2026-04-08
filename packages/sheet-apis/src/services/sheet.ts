@@ -957,24 +957,23 @@ export class SheetService extends ServiceMap.Service<SheetService>()("SheetServi
     const sheet = yield* GoogleSheets;
     const sheetConfigService = yield* SheetConfigService;
 
-    const getRangesConfig = (sheetId: string) =>
-      sheetConfigService
-        .getRangesConfig(sheetId)
-        .pipe(Effect.withSpan("SheetService.getRangesConfig"));
-    const getTeamConfig = (sheetId: string) =>
-      sheetConfigService.getTeamConfig(sheetId).pipe(Effect.withSpan("SheetService.getTeamConfig"));
-    const getEventConfig = (sheetId: string) =>
-      sheetConfigService
-        .getEventConfig(sheetId)
-        .pipe(Effect.withSpan("SheetService.getEventConfig"));
-    const getScheduleConfig = (sheetId: string) =>
-      sheetConfigService
-        .getScheduleConfig(sheetId)
-        .pipe(Effect.withSpan("SheetService.getScheduleConfig"));
-    const getRunnerConfig = (sheetId: string) =>
-      sheetConfigService
-        .getRunnerConfig(sheetId)
-        .pipe(Effect.withSpan("SheetService.getRunnerConfig"));
+    const getRangesConfig = Effect.fn("SheetService.getRangesConfig")(function* (sheetId: string) {
+      return yield* sheetConfigService.getRangesConfig(sheetId);
+    });
+    const getTeamConfig = Effect.fn("SheetService.getTeamConfig")(function* (sheetId: string) {
+      return yield* sheetConfigService.getTeamConfig(sheetId);
+    });
+    const getEventConfig = Effect.fn("SheetService.getEventConfig")(function* (sheetId: string) {
+      return yield* sheetConfigService.getEventConfig(sheetId);
+    });
+    const getScheduleConfig = Effect.fn("SheetService.getScheduleConfig")(function* (
+      sheetId: string,
+    ) {
+      return yield* sheetConfigService.getScheduleConfig(sheetId);
+    });
+    const getRunnerConfig = Effect.fn("SheetService.getRunnerConfig")(function* (sheetId: string) {
+      return yield* sheetConfigService.getRunnerConfig(sheetId);
+    });
 
     const getPlayers = (sheetId: string) =>
       Effect.gen(function* () {
@@ -1037,40 +1036,51 @@ export class SheetService extends ServiceMap.Service<SheetService>()("SheetServi
         return yield* scheduleParser(filteredScheduleConfigs, response, runnerConfig);
       });
 
-    const getAllSchedules = (sheetId: string) =>
-      getSchedulesForConfigs(sheetId, (configs) => configs).pipe(
-        Effect.withSpan("SheetService.getAllSchedules"),
-      );
-    const getDaySchedules = (sheetId: string, day: number) =>
-      getSchedulesForConfigs(sheetId, (configs) =>
+    const getAllSchedules = Effect.fn("SheetService.getAllSchedules")(function* (sheetId: string) {
+      return yield* getSchedulesForConfigs(sheetId, (configs) => configs);
+    });
+    const getDaySchedules = Effect.fn("SheetService.getDaySchedules")(function* (
+      sheetId: string,
+      day: number,
+    ) {
+      return yield* getSchedulesForConfigs(sheetId, (configs) =>
         pipe(
           configs,
           Array.filter((config) => Number.Equivalence(config.day, day)),
         ),
-      ).pipe(Effect.withSpan("SheetService.getDaySchedules"));
-    const getChannelSchedules = (sheetId: string, channel: string) =>
-      getSchedulesForConfigs(sheetId, (configs) =>
+      );
+    });
+    const getChannelSchedules = Effect.fn("SheetService.getChannelSchedules")(function* (
+      sheetId: string,
+      channel: string,
+    ) {
+      return yield* getSchedulesForConfigs(sheetId, (configs) =>
         pipe(
           configs,
           Array.filter((config) => String.Equivalence(config.channel, channel)),
         ),
-      ).pipe(Effect.withSpan("SheetService.getChannelSchedules"));
+      );
+    });
 
-    const getAllFillerSchedules = (sheetId: string) =>
-      getAllSchedules(sheetId).pipe(
-        Effect.map(filterSchedulesForFiller),
-        Effect.withSpan("SheetService.getAllFillerSchedules"),
-      );
-    const getDayFillerSchedules = (sheetId: string, day: number) =>
-      getDaySchedules(sheetId, day).pipe(
-        Effect.map(filterSchedulesForFiller),
-        Effect.withSpan("SheetService.getDayFillerSchedules"),
-      );
-    const getChannelFillerSchedules = (sheetId: string, channel: string) =>
-      getChannelSchedules(sheetId, channel).pipe(
-        Effect.map(filterSchedulesForFiller),
-        Effect.withSpan("SheetService.getChannelFillerSchedules"),
-      );
+    const getAllFillerSchedules = Effect.fn("SheetService.getAllFillerSchedules")(function* (
+      sheetId: string,
+    ) {
+      const schedules = yield* getAllSchedules(sheetId);
+      return filterSchedulesForFiller(schedules);
+    });
+    const getDayFillerSchedules = Effect.fn("SheetService.getDayFillerSchedules")(function* (
+      sheetId: string,
+      day: number,
+    ) {
+      const schedules = yield* getDaySchedules(sheetId, day);
+      return filterSchedulesForFiller(schedules);
+    });
+    const getChannelFillerSchedules = Effect.fn("SheetService.getChannelFillerSchedules")(
+      function* (sheetId: string, channel: string) {
+        const schedules = yield* getChannelSchedules(sheetId, channel);
+        return filterSchedulesForFiller(schedules);
+      },
+    );
 
     const caches = yield* Effect.all({
       getRangesConfigCache: ScopedCache.make({ lookup: getRangesConfig }),

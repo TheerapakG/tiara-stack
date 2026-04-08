@@ -68,17 +68,20 @@ export class ScreenshotService extends ServiceMap.Service<ScreenshotService>()(
             },
           );
           yield* Effect.log(`Screenshot URL: ${url}`);
-          const css = yield* pipe(
-            httpClient.get(
+          const cssResponse = yield* httpClient
+            .get(
               withQuery("https://fonts.googleapis.com/css2", {
                 family: ["Lexend:wght@100..900", "Pacifico"],
                 display: "swap",
               }),
-            ),
-            Effect.flatMap((response) => response.text),
+            )
+            .pipe(
+              Effect.catch((error) => Effect.fail(makeUnknownError("Error getting CSS", error))),
+            );
+          const cssText = yield* cssResponse.text.pipe(
             Effect.catch((error) => Effect.fail(makeUnknownError("Error getting CSS", error))),
-            Effect.map((css) => css.replace(/font-family: '([^']+)';/g, `font-family: 'docs-$1';`)),
           );
+          const css = cssText.replace(/font-family: '([^']+)';/g, `font-family: 'docs-$1';`);
 
           return yield* pipe(
             Effect.tryPromise({

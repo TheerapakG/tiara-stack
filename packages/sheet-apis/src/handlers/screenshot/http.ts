@@ -1,5 +1,5 @@
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { Effect, Layer, Option, pipe } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { catchSchemaErrorAsValidationError } from "typhoon-core/error";
 import { AuthorizationService, ScreenshotService, GuildConfigService } from "@/services";
@@ -9,22 +9,19 @@ const getSheetIdFromGuildId = (
   guildId: string,
   guildConfigService: typeof GuildConfigService.Service,
 ) =>
-  pipe(
-    guildConfigService.getGuildConfig(guildId),
-    Effect.flatMap(
-      Option.match({
-        onSome: (guildConfig) =>
-          pipe(
-            guildConfig.sheetId,
-            Option.match({
-              onSome: Effect.succeed,
-              onNone: () => Effect.die(new Error(`sheetId not found for guildId: ${guildId}`)),
-            }),
-          ),
-        onNone: () => Effect.die(new Error(`Guild config not found for guildId: ${guildId}`)),
-      }),
-    ),
-  );
+  Effect.gen(function* () {
+    const guildConfig = yield* guildConfigService.getGuildConfig(guildId);
+
+    if (Option.isNone(guildConfig)) {
+      return yield* Effect.die(new Error(`Guild config not found for guildId: ${guildId}`));
+    }
+
+    if (Option.isNone(guildConfig.value.sheetId)) {
+      return yield* Effect.die(new Error(`sheetId not found for guildId: ${guildId}`));
+    }
+
+    return guildConfig.value.sheetId.value;
+  });
 
 export const screenshotLayer = HttpApiBuilder.group(
   Api,
@@ -38,16 +35,11 @@ export const screenshotLayer = HttpApiBuilder.group(
       authorizationService
         .provideCurrentGuildUser(
           query.guildId,
-          authorizationService.requireMonitorGuild(query.guildId).pipe(
-            Effect.andThen(
-              pipe(
-                getSheetIdFromGuildId(query.guildId, guildConfigService),
-                Effect.flatMap((sheetId) =>
-                  screenshotService.getScreenshot(sheetId, query.channel, query.day),
-                ),
-              ),
-            ),
-          ),
+          Effect.gen(function* () {
+            yield* authorizationService.requireMonitorGuild(query.guildId);
+            const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+            return yield* screenshotService.getScreenshot(sheetId, query.channel, query.day);
+          }),
         )
         .pipe(catchSchemaErrorAsValidationError),
     );

@@ -13,10 +13,12 @@ export class ApplicationOwnerResolver extends ServiceMap.Service<ApplicationOwne
       const application = yield* Cache.makeWith({
         capacity: 1,
         lookup: (): Effect.Effect<Option.Option<string>> =>
-          discordApiClient.application.getApplication().pipe(
-            Effect.map((application) => Option.some(application.ownerId)),
-            Effect.catch(() => Effect.succeed(Option.none<string>())),
-          ),
+          Effect.gen(function* () {
+            return yield* Effect.matchEffect(discordApiClient.application.getApplication(), {
+              onSuccess: (application) => Effect.succeed(Option.some(application.ownerId)),
+              onFailure: () => Effect.succeed(Option.none<string>()),
+            });
+          }),
         // `Option.none()` intentionally covers both "no owner available"
         // and transient lookup failures, so we keep the short retry TTL.
         timeToLive: Exit.match({

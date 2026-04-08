@@ -16,94 +16,77 @@ export const calcLayer = HttpApiBuilder.group(
 
     return handlers
       .handle("calcBot", ({ payload }) =>
-        pipe(
-          Effect.Do,
-          Effect.let("config", () => new CalcConfig(payload.config)),
-          Effect.bind("playerTeams", () =>
-            Effect.forEach(payload.players, (player) =>
-              Effect.succeed(
-                Array.getSomes(player.map((team: Team) => PlayerTeam.fromTeam(false, team))),
-              ),
+        Effect.gen(function* () {
+          const config = new CalcConfig(payload.config);
+          const playerTeams = yield* Effect.forEach(payload.players, (player) =>
+            Effect.succeed(
+              Array.getSomes(player.map((team: Team) => PlayerTeam.fromTeam(false, team))),
             ),
-          ),
-          Effect.flatMap(({ config, playerTeams }) => calcService.calc(config, playerTeams)),
-          Effect.map(
-            Chunk.map((room) => ({
+          );
+          const rooms = yield* calcService.calc(config, playerTeams);
+
+          return Chunk.toArray(
+            Chunk.map(rooms, (room) => ({
               averageTalent: Room.avgTalent(room),
               averageEffectValue: Room.avgEffectValue(room),
-              room: pipe(
-                room.teams,
-                Chunk.map((team) => ({
+              room: Chunk.toArray(
+                Chunk.map(room.teams, (team) => ({
                   type: team.type,
                   team: team.teamName,
                   talent: team.talent,
                   effectValue: PlayerTeam.getEffectValue(team),
                   tags: Array.fromIterable(team.tags),
                 })),
-                Chunk.toArray,
               ),
             })),
-          ),
-          Effect.map(Chunk.toArray),
-        ),
+          );
+        }),
       )
       .handle("calcSheet", ({ payload }) =>
-        pipe(
-          Effect.Do,
-          Effect.let("config", () => new CalcConfig(payload.config)),
-          Effect.let("fixedTeams", () =>
-            pipe(
-              payload.fixedTeams,
-              ArrayUtils.Collect.toHashMapByKey("name"),
-              HashMap.map(({ heal }) =>
-                pipe(
-                  HashSet.make("fixed"),
-                  HashSet.union(heal ? HashSet.make("heal") : HashSet.empty()),
-                ),
+        Effect.gen(function* () {
+          const config = new CalcConfig(payload.config);
+          const fixedTeams = pipe(
+            payload.fixedTeams,
+            ArrayUtils.Collect.toHashMapByKey("name"),
+            HashMap.map(({ heal }) =>
+              pipe(
+                HashSet.make("fixed"),
+                HashSet.union(heal ? HashSet.make("heal") : HashSet.empty()),
               ),
             ),
-          ),
-          Effect.bind("playerTeams", ({ fixedTeams }) =>
-            pipe(
-              Effect.forEach(payload.players, (player) =>
-                pipe(
-                  playerService.getTeamsByNames(payload.sheetId, [player.name]),
-                  Effect.map((teams) =>
-                    pipe(
-                      teams,
-                      Array.map((team) =>
+          );
+          const playerTeams = yield* Effect.forEach(payload.players, (player) =>
+            Effect.gen(function* () {
+              const teams = yield* playerService.getTeamsByNames(payload.sheetId, [player.name]);
+
+              return Array.getSomes(
+                teams.map((team) =>
+                  pipe(
+                    PlayerTeam.fromTeam(payload.config.cc, team),
+                    Option.map((playerTeam) =>
+                      PlayerTeam.addTags(
                         pipe(
-                          PlayerTeam.fromTeam(payload.config.cc, team),
-                          Option.map((playerTeam) =>
-                            PlayerTeam.addTags(
-                              pipe(
-                                HashSet.empty<string>(),
-                                HashSet.union(
-                                  player.encable ? HashSet.make("encable") : HashSet.empty(),
-                                ),
-                                HashSet.union(
-                                  pipe(
-                                    Option.flatMap(team.teamName, (teamName) =>
-                                      HashMap.get(fixedTeams, teamName),
-                                    ),
-                                    Option.getOrElse(() => HashSet.empty<string>()),
-                                  ),
-                                ),
+                          HashSet.empty<string>(),
+                          HashSet.union(player.encable ? HashSet.make("encable") : HashSet.empty()),
+                          HashSet.union(
+                            pipe(
+                              Option.flatMap(team.teamName, (teamName) =>
+                                HashMap.get(fixedTeams, teamName),
                               ),
-                            )(playerTeam),
+                              Option.getOrElse(() => HashSet.empty<string>()),
+                            ),
                           ),
                         ),
-                      ),
-                      Array.getSomes,
+                      )(playerTeam),
                     ),
                   ),
                 ),
-              ),
-            ),
-          ),
-          Effect.flatMap(({ config, playerTeams }) => calcService.calc(config, playerTeams)),
-          Effect.map(Chunk.toArray),
-        ),
+              );
+            }),
+          );
+          const rooms = yield* calcService.calc(config, playerTeams);
+          return Chunk.toArray(rooms);
+        }),
       );
   }),
 ).pipe(Layer.provide([CalcService.layer, PlayerService.layer, SheetAuthTokenAuthorizationLive]));

@@ -1,5 +1,5 @@
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { Array, Effect, HashMap, Layer, Option, pipe } from "effect";
+import { Array, Effect, HashMap, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { catchSchemaErrorAsValidationError } from "typhoon-core/error";
 import { AuthorizationService, PlayerService, GuildConfigService } from "@/services";
@@ -9,22 +9,19 @@ const getSheetIdFromGuildId = (
   guildId: string,
   guildConfigService: typeof GuildConfigService.Service,
 ) =>
-  pipe(
-    guildConfigService.getGuildConfig(guildId),
-    Effect.flatMap(
-      Option.match({
-        onSome: (guildConfig) =>
-          pipe(
-            guildConfig.sheetId,
-            Option.match({
-              onSome: Effect.succeed,
-              onNone: () => Effect.die(new Error(`sheetId not found for guildId: ${guildId}`)),
-            }),
-          ),
-        onNone: () => Effect.die(new Error(`Guild config not found for guildId: ${guildId}`)),
-      }),
-    ),
-  );
+  Effect.gen(function* () {
+    const guildConfig = yield* guildConfigService.getGuildConfig(guildId);
+
+    if (Option.isNone(guildConfig)) {
+      return yield* Effect.die(new Error(`Guild config not found for guildId: ${guildId}`));
+    }
+
+    if (Option.isNone(guildConfig.value.sheetId)) {
+      return yield* Effect.die(new Error(`sheetId not found for guildId: ${guildId}`));
+    }
+
+    return guildConfig.value.sheetId.value;
+  });
 
 export const playerLayer = HttpApiBuilder.group(
   Api,
@@ -39,28 +36,26 @@ export const playerLayer = HttpApiBuilder.group(
         authorizationService
           .provideCurrentGuildUser(
             query.guildId,
-            authorizationService.requireMonitorGuild(query.guildId).pipe(
-              Effect.andThen(
-                pipe(
-                  getSheetIdFromGuildId(query.guildId, guildConfigService),
-                  Effect.flatMap((sheetId) => playerService.getPlayerMaps(sheetId)),
-                  Effect.map((playerMaps) => ({
-                    nameToPlayer: Array.fromIterable(HashMap.entries(playerMaps.nameToPlayer)).map(
-                      ([key, value]) => ({
-                        key,
-                        value: { name: value.name, players: Array.fromIterable(value.players) },
-                      }),
-                    ),
-                    idToPlayer: Array.fromIterable(HashMap.entries(playerMaps.idToPlayer)).map(
-                      ([key, value]) => ({
-                        key,
-                        value: Array.fromIterable(value),
-                      }),
-                    ),
-                  })),
+            Effect.gen(function* () {
+              yield* authorizationService.requireMonitorGuild(query.guildId);
+              const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+              const playerMaps = yield* playerService.getPlayerMaps(sheetId);
+
+              return {
+                nameToPlayer: Array.fromIterable(HashMap.entries(playerMaps.nameToPlayer)).map(
+                  ([key, value]) => ({
+                    key,
+                    value: { name: value.name, players: Array.fromIterable(value.players) },
+                  }),
                 ),
-              ),
-            ),
+                idToPlayer: Array.fromIterable(HashMap.entries(playerMaps.idToPlayer)).map(
+                  ([key, value]) => ({
+                    key,
+                    value: Array.fromIterable(value),
+                  }),
+                ),
+              };
+            }),
           )
           .pipe(catchSchemaErrorAsValidationError),
       )
@@ -76,14 +71,11 @@ export const playerLayer = HttpApiBuilder.group(
         return authorizationService
           .provideCurrentGuildUser(
             query.guildId,
-            auth.pipe(
-              Effect.andThen(
-                pipe(
-                  getSheetIdFromGuildId(query.guildId, guildConfigService),
-                  Effect.flatMap((sheetId) => playerService.getByIds(sheetId, query.ids)),
-                ),
-              ),
-            ),
+            Effect.gen(function* () {
+              yield* auth;
+              const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+              return yield* playerService.getByIds(sheetId, query.ids);
+            }),
           )
           .pipe(catchSchemaErrorAsValidationError);
       })
@@ -91,14 +83,11 @@ export const playerLayer = HttpApiBuilder.group(
         authorizationService
           .provideCurrentGuildUser(
             query.guildId,
-            authorizationService.requireMonitorGuild(query.guildId).pipe(
-              Effect.andThen(
-                pipe(
-                  getSheetIdFromGuildId(query.guildId, guildConfigService),
-                  Effect.flatMap((sheetId) => playerService.getByNames(sheetId, query.names)),
-                ),
-              ),
-            ),
+            Effect.gen(function* () {
+              yield* authorizationService.requireMonitorGuild(query.guildId);
+              const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+              return yield* playerService.getByNames(sheetId, query.names);
+            }),
           )
           .pipe(catchSchemaErrorAsValidationError),
       )
@@ -114,19 +103,12 @@ export const playerLayer = HttpApiBuilder.group(
         return authorizationService
           .provideCurrentGuildUser(
             query.guildId,
-            auth.pipe(
-              Effect.andThen(
-                pipe(
-                  getSheetIdFromGuildId(query.guildId, guildConfigService),
-                  Effect.flatMap((sheetId) =>
-                    Effect.map(
-                      playerService.getTeamsByIds(sheetId, query.ids),
-                      (teams) => [teams] as const,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            Effect.gen(function* () {
+              yield* auth;
+              const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+              const teams = yield* playerService.getTeamsByIds(sheetId, query.ids);
+              return [teams] as const;
+            }),
           )
           .pipe(catchSchemaErrorAsValidationError);
       })
@@ -134,19 +116,12 @@ export const playerLayer = HttpApiBuilder.group(
         authorizationService
           .provideCurrentGuildUser(
             query.guildId,
-            authorizationService.requireMonitorGuild(query.guildId).pipe(
-              Effect.andThen(
-                pipe(
-                  getSheetIdFromGuildId(query.guildId, guildConfigService),
-                  Effect.flatMap((sheetId) =>
-                    Effect.map(
-                      playerService.getTeamsByNames(sheetId, query.names),
-                      (teams) => [teams] as const,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            Effect.gen(function* () {
+              yield* authorizationService.requireMonitorGuild(query.guildId);
+              const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+              const teams = yield* playerService.getTeamsByNames(sheetId, query.names);
+              return [teams] as const;
+            }),
           )
           .pipe(catchSchemaErrorAsValidationError),
       );

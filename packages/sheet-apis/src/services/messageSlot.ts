@@ -1,4 +1,4 @@
-import { Effect, Layer, Option, ServiceMap, pipe, Schema } from "effect";
+import { Effect, Layer, Option, ServiceMap, Schema } from "effect";
 import { mutators, queries } from "sheet-db-schema/zero";
 import { catchSchemaErrorAsValidationError, makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
@@ -11,19 +11,25 @@ export class MessageSlotService extends ServiceMap.Service<MessageSlotService>()
     make: Effect.gen(function* () {
       const zeroService = yield* ZeroService;
 
-      return {
-        getMessageSlotData: (messageId: string) =>
-          pipe(
-            zeroService.run(queries.messageSlot.getMessageSlotData({ messageId }), {
+      const getMessageSlotData = Effect.fn("MessageSlotService.getMessageSlotData")(
+        function* (messageId: string) {
+          const result = yield* zeroService.run(
+            queries.messageSlot.getMessageSlotData({ messageId }),
+            {
               type: "complete",
-            }),
-            Effect.flatMap(
-              Schema.decodeEffect(Schema.OptionFromNullishOr(DefaultTaggedClass(MessageSlot))),
-            ),
-            catchSchemaErrorAsValidationError,
-            Effect.withSpan("MessageSlotService.getMessageSlotData"),
-          ),
-        upsertMessageSlotData: (
+            },
+          );
+
+          return yield* Schema.decodeEffect(
+            Schema.OptionFromNullishOr(DefaultTaggedClass(MessageSlot)),
+          )(result);
+        },
+        (effect) => effect.pipe(catchSchemaErrorAsValidationError),
+        (effect) => effect.pipe(Effect.withSpan("MessageSlotService.getMessageSlotData")),
+      );
+
+      const upsertMessageSlotData = Effect.fn("MessageSlotService.upsertMessageSlotData")(
+        function* (
           messageId: string,
           data: {
             day: number;
@@ -31,35 +37,40 @@ export class MessageSlotService extends ServiceMap.Service<MessageSlotService>()
             messageChannelId: string | null;
             createdByUserId: string | null;
           },
-        ) =>
-          pipe(
-            zeroService.mutate(
-              mutators.messageSlot.upsertMessageSlotData({
-                messageId,
-                day: data.day,
-                guildId: data.guildId,
-                messageChannelId: data.messageChannelId,
-                createdByUserId: data.createdByUserId,
-              }),
-            ),
-            Effect.andThen((mutation) => mutation.server()),
-            Effect.andThen(
-              zeroService.run(queries.messageSlot.getMessageSlotData({ messageId }), {
-                type: "complete",
-              }),
-            ),
-            Effect.flatMap(
-              Schema.decodeEffect(Schema.OptionFromNullishOr(DefaultTaggedClass(MessageSlot))),
-            ),
-            catchSchemaErrorAsValidationError,
-            Effect.flatMap(
-              Option.match({
-                onSome: Effect.succeed,
-                onNone: () => Effect.die(makeDBQueryError("Failed to upsert message slot data")),
-              }),
-            ),
-            Effect.withSpan("MessageSlotService.upsertMessageSlotData"),
-          ),
+        ) {
+          const mutation = yield* zeroService.mutate(
+            mutators.messageSlot.upsertMessageSlotData({
+              messageId,
+              day: data.day,
+              guildId: data.guildId,
+              messageChannelId: data.messageChannelId,
+              createdByUserId: data.createdByUserId,
+            }),
+          );
+          yield* mutation.server();
+
+          const result = yield* zeroService.run(
+            queries.messageSlot.getMessageSlotData({ messageId }),
+            {
+              type: "complete",
+            },
+          );
+          const messageSlot = yield* Schema.decodeEffect(
+            Schema.OptionFromNullishOr(DefaultTaggedClass(MessageSlot)),
+          )(result).pipe(catchSchemaErrorAsValidationError);
+
+          if (Option.isNone(messageSlot)) {
+            return yield* Effect.die(makeDBQueryError("Failed to upsert message slot data"));
+          }
+
+          return messageSlot.value;
+        },
+        (effect) => effect.pipe(Effect.withSpan("MessageSlotService.upsertMessageSlotData")),
+      );
+
+      return {
+        getMessageSlotData,
+        upsertMessageSlotData,
       };
     }),
   },

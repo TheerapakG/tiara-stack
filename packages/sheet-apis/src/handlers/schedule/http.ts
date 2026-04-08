@@ -1,5 +1,5 @@
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { Effect, Layer, Option, pipe } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { catchSchemaErrorAsValidationError } from "typhoon-core/error";
 import { hasGuildPermission, hasPermission } from "@/services/authorization";
@@ -18,22 +18,19 @@ const getSheetIdFromGuildId = (
   guildId: string,
   guildConfigService: typeof GuildConfigService.Service,
 ) =>
-  pipe(
-    guildConfigService.getGuildConfig(guildId),
-    Effect.flatMap(
-      Option.match({
-        onSome: (guildConfig) =>
-          pipe(
-            guildConfig.sheetId,
-            Option.match({
-              onSome: Effect.succeed,
-              onNone: () => Effect.die(new Error(`sheetId not found for guildId: ${guildId}`)),
-            }),
-          ),
-        onNone: () => Effect.die(new Error(`Guild config not found for guildId: ${guildId}`)),
-      }),
-    ),
-  );
+  Effect.gen(function* () {
+    const guildConfig = yield* guildConfigService.getGuildConfig(guildId);
+
+    if (Option.isNone(guildConfig)) {
+      return yield* Effect.die(new Error(`Guild config not found for guildId: ${guildId}`));
+    }
+
+    if (Option.isNone(guildConfig.value.sheetId)) {
+      return yield* Effect.die(new Error(`sheetId not found for guildId: ${guildId}`));
+    }
+
+    return guildConfig.value.sheetId.value;
+  });
 
 export const scheduleLayer = HttpApiBuilder.group(
   Api,
@@ -56,11 +53,11 @@ export const scheduleLayer = HttpApiBuilder.group(
                 query.guildId,
                 query.view,
               );
-              return yield* (
-                view === "monitor"
-                  ? scheduleService.getAllPopulatedSchedules(sheetId)
-                  : scheduleService.getAllPopulatedFillerSchedules(sheetId)
-              ).pipe(Effect.map((schedules) => ({ schedules, view })));
+              const schedules = yield* view === "monitor"
+                ? scheduleService.getAllPopulatedSchedules(sheetId)
+                : scheduleService.getAllPopulatedFillerSchedules(sheetId);
+
+              return { schedules, view };
             }),
           )
           .pipe(catchSchemaErrorAsValidationError),
@@ -77,11 +74,11 @@ export const scheduleLayer = HttpApiBuilder.group(
                 query.guildId,
                 query.view,
               );
-              return yield* (
-                view === "monitor"
-                  ? scheduleService.getDayPopulatedSchedules(sheetId, query.day)
-                  : scheduleService.getDayPopulatedFillerSchedules(sheetId, query.day)
-              ).pipe(Effect.map((schedules) => ({ schedules, view })));
+              const schedules = yield* view === "monitor"
+                ? scheduleService.getDayPopulatedSchedules(sheetId, query.day)
+                : scheduleService.getDayPopulatedFillerSchedules(sheetId, query.day);
+
+              return { schedules, view };
             }),
           )
           .pipe(catchSchemaErrorAsValidationError),
@@ -98,11 +95,11 @@ export const scheduleLayer = HttpApiBuilder.group(
                 query.guildId,
                 query.view,
               );
-              return yield* (
-                view === "monitor"
-                  ? scheduleService.getChannelPopulatedSchedules(sheetId, query.channel)
-                  : scheduleService.getChannelPopulatedFillerSchedules(sheetId, query.channel)
-              ).pipe(Effect.map((schedules) => ({ schedules, view })));
+              const schedules = yield* view === "monitor"
+                ? scheduleService.getChannelPopulatedSchedules(sheetId, query.channel)
+                : scheduleService.getChannelPopulatedFillerSchedules(sheetId, query.channel);
+
+              return { schedules, view };
             }),
           )
           .pipe(catchSchemaErrorAsValidationError),
@@ -119,29 +116,26 @@ export const scheduleLayer = HttpApiBuilder.group(
                 query.view,
               );
 
-              return yield* (
-                resolvedUser.accountId === query.accountId ||
-                hasPermission(resolvedUser.permissions, "bot") ||
-                hasPermission(resolvedUser.permissions, "app_owner") ||
-                hasGuildPermission(resolvedUser.permissions, "monitor_guild", query.guildId)
-                  ? Effect.void
-                  : Effect.fail(
-                      new Unauthorized({ message: "User does not have access to this user" }),
-                    )
-              ).pipe(
-                Effect.andThen(getSheetIdFromGuildId(query.guildId, guildConfigService)),
-                Effect.flatMap((sheetId) =>
-                  (view === "monitor"
-                    ? scheduleService.getDayPopulatedSchedules(sheetId, query.day)
-                    : scheduleService.getDayPopulatedFillerSchedules(sheetId, query.day)
-                  ).pipe(
-                    Effect.map((schedules) => ({
-                      view,
-                      schedule: summarizeDayPlayerSchedule(schedules, query.accountId),
-                    })),
-                  ),
-                ),
-              );
+              if (
+                resolvedUser.accountId !== query.accountId &&
+                !hasPermission(resolvedUser.permissions, "bot") &&
+                !hasPermission(resolvedUser.permissions, "app_owner") &&
+                !hasGuildPermission(resolvedUser.permissions, "monitor_guild", query.guildId)
+              ) {
+                return yield* Effect.fail(
+                  new Unauthorized({ message: "User does not have access to this user" }),
+                );
+              }
+
+              const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+              const schedules = yield* view === "monitor"
+                ? scheduleService.getDayPopulatedSchedules(sheetId, query.day)
+                : scheduleService.getDayPopulatedFillerSchedules(sheetId, query.day);
+
+              return {
+                view,
+                schedule: summarizeDayPlayerSchedule(schedules, query.accountId),
+              };
             }),
           )
           .pipe(catchSchemaErrorAsValidationError),

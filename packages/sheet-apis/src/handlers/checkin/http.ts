@@ -16,9 +16,10 @@ export const checkinLayer = HttpApiBuilder.group(
       authorizationService
         .provideCurrentGuildUser(
           payload.guildId,
-          authorizationService
-            .requireMonitorGuild(payload.guildId)
-            .pipe(Effect.andThen(checkinService.generate(payload))),
+          Effect.gen(function* () {
+            yield* authorizationService.requireMonitorGuild(payload.guildId);
+            return yield* checkinService.generate(payload);
+          }),
         )
         .pipe(catchSchemaErrorAsValidationError),
     );

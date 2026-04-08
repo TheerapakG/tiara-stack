@@ -1,6 +1,6 @@
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 
-import { Effect, Layer, Option, pipe } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { catchSchemaErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
 import { GuildConfigService } from "@/services";
@@ -16,35 +16,27 @@ export const guildConfigLayer = HttpApiBuilder.group(
 
     return handlers
       .handle("getAutoCheckinGuilds", () =>
-        authorizationService
-          .requireBot()
-          .pipe(
-            Effect.andThen(guildConfigService.getAutoCheckinGuilds()),
-            catchSchemaErrorAsValidationError,
-          ),
+        Effect.gen(function* () {
+          yield* authorizationService.requireBot();
+          return yield* guildConfigService.getAutoCheckinGuilds();
+        }).pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getGuildConfig", ({ query }) =>
         authorizationService
           .provideCurrentGuildUser(
             query.guildId,
-            authorizationService.requireManageGuild(query.guildId).pipe(
-              Effect.andThen(
-                pipe(
-                  guildConfigService.getGuildConfig(query.guildId),
-                  Effect.flatMap(
-                    Option.match({
-                      onSome: (config) => Effect.succeed(config),
-                      onNone: () =>
-                        Effect.fail(
-                          makeArgumentError(
-                            "Cannot get guild config, the guild might not be registered",
-                          ),
-                        ),
-                    }),
-                  ),
-                ),
-              ),
-            ),
+            Effect.gen(function* () {
+              yield* authorizationService.requireManageGuild(query.guildId);
+              const config = yield* guildConfigService.getGuildConfig(query.guildId);
+
+              if (Option.isNone(config)) {
+                return yield* Effect.fail(
+                  makeArgumentError("Cannot get guild config, the guild might not be registered"),
+                );
+              }
+
+              return config.value;
+            }),
           )
           .pipe(catchSchemaErrorAsValidationError),
       )
@@ -52,13 +44,10 @@ export const guildConfigLayer = HttpApiBuilder.group(
         authorizationService
           .provideCurrentGuildUser(
             payload.guildId,
-            authorizationService
-              .requireManageGuild(payload.guildId)
-              .pipe(
-                Effect.andThen(
-                  guildConfigService.upsertGuildConfig(payload.guildId, payload.config),
-                ),
-              ),
+            Effect.gen(function* () {
+              yield* authorizationService.requireManageGuild(payload.guildId);
+              return yield* guildConfigService.upsertGuildConfig(payload.guildId, payload.config);
+            }),
           )
           .pipe(catchSchemaErrorAsValidationError),
       )
@@ -79,13 +68,10 @@ export const guildConfigLayer = HttpApiBuilder.group(
         authorizationService
           .provideCurrentGuildUser(
             payload.guildId,
-            authorizationService
-              .requireManageGuild(payload.guildId)
-              .pipe(
-                Effect.andThen(
-                  guildConfigService.addGuildMonitorRole(payload.guildId, payload.roleId),
-                ),
-              ),
+            Effect.gen(function* () {
+              yield* authorizationService.requireManageGuild(payload.guildId);
+              return yield* guildConfigService.addGuildMonitorRole(payload.guildId, payload.roleId);
+            }),
           )
           .pipe(catchSchemaErrorAsValidationError),
       )
@@ -93,13 +79,13 @@ export const guildConfigLayer = HttpApiBuilder.group(
         authorizationService
           .provideCurrentGuildUser(
             payload.guildId,
-            authorizationService
-              .requireManageGuild(payload.guildId)
-              .pipe(
-                Effect.andThen(
-                  guildConfigService.removeGuildMonitorRole(payload.guildId, payload.roleId),
-                ),
-              ),
+            Effect.gen(function* () {
+              yield* authorizationService.requireManageGuild(payload.guildId);
+              return yield* guildConfigService.removeGuildMonitorRole(
+                payload.guildId,
+                payload.roleId,
+              );
+            }),
           )
           .pipe(catchSchemaErrorAsValidationError),
       )
@@ -107,63 +93,58 @@ export const guildConfigLayer = HttpApiBuilder.group(
         authorizationService
           .provideCurrentGuildUser(
             payload.guildId,
-            authorizationService
-              .requireManageGuild(payload.guildId)
-              .pipe(
-                Effect.andThen(
-                  guildConfigService.upsertGuildChannelConfig(
-                    payload.guildId,
-                    payload.channelId,
-                    payload.config,
-                  ),
-                ),
-              ),
+            Effect.gen(function* () {
+              yield* authorizationService.requireManageGuild(payload.guildId);
+              return yield* guildConfigService.upsertGuildChannelConfig(
+                payload.guildId,
+                payload.channelId,
+                payload.config,
+              );
+            }),
           )
           .pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getGuildChannelById", ({ query }) =>
-        pipe(
-          guildConfigService.getGuildChannelById({
+        Effect.gen(function* () {
+          const config = yield* guildConfigService.getGuildChannelById({
             guildId: query.guildId,
             channelId: query.channelId,
             running: query.running,
-          }),
-          Effect.flatMap(
-            Option.match({
-              onSome: (config) => Effect.succeed(config),
-              onNone: () =>
-                Effect.fail(
-                  makeArgumentError(
-                    typeof query.running === "undefined"
-                      ? "Cannot get channel by id, the guild or the channel id might not be registered"
-                      : "Cannot get channel by id, the guild or the channel id might not be registered or does not match the specified running status",
-                  ),
-                ),
-            }),
-          ),
-        ).pipe(catchSchemaErrorAsValidationError),
+          });
+
+          if (Option.isNone(config)) {
+            return yield* Effect.fail(
+              makeArgumentError(
+                typeof query.running === "undefined"
+                  ? "Cannot get channel by id, the guild or the channel id might not be registered"
+                  : "Cannot get channel by id, the guild or the channel id might not be registered or does not match the specified running status",
+              ),
+            );
+          }
+
+          return config.value;
+        }).pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getGuildChannelByName", ({ query }) =>
-        pipe(
-          guildConfigService.getGuildChannelByName({
+        Effect.gen(function* () {
+          const config = yield* guildConfigService.getGuildChannelByName({
             guildId: query.guildId,
             channelName: query.channelName,
             running: query.running,
-          }),
-          Effect.flatMap(
-            Option.match({
-              onSome: (config) => Effect.succeed(config),
-              onNone: () =>
-                Effect.fail(
-                  makeArgumentError(
-                    typeof query.running === "undefined"
-                      ? "Cannot get channel by name, the guild or the channel name might not be registered"
-                      : "Cannot get channel by name, the guild or the channel name might not be registered or does not match the specified running status",
-                  ),
-                ),
-            }),
-          ),
-        ).pipe(catchSchemaErrorAsValidationError),
+          });
+
+          if (Option.isNone(config)) {
+            return yield* Effect.fail(
+              makeArgumentError(
+                typeof query.running === "undefined"
+                  ? "Cannot get channel by name, the guild or the channel name might not be registered"
+                  : "Cannot get channel by name, the guild or the channel name might not be registered or does not match the specified running status",
+              ),
+            );
+          }
+
+          return config.value;
+        }).pipe(catchSchemaErrorAsValidationError),
       );
   }),
 ).pipe(

@@ -1,7 +1,7 @@
 import { GuildsApiCacheView } from "dfx-discord-utils/discord/cache/guilds";
 import { HttpServerRequest } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { Effect, Layer, pipe, Redacted, Schema } from "effect";
+import { Effect, Layer, Redacted, Schema } from "effect";
 import { getDiscordAccessToken } from "sheet-auth/client";
 import { catchSchemaErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
 import { Api } from "@/api";
@@ -31,8 +31,7 @@ export const discordLayer = HttpApiBuilder.group(
           if (typeof headers.origin === "string") authHeaders.origin = headers.origin;
           if (typeof headers.cookie === "string") authHeaders.cookie = headers.cookie;
 
-          const tokenResult = yield* pipe(
-            getDiscordAccessToken(authClient, authHeaders),
+          const tokenResult = yield* getDiscordAccessToken(authClient, authHeaders).pipe(
             Effect.mapError((error) =>
               makeArgumentError(
                 `Failed to get Discord access token: ${error.message}. ` +
@@ -41,22 +40,18 @@ export const discordLayer = HttpApiBuilder.group(
             ),
           );
 
-          const discordResponse = yield* pipe(
-            Effect.promise(() =>
-              fetch("https://discord.com/api/v10/users/@me", {
-                headers: {
-                  Authorization: `Bearer ${Redacted.value(tokenResult.accessToken)}`,
-                },
-              }),
-            ),
-            Effect.flatMap((response) =>
-              response.ok
-                ? Effect.succeed(response)
-                : Effect.fail(
-                    makeArgumentError(`Failed to fetch Discord user: ${response.statusText}`),
-                  ),
-            ),
+          const discordResponse = yield* Effect.promise(() =>
+            fetch("https://discord.com/api/v10/users/@me", {
+              headers: {
+                Authorization: `Bearer ${Redacted.value(tokenResult.accessToken)}`,
+              },
+            }),
           );
+          if (!discordResponse.ok) {
+            return yield* Effect.fail(
+              makeArgumentError(`Failed to fetch Discord user: ${discordResponse.statusText}`),
+            );
+          }
 
           const json = yield* Effect.tryPromise({
             try: () => discordResponse.json(),
@@ -81,8 +76,7 @@ export const discordLayer = HttpApiBuilder.group(
           if (typeof headers.origin === "string") authHeaders.origin = headers.origin;
           if (typeof headers.cookie === "string") authHeaders.cookie = headers.cookie;
 
-          const tokenResult = yield* pipe(
-            getDiscordAccessToken(authClient, authHeaders),
+          const tokenResult = yield* getDiscordAccessToken(authClient, authHeaders).pipe(
             Effect.mapError((error) =>
               makeArgumentError(
                 `Failed to get Discord access token: ${error.message}. ` +
@@ -91,22 +85,18 @@ export const discordLayer = HttpApiBuilder.group(
             ),
           );
 
-          const discordResponse = yield* pipe(
-            Effect.promise(() =>
-              fetch("https://discord.com/api/v10/users/@me/guilds", {
-                headers: {
-                  Authorization: `Bearer ${Redacted.value(tokenResult.accessToken)}`,
-                },
-              }),
-            ),
-            Effect.flatMap((response) =>
-              response.ok
-                ? Effect.succeed(response)
-                : Effect.fail(
-                    makeArgumentError(`Failed to fetch Discord guilds: ${response.statusText}`),
-                  ),
-            ),
+          const discordResponse = yield* Effect.promise(() =>
+            fetch("https://discord.com/api/v10/users/@me/guilds", {
+              headers: {
+                Authorization: `Bearer ${Redacted.value(tokenResult.accessToken)}`,
+              },
+            }),
           );
+          if (!discordResponse.ok) {
+            return yield* Effect.fail(
+              makeArgumentError(`Failed to fetch Discord guilds: ${discordResponse.statusText}`),
+            );
+          }
 
           const json = yield* Effect.tryPromise({
             try: () => discordResponse.json(),
@@ -125,8 +115,7 @@ export const discordLayer = HttpApiBuilder.group(
           const maybeGuilds = yield* Effect.forEach(
             userGuilds,
             ({ id }) =>
-              pipe(
-                guildsCache.get(id),
+              guildsCache.get(id).pipe(
                 Effect.matchEffect({
                   onSuccess: (guild) => Effect.succeed(guild),
                   onFailure: () => Effect.succeed(null),

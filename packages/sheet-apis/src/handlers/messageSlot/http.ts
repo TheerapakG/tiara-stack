@@ -18,67 +18,71 @@ export const denyLegacyMessageSlotAccess = () =>
 
 type MessageSlotAccessService = Pick<typeof MessageSlotService.Service, "getMessageSlotData">;
 
-const getRequiredMessageSlotRecord = (
-  messageSlotService: MessageSlotAccessService,
-  messageId: string,
-) =>
-  messageSlotService.getMessageSlotData(messageId).pipe(
-    Effect.flatMap(
-      Option.match({
-        onSome: Effect.succeed,
-        onNone: () => Effect.fail(missingMessageSlotError()),
-      }),
-    ),
-  );
+const getRequiredMessageSlotRecord = Effect.fn("messageSlot.getRequiredMessageSlotRecord")(
+  function* (messageSlotService: MessageSlotAccessService, messageId: string) {
+    const record = yield* messageSlotService.getMessageSlotData(messageId);
 
-export const requireMessageSlotUpsertAccess = (
+    if (Option.isNone(record)) {
+      return yield* Effect.fail(missingMessageSlotError());
+    }
+
+    return record.value;
+  },
+);
+
+export const requireMessageSlotUpsertAccess = Effect.fn(
+  "messageSlot.requireMessageSlotUpsertAccess",
+)(function* (
   authorizationService: typeof AuthorizationService.Service,
   messageSlotService: MessageSlotAccessService,
   messageId: string,
   guildId?: string,
-) =>
-  messageSlotService.getMessageSlotData(messageId).pipe(
-    Effect.flatMap(
-      Option.match({
-        onNone: () =>
-          typeof guildId === "string"
-            ? authorizationService.provideCurrentGuildUser(
-                guildId,
-                authorizationService.requireMonitorGuild(guildId),
-              )
-            : denyLegacyMessageSlotAccess(),
-        onSome: (record) =>
-          Option.match(getModernMessageGuildId(record), {
-            onSome: (resolvedGuildId) =>
-              authorizationService.provideCurrentGuildUser(
-                resolvedGuildId,
-                authorizationService.requireMonitorGuild(resolvedGuildId),
-              ),
-            onNone: denyLegacyMessageSlotAccess,
-          }),
-      }),
-    ),
-  );
+) {
+  const existingRecord = yield* messageSlotService.getMessageSlotData(messageId);
 
-export const requireMessageSlotReadAccess = (
-  authorizationService: typeof AuthorizationService.Service,
-  messageSlotService: MessageSlotAccessService,
-  messageId: string,
-) =>
-  getRequiredMessageSlotRecord(messageSlotService, messageId).pipe(
-    Effect.flatMap((record) =>
-      Option.match(getModernMessageGuildId(record), {
-        onSome: (guildId) =>
-          authorizationService.provideCurrentGuildUser(
-            guildId,
-            authorizationService
-              .requireGuildMember(guildId)
-              .pipe(Effect.andThen(Effect.succeed(record))),
-          ),
-        onNone: denyLegacyMessageSlotAccess,
-      }),
-    ),
+  if (Option.isNone(existingRecord)) {
+    if (typeof guildId === "string") {
+      return yield* authorizationService.provideCurrentGuildUser(
+        guildId,
+        authorizationService.requireMonitorGuild(guildId),
+      );
+    }
+
+    return yield* denyLegacyMessageSlotAccess();
+  }
+
+  const resolvedGuildId = getModernMessageGuildId(existingRecord.value);
+  if (Option.isNone(resolvedGuildId)) {
+    return yield* denyLegacyMessageSlotAccess();
+  }
+
+  return yield* authorizationService.provideCurrentGuildUser(
+    resolvedGuildId.value,
+    authorizationService.requireMonitorGuild(resolvedGuildId.value),
   );
+});
+
+export const requireMessageSlotReadAccess = Effect.fn("messageSlot.requireMessageSlotReadAccess")(
+  function* (
+    authorizationService: typeof AuthorizationService.Service,
+    messageSlotService: MessageSlotAccessService,
+    messageId: string,
+  ) {
+    const record = yield* getRequiredMessageSlotRecord(messageSlotService, messageId);
+    const guildId = getModernMessageGuildId(record);
+
+    if (Option.isNone(guildId)) {
+      return yield* denyLegacyMessageSlotAccess();
+    }
+
+    yield* authorizationService.provideCurrentGuildUser(
+      guildId.value,
+      authorizationService.requireGuildMember(guildId.value),
+    );
+
+    return record;
+  },
+);
 
 export const messageSlotLayer = HttpApiBuilder.group(
   Api,
@@ -96,18 +100,16 @@ export const messageSlotLayer = HttpApiBuilder.group(
         ).pipe(catchSchemaErrorAsValidationError),
       )
       .handle("upsertMessageSlotData", ({ payload }) =>
-        requireMessageSlotUpsertAccess(
-          authorizationService,
-          messageSlotService,
-          payload.messageId,
-          typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
-        )
-          .pipe(
-            Effect.andThen(
-              messageSlotService.upsertMessageSlotData(payload.messageId, payload.data),
-            ),
-          )
-          .pipe(catchSchemaErrorAsValidationError),
+        Effect.gen(function* () {
+          yield* requireMessageSlotUpsertAccess(
+            authorizationService,
+            messageSlotService,
+            payload.messageId,
+            typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
+          );
+
+          return yield* messageSlotService.upsertMessageSlotData(payload.messageId, payload.data);
+        }).pipe(catchSchemaErrorAsValidationError),
       );
   }),
 ).pipe(

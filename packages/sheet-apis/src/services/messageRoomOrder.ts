@@ -15,65 +15,83 @@ export class MessageRoomOrderService extends ServiceMap.Service<MessageRoomOrder
     make: Effect.gen(function* () {
       const zeroService = yield* ZeroService;
 
-      return {
-        getMessageRoomOrder: (messageId: string) =>
-          pipe(
-            zeroService.run(queries.messageRoomOrder.getMessageRoomOrder({ messageId }), {
+      const getMessageRoomOrder = Effect.fn("MessageRoomOrderService.getMessageRoomOrder")(
+        function* (messageId: string) {
+          const result = yield* zeroService.run(
+            queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
+            {
               type: "complete",
-            }),
-            Effect.flatMap(
-              Schema.decodeEffect(Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder))),
-            ),
-            catchSchemaErrorAsValidationError,
-            Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder"),
-          ),
-        decrementMessageRoomOrderRank: (messageId: string) =>
-          pipe(
-            zeroService.mutate(
-              mutators.messageRoomOrder.decrementMessageRoomOrderRank({ messageId }),
-            ),
-            Effect.andThen((mutation) => mutation.server()),
-            Effect.andThen(
-              zeroService.run(queries.messageRoomOrder.getMessageRoomOrder({ messageId }), {
-                type: "complete",
-              }),
-            ),
-            Effect.flatMap(
-              Schema.decodeEffect(Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder))),
-            ),
-            catchSchemaErrorAsValidationError,
-            Effect.flatMap(
-              Option.match({
-                onSome: Effect.succeed,
-                onNone: () => Effect.die(makeDBQueryError("Failed to decrement room order rank")),
-              }),
-            ),
-            Effect.withSpan("MessageRoomOrderService.decrementMessageRoomOrderRank"),
-          ),
-        incrementMessageRoomOrderRank: (messageId: string) =>
-          pipe(
-            zeroService.mutate(
-              mutators.messageRoomOrder.incrementMessageRoomOrderRank({ messageId }),
-            ),
-            Effect.andThen((mutation) => mutation.server()),
-            Effect.andThen(
-              zeroService.run(queries.messageRoomOrder.getMessageRoomOrder({ messageId }), {
-                type: "complete",
-              }),
-            ),
-            Effect.flatMap(
-              Schema.decodeEffect(Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder))),
-            ),
-            catchSchemaErrorAsValidationError,
-            Effect.flatMap(
-              Option.match({
-                onSome: Effect.succeed,
-                onNone: () => Effect.die(makeDBQueryError("Failed to increment room order rank")),
-              }),
-            ),
-            Effect.withSpan("MessageRoomOrderService.incrementMessageRoomOrderRank"),
-          ),
-        upsertMessageRoomOrder: (
+            },
+          );
+
+          return yield* Schema.decodeEffect(
+            Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder)),
+          )(result);
+        },
+        (effect) => effect.pipe(catchSchemaErrorAsValidationError),
+        (effect) => effect.pipe(Effect.withSpan("MessageRoomOrderService.getMessageRoomOrder")),
+      );
+
+      const decrementMessageRoomOrderRank = Effect.fn(
+        "MessageRoomOrderService.decrementMessageRoomOrderRank",
+      )(
+        function* (messageId: string) {
+          const mutation = yield* zeroService.mutate(
+            mutators.messageRoomOrder.decrementMessageRoomOrderRank({ messageId }),
+          );
+          yield* mutation.server();
+
+          const result = yield* zeroService.run(
+            queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
+            {
+              type: "complete",
+            },
+          );
+          const roomOrder = yield* Schema.decodeEffect(
+            Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder)),
+          )(result).pipe(catchSchemaErrorAsValidationError);
+
+          if (Option.isNone(roomOrder)) {
+            return yield* Effect.die(makeDBQueryError("Failed to decrement room order rank"));
+          }
+
+          return roomOrder.value;
+        },
+        (effect) =>
+          effect.pipe(Effect.withSpan("MessageRoomOrderService.decrementMessageRoomOrderRank")),
+      );
+
+      const incrementMessageRoomOrderRank = Effect.fn(
+        "MessageRoomOrderService.incrementMessageRoomOrderRank",
+      )(
+        function* (messageId: string) {
+          const mutation = yield* zeroService.mutate(
+            mutators.messageRoomOrder.incrementMessageRoomOrderRank({ messageId }),
+          );
+          yield* mutation.server();
+
+          const result = yield* zeroService.run(
+            queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
+            {
+              type: "complete",
+            },
+          );
+          const roomOrder = yield* Schema.decodeEffect(
+            Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder)),
+          )(result).pipe(catchSchemaErrorAsValidationError);
+
+          if (Option.isNone(roomOrder)) {
+            return yield* Effect.die(makeDBQueryError("Failed to increment room order rank"));
+          }
+
+          return roomOrder.value;
+        },
+        (effect) =>
+          effect.pipe(Effect.withSpan("MessageRoomOrderService.incrementMessageRoomOrderRank")),
+      );
+
+      const upsertMessageRoomOrder = Effect.fn("MessageRoomOrderService.upsertMessageRoomOrder")(
+        function* (
           messageId: string,
           data: {
             previousFills: readonly string[];
@@ -85,87 +103,100 @@ export class MessageRoomOrderService extends ServiceMap.Service<MessageRoomOrder
             messageChannelId: string | null;
             createdByUserId: string | null;
           },
-        ) =>
-          pipe(
-            zeroService.mutate(
-              mutators.messageRoomOrder.upsertMessageRoomOrder({
-                messageId,
-                previousFills: data.previousFills,
-                fills: data.fills,
-                hour: data.hour,
-                rank: data.rank,
-                monitor: data.monitor,
-                guildId: data.guildId,
-                messageChannelId: data.messageChannelId,
-                createdByUserId: data.createdByUserId,
-              }),
-            ),
-            Effect.andThen((mutation) => mutation.server()),
-            Effect.andThen(
-              zeroService.run(queries.messageRoomOrder.getMessageRoomOrder({ messageId }), {
-                type: "complete",
-              }),
-            ),
-            Effect.flatMap(
-              Schema.decodeEffect(Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder))),
-            ),
-            catchSchemaErrorAsValidationError,
-            Effect.flatMap(
-              Option.match({
-                onSome: Effect.succeed,
-                onNone: () => Effect.die(makeDBQueryError("Failed to upsert message room order")),
-              }),
-            ),
-            Effect.withSpan("MessageRoomOrderService.upsertMessageRoomOrder"),
-          ),
-        getMessageRoomOrderEntry: (messageId: string, rank: number) =>
-          pipe(
-            zeroService.run(
-              queries.messageRoomOrder.getMessageRoomOrderEntry({ messageId, rank }),
-              { type: "complete" },
-            ),
-            Effect.flatMap(
-              Schema.decodeEffect(Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry))),
-            ),
-            catchSchemaErrorAsValidationError,
-            Effect.withSpan("MessageRoomOrderService.getMessageRoomOrderEntry"),
-          ),
-        getMessageRoomOrderRange: (messageId: string) =>
-          pipe(
-            zeroService.run(queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }), {
-              type: "complete",
+        ) {
+          const mutation = yield* zeroService.mutate(
+            mutators.messageRoomOrder.upsertMessageRoomOrder({
+              messageId,
+              previousFills: data.previousFills,
+              fills: data.fills,
+              hour: data.hour,
+              rank: data.rank,
+              monitor: data.monitor,
+              guildId: data.guildId,
+              messageChannelId: data.messageChannelId,
+              createdByUserId: data.createdByUserId,
             }),
-            Effect.flatMap(
-              Schema.decodeEffect(Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry))),
-            ),
-            Effect.map((entries: readonly MessageRoomOrderEntry[]) =>
-              pipe(
-                entries,
-                Array.match({
-                  onEmpty: () => Option.none<MessageRoomOrderRange>(),
-                  onNonEmpty: ([head, ...tail]) => {
-                    const { minRank, maxRank } = pipe(
-                      tail,
-                      Array.reduce(
-                        {
-                          minRank: head.rank,
-                          maxRank: head.rank,
-                        },
-                        (acc, entry) => ({
-                          minRank: Math.min(acc.minRank, entry.rank),
-                          maxRank: Math.max(acc.maxRank, entry.rank),
-                        }),
-                      ),
-                    );
-                    return Option.some(MessageRoomOrderRange.makeUnsafe({ minRank, maxRank }));
+          );
+          yield* mutation.server();
+
+          const result = yield* zeroService.run(
+            queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
+            {
+              type: "complete",
+            },
+          );
+          const roomOrder = yield* Schema.decodeEffect(
+            Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder)),
+          )(result).pipe(catchSchemaErrorAsValidationError);
+
+          if (Option.isNone(roomOrder)) {
+            return yield* Effect.die(makeDBQueryError("Failed to upsert message room order"));
+          }
+
+          return roomOrder.value;
+        },
+        (effect) => effect.pipe(Effect.withSpan("MessageRoomOrderService.upsertMessageRoomOrder")),
+      );
+
+      const getMessageRoomOrderEntry = Effect.fn(
+        "MessageRoomOrderService.getMessageRoomOrderEntry",
+      )(
+        function* (messageId: string, rank: number) {
+          const result = yield* zeroService.run(
+            queries.messageRoomOrder.getMessageRoomOrderEntry({ messageId, rank }),
+            { type: "complete" },
+          );
+
+          return yield* Schema.decodeEffect(
+            Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)),
+          )(result);
+        },
+        (effect) => effect.pipe(catchSchemaErrorAsValidationError),
+        (effect) =>
+          effect.pipe(Effect.withSpan("MessageRoomOrderService.getMessageRoomOrderEntry")),
+      );
+
+      const getMessageRoomOrderRange = Effect.fn(
+        "MessageRoomOrderService.getMessageRoomOrderRange",
+      )(
+        function* (messageId: string) {
+          const result = yield* zeroService.run(
+            queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }),
+            { type: "complete" },
+          );
+          const entries = yield* Schema.decodeEffect(
+            Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)),
+          )(result);
+
+          return Array.match(entries, {
+            onEmpty: () => Option.none<MessageRoomOrderRange>(),
+            onNonEmpty: ([head, ...tail]) => {
+              const { minRank, maxRank } = pipe(
+                tail,
+                Array.reduce(
+                  {
+                    minRank: head.rank,
+                    maxRank: head.rank,
                   },
-                }),
-              ),
-            ),
-            catchSchemaErrorAsValidationError,
-            Effect.withSpan("MessageRoomOrderService.getMessageRoomOrderRange"),
-          ),
-        upsertMessageRoomOrderEntry: (
+                  (acc, entry) => ({
+                    minRank: Math.min(acc.minRank, entry.rank),
+                    maxRank: Math.max(acc.maxRank, entry.rank),
+                  }),
+                ),
+              );
+              return Option.some(MessageRoomOrderRange.makeUnsafe({ minRank, maxRank }));
+            },
+          });
+        },
+        (effect) => effect.pipe(catchSchemaErrorAsValidationError),
+        (effect) =>
+          effect.pipe(Effect.withSpan("MessageRoomOrderService.getMessageRoomOrderRange")),
+      );
+
+      const upsertMessageRoomOrderEntry = Effect.fn(
+        "MessageRoomOrderService.upsertMessageRoomOrderEntry",
+      )(
+        function* (
           messageId: string,
           entries: readonly {
             rank: number;
@@ -175,80 +206,88 @@ export class MessageRoomOrderService extends ServiceMap.Service<MessageRoomOrder
             tags: readonly string[];
             effectValue: number;
           }[],
-        ) =>
-          pipe(
-            zeroService.mutate(
-              mutators.messageRoomOrder.upsertMessageRoomOrderEntry({ messageId, entries }),
-            ),
-            Effect.andThen((mutation) => mutation.server()),
-            Effect.andThen(
-              zeroService.run(queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }), {
-                type: "complete",
-              }),
-            ),
-            Effect.flatMap(
-              Schema.decodeEffect(Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry))),
-            ),
-            Effect.map((entries: readonly MessageRoomOrderEntry[]) =>
-              pipe(
-                entries,
-                Array.map((entry) =>
-                  MessageRoomOrderEntry.makeUnsafe({
-                    messageId,
-                    rank: entry.rank,
-                    position: entry.position,
-                    team: entry.team,
-                    tags: entry.tags,
-                    effectValue: entry.effectValue,
-                    createdAt: entry.createdAt,
-                    updatedAt: entry.updatedAt,
-                    deletedAt: entry.deletedAt,
-                  }),
-                ),
-              ),
-            ),
-            catchSchemaErrorAsValidationError,
-            Effect.withSpan("MessageRoomOrderService.upsertMessageRoomOrderEntry"),
-          ),
-        removeMessageRoomOrderEntry: (messageId: string) =>
-          pipe(
-            zeroService.mutate(
-              mutators.messageRoomOrder.removeMessageRoomOrderEntry({
-                messageId,
-                rank: 0,
-                position: 0,
-              }),
-            ),
-            Effect.andThen((mutation) => mutation.server()),
-            Effect.andThen(
-              zeroService.run(queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }), {
-                type: "complete",
-              }),
-            ),
-            Effect.flatMap(
-              Schema.decodeEffect(Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry))),
-            ),
-            Effect.map((entries: readonly MessageRoomOrderEntry[]) =>
-              pipe(
-                entries,
-                Array.map((entry) =>
-                  MessageRoomOrderEntry.makeUnsafe({
-                    messageId,
-                    rank: entry.rank,
-                    position: entry.position,
-                    team: entry.team,
-                    tags: entry.tags,
-                    effectValue: entry.effectValue,
-                    createdAt: entry.createdAt,
-                    updatedAt: entry.updatedAt,
-                    deletedAt: entry.deletedAt,
-                  }),
-                ),
-              ),
-            ),
-            catchSchemaErrorAsValidationError,
-            Effect.withSpan("MessageRoomOrderService.removeMessageRoomOrderEntry"),
-          ),
+        ) {
+          const mutation = yield* zeroService.mutate(
+            mutators.messageRoomOrder.upsertMessageRoomOrderEntry({ messageId, entries }),
+          );
+          yield* mutation.server();
+
+          const result = yield* zeroService.run(
+            queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }),
+            { type: "complete" },
+          );
+          const updatedEntries = yield* Schema.decodeEffect(
+            Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)),
+          )(result);
+
+          return updatedEntries.map((entry) =>
+            MessageRoomOrderEntry.makeUnsafe({
+              messageId,
+              rank: entry.rank,
+              position: entry.position,
+              team: entry.team,
+              tags: entry.tags,
+              effectValue: entry.effectValue,
+              createdAt: entry.createdAt,
+              updatedAt: entry.updatedAt,
+              deletedAt: entry.deletedAt,
+            }),
+          );
+        },
+        (effect) => effect.pipe(catchSchemaErrorAsValidationError),
+        (effect) =>
+          effect.pipe(Effect.withSpan("MessageRoomOrderService.upsertMessageRoomOrderEntry")),
+      );
+
+      const removeMessageRoomOrderEntry = Effect.fn(
+        "MessageRoomOrderService.removeMessageRoomOrderEntry",
+      )(
+        function* (messageId: string) {
+          const mutation = yield* zeroService.mutate(
+            mutators.messageRoomOrder.removeMessageRoomOrderEntry({
+              messageId,
+              rank: 0,
+              position: 0,
+            }),
+          );
+          yield* mutation.server();
+
+          const result = yield* zeroService.run(
+            queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }),
+            { type: "complete" },
+          );
+          const updatedEntries = yield* Schema.decodeEffect(
+            Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)),
+          )(result);
+
+          return updatedEntries.map((entry) =>
+            MessageRoomOrderEntry.makeUnsafe({
+              messageId,
+              rank: entry.rank,
+              position: entry.position,
+              team: entry.team,
+              tags: entry.tags,
+              effectValue: entry.effectValue,
+              createdAt: entry.createdAt,
+              updatedAt: entry.updatedAt,
+              deletedAt: entry.deletedAt,
+            }),
+          );
+        },
+        (effect) => effect.pipe(catchSchemaErrorAsValidationError),
+        (effect) =>
+          effect.pipe(Effect.withSpan("MessageRoomOrderService.removeMessageRoomOrderEntry")),
+      );
+
+      return {
+        getMessageRoomOrder,
+        decrementMessageRoomOrderRank,
+        incrementMessageRoomOrderRank,
+        upsertMessageRoomOrder,
+        getMessageRoomOrderEntry,
+        getMessageRoomOrderRange,
+        upsertMessageRoomOrderEntry,
+        removeMessageRoomOrderEntry,
       };
     }),
   },

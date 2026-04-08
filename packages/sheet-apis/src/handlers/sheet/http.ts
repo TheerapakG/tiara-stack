@@ -1,5 +1,5 @@
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { Effect, Layer, Option, pipe } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { catchSchemaErrorAsValidationError } from "typhoon-core/error";
 import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
@@ -18,22 +18,19 @@ const getSheetIdFromGuildId = (
   guildId: string,
   guildConfigService: typeof GuildConfigService.Service,
 ) =>
-  pipe(
-    guildConfigService.getGuildConfig(guildId),
-    Effect.flatMap(
-      Option.match({
-        onSome: (guildConfig) =>
-          pipe(
-            guildConfig.sheetId,
-            Option.match({
-              onSome: Effect.succeed,
-              onNone: () => Effect.die(new Error(`sheetId not found for guildId: ${guildId}`)),
-            }),
-          ),
-        onNone: () => Effect.die(new Error(`Guild config not found for guildId: ${guildId}`)),
-      }),
-    ),
-  );
+  Effect.gen(function* () {
+    const guildConfig = yield* guildConfigService.getGuildConfig(guildId);
+
+    if (Option.isNone(guildConfig)) {
+      return yield* Effect.die(new Error(`Guild config not found for guildId: ${guildId}`));
+    }
+
+    if (Option.isNone(guildConfig.value.sheetId)) {
+      return yield* Effect.die(new Error(`sheetId not found for guildId: ${guildId}`));
+    }
+
+    return guildConfig.value.sheetId.value;
+  });
 
 const withScheduleHourWindows = (
   schedules: ReadonlyArray<BreakSchedule | Schedule>,
@@ -51,22 +48,22 @@ export const sheetLayer = HttpApiBuilder.group(
 
     return handlers
       .handle("getPlayers", ({ query }) =>
-        pipe(
-          getSheetIdFromGuildId(query.guildId, guildConfigService),
-          Effect.flatMap((sheetId) => sheetService.getPlayers(sheetId)),
-        ).pipe(catchSchemaErrorAsValidationError),
+        Effect.gen(function* () {
+          const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+          return yield* sheetService.getPlayers(sheetId);
+        }).pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getMonitors", ({ query }) =>
-        pipe(
-          getSheetIdFromGuildId(query.guildId, guildConfigService),
-          Effect.flatMap((sheetId) => sheetService.getMonitors(sheetId)),
-        ).pipe(catchSchemaErrorAsValidationError),
+        Effect.gen(function* () {
+          const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+          return yield* sheetService.getMonitors(sheetId);
+        }).pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getTeams", ({ query }) =>
-        pipe(
-          getSheetIdFromGuildId(query.guildId, guildConfigService),
-          Effect.flatMap((sheetId) => sheetService.getTeams(sheetId)),
-        ).pipe(catchSchemaErrorAsValidationError),
+        Effect.gen(function* () {
+          const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+          return yield* sheetService.getTeams(sheetId);
+        }).pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getAllSchedules", ({ query }) =>
         authorizationService
@@ -153,34 +150,34 @@ export const sheetLayer = HttpApiBuilder.group(
           .pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getRangesConfig", ({ query }) =>
-        pipe(
-          getSheetIdFromGuildId(query.guildId, guildConfigService),
-          Effect.flatMap((sheetId) => sheetConfigService.getRangesConfig(sheetId)),
-        ).pipe(catchSchemaErrorAsValidationError),
+        Effect.gen(function* () {
+          const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+          return yield* sheetConfigService.getRangesConfig(sheetId);
+        }).pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getTeamConfig", ({ query }) =>
-        pipe(
-          getSheetIdFromGuildId(query.guildId, guildConfigService),
-          Effect.flatMap((sheetId) => sheetConfigService.getTeamConfig(sheetId)),
-        ).pipe(catchSchemaErrorAsValidationError),
+        Effect.gen(function* () {
+          const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+          return yield* sheetConfigService.getTeamConfig(sheetId);
+        }).pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getEventConfig", ({ query }) =>
-        pipe(
-          getSheetIdFromGuildId(query.guildId, guildConfigService),
-          Effect.flatMap((sheetId) => sheetConfigService.getEventConfig(sheetId)),
-        ).pipe(catchSchemaErrorAsValidationError),
+        Effect.gen(function* () {
+          const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+          return yield* sheetConfigService.getEventConfig(sheetId);
+        }).pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getScheduleConfig", ({ query }) =>
-        pipe(
-          getSheetIdFromGuildId(query.guildId, guildConfigService),
-          Effect.flatMap((sheetId) => sheetConfigService.getScheduleConfig(sheetId)),
-        ).pipe(catchSchemaErrorAsValidationError),
+        Effect.gen(function* () {
+          const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+          return yield* sheetConfigService.getScheduleConfig(sheetId);
+        }).pipe(catchSchemaErrorAsValidationError),
       )
       .handle("getRunnerConfig", ({ query }) =>
-        pipe(
-          getSheetIdFromGuildId(query.guildId, guildConfigService),
-          Effect.flatMap((sheetId) => sheetConfigService.getRunnerConfig(sheetId)),
-        ).pipe(catchSchemaErrorAsValidationError),
+        Effect.gen(function* () {
+          const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+          return yield* sheetConfigService.getRunnerConfig(sheetId);
+        }).pipe(catchSchemaErrorAsValidationError),
       );
   }),
 ).pipe(
