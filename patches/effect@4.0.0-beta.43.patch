@@ -1,0 +1,21 @@
+diff --git a/dist/unstable/httpapi/HttpApiBuilder.js b/dist/unstable/httpapi/HttpApiBuilder.js
+index 61dc51d728c04febf386fae8fc10b2a85eb230e9..aded1053f7a8ebd31bb3c51dbd62582add4e7698 100644
+--- a/dist/unstable/httpapi/HttpApiBuilder.js
++++ b/dist/unstable/httpapi/HttpApiBuilder.js
+@@ -14,6 +14,7 @@ import * as Result from "../../Result.js";
+ import * as Schema from "../../Schema.js";
+ import * as Issue from "../../SchemaIssue.js";
+ import * as Transformation from "../../SchemaTransformation.js";
++import * as Scope from "../../Scope.js";
+ import * as ServiceMap from "../../ServiceMap.js";
+ import * as Stream from "../../Stream.js";
+ import * as UndefinedOr from "../../UndefinedOr.js";
+@@ -283,7 +284,7 @@ function handlerToHttpEffect(group, endpoint, services, handler, isRaw) {
+     }
+     const response = yield* handler(request);
+     return Response.isHttpServerResponse(response) ? response : yield* encodeSuccess(response);
+-  })).pipe(Effect.withErrorReporting, Effect.catch(error => Effect.orDie(encodeError(error))), Effect.provideServices(services));
++  })).pipe(Effect.withErrorReporting, Effect.catch(error => Effect.orDie(encodeError(error))), Effect.provideServices(ServiceMap.omit(services, Scope.Scope)));
+ }
+ function handlerToRoute(group, handler, services) {
+   const endpoint = handler.endpoint;

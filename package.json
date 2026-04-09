@@ -16,6 +16,9 @@
     "onlyBuiltDependencies": [
       "@rocicorp/zero-sqlite3",
       "better-sqlite3"
-    ]
+    ],
+    "patchedDependencies": {
+      "effect@4.0.0-beta.43": "patches/effect@4.0.0-beta.43.patch"
+    }
   }
 }

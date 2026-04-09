@@ -52,8 +52,6 @@ interface CachedEntry<Key, Value, Error> {
   readonly ownerCount: MutableRef.MutableRef<number>;
 }
 
-let globalCacheId = 0;
-
 class ScopedCacheImpl<Key, Value, Error, Environment> implements ScopedCache<
   Key,
   Value,
@@ -61,7 +59,6 @@ class ScopedCacheImpl<Key, Value, Error, Environment> implements ScopedCache<
   Environment
 > {
   readonly [ScopedCacheTypeId] = scopedCacheVariance<Key, Value, Error, Environment>();
-  readonly cacheId = ++globalCacheId;
 
   private readonly cache: MutableHashMap.MutableHashMap<
     Key,
@@ -70,26 +67,15 @@ class ScopedCacheImpl<Key, Value, Error, Environment> implements ScopedCache<
 
   constructor(
     readonly lookup: (key: Key) => Effect.Effect<Value, Error, Environment | Scope.Scope>,
-  ) {
-    console.log(`[ScopedCache #${this.cacheId}] Created`);
-  }
+  ) {}
 
   get(key: Key): Effect.Effect<Value, Error, Environment | Scope.Scope> {
-    console.log(
-      `[ScopedCache #${this.cacheId}] get(${String(key)}) called, cache size: ${MutableHashMap.size(this.cache)}`,
-    );
     return pipe(
       Effect.sync(() => MutableHashMap.get(this.cache, key)),
       Effect.flatMap(
         Option.match({
-          onSome: (deferred) => {
-            console.log(`[ScopedCache #${this.cacheId}] Cache HIT for ${String(key)}`);
-            return Effect.succeed(deferred);
-          },
-          onNone: () => {
-            console.log(`[ScopedCache #${this.cacheId}] Cache MISS for ${String(key)}`);
-            return this.startComputation(key);
-          },
+          onSome: Effect.succeed,
+          onNone: () => this.startComputation(key),
         }),
       ),
       Effect.flatMap((deferred) => this.useEntry(deferred)),
@@ -101,41 +87,27 @@ class ScopedCacheImpl<Key, Value, Error, Environment> implements ScopedCache<
   ): Effect.Effect<Value, Error, Scope.Scope> {
     return pipe(
       Deferred.await(deferred),
-      Effect.flatMap((cachedEntry) => {
-        const ownerCountBefore = MutableRef.get(cachedEntry.ownerCount);
-        console.log(
-          `[ScopedCache #${this.cacheId}] useEntry for ${String(cachedEntry.key)}, ownerCount before: ${ownerCountBefore}`,
-        );
-        return Effect.acquireRelease(
+      Effect.flatMap((cachedEntry) =>
+        Effect.acquireRelease(
           pipe(
             Effect.sync(() => MutableRef.incrementAndGet(cachedEntry.ownerCount)),
             Effect.flatMap(() => cachedEntry.exit),
           ),
-          () => {
-            const newCount = MutableRef.decrementAndGet(cachedEntry.ownerCount);
-            console.log(
-              `[ScopedCache #${this.cacheId}] Release finalizer for ${String(cachedEntry.key)}, ownerCount after: ${newCount}`,
-            );
-            return pipe(
-              Effect.sync(() => newCount),
+          () =>
+            pipe(
+              Effect.sync(() => MutableRef.decrementAndGet(cachedEntry.ownerCount)),
               Effect.flatMap((count) =>
                 pipe(
                   cachedEntry.finalizer(),
                   Effect.andThen(() =>
-                    Effect.sync(() => {
-                      console.log(
-                        `[ScopedCache #${this.cacheId}] Removing ${String(cachedEntry.key)} from cache`,
-                      );
-                      MutableHashMap.remove(this.cache, cachedEntry.key);
-                    }),
+                    Effect.sync(() => MutableHashMap.remove(this.cache, cachedEntry.key)),
                   ),
                   Effect.when(Effect.succeed(count === 0)),
                 ),
               ),
-            );
-          },
-        );
-      }),
+            ),
+        ),
+      ),
     );
   }
 
@@ -146,36 +118,19 @@ class ScopedCacheImpl<Key, Value, Error, Environment> implements ScopedCache<
     never,
     Environment | Scope.Scope
   > {
-    console.log(`[ScopedCache #${this.cacheId}] startComputation for ${String(key)}`);
     return pipe(
       Deferred.make<CachedEntry<Key, Value, Error>, never>(),
       Effect.tap((deferred) =>
         pipe(
-          Effect.sync(() => {
-            console.log(
-              `[ScopedCache #${this.cacheId}] Setting deferred in cache for ${String(key)}`,
-            );
-            MutableHashMap.set(this.cache, key, deferred);
-          }),
+          Effect.sync(() => MutableHashMap.set(this.cache, key, deferred)),
           Effect.tap(() =>
             Effect.uninterruptibleMask((restore) =>
-              Effect.flatMap(Effect.exit(restore(this.computeEntry(key))), (exit) => {
-                console.log(
-                  `[ScopedCache #${this.cacheId}] computeEntry done for ${String(key)}, exit:`,
-                  exit._tag,
-                );
-                return Deferred.done(deferred, exit);
-              }),
+              Effect.flatMap(Effect.exit(restore(this.computeEntry(key))), (exit) =>
+                Deferred.done(deferred, exit),
+              ),
             ),
           ),
-          Effect.onInterrupt(() =>
-            Effect.sync(() => {
-              console.log(
-                `[ScopedCache #${this.cacheId}] Interrupted, removing ${String(key)} from cache`,
-              );
-              MutableHashMap.remove(this.cache, key);
-            }),
-          ),
+          Effect.onInterrupt(() => Effect.sync(() => MutableHashMap.remove(this.cache, key))),
         ),
       ),
     );
@@ -184,7 +139,6 @@ class ScopedCacheImpl<Key, Value, Error, Environment> implements ScopedCache<
   private computeEntry(
     key: Key,
   ): Effect.Effect<CachedEntry<Key, Value, Error>, never, Environment> {
-    console.log(`[ScopedCache #${this.cacheId}] computeEntry for ${String(key)}`);
     return pipe(
       Effect.Do,
       Effect.bind("innerScope", () => Scope.make()),
@@ -194,10 +148,7 @@ class ScopedCacheImpl<Key, Value, Error, Environment> implements ScopedCache<
       Effect.map(({ exit, innerScope }) => ({
         key,
         exit,
-        finalizer: () => {
-          console.log(`[ScopedCache #${this.cacheId}] Entry finalizer running for ${String(key)}`);
-          return Scope.close(innerScope, exit);
-        },
+        finalizer: () => Scope.close(innerScope, exit),
         ownerCount: MutableRef.make(0),
       })),
     );
