@@ -38,6 +38,18 @@ function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
   });
 }
 
+// Debug middleware to log scope information
+let requestId = 0;
+const debugScopeMiddleware = HttpRouter.middleware((effect) =>
+  Effect.gen(function* () {
+    const reqNum = ++requestId;
+    const scope = yield* Effect.scope;
+    console.log(`[Request #${reqNum}] Scope object:`, scope);
+    console.log(`[Request #${reqNum}] Scope state:`, (scope as any).state);
+    return yield* effect;
+  }),
+).layer;
+
 const corsMiddlewareLayer = Layer.unwrap(
   Effect.gen(function* () {
     const trustedOrigins = [...(yield* config.trustedOrigins)];
@@ -70,7 +82,10 @@ const ApiLayer = Layer.provide(HttpApiBuilder.layer(Api), [
   screenshotLayer,
   scheduleLayer,
   discordLayer,
-]).pipe(Layer.merge(HttpApiSwagger.layer(Api)), Layer.provide(corsMiddlewareLayer));
+]).pipe(
+  Layer.merge(HttpApiSwagger.layer(Api)),
+  Layer.provide([corsMiddlewareLayer, debugScopeMiddleware]),
+);
 
 export const httpLayer = HttpRouter.serve(ApiLayer).pipe(
   Layer.provide(discordServiceLayer),

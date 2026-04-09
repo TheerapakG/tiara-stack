@@ -229,10 +229,15 @@ const runnerConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
     Effect.withSpan("runnerConfigParser"),
   );
 
+let serviceInstanceCount = 0;
+
 export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()(
   "SheetConfigService",
   {
     make: Effect.gen(function* () {
+      const instanceId = ++serviceInstanceCount;
+      console.log(`[SheetConfigService] Creating instance #${instanceId}`);
+
       const googleSheets = yield* GoogleSheets;
 
       const getRangesConfig = Effect.fn("SheetConfigService.getRangesConfig")(function* (
@@ -384,6 +389,7 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
         return yield* runnerConfigParser(ranges);
       });
 
+      console.log(`[SheetConfigService #${instanceId}] Creating caches...`);
       const {
         getRangesConfigCache,
         getTeamConfigCache,
@@ -397,6 +403,7 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
         getScheduleConfigCache: ScopedCache.make({ lookup: getScheduleConfig }),
         getRunnerConfigCache: ScopedCache.make({ lookup: getRunnerConfig }),
       });
+      console.log(`[SheetConfigService #${instanceId}] Caches created`);
 
       return {
         getRangesConfig: (sheetId: string) => getRangesConfigCache.get(sheetId),

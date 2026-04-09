@@ -26,5 +26,20 @@ export const healthLayer = HttpApiBuilder.group(Api, "health", (handlers) => {
         console.log(`[Health Scope Debug #${reqId}] Scope ID: ${scopeId}`);
         return { status: "ok", reqId, scopeId };
       }),
+    )
+    .handle("finalizerTest", () =>
+      Effect.gen(function* () {
+        const reqId = ++requestCounter;
+        console.log(`[Finalizer Test #${reqId}] Handler starting`);
+
+        yield* Effect.addFinalizer(() =>
+          Effect.sync(() => {
+            console.log(`[Finalizer Test #${reqId}] FINALIZER RUNNING!`);
+          }),
+        );
+
+        console.log(`[Finalizer Test #${reqId}] Handler completing`);
+        return { status: "ok", reqId };
+      }),
     );
 });
