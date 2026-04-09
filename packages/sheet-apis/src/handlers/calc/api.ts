@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { pipe, Schema } from "effect";
-import { ValidationError, QueryResultError } from "typhoon-core/error";
+import { SchemaError, QueryResultError } from "typhoon-core/error";
 import { GoogleSheetsError } from "@/schemas/google";
 import { ParserFieldError } from "@/schemas/sheet/error";
 import { SheetConfigError } from "@/schemas/sheetConfig";
@@ -12,7 +12,7 @@ const CalcError = [
   GoogleSheetsError,
   ParserFieldError,
   SheetConfigError,
-  ValidationError,
+  SchemaError,
   QueryResultError,
 ];
 
@@ -41,7 +41,7 @@ export class CalcApi extends HttpApiGroup.make("calc")
           ),
         }),
       ),
-      error: ValidationError,
+      error: SchemaError,
     }).middleware(SheetAuthTokenAuthorization),
   )
   .add(

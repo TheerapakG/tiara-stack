@@ -4,10 +4,9 @@ import { SheetApisClient } from "#/lib/sheetApis";
 import { Duration, Effect, Schema } from "effect";
 import {
   ArgumentError,
-  catchSchemaErrorAsValidationError,
   QueryResultAppError,
   QueryResultParseError,
-  ValidationError,
+  SchemaError,
 } from "typhoon-core/error";
 import { Discord } from "sheet-apis/schema";
 import { RequestError } from "#/lib/error";
@@ -16,7 +15,7 @@ export const _currentUserAtom = SheetApisClient.query("discord", "getCurrentUser
 
 const DiscordRequestErrorSchema = Schema.revealCodec(
   Schema.Union([
-    ValidationError,
+    SchemaError,
     QueryResultAppError,
     QueryResultParseError,
     ArgumentError,
@@ -41,7 +40,6 @@ const CurrentUserGuildsAsyncResultSchema = Schema.revealCodec(
 export const currentUserAtom = Atom.make(
   Effect.fnUntraced(function* (get) {
     return yield* get.result(_currentUserAtom).pipe(
-      catchSchemaErrorAsValidationError,
       Effect.catchTags({
         BadRequest: () => Effect.fail(RequestError.makeUnsafe({})),
       }),
@@ -69,7 +67,6 @@ export const _currentUserGuildsAtom = SheetApisClient.query("discord", "getCurre
 export const currentUserGuildsAtom = Atom.make(
   Effect.fnUntraced(function* (get) {
     return yield* get.result(_currentUserGuildsAtom).pipe(
-      catchSchemaErrorAsValidationError,
       Effect.catchTags({
         BadRequest: () => Effect.fail(RequestError.makeUnsafe({})),
       }),

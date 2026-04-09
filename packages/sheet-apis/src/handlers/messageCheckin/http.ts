@@ -1,5 +1,5 @@
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { catchSchemaErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
+import { makeArgumentError } from "typhoon-core/error";
 import { Effect, HashSet, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
@@ -256,7 +256,7 @@ export const messageCheckinLayer = HttpApiBuilder.group(
           authorizationService,
           messageCheckinService,
           query.messageId,
-        ).pipe(catchSchemaErrorAsValidationError),
+        ),
       )
       .handle("upsertMessageCheckinData", ({ payload }) =>
         Effect.gen(function* () {
@@ -271,14 +271,14 @@ export const messageCheckinLayer = HttpApiBuilder.group(
             payload.messageId,
             payload.data,
           );
-        }).pipe(catchSchemaErrorAsValidationError),
+        }),
       )
       .handle("getMessageCheckinMembers", ({ query }) =>
         requireMessageCheckinMembersReadAccess(
           authorizationService,
           messageCheckinService,
           query.messageId,
-        ).pipe(catchSchemaErrorAsValidationError),
+        ),
       )
       .handle("addMessageCheckinMembers", ({ payload }) =>
         Effect.gen(function* () {
@@ -292,7 +292,7 @@ export const messageCheckinLayer = HttpApiBuilder.group(
             payload.messageId,
             payload.memberIds,
           );
-        }).pipe(catchSchemaErrorAsValidationError),
+        }),
       )
       .handle("setMessageCheckinMemberCheckinAt", ({ payload }) =>
         Effect.gen(function* () {
@@ -308,7 +308,7 @@ export const messageCheckinLayer = HttpApiBuilder.group(
             payload.memberId,
             payload.checkinAt,
           );
-        }).pipe(catchSchemaErrorAsValidationError),
+        }),
       )
       .handle("removeMessageCheckinMember", ({ payload }) =>
         Effect.gen(function* () {
@@ -323,7 +323,7 @@ export const messageCheckinLayer = HttpApiBuilder.group(
             payload.messageId,
             payload.memberId,
           );
-        }).pipe(catchSchemaErrorAsValidationError),
+        }),
       );
   }),
 ).pipe(

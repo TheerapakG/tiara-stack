@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
-import { ValidationError, QueryResultError } from "typhoon-core/error";
+import { SchemaError, QueryResultError } from "typhoon-core/error";
 import { GoogleSheetsError } from "@/schemas/google";
 import { ParserFieldError } from "@/schemas/sheet/error";
 import { SheetConfigError } from "@/schemas/sheetConfig";
@@ -11,7 +11,7 @@ const MonitorError = [
   GoogleSheetsError,
   ParserFieldError,
   SheetConfigError,
-  ValidationError,
+  SchemaError,
   QueryResultError,
 ];
 

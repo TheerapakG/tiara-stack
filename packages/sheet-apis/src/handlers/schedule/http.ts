@@ -1,7 +1,6 @@
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
-import { catchSchemaErrorAsValidationError } from "typhoon-core/error";
 import { hasGuildPermission, hasPermission } from "@/services/authorization";
 import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
@@ -42,103 +41,95 @@ export const scheduleLayer = HttpApiBuilder.group(
 
     return handlers
       .handle("getAllPopulatedSchedules", ({ query }) =>
-        authorizationService
-          .provideCurrentGuildUser(
-            query.guildId,
-            Effect.gen(function* () {
-              const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
-              const resolvedUser = yield* SheetAuthGuildUser;
-              const view = resolveScheduleViewFromPermissions(
-                resolvedUser.permissions,
-                query.guildId,
-                query.view,
-              );
-              const schedules = yield* view === "monitor"
-                ? scheduleService.getAllPopulatedSchedules(sheetId)
-                : scheduleService.getAllPopulatedFillerSchedules(sheetId);
+        authorizationService.provideCurrentGuildUser(
+          query.guildId,
+          Effect.gen(function* () {
+            const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+            const resolvedUser = yield* SheetAuthGuildUser;
+            const view = resolveScheduleViewFromPermissions(
+              resolvedUser.permissions,
+              query.guildId,
+              query.view,
+            );
+            const schedules = yield* view === "monitor"
+              ? scheduleService.getAllPopulatedSchedules(sheetId)
+              : scheduleService.getAllPopulatedFillerSchedules(sheetId);
 
-              return { schedules, view };
-            }),
-          )
-          .pipe(catchSchemaErrorAsValidationError),
+            return { schedules, view };
+          }),
+        ),
       )
       .handle("getDayPopulatedSchedules", ({ query }) =>
-        authorizationService
-          .provideCurrentGuildUser(
-            query.guildId,
-            Effect.gen(function* () {
-              const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
-              const resolvedUser = yield* SheetAuthGuildUser;
-              const view = resolveScheduleViewFromPermissions(
-                resolvedUser.permissions,
-                query.guildId,
-                query.view,
-              );
-              const schedules = yield* view === "monitor"
-                ? scheduleService.getDayPopulatedSchedules(sheetId, query.day)
-                : scheduleService.getDayPopulatedFillerSchedules(sheetId, query.day);
+        authorizationService.provideCurrentGuildUser(
+          query.guildId,
+          Effect.gen(function* () {
+            const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+            const resolvedUser = yield* SheetAuthGuildUser;
+            const view = resolveScheduleViewFromPermissions(
+              resolvedUser.permissions,
+              query.guildId,
+              query.view,
+            );
+            const schedules = yield* view === "monitor"
+              ? scheduleService.getDayPopulatedSchedules(sheetId, query.day)
+              : scheduleService.getDayPopulatedFillerSchedules(sheetId, query.day);
 
-              return { schedules, view };
-            }),
-          )
-          .pipe(catchSchemaErrorAsValidationError),
+            return { schedules, view };
+          }),
+        ),
       )
       .handle("getChannelPopulatedSchedules", ({ query }) =>
-        authorizationService
-          .provideCurrentGuildUser(
-            query.guildId,
-            Effect.gen(function* () {
-              const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
-              const resolvedUser = yield* SheetAuthGuildUser;
-              const view = resolveScheduleViewFromPermissions(
-                resolvedUser.permissions,
-                query.guildId,
-                query.view,
-              );
-              const schedules = yield* view === "monitor"
-                ? scheduleService.getChannelPopulatedSchedules(sheetId, query.channel)
-                : scheduleService.getChannelPopulatedFillerSchedules(sheetId, query.channel);
+        authorizationService.provideCurrentGuildUser(
+          query.guildId,
+          Effect.gen(function* () {
+            const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+            const resolvedUser = yield* SheetAuthGuildUser;
+            const view = resolveScheduleViewFromPermissions(
+              resolvedUser.permissions,
+              query.guildId,
+              query.view,
+            );
+            const schedules = yield* view === "monitor"
+              ? scheduleService.getChannelPopulatedSchedules(sheetId, query.channel)
+              : scheduleService.getChannelPopulatedFillerSchedules(sheetId, query.channel);
 
-              return { schedules, view };
-            }),
-          )
-          .pipe(catchSchemaErrorAsValidationError),
+            return { schedules, view };
+          }),
+        ),
       )
       .handle("getDayPlayerSchedule", ({ query }) =>
-        authorizationService
-          .provideCurrentGuildUser(
-            query.guildId,
-            Effect.gen(function* () {
-              const resolvedUser = yield* SheetAuthGuildUser;
-              const view = resolveScheduleViewFromPermissions(
-                resolvedUser.permissions,
-                query.guildId,
-                query.view,
+        authorizationService.provideCurrentGuildUser(
+          query.guildId,
+          Effect.gen(function* () {
+            const resolvedUser = yield* SheetAuthGuildUser;
+            const view = resolveScheduleViewFromPermissions(
+              resolvedUser.permissions,
+              query.guildId,
+              query.view,
+            );
+
+            if (
+              resolvedUser.accountId !== query.accountId &&
+              !hasPermission(resolvedUser.permissions, "bot") &&
+              !hasPermission(resolvedUser.permissions, "app_owner") &&
+              !hasGuildPermission(resolvedUser.permissions, "monitor_guild", query.guildId)
+            ) {
+              return yield* Effect.fail(
+                new Unauthorized({ message: "User does not have access to this user" }),
               );
+            }
 
-              if (
-                resolvedUser.accountId !== query.accountId &&
-                !hasPermission(resolvedUser.permissions, "bot") &&
-                !hasPermission(resolvedUser.permissions, "app_owner") &&
-                !hasGuildPermission(resolvedUser.permissions, "monitor_guild", query.guildId)
-              ) {
-                return yield* Effect.fail(
-                  new Unauthorized({ message: "User does not have access to this user" }),
-                );
-              }
+            const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+            const schedules = yield* view === "monitor"
+              ? scheduleService.getDayPopulatedSchedules(sheetId, query.day)
+              : scheduleService.getDayPopulatedFillerSchedules(sheetId, query.day);
 
-              const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
-              const schedules = yield* view === "monitor"
-                ? scheduleService.getDayPopulatedSchedules(sheetId, query.day)
-                : scheduleService.getDayPopulatedFillerSchedules(sheetId, query.day);
-
-              return {
-                view,
-                schedule: summarizeDayPlayerSchedule(schedules, query.accountId),
-              };
-            }),
-          )
-          .pipe(catchSchemaErrorAsValidationError),
+            return {
+              view,
+              schedule: summarizeDayPlayerSchedule(schedules, query.accountId),
+            };
+          }),
+        ),
       );
   }),
 ).pipe(

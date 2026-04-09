@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
-import { ValidationError, QueryResultError, ArgumentError } from "typhoon-core/error";
+import { SchemaError, QueryResultError, ArgumentError } from "typhoon-core/error";
 import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthorization/tag";
 import { RoomOrderGenerateResult } from "@/schemas/roomOrder";
 import { GoogleSheetsError } from "@/schemas/google";
@@ -11,7 +11,7 @@ const RoomOrderGenerateError = [
   GoogleSheetsError,
   ParserFieldError,
   SheetConfigError,
-  ValidationError,
+  SchemaError,
   QueryResultError,
   ArgumentError,
 ];

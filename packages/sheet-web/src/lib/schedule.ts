@@ -14,12 +14,7 @@ import {
   Result,
   Schema,
 } from "effect";
-import {
-  catchSchemaErrorAsValidationError,
-  QueryResultAppError,
-  QueryResultParseError,
-  ValidationError,
-} from "typhoon-core/error";
+import { QueryResultAppError, QueryResultParseError, SchemaError } from "typhoon-core/error";
 import { RequestError } from "#/lib/error";
 import { useMemo } from "react";
 import { zoneId } from "#/hooks/useDateTimeZoned";
@@ -32,7 +27,7 @@ export type ScheduleView = Sheet.ScheduleView;
 
 const GuildScheduleErrorSchema = Schema.revealCodec(
   Schema.Union([
-    ValidationError,
+    SchemaError,
     QueryResultAppError,
     QueryResultParseError,
     Google.GoogleSheetsError,
@@ -89,7 +84,6 @@ export const guildScheduleResponseAtom = Atom.family((guildId: string) =>
   Atom.make(
     Effect.fnUntraced(function* (get) {
       return yield* get.result(_guildScheduleResponseAtom(guildId)).pipe(
-        catchSchemaErrorAsValidationError,
         Effect.catchTags({
           BadRequest: () => Effect.fail(RequestError.makeUnsafe({})),
         }),

@@ -25,7 +25,6 @@ import {
   Record,
 } from "effect";
 import { DefaultTaggedClass, OptionArrayToOptionStructValueSchema } from "typhoon-core/schema";
-import { catchSchemaErrorAsValidationError } from "typhoon-core/error";
 import { ScopedCache } from "typhoon-core/utils";
 import { GoogleSheets } from "./google/sheets";
 
@@ -276,7 +275,7 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
             }),
             Schema.decodeTo(DefaultTaggedClass(RangesConfig)),
           ),
-        )(rangeStruct).pipe(catchSchemaErrorAsValidationError);
+        )(rangeStruct);
       });
 
       const getTeamConfig = Effect.fn("SheetConfigService.getTeamConfig")(function* (
@@ -298,7 +297,7 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
           }),
         );
 
-        return yield* teamConfigParser(ranges).pipe(catchSchemaErrorAsValidationError);
+        return yield* teamConfigParser(ranges);
       });
 
       const getEventConfig = Effect.fn("SheetConfigService.getEventConfig")(function* (
@@ -338,7 +337,7 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
             }),
             Schema.decodeTo(DefaultTaggedClass(EventConfig)),
           ),
-        )(rangeStruct).pipe(catchSchemaErrorAsValidationError);
+        )(rangeStruct);
       });
 
       const getScheduleConfig = Effect.fn("SheetConfigService.getScheduleConfig")(function* (
@@ -360,7 +359,7 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
           }),
         );
 
-        return yield* scheduleConfigParser(ranges).pipe(catchSchemaErrorAsValidationError);
+        return yield* scheduleConfigParser(ranges);
       });
 
       const getRunnerConfig = Effect.fn("SheetConfigService.getRunnerConfig")(function* (
@@ -382,7 +381,7 @@ export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()
           }),
         );
 
-        return yield* runnerConfigParser(ranges).pipe(catchSchemaErrorAsValidationError);
+        return yield* runnerConfigParser(ranges);
       });
 
       const {

@@ -1,6 +1,6 @@
 import { Effect, Layer, Option, ServiceMap, Schema } from "effect";
 import { mutators, queries } from "sheet-db-schema/zero";
-import { catchSchemaErrorAsValidationError, makeDBQueryError } from "typhoon-core/error";
+import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 import { ZeroService } from "./zero";
 import { MessageSlot } from "@/schemas/messageSlot";
@@ -11,22 +11,20 @@ export class MessageSlotService extends ServiceMap.Service<MessageSlotService>()
     make: Effect.gen(function* () {
       const zeroService = yield* ZeroService;
 
-      const getMessageSlotData = Effect.fn("MessageSlotService.getMessageSlotData")(
-        function* (messageId: string) {
-          const result = yield* zeroService.run(
-            queries.messageSlot.getMessageSlotData({ messageId }),
-            {
-              type: "complete",
-            },
-          );
+      const getMessageSlotData = Effect.fn("MessageSlotService.getMessageSlotData")(function* (
+        messageId: string,
+      ) {
+        const result = yield* zeroService.run(
+          queries.messageSlot.getMessageSlotData({ messageId }),
+          {
+            type: "complete",
+          },
+        );
 
-          return yield* Schema.decodeEffect(
-            Schema.OptionFromNullishOr(DefaultTaggedClass(MessageSlot)),
-          )(result);
-        },
-        (effect) => effect.pipe(catchSchemaErrorAsValidationError),
-        (effect) => effect.pipe(Effect.withSpan("MessageSlotService.getMessageSlotData")),
-      );
+        return yield* Schema.decodeEffect(
+          Schema.OptionFromNullishOr(DefaultTaggedClass(MessageSlot)),
+        )(result);
+      });
 
       const upsertMessageSlotData = Effect.fn("MessageSlotService.upsertMessageSlotData")(
         function* (
@@ -57,7 +55,7 @@ export class MessageSlotService extends ServiceMap.Service<MessageSlotService>()
           );
           const messageSlot = yield* Schema.decodeEffect(
             Schema.OptionFromNullishOr(DefaultTaggedClass(MessageSlot)),
-          )(result).pipe(catchSchemaErrorAsValidationError);
+          )(result);
 
           if (Option.isNone(messageSlot)) {
             return yield* Effect.die(makeDBQueryError("Failed to upsert message slot data"));
@@ -65,7 +63,6 @@ export class MessageSlotService extends ServiceMap.Service<MessageSlotService>()
 
           return messageSlot.value;
         },
-        (effect) => effect.pipe(Effect.withSpan("MessageSlotService.upsertMessageSlotData")),
       );
 
       return {

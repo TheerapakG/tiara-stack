@@ -1,5 +1,5 @@
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { catchSchemaErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
+import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
@@ -93,11 +93,7 @@ export const messageSlotLayer = HttpApiBuilder.group(
 
     return handlers
       .handle("getMessageSlotData", ({ query }) =>
-        requireMessageSlotReadAccess(
-          authorizationService,
-          messageSlotService,
-          query.messageId,
-        ).pipe(catchSchemaErrorAsValidationError),
+        requireMessageSlotReadAccess(authorizationService, messageSlotService, query.messageId),
       )
       .handle("upsertMessageSlotData", ({ payload }) =>
         Effect.gen(function* () {
@@ -109,7 +105,7 @@ export const messageSlotLayer = HttpApiBuilder.group(
           );
 
           return yield* messageSlotService.upsertMessageSlotData(payload.messageId, payload.data);
-        }).pipe(catchSchemaErrorAsValidationError),
+        }),
       );
   }),
 ).pipe(

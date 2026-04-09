@@ -1,7 +1,6 @@
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
-import { catchSchemaErrorAsValidationError } from "typhoon-core/error";
 import { AuthorizationService, ScreenshotService, GuildConfigService } from "@/services";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 
@@ -32,16 +31,14 @@ export const screenshotLayer = HttpApiBuilder.group(
     const guildConfigService = yield* GuildConfigService;
 
     return handlers.handle("getScreenshot", ({ query }) =>
-      authorizationService
-        .provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
-            yield* authorizationService.requireMonitorGuild(query.guildId);
-            const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
-            return yield* screenshotService.getScreenshot(sheetId, query.channel, query.day);
-          }),
-        )
-        .pipe(catchSchemaErrorAsValidationError),
+      authorizationService.provideCurrentGuildUser(
+        query.guildId,
+        Effect.gen(function* () {
+          yield* authorizationService.requireMonitorGuild(query.guildId);
+          const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
+          return yield* screenshotService.getScreenshot(sheetId, query.channel, query.day);
+        }),
+      ),
     );
   }),
 ).pipe(

@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
-import { ValidationError, QueryResultError, UnknownError } from "typhoon-core/error";
+import { SchemaError, QueryResultError, UnknownError } from "typhoon-core/error";
 import { GoogleSheetsError } from "@/schemas/google";
 import { ParserFieldError } from "@/schemas/sheet/error";
 import { SheetConfigError } from "@/schemas/sheetConfig";
@@ -10,7 +10,7 @@ const ScreenshotError = [
   GoogleSheetsError,
   ParserFieldError,
   SheetConfigError,
-  ValidationError,
+  SchemaError,
   QueryResultError,
   UnknownError,
 ];

@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema, SchemaGetter } from "effect";
-import { ValidationError, QueryResultError, ArgumentError } from "typhoon-core/error";
+import { SchemaError, QueryResultError, ArgumentError } from "typhoon-core/error";
 import { GuildChannelConfig, GuildConfig, GuildConfigMonitorRole } from "@/schemas/guildConfig";
 import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthorization/tag";
 
@@ -15,7 +15,7 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
   .add(
     HttpApiEndpoint.get("getAutoCheckinGuilds", "/guildConfig/getAutoCheckinGuilds", {
       success: Schema.Array(GuildConfig),
-      error: [ValidationError, QueryResultError],
+      error: [SchemaError, QueryResultError],
     }),
   )
   .add(
@@ -24,7 +24,7 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
         guildId: Schema.String,
       }),
       success: GuildConfig,
-      error: [ValidationError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError],
     }),
   )
   .add(
@@ -37,7 +37,7 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
         }),
       }),
       success: GuildConfig,
-      error: [ValidationError, QueryResultError],
+      error: [SchemaError, QueryResultError],
     }),
   )
   .add(
@@ -46,7 +46,7 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
         guildId: Schema.String,
       }),
       success: Schema.Array(GuildConfigMonitorRole),
-      error: [ValidationError, QueryResultError],
+      error: [SchemaError, QueryResultError],
     }),
   )
   .add(
@@ -56,7 +56,7 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
         running: Schema.optional(BooleanFromString),
       }),
       success: Schema.Array(GuildChannelConfig),
-      error: [ValidationError, QueryResultError],
+      error: [SchemaError, QueryResultError],
     }),
   )
   .add(
@@ -66,7 +66,7 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
         roleId: Schema.String,
       }),
       success: GuildConfigMonitorRole,
-      error: [ValidationError, QueryResultError],
+      error: [SchemaError, QueryResultError],
     }),
   )
   .add(
@@ -76,7 +76,7 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
         roleId: Schema.String,
       }),
       success: GuildConfigMonitorRole,
-      error: [ValidationError, QueryResultError],
+      error: [SchemaError, QueryResultError],
     }),
   )
   .add(
@@ -92,7 +92,7 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
         }),
       }),
       success: GuildChannelConfig,
-      error: [ValidationError, QueryResultError],
+      error: [SchemaError, QueryResultError],
     }),
   )
   .add(
@@ -103,7 +103,7 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
         running: Schema.optional(BooleanFromString),
       }),
       success: GuildChannelConfig,
-      error: [ValidationError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError],
     }),
   )
   .add(
@@ -114,7 +114,7 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
         running: Schema.optional(BooleanFromString),
       }),
       success: GuildChannelConfig,
-      error: [ValidationError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError],
     }),
   )
   .middleware(SheetAuthTokenAuthorization)

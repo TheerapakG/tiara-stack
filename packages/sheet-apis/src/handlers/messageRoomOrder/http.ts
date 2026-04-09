@@ -1,5 +1,5 @@
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { catchSchemaErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
+import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
@@ -89,7 +89,7 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
           );
           yield* requireRoomOrderMonitorAccess(authorizationService, record);
           return record;
-        }).pipe(catchSchemaErrorAsValidationError),
+        }),
       )
       .handle("upsertMessageRoomOrder", ({ payload }) =>
         Effect.gen(function* () {
@@ -104,7 +104,7 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
             payload.messageId,
             payload.data,
           );
-        }).pipe(catchSchemaErrorAsValidationError),
+        }),
       )
       .handle("decrementMessageRoomOrderRank", ({ payload }) =>
         Effect.gen(function* () {
@@ -114,7 +114,7 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
           );
           yield* requireRoomOrderMonitorAccess(authorizationService, record);
           return yield* messageRoomOrderService.decrementMessageRoomOrderRank(payload.messageId);
-        }).pipe(catchSchemaErrorAsValidationError),
+        }),
       )
       .handle("incrementMessageRoomOrderRank", ({ payload }) =>
         Effect.gen(function* () {
@@ -124,7 +124,7 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
           );
           yield* requireRoomOrderMonitorAccess(authorizationService, record);
           return yield* messageRoomOrderService.incrementMessageRoomOrderRank(payload.messageId);
-        }).pipe(catchSchemaErrorAsValidationError),
+        }),
       )
       .handle("getMessageRoomOrderEntry", ({ query }) =>
         Effect.gen(function* () {
@@ -137,7 +137,7 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
             query.messageId,
             Number(query.rank),
           );
-        }).pipe(catchSchemaErrorAsValidationError),
+        }),
       )
       .handle("getMessageRoomOrderRange", ({ query }) =>
         Effect.gen(function* () {
@@ -157,7 +157,7 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
           }
 
           return range.value;
-        }).pipe(catchSchemaErrorAsValidationError),
+        }),
       )
       .handle("upsertMessageRoomOrderEntry", ({ payload }) =>
         Effect.gen(function* () {
@@ -170,7 +170,7 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
             payload.messageId,
             payload.entries,
           );
-        }).pipe(catchSchemaErrorAsValidationError),
+        }),
       )
       .handle("removeMessageRoomOrderEntry", ({ payload }) =>
         Effect.gen(function* () {
@@ -180,7 +180,7 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
           );
           yield* requireRoomOrderMonitorAccess(authorizationService, record);
           return yield* messageRoomOrderService.removeMessageRoomOrderEntry(payload.messageId);
-        }).pipe(catchSchemaErrorAsValidationError),
+        }),
       );
   }),
 ).pipe(

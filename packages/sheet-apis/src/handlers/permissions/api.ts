@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
-import { ValidationError, QueryResultError, ArgumentError } from "typhoon-core/error";
+import { SchemaError, QueryResultError, ArgumentError } from "typhoon-core/error";
 import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthorization/tag";
 import { CurrentUserPermissions } from "@/schemas/permissions";
 
@@ -11,7 +11,7 @@ export class PermissionsApi extends HttpApiGroup.make("permissions")
         guildId: Schema.optional(Schema.String),
       }),
       success: CurrentUserPermissions,
-      error: [ValidationError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError],
     }),
   )
   .middleware(SheetAuthTokenAuthorization)

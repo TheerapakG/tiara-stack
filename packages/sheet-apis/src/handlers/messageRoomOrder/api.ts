@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
-import { ValidationError, QueryResultError, ArgumentError } from "typhoon-core/error";
+import { SchemaError, QueryResultError, ArgumentError } from "typhoon-core/error";
 import {
   MessageRoomOrder,
   MessageRoomOrderEntry,
@@ -15,7 +15,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
         messageId: Schema.String,
       }),
       success: MessageRoomOrder,
-      error: [ValidationError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError],
     }),
   )
   .add(
@@ -34,7 +34,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
         }),
       }),
       success: MessageRoomOrder,
-      error: [ValidationError, QueryResultError],
+      error: [SchemaError, QueryResultError],
     }),
   )
   .add(
@@ -46,7 +46,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
           messageId: Schema.String,
         }),
         success: MessageRoomOrder,
-        error: [ValidationError, QueryResultError, ArgumentError],
+        error: [SchemaError, QueryResultError, ArgumentError],
       },
     ),
   )
@@ -59,7 +59,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
           messageId: Schema.String,
         }),
         success: MessageRoomOrder,
-        error: [ValidationError, QueryResultError, ArgumentError],
+        error: [SchemaError, QueryResultError, ArgumentError],
       },
     ),
   )
@@ -70,7 +70,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
         rank: Schema.String,
       }),
       success: Schema.Array(MessageRoomOrderEntry),
-      error: [ValidationError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError],
     }),
   )
   .add(
@@ -79,7 +79,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
         messageId: Schema.String,
       }),
       success: MessageRoomOrderRange,
-      error: [ValidationError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError],
     }),
   )
   .add(
@@ -101,7 +101,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
           ),
         }),
         success: Schema.Array(MessageRoomOrderEntry),
-        error: [ValidationError, QueryResultError, ArgumentError],
+        error: [SchemaError, QueryResultError, ArgumentError],
       },
     ),
   )
@@ -114,7 +114,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
           messageId: Schema.String,
         }),
         success: Schema.Array(MessageRoomOrderEntry),
-        error: [ValidationError, QueryResultError, ArgumentError],
+        error: [SchemaError, QueryResultError, ArgumentError],
       },
     ),
   )

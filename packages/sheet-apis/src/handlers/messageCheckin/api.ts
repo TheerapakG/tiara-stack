@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
-import { ValidationError, QueryResultError, ArgumentError } from "typhoon-core/error";
+import { SchemaError, QueryResultError, ArgumentError } from "typhoon-core/error";
 import { MessageCheckin, MessageCheckinMember } from "@/schemas/messageCheckin";
 import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthorization/tag";
 
@@ -11,7 +11,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
         messageId: Schema.String,
       }),
       success: MessageCheckin,
-      error: [ValidationError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError],
     }),
   )
   .add(
@@ -29,7 +29,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
         }),
       }),
       success: MessageCheckin,
-      error: [ValidationError, QueryResultError],
+      error: [SchemaError, QueryResultError],
     }),
   )
   .add(
@@ -38,7 +38,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
         messageId: Schema.String,
       }),
       success: Schema.Array(MessageCheckinMember),
-      error: [ValidationError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError],
     }),
   )
   .add(
@@ -48,7 +48,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
         memberIds: Schema.Array(Schema.String),
       }),
       success: Schema.Array(MessageCheckinMember),
-      error: [ValidationError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError],
     }),
   )
   .add(
@@ -62,7 +62,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
           checkinAt: Schema.Number,
         }),
         success: MessageCheckinMember,
-        error: [ValidationError, QueryResultError, ArgumentError],
+        error: [SchemaError, QueryResultError, ArgumentError],
       },
     ),
   )
@@ -76,7 +76,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
           memberId: Schema.String,
         }),
         success: MessageCheckinMember,
-        error: [ValidationError, QueryResultError, ArgumentError],
+        error: [SchemaError, QueryResultError, ArgumentError],
       },
     ),
   )

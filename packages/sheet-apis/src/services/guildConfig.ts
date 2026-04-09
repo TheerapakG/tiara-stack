@@ -1,6 +1,6 @@
 import { Array, Effect, Layer, Option, ServiceMap, Schema } from "effect";
 import { mutators, queries } from "sheet-db-schema/zero";
-import { catchSchemaErrorAsValidationError, makeDBQueryError } from "typhoon-core/error";
+import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 import { ZeroService } from "./zero";
 import { GuildChannelConfig, GuildConfig, GuildConfigMonitorRole } from "@/schemas/guildConfig";
@@ -20,10 +20,7 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
             return yield* Schema.decodeEffect(Schema.Array(DefaultTaggedClass(GuildConfig)))(
               result,
             );
-          }).pipe(
-            catchSchemaErrorAsValidationError,
-            Effect.withSpan("GuildConfigService.getAutoCheckinGuilds"),
-          ),
+          }).pipe(Effect.withSpan("GuildConfigService.getAutoCheckinGuilds")),
         getGuildConfig: (guildId: string) =>
           Effect.gen(function* () {
             const result = yield* zeroService.run(
@@ -35,10 +32,7 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
             return yield* Schema.decodeEffect(
               Schema.OptionFromNullishOr(DefaultTaggedClass(GuildConfig)),
             )(result);
-          }).pipe(
-            catchSchemaErrorAsValidationError,
-            Effect.withSpan("GuildConfigService.getGuildConfig"),
-          ),
+          }).pipe(Effect.withSpan("GuildConfigService.getGuildConfig")),
         upsertGuildConfig: (
           guildId: string,
           config: {
@@ -59,7 +53,7 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
             );
             const guildConfig = yield* Schema.decodeEffect(
               Schema.OptionFromNullishOr(DefaultTaggedClass(GuildConfig)),
-            )(result).pipe(catchSchemaErrorAsValidationError);
+            )(result);
 
             if (Option.isNone(guildConfig)) {
               return yield* Effect.die(makeDBQueryError("Failed to upsert guild config"));
@@ -80,10 +74,7 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
             return yield* Schema.decodeEffect(
               Schema.Array(DefaultTaggedClass(GuildConfigMonitorRole)),
             )(result);
-          }).pipe(
-            catchSchemaErrorAsValidationError,
-            Effect.withSpan("GuildConfigService.getGuildMonitorRoles"),
-          ),
+          }).pipe(Effect.withSpan("GuildConfigService.getGuildMonitorRoles")),
         getGuildChannels: (params: { guildId: string; running?: boolean | undefined }) =>
           Effect.gen(function* () {
             const result = yield* zeroService.run(
@@ -96,10 +87,7 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
             return yield* Schema.decodeEffect(Schema.Array(DefaultTaggedClass(GuildChannelConfig)))(
               result,
             );
-          }).pipe(
-            catchSchemaErrorAsValidationError,
-            Effect.withSpan("GuildConfigService.getGuildChannels"),
-          ),
+          }).pipe(Effect.withSpan("GuildConfigService.getGuildChannels")),
         addGuildMonitorRole: (guildId: string, roleId: string) =>
           Effect.gen(function* () {
             const mutation = yield* zeroService.mutate(
@@ -116,7 +104,7 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
             );
             const roles = yield* Schema.decodeEffect(
               Schema.Array(DefaultTaggedClass(GuildConfigMonitorRole)),
-            )(result).pipe(catchSchemaErrorAsValidationError);
+            )(result);
             const role = Array.findFirst(roles, (item) => item.roleId === roleId);
 
             if (Option.isNone(role)) {
@@ -141,7 +129,7 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
             );
             const roles = yield* Schema.decodeEffect(
               Schema.Array(DefaultTaggedClass(GuildConfigMonitorRole)),
-            )(result).pipe(catchSchemaErrorAsValidationError);
+            )(result);
             const role = Array.findFirst(roles, (item) => item.roleId === roleId);
 
             if (Option.isNone(role)) {
@@ -178,7 +166,7 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
             );
             const channel = yield* Schema.decodeEffect(
               Schema.OptionFromNullishOr(DefaultTaggedClass(GuildChannelConfig)),
-            )(result).pipe(catchSchemaErrorAsValidationError);
+            )(result);
 
             if (Option.isNone(channel)) {
               return yield* Effect.die(makeDBQueryError("Failed to upsert guild channel config"));
@@ -203,10 +191,7 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
             return yield* Schema.decodeEffect(
               Schema.OptionFromNullishOr(DefaultTaggedClass(GuildChannelConfig)),
             )(result);
-          }).pipe(
-            catchSchemaErrorAsValidationError,
-            Effect.withSpan("GuildConfigService.getGuildChannelById"),
-          ),
+          }).pipe(Effect.withSpan("GuildConfigService.getGuildChannelById")),
         getGuildChannelByName: (params: {
           guildId: string;
           channelName: string;
@@ -224,10 +209,7 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
             return yield* Schema.decodeEffect(
               Schema.OptionFromNullishOr(DefaultTaggedClass(GuildChannelConfig)),
             )(result);
-          }).pipe(
-            catchSchemaErrorAsValidationError,
-            Effect.withSpan("GuildConfigService.getGuildChannelByName"),
-          ),
+          }).pipe(Effect.withSpan("GuildConfigService.getGuildChannelByName")),
       };
     }),
   },

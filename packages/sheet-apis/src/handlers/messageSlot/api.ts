@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
-import { ValidationError, QueryResultError, ArgumentError } from "typhoon-core/error";
+import { SchemaError, QueryResultError, ArgumentError } from "typhoon-core/error";
 import { MessageSlot } from "@/schemas/messageSlot";
 import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthorization/tag";
 
@@ -11,7 +11,7 @@ export class MessageSlotApi extends HttpApiGroup.make("messageSlot")
         messageId: Schema.String,
       }),
       success: MessageSlot,
-      error: [ValidationError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError],
     }),
   )
   .add(
@@ -26,7 +26,7 @@ export class MessageSlotApi extends HttpApiGroup.make("messageSlot")
         }),
       }),
       success: MessageSlot,
-      error: [ValidationError, QueryResultError],
+      error: [SchemaError, QueryResultError],
     }),
   )
   .middleware(SheetAuthTokenAuthorization)

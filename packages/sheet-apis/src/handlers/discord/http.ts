@@ -3,7 +3,7 @@ import { HttpServerRequest } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Effect, Layer, Redacted, Schema } from "effect";
 import { getDiscordAccessToken } from "sheet-auth/client";
-import { catchSchemaErrorAsValidationError, makeArgumentError } from "typhoon-core/error";
+import { makeArgumentError } from "typhoon-core/error";
 import { Api } from "@/api";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { Discord } from "@/schema";
@@ -25,7 +25,7 @@ export const discordLayer = HttpApiBuilder.group(
         Effect.gen(function* () {
           const headers = yield* HttpServerRequest.schemaHeaders(
             Schema.Record(Schema.String, Schema.UndefinedOr(Schema.String)),
-          ).pipe(catchSchemaErrorAsValidationError);
+          );
 
           const authHeaders: Record<string, string> = {};
           if (typeof headers.origin === "string") authHeaders.origin = headers.origin;
@@ -70,7 +70,7 @@ export const discordLayer = HttpApiBuilder.group(
         Effect.gen(function* () {
           const headers = yield* HttpServerRequest.schemaHeaders(
             Schema.Record(Schema.String, Schema.UndefinedOr(Schema.String)),
-          ).pipe(catchSchemaErrorAsValidationError);
+          );
 
           const authHeaders: Record<string, string> = {};
           if (typeof headers.origin === "string") authHeaders.origin = headers.origin;

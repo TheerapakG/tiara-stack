@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
-import { ValidationError, QueryResultError, ArgumentError } from "typhoon-core/error";
+import { SchemaError, QueryResultError, ArgumentError } from "typhoon-core/error";
 import { GoogleSheetsError } from "@/schemas/google";
 import { SheetAuthTokenAuthorization } from "@/middlewares/sheetAuthTokenAuthorization/tag";
 import { ParserFieldError } from "@/schemas/sheet/error";
@@ -11,7 +11,7 @@ const CheckinGenerateError = [
   GoogleSheetsError,
   ParserFieldError,
   SheetConfigError,
-  ValidationError,
+  SchemaError,
   QueryResultError,
   ArgumentError,
 ];
