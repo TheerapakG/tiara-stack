@@ -14,6 +14,7 @@ import {
   Schema,
   SchemaGetter,
   SchemaIssue,
+  SchemaParser,
   ServiceMap,
   String,
   Types,
@@ -25,6 +26,15 @@ import { GoogleAuthService } from "./auth";
 
 const tupleSchema = <Length extends number, S extends Schema.Top>(length: Length, schema: S) =>
   Schema.Tuple(Array.makeBy(length, () => schema) as Types.TupleOf<Length, S>);
+
+export const toCellOption = (value: unknown): Option.Option<string> => {
+  if (value == null) {
+    return Option.none();
+  }
+
+  const normalized = globalThis.String(value).trim();
+  return String.isNonEmpty(normalized) ? Option.some(normalized) : Option.none();
+};
 
 const parseRowDatas = <
   Ranges extends Array.NonEmptyReadonlyArray<sheets_v4.Schema$RowData[]>,
@@ -90,13 +100,7 @@ const parseValueRanges = <
         default: () => [],
       }),
     ),
-    Array.map(
-      ArrayUtils.WithDefault.map((row) =>
-        Array.map(row, (cell) =>
-          typeof cell === "string" ? Option.some(cell) : Option.fromNullishOr(cell?.toString()),
-        ),
-      ),
-    ),
+    Array.map(ArrayUtils.WithDefault.map((row) => Array.map(row, (cell) => toCellOption(cell)))),
     Array.map(ArrayUtils.WithDefault.map((row) => [row])),
     (ranges) =>
       Array.reduce(Array.tailNonEmpty(ranges), Array.headNonEmpty(ranges), (acc, curr) =>
@@ -119,49 +123,8 @@ const parseValueRanges = <
   ).pipe(Effect.withSpan("parseValueRanges"));
 };
 
-const dataExecutionStatusSchema = Schema.Struct({
-  errorCode: Schema.OptionFromNullishOr(Schema.String),
-  errorMessage: Schema.OptionFromNullishOr(Schema.String),
-  lastRefreshTime: Schema.OptionFromNullishOr(Schema.String),
-  state: Schema.OptionFromNullishOr(Schema.String),
-});
-
-const extendedValueSchema = Schema.Struct({
-  boolValue: Schema.OptionFromNullishOr(Schema.Boolean),
-  errorValue: Schema.OptionFromNullishOr(Schema.Any),
-  formulaValue: Schema.OptionFromNullishOr(Schema.String),
-  numberValue: Schema.OptionFromNullishOr(Schema.Number),
-  stringValue: Schema.OptionFromNullishOr(Schema.String),
-});
-
-const dataSourceFormulaSchema = Schema.Struct({
-  dataExecutionStatus: Schema.OptionFromNullishOr(dataExecutionStatusSchema),
-  dataSourceId: Schema.OptionFromNullishOr(Schema.String),
-});
-
-const dataSourceTableSchema = Schema.Struct({
-  columns: Schema.OptionFromNullishOr(Schema.Array(Schema.Any)),
-  columnSelectionType: Schema.OptionFromNullishOr(Schema.String),
-  dataExecutionStatus: Schema.OptionFromNullishOr(dataExecutionStatusSchema),
-  dataSourceId: Schema.OptionFromNullishOr(Schema.String),
-  filterSpecs: Schema.OptionFromNullishOr(Schema.Array(Schema.Any)),
-  rowLimit: Schema.OptionFromNullishOr(Schema.Number),
-  sortSpecs: Schema.OptionFromNullishOr(Schema.Array(Schema.Any)),
-});
-
 const rowDataCellSchema = Schema.Struct({
-  dataSourceFormula: Schema.OptionFromNullishOr(dataSourceFormulaSchema),
-  dataSourceTable: Schema.OptionFromNullishOr(dataSourceTableSchema),
-  dataValidation: Schema.OptionFromNullishOr(Schema.Any),
-  effectiveFormat: Schema.OptionFromNullishOr(Schema.Any),
-  effectiveValue: Schema.OptionFromNullishOr(extendedValueSchema),
-  formattedValue: Schema.OptionFromNullishOr(Schema.String),
-  hyperlink: Schema.OptionFromNullishOr(Schema.String),
-  note: Schema.OptionFromNullishOr(Schema.String),
-  pivotTable: Schema.OptionFromNullishOr(Schema.Any),
-  textFormatRuns: Schema.OptionFromNullishOr(Schema.Array(Schema.Any)),
-  userEnteredFormat: Schema.OptionFromNullishOr(Schema.Any),
-  userEnteredValue: Schema.OptionFromNullishOr(extendedValueSchema),
+  formattedValue: Schema.optional(Schema.NullOr(Schema.String)),
 });
 const rowDataSchema = Schema.Array(rowDataCellSchema);
 const cellSchema = Schema.Option(Schema.String);
@@ -169,7 +132,7 @@ const rowSchema = Schema.Array(cellSchema);
 
 const rowDataCellToCellSchema = Schema.toType(rowDataCellSchema).pipe(
   Schema.decodeTo(cellSchema, {
-    decode: SchemaGetter.transform((rowDataCell) => rowDataCell.formattedValue),
+    decode: SchemaGetter.transform((rowDataCell) => toCellOption(rowDataCell.formattedValue)),
     encode: SchemaGetter.forbidden(() => "Row data cell cannot be encoded to cell"),
   }),
 );
@@ -186,7 +149,73 @@ const rowToCellSchema = rowSchema.pipe(
     encode: SchemaGetter.transform((cell) => [cell]),
   }),
 );
-const rowDataToCellSchema = rowDataToRowSchema.pipe(Schema.decodeTo(rowToCellSchema));
+const rowDataToCellSchema = Schema.toType(rowDataSchema).pipe(
+  Schema.decodeTo(cellSchema, {
+    decode: SchemaGetter.transform((rowData) =>
+      pipe(
+        rowData,
+        Array.get(0),
+        Option.flatMap((cell) => toCellOption(cell.formattedValue)),
+      ),
+    ),
+    encode: SchemaGetter.transform((cell) =>
+      pipe(
+        cell,
+        Option.match({
+          onNone: () => [] as const,
+          onSome: (formattedValue) => [{ formattedValue }],
+        }),
+      ),
+    ),
+  }),
+);
+
+const resultToEffect = <A, E>(result: Result.Result<A, E>) =>
+  Result.match(result, {
+    onSuccess: Effect.succeed,
+    onFailure: Effect.fail,
+  });
+
+const cellToSchema = <S extends Schema.Top>(schema: S) => {
+  return cellSchema.pipe(
+    Schema.decodeTo(Schema.Option(Schema.toType(schema)), {
+      decode: SchemaGetter.transformOrFail((cell: Option.Option<string>) =>
+        pipe(
+          cell,
+          Option.match({
+            onNone: () => Effect.succeed(Option.none()),
+            onSome: (value) =>
+              pipe(
+                value,
+                SchemaParser.decodeUnknownResult(
+                  schema as unknown as Schema.Decoder<unknown, never>,
+                ),
+                Result.map(Option.some),
+                resultToEffect,
+              ),
+          }),
+        ),
+      ) as never,
+      encode: SchemaGetter.transformOrFail((cell: Option.Option<Schema.Schema.Type<S>>) =>
+        pipe(
+          cell,
+          Option.match({
+            onNone: () => Effect.succeed(Option.none()),
+            onSome: (value) =>
+              pipe(
+                value,
+                SchemaParser.encodeUnknownResult(
+                  schema as unknown as Schema.Encoder<unknown, never>,
+                ),
+                Result.map(Option.some),
+                resultToEffect,
+              ),
+          }),
+        ),
+      ) as never,
+    }),
+  );
+};
 
 const matchAll =
   <Pattern extends string, Context extends RegexContext>(value: Regex<Pattern, Context>) =>
@@ -602,15 +631,15 @@ export class GoogleSheets extends ServiceMap.Service<GoogleSheets>()("GoogleShee
   static rowDataToRowSchema = rowDataToRowSchema;
   static rowDataToCellSchema = rowDataToCellSchema;
   static toStringSchema = toStringSchema;
-  static cellToStringSchema = Schema.Option(toStringSchema);
+  static cellToStringSchema = cellToSchema(toStringSchema);
   static toNumberSchema = toNumberSchema;
-  static cellToNumberSchema = Schema.Option(toNumberSchema);
+  static cellToNumberSchema = cellToSchema(toNumberSchema);
   static toBooleanSchema = toBooleanSchema;
-  static cellToBooleanSchema = Schema.Option(toBooleanSchema);
+  static cellToBooleanSchema = cellToSchema(toBooleanSchema);
   static toLiteralSchema = toLiteralSchema;
   static cellToLiteralSchema = <const Literals extends Array.NonEmptyReadonlyArray<string>>(
     literals: Literals,
-  ) => Schema.Option(toLiteralSchema(literals));
+  ) => cellToSchema(toLiteralSchema(literals));
   static toStringArraySchema = toStringArraySchema;
-  static cellToStringArraySchema = Schema.Option(toStringArraySchema);
+  static cellToStringArraySchema = cellToSchema(toStringArraySchema);
 }
