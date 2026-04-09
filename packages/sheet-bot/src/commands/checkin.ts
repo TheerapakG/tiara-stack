@@ -103,23 +103,22 @@ const makeManualSubCommand = Effect.gen(function* () {
           ],
         });
 
-        yield* Effect.all(
-          [
-            messageCheckinService.upsertMessageCheckinData(messageResult.id, {
-              initialMessage: generated.initialMessage,
-              hour: generated.hour,
-              channelId: generated.runningChannelId,
-              roleId: generated.roleId,
-              guildId,
-              messageChannelId: generated.checkinChannelId,
-              createdByUserId,
-            }),
-            generated.fillIds.length === 0
-              ? Effect.void
-              : messageCheckinService.addMessageCheckinMembers(messageResult.id, generated.fillIds),
-          ],
-          { concurrency: "unbounded" },
-        );
+        yield* messageCheckinService.upsertMessageCheckinData(messageResult.id, {
+          initialMessage: generated.initialMessage,
+          hour: generated.hour,
+          channelId: generated.runningChannelId,
+          roleId: generated.roleId,
+          guildId,
+          messageChannelId: generated.checkinChannelId,
+          createdByUserId,
+        });
+
+        if (generated.fillIds.length > 0) {
+          yield* messageCheckinService.addMessageCheckinMembers(
+            messageResult.id,
+            generated.fillIds,
+          );
+        }
       }
 
       yield* command.editReply({

@@ -41,23 +41,19 @@ const processChannel = Effect.fn("processChannel")(function* (
       components: [new ActionRowBuilder().addComponent(checkinButtonData).toJSON()],
     });
 
-    yield* Effect.all(
-      [
-        messageCheckinService.upsertMessageCheckinData(messageResult.id, {
-          initialMessage,
-          hour: generated.hour,
-          channelId: generated.runningChannelId,
-          roleId: generated.roleId,
-          guildId,
-          messageChannelId: generated.checkinChannelId,
-          createdByUserId: null,
-        }),
-        generated.fillIds.length > 0
-          ? messageCheckinService.addMessageCheckinMembers(messageResult.id, generated.fillIds)
-          : Effect.void,
-      ],
-      { concurrency: "unbounded" },
-    );
+    yield* messageCheckinService.upsertMessageCheckinData(messageResult.id, {
+      initialMessage,
+      hour: generated.hour,
+      channelId: generated.runningChannelId,
+      roleId: generated.roleId,
+      guildId,
+      messageChannelId: generated.checkinChannelId,
+      createdByUserId: null,
+    });
+
+    if (generated.fillIds.length > 0) {
+      yield* messageCheckinService.addMessageCheckinMembers(messageResult.id, generated.fillIds);
+    }
   }
 
   const embedDescriptionParts = [
