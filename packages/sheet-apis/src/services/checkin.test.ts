@@ -1,6 +1,44 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Option } from "effect";
-import { makeMonitorCheckinMessage } from "./checkin";
+import {
+  PartialNamePlayer,
+  Player,
+  PopulatedSchedule,
+  PopulatedSchedulePlayer,
+} from "@/schemas/sheet";
+import { getScheduleFillCount, makeMonitorCheckinMessage } from "./checkin";
+
+const makeResolvedFill = (id: string, name: string) =>
+  PopulatedSchedulePlayer.makeUnsafe({
+    player: Player.makeUnsafe({
+      index: 0,
+      id,
+      name,
+    }),
+    enc: false,
+  });
+
+const makePartialFill = (name: string) =>
+  PopulatedSchedulePlayer.makeUnsafe({
+    player: PartialNamePlayer.makeUnsafe({ name }),
+    enc: false,
+  });
+
+const makeSchedule = (fills: ReadonlyArray<PopulatedSchedulePlayer>) =>
+  PopulatedSchedule.makeUnsafe({
+    channel: "room-1",
+    day: 1,
+    visible: true,
+    hour: Option.some(1),
+    hourWindow: Option.none(),
+    fills: [0, 1, 2, 3, 4].map((index) =>
+      index < fills.length ? Option.some(fills[index]!) : Option.none(),
+    ),
+    overfills: [],
+    standbys: [],
+    runners: [],
+    monitor: Option.none(),
+  });
 
 describe("makeMonitorCheckinMessage", () => {
   it("shows the new no-change copy and empty slots for a partially filled row", () => {
@@ -75,5 +113,30 @@ describe("makeMonitorCheckinMessage", () => {
         lookupFailedMessage: Option.none(),
       }),
     ).toBe("Check-in message sent!\n+2 empty slots\nOut: None\nStay: <@1> <@2>\nIn: None");
+  });
+});
+
+describe("getScheduleFillCount", () => {
+  it("counts all standard fills in the target hour", () => {
+    const schedule = makeSchedule([
+      makeResolvedFill("1", "Alice"),
+      makeResolvedFill("2", "Bob"),
+      makeResolvedFill("3", "Carol"),
+      makeResolvedFill("4", "Dave"),
+      makeResolvedFill("5", "Eve"),
+    ]);
+
+    expect(getScheduleFillCount(Option.some(schedule))).toBe(5);
+  });
+
+  it("counts both resolved and partial-name fills toward the threshold", () => {
+    const schedule = makeSchedule([
+      makeResolvedFill("1", "Alice"),
+      makeResolvedFill("2", "Bob"),
+      makePartialFill("Carol"),
+      makePartialFill("Dave"),
+    ]);
+
+    expect(getScheduleFillCount(Option.some(schedule))).toBe(4);
   });
 });

@@ -10,6 +10,8 @@ import {
   EmbedService,
   GuildConfigService,
   MessageCheckinService,
+  RoomOrderService,
+  sendTentativeRoomOrder,
   SheetApisRequestContext,
 } from "../services";
 
@@ -27,6 +29,7 @@ const processChannel = Effect.fn("processChannel")(function* (
   const messageCheckinService = yield* MessageCheckinService;
   const embedService = yield* EmbedService;
   const discordRest = yield* DiscordREST;
+  const roomOrderService = yield* RoomOrderService;
 
   const generated = yield* checkinService.generate({
     guildId,
@@ -54,6 +57,15 @@ const processChannel = Effect.fn("processChannel")(function* (
     if (generated.fillIds.length > 0) {
       yield* messageCheckinService.addMessageCheckinMembers(messageResult.id, generated.fillIds);
     }
+
+    yield* sendTentativeRoomOrder({
+      guildId,
+      runningChannelId: generated.runningChannelId,
+      hour: generated.hour,
+      fillCount: generated.fillCount,
+      roomOrderService,
+      sender: discordRest,
+    });
   }
 
   const embedDescriptionParts = [
@@ -137,6 +149,7 @@ export const autoCheckinTaskLayer = Layer.effectDiscard(
                   ConverterService.layer,
                   EmbedService.layer,
                   MessageCheckinService.layer,
+                  RoomOrderService.layer,
                 ),
               ),
               Effect.catch((err) => pipe(Effect.logError(err), Effect.as(0))),

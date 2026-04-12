@@ -6,6 +6,7 @@ export class CheckinGenerateResult extends Schema.TaggedClass<CheckinGenerateRes
     hour: Schema.Number,
     runningChannelId: Schema.String,
     checkinChannelId: Schema.String,
+    fillCount: Schema.Number,
     roleId: Schema.NullOr(Schema.String),
     initialMessage: Schema.NullOr(Schema.String),
     monitorCheckinMessage: Schema.String,

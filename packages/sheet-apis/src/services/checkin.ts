@@ -189,6 +189,9 @@ const getFillIds = (schedule: Option.Option<PopulatedScheduleResult>) => [
   ),
 ];
 
+export const getScheduleFillCount = (schedule: Option.Option<PopulatedScheduleResult>): number =>
+  getScheduleFills(Option.getOrNull(schedule)).length;
+
 const getLookupFailedMessage = (schedule: Option.Option<PopulatedScheduleResult>) => {
   if (Option.isNone(schedule) || !isPopulatedSchedule(schedule.value)) {
     return Option.none<string>();
@@ -322,6 +325,7 @@ export class CheckinService extends ServiceMap.Service<CheckinService>()("Checki
           toFillParticipant,
         );
         const participants = getScheduleFills(Option.getOrNull(schedule)).map(toFillParticipant);
+        const fillCount = getScheduleFillCount(schedule);
         const fillMovement = diffFillParticipants(prevParticipants, participants);
         const fillIds = getFillIds(schedule) as readonly string[];
         const mentions = fillMovement.in.map(({ label }) => label);
@@ -400,6 +404,7 @@ export class CheckinService extends ServiceMap.Service<CheckinService>()("Checki
             runningChannel.checkinChannelId,
             () => runningChannel.channelId,
           ),
+          fillCount,
           roleId: Option.getOrNull(runningChannel.roleId),
           initialMessage,
           monitorCheckinMessage: makeMonitorCheckinMessage({

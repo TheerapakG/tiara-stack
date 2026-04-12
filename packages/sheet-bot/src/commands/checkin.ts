@@ -9,7 +9,13 @@ import { Ix } from "dfx/index";
 import { discordGatewayLayer } from "../discord/gateway";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
-import { CheckinService, MessageCheckinService, SheetApisRequestContext } from "../services";
+import {
+  CheckinService,
+  MessageCheckinService,
+  RoomOrderService,
+  sendTentativeRoomOrder,
+  SheetApisRequestContext,
+} from "../services";
 import { checkinButtonData } from "../messageComponents/buttons/checkin";
 import { makeMessageActionRowData } from "dfx-discord-utils/utils";
 
@@ -37,6 +43,7 @@ const getInteractionUserId = Effect.gen(function* () {
 const makeManualSubCommand = Effect.gen(function* () {
   const checkinService = yield* CheckinService;
   const messageCheckinService = yield* MessageCheckinService;
+  const roomOrderService = yield* RoomOrderService;
 
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
@@ -119,6 +126,15 @@ const makeManualSubCommand = Effect.gen(function* () {
             generated.fillIds,
           );
         }
+
+        yield* sendTentativeRoomOrder({
+          guildId,
+          runningChannelId: generated.runningChannelId,
+          hour: generated.hour,
+          fillCount: generated.fillCount,
+          roomOrderService,
+          sender: command.rest,
+        });
       }
 
       yield* command.editReply({
@@ -172,6 +188,11 @@ export const checkinCommandLayer = Layer.effectDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(discordGatewayLayer, CheckinService.layer, MessageCheckinService.layer),
+    Layer.mergeAll(
+      discordGatewayLayer,
+      CheckinService.layer,
+      MessageCheckinService.layer,
+      RoomOrderService.layer,
+    ),
   ),
 );
