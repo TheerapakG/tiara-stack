@@ -245,15 +245,15 @@ export function copyRange({
   targetColumnStart: string;
   targetColumnEnd: string;
 }) {
-  targetSheet
-    .getRange(`${targetColumnStart}${targetRowStart}:${targetColumnEnd}${targetRowStart + rows}`)
-    .setValues(
-      sourceSheet
-        .getRange(
-          `${sourceColumnStart}${sourceRowStart}:${sourceColumnEnd}${sourceRowStart + rows}`,
-        )
-        .getValues(),
-    );
+  const sourceRange = sourceSheet.getRange(
+    `${sourceColumnStart}${sourceRowStart}:${sourceColumnEnd}${sourceRowStart + rows}`,
+  );
+  const targetRange = targetSheet.getRange(
+    `${targetColumnStart}${targetRowStart}:${targetColumnEnd}${targetRowStart + rows}`,
+  );
+
+  targetRange.setValues(sourceRange.getValues());
+  targetRange.setFontWeights(sourceRange.getFontWeights());
 }
 
 export function TZSHORTSTAMPS(start: CellValue, tzs: CellValue[][], hours: CellValue[][]) {
