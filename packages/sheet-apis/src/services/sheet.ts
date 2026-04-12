@@ -37,7 +37,7 @@ import { upperFirst } from "scule";
 import { TupleToStructValueSchema } from "typhoon-core/schema";
 import { Array as ArrayUtils, ScopedCache, Struct as StructUtils } from "typhoon-core/utils";
 
-import { GoogleSheets } from "./google/sheets";
+import { GoogleSheets, toCellOption } from "./google/sheets";
 import { SheetConfigService } from "./sheetConfig";
 
 class ConfigField<Range> extends Data.TaggedClass("ConfigField")<{
@@ -189,6 +189,16 @@ const teamBaseRange = (teamConfigValue: FilteredTeamConfigValue) =>
   }) as const;
 
 const playerNameRegex = regex("^(?<name>.*?)\\s+(?<enc>\\(e(?:nc)?\\))?$");
+type RowDataCell = Schema.Schema.Type<typeof GoogleSheets.rowDataSchema>[number];
+
+const isRegexEnc = (value: string) => playerNameRegex.exec(value)?.groups?.enc !== undefined;
+
+const isFillEnc = (encType: string, fillCell: RowDataCell, value: string) =>
+  encType === "regex"
+    ? isRegexEnc(value)
+    : encType === "bold"
+      ? GoogleSheets.rowDataCellIsBold(fillCell)
+      : false;
 
 const teamBaseParser = (
   teamConfigValue: FilteredTeamConfigValue,
@@ -719,7 +729,7 @@ const baseScheduleParser = (
                 GoogleSheets.rowDataToCellSchema,
                 Schema.decodeTo(GoogleSheets.cellToNumberSchema),
               ),
-              fills: GoogleSheets.rowDataToRowSchema,
+              fills: GoogleSheets.rowDataSchema,
               overfills: pipe(
                 GoogleSheets.rowDataToCellSchema,
                 Schema.decodeTo(GoogleSheets.cellToStringArraySchema),
@@ -830,15 +840,16 @@ const scheduleParser = (
                 fills: Array.makeBy(5, (i) =>
                   pipe(
                     Array.get(fills, i),
-                    Option.flatten,
-                    Option.map((fill) =>
-                      RawSchedulePlayer.makeUnsafe({
-                        player: upperFirst(fill),
-                        enc:
-                          scheduleConfig.encType === "regex"
-                            ? playerNameRegex.exec(fill)?.groups?.enc !== undefined
-                            : false,
-                      }),
+                    Option.flatMap((fillCell) =>
+                      pipe(
+                        toCellOption(fillCell.formattedValue),
+                        Option.map((fill) =>
+                          RawSchedulePlayer.makeUnsafe({
+                            player: upperFirst(fill),
+                            enc: isFillEnc(scheduleConfig.encType, fillCell, fill),
+                          }),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -848,10 +859,7 @@ const scheduleParser = (
                   Array.map((overfill) =>
                     RawSchedulePlayer.makeUnsafe({
                       player: upperFirst(overfill),
-                      enc:
-                        scheduleConfig.encType === "regex"
-                          ? playerNameRegex.exec(overfill)?.groups?.enc !== undefined
-                          : false,
+                      enc: scheduleConfig.encType === "regex" ? isRegexEnc(overfill) : false,
                     }),
                   ),
                 ),
@@ -861,10 +869,7 @@ const scheduleParser = (
                   Array.map((standby) =>
                     RawSchedulePlayer.makeUnsafe({
                       player: upperFirst(standby),
-                      enc:
-                        scheduleConfig.encType === "regex"
-                          ? playerNameRegex.exec(standby)?.groups?.enc !== undefined
-                          : false,
+                      enc: scheduleConfig.encType === "regex" ? isRegexEnc(standby) : false,
                     }),
                   ),
                 ),

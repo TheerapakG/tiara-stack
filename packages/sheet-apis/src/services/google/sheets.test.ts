@@ -37,4 +37,29 @@ describe("GoogleSheets", () => {
   it("decodes empty row-data cells to none", () => {
     expect(Schema.decodeUnknownSync(GoogleSheets.rowDataToCellSchema)([{}])).toEqual(Option.none());
   });
+
+  it("prefers effective format when checking whether a cell is bold", () => {
+    const [cell] = Schema.decodeUnknownSync(GoogleSheets.rowDataSchema)([
+      {
+        formattedValue: "Alice",
+        effectiveFormat: { textFormat: { bold: true } },
+        userEnteredFormat: { textFormat: { bold: false } },
+      },
+    ]);
+
+    expect(cell).toBeDefined();
+    expect(GoogleSheets.rowDataCellIsBold(cell!)).toBe(true);
+  });
+
+  it("falls back to user-entered format when effective format is missing", () => {
+    const [cell] = Schema.decodeUnknownSync(GoogleSheets.rowDataSchema)([
+      {
+        formattedValue: "Alice",
+        userEnteredFormat: { textFormat: { bold: true } },
+      },
+    ]);
+
+    expect(cell).toBeDefined();
+    expect(GoogleSheets.rowDataCellIsBold(cell!)).toBe(true);
+  });
 });

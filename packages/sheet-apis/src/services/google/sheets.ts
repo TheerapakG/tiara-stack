@@ -123,12 +123,27 @@ const parseValueRanges = <
   ).pipe(Effect.withSpan("parseValueRanges"));
 };
 
+const textFormatSchema = Schema.Struct({
+  bold: Schema.optional(Schema.NullOr(Schema.Boolean)),
+});
+const cellFormatSchema = Schema.Struct({
+  textFormat: Schema.optional(Schema.NullOr(textFormatSchema)),
+});
 const rowDataCellSchema = Schema.Struct({
   formattedValue: Schema.optional(Schema.NullOr(Schema.String)),
+  effectiveFormat: Schema.optional(Schema.NullOr(cellFormatSchema)),
+  userEnteredFormat: Schema.optional(Schema.NullOr(cellFormatSchema)),
 });
 const rowDataSchema = Schema.Array(rowDataCellSchema);
 const cellSchema = Schema.Option(Schema.String);
 const rowSchema = Schema.Array(cellSchema);
+
+// Google Sheets uses null for "unset", so nullish-coalescing correctly falls back
+// from effectiveFormat to userEnteredFormat before defaulting to false.
+const rowDataCellIsBold = (rowDataCell: Schema.Schema.Type<typeof rowDataCellSchema>) =>
+  rowDataCell.effectiveFormat?.textFormat?.bold ??
+  rowDataCell.userEnteredFormat?.textFormat?.bold ??
+  false;
 
 const rowDataCellToCellSchema = Schema.toType(rowDataCellSchema).pipe(
   Schema.decodeTo(cellSchema, {
@@ -630,6 +645,7 @@ export class GoogleSheets extends ServiceMap.Service<GoogleSheets>()("GoogleShee
   static rowDataCellToCellSchema = rowDataCellToCellSchema;
   static rowDataToRowSchema = rowDataToRowSchema;
   static rowDataToCellSchema = rowDataToCellSchema;
+  static rowDataCellIsBold = rowDataCellIsBold;
   static toStringSchema = toStringSchema;
   static cellToStringSchema = cellToSchema(toStringSchema);
   static toNumberSchema = toNumberSchema;
