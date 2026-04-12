@@ -1,0 +1,69 @@
+import { Option } from "effect";
+import {
+  type Player,
+  type PopulatedSchedulePlayer,
+  type PopulatedScheduleResult,
+} from "@/schemas/sheet";
+
+export type FillParticipant = {
+  key: string;
+  label: string;
+  name: string;
+};
+
+const isPlayer = (player: PopulatedSchedulePlayer["player"]): player is Player =>
+  player._tag === "Player";
+
+const dedupeParticipants = (
+  participants: ReadonlyArray<FillParticipant>,
+): ReadonlyArray<FillParticipant> => {
+  const seen = new Set<string>();
+  return participants.filter((participant) => {
+    if (seen.has(participant.key)) {
+      return false;
+    }
+
+    seen.add(participant.key);
+    return true;
+  });
+};
+
+export const getScheduleFills = (
+  schedule: PopulatedScheduleResult | null | undefined,
+): ReadonlyArray<PopulatedSchedulePlayer> =>
+  schedule && schedule._tag === "PopulatedSchedule"
+    ? schedule.fills.flatMap((fill) => (Option.isSome(fill) ? [fill.value] : []))
+    : [];
+
+export const toFillParticipant = (schedulePlayer: PopulatedSchedulePlayer): FillParticipant =>
+  isPlayer(schedulePlayer.player)
+    ? {
+        key: `player:${schedulePlayer.player.id}`,
+        label: `<@${schedulePlayer.player.id}>`,
+        name: schedulePlayer.player.name,
+      }
+    : {
+        key: `name:${schedulePlayer.player.name}`,
+        label: schedulePlayer.player.name,
+        name: schedulePlayer.player.name,
+      };
+
+export const diffFillParticipants = (
+  previousParticipants: ReadonlyArray<FillParticipant>,
+  currentParticipants: ReadonlyArray<FillParticipant>,
+): {
+  out: ReadonlyArray<FillParticipant>;
+  stay: ReadonlyArray<FillParticipant>;
+  in: ReadonlyArray<FillParticipant>;
+} => {
+  const previous = dedupeParticipants(previousParticipants);
+  const current = dedupeParticipants(currentParticipants);
+  const previousKeys = new Set(previous.map(({ key }) => key));
+  const currentKeys = new Set(current.map(({ key }) => key));
+
+  return {
+    out: previous.filter(({ key }) => !currentKeys.has(key)),
+    stay: current.filter(({ key }) => previousKeys.has(key)),
+    in: current.filter(({ key }) => !previousKeys.has(key)),
+  };
+};

@@ -9,7 +9,7 @@ describe("makeMonitorCheckinMessage", () => {
         initialMessage: null,
         empty: 2,
         emptySlotMessage: "+2 empty slots",
-        playersMessage: "Players: <@1> <@2> <@3>",
+        playerChangesMessage: "Out: None\nStay: <@1> <@2>\nIn: <@3>",
         lookupFailedMessage: Option.none(),
       }),
     ).toBe("No check-in message sent, no new players to check in\n+2 empty slots");
@@ -21,7 +21,7 @@ describe("makeMonitorCheckinMessage", () => {
         initialMessage: null,
         empty: 1,
         emptySlotMessage: "+1 empty slot",
-        playersMessage: "Players: <@1> <@2> <@3> <@4>",
+        playerChangesMessage: "Out: None\nStay: <@1> <@2> <@3>\nIn: <@4>",
         lookupFailedMessage: Option.none(),
       }),
     ).toBe("No check-in message sent, no new players to check in\n+1 empty slot");
@@ -33,7 +33,7 @@ describe("makeMonitorCheckinMessage", () => {
         initialMessage: null,
         empty: 0,
         emptySlotMessage: "No empty slots",
-        playersMessage: "Players: <@1> <@2> <@3> <@4> <@5>",
+        playerChangesMessage: "Out: None\nStay: <@1> <@2> <@3> <@4>\nIn: <@5>",
         lookupFailedMessage: Option.none(),
       }),
     ).toBe("No check-in message sent, no new players to check in");
@@ -45,7 +45,7 @@ describe("makeMonitorCheckinMessage", () => {
         initialMessage: null,
         empty: 5,
         emptySlotMessage: "+5 empty slots",
-        playersMessage: "Players: ",
+        playerChangesMessage: "Out: None\nStay: None\nIn: None",
         lookupFailedMessage: Option.none(),
       }),
     ).toBe("No check-in message sent, no new players to check in");
@@ -57,23 +57,23 @@ describe("makeMonitorCheckinMessage", () => {
         initialMessage: "hello",
         empty: 2,
         emptySlotMessage: "+2 empty slots",
-        playersMessage: "Players: <@1> <@2> <@3>",
+        playerChangesMessage: "Out: <@1>\nStay: <@2>\nIn: <@3>",
         lookupFailedMessage: Option.some("Cannot look up Discord ID for Alice."),
       }),
     ).toBe(
-      "Check-in message sent!\n+2 empty slots\nPlayers: <@1> <@2> <@3>\nCannot look up Discord ID for Alice.",
+      "Check-in message sent!\n+2 empty slots\nOut: <@1>\nStay: <@2>\nIn: <@3>\nCannot look up Discord ID for Alice.",
     );
   });
 
-  it("omits lookup-failed message in sent-message branch when none", () => {
+  it("renders empty movement buckets as None when they have no players", () => {
     expect(
       makeMonitorCheckinMessage({
         initialMessage: "hello",
         empty: 2,
         emptySlotMessage: "+2 empty slots",
-        playersMessage: "Players: <@1> <@2> <@3>",
+        playerChangesMessage: "Out: None\nStay: <@1> <@2>\nIn: None",
         lookupFailedMessage: Option.none(),
       }),
-    ).toBe("Check-in message sent!\n+2 empty slots\nPlayers: <@1> <@2> <@3>");
+    ).toBe("Check-in message sent!\n+2 empty slots\nOut: None\nStay: <@1> <@2>\nIn: None");
   });
 });

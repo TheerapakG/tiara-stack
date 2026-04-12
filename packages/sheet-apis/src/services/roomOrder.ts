@@ -4,6 +4,12 @@ import { GuildConfigService } from "./guildConfig";
 import { ScheduleService } from "./schedule";
 import { CalcConfig, CalcService } from "./calc";
 import { SheetService } from "./sheet";
+import {
+  type FillParticipant,
+  diffFillParticipants,
+  getScheduleFills,
+  toFillParticipant,
+} from "./fillMovement";
 import { GeneratedRoomOrderEntry, RoomOrderGenerateResult } from "@/schemas/roomOrder";
 import { MessageRoomOrderRange } from "@/schemas/messageRoomOrder";
 import {
@@ -19,13 +25,6 @@ type SheetServiceApi = Effect.Success<typeof SheetService.make>;
 
 const isPlayer = (player: PopulatedSchedulePlayer["player"]): player is Player =>
   player._tag === "Player";
-
-const getFills = (
-  schedule: PopulatedScheduleResult | undefined,
-): ReadonlyArray<PopulatedSchedulePlayer> =>
-  schedule && schedule._tag === "PopulatedSchedule"
-    ? schedule.fills.flatMap((fill) => (Option.isSome(fill) ? [fill.value] : []))
-    : [];
 
 const formatEffectValue = (effectValue: number): string => {
   const rounded = Math.round(effectValue * 10) / 10;
@@ -132,12 +131,11 @@ const buildContent = (
   start: DateTime.DateTime,
   end: DateTime.DateTime,
   monitor: string | null,
-  previousFills: ReadonlyArray<string>,
-  fills: ReadonlyArray<string>,
+  previousParticipants: ReadonlyArray<FillParticipant>,
+  participants: ReadonlyArray<FillParticipant>,
   entries: ReadonlyArray<GeneratedRoomOrderEntry>,
 ) => {
-  const inPlayers = [...new Set(fills.filter((fill) => !previousFills.includes(fill)))];
-  const outPlayers = [...new Set(previousFills.filter((fill) => !fills.includes(fill)))];
+  const fillMovement = diffFillParticipants(previousParticipants, participants);
 
   return [
     `**Hour ${hour}** ${formatDiscordTimestamp(start)} - ${formatDiscordTimestamp(end)}`,
@@ -157,8 +155,8 @@ const buildContent = (
       return `\`P${position + 1}:\`  ${team}${effectStr}`;
     }),
     "",
-    `\`In:\` ${inPlayers.length > 0 ? inPlayers.join(", ") : "(none)"}`,
-    `\`Out:\` ${outPlayers.length > 0 ? outPlayers.join(", ") : "(none)"}`,
+    `\`In:\` ${fillMovement.in.length > 0 ? fillMovement.in.map(({ name }) => name).join(", ") : "(none)"}`,
+    `\`Out:\` ${fillMovement.out.length > 0 ? fillMovement.out.map(({ name }) => name).join(", ") : "(none)"}`,
   ].join("\n");
 };
 
@@ -198,8 +196,8 @@ export class RoomOrderService extends ServiceMap.Service<RoomOrderService>()("Ro
         const previousSchedule = schedulesByHour.get(hour - 1);
         const currentSchedule = schedulesByHour.get(hour);
 
-        const previousFills = getFills(previousSchedule);
-        const fills = getFills(currentSchedule);
+        const previousFills = getScheduleFills(previousSchedule);
+        const fills = getScheduleFills(currentSchedule);
 
         const previousFillNames = previousFills.map((fill) => fill.player.name);
         const fillNames = fills.map((fill) => fill.player.name);
@@ -274,8 +272,8 @@ export class RoomOrderService extends ServiceMap.Service<RoomOrderService>()("Ro
             start,
             end,
             monitor,
-            previousFillNames,
-            fillNames,
+            previousFills.map(toFillParticipant),
+            fills.map(toFillParticipant),
             firstRankEntries,
           ),
           range: MessageRoomOrderRange.makeUnsafe({

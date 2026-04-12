@@ -14,6 +14,7 @@ import {
 import { GuildConfigService } from "./guildConfig";
 import { ScheduleService } from "./schedule";
 import { SheetConfigService } from "./sheetConfig";
+import { diffFillParticipants, getScheduleFills, toFillParticipant } from "./fillMovement";
 
 type GuildConfigServiceApi = Effect.Success<typeof GuildConfigService.make>;
 type SheetConfigServiceApi = Effect.Success<typeof SheetConfigService.make>;
@@ -91,7 +92,6 @@ const renderTemplate = (template: string, context: Record<string, string>) =>
 const formatRelativeDiscordTime = (dateTime: DateTime.DateTime) =>
   `<t:${Math.floor(DateTime.toEpochMillis(dateTime) / 1000)}:R>`;
 
-const formatUserMention = (userId: string) => `<@${userId}>`;
 const formatChannelMention = (channelId: string) => `<#${channelId}>`;
 
 const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigServiceApi) =>
@@ -178,29 +178,14 @@ const deriveHour = Effect.fn("CheckinService.deriveHour")(function* (
   };
 });
 
-const getSchedulePlayers = (
-  schedule: Option.Option<PopulatedScheduleResult>,
-  toValue: (player: PopulatedSchedulePlayer) => string,
-) => {
-  if (Option.isNone(schedule) || !isPopulatedSchedule(schedule.value)) {
-    return [] as string[];
-  }
-  return schedule.value.fills.flatMap((fill) => (Option.isSome(fill) ? [toValue(fill.value)] : []));
-};
-
-const schedulePlayerToMentionOrName = (schedulePlayer: PopulatedSchedulePlayer) =>
-  isPlayer(schedulePlayer.player)
-    ? formatUserMention(schedulePlayer.player.id)
-    : schedulePlayer.player.name;
-
 const schedulePlayerToUserId = (schedulePlayer: PopulatedSchedulePlayer) =>
   isPlayer(schedulePlayer.player) ? Option.some(schedulePlayer.player.id) : Option.none<string>();
 
 const getFillIds = (schedule: Option.Option<PopulatedScheduleResult>) => [
   ...new Set(
-    getSchedulePlayers(schedule, (player) =>
-      Option.getOrElse(schedulePlayerToUserId(player), () => ""),
-    ).filter(Boolean),
+    getScheduleFills(Option.getOrNull(schedule))
+      .map((player) => Option.getOrElse(schedulePlayerToUserId(player), () => ""))
+      .filter(Boolean),
   ),
 ];
 
@@ -253,20 +238,20 @@ export const makeMonitorCheckinMessage = ({
   initialMessage,
   empty,
   emptySlotMessage,
-  playersMessage,
+  playerChangesMessage,
   lookupFailedMessage,
 }: {
   initialMessage: string | null;
   empty: number;
   emptySlotMessage: string;
-  playersMessage: string;
+  playerChangesMessage: string;
   lookupFailedMessage: Option.Option<string>;
 }) =>
   initialMessage
     ? [
         "Check-in message sent!",
         emptySlotMessage,
-        playersMessage,
+        playerChangesMessage,
         ...Option.toArray(lookupFailedMessage),
       ].join("\n")
     : [
@@ -288,6 +273,12 @@ const formatChannelString = (
         ),
       )
     : `head to ${formatChannelMention(channelId)}`;
+
+const renderParticipantGroup = (
+  label: "Out" | "Stay" | "In",
+  participants: ReadonlyArray<{ label: string }>,
+) =>
+  `${label}: ${participants.length > 0 ? participants.map(({ label }) => label).join(" ") : "None"}`;
 
 export class CheckinService extends ServiceMap.Service<CheckinService>()("CheckinService", {
   make: Effect.gen(function* () {
@@ -327,10 +318,13 @@ export class CheckinService extends ServiceMap.Service<CheckinService>()("Checki
           ? Option.some(schedulesByHour.get(hour)!)
           : Option.none<PopulatedScheduleResult>();
 
-        const prevFills = getSchedulePlayers(prevSchedule, schedulePlayerToMentionOrName);
-        const fills = getSchedulePlayers(schedule, schedulePlayerToMentionOrName);
+        const prevParticipants = getScheduleFills(Option.getOrNull(prevSchedule)).map(
+          toFillParticipant,
+        );
+        const participants = getScheduleFills(Option.getOrNull(schedule)).map(toFillParticipant);
+        const fillMovement = diffFillParticipants(prevParticipants, participants);
         const fillIds = getFillIds(schedule) as readonly string[];
-        const mentions = [...new Set(fills.filter((fill) => !prevFills.includes(fill)))];
+        const mentions = fillMovement.in.map(({ label }) => label);
         const mentionsString =
           mentions.length > 0 ? Option.some(mentions.join(" ")) : Option.none<string>();
 
@@ -391,7 +385,11 @@ export class CheckinService extends ServiceMap.Service<CheckinService>()("Checki
             ? PopulatedSchedule.empty(schedule.value)
             : SLOTS_PER_ROW;
         const emptySlotMessage = `${empty > 0 ? `+${empty}` : "No"} empty slot${empty > 1 ? "s" : ""}`;
-        const playersMessage = `Players: ${fills.join(" ")}`;
+        const playerChangesMessage = [
+          renderParticipantGroup("Out", fillMovement.out),
+          renderParticipantGroup("Stay", fillMovement.stay),
+          renderParticipantGroup("In", fillMovement.in),
+        ].join("\n");
         const lookupFailedMessage = getLookupFailedMessage(schedule);
         const monitorInfo = getMonitorInfo(schedule);
 
@@ -408,7 +406,7 @@ export class CheckinService extends ServiceMap.Service<CheckinService>()("Checki
             initialMessage,
             empty,
             emptySlotMessage,
-            playersMessage,
+            playerChangesMessage,
             lookupFailedMessage,
           }),
           monitorUserId: monitorInfo.monitorUserId,
