@@ -10,6 +10,7 @@ const makePlayerTeam = ({
   lead = 10,
   backline = 10,
   talent = 10,
+  tags = [],
 }: {
   playerId: Option.Option<string>;
   playerName: Option.Option<string>;
@@ -17,6 +18,7 @@ const makePlayerTeam = ({
   lead?: number;
   backline?: number;
   talent?: number;
+  tags?: ReadonlyArray<string>;
 }) =>
   new PlayerTeam({
     type: "Test",
@@ -26,7 +28,7 @@ const makePlayerTeam = ({
     lead,
     backline,
     talent,
-    tags: HashSet.empty(),
+    tags: HashSet.fromIterable(tags),
   });
 
 describe("CalcService", () => {
@@ -147,5 +149,61 @@ describe("CalcService", () => {
           Chunk.toArray(roomArray[1]?.teams ?? Chunk.empty()).map((team) => team.teamName),
         ).not.toContain("High Talent Same Effect");
       }).pipe(Effect.provide(CalcService.layer)),
+  );
+
+  it.effect("tags non-enc teams with not_enc when enc is considered", () =>
+    Effect.gen(function* () {
+      const calcService = yield* CalcService;
+      const rooms = yield* calcService.calc(new CalcConfig({ healNeeded: 0, considerEnc: true }), [
+        [
+          makePlayerTeam({
+            playerId: Option.some("player-1"),
+            playerName: Option.some("Alice"),
+            teamName: "Enc Team",
+            lead: 20,
+            backline: 20,
+            talent: 5,
+            tags: ["encable"],
+          }),
+        ],
+        [
+          makePlayerTeam({
+            playerId: Option.some("player-2"),
+            playerName: Option.some("Bob"),
+            teamName: "Same Talent",
+            lead: 10,
+            backline: 10,
+            talent: 5,
+          }),
+        ],
+        [
+          makePlayerTeam({
+            playerId: Option.some("player-3"),
+            playerName: Option.some("Carol"),
+            teamName: "Higher Talent",
+            lead: 8,
+            backline: 8,
+            talent: 6,
+          }),
+        ],
+      ]);
+
+      const [room] = Chunk.toArray(rooms);
+      const roomTeams = Chunk.toArray(room?.teams ?? Chunk.empty());
+      const encTeam = roomTeams.find((team) => team.teamName === "Enc Team");
+      const sameTalentTeam = roomTeams.find((team) => team.teamName === "Same Talent");
+      const higherTalentTeam = roomTeams.find((team) => team.teamName === "Higher Talent");
+
+      expect(encTeam).toBeDefined();
+      expect(sameTalentTeam).toBeDefined();
+      expect(higherTalentTeam).toBeDefined();
+      expect(HashSet.has(encTeam!.tags, "enc")).toBe(true);
+      expect(HashSet.has(encTeam!.tags, "not_enc")).toBe(false);
+      expect(HashSet.has(sameTalentTeam!.tags, "not_enc")).toBe(true);
+      expect(HashSet.has(higherTalentTeam!.tags, "not_enc")).toBe(true);
+      expect(HashSet.size(encTeam!.tags)).toBe(2);
+      expect(HashSet.size(sameTalentTeam!.tags)).toBe(1);
+      expect(HashSet.size(higherTalentTeam!.tags)).toBe(1);
+    }).pipe(Effect.provide(CalcService.layer)),
   );
 });

@@ -148,7 +148,7 @@ const buildContent = (
         : [
             formatEffectValue(effectValue),
             ...(tags.includes("enc") ? ["enc"] : []),
-            ...(tags.includes("avoid_enc") ? ["avoid enc"] : []),
+            ...(tags.includes("not_enc") ? ["not enc"] : []),
           ];
 
       const effectStr = effectParts.length > 0 ? ` (${effectParts.join(", ")})` : "";

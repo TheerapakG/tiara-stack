@@ -134,7 +134,7 @@ const makeRoomOrderReply = (
                   [
                     Option.some(formatEffectValue(effectValue)),
                     tags.includes("enc") ? Option.some("enc") : Option.none(),
-                    tags.includes("avoid_enc") ? Option.some("avoid enc") : Option.none(),
+                    tags.includes("not_enc") ? Option.some("not enc") : Option.none(),
                   ],
                   Array.getSomes,
                 );
