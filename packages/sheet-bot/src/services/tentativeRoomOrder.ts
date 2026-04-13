@@ -1,4 +1,6 @@
+import { Discord } from "dfx";
 import { Effect } from "effect";
+import { tentativeRoomOrderActionRow } from "../messageComponents/buttons/roomOrderComponents";
 
 const MIN_FILL_COUNT = 5;
 const TENTATIVE_PREFIX = "(tentative)";
@@ -6,8 +8,8 @@ const TENTATIVE_PREFIX = "(tentative)";
 type TentativeRoomOrderSender = {
   createMessage: (
     channelId: string,
-    payload: { content: string },
-  ) => Effect.Effect<unknown, unknown, never>;
+    payload: Discord.MessageCreateRequest,
+  ) => Effect.Effect<unknown, unknown, unknown>;
 };
 
 type TentativeRoomOrderGenerator = {
@@ -17,7 +19,7 @@ type TentativeRoomOrderGenerator = {
     channelName?: string | undefined;
     hour?: number | undefined;
     healNeeded?: number | undefined;
-  }) => Effect.Effect<{ content: string }, unknown, never>;
+  }) => Effect.Effect<{ content: string }, unknown, unknown>;
 };
 
 export const formatTentativeRoomOrderContent = (content: string): string =>
@@ -55,6 +57,7 @@ export const sendTentativeRoomOrder = Effect.fn("sendTentativeRoomOrder")(functi
       Effect.flatMap((generated) =>
         sender.createMessage(runningChannelId, {
           content: formatTentativeRoomOrderContent(generated.content),
+          components: [tentativeRoomOrderActionRow().toJSON()],
         }),
       ),
       Effect.catchCause((cause) =>

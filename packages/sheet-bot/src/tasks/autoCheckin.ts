@@ -57,15 +57,6 @@ const processChannel = Effect.fn("processChannel")(function* (
     if (generated.fillIds.length > 0) {
       yield* messageCheckinService.addMessageCheckinMembers(messageResult.id, generated.fillIds);
     }
-
-    yield* sendTentativeRoomOrder({
-      guildId,
-      runningChannelId: generated.runningChannelId,
-      hour: generated.hour,
-      fillCount: generated.fillCount,
-      roomOrderService,
-      sender: discordRest,
-    });
   }
 
   const embedDescriptionParts = [
@@ -97,6 +88,17 @@ const processChannel = Effect.fn("processChannel")(function* (
         ? { users: [monitorUserId] as const }
         : { parse: [] as const },
   });
+
+  if (generated.initialMessage !== null) {
+    yield* sendTentativeRoomOrder({
+      guildId,
+      runningChannelId: generated.runningChannelId,
+      hour: generated.hour,
+      fillCount: generated.fillCount,
+      roomOrderService,
+      sender: discordRest,
+    });
+  }
 
   return generated.initialMessage !== null ? 1 : 0;
 });

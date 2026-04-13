@@ -1,23 +1,26 @@
 import { InteractionsRegistry } from "dfx/gateway";
 import { bold, inlineCode, time, TimestampStyles } from "@discordjs/formatters";
-import { ButtonStyle, MessageFlags } from "discord-api-types/v10";
+import { MessageFlags } from "discord-api-types/v10";
 import { Ix } from "dfx/index";
 import { Array, Effect, HashSet, Layer, Option, pipe } from "effect";
-import {
-  Interaction,
-  makeButton,
-  makeButtonData,
-  makeMessageActionRowData,
-  makeMessageComponent,
-} from "dfx-discord-utils/utils";
+import { Interaction, makeButton, makeMessageComponent } from "dfx-discord-utils/utils";
 import { MessageRoomOrder } from "sheet-apis/schema";
 import { discordGatewayLayer } from "../../discord/gateway";
+import {
+  nextButtonData,
+  previousButtonData,
+  roomOrderActionRow,
+  sendButtonData,
+  tentativePinButtonData,
+  tentativeRoomOrderActionRow,
+} from "./roomOrderComponents";
 import {
   ConverterService,
   HourWindow,
   FormatService,
   FormattedHourWindow,
   MessageRoomOrderService,
+  PermissionService,
   SheetApisRequestContext,
 } from "@/services";
 
@@ -42,30 +45,6 @@ const getInteractionMessage = Effect.gen(function* () {
     Option.map((message) => message as { id: string; channel_id: string }),
   );
 });
-
-const previousButtonData = makeButtonData((b) =>
-  b
-    .setCustomId("interaction:roomOrder:previous")
-    .setLabel("Previous")
-    .setStyle(ButtonStyle.Secondary),
-);
-
-const nextButtonData = makeButtonData((b) =>
-  b.setCustomId("interaction:roomOrder:next").setLabel("Next").setStyle(ButtonStyle.Secondary),
-);
-
-const sendButtonData = makeButtonData((b) =>
-  b.setCustomId("interaction:roomOrder:send").setLabel("Send").setStyle(ButtonStyle.Primary),
-);
-
-export const roomOrderActionRow = (range: { minRank: number; maxRank: number }, rank: number) =>
-  makeMessageActionRowData((b) =>
-    b.setComponents(
-      previousButtonData.setDisabled(range.minRank === rank),
-      nextButtonData.setDisabled(range.maxRank === rank),
-      sendButtonData,
-    ),
-  );
 
 const renderDelta = (current: ReadonlyArray<string>, previous: ReadonlyArray<string>) => {
   const values = globalThis.Array.from(
@@ -253,21 +232,96 @@ const makeRoomOrderSendButtonHandler = Effect.gen(function* () {
         const messageRoomOrderData = yield* messageRoomOrderService.getMessageRoomOrder(message.id);
         const reply = yield* roomOrderReply(guildId, message.id, messageRoomOrderData);
 
-        yield* pipe(
-          Option.some(message),
-          Option.match({
-            onSome: (interactionMessage) =>
-              msgHelper.rest.createMessage(interactionMessage.channel_id, {
-                content: reply.content,
+        const sentMessage = yield* msgHelper.rest.createMessage(message.channel_id, {
+          content: reply.content,
+        });
+
+        const pinned = yield* msgHelper.rest.createPin(sentMessage.channel_id, sentMessage.id).pipe(
+          Effect.as(true),
+          Effect.catchCause((cause) =>
+            Effect.logError("Failed to pin sent room order").pipe(
+              Effect.annotateLogs({
+                guildId,
+                channelId: sentMessage.channel_id,
+                messageId: sentMessage.id,
               }),
-            onNone: () => Effect.void,
-          }),
+              Effect.andThen(Effect.logError(cause)),
+              Effect.as(false),
+            ),
+          ),
         );
 
         yield* msgHelper.editReply({
           payload: {
-            content: "sent room order!",
+            content: pinned
+              ? "sent room order and pinned it!"
+              : "sent room order, but failed to pin it.",
             components: [],
+          },
+        });
+      }),
+    ),
+  );
+});
+
+const makeTentativeRoomOrderPinButtonHandler = Effect.gen(function* () {
+  const permissionService = yield* PermissionService;
+
+  return yield* makeButton(
+    tentativePinButtonData.toJSON(),
+    SheetApisRequestContext.asInteractionUser(
+      Effect.fn("roomOrderTentativePinButton")(function* (helper) {
+        yield* helper.deferReply({ flags: MessageFlags.Ephemeral });
+
+        const guildId = Option.getOrThrowWith(
+          yield* getInteractionGuildId,
+          () => new Error("Guild not found in interaction"),
+        );
+        const message = Option.getOrThrowWith(
+          yield* getInteractionMessage,
+          () => new Error("Message not found in interaction"),
+        );
+
+        yield* permissionService.checkInteractionUserMonitorGuild(guildId);
+        const pinned = yield* helper.rest.createPin(message.channel_id, message.id).pipe(
+          Effect.as(true),
+          Effect.catchCause((cause) =>
+            Effect.logError("Failed to pin tentative room order").pipe(
+              Effect.annotateLogs({
+                guildId,
+                channelId: message.channel_id,
+                messageId: message.id,
+              }),
+              Effect.andThen(Effect.logError(cause)),
+              Effect.as(false),
+            ),
+          ),
+        );
+
+        if (pinned) {
+          yield* helper.rest
+            .updateMessage(message.channel_id, message.id, {
+              components: [tentativeRoomOrderActionRow(true).toJSON()],
+            })
+            .pipe(
+              Effect.catchCause((cause) =>
+                Effect.logError("Failed to disable tentative room order pin button").pipe(
+                  Effect.annotateLogs({
+                    guildId,
+                    channelId: message.channel_id,
+                    messageId: message.id,
+                  }),
+                  Effect.andThen(Effect.logError(cause)),
+                ),
+              ),
+            );
+        }
+
+        yield* helper.editReply({
+          payload: {
+            content: pinned
+              ? "pinned tentative room order!"
+              : "tentative room order could not be pinned.",
           },
         });
       }),
@@ -290,16 +344,23 @@ const makeRoomOrderSendButton = Effect.gen(function* () {
   return makeMessageComponent(button.data, button.handler as never);
 });
 
+const makeTentativeRoomOrderPinButton = Effect.gen(function* () {
+  const button = yield* makeTentativeRoomOrderPinButtonHandler;
+  return makeMessageComponent(button.data, button.handler as never);
+});
+
 export const roomOrderButtonLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const registry = yield* InteractionsRegistry;
     const previousButton = yield* makeRoomOrderPreviousButton;
     const nextButton = yield* makeRoomOrderNextButton;
     const sendButton = yield* makeRoomOrderSendButton;
+    const tentativePinButton = yield* makeTentativeRoomOrderPinButton;
 
     yield* registry.register(Ix.builder.add(previousButton).catchAllCause(Effect.log));
     yield* registry.register(Ix.builder.add(nextButton).catchAllCause(Effect.log));
     yield* registry.register(Ix.builder.add(sendButton).catchAllCause(Effect.log));
+    yield* registry.register(Ix.builder.add(tentativePinButton).catchAllCause(Effect.log));
   }),
 ).pipe(
   Layer.provide(
@@ -308,6 +369,7 @@ export const roomOrderButtonLayer = Layer.effectDiscard(
       MessageRoomOrderService.layer,
       ConverterService.layer,
       FormatService.layer,
+      PermissionService.layer,
     ),
   ),
 );
