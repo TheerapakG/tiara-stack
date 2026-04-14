@@ -127,6 +127,57 @@ export class MessageRoomOrderService extends ServiceMap.Service<MessageRoomOrder
         },
       );
 
+      const persistMessageRoomOrder = Effect.fn("MessageRoomOrderService.persistMessageRoomOrder")(
+        function* (
+          messageId: string,
+          payload: {
+            data: {
+              previousFills: readonly string[];
+              fills: readonly string[];
+              hour: number;
+              rank: number;
+              monitor?: string | null | undefined;
+              guildId: string | null;
+              messageChannelId: string | null;
+              createdByUserId: string | null;
+            };
+            entries: readonly {
+              rank: number;
+              position: number;
+              hour: number;
+              team: string;
+              tags: readonly string[];
+              effectValue: number;
+            }[];
+          },
+        ) {
+          const mutation = yield* zeroService.mutate(
+            mutators.messageRoomOrder.persistMessageRoomOrder({
+              messageId,
+              data: payload.data,
+              entries: payload.entries,
+            }),
+          );
+          yield* mutation.server();
+
+          const result = yield* zeroService.run(
+            queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
+            {
+              type: "complete",
+            },
+          );
+          const roomOrder = yield* Schema.decodeEffect(
+            Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder)),
+          )(result);
+
+          if (Option.isNone(roomOrder)) {
+            return yield* Effect.die(makeDBQueryError("Failed to persist message room order"));
+          }
+
+          return roomOrder.value;
+        },
+      );
+
       const getMessageRoomOrderEntry = Effect.fn(
         "MessageRoomOrderService.getMessageRoomOrderEntry",
       )(function* (messageId: string, rank: number) {
@@ -253,6 +304,7 @@ export class MessageRoomOrderService extends ServiceMap.Service<MessageRoomOrder
         decrementMessageRoomOrderRank,
         incrementMessageRoomOrderRank,
         upsertMessageRoomOrder,
+        persistMessageRoomOrder,
         getMessageRoomOrderEntry,
         getMessageRoomOrderRange,
         upsertMessageRoomOrderEntry,

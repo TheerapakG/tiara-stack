@@ -34,6 +34,35 @@ export class MessageRoomOrderService extends ServiceMap.Service<MessageRoomOrder
             });
           },
         ),
+        persistMessageRoomOrder: Effect.fn("MessageRoomOrderService.persistMessageRoomOrder")(
+          function* (
+            messageId: string,
+            payload: {
+              data: {
+                previousFills: ReadonlyArray<string>;
+                fills: ReadonlyArray<string>;
+                hour: number;
+                rank: number;
+                monitor: string | null | undefined;
+                guildId: string | null;
+                messageChannelId: string | null;
+                createdByUserId: string | null;
+              };
+              entries: ReadonlyArray<{
+                rank: number;
+                position: number;
+                hour: number;
+                team: string;
+                tags: ReadonlyArray<string>;
+                effectValue: number;
+              }>;
+            },
+          ) {
+            return yield* sheetApisClient.get().messageRoomOrder.persistMessageRoomOrder({
+              payload: { messageId, data: payload.data, entries: payload.entries },
+            });
+          },
+        ),
         decrementMessageRoomOrderRank: Effect.fn(
           "MessageRoomOrderService.decrementMessageRoomOrderRank",
         )(function* (messageId: string) {

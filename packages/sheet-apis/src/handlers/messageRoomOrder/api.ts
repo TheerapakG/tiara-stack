@@ -38,6 +38,35 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
     }),
   )
   .add(
+    HttpApiEndpoint.post("persistMessageRoomOrder", "/messageRoomOrder/persistMessageRoomOrder", {
+      payload: Schema.Struct({
+        messageId: Schema.String,
+        data: Schema.Struct({
+          previousFills: Schema.Array(Schema.String),
+          fills: Schema.Array(Schema.String),
+          hour: Schema.Number,
+          rank: Schema.Number,
+          monitor: Schema.optional(Schema.NullOr(Schema.String)),
+          guildId: Schema.NullOr(Schema.String),
+          messageChannelId: Schema.NullOr(Schema.String),
+          createdByUserId: Schema.NullOr(Schema.String),
+        }),
+        entries: Schema.Array(
+          Schema.Struct({
+            rank: Schema.Number,
+            position: Schema.Number,
+            hour: Schema.Number,
+            team: Schema.String,
+            tags: Schema.Array(Schema.String),
+            effectValue: Schema.Number,
+          }),
+        ),
+      }),
+      success: MessageRoomOrder,
+      error: [SchemaError, QueryResultError],
+    }),
+  )
+  .add(
     HttpApiEndpoint.post(
       "decrementMessageRoomOrderRank",
       "/messageRoomOrder/decrementMessageRoomOrderRank",

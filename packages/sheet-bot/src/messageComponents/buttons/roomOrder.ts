@@ -19,9 +19,13 @@ import {
   HourWindow,
   FormatService,
   FormattedHourWindow,
+  formatTentativeRoomOrderContent,
+  hasTentativeRoomOrderPrefix,
   MessageRoomOrderService,
+  PermissionError,
   PermissionService,
   SheetApisRequestContext,
+  stripTentativeRoomOrderPrefix,
 } from "@/services";
 
 const formatEffectValue = (effectValue: number): string => {
@@ -42,9 +46,11 @@ const getInteractionMessage = Effect.gen(function* () {
   const interactionMessage = yield* Interaction.message();
   return pipe(
     interactionMessage,
-    Option.map((message) => message as { id: string; channel_id: string }),
+    Option.map((message) => message as { id: string; channel_id: string; content?: string }),
   );
 });
+
+type RoomOrderReplyMode = "normal" | "tentative";
 
 const renderDelta = (current: ReadonlyArray<string>, previous: ReadonlyArray<string>) => {
   const values = globalThis.Array.from(
@@ -85,7 +91,12 @@ const makeRoomOrderReply = (
   },
 ) =>
   Effect.fn("roomOrderButton.getReply")(
-    (guildId: string, messageId: string, messageRoomOrder: MessageRoomOrder.MessageRoomOrder) =>
+    (
+      mode: RoomOrderReplyMode,
+      guildId: string,
+      messageId: string,
+      messageRoomOrder: MessageRoomOrder.MessageRoomOrder,
+    ) =>
       Effect.gen(function* () {
         const messageRoomOrderRange =
           yield* messageRoomOrderService.getMessageRoomOrderRange(messageId);
@@ -126,10 +137,19 @@ const makeRoomOrderReply = (
           `${inlineCode("Out:")} ${renderDelta(messageRoomOrder.previousFills, messageRoomOrder.fills)}`,
         ].join("\n");
 
-        return {
-          content: roomOrderContent,
-          components: [roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank).toJSON()],
-        };
+        return mode === "tentative"
+          ? {
+              content: formatTentativeRoomOrderContent(roomOrderContent),
+              components: [
+                tentativeRoomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank).toJSON(),
+              ],
+            }
+          : {
+              content: roomOrderContent,
+              components: [
+                roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank).toJSON(),
+              ],
+            };
       }),
   );
 
@@ -137,6 +157,7 @@ const makeRoomOrderPreviousButtonHandler = Effect.gen(function* () {
   const converterService = yield* ConverterService;
   const formatService = yield* FormatService;
   const messageRoomOrderService = yield* MessageRoomOrderService;
+  const permissionService = yield* PermissionService;
   const roomOrderReply = makeRoomOrderReply(
     converterService,
     formatService,
@@ -147,8 +168,6 @@ const makeRoomOrderPreviousButtonHandler = Effect.gen(function* () {
     previousButtonData.toJSON(),
     SheetApisRequestContext.asInteractionUser(
       Effect.fn("roomOrderPreviousButton")(function* (msgHelper) {
-        yield* msgHelper.deferUpdate({ flags: MessageFlags.Ephemeral });
-
         const guildId = Option.getOrThrowWith(
           yield* getInteractionGuildId,
           () => new Error("Guild not found in interaction"),
@@ -157,11 +176,54 @@ const makeRoomOrderPreviousButtonHandler = Effect.gen(function* () {
           yield* getInteractionMessage,
           () => new Error("Message not found in interaction"),
         );
+        const mode = hasTentativeRoomOrderPrefix(message.content ?? "") ? "tentative" : "normal";
 
+        if (mode === "tentative") {
+          yield* msgHelper.deferReply({ flags: MessageFlags.Ephemeral });
+          const hasPermission = yield* permissionService
+            .checkInteractionUserMonitorGuild(guildId)
+            .pipe(
+              Effect.as(true),
+              Effect.catch((error) =>
+                error instanceof PermissionError
+                  ? msgHelper
+                      .editReply({ payload: { content: error.message } })
+                      .pipe(Effect.as(false))
+                  : Effect.fail(error),
+              ),
+            );
+
+          if (!hasPermission) {
+            return;
+          }
+
+          const decrementedRank = yield* messageRoomOrderService.decrementMessageRoomOrderRank(
+            message.id,
+          );
+          yield* Effect.gen(function* () {
+            const reply = yield* roomOrderReply(mode, guildId, message.id, decrementedRank);
+            yield* msgHelper.rest.updateMessage(message.channel_id, message.id, reply);
+          }).pipe(
+            Effect.catchCause((cause) =>
+              messageRoomOrderService.incrementMessageRoomOrderRank(message.id).pipe(
+                Effect.catchCause(() => Effect.void),
+                Effect.andThen(Effect.failCause(cause)),
+              ),
+            ),
+          );
+          yield* msgHelper.editReply({
+            payload: {
+              content: "updated tentative room order.",
+            },
+          });
+          return;
+        }
+
+        yield* msgHelper.deferUpdate({ flags: MessageFlags.Ephemeral });
         const decrementedRank = yield* messageRoomOrderService.decrementMessageRoomOrderRank(
           message.id,
         );
-        const reply = yield* roomOrderReply(guildId, message.id, decrementedRank);
+        const reply = yield* roomOrderReply(mode, guildId, message.id, decrementedRank);
 
         yield* msgHelper.editReply({ payload: reply });
       }),
@@ -173,6 +235,7 @@ const makeRoomOrderNextButtonHandler = Effect.gen(function* () {
   const converterService = yield* ConverterService;
   const formatService = yield* FormatService;
   const messageRoomOrderService = yield* MessageRoomOrderService;
+  const permissionService = yield* PermissionService;
   const roomOrderReply = makeRoomOrderReply(
     converterService,
     formatService,
@@ -183,8 +246,6 @@ const makeRoomOrderNextButtonHandler = Effect.gen(function* () {
     nextButtonData.toJSON(),
     SheetApisRequestContext.asInteractionUser(
       Effect.fn("roomOrderNextButton")(function* (msgHelper) {
-        yield* msgHelper.deferUpdate({ flags: MessageFlags.Ephemeral });
-
         const guildId = Option.getOrThrowWith(
           yield* getInteractionGuildId,
           () => new Error("Guild not found in interaction"),
@@ -193,11 +254,54 @@ const makeRoomOrderNextButtonHandler = Effect.gen(function* () {
           yield* getInteractionMessage,
           () => new Error("Message not found in interaction"),
         );
+        const mode = hasTentativeRoomOrderPrefix(message.content ?? "") ? "tentative" : "normal";
 
+        if (mode === "tentative") {
+          yield* msgHelper.deferReply({ flags: MessageFlags.Ephemeral });
+          const hasPermission = yield* permissionService
+            .checkInteractionUserMonitorGuild(guildId)
+            .pipe(
+              Effect.as(true),
+              Effect.catch((error) =>
+                error instanceof PermissionError
+                  ? msgHelper
+                      .editReply({ payload: { content: error.message } })
+                      .pipe(Effect.as(false))
+                  : Effect.fail(error),
+              ),
+            );
+
+          if (!hasPermission) {
+            return;
+          }
+
+          const incrementedRank = yield* messageRoomOrderService.incrementMessageRoomOrderRank(
+            message.id,
+          );
+          yield* Effect.gen(function* () {
+            const reply = yield* roomOrderReply(mode, guildId, message.id, incrementedRank);
+            yield* msgHelper.rest.updateMessage(message.channel_id, message.id, reply);
+          }).pipe(
+            Effect.catchCause((cause) =>
+              messageRoomOrderService.decrementMessageRoomOrderRank(message.id).pipe(
+                Effect.catchCause(() => Effect.void),
+                Effect.andThen(Effect.failCause(cause)),
+              ),
+            ),
+          );
+          yield* msgHelper.editReply({
+            payload: {
+              content: "updated tentative room order.",
+            },
+          });
+          return;
+        }
+
+        yield* msgHelper.deferUpdate({ flags: MessageFlags.Ephemeral });
         const incrementedRank = yield* messageRoomOrderService.incrementMessageRoomOrderRank(
           message.id,
         );
-        const reply = yield* roomOrderReply(guildId, message.id, incrementedRank);
+        const reply = yield* roomOrderReply(mode, guildId, message.id, incrementedRank);
 
         yield* msgHelper.editReply({ payload: reply });
       }),
@@ -230,7 +334,7 @@ const makeRoomOrderSendButtonHandler = Effect.gen(function* () {
           () => new Error("Message not found in interaction"),
         );
         const messageRoomOrderData = yield* messageRoomOrderService.getMessageRoomOrder(message.id);
-        const reply = yield* roomOrderReply(guildId, message.id, messageRoomOrderData);
+        const reply = yield* roomOrderReply("normal", guildId, message.id, messageRoomOrderData);
 
         const sentMessage = yield* msgHelper.rest.createMessage(message.channel_id, {
           content: reply.content,
@@ -282,7 +386,21 @@ const makeTentativeRoomOrderPinButtonHandler = Effect.gen(function* () {
           () => new Error("Message not found in interaction"),
         );
 
-        yield* permissionService.checkInteractionUserMonitorGuild(guildId);
+        const hasPermission = yield* permissionService
+          .checkInteractionUserMonitorGuild(guildId)
+          .pipe(
+            Effect.as(true),
+            Effect.catch((error) =>
+              error instanceof PermissionError
+                ? helper.editReply({ payload: { content: error.message } }).pipe(Effect.as(false))
+                : Effect.fail(error),
+            ),
+          );
+
+        if (!hasPermission) {
+          return;
+        }
+
         const pinned = yield* helper.rest.createPin(message.channel_id, message.id).pipe(
           Effect.as(true),
           Effect.catchCause((cause) =>
@@ -298,29 +416,34 @@ const makeTentativeRoomOrderPinButtonHandler = Effect.gen(function* () {
           ),
         );
 
-        if (pinned) {
-          yield* helper.rest
-            .updateMessage(message.channel_id, message.id, {
-              components: [tentativeRoomOrderActionRow(true).toJSON()],
-            })
-            .pipe(
-              Effect.catchCause((cause) =>
-                Effect.logError("Failed to disable tentative room order pin button").pipe(
-                  Effect.annotateLogs({
-                    guildId,
-                    channelId: message.channel_id,
-                    messageId: message.id,
-                  }),
-                  Effect.andThen(Effect.logError(cause)),
+        const cleanedUp = pinned
+          ? yield* helper.rest
+              .updateMessage(message.channel_id, message.id, {
+                content: stripTentativeRoomOrderPrefix(message.content ?? ""),
+                components: [],
+              })
+              .pipe(
+                Effect.as(true),
+                Effect.catchCause((cause) =>
+                  Effect.logError("Failed to clean up pinned tentative room order").pipe(
+                    Effect.annotateLogs({
+                      guildId,
+                      channelId: message.channel_id,
+                      messageId: message.id,
+                    }),
+                    Effect.andThen(Effect.logError(cause)),
+                    Effect.as(false),
+                  ),
                 ),
-              ),
-            );
-        }
+              )
+          : false;
 
         yield* helper.editReply({
           payload: {
             content: pinned
-              ? "pinned tentative room order!"
+              ? cleanedUp
+                ? "pinned tentative room order!"
+                : "pinned tentative room order, but failed to clean up the message."
               : "tentative room order could not be pinned.",
           },
         });

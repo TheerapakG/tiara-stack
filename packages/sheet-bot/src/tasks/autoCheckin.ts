@@ -10,6 +10,7 @@ import {
   EmbedService,
   GuildConfigService,
   MessageCheckinService,
+  MessageRoomOrderService,
   RoomOrderService,
   sendTentativeRoomOrder,
   SheetApisRequestContext,
@@ -27,6 +28,7 @@ const processChannel = Effect.fn("processChannel")(function* (
 ) {
   const checkinService = yield* CheckinService;
   const messageCheckinService = yield* MessageCheckinService;
+  const messageRoomOrderService = yield* MessageRoomOrderService;
   const embedService = yield* EmbedService;
   const discordRest = yield* DiscordREST;
   const roomOrderService = yield* RoomOrderService;
@@ -96,7 +98,9 @@ const processChannel = Effect.fn("processChannel")(function* (
       hour: generated.hour,
       fillCount: generated.fillCount,
       roomOrderService,
+      messageRoomOrderService,
       sender: discordRest,
+      createdByUserId: null,
     });
   }
 
@@ -151,6 +155,7 @@ export const autoCheckinTaskLayer = Layer.effectDiscard(
                   ConverterService.layer,
                   EmbedService.layer,
                   MessageCheckinService.layer,
+                  MessageRoomOrderService.layer,
                   RoomOrderService.layer,
                 ),
               ),

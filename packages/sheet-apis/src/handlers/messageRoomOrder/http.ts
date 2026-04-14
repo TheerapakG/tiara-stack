@@ -106,6 +106,21 @@ export const messageRoomOrderLayer = HttpApiBuilder.group(
           );
         }),
       )
+      .handle("persistMessageRoomOrder", ({ payload }) =>
+        Effect.gen(function* () {
+          yield* requireRoomOrderUpsertAccess(
+            authorizationService,
+            messageRoomOrderService,
+            payload.messageId,
+            typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
+          );
+
+          return yield* messageRoomOrderService.persistMessageRoomOrder(payload.messageId, {
+            data: payload.data,
+            entries: payload.entries,
+          });
+        }),
+      )
       .handle("decrementMessageRoomOrderRank", ({ payload }) =>
         Effect.gen(function* () {
           const record = yield* getRequiredMessageRoomOrderRecord(

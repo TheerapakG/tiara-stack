@@ -17,7 +17,11 @@ export const sendButtonData = makeButtonData((b) =>
 );
 
 export const tentativePinButtonData = makeButtonData((b) =>
-  b.setCustomId("interaction:roomOrder:pinTentative").setLabel("Pin").setStyle(ButtonStyle.Primary),
+  b
+    .setCustomId("interaction:roomOrder:pinTentative")
+    .setLabel("Pin")
+    .setEmoji({ name: "📌" })
+    .setStyle(ButtonStyle.Primary),
 );
 
 export const roomOrderActionRow = (range: { minRank: number; maxRank: number }, rank: number) =>
@@ -29,5 +33,17 @@ export const roomOrderActionRow = (range: { minRank: number; maxRank: number }, 
     ),
   );
 
-export const tentativeRoomOrderActionRow = (disabled = false) =>
+export const tentativeRoomOrderActionRow = (
+  range: { minRank: number; maxRank: number },
+  rank: number,
+) =>
+  makeMessageActionRowData((b) =>
+    b.setComponents(
+      previousButtonData.setDisabled(range.minRank === rank),
+      nextButtonData.setDisabled(range.maxRank === rank),
+      tentativePinButtonData,
+    ),
+  );
+
+export const tentativeRoomOrderPinActionRow = (disabled = false) =>
   makeMessageActionRowData((b) => b.setComponents(tentativePinButtonData.setDisabled(disabled)));

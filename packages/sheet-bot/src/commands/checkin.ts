@@ -12,6 +12,7 @@ import { Interaction } from "dfx-discord-utils/utils";
 import {
   CheckinService,
   MessageCheckinService,
+  MessageRoomOrderService,
   RoomOrderService,
   sendTentativeRoomOrder,
   SheetApisRequestContext,
@@ -43,6 +44,7 @@ const getInteractionUserId = Effect.gen(function* () {
 const makeManualSubCommand = Effect.gen(function* () {
   const checkinService = yield* CheckinService;
   const messageCheckinService = yield* MessageCheckinService;
+  const messageRoomOrderService = yield* MessageRoomOrderService;
   const roomOrderService = yield* RoomOrderService;
 
   return yield* CommandHelper.makeSubCommand(
@@ -133,7 +135,9 @@ const makeManualSubCommand = Effect.gen(function* () {
           hour: generated.hour,
           fillCount: generated.fillCount,
           roomOrderService,
+          messageRoomOrderService,
           sender: command.rest,
+          createdByUserId,
         });
       }
 
@@ -192,6 +196,7 @@ export const checkinCommandLayer = Layer.effectDiscard(
       discordGatewayLayer,
       CheckinService.layer,
       MessageCheckinService.layer,
+      MessageRoomOrderService.layer,
       RoomOrderService.layer,
     ),
   ),

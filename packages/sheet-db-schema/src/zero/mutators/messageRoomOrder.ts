@@ -80,6 +80,63 @@ export const messageRoomOrder = {
         deletedAt: null,
       }),
   ),
+  persistMessageRoomOrder: defineMutator(
+    pipe(
+      Schema.Struct({
+        messageId: Schema.String,
+        data: Schema.Struct({
+          previousFills: Schema.Array(Schema.String),
+          fills: Schema.Array(Schema.String),
+          hour: Schema.Number,
+          rank: Schema.Number,
+          monitor: Schema.optional(Schema.NullOr(Schema.String)),
+          guildId: Schema.NullOr(Schema.String),
+          messageChannelId: Schema.NullOr(Schema.String),
+          createdByUserId: Schema.NullOr(Schema.String),
+        }),
+        entries: Schema.Array(
+          Schema.Struct({
+            rank: Schema.Number,
+            position: Schema.Number,
+            hour: Schema.Number,
+            team: Schema.String,
+            tags: Schema.Array(Schema.String),
+            effectValue: Schema.Number,
+          }),
+        ),
+      }),
+      Schema.toStandardSchemaV1,
+    ),
+    async ({ tx, args }) => {
+      await tx.mutate.messageRoomOrder.upsert({
+        messageId: args.messageId,
+        previousFills: args.data.previousFills.slice(),
+        fills: args.data.fills.slice(),
+        hour: args.data.hour,
+        rank: args.data.rank,
+        monitor: args.data.monitor,
+        guildId: args.data.guildId,
+        messageChannelId: args.data.messageChannelId,
+        createdByUserId: args.data.createdByUserId,
+        deletedAt: null,
+      });
+
+      await Promise.all(
+        args.entries.map((entry) =>
+          tx.mutate.messageRoomOrderEntry.upsert({
+            messageId: args.messageId,
+            rank: entry.rank,
+            position: entry.position,
+            hour: entry.hour,
+            team: entry.team,
+            tags: entry.tags.slice(),
+            effectValue: entry.effectValue,
+            deletedAt: null,
+          }),
+        ),
+      );
+    },
+  ),
   upsertMessageRoomOrderEntry: defineMutator(
     pipe(
       Schema.Struct({
