@@ -4,7 +4,7 @@ import { RolesApiCacheView } from "dfx-discord-utils/discord/cache/roles";
 import { CacheNotFoundError } from "dfx-discord-utils/discord/schema";
 import type { CachedGuildMember } from "dfx-discord-utils/cache";
 import { Discord } from "dfx";
-import { Cause, Effect, Redacted } from "effect";
+import { Cause, Effect, Exit, Redacted } from "effect";
 import {
   AuthorizationService,
   hasDiscordAccountPermission,
@@ -362,7 +362,7 @@ describe("authorization service helpers", () => {
       );
 
       expect(exit._tag).toBe("Failure");
-      if (exit._tag === "Failure") {
+      if (Exit.isFailure(exit)) {
         expect(Cause.hasDies(exit.cause)).toBe(true);
       }
     }),
@@ -425,7 +425,7 @@ describe("authorization service helpers", () => {
       );
 
       expect(exit._tag).toBe("Failure");
-      if (exit._tag === "Failure") {
+      if (Exit.isFailure(exit)) {
         expect(Cause.hasDies(exit.cause)).toBe(true);
       }
     }),
@@ -438,7 +438,7 @@ describe("authorization service helpers", () => {
       );
 
       expect(exit._tag).toBe("Failure");
-      if (exit._tag === "Failure") {
+      if (Exit.isFailure(exit)) {
         expect(Cause.hasFails(exit.cause)).toBe(true);
       }
     }),
@@ -454,7 +454,7 @@ describe("authorization service helpers", () => {
       );
 
       expect(exit._tag).toBe("Failure");
-      if (exit._tag === "Failure") {
+      if (Exit.isFailure(exit)) {
         expect(Cause.hasFails(exit.cause)).toBe(true);
       }
     }),
@@ -471,7 +471,7 @@ describe("authorization service helpers", () => {
       );
 
       expect(exit._tag).toBe("Failure");
-      if (exit._tag === "Failure") {
+      if (Exit.isFailure(exit)) {
         expect(Cause.hasFails(exit.cause)).toBe(true);
       }
     }),

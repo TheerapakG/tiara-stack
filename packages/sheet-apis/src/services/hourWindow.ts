@@ -1,4 +1,4 @@
-import { DateTime, Duration, Option, pipe } from "effect";
+import { DateTime, Duration, Match, Option, pipe } from "effect";
 import { BreakSchedule, Schedule, ScheduleHourWindow } from "@/schemas/sheet";
 
 export const deriveScheduleHourWindow = (
@@ -19,23 +19,28 @@ export const withScheduleHourWindow = (
   startTime: DateTime.Utc,
   schedule: BreakSchedule | Schedule,
 ): BreakSchedule | Schedule =>
-  schedule._tag === "BreakSchedule"
-    ? BreakSchedule.makeUnsafe({
-        channel: schedule.channel,
-        day: schedule.day,
-        visible: schedule.visible,
-        hour: schedule.hour,
-        hourWindow: deriveScheduleHourWindow(startTime, schedule.hour),
-      })
-    : Schedule.makeUnsafe({
-        channel: schedule.channel,
-        day: schedule.day,
-        visible: schedule.visible,
-        hour: schedule.hour,
-        hourWindow: deriveScheduleHourWindow(startTime, schedule.hour),
-        fills: schedule.fills,
-        overfills: schedule.overfills,
-        standbys: schedule.standbys,
-        runners: schedule.runners,
-        monitor: schedule.monitor,
-      });
+  Match.value(schedule).pipe(
+    Match.tagsExhaustive({
+      BreakSchedule: (schedule) =>
+        BreakSchedule.makeUnsafe({
+          channel: schedule.channel,
+          day: schedule.day,
+          visible: schedule.visible,
+          hour: schedule.hour,
+          hourWindow: deriveScheduleHourWindow(startTime, schedule.hour),
+        }),
+      Schedule: (schedule) =>
+        Schedule.makeUnsafe({
+          channel: schedule.channel,
+          day: schedule.day,
+          visible: schedule.visible,
+          hour: schedule.hour,
+          hourWindow: deriveScheduleHourWindow(startTime, schedule.hour),
+          fills: schedule.fills,
+          overfills: schedule.overfills,
+          standbys: schedule.standbys,
+          runners: schedule.runners,
+          monitor: schedule.monitor,
+        }),
+    }),
+  );

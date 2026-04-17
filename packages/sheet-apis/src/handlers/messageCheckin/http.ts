@@ -1,6 +1,6 @@
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { makeArgumentError } from "typhoon-core/error";
-import { Effect, HashSet, Layer, Option } from "effect";
+import { Effect, HashSet, Layer, Match, Option } from "effect";
 import { Api } from "@/api";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
@@ -192,11 +192,12 @@ export const requireMessageCheckinMembersReadAccess = Effect.fn(
     guildId.value,
   );
 
-  if (access._tag === "monitor") {
-    return yield* messageCheckinService.getMessageCheckinMembers(messageId);
-  }
-
-  return access.members;
+  return yield* Match.value(access).pipe(
+    Match.tagsExhaustive({
+      monitor: () => messageCheckinService.getMessageCheckinMembers(messageId),
+      participant: (access) => Effect.succeed(access.members),
+    }),
+  );
 });
 
 export const requireMessageCheckinParticipantMutationAccess = Effect.fn(

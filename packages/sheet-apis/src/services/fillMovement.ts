@@ -1,4 +1,4 @@
-import { Option } from "effect";
+import { Option, Predicate } from "effect";
 import {
   type Player,
   type PopulatedSchedulePlayer,
@@ -12,7 +12,8 @@ export type FillParticipant = {
 };
 
 const isPlayer = (player: PopulatedSchedulePlayer["player"]): player is Player =>
-  player._tag === "Player";
+  Predicate.isTagged("Player")(player);
+const isPopulatedSchedule = Predicate.isTagged("PopulatedSchedule");
 
 const dedupeParticipants = (
   participants: ReadonlyArray<FillParticipant>,
@@ -31,7 +32,7 @@ const dedupeParticipants = (
 export const getScheduleFills = (
   schedule: PopulatedScheduleResult | null | undefined,
 ): ReadonlyArray<PopulatedSchedulePlayer> =>
-  schedule && schedule._tag === "PopulatedSchedule"
+  schedule != null && isPopulatedSchedule(schedule)
     ? schedule.fills.flatMap((fill) => (Option.isSome(fill) ? [fill.value] : []))
     : [];
 

@@ -3,7 +3,7 @@ import { ChevronLeft } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { DateTime, Option, Effect, pipe, HashMap, Array, Duration } from "effect";
+import { DateTime, Option, Effect, pipe, HashMap, Array, Duration, Predicate } from "effect";
 
 import { ensureResultAtomData } from "#/lib/atomRegistry";
 import {
@@ -35,6 +35,10 @@ const INITIAL_START_OFFSET = -10;
 const INITIAL_END_OFFSET = 10;
 const TOP_EDGE_THRESHOLD = 3;
 const BOTTOM_EDGE_THRESHOLD = 3;
+const isPlayer = Predicate.isTagged("Player");
+const hasHour = <S extends { hour: Option.Option<number> }>(
+  schedule: S,
+): schedule is S & { hour: Option.Some<number> } => Option.isSome(schedule.hour);
 
 export const Route = createFileRoute(
   "/_authenticated/dashboard/guilds/$guildId/schedule/$channel/_channelLayout/daily",
@@ -237,7 +241,7 @@ function DailyScheduleContent() {
   const eventConfig = useEventConfig(guildId);
   const startTimeZoned = useZoned(timeZone, eventConfig.startTime);
   const channelSchedules = useMemo(
-    () => allSchedules.filter((s) => s.channel === channel && Option.isSome(s.hour)),
+    () => allSchedules.filter((s) => s.channel === channel).filter(hasHour),
     [allSchedules, channel],
   );
 
@@ -245,14 +249,14 @@ function DailyScheduleContent() {
     return pipe(
       channelSchedules,
       Array.reduce(HashMap.empty<number, number>(), (acc, schedule) => {
-        const hour = (schedule.hour as Option.Some<number>).value;
+        const hour = schedule.hour.value;
         return HashMap.set(acc, hour, schedule.day);
       }),
     );
   }, [channelSchedules]);
 
   const maxScheduleHour = useMemo(() => {
-    const hours = channelSchedules.map((s) => (s.hour as Option.Some<number>).value);
+    const hours = channelSchedules.map((s) => s.hour.value);
     return hours.length > 0 ? Math.max(...hours) : 0;
   }, [channelSchedules]);
 
@@ -898,9 +902,7 @@ function PlayerBadge({
   isCurrentHour: boolean;
 }) {
   const isCurrentUser =
-    currentUserId !== undefined &&
-    player.player._tag === "Player" &&
-    player.player.id === currentUserId;
+    currentUserId !== undefined && isPlayer(player.player) && player.player.id === currentUserId;
 
   return (
     <span

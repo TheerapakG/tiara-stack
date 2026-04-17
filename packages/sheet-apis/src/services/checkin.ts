@@ -1,4 +1,14 @@
-import { DateTime, Duration, Effect, Layer, Option, Random, ServiceMap, pipe } from "effect";
+import {
+  DateTime,
+  Duration,
+  Effect,
+  Layer,
+  Option,
+  Predicate,
+  Random,
+  ServiceMap,
+  pipe,
+} from "effect";
 import { makeArgumentError } from "typhoon-core/error";
 import { CheckinGenerateResult } from "@/schemas/checkin";
 import {
@@ -24,12 +34,13 @@ type Weighted<A> = { value: A; weight: number };
 const SLOTS_PER_ROW = 5;
 
 const isPopulatedSchedule = (schedule: PopulatedScheduleResult): schedule is PopulatedSchedule =>
-  schedule._tag === "PopulatedSchedule";
+  Predicate.isTagged("PopulatedSchedule")(schedule);
 
-const isPlayer = (player: Player | PartialNamePlayer): player is Player => player._tag === "Player";
+const isPlayer = (player: Player | PartialNamePlayer): player is Player =>
+  Predicate.isTagged("Player")(player);
 
 const isMonitor = (monitor: Monitor | PartialNameMonitor): monitor is Monitor =>
-  monitor._tag === "Monitor";
+  Predicate.isTagged("Monitor")(monitor);
 
 const checkinMessageTemplates: [Weighted<string>, ...Weighted<string>[]] = [
   {
@@ -385,7 +396,7 @@ export class CheckinService extends ServiceMap.Service<CheckinService>()("Checki
         );
 
         const empty =
-          Option.isSome(schedule) && schedule.value._tag === "PopulatedSchedule"
+          Option.isSome(schedule) && isPopulatedSchedule(schedule.value)
             ? PopulatedSchedule.empty(schedule.value)
             : SLOTS_PER_ROW;
         const emptySlotMessage = `${empty > 0 ? `+${empty}` : "No"} empty slot${empty > 1 ? "s" : ""}`;

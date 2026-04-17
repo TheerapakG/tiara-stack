@@ -2,7 +2,7 @@ import { escapeMarkdown, roleMention } from "@discordjs/formatters";
 import { InteractionsRegistry } from "dfx/gateway";
 import { Ix } from "dfx/index";
 import { ApplicationIntegrationType, InteractionContextType } from "discord-api-types/v10";
-import { Effect, Layer, Option, Result, pipe } from "effect";
+import { Effect, Layer, Option, Predicate, Result, pipe } from "effect";
 import { GuildsCache } from "dfx-discord-utils/discord/cache";
 import { CommandHelper, Interaction } from "dfx-discord-utils/utils";
 import { cachesLayer } from "../discord/cache";
@@ -27,10 +27,7 @@ const resolveGuildId = (serverId: Option.Option<string>) =>
     );
   });
 
-type UnauthorizedLike = { readonly _tag: "Unauthorized" };
-
-const isUnauthorized = (error: unknown): error is UnauthorizedLike =>
-  !!error && typeof error === "object" && "_tag" in error && error._tag === "Unauthorized";
+const isUnauthorized = Predicate.isTagged("Unauthorized");
 
 const makeListConfigSubCommand = Effect.gen(function* () {
   const embedService = yield* EmbedService;

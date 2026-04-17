@@ -1,10 +1,13 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Schema, Scope } from "effect";
+import { Effect, Predicate, Schema, Scope } from "effect";
 import { ArgumentError } from "./argument";
 import { SchemaError } from "./schema";
 
 const decodeFailure = <S extends Schema.Top>(schema: S, value: unknown) =>
   Effect.flip(Schema.decodeUnknownEffect(schema)(value));
+const isCompositeIssue = Predicate.isTagged("Composite");
+const isPointerIssue = Predicate.isTagged("Pointer");
+const isFilterIssue = Predicate.isTagged("Filter");
 
 describe("SchemaError", () => {
   it.effect(
@@ -16,14 +19,14 @@ describe("SchemaError", () => {
       expect(error.message).toContain("Expected string");
       expect(error.issue._tag).toBe("Composite");
 
-      if (error.issue._tag !== "Composite") {
+      if (!isCompositeIssue(error.issue)) {
         return;
       }
 
       const pointerIssue = error.issue.issues[0];
       expect(pointerIssue?._tag).toBe("Pointer");
 
-      if (pointerIssue?._tag !== "Pointer") {
+      if (!isPointerIssue(pointerIssue)) {
         return;
       }
 
@@ -39,14 +42,14 @@ describe("SchemaError", () => {
 
       expect(error.issue._tag).toBe("Composite");
 
-      if (error.issue._tag !== "Composite") {
+      if (!isCompositeIssue(error.issue)) {
         return;
       }
 
       const pointerIssue = error.issue.issues[0];
       expect(pointerIssue?._tag).toBe("Pointer");
 
-      if (pointerIssue?._tag !== "Pointer") {
+      if (!isPointerIssue(pointerIssue)) {
         return;
       }
 
@@ -62,14 +65,14 @@ describe("SchemaError", () => {
 
       expect(error.issue._tag).toBe("Composite");
 
-      if (error.issue._tag !== "Composite") {
+      if (!isCompositeIssue(error.issue)) {
         return;
       }
 
       const filterIssue = error.issue.issues[0];
       expect(filterIssue?._tag).toBe("Filter");
 
-      if (filterIssue?._tag !== "Filter") {
+      if (!isFilterIssue(filterIssue)) {
         return;
       }
 

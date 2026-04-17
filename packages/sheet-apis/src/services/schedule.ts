@@ -1,4 +1,4 @@
-import { Array, Effect, HashMap, Layer, Option, ServiceMap, pipe } from "effect";
+import { Array, Effect, HashMap, Layer, Match, Option, Predicate, ServiceMap, pipe } from "effect";
 import { SheetService } from "./sheet";
 import { PlayerService } from "./player";
 import { MonitorService } from "./monitor";
@@ -23,7 +23,10 @@ import { upperFirst } from "scule";
 type SheetConfigServiceApi = Effect.Success<typeof SheetConfigService.make>;
 type EventConfig = Effect.Success<ReturnType<SheetConfigServiceApi["getEventConfig"]>>;
 
-const isPlayer = (player: Player | PartialNamePlayer): player is Player => player._tag === "Player";
+const isPlayer = (player: Player | PartialNamePlayer): player is Player =>
+  Predicate.isTagged("Player")(player);
+const isPopulatedSchedule = (schedule: PopulatedScheduleResult): schedule is PopulatedSchedule =>
+  Predicate.isTagged("PopulatedSchedule")(schedule);
 
 const populateSchedule = (
   schedule: Schedule,
@@ -135,15 +138,19 @@ const populateScheduleResult = (
   playerMap: Map<string, [Player | PartialNamePlayer, ...(Player | PartialNamePlayer)[]]>,
   monitorMap: Map<string, [Monitor | PartialNameMonitor, ...(Monitor | PartialNameMonitor)[]]>,
 ): PopulatedScheduleResult =>
-  schedule._tag === "BreakSchedule"
-    ? PopulatedBreakSchedule.makeUnsafe({
-        channel: schedule.channel,
-        day: schedule.day,
-        visible: schedule.visible,
-        hour: schedule.hour,
-        hourWindow: schedule.hourWindow,
-      })
-    : populateSchedule(schedule, playerMap, monitorMap);
+  Match.value(schedule).pipe(
+    Match.tagsExhaustive({
+      BreakSchedule: (schedule) =>
+        PopulatedBreakSchedule.makeUnsafe({
+          channel: schedule.channel,
+          day: schedule.day,
+          visible: schedule.visible,
+          hour: schedule.hour,
+          hourWindow: schedule.hourWindow,
+        }),
+      Schedule: (schedule) => populateSchedule(schedule, playerMap, monitorMap),
+    }),
+  );
 
 const toPopulatedSchedules = (
   schedules: ReadonlyArray<BreakSchedule | Schedule>,
@@ -181,7 +188,7 @@ export const summarizeDayPlayerSchedule = (
   const standbyHours: number[] = [];
 
   for (const schedule of schedules) {
-    if (schedule._tag !== "PopulatedSchedule") {
+    if (!isPopulatedSchedule(schedule)) {
       continue;
     }
 

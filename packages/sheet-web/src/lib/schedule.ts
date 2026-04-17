@@ -152,9 +152,7 @@ export const getAllChannelsAtom = Atom.family((guildId: string) =>
   Atom.make(
     Effect.fnUntraced(function* (get) {
       const schedules = yield* get.result(guildScheduleAtom(guildId));
-      const populatedSchedules = schedules.filter(
-        (s): s is Sheet.PopulatedSchedule => s._tag === "PopulatedSchedule",
-      );
+      const populatedSchedules = schedules.filter(Predicate.isTagged("PopulatedSchedule"));
       const channelArray = populatedSchedules.map((s) => s.channel);
       const channelSet = HashSet.fromIterable(channelArray);
       const uniqueChannels = Array.fromIterable(channelSet);

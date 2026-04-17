@@ -1,4 +1,14 @@
-import { Chunk, DateTime, Duration, Effect, Layer, Option, ServiceMap, pipe } from "effect";
+import {
+  Chunk,
+  DateTime,
+  Duration,
+  Effect,
+  Layer,
+  Option,
+  Predicate,
+  ServiceMap,
+  pipe,
+} from "effect";
 import { makeArgumentError } from "typhoon-core/error";
 import { GuildConfigService } from "./guildConfig";
 import { ScheduleService } from "./schedule";
@@ -24,7 +34,8 @@ type GuildConfigServiceApi = Effect.Success<typeof GuildConfigService.make>;
 type SheetServiceApi = Effect.Success<typeof SheetService.make>;
 
 const isPlayer = (player: PopulatedSchedulePlayer["player"]): player is Player =>
-  player._tag === "Player";
+  Predicate.isTagged("Player")(player);
+const isPopulatedSchedule = Predicate.isTagged("PopulatedSchedule");
 
 const formatEffectValue = (effectValue: number): string => {
   const rounded = Math.round(effectValue * 10) / 10;
@@ -204,7 +215,7 @@ export class RoomOrderService extends ServiceMap.Service<RoomOrderService>()("Ro
         const runnerNames = fillNames;
         const monitor =
           currentSchedule &&
-          currentSchedule._tag === "PopulatedSchedule" &&
+          isPopulatedSchedule(currentSchedule) &&
           Option.isSome(currentSchedule.monitor)
             ? currentSchedule.monitor.value.monitor.name
             : null;

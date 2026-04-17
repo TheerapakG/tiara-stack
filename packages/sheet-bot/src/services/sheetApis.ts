@@ -11,6 +11,7 @@ import {
   Exit,
   FileSystem,
   Ref,
+  Match,
   pipe,
   Schedule,
   DateTime,
@@ -141,10 +142,14 @@ export class SheetApisClient extends ServiceMap.Service<SheetApisClient>()("Shee
             ),
           ),
         );
+        const cacheKey = Match.value(requester).pipe(
+          Match.tagsExhaustive({
+            Bot: () => DISCORD_BOT_USER_ID_SENTINEL,
+            DiscordUser: (requester) => requester.discordUserId,
+          }),
+        );
         const { token } = yield* pipe(
-          requester._tag === "Bot"
-            ? Cache.get(tokenCache, DISCORD_BOT_USER_ID_SENTINEL)
-            : Cache.get(tokenCache, requester.discordUserId),
+          Cache.get(tokenCache, cacheKey),
           Effect.catch((err) =>
             pipe(
               Effect.logWarning(

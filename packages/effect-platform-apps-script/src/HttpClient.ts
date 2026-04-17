@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Match from "effect/Match";
 import { pipeArguments } from "effect/Pipeable";
 import * as Cookies from "effect/unstable/http/Cookies";
 import type * as Body from "effect/unstable/http/HttpBody";
@@ -123,52 +124,55 @@ const sendBody = (
   httpRequest: AppsScriptHttpRequest,
   body: Body.HttpBody,
 ): Effect.Effect<void, Error.HttpClientError> =>
-  Effect.suspend((): Effect.Effect<void, Error.HttpClientError> => {
-    switch (body._tag) {
-      case "Empty": {
-        httpRequest.body = new Uint8Array(0);
-        return Effect.void;
-      }
-      case "Uint8Array": {
-        httpRequest.body = body.body as Uint8Array;
-        return Effect.void;
-      }
-      case "Raw": {
-        if (body.body instanceof Uint8Array || typeof body.body === "string") {
-          httpRequest.body = body.body;
-          return Effect.void;
-        }
-        return Effect.fail(
-          new Error.HttpClientError({
-            reason: new Error.EncodeError({
-              request,
-              cause: new globalThis.Error("Raw body must be a string or Uint8Array in Apps Script"),
-            }),
-          }),
-        );
-      }
-      case "FormData": {
-        return Effect.fail(
-          new Error.HttpClientError({
-            reason: new Error.EncodeError({
-              request,
-              cause: new globalThis.Error("FormData not supported in Apps Script"),
-            }),
-          }),
-        );
-      }
-      case "Stream": {
-        return Effect.fail(
-          new Error.HttpClientError({
-            reason: new Error.EncodeError({
-              request,
-              cause: new globalThis.Error("Stream body not supported in Apps Script"),
-            }),
-          }),
-        );
-      }
-    }
-  });
+  Effect.suspend(
+    (): Effect.Effect<void, Error.HttpClientError> =>
+      Match.value(body).pipe(
+        Match.tagsExhaustive({
+          Empty: () => {
+            httpRequest.body = new Uint8Array(0);
+            return Effect.void;
+          },
+          Uint8Array: (body) => {
+            httpRequest.body = body.body as Uint8Array;
+            return Effect.void;
+          },
+          Raw: (body) => {
+            if (body.body instanceof Uint8Array || typeof body.body === "string") {
+              httpRequest.body = body.body;
+              return Effect.void;
+            }
+            return Effect.fail(
+              new Error.HttpClientError({
+                reason: new Error.EncodeError({
+                  request,
+                  cause: new globalThis.Error(
+                    "Raw body must be a string or Uint8Array in Apps Script",
+                  ),
+                }),
+              }),
+            );
+          },
+          FormData: () =>
+            Effect.fail(
+              new Error.HttpClientError({
+                reason: new Error.EncodeError({
+                  request,
+                  cause: new globalThis.Error("FormData not supported in Apps Script"),
+                }),
+              }),
+            ),
+          Stream: () =>
+            Effect.fail(
+              new Error.HttpClientError({
+                reason: new Error.EncodeError({
+                  request,
+                  cause: new globalThis.Error("Stream body not supported in Apps Script"),
+                }),
+              }),
+            ),
+        }),
+      ),
+  );
 
 const waitForResponse = (
   request: HttpClientRequest,

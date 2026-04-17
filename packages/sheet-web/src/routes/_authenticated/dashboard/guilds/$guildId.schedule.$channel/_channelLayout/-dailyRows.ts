@@ -1,13 +1,14 @@
+import { Predicate } from "effect";
 import { Sheet } from "sheet-apis/schema";
+
+const isPopulatedSchedule = (
+  schedule: Sheet.PopulatedScheduleResult,
+): schedule is Sheet.PopulatedSchedule => Predicate.isTagged("PopulatedSchedule")(schedule);
 
 export const classifyDailyHourSchedules = (
   schedules: readonly Sheet.PopulatedScheduleResult[],
-): "break" | "schedule" =>
-  schedules.some((schedule) => schedule._tag === "PopulatedSchedule") ? "schedule" : "break";
+): "break" | "schedule" => (schedules.some(isPopulatedSchedule) ? "schedule" : "break");
 
 export const getDailyHourSchedules = (
   schedules: readonly Sheet.PopulatedScheduleResult[],
-): readonly Sheet.PopulatedSchedule[] =>
-  schedules.filter((schedule): schedule is Sheet.PopulatedSchedule => {
-    return schedule._tag === "PopulatedSchedule";
-  });
+): readonly Sheet.PopulatedSchedule[] => schedules.filter(isPopulatedSchedule);

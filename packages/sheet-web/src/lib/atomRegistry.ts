@@ -1,7 +1,7 @@
 import { scheduleTask } from "@effect/atom-react";
 import { Atom, AtomRegistry, AsyncResult } from "effect/unstable/reactivity";
 import { createIsomorphicFn } from "@tanstack/react-start";
-import { Effect } from "effect";
+import { Effect, Predicate } from "effect";
 
 const atomRegistryScheduleTask = createIsomorphicFn()
   .server((callback: () => void) => {
@@ -60,6 +60,8 @@ interface Registry {
   readonly scheduleNodeRemoval: (node: Node<any>) => void;
 }
 
+const isInitialAsyncResult = Predicate.isTagged("Initial");
+
 const ensureAtomDataNode = <A>(
   registry: AtomRegistry.AtomRegistry,
   atom: Atom.Atom<A>,
@@ -113,14 +115,17 @@ export const ensureResultAtomData = <A, E>(
   Effect.callback((resume) => {
     const registryImpl = registry as unknown as Registry;
     const node = ensureAtomDataNode(registry, atom, options);
-    if (node._value._tag !== "Initial") {
-      return resume(AsyncResult.toExit(node._value).asEffect() as Effect.Effect<A, E>);
+    const currentValue = node._value;
+    if (!isInitialAsyncResult(currentValue)) {
+      return resume(AsyncResult.toExit(currentValue).asEffect() as Effect.Effect<A, E>);
     }
     const unsubscribe = node.subscribe(() => {
-      if (node._value._tag !== "Initial") {
-        resume(AsyncResult.toExit(node._value).asEffect() as Effect.Effect<A, E>);
-        cancel();
+      const nextValue = node._value;
+      if (isInitialAsyncResult(nextValue)) {
+        return;
       }
+      resume(AsyncResult.toExit(nextValue).asEffect() as Effect.Effect<A, E>);
+      cancel();
     });
     const cancel = () => {
       unsubscribe();

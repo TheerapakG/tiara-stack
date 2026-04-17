@@ -515,19 +515,25 @@ const teamParser = (
         const isvConfig = teamConfig.isvConfig;
         const tagsConfig = teamConfig.tagsConfig;
         const base = yield* teamBaseParser(teamConfig, sheet);
-        const isv = yield* isvConfig._tag === "TeamIsvSplitConfig"
-          ? teamSplitIsvParser(teamConfig, isvConfig, sheet)
-          : teamCombinedIsvParser(teamConfig, isvConfig, sheet);
-        const tags = yield* (() => {
-          if (tagsConfig._tag === "TeamTagsConstantsConfig") {
-            return Effect.succeed(
-              ArrayUtils.WithDefault.wrap<ReadonlyArray<{ tags: readonly string[] }>>({
-                default: () => ({ tags: tagsConfig.tags }),
-              })([]),
-            );
-          }
-          return teamRangesTagsParser(teamConfig, tagsConfig, sheet);
-        })();
+        const isv = yield* Match.value(isvConfig).pipe(
+          Match.tagsExhaustive({
+            TeamIsvSplitConfig: (isvConfig) => teamSplitIsvParser(teamConfig, isvConfig, sheet),
+            TeamIsvCombinedConfig: (isvConfig) =>
+              teamCombinedIsvParser(teamConfig, isvConfig, sheet),
+          }),
+        );
+        const tags = yield* Match.value(tagsConfig).pipe(
+          Match.tagsExhaustive({
+            TeamTagsConstantsConfig: (tagsConfig) =>
+              Effect.succeed(
+                ArrayUtils.WithDefault.wrap<ReadonlyArray<{ tags: readonly string[] }>>({
+                  default: () => ({ tags: tagsConfig.tags }),
+                })([]),
+              ),
+            TeamTagsRangesConfig: (tagsConfig) =>
+              teamRangesTagsParser(teamConfig, tagsConfig, sheet),
+          }),
+        );
 
         return pipe(
           base,

@@ -1,7 +1,7 @@
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 import { beforeEach, describe, expect, it } from "@effect/vitest";
 import { TestClock } from "effect/testing";
-import { Cause, DateTime, Duration, Effect, Option, Redacted, Ref } from "effect";
+import { Cause, DateTime, Duration, Effect, Exit, Option, Redacted, Ref } from "effect";
 import { vi } from "vitest";
 import type { Account } from "sheet-auth/model";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
@@ -244,7 +244,7 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       const exit = yield* Effect.exit(runSheetAuthToken(authorization, Redacted.make("token-1")));
 
       expect(exit._tag).toBe("Failure");
-      if (exit._tag === "Failure") {
+      if (Exit.isFailure(exit)) {
         const failure = Cause.findErrorOption(exit.cause);
         if (Option.isSome(failure)) {
           expect((failure.value as { message: string }).message).toContain(

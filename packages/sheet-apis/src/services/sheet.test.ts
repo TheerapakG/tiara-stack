@@ -1,6 +1,6 @@
 import type { sheets_v4 } from "@googleapis/sheets";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, HashMap, Option } from "effect";
+import { Effect, HashMap, Option, Predicate } from "effect";
 import type { BreakSchedule, Schedule } from "@/schemas/sheet";
 import { ScheduleConfig } from "@/schemas/sheetConfig";
 import { GoogleSheets } from "./google/sheets";
@@ -63,14 +63,15 @@ const makeGoogleSheets = (ranges: Record<string, sheets_v4.Schema$RowData[]>) =>
     getRowDatasHashMap: <K>(requestedRanges: HashMap.HashMap<K, string>) =>
       Effect.succeed(HashMap.map(requestedRanges, (range) => ranges[range] ?? [])),
   }) as unknown as GoogleSheetsApi;
+const isSchedule = Predicate.isTagged("Schedule");
 
 const getSchedule = (schedules: ReadonlyArray<BreakSchedule | Schedule>) => {
   const schedule = schedules.find(
-    (candidate) => candidate._tag === "Schedule" && Option.isSome(candidate.hour),
+    (candidate) => isSchedule(candidate) && Option.isSome(candidate.hour),
   );
   expect(schedule?._tag).toBe("Schedule");
 
-  if (schedule == null || schedule._tag !== "Schedule" || Option.isNone(schedule.hour)) {
+  if (schedule == null || !isSchedule(schedule) || Option.isNone(schedule.hour)) {
     throw new Error("Expected a schedule row");
   }
 
