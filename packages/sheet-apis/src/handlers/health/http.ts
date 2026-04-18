@@ -4,14 +4,16 @@ import { Api } from "@/api";
 
 export const healthLayer = HttpApiBuilder.group(Api, "health", (handlers) => {
   return handlers
-    .handle("live", () =>
-      Effect.gen(function* () {
+    .handle(
+      "live",
+      Effect.fnUntraced(function* () {
         const timestamp = yield* DateTime.now;
         return { status: "ok" as const, timestamp };
       }),
     )
-    .handle("ready", () =>
-      Effect.gen(function* () {
+    .handle(
+      "ready",
+      Effect.fnUntraced(function* () {
         const timestamp = yield* DateTime.now;
         return { status: "ok" as const, timestamp };
       }),

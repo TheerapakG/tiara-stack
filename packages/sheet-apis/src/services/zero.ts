@@ -9,44 +9,41 @@ const getAuth = Effect.fn("zero.getAuth")(function* () {
   return yield* Effect.promise(() => readFile("/var/run/secrets/tokens/zero-cache-token", "utf-8"));
 });
 
-const makeZero = () =>
-  Effect.gen(function* () {
-    const auth = yield* getAuth();
-    const zeroCacheServer = yield* config.zeroCacheServer;
-    const zeroCacheUserId = yield* config.zeroCacheUserId;
-    const services = yield* Effect.services();
-    const zero = new Zero({
-      server: zeroCacheServer,
-      userID: zeroCacheUserId,
-      auth,
-      schema,
-      mutators,
-    });
+const makeZero = Effect.fn("zero.makeZero")(function* () {
+  const auth = yield* getAuth();
+  const zeroCacheServer = yield* config.zeroCacheServer;
+  const zeroCacheUserId = yield* config.zeroCacheUserId;
+  const services = yield* Effect.services();
+  const zero = new Zero({
+    server: zeroCacheServer,
+    userID: zeroCacheUserId,
+    auth,
+    schema,
+    mutators,
+  });
 
-    yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        zero.connection.state.subscribe((state) =>
-          pipe(
-            Match.value(state),
-            Match.when({ name: "needs-auth" }, () =>
-              pipe(
-                getAuth(),
-                Effect.flatMap((auth) =>
-                  Effect.tryPromise(() => zero.connection.connect({ auth })),
-                ),
-              ),
+  yield* Effect.acquireRelease(
+    Effect.sync(() =>
+      zero.connection.state.subscribe((state) =>
+        pipe(
+          Match.value(state),
+          Match.when({ name: "needs-auth" }, () =>
+            pipe(
+              getAuth(),
+              Effect.flatMap((auth) => Effect.tryPromise(() => zero.connection.connect({ auth }))),
             ),
-            Match.orElse(() => Effect.void),
-            Effect.provideServices(services),
-            Effect.runFork,
           ),
+          Match.orElse(() => Effect.void),
+          Effect.provideServices(services),
+          Effect.runFork,
         ),
       ),
-      (unsubscribe) => Effect.sync(unsubscribe),
-    );
+    ),
+    (unsubscribe) => Effect.sync(unsubscribe),
+  );
 
-    return zero;
-  });
+  return zero;
+});
 
 export class ZeroService extends BaseZeroService.ZeroService<Schema, undefined, unknown>() {
   static layer = Layer.effect(

@@ -1,26 +1,26 @@
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Array, Effect, HashMap, Layer, Option } from "effect";
 import { Api } from "@/api";
+import { withCurrentGuildAuthFromQuery } from "@/handlers/shared/guildAuthorization";
 import { AuthorizationService, PlayerService, GuildConfigService } from "@/services";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 
-const getSheetIdFromGuildId = (
+const getSheetIdFromGuildId = Effect.fn("player.getSheetIdFromGuildId")(function* (
   guildId: string,
   guildConfigService: typeof GuildConfigService.Service,
-) =>
-  Effect.gen(function* () {
-    const guildConfig = yield* guildConfigService.getGuildConfig(guildId);
+) {
+  const guildConfig = yield* guildConfigService.getGuildConfig(guildId);
 
-    if (Option.isNone(guildConfig)) {
-      return yield* Effect.die(new Error(`Guild config not found for guildId: ${guildId}`));
-    }
+  if (Option.isNone(guildConfig)) {
+    return yield* Effect.die(new Error(`Guild config not found for guildId: ${guildId}`));
+  }
 
-    if (Option.isNone(guildConfig.value.sheetId)) {
-      return yield* Effect.die(new Error(`sheetId not found for guildId: ${guildId}`));
-    }
+  if (Option.isNone(guildConfig.value.sheetId)) {
+    return yield* Effect.die(new Error(`sheetId not found for guildId: ${guildId}`));
+  }
 
-    return guildConfig.value.sheetId.value;
-  });
+  return guildConfig.value.sheetId.value;
+});
 
 export const playerLayer = HttpApiBuilder.group(
   Api,
@@ -29,12 +29,13 @@ export const playerLayer = HttpApiBuilder.group(
     const authorizationService = yield* AuthorizationService;
     const playerService = yield* PlayerService;
     const guildConfigService = yield* GuildConfigService;
+    const withQueryGuildAuth = withCurrentGuildAuthFromQuery(authorizationService);
 
     return handlers
-      .handle("getPlayerMaps", ({ query }) =>
-        authorizationService.provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
+      .handle(
+        "getPlayerMaps",
+        withQueryGuildAuth(
+          Effect.fnUntraced(function* ({ query }) {
             yield* authorizationService.requireMonitorGuild(query.guildId);
             const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
             const playerMaps = yield* playerService.getPlayerMaps(sheetId);
@@ -56,57 +57,57 @@ export const playerLayer = HttpApiBuilder.group(
           }),
         ),
       )
-      .handle("getByIds", ({ query }) => {
-        const auth =
-          query.ids.length === 1
-            ? authorizationService.requireDiscordAccountIdOrMonitorGuild(
-                query.guildId,
-                query.ids[0],
-              )
-            : authorizationService.requireMonitorGuild(query.guildId);
+      .handle(
+        "getByIds",
+        withQueryGuildAuth(
+          Effect.fnUntraced(function* ({ query }) {
+            const auth =
+              query.ids.length === 1
+                ? authorizationService.requireDiscordAccountIdOrMonitorGuild(
+                    query.guildId,
+                    query.ids[0],
+                  )
+                : authorizationService.requireMonitorGuild(query.guildId);
 
-        return authorizationService.provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
             yield* auth;
             const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
             return yield* playerService.getByIds(sheetId, query.ids);
           }),
-        );
-      })
-      .handle("getByNames", ({ query }) =>
-        authorizationService.provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
+        ),
+      )
+      .handle(
+        "getByNames",
+        withQueryGuildAuth(
+          Effect.fnUntraced(function* ({ query }) {
             yield* authorizationService.requireMonitorGuild(query.guildId);
             const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
             return yield* playerService.getByNames(sheetId, query.names);
           }),
         ),
       )
-      .handle("getTeamsByIds", ({ query }) => {
-        const auth =
-          query.ids.length === 1
-            ? authorizationService.requireDiscordAccountIdOrMonitorGuild(
-                query.guildId,
-                query.ids[0],
-              )
-            : authorizationService.requireMonitorGuild(query.guildId);
+      .handle(
+        "getTeamsByIds",
+        withQueryGuildAuth(
+          Effect.fnUntraced(function* ({ query }) {
+            const auth =
+              query.ids.length === 1
+                ? authorizationService.requireDiscordAccountIdOrMonitorGuild(
+                    query.guildId,
+                    query.ids[0],
+                  )
+                : authorizationService.requireMonitorGuild(query.guildId);
 
-        return authorizationService.provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
             yield* auth;
             const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
             const teams = yield* playerService.getTeamsByIds(sheetId, query.ids);
             return [teams] as const;
           }),
-        );
-      })
-      .handle("getTeamsByNames", ({ query }) =>
-        authorizationService.provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
+        ),
+      )
+      .handle(
+        "getTeamsByNames",
+        withQueryGuildAuth(
+          Effect.fnUntraced(function* ({ query }) {
             yield* authorizationService.requireMonitorGuild(query.guildId);
             const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
             const teams = yield* playerService.getTeamsByNames(sheetId, query.names);

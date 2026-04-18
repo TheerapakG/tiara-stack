@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option } from "effect";
+import { Effect, Option, ServiceMap } from "effect";
 import {
   LEGACY_MESSAGE_ROOM_ORDER_ACCESS_ERROR,
   requireRoomOrderMonitorAccess,
@@ -14,7 +14,7 @@ type MessageRoomOrderAccessService = Pick<
   typeof MessageRoomOrderService.Service,
   "getMessageRoomOrder"
 >;
-type AuthorizationServiceApi = Effect.Success<typeof AuthorizationService.make>;
+type AuthorizationServiceApi = ServiceMap.Service.Shape<typeof AuthorizationService>;
 
 const makeMessageRoomOrderRecord = (overrides?: {
   readonly guildId?: string | null;
@@ -45,17 +45,17 @@ const makeRoomOrderService = (record?: MessageRoomOrder) =>
     getMessageRoomOrder: () => Effect.succeed(Option.fromNullishOr(record)),
   }) satisfies MessageRoomOrderAccessService;
 
-const withAuthorization = <A, E, R>(
+const withAuthorization = Effect.fnUntraced(function* <A, E, R>(
   f: (authorizationService: AuthorizationServiceApi) => Effect.Effect<A, E, R>,
-) =>
-  Effect.gen(function* () {
-    const authorizationService = yield* AuthorizationService.make;
-    return yield* f(authorizationService);
-  });
+) {
+  const authorizationService = yield* AuthorizationService.make;
+  return yield* f(authorizationService);
+});
 
 describe("messageRoomOrder legacy access", () => {
-  it.effect("denies legacy record access via requireRoomOrderMonitorAccess", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "denies legacy record access via requireRoomOrderMonitorAccess",
+    Effect.fnUntraced(function* () {
       const legacyRecord = makeMessageRoomOrderRecord({ guildId: null, messageChannelId: null });
       let operationCalls = 0;
 
@@ -79,8 +79,9 @@ describe("messageRoomOrder legacy access", () => {
     }),
   );
 
-  it.effect("denies partially legacy record access for regular users", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "denies partially legacy record access for regular users",
+    Effect.fnUntraced(function* () {
       const legacyRecord = makeMessageRoomOrderRecord({
         guildId: "guild-1",
         messageChannelId: null,
@@ -100,8 +101,9 @@ describe("messageRoomOrder legacy access", () => {
     }),
   );
 
-  it.effect("denies upsert for an existing legacy room-order record before the mutation runs", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "denies upsert for an existing legacy room-order record before the mutation runs",
+    Effect.fnUntraced(function* () {
       let mutationCalls = 0;
       const error = yield* getFailure(
         withAuthorization((authorizationService) =>
@@ -129,8 +131,9 @@ describe("messageRoomOrder legacy access", () => {
     }),
   );
 
-  it.effect("denies creating a missing legacy room-order record", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "denies creating a missing legacy room-order record",
+    Effect.fnUntraced(function* () {
       const error = yield* getFailure(
         withAuthorization((authorizationService) =>
           requireRoomOrderUpsertAccess(authorizationService, makeRoomOrderService(), "message-1"),
@@ -142,8 +145,9 @@ describe("messageRoomOrder legacy access", () => {
     }),
   );
 
-  it.effect("allows modern monitor access", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "allows modern monitor access",
+    Effect.fnUntraced(function* () {
       yield* withAuthorization((authorizationService) =>
         requireRoomOrderMonitorAccess(authorizationService, makeMessageRoomOrderRecord()),
       ).pipe(
@@ -157,8 +161,9 @@ describe("messageRoomOrder legacy access", () => {
     }),
   );
 
-  it.effect("allows modern upsert for monitors", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "allows modern upsert for monitors",
+    Effect.fnUntraced(function* () {
       yield* withAuthorization((authorizationService) =>
         requireRoomOrderUpsertAccess(
           authorizationService,

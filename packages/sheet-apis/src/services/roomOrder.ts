@@ -30,8 +30,8 @@ import {
   type PopulatedScheduleResult,
 } from "@/schemas/sheet";
 
-type GuildConfigServiceApi = Effect.Success<typeof GuildConfigService.make>;
-type SheetServiceApi = Effect.Success<typeof SheetService.make>;
+type GuildConfigServiceApi = ServiceMap.Service.Shape<typeof GuildConfigService>;
+type SheetServiceApi = ServiceMap.Service.Shape<typeof SheetService>;
 
 const isPlayer = (player: PopulatedSchedulePlayer["player"]): player is Player =>
   Predicate.isTagged("Player")(player);

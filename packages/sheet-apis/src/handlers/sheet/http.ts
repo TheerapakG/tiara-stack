@@ -1,6 +1,7 @@
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
+import { withCurrentGuildAuthFromQuery } from "@/handlers/shared/guildAuthorization";
 import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
 import { BreakSchedule, Schedule } from "@/schemas/sheet";
 import {
@@ -13,23 +14,22 @@ import {
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { resolveScheduleViewFromPermissions } from "../schedule/shared";
 
-const getSheetIdFromGuildId = (
+const getSheetIdFromGuildId = Effect.fn("sheet.getSheetIdFromGuildId")(function* (
   guildId: string,
   guildConfigService: typeof GuildConfigService.Service,
-) =>
-  Effect.gen(function* () {
-    const guildConfig = yield* guildConfigService.getGuildConfig(guildId);
+) {
+  const guildConfig = yield* guildConfigService.getGuildConfig(guildId);
 
-    if (Option.isNone(guildConfig)) {
-      return yield* Effect.die(new Error(`Guild config not found for guildId: ${guildId}`));
-    }
+  if (Option.isNone(guildConfig)) {
+    return yield* Effect.die(new Error(`Guild config not found for guildId: ${guildId}`));
+  }
 
-    if (Option.isNone(guildConfig.value.sheetId)) {
-      return yield* Effect.die(new Error(`sheetId not found for guildId: ${guildId}`));
-    }
+  if (Option.isNone(guildConfig.value.sheetId)) {
+    return yield* Effect.die(new Error(`sheetId not found for guildId: ${guildId}`));
+  }
 
-    return guildConfig.value.sheetId.value;
-  });
+  return guildConfig.value.sheetId.value;
+});
 
 const withScheduleHourWindows = (
   schedules: ReadonlyArray<BreakSchedule | Schedule>,
@@ -44,30 +44,34 @@ export const sheetLayer = HttpApiBuilder.group(
     const sheetService = yield* SheetService;
     const sheetConfigService = yield* SheetConfigService;
     const guildConfigService = yield* GuildConfigService;
+    const withQueryGuildAuth = withCurrentGuildAuthFromQuery(authorizationService);
 
     return handlers
-      .handle("getPlayers", ({ query }) =>
-        Effect.gen(function* () {
+      .handle(
+        "getPlayers",
+        Effect.fnUntraced(function* ({ query }) {
           const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
           return yield* sheetService.getPlayers(sheetId);
         }),
       )
-      .handle("getMonitors", ({ query }) =>
-        Effect.gen(function* () {
+      .handle(
+        "getMonitors",
+        Effect.fnUntraced(function* ({ query }) {
           const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
           return yield* sheetService.getMonitors(sheetId);
         }),
       )
-      .handle("getTeams", ({ query }) =>
-        Effect.gen(function* () {
+      .handle(
+        "getTeams",
+        Effect.fnUntraced(function* ({ query }) {
           const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
           return yield* sheetService.getTeams(sheetId);
         }),
       )
-      .handle("getAllSchedules", ({ query }) =>
-        authorizationService.provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
+      .handle(
+        "getAllSchedules",
+        withQueryGuildAuth(
+          Effect.fnUntraced(function* ({ query }) {
             const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
             const resolvedUser = yield* SheetAuthGuildUser;
             const view = resolveScheduleViewFromPermissions(
@@ -90,10 +94,10 @@ export const sheetLayer = HttpApiBuilder.group(
           }),
         ),
       )
-      .handle("getDaySchedules", ({ query }) =>
-        authorizationService.provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
+      .handle(
+        "getDaySchedules",
+        withQueryGuildAuth(
+          Effect.fnUntraced(function* ({ query }) {
             const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
             const resolvedUser = yield* SheetAuthGuildUser;
             const view = resolveScheduleViewFromPermissions(
@@ -116,10 +120,10 @@ export const sheetLayer = HttpApiBuilder.group(
           }),
         ),
       )
-      .handle("getChannelSchedules", ({ query }) =>
-        authorizationService.provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
+      .handle(
+        "getChannelSchedules",
+        withQueryGuildAuth(
+          Effect.fnUntraced(function* ({ query }) {
             const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
             const resolvedUser = yield* SheetAuthGuildUser;
             const view = resolveScheduleViewFromPermissions(
@@ -142,32 +146,37 @@ export const sheetLayer = HttpApiBuilder.group(
           }),
         ),
       )
-      .handle("getRangesConfig", ({ query }) =>
-        Effect.gen(function* () {
+      .handle(
+        "getRangesConfig",
+        Effect.fnUntraced(function* ({ query }) {
           const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
           return yield* sheetConfigService.getRangesConfig(sheetId);
         }),
       )
-      .handle("getTeamConfig", ({ query }) =>
-        Effect.gen(function* () {
+      .handle(
+        "getTeamConfig",
+        Effect.fnUntraced(function* ({ query }) {
           const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
           return yield* sheetConfigService.getTeamConfig(sheetId);
         }),
       )
-      .handle("getEventConfig", ({ query }) =>
-        Effect.gen(function* () {
+      .handle(
+        "getEventConfig",
+        Effect.fnUntraced(function* ({ query }) {
           const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
           return yield* sheetConfigService.getEventConfig(sheetId);
         }),
       )
-      .handle("getScheduleConfig", ({ query }) =>
-        Effect.gen(function* () {
+      .handle(
+        "getScheduleConfig",
+        Effect.fnUntraced(function* ({ query }) {
           const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
           return yield* sheetConfigService.getScheduleConfig(sheetId);
         }),
       )
-      .handle("getRunnerConfig", ({ query }) =>
-        Effect.gen(function* () {
+      .handle(
+        "getRunnerConfig",
+        Effect.fnUntraced(function* ({ query }) {
           const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
           return yield* sheetConfigService.getRunnerConfig(sheetId);
         }),

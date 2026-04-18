@@ -91,26 +91,24 @@ describe("SchemaError", () => {
 
   it.effect(
     "round-trips a converted SchemaError through the local schema",
-    () =>
-      Effect.gen(function* () {
-        const converted = yield* decodeFailure(Schema.Struct({ a: Schema.String }), { a: 1 }).pipe(
-          Effect.orDie,
-        );
+    Effect.fnUntraced(function* () {
+      const converted = yield* decodeFailure(Schema.Struct({ a: Schema.String }), { a: 1 }).pipe(
+        Effect.orDie,
+      );
 
-        const encoded = yield* Schema.encodeUnknownEffect(SchemaError)(converted).pipe(
-          Effect.orDie,
-        );
-        const decoded = yield* Schema.decodeUnknownEffect(SchemaError)(encoded).pipe(Effect.orDie);
+      const encoded = yield* Schema.encodeUnknownEffect(SchemaError)(converted).pipe(Effect.orDie);
+      const decoded = yield* Schema.decodeUnknownEffect(SchemaError)(encoded).pipe(Effect.orDie);
 
-        expect(decoded).toBeInstanceOf(Schema.SchemaError);
-        expect(decoded._tag).toBe(converted._tag);
-        expect(decoded.message).toBe(converted.message);
-        expect(decoded.issue).toEqual(converted.issue);
-      }) as Effect.Effect<void, never, Scope.Scope>,
+      expect(decoded).toBeInstanceOf(Schema.SchemaError);
+      expect(decoded._tag).toBe(converted._tag);
+      expect(decoded.message).toBe(converted.message);
+      expect(decoded.issue).toEqual(converted.issue);
+    }) as () => Effect.Effect<void, never, Scope.Scope>,
   );
 
-  it.effect("supports inline catchTag conversion and leaves non-schema errors alone", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "supports inline catchTag conversion and leaves non-schema errors alone",
+    Effect.fnUntraced(function* () {
       const schemaFailure = yield* Effect.flip(
         Schema.decodeUnknownEffect(Schema.Struct({ a: Schema.String }))({ a: 1 }).pipe(
           Effect.catchTag("SchemaError", Effect.fail),

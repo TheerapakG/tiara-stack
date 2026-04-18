@@ -148,8 +148,10 @@ function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
 }
 
 // Auth handler group - forwards all requests to Better Auth
-const authLayer = HttpApiBuilder.group(Api, "auth", (handlers) =>
-  Effect.gen(function* () {
+const authLayer = HttpApiBuilder.group(
+  Api,
+  "auth",
+  Effect.fn(function* (handlers) {
     const auth = yield* AuthService;
     const trustedOrigins = [...(yield* config.trustedOrigins)];
     const baseUrl = yield* config.baseUrl;
@@ -185,8 +187,10 @@ const authLayer = HttpApiBuilder.group(Api, "auth", (handlers) =>
 
 // Well-known handler group - handles SERVER_ONLY metadata endpoints
 // by wrapping the helper functions with getRequestListener
-const wellKnownLayer = HttpApiBuilder.group(Api, "well-known", (handlers) =>
-  Effect.gen(function* () {
+const wellKnownLayer = HttpApiBuilder.group(
+  Api,
+  "well-known",
+  Effect.fn(function* (handlers) {
     const auth = yield* AuthService;
 
     // Create web handlers for well-known endpoints

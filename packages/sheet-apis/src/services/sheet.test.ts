@@ -1,14 +1,14 @@
 import type { sheets_v4 } from "@googleapis/sheets";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, HashMap, Option, Predicate } from "effect";
+import { Effect, HashMap, Option, Predicate, ServiceMap } from "effect";
 import type { BreakSchedule, Schedule } from "@/schemas/sheet";
 import { ScheduleConfig } from "@/schemas/sheetConfig";
 import { GoogleSheets } from "./google/sheets";
 import { SheetConfigService } from "./sheetConfig";
 import { SheetService } from "./sheet";
 
-type GoogleSheetsApi = Effect.Success<typeof GoogleSheets.make>;
-type SheetConfigServiceApi = Effect.Success<typeof SheetConfigService.make>;
+type GoogleSheetsApi = ServiceMap.Service.Shape<typeof GoogleSheets>;
+type SheetConfigServiceApi = ServiceMap.Service.Shape<typeof SheetConfigService>;
 
 const scheduleSheet = "Schedule";
 
@@ -100,10 +100,10 @@ const runGetAllSchedules = ({
   overfills?: string;
   standbys?: string;
 }) =>
-  Effect.gen(function* () {
+  Effect.fnUntraced(function* () {
     const sheetService = yield* SheetService.make;
     return yield* sheetService.getAllSchedules("sheet-1");
-  }).pipe(
+  })().pipe(
     Effect.provideService(
       GoogleSheets,
       makeGoogleSheets({

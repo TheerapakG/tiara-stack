@@ -21,8 +21,9 @@ export const discordLayer = HttpApiBuilder.group(
     const guildsCache = yield* GuildsApiCacheView;
 
     return handlers
-      .handle("getCurrentUser", () =>
-        Effect.gen(function* () {
+      .handle(
+        "getCurrentUser",
+        Effect.fnUntraced(function* () {
           const headers = yield* HttpServerRequest.schemaHeaders(
             Schema.Record(Schema.String, Schema.UndefinedOr(Schema.String)),
           );
@@ -66,8 +67,9 @@ export const discordLayer = HttpApiBuilder.group(
           );
         }),
       )
-      .handle("getCurrentUserGuilds", () =>
-        Effect.gen(function* () {
+      .handle(
+        "getCurrentUserGuilds",
+        Effect.fnUntraced(function* () {
           const headers = yield* HttpServerRequest.schemaHeaders(
             Schema.Record(Schema.String, Schema.UndefinedOr(Schema.String)),
           );

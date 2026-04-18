@@ -1,7 +1,7 @@
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 import { beforeEach, describe, expect, it } from "@effect/vitest";
 import { TestClock } from "effect/testing";
-import { Cause, DateTime, Duration, Effect, Exit, Option, Redacted, Ref } from "effect";
+import { Cause, DateTime, Duration, Effect, Exit, Option, Redacted, Ref, ServiceMap } from "effect";
 import { vi } from "vitest";
 import type { Account } from "sheet-auth/model";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
@@ -47,51 +47,49 @@ const provideRequestContext = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.
     Effect.provideService(HttpRouter.RouteContext, routeContext),
   ) as Effect.Effect<A, E>;
 
-const makeAccount = (userId: string, accountId = `discord-${userId}`) =>
-  Effect.gen(function* () {
-    const now = yield* DateTime.now;
-    return {
-      _tag: "Account",
-      userId,
-      accountId,
-      providerId: "discord",
-      scopes: [],
-      createdAt: now,
-      updatedAt: now,
-    } satisfies Account;
-  });
+const makeAccount = Effect.fnUntraced(function* (userId: string, accountId = `discord-${userId}`) {
+  const now = yield* DateTime.now;
+  return {
+    _tag: "Account",
+    userId,
+    accountId,
+    providerId: "discord",
+    scopes: [],
+    createdAt: now,
+    updatedAt: now,
+  } satisfies Account;
+});
 
 const permissionValues = (permissions: ReturnType<typeof permissionSetFromIterable>) =>
   Array.from(permissions).sort();
 
-const runSheetAuthToken = (
+const runSheetAuthToken = Effect.fnUntraced(function* (
   authorization: Effect.Success<ReturnType<typeof makeAuthorization>>,
   token: Redacted.Redacted<string>,
-) =>
-  Effect.gen(function* () {
-    const currentUserRef = yield* Ref.make<Option.Option<(typeof SheetAuthUser)["Type"]>>(
-      Option.none(),
-    );
+) {
+  const currentUserRef = yield* Ref.make<
+    Option.Option<ServiceMap.Service.Shape<typeof SheetAuthUser>>
+  >(Option.none());
 
-    yield* provideRequestContext(
-      authorization.sheetAuthToken(
-        Effect.gen(function* () {
-          const currentUser = yield* SheetAuthUser;
-          yield* Ref.set(currentUserRef, Option.some(currentUser));
-          return HttpServerResponse.empty();
-        }),
-        {
-          credential: token,
-          endpoint: {} as never,
-          group: {} as never,
-        },
-      ),
-    );
+  yield* provideRequestContext(
+    authorization.sheetAuthToken(
+      Effect.fnUntraced(function* () {
+        const currentUser = yield* SheetAuthUser;
+        yield* Ref.set(currentUserRef, Option.some(currentUser));
+        return HttpServerResponse.empty();
+      })(),
+      {
+        credential: token,
+        endpoint: {} as never,
+        group: {} as never,
+      },
+    ),
+  );
 
-    return Option.getOrElse(yield* Ref.get(currentUserRef), () => {
-      throw new Error("SheetAuthUser was not provided");
-    });
+  return Option.getOrElse(yield* Ref.get(currentUserRef), () => {
+    throw new Error("SheetAuthUser was not provided");
   });
+});
 
 describe("SheetAuthTokenAuthorizationLive", () => {
   beforeEach(() => {
@@ -99,8 +97,9 @@ describe("SheetAuthTokenAuthorizationLive", () => {
     getOwnerIdMock.mockReturnValue(Effect.succeed(Option.none()));
   });
 
-  it.effect("caches base authorization lookup for the same token", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "caches base authorization lookup for the same token",
+    Effect.fnUntraced(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(
         Effect.succeed({
@@ -129,40 +128,40 @@ describe("SheetAuthTokenAuthorizationLive", () => {
 
   it.effect(
     "skips guild lookups for bot accounts even when implicit permissions include guild roles",
-    () =>
-      Effect.gen(function* () {
-        getAccountMock.mockReturnValue(makeAccount("user-1"));
-        getImplicitPermissionsMock.mockReturnValue(
-          Effect.succeed({
-            permissions: [
-              "bot",
-              "monitor_guild:guild-1",
-              "manage_guild:guild-1",
-              "monitor_guild:guild-2",
-              "manage_guild:guild-2",
-            ],
-          }),
-        );
+    Effect.fnUntraced(function* () {
+      getAccountMock.mockReturnValue(makeAccount("user-1"));
+      getImplicitPermissionsMock.mockReturnValue(
+        Effect.succeed({
+          permissions: [
+            "bot",
+            "monitor_guild:guild-1",
+            "manage_guild:guild-1",
+            "monitor_guild:guild-2",
+            "manage_guild:guild-2",
+          ],
+        }),
+      );
 
-        const authorization = yield* makeAuthorization();
-        const token = Redacted.make("token-1");
+      const authorization = yield* makeAuthorization();
+      const token = Redacted.make("token-1");
 
-        const first = yield* runSheetAuthToken(authorization, token);
-        const second = yield* runSheetAuthToken(authorization, token);
+      const first = yield* runSheetAuthToken(authorization, token);
+      const second = yield* runSheetAuthToken(authorization, token);
 
-        expect(permissionValues(first.permissions)).toEqual([
-          "account:discord:discord-user-1",
-          "bot",
-        ]);
-        expect(permissionValues(second.permissions)).toEqual([
-          "account:discord:discord-user-1",
-          "bot",
-        ]);
-      }),
+      expect(permissionValues(first.permissions)).toEqual([
+        "account:discord:discord-user-1",
+        "bot",
+      ]);
+      expect(permissionValues(second.permissions)).toEqual([
+        "account:discord:discord-user-1",
+        "bot",
+      ]);
+    }),
   );
 
-  it.effect("appends app owner without deriving guild permissions", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "appends app owner without deriving guild permissions",
+    Effect.fnUntraced(function* () {
       getAccountMock.mockReturnValue(makeAccount("owner-user", "discord-owner"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
       getOwnerIdMock.mockReturnValue(Effect.succeed(Option.some("discord-owner")));
@@ -177,8 +176,9 @@ describe("SheetAuthTokenAuthorizationLive", () => {
     }),
   );
 
-  it.effect("does not fail authorization when owner lookup fails", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "does not fail authorization when owner lookup fails",
+    Effect.fnUntraced(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
       getOwnerIdMock.mockReturnValue(Effect.fail(new Error("owner lookup failed")));
@@ -190,8 +190,9 @@ describe("SheetAuthTokenAuthorizationLive", () => {
     }),
   );
 
-  it.effect("uses distinct cache entries for distinct tokens", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "uses distinct cache entries for distinct tokens",
+    Effect.fnUntraced(function* () {
       getAccountMock
         .mockReturnValueOnce(makeAccount("user-1"))
         .mockReturnValueOnce(makeAccount("user-2"));
@@ -209,8 +210,9 @@ describe("SheetAuthTokenAuthorizationLive", () => {
     }),
   );
 
-  it.effect("falls back to empty permissions when implicit permission lookup fails", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "falls back to empty permissions when implicit permission lookup fails",
+    Effect.fnUntraced(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.fail(new Error("boom")));
 
@@ -223,8 +225,9 @@ describe("SheetAuthTokenAuthorizationLive", () => {
     }),
   );
 
-  it.effect("returns only base permissions", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "returns only base permissions",
+    Effect.fnUntraced(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
 
@@ -235,8 +238,9 @@ describe("SheetAuthTokenAuthorizationLive", () => {
     }),
   );
 
-  it.effect("maps account failures to Unauthorized", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "maps account failures to Unauthorized",
+    Effect.fnUntraced(function* () {
       getAccountMock.mockReturnValue(Effect.fail(new Error("ACCOUNT_NOT_FOUND")));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
 
@@ -255,8 +259,9 @@ describe("SheetAuthTokenAuthorizationLive", () => {
     }),
   );
 
-  it.effect("expires successful cache entries after 30 seconds", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "expires successful cache entries after 30 seconds",
+    Effect.fnUntraced(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(Effect.succeed({ permissions: [] }));
 
@@ -272,8 +277,9 @@ describe("SheetAuthTokenAuthorizationLive", () => {
     }),
   );
 
-  it.effect("retries failed lookups after the failure ttl", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "retries failed lookups after the failure ttl",
+    Effect.fnUntraced(function* () {
       getAccountMock
         .mockReturnValueOnce(Effect.fail(new Error("ACCOUNT_NOT_FOUND")))
         .mockReturnValueOnce(makeAccount("user-1"));

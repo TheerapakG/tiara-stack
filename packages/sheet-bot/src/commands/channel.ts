@@ -39,8 +39,8 @@ const configFields = (
   },
 ];
 
-const resolveGuildId = (serverId: Option.Option<string>): Effect.Effect<string, unknown, unknown> =>
-  Effect.gen(function* () {
+const resolveGuildId: (serverId: Option.Option<string>) => Effect.Effect<string, unknown, unknown> =
+  Effect.fn("resolveGuildId")(function* (serverId: Option.Option<string>) {
     const explicitGuildId = Option.getOrUndefined(serverId);
     if (typeof explicitGuildId === "string") {
       return explicitGuildId;

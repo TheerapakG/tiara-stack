@@ -40,14 +40,16 @@ function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
 
 // Debug middleware to log scope information
 let requestId = 0;
-const debugScopeMiddleware = HttpRouter.middleware((effect) =>
-  Effect.gen(function* () {
-    const reqNum = ++requestId;
-    const scope = yield* Effect.scope;
-    console.log(`[Request #${reqNum}] Scope object:`, scope);
-    console.log(`[Request #${reqNum}] Scope state:`, (scope as any).state);
-    return yield* effect;
-  }),
+const debugScopeMiddleware = HttpRouter.middleware(
+  Effect.succeed(
+    Effect.fnUntraced(function* (effect) {
+      const reqNum = ++requestId;
+      const scope = yield* Effect.scope;
+      console.log(`[Request #${reqNum}] Scope object:`, scope);
+      console.log(`[Request #${reqNum}] Scope state:`, (scope as any).state);
+      return yield* effect;
+    }),
+  ),
 ).layer;
 
 const corsMiddlewareLayer = Layer.unwrap(

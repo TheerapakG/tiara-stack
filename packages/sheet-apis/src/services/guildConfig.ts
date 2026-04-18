@@ -12,143 +12,145 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
       const zeroService = yield* ZeroService;
 
       return {
-        getAutoCheckinGuilds: () =>
-          Effect.gen(function* () {
-            const result = yield* zeroService.run(queries.guildConfig.getAutoCheckinGuilds({}), {
+        getAutoCheckinGuilds: Effect.fn("GuildConfigService.getAutoCheckinGuilds")(function* () {
+          const result = yield* zeroService.run(queries.guildConfig.getAutoCheckinGuilds({}), {
+            type: "complete",
+          });
+          return yield* Schema.decodeEffect(Schema.Array(DefaultTaggedClass(GuildConfig)))(result);
+        }),
+        getGuildConfig: Effect.fn("GuildConfigService.getGuildConfig")(function* (guildId: string) {
+          const result = yield* zeroService.run(
+            queries.guildConfig.getGuildConfigByGuildId({ guildId }),
+            {
               type: "complete",
-            });
-            return yield* Schema.decodeEffect(Schema.Array(DefaultTaggedClass(GuildConfig)))(
-              result,
-            );
-          }).pipe(Effect.withSpan("GuildConfigService.getAutoCheckinGuilds")),
-        getGuildConfig: (guildId: string) =>
-          Effect.gen(function* () {
-            const result = yield* zeroService.run(
-              queries.guildConfig.getGuildConfigByGuildId({ guildId }),
-              {
-                type: "complete",
-              },
-            );
-            return yield* Schema.decodeEffect(
-              Schema.OptionFromNullishOr(DefaultTaggedClass(GuildConfig)),
-            )(result);
-          }).pipe(Effect.withSpan("GuildConfigService.getGuildConfig")),
-        upsertGuildConfig: (
+            },
+          );
+          return yield* Schema.decodeEffect(
+            Schema.OptionFromNullishOr(DefaultTaggedClass(GuildConfig)),
+          )(result);
+        }),
+        upsertGuildConfig: Effect.fn("GuildConfigService.upsertGuildConfig")(function* (
           guildId: string,
           config: {
             sheetId?: string | null | undefined;
             autoCheckin?: boolean | null | undefined;
           },
-        ) =>
-          Effect.gen(function* () {
-            const mutation = yield* zeroService.mutate(
-              mutators.guildConfig.upsertGuildConfig({ guildId, ...config }),
-            );
-            yield* mutation.server();
-            const result = yield* zeroService.run(
-              queries.guildConfig.getGuildConfigByGuildId({ guildId }),
-              {
-                type: "complete",
-              },
-            );
-            const guildConfig = yield* Schema.decodeEffect(
-              Schema.OptionFromNullishOr(DefaultTaggedClass(GuildConfig)),
-            )(result);
+        ) {
+          const mutation = yield* zeroService.mutate(
+            mutators.guildConfig.upsertGuildConfig({ guildId, ...config }),
+          );
+          yield* mutation.server();
+          const result = yield* zeroService.run(
+            queries.guildConfig.getGuildConfigByGuildId({ guildId }),
+            {
+              type: "complete",
+            },
+          );
+          const guildConfig = yield* Schema.decodeEffect(
+            Schema.OptionFromNullishOr(DefaultTaggedClass(GuildConfig)),
+          )(result);
 
-            if (Option.isNone(guildConfig)) {
-              return yield* Effect.die(makeDBQueryError("Failed to upsert guild config"));
-            }
+          if (Option.isNone(guildConfig)) {
+            return yield* Effect.die(makeDBQueryError("Failed to upsert guild config"));
+          }
 
-            return guildConfig.value;
-          }).pipe(Effect.withSpan("GuildConfigService.upsertGuildConfig")),
-        getGuildMonitorRoles: (guildId: string) =>
-          Effect.gen(function* () {
-            const result = yield* zeroService.run(
-              queries.guildConfig.getGuildMonitorRoles({
-                guildId,
-              }),
-              {
-                type: "complete",
-              },
-            );
-            return yield* Schema.decodeEffect(
-              Schema.Array(DefaultTaggedClass(GuildConfigMonitorRole)),
-            )(result);
-          }).pipe(Effect.withSpan("GuildConfigService.getGuildMonitorRoles")),
-        getGuildChannels: (params: { guildId: string; running?: boolean | undefined }) =>
-          Effect.gen(function* () {
-            const result = yield* zeroService.run(
-              queries.guildConfig.getGuildChannels({
-                guildId: params.guildId,
-                ...(typeof params.running === "undefined" ? {} : { running: params.running }),
-              }),
-              { type: "complete" },
-            );
-            return yield* Schema.decodeEffect(Schema.Array(DefaultTaggedClass(GuildChannelConfig)))(
-              result,
-            );
-          }).pipe(Effect.withSpan("GuildConfigService.getGuildChannels")),
-        addGuildMonitorRole: (guildId: string, roleId: string) =>
-          Effect.gen(function* () {
-            const mutation = yield* zeroService.mutate(
-              mutators.guildConfig.addGuildMonitorRole({ guildId, roleId }),
-            );
-            yield* mutation.server();
-            const result = yield* zeroService.run(
-              queries.guildConfig.getGuildMonitorRoles({
-                guildId,
-              }),
-              {
-                type: "complete",
-              },
-            );
-            const roles = yield* Schema.decodeEffect(
-              Schema.Array(DefaultTaggedClass(GuildConfigMonitorRole)),
-            )(result);
-            const role = Array.findFirst(roles, (item) => item.roleId === roleId);
-
-            if (Option.isNone(role)) {
-              return yield* Effect.die(makeDBQueryError("Failed to add guild monitor role"));
-            }
-
-            return role.value;
-          }).pipe(Effect.withSpan("GuildConfigService.addGuildMonitorRole")),
-        removeGuildMonitorRole: (guildId: string, roleId: string) =>
-          Effect.gen(function* () {
-            const mutation = yield* zeroService.mutate(
-              mutators.guildConfig.removeGuildMonitorRole({ guildId, roleId }),
-            );
-            yield* mutation.server();
-            const result = yield* zeroService.run(
-              queries.guildConfig.getGuildMonitorRoles({
-                guildId,
-              }),
-              {
-                type: "complete",
-              },
-            );
-            const roles = yield* Schema.decodeEffect(
-              Schema.Array(DefaultTaggedClass(GuildConfigMonitorRole)),
-            )(result);
-            const role = Array.findFirst(roles, (item) => item.roleId === roleId);
-
-            if (Option.isNone(role)) {
-              return yield* Effect.die(makeDBQueryError("Failed to remove guild monitor role"));
-            }
-
-            return role.value;
-          }).pipe(Effect.withSpan("GuildConfigService.removeGuildMonitorRole")),
-        upsertGuildChannelConfig: (
+          return guildConfig.value;
+        }),
+        getGuildMonitorRoles: Effect.fn("GuildConfigService.getGuildMonitorRoles")(function* (
           guildId: string,
-          channelId: string,
-          config: {
-            name?: string | null | undefined;
-            running?: boolean | null | undefined;
-            roleId?: string | null | undefined;
-            checkinChannelId?: string | null | undefined;
-          },
-        ) =>
-          Effect.gen(function* () {
+        ) {
+          const result = yield* zeroService.run(
+            queries.guildConfig.getGuildMonitorRoles({
+              guildId,
+            }),
+            {
+              type: "complete",
+            },
+          );
+          return yield* Schema.decodeEffect(
+            Schema.Array(DefaultTaggedClass(GuildConfigMonitorRole)),
+          )(result);
+        }),
+        getGuildChannels: Effect.fn("GuildConfigService.getGuildChannels")(function* (params: {
+          guildId: string;
+          running?: boolean | undefined;
+        }) {
+          const result = yield* zeroService.run(
+            queries.guildConfig.getGuildChannels({
+              guildId: params.guildId,
+              ...(typeof params.running === "undefined" ? {} : { running: params.running }),
+            }),
+            { type: "complete" },
+          );
+          return yield* Schema.decodeEffect(Schema.Array(DefaultTaggedClass(GuildChannelConfig)))(
+            result,
+          );
+        }),
+        addGuildMonitorRole: Effect.fn("GuildConfigService.addGuildMonitorRole")(function* (
+          guildId: string,
+          roleId: string,
+        ) {
+          const mutation = yield* zeroService.mutate(
+            mutators.guildConfig.addGuildMonitorRole({ guildId, roleId }),
+          );
+          yield* mutation.server();
+          const result = yield* zeroService.run(
+            queries.guildConfig.getGuildMonitorRoles({
+              guildId,
+            }),
+            {
+              type: "complete",
+            },
+          );
+          const roles = yield* Schema.decodeEffect(
+            Schema.Array(DefaultTaggedClass(GuildConfigMonitorRole)),
+          )(result);
+          const role = Array.findFirst(roles, (item) => item.roleId === roleId);
+
+          if (Option.isNone(role)) {
+            return yield* Effect.die(makeDBQueryError("Failed to add guild monitor role"));
+          }
+
+          return role.value;
+        }),
+        removeGuildMonitorRole: Effect.fn("GuildConfigService.removeGuildMonitorRole")(function* (
+          guildId: string,
+          roleId: string,
+        ) {
+          const mutation = yield* zeroService.mutate(
+            mutators.guildConfig.removeGuildMonitorRole({ guildId, roleId }),
+          );
+          yield* mutation.server();
+          const result = yield* zeroService.run(
+            queries.guildConfig.getGuildMonitorRoles({
+              guildId,
+            }),
+            {
+              type: "complete",
+            },
+          );
+          const roles = yield* Schema.decodeEffect(
+            Schema.Array(DefaultTaggedClass(GuildConfigMonitorRole)),
+          )(result);
+          const role = Array.findFirst(roles, (item) => item.roleId === roleId);
+
+          if (Option.isNone(role)) {
+            return yield* Effect.die(makeDBQueryError("Failed to remove guild monitor role"));
+          }
+
+          return role.value;
+        }),
+        upsertGuildChannelConfig: Effect.fn("GuildConfigService.upsertGuildChannelConfig")(
+          function* (
+            guildId: string,
+            channelId: string,
+            config: {
+              name?: string | null | undefined;
+              running?: boolean | null | undefined;
+              roleId?: string | null | undefined;
+              checkinChannelId?: string | null | undefined;
+            },
+          ) {
             const mutation = yield* zeroService.mutate(
               mutators.guildConfig.upsertGuildChannelConfig({
                 guildId,
@@ -173,13 +175,14 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
             }
 
             return channel.value;
-          }).pipe(Effect.withSpan("GuildConfigService.upsertGuildChannelConfig")),
-        getGuildChannelById: (params: {
-          guildId: string;
-          channelId: string;
-          running?: boolean | undefined;
-        }) =>
-          Effect.gen(function* () {
+          },
+        ),
+        getGuildChannelById: Effect.fn("GuildConfigService.getGuildChannelById")(
+          function* (params: {
+            guildId: string;
+            channelId: string;
+            running?: boolean | undefined;
+          }) {
             const result = yield* zeroService.run(
               queries.guildConfig.getGuildChannelById({
                 guildId: params.guildId,
@@ -191,13 +194,14 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
             return yield* Schema.decodeEffect(
               Schema.OptionFromNullishOr(DefaultTaggedClass(GuildChannelConfig)),
             )(result);
-          }).pipe(Effect.withSpan("GuildConfigService.getGuildChannelById")),
-        getGuildChannelByName: (params: {
-          guildId: string;
-          channelName: string;
-          running?: boolean | undefined;
-        }) =>
-          Effect.gen(function* () {
+          },
+        ),
+        getGuildChannelByName: Effect.fn("GuildConfigService.getGuildChannelByName")(
+          function* (params: {
+            guildId: string;
+            channelName: string;
+            running?: boolean | undefined;
+          }) {
             const result = yield* zeroService.run(
               queries.guildConfig.getGuildChannelByName({
                 guildId: params.guildId,
@@ -209,7 +213,8 @@ export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()
             return yield* Schema.decodeEffect(
               Schema.OptionFromNullishOr(DefaultTaggedClass(GuildChannelConfig)),
             )(result);
-          }).pipe(Effect.withSpan("GuildConfigService.getGuildChannelByName")),
+          },
+        ),
       };
     }),
   },

@@ -35,6 +35,11 @@ type SheetApisRequestContextType = {
   requester: SheetApisRequester;
 };
 
+type TokenCacheEntry = {
+  token: Redacted.Redacted<string> | undefined;
+  timeToLive: Duration.Duration;
+};
+
 const sheetApisRequestContextTag = ServiceMap.Reference<SheetApisRequestContextType>(
   "SheetApisRequestContext",
   {
@@ -102,37 +107,37 @@ export class SheetApisClient extends ServiceMap.Service<SheetApisClient>()("Shee
       Effect.forkScoped,
     );
 
-    const tokenCache = yield* Cache.makeWith({
+    const tokenCache = yield* Cache.makeWith<string, TokenCacheEntry>({
       capacity: Infinity,
-      lookup: (discordUserId: string) =>
-        Effect.gen(function* () {
-          const k8sToken = yield* Ref.get(k8sTokenRef);
-          const session = yield* createKubernetesOAuthSession(
-            sheetAuthClient,
-            discordUserId,
-            k8sToken,
-          ).pipe(Effect.catch(() => Effect.succeed(undefined)));
-          const now = yield* DateTime.now;
-          const timeToLive = session?.session?.expiresAt
-            ? pipe(
-                DateTime.distance(now, session.session.expiresAt),
-                Duration.subtract(Duration.seconds(60)),
-              )
-            : Duration.minutes(1);
+      lookup: Effect.fn("SheetApisClient.lookup")(function* (discordUserId: string) {
+        const k8sToken = yield* Ref.get(k8sTokenRef);
+        const session = yield* createKubernetesOAuthSession(
+          sheetAuthClient,
+          discordUserId,
+          k8sToken,
+        ).pipe(Effect.catch(() => Effect.succeed(undefined)));
+        const now = yield* DateTime.now;
+        const timeToLive = session?.session?.expiresAt
+          ? pipe(
+              DateTime.distance(now, session.session.expiresAt),
+              Duration.subtract(Duration.seconds(60)),
+            )
+          : Duration.minutes(1);
 
-          return {
-            token: session?.token,
-            timeToLive,
-          };
-        }),
+        return {
+          token: session?.token,
+          timeToLive,
+        };
+      }),
       timeToLive: Exit.match({
         onFailure: () => Duration.minutes(1),
         onSuccess: ({ timeToLive }) => timeToLive,
       }),
     });
 
-    const httpClientWithToken = HttpClient.mapRequestEffect(httpClient, (request) =>
-      Effect.gen(function* () {
+    const httpClientWithToken = HttpClient.mapRequestEffect(
+      httpClient,
+      Effect.fnUntraced(function* (request) {
         const { requester } = yield* Effect.serviceOption(sheetApisRequestContextTag).pipe(
           Effect.map(
             Option.getOrElse(

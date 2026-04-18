@@ -91,68 +91,65 @@ describe("CalcService", () => {
 
   it.effect(
     "keeps the lowest talent room for a given effect value and orders results by effect descending",
-    () =>
-      Effect.gen(function* () {
-        const calcService = yield* CalcService;
-        const rooms = yield* calcService.calc(
-          new CalcConfig({ healNeeded: 0, considerEnc: false }),
-          [
-            [
-              makePlayerTeam({
-                playerId: Option.some("player-1"),
-                playerName: Option.some("Alice"),
-                teamName: "Low Talent Same Effect",
-                lead: 10,
-                backline: 10,
-                talent: 1,
-              }),
-              makePlayerTeam({
-                playerId: Option.some("player-2"),
-                playerName: Option.some("Beatrice"),
-                teamName: "High Talent Same Effect",
-                lead: 10,
-                backline: 10,
-                talent: 5,
-              }),
-              makePlayerTeam({
-                playerId: Option.some("player-3"),
-                playerName: Option.some("Celine"),
-                teamName: "Highest Effect",
-                lead: 20,
-                backline: 20,
-                talent: 8,
-              }),
-            ],
-            [
-              makePlayerTeam({
-                playerId: Option.some("player-4"),
-                playerName: Option.some("Dana"),
-                teamName: "Anchor",
-                lead: 0,
-                backline: 0,
-                talent: 0,
-              }),
-            ],
-          ],
-        );
-        const roomArray = Chunk.toArray(rooms);
+    Effect.fnUntraced(function* () {
+      const calcService = yield* CalcService;
+      const rooms = yield* calcService.calc(new CalcConfig({ healNeeded: 0, considerEnc: false }), [
+        [
+          makePlayerTeam({
+            playerId: Option.some("player-1"),
+            playerName: Option.some("Alice"),
+            teamName: "Low Talent Same Effect",
+            lead: 10,
+            backline: 10,
+            talent: 1,
+          }),
+          makePlayerTeam({
+            playerId: Option.some("player-2"),
+            playerName: Option.some("Beatrice"),
+            teamName: "High Talent Same Effect",
+            lead: 10,
+            backline: 10,
+            talent: 5,
+          }),
+          makePlayerTeam({
+            playerId: Option.some("player-3"),
+            playerName: Option.some("Celine"),
+            teamName: "Highest Effect",
+            lead: 20,
+            backline: 20,
+            talent: 8,
+          }),
+        ],
+        [
+          makePlayerTeam({
+            playerId: Option.some("player-4"),
+            playerName: Option.some("Dana"),
+            teamName: "Anchor",
+            lead: 0,
+            backline: 0,
+            talent: 0,
+          }),
+        ],
+      ]);
+      const roomArray = Chunk.toArray(rooms);
 
-        expect(roomArray).toHaveLength(2);
-        expect(roomArray[0]?.effectValue).toBe(20);
-        expect(roomArray[0]?.talent).toBe(8);
-        expect(roomArray[1]?.effectValue).toBe(10);
-        expect(roomArray[1]?.talent).toBe(1);
-        expect(
-          Chunk.toArray(roomArray[1]?.teams ?? Chunk.empty()).map((team) => team.teamName),
-        ).toContain("Low Talent Same Effect");
-        expect(
-          Chunk.toArray(roomArray[1]?.teams ?? Chunk.empty()).map((team) => team.teamName),
-        ).not.toContain("High Talent Same Effect");
-      }).pipe(Effect.provide(CalcService.layer)),
+      expect(roomArray).toHaveLength(2);
+      expect(roomArray[0]?.effectValue).toBe(20);
+      expect(roomArray[0]?.talent).toBe(8);
+      expect(roomArray[1]?.effectValue).toBe(10);
+      expect(roomArray[1]?.talent).toBe(1);
+      expect(
+        Chunk.toArray(roomArray[1]?.teams ?? Chunk.empty()).map((team) => team.teamName),
+      ).toContain("Low Talent Same Effect");
+      expect(
+        Chunk.toArray(roomArray[1]?.teams ?? Chunk.empty()).map((team) => team.teamName),
+      ).not.toContain("High Talent Same Effect");
+    }, Effect.provide(CalcService.layer)),
   );
 
-  it.effect("tags non-enc teams with not_enc when enc is considered", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "tags non-enc teams with not_enc when enc is considered",
+    Effect.fnUntraced(function* () {
       const calcService = yield* CalcService;
       const rooms = yield* calcService.calc(new CalcConfig({ healNeeded: 0, considerEnc: true }), [
         [
@@ -204,6 +201,6 @@ describe("CalcService", () => {
       expect(HashSet.size(encTeam!.tags)).toBe(2);
       expect(HashSet.size(sameTalentTeam!.tags)).toBe(1);
       expect(HashSet.size(higherTalentTeam!.tags)).toBe(1);
-    }).pipe(Effect.provide(CalcService.layer)),
+    }, Effect.provide(CalcService.layer)),
   );
 });

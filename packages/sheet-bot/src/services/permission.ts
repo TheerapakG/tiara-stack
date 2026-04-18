@@ -23,18 +23,17 @@ const getInteractionUserId = Effect.gen(function* () {
   return (interactionUser as { id: string }).id;
 });
 
-const resolveGuildId = (guildId?: string) =>
-  Effect.gen(function* () {
-    const resolvedInteractionGuildId: Option.Option<string> = yield* getInteractionGuildId;
-    const resolvedGuildId: Option.Option<string> =
-      typeof guildId === "undefined" ? resolvedInteractionGuildId : Option.some(guildId);
+const resolveGuildId = Effect.fn("resolveGuildId")(function* (guildId?: string) {
+  const resolvedInteractionGuildId: Option.Option<string> = yield* getInteractionGuildId;
+  const resolvedGuildId: Option.Option<string> =
+    typeof guildId === "undefined" ? resolvedInteractionGuildId : Option.some(guildId);
 
-    if (Option.isSome(resolvedGuildId)) {
-      return resolvedGuildId.value;
-    }
+  if (Option.isSome(resolvedGuildId)) {
+    return resolvedGuildId.value;
+  }
 
-    return yield* Effect.fail(new PermissionError("Interaction guild or provided guild not found"));
-  });
+  return yield* Effect.fail(new PermissionError("Interaction guild or provided guild not found"));
+});
 
 export class PermissionService extends ServiceMap.Service<PermissionService>()(
   "PermissionService",
