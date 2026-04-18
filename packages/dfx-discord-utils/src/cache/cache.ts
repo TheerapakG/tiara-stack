@@ -2,7 +2,6 @@ import type { CacheDriver } from "dfx/Cache/driver";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
-import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import type { ReverseLookupCacheDriver } from "./driver";
 import type { ReverseLookupCacheOp } from "./prelude";
@@ -72,37 +71,37 @@ export interface ReverseLookupCache<
   ) => WriteEffect<ReadonlyValue, EDriver>;
 }
 
-export const makeWithReverseLookup = <
-  EOps,
-  EDriver,
-  EMiss,
-  EPMiss,
-  ERMiss,
-  A,
-  EId = never,
-  const ReadonlyValue extends boolean = false,
->({
-  driver,
-  id,
-  onMiss,
-  onParentMiss,
-  onResourceMiss,
-  ops = Stream.empty,
-  readonly = false as ReadonlyValue,
-}: {
-  driver: ReverseLookupCacheDriver<EDriver, A>;
-  ops?: Stream.Stream<ReverseLookupCacheOp<A>, EOps>;
-  id: (_: A) => Effect.Effect<readonly [parentId: string, resourceId: string], EId>;
-  onMiss: (parentId: string, resourceId: string) => Effect.Effect<A, EMiss>;
-  onParentMiss: (parentId: string) => Effect.Effect<readonly (readonly [string, A])[], EPMiss>;
-  onResourceMiss: (resourceId: string) => Effect.Effect<readonly (readonly [string, A])[], ERMiss>;
-  readonly?: ReadonlyValue;
-}): Effect.Effect<
-  ReverseLookupCache<EDriver, EMiss | EId, EPMiss, ERMiss, A, ReadonlyValue>,
-  never,
-  Scope.Scope
-> =>
-  Effect.gen(function* () {
+export const makeWithReverseLookup = Effect.fn("cache.makeWithReverseLookup")(
+  function* <
+    EOps,
+    EDriver,
+    EMiss,
+    EPMiss,
+    ERMiss,
+    A,
+    EId = never,
+    const ReadonlyValue extends boolean = false,
+  >(args: {
+    driver: ReverseLookupCacheDriver<EDriver, A>;
+    ops?: Stream.Stream<ReverseLookupCacheOp<A>, EOps>;
+    id: (_: A) => Effect.Effect<readonly [parentId: string, resourceId: string], EId>;
+    onMiss: (parentId: string, resourceId: string) => Effect.Effect<A, EMiss>;
+    onParentMiss: (parentId: string) => Effect.Effect<readonly (readonly [string, A])[], EPMiss>;
+    onResourceMiss: (
+      resourceId: string,
+    ) => Effect.Effect<readonly (readonly [string, A])[], ERMiss>;
+    readonly?: ReadonlyValue;
+  }) {
+    const {
+      driver,
+      id,
+      onMiss,
+      onParentMiss,
+      onResourceMiss,
+      ops = Stream.empty,
+      readonly = false as ReadonlyValue,
+    } = args;
+
     // In readonly mode, we still consume the ops stream but don't apply writes
     yield* Stream.runDrain(
       Stream.tap(ops, (op): Effect.Effect<void, EDriver> => {
@@ -274,12 +273,12 @@ export const makeWithReverseLookup = <
         resourceId: string,
       ) => WriteEffect<ReadonlyValue, EDriver>,
     } as ReverseLookupCache<EDriver, EMiss | EId, EPMiss, ERMiss, A, ReadonlyValue>;
-  }).pipe(
-    Effect.annotateLogs({
-      package: "dfx-discord-utils",
-      service: "ReverseLookupCache",
-    }),
-  );
+  },
+  Effect.annotateLogs({
+    package: "dfx-discord-utils",
+    service: "ReverseLookupCache",
+  }),
+);
 
 // ============================================================================
 // Simple Cache (non-parented, like dfx/Cache but with readonly support)
@@ -326,20 +325,16 @@ export interface SimpleCache<EDriver, EMiss, A, ReadonlyValue extends boolean = 
   readonly refreshTTL: (resourceId: string) => SimpleWriteEffect<ReadonlyValue, EDriver>;
 }
 
-export const make = <EOps, EDriver, EMiss, A, const ReadonlyValue extends boolean = false>({
-  driver,
-  id,
-  onMiss,
-  ops = Stream.empty,
-  readonly = false as ReadonlyValue,
-}: {
-  driver: CacheDriver<EDriver, A>;
-  ops?: Stream.Stream<SimpleCacheOp<A>, EOps>;
-  id: (_: A) => string;
-  onMiss: (id: string) => Effect.Effect<A, EMiss>;
-  readonly?: ReadonlyValue;
-}): Effect.Effect<SimpleCache<EDriver, EMiss, A, ReadonlyValue>, never, Scope.Scope> =>
-  Effect.gen(function* () {
+export const make = Effect.fn("cache.make")(
+  function* <EOps, EDriver, EMiss, A, const ReadonlyValue extends boolean = false>(args: {
+    driver: CacheDriver<EDriver, A>;
+    ops?: Stream.Stream<SimpleCacheOp<A>, EOps>;
+    id: (_: A) => string;
+    onMiss: (id: string) => Effect.Effect<A, EMiss>;
+    readonly?: ReadonlyValue;
+  }) {
+    const { driver, id, onMiss, ops = Stream.empty, readonly = false as ReadonlyValue } = args;
+
     // In readonly mode, we still consume the ops stream but don't apply writes
     yield* Stream.runDrain(
       Stream.tap(ops, (op): Effect.Effect<void, EDriver> => {
@@ -439,9 +434,9 @@ export const make = <EOps, EDriver, EMiss, A, const ReadonlyValue extends boolea
       refreshTTL,
       size: driver.size,
     } as SimpleCache<EDriver, EMiss, A, ReadonlyValue>;
-  }).pipe(
-    Effect.annotateLogs({
-      package: "dfx-discord-utils",
-      service: "SimpleCache",
-    }),
-  );
+  },
+  Effect.annotateLogs({
+    package: "dfx-discord-utils",
+    service: "SimpleCache",
+  }),
+);

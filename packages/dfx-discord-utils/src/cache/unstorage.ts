@@ -99,63 +99,65 @@ export const createWithParent = <T>({
 
     return createParentDriver({
       size: store.size,
-      sizeForParent: (parentId) =>
-        Effect.gen(function* () {
-          const ids = yield* getParentIds(parentId);
-          return ids.size;
-        }),
+      sizeForParent: Effect.fnUntraced(function* (parentId) {
+        const ids = yield* getParentIds(parentId);
+        return ids.size;
+      }),
 
       refreshTTL: () => Effect.void,
 
       get: (_, id) => store.get(id),
 
-      getForParent: (parentId) =>
-        Effect.gen(function* () {
-          const ids = yield* getParentIds(parentId);
-          if (ids.size === 0) return Option.none();
+      getForParent: Effect.fnUntraced(function* (parentId) {
+        const ids = yield* getParentIds(parentId);
+        if (ids.size === 0) return Option.none();
 
-          const entries = yield* Effect.forEach(
-            Array.from(ids),
-            (id) => store.get(id).pipe(Effect.map((item) => [id, item] as const)),
-            { concurrency: "unbounded" },
-          );
+        const entries = yield* Effect.forEach(
+          Array.from(ids),
+          (id) => store.get(id).pipe(Effect.map((item) => [id, item] as const)),
+          { concurrency: "unbounded" },
+        );
 
-          const result = new Map<string, T>();
-          const validIds = new Set<string>();
-          for (const [id, item] of entries) {
-            if (Option.isSome(item)) {
-              result.set(id, item.value);
-              validIds.add(id);
-            }
+        const result = new Map<string, T>();
+        const validIds = new Set<string>();
+        for (const [id, item] of entries) {
+          if (Option.isSome(item)) {
+            result.set(id, item.value);
+            validIds.add(id);
           }
+        }
 
-          if (validIds.size !== ids.size) {
-            yield* setParentIds(parentId, validIds);
-          }
+        if (validIds.size !== ids.size) {
+          yield* setParentIds(parentId, validIds);
+        }
 
-          return result.size > 0 ? Option.some(result) : Option.none();
-        }),
+        return result.size > 0 ? Option.some(result) : Option.none();
+      }),
 
-      set: (parentId, resourceId, resource) =>
-        Effect.gen(function* () {
+      set: Effect.fnUntraced(
+        function* (parentId, resourceId, resource) {
           yield* store.set(resourceId, resource);
 
           const existingIds = yield* getParentIds(parentId);
           existingIds.add(resourceId);
           yield* setParentIds(parentId, existingIds);
-        }).pipe(Effect.catchDefect((e) => Effect.logWarning("Cache set failed", e))),
+        },
+        Effect.catchDefect((e) => Effect.logWarning("Cache set failed", e)),
+      ),
 
-      delete: (parentId, resourceId) =>
-        Effect.gen(function* () {
+      delete: Effect.fnUntraced(
+        function* (parentId, resourceId) {
           yield* store.delete(resourceId);
 
           const existingIds = yield* getParentIds(parentId);
           existingIds.delete(resourceId);
           yield* setParentIds(parentId, existingIds);
-        }).pipe(Effect.catchDefect((e) => Effect.logWarning("Cache delete failed", e))),
+        },
+        Effect.catchDefect((e) => Effect.logWarning("Cache delete failed", e)),
+      ),
 
-      parentDelete: (parentId) =>
-        Effect.gen(function* () {
+      parentDelete: Effect.fnUntraced(
+        function* (parentId) {
           const ids = yield* getParentIds(parentId);
           yield* setParentIds(parentId, new Set());
 
@@ -164,7 +166,9 @@ export const createWithParent = <T>({
             effects.push(store.delete(id));
           }
           yield* Effect.all(effects, { concurrency: "unbounded", discard: true });
-        }).pipe(Effect.catchDefect((e) => Effect.logWarning("Cache parentDelete failed", e))),
+        },
+        Effect.catchDefect((e) => Effect.logWarning("Cache parentDelete failed", e)),
+      ),
 
       run: Effect.never,
     });
@@ -219,17 +223,15 @@ export const createWithReverseLookup = <T>({
     const driver: ReverseLookupCacheDriver<never, T> = {
       size: Effect.promise(() => prefixedStorage.getKeys("").then((keys) => keys.length)),
 
-      sizeForParent: (parentId) =>
-        Effect.gen(function* () {
-          const ids = yield* getParentIds(parentId);
-          return ids.size;
-        }),
+      sizeForParent: Effect.fnUntraced(function* (parentId) {
+        const ids = yield* getParentIds(parentId);
+        return ids.size;
+      }),
 
-      sizeForResource: (resourceId) =>
-        Effect.gen(function* () {
-          const parentIds = yield* getResourceParentIds(resourceId);
-          return parentIds.size;
-        }),
+      sizeForResource: Effect.fnUntraced(function* (resourceId) {
+        const parentIds = yield* getResourceParentIds(resourceId);
+        return parentIds.size;
+      }),
 
       get: (parentId, resourceId) =>
         Effect.promise(async () => {
@@ -237,74 +239,72 @@ export const createWithReverseLookup = <T>({
           return Option.fromNullishOr(value);
         }),
 
-      getForParent: (parentId) =>
-        Effect.gen(function* () {
-          const ids = yield* getParentIds(parentId);
-          if (ids.size === 0) return Option.none();
+      getForParent: Effect.fnUntraced(function* (parentId) {
+        const ids = yield* getParentIds(parentId);
+        if (ids.size === 0) return Option.none();
 
-          const entries = yield* Effect.forEach(
-            Array.from(ids),
-            (resourceId) =>
-              Effect.promise(async () => {
-                const value = (await prefixedStorage.getItem(
-                  `${parentId}:${resourceId}`,
-                )) as T | null;
-                return [resourceId, value] as const;
-              }),
-            { concurrency: "unbounded" },
-          );
+        const entries = yield* Effect.forEach(
+          Array.from(ids),
+          (resourceId) =>
+            Effect.promise(async () => {
+              const value = (await prefixedStorage.getItem(
+                `${parentId}:${resourceId}`,
+              )) as T | null;
+              return [resourceId, value] as const;
+            }),
+          { concurrency: "unbounded" },
+        );
 
-          const result = new Map<string, T>();
-          const validIds = new Set<string>();
-          for (const [id, value] of entries) {
-            if (value !== null) {
-              result.set(id, value);
-              validIds.add(id);
-            }
+        const result = new Map<string, T>();
+        const validIds = new Set<string>();
+        for (const [id, value] of entries) {
+          if (value !== null) {
+            result.set(id, value);
+            validIds.add(id);
           }
+        }
 
-          if (validIds.size !== ids.size) {
-            yield* setParentIds(parentId, validIds);
+        if (validIds.size !== ids.size) {
+          yield* setParentIds(parentId, validIds);
+        }
+
+        return result.size > 0 ? Option.some(result) : Option.none();
+      }),
+
+      getForResource: Effect.fnUntraced(function* (resourceId) {
+        const parentIds = yield* getResourceParentIds(resourceId);
+        if (parentIds.size === 0) return Option.none();
+
+        const entries = yield* Effect.forEach(
+          Array.from(parentIds),
+          (parentId) =>
+            Effect.promise(async () => {
+              const value = (await prefixedStorage.getItem(
+                `${parentId}:${resourceId}`,
+              )) as T | null;
+              return [parentId, value] as const;
+            }),
+          { concurrency: "unbounded" },
+        );
+
+        const result = new Map<string, T>();
+        const validParentIds = new Set<string>();
+        for (const [parentId, value] of entries) {
+          if (value !== null) {
+            result.set(parentId, value);
+            validParentIds.add(parentId);
           }
+        }
 
-          return result.size > 0 ? Option.some(result) : Option.none();
-        }),
+        if (validParentIds.size !== parentIds.size) {
+          yield* setResourceParentIds(resourceId, validParentIds);
+        }
 
-      getForResource: (resourceId) =>
-        Effect.gen(function* () {
-          const parentIds = yield* getResourceParentIds(resourceId);
-          if (parentIds.size === 0) return Option.none();
+        return result.size > 0 ? Option.some(result) : Option.none();
+      }),
 
-          const entries = yield* Effect.forEach(
-            Array.from(parentIds),
-            (parentId) =>
-              Effect.promise(async () => {
-                const value = (await prefixedStorage.getItem(
-                  `${parentId}:${resourceId}`,
-                )) as T | null;
-                return [parentId, value] as const;
-              }),
-            { concurrency: "unbounded" },
-          );
-
-          const result = new Map<string, T>();
-          const validParentIds = new Set<string>();
-          for (const [parentId, value] of entries) {
-            if (value !== null) {
-              result.set(parentId, value);
-              validParentIds.add(parentId);
-            }
-          }
-
-          if (validParentIds.size !== parentIds.size) {
-            yield* setResourceParentIds(resourceId, validParentIds);
-          }
-
-          return result.size > 0 ? Option.some(result) : Option.none();
-        }),
-
-      set: (parentId, resourceId, resource) =>
-        Effect.gen(function* () {
+      set: Effect.fnUntraced(
+        function* (parentId, resourceId, resource) {
           yield* Effect.promise(() =>
             prefixedStorage.setItem(`${parentId}:${resourceId}`, resource as never),
           );
@@ -316,10 +316,12 @@ export const createWithReverseLookup = <T>({
           const existingParentIds = yield* getResourceParentIds(resourceId);
           existingParentIds.add(parentId);
           yield* setResourceParentIds(resourceId, existingParentIds);
-        }).pipe(Effect.catchDefect((e) => Effect.logWarning("Cache set failed", e))),
+        },
+        Effect.catchDefect((e) => Effect.logWarning("Cache set failed", e)),
+      ),
 
-      delete: (parentId, resourceId) =>
-        Effect.gen(function* () {
+      delete: Effect.fnUntraced(
+        function* (parentId, resourceId) {
           yield* Effect.promise(() => prefixedStorage.removeItem(`${parentId}:${resourceId}`));
 
           const existingIds = yield* getParentIds(parentId);
@@ -329,10 +331,12 @@ export const createWithReverseLookup = <T>({
           const existingParentIds = yield* getResourceParentIds(resourceId);
           existingParentIds.delete(parentId);
           yield* setResourceParentIds(resourceId, existingParentIds);
-        }).pipe(Effect.catchDefect((e) => Effect.logWarning("Cache delete failed", e))),
+        },
+        Effect.catchDefect((e) => Effect.logWarning("Cache delete failed", e)),
+      ),
 
-      parentDelete: (parentId) =>
-        Effect.gen(function* () {
+      parentDelete: Effect.fnUntraced(
+        function* (parentId) {
           const ids = yield* getParentIds(parentId);
           yield* setParentIds(parentId, new Set());
 
@@ -349,10 +353,12 @@ export const createWithReverseLookup = <T>({
             );
           }
           yield* Effect.all(effects, { concurrency: "unbounded", discard: true });
-        }).pipe(Effect.catchDefect((e) => Effect.logWarning("Cache parentDelete failed", e))),
+        },
+        Effect.catchDefect((e) => Effect.logWarning("Cache parentDelete failed", e)),
+      ),
 
-      resourceDelete: (resourceId) =>
-        Effect.gen(function* () {
+      resourceDelete: Effect.fnUntraced(
+        function* (resourceId) {
           const parentIds = yield* getResourceParentIds(resourceId);
           yield* setResourceParentIds(resourceId, new Set());
 
@@ -369,7 +375,9 @@ export const createWithReverseLookup = <T>({
             );
           }
           yield* Effect.all(effects, { concurrency: "unbounded", discard: true });
-        }).pipe(Effect.catchDefect((e) => Effect.logWarning("Cache resourceDelete failed", e))),
+        },
+        Effect.catchDefect((e) => Effect.logWarning("Cache resourceDelete failed", e)),
+      ),
 
       refreshTTL: () => Effect.void,
 
