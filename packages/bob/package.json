@@ -6,7 +6,9 @@
   "author": "",
   "type": "module",
   "scripts": {
-    "build": "echo 'no build'"
+    "build": "echo 'no build'",
+    "lint": "echo 'no lint targets'",
+    "test": "echo 'no tests defined'"
   },
   "dependencies": {
     "@standard-schema/spec": "^1.0.0"

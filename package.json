@@ -3,7 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "checks": "vp run -r format && vp run -r lint && vp run -r test",
+    "format": "vp run -r format",
+    "lint": "vp run -r lint",
+    "test": "vp run -r test",
+    "checks": "pnpm format && pnpm lint && pnpm test",
     "format:apply": "vp run -r format:apply",
     "build": "vp run -r build",
     "prepare": "vp config"

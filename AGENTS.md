@@ -106,24 +106,27 @@ Integration library connecting TanStack Start with Effect Atom for server-side r
 
 The following workspace-level scripts are defined in `package.json`:
 
-- **`build`**: `nx run-many -t build --output-style=stream` - Builds all packages using Nx
-- **`checks`**: `nx run-many -t format,lint,typecheck,test --output-style=stream` - Runs format check, lint, typecheck, and tests across all packages
-- **`format:apply`**: `nx run-many -t format:apply --output-style=stream` - Applies formatting across all packages
+- **`format`**: `vp run -r format` - Runs format checks across packages that define a format script
+- **`lint`**: `vp run -r lint` - Runs lint plus type-aware TypeScript checks across packages that define a lint script
+- **`test`**: `vp run -r test` - Runs tests across packages that define a test script
+- **`build`**: `vp run -r build` - Builds all packages
+- **`checks`**: `pnpm format && pnpm lint && pnpm test` - Runs format checks, lint/type checks, and tests across packages that define those scripts
+- **`format:apply`**: `vp run -r format:apply` - Applies formatting across all packages that define a format script
 
-Run these scripts using `pnpm -w <script>`, replacing `<script>` with the script you want to run.
+Run these scripts from the repo root using `pnpm <script>`.
 
-Run `pnpm -w format:apply` every time after you finish proposing a change to correctly format all the code.
+Run `pnpm format:apply` every time after you finish proposing a change to correctly format all the code.
 
 ## Package Scripts
 
-Each package has the following standard scripts:
+Packages with source code generally have the following standard scripts:
 
 - **`build`**: Compiles TypeScript and creates distribution bundles
-- **`format`**: Checks code formatting (oxfmt)
-- **`format:apply`**: Applies code formatting (oxfmt)
-- **`lint`**: Runs linter (oxlint)
-- **`typecheck`**: Runs TypeScript type checking (tsgo)
-- **`test`**: Runs tests (vitest) - where applicable
+- **`format`**: Checks formatting via `vp fmt --check`
+- **`format:apply`**: Applies formatting via `vp fmt`
+- **`lint`**: Runs linting via `vp lint src`; in this repo's Vite+ packages it also performs type-aware TypeScript checking because `lint.options.typeCheck` is enabled
+- **`test`**: Runs tests via `vp test run` where applicable
+- **`test:watch`**: Runs tests in watch mode via `vp test` where applicable
 
 Database-related packages (`sheet-auth`, `vibecord`) have additional scripts:
 

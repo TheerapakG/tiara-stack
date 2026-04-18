@@ -187,7 +187,7 @@ sequenceDiagram
 - **Drizzle ORM**: Type-safe SQL-like ORM for PostgreSQL
 - **BetterAuth**: Authentication framework with Discord OAuth
 - **dfx**: Discord Effect library for bot development
-- **Nx**: Monorepo task runner and build system
+- **vite-plus (`vp`)**: Monorepo build, lint, format, and test tooling
 
 ## Development
 
@@ -205,28 +205,36 @@ sequenceDiagram
 pnpm install
 
 # Build all packages
-pnpm -w build
+pnpm build
 
-# Run checks (lint, format, typecheck, test)
-pnpm -w checks
+# Run format checks across the monorepo
+pnpm format
+
+# Run lint plus type-aware type checks across the monorepo
+pnpm lint
+
+# Run tests across the monorepo
+pnpm test
+
+# Run workspace checks
+pnpm checks
 
 # Apply formatting
-pnpm -w format:apply
+pnpm format:apply
 ```
 
 ### Package Scripts
 
-Each package supports standard scripts:
+Packages with source code generally support these scripts:
 
 ```bash
-# Build
-pnpm -w build
-
-# Run all checks
-pnpm -w checks
-
-# Apply formatting
-pnpm -w format:apply
+# From a package directory
+pnpm build
+pnpm format
+pnpm format:apply
+pnpm lint
+pnpm test        # Only in packages that define tests
+pnpm test:watch  # Only in packages that define tests
 
 # Package-specific scripts (run from package directory)
 pnpm db:generate    # Generate Drizzle migrations
@@ -234,6 +242,19 @@ pnpm db:migrate     # Run migrations
 pnpm db:push        # Push schema changes
 pnpm db:studio      # Open Drizzle Studio (vibecord only)
 ```
+
+Workspace scripts are defined in the repo root:
+
+```bash
+pnpm format        # vp run -r format
+pnpm lint          # vp run -r lint
+pnpm test          # vp run -r test
+pnpm build         # vp run -r build
+pnpm checks        # pnpm format && pnpm lint && pnpm test
+pnpm format:apply  # vp run -r format:apply
+```
+
+In this repo, `pnpm lint` also performs type-aware TypeScript checking for the Vite+ packages because each package `vite.config.ts` enables `lint.options.typeAware` and `lint.options.typeCheck`.
 
 ## Project Structure
 

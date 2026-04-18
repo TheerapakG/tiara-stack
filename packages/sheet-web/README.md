@@ -7,6 +7,7 @@ To run this application:
 ```bash
 pnpm install
 pnpm dev
+pnpm lint
 ```
 
 # Building For Production
@@ -23,6 +24,7 @@ This project uses [Vitest](https://vitest.dev/) for testing. You can run the tes
 
 ```bash
 pnpm test
+pnpm test:watch
 ```
 
 ## Styling
