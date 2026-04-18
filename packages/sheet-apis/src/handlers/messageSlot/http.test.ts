@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option } from "effect";
+import { Effect, Option, ServiceMap } from "effect";
 import {
   LEGACY_MESSAGE_SLOT_ACCESS_ERROR,
   requireMessageSlotReadAccess,
@@ -11,7 +11,7 @@ import { AuthorizationService, MessageSlotService } from "@/services";
 import { getFailure, liveGuildServices, withUser } from "@/test-utils/guildTestHelpers";
 
 type MessageSlotAccessService = Pick<typeof MessageSlotService.Service, "getMessageSlotData">;
-type AuthorizationServiceApi = Effect.Success<typeof AuthorizationService.make>;
+type AuthorizationServiceApi = ServiceMap.Service.Shape<typeof AuthorizationService>;
 
 const makeMessageSlotRecord = (overrides?: {
   readonly guildId?: string | null;
@@ -38,17 +38,17 @@ const makeMessageSlotService = (record?: MessageSlot) =>
     getMessageSlotData: () => Effect.succeed(Option.fromNullishOr(record)),
   }) satisfies MessageSlotAccessService;
 
-const withAuthorization = <A, E, R>(
+const withAuthorization = Effect.fnUntraced(function* <A, E, R>(
   f: (authorizationService: AuthorizationServiceApi) => Effect.Effect<A, E, R>,
-) =>
-  Effect.gen(function* () {
-    const authorizationService = yield* AuthorizationService.make;
-    return yield* f(authorizationService);
-  });
+) {
+  const authorizationService = yield* AuthorizationService.make;
+  return yield* f(authorizationService);
+});
 
 describe("messageSlot legacy access", () => {
-  it.effect("denies legacy reads for bot users", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "denies legacy reads for bot users",
+    Effect.fnUntraced(function* () {
       const error = yield* getFailure(
         withAuthorization((authorizationService) =>
           requireMessageSlotReadAccess(
@@ -66,8 +66,9 @@ describe("messageSlot legacy access", () => {
     }),
   );
 
-  it.effect("denies partially legacy reads for regular users", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "denies partially legacy reads for regular users",
+    Effect.fnUntraced(function* () {
       const error = yield* getFailure(
         withAuthorization((authorizationService) =>
           requireMessageSlotReadAccess(
@@ -88,8 +89,9 @@ describe("messageSlot legacy access", () => {
     }),
   );
 
-  it.effect("denies upsert for an existing legacy slot record before the mutation runs", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "denies upsert for an existing legacy slot record before the mutation runs",
+    Effect.fnUntraced(function* () {
       let mutationCalls = 0;
       const error = yield* getFailure(
         withAuthorization((authorizationService) =>
@@ -117,8 +119,9 @@ describe("messageSlot legacy access", () => {
     }),
   );
 
-  it.effect("denies creating a missing legacy slot record", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "denies creating a missing legacy slot record",
+    Effect.fnUntraced(function* () {
       const error = yield* getFailure(
         withAuthorization((authorizationService) =>
           requireMessageSlotUpsertAccess(
@@ -134,8 +137,9 @@ describe("messageSlot legacy access", () => {
     }),
   );
 
-  it.effect("allows modern reads for guild members", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "allows modern reads for guild members",
+    Effect.fnUntraced(function* () {
       const record = yield* withAuthorization((authorizationService) =>
         requireMessageSlotReadAccess(
           authorizationService,
@@ -155,8 +159,9 @@ describe("messageSlot legacy access", () => {
     }),
   );
 
-  it.effect("allows modern upsert for monitors", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "allows modern upsert for monitors",
+    Effect.fnUntraced(function* () {
       yield* withAuthorization((authorizationService) =>
         requireMessageSlotUpsertAccess(
           authorizationService,
@@ -175,8 +180,9 @@ describe("messageSlot legacy access", () => {
     }),
   );
 
-  it.effect("allows modern upsert for monitors on an existing record", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "allows modern upsert for monitors on an existing record",
+    Effect.fnUntraced(function* () {
       yield* withAuthorization((authorizationService) =>
         requireMessageSlotUpsertAccess(
           authorizationService,

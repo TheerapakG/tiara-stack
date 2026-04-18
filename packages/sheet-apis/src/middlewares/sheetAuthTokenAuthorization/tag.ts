@@ -5,7 +5,7 @@ import { SheetAuthUser } from "../../schemas/middlewares/sheetAuthUser";
 export class SheetAuthTokenAuthorization extends HttpApiMiddleware.Service<
   SheetAuthTokenAuthorization,
   {
-    provides: typeof SheetAuthUser;
+    provides: SheetAuthUser;
     requires: never;
   }
 >()("SheetAuthTokenAuthorization", {

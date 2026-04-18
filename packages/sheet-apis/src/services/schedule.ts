@@ -20,7 +20,7 @@ import {
 } from "@/schemas/sheet";
 import { upperFirst } from "scule";
 
-type SheetConfigServiceApi = Effect.Success<typeof SheetConfigService.make>;
+type SheetConfigServiceApi = ServiceMap.Service.Shape<typeof SheetConfigService>;
 type EventConfig = Effect.Success<ReturnType<SheetConfigServiceApi["getEventConfig"]>>;
 
 const isPlayer = (player: Player | PartialNamePlayer): player is Player =>

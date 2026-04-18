@@ -15,8 +15,9 @@ export const calcLayer = HttpApiBuilder.group(
     const playerService = yield* PlayerService;
 
     return handlers
-      .handle("calcBot", ({ payload }) =>
-        Effect.gen(function* () {
+      .handle(
+        "calcBot",
+        Effect.fnUntraced(function* ({ payload }) {
           const config = new CalcConfig(payload.config);
           const playerTeams = yield* Effect.forEach(payload.players, (player) =>
             Effect.succeed(
@@ -42,8 +43,9 @@ export const calcLayer = HttpApiBuilder.group(
           );
         }),
       )
-      .handle("calcSheet", ({ payload }) =>
-        Effect.gen(function* () {
+      .handle(
+        "calcSheet",
+        Effect.fnUntraced(function* ({ payload }) {
           const config = new CalcConfig(payload.config);
           const fixedTeams = pipe(
             payload.fixedTeams,
@@ -55,8 +57,9 @@ export const calcLayer = HttpApiBuilder.group(
               ),
             ),
           );
-          const playerTeams = yield* Effect.forEach(payload.players, (player) =>
-            Effect.gen(function* () {
+          const playerTeams = yield* Effect.forEach(
+            payload.players,
+            Effect.fnUntraced(function* (player) {
               const teams = yield* playerService.getTeamsByNames(payload.sheetId, [player.name]);
 
               return Array.getSomes(

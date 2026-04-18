@@ -1,5 +1,5 @@
-import { HashSet, Redacted, ServiceMap } from "effect";
-import type { Permission, PermissionSet } from "@/schemas/permissions";
+import { Redacted, ServiceMap } from "effect";
+import type { PermissionSet } from "@/schemas/permissions";
 
 type SheetAuthGuildUserType = {
   // Discord user ID from the linked auth account.
@@ -11,17 +11,7 @@ type SheetAuthGuildUserType = {
   token: Redacted.Redacted<string>;
 };
 
-export const SheetAuthGuildUser = ServiceMap.Reference<SheetAuthGuildUserType>(
-  "SheetAuthGuildUser",
-  {
-    defaultValue: () => ({
-      accountId: "",
-      userId: "",
-      guildId: "",
-      permissions: HashSet.empty<Permission>() as PermissionSet,
-      token: Redacted.make(""),
-    }),
-  },
-) as ServiceMap.Reference<SheetAuthGuildUserType> & {
-  readonly Type: SheetAuthGuildUserType;
-};
+export class SheetAuthGuildUser extends ServiceMap.Service<
+  SheetAuthGuildUser,
+  SheetAuthGuildUserType
+>()("SheetAuthGuildUser") {}

@@ -1,5 +1,5 @@
-import { HashSet, Redacted, ServiceMap } from "effect";
-import type { Permission, PermissionSet } from "@/schemas/permissions";
+import { Redacted, ServiceMap } from "effect";
+import type { PermissionSet } from "@/schemas/permissions";
 
 type SheetAuthUserType = {
   // Discord user ID from the linked auth account.
@@ -10,11 +10,6 @@ type SheetAuthUserType = {
   token: Redacted.Redacted<string>;
 };
 
-export const SheetAuthUser = ServiceMap.Reference<SheetAuthUserType>("SheetAuthUser", {
-  defaultValue: () => ({
-    accountId: "",
-    userId: "",
-    permissions: HashSet.empty<Permission>() as PermissionSet,
-    token: Redacted.make(""),
-  }),
-}) as ServiceMap.Reference<SheetAuthUserType> & { readonly Type: SheetAuthUserType };
+export class SheetAuthUser extends ServiceMap.Service<SheetAuthUser, SheetAuthUserType>()(
+  "SheetAuthUser",
+) {}

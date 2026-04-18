@@ -10,15 +10,14 @@ export class ApplicationOwnerResolver extends ServiceMap.Service<ApplicationOwne
   {
     make: Effect.gen(function* () {
       const discordApiClient = yield* DiscordApiClient;
-      const application = yield* Cache.makeWith({
+      const application = yield* Cache.makeWith<string, Option.Option<string>>({
         capacity: 1,
-        lookup: (): Effect.Effect<Option.Option<string>> =>
-          Effect.gen(function* () {
-            return yield* Effect.matchEffect(discordApiClient.application.getApplication(), {
-              onSuccess: (application) => Effect.succeed(Option.some(application.ownerId)),
-              onFailure: () => Effect.succeed(Option.none<string>()),
-            });
-          }),
+        lookup: Effect.fn("ApplicationOwnerResolver.lookup")(function* (_: string) {
+          return yield* Effect.matchEffect(discordApiClient.application.getApplication(), {
+            onSuccess: (application) => Effect.succeed(Option.some(application.ownerId)),
+            onFailure: () => Effect.succeed(Option.none<string>()),
+          });
+        }),
         // `Option.none()` intentionally covers both "no owner available"
         // and transient lookup failures, so we keep the short retry TTL.
         timeToLive: Exit.match({
@@ -28,9 +27,9 @@ export class ApplicationOwnerResolver extends ServiceMap.Service<ApplicationOwne
       });
 
       return {
-        getOwnerId: Effect.fn("ApplicationOwnerResolver.getOwnerId")(() =>
-          Cache.get(application, "owner"),
-        ),
+        getOwnerId: Effect.fn("ApplicationOwnerResolver.getOwnerId")(function* () {
+          return yield* Cache.get(application, "owner");
+        }),
       };
     }),
   },

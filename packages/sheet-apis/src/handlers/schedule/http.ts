@@ -1,6 +1,7 @@
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
+import { withCurrentGuildAuthFromQuery } from "@/handlers/shared/guildAuthorization";
 import { hasGuildPermission, hasPermission } from "@/services/authorization";
 import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
 import { Unauthorized } from "@/schemas/middlewares/unauthorized";
@@ -13,23 +14,22 @@ import {
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { resolveScheduleViewFromPermissions } from "./shared";
 
-const getSheetIdFromGuildId = (
+const getSheetIdFromGuildId = Effect.fn("schedule.getSheetIdFromGuildId")(function* (
   guildId: string,
   guildConfigService: typeof GuildConfigService.Service,
-) =>
-  Effect.gen(function* () {
-    const guildConfig = yield* guildConfigService.getGuildConfig(guildId);
+) {
+  const guildConfig = yield* guildConfigService.getGuildConfig(guildId);
 
-    if (Option.isNone(guildConfig)) {
-      return yield* Effect.die(new Error(`Guild config not found for guildId: ${guildId}`));
-    }
+  if (Option.isNone(guildConfig)) {
+    return yield* Effect.die(new Error(`Guild config not found for guildId: ${guildId}`));
+  }
 
-    if (Option.isNone(guildConfig.value.sheetId)) {
-      return yield* Effect.die(new Error(`sheetId not found for guildId: ${guildId}`));
-    }
+  if (Option.isNone(guildConfig.value.sheetId)) {
+    return yield* Effect.die(new Error(`sheetId not found for guildId: ${guildId}`));
+  }
 
-    return guildConfig.value.sheetId.value;
-  });
+  return guildConfig.value.sheetId.value;
+});
 
 export const scheduleLayer = HttpApiBuilder.group(
   Api,
@@ -38,12 +38,13 @@ export const scheduleLayer = HttpApiBuilder.group(
     const authorizationService = yield* AuthorizationService;
     const scheduleService = yield* ScheduleService;
     const guildConfigService = yield* GuildConfigService;
+    const withQueryGuildAuth = withCurrentGuildAuthFromQuery(authorizationService);
 
     return handlers
-      .handle("getAllPopulatedSchedules", ({ query }) =>
-        authorizationService.provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
+      .handle(
+        "getAllPopulatedSchedules",
+        withQueryGuildAuth(
+          Effect.fnUntraced(function* ({ query }) {
             const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
             const resolvedUser = yield* SheetAuthGuildUser;
             const view = resolveScheduleViewFromPermissions(
@@ -59,10 +60,10 @@ export const scheduleLayer = HttpApiBuilder.group(
           }),
         ),
       )
-      .handle("getDayPopulatedSchedules", ({ query }) =>
-        authorizationService.provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
+      .handle(
+        "getDayPopulatedSchedules",
+        withQueryGuildAuth(
+          Effect.fnUntraced(function* ({ query }) {
             const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
             const resolvedUser = yield* SheetAuthGuildUser;
             const view = resolveScheduleViewFromPermissions(
@@ -78,10 +79,10 @@ export const scheduleLayer = HttpApiBuilder.group(
           }),
         ),
       )
-      .handle("getChannelPopulatedSchedules", ({ query }) =>
-        authorizationService.provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
+      .handle(
+        "getChannelPopulatedSchedules",
+        withQueryGuildAuth(
+          Effect.fnUntraced(function* ({ query }) {
             const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
             const resolvedUser = yield* SheetAuthGuildUser;
             const view = resolveScheduleViewFromPermissions(
@@ -97,10 +98,10 @@ export const scheduleLayer = HttpApiBuilder.group(
           }),
         ),
       )
-      .handle("getDayPlayerSchedule", ({ query }) =>
-        authorizationService.provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
+      .handle(
+        "getDayPlayerSchedule",
+        withQueryGuildAuth(
+          Effect.fnUntraced(function* ({ query }) {
             const resolvedUser = yield* SheetAuthGuildUser;
             const view = resolveScheduleViewFromPermissions(
               resolvedUser.permissions,

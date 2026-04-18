@@ -11,8 +11,8 @@ import { Unauthorized } from "@/schemas/middlewares/unauthorized";
 import { GuildConfigService } from "./guildConfig";
 import { discordLayer } from "./discord";
 
-type SheetAuthUserType = (typeof SheetAuthUser)["Type"];
-type SheetAuthGuildUserType = (typeof SheetAuthGuildUser)["Type"];
+type SheetAuthUserType = ServiceMap.Service.Shape<typeof SheetAuthUser>;
+type SheetAuthGuildUserType = ServiceMap.Service.Shape<typeof SheetAuthGuildUser>;
 
 type GuildPermissionScope = "member" | "monitor" | "manage";
 
@@ -80,14 +80,19 @@ const makeSheetAuthGuildUser = (
   token: user.token,
 });
 
-const provideResolvedGuildUser = <A, E, R, R2>(
-  resolvedGuildUser: Effect.Effect<SheetAuthGuildUserType, never, R2>,
-  effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E, Exclude<R | R2, typeof SheetAuthGuildUser>> =>
-  Effect.gen(function* () {
+const provideResolvedGuildUser = Effect.fn("AuthorizationService.provideResolvedGuildUser")(
+  function* <A, E, R, R2>(
+    resolvedGuildUser: Effect.Effect<SheetAuthGuildUserType, never, R2>,
+    effect: Effect.Effect<A, E, R>,
+  ) {
     const user = yield* resolvedGuildUser;
-    return yield* effect.pipe(Effect.provideService(SheetAuthGuildUser, user));
-  }) as Effect.Effect<A, E, Exclude<R | R2, typeof SheetAuthGuildUser>>;
+    return yield* effect.pipe(Effect.provideService(SheetAuthGuildUser, user)) as Effect.Effect<
+      A,
+      E,
+      Exclude<R, SheetAuthGuildUser>
+    >;
+  },
+);
 
 export class AuthorizationService extends ServiceMap.Service<AuthorizationService>()(
   "AuthorizationService",
@@ -97,22 +102,22 @@ export class AuthorizationService extends ServiceMap.Service<AuthorizationServic
       const guildConfigService = yield* GuildConfigService;
       const rolesCache = yield* RolesApiCacheView;
 
-      const getOptionalGuildMember = (guildId: string, accountId: string) =>
-        Effect.gen(function* () {
+      const getOptionalGuildMember = Effect.fn("AuthorizationService.getOptionalGuildMember")(
+        function* (guildId: string, accountId: string) {
           return yield* Effect.matchEffect(membersCache.get(guildId, accountId), {
             onSuccess: (member) => Effect.succeed(Option.some(member)),
-            onFailure: (error) =>
-              error instanceof CacheNotFoundError
-                ? Effect.succeed(Option.none())
-                : Effect.gen(function* () {
-                    yield* Effect.logError(error);
-                    return Option.none();
-                  }),
+            onFailure: Effect.fnUntraced(function* (error) {
+              if (error instanceof CacheNotFoundError) {
+                yield* Effect.logError(error);
+              }
+              return Option.none();
+            }),
           });
-        });
+        },
+      );
 
-      const getOptionalMonitorRoleIds = (guildId: string) =>
-        Effect.gen(function* () {
+      const getOptionalMonitorRoleIds = Effect.fn("AuthorizationService.getOptionalMonitorRoleIds")(
+        function* (guildId: string) {
           return yield* Effect.matchEffect(guildConfigService.getGuildMonitorRoles(guildId), {
             onSuccess: (monitorRoles) =>
               Effect.succeed(
@@ -120,141 +125,161 @@ export class AuthorizationService extends ServiceMap.Service<AuthorizationServic
                   new Set(monitorRoles.map((role) => role.roleId)) as ReadonlySet<string>,
                 ),
               ),
-            onFailure: (error) =>
-              Effect.gen(function* () {
-                yield* Effect.logError(error);
-                return Option.none<ReadonlySet<string>>();
-              }),
+            onFailure: Effect.fnUntraced(function* (error) {
+              yield* Effect.logError(error);
+              return Option.none<ReadonlySet<string>>();
+            }),
           });
-        });
+        },
+      );
 
       const getOptionalGuildRoles = (guildId: string) =>
         rolesCache.getForParent(guildId).pipe(Effect.tapError(Effect.logError), Effect.option);
 
-      const resolveGuildScopedPermissions = (user: SheetAuthUserType, guildId: string) =>
-        Effect.gen(function* () {
-          if (
-            hasPermission(user.permissions, "bot") ||
-            hasPermission(user.permissions, "app_owner")
-          ) {
-            return {
-              permissions: appendPermissions(user.permissions, [
-                `member_guild:${guildId}`,
-                `monitor_guild:${guildId}`,
-                `manage_guild:${guildId}`,
-              ]),
-              maybeMember: Option.none(),
-            } satisfies ResolvedGuildPermissions;
-          }
-
-          const [maybeMember, maybeMonitorRoleIds, maybeRoles] = yield* Effect.all(
-            [
-              getOptionalGuildMember(guildId, user.accountId),
-              getOptionalMonitorRoleIds(guildId),
-              getOptionalGuildRoles(guildId),
-            ],
-            { concurrency: "unbounded" },
-          );
-
-          let permissions = user.permissions;
-
-          if (Option.isSome(maybeMember)) {
-            permissions = appendPermission(permissions, `member_guild:${guildId}`);
-          }
-
-          if (
-            Option.isSome(maybeMember) &&
-            Option.isSome(maybeMonitorRoleIds) &&
-            maybeMonitorRoleIds.value.size > 0 &&
-            hasMonitorGuildPermission(maybeMember.value, maybeMonitorRoleIds.value)
-          ) {
-            permissions = appendPermission(permissions, `monitor_guild:${guildId}`);
-          }
-
-          if (
-            Option.isSome(maybeMember) &&
-            Option.isSome(maybeRoles) &&
-            hasManageGuildPermission(maybeMember.value, maybeRoles.value)
-          ) {
-            permissions = appendPermission(permissions, `manage_guild:${guildId}`);
-          }
-
+      const resolveGuildScopedPermissions = Effect.fn(
+        "AuthorizationService.resolveGuildScopedPermissions",
+      )(function* (user: SheetAuthUserType, guildId: string) {
+        if (
+          hasPermission(user.permissions, "bot") ||
+          hasPermission(user.permissions, "app_owner")
+        ) {
           return {
-            permissions,
-            maybeMember,
+            permissions: appendPermissions(user.permissions, [
+              `member_guild:${guildId}`,
+              `monitor_guild:${guildId}`,
+              `manage_guild:${guildId}`,
+            ]),
+            maybeMember: Option.none(),
           } satisfies ResolvedGuildPermissions;
-        });
+        }
 
-      const resolveSheetAuthGuildUser = (user: SheetAuthUserType, guildId: string) =>
-        Effect.gen(function* () {
+        const [maybeMember, maybeMonitorRoleIds, maybeRoles] = yield* Effect.all(
+          [
+            getOptionalGuildMember(guildId, user.accountId),
+            getOptionalMonitorRoleIds(guildId),
+            getOptionalGuildRoles(guildId),
+          ],
+          { concurrency: "unbounded" },
+        );
+
+        let permissions = user.permissions;
+
+        if (Option.isSome(maybeMember)) {
+          permissions = appendPermission(permissions, `member_guild:${guildId}`);
+        }
+
+        if (
+          Option.isSome(maybeMember) &&
+          Option.isSome(maybeMonitorRoleIds) &&
+          maybeMonitorRoleIds.value.size > 0 &&
+          hasMonitorGuildPermission(maybeMember.value, maybeMonitorRoleIds.value)
+        ) {
+          permissions = appendPermission(permissions, `monitor_guild:${guildId}`);
+        }
+
+        if (
+          Option.isSome(maybeMember) &&
+          Option.isSome(maybeRoles) &&
+          hasManageGuildPermission(maybeMember.value, maybeRoles.value)
+        ) {
+          permissions = appendPermission(permissions, `manage_guild:${guildId}`);
+        }
+
+        return {
+          permissions,
+          maybeMember,
+        } satisfies ResolvedGuildPermissions;
+      });
+
+      const resolveSheetAuthGuildUser = Effect.fn("AuthorizationService.resolveSheetAuthGuildUser")(
+        function* (user: SheetAuthUserType, guildId: string) {
           const { permissions } = yield* resolveGuildScopedPermissions(user, guildId);
           return makeSheetAuthGuildUser(user, guildId, permissions);
-        });
+        },
+      );
 
-      const resolveCurrentGuildUser = (guildId: string) =>
-        Effect.gen(function* () {
+      const resolveCurrentGuildUser = Effect.fn("AuthorizationService.resolveCurrentGuildUser")(
+        function* (guildId: string) {
           const user = yield* SheetAuthUser;
           return yield* resolveSheetAuthGuildUser(user, guildId);
-        });
+        },
+      );
 
       const provideCurrentGuildUser = <A, E, R>(guildId: string, effect: Effect.Effect<A, E, R>) =>
         provideResolvedGuildUser(resolveCurrentGuildUser(guildId), effect);
 
-      const getRequiredCurrentGuildUser = (guildId: string) =>
-        Effect.gen(function* () {
-          const user = yield* SheetAuthGuildUser;
+      const getRequiredCurrentGuildUser = Effect.fn(
+        "AuthorizationService.getRequiredCurrentGuildUser",
+      )(function* (guildId: string) {
+        const user = yield* SheetAuthGuildUser;
 
-          if (user.guildId === guildId) {
-            return user;
-          }
+        if (user.guildId === guildId) {
+          return user;
+        }
 
-          return yield* Effect.die(
-            new Error(
-              `SheetAuthGuildUser guild mismatch: expected ${guildId}, received ${user.guildId}`,
-            ),
-          );
-        });
+        return yield* Effect.die(
+          new Error(
+            `SheetAuthGuildUser guild mismatch: expected ${guildId}, received ${user.guildId}`,
+          ),
+        );
+      });
 
-      const getGuildMonitorAccessLevel = (user: SheetAuthUserType, guildId: string) =>
-        Effect.gen(function* () {
-          const resolvedUser = yield* resolveSheetAuthGuildUser(user, guildId);
+      const getGuildMonitorAccessLevel = Effect.fn(
+        "AuthorizationService.getGuildMonitorAccessLevel",
+      )(function* (user: SheetAuthUserType, guildId: string) {
+        const resolvedUser = yield* resolveSheetAuthGuildUser(user, guildId);
 
-          if (hasGuildPermission(resolvedUser.permissions, "monitor_guild", guildId)) {
-            return "monitor" as const;
-          }
+        if (hasGuildPermission(resolvedUser.permissions, "monitor_guild", guildId)) {
+          return "monitor" as const;
+        }
 
-          if (hasGuildPermission(resolvedUser.permissions, "member_guild", guildId)) {
-            return "member" as const;
-          }
+        if (hasGuildPermission(resolvedUser.permissions, "member_guild", guildId)) {
+          return "member" as const;
+        }
 
-          return "none" as const;
-        });
+        return "none" as const;
+      });
 
-      const requireResolvedGuildPermission = (
-        guildId: string,
-        scope: GuildPermissionScope,
-        message: string,
-      ) =>
-        Effect.gen(function* () {
-          const user = yield* getRequiredCurrentGuildUser(guildId);
-          const hasRequiredScope =
-            scope === "member"
-              ? hasGuildPermission(user.permissions, "member_guild", guildId)
-              : scope === "monitor"
-                ? hasGuildPermission(user.permissions, "monitor_guild", guildId)
-                : hasGuildPermission(user.permissions, "manage_guild", guildId);
+      const getCurrentGuildMonitorAccessLevel = Effect.fn(
+        "AuthorizationService.getCurrentGuildMonitorAccessLevel",
+      )(function* (guildId: string) {
+        const resolvedUser = yield* resolveCurrentGuildUser(guildId);
 
-          if (!hasRequiredScope) {
-            return yield* Effect.fail(new Unauthorized({ message }));
-          }
+        if (hasGuildPermission(resolvedUser.permissions, "monitor_guild", guildId)) {
+          return "monitor" as const;
+        }
 
-          return yield* Effect.void;
-        });
+        if (hasGuildPermission(resolvedUser.permissions, "member_guild", guildId)) {
+          return "member" as const;
+        }
+
+        return "none" as const;
+      });
+
+      const requireResolvedGuildPermission = Effect.fn(
+        "AuthorizationService.requireResolvedGuildPermission",
+      )(function* (guildId: string, scope: GuildPermissionScope, message: string) {
+        const user = yield* getRequiredCurrentGuildUser(guildId);
+        const hasRequiredScope =
+          scope === "member"
+            ? hasGuildPermission(user.permissions, "member_guild", guildId)
+            : scope === "monitor"
+              ? hasGuildPermission(user.permissions, "monitor_guild", guildId)
+              : hasGuildPermission(user.permissions, "manage_guild", guildId);
+
+        if (!hasRequiredScope) {
+          return yield* Effect.fail(new Unauthorized({ message }));
+        }
+
+        return yield* Effect.void;
+      });
 
       return {
         resolveSheetAuthGuildUser,
+        resolveCurrentGuildUser,
         provideCurrentGuildUser,
         getGuildMonitorAccessLevel,
+        getCurrentGuildMonitorAccessLevel,
         requireManageGuild: (
           guildId: string,
           message = "User does not have manage guild permission",
@@ -263,21 +288,19 @@ export class AuthorizationService extends ServiceMap.Service<AuthorizationServic
           guildId: string,
           message = "User does not have monitor guild permission",
         ) => requireResolvedGuildPermission(guildId, "monitor", message),
-        requireBot: (message = "User is not the bot") =>
-          Effect.gen(function* () {
-            const user = yield* SheetAuthUser;
+        requireBot: Effect.fn("AuthorizationService.requireBot")(function* (
+          message = "User is not the bot",
+        ) {
+          const user = yield* SheetAuthUser;
 
-            return yield* requirePermissions(
-              user.permissions,
-              (permissions) => hasPermission(permissions, "bot"),
-              message,
-            );
-          }),
-        requireDiscordAccountId: (
-          accountId: string,
-          message = "User does not have access to this user",
-        ) =>
-          Effect.gen(function* () {
+          return yield* requirePermissions(
+            user.permissions,
+            (permissions) => hasPermission(permissions, "bot"),
+            message,
+          );
+        }),
+        requireDiscordAccountId: Effect.fn("AuthorizationService.requireDiscordAccountId")(
+          function* (accountId: string, message = "User does not have access to this user") {
             const user = yield* SheetAuthUser;
 
             return yield* requirePermissions(
@@ -288,26 +311,28 @@ export class AuthorizationService extends ServiceMap.Service<AuthorizationServic
                 hasDiscordAccountPermission(permissions, accountId),
               message,
             );
-          }),
-        requireDiscordAccountIdOrMonitorGuild: (
+          },
+        ),
+        requireDiscordAccountIdOrMonitorGuild: Effect.fn(
+          "AuthorizationService.requireDiscordAccountIdOrMonitorGuild",
+        )(function* (
           guildId: string,
           accountId: string,
           message = "User does not have access to this user",
-        ) =>
-          Effect.gen(function* () {
-            const user = yield* getRequiredCurrentGuildUser(guildId);
+        ) {
+          const user = yield* getRequiredCurrentGuildUser(guildId);
 
-            if (
-              hasPermission(user.permissions, "bot") ||
-              hasPermission(user.permissions, "app_owner") ||
-              hasDiscordAccountPermission(user.permissions, accountId) ||
-              hasGuildPermission(user.permissions, "monitor_guild", guildId)
-            ) {
-              return yield* Effect.void;
-            }
+          if (
+            hasPermission(user.permissions, "bot") ||
+            hasPermission(user.permissions, "app_owner") ||
+            hasDiscordAccountPermission(user.permissions, accountId) ||
+            hasGuildPermission(user.permissions, "monitor_guild", guildId)
+          ) {
+            return yield* Effect.void;
+          }
 
-            return yield* Effect.fail(new Unauthorized({ message }));
-          }),
+          return yield* Effect.fail(new Unauthorized({ message }));
+        }),
         requireGuildMember: (guildId: string, message = "User is not a member of this guild") =>
           requireResolvedGuildPermission(guildId, "member", message),
       };

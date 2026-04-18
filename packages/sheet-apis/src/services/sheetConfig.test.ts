@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option } from "effect";
+import { Effect, Option, ServiceMap } from "effect";
 import { GoogleSheets } from "./google/sheets";
 import { SheetConfigService } from "./sheetConfig";
 
-type GoogleSheetsApi = Effect.Success<typeof GoogleSheets.make>;
+type GoogleSheetsApi = ServiceMap.Service.Shape<typeof GoogleSheets>;
 
 const makeGoogleSheets = () =>
   ({
@@ -37,13 +37,17 @@ const makeGoogleSheets = () =>
   }) as unknown as GoogleSheetsApi;
 
 describe("SheetConfigService", () => {
-  it.effect("accepts bold as a schedule encType", () =>
-    Effect.gen(function* () {
-      const sheetConfigService = yield* SheetConfigService.make;
-      const [config] = yield* sheetConfigService.getScheduleConfig("sheet-1");
+  it.effect(
+    "accepts bold as a schedule encType",
+    Effect.fnUntraced(
+      function* () {
+        const sheetConfigService = yield* SheetConfigService.make;
+        const [config] = yield* sheetConfigService.getScheduleConfig("sheet-1");
 
-      expect(config).toBeDefined();
-      expect(config?.encType).toEqual(Option.some("bold"));
-    }).pipe(Effect.provideService(GoogleSheets, makeGoogleSheets())),
+        expect(config).toBeDefined();
+        expect(config?.encType).toEqual(Option.some("bold"));
+      },
+      Effect.provideService(GoogleSheets, makeGoogleSheets()),
+    ),
   );
 });

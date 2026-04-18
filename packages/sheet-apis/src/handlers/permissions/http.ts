@@ -11,13 +11,13 @@ export const permissionsLayer = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const authorizationService = yield* AuthorizationService;
 
-    return handlers.handle("getCurrentUserPermissions", ({ query }) =>
-      Effect.gen(function* () {
-        const user = yield* SheetAuthUser;
+    return handlers.handle(
+      "getCurrentUserPermissions",
+      Effect.fnUntraced(function* ({ query }) {
         const resolvedUser =
           typeof query.guildId === "string"
-            ? yield* authorizationService.resolveSheetAuthGuildUser(user, query.guildId)
-            : user;
+            ? yield* authorizationService.resolveCurrentGuildUser(query.guildId)
+            : yield* SheetAuthUser;
         return {
           permissions: resolvedUser.permissions,
         };

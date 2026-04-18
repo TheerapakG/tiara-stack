@@ -26,8 +26,8 @@ import { ScheduleService } from "./schedule";
 import { SheetConfigService } from "./sheetConfig";
 import { diffFillParticipants, getScheduleFills, toFillParticipant } from "./fillMovement";
 
-type GuildConfigServiceApi = Effect.Success<typeof GuildConfigService.make>;
-type SheetConfigServiceApi = Effect.Success<typeof SheetConfigService.make>;
+type GuildConfigServiceApi = ServiceMap.Service.Shape<typeof GuildConfigService>;
+type SheetConfigServiceApi = ServiceMap.Service.Shape<typeof SheetConfigService>;
 type EventConfig = Effect.Success<ReturnType<SheetConfigServiceApi["getEventConfig"]>>;
 
 type Weighted<A> = { value: A; weight: number };

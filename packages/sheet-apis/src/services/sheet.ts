@@ -510,8 +510,8 @@ const teamParser = (
 ) =>
   pipe(
     teamConfigValues,
-    Effect.forEach((teamConfig) =>
-      Effect.gen(function* () {
+    Effect.forEach(
+      Effect.fnUntraced(function* (teamConfig) {
         const isvConfig = teamConfig.isvConfig;
         const tagsConfig = teamConfig.tagsConfig;
         const base = yield* teamBaseParser(teamConfig, sheet);
@@ -986,66 +986,62 @@ export class SheetService extends ServiceMap.Service<SheetService>()("SheetServi
       return yield* sheetConfigService.getRunnerConfig(sheetId);
     });
 
-    const getPlayers = (sheetId: string) =>
-      Effect.gen(function* () {
-        const rangesConfig = yield* sheetConfigService.getRangesConfig(sheetId);
-        const response = yield* sheet.get({
+    const getPlayers = Effect.fn("SheetService.getPlayers")(function* (sheetId: string) {
+      const rangesConfig = yield* sheetConfigService.getRangesConfig(sheetId);
+      const response = yield* sheet.get({
+        spreadsheetId: sheetId,
+        ranges: [rangesConfig.userIds, rangesConfig.userSheetNames],
+      });
+      return yield* playerParser(response.data.valueRanges ?? []);
+    });
+
+    const getMonitors = Effect.fn("SheetService.getMonitors")(function* (sheetId: string) {
+      const rangesConfig = yield* sheetConfigService.getRangesConfig(sheetId);
+      const ranges = Option.all({
+        ids: rangesConfig.monitorIds,
+        names: rangesConfig.monitorNames,
+      });
+      if (Option.isNone(ranges)) {
+        return [] as readonly RawMonitor[];
+      }
+      const response = yield* sheet.get({
+        spreadsheetId: sheetId,
+        ranges: [ranges.value.ids, ranges.value.names],
+      });
+      return yield* monitorParser(response.data.valueRanges ?? []);
+    });
+
+    const getTeams = Effect.fn("SheetService.getTeams")(function* (sheetId: string) {
+      const teamConfigs = yield* sheetConfigService.getTeamConfig(sheetId);
+      const filteredTeamConfigValues = filterTeamConfigValues(teamConfigs);
+      const response = yield* sheet.getHashMap(
+        teamRanges(filteredTeamConfigValues) as HashMap.HashMap<TeamConfigField, string>,
+        {
           spreadsheetId: sheetId,
-          ranges: [rangesConfig.userIds, rangesConfig.userSheetNames],
-        });
-        return yield* playerParser(response.data.valueRanges ?? []);
-      }).pipe(Effect.withSpan("SheetService.getPlayers"));
+        },
+      );
+      return yield* teamParser(filteredTeamConfigValues, response);
+    });
 
-    const getMonitors = (sheetId: string) =>
-      Effect.gen(function* () {
-        const rangesConfig = yield* sheetConfigService.getRangesConfig(sheetId);
-        const ranges = Option.all({
-          ids: rangesConfig.monitorIds,
-          names: rangesConfig.monitorNames,
-        });
-        if (Option.isNone(ranges)) {
-          return [] as readonly RawMonitor[];
-        }
-        const response = yield* sheet.get({
-          spreadsheetId: sheetId,
-          ranges: [ranges.value.ids, ranges.value.names],
-        });
-        return yield* monitorParser(response.data.valueRanges ?? []);
-      }).pipe(Effect.withSpan("SheetService.getMonitors"));
-
-    const getTeams = (sheetId: string) =>
-      Effect.gen(function* () {
-        const teamConfigs = yield* sheetConfigService.getTeamConfig(sheetId);
-        const filteredTeamConfigValues = filterTeamConfigValues(teamConfigs);
-        const response = yield* sheet.getHashMap(
-          teamRanges(filteredTeamConfigValues) as HashMap.HashMap<TeamConfigField, string>,
-          {
-            spreadsheetId: sheetId,
-          },
-        );
-        return yield* teamParser(filteredTeamConfigValues, response);
-      }).pipe(Effect.withSpan("SheetService.getTeams"));
-
-    const getSchedulesForConfigs = (
+    const getSchedulesForConfigs = Effect.fn("SheetService.getSchedulesForConfigs")(function* (
       sheetId: string,
       filter: (
         configs: ReturnType<typeof filterScheduleConfigValues>,
       ) => ReturnType<typeof filterScheduleConfigValues>,
-    ) =>
-      Effect.gen(function* () {
-        const { scheduleConfigs, runnerConfig } = yield* Effect.all({
-          scheduleConfigs: sheetConfigService.getScheduleConfig(sheetId),
-          runnerConfig: sheetConfigService.getRunnerConfig(sheetId),
-        });
-        const filteredScheduleConfigs = filter(filterScheduleConfigValues(scheduleConfigs));
-        const response = yield* sheet.getRowDatasHashMap(
-          scheduleRanges(filteredScheduleConfigs) as HashMap.HashMap<ScheduleConfigField, string>,
-          {
-            spreadsheetId: sheetId,
-          },
-        );
-        return yield* scheduleParser(filteredScheduleConfigs, response, runnerConfig);
+    ) {
+      const { scheduleConfigs, runnerConfig } = yield* Effect.all({
+        scheduleConfigs: sheetConfigService.getScheduleConfig(sheetId),
+        runnerConfig: sheetConfigService.getRunnerConfig(sheetId),
       });
+      const filteredScheduleConfigs = filter(filterScheduleConfigValues(scheduleConfigs));
+      const response = yield* sheet.getRowDatasHashMap(
+        scheduleRanges(filteredScheduleConfigs) as HashMap.HashMap<ScheduleConfigField, string>,
+        {
+          spreadsheetId: sheetId,
+        },
+      );
+      return yield* scheduleParser(filteredScheduleConfigs, response, runnerConfig);
+    });
 
     const getAllSchedules = Effect.fn("SheetService.getAllSchedules")(function* (sheetId: string) {
       return yield* getSchedulesForConfigs(sheetId, (configs) => configs);

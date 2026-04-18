@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option } from "effect";
+import { Effect, Option, ServiceMap } from "effect";
 import {
   LEGACY_MESSAGE_CHECKIN_ACCESS_ERROR,
   requireCheckinUpsertAccess,
@@ -17,7 +17,7 @@ type MessageCheckinAccessService = Pick<
   typeof MessageCheckinService.Service,
   "getMessageCheckinData" | "getMessageCheckinMembers"
 >;
-type AuthorizationServiceApi = Effect.Success<typeof AuthorizationService.make>;
+type AuthorizationServiceApi = ServiceMap.Service.Shape<typeof AuthorizationService>;
 
 const makeMessageCheckinRecord = (overrides?: {
   readonly guildId?: string | null;
@@ -61,17 +61,17 @@ const makeMessageCheckinService = (options?: {
     getMessageCheckinMembers: () => Effect.succeed([...(options?.members ?? [])]),
   }) satisfies MessageCheckinAccessService;
 
-const withAuthorization = <A, E, R>(
+const withAuthorization = Effect.fnUntraced(function* <A, E, R>(
   f: (authorizationService: AuthorizationServiceApi) => Effect.Effect<A, E, R>,
-) =>
-  Effect.gen(function* () {
-    const authorizationService = yield* AuthorizationService.make;
-    return yield* f(authorizationService);
-  });
+) {
+  const authorizationService = yield* AuthorizationService.make;
+  return yield* f(authorizationService);
+});
 
 describe("messageCheckin legacy access", () => {
-  it.effect("denies legacy reads for bot users", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "denies legacy reads for bot users",
+    Effect.fnUntraced(function* () {
       const service = makeMessageCheckinService({
         record: makeMessageCheckinRecord({ guildId: null, messageChannelId: null }),
       });
@@ -87,8 +87,9 @@ describe("messageCheckin legacy access", () => {
     }),
   );
 
-  it.effect("denies partially legacy reads for regular users", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "denies partially legacy reads for regular users",
+    Effect.fnUntraced(function* () {
       const service = makeMessageCheckinService({
         record: makeMessageCheckinRecord({ guildId: "guild-1", messageChannelId: null }),
       });
@@ -107,8 +108,9 @@ describe("messageCheckin legacy access", () => {
     }),
   );
 
-  it.effect("denies legacy member reads for bot users", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "denies legacy member reads for bot users",
+    Effect.fnUntraced(function* () {
       const service = makeMessageCheckinService({
         record: makeMessageCheckinRecord({ guildId: null, messageChannelId: null }),
       });
@@ -124,8 +126,9 @@ describe("messageCheckin legacy access", () => {
     }),
   );
 
-  it.effect("denies legacy add-member mutations before the service call runs", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "denies legacy add-member mutations before the service call runs",
+    Effect.fnUntraced(function* () {
       let mutationCalls = 0;
       const service = makeMessageCheckinService({
         record: makeMessageCheckinRecord({ guildId: null, messageChannelId: null }),
@@ -151,8 +154,9 @@ describe("messageCheckin legacy access", () => {
     }),
   );
 
-  it.effect("denies legacy participant mutations before the service call runs", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "denies legacy participant mutations before the service call runs",
+    Effect.fnUntraced(function* () {
       let mutationCalls = 0;
       const service = makeMessageCheckinService({
         record: makeMessageCheckinRecord({ guildId: null, messageChannelId: null }),
@@ -183,8 +187,9 @@ describe("messageCheckin legacy access", () => {
     }),
   );
 
-  it.effect("denies creating a missing legacy check-in record", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "denies creating a missing legacy check-in record",
+    Effect.fnUntraced(function* () {
       const service = makeMessageCheckinService();
 
       const error = yield* getFailure(
@@ -198,8 +203,9 @@ describe("messageCheckin legacy access", () => {
     }),
   );
 
-  it.effect("allows modern upsert for monitor access", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "allows modern upsert for monitor access",
+    Effect.fnUntraced(function* () {
       yield* withAuthorization((authorizationService) =>
         requireCheckinUpsertAccess(
           authorizationService,
@@ -218,8 +224,9 @@ describe("messageCheckin legacy access", () => {
     }),
   );
 
-  it.effect("allows modern monitor reads", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "allows modern monitor reads",
+    Effect.fnUntraced(function* () {
       const record = yield* withAuthorization((authorizationService) =>
         requireMessageCheckinReadAccess(
           authorizationService,
@@ -241,8 +248,9 @@ describe("messageCheckin legacy access", () => {
     }),
   );
 
-  it.effect("allows modern monitor to add members", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "allows modern monitor to add members",
+    Effect.fnUntraced(function* () {
       yield* withAuthorization((authorizationService) =>
         requireMessageCheckinMonitorMutationAccess(
           authorizationService,
@@ -262,8 +270,9 @@ describe("messageCheckin legacy access", () => {
     }),
   );
 
-  it.effect("allows recorded participant mutations for modern records", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "allows recorded participant mutations for modern records",
+    Effect.fnUntraced(function* () {
       yield* withAuthorization((authorizationService) =>
         requireMessageCheckinParticipantMutationAccess(
           authorizationService,
@@ -291,8 +300,9 @@ describe("messageCheckin legacy access", () => {
     }),
   );
 
-  it.effect("allows participant self-read behavior for modern records", () =>
-    Effect.gen(function* () {
+  it.effect(
+    "allows participant self-read behavior for modern records",
+    Effect.fnUntraced(function* () {
       const members = yield* withAuthorization((authorizationService) =>
         requireMessageCheckinMembersReadAccess(
           authorizationService,

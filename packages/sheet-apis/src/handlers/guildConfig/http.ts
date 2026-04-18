@@ -2,6 +2,10 @@ import { HttpApiBuilder } from "effect/unstable/httpapi";
 
 import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
+import {
+  withCurrentGuildAuthFromPayload,
+  withCurrentGuildAuthFromQuery,
+} from "@/handlers/shared/guildAuthorization";
 import { makeArgumentError } from "typhoon-core/error";
 import { GuildConfigService } from "@/services";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
@@ -13,18 +17,21 @@ export const guildConfigLayer = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const authorizationService = yield* AuthorizationService;
     const guildConfigService = yield* GuildConfigService;
+    const withQueryGuildAuth = withCurrentGuildAuthFromQuery(authorizationService);
+    const withPayloadGuildAuth = withCurrentGuildAuthFromPayload(authorizationService);
 
     return handlers
-      .handle("getAutoCheckinGuilds", () =>
-        Effect.gen(function* () {
+      .handle(
+        "getAutoCheckinGuilds",
+        Effect.fnUntraced(function* () {
           yield* authorizationService.requireBot();
           return yield* guildConfigService.getAutoCheckinGuilds();
         }),
       )
-      .handle("getGuildConfig", ({ query }) =>
-        authorizationService.provideCurrentGuildUser(
-          query.guildId,
-          Effect.gen(function* () {
+      .handle(
+        "getGuildConfig",
+        withQueryGuildAuth(
+          Effect.fnUntraced(function* ({ query }) {
             yield* authorizationService.requireManageGuild(query.guildId);
             const config = yield* guildConfigService.getGuildConfig(query.guildId);
 
@@ -38,10 +45,10 @@ export const guildConfigLayer = HttpApiBuilder.group(
           }),
         ),
       )
-      .handle("upsertGuildConfig", ({ payload }) =>
-        authorizationService.provideCurrentGuildUser(
-          payload.guildId,
-          Effect.gen(function* () {
+      .handle(
+        "upsertGuildConfig",
+        withPayloadGuildAuth(
+          Effect.fnUntraced(function* ({ payload }) {
             yield* authorizationService.requireManageGuild(payload.guildId);
             return yield* guildConfigService.upsertGuildConfig(payload.guildId, payload.config);
           }),
@@ -56,19 +63,19 @@ export const guildConfigLayer = HttpApiBuilder.group(
           ...(typeof query.running === "undefined" ? {} : { running: query.running }),
         }),
       )
-      .handle("addGuildMonitorRole", ({ payload }) =>
-        authorizationService.provideCurrentGuildUser(
-          payload.guildId,
-          Effect.gen(function* () {
+      .handle(
+        "addGuildMonitorRole",
+        withPayloadGuildAuth(
+          Effect.fnUntraced(function* ({ payload }) {
             yield* authorizationService.requireManageGuild(payload.guildId);
             return yield* guildConfigService.addGuildMonitorRole(payload.guildId, payload.roleId);
           }),
         ),
       )
-      .handle("removeGuildMonitorRole", ({ payload }) =>
-        authorizationService.provideCurrentGuildUser(
-          payload.guildId,
-          Effect.gen(function* () {
+      .handle(
+        "removeGuildMonitorRole",
+        withPayloadGuildAuth(
+          Effect.fnUntraced(function* ({ payload }) {
             yield* authorizationService.requireManageGuild(payload.guildId);
             return yield* guildConfigService.removeGuildMonitorRole(
               payload.guildId,
@@ -77,10 +84,10 @@ export const guildConfigLayer = HttpApiBuilder.group(
           }),
         ),
       )
-      .handle("upsertGuildChannelConfig", ({ payload }) =>
-        authorizationService.provideCurrentGuildUser(
-          payload.guildId,
-          Effect.gen(function* () {
+      .handle(
+        "upsertGuildChannelConfig",
+        withPayloadGuildAuth(
+          Effect.fnUntraced(function* ({ payload }) {
             yield* authorizationService.requireManageGuild(payload.guildId);
             return yield* guildConfigService.upsertGuildChannelConfig(
               payload.guildId,
@@ -90,8 +97,9 @@ export const guildConfigLayer = HttpApiBuilder.group(
           }),
         ),
       )
-      .handle("getGuildChannelById", ({ query }) =>
-        Effect.gen(function* () {
+      .handle(
+        "getGuildChannelById",
+        Effect.fnUntraced(function* ({ query }) {
           const config = yield* guildConfigService.getGuildChannelById({
             guildId: query.guildId,
             channelId: query.channelId,
@@ -111,8 +119,9 @@ export const guildConfigLayer = HttpApiBuilder.group(
           return config.value;
         }),
       )
-      .handle("getGuildChannelByName", ({ query }) =>
-        Effect.gen(function* () {
+      .handle(
+        "getGuildChannelByName",
+        Effect.fnUntraced(function* ({ query }) {
           const config = yield* guildConfigService.getGuildChannelByName({
             guildId: query.guildId,
             channelName: query.channelName,
