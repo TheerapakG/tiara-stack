@@ -20,8 +20,12 @@
       "@rocicorp/zero-sqlite3",
       "better-sqlite3"
     ],
+    "overrides": {
+      "better-auth": "1.4.18"
+    },
     "patchedDependencies": {
-      "effect@4.0.0-beta.43": "patches/effect@4.0.0-beta.43.patch"
+      "effect@4.0.0-beta.43": "patches/effect@4.0.0-beta.43.patch",
+      "better-auth@1.4.18": "patches/better-auth@1.4.18.patch"
     }
   }
 }

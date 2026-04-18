@@ -1,5 +1,5 @@
 import { Option } from "effect";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "@effect/vitest";
 import { Sheet } from "sheet-apis/schema";
 import { classifyDailyHourSchedules, getDailyHourSchedules } from "./-dailyRows";
 
