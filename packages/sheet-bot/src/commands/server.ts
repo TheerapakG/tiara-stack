@@ -17,15 +17,14 @@ const getInteractionGuildId = Effect.gen(function* () {
   );
 });
 
-const resolveGuildId = (serverId: Option.Option<string>) =>
-  Effect.gen(function* () {
-    const interactionGuildId = yield* getInteractionGuildId;
+const resolveGuildId = Effect.fn("resolveGuildId")(function* (serverId: Option.Option<string>) {
+  const interactionGuildId = yield* getInteractionGuildId;
 
-    return pipe(
-      serverId.pipe(Option.orElse(() => interactionGuildId)),
-      Option.getOrThrowWith(() => new Error("Guild not found in interaction or command options")),
-    );
-  });
+  return pipe(
+    serverId.pipe(Option.orElse(() => interactionGuildId)),
+    Option.getOrThrowWith(() => new Error("Guild not found in interaction or command options")),
+  );
+});
 
 const isUnauthorized = Predicate.isTagged("Unauthorized");
 

@@ -69,46 +69,45 @@ export class FormatService extends ServiceMap.Service<FormatService>()("FormatSe
         return yield* Match.value(schedule).pipe(
           Match.tagsExhaustive({
             PopulatedBreakSchedule: () => Effect.succeed(""),
-            PopulatedSchedule: (schedule) =>
-              Effect.gen(function* () {
-                const hour = schedule.hour;
-                const empty = Sheet.PopulatedSchedule.empty(schedule);
-                const slotCountString = schedule.visible ? bold(`+${empty} |`) : "";
-                const hourString = pipe(
-                  hour,
-                  Option.map((hour) => bold(`hour ${hour}`)),
-                  Option.getOrElse(() => bold("hour ??")),
-                );
-                const rangeString = yield* formatScheduleHourWindow(
-                  schedule,
-                  () =>
-                    pipe(
-                      hour,
-                      Option.map((h) =>
-                        pipe(
-                          converterService.convertHourToHourWindow(guildId, h),
-                          Effect.flatMap(formatHourWindow),
-                          Effect.map(
-                            (hw) =>
-                              `${time(hw.start, TimestampStyles.ShortTime)}-${time(hw.end, TimestampStyles.ShortTime)}`,
-                          ),
-                          Effect.catch(() => Effect.succeed("??-??")),
+            PopulatedSchedule: Effect.fnUntraced(function* (schedule: Sheet.PopulatedSchedule) {
+              const hour = schedule.hour;
+              const empty = Sheet.PopulatedSchedule.empty(schedule);
+              const slotCountString = schedule.visible ? bold(`+${empty} |`) : "";
+              const hourString = pipe(
+                hour,
+                Option.map((hour) => bold(`hour ${hour}`)),
+                Option.getOrElse(() => bold("hour ??")),
+              );
+              const rangeString = yield* formatScheduleHourWindow(
+                schedule,
+                () =>
+                  pipe(
+                    hour,
+                    Option.map((h) =>
+                      pipe(
+                        converterService.convertHourToHourWindow(guildId, h),
+                        Effect.flatMap(formatHourWindow),
+                        Effect.map(
+                          (hw) =>
+                            `${time(hw.start, TimestampStyles.ShortTime)}-${time(hw.end, TimestampStyles.ShortTime)}`,
                         ),
+                        Effect.catch(() => Effect.succeed("??-??")),
                       ),
-                      Option.getOrElse(() => Effect.succeed("??-??")),
                     ),
-                  (hw) =>
-                    `${time(hw.start, TimestampStyles.ShortTime)}-${time(hw.end, TimestampStyles.ShortTime)}`,
-                );
+                    Option.getOrElse(() => Effect.succeed("??-??")),
+                  ),
+                (hw) =>
+                  `${time(hw.start, TimestampStyles.ShortTime)}-${time(hw.end, TimestampStyles.ShortTime)}`,
+              );
 
-                return !schedule.visible || Order.isGreaterThan(Number.Order)(empty, 0)
-                  ? pipe(
-                      [slotCountString, hourString, rangeString],
-                      Array.filter(String.isNonEmpty),
-                      Array.join(" "),
-                    )
-                  : "";
-              }),
+              return !schedule.visible || Order.isGreaterThan(Number.Order)(empty, 0)
+                ? pipe(
+                    [slotCountString, hourString, rangeString],
+                    Array.filter(String.isNonEmpty),
+                    Array.join(" "),
+                  )
+                : "";
+            }),
           }),
         );
       }),
@@ -119,45 +118,40 @@ export class FormatService extends ServiceMap.Service<FormatService>()("FormatSe
         return yield* Match.value(schedule).pipe(
           Match.tagsExhaustive({
             PopulatedBreakSchedule: () => Effect.succeed(""),
-            PopulatedSchedule: (schedule) =>
-              Effect.gen(function* () {
-                const hour = schedule.hour;
-                const empty = Sheet.PopulatedSchedule.empty(schedule);
-                const hourString = pipe(
-                  hour,
-                  Option.map((hour) => bold(`hour ${hour}`)),
-                  Option.getOrElse(() => bold("hour ??")),
-                );
-                const rangeString = yield* formatScheduleHourWindow(
-                  schedule,
-                  () =>
-                    pipe(
-                      hour,
-                      Option.map((h) =>
-                        pipe(
-                          converterService.convertHourToHourWindow(guildId, h),
-                          Effect.flatMap(formatHourWindow),
-                          Effect.map(
-                            (hw) =>
-                              `${time(hw.start, TimestampStyles.ShortTime)}-${time(hw.end, TimestampStyles.ShortTime)}`,
-                          ),
-                          Effect.catch(() => Effect.succeed("??-??")),
+            PopulatedSchedule: Effect.fnUntraced(function* (schedule: Sheet.PopulatedSchedule) {
+              const hour = schedule.hour;
+              const empty = Sheet.PopulatedSchedule.empty(schedule);
+              const hourString = pipe(
+                hour,
+                Option.map((hour) => bold(`hour ${hour}`)),
+                Option.getOrElse(() => bold("hour ??")),
+              );
+              const rangeString = yield* formatScheduleHourWindow(
+                schedule,
+                () =>
+                  pipe(
+                    hour,
+                    Option.map((h) =>
+                      pipe(
+                        converterService.convertHourToHourWindow(guildId, h),
+                        Effect.flatMap(formatHourWindow),
+                        Effect.map(
+                          (hw) =>
+                            `${time(hw.start, TimestampStyles.ShortTime)}-${time(hw.end, TimestampStyles.ShortTime)}`,
                         ),
+                        Effect.catch(() => Effect.succeed("??-??")),
                       ),
-                      Option.getOrElse(() => Effect.succeed("??-??")),
                     ),
-                  (hw) =>
-                    `${time(hw.start, TimestampStyles.ShortTime)}-${time(hw.end, TimestampStyles.ShortTime)}`,
-                );
+                    Option.getOrElse(() => Effect.succeed("??-??")),
+                  ),
+                (hw) =>
+                  `${time(hw.start, TimestampStyles.ShortTime)}-${time(hw.end, TimestampStyles.ShortTime)}`,
+              );
 
-                return schedule.visible && Number.Equivalence(empty, 0)
-                  ? pipe(
-                      [hourString, rangeString],
-                      Array.filter(String.isNonEmpty),
-                      Array.join(" "),
-                    )
-                  : "";
-              }),
+              return schedule.visible && Number.Equivalence(empty, 0)
+                ? pipe([hourString, rangeString], Array.filter(String.isNonEmpty), Array.join(" "))
+                : "";
+            }),
           }),
         );
       }),

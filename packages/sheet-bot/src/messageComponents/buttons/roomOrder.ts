@@ -90,68 +90,63 @@ const makeRoomOrderReply = (
     >;
   },
 ) =>
-  Effect.fn("roomOrderButton.getReply")(
-    (
-      mode: RoomOrderReplyMode,
-      guildId: string,
-      messageId: string,
-      messageRoomOrder: MessageRoomOrder.MessageRoomOrder,
-    ) =>
-      Effect.gen(function* () {
-        const messageRoomOrderRange =
-          yield* messageRoomOrderService.getMessageRoomOrderRange(messageId);
-        const messageRoomOrderEntry = yield* messageRoomOrderService.getMessageRoomOrderEntry(
-          messageId,
-          messageRoomOrder.rank.toString(),
-        );
-        const { start, end } = yield* pipe(
-          converterService.convertHourToHourWindow(guildId, messageRoomOrder.hour),
-          Effect.flatMap(formatService.formatHourWindow),
-        );
+  Effect.fn("roomOrderButton.getReply")(function* (
+    mode: RoomOrderReplyMode,
+    guildId: string,
+    messageId: string,
+    messageRoomOrder: MessageRoomOrder.MessageRoomOrder,
+  ) {
+    const messageRoomOrderRange =
+      yield* messageRoomOrderService.getMessageRoomOrderRange(messageId);
+    const messageRoomOrderEntry = yield* messageRoomOrderService.getMessageRoomOrderEntry(
+      messageId,
+      messageRoomOrder.rank.toString(),
+    );
+    const { start, end } = yield* pipe(
+      converterService.convertHourToHourWindow(guildId, messageRoomOrder.hour),
+      Effect.flatMap(formatService.formatHourWindow),
+    );
 
-        const roomOrderContent = [
-          `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.LongDateShortTime)} - ${time(end, TimestampStyles.LongDateShortTime)}`,
-          ...Option.match(messageRoomOrder.monitor, {
-            onNone: () => [],
-            onSome: (monitor) => [`${inlineCode("Monitor:")} ${monitor}`],
-          }),
-          "",
-          ...messageRoomOrderEntry.map(({ team, tags, position, effectValue }) => {
-            const hasTiererTag = tags.includes("tierer");
-            const effectParts = hasTiererTag
-              ? []
-              : pipe(
-                  [
-                    Option.some(formatEffectValue(effectValue)),
-                    tags.includes("enc") ? Option.some("enc") : Option.none(),
-                    tags.includes("not_enc") ? Option.some("not enc") : Option.none(),
-                  ],
-                  Array.getSomes,
-                );
-
-            const effectStr = effectParts.length > 0 ? ` (${effectParts.join(", ")})` : "";
-            return `${inlineCode(`P${position + 1}:`)}  ${team}${effectStr}`;
-          }),
-          "",
-          `${inlineCode("In:")} ${renderDelta(messageRoomOrder.fills, messageRoomOrder.previousFills)}`,
-          `${inlineCode("Out:")} ${renderDelta(messageRoomOrder.previousFills, messageRoomOrder.fills)}`,
-        ].join("\n");
-
-        return mode === "tentative"
-          ? {
-              content: formatTentativeRoomOrderContent(roomOrderContent),
-              components: [
-                tentativeRoomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank).toJSON(),
-              ],
-            }
-          : {
-              content: roomOrderContent,
-              components: [
-                roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank).toJSON(),
-              ],
-            };
+    const roomOrderContent = [
+      `${bold(`Hour ${messageRoomOrder.hour}`)} ${time(start, TimestampStyles.LongDateShortTime)} - ${time(end, TimestampStyles.LongDateShortTime)}`,
+      ...Option.match(messageRoomOrder.monitor, {
+        onNone: () => [],
+        onSome: (monitor) => [`${inlineCode("Monitor:")} ${monitor}`],
       }),
-  );
+      "",
+      ...messageRoomOrderEntry.map(({ team, tags, position, effectValue }) => {
+        const hasTiererTag = tags.includes("tierer");
+        const effectParts = hasTiererTag
+          ? []
+          : pipe(
+              [
+                Option.some(formatEffectValue(effectValue)),
+                tags.includes("enc") ? Option.some("enc") : Option.none(),
+                tags.includes("not_enc") ? Option.some("not enc") : Option.none(),
+              ],
+              Array.getSomes,
+            );
+
+        const effectStr = effectParts.length > 0 ? ` (${effectParts.join(", ")})` : "";
+        return `${inlineCode(`P${position + 1}:`)}  ${team}${effectStr}`;
+      }),
+      "",
+      `${inlineCode("In:")} ${renderDelta(messageRoomOrder.fills, messageRoomOrder.previousFills)}`,
+      `${inlineCode("Out:")} ${renderDelta(messageRoomOrder.previousFills, messageRoomOrder.fills)}`,
+    ].join("\n");
+
+    return mode === "tentative"
+      ? {
+          content: formatTentativeRoomOrderContent(roomOrderContent),
+          components: [
+            tentativeRoomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank).toJSON(),
+          ],
+        }
+      : {
+          content: roomOrderContent,
+          components: [roomOrderActionRow(messageRoomOrderRange, messageRoomOrder.rank).toJSON()],
+        };
+  });
 
 const makeRoomOrderPreviousButtonHandler = Effect.gen(function* () {
   const converterService = yield* ConverterService;
