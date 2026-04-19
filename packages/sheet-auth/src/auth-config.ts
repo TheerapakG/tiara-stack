@@ -1,4 +1,4 @@
-import { betterAuth } from "better-auth";
+import { betterAuth, type Auth as BetterAuth, type BetterAuthOptions } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, jwt } from "better-auth/plugins";
 import { oauthProvider } from "@better-auth/oauth-provider";
@@ -21,33 +21,29 @@ interface CreateAuthOptions {
   secondaryStorageDriver: Driver;
 }
 
-// Infer the Auth type from betterAuth return type
-type BetterAuthInstance = ReturnType<typeof betterAuth>;
+export type Auth = BetterAuth<BetterAuthOptions>;
 
-export type Auth = BetterAuthInstance;
+type BaseAuthOptions = Omit<CreateAuthOptions, "postgresUrl" | "secondaryStorageDriver"> & {
+  db: ReturnType<typeof drizzle>;
+  secondaryStorage: ReturnType<typeof createSecondaryStorage>;
+};
 
-export interface AuthWithCleanup extends Auth {
+type CleanupMethods = {
   close: () => Promise<void>;
   closeStorage: () => Promise<void>;
-}
+};
 
-export function authConfig({
-  postgresUrl,
+function createBaseAuth({
+  db,
   discordClientId,
   discordClientSecret,
   kubernetesAudience,
   baseUrl,
   trustedOrigins,
   cookieDomain,
-  secondaryStorageDriver,
-}: CreateAuthOptions): AuthWithCleanup {
-  const pgClient = postgres(postgresUrl);
-  const db = drizzle(pgClient);
-
-  // Create secondary storage from driver
-  const secondaryStorage = createSecondaryStorage(secondaryStorageDriver);
-
-  const auth = betterAuth({
+  secondaryStorage,
+}: BaseAuthOptions) {
+  return betterAuth({
     baseURL: baseUrl,
     basePath: "/",
     database: drizzleAdapter(db, { provider: "pg", schema }),
@@ -86,6 +82,36 @@ export function authConfig({
       },
     },
     trustedOrigins: trustedOrigins ?? [baseUrl],
+  });
+}
+
+export type AuthWithCleanup = ReturnType<typeof createBaseAuth> & CleanupMethods;
+
+export function authConfig({
+  postgresUrl,
+  discordClientId,
+  discordClientSecret,
+  kubernetesAudience,
+  baseUrl,
+  trustedOrigins,
+  cookieDomain,
+  secondaryStorageDriver,
+}: CreateAuthOptions): AuthWithCleanup {
+  const pgClient = postgres(postgresUrl);
+  const db = drizzle(pgClient);
+
+  // Create secondary storage from driver
+  const secondaryStorage = createSecondaryStorage(secondaryStorageDriver);
+
+  const auth = createBaseAuth({
+    db,
+    discordClientId,
+    discordClientSecret,
+    kubernetesAudience,
+    baseUrl,
+    trustedOrigins,
+    cookieDomain,
+    secondaryStorage,
   });
 
   return Object.assign(auth, {

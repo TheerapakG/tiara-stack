@@ -51,18 +51,19 @@
     "unstorage": "^1.15.0"
   },
   "devDependencies": {
+    "@effect/vitest": "catalog:",
     "@types/node": "^24.10.9",
     "@typescript/native-preview": "latest",
     "dotenv": "^17.2.3",
     "glob": "^11.0.1",
     "pathe": "^2.0.3",
+    "vite": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:"
   },
   "peerDependencies": {
     "@effect/opentelemetry": "catalog:",
     "@effect/platform-node": "catalog:",
-    "@effect/vitest": "catalog:",
     "dfx": "catalog:",
     "effect": "catalog:"
   }

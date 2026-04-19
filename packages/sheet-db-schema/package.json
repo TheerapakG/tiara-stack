@@ -38,6 +38,7 @@
     "dotenv": "^17.2.3",
     "drizzle-kit": "^0.31.4",
     "pathe": "^2.0.3",
+    "vite": "catalog:",
     "vite-plus": "catalog:"
   },
   "peerDependencies": {

@@ -30,6 +30,7 @@
     "@types/node": "^24.7.2",
     "@typescript/native-preview": "latest",
     "pathe": "^2.0.3",
+    "vite": "catalog:",
     "vite-plus": "catalog:"
   }
 }
