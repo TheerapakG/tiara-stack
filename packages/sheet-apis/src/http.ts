@@ -64,7 +64,8 @@ const corsMiddlewareLayer = Layer.unwrap(
         maxAge: 600,
         credentials: true,
       }),
-    ).layer;
+      { global: true },
+    );
   }),
 );
 
