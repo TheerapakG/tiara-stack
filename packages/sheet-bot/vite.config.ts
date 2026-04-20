@@ -20,9 +20,6 @@ export default defineConfig({
     },
     deps: {
       alwaysBundle: [/^.*$/],
-      neverBundle: [
-        /^(dfx-discord-utils|sheet-apis|sheet-auth|sheet-db-schema|typhoon-core)(?:\/.*)?$/,
-      ],
       onlyBundle: false,
     },
   },

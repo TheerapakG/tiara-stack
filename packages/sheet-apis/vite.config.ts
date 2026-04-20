@@ -20,11 +20,7 @@ export default defineConfig({
       sourcemap: true,
       deps: {
         alwaysBundle: [/^.*$/],
-        neverBundle: [
-          "playwright",
-          "playwright-core",
-          /^(dfx-discord-utils|sheet-auth|sheet-db-schema|typhoon-core)(?:\/.*)?$/,
-        ],
+        neverBundle: ["playwright", "playwright-core"],
         onlyBundle: false,
       },
     },
