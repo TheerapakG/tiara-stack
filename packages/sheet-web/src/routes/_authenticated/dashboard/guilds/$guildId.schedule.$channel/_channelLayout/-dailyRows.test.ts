@@ -4,7 +4,7 @@ import { Sheet } from "sheet-apis/schema";
 import { classifyDailyHourSchedules, getDailyHourSchedules } from "./-dailyRows";
 
 const makeBreakSchedule = () =>
-  Sheet.PopulatedBreakSchedule.makeUnsafe({
+  new Sheet.PopulatedBreakSchedule({
     channel: "raid",
     day: 1,
     visible: true,
@@ -13,7 +13,7 @@ const makeBreakSchedule = () =>
   });
 
 const makeSchedule = (fills: readonly Option.Option<Sheet.PopulatedSchedulePlayer>[]) =>
-  Sheet.PopulatedSchedule.makeUnsafe({
+  new Sheet.PopulatedSchedule({
     channel: "raid",
     day: 1,
     visible: true,
@@ -27,8 +27,8 @@ const makeSchedule = (fills: readonly Option.Option<Sheet.PopulatedSchedulePlaye
   });
 
 const makePlayer = (name: string) =>
-  Sheet.PopulatedSchedulePlayer.makeUnsafe({
-    player: Sheet.PartialNamePlayer.makeUnsafe({ name }),
+  new Sheet.PopulatedSchedulePlayer({
+    player: new Sheet.PartialNamePlayer({ name }),
     enc: false,
   });
 

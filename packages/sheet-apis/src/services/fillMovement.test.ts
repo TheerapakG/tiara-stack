@@ -10,8 +10,8 @@ import {
 import { diffFillParticipants, getScheduleFills, toFillParticipant } from "./fillMovement";
 
 const makeResolvedFill = (id: string, name: string) =>
-  PopulatedSchedulePlayer.makeUnsafe({
-    player: Player.makeUnsafe({
+  new PopulatedSchedulePlayer({
+    player: new Player({
       index: 0,
       id,
       name,
@@ -20,13 +20,13 @@ const makeResolvedFill = (id: string, name: string) =>
   });
 
 const makePartialFill = (name: string) =>
-  PopulatedSchedulePlayer.makeUnsafe({
-    player: PartialNamePlayer.makeUnsafe({ name }),
+  new PopulatedSchedulePlayer({
+    player: new PartialNamePlayer({ name }),
     enc: false,
   });
 
 const makeSchedule = (fills: ReadonlyArray<PopulatedSchedulePlayer>) =>
-  PopulatedSchedule.makeUnsafe({
+  new PopulatedSchedule({
     channel: "room-1",
     day: 1,
     visible: true,
@@ -46,7 +46,7 @@ describe("fillMovement", () => {
     const resolved = makeResolvedFill("1", "Alice");
     const partial = makePartialFill("Bob");
     const schedule = makeSchedule([resolved, partial]);
-    const breakSchedule = PopulatedBreakSchedule.makeUnsafe({
+    const breakSchedule = new PopulatedBreakSchedule({
       channel: "room-1",
       day: 1,
       visible: true,

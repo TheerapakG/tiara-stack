@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option, ServiceMap } from "effect";
+import { Effect, Option, Context } from "effect";
 import {
   LEGACY_MESSAGE_CHECKIN_ACCESS_ERROR,
   requireCheckinUpsertAccess,
@@ -17,7 +17,7 @@ type MessageCheckinAccessService = Pick<
   typeof MessageCheckinService.Service,
   "getMessageCheckinData" | "getMessageCheckinMembers"
 >;
-type AuthorizationServiceApi = ServiceMap.Service.Shape<typeof AuthorizationService>;
+type AuthorizationServiceApi = Context.Service.Shape<typeof AuthorizationService>;
 
 const makeMessageCheckinRecord = (overrides?: {
   readonly guildId?: string | null;

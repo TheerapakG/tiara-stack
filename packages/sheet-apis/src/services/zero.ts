@@ -13,7 +13,7 @@ const makeZero = Effect.fn("zero.makeZero")(function* () {
   const auth = yield* getAuth();
   const zeroCacheServer = yield* config.zeroCacheServer;
   const zeroCacheUserId = yield* config.zeroCacheUserId;
-  const services = yield* Effect.services();
+  const context = yield* Effect.context();
   const zero = new Zero({
     server: zeroCacheServer,
     userID: zeroCacheUserId,
@@ -34,7 +34,7 @@ const makeZero = Effect.fn("zero.makeZero")(function* () {
             ),
           ),
           Match.orElse(() => Effect.void),
-          Effect.provideServices(services),
+          Effect.provideContext(context),
           Effect.runFork,
         ),
       ),

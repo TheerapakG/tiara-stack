@@ -1,11 +1,11 @@
-import { Array, Effect, Layer, Option, ServiceMap, Schema } from "effect";
+import { Array, Effect, Layer, Option, Context, Schema } from "effect";
 import { mutators, queries } from "sheet-db-schema/zero";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 import { ZeroService } from "./zero";
 import { GuildChannelConfig, GuildConfig, GuildConfigMonitorRole } from "@/schemas/guildConfig";
 
-export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()(
+export class GuildConfigService extends Context.Service<GuildConfigService>()(
   "GuildConfigService",
   {
     make: Effect.gen(function* () {

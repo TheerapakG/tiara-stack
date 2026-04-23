@@ -1,4 +1,4 @@
-import { Redacted, ServiceMap } from "effect";
+import { Redacted, Context } from "effect";
 import type { PermissionSet } from "@/schemas/permissions";
 
 type SheetAuthUserType = {
@@ -10,6 +10,6 @@ type SheetAuthUserType = {
   token: Redacted.Redacted<string>;
 };
 
-export class SheetAuthUser extends ServiceMap.Service<SheetAuthUser, SheetAuthUserType>()(
+export class SheetAuthUser extends Context.Service<SheetAuthUser, SheetAuthUserType>()(
   "SheetAuthUser",
 ) {}

@@ -57,28 +57,32 @@ export const makeSchedule = ({
 }) =>
   pipe(
     Match.value(breakHour),
-    Match.when(true, () =>
-      BreakSchedule.makeUnsafe({
-        channel,
-        day,
-        visible,
-        hour,
-        hourWindow,
-      }),
+    Match.when(
+      true,
+      () =>
+        new BreakSchedule({
+          channel,
+          day,
+          visible,
+          hour,
+          hourWindow,
+        }),
     ),
-    Match.when(false, () =>
-      Schedule.makeUnsafe({
-        channel,
-        day,
-        visible,
-        hour,
-        hourWindow,
-        fills,
-        overfills,
-        standbys,
-        runners,
-        monitor,
-      }),
+    Match.when(
+      false,
+      () =>
+        new Schedule({
+          channel,
+          day,
+          visible,
+          hour,
+          hourWindow,
+          fills,
+          overfills,
+          standbys,
+          runners,
+          monitor,
+        }),
     ),
     Match.exhaustive,
   );

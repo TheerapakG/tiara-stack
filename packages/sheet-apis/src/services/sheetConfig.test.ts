@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option, ServiceMap } from "effect";
+import { Effect, Option, Context } from "effect";
 import { GoogleSheets } from "./google/sheets";
 import { SheetConfigService } from "./sheetConfig";
 
-type GoogleSheetsApi = ServiceMap.Service.Shape<typeof GoogleSheets>;
+type GoogleSheetsApi = Context.Service.Shape<typeof GoogleSheets>;
 
 const makeGoogleSheets = () =>
   ({

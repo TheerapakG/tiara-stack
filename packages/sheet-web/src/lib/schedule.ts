@@ -15,7 +15,6 @@ import {
   Schema,
 } from "effect";
 import { QueryResultAppError, QueryResultParseError, SchemaError } from "typhoon-core/error";
-import { RequestError } from "#/lib/error";
 import { useMemo } from "react";
 import { zoneId } from "#/hooks/useDateTimeZoned";
 
@@ -33,7 +32,6 @@ const GuildScheduleErrorSchema = Schema.revealCodec(
     Google.GoogleSheetsError,
     Sheet.ParserFieldError,
     SheetConfig.SheetConfigError,
-    RequestError,
   ]),
 );
 
@@ -81,15 +79,7 @@ const _guildScheduleResponseAtom = Atom.family((guildId: string) =>
 
 // Serializable atom for guild schedule response
 export const guildScheduleResponseAtom = Atom.family((guildId: string) =>
-  Atom.make(
-    Effect.fnUntraced(function* (get) {
-      return yield* get.result(_guildScheduleResponseAtom(guildId)).pipe(
-        Effect.catchTags({
-          BadRequest: () => Effect.fail(RequestError.makeUnsafe({})),
-        }),
-      );
-    }),
-  ).pipe(
+  _guildScheduleResponseAtom(guildId).pipe(
     Atom.setIdleTTL(Duration.infinity),
     Atom.serializable({
       key: `schedule.response.getAllPopulatedSchedules.${guildId}`,
@@ -156,7 +146,9 @@ export const getAllChannelsAtom = Atom.family((guildId: string) =>
       const channelArray = populatedSchedules.map((s) => s.channel);
       const channelSet = HashSet.fromIterable(channelArray);
       const uniqueChannels = Array.fromIterable(channelSet);
-      return [...uniqueChannels].sort() as readonly string[];
+      return [...uniqueChannels].sort((left, right) =>
+        left.localeCompare(right),
+      ) as readonly string[];
     }),
   ).pipe(
     Atom.setIdleTTL(Duration.infinity),

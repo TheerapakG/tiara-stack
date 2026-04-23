@@ -15,7 +15,7 @@ import {
   SchemaGetter,
   SchemaIssue,
   SchemaParser,
-  ServiceMap,
+  Context,
   String,
   Types,
 } from "effect";
@@ -349,7 +349,7 @@ const parseA1RangeKey = (range: string) =>
 const gridDataToKey = (sheetTitle: string, gridData: sheets_v4.Schema$GridData) =>
   toRangeKey(sheetTitle, (gridData.startRow ?? 0) + 1, (gridData.startColumn ?? 0) + 1);
 
-export class GoogleSheets extends ServiceMap.Service<GoogleSheets>()("GoogleSheets", {
+export class GoogleSheets extends Context.Service<GoogleSheets>()("GoogleSheets", {
   make: Effect.gen(function* () {
     const googleAuthService = yield* GoogleAuthService;
     const auth = googleAuthService.getAuth();
@@ -360,7 +360,7 @@ export class GoogleSheets extends ServiceMap.Service<GoogleSheets>()("GoogleShee
           auth,
         }),
       catch: (cause) =>
-        GoogleSheetsError.makeUnsafe({
+        new GoogleSheetsError({
           message: "Failed to create Google Sheets client",
           cause,
         }),
@@ -379,7 +379,7 @@ export class GoogleSheets extends ServiceMap.Service<GoogleSheets>()("GoogleShee
           }),
           Effect.catch((error) =>
             Effect.fail(
-              GoogleSheetsError.makeUnsafe({
+              new GoogleSheetsError({
                 message: pipe(
                   error,
                   Schema.decodeUnknownResult(Schema.Struct({ message: Schema.String })),
@@ -429,7 +429,7 @@ export class GoogleSheets extends ServiceMap.Service<GoogleSheets>()("GoogleShee
             rowDatas.length === (params.ranges?.length ?? 0)
               ? Effect.succeed(rowDatas)
               : Effect.fail(
-                  GoogleSheetsError.makeUnsafe({
+                  new GoogleSheetsError({
                     message: "Row datas length does not match ranges length",
                     cause: undefined,
                   }),
@@ -448,7 +448,7 @@ export class GoogleSheets extends ServiceMap.Service<GoogleSheets>()("GoogleShee
         }).pipe(
           Effect.catch((error) =>
             Effect.fail(
-              GoogleSheetsError.makeUnsafe({
+              new GoogleSheetsError({
                 message: pipe(
                   error,
                   Schema.decodeUnknownResult(Schema.Struct({ message: Schema.String })),
@@ -479,7 +479,7 @@ export class GoogleSheets extends ServiceMap.Service<GoogleSheets>()("GoogleShee
             }).pipe(
               Effect.catch((error) =>
                 Effect.fail(
-                  GoogleSheetsError.makeUnsafe({
+                  new GoogleSheetsError({
                     message: pipe(
                       error,
                       Schema.decodeUnknownResult(Schema.Struct({ message: Schema.String })),
@@ -517,7 +517,7 @@ export class GoogleSheets extends ServiceMap.Service<GoogleSheets>()("GoogleShee
             }).pipe(
               Effect.catch((error) =>
                 Effect.fail(
-                  GoogleSheetsError.makeUnsafe({
+                  new GoogleSheetsError({
                     message: pipe(
                       error,
                       Schema.decodeUnknownResult(Schema.Struct({ message: Schema.String })),
@@ -566,7 +566,7 @@ export class GoogleSheets extends ServiceMap.Service<GoogleSheets>()("GoogleShee
                 return rowDatas.length === orderedRanges.length
                   ? Effect.succeed(rowDatas)
                   : Effect.fail(
-                      GoogleSheetsError.makeUnsafe({
+                      new GoogleSheetsError({
                         message: "Row datas length does not match ranges length",
                         cause: undefined,
                       }),
@@ -586,7 +586,7 @@ export class GoogleSheets extends ServiceMap.Service<GoogleSheets>()("GoogleShee
         }).pipe(
           Effect.catch((error) =>
             Effect.fail(
-              GoogleSheetsError.makeUnsafe({
+              new GoogleSheetsError({
                 message: pipe(
                   error,
                   Schema.decodeUnknownResult(Schema.Struct({ message: Schema.String })),
@@ -606,7 +606,7 @@ export class GoogleSheets extends ServiceMap.Service<GoogleSheets>()("GoogleShee
         }).pipe(
           Effect.catch((error) =>
             Effect.fail(
-              GoogleSheetsError.makeUnsafe({
+              new GoogleSheetsError({
                 message: pipe(
                   error,
                   Schema.decodeUnknownResult(Schema.Struct({ message: Schema.String })),

@@ -1,4 +1,4 @@
-import { Effect, Layer, ServiceMap } from "effect";
+import { Effect, Layer, Context } from "effect";
 import {
   membersApiCacheViewWithReverseLookup,
   membersCacheViewWithReverseLookup,
@@ -8,7 +8,7 @@ import {
 import { discordGatewayLayer } from "../gateway";
 import { Unstorage } from "./shared";
 
-export class MembersCache extends ServiceMap.Service<MembersCache>()("MembersCache", {
+export class MembersCache extends Context.Service<MembersCache>()("MembersCache", {
   make: Effect.gen(function* () {
     const storage = yield* Unstorage.prefixed("members:");
     return yield* membersWithReverseLookup(unstorageWithReverseLookupDriver({ storage }));
@@ -17,7 +17,7 @@ export class MembersCache extends ServiceMap.Service<MembersCache>()("MembersCac
   static layer = Layer.effect(MembersCache, this.make).pipe(Layer.provide(discordGatewayLayer));
 }
 
-export class MembersCacheView extends ServiceMap.Service<MembersCacheView>()("MembersCacheView", {
+export class MembersCacheView extends Context.Service<MembersCacheView>()("MembersCacheView", {
   make: Effect.gen(function* () {
     const storage = yield* Unstorage.prefixed("members:");
     return yield* membersCacheViewWithReverseLookup(unstorageWithReverseLookupDriver({ storage }));
@@ -26,7 +26,7 @@ export class MembersCacheView extends ServiceMap.Service<MembersCacheView>()("Me
   static layer = Layer.effect(MembersCacheView, this.make);
 }
 
-export class MembersApiCacheView extends ServiceMap.Service<MembersApiCacheView>()(
+export class MembersApiCacheView extends Context.Service<MembersApiCacheView>()(
   "MembersApiCacheView",
   {
     make: Effect.gen(function* () {

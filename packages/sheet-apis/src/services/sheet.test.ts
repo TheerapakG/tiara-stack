@@ -1,14 +1,14 @@
 import type { sheets_v4 } from "@googleapis/sheets";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, HashMap, Option, Predicate, ServiceMap } from "effect";
+import { Effect, HashMap, Option, Predicate, Context } from "effect";
 import type { BreakSchedule, Schedule } from "@/schemas/sheet";
 import { ScheduleConfig } from "@/schemas/sheetConfig";
 import { GoogleSheets } from "./google/sheets";
 import { SheetConfigService } from "./sheetConfig";
 import { SheetService } from "./sheet";
 
-type GoogleSheetsApi = ServiceMap.Service.Shape<typeof GoogleSheets>;
-type SheetConfigServiceApi = ServiceMap.Service.Shape<typeof SheetConfigService>;
+type GoogleSheetsApi = Context.Service.Shape<typeof GoogleSheets>;
+type SheetConfigServiceApi = Context.Service.Shape<typeof SheetConfigService>;
 
 const scheduleSheet = "Schedule";
 
@@ -35,7 +35,7 @@ const makeRow = (...values: sheets_v4.Schema$CellData[]): sheets_v4.Schema$RowDa
 const makeRange = (range: string) => `'${scheduleSheet}'!${range}`;
 
 const makeScheduleConfig = (encType: "none" | "regex" | "bold") =>
-  ScheduleConfig.makeUnsafe({
+  new ScheduleConfig({
     channel: Option.some("main"),
     day: Option.some(1),
     sheet: Option.some(scheduleSheet),

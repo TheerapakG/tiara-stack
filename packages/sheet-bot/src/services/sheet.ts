@@ -1,11 +1,11 @@
-import { Data, Effect, Layer, ServiceMap } from "effect";
+import { Data, Effect, Layer, Context } from "effect";
 import { ScopedCache } from "typhoon-core/utils";
 import { SheetApisClient } from "./sheetApis";
 
 class GuildDayKey extends Data.Class<{ guildId: string; day: number }> {}
 class GuildChannelKey extends Data.Class<{ guildId: string; channel: string }> {}
 
-export class SheetService extends ServiceMap.Service<SheetService>()("SheetService", {
+export class SheetService extends Context.Service<SheetService>()("SheetService", {
   make: Effect.gen(function* () {
     const sheetApisClient = yield* SheetApisClient;
 

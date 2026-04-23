@@ -1,4 +1,4 @@
-import { Effect, Layer, ServiceMap } from "effect";
+import { Effect, Layer, Context } from "effect";
 import {
   rolesApiCacheViewWithReverseLookup,
   rolesCacheViewWithReverseLookup,
@@ -8,7 +8,7 @@ import {
 import { discordGatewayLayer } from "../gateway";
 import { Unstorage } from "./shared";
 
-export class RolesCache extends ServiceMap.Service<RolesCache>()("RolesCache", {
+export class RolesCache extends Context.Service<RolesCache>()("RolesCache", {
   make: Effect.gen(function* () {
     const storage = yield* Unstorage.prefixed("roles:");
     return yield* rolesWithReverseLookup(unstorageWithReverseLookupDriver({ storage }));
@@ -17,7 +17,7 @@ export class RolesCache extends ServiceMap.Service<RolesCache>()("RolesCache", {
   static layer = Layer.effect(RolesCache, this.make).pipe(Layer.provide(discordGatewayLayer));
 }
 
-export class RolesCacheView extends ServiceMap.Service<RolesCacheView>()("RolesCacheView", {
+export class RolesCacheView extends Context.Service<RolesCacheView>()("RolesCacheView", {
   make: Effect.gen(function* () {
     const storage = yield* Unstorage.prefixed("roles:");
     return yield* rolesCacheViewWithReverseLookup(unstorageWithReverseLookupDriver({ storage }));
@@ -26,16 +26,11 @@ export class RolesCacheView extends ServiceMap.Service<RolesCacheView>()("RolesC
   static layer = Layer.effect(RolesCacheView, this.make);
 }
 
-export class RolesApiCacheView extends ServiceMap.Service<RolesApiCacheView>()(
-  "RolesApiCacheView",
-  {
-    make: Effect.gen(function* () {
-      const storage = yield* Unstorage.prefixed("roles:");
-      return yield* rolesApiCacheViewWithReverseLookup(
-        unstorageWithReverseLookupDriver({ storage }),
-      );
-    }),
-  },
-) {
+export class RolesApiCacheView extends Context.Service<RolesApiCacheView>()("RolesApiCacheView", {
+  make: Effect.gen(function* () {
+    const storage = yield* Unstorage.prefixed("roles:");
+    return yield* rolesApiCacheViewWithReverseLookup(unstorageWithReverseLookupDriver({ storage }));
+  }),
+}) {
   static layer = Layer.effect(RolesApiCacheView, this.make);
 }

@@ -1,7 +1,7 @@
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 import { beforeEach, describe, expect, it } from "@effect/vitest";
 import { TestClock } from "effect/testing";
-import { Cause, DateTime, Duration, Effect, Exit, Option, Redacted, Ref, ServiceMap } from "effect";
+import { Cause, DateTime, Duration, Effect, Exit, Option, Redacted, Ref, Context } from "effect";
 import { vi } from "vitest";
 import type { Account } from "sheet-auth/model";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
@@ -68,7 +68,7 @@ const runSheetAuthToken = Effect.fnUntraced(function* (
   token: Redacted.Redacted<string>,
 ) {
   const currentUserRef = yield* Ref.make<
-    Option.Option<ServiceMap.Service.Shape<typeof SheetAuthUser>>
+    Option.Option<Context.Service.Shape<typeof SheetAuthUser>>
   >(Option.none());
 
   yield* provideRequestContext(

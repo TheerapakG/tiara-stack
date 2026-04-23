@@ -243,4 +243,4 @@ export const make: Effect.Effect<Client.HttpClient> = Effect.sync(() =>
  * @since 1.0.0
  * @category Layers
  */
-export const layer: Layer.Layer<Client.HttpClient> = Client.layerMergedServices(make);
+export const layer: Layer.Layer<Client.HttpClient> = Client.layerMergedContext(make);

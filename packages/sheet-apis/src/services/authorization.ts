@@ -3,7 +3,7 @@ import { RolesApiCacheView } from "dfx-discord-utils/discord/cache/roles";
 import { CacheNotFoundError } from "dfx-discord-utils/discord/schema";
 import type { CachedGuildMember } from "dfx-discord-utils/cache";
 import { Discord, Perms } from "dfx";
-import { Effect, HashSet, Layer, Option, ServiceMap } from "effect";
+import { Effect, HashSet, Layer, Option, Context } from "effect";
 import type { Permission, PermissionSet } from "@/schemas/permissions";
 import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
@@ -11,8 +11,8 @@ import { Unauthorized } from "@/schemas/middlewares/unauthorized";
 import { GuildConfigService } from "./guildConfig";
 import { discordLayer } from "./discord";
 
-type SheetAuthUserType = ServiceMap.Service.Shape<typeof SheetAuthUser>;
-type SheetAuthGuildUserType = ServiceMap.Service.Shape<typeof SheetAuthGuildUser>;
+type SheetAuthUserType = Context.Service.Shape<typeof SheetAuthUser>;
+type SheetAuthGuildUserType = Context.Service.Shape<typeof SheetAuthGuildUser>;
 
 type GuildPermissionScope = "member" | "monitor" | "manage";
 
@@ -94,7 +94,7 @@ const provideResolvedGuildUser = Effect.fn("AuthorizationService.provideResolved
   },
 );
 
-export class AuthorizationService extends ServiceMap.Service<AuthorizationService>()(
+export class AuthorizationService extends Context.Service<AuthorizationService>()(
   "AuthorizationService",
   {
     make: Effect.gen(function* () {

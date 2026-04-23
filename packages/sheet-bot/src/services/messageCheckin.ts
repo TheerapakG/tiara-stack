@@ -1,7 +1,7 @@
-import { Effect, Layer, ServiceMap } from "effect";
+import { Effect, Layer, Context } from "effect";
 import { SheetApisClient } from "./sheetApis";
 
-export class MessageCheckinService extends ServiceMap.Service<MessageCheckinService>()(
+export class MessageCheckinService extends Context.Service<MessageCheckinService>()(
   "MessageCheckinService",
   {
     make: Effect.gen(function* () {

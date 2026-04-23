@@ -81,7 +81,7 @@ const getPlayerFromMap = (
   if (Option.isSome(result)) {
     return result.value;
   }
-  return Array.make(PartialNamePlayer.makeUnsafe({ name }));
+  return Array.make(new PartialNamePlayer({ name }));
 };
 
 // Helper function to get monitor from map
@@ -93,7 +93,7 @@ const getMonitorFromMap = (
   if (Option.isSome(result)) {
     return result.value;
   }
-  return Array.make(PartialNameMonitor.makeUnsafe({ name }));
+  return Array.make(new PartialNameMonitor({ name }));
 };
 
 // Creates a PopulatedSchedulePlayer from raw player data and resolved player
@@ -101,7 +101,7 @@ const makePopulatedSchedulePlayer = (
   rawPlayer: RawSchedulePlayer,
   resolvedPlayers: Array.NonEmptyArray<Player | PartialNamePlayer>,
 ): PopulatedSchedulePlayer =>
-  PopulatedSchedulePlayer.makeUnsafe({
+  new PopulatedSchedulePlayer({
     player: Array.headNonEmpty(resolvedPlayers),
     enc: rawPlayer.enc,
   });
@@ -111,7 +111,7 @@ const makePopulatedScheduleMonitor = (
   monitorName: string,
   resolvedMonitors: Array.NonEmptyArray<Monitor | PartialNameMonitor>,
 ): PopulatedScheduleMonitor =>
-  PopulatedScheduleMonitor.makeUnsafe({
+  new PopulatedScheduleMonitor({
     monitor: Array.headNonEmpty(resolvedMonitors),
   });
 
@@ -165,7 +165,7 @@ export const toPopulatedSchedule = (
     ),
   );
 
-  return PopulatedSchedule.makeUnsafe({
+  return new PopulatedSchedule({
     channel: schedule.channel,
     day: schedule.day,
     visible: schedule.visible,

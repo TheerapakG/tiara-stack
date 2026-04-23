@@ -8,7 +8,7 @@ import type {
 } from "dfx/gateway";
 import { DiscordIxLive } from "dfx/gateway";
 import type { RateLimiter as RateLimiterService } from "dfx/RateLimit";
-import { Effect, Layer, ServiceMap } from "effect";
+import { Effect, Layer, Context } from "effect";
 import { HttpClientError } from "effect/unstable/http";
 
 export const DiscordLayer = DiscordIxLive.pipe(
@@ -16,7 +16,7 @@ export const DiscordLayer = DiscordIxLive.pipe(
   Layer.provide(NodeSocket.layerWebSocketConstructor),
 );
 
-export class DiscordApplication extends ServiceMap.Service<DiscordApplication>()(
+export class DiscordApplication extends Context.Service<DiscordApplication>()(
   "DiscordApplication",
   {
     make: Effect.gen(function* () {

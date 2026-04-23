@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option, ServiceMap } from "effect";
+import { Effect, Option, Context } from "effect";
 import {
   LEGACY_MESSAGE_ROOM_ORDER_ACCESS_ERROR,
   requireRoomOrderMonitorAccess,
@@ -14,7 +14,7 @@ type MessageRoomOrderAccessService = Pick<
   typeof MessageRoomOrderService.Service,
   "getMessageRoomOrder"
 >;
-type AuthorizationServiceApi = ServiceMap.Service.Shape<typeof AuthorizationService>;
+type AuthorizationServiceApi = Context.Service.Shape<typeof AuthorizationService>;
 
 const makeMessageRoomOrderRecord = (overrides?: {
   readonly guildId?: string | null;

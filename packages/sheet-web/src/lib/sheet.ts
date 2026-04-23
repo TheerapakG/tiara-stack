@@ -2,9 +2,8 @@ import { useAtomSuspense } from "@effect/atom-react";
 import { Atom, AsyncResult } from "effect/unstable/reactivity";
 import { Sheet, Google, SheetConfig } from "sheet-apis/schema";
 import { SheetApisClient } from "#/lib/sheetApis";
-import { Effect, Schema } from "effect";
+import { Schema } from "effect";
 import { QueryResultAppError, QueryResultParseError, SchemaError } from "typhoon-core/error";
-import { RequestError } from "#/lib/error";
 import { useMemo } from "react";
 
 // Private atom for fetching event config (includes startTime)
@@ -19,8 +18,7 @@ type EventConfigError =
   | QueryResultParseError
   | Google.GoogleSheetsError
   | Sheet.ParserFieldError
-  | SheetConfig.SheetConfigError
-  | RequestError;
+  | SheetConfig.SheetConfigError;
 
 const EventConfigErrorSchema: Schema.Codec<EventConfigError, any> = Schema.revealCodec(
   Schema.Union([
@@ -30,7 +28,6 @@ const EventConfigErrorSchema: Schema.Codec<EventConfigError, any> = Schema.revea
     Google.GoogleSheetsError,
     Sheet.ParserFieldError,
     SheetConfig.SheetConfigError,
-    RequestError,
   ]),
 );
 
@@ -46,15 +43,7 @@ const EventConfigAsyncResultSchema: Schema.Codec<
 
 // Serializable atom for event config
 export const eventConfigAtom = Atom.family((guildId: string) =>
-  Atom.make(
-    Effect.fnUntraced(function* (get) {
-      return yield* get.result(_eventConfigAtom(guildId)).pipe(
-        Effect.catchTags({
-          BadRequest: () => Effect.fail(RequestError.makeUnsafe({})),
-        }),
-      );
-    }),
-  ).pipe(
+  _eventConfigAtom(guildId).pipe(
     Atom.serializable({
       key: `sheet.getEventConfig.${guildId}`,
       schema: EventConfigAsyncResultSchema,

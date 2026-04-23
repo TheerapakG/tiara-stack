@@ -6,7 +6,7 @@ import {
   Option,
   Predicate,
   Random,
-  ServiceMap,
+  Context,
   pipe,
 } from "effect";
 import { makeArgumentError } from "typhoon-core/error";
@@ -26,8 +26,8 @@ import { ScheduleService } from "./schedule";
 import { SheetConfigService } from "./sheetConfig";
 import { diffFillParticipants, getScheduleFills, toFillParticipant } from "./fillMovement";
 
-type GuildConfigServiceApi = ServiceMap.Service.Shape<typeof GuildConfigService>;
-type SheetConfigServiceApi = ServiceMap.Service.Shape<typeof SheetConfigService>;
+type GuildConfigServiceApi = Context.Service.Shape<typeof GuildConfigService>;
+type SheetConfigServiceApi = Context.Service.Shape<typeof SheetConfigService>;
 type EventConfig = Effect.Success<ReturnType<SheetConfigServiceApi["getEventConfig"]>>;
 
 type Weighted<A> = { value: A; weight: number };
@@ -294,7 +294,7 @@ const renderParticipantGroup = (
 ) =>
   `${label}: ${participants.length > 0 ? participants.map(({ label }) => label).join(" ") : "None"}`;
 
-export class CheckinService extends ServiceMap.Service<CheckinService>()("CheckinService", {
+export class CheckinService extends Context.Service<CheckinService>()("CheckinService", {
   make: Effect.gen(function* () {
     const guildConfigService = yield* GuildConfigService;
     const scheduleService = yield* ScheduleService;
@@ -408,7 +408,7 @@ export class CheckinService extends ServiceMap.Service<CheckinService>()("Checki
         const lookupFailedMessage = getLookupFailedMessage(schedule);
         const monitorInfo = getMonitorInfo(schedule);
 
-        return CheckinGenerateResult.makeUnsafe({
+        return new CheckinGenerateResult({
           hour,
           runningChannelId: runningChannel.channelId,
           checkinChannelId: Option.getOrElse(

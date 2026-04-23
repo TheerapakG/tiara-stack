@@ -1,11 +1,11 @@
-import { Effect, Layer, Option, ServiceMap, Schema } from "effect";
+import { Effect, Layer, Option, Context, Schema } from "effect";
 import { mutators, queries } from "sheet-db-schema/zero";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 import { ZeroService } from "./zero";
 import { MessageSlot } from "@/schemas/messageSlot";
 
-export class MessageSlotService extends ServiceMap.Service<MessageSlotService>()(
+export class MessageSlotService extends Context.Service<MessageSlotService>()(
   "MessageSlotService",
   {
     make: Effect.gen(function* () {

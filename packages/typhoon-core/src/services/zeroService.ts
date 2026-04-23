@@ -1,4 +1,4 @@
-import { Effect, Match, pipe, Schema, ServiceMap, Types } from "effect";
+import { Effect, Match, pipe, Schema, Context, Types } from "effect";
 import type {
   Zero,
   Schema as ZeroSchema,
@@ -102,7 +102,7 @@ const parseMutatorResultDetails = (result: MutatorResultDetails) =>
  * ZeroService provides access to a Zero instance.
  */
 export const ZeroService = <S extends ZeroSchema, MD extends CustomMutatorDefs | undefined, C>() =>
-  ServiceMap.Service<ZeroServiceTag<S, MD, C>, ZeroService<S, MD, C>>()("ZeroService", {
+  Context.Service<ZeroServiceTag<S, MD, C>, ZeroService<S, MD, C>>()("ZeroService", {
     make: (zero: Zero<S, MD, C>) =>
       Effect.succeed({
         zero,

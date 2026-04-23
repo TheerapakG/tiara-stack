@@ -161,29 +161,30 @@ export function getSession(
     const token = yield* Deferred.await(tokenDeferred);
 
     return Option.fromNullishOr(session.data).pipe(
-      Option.map((data) =>
-        Session.makeUnsafe({
-          user: {
-            createdAt: DateTime.fromDateUnsafe(data.user.createdAt),
-            updatedAt: DateTime.fromDateUnsafe(data.user.updatedAt),
-            email: data.user.email,
-            emailVerified: data.user.emailVerified,
-            name: data.user.name,
-            image: data.user.image,
-          },
-          session: data.session
-            ? {
-                createdAt: DateTime.fromDateUnsafe(data.session.createdAt),
-                updatedAt: DateTime.fromDateUnsafe(data.session.updatedAt),
-                userId: data.session.userId,
-                expiresAt: DateTime.fromDateUnsafe(data.session.expiresAt),
-                token: data.session.token,
-                ipAddress: data.session.ipAddress,
-                userAgent: data.session.userAgent,
-              }
-            : undefined,
-          token: token ? Redacted.make(token) : undefined,
-        }),
+      Option.map(
+        (data) =>
+          new Session({
+            user: {
+              createdAt: DateTime.fromDateUnsafe(data.user.createdAt),
+              updatedAt: DateTime.fromDateUnsafe(data.user.updatedAt),
+              email: data.user.email,
+              emailVerified: data.user.emailVerified,
+              name: data.user.name,
+              image: data.user.image,
+            },
+            session: data.session
+              ? {
+                  createdAt: DateTime.fromDateUnsafe(data.session.createdAt),
+                  updatedAt: DateTime.fromDateUnsafe(data.session.updatedAt),
+                  userId: data.session.userId,
+                  expiresAt: DateTime.fromDateUnsafe(data.session.expiresAt),
+                  token: data.session.token,
+                  ipAddress: data.session.ipAddress,
+                  userAgent: data.session.userAgent,
+                }
+              : undefined,
+            token: token ? Redacted.make(token) : undefined,
+          }),
       ),
     );
   });
@@ -238,7 +239,7 @@ export function getAccount(
       );
     }
 
-    return Account.makeUnsafe({
+    return new Account({
       scopes: account.scopes,
       userId: account.userId,
       accountId: account.accountId,
@@ -357,7 +358,7 @@ export function createKubernetesOAuthSession(
     }
 
     const token = yield* Deferred.await(tokenDeferred);
-    return Session.makeUnsafe({
+    return new Session({
       user: {
         createdAt: DateTime.fromDateUnsafe(response.data.user.createdAt),
         updatedAt: DateTime.fromDateUnsafe(response.data.user.updatedAt),

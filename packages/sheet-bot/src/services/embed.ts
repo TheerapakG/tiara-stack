@@ -1,8 +1,8 @@
-import { DateTime, Effect, Layer, ServiceMap } from "effect";
+import { DateTime, Effect, Layer, Context } from "effect";
 import { EmbedBuilder } from "@discordjs/builders";
 import { DiscordApplication } from "dfx-discord-utils/discord";
 
-export class EmbedService extends ServiceMap.Service<EmbedService>()("EmbedService", {
+export class EmbedService extends Context.Service<EmbedService>()("EmbedService", {
   make: Effect.gen(function* () {
     const application = yield* DiscordApplication;
 

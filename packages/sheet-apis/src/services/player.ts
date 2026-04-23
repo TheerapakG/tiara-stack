@@ -1,11 +1,11 @@
-import { Effect, HashMap, Layer, Option, ServiceMap, pipe } from "effect";
+import { Effect, HashMap, Layer, Option, Context, pipe } from "effect";
 import { upperFirst } from "scule";
 import { SheetService } from "./sheet";
 import { Player, PartialIdPlayer, PartialNamePlayer, Team } from "@/schemas/sheet";
 import { ScopedCache } from "typhoon-core/utils";
 
 const attachPlayerId = (playerId: string) => (team: Team) =>
-  Team.makeUnsafe({
+  new Team({
     ...team,
     playerId: Option.some(playerId),
   });
@@ -15,7 +15,7 @@ type PlayerMaps = {
   idToPlayer: HashMap.HashMap<string, [Player, ...Player[]]>;
 };
 
-export class PlayerService extends ServiceMap.Service<PlayerService>()("PlayerService", {
+export class PlayerService extends Context.Service<PlayerService>()("PlayerService", {
   make: Effect.gen(function* () {
     const sheetService = yield* SheetService;
 
@@ -26,7 +26,7 @@ export class PlayerService extends ServiceMap.Service<PlayerService>()("PlayerSe
       for (const player of rawPlayers) {
         if (Option.isSome(player.id) && Option.isSome(player.name)) {
           players.push(
-            Player.makeUnsafe({
+            new Player({
               index: player.index,
               id: player.id.value,
               name: player.name.value,
@@ -79,9 +79,7 @@ export class PlayerService extends ServiceMap.Service<PlayerService>()("PlayerSe
               ({ players }) =>
                 players as [Player | PartialNamePlayer, ...(Player | PartialNamePlayer)[]],
             ),
-            Option.getOrElse(
-              () => [PartialNamePlayer.makeUnsafe({ name: normalizedName })] as const,
-            ),
+            Option.getOrElse(() => [new PartialNamePlayer({ name: normalizedName })] as const),
           );
         }),
       ).pipe(Effect.withSpan("PlayerService.getByNames"));
@@ -96,7 +94,7 @@ export class PlayerService extends ServiceMap.Service<PlayerService>()("PlayerSe
         ids.map((id) =>
           pipe(
             HashMap.get(idToPlayer, id),
-            Option.getOrElse(() => [PartialIdPlayer.makeUnsafe({ id })] as const),
+            Option.getOrElse(() => [new PartialIdPlayer({ id })] as const),
           ),
         ),
       ).pipe(Effect.withSpan("PlayerService.getByIds"));

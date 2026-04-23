@@ -1,7 +1,7 @@
 import { useAtomSuspense } from "@effect/atom-react";
 import { Atom, AsyncResult } from "effect/unstable/reactivity";
 import { SheetApisClient } from "#/lib/sheetApis";
-import { Duration, Effect, Schema } from "effect";
+import { Duration, Schema } from "effect";
 import {
   ArgumentError,
   QueryResultAppError,
@@ -9,18 +9,11 @@ import {
   SchemaError,
 } from "typhoon-core/error";
 import { Discord } from "sheet-apis/schema";
-import { RequestError } from "#/lib/error";
 
 export const _currentUserAtom = SheetApisClient.query("discord", "getCurrentUser", {});
 
 const DiscordRequestErrorSchema = Schema.revealCodec(
-  Schema.Union([
-    SchemaError,
-    QueryResultAppError,
-    QueryResultParseError,
-    ArgumentError,
-    RequestError,
-  ]),
+  Schema.Union([SchemaError, QueryResultAppError, QueryResultParseError, ArgumentError]),
 );
 
 const CurrentUserAsyncResultSchema = Schema.revealCodec(
@@ -37,15 +30,7 @@ const CurrentUserGuildsAsyncResultSchema = Schema.revealCodec(
   }),
 );
 
-export const currentUserAtom = Atom.make(
-  Effect.fnUntraced(function* (get) {
-    return yield* get.result(_currentUserAtom).pipe(
-      Effect.catchTags({
-        BadRequest: () => Effect.fail(RequestError.makeUnsafe({})),
-      }),
-    );
-  }),
-).pipe(
+export const currentUserAtom = _currentUserAtom.pipe(
   Atom.setIdleTTL(Duration.infinity),
   Atom.serializable({
     key: "discord.getCurrentUser",
@@ -64,15 +49,7 @@ export const useCurrentUser = () => {
 
 export const _currentUserGuildsAtom = SheetApisClient.query("discord", "getCurrentUserGuilds", {});
 
-export const currentUserGuildsAtom = Atom.make(
-  Effect.fnUntraced(function* (get) {
-    return yield* get.result(_currentUserGuildsAtom).pipe(
-      Effect.catchTags({
-        BadRequest: () => Effect.fail(RequestError.makeUnsafe({})),
-      }),
-    );
-  }),
-).pipe(
+export const currentUserGuildsAtom = _currentUserGuildsAtom.pipe(
   Atom.setIdleTTL(Duration.infinity),
   Atom.serializable({
     key: "discord.getCurrentUserGuilds",

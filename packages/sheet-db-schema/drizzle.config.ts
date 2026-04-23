@@ -4,7 +4,9 @@ import { defineConfig } from "drizzle-kit";
 
 const env = Schema.decodeUnknownSync(
   Schema.Struct({
-    POSTGRES_URL: Schema.optional(Schema.String).pipe(Schema.withDecodingDefault(() => "")),
+    POSTGRES_URL: Schema.optional(Schema.String).pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+    ),
   }),
 )(process.env);
 

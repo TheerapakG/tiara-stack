@@ -1,7 +1,7 @@
-import { Effect, Layer, ServiceMap } from "effect";
+import { Effect, Layer, Context } from "effect";
 import { SheetApisClient } from "./sheetApis";
 
-export class GuildConfigService extends ServiceMap.Service<GuildConfigService>()(
+export class GuildConfigService extends Context.Service<GuildConfigService>()(
   "GuildConfigService",
   {
     make: Effect.gen(function* () {

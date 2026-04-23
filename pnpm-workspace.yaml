@@ -3,12 +3,12 @@ packages:
 
 catalog:
   {
-    "@effect/atom-react": npm:@effect/atom-react@4.0.0-beta.43,
-    "@effect/vitest": npm:@effect/vitest@4.0.0-beta.43,
-    "@effect/platform-node": npm:@effect/platform-node@4.0.0-beta.43,
-    "@effect/opentelemetry": npm:@effect/opentelemetry@4.0.0-beta.43,
-    dfx: npm:dfx@1.0.11,
-    effect: npm:effect@4.0.0-beta.43,
+    "@effect/atom-react": npm:@effect/atom-react@4.0.0-beta.56,
+    "@effect/vitest": npm:@effect/vitest@4.0.0-beta.56,
+    "@effect/platform-node": npm:@effect/platform-node@4.0.0-beta.56,
+    "@effect/opentelemetry": npm:@effect/opentelemetry@4.0.0-beta.56,
+    dfx: npm:dfx@1.0.13,
+    effect: npm:effect@4.0.0-beta.56,
     vite: npm:@voidzero-dev/vite-plus-core@0.1.15,
     vitest: npm:@voidzero-dev/vite-plus-test@0.1.15,
     vite-plus: 0.1.15,

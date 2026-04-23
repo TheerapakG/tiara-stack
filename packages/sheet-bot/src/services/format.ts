@@ -10,7 +10,7 @@ import {
   Option,
   Order,
   pipe,
-  ServiceMap,
+  Context,
   String,
 } from "effect";
 import { ConverterService, HourWindow } from "./converter";
@@ -21,7 +21,7 @@ export class FormattedHourWindow extends Data.TaggedClass("FormattedHourWindow")
   end: number;
 }> {}
 
-export class FormatService extends ServiceMap.Service<FormatService>()("FormatService", {
+export class FormatService extends Context.Service<FormatService>()("FormatService", {
   make: Effect.gen(function* () {
     const converterService = yield* ConverterService;
 

@@ -30,7 +30,7 @@ import {
   Option,
   pipe,
   Schema,
-  ServiceMap,
+  Context,
   String,
 } from "effect";
 import { upperFirst } from "scule";
@@ -46,7 +46,7 @@ class ConfigField<Range> extends Data.TaggedClass("ConfigField")<{
 }> {}
 
 const makeParserFieldError = <Range>(configField: ConfigField<Range>) =>
-  ParserFieldError.makeUnsafe({
+  new ParserFieldError({
     message: `Error getting ${configField.field}, no config field found`,
     range: configField.range,
     field: configField.field,
@@ -96,15 +96,16 @@ const playerParser = ([userIds, userSheetNames]: sheets_v4.Schema$ValueRange[]) 
     ),
     Effect.map(Array.getSuccesses),
     Effect.map(
-      Array.map((config, index) =>
-        RawPlayer.makeUnsafe({
-          index,
-          id: config.id,
-          name: pipe(
-            config.name,
-            Option.map((name) => upperFirst(name)),
-          ),
-        }),
+      Array.map(
+        (config, index) =>
+          new RawPlayer({
+            index,
+            id: config.id,
+            name: pipe(
+              config.name,
+              Option.map((name) => upperFirst(name)),
+            ),
+          }),
       ),
     ),
     Effect.withSpan("playerParser"),
@@ -126,15 +127,16 @@ const monitorParser = ([monitorIds, monitorNames]: sheets_v4.Schema$ValueRange[]
     ),
     Effect.map(Array.getSuccesses),
     Effect.map(
-      Array.map((config, index) =>
-        RawMonitor.makeUnsafe({
-          index,
-          id: config.id,
-          name: pipe(
-            config.name,
-            Option.map((name) => upperFirst(name)),
-          ),
-        }),
+      Array.map(
+        (config, index) =>
+          new RawMonitor({
+            index,
+            id: config.id,
+            name: pipe(
+              config.name,
+              Option.map((name) => upperFirst(name)),
+            ),
+          }),
       ),
     ),
     Effect.withSpan("monitorParser"),
@@ -547,17 +549,18 @@ const teamParser = (
               lead: config.lead,
               backline: config.backline,
             }).pipe(
-              Option.map(({ playerName, teamName, lead, backline }) =>
-                Team.makeUnsafe({
-                  type: teamConfig.name,
-                  playerId: Option.none(),
-                  playerName: Option.some(playerName),
-                  teamName: Option.some(teamName),
-                  tags: [...config.tags],
-                  lead,
-                  backline,
-                  talent: config.talent,
-                }),
+              Option.map(
+                ({ playerName, teamName, lead, backline }) =>
+                  new Team({
+                    type: teamConfig.name,
+                    playerId: Option.none(),
+                    playerName: Option.some(playerName),
+                    teamName: Option.some(teamName),
+                    tags: [...config.tags],
+                    lead,
+                    backline,
+                    talent: config.talent,
+                  }),
               ),
             ),
           ),
@@ -849,11 +852,12 @@ const scheduleParser = (
                     Option.flatMap((fillCell) =>
                       pipe(
                         toCellOption(fillCell.formattedValue),
-                        Option.map((fill) =>
-                          RawSchedulePlayer.makeUnsafe({
-                            player: upperFirst(fill),
-                            enc: isFillEnc(scheduleConfig.encType, fillCell, fill),
-                          }),
+                        Option.map(
+                          (fill) =>
+                            new RawSchedulePlayer({
+                              player: upperFirst(fill),
+                              enc: isFillEnc(scheduleConfig.encType, fillCell, fill),
+                            }),
                         ),
                       ),
                     ),
@@ -862,21 +866,23 @@ const scheduleParser = (
                 overfills: pipe(
                   overfills,
                   Option.getOrElse(() => []),
-                  Array.map((overfill) =>
-                    RawSchedulePlayer.makeUnsafe({
-                      player: upperFirst(overfill),
-                      enc: scheduleConfig.encType === "regex" ? isRegexEnc(overfill) : false,
-                    }),
+                  Array.map(
+                    (overfill) =>
+                      new RawSchedulePlayer({
+                        player: upperFirst(overfill),
+                        enc: scheduleConfig.encType === "regex" ? isRegexEnc(overfill) : false,
+                      }),
                   ),
                 ),
                 standbys: pipe(
                   standbys,
                   Option.getOrElse(() => []),
-                  Array.map((standby) =>
-                    RawSchedulePlayer.makeUnsafe({
-                      player: upperFirst(standby),
-                      enc: scheduleConfig.encType === "regex" ? isRegexEnc(standby) : false,
-                    }),
+                  Array.map(
+                    (standby) =>
+                      new RawSchedulePlayer({
+                        player: upperFirst(standby),
+                        enc: scheduleConfig.encType === "regex" ? isRegexEnc(standby) : false,
+                      }),
                   ),
                 ),
                 breakHour,
@@ -946,7 +952,7 @@ const filterSchedulesForFiller = (schedules: Array<BreakSchedule | Schedule>) =>
           Schedule: (s) =>
             s.visible
               ? s // Keep visible schedules as-is
-              : Schedule.makeUnsafe({
+              : new Schedule({
                   channel: s.channel,
                   day: s.day,
                   visible: s.visible,
@@ -963,7 +969,7 @@ const filterSchedulesForFiller = (schedules: Array<BreakSchedule | Schedule>) =>
     ),
   );
 
-export class SheetService extends ServiceMap.Service<SheetService>()("SheetService", {
+export class SheetService extends Context.Service<SheetService>()("SheetService", {
   make: Effect.gen(function* () {
     const sheet = yield* GoogleSheets;
     const sheetConfigService = yield* SheetConfigService;

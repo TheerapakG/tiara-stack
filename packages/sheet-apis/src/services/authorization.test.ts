@@ -4,7 +4,7 @@ import { RolesApiCacheView } from "dfx-discord-utils/discord/cache/roles";
 import { CacheNotFoundError } from "dfx-discord-utils/discord/schema";
 import type { CachedGuildMember } from "dfx-discord-utils/cache";
 import { Discord } from "dfx";
-import { Cause, Effect, Exit, Redacted, ServiceMap } from "effect";
+import { Cause, Effect, Exit, Redacted, Context } from "effect";
 import {
   AuthorizationService,
   hasDiscordAccountPermission,
@@ -14,10 +14,10 @@ import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
 import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
 import { GuildConfigService } from "@/services";
 
-type MembersApiCacheViewService = ServiceMap.Service.Shape<typeof MembersApiCacheView>;
-type RolesApiCacheViewService = ServiceMap.Service.Shape<typeof RolesApiCacheView>;
-type GuildConfigServiceApi = ServiceMap.Service.Shape<typeof GuildConfigService>;
-type AuthorizationServiceApi = ServiceMap.Service.Shape<typeof AuthorizationService>;
+type MembersApiCacheViewService = Context.Service.Shape<typeof MembersApiCacheView>;
+type RolesApiCacheViewService = Context.Service.Shape<typeof RolesApiCacheView>;
+type GuildConfigServiceApi = Context.Service.Shape<typeof GuildConfigService>;
+type AuthorizationServiceApi = Context.Service.Shape<typeof AuthorizationService>;
 
 type TestPermission =
   | "bot"

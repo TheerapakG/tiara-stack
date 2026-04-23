@@ -7,11 +7,12 @@ export const deriveScheduleHourWindow = (
 ): Option.Option<ScheduleHourWindow> =>
   pipe(
     hour,
-    Option.map((value) =>
-      ScheduleHourWindow.makeUnsafe({
-        start: pipe(startTime, DateTime.addDuration(Duration.hours(value - 1))),
-        end: pipe(startTime, DateTime.addDuration(Duration.hours(value))),
-      }),
+    Option.map(
+      (value) =>
+        new ScheduleHourWindow({
+          start: pipe(startTime, DateTime.addDuration(Duration.hours(value - 1))),
+          end: pipe(startTime, DateTime.addDuration(Duration.hours(value))),
+        }),
     ),
   );
 
@@ -22,7 +23,7 @@ export const withScheduleHourWindow = (
   Match.value(schedule).pipe(
     Match.tagsExhaustive({
       BreakSchedule: (schedule) =>
-        BreakSchedule.makeUnsafe({
+        new BreakSchedule({
           channel: schedule.channel,
           day: schedule.day,
           visible: schedule.visible,
@@ -30,7 +31,7 @@ export const withScheduleHourWindow = (
           hourWindow: deriveScheduleHourWindow(startTime, schedule.hour),
         }),
       Schedule: (schedule) =>
-        Schedule.makeUnsafe({
+        new Schedule({
           channel: schedule.channel,
           day: schedule.day,
           visible: schedule.visible,

@@ -1,4 +1,4 @@
-import { Effect, HashMap, Layer, Option, ServiceMap, pipe } from "effect";
+import { Effect, HashMap, Layer, Option, Context, pipe } from "effect";
 import { SheetService } from "./sheet";
 import { Monitor, PartialIdMonitor, PartialNameMonitor } from "@/schemas/sheet";
 import { upperFirst } from "scule";
@@ -9,7 +9,7 @@ type MonitorMaps = {
   nameToMonitor: HashMap.HashMap<string, { name: string; monitors: ReadonlyArray<Monitor> }>;
 };
 
-export class MonitorService extends ServiceMap.Service<MonitorService>()("MonitorService", {
+export class MonitorService extends Context.Service<MonitorService>()("MonitorService", {
   make: Effect.gen(function* () {
     const sheetService = yield* SheetService;
 
@@ -20,7 +20,7 @@ export class MonitorService extends ServiceMap.Service<MonitorService>()("Monito
       for (const monitor of rawMonitors) {
         if (Option.isSome(monitor.id) && Option.isSome(monitor.name)) {
           monitors.push(
-            Monitor.makeUnsafe({
+            new Monitor({
               index: monitor.index,
               id: monitor.id.value,
               name: monitor.name.value,
@@ -68,7 +68,7 @@ export class MonitorService extends ServiceMap.Service<MonitorService>()("Monito
         ids.map((id) =>
           pipe(
             HashMap.get(idToMonitor, id),
-            Option.getOrElse(() => [PartialIdMonitor.makeUnsafe({ id })] as const),
+            Option.getOrElse(() => [new PartialIdMonitor({ id })] as const),
           ),
         ),
       ).pipe(Effect.withSpan("MonitorService.getByIds"));
@@ -85,9 +85,7 @@ export class MonitorService extends ServiceMap.Service<MonitorService>()("Monito
           return pipe(
             HashMap.get(nameToMonitor, normalizedName),
             Option.map((entry) => entry.monitors),
-            Option.getOrElse(
-              () => [PartialNameMonitor.makeUnsafe({ name: normalizedName })] as const,
-            ),
+            Option.getOrElse(() => [new PartialNameMonitor({ name: normalizedName })] as const),
           );
         }),
       ).pipe(Effect.withSpan("MonitorService.getByNames"));

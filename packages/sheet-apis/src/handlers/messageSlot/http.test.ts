@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option, ServiceMap } from "effect";
+import { Effect, Option, Context } from "effect";
 import {
   LEGACY_MESSAGE_SLOT_ACCESS_ERROR,
   requireMessageSlotReadAccess,
@@ -11,7 +11,7 @@ import { AuthorizationService, MessageSlotService } from "@/services";
 import { getFailure, liveGuildServices, withUser } from "@/test-utils/guildTestHelpers";
 
 type MessageSlotAccessService = Pick<typeof MessageSlotService.Service, "getMessageSlotData">;
-type AuthorizationServiceApi = ServiceMap.Service.Shape<typeof AuthorizationService>;
+type AuthorizationServiceApi = Context.Service.Shape<typeof AuthorizationService>;
 
 const makeMessageSlotRecord = (overrides?: {
   readonly guildId?: string | null;

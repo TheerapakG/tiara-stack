@@ -1,9 +1,9 @@
-import { Effect, Layer, ServiceMap } from "effect";
+import { Effect, Layer, Context } from "effect";
 import { createStorage, CreateStorageOptions, prefixStorage, type Storage } from "unstorage";
 import { default as memoryDriver } from "unstorage/drivers/memory";
 import { default as redisDriver, RedisOptions } from "unstorage/drivers/redis";
 
-export class Unstorage extends ServiceMap.Service<Unstorage, Storage>()("Unstorage") {
+export class Unstorage extends Context.Service<Unstorage, Storage>()("Unstorage") {
   static layer = (storage: Storage) => Layer.succeed(Unstorage, storage);
 
   static createLayer = (opts?: CreateStorageOptions) => Unstorage.layer(createStorage(opts));
@@ -18,10 +18,10 @@ export class Unstorage extends ServiceMap.Service<Unstorage, Storage>()("Unstora
   });
 
   static prefixedLayer = (prefix: string) =>
-    Layer.effectServices(
+    Layer.effectContext(
       Effect.gen(function* () {
         const storage = yield* Unstorage.prefixed(prefix);
-        return ServiceMap.make(Unstorage, storage);
+        return Context.make(Unstorage, storage);
       }),
     );
 }

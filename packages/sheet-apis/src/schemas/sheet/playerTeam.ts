@@ -24,7 +24,7 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
 
   static addTags(tags: HashSet.HashSet<string>) {
     return (playerTeam: PlayerTeam) =>
-      PlayerTeam.makeUnsafe({
+      new PlayerTeam({
         type: playerTeam.type,
         playerId: playerTeam.playerId,
         playerName: playerTeam.playerName,
@@ -42,7 +42,7 @@ export class PlayerTeam extends Schema.TaggedClass<PlayerTeam>()("PlayerTeam", {
     if (Option.isNone(team.teamName) || Option.isNone(talent)) return Option.none();
 
     return Option.some(
-      PlayerTeam.makeUnsafe({
+      new PlayerTeam({
         type: team.type,
         playerId: team.playerId,
         playerName: team.playerName,

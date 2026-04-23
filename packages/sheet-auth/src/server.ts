@@ -20,7 +20,7 @@ import {
   Logger,
   Option,
   Redacted,
-  ServiceMap,
+  Context,
 } from "effect";
 import { getRequestListener } from "@hono/node-server";
 import { cors } from "hono/cors";
@@ -66,7 +66,7 @@ type HandlerParams = {
 interface AuthWithOAuthProvider extends AuthWithCleanup {}
 
 // Auth service tag to share auth instance between route groups
-class AuthService extends ServiceMap.Service<AuthService, AuthWithOAuthProvider>()("AuthService") {}
+class AuthService extends Context.Service<AuthService, AuthWithOAuthProvider>()("AuthService") {}
 
 // Helper to create a forwarder from a web handler
 const createForwarder =

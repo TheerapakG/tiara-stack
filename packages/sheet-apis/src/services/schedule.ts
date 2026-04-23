@@ -1,4 +1,4 @@
-import { Array, Effect, HashMap, Layer, Match, Option, Predicate, ServiceMap, pipe } from "effect";
+import { Array, Effect, HashMap, Layer, Match, Option, Predicate, Context, pipe } from "effect";
 import { SheetService } from "./sheet";
 import { PlayerService } from "./player";
 import { MonitorService } from "./monitor";
@@ -20,7 +20,7 @@ import {
 } from "@/schemas/sheet";
 import { upperFirst } from "scule";
 
-type SheetConfigServiceApi = ServiceMap.Service.Shape<typeof SheetConfigService>;
+type SheetConfigServiceApi = Context.Service.Shape<typeof SheetConfigService>;
 type EventConfig = Effect.Success<ReturnType<SheetConfigServiceApi["getEventConfig"]>>;
 
 const isPlayer = (player: Player | PartialNamePlayer): player is Player =>
@@ -34,14 +34,14 @@ const populateSchedule = (
   monitorMap: Map<string, [Monitor | PartialNameMonitor, ...(Monitor | PartialNameMonitor)[]]>,
 ): PopulatedSchedule => {
   const resolvePlayers = (name: string) =>
-    playerMap.get(upperFirst(name)) ?? [PartialNamePlayer.makeUnsafe({ name: upperFirst(name) })];
+    playerMap.get(upperFirst(name)) ?? [new PartialNamePlayer({ name: upperFirst(name) })];
 
   const fills = Array.makeBy(5, (index) =>
     pipe(
       schedule.fills[index],
       Option.flatMap((rawPlayer) =>
         Option.some(
-          PopulatedSchedulePlayer.makeUnsafe({
+          new PopulatedSchedulePlayer({
             player: resolvePlayers(rawPlayer.player)[0],
             enc: rawPlayer.enc,
           }),
@@ -50,25 +50,28 @@ const populateSchedule = (
     ),
   );
 
-  const overfills = schedule.overfills.map((rawPlayer) =>
-    PopulatedSchedulePlayer.makeUnsafe({
-      player: resolvePlayers(rawPlayer.player)[0],
-      enc: rawPlayer.enc,
-    }),
+  const overfills = schedule.overfills.map(
+    (rawPlayer) =>
+      new PopulatedSchedulePlayer({
+        player: resolvePlayers(rawPlayer.player)[0],
+        enc: rawPlayer.enc,
+      }),
   );
 
-  const standbys = schedule.standbys.map((rawPlayer) =>
-    PopulatedSchedulePlayer.makeUnsafe({
-      player: resolvePlayers(rawPlayer.player)[0],
-      enc: rawPlayer.enc,
-    }),
+  const standbys = schedule.standbys.map(
+    (rawPlayer) =>
+      new PopulatedSchedulePlayer({
+        player: resolvePlayers(rawPlayer.player)[0],
+        enc: rawPlayer.enc,
+      }),
   );
 
-  const runners = schedule.runners.map((rawPlayer) =>
-    PopulatedSchedulePlayer.makeUnsafe({
-      player: resolvePlayers(rawPlayer.player)[0],
-      enc: rawPlayer.enc,
-    }),
+  const runners = schedule.runners.map(
+    (rawPlayer) =>
+      new PopulatedSchedulePlayer({
+        player: resolvePlayers(rawPlayer.player)[0],
+        enc: rawPlayer.enc,
+      }),
   );
 
   const monitor = pipe(
@@ -76,15 +79,15 @@ const populateSchedule = (
     Option.map((name) => {
       const resolvedName = String(name);
       const monitors = monitorMap.get(upperFirst(resolvedName)) ?? [
-        PartialNameMonitor.makeUnsafe({ name: upperFirst(resolvedName) }),
+        new PartialNameMonitor({ name: upperFirst(resolvedName) }),
       ];
-      return PopulatedScheduleMonitor.makeUnsafe({
+      return new PopulatedScheduleMonitor({
         monitor: monitors[0],
       });
     }),
   );
 
-  return PopulatedSchedule.makeUnsafe({
+  return new PopulatedSchedule({
     channel: schedule.channel,
     day: schedule.day,
     visible: schedule.visible,
@@ -141,7 +144,7 @@ const populateScheduleResult = (
   Match.value(schedule).pipe(
     Match.tagsExhaustive({
       BreakSchedule: (schedule) =>
-        PopulatedBreakSchedule.makeUnsafe({
+        new PopulatedBreakSchedule({
           channel: schedule.channel,
           day: schedule.day,
           visible: schedule.visible,
@@ -224,7 +227,7 @@ export const summarizeDayPlayerSchedule = (
   };
 };
 
-export class ScheduleService extends ServiceMap.Service<ScheduleService>()("ScheduleService", {
+export class ScheduleService extends Context.Service<ScheduleService>()("ScheduleService", {
   make: Effect.gen(function* () {
     const sheetService = yield* SheetService;
     const playerService = yield* PlayerService;

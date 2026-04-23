@@ -19,7 +19,7 @@ import {
   pipe,
   Schema,
   SchemaGetter,
-  ServiceMap,
+  Context,
   String,
   Layer,
   Record,
@@ -73,7 +73,7 @@ const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
     ]),
   ).pipe(
     Effect.map(Array.getSuccesses),
-    Effect.map(Array.map(([config]) => ScheduleConfig.makeUnsafe(config))),
+    Effect.map(Array.map(([config]) => new ScheduleConfig(config))),
     Effect.withSpan("scheduleConfigParser"),
   );
 
@@ -96,7 +96,7 @@ const parseTeamIsvConfig = (
 
             return leadRange && backlineRange && talentRange
               ? Option.some(
-                  TeamIsvSplitConfig.makeUnsafe({
+                  new TeamIsvSplitConfig({
                     leadRange,
                     backlineRange,
                     talentRange,
@@ -109,7 +109,7 @@ const parseTeamIsvConfig = (
 
       return pipe(
         isvRanges,
-        Option.map((value) => TeamIsvCombinedConfig.makeUnsafe({ isvRange: value })),
+        Option.map((value) => new TeamIsvCombinedConfig({ isvRange: value })),
       );
     },
   });
@@ -123,7 +123,7 @@ const parseTeamTagsConfig = (
     onSome: (type) => {
       if (type === "constants") {
         return Option.some(
-          TeamTagsConstantsConfig.makeUnsafe({
+          new TeamTagsConstantsConfig({
             tags: pipe(
               tags,
               Option.getOrElse(() => ""),
@@ -137,7 +137,7 @@ const parseTeamTagsConfig = (
 
       return pipe(
         tags,
-        Option.map((value) => TeamTagsRangesConfig.makeUnsafe({ tagsRange: value })),
+        Option.map((value) => new TeamTagsRangesConfig({ tagsRange: value })),
       );
     },
   });
@@ -178,7 +178,7 @@ const teamConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
     Effect.map(
       Array.map(
         ([{ name, sheet, playerNameRange, teamNameRange, isvType, isvRanges, tagsType, tags }]) =>
-          TeamConfig.makeUnsafe({
+          new TeamConfig({
             name,
             sheet,
             playerNameRange,
@@ -215,15 +215,16 @@ const runnerConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
   ).pipe(
     Effect.map(Array.getSuccesses),
     Effect.map(
-      Array.map(([{ name, hours }]) =>
-        RunnerConfig.makeUnsafe({
-          name,
-          hours: pipe(
-            hours,
-            Option.getOrElse(() => []),
-            Array.map(hourRangeParser),
-          ),
-        }),
+      Array.map(
+        ([{ name, hours }]) =>
+          new RunnerConfig({
+            name,
+            hours: pipe(
+              hours,
+              Option.getOrElse(() => []),
+              Array.map(hourRangeParser),
+            ),
+          }),
       ),
     ),
     Effect.withSpan("runnerConfigParser"),
@@ -231,7 +232,7 @@ const runnerConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
 
 let serviceInstanceCount = 0;
 
-export class SheetConfigService extends ServiceMap.Service<SheetConfigService>()(
+export class SheetConfigService extends Context.Service<SheetConfigService>()(
   "SheetConfigService",
   {
     make: Effect.gen(function* () {

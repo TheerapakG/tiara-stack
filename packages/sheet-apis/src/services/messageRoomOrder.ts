@@ -1,4 +1,4 @@
-import { Array, Effect, Layer, Option, ServiceMap, pipe, Schema } from "effect";
+import { Array, Effect, Layer, Option, Context, pipe, Schema } from "effect";
 import { mutators, queries } from "sheet-db-schema/zero";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
@@ -9,7 +9,7 @@ import {
   MessageRoomOrderRange,
 } from "@/schemas/messageRoomOrder";
 
-export class MessageRoomOrderService extends ServiceMap.Service<MessageRoomOrderService>()(
+export class MessageRoomOrderService extends Context.Service<MessageRoomOrderService>()(
   "MessageRoomOrderService",
   {
     make: Effect.gen(function* () {
@@ -218,7 +218,7 @@ export class MessageRoomOrderService extends ServiceMap.Service<MessageRoomOrder
                 }),
               ),
             );
-            return Option.some(MessageRoomOrderRange.makeUnsafe({ minRank, maxRank }));
+            return Option.some(new MessageRoomOrderRange({ minRank, maxRank }));
           },
         });
       });
@@ -249,18 +249,19 @@ export class MessageRoomOrderService extends ServiceMap.Service<MessageRoomOrder
           Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)),
         )(result);
 
-        return updatedEntries.map((entry) =>
-          MessageRoomOrderEntry.makeUnsafe({
-            messageId,
-            rank: entry.rank,
-            position: entry.position,
-            team: entry.team,
-            tags: entry.tags,
-            effectValue: entry.effectValue,
-            createdAt: entry.createdAt,
-            updatedAt: entry.updatedAt,
-            deletedAt: entry.deletedAt,
-          }),
+        return updatedEntries.map(
+          (entry) =>
+            new MessageRoomOrderEntry({
+              messageId,
+              rank: entry.rank,
+              position: entry.position,
+              team: entry.team,
+              tags: entry.tags,
+              effectValue: entry.effectValue,
+              createdAt: entry.createdAt,
+              updatedAt: entry.updatedAt,
+              deletedAt: entry.deletedAt,
+            }),
         );
       });
 
@@ -284,18 +285,19 @@ export class MessageRoomOrderService extends ServiceMap.Service<MessageRoomOrder
           Schema.Array(DefaultTaggedClass(MessageRoomOrderEntry)),
         )(result);
 
-        return updatedEntries.map((entry) =>
-          MessageRoomOrderEntry.makeUnsafe({
-            messageId,
-            rank: entry.rank,
-            position: entry.position,
-            team: entry.team,
-            tags: entry.tags,
-            effectValue: entry.effectValue,
-            createdAt: entry.createdAt,
-            updatedAt: entry.updatedAt,
-            deletedAt: entry.deletedAt,
-          }),
+        return updatedEntries.map(
+          (entry) =>
+            new MessageRoomOrderEntry({
+              messageId,
+              rank: entry.rank,
+              position: entry.position,
+              team: entry.team,
+              tags: entry.tags,
+              effectValue: entry.effectValue,
+              createdAt: entry.createdAt,
+              updatedAt: entry.updatedAt,
+              deletedAt: entry.deletedAt,
+            }),
         );
       });
 

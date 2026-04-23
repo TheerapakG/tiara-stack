@@ -1,4 +1,4 @@
-import { Data, DateTime, Duration, Effect, Layer, Number, ServiceMap, pipe } from "effect";
+import { Data, DateTime, Duration, Effect, Layer, Number, Context, pipe } from "effect";
 import { SheetService } from "./sheet";
 
 export class HourWindow extends Data.TaggedClass("HourWindow")<{
@@ -6,7 +6,7 @@ export class HourWindow extends Data.TaggedClass("HourWindow")<{
   end: DateTime.DateTime;
 }> {}
 
-export class ConverterService extends ServiceMap.Service<ConverterService>()("ConverterService", {
+export class ConverterService extends Context.Service<ConverterService>()("ConverterService", {
   make: Effect.gen(function* () {
     const sheet = yield* SheetService;
 

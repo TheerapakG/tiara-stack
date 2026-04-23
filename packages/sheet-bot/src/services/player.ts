@@ -1,7 +1,7 @@
-import { Effect, Layer, ServiceMap } from "effect";
+import { Effect, Layer, Context } from "effect";
 import { SheetApisClient } from "./sheetApis";
 
-export class PlayerService extends ServiceMap.Service<PlayerService>()("PlayerService", {
+export class PlayerService extends Context.Service<PlayerService>()("PlayerService", {
   make: Effect.gen(function* () {
     const sheetApisClient = yield* SheetApisClient;
 

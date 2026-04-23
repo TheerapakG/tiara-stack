@@ -96,14 +96,16 @@ export const makeSheetAuthTokenAuthorization = Effect.fn("makeSheetAuthTokenAuth
       getOwnerId: () => Effect.Effect<Option.Option<string>, never, never>;
     },
   ) {
-    const authorizationCache = yield* Cache.makeWith({
-      capacity: Infinity,
-      lookup: (token: Redacted.Redacted<string>) => resolveCachedAuthorization(authClient, token),
-      timeToLive: Exit.match({
-        onFailure: () => FAILURE_TTL,
-        onSuccess: () => SUCCESS_TTL,
-      }),
-    });
+    const authorizationCache = yield* Cache.makeWith(
+      (token: Redacted.Redacted<string>) => resolveCachedAuthorization(authClient, token),
+      {
+        capacity: Infinity,
+        timeToLive: Exit.match({
+          onFailure: () => FAILURE_TTL,
+          onSuccess: () => SUCCESS_TTL,
+        }),
+      },
+    );
 
     return SheetAuthTokenAuthorization.of({
       sheetAuthToken: Effect.fn("SheetAuthTokenAuthorization.sheetAuthToken")(function* (

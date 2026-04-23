@@ -1,8 +1,8 @@
-import { Effect, Layer, ServiceMap } from "effect";
+import { Effect, Layer, Context } from "effect";
 import { DiscordREST } from "dfx";
 import { discordGatewayLayer } from "../discord/gateway";
 
-export class GuildMemberUtils extends ServiceMap.Service<GuildMemberUtils>()("GuildMemberUtils", {
+export class GuildMemberUtils extends Context.Service<GuildMemberUtils>()("GuildMemberUtils", {
   make: Effect.gen(function* () {
     const discordREST = yield* DiscordREST;
     return {

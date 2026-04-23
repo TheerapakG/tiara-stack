@@ -9,7 +9,7 @@ import {
   HashSet,
   Option,
   Layer,
-  ServiceMap,
+  Context,
   String,
   pipe,
 } from "effect";
@@ -39,7 +39,7 @@ const filterFixedTeams = (playerTeams: PlayerTeam[]) =>
   );
 
 const baseRoom = (teams: ReadonlyArray<PlayerTeam>) => {
-  return Room.makeUnsafe({
+  return new Room({
     enced: false,
     tiererEnced: false,
     healed: pipe(
@@ -111,7 +111,7 @@ const applyRoomEncAndDoormat = (roomTeam: Room) => {
       : t;
   });
 
-  return Room.makeUnsafe({
+  return new Room({
     enced: true,
     tiererEnced: tiererOverride,
     healed: roomTeam.healed,
@@ -239,7 +239,7 @@ const filterBestRooms = (rooms: Chunk.Chunk<Room>) =>
     return Chunk.fromIterable(bestRooms);
   }).pipe(Effect.withSpan("filterBestRooms"));
 
-export class CalcService extends ServiceMap.Service<CalcService>()("CalcService", {
+export class CalcService extends Context.Service<CalcService>()("CalcService", {
   make: Effect.succeed({
     calc: Effect.fn("CalcService.calc")(function* (
       config: CalcConfig,

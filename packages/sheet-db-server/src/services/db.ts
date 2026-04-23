@@ -1,12 +1,12 @@
 import { zeroDrizzle } from "@rocicorp/zero/server/adapters/drizzle";
 import { drizzle } from "drizzle-orm/postgres-js";
-import { Cause, Effect, Layer, pipe, ServiceMap } from "effect";
+import { Cause, Effect, Layer, pipe, Context } from "effect";
 import postgres from "postgres";
 import * as schema from "sheet-db-schema";
 import { schema as zeroSchema } from "sheet-db-schema/zero";
 import { config } from "@/config";
 
-export class DBService extends ServiceMap.Service<DBService>()("DBService", {
+export class DBService extends Context.Service<DBService>()("DBService", {
   make: Effect.gen(function* () {
     yield* Effect.log("creating db client");
     const postgresUrl = yield* config.postgresUrl;

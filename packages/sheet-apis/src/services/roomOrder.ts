@@ -1,14 +1,4 @@
-import {
-  Chunk,
-  DateTime,
-  Duration,
-  Effect,
-  Layer,
-  Option,
-  Predicate,
-  ServiceMap,
-  pipe,
-} from "effect";
+import { Chunk, DateTime, Duration, Effect, Layer, Option, Predicate, Context, pipe } from "effect";
 import { makeArgumentError } from "typhoon-core/error";
 import { GuildConfigService } from "./guildConfig";
 import { ScheduleService } from "./schedule";
@@ -30,8 +20,8 @@ import {
   type PopulatedScheduleResult,
 } from "@/schemas/sheet";
 
-type GuildConfigServiceApi = ServiceMap.Service.Shape<typeof GuildConfigService>;
-type SheetServiceApi = ServiceMap.Service.Shape<typeof SheetService>;
+type GuildConfigServiceApi = Context.Service.Shape<typeof GuildConfigService>;
+type SheetServiceApi = Context.Service.Shape<typeof SheetService>;
 
 const isPlayer = (player: PopulatedSchedulePlayer["player"]): player is Player =>
   Predicate.isTagged("Player")(player);
@@ -132,7 +122,7 @@ const deriveHourWindow = (sheetService: SheetServiceApi, sheetId: string, hour: 
   );
 
 const toTeamWithPlayer = (player: Player, team: Team) =>
-  Team.makeUnsafe({
+  new Team({
     ...team,
     playerId: Option.some(player.id),
   });
@@ -171,7 +161,7 @@ const buildContent = (
   ].join("\n");
 };
 
-export class RoomOrderService extends ServiceMap.Service<RoomOrderService>()("RoomOrderService", {
+export class RoomOrderService extends Context.Service<RoomOrderService>()("RoomOrderService", {
   make: Effect.gen(function* () {
     const calcService = yield* CalcService;
     const guildConfigService = yield* GuildConfigService;
@@ -230,18 +220,19 @@ export class RoomOrderService extends ServiceMap.Service<RoomOrderService>()("Ro
           return allTeams
             .filter((team) => Option.exists(team.playerName, (name) => name === player.name))
             .map((team) => toTeamWithPlayer(player, team))
-            .map((team) =>
-              Team.makeUnsafe({
-                ...team,
-                tags: pipe(
-                  team.tags,
-                  (tags) =>
-                    tags.includes("tierer_hint") && runnerNames.includes(player.name)
-                      ? [...tags, "tierer"]
-                      : [...tags],
-                  (tags) => (fill.enc ? [...tags, "encable"] : tags),
-                ),
-              }),
+            .map(
+              (team) =>
+                new Team({
+                  ...team,
+                  tags: pipe(
+                    team.tags,
+                    (tags) =>
+                      tags.includes("tierer_hint") && runnerNames.includes(player.name)
+                        ? [...tags, "tierer"]
+                        : [...tags],
+                    (tags) => (fill.enc ? [...tags, "encable"] : tags),
+                  ),
+                }),
             )
             .flatMap((team) => Option.toArray(PlayerTeam.fromTeam(false, team)));
         });
@@ -259,15 +250,16 @@ export class RoomOrderService extends ServiceMap.Service<RoomOrderService>()("Ro
         }
 
         const entries = roomOrders.flatMap((room: any, rank) =>
-          Chunk.toArray(room.teams).map((entry: any, position) =>
-            GeneratedRoomOrderEntry.makeUnsafe({
-              rank,
-              position,
-              hour,
-              team: entry.teamName,
-              tags: Array.from(entry.tags),
-              effectValue: PlayerTeam.getEffectValue(entry),
-            }),
+          Chunk.toArray(room.teams).map(
+            (entry: any, position) =>
+              new GeneratedRoomOrderEntry({
+                rank,
+                position,
+                hour,
+                team: entry.teamName,
+                tags: Array.from(entry.tags),
+                effectValue: PlayerTeam.getEffectValue(entry),
+              }),
           ),
         );
 
@@ -277,7 +269,7 @@ export class RoomOrderService extends ServiceMap.Service<RoomOrderService>()("Ro
             ? currentSchedule.hourWindow.value
             : yield* deriveHourWindow(sheetService, sheetId, hour);
 
-        return RoomOrderGenerateResult.makeUnsafe({
+        return new RoomOrderGenerateResult({
           content: buildContent(
             hour,
             start,
@@ -287,7 +279,7 @@ export class RoomOrderService extends ServiceMap.Service<RoomOrderService>()("Ro
             fills.map(toFillParticipant),
             firstRankEntries,
           ),
-          range: MessageRoomOrderRange.makeUnsafe({
+          range: new MessageRoomOrderRange({
             minRank: 0,
             maxRank: roomOrders.length - 1,
           }),
