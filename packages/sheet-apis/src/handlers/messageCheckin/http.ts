@@ -178,7 +178,7 @@ const requireMessageCheckinParticipantMutationPermission = Effect.fn(
 ) {
   const user = yield* SheetAuthUser;
 
-  if (HashSet.has(user.permissions, "bot") || HashSet.has(user.permissions, "app_owner")) {
+  if (HashSet.has(user.permissions, "service") || HashSet.has(user.permissions, "app_owner")) {
     return yield* getRequiredMessageCheckinGuildId(authContext).pipe(Effect.asVoid);
   }
 

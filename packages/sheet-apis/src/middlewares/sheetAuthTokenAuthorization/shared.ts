@@ -44,7 +44,7 @@ const resolveCachedAuthorization = Effect.fn("resolveCachedAuthorization")(funct
   }).pipe(Effect.mapError((error) => makeUnauthorized(error.message, error.cause)));
 
   const discardedPermissions = permissions.permissions.filter(
-    (permission: string) => permission !== "bot",
+    (permission: string) => permission !== "service",
   );
   if (discardedPermissions.length > 0) {
     yield* Effect.logWarning(
@@ -55,8 +55,8 @@ const resolveCachedAuthorization = Effect.fn("resolveCachedAuthorization")(funct
   return {
     userId: account.userId,
     accountId: account.accountId,
-    permissions: permissions.permissions.some((permission: string) => permission === "bot")
-      ? permissionSetFromIterable(["bot"] satisfies Extract<Permission, "bot">[])
+    permissions: permissions.permissions.some((permission: string) => permission === "service")
+      ? permissionSetFromIterable(["service"] satisfies Extract<Permission, "service">[])
       : permissionSetFromIterable([] as Permission[]),
   };
 });
@@ -73,7 +73,7 @@ const resolveBaseAuthorizationPermissions = Effect.fn("resolveBaseAuthorizationP
       `account:discord:${authorization.accountId}`,
     );
 
-    if (hasPermission(permissions, "bot")) {
+    if (hasPermission(permissions, "service")) {
       return permissions;
     }
 

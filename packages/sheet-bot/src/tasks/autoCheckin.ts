@@ -169,7 +169,7 @@ export const autoCheckinTaskLayer = Layer.effectDiscard(
         );
       },
     );
-    const runAutoCheckinTask = SheetApisRequestContext.asBot(() =>
+    const runAutoCheckinTask = SheetApisRequestContext.asService(() =>
       autoCheckinTask().pipe(Effect.annotateLogs({ task: "autoCheckin" })),
     );
 

@@ -16,7 +16,7 @@ import { PermissionValues, type Permission } from "./shared";
 
 const KUBERNETES_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token";
 const KUBERNETES_JWKS_URL = "https://kubernetes.default.svc.cluster.local/openid/v1/jwks";
-export const DISCORD_BOT_USER_ID_SENTINEL = "discord_bot_user";
+export const DISCORD_SERVICE_USER_ID_SENTINEL = "service_user";
 
 function readKubernetesToken(): string {
   try {
@@ -244,7 +244,7 @@ const makeKubernetesOAuth = (options: KubernetesOAuthOptions): KubernetesOAuthPl
           const kubernetesAccount = accounts.find(
             (account) => account.providerId === "kubernetes:discord",
           );
-          if (kubernetesAccount?.accountId === DISCORD_BOT_USER_ID_SENTINEL) {
+          if (kubernetesAccount?.accountId === DISCORD_SERVICE_USER_ID_SENTINEL) {
             permissions.push(...PermissionValues);
           }
 

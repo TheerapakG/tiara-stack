@@ -47,8 +47,10 @@ describe("PlayerDayScheduleResponse", () => {
 });
 
 describe("getMaximumScheduleView", () => {
-  it("returns monitor for bot users", () => {
-    expect(getMaximumScheduleView(permissionSetFromIterable(["bot"]), "guild-1")).toBe("monitor");
+  it("returns monitor for service users", () => {
+    expect(getMaximumScheduleView(permissionSetFromIterable(["service"]), "guild-1")).toBe(
+      "monitor",
+    );
   });
 
   it("returns monitor for app owners", () => {

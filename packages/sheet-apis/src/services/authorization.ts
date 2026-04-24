@@ -140,7 +140,7 @@ export class AuthorizationService extends Context.Service<AuthorizationService>(
         "AuthorizationService.resolveGuildScopedPermissions",
       )(function* (user: SheetAuthUserType, guildId: string) {
         if (
-          hasPermission(user.permissions, "bot") ||
+          hasPermission(user.permissions, "service") ||
           hasPermission(user.permissions, "app_owner")
         ) {
           return {
@@ -288,14 +288,14 @@ export class AuthorizationService extends Context.Service<AuthorizationService>(
           guildId: string,
           message = "User does not have monitor guild permission",
         ) => requireResolvedGuildPermission(guildId, "monitor", message),
-        requireBot: Effect.fn("AuthorizationService.requireBot")(function* (
-          message = "User is not the bot",
+        requireService: Effect.fn("AuthorizationService.requireService")(function* (
+          message = "User is not the service user",
         ) {
           const user = yield* SheetAuthUser;
 
           return yield* requirePermissions(
             user.permissions,
-            (permissions) => hasPermission(permissions, "bot"),
+            (permissions) => hasPermission(permissions, "service"),
             message,
           );
         }),
@@ -306,7 +306,7 @@ export class AuthorizationService extends Context.Service<AuthorizationService>(
             return yield* requirePermissions(
               user.permissions,
               (permissions) =>
-                hasPermission(permissions, "bot") ||
+                hasPermission(permissions, "service") ||
                 hasPermission(permissions, "app_owner") ||
                 hasDiscordAccountPermission(permissions, accountId),
               message,
@@ -323,7 +323,7 @@ export class AuthorizationService extends Context.Service<AuthorizationService>(
           const user = yield* getRequiredCurrentGuildUser(guildId);
 
           if (
-            hasPermission(user.permissions, "bot") ||
+            hasPermission(user.permissions, "service") ||
             hasPermission(user.permissions, "app_owner") ||
             hasDiscordAccountPermission(user.permissions, accountId) ||
             hasGuildPermission(user.permissions, "monitor_guild", guildId)

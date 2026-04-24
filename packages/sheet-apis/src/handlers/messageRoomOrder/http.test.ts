@@ -68,7 +68,7 @@ describe("messageRoomOrder legacy access", () => {
               operationCalls += 1;
             }),
           ),
-          withUser(["bot"]),
+          withUser(["service"]),
           liveGuildServices(),
         ),
       );
@@ -120,7 +120,7 @@ describe("messageRoomOrder legacy access", () => {
               mutationCalls += 1;
             }),
           ),
-          withUser(["bot"]),
+          withUser(["service"]),
           liveGuildServices(),
         ),
       );
@@ -137,7 +137,7 @@ describe("messageRoomOrder legacy access", () => {
       const error = yield* getFailure(
         withAuthorization((authorizationService) =>
           requireRoomOrderUpsertAccess(authorizationService, makeRoomOrderService(), "message-1"),
-        ).pipe(withUser(["bot"]), liveGuildServices()),
+        ).pipe(withUser(["service"]), liveGuildServices()),
       );
 
       expect(error).toBeInstanceOf(Unauthorized);

@@ -1,4 +1,4 @@
-export const BasePermissionValues = ["bot", "app_owner"] as const;
+export const BasePermissionValues = ["service", "app_owner"] as const;
 
 // Backward-compatible alias for existing imports that enumerate fixed permissions.
 export const PermissionValues = BasePermissionValues;

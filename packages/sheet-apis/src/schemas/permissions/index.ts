@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-export const BasePermissionValues = ["bot", "app_owner"] as const;
+export const BasePermissionValues = ["service", "app_owner"] as const;
 export const PermissionValues = BasePermissionValues;
 
 const startsWith = <T extends string>(prefix: T) =>

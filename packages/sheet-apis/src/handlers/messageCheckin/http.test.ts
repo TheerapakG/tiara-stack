@@ -70,7 +70,7 @@ const withAuthorization = Effect.fnUntraced(function* <A, E, R>(
 
 describe("messageCheckin legacy access", () => {
   it.effect(
-    "denies legacy reads for bot users",
+    "denies legacy reads for service users",
     Effect.fnUntraced(function* () {
       const service = makeMessageCheckinService({
         record: makeMessageCheckinRecord({ guildId: null, messageChannelId: null }),
@@ -79,7 +79,7 @@ describe("messageCheckin legacy access", () => {
       const error = yield* getFailure(
         withAuthorization((authorizationService) =>
           requireMessageCheckinReadAccess(authorizationService, service, "message-1"),
-        ).pipe(withUser(["bot"]), liveGuildServices()),
+        ).pipe(withUser(["service"]), liveGuildServices()),
       );
 
       expect(error).toBeInstanceOf(Unauthorized);
@@ -109,7 +109,7 @@ describe("messageCheckin legacy access", () => {
   );
 
   it.effect(
-    "denies legacy member reads for bot users",
+    "denies legacy member reads for service users",
     Effect.fnUntraced(function* () {
       const service = makeMessageCheckinService({
         record: makeMessageCheckinRecord({ guildId: null, messageChannelId: null }),
@@ -118,7 +118,7 @@ describe("messageCheckin legacy access", () => {
       const error = yield* getFailure(
         withAuthorization((authorizationService) =>
           requireMessageCheckinMembersReadAccess(authorizationService, service, "message-1"),
-        ).pipe(withUser(["bot"]), liveGuildServices()),
+        ).pipe(withUser(["service"]), liveGuildServices()),
       );
 
       expect(error).toBeInstanceOf(Unauthorized);
@@ -143,7 +143,7 @@ describe("messageCheckin legacy access", () => {
               mutationCalls += 1;
             }),
           ),
-          withUser(["bot"]),
+          withUser(["service"]),
           liveGuildServices(),
         ),
       );
@@ -176,7 +176,7 @@ describe("messageCheckin legacy access", () => {
               mutationCalls += 1;
             }),
           ),
-          withUser(["bot"]),
+          withUser(["service"]),
           liveGuildServices(),
         ),
       );
@@ -195,7 +195,7 @@ describe("messageCheckin legacy access", () => {
       const error = yield* getFailure(
         withAuthorization((authorizationService) =>
           requireCheckinUpsertAccess(authorizationService, service, "message-1"),
-        ).pipe(withUser(["bot"]), liveGuildServices()),
+        ).pipe(withUser(["service"]), liveGuildServices()),
       );
 
       expect(error).toBeInstanceOf(Unauthorized);

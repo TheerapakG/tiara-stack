@@ -21,12 +21,12 @@ import {
   Context,
 } from "effect";
 import { createKubernetesOAuthSession } from "sheet-auth/client";
-import { DISCORD_BOT_USER_ID_SENTINEL } from "sheet-auth/plugins/kubernetes-oauth";
+import { DISCORD_SERVICE_USER_ID_SENTINEL } from "sheet-auth/plugins/kubernetes-oauth";
 import { Api } from "sheet-apis/api";
 import { SheetAuthClient } from "./sheetAuthClient";
 
 type SheetApisRequester = Data.TaggedEnum<{
-  Bot: {};
+  Service: {};
   DiscordUser: { readonly discordUserId: string };
 }>;
 export const SheetApisRequester = Data.taggedEnum<SheetApisRequester>();
@@ -44,7 +44,7 @@ const sheetApisRequestContextTag = Context.Reference<SheetApisRequestContextType
   "SheetApisRequestContext",
   {
     defaultValue: () => ({
-      requester: SheetApisRequester.Bot(),
+      requester: SheetApisRequester.Service(),
     }),
   },
 ) as Context.Reference<SheetApisRequestContextType> & {
@@ -54,10 +54,10 @@ const sheetApisRequestContextTag = Context.Reference<SheetApisRequestContextType
 type SheetApisRequestContextTag = typeof sheetApisRequestContextTag;
 
 export const SheetApisRequestContext = Object.assign(sheetApisRequestContextTag, {
-  asBot: <Args extends any[], A, E, R>(fn: (...args: Args) => Effect.Effect<A, E, R>) =>
-    Effect.fn("SheetApisRequestContext.asBot")(function* (...args: Args) {
+  asService: <Args extends any[], A, E, R>(fn: (...args: Args) => Effect.Effect<A, E, R>) =>
+    Effect.fn("SheetApisRequestContext.asService")(function* (...args: Args) {
       const sheetApisRequestContext: SheetApisRequestContextType = {
-        requester: SheetApisRequester.Bot(),
+        requester: SheetApisRequester.Service(),
       };
 
       return yield* fn(...args).pipe(
@@ -79,7 +79,7 @@ export const SheetApisRequestContext = Object.assign(sheetApisRequestContextTag,
       );
     }),
 }) as SheetApisRequestContextTag & {
-  asBot: <Args extends any[], A, E, R>(
+  asService: <Args extends any[], A, E, R>(
     fn: (...args: Args) => Effect.Effect<A, E, R>,
   ) => (...args: Args) => Effect.Effect<A, E, Exclude<R, SheetApisRequestContextTag>>;
   asInteractionUser: <Args extends any[], A, E, R>(
@@ -144,14 +144,14 @@ export class SheetApisClient extends Context.Service<SheetApisClient>()("SheetAp
           Effect.map(
             Option.getOrElse(
               (): SheetApisRequestContextType => ({
-                requester: SheetApisRequester.Bot(),
+                requester: SheetApisRequester.Service(),
               }),
             ),
           ),
         );
         const cacheKey = Match.value(requester).pipe(
           Match.tagsExhaustive({
-            Bot: () => DISCORD_BOT_USER_ID_SENTINEL,
+            Service: () => DISCORD_SERVICE_USER_ID_SENTINEL,
             DiscordUser: (requester) => requester.discordUserId,
           }),
         );

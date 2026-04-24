@@ -111,7 +111,7 @@ export const scheduleLayer = HttpApiBuilder.group(
 
             if (
               resolvedUser.accountId !== query.accountId &&
-              !hasPermission(resolvedUser.permissions, "bot") &&
+              !hasPermission(resolvedUser.permissions, "service") &&
               !hasPermission(resolvedUser.permissions, "app_owner") &&
               !hasGuildPermission(resolvedUser.permissions, "monitor_guild", query.guildId)
             ) {

@@ -24,7 +24,7 @@ export const guildConfigLayer = HttpApiBuilder.group(
       .handle(
         "getAutoCheckinGuilds",
         Effect.fnUntraced(function* () {
-          yield* authorizationService.requireBot();
+          yield* authorizationService.requireService();
           return yield* guildConfigService.getAutoCheckinGuilds();
         }),
       )

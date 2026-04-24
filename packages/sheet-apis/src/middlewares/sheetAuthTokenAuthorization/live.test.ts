@@ -103,7 +103,7 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(
         Effect.succeed({
-          permissions: ["bot", "monitor_guild:guild-1", "manage_guild:guild-1"],
+          permissions: ["service", "monitor_guild:guild-1", "manage_guild:guild-1"],
         }),
       );
 
@@ -118,7 +118,7 @@ describe("SheetAuthTokenAuthorizationLive", () => {
       expect(first.token).toBe(token);
       expect(permissionValues(first.permissions)).toEqual([
         "account:discord:discord-user-1",
-        "bot",
+        "service",
       ]);
       expect(second).toEqual(first);
       expect(getAccountMock).toHaveBeenCalledTimes(1);
@@ -127,13 +127,13 @@ describe("SheetAuthTokenAuthorizationLive", () => {
   );
 
   it.effect(
-    "skips guild lookups for bot accounts even when implicit permissions include guild roles",
+    "skips guild lookups for service users even when implicit permissions include guild roles",
     Effect.fnUntraced(function* () {
       getAccountMock.mockReturnValue(makeAccount("user-1"));
       getImplicitPermissionsMock.mockReturnValue(
         Effect.succeed({
           permissions: [
-            "bot",
+            "service",
             "monitor_guild:guild-1",
             "manage_guild:guild-1",
             "monitor_guild:guild-2",
@@ -150,11 +150,11 @@ describe("SheetAuthTokenAuthorizationLive", () => {
 
       expect(permissionValues(first.permissions)).toEqual([
         "account:discord:discord-user-1",
-        "bot",
+        "service",
       ]);
       expect(permissionValues(second.permissions)).toEqual([
         "account:discord:discord-user-1",
-        "bot",
+        "service",
       ]);
     }),
   );

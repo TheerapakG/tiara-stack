@@ -20,7 +20,7 @@ type GuildConfigServiceApi = Context.Service.Shape<typeof GuildConfigService>;
 type AuthorizationServiceApi = Context.Service.Shape<typeof AuthorizationService>;
 
 type TestPermission =
-  | "bot"
+  | "service"
   | "app_owner"
   | `member_guild:${string}`
   | `monitor_guild:${string}`
@@ -76,8 +76,8 @@ const requireManageGuild = (guildId: string) =>
 const requireMonitorGuild = (guildId: string) =>
   withAuthorization((authorizationService) => authorizationService.requireMonitorGuild(guildId));
 
-const requireBot = () =>
-  withAuthorization((authorizationService) => authorizationService.requireBot());
+const requireService = () =>
+  withAuthorization((authorizationService) => authorizationService.requireService());
 
 const requireDiscordAccountId = (accountId: string) =>
   withAuthorization((authorizationService) =>
@@ -464,10 +464,10 @@ describe("authorization service helpers", () => {
   );
 
   it.effect(
-    "rejects missing bot permission for bot-only routes",
+    "rejects missing service permission for service-only routes",
     Effect.fnUntraced(function* () {
       const exit = yield* Effect.exit(
-        withUser(["manage_guild:guild-1"], requireBot()).pipe(liveGuildServices()),
+        withUser(["manage_guild:guild-1"], requireService()).pipe(liveGuildServices()),
       );
 
       expect(exit._tag).toBe("Failure");

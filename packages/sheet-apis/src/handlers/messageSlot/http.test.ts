@@ -47,7 +47,7 @@ const withAuthorization = Effect.fnUntraced(function* <A, E, R>(
 
 describe("messageSlot legacy access", () => {
   it.effect(
-    "denies legacy reads for bot users",
+    "denies legacy reads for service users",
     Effect.fnUntraced(function* () {
       const error = yield* getFailure(
         withAuthorization((authorizationService) =>
@@ -58,7 +58,7 @@ describe("messageSlot legacy access", () => {
             ),
             "message-1",
           ),
-        ).pipe(withUser(["bot"]), liveGuildServices()),
+        ).pipe(withUser(["service"]), liveGuildServices()),
       );
 
       expect(error).toBeInstanceOf(Unauthorized);
@@ -108,7 +108,7 @@ describe("messageSlot legacy access", () => {
               mutationCalls += 1;
             }),
           ),
-          withUser(["bot"]),
+          withUser(["service"]),
           liveGuildServices(),
         ),
       );
@@ -129,7 +129,7 @@ describe("messageSlot legacy access", () => {
             makeMessageSlotService(),
             "message-1",
           ),
-        ).pipe(withUser(["bot"]), liveGuildServices()),
+        ).pipe(withUser(["service"]), liveGuildServices()),
       );
 
       expect(error).toBeInstanceOf(Unauthorized);

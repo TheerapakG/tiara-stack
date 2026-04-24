@@ -6,7 +6,7 @@ import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
 import { GuildConfigService } from "@/services";
 
 export type TestPermission =
-  | "bot"
+  | "service"
   | "app_owner"
   | `member_guild:${string}`
   | `monitor_guild:${string}`
