@@ -4,10 +4,10 @@ import { CacheNotFoundError } from "dfx-discord-utils/discord/schema";
 import type { CachedGuildMember } from "dfx-discord-utils/cache";
 import { Discord, Perms } from "dfx";
 import { Effect, HashSet, Layer, Option, Context } from "effect";
-import type { Permission, PermissionSet } from "@/schemas/permissions";
-import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
-import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
-import { Unauthorized } from "@/schemas/middlewares/unauthorized";
+import type { Permission, PermissionSet } from "sheet-ingress-api/schemas/permissions";
+import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthGuildUser";
+import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
+import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
 import { GuildConfigService } from "./guildConfig";
 import { discordLayer } from "./discord";
 

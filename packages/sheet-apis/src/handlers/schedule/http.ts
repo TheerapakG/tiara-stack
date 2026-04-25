@@ -3,8 +3,8 @@ import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { withCurrentGuildAuthFromQuery } from "@/handlers/shared/guildAuthorization";
 import { hasGuildPermission, hasPermission } from "@/services/authorization";
-import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
-import { Unauthorized } from "@/schemas/middlewares/unauthorized";
+import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthGuildUser";
+import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
 import {
   AuthorizationService,
   GuildConfigService,

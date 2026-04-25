@@ -3,7 +3,7 @@ import {
   type Player,
   type PopulatedSchedulePlayer,
   type PopulatedScheduleResult,
-} from "@/schemas/sheet";
+} from "sheet-ingress-api/schemas/sheet";
 
 export type FillParticipant = {
   key: string;

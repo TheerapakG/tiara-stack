@@ -1,0 +1,65 @@
+{
+  "name": "sheet-ingress-api",
+  "version": "0.0.0",
+  "private": true,
+  "keywords": [],
+  "author": "",
+  "files": [
+    "./dist/**"
+  ],
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./api": {
+      "types": "./dist/api.d.mts",
+      "default": "./dist/api.mjs"
+    },
+    "./api-groups": {
+      "types": "./dist/api-groups.d.mts",
+      "default": "./dist/api-groups.mjs"
+    },
+    "./handlers/health/schema": {
+      "types": "./dist/handlers/health/schema.d.mts",
+      "default": "./dist/handlers/health/schema.mjs"
+    },
+    "./middlewares/sheetAuthTokenAuthorization/tag": {
+      "types": "./dist/middlewares/sheetAuthTokenAuthorization/tag.d.mts",
+      "default": "./dist/middlewares/sheetAuthTokenAuthorization/tag.mjs"
+    },
+    "./sheet-apis": {
+      "types": "./dist/sheet-apis.d.mts",
+      "default": "./dist/sheet-apis.mjs"
+    },
+    "./sheet-bot": {
+      "types": "./dist/sheet-bot.d.mts",
+      "default": "./dist/sheet-bot.mjs"
+    },
+    "./schemas/*": {
+      "types": "./dist/schemas/*.d.mts",
+      "default": "./dist/schemas/*.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "format": "vp fmt --check",
+    "format:apply": "vp fmt",
+    "lint": "vp lint src",
+    "build": "vp pack && tar -acf dist.tar.zst ./dist"
+  },
+  "dependencies": {
+    "dfx-discord-utils": "workspace:*",
+    "typhoon-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260327.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "effect": "catalog:"
+  }
+}

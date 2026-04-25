@@ -10,15 +10,18 @@ import {
   getScheduleFills,
   toFillParticipant,
 } from "./fillMovement";
-import { GeneratedRoomOrderEntry, RoomOrderGenerateResult } from "@/schemas/roomOrder";
-import { MessageRoomOrderRange } from "@/schemas/messageRoomOrder";
+import {
+  GeneratedRoomOrderEntry,
+  RoomOrderGenerateResult,
+} from "sheet-ingress-api/schemas/roomOrder";
+import { MessageRoomOrderRange } from "sheet-ingress-api/schemas/messageRoomOrder";
 import {
   Player,
   PlayerTeam,
   Team,
   type PopulatedSchedulePlayer,
   type PopulatedScheduleResult,
-} from "@/schemas/sheet";
+} from "sheet-ingress-api/schemas/sheet";
 
 type GuildConfigServiceApi = Context.Service.Shape<typeof GuildConfigService>;
 type SheetServiceApi = Context.Service.Shape<typeof SheetService>;

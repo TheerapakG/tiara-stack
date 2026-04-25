@@ -17,7 +17,7 @@ import {
   PartialNamePlayer,
   Monitor,
   PartialNameMonitor,
-} from "@/schemas/sheet";
+} from "sheet-ingress-api/schemas/sheet";
 import { upperFirst } from "scule";
 
 type SheetConfigServiceApi = Context.Service.Shape<typeof SheetConfigService>;

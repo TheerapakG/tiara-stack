@@ -47,7 +47,7 @@ const configProviderLayer = Layer.unwrap(
   }),
 ).pipe(Layer.provide(NodeFileSystem.layer));
 
-const main = Layer.mergeAll(botLayer, httpLayer).pipe(
+Layer.mergeAll(botLayer, httpLayer).pipe(
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
   Layer.provide(Logger.layer([Logger.consoleLogFmt])),
@@ -55,6 +55,5 @@ const main = Layer.mergeAll(botLayer, httpLayer).pipe(
   Layer.provide(NodeFileSystem.layer),
   Layer.provide(configProviderLayer),
   Layer.launch,
+  NodeRuntime.runMain(),
 );
-
-NodeRuntime.runMain(main as Effect.Effect<never, unknown>);

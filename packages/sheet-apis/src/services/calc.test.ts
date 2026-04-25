@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Chunk, Effect, HashSet, Option } from "effect";
 import { CalcConfig, CalcService, cartesianTeams } from "./calc";
-import { PlayerTeam } from "@/schemas/sheet";
+import { PlayerTeam } from "sheet-ingress-api/schemas/sheet";
 
 const makePlayerTeam = ({
   playerId,

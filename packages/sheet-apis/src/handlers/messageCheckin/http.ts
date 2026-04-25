@@ -4,10 +4,10 @@ import { Effect, HashSet, Layer, Match, Option } from "effect";
 import { Api } from "@/api";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
-import { MessageCheckin, MessageCheckinMember } from "@/schemas/messageCheckin";
-import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
-import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
-import { Unauthorized } from "@/schemas/middlewares/unauthorized";
+import { MessageCheckin, MessageCheckinMember } from "sheet-ingress-api/schemas/messageCheckin";
+import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthGuildUser";
+import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
+import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
 import { AuthorizationService, MessageCheckinService } from "@/services";
 
 const missingMessageCheckinError = () =>

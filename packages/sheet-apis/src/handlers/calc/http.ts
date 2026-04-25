@@ -2,8 +2,8 @@ import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Array, Chunk, Effect, HashMap, HashSet, Layer, Option, pipe } from "effect";
 import { Api } from "@/api";
 import { CalcConfig, CalcService, PlayerService } from "@/services";
-import { PlayerTeam, Team } from "@/schemas/sheet";
-import { Room } from "@/schemas/sheet/room";
+import { PlayerTeam, Team } from "sheet-ingress-api/schemas/sheet";
+import { Room } from "sheet-ingress-api/schemas/sheet/room";
 import { Array as ArrayUtils } from "typhoon-core/utils";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 

@@ -12,7 +12,8 @@ import {
   PlayerService,
   SheetApisRequestContext,
 } from "../services";
-import { Sheet } from "sheet-apis/schema";
+import * as Sheet from "sheet-ingress-api/schemas/sheet";
+import { discordApplicationLayer } from "../discord/application";
 
 const getInteractionGuildId = Effect.gen(function* () {
   const interactionGuild = yield* Interaction.guild();
@@ -179,6 +180,7 @@ export const teamCommandLayer = Layer.effectDiscard(
   Layer.provide(
     Layer.mergeAll(
       discordGatewayLayer,
+      discordApplicationLayer,
       PermissionService.layer,
       PlayerService.layer,
       EmbedService.layer,

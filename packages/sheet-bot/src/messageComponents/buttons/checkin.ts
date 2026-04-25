@@ -13,6 +13,8 @@ import {
 import { MessageCheckinService, SheetApisRequestContext } from "@/services";
 import { GuildMember } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
+import { discordApplicationLayer } from "../../discord/application";
+import { discordConfigLayer } from "../../discord/config";
 
 const getInteractionGuildId = Effect.gen(function* () {
   const interactionGuild = yield* Interaction.guild();
@@ -138,8 +140,9 @@ export const checkinButtonLayer = Layer.effectDiscard(
   Layer.provide(
     Layer.mergeAll(
       discordGatewayLayer,
+      discordApplicationLayer,
       MessageCheckinService.layer,
-      GuildMember.GuildMemberUtils.layer,
+      Layer.provide(GuildMember.GuildMemberUtils.layer, discordConfigLayer),
     ),
   ),
 );

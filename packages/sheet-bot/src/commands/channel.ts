@@ -6,8 +6,9 @@ import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import { discordGatewayLayer } from "../discord/gateway";
 import { EmbedService, GuildConfigService, SheetApisRequestContext } from "../services";
-import { GuildConfig } from "sheet-apis/schema";
+import * as GuildConfig from "sheet-ingress-api/schemas/guildConfig";
 import { Ix } from "dfx/index";
+import { discordApplicationLayer } from "../discord/application";
 
 const configFields = (
   config: GuildConfig.GuildChannelConfig,
@@ -316,5 +317,12 @@ export const channelCommandLayer = Layer.effectDiscard(
     yield* registry.register(Ix.builder.add(command).catchAllCause(Effect.log));
   }),
 ).pipe(
-  Layer.provide(Layer.mergeAll(discordGatewayLayer, GuildConfigService.layer, EmbedService.layer)),
+  Layer.provide(
+    Layer.mergeAll(
+      discordGatewayLayer,
+      discordApplicationLayer,
+      GuildConfigService.layer,
+      EmbedService.layer,
+    ),
+  ),
 );

@@ -14,7 +14,7 @@ import {
   String,
 } from "effect";
 import { ConverterService, HourWindow } from "./converter";
-import { Sheet } from "sheet-apis/schema";
+import * as Sheet from "sheet-ingress-api/schemas/sheet";
 
 export class FormattedHourWindow extends Data.TaggedClass("FormattedHourWindow")<{
   start: number;

@@ -3,7 +3,7 @@ import { mutators, queries } from "sheet-db-schema/zero";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 import { ZeroService } from "./zero";
-import { MessageSlot } from "@/schemas/messageSlot";
+import { MessageSlot } from "sheet-ingress-api/schemas/messageSlot";
 
 export class MessageSlotService extends Context.Service<MessageSlotService>()(
   "MessageSlotService",

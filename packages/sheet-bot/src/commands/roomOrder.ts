@@ -11,6 +11,7 @@ import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import { roomOrderActionRow } from "../messageComponents/buttons/roomOrderComponents";
 import { MessageRoomOrderService, RoomOrderService, SheetApisRequestContext } from "../services";
+import { discordApplicationLayer } from "../discord/application";
 
 const getInteractionGuildId = Effect.gen(function* () {
   const interactionGuild = yield* Interaction.guild();
@@ -150,6 +151,11 @@ export const roomOrderCommandLayer = Layer.effectDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(discordGatewayLayer, RoomOrderService.layer, MessageRoomOrderService.layer),
+    Layer.mergeAll(
+      discordGatewayLayer,
+      discordApplicationLayer,
+      RoomOrderService.layer,
+      MessageRoomOrderService.layer,
+    ),
   ),
 );

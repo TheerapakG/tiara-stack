@@ -3,7 +3,7 @@ import { HttpMiddleware, HttpRouter, HttpServer } from "effect/unstable/http";
 import { HttpApiBuilder, HttpApiSwagger } from "effect/unstable/httpapi";
 import { Effect, Layer } from "effect";
 import { createServer } from "http";
-import { Api } from "./api";
+import { SheetApisApi } from "sheet-ingress-api/sheet-apis";
 import { config } from "./config";
 import { calcLayer } from "./handlers/calc";
 import { checkinLayer } from "./handlers/checkin";
@@ -69,7 +69,7 @@ const corsMiddlewareLayer = Layer.unwrap(
   }),
 );
 
-const ApiLayer = Layer.provide(HttpApiBuilder.layer(Api), [
+const ApiLayer = Layer.provide(HttpApiBuilder.layer(SheetApisApi), [
   calcLayer,
   checkinLayer,
   healthLayer,
@@ -86,7 +86,7 @@ const ApiLayer = Layer.provide(HttpApiBuilder.layer(Api), [
   scheduleLayer,
   discordLayer,
 ]).pipe(
-  Layer.merge(HttpApiSwagger.layer(Api)),
+  Layer.merge(HttpApiSwagger.layer(SheetApisApi)),
   Layer.provide([corsMiddlewareLayer, debugScopeMiddleware]),
 );
 

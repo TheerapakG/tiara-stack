@@ -1,8 +1,8 @@
 import type { sheets_v4 } from "@googleapis/sheets";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, HashMap, Option, Predicate, Context } from "effect";
-import type { BreakSchedule, Schedule } from "@/schemas/sheet";
-import { ScheduleConfig } from "@/schemas/sheetConfig";
+import type { BreakSchedule, Schedule } from "sheet-ingress-api/schemas/sheet";
+import { ScheduleConfig } from "sheet-ingress-api/schemas/sheetConfig";
 import { GoogleSheets } from "./google/sheets";
 import { SheetConfigService } from "./sheetConfig";
 import { SheetService } from "./sheet";

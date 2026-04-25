@@ -8,6 +8,7 @@ import { CommandHelper, Interaction } from "dfx-discord-utils/utils";
 import { cachesLayer } from "../discord/cache";
 import { discordGatewayLayer } from "../discord/gateway";
 import { EmbedService, GuildConfigService, SheetApisRequestContext } from "../services";
+import { discordApplicationLayer } from "../discord/application";
 
 const getInteractionGuildId = Effect.gen(function* () {
   const interactionGuild = yield* Interaction.guild();
@@ -416,6 +417,12 @@ export const serverCommandLayer = Layer.effectDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(discordGatewayLayer, cachesLayer, GuildConfigService.layer, EmbedService.layer),
+    Layer.mergeAll(
+      discordGatewayLayer,
+      discordApplicationLayer,
+      cachesLayer,
+      GuildConfigService.layer,
+      EmbedService.layer,
+    ),
   ),
 );

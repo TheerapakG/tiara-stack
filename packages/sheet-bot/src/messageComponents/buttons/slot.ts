@@ -12,6 +12,7 @@ import {
 } from "@/services";
 import { Interaction } from "dfx-discord-utils/utils";
 import { ButtonStyle, MessageFlags } from "discord-api-types/v10";
+import { discordApplicationLayer } from "../../discord/application";
 
 const getInteractionGuildId = Effect.gen(function* () {
   const interactionGuild = yield* Interaction.guild();
@@ -136,6 +137,7 @@ export const slotButtonLayer = Layer.effectDiscard(
   Layer.provide(
     Layer.mergeAll(
       discordGatewayLayer,
+      discordApplicationLayer,
       MessageSlotService.layer,
       ScheduleService.layer,
       FormatService.layer,

@@ -16,6 +16,8 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "paths": {
+      "sheet-apis/api-groups": ["./src/api-groups.ts"],
+      "sheet-ingress-api/*": ["../sheet-ingress-api/src/*"],
       "*": ["./*"],
       "~~/*": ["./*"],
       "@@/*": ["./*"],

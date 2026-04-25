@@ -8,8 +8,8 @@ import {
   requireMessageCheckinMonitorMutationAccess,
   requireMessageCheckinReadAccess,
 } from "./http";
-import { Unauthorized } from "@/schemas/middlewares/unauthorized";
-import { MessageCheckin, MessageCheckinMember } from "@/schemas/messageCheckin";
+import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
+import { MessageCheckin, MessageCheckinMember } from "sheet-ingress-api/schemas/messageCheckin";
 import { AuthorizationService, MessageCheckinService } from "@/services";
 import { getFailure, liveGuildServices, withUser } from "@/test-utils/guildTestHelpers";
 

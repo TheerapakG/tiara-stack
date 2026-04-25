@@ -10,8 +10,8 @@ import {
   hasDiscordAccountPermission,
   permissionSetFromIterable,
 } from "./authorization";
-import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
-import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
+import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthGuildUser";
+import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import { GuildConfigService } from "@/services";
 
 type MembersApiCacheViewService = Context.Service.Shape<typeof MembersApiCacheView>;

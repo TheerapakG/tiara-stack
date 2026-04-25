@@ -1,7 +1,7 @@
 import { Effect, HashMap, Layer, Option, Context, pipe } from "effect";
 import { upperFirst } from "scule";
 import { SheetService } from "./sheet";
-import { Player, PartialIdPlayer, PartialNamePlayer, Team } from "@/schemas/sheet";
+import { Player, PartialIdPlayer, PartialNamePlayer, Team } from "sheet-ingress-api/schemas/sheet";
 import { ScopedCache } from "typhoon-core/utils";
 
 const attachPlayerId = (playerId: string) => (team: Team) =>

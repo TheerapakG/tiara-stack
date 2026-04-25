@@ -2,7 +2,7 @@ import { Effect, Layer } from "effect";
 import { ApplicationOwnerResolver } from "../../services/applicationOwner";
 import { SheetAuthClient } from "../../services/sheetAuthClient";
 import { makeSheetAuthTokenAuthorization } from "./shared";
-import { SheetAuthTokenAuthorization } from "./tag";
+import { SheetAuthTokenAuthorization } from "sheet-ingress-api/middlewares/sheetAuthTokenAuthorization/tag";
 
 export const SheetAuthTokenAuthorizationLive = Layer.effect(
   SheetAuthTokenAuthorization,

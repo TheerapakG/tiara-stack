@@ -6,7 +6,7 @@ import {
   PopulatedBreakSchedule,
   PopulatedSchedule,
   PopulatedSchedulePlayer,
-} from "@/schemas/sheet";
+} from "sheet-ingress-api/schemas/sheet";
 import { summarizeDayPlayerSchedule } from "./schedule";
 
 const makePlayer = (id: string, name = id) =>

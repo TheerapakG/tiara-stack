@@ -22,7 +22,7 @@ import {
 } from "effect";
 import { createKubernetesOAuthSession } from "sheet-auth/client";
 import { DISCORD_SERVICE_USER_ID_SENTINEL } from "sheet-auth/plugins/kubernetes-oauth";
-import { Api } from "sheet-apis/api";
+import { SheetApisApi } from "sheet-ingress-api/sheet-apis";
 import { SheetAuthClient } from "./sheetAuthClient";
 
 type SheetApisRequester = Data.TaggedEnum<{
@@ -95,7 +95,7 @@ export class SheetApisClient extends Context.Service<SheetApisClient>()("SheetAp
     const sheetAuthClient = yield* SheetAuthClient;
     const httpClient = yield* HttpClient.HttpClient;
     const k8sTokenRef = yield* Ref.make("");
-    const baseUrl = yield* config.sheetApisBaseUrl;
+    const baseUrl = yield* config.sheetIngressBaseUrl;
 
     yield* pipe(
       fs.readFileString("/var/run/secrets/tokens/sheet-auth-token", "utf-8"),
@@ -171,7 +171,7 @@ export class SheetApisClient extends Context.Service<SheetApisClient>()("SheetAp
       }),
     ) as unknown as HttpClient.HttpClient;
 
-    const client = yield* HttpApiClient.makeWith(Api, {
+    const client = yield* HttpApiClient.makeWith(SheetApisApi, {
       httpClient: httpClientWithToken,
       baseUrl,
     });

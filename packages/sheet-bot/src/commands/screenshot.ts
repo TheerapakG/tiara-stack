@@ -6,6 +6,7 @@ import { discordGatewayLayer } from "../discord/gateway";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import { EmbedService, ScreenshotService, SheetApisRequestContext } from "../services";
+import { discordApplicationLayer } from "../discord/application";
 
 const getInteractionGuildId = Effect.gen(function* () {
   const interactionGuild = yield* Interaction.guild();
@@ -97,5 +98,12 @@ export const screenshotCommandLayer = Layer.effectDiscard(
     yield* registry.register(Ix.builder.add(command).catchAllCause(Effect.log));
   }),
 ).pipe(
-  Layer.provide(Layer.mergeAll(discordGatewayLayer, EmbedService.layer, ScreenshotService.layer)),
+  Layer.provide(
+    Layer.mergeAll(
+      discordGatewayLayer,
+      discordApplicationLayer,
+      EmbedService.layer,
+      ScreenshotService.layer,
+    ),
+  ),
 );

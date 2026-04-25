@@ -10,7 +10,7 @@ import {
   pipe,
 } from "effect";
 import { makeArgumentError } from "typhoon-core/error";
-import { CheckinGenerateResult } from "@/schemas/checkin";
+import { CheckinGenerateResult } from "sheet-ingress-api/schemas/checkin";
 import {
   Player,
   PopulatedScheduleMonitor,
@@ -20,7 +20,7 @@ import {
   Monitor,
   PartialNameMonitor,
   PartialNamePlayer,
-} from "@/schemas/sheet";
+} from "sheet-ingress-api/schemas/sheet";
 import { GuildConfigService } from "./guildConfig";
 import { ScheduleService } from "./schedule";
 import { SheetConfigService } from "./sheetConfig";

@@ -22,5 +22,5 @@ export const config = {
     "TRUSTED_ORIGINS",
   ),
   redisUrl: Config.schema(Schema.Redacted(Schema.String), "REDIS_URL"),
-  cacheApiBaseUrl: Config.schema(Schema.String, "CACHE_API_BASE_URL"),
+  sheetIngressBaseUrl: Config.schema(Schema.String, "SHEET_INGRESS_BASE_URL"),
 };

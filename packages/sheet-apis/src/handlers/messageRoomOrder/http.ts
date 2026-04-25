@@ -4,9 +4,9 @@ import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
-import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
-import { MessageRoomOrder } from "@/schemas/messageRoomOrder";
-import { Unauthorized } from "@/schemas/middlewares/unauthorized";
+import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthGuildUser";
+import { MessageRoomOrder } from "sheet-ingress-api/schemas/messageRoomOrder";
+import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
 import { AuthorizationService, MessageRoomOrderService } from "@/services";
 
 const missingMessageRoomOrderError = () =>

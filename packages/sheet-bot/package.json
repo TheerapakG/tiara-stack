@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./api": "./src/api.ts",
     "./main": "./src/main.ts",
     "./package.json": "./package.json"
   },
@@ -31,6 +32,7 @@
     "sheet-apis": "workspace:*",
     "sheet-auth": "workspace:*",
     "sheet-db-schema": "workspace:*",
+    "sheet-ingress-api": "workspace:*",
     "ts-mixer": "^6.0.4",
     "typhoon-core": "workspace:*"
   },

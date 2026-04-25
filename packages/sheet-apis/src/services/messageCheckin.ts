@@ -3,7 +3,7 @@ import { mutators, queries } from "sheet-db-schema/zero";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 import { ZeroService } from "./zero";
-import { MessageCheckin, MessageCheckinMember } from "@/schemas/messageCheckin";
+import { MessageCheckin, MessageCheckinMember } from "sheet-ingress-api/schemas/messageCheckin";
 
 export class MessageCheckinService extends Context.Service<MessageCheckinService>()(
   "MessageCheckinService",

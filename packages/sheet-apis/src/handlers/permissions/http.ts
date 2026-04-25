@@ -2,7 +2,7 @@ import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Effect, Layer } from "effect";
 import { Api } from "@/api";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
-import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
+import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import { AuthorizationService } from "@/services";
 
 export const permissionsLayer = HttpApiBuilder.group(

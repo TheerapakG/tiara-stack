@@ -1,6 +1,1 @@
-import { Schema } from "effect";
-
-export const HealthResponseSchema = Schema.Struct({
-  status: Schema.Literals(["ok"]),
-  timestamp: Schema.DateTimeUtcFromMillis,
-});
+export { HealthResponseSchema } from "sheet-ingress-api/handlers/health/schema";

@@ -3,7 +3,11 @@ import { mutators, queries } from "sheet-db-schema/zero";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 import { ZeroService } from "./zero";
-import { GuildChannelConfig, GuildConfig, GuildConfigMonitorRole } from "@/schemas/guildConfig";
+import {
+  GuildChannelConfig,
+  GuildConfig,
+  GuildConfigMonitorRole,
+} from "sheet-ingress-api/schemas/guildConfig";
 
 export class GuildConfigService extends Context.Service<GuildConfigService>()(
   "GuildConfigService",

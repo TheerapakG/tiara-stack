@@ -21,7 +21,7 @@ import {
 } from "effect";
 import { Array as ArrayUtils, Utils } from "typhoon-core/utils";
 
-import { GoogleSheetsError } from "@/schemas/google";
+import { GoogleSheetsError } from "sheet-ingress-api/schemas/google";
 import { GoogleAuthService } from "./auth";
 
 const tupleSchema = <Length extends number, S extends Schema.Top>(length: Length, schema: S) =>

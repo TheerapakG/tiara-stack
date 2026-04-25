@@ -1,5 +1,6 @@
 import { Effect, Layer, Context } from "effect";
-import { DiscordREST } from "dfx";
+import { HttpClientError } from "effect/unstable/http";
+import { Discord, DiscordConfig, DiscordREST } from "dfx";
 import { discordGatewayLayer } from "../discord/gateway";
 
 export class GuildMemberUtils extends Context.Service<GuildMemberUtils>()("GuildMemberUtils", {
@@ -27,5 +28,13 @@ export class GuildMemberUtils extends Context.Service<GuildMemberUtils>()("Guild
     };
   }),
 }) {
-  static layer = Layer.effect(GuildMemberUtils, this.make).pipe(Layer.provide(discordGatewayLayer));
+  static layer = Layer.effect(GuildMemberUtils, this.make).pipe(
+    Layer.provide(discordGatewayLayer),
+  ) as Layer.Layer<
+    GuildMemberUtils,
+    | Discord.DiscordRestError<"ErrorResponse", Discord.ErrorResponse>
+    | Discord.DiscordRestError<"RatelimitedResponse", Discord.RatelimitedResponse>
+    | HttpClientError.HttpClientError,
+    DiscordConfig.DiscordConfig
+  >;
 }

@@ -16,6 +16,7 @@ import {
   ScheduleService,
   SheetApisRequestContext,
 } from "../services";
+import { discordApplicationLayer } from "../discord/application";
 
 const getInteractionGuildId = Effect.gen(function* () {
   const interactionGuild = yield* Interaction.guild();
@@ -167,6 +168,7 @@ export const scheduleCommandLayer = Layer.effectDiscard(
   Layer.provide(
     Layer.mergeAll(
       discordGatewayLayer,
+      discordApplicationLayer,
       PermissionService.layer,
       EmbedService.layer,
       ScheduleService.layer,

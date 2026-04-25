@@ -1,6 +1,7 @@
 import { DateTime, Effect, Layer, Context } from "effect";
 import { EmbedBuilder } from "@discordjs/builders";
 import { DiscordApplication } from "dfx-discord-utils/discord";
+import { discordApplicationLayer } from "../discord/application";
 
 export class EmbedService extends Context.Service<EmbedService>()("EmbedService", {
   make: Effect.gen(function* () {
@@ -30,7 +31,5 @@ export class EmbedService extends Context.Service<EmbedService>()("EmbedService"
     };
   }),
 }) {
-  static layer = Layer.effect(EmbedService, this.make).pipe(
-    Layer.provide(DiscordApplication.layer),
-  );
+  static layer = Layer.effect(EmbedService, this.make).pipe(Layer.provide(discordApplicationLayer));
 }

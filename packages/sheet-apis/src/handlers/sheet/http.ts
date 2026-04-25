@@ -2,8 +2,8 @@ import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { withCurrentGuildAuthFromQuery } from "@/handlers/shared/guildAuthorization";
-import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
-import { BreakSchedule, Schedule } from "@/schemas/sheet";
+import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthGuildUser";
+import { BreakSchedule, Schedule } from "sheet-ingress-api/schemas/sheet";
 import {
   AuthorizationService,
   withScheduleHourWindow,

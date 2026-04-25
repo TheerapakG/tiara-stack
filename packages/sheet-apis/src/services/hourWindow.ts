@@ -1,5 +1,5 @@
 import { DateTime, Duration, Match, Option, pipe } from "effect";
-import { BreakSchedule, Schedule, ScheduleHourWindow } from "@/schemas/sheet";
+import { BreakSchedule, Schedule, ScheduleHourWindow } from "sheet-ingress-api/schemas/sheet";
 
 export const deriveScheduleHourWindow = (
   startTime: DateTime.Utc,

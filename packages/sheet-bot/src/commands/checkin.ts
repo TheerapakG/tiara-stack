@@ -19,6 +19,7 @@ import {
 } from "../services";
 import { checkinButtonData } from "../messageComponents/buttons/checkin";
 import { makeMessageActionRowData } from "dfx-discord-utils/utils";
+import { discordApplicationLayer } from "../discord/application";
 
 const getInteractionGuildId = Effect.gen(function* () {
   const interactionGuild = yield* Interaction.guild();
@@ -194,6 +195,7 @@ export const checkinCommandLayer = Layer.effectDiscard(
   Layer.provide(
     Layer.mergeAll(
       discordGatewayLayer,
+      discordApplicationLayer,
       CheckinService.layer,
       MessageCheckinService.layer,
       MessageRoomOrderService.layer,

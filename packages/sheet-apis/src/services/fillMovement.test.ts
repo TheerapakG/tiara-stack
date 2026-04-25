@@ -6,7 +6,7 @@ import {
   PopulatedBreakSchedule,
   PopulatedSchedule,
   PopulatedSchedulePlayer,
-} from "@/schemas/sheet";
+} from "sheet-ingress-api/schemas/sheet";
 import { diffFillParticipants, getScheduleFills, toFillParticipant } from "./fillMovement";
 
 const makeResolvedFill = (id: string, name: string) =>

@@ -1,0 +1,39 @@
+{
+  "name": "sheet-ingress-server",
+  "version": "0.0.0",
+  "private": true,
+  "keywords": [],
+  "author": "",
+  "files": [
+    "./dist/**"
+  ],
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "format": "vp fmt --check",
+    "format:apply": "vp fmt",
+    "lint": "vp lint src",
+    "build": "vp pack && tar -acf dist.tar.zst ./dist"
+  },
+  "dependencies": {
+    "@effect/platform-node": "catalog:",
+    "effect": "catalog:",
+    "sheet-auth": "workspace:*",
+    "sheet-ingress-api": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.9",
+    "@typescript/native-preview": "7.0.0-dev.20260327.2",
+    "glob": "^11.0.1",
+    "pathe": "^2.0.3",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

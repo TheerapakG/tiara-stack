@@ -10,7 +10,7 @@ import {
   TeamTagsRangesConfig,
   TeamIsvCombinedConfig,
   TeamIsvSplitConfig,
-} from "@/schemas/sheetConfig";
+} from "sheet-ingress-api/schemas/sheetConfig";
 import { type sheets_v4 } from "@googleapis/sheets";
 import {
   Array,

@@ -1,4 +1,4 @@
-import { ParserFieldError } from "@/schemas/sheet/error";
+import { ParserFieldError } from "sheet-ingress-api/schemas/sheet/error";
 import {
   HourRange,
   RunnerConfig,
@@ -7,7 +7,7 @@ import {
   TeamIsvSplitConfig,
   TeamIsvCombinedConfig,
   TeamTagsRangesConfig,
-} from "@/schemas/sheetConfig";
+} from "sheet-ingress-api/schemas/sheetConfig";
 import {
   RawPlayer,
   RawMonitor,
@@ -16,7 +16,7 @@ import {
   makeSchedule,
   BreakSchedule,
   Schedule,
-} from "@/schemas/sheet";
+} from "sheet-ingress-api/schemas/sheet";
 import { regex } from "arkregex";
 import { type sheets_v4 } from "@googleapis/sheets";
 import {

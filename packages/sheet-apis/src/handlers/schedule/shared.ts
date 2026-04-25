@@ -1,9 +1,9 @@
-import type { PermissionSet } from "@/schemas/permissions";
+import type { PermissionSet } from "sheet-ingress-api/schemas/permissions";
 import {
   getEffectiveScheduleView,
   getMaximumScheduleView,
   type ScheduleView,
-} from "@/schemas/sheet";
+} from "sheet-ingress-api/schemas/sheet";
 
 export const resolveScheduleViewFromPermissions = (
   permissions: PermissionSet,

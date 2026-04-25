@@ -4,10 +4,10 @@ import { Effect, Layer, Option } from "effect";
 import { Api } from "@/api";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
-import { SheetAuthGuildUser } from "@/schemas/middlewares/sheetAuthGuildUser";
-import { MessageSlot } from "@/schemas/messageSlot";
+import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthGuildUser";
+import { MessageSlot } from "sheet-ingress-api/schemas/messageSlot";
 import { AuthorizationService, MessageSlotService } from "@/services";
-import { Unauthorized } from "@/schemas/middlewares/unauthorized";
+import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
 
 const missingMessageSlotError = () =>
   makeArgumentError("Cannot get message slot data, the message might not be registered");

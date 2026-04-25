@@ -5,7 +5,7 @@ import {
   Player,
   PopulatedSchedule,
   PopulatedSchedulePlayer,
-} from "@/schemas/sheet";
+} from "sheet-ingress-api/schemas/sheet";
 import { getScheduleFillCount, makeMonitorCheckinMessage } from "./checkin";
 
 const makeResolvedFill = (id: string, name: string) =>

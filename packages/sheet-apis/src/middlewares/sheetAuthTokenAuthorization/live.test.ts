@@ -4,7 +4,7 @@ import { TestClock } from "effect/testing";
 import { Cause, DateTime, Duration, Effect, Exit, Option, Redacted, Ref, Context } from "effect";
 import { vi } from "vitest";
 import type { Account } from "sheet-auth/model";
-import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
+import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import { permissionSetFromIterable } from "@/services/authorization";
 import { makeSheetAuthTokenAuthorization } from "./shared";
 

@@ -1,0 +1,58 @@
+import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
+import { Schema } from "effect";
+import { SchemaError, QueryResultError } from "typhoon-core/error";
+import { GoogleSheetsError } from "../../schemas/google";
+import { ParserFieldError } from "../../schemas/sheet/error";
+import { SheetConfigError } from "../../schemas/sheetConfig";
+import { Monitor, PartialIdMonitor, PartialNameMonitor } from "../../schemas/sheet";
+import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
+
+const MonitorError = [
+  GoogleSheetsError,
+  ParserFieldError,
+  SheetConfigError,
+  SchemaError,
+  QueryResultError,
+];
+
+export class MonitorApi extends HttpApiGroup.make("monitor")
+  .add(
+    HttpApiEndpoint.get("getMonitorMaps", "/monitor/getMonitorMaps", {
+      query: Schema.Struct({ guildId: Schema.String }),
+      success: Schema.Struct({
+        idToMonitor: Schema.Array(
+          Schema.Struct({
+            key: Schema.String,
+            value: Schema.Array(Monitor),
+          }),
+        ),
+        nameToMonitor: Schema.Array(
+          Schema.Struct({
+            key: Schema.String,
+            value: Schema.Struct({
+              name: Schema.String,
+              monitors: Schema.Array(Monitor),
+            }),
+          }),
+        ),
+      }),
+      error: MonitorError,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("getByIds", "/monitor/getByIds", {
+      query: Schema.Struct({ guildId: Schema.String, ids: Schema.Array(Schema.String) }),
+      success: Schema.Array(Schema.Array(Schema.Union([Monitor, PartialIdMonitor]))),
+      error: MonitorError,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("getByNames", "/monitor/getByNames", {
+      query: Schema.Struct({ guildId: Schema.String, names: Schema.Array(Schema.String) }),
+      success: Schema.Array(Schema.Array(Schema.Union([Monitor, PartialNameMonitor]))),
+      error: MonitorError,
+    }),
+  )
+  .middleware(SheetAuthTokenAuthorization)
+  .annotate(OpenApi.Title, "Monitor")
+  .annotate(OpenApi.Description, "Monitor data endpoints") {}

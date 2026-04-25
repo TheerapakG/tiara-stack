@@ -7,7 +7,7 @@ import {
   MessageRoomOrder,
   MessageRoomOrderEntry,
   MessageRoomOrderRange,
-} from "@/schemas/messageRoomOrder";
+} from "sheet-ingress-api/schemas/messageRoomOrder";
 
 export class MessageRoomOrderService extends Context.Service<MessageRoomOrderService>()(
   "MessageRoomOrderService",

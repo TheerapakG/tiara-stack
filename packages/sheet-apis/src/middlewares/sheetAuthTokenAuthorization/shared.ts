@@ -4,15 +4,15 @@ import {
   getKubernetesOAuthImplicitPermissions,
   type SheetAuthClient as SheetAuthClientValue,
 } from "sheet-auth/client";
-import type { Permission, PermissionSet } from "@/schemas/permissions";
-import { SheetAuthUser } from "@/schemas/middlewares/sheetAuthUser";
+import type { Permission, PermissionSet } from "sheet-ingress-api/schemas/permissions";
+import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import {
   appendPermission,
   hasPermission,
   permissionSetFromIterable,
 } from "@/services/authorization";
-import { Unauthorized } from "../../schemas/middlewares/unauthorized";
-import { SheetAuthTokenAuthorization } from "./tag";
+import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
+import { SheetAuthTokenAuthorization } from "sheet-ingress-api/middlewares/sheetAuthTokenAuthorization/tag";
 
 const SUCCESS_TTL = Duration.seconds(30);
 const FAILURE_TTL = Duration.seconds(1);

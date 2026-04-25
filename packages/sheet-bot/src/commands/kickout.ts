@@ -17,6 +17,8 @@ import {
   SheetApisRequestContext,
 } from "../services";
 import { cachesLayer } from "../discord/cache";
+import { discordApplicationLayer } from "../discord/application";
+import { discordConfigLayer } from "../discord/config";
 
 const getInteractionGuildId = Effect.gen(function* () {
   const interactionGuild = yield* Interaction.guild();
@@ -226,7 +228,8 @@ export const kickoutCommandLayer = Layer.effectDiscard(
   Layer.provide(
     Layer.mergeAll(
       discordGatewayLayer,
-      GuildMember.GuildMemberUtils.layer,
+      discordApplicationLayer,
+      Layer.provide(GuildMember.GuildMemberUtils.layer, discordConfigLayer),
       cachesLayer,
       PermissionService.layer,
       GuildConfigService.layer,

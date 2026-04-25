@@ -4,7 +4,7 @@ import { MessageFlags } from "discord-api-types/v10";
 import { Ix } from "dfx/index";
 import { Array, Effect, HashSet, Layer, Option, pipe } from "effect";
 import { Interaction, makeButton, makeMessageComponent } from "dfx-discord-utils/utils";
-import { MessageRoomOrder } from "sheet-apis/schema";
+import * as MessageRoomOrder from "sheet-ingress-api/schemas/messageRoomOrder";
 import { discordGatewayLayer } from "../../discord/gateway";
 import {
   nextButtonData,
@@ -26,6 +26,7 @@ import {
   SheetApisRequestContext,
   stripTentativeRoomOrderPrefix,
 } from "@/services";
+import { discordApplicationLayer } from "../../discord/application";
 
 const formatEffectValue = (effectValue: number): string => {
   const rounded = Math.round(effectValue * 10) / 10;
@@ -473,6 +474,7 @@ export const roomOrderButtonLayer = Layer.effectDiscard(
   Layer.provide(
     Layer.mergeAll(
       discordGatewayLayer,
+      discordApplicationLayer,
       MessageRoomOrderService.layer,
       ConverterService.layer,
       FormatService.layer,

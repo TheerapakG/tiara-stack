@@ -5,8 +5,8 @@ import {
   requireMessageSlotReadAccess,
   requireMessageSlotUpsertAccess,
 } from "./http";
-import { Unauthorized } from "@/schemas/middlewares/unauthorized";
-import { MessageSlot } from "@/schemas/messageSlot";
+import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
+import { MessageSlot } from "sheet-ingress-api/schemas/messageSlot";
 import { AuthorizationService, MessageSlotService } from "@/services";
 import { getFailure, liveGuildServices, withUser } from "@/test-utils/guildTestHelpers";
 

@@ -36,7 +36,7 @@ type TentativeRoomOrderGenerator = {
       }>;
     },
     unknown,
-    unknown
+    never
   >;
 };
 
@@ -63,7 +63,7 @@ type TentativeMessageRoomOrderService = {
         effectValue: number;
       }>;
     },
-  ) => Effect.Effect<unknown, unknown, unknown>;
+  ) => Effect.Effect<unknown, unknown, never>;
 };
 
 export const hasTentativeRoomOrderPrefix = (content: string): boolean =>

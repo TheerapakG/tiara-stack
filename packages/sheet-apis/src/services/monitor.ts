@@ -1,6 +1,6 @@
 import { Effect, HashMap, Layer, Option, Context, pipe } from "effect";
 import { SheetService } from "./sheet";
-import { Monitor, PartialIdMonitor, PartialNameMonitor } from "@/schemas/sheet";
+import { Monitor, PartialIdMonitor, PartialNameMonitor } from "sheet-ingress-api/schemas/sheet";
 import { upperFirst } from "scule";
 import { ScopedCache } from "typhoon-core/utils";
 

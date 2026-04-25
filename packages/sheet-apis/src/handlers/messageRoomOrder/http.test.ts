@@ -5,8 +5,8 @@ import {
   requireRoomOrderMonitorAccess,
   requireRoomOrderUpsertAccess,
 } from "./http";
-import { Unauthorized } from "@/schemas/middlewares/unauthorized";
-import { MessageRoomOrder } from "@/schemas/messageRoomOrder";
+import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
+import { MessageRoomOrder } from "sheet-ingress-api/schemas/messageRoomOrder";
 import { AuthorizationService, MessageRoomOrderService } from "@/services";
 import { getFailure, liveGuildServices, withUser } from "@/test-utils/guildTestHelpers";
 
