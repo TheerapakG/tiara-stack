@@ -4,6 +4,7 @@ import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetA
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
 import type { Permission, PermissionSet } from "sheet-ingress-api/schemas/permissions";
+import { decodeBearerCredential } from "./bearerCredential";
 import { SheetApisClient } from "./sheetApisClient";
 
 type SheetAuthUserType = Context.Service.Shape<typeof SheetAuthUser>;
@@ -260,11 +261,12 @@ export const SheetAuthTokenAuthorizationLive = Layer.effect(
         httpEffect,
         { credential },
       ) {
+        const token = decodeBearerCredential(credential);
         const resolvedUser = yield* sheetApisClient
           .withServiceUser(
             sheetApisClient.permissions.resolveTokenPermissions({
               payload: {
-                token: credential,
+                token,
               },
             }),
           )
@@ -282,7 +284,7 @@ export const SheetAuthTokenAuthorizationLive = Layer.effect(
           accountId: resolvedUser.accountId,
           userId: resolvedUser.userId,
           permissions: resolvedUser.permissions,
-          token: credential,
+          token,
         });
       }),
     });

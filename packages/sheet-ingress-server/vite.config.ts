@@ -13,6 +13,11 @@ const filePaths = [
 ];
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+    },
+  },
   pack: {
     entry: Object.fromEntries(
       filePaths.map((filePath) => {

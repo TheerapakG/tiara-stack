@@ -37,6 +37,8 @@ import {
   hasPermission,
   SheetAuthTokenAuthorizationLive,
 } from "./services/authorization";
+import { decodeBearerCredential } from "./services/bearerCredential";
+import { scrubbedForwardHeadersFrom } from "./services/headers";
 import { MessageLookup } from "./services/messageLookup";
 import { SheetApisClient } from "./services/sheetApisClient";
 
@@ -91,29 +93,6 @@ function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
   });
 }
 
-const forwardedHeadersFrom = (request: HttpServerRequest.HttpServerRequest) => {
-  const remoteAddress = Option.getOrUndefined(request.remoteAddress);
-  const forwardedFor = remoteAddress
-    ? [request.headers["x-forwarded-for"], remoteAddress].filter(Boolean).join(", ")
-    : request.headers["x-forwarded-for"];
-
-  return {
-    ...(forwardedFor ? { "x-forwarded-for": forwardedFor } : {}),
-    "x-forwarded-host": request.headers["x-forwarded-host"] ?? request.headers.host ?? "",
-    "x-forwarded-proto": request.headers["x-forwarded-proto"] ?? "http",
-  };
-};
-
-const scrubbedForwardHeadersFrom = (request: HttpServerRequest.HttpServerRequest) => {
-  const safeHeaders = Object.fromEntries(
-    Object.entries(request.headers).filter(([key]) => {
-      const normalizedKey = key.toLowerCase();
-      return normalizedKey !== "authorization" && !normalizedKey.startsWith("x-sheet-");
-    }),
-  );
-  return { ...safeHeaders, ...forwardedHeadersFrom(request) };
-};
-
 const getBearerAuthorization = (request: HttpServerRequest.HttpServerRequest) => {
   const authorization = request.headers.authorization;
 
@@ -142,7 +121,9 @@ class ServiceTokenAuthorizer extends Context.Service<
             .withServiceUser(
               sheetApisClient.permissions.resolveTokenPermissions({
                 payload: {
-                  token: Redacted.make(authorization.slice("Bearer ".length).trim()),
+                  token: decodeBearerCredential(
+                    Redacted.make(authorization.slice("Bearer ".length).trim()),
+                  ),
                 },
               }),
             )

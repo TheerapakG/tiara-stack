@@ -4,7 +4,7 @@ import { SchemaError, QueryResultError, ArgumentError } from "typhoon-core/error
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
 import { CurrentUserPermissions, ResolvedUserPermissions } from "../../schemas/permissions";
 
-const RedactedStringFromJsonString = Schema.String.pipe(
+export const RedactedStringFromJsonString = Schema.String.pipe(
   Schema.decodeTo(Schema.Redacted(Schema.String), {
     decode: SchemaGetter.transform((token: string) => Redacted.make(token)),
     encode: SchemaGetter.transform((token: Redacted.Redacted<string>) => Redacted.value(token)),
