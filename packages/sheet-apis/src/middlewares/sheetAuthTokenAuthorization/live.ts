@@ -1,15 +1,149 @@
-import { Effect, Layer } from "effect";
-import { ApplicationOwnerResolver } from "../../services/applicationOwner";
-import { SheetAuthClient } from "../../services/sheetAuthClient";
-import { makeSheetAuthTokenAuthorization } from "./shared";
+import { HttpServerRequest } from "effect/unstable/http";
+import {
+  Cache,
+  Clock,
+  Duration,
+  Effect,
+  Exit,
+  HashSet,
+  Layer,
+  Option,
+  Redacted,
+  Schema,
+} from "effect";
+import { verifyKubernetesToken } from "sheet-auth/plugins/kubernetes-oauth";
 import { SheetAuthTokenAuthorization } from "sheet-ingress-api/middlewares/sheetAuthTokenAuthorization/tag";
+import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
+import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
+import { Permission } from "sheet-ingress-api/schemas/permissions";
+import { config } from "@/config";
+
+const forwardedHeaders = Schema.Struct({
+  "x-sheet-ingress-auth": Schema.optional(Schema.String),
+  "x-sheet-auth-user-id": Schema.optional(Schema.String),
+  "x-sheet-auth-account-id": Schema.optional(Schema.String),
+  "x-sheet-auth-permissions": Schema.optional(Schema.String),
+});
+
+// Ingress-forwarded users are already authenticated at the boundary. The raw
+// sheet-auth session token is intentionally unavailable inside sheet-apis.
+const forwardedSessionTokenUnavailable = Redacted.make("ingress-forwarded-token-unavailable");
+
+const parsePermissions = (permissions: string | undefined) =>
+  Effect.forEach(
+    permissions?.split(",").filter((permission) => permission.length > 0) ?? [],
+    (permission) => Schema.decodeUnknownEffect(Permission)(permission),
+  ).pipe(
+    Effect.map((values) => HashSet.fromIterable(values)),
+    Effect.mapError(
+      (cause) => new Unauthorized({ message: "Invalid forwarded auth permissions", cause }),
+    ),
+  );
+
+const getBearerToken = (authorization: string | undefined) => {
+  if (!authorization?.startsWith("Bearer ")) {
+    return undefined;
+  }
+
+  const token = authorization.slice("Bearer ".length).trim();
+  return token.length === 0 ? undefined : token;
+};
+
+type VerifiedIngressToken = {
+  readonly exp: number | undefined;
+  readonly ttl: Duration.Duration;
+};
+
+const requireUnexpiredVerifiedToken = ({ exp }: { readonly exp: number | undefined }) =>
+  typeof exp === "number"
+    ? Clock.currentTimeMillis.pipe(
+        Effect.flatMap((now) =>
+          now < exp * 1000
+            ? Effect.void
+            : Effect.fail(new Unauthorized({ message: "Expired ingress Kubernetes token" })),
+        ),
+      )
+    : Effect.void;
 
 export const SheetAuthTokenAuthorizationLive = Layer.effect(
   SheetAuthTokenAuthorization,
   Effect.gen(function* () {
-    const authClient = yield* SheetAuthClient;
-    const applicationOwnerResolver = yield* ApplicationOwnerResolver;
+    const podNamespace = yield* config.podNamespace;
+    const maybeIngressNamespace = yield* config.sheetIngressNamespace;
+    const ingressNamespace = Option.getOrElse(maybeIngressNamespace, () => podNamespace);
+    const audience = yield* config.sheetIngressKubernetesAudience;
+    const expectedSubject = `system:serviceaccount:${ingressNamespace}:sheet-ingress-server`;
+    // 100 entries covers normal 5-minute projected token rotation with headroom
+    // while still bounding distinct invalid/old token pressure.
+    const ingressTokenCache = yield* Cache.makeWith(
+      (token: string) =>
+        Effect.tryPromise({
+          try: () => verifyKubernetesToken(token, audience),
+          catch: (cause) =>
+            new Unauthorized({ message: "Invalid ingress Kubernetes token", cause }),
+        }).pipe(
+          Effect.flatMap(({ exp, sub }) =>
+            sub === expectedSubject
+              ? Clock.currentTimeMillis.pipe(
+                  Effect.map((now) => ({
+                    exp,
+                    ttl:
+                      typeof exp === "number"
+                        ? Duration.min(
+                            Duration.minutes(5),
+                            Duration.millis(Math.max(0, exp * 1000 - now)),
+                          )
+                        : Duration.minutes(5),
+                  })),
+                )
+              : Effect.fail(
+                  new Unauthorized({
+                    message: `Invalid ingress Kubernetes token subject: ${sub}`,
+                  }),
+                ),
+          ),
+        ),
+      {
+        capacity: 100,
+        timeToLive: Exit.match({
+          onFailure: () => Duration.seconds(1),
+          onSuccess: ({ ttl }: VerifiedIngressToken) => ttl,
+        }),
+      },
+    );
 
-    return yield* makeSheetAuthTokenAuthorization(authClient, applicationOwnerResolver);
+    return SheetAuthTokenAuthorization.of({
+      sheetAuthToken: Effect.fn("SheetAuthTokenAuthorization.sheetAuthToken")(
+        function* (httpEffect, _options) {
+          const headers = yield* HttpServerRequest.schemaHeaders(forwardedHeaders).pipe(
+            Effect.mapError(
+              (cause) => new Unauthorized({ message: "Invalid forwarded auth headers", cause }),
+            ),
+          );
+          const ingressToken = getBearerToken(headers["x-sheet-ingress-auth"]);
+
+          if (!ingressToken) {
+            return yield* Effect.fail(
+              new Unauthorized({ message: "Missing ingress authorization" }),
+            );
+          }
+          const verifiedToken = yield* Cache.get(ingressTokenCache, ingressToken);
+          yield* requireUnexpiredVerifiedToken(verifiedToken);
+
+          if (!headers["x-sheet-auth-user-id"] || !headers["x-sheet-auth-account-id"]) {
+            return yield* Effect.fail(new Unauthorized({ message: "Missing forwarded auth user" }));
+          }
+
+          const permissions = yield* parsePermissions(headers["x-sheet-auth-permissions"]);
+
+          return yield* Effect.provideService(httpEffect, SheetAuthUser, {
+            accountId: headers["x-sheet-auth-account-id"],
+            userId: headers["x-sheet-auth-user-id"],
+            permissions,
+            token: forwardedSessionTokenUnavailable,
+          });
+        },
+      ),
+    });
   }),
-).pipe(Layer.provide([SheetAuthClient.layer, ApplicationOwnerResolver.layer]));
+);

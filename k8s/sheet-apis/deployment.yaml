@@ -32,6 +32,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: SHEET_INGRESS_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               valueFrom:
                 secretKeyRef:
@@ -54,11 +58,8 @@ spec:
                 secretKeyRef:
                   name: sheet-apis-secret
                   key: sheetAuthIssuer
-            - name: TRUSTED_ORIGINS
-              valueFrom:
-                secretKeyRef:
-                  name: sheet-apis-secret
-                  key: trustedOrigins
+            - name: SHEET_INGRESS_KUBERNETES_AUDIENCE
+              value: sheet-apis
             - name: SHEET_INGRESS_BASE_URL
               valueFrom:
                 secretKeyRef:

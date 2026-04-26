@@ -41,6 +41,11 @@ spec:
                 secretKeyRef:
                   name: sheet-ingress-server-secret
                   key: sheetAuthIssuer
+            - name: TRUSTED_ORIGINS
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-ingress-server-secret
+                  key: trustedOrigins
           livenessProbe:
             httpGet:
               path: /health
@@ -65,7 +70,23 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 2
             failureThreshold: 12
+          volumeMounts:
+            - name: sheet-ingress-server-tokens
+              readOnly: true
+              mountPath: "/var/run/secrets/tokens"
       serviceAccountName: sheet-ingress-server
+      volumes:
+        - name: sheet-ingress-server-tokens
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: sheet-auth-token
+                  expirationSeconds: 3600
+                  audience: sheet-auth
+              - serviceAccountToken:
+                  path: sheet-apis-token
+                  expirationSeconds: 3600
+                  audience: sheet-apis
 ---
 apiVersion: v1
 kind: Service

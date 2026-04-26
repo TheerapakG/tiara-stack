@@ -566,6 +566,9 @@ importers:
       sheet-ingress-api:
         specifier: workspace:*
         version: link:../sheet-ingress-api
+      typhoon-core:
+        specifier: workspace:*
+        version: link:../typhoon-core
     devDependencies:
       '@types/node':
         specifier: ^24.10.9

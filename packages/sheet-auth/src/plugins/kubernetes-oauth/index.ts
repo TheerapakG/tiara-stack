@@ -63,7 +63,7 @@ function getJWKS(expectedAudience: string) {
 export async function verifyKubernetesToken(
   token: string,
   expectedAudience: string,
-): Promise<{ sub: string }> {
+): Promise<{ exp: number | undefined; sub: string }> {
   const jwks = getJWKS(expectedAudience);
 
   const { payload } = await jwtVerify(token, jwks, {
@@ -76,6 +76,7 @@ export async function verifyKubernetesToken(
   }
 
   return {
+    exp: payload.exp,
     sub: payload.sub,
   };
 }

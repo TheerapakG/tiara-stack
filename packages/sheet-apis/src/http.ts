@@ -1,10 +1,9 @@
 import { NodeHttpServer } from "@effect/platform-node";
-import { HttpMiddleware, HttpRouter, HttpServer } from "effect/unstable/http";
+import { HttpRouter, HttpServer } from "effect/unstable/http";
 import { HttpApiBuilder, HttpApiSwagger } from "effect/unstable/httpapi";
-import { Effect, Layer } from "effect";
+import { Layer } from "effect";
 import { createServer } from "http";
 import { SheetApisApi } from "sheet-ingress-api/sheet-apis";
-import { config } from "./config";
 import { calcLayer } from "./handlers/calc";
 import { checkinLayer } from "./handlers/checkin";
 import { discordLayer } from "./handlers/discord";
@@ -22,53 +21,6 @@ import { screenshotLayer } from "./handlers/screenshot";
 import { sheetLayer } from "./handlers/sheet";
 import { discordLayer as discordServiceLayer } from "./services/discord";
 
-function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
-  return allowedOrigins.some((allowed) => {
-    if (allowed === origin) {
-      return true;
-    }
-    if (allowed.includes("*")) {
-      const withPlaceholder = allowed.replace(/\*/g, "\x00");
-      const escaped = withPlaceholder.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-      // eslint-disable-next-line no-control-regex
-      const regex = new RegExp(`^${escaped.replace(/\x00/g, "[^./]*")}$`);
-      return regex.test(origin);
-    }
-    return false;
-  });
-}
-
-// Debug middleware to log scope information
-let requestId = 0;
-const debugScopeMiddleware = HttpRouter.middleware(
-  Effect.succeed(
-    Effect.fnUntraced(function* (effect) {
-      const reqNum = ++requestId;
-      const scope = yield* Effect.scope;
-      console.log(`[Request #${reqNum}] Scope object:`, scope);
-      console.log(`[Request #${reqNum}] Scope state:`, (scope as any).state);
-      return yield* effect;
-    }),
-  ),
-).layer;
-
-const corsMiddlewareLayer = Layer.unwrap(
-  Effect.gen(function* () {
-    const trustedOrigins = [...(yield* config.trustedOrigins)];
-    return HttpRouter.middleware(
-      HttpMiddleware.cors({
-        allowedOrigins: (origin) => isOriginAllowed(origin, trustedOrigins),
-        allowedHeaders: ["Content-Type", "Authorization", "b3", "traceparent", "tracestate"],
-        allowedMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
-        exposedHeaders: ["Content-Length"],
-        maxAge: 600,
-        credentials: true,
-      }),
-      { global: true },
-    );
-  }),
-);
-
 const ApiLayer = Layer.provide(HttpApiBuilder.layer(SheetApisApi), [
   calcLayer,
   checkinLayer,
@@ -85,10 +37,7 @@ const ApiLayer = Layer.provide(HttpApiBuilder.layer(SheetApisApi), [
   screenshotLayer,
   scheduleLayer,
   discordLayer,
-]).pipe(
-  Layer.merge(HttpApiSwagger.layer(SheetApisApi)),
-  Layer.provide([corsMiddlewareLayer, debugScopeMiddleware]),
-);
+]).pipe(Layer.merge(HttpApiSwagger.layer(SheetApisApi)));
 
 export const httpLayer = HttpRouter.serve(ApiLayer).pipe(
   Layer.provide(discordServiceLayer),

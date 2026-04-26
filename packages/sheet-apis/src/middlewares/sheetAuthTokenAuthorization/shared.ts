@@ -1,4 +1,4 @@
-import { Cache, Duration, Effect, Exit, Option, Redacted } from "effect";
+import { Cache, Context, Duration, Effect, Exit, Option, Redacted } from "effect";
 import {
   getAccount,
   getKubernetesOAuthImplicitPermissions,
@@ -21,6 +21,8 @@ interface CachedAuthorization {
   accountId: string;
   permissions: PermissionSet;
 }
+
+type SheetAuthUserType = Context.Service.Shape<typeof SheetAuthUser>;
 
 const makeUnauthorized = (message: string, cause?: unknown) =>
   new Unauthorized({
@@ -86,6 +88,64 @@ const resolveBaseAuthorizationPermissions = Effect.fn("resolveBaseAuthorizationP
     }
 
     return permissions;
+  },
+);
+
+export const resolveSheetAuthUserFromToken = Effect.fn("resolveSheetAuthUserFromToken")(function* (
+  authClient: SheetAuthClientValue,
+  applicationOwnerResolver: {
+    getOwnerId: () => Effect.Effect<Option.Option<string>, never, never>;
+  },
+  token: Redacted.Redacted<string>,
+) {
+  const authorization = yield* resolveCachedAuthorization(authClient, token);
+  const permissions = yield* resolveBaseAuthorizationPermissions(
+    authorization,
+    applicationOwnerResolver,
+  );
+
+  return {
+    accountId: authorization.accountId,
+    userId: authorization.userId,
+    permissions,
+    token,
+  } satisfies SheetAuthUserType;
+});
+
+export const makeResolveSheetAuthUserFromToken = Effect.fn("makeResolveSheetAuthUserFromToken")(
+  function* (
+    authClient: SheetAuthClientValue,
+    applicationOwnerResolver: {
+      getOwnerId: () => Effect.Effect<Option.Option<string>, never, never>;
+    },
+  ) {
+    const authorizationCache = yield* Cache.makeWith(
+      (token: Redacted.Redacted<string>) => resolveCachedAuthorization(authClient, token),
+      {
+        capacity: 10_000,
+        timeToLive: Exit.match({
+          onFailure: () => FAILURE_TTL,
+          onSuccess: () => SUCCESS_TTL,
+        }),
+      },
+    );
+
+    return Effect.fn("resolveSheetAuthUserFromTokenCached")(function* (
+      token: Redacted.Redacted<string>,
+    ) {
+      const authorization = yield* Cache.get(authorizationCache, token);
+      const permissions = yield* resolveBaseAuthorizationPermissions(
+        authorization,
+        applicationOwnerResolver,
+      );
+
+      return {
+        accountId: authorization.accountId,
+        userId: authorization.userId,
+        permissions,
+        token,
+      } satisfies SheetAuthUserType;
+    });
   },
 );
 

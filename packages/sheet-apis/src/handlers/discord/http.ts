@@ -2,49 +2,44 @@ import { GuildsApiCacheView } from "dfx-discord-utils/discord/cache/guilds";
 import { HttpServerRequest } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Effect, Layer, Redacted, Schema } from "effect";
-import { getDiscordAccessToken } from "sheet-auth/client";
 import { makeArgumentError } from "typhoon-core/error";
 import { Api } from "@/api";
 import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { Discord } from "@/schema";
-import { SheetAuthClient, discordLayer as discordServiceLayer } from "@/services";
+import { discordLayer as discordServiceLayer } from "@/services";
+
+const forwardedDiscordHeaders = Schema.Struct({
+  "x-sheet-discord-access-token": Schema.optional(Schema.String),
+});
 
 const DiscordMyGuild = Schema.Struct({
   id: Schema.String,
+});
+
+const getForwardedDiscordAccessToken = Effect.fn("getForwardedDiscordAccessToken")(function* () {
+  const headers = yield* HttpServerRequest.schemaHeaders(forwardedDiscordHeaders);
+  if (!headers["x-sheet-discord-access-token"]) {
+    return yield* Effect.fail(makeArgumentError("Missing forwarded Discord access token"));
+  }
+  return Redacted.make(headers["x-sheet-discord-access-token"]);
 });
 
 export const discordLayer = HttpApiBuilder.group(
   Api,
   "discord",
   Effect.fn(function* (handlers) {
-    const authClient = yield* SheetAuthClient;
     const guildsCache = yield* GuildsApiCacheView;
 
     return handlers
       .handle(
         "getCurrentUser",
         Effect.fnUntraced(function* () {
-          const headers = yield* HttpServerRequest.schemaHeaders(
-            Schema.Record(Schema.String, Schema.UndefinedOr(Schema.String)),
-          );
-
-          const authHeaders: Record<string, string> = {};
-          if (typeof headers.origin === "string") authHeaders.origin = headers.origin;
-          if (typeof headers.cookie === "string") authHeaders.cookie = headers.cookie;
-
-          const tokenResult = yield* getDiscordAccessToken(authClient, authHeaders).pipe(
-            Effect.mapError((error) =>
-              makeArgumentError(
-                `Failed to get Discord access token: ${error.message}. ` +
-                  "Ensure the user has authenticated with Discord.",
-              ),
-            ),
-          );
+          const accessToken = yield* getForwardedDiscordAccessToken();
 
           const discordResponse = yield* Effect.promise(() =>
             fetch("https://discord.com/api/v10/users/@me", {
               headers: {
-                Authorization: `Bearer ${Redacted.value(tokenResult.accessToken)}`,
+                Authorization: `Bearer ${Redacted.value(accessToken)}`,
               },
             }),
           );
@@ -70,27 +65,12 @@ export const discordLayer = HttpApiBuilder.group(
       .handle(
         "getCurrentUserGuilds",
         Effect.fnUntraced(function* () {
-          const headers = yield* HttpServerRequest.schemaHeaders(
-            Schema.Record(Schema.String, Schema.UndefinedOr(Schema.String)),
-          );
-
-          const authHeaders: Record<string, string> = {};
-          if (typeof headers.origin === "string") authHeaders.origin = headers.origin;
-          if (typeof headers.cookie === "string") authHeaders.cookie = headers.cookie;
-
-          const tokenResult = yield* getDiscordAccessToken(authClient, authHeaders).pipe(
-            Effect.mapError((error) =>
-              makeArgumentError(
-                `Failed to get Discord access token: ${error.message}. ` +
-                  "Ensure the user has authenticated with Discord.",
-              ),
-            ),
-          );
+          const accessToken = yield* getForwardedDiscordAccessToken();
 
           const discordResponse = yield* Effect.promise(() =>
             fetch("https://discord.com/api/v10/users/@me/guilds", {
               headers: {
-                Authorization: `Bearer ${Redacted.value(tokenResult.accessToken)}`,
+                Authorization: `Bearer ${Redacted.value(accessToken)}`,
               },
             }),
           );
@@ -140,6 +120,4 @@ export const discordLayer = HttpApiBuilder.group(
         }),
       );
   }),
-).pipe(
-  Layer.provide([SheetAuthClient.layer, discordServiceLayer, SheetAuthTokenAuthorizationLive]),
-);
+).pipe(Layer.provide([discordServiceLayer, SheetAuthTokenAuthorizationLive]));

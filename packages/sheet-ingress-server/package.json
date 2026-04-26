@@ -26,7 +26,8 @@
     "@effect/platform-node": "catalog:",
     "effect": "catalog:",
     "sheet-auth": "workspace:*",
-    "sheet-ingress-api": "workspace:*"
+    "sheet-ingress-api": "workspace:*",
+    "typhoon-core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.10.9",
