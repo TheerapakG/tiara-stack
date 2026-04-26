@@ -1,8 +1,15 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
-import { Schema } from "effect";
+import { Redacted, Schema, SchemaGetter } from "effect";
 import { SchemaError, QueryResultError, ArgumentError } from "typhoon-core/error";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
 import { CurrentUserPermissions, ResolvedUserPermissions } from "../../schemas/permissions";
+
+const RedactedStringFromJsonString = Schema.String.pipe(
+  Schema.decodeTo(Schema.Redacted(Schema.String), {
+    decode: SchemaGetter.transform((token: string) => Redacted.make(token)),
+    encode: SchemaGetter.transform((token: Redacted.Redacted<string>) => Redacted.value(token)),
+  }),
+);
 
 export class PermissionsApi extends HttpApiGroup.make("permissions")
   .add(
@@ -17,7 +24,7 @@ export class PermissionsApi extends HttpApiGroup.make("permissions")
   .add(
     HttpApiEndpoint.post("resolveTokenPermissions", "/permissions/resolveTokenPermissions", {
       payload: Schema.Struct({
-        token: Schema.Redacted(Schema.String),
+        token: RedactedStringFromJsonString,
         guildId: Schema.optional(Schema.String),
       }),
       success: ResolvedUserPermissions,
