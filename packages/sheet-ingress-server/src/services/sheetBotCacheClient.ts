@@ -35,7 +35,7 @@ export class SheetBotCacheClient extends Context.Service<SheetBotCacheClient>()(
             params: { parentId: guildId },
           });
 
-          return new Map(
+          return new Map<string, CachedGuildRole>(
             roles.map(({ value }) => [
               value.id,
               {

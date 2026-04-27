@@ -18,6 +18,10 @@
       "types": "./dist/discord/index.d.mts",
       "default": "./dist/discord/index.mjs"
     },
+    "./discord/api": {
+      "types": "./dist/discord/api.d.mts",
+      "default": "./dist/discord/api.mjs"
+    },
     "./discord/cache": {
       "types": "./dist/discord/cache.d.mts",
       "default": "./dist/discord/cache.mjs"
@@ -49,6 +53,10 @@
     "./discord/gateway": {
       "types": "./dist/discord/gateway.d.mts",
       "default": "./dist/discord/gateway.mjs"
+    },
+    "./discord/rpc": {
+      "types": "./dist/discord/rpc.d.mts",
+      "default": "./dist/discord/rpc.mjs"
     },
     "./utils": {
       "types": "./dist/utils/index.d.mts",

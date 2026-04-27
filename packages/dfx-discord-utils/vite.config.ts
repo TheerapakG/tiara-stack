@@ -13,6 +13,7 @@ const filePaths = [
 ];
 
 const directEntries = {
+  "discord/api": fileURLToPath(new URL("./src/discord/api.ts", import.meta.url)),
   "discord/cache": fileURLToPath(new URL("./src/discord/cache/index.ts", import.meta.url)),
   "discord/cache/shared": fileURLToPath(new URL("./src/discord/cache/shared.ts", import.meta.url)),
   "discord/cache/guilds": fileURLToPath(new URL("./src/discord/cache/guilds.ts", import.meta.url)),
@@ -25,9 +26,16 @@ const directEntries = {
   ),
   "discord/schema": fileURLToPath(new URL("./src/discord/schema/index.ts", import.meta.url)),
   "discord/gateway": fileURLToPath(new URL("./src/discord/gateway.ts", import.meta.url)),
+  "discord/rpc": fileURLToPath(new URL("./src/discord/rpc.ts", import.meta.url)),
 };
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "~": fileURLToPath(new URL("./src", import.meta.url)),
+    },
+  },
   pack: {
     entry: {
       ...Object.fromEntries(

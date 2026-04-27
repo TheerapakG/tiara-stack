@@ -1,1 +1,1 @@
-export { SheetBotApi as Api } from "sheet-ingress-api/sheet-bot";
+export { SheetBotRpcs as Api } from "sheet-ingress-api/sheet-bot";
