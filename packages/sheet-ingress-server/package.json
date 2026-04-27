@@ -25,7 +25,12 @@
     "build": "vp pack && tar -acf dist.tar.zst ./dist"
   },
   "dependencies": {
+    "@effect/opentelemetry": "catalog:",
     "@effect/platform-node": "catalog:",
+    "@opentelemetry/exporter-prometheus": "^0.207.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.207.0",
+    "@opentelemetry/sdk-metrics": "^2.2.0",
+    "@opentelemetry/sdk-trace-base": "^2.2.0",
     "effect": "catalog:",
     "sheet-auth": "workspace:*",
     "sheet-ingress-api": "workspace:*",

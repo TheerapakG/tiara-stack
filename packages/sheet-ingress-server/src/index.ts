@@ -45,6 +45,7 @@ import { decodeBearerCredential } from "./services/bearerCredential";
 import { MessageLookup } from "./services/messageLookup";
 import { SheetApisClient } from "./services/sheetApisClient";
 import { SheetBotClient } from "./services/sheetBotClient";
+import { TelemetryLive } from "./telemetry";
 
 function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
   return allowedOrigins.some((allowed) => {
@@ -920,6 +921,7 @@ const HttpLive = Layer.unwrap(
 );
 
 const MainLive = HttpLive.pipe(
+  Layer.provide(TelemetryLive),
   Layer.provide(Logger.layer([Logger.consoleLogFmt])),
   Layer.provide(NodeHttpClient.layerFetch),
   Layer.provide(configProviderLayer),

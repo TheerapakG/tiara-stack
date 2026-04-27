@@ -25,7 +25,14 @@ spec:
           ports:
             - containerPort: 3000
               name: ingress-svc
+            - containerPort: 9464
+              name: ingress-met
           env:
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-ingress-server-secret
+                  key: otelExporterOtlpEndpoint
             - name: SHEET_APIS_BASE_URL
               valueFrom:
                 secretKeyRef:
@@ -100,5 +107,23 @@ spec:
       protocol: TCP
       port: 80
       targetPort: ingress-svc
+    - name: ingress-met
+      protocol: TCP
+      port: 9464
+      targetPort: ingress-met
   selector:
     app: sheet-ingress-server
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: sheet-ingress-server
+  labels:
+    app: sheet-ingress-server
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: sheet-ingress-server
+  endpoints:
+    - port: ingress-met
