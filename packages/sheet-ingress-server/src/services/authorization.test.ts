@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { Cause, Effect, Exit, HashSet, Layer, Redacted } from "effect";
+import { Cause, Effect, Exit, Layer, Option, Redacted } from "effect";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
-import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
 import {
   AuthorizationService,
   hasDiscordAccountPermission,
@@ -10,44 +9,68 @@ import {
   permissionSetFromIterable,
 } from "./authorization";
 import { SheetApisClient } from "./sheetApisClient";
+import { SheetBotCacheClient } from "./sheetBotCacheClient";
 
-const makeUser = (permissions: Iterable<string> = []) => ({
-  accountId: "discord-user-1",
-  userId: "user-1",
-  permissions: HashSet.fromIterable(permissions),
+type SheetBotCacheClientApi = typeof SheetBotCacheClient.Service;
+
+const makeUser = (
+  permissions: Iterable<string> = [],
+  identity = { accountId: "discord-user-1", userId: "user-1" },
+) => ({
+  accountId: identity.accountId,
+  userId: identity.userId,
+  permissions: permissionSetFromIterable(permissions as never),
   token: Redacted.make("token-1"),
 });
 
-const makeSheetApisClient = (permissions: Iterable<string>) => {
-  const resolveTokenPermissions = vi.fn(
-    ({ payload }: { payload: { token: Redacted.Redacted<string>; guildId?: string } }) =>
-      Effect.succeed({
-        accountId: "discord-user-1",
-        userId: "user-1",
-        permissions: permissionSetFromIterable(permissions as never),
-        guildId: payload.guildId,
-      }),
+const makeSheetApisClient = (monitorRoleIds: ReadonlyArray<string> = []) => {
+  const getGuildMonitorRoles = vi.fn(() =>
+    Effect.succeed(monitorRoleIds.map((roleId) => ({ roleId }))),
   );
 
   return {
     client: {
       withServiceUser: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect,
-      permissions: {
-        resolveTokenPermissions,
+      guildConfig: {
+        getGuildMonitorRoles,
       },
     } as never,
-    resolveTokenPermissions,
+    getGuildMonitorRoles,
   };
 };
+
+const makeSheetBotCacheClient = ({
+  member = Option.some({ roles: [] as ReadonlyArray<string> }),
+  roles = new Map<string, { id: string; permissions: string }>(),
+  memberError,
+  rolesError,
+}: {
+  readonly member?: Option.Option<{ readonly roles: ReadonlyArray<string> }>;
+  readonly roles?: ReadonlyMap<string, { readonly id: string; readonly permissions: string }>;
+  readonly memberError?: unknown;
+  readonly rolesError?: unknown;
+} = {}): SheetBotCacheClientApi & {
+  readonly getMember: ReturnType<typeof vi.fn>;
+  readonly getRolesForGuild: ReturnType<typeof vi.fn>;
+} =>
+  ({
+    getMember: vi.fn(() => (memberError ? Effect.fail(memberError) : Effect.succeed(member))),
+    getRolesForGuild: vi.fn(() => (rolesError ? Effect.fail(rolesError) : Effect.succeed(roles))),
+  }) as unknown as SheetBotCacheClientApi & {
+    readonly getMember: ReturnType<typeof vi.fn>;
+    readonly getRolesForGuild: ReturnType<typeof vi.fn>;
+  };
 
 const runAuthorization = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
   {
     user = makeUser(),
     sheetApisClient = makeSheetApisClient([]).client,
+    sheetBotCacheClient = makeSheetBotCacheClient(),
   }: {
     readonly user?: ReturnType<typeof makeUser>;
     readonly sheetApisClient?: typeof SheetApisClient.Service;
+    readonly sheetBotCacheClient?: typeof SheetBotCacheClient.Service;
   } = {},
 ) => {
   const authorizationLayer = Layer.effect(AuthorizationService, AuthorizationService.make);
@@ -55,6 +78,7 @@ const runAuthorization = <A, E, R>(
     Effect.provide(authorizationLayer),
     Effect.provideService(SheetAuthUser, user),
     Effect.provideService(SheetApisClient, sheetApisClient),
+    Effect.provideService(SheetBotCacheClient, sheetBotCacheClient),
   );
 
   return provided;
@@ -127,7 +151,10 @@ describe("AuthorizationService", () => {
   });
 
   it("resolves guild permissions before requiring guild permission", async () => {
-    const { client, resolveTokenPermissions } = makeSheetApisClient(["monitor_guild:guild-1"]);
+    const { client, getGuildMonitorRoles } = makeSheetApisClient(["role-1"]);
+    const sheetBotCacheClient = makeSheetBotCacheClient({
+      member: Option.some({ roles: ["role-1"] }),
+    });
 
     await Effect.runPromise(
       runAuthorization(
@@ -137,18 +164,20 @@ describe("AuthorizationService", () => {
         }),
         {
           sheetApisClient: client,
+          sheetBotCacheClient,
         },
       ),
     );
 
-    expect(resolveTokenPermissions).toHaveBeenCalledTimes(1);
-    const [actualCall] = resolveTokenPermissions.mock.calls[0];
-    expect(Redacted.value(actualCall.payload.token)).toBe("token-1");
-    expect(actualCall.payload.guildId).toBe("guild-1");
+    expect(getGuildMonitorRoles).toHaveBeenCalledTimes(1);
+    expect(sheetBotCacheClient.getMember).toHaveBeenCalledTimes(1);
   });
 
   it("caches guild permission resolution for the same token and guild", async () => {
-    const { client, resolveTokenPermissions } = makeSheetApisClient(["member_guild:guild-1"]);
+    const { client, getGuildMonitorRoles } = makeSheetApisClient([]);
+    const sheetBotCacheClient = makeSheetBotCacheClient({
+      member: Option.some({ roles: [] }),
+    });
 
     await Effect.runPromise(
       runAuthorization(
@@ -159,35 +188,117 @@ describe("AuthorizationService", () => {
         }),
         {
           sheetApisClient: client,
+          sheetBotCacheClient,
         },
       ),
     );
 
-    expect(resolveTokenPermissions).toHaveBeenCalledTimes(1);
+    expect(getGuildMonitorRoles).toHaveBeenCalledTimes(1);
+    expect(sheetBotCacheClient.getMember).toHaveBeenCalledTimes(1);
   });
 
-  it("maps guild permission lookup failures to Unauthorized", async () => {
-    const sheetApisClient = {
-      withServiceUser: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect,
-      permissions: {
-        resolveTokenPermissions: () => Effect.fail(new Error("lookup failed")),
-      },
-    } as never;
+  it("caches guild role lookups across users for the same guild", async () => {
+    const sheetBotCacheClient = makeSheetBotCacheClient({
+      member: Option.some({ roles: ["role-1"] }),
+      roles: new Map([["role-1", { id: "role-1", permissions: "32" }]]),
+    });
 
-    const exit = await Effect.runPromiseExit(
+    await Effect.runPromise(
       runAuthorization(
         Effect.gen(function* () {
           const authorization = yield* AuthorizationService;
           yield* authorization.resolveCurrentGuildUser("guild-1");
+          yield* authorization.resolveSheetAuthGuildUser(
+            makeUser([], { accountId: "discord-user-2", userId: "user-2" }),
+            "guild-1",
+          );
         }),
-        { sheetApisClient },
+        { sheetBotCacheClient },
       ),
     );
 
-    expect(Exit.isFailure(exit)).toBe(true);
-    if (Exit.isFailure(exit)) {
-      expect(Cause.pretty(exit.cause)).toContain("Failed to resolve guild permissions");
-      expect(Cause.pretty(exit.cause)).toContain(Unauthorized.name);
-    }
+    expect(sheetBotCacheClient.getRolesForGuild).toHaveBeenCalledTimes(1);
+  });
+
+  it("caches monitor role lookups across users for the same guild", async () => {
+    const { client, getGuildMonitorRoles } = makeSheetApisClient(["role-1"]);
+    const sheetBotCacheClient = makeSheetBotCacheClient({
+      member: Option.some({ roles: ["role-1"] }),
+    });
+
+    await Effect.runPromise(
+      runAuthorization(
+        Effect.gen(function* () {
+          const authorization = yield* AuthorizationService;
+          yield* authorization.resolveCurrentGuildUser("guild-1");
+          yield* authorization.resolveSheetAuthGuildUser(
+            makeUser([], { accountId: "discord-user-2", userId: "user-2" }),
+            "guild-1",
+          );
+        }),
+        { sheetApisClient: client, sheetBotCacheClient },
+      ),
+    );
+
+    expect(getGuildMonitorRoles).toHaveBeenCalledTimes(1);
+  });
+
+  it("degrades safely when guild permission lookups fail", async () => {
+    const sheetApisClient = {
+      withServiceUser: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect,
+      guildConfig: {
+        getGuildMonitorRoles: () => Effect.fail(new Error("lookup failed")),
+      },
+    } as never;
+    const sheetBotCacheClient = makeSheetBotCacheClient({
+      memberError: new Error("member lookup failed"),
+      rolesError: new Error("roles lookup failed"),
+    });
+
+    const resolvedUser = await Effect.runPromise(
+      runAuthorization(
+        Effect.gen(function* () {
+          const authorization = yield* AuthorizationService;
+          return yield* authorization.resolveCurrentGuildUser("guild-1");
+        }),
+        { sheetApisClient, sheetBotCacheClient },
+      ),
+    );
+
+    expect(Array.from(resolvedUser.permissions)).toEqual([]);
+  });
+
+  it("resolves manage guild permission from cached role permissions", async () => {
+    const sheetBotCacheClient = makeSheetBotCacheClient({
+      member: Option.some({ roles: ["role-1"] }),
+      roles: new Map([["role-1", { id: "role-1", permissions: "32" }]]),
+    });
+
+    await Effect.runPromise(
+      runAuthorization(
+        Effect.gen(function* () {
+          const authorization = yield* AuthorizationService;
+          yield* authorization.requireManageGuild("guild-1");
+        }),
+        { sheetBotCacheClient },
+      ),
+    );
+  });
+
+  it("resolves manage guild permission from the implicit everyone role", async () => {
+    const sheetBotCacheClient = makeSheetBotCacheClient({
+      member: Option.some({ roles: [] }),
+      roles: new Map([["guild-1", { id: "guild-1", permissions: "32" }]]),
+    });
+
+    await Effect.runPromise(
+      runAuthorization(
+        Effect.gen(function* () {
+          const authorization = yield* AuthorizationService;
+          yield* authorization.requireManageGuild("guild-1");
+        }),
+        { sheetBotCacheClient },
+      ),
+    );
   });
 });

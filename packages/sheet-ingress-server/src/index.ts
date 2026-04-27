@@ -15,17 +15,20 @@ import {
   Redacted,
 } from "effect";
 import {
-  HttpClient,
-  HttpClientRequest,
-  HttpBody,
   HttpMiddleware,
   HttpRouter,
   HttpServer,
   HttpServerRequest,
   HttpServerResponse,
 } from "effect/unstable/http";
-import { HttpApiBuilder, HttpApiSwagger } from "effect/unstable/httpapi";
+import {
+  HttpApiBuilder,
+  HttpApiEndpoint,
+  HttpApiGroup,
+  HttpApiSwagger,
+} from "effect/unstable/httpapi";
 import { Api } from "sheet-ingress-api/api";
+import { SheetBotUnauthorized } from "sheet-ingress-api/sheet-bot";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
 import { makeArgumentError } from "typhoon-core/error";
@@ -37,45 +40,11 @@ import {
   hasPermission,
   SheetAuthTokenAuthorizationLive,
 } from "./services/authorization";
+import { SheetAuthUserResolver } from "./services/authResolver";
 import { decodeBearerCredential } from "./services/bearerCredential";
-import { scrubbedForwardHeadersFrom } from "./services/headers";
 import { MessageLookup } from "./services/messageLookup";
 import { SheetApisClient } from "./services/sheetApisClient";
-
-type Upstream = "sheetApis" | "sheetBot";
-
-const hopByHopResponseHeaders = new Set([
-  "connection",
-  "keep-alive",
-  "proxy-authenticate",
-  "proxy-authorization",
-  "te",
-  "trailers",
-  "transfer-encoding",
-  "upgrade",
-]);
-
-const skippedResponseHeaders = new Set([...hopByHopResponseHeaders, "content-length"]);
-
-const makeTargetUrl = (baseUrl: string, requestUrl: string) => {
-  const base = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
-  const relativePath = requestUrl.replace(/^\/+/, "");
-  const url = new URL(relativePath, base);
-
-  return url.toString();
-};
-
-const responseHeadersFrom = (headers: Readonly<Record<string, string>>) => {
-  const result: Record<string, string> = {};
-
-  for (const [key, value] of Object.entries(headers)) {
-    if (!skippedResponseHeaders.has(key.toLowerCase())) {
-      result[key] = value;
-    }
-  }
-
-  return result;
-};
+import { SheetBotClient } from "./services/sheetBotClient";
 
 function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
   return allowedOrigins.some((allowed) => {
@@ -114,18 +83,12 @@ class ServiceTokenAuthorizer extends Context.Service<
   static layer = Layer.effect(
     ServiceTokenAuthorizer,
     Effect.gen(function* () {
-      const sheetApisClient = yield* SheetApisClient;
+      const sheetAuthUserResolver = yield* SheetAuthUserResolver;
       const servicePermissionCache = yield* Cache.makeWith(
         (authorization: string) =>
-          sheetApisClient
-            .withServiceUser(
-              sheetApisClient.permissions.resolveTokenPermissions({
-                payload: {
-                  token: decodeBearerCredential(
-                    Redacted.make(authorization.slice("Bearer ".length).trim()),
-                  ),
-                },
-              }),
+          sheetAuthUserResolver
+            .resolveToken(
+              decodeBearerCredential(Redacted.make(authorization.slice("Bearer ".length).trim())),
             )
             .pipe(
               Effect.map(({ permissions }) => hasPermission(permissions, "service")),
@@ -147,61 +110,69 @@ class ServiceTokenAuthorizer extends Context.Service<
           Cache.get(servicePermissionCache, authorization),
       };
     }),
-  ).pipe(Layer.provide(SheetApisClient.layer));
+  ).pipe(Layer.provide(SheetAuthUserResolver.layer));
 }
 
-const proxyTo =
-  (
-    upstream: Upstream,
-    baseUrl: string,
-    options?: { readonly requireServicePermission?: boolean },
-  ) =>
-  ({ request }: { readonly request: HttpServerRequest.HttpServerRequest }) =>
+const hasServiceTokenFromRequest = (request: HttpServerRequest.HttpServerRequest) =>
+  Effect.gen(function* () {
+    const authorization = getBearerAuthorization(request);
+    if (!authorization) {
+      return false;
+    }
+
+    const serviceTokenAuthorizer = yield* ServiceTokenAuthorizer;
+    return yield* serviceTokenAuthorizer
+      .hasServicePermission(authorization)
+      .pipe(Effect.catch(() => Effect.succeed(false)));
+  });
+
+type SheetBotGroups = (typeof Api)["groups"][keyof (typeof Api)["groups"]];
+type SheetBotGroupName = Extract<HttpApiGroup.Name<SheetBotGroups>, "application" | "cache">;
+type SheetBotGroup<GroupName extends SheetBotGroupName> = HttpApiGroup.WithName<
+  SheetBotGroups,
+  GroupName
+>;
+type SheetBotEndpointName<GroupName extends SheetBotGroupName> = Extract<
+  HttpApiEndpoint.Name<HttpApiGroup.Endpoints<SheetBotGroup<GroupName>>>,
+  string
+>;
+type SheetBotProxyHandler<
+  GroupName extends SheetBotGroupName,
+  EndpointName extends SheetBotEndpointName<GroupName>,
+> = HttpApiEndpoint.HandlerWithName<
+  HttpApiGroup.Endpoints<SheetBotGroup<GroupName>>,
+  EndpointName,
+  never,
+  SheetBotClient | ServiceTokenAuthorizer
+>;
+type SheetBotEndpointClient = (args: unknown) => Effect.Effect<unknown, unknown, unknown>;
+
+const proxySheetBot =
+  <GroupName extends SheetBotGroupName, EndpointName extends SheetBotEndpointName<GroupName>>(
+    group: GroupName,
+    endpoint: EndpointName,
+  ): SheetBotProxyHandler<GroupName, EndpointName> =>
+  (args) =>
     Effect.gen(function* () {
-      if (options?.requireServicePermission) {
-        const authorization = getBearerAuthorization(request);
-        if (!authorization) {
-          return HttpServerResponse.text("Unauthorized", { status: 401 });
-        }
-
-        const serviceTokenAuthorizer = yield* ServiceTokenAuthorizer;
-        const hasServicePermission = yield* serviceTokenAuthorizer
-          .hasServicePermission(authorization)
-          .pipe(Effect.catch(() => Effect.succeed(false)));
-
-        if (!hasServicePermission) {
-          return HttpServerResponse.text("Unauthorized", { status: 401 });
-        }
+      const requestArgs = args as {
+        readonly request: HttpServerRequest.HttpServerRequest;
+      } & Record<string, unknown>;
+      const hasServicePermission = yield* hasServiceTokenFromRequest(requestArgs.request);
+      if (!hasServicePermission) {
+        return yield* Effect.fail(new SheetBotUnauthorized({ message: "Unauthorized" }));
       }
 
-      const webRequest = yield* HttpServerRequest.toWeb(request).pipe(
-        Effect.mapError((cause) => new Error("Incoming request conversion failed", { cause })),
-      );
-      const targetUrl = makeTargetUrl(baseUrl, request.url);
-      const client = yield* HttpClient.HttpClient;
-      const scrubbedRequest = new Request(webRequest, {
-        headers: scrubbedForwardHeadersFrom(request),
-      });
-      const response = yield* client
-        .execute(
-          HttpClientRequest.fromWeb(scrubbedRequest).pipe(HttpClientRequest.setUrl(targetUrl)),
-        )
-        .pipe(Effect.timeout(Duration.seconds(30)));
+      const client = yield* SheetBotClient;
+      const groupClient = (
+        client as unknown as Record<string, Record<string, SheetBotEndpointClient>>
+      )[group];
+      const endpointClient = groupClient?.[endpoint];
+      if (typeof endpointClient !== "function") {
+        return yield* Effect.die(new Error(`Unknown sheet-bot proxy target: ${group}.${endpoint}`));
+      }
 
-      const contentType = response.headers["content-type"] ?? "application/octet-stream";
-      const body = HttpBody.stream(response.stream, contentType);
-
-      return HttpServerResponse.raw(body, {
-        status: response.status,
-        headers: responseHeadersFrom(response.headers),
-      });
-    }).pipe(
-      Effect.catch((error) =>
-        Effect.logError(`Ingress proxy failed for ${upstream}`, error).pipe(
-          Effect.as(HttpServerResponse.text("Bad Gateway", { status: 502 })),
-        ),
-      ),
-    );
+      return yield* endpointClient(clientArgsFrom(requestArgs));
+    }) as ReturnType<SheetBotProxyHandler<GroupName, EndpointName>>;
 
 const getModernMessageGuildId = <
   T extends {
@@ -514,9 +485,7 @@ const requireDayPlayerSchedule = (guildId: string, accountId: string) =>
     }
   });
 
-const makeApiLayer = ({ sheetBotBaseUrl }: { readonly sheetBotBaseUrl: string }) => {
-  const sheetBotProxy = proxyTo("sheetBot", sheetBotBaseUrl, { requireServicePermission: true });
-
+const makeApiLayer = () => {
   const ProxyLayers = Layer.mergeAll(
     HttpApiBuilder.group(Api, "calc", (handlers) =>
       handlers
@@ -763,14 +732,20 @@ const makeApiLayer = ({ sheetBotBaseUrl }: { readonly sheetBotBaseUrl: string })
         ),
     ),
     HttpApiBuilder.group(Api, "permissions", (handlers) =>
-      handlers
-        .handle(
-          "getCurrentUserPermissions",
-          proxySheetApis("permissions", "getCurrentUserPermissions"),
-        )
-        .handleRaw("resolveTokenPermissions", () =>
-          Effect.succeed(HttpServerResponse.empty({ status: 403 })),
-        ),
+      handlers.handle(
+        "getCurrentUserPermissions",
+        Effect.fnUntraced(function* ({ query }) {
+          const authorization = yield* AuthorizationService;
+          const resolvedUser =
+            typeof query.guildId === "string"
+              ? yield* authorization.resolveCurrentGuildUser(query.guildId)
+              : yield* SheetAuthUser;
+
+          return {
+            permissions: resolvedUser.permissions,
+          };
+        }),
+      ),
     ),
     HttpApiBuilder.group(Api, "player", (handlers) =>
       handlers
@@ -870,30 +845,30 @@ const makeApiLayer = ({ sheetBotBaseUrl }: { readonly sheetBotBaseUrl: string })
         .handle("getRunnerConfig", proxySheetApis("sheet", "getRunnerConfig", requireService)),
     ),
     HttpApiBuilder.group(Api, "application", (handlers) =>
-      handlers.handleRaw("getApplication", sheetBotProxy),
+      handlers.handle("getApplication", proxySheetBot("application", "getApplication")),
     ),
     HttpApiBuilder.group(Api, "cache", (handlers) =>
       handlers
-        .handleRaw("getGuild", sheetBotProxy)
-        .handleRaw("getGuildSize", sheetBotProxy)
-        .handleRaw("getChannel", sheetBotProxy)
-        .handleRaw("getRole", sheetBotProxy)
-        .handleRaw("getMember", sheetBotProxy)
-        .handleRaw("getChannelsForParent", sheetBotProxy)
-        .handleRaw("getRolesForParent", sheetBotProxy)
-        .handleRaw("getMembersForParent", sheetBotProxy)
-        .handleRaw("getChannelsForResource", sheetBotProxy)
-        .handleRaw("getRolesForResource", sheetBotProxy)
-        .handleRaw("getMembersForResource", sheetBotProxy)
-        .handleRaw("getChannelsSize", sheetBotProxy)
-        .handleRaw("getRolesSize", sheetBotProxy)
-        .handleRaw("getMembersSize", sheetBotProxy)
-        .handleRaw("getChannelsSizeForParent", sheetBotProxy)
-        .handleRaw("getRolesSizeForParent", sheetBotProxy)
-        .handleRaw("getMembersSizeForParent", sheetBotProxy)
-        .handleRaw("getChannelsSizeForResource", sheetBotProxy)
-        .handleRaw("getRolesSizeForResource", sheetBotProxy)
-        .handleRaw("getMembersSizeForResource", sheetBotProxy),
+        .handle("getGuild", proxySheetBot("cache", "getGuild"))
+        .handle("getGuildSize", proxySheetBot("cache", "getGuildSize"))
+        .handle("getChannel", proxySheetBot("cache", "getChannel"))
+        .handle("getRole", proxySheetBot("cache", "getRole"))
+        .handle("getMember", proxySheetBot("cache", "getMember"))
+        .handle("getChannelsForParent", proxySheetBot("cache", "getChannelsForParent"))
+        .handle("getRolesForParent", proxySheetBot("cache", "getRolesForParent"))
+        .handle("getMembersForParent", proxySheetBot("cache", "getMembersForParent"))
+        .handle("getChannelsForResource", proxySheetBot("cache", "getChannelsForResource"))
+        .handle("getRolesForResource", proxySheetBot("cache", "getRolesForResource"))
+        .handle("getMembersForResource", proxySheetBot("cache", "getMembersForResource"))
+        .handle("getChannelsSize", proxySheetBot("cache", "getChannelsSize"))
+        .handle("getRolesSize", proxySheetBot("cache", "getRolesSize"))
+        .handle("getMembersSize", proxySheetBot("cache", "getMembersSize"))
+        .handle("getChannelsSizeForParent", proxySheetBot("cache", "getChannelsSizeForParent"))
+        .handle("getRolesSizeForParent", proxySheetBot("cache", "getRolesSizeForParent"))
+        .handle("getMembersSizeForParent", proxySheetBot("cache", "getMembersSizeForParent"))
+        .handle("getChannelsSizeForResource", proxySheetBot("cache", "getChannelsSizeForResource"))
+        .handle("getRolesSizeForResource", proxySheetBot("cache", "getRolesSizeForResource"))
+        .handle("getMembersSizeForResource", proxySheetBot("cache", "getMembersSizeForResource")),
     ),
   );
 
@@ -907,6 +882,7 @@ const makeApiLayer = ({ sheetBotBaseUrl }: { readonly sheetBotBaseUrl: string })
       AuthorizationService.layer,
       MessageLookup.layer,
       SheetApisClient.layer,
+      SheetBotClient.layer,
     ]),
   );
 };
@@ -933,8 +909,7 @@ const configProviderLayer = Layer.unwrap(
 const HttpLive = Layer.unwrap(
   Effect.gen(function* () {
     const port = yield* config.port;
-    const sheetBotBaseUrl = yield* config.sheetBotBaseUrl;
-    const ApiLayer = makeApiLayer({ sheetBotBaseUrl });
+    const ApiLayer = makeApiLayer();
 
     return HttpRouter.serve(ApiLayer).pipe(
       HttpServer.withLogAddress,

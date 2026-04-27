@@ -11,7 +11,10 @@ import {
   MemberCacheEntriesSchema,
   CacheSizeSchema,
   CacheNotFoundError,
+  Unauthorized,
 } from "./schema";
+
+export { Unauthorized } from "./schema";
 
 // Path parameters
 export const ParentIdParam = Schema.String;
@@ -23,7 +26,12 @@ export const ResourceIdParam = Schema.String;
 // dynamic routes in the registration order.
 
 export class ApplicationApi extends HttpApiGroup.make("application")
-  .add(HttpApiEndpoint.get("getApplication", "/application", { success: ApplicationValueSchema }))
+  .add(
+    HttpApiEndpoint.get("getApplication", "/application", {
+      success: ApplicationValueSchema,
+      error: Unauthorized,
+    }),
+  )
   .annotate(OpenApi.Title, "Application")
   .annotate(OpenApi.Description, "Discord application metadata API") {}
 
@@ -34,30 +42,35 @@ export class CacheApi extends HttpApiGroup.make("cache")
     HttpApiEndpoint.get("getGuild", "/cache/guilds/:resourceId", {
       params: Schema.Struct({ resourceId: ResourceIdParam }),
       success: GuildValueSchema,
-      error: CacheNotFoundError,
+      error: [CacheNotFoundError, Unauthorized],
     }),
   )
-  .add(HttpApiEndpoint.get("getGuildSize", "/cache/guilds/size", { success: CacheSizeSchema }))
+  .add(
+    HttpApiEndpoint.get("getGuildSize", "/cache/guilds/size", {
+      success: CacheSizeSchema,
+      error: Unauthorized,
+    }),
+  )
   // Reverse lookup cache endpoints - get specific resource
   .add(
     HttpApiEndpoint.get("getChannel", "/cache/channels/:parentId/:resourceId", {
       params: Schema.Struct({ parentId: ParentIdParam, resourceId: ResourceIdParam }),
       success: ChannelValueSchema,
-      error: CacheNotFoundError,
+      error: [CacheNotFoundError, Unauthorized],
     }),
   )
   .add(
     HttpApiEndpoint.get("getRole", "/cache/roles/:parentId/:resourceId", {
       params: Schema.Struct({ parentId: ParentIdParam, resourceId: ResourceIdParam }),
       success: RoleValueSchema,
-      error: CacheNotFoundError,
+      error: [CacheNotFoundError, Unauthorized],
     }),
   )
   .add(
     HttpApiEndpoint.get("getMember", "/cache/members/:parentId/:resourceId", {
       params: Schema.Struct({ parentId: ParentIdParam, resourceId: ResourceIdParam }),
       success: MemberValueSchema,
-      error: CacheNotFoundError,
+      error: [CacheNotFoundError, Unauthorized],
     }),
   )
   // Reverse lookup cache endpoints - get all for parent
@@ -65,21 +78,21 @@ export class CacheApi extends HttpApiGroup.make("cache")
     HttpApiEndpoint.get("getChannelsForParent", "/cache/channels/:parentId", {
       params: Schema.Struct({ parentId: ParentIdParam }),
       success: ChannelCacheEntriesSchema,
-      error: CacheNotFoundError,
+      error: [CacheNotFoundError, Unauthorized],
     }),
   )
   .add(
     HttpApiEndpoint.get("getRolesForParent", "/cache/roles/:parentId", {
       params: Schema.Struct({ parentId: ParentIdParam }),
       success: RoleCacheEntriesSchema,
-      error: CacheNotFoundError,
+      error: [CacheNotFoundError, Unauthorized],
     }),
   )
   .add(
     HttpApiEndpoint.get("getMembersForParent", "/cache/members/:parentId", {
       params: Schema.Struct({ parentId: ParentIdParam }),
       success: MemberCacheEntriesSchema,
-      error: CacheNotFoundError,
+      error: [CacheNotFoundError, Unauthorized],
     }),
   )
   // Reverse lookup cache endpoints - get all for resource (cross-parent lookup)
@@ -87,67 +100,82 @@ export class CacheApi extends HttpApiGroup.make("cache")
     HttpApiEndpoint.get("getChannelsForResource", "/cache/channels/resource/:resourceId", {
       params: Schema.Struct({ resourceId: ResourceIdParam }),
       success: ChannelCacheEntriesSchema,
-      error: CacheNotFoundError,
+      error: [CacheNotFoundError, Unauthorized],
     }),
   )
   .add(
     HttpApiEndpoint.get("getRolesForResource", "/cache/roles/resource/:resourceId", {
       params: Schema.Struct({ resourceId: ResourceIdParam }),
       success: RoleCacheEntriesSchema,
-      error: CacheNotFoundError,
+      error: [CacheNotFoundError, Unauthorized],
     }),
   )
   .add(
     HttpApiEndpoint.get("getMembersForResource", "/cache/members/resource/:resourceId", {
       params: Schema.Struct({ resourceId: ResourceIdParam }),
       success: MemberCacheEntriesSchema,
-      error: CacheNotFoundError,
+      error: [CacheNotFoundError, Unauthorized],
     }),
   )
   // Size endpoints for reverse lookup caches
-  .add(HttpApiEndpoint.get("getChannelsSize", "/cache/channels/size", { success: CacheSizeSchema }))
-  .add(HttpApiEndpoint.get("getRolesSize", "/cache/roles/size", { success: CacheSizeSchema }))
-  .add(HttpApiEndpoint.get("getMembersSize", "/cache/members/size", { success: CacheSizeSchema }))
+  .add(
+    HttpApiEndpoint.get("getChannelsSize", "/cache/channels/size", {
+      success: CacheSizeSchema,
+      error: Unauthorized,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("getRolesSize", "/cache/roles/size", {
+      success: CacheSizeSchema,
+      error: Unauthorized,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("getMembersSize", "/cache/members/size", {
+      success: CacheSizeSchema,
+      error: Unauthorized,
+    }),
+  )
   .add(
     HttpApiEndpoint.get("getChannelsSizeForParent", "/cache/channels/:parentId/size", {
       params: Schema.Struct({ parentId: ParentIdParam }),
       success: CacheSizeSchema,
-      error: CacheNotFoundError,
+      error: [CacheNotFoundError, Unauthorized],
     }),
   )
   .add(
     HttpApiEndpoint.get("getRolesSizeForParent", "/cache/roles/:parentId/size", {
       params: Schema.Struct({ parentId: ParentIdParam }),
       success: CacheSizeSchema,
-      error: CacheNotFoundError,
+      error: [CacheNotFoundError, Unauthorized],
     }),
   )
   .add(
     HttpApiEndpoint.get("getMembersSizeForParent", "/cache/members/:parentId/size", {
       params: Schema.Struct({ parentId: ParentIdParam }),
       success: CacheSizeSchema,
-      error: CacheNotFoundError,
+      error: [CacheNotFoundError, Unauthorized],
     }),
   )
   .add(
     HttpApiEndpoint.get("getChannelsSizeForResource", "/cache/channels/resource/:resourceId/size", {
       params: Schema.Struct({ resourceId: ResourceIdParam }),
       success: CacheSizeSchema,
-      error: CacheNotFoundError,
+      error: [CacheNotFoundError, Unauthorized],
     }),
   )
   .add(
     HttpApiEndpoint.get("getRolesSizeForResource", "/cache/roles/resource/:resourceId/size", {
       params: Schema.Struct({ resourceId: ResourceIdParam }),
       success: CacheSizeSchema,
-      error: CacheNotFoundError,
+      error: [CacheNotFoundError, Unauthorized],
     }),
   )
   .add(
     HttpApiEndpoint.get("getMembersSizeForResource", "/cache/members/resource/:resourceId/size", {
       params: Schema.Struct({ resourceId: ResourceIdParam }),
       success: CacheSizeSchema,
-      error: CacheNotFoundError,
+      error: [CacheNotFoundError, Unauthorized],
     }),
   )
   .annotate(OpenApi.Title, "Cache")

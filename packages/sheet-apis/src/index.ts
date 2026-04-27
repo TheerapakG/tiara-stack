@@ -1,4 +1,4 @@
-import { NodeFileSystem, NodeRuntime } from "@effect/platform-node";
+import { NodeFileSystem, NodeHttpClient, NodeRuntime } from "@effect/platform-node";
 import { ConfigProvider, Effect, FileSystem, Layer, Logger } from "effect";
 import { httpLayer } from "./http";
 import { MetricsLive } from "./metrics";
@@ -22,6 +22,7 @@ httpLayer.pipe(
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
   Layer.provide(Logger.layer([Logger.consoleLogFmt])),
+  Layer.provide(NodeHttpClient.layerFetch),
   Layer.provide(configProviderLayer),
   Layer.launch,
   NodeRuntime.runMain(),

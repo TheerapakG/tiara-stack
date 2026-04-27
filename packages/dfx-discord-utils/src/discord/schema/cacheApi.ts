@@ -56,6 +56,12 @@ export class CacheNotFoundError extends Schema.TaggedErrorClass<CacheNotFoundErr
   { httpApiStatus: 404 },
 ) {}
 
+export class Unauthorized extends Schema.TaggedErrorClass<Unauthorized>()(
+  "Unauthorized",
+  { message: Schema.String },
+  { httpApiStatus: 401 },
+) {}
+
 export class CacheReadonlyError extends Schema.TaggedErrorClass<CacheReadonlyError>()(
   "CacheReadonlyError",
   { message: Schema.String },
