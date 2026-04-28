@@ -136,7 +136,8 @@ export class AuthorizationService extends Context.Service<AuthorizationService>(
             )
             .pipe(
               Effect.map(
-                (roles) => new Set(roles.map((role) => role.roleId)) as ReadonlySet<string>,
+                (roles: ReadonlyArray<{ readonly roleId: string }>) =>
+                  new Set(roles.map((role) => role.roleId)) as ReadonlySet<string>,
               ),
             ),
         {

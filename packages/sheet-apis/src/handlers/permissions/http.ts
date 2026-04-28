@@ -1,19 +1,14 @@
-import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Effect, Layer } from "effect";
-import { Api } from "@/api";
-import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
+import { PermissionsRpcs } from "sheet-ingress-api/sheet-apis-rpc";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import { AuthorizationService } from "@/services";
 
-export const permissionsLayer = HttpApiBuilder.group(
-  Api,
-  "permissions",
-  Effect.fn(function* (handlers) {
+export const permissionsLayer = PermissionsRpcs.toLayer(
+  Effect.gen(function* () {
     const authorizationService = yield* AuthorizationService;
 
-    return handlers.handle(
-      "getCurrentUserPermissions",
-      Effect.fnUntraced(function* ({ query }) {
+    return {
+      "permissions.getCurrentUserPermissions": Effect.fnUntraced(function* ({ query }) {
         const resolvedUser =
           typeof query.guildId === "string"
             ? yield* authorizationService.resolveCurrentGuildUser(query.guildId)
@@ -22,6 +17,6 @@ export const permissionsLayer = HttpApiBuilder.group(
           permissions: resolvedUser.permissions,
         };
       }),
-    );
+    };
   }),
-).pipe(Layer.provide([AuthorizationService.layer, SheetAuthTokenAuthorizationLive]));
+).pipe(Layer.provide([AuthorizationService.layer]));

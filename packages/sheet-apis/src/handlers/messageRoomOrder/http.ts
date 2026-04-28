@@ -1,9 +1,7 @@
-import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option } from "effect";
-import { Api } from "@/api";
+import { MessageRoomOrderRpcs } from "sheet-ingress-api/sheet-apis-rpc";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
-import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthGuildUser";
 import { MessageRoomOrder } from "sheet-ingress-api/schemas/messageRoomOrder";
 import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
@@ -142,164 +140,127 @@ export const requireRoomOrderUpsertAccess = Effect.fn(
   );
 });
 
-export const messageRoomOrderLayer = HttpApiBuilder.group(
-  Api,
-  "messageRoomOrder",
-  Effect.fn(function* (handlers) {
+export const messageRoomOrderLayer = MessageRoomOrderRpcs.toLayer(
+  Effect.gen(function* () {
     const authorizationService = yield* AuthorizationService;
     const messageRoomOrderService = yield* MessageRoomOrderService;
 
-    return handlers
-      .handle(
-        "getMessageRoomOrder",
-        Effect.fnUntraced(function* ({ query }) {
-          const record = yield* loadRequiredMessageRoomOrderRecord(
-            messageRoomOrderService,
-            query.messageId,
+    return {
+      "messageRoomOrder.getMessageRoomOrder": Effect.fnUntraced(function* ({ query }) {
+        const record = yield* loadRequiredMessageRoomOrderRecord(
+          messageRoomOrderService,
+          query.messageId,
+        );
+        const authContext = resolveMessageRoomOrderAuthContext(record);
+
+        yield* requireMessageRoomOrderMonitorPermission(authorizationService, authContext);
+
+        return authContext.record;
+      }),
+      "messageRoomOrder.upsertMessageRoomOrder": Effect.fnUntraced(function* ({ payload }) {
+        yield* requireRoomOrderUpsertAccess(
+          authorizationService,
+          messageRoomOrderService,
+          payload.messageId,
+          typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
+        );
+
+        return yield* messageRoomOrderService.upsertMessageRoomOrder(
+          payload.messageId,
+          payload.data,
+        );
+      }),
+      "messageRoomOrder.persistMessageRoomOrder": Effect.fnUntraced(function* ({ payload }) {
+        yield* requireRoomOrderUpsertAccess(
+          authorizationService,
+          messageRoomOrderService,
+          payload.messageId,
+          typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
+        );
+
+        return yield* messageRoomOrderService.persistMessageRoomOrder(payload.messageId, {
+          data: payload.data,
+          entries: payload.entries,
+        });
+      }),
+      "messageRoomOrder.decrementMessageRoomOrderRank": Effect.fnUntraced(function* ({ payload }) {
+        const record = yield* loadRequiredMessageRoomOrderRecord(
+          messageRoomOrderService,
+          payload.messageId,
+        );
+        const authContext = resolveMessageRoomOrderAuthContext(record);
+
+        yield* requireMessageRoomOrderMonitorPermission(authorizationService, authContext);
+
+        return yield* messageRoomOrderService.decrementMessageRoomOrderRank(payload.messageId);
+      }),
+      "messageRoomOrder.incrementMessageRoomOrderRank": Effect.fnUntraced(function* ({ payload }) {
+        const record = yield* loadRequiredMessageRoomOrderRecord(
+          messageRoomOrderService,
+          payload.messageId,
+        );
+        const authContext = resolveMessageRoomOrderAuthContext(record);
+
+        yield* requireMessageRoomOrderMonitorPermission(authorizationService, authContext);
+
+        return yield* messageRoomOrderService.incrementMessageRoomOrderRank(payload.messageId);
+      }),
+      "messageRoomOrder.getMessageRoomOrderEntry": Effect.fnUntraced(function* ({ query }) {
+        const record = yield* loadRequiredMessageRoomOrderRecord(
+          messageRoomOrderService,
+          query.messageId,
+        );
+        const authContext = resolveMessageRoomOrderAuthContext(record);
+
+        yield* requireMessageRoomOrderMonitorPermission(authorizationService, authContext);
+
+        return yield* messageRoomOrderService.getMessageRoomOrderEntry(query.messageId, query.rank);
+      }),
+      "messageRoomOrder.getMessageRoomOrderRange": Effect.fnUntraced(function* ({ query }) {
+        const record = yield* loadRequiredMessageRoomOrderRecord(
+          messageRoomOrderService,
+          query.messageId,
+        );
+        const authContext = resolveMessageRoomOrderAuthContext(record);
+
+        yield* requireMessageRoomOrderMonitorPermission(authorizationService, authContext);
+
+        const range = yield* messageRoomOrderService.getMessageRoomOrderRange(query.messageId);
+        if (Option.isNone(range)) {
+          return yield* Effect.fail(
+            makeArgumentError(
+              "Cannot get message room order range, the message might not be registered",
+            ),
           );
-          const authContext = resolveMessageRoomOrderAuthContext(record);
+        }
 
-          yield* requireMessageRoomOrderMonitorPermission(authorizationService, authContext);
+        return range.value;
+      }),
+      "messageRoomOrder.upsertMessageRoomOrderEntry": Effect.fnUntraced(function* ({ payload }) {
+        const record = yield* loadRequiredMessageRoomOrderRecord(
+          messageRoomOrderService,
+          payload.messageId,
+        );
+        const authContext = resolveMessageRoomOrderAuthContext(record);
 
-          return authContext.record;
-        }),
-      )
-      .handle(
-        "upsertMessageRoomOrder",
-        Effect.fnUntraced(function* ({ payload }) {
-          yield* requireRoomOrderUpsertAccess(
-            authorizationService,
-            messageRoomOrderService,
-            payload.messageId,
-            typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
-          );
+        yield* requireMessageRoomOrderMonitorPermission(authorizationService, authContext);
 
-          return yield* messageRoomOrderService.upsertMessageRoomOrder(
-            payload.messageId,
-            payload.data,
-          );
-        }),
-      )
-      .handle(
-        "persistMessageRoomOrder",
-        Effect.fnUntraced(function* ({ payload }) {
-          yield* requireRoomOrderUpsertAccess(
-            authorizationService,
-            messageRoomOrderService,
-            payload.messageId,
-            typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
-          );
+        return yield* messageRoomOrderService.upsertMessageRoomOrderEntry(
+          payload.messageId,
+          payload.entries,
+        );
+      }),
+      "messageRoomOrder.removeMessageRoomOrderEntry": Effect.fnUntraced(function* ({ payload }) {
+        const record = yield* loadRequiredMessageRoomOrderRecord(
+          messageRoomOrderService,
+          payload.messageId,
+        );
+        const authContext = resolveMessageRoomOrderAuthContext(record);
 
-          return yield* messageRoomOrderService.persistMessageRoomOrder(payload.messageId, {
-            data: payload.data,
-            entries: payload.entries,
-          });
-        }),
-      )
-      .handle(
-        "decrementMessageRoomOrderRank",
-        Effect.fnUntraced(function* ({ payload }) {
-          const record = yield* loadRequiredMessageRoomOrderRecord(
-            messageRoomOrderService,
-            payload.messageId,
-          );
-          const authContext = resolveMessageRoomOrderAuthContext(record);
+        yield* requireMessageRoomOrderMonitorPermission(authorizationService, authContext);
 
-          yield* requireMessageRoomOrderMonitorPermission(authorizationService, authContext);
-
-          return yield* messageRoomOrderService.decrementMessageRoomOrderRank(payload.messageId);
-        }),
-      )
-      .handle(
-        "incrementMessageRoomOrderRank",
-        Effect.fnUntraced(function* ({ payload }) {
-          const record = yield* loadRequiredMessageRoomOrderRecord(
-            messageRoomOrderService,
-            payload.messageId,
-          );
-          const authContext = resolveMessageRoomOrderAuthContext(record);
-
-          yield* requireMessageRoomOrderMonitorPermission(authorizationService, authContext);
-
-          return yield* messageRoomOrderService.incrementMessageRoomOrderRank(payload.messageId);
-        }),
-      )
-      .handle(
-        "getMessageRoomOrderEntry",
-        Effect.fnUntraced(function* ({ query }) {
-          const record = yield* loadRequiredMessageRoomOrderRecord(
-            messageRoomOrderService,
-            query.messageId,
-          );
-          const authContext = resolveMessageRoomOrderAuthContext(record);
-
-          yield* requireMessageRoomOrderMonitorPermission(authorizationService, authContext);
-
-          return yield* messageRoomOrderService.getMessageRoomOrderEntry(
-            query.messageId,
-            Number(query.rank),
-          );
-        }),
-      )
-      .handle(
-        "getMessageRoomOrderRange",
-        Effect.fnUntraced(function* ({ query }) {
-          const record = yield* loadRequiredMessageRoomOrderRecord(
-            messageRoomOrderService,
-            query.messageId,
-          );
-          const authContext = resolveMessageRoomOrderAuthContext(record);
-
-          yield* requireMessageRoomOrderMonitorPermission(authorizationService, authContext);
-
-          const range = yield* messageRoomOrderService.getMessageRoomOrderRange(query.messageId);
-          if (Option.isNone(range)) {
-            return yield* Effect.fail(
-              makeArgumentError(
-                "Cannot get message room order range, the message might not be registered",
-              ),
-            );
-          }
-
-          return range.value;
-        }),
-      )
-      .handle(
-        "upsertMessageRoomOrderEntry",
-        Effect.fnUntraced(function* ({ payload }) {
-          const record = yield* loadRequiredMessageRoomOrderRecord(
-            messageRoomOrderService,
-            payload.messageId,
-          );
-          const authContext = resolveMessageRoomOrderAuthContext(record);
-
-          yield* requireMessageRoomOrderMonitorPermission(authorizationService, authContext);
-
-          return yield* messageRoomOrderService.upsertMessageRoomOrderEntry(
-            payload.messageId,
-            payload.entries,
-          );
-        }),
-      )
-      .handle(
-        "removeMessageRoomOrderEntry",
-        Effect.fnUntraced(function* ({ payload }) {
-          const record = yield* loadRequiredMessageRoomOrderRecord(
-            messageRoomOrderService,
-            payload.messageId,
-          );
-          const authContext = resolveMessageRoomOrderAuthContext(record);
-
-          yield* requireMessageRoomOrderMonitorPermission(authorizationService, authContext);
-
-          return yield* messageRoomOrderService.removeMessageRoomOrderEntry(payload.messageId);
-        }),
-      );
+        return yield* messageRoomOrderService.removeMessageRoomOrderEntry(payload.messageId);
+      }),
+    };
   }),
-).pipe(
-  Layer.provide([
-    AuthorizationService.layer,
-    MessageRoomOrderService.layer,
-    SheetAuthTokenAuthorizationLive,
-  ]),
-);
+).pipe(Layer.provide([AuthorizationService.layer, MessageRoomOrderService.layer]));

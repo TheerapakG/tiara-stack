@@ -1,5 +1,5 @@
-import { Headers, HttpClient, HttpClientRequest } from "effect/unstable/http";
-import { HttpApiClient } from "effect/unstable/httpapi";
+import { Headers, HttpClient } from "effect/unstable/http";
+import { RpcClient, RpcSerialization } from "effect/unstable/rpc";
 import { NodeFileSystem } from "@effect/platform-node";
 import {
   Array,
@@ -20,7 +20,7 @@ import {
 } from "effect";
 import { createKubernetesOAuthSession, getDiscordAccessToken } from "sheet-auth/client";
 import { DISCORD_SERVICE_USER_ID_SENTINEL } from "sheet-auth/plugins/kubernetes-oauth";
-import { SheetApisApi } from "sheet-ingress-api/sheet-apis";
+import { SheetApisRpcs } from "sheet-ingress-api/sheet-apis-rpc";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
 import { config } from "@/config";
@@ -164,64 +164,176 @@ export class SheetApisClient extends Context.Service<SheetApisClient>()("SheetAp
       },
     );
 
-    const httpClientWithIngressAuth = HttpClient.mapRequestEffect(
-      httpClient,
-      Effect.fnUntraced(function* (request) {
-        const user = yield* SheetAuthUser;
-        const forwardDiscordAccessToken = yield* forwardDiscordAccessTokenTag;
-        const sheetApisToken = yield* Ref.get(sheetApisTokenRef);
-        let headers = pipe(
-          Headers.set(Headers.empty, "x-sheet-ingress-auth", `Bearer ${sheetApisToken}`),
-          Headers.set("x-sheet-auth-user-id", user.userId),
-          Headers.set("x-sheet-auth-account-id", user.accountId),
-          Headers.set("x-sheet-auth-permissions", Array.fromIterable(user.permissions).join(",")),
+    const getForwardedHeaders = Effect.fn("SheetApisClient.getForwardedHeaders")(function* () {
+      const user = yield* SheetAuthUser;
+      const forwardDiscordAccessToken = yield* forwardDiscordAccessTokenTag;
+      const sheetApisToken = yield* Ref.get(sheetApisTokenRef);
+      let headers = pipe(
+        Headers.set(Headers.empty, "x-sheet-ingress-auth", `Bearer ${sheetApisToken}`),
+        Headers.set("x-sheet-auth-user-id", user.userId),
+        Headers.set("x-sheet-auth-account-id", user.accountId),
+        Headers.set("x-sheet-auth-permissions", Array.fromIterable(user.permissions).join(",")),
+      );
+
+      const maybeDiscordAccessToken =
+        !forwardDiscordAccessToken ||
+        HashSet.has(user.permissions, "service") ||
+        user.accountId === "anonymous"
+          ? Option.none()
+          : yield* Cache.get(discordAccessTokenCache, user.token).pipe(
+              Effect.map(Option.some),
+              Effect.mapError(
+                (cause) =>
+                  new Unauthorized({
+                    message: "Invalid Discord access token",
+                    cause,
+                  }),
+              ),
+            );
+
+      if (Option.isSome(maybeDiscordAccessToken)) {
+        headers = Headers.set(
+          headers,
+          "x-sheet-discord-access-token",
+          Redacted.value(maybeDiscordAccessToken.value),
         );
+      }
 
-        const maybeDiscordAccessToken =
-          !forwardDiscordAccessToken ||
-          HashSet.has(user.permissions, "service") ||
-          user.accountId === "anonymous"
-            ? Option.none()
-            : yield* Cache.get(discordAccessTokenCache, user.token).pipe(
-                Effect.map(Option.some),
-                Effect.mapError(
-                  (cause) =>
-                    new Unauthorized({
-                      message: "Invalid Discord access token",
-                      cause,
-                    }),
-                ),
-              );
+      return headers;
+    });
 
-        if (Option.isSome(maybeDiscordAccessToken)) {
-          headers = Headers.set(
-            headers,
-            "x-sheet-discord-access-token",
-            Redacted.value(maybeDiscordAccessToken.value),
-          );
-        }
-
-        return HttpClientRequest.setHeaders(request, headers);
-      }),
+    const rpcUrl = `${baseUrl.replace(/\/$/, "")}/rpc`;
+    const rpcClient = yield* RpcClient.make(SheetApisRpcs).pipe(
+      Effect.provide(RpcClient.layerProtocolHttp({ url: rpcUrl })),
+      Effect.provide(RpcSerialization.layerJson),
+      Effect.provideService(HttpClient.HttpClient, httpClient),
     );
 
-    return yield* HttpApiClient.makeWith(SheetApisApi, {
-      httpClient: httpClientWithIngressAuth,
-      baseUrl,
-    }).pipe(
-      Effect.map((client) =>
-        Object.assign(client, {
-          getServiceUser,
-          withServiceUser: <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-            Effect.gen(function* () {
-              const serviceUser = yield* getServiceUser();
-              return yield* effect.pipe(Effect.provideService(SheetAuthUser, serviceUser));
-            }),
-          withDiscordAccessToken: <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-            effect.pipe(Effect.provideService(forwardDiscordAccessTokenTag, true)),
+    const withForwardedHeaders = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+      Effect.gen(function* () {
+        const headers = yield* getForwardedHeaders();
+        return yield* effect.pipe(RpcClient.withHeaders(headers));
+      });
+
+    const call =
+      <Input, A, E, R>(fn: (args: Input) => Effect.Effect<A, E, R>) =>
+      (args: Input) =>
+        withForwardedHeaders(fn(args));
+    const callNoInput =
+      <A, E, R>(fn: (args: undefined) => Effect.Effect<A, E, R>) =>
+      () =>
+        withForwardedHeaders(fn(undefined));
+
+    return {
+      calc: {
+        calcBot: call(rpcClient["calc.calcBot"]),
+        calcSheet: call(rpcClient["calc.calcSheet"]),
+      },
+      checkin: {
+        generate: call(rpcClient["checkin.generate"]),
+      },
+      discord: {
+        getCurrentUser: callNoInput(rpcClient["discord.getCurrentUser"]),
+        getCurrentUserGuilds: callNoInput(rpcClient["discord.getCurrentUserGuilds"]),
+      },
+      guildConfig: {
+        getAutoCheckinGuilds: callNoInput(rpcClient["guildConfig.getAutoCheckinGuilds"]),
+        getGuildConfig: call(rpcClient["guildConfig.getGuildConfig"]),
+        upsertGuildConfig: call(rpcClient["guildConfig.upsertGuildConfig"]),
+        getGuildMonitorRoles: call(rpcClient["guildConfig.getGuildMonitorRoles"]),
+        getGuildChannels: call(rpcClient["guildConfig.getGuildChannels"]),
+        addGuildMonitorRole: call(rpcClient["guildConfig.addGuildMonitorRole"]),
+        removeGuildMonitorRole: call(rpcClient["guildConfig.removeGuildMonitorRole"]),
+        upsertGuildChannelConfig: call(rpcClient["guildConfig.upsertGuildChannelConfig"]),
+        getGuildChannelById: call(rpcClient["guildConfig.getGuildChannelById"]),
+        getGuildChannelByName: call(rpcClient["guildConfig.getGuildChannelByName"]),
+      },
+      health: {
+        live: () => rpcClient["health.live"](undefined),
+        ready: () => rpcClient["health.ready"](undefined),
+      },
+      messageCheckin: {
+        getMessageCheckinData: call(rpcClient["messageCheckin.getMessageCheckinData"]),
+        upsertMessageCheckinData: call(rpcClient["messageCheckin.upsertMessageCheckinData"]),
+        getMessageCheckinMembers: call(rpcClient["messageCheckin.getMessageCheckinMembers"]),
+        addMessageCheckinMembers: call(rpcClient["messageCheckin.addMessageCheckinMembers"]),
+        setMessageCheckinMemberCheckinAt: call(
+          rpcClient["messageCheckin.setMessageCheckinMemberCheckinAt"],
+        ),
+        removeMessageCheckinMember: call(rpcClient["messageCheckin.removeMessageCheckinMember"]),
+      },
+      messageRoomOrder: {
+        getMessageRoomOrder: call(rpcClient["messageRoomOrder.getMessageRoomOrder"]),
+        upsertMessageRoomOrder: call(rpcClient["messageRoomOrder.upsertMessageRoomOrder"]),
+        persistMessageRoomOrder: call(rpcClient["messageRoomOrder.persistMessageRoomOrder"]),
+        decrementMessageRoomOrderRank: call(
+          rpcClient["messageRoomOrder.decrementMessageRoomOrderRank"],
+        ),
+        incrementMessageRoomOrderRank: call(
+          rpcClient["messageRoomOrder.incrementMessageRoomOrderRank"],
+        ),
+        getMessageRoomOrderEntry: call(rpcClient["messageRoomOrder.getMessageRoomOrderEntry"]),
+        getMessageRoomOrderRange: call(rpcClient["messageRoomOrder.getMessageRoomOrderRange"]),
+        upsertMessageRoomOrderEntry: call(
+          rpcClient["messageRoomOrder.upsertMessageRoomOrderEntry"],
+        ),
+        removeMessageRoomOrderEntry: call(
+          rpcClient["messageRoomOrder.removeMessageRoomOrderEntry"],
+        ),
+      },
+      messageSlot: {
+        getMessageSlotData: call(rpcClient["messageSlot.getMessageSlotData"]),
+        upsertMessageSlotData: call(rpcClient["messageSlot.upsertMessageSlotData"]),
+      },
+      monitor: {
+        getMonitorMaps: call(rpcClient["monitor.getMonitorMaps"]),
+        getByIds: call(rpcClient["monitor.getByIds"]),
+        getByNames: call(rpcClient["monitor.getByNames"]),
+      },
+      permissions: {
+        getCurrentUserPermissions: call(rpcClient["permissions.getCurrentUserPermissions"]),
+      },
+      player: {
+        getPlayerMaps: call(rpcClient["player.getPlayerMaps"]),
+        getByIds: call(rpcClient["player.getByIds"]),
+        getByNames: call(rpcClient["player.getByNames"]),
+        getTeamsByIds: call(rpcClient["player.getTeamsByIds"]),
+        getTeamsByNames: call(rpcClient["player.getTeamsByNames"]),
+      },
+      roomOrder: {
+        generate: call(rpcClient["roomOrder.generate"]),
+      },
+      schedule: {
+        getAllPopulatedSchedules: call(rpcClient["schedule.getAllPopulatedSchedules"]),
+        getDayPopulatedSchedules: call(rpcClient["schedule.getDayPopulatedSchedules"]),
+        getChannelPopulatedSchedules: call(rpcClient["schedule.getChannelPopulatedSchedules"]),
+        getDayPlayerSchedule: call(rpcClient["schedule.getDayPlayerSchedule"]),
+      },
+      screenshot: {
+        getScreenshot: call(rpcClient["screenshot.getScreenshot"]),
+      },
+      sheet: {
+        getPlayers: call(rpcClient["sheet.getPlayers"]),
+        getMonitors: call(rpcClient["sheet.getMonitors"]),
+        getTeams: call(rpcClient["sheet.getTeams"]),
+        getAllSchedules: call(rpcClient["sheet.getAllSchedules"]),
+        getDaySchedules: call(rpcClient["sheet.getDaySchedules"]),
+        getChannelSchedules: call(rpcClient["sheet.getChannelSchedules"]),
+        getRangesConfig: call(rpcClient["sheet.getRangesConfig"]),
+        getTeamConfig: call(rpcClient["sheet.getTeamConfig"]),
+        getEventConfig: call(rpcClient["sheet.getEventConfig"]),
+        getScheduleConfig: call(rpcClient["sheet.getScheduleConfig"]),
+        getRunnerConfig: call(rpcClient["sheet.getRunnerConfig"]),
+      },
+      getServiceUser,
+      withServiceUser: <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+        Effect.gen(function* () {
+          const serviceUser = yield* getServiceUser();
+          return yield* effect.pipe(Effect.provideService(SheetAuthUser, serviceUser));
         }),
-      ),
-    );
+      withDiscordAccessToken: <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+        effect.pipe(Effect.provideService(forwardDiscordAccessTokenTag, true)),
+    };
   }),
 }) {
   static layer = Layer.effect(SheetApisClient, this.make).pipe(

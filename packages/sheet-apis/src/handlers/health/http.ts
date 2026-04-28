@@ -1,21 +1,13 @@
-import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { DateTime, Effect } from "effect";
-import { Api } from "@/api";
+import { HealthRpcs } from "sheet-ingress-api/sheet-apis-rpc";
 
-export const healthLayer = HttpApiBuilder.group(Api, "health", (handlers) => {
-  return handlers
-    .handle(
-      "live",
-      Effect.fnUntraced(function* () {
-        const timestamp = yield* DateTime.now;
-        return { status: "ok" as const, timestamp };
-      }),
-    )
-    .handle(
-      "ready",
-      Effect.fnUntraced(function* () {
-        const timestamp = yield* DateTime.now;
-        return { status: "ok" as const, timestamp };
-      }),
-    );
+export const healthLayer = HealthRpcs.toLayer({
+  "health.live": Effect.fnUntraced(function* () {
+    const timestamp = yield* DateTime.now;
+    return { status: "ok" as const, timestamp };
+  }),
+  "health.ready": Effect.fnUntraced(function* () {
+    const timestamp = yield* DateTime.now;
+    return { status: "ok" as const, timestamp };
+  }),
 });

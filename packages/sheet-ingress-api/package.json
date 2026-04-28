@@ -30,9 +30,17 @@
       "types": "./dist/middlewares/sheetAuthTokenAuthorization/tag.d.mts",
       "default": "./dist/middlewares/sheetAuthTokenAuthorization/tag.mjs"
     },
+    "./middlewares/sheetApisRpcAuthorization/tag": {
+      "types": "./dist/middlewares/sheetApisRpcAuthorization/tag.d.mts",
+      "default": "./dist/middlewares/sheetApisRpcAuthorization/tag.mjs"
+    },
     "./sheet-apis": {
       "types": "./dist/sheet-apis.d.mts",
       "default": "./dist/sheet-apis.mjs"
+    },
+    "./sheet-apis-rpc": {
+      "types": "./dist/sheet-apis-rpc.d.mts",
+      "default": "./dist/sheet-apis-rpc.mjs"
     },
     "./sheet-bot": {
       "types": "./dist/sheet-bot.d.mts",

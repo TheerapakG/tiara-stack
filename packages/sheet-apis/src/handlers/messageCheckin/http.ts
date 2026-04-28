@@ -1,9 +1,7 @@
-import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { makeArgumentError } from "typhoon-core/error";
 import { Effect, HashSet, Layer, Match, Option } from "effect";
-import { Api } from "@/api";
+import { MessageCheckinRpcs } from "sheet-ingress-api/sheet-apis-rpc";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
-import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { MessageCheckin, MessageCheckinMember } from "sheet-ingress-api/schemas/messageCheckin";
 import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthGuildUser";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
@@ -293,103 +291,78 @@ export const requireMessageCheckinMonitorMutationAccess = Effect.fn(
   return yield* requireMessageCheckinMonitorPermission(authorizationService, authContext);
 });
 
-export const messageCheckinLayer = HttpApiBuilder.group(
-  Api,
-  "messageCheckin",
-  Effect.fn(function* (handlers) {
+export const messageCheckinLayer = MessageCheckinRpcs.toLayer(
+  Effect.gen(function* () {
     const authorizationService = yield* AuthorizationService;
     const messageCheckinService = yield* MessageCheckinService;
 
-    return handlers
-      .handle(
-        "getMessageCheckinData",
-        Effect.fnUntraced(function* ({ query }) {
-          return yield* requireMessageCheckinReadAccess(
-            authorizationService,
-            messageCheckinService,
-            query.messageId,
-          );
-        }),
-      )
-      .handle(
-        "upsertMessageCheckinData",
-        Effect.fnUntraced(function* ({ payload }) {
-          yield* requireCheckinUpsertAccess(
-            authorizationService,
-            messageCheckinService,
-            payload.messageId,
-            typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
-          );
+    return {
+      "messageCheckin.getMessageCheckinData": Effect.fnUntraced(function* ({ query }) {
+        return yield* requireMessageCheckinReadAccess(
+          authorizationService,
+          messageCheckinService,
+          query.messageId,
+        );
+      }),
+      "messageCheckin.upsertMessageCheckinData": Effect.fnUntraced(function* ({ payload }) {
+        yield* requireCheckinUpsertAccess(
+          authorizationService,
+          messageCheckinService,
+          payload.messageId,
+          typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
+        );
 
-          return yield* messageCheckinService.upsertMessageCheckinData(
-            payload.messageId,
-            payload.data,
-          );
-        }),
-      )
-      .handle(
-        "getMessageCheckinMembers",
-        Effect.fnUntraced(function* ({ query }) {
-          return yield* requireMessageCheckinMembersReadAccess(
-            authorizationService,
-            messageCheckinService,
-            query.messageId,
-          );
-        }),
-      )
-      .handle(
-        "addMessageCheckinMembers",
-        Effect.fnUntraced(function* ({ payload }) {
-          yield* requireMessageCheckinMonitorMutationAccess(
-            authorizationService,
-            messageCheckinService,
-            payload.messageId,
-          );
+        return yield* messageCheckinService.upsertMessageCheckinData(
+          payload.messageId,
+          payload.data,
+        );
+      }),
+      "messageCheckin.getMessageCheckinMembers": Effect.fnUntraced(function* ({ query }) {
+        return yield* requireMessageCheckinMembersReadAccess(
+          authorizationService,
+          messageCheckinService,
+          query.messageId,
+        );
+      }),
+      "messageCheckin.addMessageCheckinMembers": Effect.fnUntraced(function* ({ payload }) {
+        yield* requireMessageCheckinMonitorMutationAccess(
+          authorizationService,
+          messageCheckinService,
+          payload.messageId,
+        );
 
-          return yield* messageCheckinService.addMessageCheckinMembers(
-            payload.messageId,
-            payload.memberIds,
-          );
-        }),
-      )
-      .handle(
-        "setMessageCheckinMemberCheckinAt",
-        Effect.fnUntraced(function* ({ payload }) {
-          yield* requireMessageCheckinParticipantMutationAccess(
-            authorizationService,
-            messageCheckinService,
-            payload.messageId,
-            payload.memberId,
-          );
+        return yield* messageCheckinService.addMessageCheckinMembers(
+          payload.messageId,
+          payload.memberIds,
+        );
+      }),
+      "messageCheckin.setMessageCheckinMemberCheckinAt": Effect.fnUntraced(function* ({ payload }) {
+        yield* requireMessageCheckinParticipantMutationAccess(
+          authorizationService,
+          messageCheckinService,
+          payload.messageId,
+          payload.memberId,
+        );
 
-          return yield* messageCheckinService.setMessageCheckinMemberCheckinAt(
-            payload.messageId,
-            payload.memberId,
-            payload.checkinAt,
-          );
-        }),
-      )
-      .handle(
-        "removeMessageCheckinMember",
-        Effect.fnUntraced(function* ({ payload }) {
-          yield* requireMessageCheckinParticipantMutationAccess(
-            authorizationService,
-            messageCheckinService,
-            payload.messageId,
-            payload.memberId,
-          );
+        return yield* messageCheckinService.setMessageCheckinMemberCheckinAt(
+          payload.messageId,
+          payload.memberId,
+          payload.checkinAt,
+        );
+      }),
+      "messageCheckin.removeMessageCheckinMember": Effect.fnUntraced(function* ({ payload }) {
+        yield* requireMessageCheckinParticipantMutationAccess(
+          authorizationService,
+          messageCheckinService,
+          payload.messageId,
+          payload.memberId,
+        );
 
-          return yield* messageCheckinService.removeMessageCheckinMember(
-            payload.messageId,
-            payload.memberId,
-          );
-        }),
-      );
+        return yield* messageCheckinService.removeMessageCheckinMember(
+          payload.messageId,
+          payload.memberId,
+        );
+      }),
+    };
   }),
-).pipe(
-  Layer.provide([
-    AuthorizationService.layer,
-    MessageCheckinService.layer,
-    SheetAuthTokenAuthorizationLive,
-  ]),
-);
+).pipe(Layer.provide([AuthorizationService.layer, MessageCheckinService.layer]));

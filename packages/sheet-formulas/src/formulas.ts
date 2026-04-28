@@ -14,8 +14,8 @@ import {
   SchemaGetter,
 } from "effect";
 import { HttpApiClient } from "effect/unstable/httpapi";
-import { Api } from "sheet-apis/api";
-import { Sheet } from "sheet-apis/schema";
+import { SheetApisApi as Api } from "sheet-ingress-api/sheet-apis";
+import * as Sheet from "sheet-ingress-api/schemas/sheet";
 import { layer as AppsScriptHttpClientLayer } from "effect-platform-apps-script";
 
 const SETTING_SHEET_NAME = "Thee's Sheet Settings";

@@ -1,16 +1,11 @@
 import { GuildsApiCacheView } from "dfx-discord-utils/discord/cache/guilds";
-import { HttpClient, HttpServerRequest } from "effect/unstable/http";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { Effect, Layer, Redacted, Schema } from "effect";
+import { HttpClient } from "effect/unstable/http";
+import { Effect, Layer, Option, Redacted, Schema } from "effect";
 import { makeArgumentError } from "typhoon-core/error";
-import { Api } from "@/api";
-import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
+import { DiscordRpcs } from "sheet-ingress-api/sheet-apis-rpc";
+import { ForwardedDiscordAccessToken } from "@/middlewares/forwardedDiscordAccessToken/tag";
 import { Discord } from "@/schema";
 import { discordLayer as discordServiceLayer } from "@/services";
-
-const forwardedDiscordHeaders = Schema.Struct({
-  "x-sheet-discord-access-token": Schema.optional(Schema.String),
-});
 
 const DiscordMyGuild = Schema.Struct({
   id: Schema.String,
@@ -24,17 +19,15 @@ const formatError = (error: unknown) =>
       : JSON.stringify(error);
 
 const getForwardedDiscordAccessToken = Effect.fn("getForwardedDiscordAccessToken")(function* () {
-  const headers = yield* HttpServerRequest.schemaHeaders(forwardedDiscordHeaders);
-  if (!headers["x-sheet-discord-access-token"]) {
+  const accessToken = yield* ForwardedDiscordAccessToken;
+  if (Option.isNone(accessToken)) {
     return yield* Effect.fail(makeArgumentError("Missing forwarded Discord access token"));
   }
-  return Redacted.make(headers["x-sheet-discord-access-token"]);
+  return accessToken.value;
 });
 
-export const discordLayer = HttpApiBuilder.group(
-  Api,
-  "discord",
-  Effect.fn(function* (handlers) {
+export const discordLayer = DiscordRpcs.toLayer(
+  Effect.gen(function* () {
     const guildsCache = yield* GuildsApiCacheView;
     const httpClient = yield* HttpClient.HttpClient;
 
@@ -63,66 +56,61 @@ export const discordLayer = HttpApiBuilder.group(
       );
     });
 
-    return handlers
-      .handle(
-        "getCurrentUser",
-        Effect.fnUntraced(function* () {
-          const accessToken = yield* getForwardedDiscordAccessToken();
-          const json = yield* getDiscordJson(
-            "https://discord.com/api/v10/users/@me",
-            accessToken,
-            "Failed to fetch Discord user",
-          );
+    return {
+      "discord.getCurrentUser": Effect.fnUntraced(function* () {
+        const accessToken = yield* getForwardedDiscordAccessToken();
+        const json = yield* getDiscordJson(
+          "https://discord.com/api/v10/users/@me",
+          accessToken,
+          "Failed to fetch Discord user",
+        );
 
-          return yield* Schema.decodeUnknownEffect(Discord.DiscordUser)(json).pipe(
-            Effect.mapError((error) =>
-              makeArgumentError(`Invalid response from Discord API: ${String(error)}`),
+        return yield* Schema.decodeUnknownEffect(Discord.DiscordUser)(json).pipe(
+          Effect.mapError((error) =>
+            makeArgumentError(`Invalid response from Discord API: ${String(error)}`),
+          ),
+        );
+      }),
+      "discord.getCurrentUserGuilds": Effect.fnUntraced(function* () {
+        const accessToken = yield* getForwardedDiscordAccessToken();
+        const json = yield* getDiscordJson(
+          "https://discord.com/api/v10/users/@me/guilds",
+          accessToken,
+          "Failed to fetch Discord guilds",
+        );
+
+        const userGuilds = yield* Schema.decodeUnknownEffect(Schema.Array(DiscordMyGuild))(
+          json,
+        ).pipe(
+          Effect.mapError((error) =>
+            makeArgumentError(`Invalid response from Discord API: ${String(error)}`),
+          ),
+        );
+
+        const maybeGuilds = yield* Effect.forEach(
+          userGuilds,
+          ({ id }) =>
+            guildsCache.get(id).pipe(
+              Effect.matchEffect({
+                onSuccess: (guild) => Effect.succeed(guild),
+                onFailure: () => Effect.succeed(null),
+              }),
             ),
-          );
-        }),
-      )
-      .handle(
-        "getCurrentUserGuilds",
-        Effect.fnUntraced(function* () {
-          const accessToken = yield* getForwardedDiscordAccessToken();
-          const json = yield* getDiscordJson(
-            "https://discord.com/api/v10/users/@me/guilds",
-            accessToken,
-            "Failed to fetch Discord guilds",
-          );
+          { concurrency: "unbounded" },
+        );
 
-          const userGuilds = yield* Schema.decodeUnknownEffect(Schema.Array(DiscordMyGuild))(
-            json,
-          ).pipe(
-            Effect.mapError((error) =>
-              makeArgumentError(`Invalid response from Discord API: ${String(error)}`),
-            ),
-          );
+        const cachedGuilds = maybeGuilds.filter(
+          (guild): guild is NonNullable<typeof guild> => guild !== null,
+        );
 
-          const maybeGuilds = yield* Effect.forEach(
-            userGuilds,
-            ({ id }) =>
-              guildsCache.get(id).pipe(
-                Effect.matchEffect({
-                  onSuccess: (guild) => Effect.succeed(guild),
-                  onFailure: () => Effect.succeed(null),
-                }),
-              ),
-            { concurrency: "unbounded" },
-          );
-
-          const cachedGuilds = maybeGuilds.filter(
-            (guild): guild is NonNullable<typeof guild> => guild !== null,
-          );
-
-          return yield* Schema.decodeUnknownEffect(Schema.Array(Discord.DiscordGuild))(
-            cachedGuilds,
-          ).pipe(
-            Effect.mapError((error) =>
-              makeArgumentError(`Invalid cached guild data: ${String(error)}`),
-            ),
-          );
-        }),
-      );
+        return yield* Schema.decodeUnknownEffect(Schema.Array(Discord.DiscordGuild))(
+          cachedGuilds,
+        ).pipe(
+          Effect.mapError((error) =>
+            makeArgumentError(`Invalid cached guild data: ${String(error)}`),
+          ),
+        );
+      }),
+    };
   }),
-).pipe(Layer.provide([discordServiceLayer, SheetAuthTokenAuthorizationLive]));
+).pipe(Layer.provide([discordServiceLayer]));

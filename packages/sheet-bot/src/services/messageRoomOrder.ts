@@ -78,7 +78,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
           });
         }),
         getMessageRoomOrderEntry: Effect.fn("MessageRoomOrderService.getMessageRoomOrderEntry")(
-          function* (messageId: string, rank: string) {
+          function* (messageId: string, rank: number) {
             return yield* sheetApisClient.get().messageRoomOrder.getMessageRoomOrderEntry({
               query: { messageId, rank },
             });

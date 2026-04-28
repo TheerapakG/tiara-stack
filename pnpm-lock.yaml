@@ -348,9 +348,6 @@ importers:
       handlebars:
         specifier: ^4.7.8
         version: 4.7.8
-      sheet-apis:
-        specifier: workspace:*
-        version: link:../sheet-apis
       sheet-auth:
         specifier: workspace:*
         version: link:../sheet-auth
@@ -504,9 +501,9 @@ importers:
       effect-platform-apps-script:
         specifier: workspace:*
         version: link:../effect-platform-apps-script
-      sheet-apis:
+      sheet-ingress-api:
         specifier: workspace:*
-        version: link:../sheet-apis
+        version: link:../sheet-ingress-api
       typhoon-core:
         specifier: workspace:*
         version: link:../typhoon-core

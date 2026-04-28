@@ -1,9 +1,7 @@
-import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option } from "effect";
-import { Api } from "@/api";
+import { MessageSlotRpcs } from "sheet-ingress-api/sheet-apis-rpc";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
-import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthGuildUser";
 import { MessageSlot } from "sheet-ingress-api/schemas/messageSlot";
 import { AuthorizationService, MessageSlotService } from "@/services";
@@ -139,42 +137,29 @@ export const requireMessageSlotReadAccess = Effect.fn("messageSlot.requireMessag
   },
 );
 
-export const messageSlotLayer = HttpApiBuilder.group(
-  Api,
-  "messageSlot",
-  Effect.fn(function* (handlers) {
+export const messageSlotLayer = MessageSlotRpcs.toLayer(
+  Effect.gen(function* () {
     const authorizationService = yield* AuthorizationService;
     const messageSlotService = yield* MessageSlotService;
 
-    return handlers
-      .handle(
-        "getMessageSlotData",
-        Effect.fnUntraced(function* ({ query }) {
-          return yield* requireMessageSlotReadAccess(
-            authorizationService,
-            messageSlotService,
-            query.messageId,
-          );
-        }),
-      )
-      .handle(
-        "upsertMessageSlotData",
-        Effect.fnUntraced(function* ({ payload }) {
-          yield* requireMessageSlotUpsertAccess(
-            authorizationService,
-            messageSlotService,
-            payload.messageId,
-            typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
-          );
+    return {
+      "messageSlot.getMessageSlotData": Effect.fnUntraced(function* ({ query }) {
+        return yield* requireMessageSlotReadAccess(
+          authorizationService,
+          messageSlotService,
+          query.messageId,
+        );
+      }),
+      "messageSlot.upsertMessageSlotData": Effect.fnUntraced(function* ({ payload }) {
+        yield* requireMessageSlotUpsertAccess(
+          authorizationService,
+          messageSlotService,
+          payload.messageId,
+          typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
+        );
 
-          return yield* messageSlotService.upsertMessageSlotData(payload.messageId, payload.data);
-        }),
-      );
+        return yield* messageSlotService.upsertMessageSlotData(payload.messageId, payload.data);
+      }),
+    };
   }),
-).pipe(
-  Layer.provide([
-    AuthorizationService.layer,
-    MessageSlotService.layer,
-    SheetAuthTokenAuthorizationLive,
-  ]),
-);
+).pipe(Layer.provide([AuthorizationService.layer, MessageSlotService.layer]));

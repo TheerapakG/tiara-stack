@@ -1,4 +1,3 @@
-import { HttpServerRequest } from "effect/unstable/http";
 import {
   Cache,
   Clock,
@@ -11,19 +10,14 @@ import {
   Redacted,
   Schema,
 } from "effect";
+import { Headers } from "effect/unstable/http";
 import { verifyKubernetesToken } from "sheet-auth/plugins/kubernetes-oauth";
-import { SheetAuthTokenAuthorization } from "sheet-ingress-api/middlewares/sheetAuthTokenAuthorization/tag";
+import { SheetApisRpcAuthorization } from "sheet-ingress-api/middlewares/sheetApisRpcAuthorization/tag";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
 import { Permission } from "sheet-ingress-api/schemas/permissions";
 import { config } from "@/config";
-
-const forwardedHeaders = Schema.Struct({
-  "x-sheet-ingress-auth": Schema.optional(Schema.String),
-  "x-sheet-auth-user-id": Schema.optional(Schema.String),
-  "x-sheet-auth-account-id": Schema.optional(Schema.String),
-  "x-sheet-auth-permissions": Schema.optional(Schema.String),
-});
+import { ForwardedDiscordAccessToken } from "../forwardedDiscordAccessToken/tag";
 
 // Ingress-forwarded users are already authenticated at the boundary. The raw
 // sheet-auth session token is intentionally unavailable inside sheet-apis.
@@ -54,6 +48,8 @@ type VerifiedIngressToken = {
   readonly ttl: Duration.Duration;
 };
 
+type SheetApisRpcAuthorizationMiddleware = Parameters<typeof SheetApisRpcAuthorization.of>[0];
+
 const requireUnexpiredVerifiedToken = ({ exp }: { readonly exp: number | undefined }) =>
   typeof exp === "number"
     ? Clock.currentTimeMillis.pipe(
@@ -66,7 +62,7 @@ const requireUnexpiredVerifiedToken = ({ exp }: { readonly exp: number | undefin
     : Effect.void;
 
 export const SheetAuthTokenAuthorizationLive = Layer.effect(
-  SheetAuthTokenAuthorization,
+  SheetApisRpcAuthorization,
   Effect.gen(function* () {
     const podNamespace = yield* config.podNamespace;
     const maybeIngressNamespace = yield* config.sheetIngressNamespace;
@@ -112,38 +108,48 @@ export const SheetAuthTokenAuthorizationLive = Layer.effect(
       },
     );
 
-    return SheetAuthTokenAuthorization.of({
-      sheetAuthToken: Effect.fn("SheetAuthTokenAuthorization.sheetAuthToken")(
-        function* (httpEffect, _options) {
-          const headers = yield* HttpServerRequest.schemaHeaders(forwardedHeaders).pipe(
-            Effect.mapError(
-              (cause) => new Unauthorized({ message: "Invalid forwarded auth headers", cause }),
-            ),
-          );
-          const ingressToken = getBearerToken(headers["x-sheet-ingress-auth"]);
+    const middleware: SheetApisRpcAuthorizationMiddleware = Effect.fn("SheetApisRpcAuthorization")(
+      function* (rpcEffect, options) {
+        const headers = options.headers;
+        const ingressToken = getBearerToken(
+          Option.getOrUndefined(Headers.get(headers, "x-sheet-ingress-auth")),
+        );
 
-          if (!ingressToken) {
-            return yield* Effect.fail(
-              new Unauthorized({ message: "Missing ingress authorization" }),
-            );
-          }
-          const verifiedToken = yield* Cache.get(ingressTokenCache, ingressToken);
-          yield* requireUnexpiredVerifiedToken(verifiedToken);
+        if (!ingressToken) {
+          return yield* Effect.fail(new Unauthorized({ message: "Missing ingress authorization" }));
+        }
+        const verifiedToken = yield* Cache.get(ingressTokenCache, ingressToken);
+        yield* requireUnexpiredVerifiedToken(verifiedToken);
 
-          if (!headers["x-sheet-auth-user-id"] || !headers["x-sheet-auth-account-id"]) {
-            return yield* Effect.fail(new Unauthorized({ message: "Missing forwarded auth user" }));
-          }
+        const userId = Option.getOrUndefined(Headers.get(headers, "x-sheet-auth-user-id"));
+        const accountId = Option.getOrUndefined(Headers.get(headers, "x-sheet-auth-account-id"));
 
-          const permissions = yield* parsePermissions(headers["x-sheet-auth-permissions"]);
+        if (!userId || !accountId) {
+          return yield* Effect.fail(new Unauthorized({ message: "Missing forwarded auth user" }));
+        }
 
-          return yield* Effect.provideService(httpEffect, SheetAuthUser, {
-            accountId: headers["x-sheet-auth-account-id"],
-            userId: headers["x-sheet-auth-user-id"],
+        const permissions = yield* parsePermissions(
+          Option.getOrUndefined(Headers.get(headers, "x-sheet-auth-permissions")),
+        );
+        const forwardedDiscordAccessToken = Option.map(
+          Headers.get(headers, "x-sheet-discord-access-token"),
+          Redacted.make,
+        );
+
+        const provided = rpcEffect.pipe(
+          Effect.provideService(SheetAuthUser, {
+            accountId,
+            userId,
             permissions,
             token: forwardedSessionTokenUnavailable,
-          });
-        },
-      ),
-    });
+          }),
+          Effect.provideService(ForwardedDiscordAccessToken, forwardedDiscordAccessToken),
+        );
+
+        return yield* provided;
+      },
+    );
+
+    return SheetApisRpcAuthorization.of(middleware);
   }),
 );

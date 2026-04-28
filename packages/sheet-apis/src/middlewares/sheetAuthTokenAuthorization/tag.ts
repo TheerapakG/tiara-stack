@@ -1,1 +1,1 @@
-export { SheetAuthTokenAuthorization } from "sheet-ingress-api/middlewares/sheetAuthTokenAuthorization/tag";
+export { SheetApisRpcAuthorization as SheetAuthTokenAuthorization } from "sheet-ingress-api/middlewares/sheetApisRpcAuthorization/tag";

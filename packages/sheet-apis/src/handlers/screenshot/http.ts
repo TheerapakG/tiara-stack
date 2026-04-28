@@ -1,9 +1,7 @@
-import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Effect, Layer, Option } from "effect";
-import { Api } from "@/api";
+import { ScreenshotRpcs } from "sheet-ingress-api/sheet-apis-rpc";
 import { withCurrentGuildAuthFromQuery } from "@/handlers/shared/guildAuthorization";
 import { AuthorizationService, ScreenshotService, GuildConfigService } from "@/services";
-import { SheetAuthTokenAuthorizationLive } from "@/middlewares/sheetAuthTokenAuthorization/live";
 
 const getSheetIdFromGuildId = Effect.fn("screenshot.getSheetIdFromGuildId")(function* (
   guildId: string,
@@ -22,31 +20,23 @@ const getSheetIdFromGuildId = Effect.fn("screenshot.getSheetIdFromGuildId")(func
   return guildConfig.value.sheetId.value;
 });
 
-export const screenshotLayer = HttpApiBuilder.group(
-  Api,
-  "screenshot",
-  Effect.fn(function* (handlers) {
+export const screenshotLayer = ScreenshotRpcs.toLayer(
+  Effect.gen(function* () {
     const authorizationService = yield* AuthorizationService;
     const screenshotService = yield* ScreenshotService;
     const guildConfigService = yield* GuildConfigService;
     const withQueryGuildAuth = withCurrentGuildAuthFromQuery(authorizationService);
 
-    return handlers.handle(
-      "getScreenshot",
-      withQueryGuildAuth(
+    return {
+      "screenshot.getScreenshot": withQueryGuildAuth(
         Effect.fnUntraced(function* ({ query }) {
           yield* authorizationService.requireMonitorGuild(query.guildId);
           const sheetId = yield* getSheetIdFromGuildId(query.guildId, guildConfigService);
           return yield* screenshotService.getScreenshot(sheetId, query.channel, query.day);
         }),
       ),
-    );
+    };
   }),
 ).pipe(
-  Layer.provide([
-    AuthorizationService.layer,
-    ScreenshotService.layer,
-    GuildConfigService.layer,
-    SheetAuthTokenAuthorizationLive,
-  ]),
+  Layer.provide([AuthorizationService.layer, ScreenshotService.layer, GuildConfigService.layer]),
 );

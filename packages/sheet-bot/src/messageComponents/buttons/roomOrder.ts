@@ -77,7 +77,7 @@ const makeRoomOrderReply = (
     ) => Effect.Effect<{ minRank: number; maxRank: number }, unknown, unknown>;
     getMessageRoomOrderEntry: (
       messageId: string,
-      rank: string,
+      rank: number,
     ) => Effect.Effect<
       ReadonlyArray<{
         team: string;
@@ -100,7 +100,7 @@ const makeRoomOrderReply = (
       yield* messageRoomOrderService.getMessageRoomOrderRange(messageId);
     const messageRoomOrderEntry = yield* messageRoomOrderService.getMessageRoomOrderEntry(
       messageId,
-      messageRoomOrder.rank.toString(),
+      messageRoomOrder.rank,
     );
     const { start, end } = yield* pipe(
       converterService.convertHourToHourWindow(guildId, messageRoomOrder.hour),

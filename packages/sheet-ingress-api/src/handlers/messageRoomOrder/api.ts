@@ -96,7 +96,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
     HttpApiEndpoint.get("getMessageRoomOrderEntry", "/messageRoomOrder/getMessageRoomOrderEntry", {
       query: Schema.Struct({
         messageId: Schema.String,
-        rank: Schema.String,
+        rank: Schema.NumberFromString,
       }),
       success: Schema.Array(MessageRoomOrderEntry),
       error: [SchemaError, QueryResultError, ArgumentError],

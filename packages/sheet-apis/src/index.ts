@@ -25,5 +25,6 @@ httpLayer.pipe(
   Layer.provide(NodeHttpClient.layerFetch),
   Layer.provide(configProviderLayer),
   Layer.launch,
+  Effect.orDie,
   NodeRuntime.runMain(),
 );
