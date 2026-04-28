@@ -31,7 +31,7 @@ import { Api } from "sheet-ingress-api/api";
 import { SheetBotUnauthorized } from "sheet-ingress-api/sheet-bot";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
-import { makeArgumentError } from "typhoon-core/error";
+import { ArgumentError, makeArgumentError } from "typhoon-core/error";
 import { config } from "./config";
 import {
   AuthorizationService,
@@ -192,6 +192,16 @@ const missingMessage = (kind: string) =>
 const legacyDenied = (kind: string) =>
   Effect.fail(new Unauthorized({ message: `Legacy ${kind} records are no longer accessible` }));
 
+const authorizationArgumentError = (kind: string) => (cause: unknown) =>
+  cause instanceof Unauthorized || cause instanceof ArgumentError
+    ? cause
+    : makeArgumentError(`Cannot authorize ${kind}`, cause);
+
+const authorizationUnauthorized = (kind: string) => (cause: unknown) =>
+  cause instanceof Unauthorized
+    ? cause
+    : new Unauthorized({ message: `Cannot authorize ${kind}`, cause });
+
 const getRequiredModernGuildId = <T extends Parameters<typeof getModernMessageGuildId>[0]>(
   record: T,
   kind: string,
@@ -223,24 +233,68 @@ const corsMiddlewareLayer = Layer.unwrap(
   }),
 );
 
+type SheetIngressGroups = (typeof Api)["groups"][keyof (typeof Api)["groups"]];
+type SheetApisClientService = typeof SheetApisClient.Service;
+type SheetApisGroupName = Extract<
+  keyof SheetApisClientService,
+  HttpApiGroup.Name<SheetIngressGroups>
+>;
+type SheetApisGroup<GroupName extends SheetApisGroupName> = HttpApiGroup.WithName<
+  SheetIngressGroups,
+  GroupName
+>;
+type SheetApisEndpointName<GroupName extends SheetApisGroupName> = Extract<
+  HttpApiEndpoint.Name<HttpApiGroup.Endpoints<SheetApisGroup<GroupName>>>,
+  keyof SheetApisClientService[GroupName] & string
+>;
+type SheetApisEndpoint<GroupName extends SheetApisGroupName> = HttpApiGroup.Endpoints<
+  SheetApisGroup<GroupName>
+>;
+type SheetApisProxyRequest<
+  GroupName extends SheetApisGroupName,
+  EndpointName extends SheetApisEndpointName<GroupName>,
+> = HttpApiEndpoint.Request<HttpApiEndpoint.WithName<SheetApisEndpoint<GroupName>, EndpointName>>;
+type SheetApisProxyError<
+  GroupName extends SheetApisGroupName,
+  EndpointName extends SheetApisEndpointName<GroupName>,
+> = HttpApiEndpoint.ErrorsWithName<SheetApisEndpoint<GroupName>, EndpointName>;
+type SheetApisProxyHandler<
+  GroupName extends SheetApisGroupName,
+  EndpointName extends SheetApisEndpointName<GroupName>,
+  R,
+> = HttpApiEndpoint.HandlerWithName<
+  SheetApisEndpoint<GroupName>,
+  EndpointName,
+  SheetApisProxyError<GroupName, EndpointName>,
+  SheetApisClient | R
+>;
+type SheetApisEndpointClient = (args: unknown) => Effect.Effect<unknown, unknown, unknown>;
+
 const proxySheetApis =
-  (
-    group: string,
-    endpoint: string,
-    authorize?: (args: any) => Effect.Effect<void, unknown, any>,
+  <
+    GroupName extends SheetApisGroupName,
+    EndpointName extends SheetApisEndpointName<GroupName>,
+    R = never,
+  >(
+    group: GroupName,
+    endpoint: EndpointName,
+    authorize?: (
+      args: SheetApisProxyRequest<GroupName, EndpointName>,
+    ) => Effect.Effect<void, SheetApisProxyError<GroupName, EndpointName>, R>,
     options?: {
       readonly forwardDiscordAccessToken?: boolean;
       readonly unauthenticated?: "anonymous";
     },
-  ): any =>
-  (args: any) =>
+  ): SheetApisProxyHandler<GroupName, EndpointName, R> =>
+  (rawArgs) =>
     Effect.gen(function* () {
+      const args = rawArgs as SheetApisProxyRequest<GroupName, EndpointName>;
       if (authorize) {
         yield* authorize(args);
       }
 
       const client = yield* SheetApisClient;
-      const groupClient = (client as any)[group];
+      const groupClient = client[group] as unknown as Record<string, SheetApisEndpointClient>;
       const endpointClient = groupClient?.[endpoint];
       if (typeof endpointClient !== "function") {
         return yield* Effect.die(
@@ -265,7 +319,7 @@ const proxySheetApis =
         );
       }
       return yield* client.withServiceUser(proxied);
-    });
+    }) as ReturnType<SheetApisProxyHandler<GroupName, EndpointName, R>>;
 
 const requireService = () =>
   Effect.gen(function* () {
@@ -310,7 +364,7 @@ const requireMessageSlotRead = (messageId: string) =>
     }
     const guildId = yield* getRequiredModernGuildId(record.value, "message slot");
     yield* requireGuild("member", guildId);
-  });
+  }).pipe(Effect.mapError(authorizationArgumentError("message slot")));
 
 const requireMessageSlotUpsert = (messageId: string, guildId?: string) =>
   Effect.gen(function* () {
@@ -322,7 +376,7 @@ const requireMessageSlotUpsert = (messageId: string, guildId?: string) =>
         ? guildId
         : yield* legacyDenied("message slot");
     yield* requireGuild("monitor", resolvedGuildId);
-  });
+  }).pipe(Effect.mapError(authorizationUnauthorized("message slot")));
 
 const requireRoomOrderMonitor = (messageId: string) =>
   Effect.gen(function* () {
@@ -333,7 +387,7 @@ const requireRoomOrderMonitor = (messageId: string) =>
     }
     const guildId = yield* getRequiredModernGuildId(record.value, "message room order");
     yield* requireGuild("monitor", guildId);
-  });
+  }).pipe(Effect.mapError(authorizationArgumentError("message room order")));
 
 const requireRoomOrderUpsert = (messageId: string, guildId?: string) =>
   Effect.gen(function* () {
@@ -345,7 +399,7 @@ const requireRoomOrderUpsert = (messageId: string, guildId?: string) =>
         ? guildId
         : yield* legacyDenied("message room order");
     yield* requireGuild("monitor", resolvedGuildId);
-  });
+  }).pipe(Effect.mapError(authorizationUnauthorized("message room order")));
 
 const requireMessageCheckinRead = (messageId: string) =>
   Effect.gen(function* () {
@@ -374,7 +428,7 @@ const requireMessageCheckinRead = (messageId: string) =>
         }),
       );
     }
-  });
+  }).pipe(Effect.mapError(authorizationArgumentError("message check-in")));
 
 const getAuthorizedMessageCheckinMembers = (messageId: string) =>
   Effect.gen(function* () {
@@ -421,7 +475,7 @@ const requireMessageCheckinMonitor = (messageId: string) =>
     }
     const guildId = yield* getRequiredModernGuildId(record.value, "message check-in");
     yield* requireGuild("monitor", guildId);
-  });
+  }).pipe(Effect.mapError(authorizationArgumentError("message check-in")));
 
 const requireMessageCheckinParticipantMutation = (messageId: string, memberId: string) =>
   Effect.gen(function* () {
@@ -453,7 +507,7 @@ const requireMessageCheckinParticipantMutation = (messageId: string, memberId: s
         }),
       );
     }
-  });
+  }).pipe(Effect.mapError(authorizationArgumentError("message check-in participant")));
 
 const requireMessageCheckinUpsert = (messageId: string, guildId?: string) =>
   Effect.gen(function* () {
@@ -465,7 +519,7 @@ const requireMessageCheckinUpsert = (messageId: string, guildId?: string) =>
         ? guildId
         : yield* legacyDenied("message check-in");
     yield* requireGuild("monitor", resolvedGuildId);
-  });
+  }).pipe(Effect.mapError(authorizationUnauthorized("message check-in")));
 
 const requireDayPlayerSchedule = (guildId: string, accountId: string) =>
   Effect.gen(function* () {
@@ -575,17 +629,6 @@ const makeApiLayer = () => {
           proxySheetApis("guildConfig", "getGuildChannelByName", ({ query }) =>
             requireGuild("member", query.guildId),
           ),
-        ),
-    ),
-    HttpApiBuilder.group(Api, "health", (handlers) =>
-      handlers
-        .handle(
-          "live",
-          proxySheetApis("health", "live", undefined, { unauthenticated: "anonymous" }),
-        )
-        .handle(
-          "ready",
-          proxySheetApis("health", "ready", undefined, { unauthenticated: "anonymous" }),
         ),
     ),
     HttpApiBuilder.group(Api, "messageCheckin", (handlers) =>

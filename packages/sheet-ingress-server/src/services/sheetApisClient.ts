@@ -248,10 +248,6 @@ export class SheetApisClient extends Context.Service<SheetApisClient>()("SheetAp
         getGuildChannelById: call(rpcClient["guildConfig.getGuildChannelById"]),
         getGuildChannelByName: call(rpcClient["guildConfig.getGuildChannelByName"]),
       },
-      health: {
-        live: () => rpcClient["health.live"](undefined),
-        ready: () => rpcClient["health.ready"](undefined),
-      },
       messageCheckin: {
         getMessageCheckinData: call(rpcClient["messageCheckin.getMessageCheckinData"]),
         upsertMessageCheckinData: call(rpcClient["messageCheckin.upsertMessageCheckinData"]),
