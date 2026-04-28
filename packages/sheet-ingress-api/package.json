@@ -46,10 +46,6 @@
       "types": "./dist/sheet-apis-rpc.d.mts",
       "default": "./dist/sheet-apis-rpc.mjs"
     },
-    "./sheet-bot": {
-      "types": "./dist/sheet-bot.d.mts",
-      "default": "./dist/sheet-bot.mjs"
-    },
     "./schemas/*": {
       "types": "./dist/schemas/*.d.mts",
       "default": "./dist/schemas/*.mjs"

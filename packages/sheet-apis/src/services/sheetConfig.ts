@@ -77,8 +77,6 @@ const scheduleConfigParser = ([range]: sheets_v4.Schema$ValueRange[]) =>
     Effect.withSpan("scheduleConfigParser"),
   );
 
-export type TeamConfigMap = Map<string, TeamConfig>;
-
 const parseTeamIsvConfig = (
   isvType: Option.Option<"split" | "combined">,
   isvRanges: Option.Option<string>,

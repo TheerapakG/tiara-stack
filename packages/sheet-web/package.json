@@ -50,6 +50,7 @@
     "recharts": "2.15.4",
     "sheet-apis": "workspace:*",
     "sheet-auth": "workspace:*",
+    "sheet-ingress-api": "workspace:*",
     "sonner": "^2.0.7",
     "start-atom": "workspace:*",
     "tailwind-merge": "^3.0.2",

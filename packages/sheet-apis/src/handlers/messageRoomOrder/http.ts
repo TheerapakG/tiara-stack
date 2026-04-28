@@ -13,7 +13,7 @@ const missingMessageRoomOrderError = () =>
 export const LEGACY_MESSAGE_ROOM_ORDER_ACCESS_ERROR =
   "Legacy message room order records are no longer accessible";
 
-export const denyLegacyMessageRoomOrderAccess = () =>
+const denyLegacyMessageRoomOrderAccess = () =>
   Effect.fail(new Unauthorized({ message: LEGACY_MESSAGE_ROOM_ORDER_ACCESS_ERROR }));
 
 type MessageRoomOrderAccessService = Pick<

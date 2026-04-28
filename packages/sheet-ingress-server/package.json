@@ -31,6 +31,7 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.207.0",
     "@opentelemetry/sdk-metrics": "^2.2.0",
     "@opentelemetry/sdk-trace-base": "^2.2.0",
+    "dfx-discord-utils": "workspace:*",
     "effect": "catalog:",
     "sheet-auth": "workspace:*",
     "sheet-ingress-api": "workspace:*",

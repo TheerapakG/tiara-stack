@@ -69,7 +69,7 @@ const resolveCachedAuthorization = Effect.fn("resolveCachedAuthorization")(funct
   } satisfies CachedAuthorization;
 });
 
-export class ApplicationOwnerResolver extends Context.Service<ApplicationOwnerResolver>()(
+class ApplicationOwnerResolver extends Context.Service<ApplicationOwnerResolver>()(
   "ApplicationOwnerResolver",
   {
     make: Effect.gen(function* () {

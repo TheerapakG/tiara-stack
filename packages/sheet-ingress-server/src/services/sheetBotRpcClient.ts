@@ -1,22 +1,21 @@
 import { Headers, HttpClient } from "effect/unstable/http";
 import { RpcClient, RpcMiddleware, RpcSerialization } from "effect/unstable/rpc";
 import { Context, Effect, Layer } from "effect";
-import { SheetBotRpcAuthorization, SheetBotRpcs } from "sheet-ingress-api/sheet-bot";
+import { DiscordRpcs as SheetBotRpcs } from "dfx-discord-utils/discord/rpc";
+import { SheetBotRpcAuthorization } from "sheet-ingress-api/middlewares/sheetBotRpcAuthorization/tag";
 import { config } from "@/config";
 import { SheetApisRpcTokens } from "./sheetApisRpcTokens";
 
 const AuthorizedSheetBotRpcs = SheetBotRpcs.middleware(SheetBotRpcAuthorization);
 
-export const getSheetBotRpcHeaders = Effect.fn("SheetBotRpcClient.getSheetBotRpcHeaders")(
-  function* () {
-    const tokens = yield* SheetApisRpcTokens;
-    const sheetBotToken = yield* tokens.getSheetBotToken();
+const getSheetBotRpcHeaders = Effect.fn("SheetBotRpcClient.getSheetBotRpcHeaders")(function* () {
+  const tokens = yield* SheetApisRpcTokens;
+  const sheetBotToken = yield* tokens.getSheetBotToken();
 
-    return Headers.set(Headers.empty, "x-sheet-ingress-auth", `Bearer ${sheetBotToken}`);
-  },
-);
+  return Headers.set(Headers.empty, "x-sheet-ingress-auth", `Bearer ${sheetBotToken}`);
+});
 
-export const sheetBotRpcAuthorizationClientLayer = RpcMiddleware.layerClient(
+const sheetBotRpcAuthorizationClientLayer = RpcMiddleware.layerClient(
   SheetBotRpcAuthorization,
   Effect.fn("SheetBotRpcClient.SheetBotRpcAuthorizationClient")(function* ({ request, next }) {
     const headers = yield* getSheetBotRpcHeaders();

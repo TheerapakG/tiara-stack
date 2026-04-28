@@ -22,7 +22,7 @@ const makeSheetApisRpcAuthorizationClientLayer = <R>(
     }),
   );
 
-export const getRpcHeaders = Effect.fn("SheetApisRpcClient.getRpcHeaders")(function* () {
+const getRpcHeaders = Effect.fn("SheetApisRpcClient.getRpcHeaders")(function* () {
   const tokens = yield* SheetApisRpcTokens;
   const user = yield* SheetAuthUser;
   const sheetApisToken = yield* tokens.getSheetApisToken();

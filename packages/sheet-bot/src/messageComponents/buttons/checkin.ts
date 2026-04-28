@@ -118,11 +118,6 @@ const makeCheckinButtonHandler = Effect.gen(function* () {
   );
 });
 
-export const checkinButton = {
-  data: checkinButtonData,
-  handler: makeCheckinButtonHandler,
-};
-
 const makeCheckinButton = Effect.gen(function* () {
   const button = yield* makeCheckinButtonHandler;
 

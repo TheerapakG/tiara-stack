@@ -44,7 +44,6 @@ export default defineConfig({
       ),
       "sheet-apis": fileURLToPath(new URL("./src/sheet-apis.ts", import.meta.url)),
       "sheet-apis-rpc": fileURLToPath(new URL("./src/sheet-apis-rpc.ts", import.meta.url)),
-      "sheet-bot": fileURLToPath(new URL("./src/sheet-bot.ts", import.meta.url)),
       ...collectEntries("schemas"),
     },
     sourcemap: true,

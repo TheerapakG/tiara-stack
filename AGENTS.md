@@ -192,8 +192,19 @@ This project utilizes the ArkType library for runtime type validation in some li
 sheet-web
   ├─ sheet-apis
   ├─ sheet-auth
+  ├─ sheet-ingress-api
   ├─ start-atom
   └─ typhoon-core
+
+sheet-ingress-server
+  ├─ sheet-auth
+  ├─ sheet-ingress-api
+  ├─ typhoon-core
+  └─ dfx-discord-utils
+
+sheet-ingress-api
+  ├─ typhoon-core
+  └─ dfx-discord-utils
 
 sheet-bot
   ├─ sheet-apis

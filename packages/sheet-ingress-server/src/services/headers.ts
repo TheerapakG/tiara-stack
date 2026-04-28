@@ -1,7 +1,7 @@
 import { Option } from "effect";
 import type { HttpServerRequest } from "effect/unstable/http";
 
-export const forwardedHeadersFrom = (request: HttpServerRequest.HttpServerRequest) => {
+const forwardedHeadersFrom = (request: HttpServerRequest.HttpServerRequest) => {
   const remoteAddress = Option.getOrUndefined(request.remoteAddress);
   const forwardedFor = remoteAddress
     ? [request.headers["x-forwarded-for"], remoteAddress].filter(Boolean).join(", ")

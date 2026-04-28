@@ -11,7 +11,7 @@ export const DiscordAvatarDecorationData = Schema.Struct({
 
 // Nameplate Structure
 // https://docs.discord.com/developers/resources/user#nameplate
-export const DiscordNameplate = Schema.Struct({
+const DiscordNameplate = Schema.Struct({
   // ID of the nameplate SKU
   sku_id: Schema.String,
   // Path to the nameplate asset
@@ -24,7 +24,7 @@ export const DiscordNameplate = Schema.Struct({
 
 // Collectibles Structure
 // https://docs.discord.com/developers/resources/user#collectibles
-export const DiscordCollectibles = Schema.Struct({
+const DiscordCollectibles = Schema.Struct({
   // Object mapping of nameplate data
   nameplate: Schema.optional(DiscordNameplate),
 });

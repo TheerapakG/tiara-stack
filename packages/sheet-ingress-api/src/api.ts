@@ -28,7 +28,7 @@ const withIngressApiAnnotations = <Id extends string, Groups extends HttpApiGrou
       "Ingress API for sheet APIs and sheet bot HTTP routes",
     ) as HttpApi.HttpApi<Id, Groups>;
 
-export class SheetIngressSheetApisApi extends HttpApi.make("api")
+class SheetIngressSheetApisApi extends HttpApi.make("api")
   .add(CalcApi)
   .add(CheckinApi)
   .add(GuildConfigApi)

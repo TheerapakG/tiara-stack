@@ -13,7 +13,7 @@ const missingMessageSlotError = () =>
 export const LEGACY_MESSAGE_SLOT_ACCESS_ERROR =
   "Legacy message slot records are no longer accessible";
 
-export const denyLegacyMessageSlotAccess = () =>
+const denyLegacyMessageSlotAccess = () =>
   Effect.fail(new Unauthorized({ message: LEGACY_MESSAGE_SLOT_ACCESS_ERROR }));
 
 type MessageSlotAccessService = Pick<typeof MessageSlotService.Service, "getMessageSlotData">;

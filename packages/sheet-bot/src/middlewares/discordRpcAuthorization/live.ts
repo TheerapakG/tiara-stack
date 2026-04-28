@@ -1,7 +1,8 @@
 import { Cache, Clock, Duration, Effect, Exit, Layer, Option } from "effect";
 import { Headers } from "effect/unstable/http";
+import { Unauthorized as SheetBotUnauthorized } from "dfx-discord-utils/discord/schema";
 import { verifyKubernetesToken } from "sheet-auth/plugins/kubernetes-oauth";
-import { SheetBotRpcAuthorization, SheetBotUnauthorized } from "sheet-ingress-api/sheet-bot";
+import { SheetBotRpcAuthorization } from "sheet-ingress-api/middlewares/sheetBotRpcAuthorization/tag";
 import { config } from "@/config";
 
 const getBearerToken = (authorization: string | undefined) => {

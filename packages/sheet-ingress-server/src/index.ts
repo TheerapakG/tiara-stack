@@ -27,8 +27,8 @@ import {
   HttpApiGroup,
   HttpApiSwagger,
 } from "effect/unstable/httpapi";
+import { Unauthorized as SheetBotUnauthorized } from "dfx-discord-utils/discord/schema";
 import { Api } from "sheet-ingress-api/api";
-import { SheetBotUnauthorized } from "sheet-ingress-api/sheet-bot";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
 import { ArgumentError, makeArgumentError } from "typhoon-core/error";

@@ -6,7 +6,6 @@ export default defineConfig({
     {
       entry: {
         "api-groups": fileURLToPath(new URL("./src/api-groups.ts", import.meta.url)),
-        api: fileURLToPath(new URL("./src/api.ts", import.meta.url)),
         schema: fileURLToPath(new URL("./src/schema.ts", import.meta.url)),
       },
       sourcemap: true,

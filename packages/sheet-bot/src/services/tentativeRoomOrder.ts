@@ -77,8 +77,7 @@ export const stripTentativeRoomOrderPrefix = (content: string): string =>
 export const formatTentativeRoomOrderContent = (content: string): string =>
   hasTentativeRoomOrderPrefix(content) ? content : [TENTATIVE_PREFIX, content].join("\n");
 
-export const shouldSendTentativeRoomOrder = (fillCount: number): boolean =>
-  fillCount >= MIN_FILL_COUNT;
+const shouldSendTentativeRoomOrder = (fillCount: number): boolean => fillCount >= MIN_FILL_COUNT;
 
 export const sendTentativeRoomOrder = Effect.fn("sendTentativeRoomOrder")(function* ({
   guildId,

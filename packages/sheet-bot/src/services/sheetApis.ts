@@ -29,7 +29,7 @@ type SheetApisRequester = Data.TaggedEnum<{
   Service: {};
   DiscordUser: { readonly discordUserId: string };
 }>;
-export const SheetApisRequester = Data.taggedEnum<SheetApisRequester>();
+const SheetApisRequester = Data.taggedEnum<SheetApisRequester>();
 
 type SheetApisRequestContextType = {
   requester: SheetApisRequester;

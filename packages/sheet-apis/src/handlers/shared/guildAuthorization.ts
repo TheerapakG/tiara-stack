@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { AuthorizationService } from "@/services";
 
-export const withCurrentGuildAuth =
+const withCurrentGuildAuth =
   <Args>(
     authorizationService: typeof AuthorizationService.Service,
     extractGuildId: (args: Args) => string,

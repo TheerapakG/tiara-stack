@@ -14,7 +14,7 @@ const missingMessageCheckinError = () =>
 export const LEGACY_MESSAGE_CHECKIN_ACCESS_ERROR =
   "Legacy message check-in records are no longer accessible";
 
-export const denyLegacyMessageCheckinAccess = () =>
+const denyLegacyMessageCheckinAccess = () =>
   Effect.fail(new Unauthorized({ message: LEGACY_MESSAGE_CHECKIN_ACCESS_ERROR }));
 
 type MessageCheckinAccessService = Pick<
