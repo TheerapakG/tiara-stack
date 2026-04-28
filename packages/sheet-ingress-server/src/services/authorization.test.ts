@@ -8,7 +8,8 @@ import {
   hasPermission,
   permissionSetFromIterable,
 } from "./authorization";
-import { SheetApisClient } from "./sheetApisClient";
+import { SheetApisForwardingClient } from "./sheetApisForwardingClient";
+import { SheetApisRpcTokens } from "./sheetApisRpcTokens";
 import { SheetBotCacheClient } from "./sheetBotCacheClient";
 
 type SheetBotCacheClientApi = typeof SheetBotCacheClient.Service;
@@ -23,14 +24,13 @@ const makeUser = (
   token: Redacted.make("token-1"),
 });
 
-const makeSheetApisClient = (monitorRoleIds: ReadonlyArray<string> = []) => {
+const makeSheetApisForwardingClient = (monitorRoleIds: ReadonlyArray<string> = []) => {
   const getGuildMonitorRoles = vi.fn(() =>
     Effect.succeed(monitorRoleIds.map((roleId) => ({ roleId }))),
   );
 
   return {
     client: {
-      withServiceUser: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect,
       guildConfig: {
         getGuildMonitorRoles,
       },
@@ -65,11 +65,17 @@ const runAuthorization = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
   {
     user = makeUser(),
-    sheetApisClient = makeSheetApisClient([]).client,
+    sheetApisForwardingClient = makeSheetApisForwardingClient([]).client,
     sheetBotCacheClient = makeSheetBotCacheClient(),
+    sheetApisRpcTokens = {
+      getServiceUser: () =>
+        Effect.succeed(makeUser(["service"], { accountId: "service", userId: "service-user" })),
+      withServiceUser: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect,
+    } as never,
   }: {
     readonly user?: ReturnType<typeof makeUser>;
-    readonly sheetApisClient?: typeof SheetApisClient.Service;
+    readonly sheetApisForwardingClient?: typeof SheetApisForwardingClient.Service;
+    readonly sheetApisRpcTokens?: typeof SheetApisRpcTokens.Service;
     readonly sheetBotCacheClient?: typeof SheetBotCacheClient.Service;
   } = {},
 ) => {
@@ -77,7 +83,8 @@ const runAuthorization = <A, E, R>(
   const provided = effect.pipe(
     Effect.provide(authorizationLayer),
     Effect.provideService(SheetAuthUser, user),
-    Effect.provideService(SheetApisClient, sheetApisClient),
+    Effect.provideService(SheetApisForwardingClient, sheetApisForwardingClient),
+    Effect.provideService(SheetApisRpcTokens, sheetApisRpcTokens),
     Effect.provideService(SheetBotCacheClient, sheetBotCacheClient),
   );
 
@@ -151,7 +158,7 @@ describe("AuthorizationService", () => {
   });
 
   it("resolves guild permissions before requiring guild permission", async () => {
-    const { client, getGuildMonitorRoles } = makeSheetApisClient(["role-1"]);
+    const { client, getGuildMonitorRoles } = makeSheetApisForwardingClient(["role-1"]);
     const sheetBotCacheClient = makeSheetBotCacheClient({
       member: Option.some({ roles: ["role-1"] }),
     });
@@ -163,7 +170,7 @@ describe("AuthorizationService", () => {
           yield* authorization.requireMonitorGuild("guild-1");
         }),
         {
-          sheetApisClient: client,
+          sheetApisForwardingClient: client,
           sheetBotCacheClient,
         },
       ),
@@ -174,7 +181,7 @@ describe("AuthorizationService", () => {
   });
 
   it("caches guild permission resolution for the same token and guild", async () => {
-    const { client, getGuildMonitorRoles } = makeSheetApisClient([]);
+    const { client, getGuildMonitorRoles } = makeSheetApisForwardingClient([]);
     const sheetBotCacheClient = makeSheetBotCacheClient({
       member: Option.some({ roles: [] }),
     });
@@ -187,7 +194,7 @@ describe("AuthorizationService", () => {
           yield* authorization.resolveCurrentGuildUser("guild-1");
         }),
         {
-          sheetApisClient: client,
+          sheetApisForwardingClient: client,
           sheetBotCacheClient,
         },
       ),
@@ -221,7 +228,7 @@ describe("AuthorizationService", () => {
   });
 
   it("caches monitor role lookups across users for the same guild", async () => {
-    const { client, getGuildMonitorRoles } = makeSheetApisClient(["role-1"]);
+    const { client, getGuildMonitorRoles } = makeSheetApisForwardingClient(["role-1"]);
     const sheetBotCacheClient = makeSheetBotCacheClient({
       member: Option.some({ roles: ["role-1"] }),
     });
@@ -236,7 +243,7 @@ describe("AuthorizationService", () => {
             "guild-1",
           );
         }),
-        { sheetApisClient: client, sheetBotCacheClient },
+        { sheetApisForwardingClient: client, sheetBotCacheClient },
       ),
     );
 
@@ -244,8 +251,7 @@ describe("AuthorizationService", () => {
   });
 
   it("degrades safely when guild permission lookups fail", async () => {
-    const sheetApisClient = {
-      withServiceUser: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect,
+    const sheetApisForwardingClient = {
       guildConfig: {
         getGuildMonitorRoles: () => Effect.fail(new Error("lookup failed")),
       },
@@ -261,7 +267,7 @@ describe("AuthorizationService", () => {
           const authorization = yield* AuthorizationService;
           return yield* authorization.resolveCurrentGuildUser("guild-1");
         }),
-        { sheetApisClient, sheetBotCacheClient },
+        { sheetApisForwardingClient, sheetBotCacheClient },
       ),
     );
 

@@ -1,28 +1,43 @@
 import { describe, expect, it } from "vitest";
-import { Cause, ConfigProvider, Deferred, Effect, Exit, Fiber, Option, Redacted } from "effect";
-import { Headers, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http";
-import { SheetBotClient } from "./sheetBotClient";
-import { SheetApisClient } from "./sheetApisClient";
+import { Cause, ConfigProvider, Deferred, Effect, Exit, Fiber } from "effect";
+import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http";
+import { SheetApisRpcTokens } from "./sheetApisRpcTokens";
+import { SheetBotForwardingClient } from "./sheetBotForwardingClient";
+import { SheetBotRpcClient } from "./sheetBotRpcClient";
 
-const makeSheetApisClient = () =>
+const makeSheetApisRpcTokens = () =>
   ({
-    getServiceUser: () =>
-      Effect.succeed({
-        token: Redacted.make("service-token"),
-      }),
+    getSheetBotToken: () => Effect.succeed("ingress-token"),
   }) as never;
+
+const getRpcRequestHeaders = (request: HttpClientRequest.HttpClientRequest) => {
+  if (request.body._tag !== "Uint8Array") return [];
+
+  const body = new TextDecoder().decode(request.body.body);
+  const parsed = JSON.parse(body) as
+    | {
+        readonly headers?: ReadonlyArray<readonly [string, string]>;
+      }
+    | Array<{
+        readonly headers?: ReadonlyArray<readonly [string, string]>;
+      }>;
+  const message = Array.isArray(parsed) ? parsed[0] : parsed;
+
+  return message?.headers ?? [];
+};
 
 const run = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
   httpClient: HttpClient.HttpClient = HttpClient.make((request) =>
     Effect.succeed(HttpClientResponse.fromWeb(request, new Response("{}", { status: 500 }))),
   ),
-  sheetApisClient: never = makeSheetApisClient(),
+  sheetApisRpcTokens: never = makeSheetApisRpcTokens(),
 ) =>
   Effect.runPromise(
     Effect.scoped(
       effect.pipe(
-        Effect.provideService(SheetApisClient, sheetApisClient),
+        Effect.provide(SheetBotRpcClient.layer),
+        Effect.provideService(SheetApisRpcTokens, sheetApisRpcTokens),
         Effect.provideService(HttpClient.HttpClient, httpClient),
         Effect.provide(
           ConfigProvider.layer(
@@ -33,15 +48,15 @@ const run = <A, E, R>(
     ),
   );
 
-describe("SheetBotClient", () => {
+describe("SheetBotForwardingClient", () => {
   it("exposes application and cache compatibility wrappers", async () => {
-    const client = await run(SheetBotClient.make);
+    const client = await run(SheetBotForwardingClient.make);
 
     expect(client.application.getApplication).toEqual(expect.any(Function));
     expect(client.cache.getMember).toEqual(expect.any(Function));
   });
 
-  it("adds the service bearer token to RPC HTTP requests", async () => {
+  it("adds the ingress bearer token to RPC HTTP requests", async () => {
     const requestReceived = Deferred.makeUnsafe<HttpClientRequest.HttpClientRequest>();
     const httpClient = HttpClient.make((request) => {
       return Deferred.succeed(requestReceived, request).pipe(
@@ -51,7 +66,7 @@ describe("SheetBotClient", () => {
 
     const request = await run(
       Effect.gen(function* () {
-        const client = yield* SheetBotClient.make;
+        const client = yield* SheetBotForwardingClient.make;
         const fiber = yield* Effect.forkScoped(Effect.ignore(client.application.getApplication()));
         const request = yield* Deferred.await(requestReceived);
         yield* Fiber.interrupt(fiber);
@@ -61,24 +76,26 @@ describe("SheetBotClient", () => {
     );
 
     expect(request.url).toBe("http://sheet-bot/rpc/");
-    expect(Option.getOrUndefined(Headers.get(request.headers, "authorization"))).toBe(
-      "Bearer service-token",
-    );
+    expect(getRpcRequestHeaders(request)).toContainEqual([
+      "x-sheet-ingress-auth",
+      "Bearer ingress-token",
+    ]);
   });
 
-  it("wraps service-user failures as RPC transport errors", async () => {
-    const serviceUserFailure = new Error("service-user refresh failed");
-    const sheetApisClient = {
-      getServiceUser: () => Effect.fail(serviceUserFailure),
+  it("surfaces ingress token failures as RPC client errors", async () => {
+    const ingressTokenFailure = new Error("ingress token refresh failed");
+    const sheetApisRpcTokens = {
+      getSheetBotToken: () => Effect.fail(ingressTokenFailure),
     } as never;
 
     const exit = await Effect.runPromiseExit(
       Effect.scoped(
         Effect.gen(function* () {
-          const client = yield* SheetBotClient.make;
+          const client = yield* SheetBotForwardingClient.make;
           return yield* client.application.getApplication();
         }).pipe(
-          Effect.provideService(SheetApisClient, sheetApisClient),
+          Effect.provide(SheetBotRpcClient.layer),
+          Effect.provideService(SheetApisRpcTokens, sheetApisRpcTokens),
           Effect.provideService(
             HttpClient.HttpClient,
             HttpClient.make((request) =>
@@ -98,23 +115,8 @@ describe("SheetBotClient", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      const error = Cause.findErrorOption(exit.cause);
       const cause = Cause.pretty(exit.cause);
-      expect(Option.isSome(error)).toBe(true);
-      if (Option.isSome(error)) {
-        expect(error.value._tag).toBe("RpcClientError");
-        if (error.value._tag !== "RpcClientError") return;
-        const reason = error.value.reason;
-        expect(reason._tag).toBe("HttpError");
-        if (reason._tag !== "HttpError") return;
-        expect(reason.kind).toBe("TransportError");
-        const authCause = (reason.cause as { cause?: unknown }).cause as Error & {
-          cause?: unknown;
-        };
-        expect(authCause.message).toContain("Failed to get sheet-bot service user");
-        expect(String(authCause.cause)).toContain("service-user refresh failed");
-      }
-      expect(cause).toContain("RpcClientError");
+      expect(cause).toContain("ingress token refresh failed");
     }
   });
 });

@@ -9,6 +9,6 @@ export class SheetApisRpcAuthorization extends RpcMiddleware.Service<
     requires: never;
   }
 >()("SheetApisRpcAuthorization", {
-  requiredForClient: false,
+  requiredForClient: true,
   error: Unauthorized,
 }) {}

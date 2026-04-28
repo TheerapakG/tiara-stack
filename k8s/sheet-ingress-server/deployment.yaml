@@ -94,6 +94,10 @@ spec:
                   path: sheet-apis-token
                   expirationSeconds: 3600
                   audience: sheet-apis
+              - serviceAccountToken:
+                  path: sheet-bot-token
+                  expirationSeconds: 3600
+                  audience: sheet-bot
 ---
 apiVersion: v1
 kind: Service

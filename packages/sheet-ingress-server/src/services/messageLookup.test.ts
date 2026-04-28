@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { Effect, Layer, Option } from "effect";
 import { MessageLookup } from "./messageLookup";
-import { SheetApisClient } from "./sheetApisClient";
+import { SheetApisForwardingClient } from "./sheetApisForwardingClient";
+import { SheetApisRpcTokens } from "./sheetApisRpcTokens";
 
-const makeSheetApisClient = () => {
+const makeSheetApisForwardingClient = () => {
   const getMessageCheckinData = vi.fn(({ query }: { query: { messageId: string } }) =>
     Effect.succeed({
       messageId: query.messageId,
@@ -41,7 +42,6 @@ const makeSheetApisClient = () => {
 
   return {
     client: {
-      withServiceUser: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect,
       messageCheckin: {
         getMessageCheckinData,
         getMessageCheckinMembers,
@@ -62,16 +62,26 @@ const makeSheetApisClient = () => {
 
 const runLookup = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
-  sheetApisClient: typeof SheetApisClient.Service,
+  sheetApisForwardingClient: typeof SheetApisForwardingClient.Service,
 ) =>
   effect.pipe(
     Effect.provide(Layer.effect(MessageLookup, MessageLookup.make)),
-    Effect.provideService(SheetApisClient, sheetApisClient),
+    Effect.provideService(SheetApisForwardingClient, sheetApisForwardingClient),
+    Effect.provideService(SheetApisRpcTokens, {
+      getServiceUser: () =>
+        Effect.succeed({
+          accountId: "service",
+          userId: "service-user",
+          permissions: new Set(["service"]) as never,
+          token: {} as never,
+        }),
+      withServiceUser: <A, E, R>(serviceEffect: Effect.Effect<A, E, R>) => serviceEffect,
+    } as never),
   );
 
 describe("MessageLookup", () => {
   it("caches message checkin data lookups by message id", async () => {
-    const { client, getMessageCheckinData } = makeSheetApisClient();
+    const { client, getMessageCheckinData } = makeSheetApisForwardingClient();
 
     const result = await Effect.runPromise(
       runLookup(
@@ -92,7 +102,7 @@ describe("MessageLookup", () => {
 
   it("caches checkin member, room order, and slot lookups independently", async () => {
     const { client, getMessageCheckinMembers, getMessageRoomOrder, getMessageSlotData } =
-      makeSheetApisClient();
+      makeSheetApisForwardingClient();
 
     const result = await Effect.runPromise(
       runLookup(

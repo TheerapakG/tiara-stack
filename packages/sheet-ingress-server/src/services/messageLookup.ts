@@ -2,11 +2,13 @@ import { Cache, Context, Duration, Effect, Exit, Layer, Option } from "effect";
 import { MessageCheckin, MessageCheckinMember } from "sheet-ingress-api/schemas/messageCheckin";
 import { MessageRoomOrder } from "sheet-ingress-api/schemas/messageRoomOrder";
 import { MessageSlot } from "sheet-ingress-api/schemas/messageSlot";
-import { SheetApisClient } from "./sheetApisClient";
+import { SheetApisForwardingClient } from "./sheetApisForwardingClient";
+import { SheetApisRpcTokens } from "./sheetApisRpcTokens";
 
 export class MessageLookup extends Context.Service<MessageLookup>()("MessageLookup", {
   make: Effect.gen(function* () {
-    const sheetApisClient = yield* SheetApisClient;
+    const sheetApisForwardingClient = yield* SheetApisForwardingClient;
+    const sheetApisRpcTokens = yield* SheetApisRpcTokens;
     const cacheOptions = {
       capacity: 1_000,
       timeToLive: Exit.match({
@@ -21,8 +23,8 @@ export class MessageLookup extends Context.Service<MessageLookup>()("MessageLook
       unknown
     >(
       (messageId) =>
-        sheetApisClient.withServiceUser(
-          sheetApisClient.messageCheckin
+        sheetApisRpcTokens.withServiceUser(
+          sheetApisForwardingClient.messageCheckin
             .getMessageCheckinData({ query: { messageId } })
             .pipe(Effect.option),
         ),
@@ -34,8 +36,10 @@ export class MessageLookup extends Context.Service<MessageLookup>()("MessageLook
       unknown
     >(
       (messageId) =>
-        sheetApisClient.withServiceUser(
-          sheetApisClient.messageCheckin.getMessageCheckinMembers({ query: { messageId } }),
+        sheetApisRpcTokens.withServiceUser(
+          sheetApisForwardingClient.messageCheckin.getMessageCheckinMembers({
+            query: { messageId },
+          }),
         ),
       cacheOptions,
     );
@@ -45,8 +49,8 @@ export class MessageLookup extends Context.Service<MessageLookup>()("MessageLook
       unknown
     >(
       (messageId) =>
-        sheetApisClient.withServiceUser(
-          sheetApisClient.messageRoomOrder
+        sheetApisRpcTokens.withServiceUser(
+          sheetApisForwardingClient.messageRoomOrder
             .getMessageRoomOrder({ query: { messageId } })
             .pipe(Effect.option),
         ),
@@ -54,8 +58,8 @@ export class MessageLookup extends Context.Service<MessageLookup>()("MessageLook
     );
     const messageSlotDataCache = yield* Cache.makeWith<string, Option.Option<MessageSlot>, unknown>(
       (messageId) =>
-        sheetApisClient.withServiceUser(
-          sheetApisClient.messageSlot
+        sheetApisRpcTokens.withServiceUser(
+          sheetApisForwardingClient.messageSlot
             .getMessageSlotData({ query: { messageId } })
             .pipe(Effect.option),
         ),
@@ -99,5 +103,7 @@ export class MessageLookup extends Context.Service<MessageLookup>()("MessageLook
     };
   }),
 }) {
-  static layer = Layer.effect(MessageLookup, this.make).pipe(Layer.provide(SheetApisClient.layer));
+  static layer = Layer.effect(MessageLookup, this.make).pipe(
+    Layer.provide([SheetApisForwardingClient.layer, SheetApisRpcTokens.layer]),
+  );
 }

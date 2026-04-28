@@ -34,6 +34,10 @@
       "types": "./dist/middlewares/sheetApisRpcAuthorization/tag.d.mts",
       "default": "./dist/middlewares/sheetApisRpcAuthorization/tag.mjs"
     },
+    "./middlewares/sheetBotRpcAuthorization/tag": {
+      "types": "./dist/middlewares/sheetBotRpcAuthorization/tag.d.mts",
+      "default": "./dist/middlewares/sheetBotRpcAuthorization/tag.mjs"
+    },
     "./sheet-apis": {
       "types": "./dist/sheet-apis.d.mts",
       "default": "./dist/sheet-apis.mjs"

@@ -42,8 +42,9 @@ import {
 } from "./services/authorization";
 import { SheetAuthUserResolver } from "./services/authResolver";
 import { MessageLookup } from "./services/messageLookup";
-import { SheetApisClient } from "./services/sheetApisClient";
-import { SheetBotClient } from "./services/sheetBotClient";
+import { SheetApisForwardingClient } from "./services/sheetApisForwardingClient";
+import { SheetApisRpcTokens } from "./services/sheetApisRpcTokens";
+import { SheetBotForwardingClient } from "./services/sheetBotForwardingClient";
 import { TelemetryLive } from "./telemetry";
 
 function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
@@ -141,7 +142,7 @@ type SheetBotProxyHandler<
   HttpApiGroup.Endpoints<SheetBotGroup<GroupName>>,
   EndpointName,
   never,
-  SheetBotClient | ServiceTokenAuthorizer
+  SheetBotForwardingClient | ServiceTokenAuthorizer
 >;
 type SheetBotEndpointClient = (args: unknown) => Effect.Effect<unknown, unknown, unknown>;
 
@@ -160,7 +161,7 @@ const proxySheetBot =
         return yield* Effect.fail(new SheetBotUnauthorized({ message: "Unauthorized" }));
       }
 
-      const client = yield* SheetBotClient;
+      const client = yield* SheetBotForwardingClient;
       const groupClient = (
         client as unknown as Record<string, Record<string, SheetBotEndpointClient>>
       )[group];
@@ -234,9 +235,9 @@ const corsMiddlewareLayer = Layer.unwrap(
 );
 
 type SheetIngressGroups = (typeof Api)["groups"][keyof (typeof Api)["groups"]];
-type SheetApisClientService = typeof SheetApisClient.Service;
+type SheetApisForwardingClientService = typeof SheetApisForwardingClient.Service;
 type SheetApisGroupName = Extract<
-  keyof SheetApisClientService,
+  keyof SheetApisForwardingClientService,
   HttpApiGroup.Name<SheetIngressGroups>
 >;
 type SheetApisGroup<GroupName extends SheetApisGroupName> = HttpApiGroup.WithName<
@@ -245,7 +246,7 @@ type SheetApisGroup<GroupName extends SheetApisGroupName> = HttpApiGroup.WithNam
 >;
 type SheetApisEndpointName<GroupName extends SheetApisGroupName> = Extract<
   HttpApiEndpoint.Name<HttpApiGroup.Endpoints<SheetApisGroup<GroupName>>>,
-  keyof SheetApisClientService[GroupName] & string
+  keyof SheetApisForwardingClientService[GroupName] & string
 >;
 type SheetApisEndpoint<GroupName extends SheetApisGroupName> = HttpApiGroup.Endpoints<
   SheetApisGroup<GroupName>
@@ -266,7 +267,7 @@ type SheetApisProxyHandler<
   SheetApisEndpoint<GroupName>,
   EndpointName,
   SheetApisProxyError<GroupName, EndpointName>,
-  SheetApisClient | R
+  SheetApisForwardingClient | SheetApisRpcTokens | R
 >;
 type SheetApisEndpointClient = (args: unknown) => Effect.Effect<unknown, unknown, unknown>;
 
@@ -282,7 +283,6 @@ const proxySheetApis =
       args: SheetApisProxyRequest<GroupName, EndpointName>,
     ) => Effect.Effect<void, SheetApisProxyError<GroupName, EndpointName>, R>,
     options?: {
-      readonly forwardDiscordAccessToken?: boolean;
       readonly unauthenticated?: "anonymous";
     },
   ): SheetApisProxyHandler<GroupName, EndpointName, R> =>
@@ -293,7 +293,7 @@ const proxySheetApis =
         yield* authorize(args);
       }
 
-      const client = yield* SheetApisClient;
+      const client = yield* SheetApisForwardingClient;
       const groupClient = client[group] as unknown as Record<string, SheetApisEndpointClient>;
       const endpointClient = groupClient?.[endpoint];
       if (typeof endpointClient !== "function") {
@@ -301,9 +301,7 @@ const proxySheetApis =
           new Error(`Unknown sheet-apis proxy target: ${group}.${endpoint}`),
         );
       }
-      const proxied = options?.forwardDiscordAccessToken
-        ? client.withDiscordAccessToken(endpointClient.call(groupClient, clientArgsFrom(args)))
-        : endpointClient.call(groupClient, clientArgsFrom(args));
+      const proxied = endpointClient.call(groupClient, clientArgsFrom(args));
       const maybeUser = yield* Effect.serviceOption(SheetAuthUser);
       if (Option.isSome(maybeUser)) {
         return yield* proxied;
@@ -318,7 +316,9 @@ const proxySheetApis =
           }),
         );
       }
-      return yield* client.withServiceUser(proxied);
+      const tokens = yield* SheetApisRpcTokens;
+      const serviceUser = yield* tokens.getServiceUser();
+      return yield* proxied.pipe(Effect.provideService(SheetAuthUser, serviceUser));
     }) as ReturnType<SheetApisProxyHandler<GroupName, EndpointName, R>>;
 
 const requireService = () =>
@@ -557,17 +557,10 @@ const makeApiLayer = () => {
     ),
     HttpApiBuilder.group(Api, "discord", (handlers) =>
       handlers
-        .handle(
-          "getCurrentUser",
-          proxySheetApis("discord", "getCurrentUser", requireNonService, {
-            forwardDiscordAccessToken: true,
-          }),
-        )
+        .handle("getCurrentUser", proxySheetApis("discord", "getCurrentUser", requireNonService))
         .handle(
           "getCurrentUserGuilds",
-          proxySheetApis("discord", "getCurrentUserGuilds", requireNonService, {
-            forwardDiscordAccessToken: true,
-          }),
+          proxySheetApis("discord", "getCurrentUserGuilds", requireNonService),
         ),
     ),
     HttpApiBuilder.group(Api, "guildConfig", (handlers) =>
@@ -922,8 +915,9 @@ const makeApiLayer = () => {
       SheetAuthTokenAuthorizationLive,
       AuthorizationService.layer,
       MessageLookup.layer,
-      SheetApisClient.layer,
-      SheetBotClient.layer,
+      SheetApisForwardingClient.layer,
+      SheetApisRpcTokens.layer,
+      SheetBotForwardingClient.layer,
     ]),
   );
 };

@@ -7,7 +7,7 @@ import {
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
 import type { Permission, PermissionSet } from "sheet-ingress-api/schemas/permissions";
-import { SheetBotClient } from "./sheetBotClient";
+import { SheetBotForwardingClient } from "./sheetBotForwardingClient";
 import { SheetAuthClient } from "./sheetAuthClient";
 
 const SUCCESS_TTL = Duration.seconds(30);
@@ -73,10 +73,10 @@ export class ApplicationOwnerResolver extends Context.Service<ApplicationOwnerRe
   "ApplicationOwnerResolver",
   {
     make: Effect.gen(function* () {
-      const sheetBotClient = yield* SheetBotClient;
+      const sheetBotForwardingClient = yield* SheetBotForwardingClient;
       const application = yield* Cache.makeWith(
         Effect.fn("ApplicationOwnerResolver.lookup")(function* (_key: string) {
-          return yield* sheetBotClient.application.getApplication().pipe(
+          return yield* sheetBotForwardingClient.application.getApplication().pipe(
             Effect.map(({ ownerId }) => Option.some(ownerId)),
             Effect.orElseSucceed(() => Option.none<string>()),
           );
@@ -100,7 +100,7 @@ export class ApplicationOwnerResolver extends Context.Service<ApplicationOwnerRe
   },
 ) {
   static layer = Layer.effect(ApplicationOwnerResolver, this.make).pipe(
-    Layer.provide(SheetBotClient.layer),
+    Layer.provide(SheetBotForwardingClient.layer),
   );
 }
 

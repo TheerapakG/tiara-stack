@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { Effect, Layer, Option } from "effect";
 import { SheetBotCacheClient } from "./sheetBotCacheClient";
-import { SheetBotClient } from "./sheetBotClient";
+import { SheetBotForwardingClient } from "./sheetBotForwardingClient";
 
-const makeSheetBotClient = ({
+const makeSheetBotForwardingClient = ({
   getMember = vi.fn(() =>
     Effect.succeed({
       value: {
@@ -40,16 +40,16 @@ const makeSheetBotClient = ({
 
 const run = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
-  sheetBotClient: typeof SheetBotClient.Service,
+  sheetBotForwardingClient: typeof SheetBotForwardingClient.Service,
 ) =>
   effect.pipe(
     Effect.provide(Layer.effect(SheetBotCacheClient, SheetBotCacheClient.make)),
-    Effect.provideService(SheetBotClient, sheetBotClient),
+    Effect.provideService(SheetBotForwardingClient, sheetBotForwardingClient),
   );
 
 describe("SheetBotCacheClient", () => {
   it("maps missing bot cache members to Option.none", async () => {
-    const { client, getMember } = makeSheetBotClient({
+    const { client, getMember } = makeSheetBotForwardingClient({
       getMember: vi.fn(() =>
         Effect.fail({
           _tag: "CacheNotFoundError",
@@ -75,7 +75,7 @@ describe("SheetBotCacheClient", () => {
   });
 
   it("converts role cache entries to a role map", async () => {
-    const { client, getRolesForParent } = makeSheetBotClient();
+    const { client, getRolesForParent } = makeSheetBotForwardingClient();
 
     const result = await Effect.runPromise(
       run(

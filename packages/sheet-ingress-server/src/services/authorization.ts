@@ -16,7 +16,8 @@ import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUs
 import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
 import type { Permission, PermissionSet } from "sheet-ingress-api/schemas/permissions";
 import { SheetAuthUserResolver } from "./authResolver";
-import { SheetApisClient } from "./sheetApisClient";
+import { SheetApisForwardingClient } from "./sheetApisForwardingClient";
+import { SheetApisRpcTokens } from "./sheetApisRpcTokens";
 import {
   type CachedGuildMember,
   type CachedGuildRole,
@@ -115,7 +116,8 @@ export class AuthorizationService extends Context.Service<AuthorizationService>(
   "AuthorizationService",
   {
     make: Effect.gen(function* () {
-      const sheetApisClient = yield* SheetApisClient;
+      const sheetApisForwardingClient = yield* SheetApisForwardingClient;
+      const sheetApisRpcTokens = yield* SheetApisRpcTokens;
       const sheetBotCacheClient = yield* SheetBotCacheClient;
 
       const getOptionalGuildMember = Effect.fn("AuthorizationService.getOptionalGuildMember")(
@@ -129,9 +131,9 @@ export class AuthorizationService extends Context.Service<AuthorizationService>(
 
       const monitorRoleIdsCache = yield* Cache.makeWith(
         (guildId: string) =>
-          sheetApisClient
+          sheetApisRpcTokens
             .withServiceUser(
-              sheetApisClient.guildConfig.getGuildMonitorRoles({ query: { guildId } }),
+              sheetApisForwardingClient.guildConfig.getGuildMonitorRoles({ query: { guildId } }),
             )
             .pipe(
               Effect.map(
@@ -383,7 +385,11 @@ export class AuthorizationService extends Context.Service<AuthorizationService>(
   },
 ) {
   static layer = Layer.effect(AuthorizationService, this.make).pipe(
-    Layer.provide([SheetApisClient.layer, SheetBotCacheClient.layer]),
+    Layer.provide([
+      SheetApisForwardingClient.layer,
+      SheetApisRpcTokens.layer,
+      SheetBotCacheClient.layer,
+    ]),
   );
 }
 

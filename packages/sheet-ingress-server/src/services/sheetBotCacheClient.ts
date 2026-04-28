@@ -1,5 +1,5 @@
 import { Context, Effect, Layer, Option } from "effect";
-import { SheetBotClient } from "./sheetBotClient";
+import { SheetBotForwardingClient } from "./sheetBotForwardingClient";
 
 export interface CachedGuildMember {
   readonly roles: ReadonlyArray<string>;
@@ -14,14 +14,14 @@ export class SheetBotCacheClient extends Context.Service<SheetBotCacheClient>()(
   "SheetBotCacheClient",
   {
     make: Effect.gen(function* () {
-      const sheetBotClient = yield* SheetBotClient;
+      const sheetBotForwardingClient = yield* SheetBotForwardingClient;
 
       return {
         getMember: Effect.fn("SheetBotCacheClient.getMember")(function* (
           guildId: string,
           accountId: string,
         ) {
-          return yield* sheetBotClient.cache
+          return yield* sheetBotForwardingClient.cache
             .getMember({ params: { parentId: guildId, resourceId: accountId } })
             .pipe(
               Effect.map(({ value }) => Option.some({ roles: value.roles })),
@@ -31,7 +31,7 @@ export class SheetBotCacheClient extends Context.Service<SheetBotCacheClient>()(
         getRolesForGuild: Effect.fn("SheetBotCacheClient.getRolesForGuild")(function* (
           guildId: string,
         ) {
-          const roles = yield* sheetBotClient.cache.getRolesForParent({
+          const roles = yield* sheetBotForwardingClient.cache.getRolesForParent({
             params: { parentId: guildId },
           });
 
@@ -50,6 +50,6 @@ export class SheetBotCacheClient extends Context.Service<SheetBotCacheClient>()(
   },
 ) {
   static layer = Layer.effect(SheetBotCacheClient, this.make).pipe(
-    Layer.provide(SheetBotClient.layer),
+    Layer.provide(SheetBotForwardingClient.layer),
   );
 }

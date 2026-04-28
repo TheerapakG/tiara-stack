@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SheetApisRpcAuthorization } from "sheet-ingress-api/middlewares/sheetApisRpcAuthorization/tag";
 import { SheetApisRpcs } from "sheet-ingress-api/sheet-apis-rpc";
 
 describe("SheetApisRpcs", () => {
@@ -6,5 +7,9 @@ describe("SheetApisRpcs", () => {
     expect(SheetApisRpcs.requests.has("health.live")).toBe(true);
     expect(SheetApisRpcs.requests.has("messageSlot.getMessageSlotData")).toBe(true);
     expect(SheetApisRpcs.requests.has("calc.calcSheet")).toBe(true);
+  });
+
+  it("requires authorization middleware on clients", () => {
+    expect(SheetApisRpcAuthorization.requiredForClient).toBe(true);
   });
 });
