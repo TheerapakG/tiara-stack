@@ -41,7 +41,6 @@ import {
   SheetAuthTokenAuthorizationLive,
 } from "./services/authorization";
 import { SheetAuthUserResolver } from "./services/authResolver";
-import { decodeBearerCredential } from "./services/bearerCredential";
 import { MessageLookup } from "./services/messageLookup";
 import { SheetApisClient } from "./services/sheetApisClient";
 import { SheetBotClient } from "./services/sheetBotClient";
@@ -88,9 +87,7 @@ class ServiceTokenAuthorizer extends Context.Service<
       const servicePermissionCache = yield* Cache.makeWith(
         (authorization: string) =>
           sheetAuthUserResolver
-            .resolveToken(
-              decodeBearerCredential(Redacted.make(authorization.slice("Bearer ".length).trim())),
-            )
+            .resolveToken(Redacted.make(authorization.slice("Bearer ".length).trim()))
             .pipe(
               Effect.map(({ permissions }) => hasPermission(permissions, "service")),
               Effect.tapError((error) =>
