@@ -1,26 +1,17 @@
 import { Array, Chunk, Effect, HashMap, HashSet, Layer, Option, pipe } from "effect";
-import type { Rpc, RpcGroup } from "effect/unstable/rpc";
 import { CalcRpcs } from "sheet-ingress-api/sheet-apis-rpc";
 import { CalcConfig, CalcService, PlayerService } from "@/services";
 import { PlayerTeam } from "sheet-ingress-api/schemas/sheet";
 import { Room } from "sheet-ingress-api/schemas/sheet/room";
 import { Array as ArrayUtils } from "typhoon-core/utils";
 
-type CalcRpc<Tag extends RpcGroup.Rpcs<typeof CalcRpcs>["_tag"]> = Extract<
-  RpcGroup.Rpcs<typeof CalcRpcs>,
-  { readonly _tag: Tag }
->;
-
-type CalcBotPayload = Rpc.Payload<CalcRpc<"calc.calcBot">>;
-type CalcSheetPayload = Rpc.Payload<CalcRpc<"calc.calcSheet">>;
-
 export const calcLayer = CalcRpcs.toLayer(
   Effect.gen(function* () {
     const calcService = yield* CalcService;
     const playerService = yield* PlayerService;
 
-    return {
-      "calc.calcBot": Effect.fnUntraced(function* ({ payload }: CalcBotPayload) {
+    return CalcRpcs.of({
+      "calc.calcBot": Effect.fnUntraced(function* ({ payload }) {
         const config = new CalcConfig(payload.config);
         const playerTeams = yield* Effect.forEach(payload.players, (player) =>
           Effect.succeed(Array.getSomes(player.map((team) => PlayerTeam.fromTeam(false, team)))),
@@ -43,7 +34,7 @@ export const calcLayer = CalcRpcs.toLayer(
           })),
         );
       }),
-      "calc.calcSheet": Effect.fnUntraced(function* ({ payload }: CalcSheetPayload) {
+      "calc.calcSheet": Effect.fnUntraced(function* ({ payload }) {
         const config = new CalcConfig(payload.config);
         const fixedTeams = pipe(
           payload.fixedTeams,
@@ -88,6 +79,6 @@ export const calcLayer = CalcRpcs.toLayer(
         const rooms = yield* calcService.calc(config, playerTeams);
         return Chunk.toArray(rooms);
       }),
-    };
+    });
   }),
 ).pipe(Layer.provide([CalcService.layer, PlayerService.layer]));

@@ -1,7 +1,7 @@
 import { NodeHttpServer } from "@effect/platform-node";
 import { HttpClient, HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http";
 import type { ServeError } from "effect/unstable/http/HttpServerError";
-import { RpcSerialization, RpcServer, type Rpc, type RpcGroup } from "effect/unstable/rpc";
+import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import { Layer } from "effect";
 import type { ConfigError } from "effect/Config";
 import { createServer } from "http";
@@ -25,13 +25,7 @@ import { screenshotLayer } from "./handlers/screenshot";
 import { sheetLayer } from "./handlers/sheet";
 import { discordLayer as discordServiceLayer } from "./services/discord";
 
-type SheetApisRpcHandlers = Rpc.ToHandler<RpcGroup.Rpcs<typeof SheetApisRpcs>>;
-
-const rpcHandlersLayer: Layer.Layer<
-  SheetApisRpcHandlers,
-  ConfigError | GoogleSheetsError,
-  HttpClient.HttpClient
-> = Layer.mergeAll(
+const rpcHandlersLayer = Layer.mergeAll(
   calcLayer,
   checkinLayer,
   healthLayer,
