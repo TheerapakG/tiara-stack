@@ -9,21 +9,17 @@ import {
   FileSystem,
   HashSet,
   Layer,
-  Option,
   pipe,
   Redacted,
   Ref,
   Schedule,
 } from "effect";
-import { createKubernetesOAuthSession, getDiscordAccessToken } from "sheet-auth/client";
+import { createKubernetesOAuthSession } from "sheet-auth/client";
 import { DISCORD_SERVICE_USER_ID_SENTINEL } from "sheet-auth/plugins/kubernetes-oauth";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
-import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
 import { SheetAuthClient } from "./sheetAuthClient";
 
 const sheetAuthTokenPath = "/var/run/secrets/tokens/sheet-auth-token";
-const sheetApisTokenPath = "/var/run/secrets/tokens/sheet-apis-token";
-const sheetBotTokenPath = "/var/run/secrets/tokens/sheet-bot-token";
 
 type SheetAuthUserType = Context.Service.Shape<typeof SheetAuthUser>;
 
@@ -40,8 +36,6 @@ export class SheetApisRpcTokens extends Context.Service<SheetApisRpcTokens>()(
       const fs = yield* FileSystem.FileSystem;
       const sheetAuthClient = yield* SheetAuthClient;
       const k8sTokenRef = yield* Ref.make("");
-      const sheetApisTokenRef = yield* Ref.make("");
-      const sheetBotTokenRef = yield* Ref.make("");
 
       const refreshToken = (tokenPath: string, tokenName: string, tokenRef: Ref.Ref<string>) =>
         pipe(
@@ -70,38 +64,33 @@ export class SheetApisRpcTokens extends Context.Service<SheetApisRpcTokens>()(
         Effect.forkScoped,
       );
 
-      const refreshSheetApisToken = refreshToken(
-        sheetApisTokenPath,
-        "sheet-apis",
-        sheetApisTokenRef,
-      );
+      const serviceTokenRefs = yield* Cache.makeWith(
+        Effect.fn("SheetApisRpcTokens.lookupServiceTokenRef")(function* (tokenPath) {
+          const tokenRef = yield* Ref.make("");
+          const refreshServiceToken = refreshToken(tokenPath, tokenPath, tokenRef);
 
-      yield* refreshSheetApisToken.pipe(
-        Effect.tapError((error) =>
-          Effect.logError("Failed to initialize sheet-apis Kubernetes token", error),
-        ),
-      );
-      yield* refreshSheetApisToken.pipe(
-        Effect.catch((error) =>
-          Effect.logWarning("Failed to refresh sheet-apis Kubernetes token", error),
-        ),
-        Effect.repeat(Schedule.spaced("5 minutes")),
-        Effect.forkScoped,
-      );
+          yield* refreshServiceToken.pipe(
+            Effect.tapError((error) =>
+              Effect.logError(`Failed to initialize Kubernetes token at ${tokenPath}`, error),
+            ),
+          );
+          yield* refreshServiceToken.pipe(
+            Effect.catch((error) =>
+              Effect.logWarning(`Failed to refresh Kubernetes token at ${tokenPath}`, error),
+            ),
+            Effect.repeat(Schedule.spaced("5 minutes")),
+            Effect.forkScoped,
+          );
 
-      const refreshSheetBotToken = refreshToken(sheetBotTokenPath, "sheet-bot", sheetBotTokenRef);
-
-      yield* refreshSheetBotToken.pipe(
-        Effect.tapError((error) =>
-          Effect.logError("Failed to initialize sheet-bot Kubernetes token", error),
-        ),
-      );
-      yield* refreshSheetBotToken.pipe(
-        Effect.catch((error) =>
-          Effect.logWarning("Failed to refresh sheet-bot Kubernetes token", error),
-        ),
-        Effect.repeat(Schedule.spaced("5 minutes")),
-        Effect.forkScoped,
+          return tokenRef;
+        }),
+        {
+          capacity: 16,
+          timeToLive: Exit.match({
+            onFailure: () => Duration.seconds(30),
+            onSuccess: () => Duration.infinity,
+          }),
+        },
       );
 
       const serviceUserTokenCache = yield* Cache.makeWith<string, TokenCacheEntry>(
@@ -144,20 +133,6 @@ export class SheetApisRpcTokens extends Context.Service<SheetApisRpcTokens>()(
         },
       );
 
-      const discordAccessTokenCache = yield* Cache.makeWith(
-        (token: Redacted.Redacted<string>) =>
-          getDiscordAccessToken(sheetAuthClient, {
-            Authorization: `Bearer ${Redacted.value(token)}`,
-          }).pipe(Effect.map(({ accessToken }) => accessToken)),
-        {
-          capacity: 10_000,
-          timeToLive: Exit.match({
-            onFailure: () => Duration.seconds(30),
-            onSuccess: () => Duration.minutes(5),
-          }),
-        },
-      );
-
       const getServiceUser = Effect.fn("SheetApisRpcTokens.getServiceUser")(function* () {
         const { token, userId } = yield* Cache.get(
           serviceUserTokenCache,
@@ -177,11 +152,11 @@ export class SheetApisRpcTokens extends Context.Service<SheetApisRpcTokens>()(
       });
 
       return {
-        getSheetApisToken: Effect.fn("SheetApisRpcTokens.getSheetApisToken")(function* () {
-          return yield* Ref.get(sheetApisTokenRef);
-        }),
-        getSheetBotToken: Effect.fn("SheetApisRpcTokens.getSheetBotToken")(function* () {
-          return yield* Ref.get(sheetBotTokenRef);
+        getServiceToken: Effect.fn("SheetApisRpcTokens.getServiceToken")(function* (
+          tokenPath: string,
+        ) {
+          const tokenRef = yield* Cache.get(serviceTokenRefs, tokenPath);
+          return yield* Ref.get(tokenRef);
         }),
         getServiceUser,
         withServiceUser: Effect.fn("SheetApisRpcTokens.withServiceUser")(function* <A, E, R>(
@@ -189,24 +164,6 @@ export class SheetApisRpcTokens extends Context.Service<SheetApisRpcTokens>()(
         ) {
           const serviceUser = yield* getServiceUser();
           return yield* effect.pipe(Effect.provideService(SheetAuthUser, serviceUser));
-        }),
-        getOptionalDiscordAccessToken: Effect.fn(
-          "SheetApisRpcTokens.getOptionalDiscordAccessToken",
-        )(function* (user: SheetAuthUserType) {
-          if (HashSet.has(user.permissions, "service") || user.accountId === "anonymous") {
-            return Option.none();
-          }
-
-          return yield* Cache.get(discordAccessTokenCache, user.token).pipe(
-            Effect.map(Option.some),
-            Effect.mapError(
-              (cause) =>
-                new Unauthorized({
-                  message: "Failed to get Discord access token for forwarding",
-                  cause,
-                }),
-            ),
-          );
         }),
       };
     }),

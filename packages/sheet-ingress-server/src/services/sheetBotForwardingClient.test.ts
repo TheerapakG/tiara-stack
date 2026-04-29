@@ -7,7 +7,7 @@ import { SheetBotRpcClient } from "./sheetBotRpcClient";
 
 const makeSheetApisRpcTokens = () =>
   ({
-    getSheetBotToken: () => Effect.succeed("ingress-token"),
+    getServiceToken: () => Effect.succeed("ingress-token"),
   }) as never;
 
 const getRpcRequestHeaders = (request: HttpClientRequest.HttpClientRequest) => {
@@ -85,7 +85,7 @@ describe("SheetBotForwardingClient", () => {
   it("surfaces ingress token failures as RPC client errors", async () => {
     const ingressTokenFailure = new Error("ingress token refresh failed");
     const sheetApisRpcTokens = {
-      getSheetBotToken: () => Effect.fail(ingressTokenFailure),
+      getServiceToken: () => Effect.fail(ingressTokenFailure),
     } as never;
 
     const exit = await Effect.runPromiseExit(

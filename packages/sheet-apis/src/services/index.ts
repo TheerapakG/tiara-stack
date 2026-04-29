@@ -2,6 +2,7 @@ export * from "./authorization";
 export * from "./calc";
 export * from "./checkin";
 export * from "./discord";
+export * from "./discordAccessToken";
 export * from "./google";
 export * from "./guildConfig";
 export * from "./hourWindow";

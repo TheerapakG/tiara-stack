@@ -1,11 +1,10 @@
 import { GuildsApiCacheView } from "dfx-discord-utils/discord/cache/guilds";
 import { HttpClient } from "effect/unstable/http";
-import { Effect, Layer, Option, Redacted, Schema } from "effect";
+import { Effect, Layer, Redacted, Schema } from "effect";
 import { makeArgumentError } from "typhoon-core/error";
 import { DiscordRpcs } from "sheet-ingress-api/sheet-apis-rpc";
-import { ForwardedDiscordAccessToken } from "@/middlewares/forwardedDiscordAccessToken/tag";
 import { Discord } from "@/schema";
-import { discordLayer as discordServiceLayer } from "@/services";
+import { discordLayer as discordServiceLayer, DiscordAccessTokenService } from "@/services";
 
 const DiscordMyGuild = Schema.Struct({
   id: Schema.String,
@@ -18,18 +17,11 @@ const formatError = (error: unknown) =>
       ? error
       : JSON.stringify(error);
 
-const getForwardedDiscordAccessToken = Effect.fn("getForwardedDiscordAccessToken")(function* () {
-  const accessToken = yield* ForwardedDiscordAccessToken;
-  if (Option.isNone(accessToken)) {
-    return yield* Effect.fail(makeArgumentError("Missing forwarded Discord access token"));
-  }
-  return accessToken.value;
-});
-
 export const discordLayer = DiscordRpcs.toLayer(
   Effect.gen(function* () {
     const guildsCache = yield* GuildsApiCacheView;
     const httpClient = yield* HttpClient.HttpClient;
+    const discordAccessTokenService = yield* DiscordAccessTokenService;
 
     const getDiscordJson = Effect.fn("getDiscordJson")(function* (
       url: string,
@@ -58,7 +50,7 @@ export const discordLayer = DiscordRpcs.toLayer(
 
     return {
       "discord.getCurrentUser": Effect.fnUntraced(function* () {
-        const accessToken = yield* getForwardedDiscordAccessToken();
+        const accessToken = yield* discordAccessTokenService.getCurrentUserDiscordAccessToken();
         const json = yield* getDiscordJson(
           "https://discord.com/api/v10/users/@me",
           accessToken,
@@ -72,7 +64,7 @@ export const discordLayer = DiscordRpcs.toLayer(
         );
       }),
       "discord.getCurrentUserGuilds": Effect.fnUntraced(function* () {
-        const accessToken = yield* getForwardedDiscordAccessToken();
+        const accessToken = yield* discordAccessTokenService.getCurrentUserDiscordAccessToken();
         const json = yield* getDiscordJson(
           "https://discord.com/api/v10/users/@me/guilds",
           accessToken,
@@ -113,4 +105,4 @@ export const discordLayer = DiscordRpcs.toLayer(
       }),
     };
   }),
-).pipe(Layer.provide([discordServiceLayer]));
+).pipe(Layer.provide([discordServiceLayer, DiscordAccessTokenService.layer]));

@@ -17,11 +17,11 @@ import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUs
 import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
 import { Permission } from "sheet-ingress-api/schemas/permissions";
 import { config } from "@/config";
-import { ForwardedDiscordAccessToken } from "../forwardedDiscordAccessToken/tag";
+import { SHEET_AUTH_SESSION_TOKEN_UNAVAILABLE } from "@/services/discordAccessToken";
 
-// Ingress-forwarded users are already authenticated at the boundary. The raw
-// sheet-auth session token is intentionally unavailable inside sheet-apis.
-const forwardedSessionTokenUnavailable = Redacted.make("ingress-forwarded-token-unavailable");
+// Some internal calls, such as service/anonymous requests, do not carry a
+// user-scoped sheet-auth session token.
+const forwardedSessionTokenUnavailable = Redacted.make(SHEET_AUTH_SESSION_TOKEN_UNAVAILABLE);
 
 const parsePermissions = (permissions: string | undefined) =>
   Effect.forEach(
@@ -131,9 +131,8 @@ export const SheetAuthTokenAuthorizationLive = Layer.effect(
         const permissions = yield* parsePermissions(
           Option.getOrUndefined(Headers.get(headers, "x-sheet-auth-permissions")),
         );
-        const forwardedDiscordAccessToken = Option.map(
-          Headers.get(headers, "x-sheet-discord-access-token"),
-          Redacted.make,
+        const sessionToken = getBearerToken(
+          Option.getOrUndefined(Headers.get(headers, "x-sheet-auth-session-token")),
         );
 
         const provided = rpcEffect.pipe(
@@ -141,9 +140,8 @@ export const SheetAuthTokenAuthorizationLive = Layer.effect(
             accountId,
             userId,
             permissions,
-            token: forwardedSessionTokenUnavailable,
+            token: sessionToken ? Redacted.make(sessionToken) : forwardedSessionTokenUnavailable,
           }),
-          Effect.provideService(ForwardedDiscordAccessToken, forwardedDiscordAccessToken),
         );
 
         return yield* provided;
