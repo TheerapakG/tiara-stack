@@ -1,6 +1,12 @@
 import { Rpc, RpcGroup } from "effect/unstable/rpc";
 import { pipe, Schema } from "effect";
-import { ArgumentError, QueryResultError, SchemaError, UnknownError } from "typhoon-core/error";
+import {
+  ArgumentError,
+  MutatorResultError,
+  QueryResultError,
+  SchemaError,
+  UnknownError,
+} from "typhoon-core/error";
 import { SheetApisRpcAuthorization } from "./middlewares/sheetApisRpcAuthorization/tag";
 import { CheckinGenerateResult } from "./schemas/checkin";
 import { DiscordGuild, DiscordUser } from "./schemas/discord";
@@ -250,7 +256,7 @@ export const GuildConfigRpcs = RpcGroup.make(
       }),
     }),
     success: GuildConfig,
-    error: Schema.Union([SchemaError, QueryResultError]),
+    error: Schema.Union([SchemaError, QueryResultError, MutatorResultError]),
   }),
   protectedRpc("guildConfig.getGuildMonitorRoles", {
     payload: Query({ guildId: Schema.String }),
@@ -268,12 +274,12 @@ export const GuildConfigRpcs = RpcGroup.make(
   protectedRpc("guildConfig.addGuildMonitorRole", {
     payload: Payload({ guildId: Schema.String, roleId: Schema.String }),
     success: GuildConfigMonitorRole,
-    error: Schema.Union([SchemaError, QueryResultError]),
+    error: Schema.Union([SchemaError, QueryResultError, MutatorResultError]),
   }),
   protectedRpc("guildConfig.removeGuildMonitorRole", {
     payload: Payload({ guildId: Schema.String, roleId: Schema.String }),
     success: GuildConfigMonitorRole,
-    error: Schema.Union([SchemaError, QueryResultError]),
+    error: Schema.Union([SchemaError, QueryResultError, MutatorResultError]),
   }),
   protectedRpc("guildConfig.upsertGuildChannelConfig", {
     payload: Payload({
@@ -287,7 +293,7 @@ export const GuildConfigRpcs = RpcGroup.make(
       }),
     }),
     success: GuildChannelConfig,
-    error: Schema.Union([SchemaError, QueryResultError]),
+    error: Schema.Union([SchemaError, QueryResultError, MutatorResultError]),
   }),
   protectedRpc("guildConfig.getGuildChannelById", {
     payload: Query({

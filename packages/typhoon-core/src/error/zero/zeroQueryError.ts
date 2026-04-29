@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { ReadonlyJSONValue } from "@/schema/readonlyJsonValue";
+import { ReadonlyJSONValue } from "../../schema/readonlyJsonValue";
 
 const ZeroQueryErrorData = Schema.Struct({
   id: Schema.String,

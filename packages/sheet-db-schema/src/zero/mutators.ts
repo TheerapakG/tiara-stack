@@ -1,11 +1,7 @@
-import { defineMutators } from "@rocicorp/zero";
-import { guildConfig, messageCheckin, messageRoomOrder, messageSlot } from "./mutators/";
+import { ZeroApiRegistry } from "typhoon-core/zeroApi";
+import { SheetZeroApi } from "./api";
+import type { Schema } from "./schema";
 
-export const mutators = defineMutators({
-  guildConfig,
-  messageCheckin,
-  messageRoomOrder,
-  messageSlot,
-});
+export type Mutators = ReturnType<typeof ZeroApiRegistry.toMutators<typeof SheetZeroApi, Schema>>;
 
-export type Mutators = typeof mutators;
+export const mutators: Mutators = ZeroApiRegistry.toMutators(SheetZeroApi) as Mutators;

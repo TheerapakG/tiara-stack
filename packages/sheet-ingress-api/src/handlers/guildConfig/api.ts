@@ -1,6 +1,11 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema, SchemaGetter } from "effect";
-import { SchemaError, QueryResultError, ArgumentError } from "typhoon-core/error";
+import {
+  SchemaError,
+  QueryResultError,
+  ArgumentError,
+  MutatorResultError,
+} from "typhoon-core/error";
 import { GuildChannelConfig, GuildConfig, GuildConfigMonitorRole } from "../../schemas/guildConfig";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
 
@@ -37,7 +42,7 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
         }),
       }),
       success: GuildConfig,
-      error: [SchemaError, QueryResultError],
+      error: [SchemaError, QueryResultError, MutatorResultError],
     }),
   )
   .add(
@@ -66,7 +71,7 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
         roleId: Schema.String,
       }),
       success: GuildConfigMonitorRole,
-      error: [SchemaError, QueryResultError],
+      error: [SchemaError, QueryResultError, MutatorResultError],
     }),
   )
   .add(
@@ -76,7 +81,7 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
         roleId: Schema.String,
       }),
       success: GuildConfigMonitorRole,
-      error: [SchemaError, QueryResultError],
+      error: [SchemaError, QueryResultError, MutatorResultError],
     }),
   )
   .add(
@@ -92,7 +97,7 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
         }),
       }),
       success: GuildChannelConfig,
-      error: [SchemaError, QueryResultError],
+      error: [SchemaError, QueryResultError, MutatorResultError],
     }),
   )
   .add(

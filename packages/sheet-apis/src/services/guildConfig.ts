@@ -1,37 +1,19 @@
-import { Array, Effect, Layer, Option, Context, Schema } from "effect";
-import { mutators, queries } from "sheet-db-schema/zero";
+import { Array, Effect, Layer, Option, Context } from "effect";
 import { makeDBQueryError } from "typhoon-core/error";
-import { DefaultTaggedClass } from "typhoon-core/schema";
-import { ZeroService } from "./zero";
-import {
-  GuildChannelConfig,
-  GuildConfig,
-  GuildConfigMonitorRole,
-} from "sheet-ingress-api/schemas/guildConfig";
+import { SheetZeroClient } from "./sheetZeroClient";
 
 export class GuildConfigService extends Context.Service<GuildConfigService>()(
   "GuildConfigService",
   {
     make: Effect.gen(function* () {
-      const zeroService = yield* ZeroService;
+      const zero = yield* SheetZeroClient;
 
       return {
         getAutoCheckinGuilds: Effect.fn("GuildConfigService.getAutoCheckinGuilds")(function* () {
-          const result = yield* zeroService.run(queries.guildConfig.getAutoCheckinGuilds({}), {
-            type: "complete",
-          });
-          return yield* Schema.decodeEffect(Schema.Array(DefaultTaggedClass(GuildConfig)))(result);
+          return yield* zero.guildConfig.getAutoCheckinGuilds({});
         }),
         getGuildConfig: Effect.fn("GuildConfigService.getGuildConfig")(function* (guildId: string) {
-          const result = yield* zeroService.run(
-            queries.guildConfig.getGuildConfigByGuildId({ guildId }),
-            {
-              type: "complete",
-            },
-          );
-          return yield* Schema.decodeEffect(
-            Schema.OptionFromNullishOr(DefaultTaggedClass(GuildConfig)),
-          )(result);
+          return yield* zero.guildConfig.getGuildConfigByGuildId({ guildId });
         }),
         upsertGuildConfig: Effect.fn("GuildConfigService.upsertGuildConfig")(function* (
           guildId: string,
@@ -40,19 +22,8 @@ export class GuildConfigService extends Context.Service<GuildConfigService>()(
             autoCheckin?: boolean | null | undefined;
           },
         ) {
-          const mutation = yield* zeroService.mutate(
-            mutators.guildConfig.upsertGuildConfig({ guildId, ...config }),
-          );
-          yield* mutation.server();
-          const result = yield* zeroService.run(
-            queries.guildConfig.getGuildConfigByGuildId({ guildId }),
-            {
-              type: "complete",
-            },
-          );
-          const guildConfig = yield* Schema.decodeEffect(
-            Schema.OptionFromNullishOr(DefaultTaggedClass(GuildConfig)),
-          )(result);
+          yield* zero.guildConfig.upsertGuildConfig({ guildId, ...config });
+          const guildConfig = yield* zero.guildConfig.getGuildConfigByGuildId({ guildId });
 
           if (Option.isNone(guildConfig)) {
             return yield* Effect.die(makeDBQueryError("Failed to upsert guild config"));
@@ -63,52 +34,23 @@ export class GuildConfigService extends Context.Service<GuildConfigService>()(
         getGuildMonitorRoles: Effect.fn("GuildConfigService.getGuildMonitorRoles")(function* (
           guildId: string,
         ) {
-          const result = yield* zeroService.run(
-            queries.guildConfig.getGuildMonitorRoles({
-              guildId,
-            }),
-            {
-              type: "complete",
-            },
-          );
-          return yield* Schema.decodeEffect(
-            Schema.Array(DefaultTaggedClass(GuildConfigMonitorRole)),
-          )(result);
+          return yield* zero.guildConfig.getGuildMonitorRoles({ guildId });
         }),
         getGuildChannels: Effect.fn("GuildConfigService.getGuildChannels")(function* (params: {
           guildId: string;
           running?: boolean | undefined;
         }) {
-          const result = yield* zeroService.run(
-            queries.guildConfig.getGuildChannels({
-              guildId: params.guildId,
-              ...(typeof params.running === "undefined" ? {} : { running: params.running }),
-            }),
-            { type: "complete" },
-          );
-          return yield* Schema.decodeEffect(Schema.Array(DefaultTaggedClass(GuildChannelConfig)))(
-            result,
-          );
+          return yield* zero.guildConfig.getGuildChannels({
+            guildId: params.guildId,
+            ...(typeof params.running === "undefined" ? {} : { running: params.running }),
+          });
         }),
         addGuildMonitorRole: Effect.fn("GuildConfigService.addGuildMonitorRole")(function* (
           guildId: string,
           roleId: string,
         ) {
-          const mutation = yield* zeroService.mutate(
-            mutators.guildConfig.addGuildMonitorRole({ guildId, roleId }),
-          );
-          yield* mutation.server();
-          const result = yield* zeroService.run(
-            queries.guildConfig.getGuildMonitorRoles({
-              guildId,
-            }),
-            {
-              type: "complete",
-            },
-          );
-          const roles = yield* Schema.decodeEffect(
-            Schema.Array(DefaultTaggedClass(GuildConfigMonitorRole)),
-          )(result);
+          yield* zero.guildConfig.addGuildMonitorRole({ guildId, roleId });
+          const roles = yield* zero.guildConfig.getGuildMonitorRoles({ guildId });
           const role = Array.findFirst(roles, (item) => item.roleId === roleId);
 
           if (Option.isNone(role)) {
@@ -121,21 +63,8 @@ export class GuildConfigService extends Context.Service<GuildConfigService>()(
           guildId: string,
           roleId: string,
         ) {
-          const mutation = yield* zeroService.mutate(
-            mutators.guildConfig.removeGuildMonitorRole({ guildId, roleId }),
-          );
-          yield* mutation.server();
-          const result = yield* zeroService.run(
-            queries.guildConfig.getGuildMonitorRoles({
-              guildId,
-            }),
-            {
-              type: "complete",
-            },
-          );
-          const roles = yield* Schema.decodeEffect(
-            Schema.Array(DefaultTaggedClass(GuildConfigMonitorRole)),
-          )(result);
+          yield* zero.guildConfig.removeGuildMonitorRole({ guildId, roleId });
+          const roles = yield* zero.guildConfig.getGuildMonitorRoles({ guildId });
           const role = Array.findFirst(roles, (item) => item.roleId === roleId);
 
           if (Option.isNone(role)) {
@@ -155,24 +84,15 @@ export class GuildConfigService extends Context.Service<GuildConfigService>()(
               checkinChannelId?: string | null | undefined;
             },
           ) {
-            const mutation = yield* zeroService.mutate(
-              mutators.guildConfig.upsertGuildChannelConfig({
-                guildId,
-                channelId,
-                name: config.name,
-                running: config.running,
-                roleId: config.roleId,
-                checkinChannelId: config.checkinChannelId,
-              }),
-            );
-            yield* mutation.server();
-            const result = yield* zeroService.run(
-              queries.guildConfig.getGuildChannelById({ guildId, channelId }),
-              { type: "complete" },
-            );
-            const channel = yield* Schema.decodeEffect(
-              Schema.OptionFromNullishOr(DefaultTaggedClass(GuildChannelConfig)),
-            )(result);
+            yield* zero.guildConfig.upsertGuildChannelConfig({
+              guildId,
+              channelId,
+              name: config.name,
+              running: config.running,
+              roleId: config.roleId,
+              checkinChannelId: config.checkinChannelId,
+            });
+            const channel = yield* zero.guildConfig.getGuildChannelById({ guildId, channelId });
 
             if (Option.isNone(channel)) {
               return yield* Effect.die(makeDBQueryError("Failed to upsert guild channel config"));
@@ -187,17 +107,11 @@ export class GuildConfigService extends Context.Service<GuildConfigService>()(
             channelId: string;
             running?: boolean | undefined;
           }) {
-            const result = yield* zeroService.run(
-              queries.guildConfig.getGuildChannelById({
-                guildId: params.guildId,
-                channelId: params.channelId,
-                ...(typeof params.running === "undefined" ? {} : { running: params.running }),
-              }),
-              { type: "complete" },
-            );
-            return yield* Schema.decodeEffect(
-              Schema.OptionFromNullishOr(DefaultTaggedClass(GuildChannelConfig)),
-            )(result);
+            return yield* zero.guildConfig.getGuildChannelById({
+              guildId: params.guildId,
+              channelId: params.channelId,
+              ...(typeof params.running === "undefined" ? {} : { running: params.running }),
+            });
           },
         ),
         getGuildChannelByName: Effect.fn("GuildConfigService.getGuildChannelByName")(
@@ -206,22 +120,18 @@ export class GuildConfigService extends Context.Service<GuildConfigService>()(
             channelName: string;
             running?: boolean | undefined;
           }) {
-            const result = yield* zeroService.run(
-              queries.guildConfig.getGuildChannelByName({
-                guildId: params.guildId,
-                channelName: params.channelName,
-                ...(typeof params.running === "undefined" ? {} : { running: params.running }),
-              }),
-              { type: "complete" },
-            );
-            return yield* Schema.decodeEffect(
-              Schema.OptionFromNullishOr(DefaultTaggedClass(GuildChannelConfig)),
-            )(result);
+            return yield* zero.guildConfig.getGuildChannelByName({
+              guildId: params.guildId,
+              channelName: params.channelName,
+              ...(typeof params.running === "undefined" ? {} : { running: params.running }),
+            });
           },
         ),
       };
     }),
   },
 ) {
-  static layer = Layer.effect(GuildConfigService, this.make).pipe(Layer.provide(ZeroService.layer));
+  static layer = Layer.effect(GuildConfigService, this.make).pipe(
+    Layer.provide(SheetZeroClient.layer),
+  );
 }
