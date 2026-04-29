@@ -1,4 +1,4 @@
-import { ZeroApiRegistry } from "typhoon-core/zeroApi";
+import { ZeroApiRegistry } from "typhoon-zero/zeroApi";
 import { SheetZeroApi } from "./api";
 import type { Schema } from "./schema";
 

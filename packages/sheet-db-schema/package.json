@@ -30,7 +30,8 @@
     "drizzle-orm": "^0.45.1",
     "drizzle-zero": "^0.17.2",
     "postgres": "^3.4.7",
-    "typhoon-core": "workspace:*"
+    "typhoon-core": "workspace:*",
+    "typhoon-zero": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",

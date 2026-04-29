@@ -1,6 +1,7 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
-import { SchemaError, QueryResultError, UnknownError } from "typhoon-core/error";
+import { SchemaError, UnknownError } from "typhoon-core/error";
+import { QueryResultError } from "typhoon-zero/error";
 import { GoogleSheetsError } from "../../schemas/google";
 import { ParserFieldError } from "../../schemas/sheet/error";
 import { SheetConfigError } from "../../schemas/sheetConfig";

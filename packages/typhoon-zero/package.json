@@ -1,5 +1,5 @@
 {
-  "name": "typhoon-core",
+  "name": "typhoon-zero",
   "version": "0.0.0",
   "private": true,
   "keywords": [],
@@ -13,6 +13,26 @@
     ".": {
       "types": "./dist/index.d.mts",
       "default": "./dist/index.mjs"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.mts",
+      "default": "./dist/client/index.mjs"
+    },
+    "./error": {
+      "types": "./dist/error/index.d.mts",
+      "default": "./dist/error/index.mjs"
+    },
+    "./schema": {
+      "types": "./dist/schema/index.d.mts",
+      "default": "./dist/schema/index.mjs"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.mts",
+      "default": "./dist/server/index.mjs"
+    },
+    "./zeroApi": {
+      "types": "./dist/zeroApi/index.d.mts",
+      "default": "./dist/zeroApi/index.mjs"
     },
     "./*": {
       "types": "./dist/*/index.d.mts",
@@ -29,7 +49,8 @@
     "build": "vp pack"
   },
   "dependencies": {
-    "@standard-schema/spec": "^1.0.0"
+    "@rocicorp/zero": "^0.25.9",
+    "typhoon-core": "workspace:*"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",

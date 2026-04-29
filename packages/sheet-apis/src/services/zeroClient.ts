@@ -2,7 +2,7 @@ import { Zero } from "@rocicorp/zero";
 import { readFile } from "node:fs/promises";
 import { Effect, Layer, Match, pipe } from "effect";
 import { type Schema, schema, mutators } from "sheet-db-schema/zero";
-import { ZeroService as BaseZeroService } from "typhoon-core/services";
+import { ZeroClient as BaseZeroClient } from "typhoon-zero/client";
 import { config } from "@/config";
 
 const getAuth = Effect.fn("zero.getAuth")(function* () {
@@ -45,9 +45,9 @@ const makeZero = Effect.fn("zero.makeZero")(function* () {
   return zero;
 });
 
-export class ZeroService extends BaseZeroService.ZeroService<Schema, undefined, unknown>() {
+export class ZeroClient extends BaseZeroClient.ZeroClient<Schema, undefined, unknown>() {
   static layer = Layer.effect(
-    ZeroService,
+    ZeroClient,
     Effect.gen({ self: this }, function* () {
       const zero = yield* makeZero();
       return yield* this.make(zero);

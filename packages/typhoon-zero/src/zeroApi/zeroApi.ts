@@ -3,7 +3,7 @@ import type { Pipeable } from "effect/Pipeable";
 import { pipeArguments } from "effect/Pipeable";
 import * as ZeroApiGroup from "./zeroApiGroup";
 
-const TypeId = "~typhoon-core/ZeroApi";
+const TypeId = "~typhoon-zero/ZeroApi";
 
 export interface ZeroApi<
   out Id extends string,

@@ -2,7 +2,7 @@ import type { Pipeable } from "effect/Pipeable";
 import { pipeArguments } from "effect/Pipeable";
 import * as ZeroApiEndpoint from "./zeroApiEndpoint";
 
-const TypeId = "~typhoon-core/ZeroApiGroup";
+const TypeId = "~typhoon-zero/ZeroApiGroup";
 
 export interface ZeroApiGroup<
   out Name extends string,

@@ -14,7 +14,8 @@ import {
   Result,
   Schema,
 } from "effect";
-import { QueryResultAppError, QueryResultParseError, SchemaError } from "typhoon-core/error";
+import { SchemaError } from "typhoon-core/error";
+import { QueryResultAppError, QueryResultParseError } from "typhoon-zero/error";
 import { useMemo } from "react";
 import { zoneId } from "#/hooks/useDateTimeZoned";
 

@@ -4,14 +4,14 @@ import {
   MutatorResultZeroError,
   QueryResultAppError,
   QueryResultParseError,
-} from "../error/zero/zeroQueryError";
+} from "../error/zeroQueryError";
 
 export {
   MutatorResultAppError,
   MutatorResultZeroError,
   QueryResultAppError,
   QueryResultParseError,
-} from "../error/zero/zeroQueryError";
+} from "../error/zeroQueryError";
 
 export type QueryError = QueryResultAppError | QueryResultParseError | Schema.SchemaError;
 

@@ -15,14 +15,14 @@ import {
   MutatorResultZeroError,
   QueryResultAppError,
   QueryResultParseError,
-} from "../error/zero/zeroQueryError";
-import { DefaultTaggedClass } from "../schema/defaultTaggedClass";
+} from "../error/zeroQueryError";
+import { DefaultTaggedClass } from "typhoon-core/schema";
 
-const ZeroServiceTypeId = Symbol("ZeroServiceTypeId");
-export type ZeroServiceTypeId = typeof ZeroServiceTypeId;
+const ZeroClientTypeId = Symbol("ZeroClientTypeId");
+export type ZeroClientTypeId = typeof ZeroClientTypeId;
 
 interface Variance<out S extends ZeroSchema, out MD extends CustomMutatorDefs | undefined, out C> {
-  [ZeroServiceTypeId]: {
+  [ZeroClientTypeId]: {
     _S: Types.Covariant<S>;
     _MD: Types.Covariant<MD>;
     _C: Types.Covariant<C>;
@@ -30,18 +30,18 @@ interface Variance<out S extends ZeroSchema, out MD extends CustomMutatorDefs | 
 }
 
 /**
- * ZeroServiceTag provides access to a Zero instance.
+ * ZeroClientTag provides access to a Zero instance.
  */
-export interface ZeroServiceTag<
+export interface ZeroClientTag<
   S extends ZeroSchema,
   MD extends CustomMutatorDefs | undefined,
   C,
 > extends Variance<S, MD, C> {}
 
 /**
- * ZeroServiceTag provides access to a Zero instance.
+ * ZeroClient wraps access to a Zero instance.
  */
-export interface ZeroService<S extends ZeroSchema, MD extends CustomMutatorDefs | undefined, C> {
+export interface ZeroClient<S extends ZeroSchema, MD extends CustomMutatorDefs | undefined, C> {
   zero: Zero<S, MD, C>;
   run: <TReturn>(
     query: QueryOrQueryRequest<any, any, any, S, TReturn, C>,
@@ -99,14 +99,14 @@ const parseMutatorResultDetails = (result: MutatorResultDetails) =>
   );
 
 /**
- * ZeroService provides access to a Zero instance.
+ * ZeroClient provides access to a Zero instance.
  */
-export const ZeroService = <S extends ZeroSchema, MD extends CustomMutatorDefs | undefined, C>() =>
-  Context.Service<ZeroServiceTag<S, MD, C>, ZeroService<S, MD, C>>()("ZeroService", {
+export const ZeroClient = <S extends ZeroSchema, MD extends CustomMutatorDefs | undefined, C>() =>
+  Context.Service<ZeroClientTag<S, MD, C>, ZeroClient<S, MD, C>>()("ZeroClient", {
     make: (zero: Zero<S, MD, C>) =>
       Effect.succeed({
         zero,
-        run: Effect.fn("ZeroService.run")(function* <TReturn>(
+        run: Effect.fn("ZeroClient.run")(function* <TReturn>(
           query: QueryOrQueryRequest<any, any, any, S, TReturn, C>,
           runOptions?: RunOptions,
         ) {
@@ -119,14 +119,14 @@ export const ZeroService = <S extends ZeroSchema, MD extends CustomMutatorDefs |
             ),
           );
         }),
-        mutate: Effect.fn("ZeroService.mutate")(function* (request: MutateRequest<any, S, C, any>) {
+        mutate: Effect.fn("ZeroClient.mutate")(function* (request: MutateRequest<any, S, C, any>) {
           const { client, server } = yield* Effect.sync(() => zero.mutate(request));
 
           return {
-            client: Effect.fn("ZeroService.mutate.client")(() =>
+            client: Effect.fn("ZeroClient.mutate.client")(() =>
               Effect.promise(() => client).pipe(Effect.flatMap(parseMutatorResultDetails)),
             ),
-            server: Effect.fn("ZeroService.mutate.server")(() =>
+            server: Effect.fn("ZeroClient.mutate.server")(() =>
               pipe(
                 Effect.promise(() => server),
                 Effect.flatMap(parseMutatorResultDetails),

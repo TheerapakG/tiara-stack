@@ -1,8 +1,8 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
-import { ReadonlyJSONValue } from "typhoon-core/schema";
+import { ReadonlyJSONValue } from "../schema";
 
-export class ZeroApi extends HttpApiGroup.make("zero")
+export class ZeroHttpApi extends HttpApiGroup.make("zero")
   .add(
     HttpApiEndpoint.post("query", "/zero/query", {
       success: ReadonlyJSONValue,

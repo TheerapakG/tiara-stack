@@ -8,9 +8,15 @@ This monorepo contains the following packages:
 
 ### `typhoon-core` (packages/typhoon-core)
 
-Shared utilities library providing Effect.js integration for Rocicorp Zero, schema transformation helpers, standardized error types, and common utilities used across the monorepo.
+Shared utilities library providing schema transformation helpers, standardized error types, and common utilities used across the monorepo.
 
-**Dependencies**: `@rocicorp/zero`, `@standard-schema/spec` (peer: `effect`)
+**Dependencies**: `@standard-schema/spec` (peer: `effect`)
+
+### `typhoon-zero` (packages/typhoon-zero)
+
+Shared Rocicorp Zero integration library providing typed Zero API definitions, Effect-based Zero client helpers, Zero error schemas, readonly JSON schemas, and reusable Zero HTTP server layers.
+
+**Dependencies**: `@rocicorp/zero`, `typhoon-core` (peer: `effect`)
 
 ## Application Packages
 
@@ -18,19 +24,19 @@ Shared utilities library providing Effect.js integration for Rocicorp Zero, sche
 
 Backend API server for Google Sheets integration using Effect's HttpApiBuilder, providing HTTP API handlers for sheet operations, calculations, guild configuration, and message management.
 
-**Dependencies**: Effect ecosystem, `@googleapis/sheets`, `@rocicorp/zero`, Playwright, `sheet-db-schema`, `sheet-auth`, `typhoon-core`, `dfx`, `dfx-discord-utils`
+**Dependencies**: Effect ecosystem, `@googleapis/sheets`, `@rocicorp/zero`, Playwright, `sheet-db-schema`, `sheet-auth`, `typhoon-core`, `typhoon-zero`, `dfx`, `dfx-discord-utils`
 
 ### `sheet-db-server` (packages/sheet-db-server)
 
 Database server providing Zero (real-time sync) HTTP API for the sheet database schema using Rocicorp Zero.
 
-**Dependencies**: Effect ecosystem, `@rocicorp/zero`, `drizzle-orm`, `postgres`, `sheet-db-schema`, `typhoon-core`
+**Dependencies**: Effect ecosystem, `@rocicorp/zero`, `drizzle-orm`, `postgres`, `sheet-db-schema`, `typhoon-core`, `typhoon-zero`
 
 ### `sheet-db-schema` (packages/sheet-db-schema)
 
 Database schema definitions using Drizzle ORM for PostgreSQL with Zero integration.
 
-**Dependencies**: `@rocicorp/zero`, `drizzle-orm`, `drizzle-zero`, `postgres`, `typhoon-core`, `effect`
+**Dependencies**: `@rocicorp/zero`, `drizzle-orm`, `drizzle-zero`, `postgres`, `typhoon-core`, `typhoon-zero`, `effect`
 
 ### `sheet-auth` (packages/sheet-auth)
 
@@ -46,7 +52,7 @@ Authentication service using BetterAuth for Discord OAuth, JWT tokens, and Kuber
 
 Web application for the sheet system built with TanStack Start, providing a dashboard for guild management, scheduling, and calendar views.
 
-**Dependencies**: TanStack Start/React ecosystem, Effect, `better-auth`, `sheet-apis`, `sheet-auth`, `start-atom`, `typhoon-core`, shadcn/ui components, Recharts
+**Dependencies**: TanStack Start/React ecosystem, Effect, `better-auth`, `sheet-apis`, `sheet-auth`, `start-atom`, `typhoon-core`, `typhoon-zero`, shadcn/ui components, Recharts
 
 ### `sheet-bot` (packages/sheet-bot)
 
@@ -194,7 +200,8 @@ sheet-web
   ├─ sheet-auth
   ├─ sheet-ingress-api
   ├─ start-atom
-  └─ typhoon-core
+  ├─ typhoon-core
+  └─ typhoon-zero
 
 sheet-ingress-server
   ├─ sheet-auth
@@ -204,6 +211,7 @@ sheet-ingress-server
 
 sheet-ingress-api
   ├─ typhoon-core
+  ├─ typhoon-zero
   └─ dfx-discord-utils
 
 sheet-bot
@@ -217,11 +225,13 @@ sheet-apis
   ├─ sheet-db-schema
   ├─ sheet-auth
   ├─ typhoon-core
+  ├─ typhoon-zero
   └─ dfx-discord-utils
 
 sheet-db-server
   ├─ sheet-db-schema
-  └─ typhoon-core
+  ├─ typhoon-core
+  └─ typhoon-zero
 
 sheet-formulas
   ├─ sheet-apis
@@ -229,7 +239,8 @@ sheet-formulas
   └─ typhoon-core
 
 sheet-db-schema
-  └─ typhoon-core
+  ├─ typhoon-core
+  └─ typhoon-zero
 
 dfx-discord-utils
   (peer dependencies: effect, dfx)
@@ -244,6 +255,10 @@ bob
   (no workspace dependencies)
 
 typhoon-core
+  (peer dependency: effect)
+
+typhoon-zero
+  └─ typhoon-core
   (peer dependency: effect)
 
 vibecord

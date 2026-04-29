@@ -62,7 +62,8 @@
   },
   "dependencies": {
     "dfx-discord-utils": "workspace:*",
-    "typhoon-core": "workspace:*"
+    "typhoon-core": "workspace:*",
+    "typhoon-zero": "workspace:*"
   },
   "devDependencies": {
     "@typescript/native-preview": "7.0.0-dev.20260327.2",

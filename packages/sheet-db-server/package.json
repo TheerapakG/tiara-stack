@@ -38,7 +38,8 @@
     "effect": "catalog:",
     "postgres": "^3.4.7",
     "sheet-db-schema": "workspace:*",
-    "typhoon-core": "workspace:*"
+    "typhoon-core": "workspace:*",
+    "typhoon-zero": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",

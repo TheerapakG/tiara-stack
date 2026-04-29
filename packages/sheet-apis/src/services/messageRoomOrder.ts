@@ -2,7 +2,7 @@ import { Array, Effect, Layer, Option, Context, pipe, Schema } from "effect";
 import { mutators, queries } from "sheet-db-schema/zero";
 import { makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
-import { ZeroService } from "./zero";
+import { ZeroClient } from "./zeroClient";
 import {
   MessageRoomOrder,
   MessageRoomOrderEntry,
@@ -13,11 +13,11 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
   "MessageRoomOrderService",
   {
     make: Effect.gen(function* () {
-      const zeroService = yield* ZeroService;
+      const zeroClient = yield* ZeroClient;
 
       const getMessageRoomOrder = Effect.fn("MessageRoomOrderService.getMessageRoomOrder")(
         function* (messageId: string) {
-          const result = yield* zeroService.run(
+          const result = yield* zeroClient.run(
             queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
             {
               type: "complete",
@@ -33,12 +33,12 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
       const decrementMessageRoomOrderRank = Effect.fn(
         "MessageRoomOrderService.decrementMessageRoomOrderRank",
       )(function* (messageId: string) {
-        const mutation = yield* zeroService.mutate(
+        const mutation = yield* zeroClient.mutate(
           mutators.messageRoomOrder.decrementMessageRoomOrderRank({ messageId }),
         );
         yield* mutation.server();
 
-        const result = yield* zeroService.run(
+        const result = yield* zeroClient.run(
           queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
           {
             type: "complete",
@@ -58,12 +58,12 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
       const incrementMessageRoomOrderRank = Effect.fn(
         "MessageRoomOrderService.incrementMessageRoomOrderRank",
       )(function* (messageId: string) {
-        const mutation = yield* zeroService.mutate(
+        const mutation = yield* zeroClient.mutate(
           mutators.messageRoomOrder.incrementMessageRoomOrderRank({ messageId }),
         );
         yield* mutation.server();
 
-        const result = yield* zeroService.run(
+        const result = yield* zeroClient.run(
           queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
           {
             type: "complete",
@@ -94,7 +94,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
             createdByUserId: string | null;
           },
         ) {
-          const mutation = yield* zeroService.mutate(
+          const mutation = yield* zeroClient.mutate(
             mutators.messageRoomOrder.upsertMessageRoomOrder({
               messageId,
               previousFills: data.previousFills,
@@ -109,7 +109,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
           );
           yield* mutation.server();
 
-          const result = yield* zeroService.run(
+          const result = yield* zeroClient.run(
             queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
             {
               type: "complete",
@@ -151,7 +151,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
             }[];
           },
         ) {
-          const mutation = yield* zeroService.mutate(
+          const mutation = yield* zeroClient.mutate(
             mutators.messageRoomOrder.persistMessageRoomOrder({
               messageId,
               data: payload.data,
@@ -160,7 +160,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
           );
           yield* mutation.server();
 
-          const result = yield* zeroService.run(
+          const result = yield* zeroClient.run(
             queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
             {
               type: "complete",
@@ -181,7 +181,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
       const getMessageRoomOrderEntry = Effect.fn(
         "MessageRoomOrderService.getMessageRoomOrderEntry",
       )(function* (messageId: string, rank: number) {
-        const result = yield* zeroService.run(
+        const result = yield* zeroClient.run(
           queries.messageRoomOrder.getMessageRoomOrderEntry({ messageId, rank }),
           { type: "complete" },
         );
@@ -194,7 +194,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
       const getMessageRoomOrderRange = Effect.fn(
         "MessageRoomOrderService.getMessageRoomOrderRange",
       )(function* (messageId: string) {
-        const result = yield* zeroService.run(
+        const result = yield* zeroClient.run(
           queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }),
           { type: "complete" },
         );
@@ -236,12 +236,12 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
           effectValue: number;
         }[],
       ) {
-        const mutation = yield* zeroService.mutate(
+        const mutation = yield* zeroClient.mutate(
           mutators.messageRoomOrder.upsertMessageRoomOrderEntry({ messageId, entries }),
         );
         yield* mutation.server();
 
-        const result = yield* zeroService.run(
+        const result = yield* zeroClient.run(
           queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }),
           { type: "complete" },
         );
@@ -268,7 +268,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
       const removeMessageRoomOrderEntry = Effect.fn(
         "MessageRoomOrderService.removeMessageRoomOrderEntry",
       )(function* (messageId: string) {
-        const mutation = yield* zeroService.mutate(
+        const mutation = yield* zeroClient.mutate(
           mutators.messageRoomOrder.removeMessageRoomOrderEntry({
             messageId,
             rank: 0,
@@ -277,7 +277,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
         );
         yield* mutation.server();
 
-        const result = yield* zeroService.run(
+        const result = yield* zeroClient.run(
           queries.messageRoomOrder.getMessageRoomOrderRange({ messageId }),
           { type: "complete" },
         );
@@ -316,6 +316,6 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
   },
 ) {
   static layer = Layer.effect(MessageRoomOrderService, this.make).pipe(
-    Layer.provide(ZeroService.layer),
+    Layer.provide(ZeroClient.layer),
   );
 }

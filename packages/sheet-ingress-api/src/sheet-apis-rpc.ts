@@ -1,12 +1,7 @@
 import { Rpc, RpcGroup } from "effect/unstable/rpc";
 import { pipe, Schema } from "effect";
-import {
-  ArgumentError,
-  MutatorResultError,
-  QueryResultError,
-  SchemaError,
-  UnknownError,
-} from "typhoon-core/error";
+import { ArgumentError, SchemaError, UnknownError } from "typhoon-core/error";
+import { MutatorResultError, QueryResultError } from "typhoon-zero/error";
 import { SheetApisRpcAuthorization } from "./middlewares/sheetApisRpcAuthorization/tag";
 import { CheckinGenerateResult } from "./schemas/checkin";
 import { DiscordGuild, DiscordUser } from "./schemas/discord";

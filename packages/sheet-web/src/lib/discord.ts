@@ -2,12 +2,8 @@ import { useAtomSuspense } from "@effect/atom-react";
 import { Atom, AsyncResult } from "effect/unstable/reactivity";
 import { SheetApisClient } from "#/lib/sheetApis";
 import { Duration, Schema } from "effect";
-import {
-  ArgumentError,
-  QueryResultAppError,
-  QueryResultParseError,
-  SchemaError,
-} from "typhoon-core/error";
+import { ArgumentError, SchemaError } from "typhoon-core/error";
+import { QueryResultAppError, QueryResultParseError } from "typhoon-zero/error";
 import { Discord } from "sheet-apis/schema";
 
 export const _currentUserAtom = SheetApisClient.query("discord", "getCurrentUser", {});

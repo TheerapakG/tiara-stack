@@ -196,6 +196,9 @@ importers:
       typhoon-core:
         specifier: workspace:*
         version: link:../typhoon-core
+      typhoon-zero:
+        specifier: workspace:*
+        version: link:../typhoon-zero
       ufo:
         specifier: ^1.6.1
         version: 1.6.1
@@ -406,6 +409,9 @@ importers:
       typhoon-core:
         specifier: workspace:*
         version: link:../typhoon-core
+      typhoon-zero:
+        specifier: workspace:*
+        version: link:../typhoon-zero
     devDependencies:
       '@types/node':
         specifier: ^24.7.2
@@ -467,6 +473,9 @@ importers:
       typhoon-core:
         specifier: workspace:*
         version: link:../typhoon-core
+      typhoon-zero:
+        specifier: workspace:*
+        version: link:../typhoon-zero
     devDependencies:
       '@types/node':
         specifier: ^24.7.2
@@ -538,6 +547,9 @@ importers:
       typhoon-core:
         specifier: workspace:*
         version: link:../typhoon-core
+      typhoon-zero:
+        specifier: workspace:*
+        version: link:../typhoon-zero
     devDependencies:
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260327.2
@@ -735,6 +747,9 @@ importers:
       typhoon-core:
         specifier: workspace:*
         version: link:../typhoon-core
+      typhoon-zero:
+        specifier: workspace:*
+        version: link:../typhoon-zero
       vaul:
         specifier: ^1.1.2
         version: 1.1.2(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.3.0-canary-98ce535f-20260226(react@19.3.0-canary-98ce535f-20260226))(react@19.3.0-canary-98ce535f-20260226)
@@ -830,9 +845,6 @@ importers:
 
   packages/typhoon-core:
     dependencies:
-      '@rocicorp/zero':
-        specifier: ^0.25.9
-        version: 0.25.9(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0))
       '@standard-schema/spec':
         specifier: ^1.0.0
         version: 1.0.0
@@ -846,6 +858,40 @@ importers:
       '@typescript/native-preview':
         specifier: latest
         version: 7.0.0-dev.20260327.2
+      glob:
+        specifier: ^11.0.3
+        version: 11.0.3
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
+      vite:
+        specifier: 'catalog:'
+        version: '@voidzero-dev/vite-plus-core@0.1.15(@types/node@24.10.9)(esbuild@0.27.2)(jiti@2.6.1)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.3)'
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.1.15(@opentelemetry/api@1.9.0)(@types/node@24.10.9)(@voidzero-dev/vite-plus-core@0.1.15(@types/node@24.10.9)(esbuild@0.27.2)(jiti@2.6.1)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.3))(esbuild@0.27.2)(jiti@2.6.1)(jsdom@27.4.0(@noble/hashes@2.0.1))(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.3)
+      vitest:
+        specifier: 'catalog:'
+        version: '@voidzero-dev/vite-plus-test@0.1.15(@opentelemetry/api@1.9.0)(@types/node@24.10.9)(@voidzero-dev/vite-plus-core@0.1.15(@types/node@24.10.9)(esbuild@0.27.2)(jiti@2.6.1)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.3))(esbuild@0.27.2)(jiti@2.6.1)(jsdom@27.4.0(@noble/hashes@2.0.1))(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.3)'
+
+  packages/typhoon-zero:
+    dependencies:
+      '@rocicorp/zero':
+        specifier: ^0.25.9
+        version: 0.25.9(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0))
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.56
+      typhoon-core:
+        specifier: workspace:*
+        version: link:../typhoon-core
+    devDependencies:
+      '@effect/vitest':
+        specifier: 'catalog:'
+        version: 4.0.0-beta.56(@voidzero-dev/vite-plus-test@0.1.15(@opentelemetry/api@1.9.0)(@types/node@24.10.9)(@voidzero-dev/vite-plus-core@0.1.15(@types/node@24.10.9)(esbuild@0.27.2)(jiti@2.6.1)(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.3))(esbuild@0.27.2)(jiti@2.6.1)(jsdom@27.4.0(@noble/hashes@2.0.1))(tsx@4.20.6)(typescript@5.9.3)(yaml@2.8.3))(effect@4.0.0-beta.56)
+      '@typescript/native-preview':
+        specifier: latest
+        version: 7.0.0-dev.20260429.1
       glob:
         specifier: ^11.0.3
         version: 11.0.3
@@ -4054,8 +4100,20 @@ packages:
     cpu: [arm64]
     os: [darwin]
 
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260429.1':
+    resolution: {integrity: sha512-+Rl8iPf+vYKq0fnb8euEOJxxvE/abEOWmhdllQIe+Shd8xhS7UVi+2WunsP1GyH2Ofc+N8rGYz0/dMnhrRYEZA==}
+    engines: {node: '>=16.20.0'}
+    cpu: [arm64]
+    os: [darwin]
+
   '@typescript/native-preview-darwin-x64@7.0.0-dev.20260327.2':
     resolution: {integrity: sha512-IvUv0dCaVNKbA9Oq/GEEhtBPF9PP3E5MfW4pla4NpDsZh+6/nL5p0WXvlocV0fe1rT9fqmCQfk3oH+XrN1I8Qw==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260429.1':
+    resolution: {integrity: sha512-be6Y7VVJz+usdI1ifCHy5mcldpxf8KXGYoyIp8w5Rd54zUtvtkYEJJWKzV5/bJt4bsQLLcp1i0vD4KJSr06Tmg==}
+    engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [darwin]
 
@@ -4064,8 +4122,20 @@ packages:
     cpu: [arm64]
     os: [linux]
 
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260429.1':
+    resolution: {integrity: sha512-44amAEH/VxG6K/hrAmhiyOTnwoTzm7bj0ja7d8sV8Iuocv37oUiSB/8OgJLytLqfIh+Q6kipfTwY6Do3jh6THQ==}
+    engines: {node: '>=16.20.0'}
+    cpu: [arm64]
+    os: [linux]
+
   '@typescript/native-preview-linux-arm@7.0.0-dev.20260327.2':
     resolution: {integrity: sha512-7ATSft1YojnRp/VG70i97CxFe+umhTHYA/jJwQBPrjdopAFa5IvFDr4kNajjy1uypbz/x6pfvCnTdOd1/lM3FQ==}
+    cpu: [arm]
+    os: [linux]
+
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20260429.1':
+    resolution: {integrity: sha512-ngN6+qt5bPdp2zzasShoT4UONGXr+tvzHdz4NjuitwhiAF/d70CseXunb4syaudl1a+lJyTHro/ALTC0hRf6vA==}
+    engines: {node: '>=16.20.0'}
     cpu: [arm]
     os: [linux]
 
@@ -4074,8 +4144,20 @@ packages:
     cpu: [x64]
     os: [linux]
 
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20260429.1':
+    resolution: {integrity: sha512-haAOqc0fJCZkt4RDi0/ZQGBdDfpDzr2N+mEcR+FbiYQD3Y00kOK34hXSrjZafO2kq56ZDWunvCaUTCev0fJDbA==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [linux]
+
   '@typescript/native-preview-win32-arm64@7.0.0-dev.20260327.2':
     resolution: {integrity: sha512-1F86Pmf1QcHv0IENBJJ7nWWVSWjR1nn4jokuSbWiPkKGD57rkJWiHY7xtpt4ql8ZG4bIWxdHonLaepBfjIkaug==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260429.1':
+    resolution: {integrity: sha512-J5O0tGVGqOZHbqm9ijRnZ5ADfPqYTjFIwZtYKpQL1yj1dZnUzMszO8P3bnOSfYD//DJhZINQyJzpPJxu29uiwQ==}
+    engines: {node: '>=16.20.0'}
     cpu: [arm64]
     os: [win32]
 
@@ -4084,8 +4166,19 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20260429.1':
+    resolution: {integrity: sha512-/OZ99Hi/32huvZQ5fdqTwqLvZtKC3QrCXmLuKfMyVuBisV/TSd6LhlFQLolvIpr7/E530mnFZ4sXjgDEzVFqAw==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [win32]
+
   '@typescript/native-preview@7.0.0-dev.20260327.2':
     resolution: {integrity: sha512-npU/LrswTK7gawemSkI2BufIgNgoOHA1OwwIC5EUh++oWLDuWZSvSAcH6mfn28NOt5A196zrHQd3SK7f5XCVAw==}
+    hasBin: true
+
+  '@typescript/native-preview@7.0.0-dev.20260429.1':
+    resolution: {integrity: sha512-SGKnvs5EA+V1spnraYJqum/lEajE0IQ2bVVPC72hFfWjoCfQ6N7iVYxLUGreiE3VFyQWWQBPgXZrRUFnawVvpQ==}
+    engines: {node: '>=16.20.0'}
     hasBin: true
 
   '@typescript/vfs@1.6.1':
@@ -10405,22 +10498,43 @@ snapshots:
   '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260327.2':
     optional: true
 
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260429.1':
+    optional: true
+
   '@typescript/native-preview-darwin-x64@7.0.0-dev.20260327.2':
+    optional: true
+
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260429.1':
     optional: true
 
   '@typescript/native-preview-linux-arm64@7.0.0-dev.20260327.2':
     optional: true
 
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260429.1':
+    optional: true
+
   '@typescript/native-preview-linux-arm@7.0.0-dev.20260327.2':
+    optional: true
+
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20260429.1':
     optional: true
 
   '@typescript/native-preview-linux-x64@7.0.0-dev.20260327.2':
     optional: true
 
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20260429.1':
+    optional: true
+
   '@typescript/native-preview-win32-arm64@7.0.0-dev.20260327.2':
     optional: true
 
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260429.1':
+    optional: true
+
   '@typescript/native-preview-win32-x64@7.0.0-dev.20260327.2':
+    optional: true
+
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20260429.1':
     optional: true
 
   '@typescript/native-preview@7.0.0-dev.20260327.2':
@@ -10432,6 +10546,16 @@ snapshots:
       '@typescript/native-preview-linux-x64': 7.0.0-dev.20260327.2
       '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260327.2
       '@typescript/native-preview-win32-x64': 7.0.0-dev.20260327.2
+
+  '@typescript/native-preview@7.0.0-dev.20260429.1':
+    optionalDependencies:
+      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20260429.1
+      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20260429.1
+      '@typescript/native-preview-linux-arm': 7.0.0-dev.20260429.1
+      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20260429.1
+      '@typescript/native-preview-linux-x64': 7.0.0-dev.20260429.1
+      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260429.1
+      '@typescript/native-preview-win32-x64': 7.0.0-dev.20260429.1
 
   '@typescript/vfs@1.6.1(typescript@5.9.3)':
     dependencies:

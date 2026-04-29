@@ -15,11 +15,11 @@ import {
   MutatorResultZeroError,
   type QueryError,
 } from "./zeroApiError";
-import * as ZeroService from "../services/zeroService";
+import * as ZeroClient from "../client/zeroClient";
 
 export type { QueryError, MutatorError } from "./zeroApiError";
 
-type ServiceContext = ZeroService.ZeroServiceTag<ZeroSchema, any, any>;
+type ServiceContext = ZeroClient.ZeroClientTag<ZeroSchema, any, any>;
 
 type OptionalArgs<Args> = [Args] extends [undefined]
   ? readonly []
@@ -89,7 +89,7 @@ const flattenMutationPhase = (
 const getArgs = (args: readonly unknown[]): unknown => (args.length > 0 ? args[0] : undefined);
 
 const makeQueryMethod = (
-  zeroService: ZeroService.ZeroService<any, any, any>,
+  zeroClient: ZeroClient.ZeroClient<any, any, any>,
   registryMethod: (args?: unknown) => QueryOrQueryRequest<any, any, any, any, any, any>,
   group: ZeroApiGroup.Any,
   endpoint: ZeroApiEndpoint.AnyQuery,
@@ -99,12 +99,12 @@ const makeQueryMethod = (
   ) {
     const encoded = yield* Schema.encodeEffect(endpoint.request)(getArgs(args));
     const queryRequest = registryMethod(encoded as any);
-    const result = yield* zeroService.run(queryRequest, endpoint.runOptions ?? defaultRunOptions);
+    const result = yield* zeroClient.run(queryRequest, endpoint.runOptions ?? defaultRunOptions);
     return yield* Schema.decodeUnknownEffect(endpoint.success)(result);
   });
 
 const makeMutatorMethod = (
-  zeroService: ZeroService.ZeroService<any, any, any>,
+  zeroClient: ZeroClient.ZeroClient<any, any, any>,
   registryMethod: (args?: unknown) => MutateRequest<any, any, any, any>,
   group: ZeroApiGroup.Any,
   endpoint: ZeroApiEndpoint.AnyMutator,
@@ -113,7 +113,7 @@ const makeMutatorMethod = (
     ...args: readonly unknown[]
   ) {
     const encoded = yield* Schema.encodeEffect(endpoint.request)(getArgs(args));
-    const mutation = yield* zeroService.mutate(registryMethod(encoded as any));
+    const mutation = yield* zeroClient.mutate(registryMethod(encoded as any));
     return {
       client: flattenMutationPhase(mutation.client),
       server: flattenMutationPhase(mutation.server),
@@ -137,7 +137,7 @@ const makeMutatorMethod = (
 
 const makeClient = <Api extends ZeroApi.Any>(
   api: Api,
-  zeroService: ZeroService.ZeroService<any, any, any>,
+  zeroClient: ZeroClient.ZeroClient<any, any, any>,
 ): Client<Api> => {
   const queries = ZeroApiRegistry.toQueries(api) as any;
   const mutators = ZeroApiRegistry.toMutators(api) as any;
@@ -148,14 +148,14 @@ const makeClient = <Api extends ZeroApi.Any>(
     for (const endpoint of Object.values(group.endpoints)) {
       if (endpoint.kind === "query") {
         groupClient[endpoint.name] = makeQueryMethod(
-          zeroService,
+          zeroClient,
           queries[group.identifier][endpoint.name],
           group,
           endpoint,
         );
       } else {
         groupClient[endpoint.name] = makeMutatorMethod(
-          zeroService,
+          zeroClient,
           mutators[group.identifier][endpoint.name],
           group,
           endpoint,
@@ -170,15 +170,15 @@ const makeClient = <Api extends ZeroApi.Any>(
 
 export const makeWithService = <Api extends ZeroApi.Any>(
   api: Api,
-  zeroService: ZeroService.ZeroService<any, any, any>,
-): Effect.Effect<Client<Api>, never, never> => Effect.sync(() => makeClient(api, zeroService));
+  zeroClient: ZeroClient.ZeroClient<any, any, any>,
+): Effect.Effect<Client<Api>, never, never> => Effect.sync(() => makeClient(api, zeroClient));
 
 export const make = <Api extends ZeroApi.Any>(
   api: Api,
 ): Effect.Effect<Client<Api>, never, ServiceContext> =>
   Effect.gen(function* () {
-    const zeroService = yield* ZeroService.ZeroService<ZeroSchema, any, any>();
-    return yield* makeWithService(api, zeroService);
+    const zeroClient = yield* ZeroClient.ZeroClient<ZeroSchema, any, any>();
+    return yield* makeWithService(api, zeroClient);
   });
 
 export const Service =

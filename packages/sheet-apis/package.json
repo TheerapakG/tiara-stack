@@ -48,6 +48,7 @@
     "sheet-db-schema": "workspace:*",
     "sheet-ingress-api": "workspace:*",
     "typhoon-core": "workspace:*",
+    "typhoon-zero": "workspace:*",
     "ufo": "^1.6.1",
     "unstorage": "^1.15.0"
   },

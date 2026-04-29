@@ -10,7 +10,7 @@ import {
 } from "@rocicorp/zero";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Exit, Schema } from "effect";
-import * as ZeroService from "../services/zeroService";
+import * as ZeroClient from "../client/zeroClient";
 import * as ZeroApi from "./zeroApi";
 import * as ZeroApiClient from "./zeroApiClient";
 import * as ZeroApiEndpoint from "./zeroApiEndpoint";
@@ -51,19 +51,19 @@ const setCount = ZeroApiEndpoint.mutator("setCount", {
 const ItemsGroup = ZeroApiGroup.make("items").add(getItem, getByCount, setCount);
 const TestApi = ZeroApi.make("test").add(ItemsGroup);
 
-type FakeZeroService = ZeroService.ZeroService<ZeroSchema, any, any>;
+type FakeZeroClient = ZeroClient.ZeroClient<ZeroSchema, any, any>;
 
 const provideFakeZero = <A, E>(
-  effect: Effect.Effect<A, E, ZeroService.ZeroServiceTag<ZeroSchema, any, any>>,
-  service: FakeZeroService,
+  effect: Effect.Effect<A, E, ZeroClient.ZeroClientTag<ZeroSchema, any, any>>,
+  service: FakeZeroClient,
 ) =>
   Effect.provideService(
     effect,
-    ZeroService.ZeroService<ZeroSchema, any, any>(),
+    ZeroClient.ZeroClient<ZeroSchema, any, any>(),
     service,
   ) as Effect.Effect<A, E, never>;
 
-const makeFakeZeroService = (options: Partial<FakeZeroService>): FakeZeroService =>
+const makeFakeZeroClient = (options: Partial<FakeZeroClient>): FakeZeroClient =>
   ({
     zero: {} as never,
     run: () => Effect.succeed(undefined),
@@ -73,7 +73,7 @@ const makeFakeZeroService = (options: Partial<FakeZeroService>): FakeZeroService
         server: () => Effect.void,
       }),
     ...options,
-  }) as FakeZeroService;
+  }) as FakeZeroClient;
 
 describe("ZeroApiClient", () => {
   it.effect(
@@ -81,8 +81,8 @@ describe("ZeroApiClient", () => {
     Effect.fnUntraced(function* () {
       const client = yield* provideFakeZero(
         ZeroApiClient.make(TestApi),
-        makeFakeZeroService({
-          run: (() => Effect.succeed({ id: "item-1", count: 1 })) as FakeZeroService["run"],
+        makeFakeZeroClient({
+          run: (() => Effect.succeed({ id: "item-1", count: 1 })) as FakeZeroClient["run"],
         }),
       );
 
@@ -97,8 +97,8 @@ describe("ZeroApiClient", () => {
     Effect.fnUntraced(function* () {
       const client = yield* provideFakeZero(
         ZeroApiClient.make(TestApi),
-        makeFakeZeroService({
-          run: (() => Effect.succeed({ id: "item-1", count: "bad" })) as FakeZeroService["run"],
+        makeFakeZeroClient({
+          run: (() => Effect.succeed({ id: "item-1", count: "bad" })) as FakeZeroClient["run"],
         }),
       );
 
@@ -114,11 +114,11 @@ describe("ZeroApiClient", () => {
       let capturedArgs: unknown;
       const client = yield* provideFakeZero(
         ZeroApiClient.make(TestApi),
-        makeFakeZeroService({
+        makeFakeZeroClient({
           run: ((request: QueryOrQueryRequest<any, any, any, any, any, any>) => {
             capturedArgs = "args" in request ? request.args : undefined;
             return Effect.succeed([{ id: "item-1", count: 3 }]);
-          }) as FakeZeroService["run"],
+          }) as FakeZeroClient["run"],
         }),
       );
 
@@ -137,7 +137,7 @@ describe("ZeroApiClient", () => {
       let capturedArgs: unknown;
       const client = yield* provideFakeZero(
         ZeroApiClient.make(TestApi),
-        makeFakeZeroService({
+        makeFakeZeroClient({
           mutate: (request: MutateRequest<any, any, any, any>) => {
             capturedArgs = request.args;
             return Effect.succeed({
@@ -169,7 +169,7 @@ describe("ZeroApiClient", () => {
       let serverRuns = 0;
       const client = yield* provideFakeZero(
         ZeroApiClient.make(TestApi),
-        makeFakeZeroService({
+        makeFakeZeroClient({
           mutate: (() =>
             Effect.succeed({
               client: () =>
@@ -180,7 +180,7 @@ describe("ZeroApiClient", () => {
                 Effect.sync(() => {
                   serverRuns++;
                 }),
-            })) as FakeZeroService["mutate"],
+            })) as FakeZeroClient["mutate"],
         }),
       );
 
@@ -196,7 +196,7 @@ describe("ZeroApiClient", () => {
   it.effect(
     "keeps mixed query and mutator endpoints under one group",
     Effect.fnUntraced(function* () {
-      const client = yield* provideFakeZero(ZeroApiClient.make(TestApi), makeFakeZeroService({}));
+      const client = yield* provideFakeZero(ZeroApiClient.make(TestApi), makeFakeZeroClient({}));
 
       expect(client.items.getItem).toBeTypeOf("function");
       expect(client.items.getByCount).toBeTypeOf("function");

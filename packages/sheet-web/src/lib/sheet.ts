@@ -3,7 +3,8 @@ import { Atom, AsyncResult } from "effect/unstable/reactivity";
 import { Sheet, Google, SheetConfig } from "sheet-apis/schema";
 import { SheetApisClient } from "#/lib/sheetApis";
 import { Schema } from "effect";
-import { QueryResultAppError, QueryResultParseError, SchemaError } from "typhoon-core/error";
+import { SchemaError } from "typhoon-core/error";
+import { QueryResultAppError, QueryResultParseError } from "typhoon-zero/error";
 import { useMemo } from "react";
 
 // Private atom for fetching event config (includes startTime)

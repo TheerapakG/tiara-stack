@@ -1,11 +1,7 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema, SchemaGetter } from "effect";
-import {
-  SchemaError,
-  QueryResultError,
-  ArgumentError,
-  MutatorResultError,
-} from "typhoon-core/error";
+import { SchemaError, ArgumentError } from "typhoon-core/error";
+import { QueryResultError, MutatorResultError } from "typhoon-zero/error";
 import { GuildChannelConfig, GuildConfig, GuildConfigMonitorRole } from "../../schemas/guildConfig";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
 

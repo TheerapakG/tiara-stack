@@ -1,6 +1,7 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
-import { SchemaError, QueryResultError, ArgumentError } from "typhoon-core/error";
+import { SchemaError, ArgumentError } from "typhoon-core/error";
+import { QueryResultError } from "typhoon-zero/error";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
 import { DiscordUser, DiscordGuild } from "../../schemas/discord";
 

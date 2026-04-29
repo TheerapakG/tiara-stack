@@ -9,7 +9,7 @@ import type { Pipeable } from "effect/Pipeable";
 import { pipeArguments } from "effect/Pipeable";
 import type { Schema } from "effect";
 
-const TypeId = "~typhoon-core/ZeroApiEndpoint";
+const TypeId = "~typhoon-zero/ZeroApiEndpoint";
 
 export type Kind = "query" | "mutator";
 

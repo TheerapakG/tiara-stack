@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { make, ZeroApiEndpoint, ZeroApiGroup } from "typhoon-core/zeroApi";
+import { make, ZeroApiEndpoint, ZeroApiGroup } from "typhoon-zero/zeroApi";
 import { builder, Schema as ZeroSchema } from "./schema";
 
 declare module "@rocicorp/zero" {

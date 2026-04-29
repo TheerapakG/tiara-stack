@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import { makeSheetZeroApi } from "sheet-db-schema/zero";
-import { ZeroApiClient } from "typhoon-core/zeroApi";
+import { ZeroApiClient } from "typhoon-zero/zeroApi";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 import {
   GuildChannelConfig,
@@ -13,7 +13,7 @@ import {
   MessageRoomOrderEntry,
 } from "sheet-ingress-api/schemas/messageRoomOrder";
 import { MessageSlot } from "sheet-ingress-api/schemas/messageSlot";
-import { ZeroService } from "./zero";
+import { ZeroClient } from "./zeroClient";
 
 const successSchemas = {
   guildConfig: {
@@ -193,11 +193,11 @@ export interface SheetZeroClientApi {
 
 export class SheetZeroClient extends Context.Service<SheetZeroClient>()("SheetZeroClient", {
   make: Effect.gen(function* () {
-    const zeroService = yield* ZeroService;
-    return yield* ZeroApiClient.makeWithService(SheetZeroApi, zeroService).pipe(
+    const zeroClient = yield* ZeroClient;
+    return yield* ZeroApiClient.makeWithService(SheetZeroApi, zeroClient).pipe(
       Effect.map((client) => client as SheetZeroClientApi),
     );
   }),
 }) {
-  static layer = Layer.effect(SheetZeroClient, this.make).pipe(Layer.provide(ZeroService.layer));
+  static layer = Layer.effect(SheetZeroClient, this.make).pipe(Layer.provide(ZeroClient.layer));
 }

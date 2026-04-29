@@ -5,4 +5,3 @@ export * from "./optionArrayToOptionTuple";
 
 export * from "./structToTuple";
 export * from "./tupleToStruct";
-export * from "./readonlyJsonValue";
