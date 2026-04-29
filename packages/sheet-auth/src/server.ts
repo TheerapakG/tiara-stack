@@ -12,16 +12,8 @@ import {
   NodeHttpServerRequest,
   NodeRuntime,
 } from "@effect/platform-node";
-import {
-  ConfigProvider,
-  Effect,
-  FileSystem,
-  Layer,
-  Logger,
-  Option,
-  Redacted,
-  Context,
-} from "effect";
+import { Effect, Layer, Logger, Option, Redacted, Context } from "effect";
+import { dotEnvConfigProviderLayer } from "typhoon-core/config";
 import { getRequestListener } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { createServer } from "http";
@@ -218,19 +210,7 @@ const HttpLive = HttpRouter.serve(apiLayer).pipe(
   Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 })),
 );
 
-const configProviderLayer = Layer.unwrap(
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    return yield* fs.readFileString(".env").pipe(
-      Effect.map((content) =>
-        ConfigProvider.layerAdd(ConfigProvider.fromDotEnvContents(content)).pipe(
-          Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
-        ),
-      ),
-      Effect.catch(() => Effect.succeed(ConfigProvider.layer(ConfigProvider.fromEnv()))),
-    );
-  }),
-).pipe(Layer.provide(NodeFileSystem.layer));
+const configProviderLayer = dotEnvConfigProviderLayer().pipe(Layer.provide(NodeFileSystem.layer));
 
 HttpLive.pipe(
   Layer.provide(MetricsLive),

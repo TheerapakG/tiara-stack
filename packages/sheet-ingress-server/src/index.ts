@@ -2,12 +2,10 @@ import { NodeFileSystem, NodeHttpClient, NodeHttpServer, NodeRuntime } from "@ef
 import { createServer } from "http";
 import {
   Cache,
-  ConfigProvider,
   Context,
   Duration,
   Effect,
   Exit,
-  FileSystem,
   HashSet,
   Layer,
   Logger,
@@ -31,6 +29,7 @@ import { Unauthorized as SheetBotUnauthorized } from "dfx-discord-utils/discord/
 import { Api } from "sheet-ingress-api/api";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
+import { dotEnvConfigProviderLayer } from "typhoon-core/config";
 import { ArgumentError, makeArgumentError } from "typhoon-core/error";
 import { config } from "./config";
 import {
@@ -922,24 +921,7 @@ const makeApiLayer = () => {
   );
 };
 
-const configProviderLayer = Layer.unwrap(
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    return yield* fs.readFileString(".env").pipe(
-      Effect.map((content) =>
-        ConfigProvider.layerAdd(ConfigProvider.fromDotEnvContents(content)).pipe(
-          Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
-        ),
-      ),
-      Effect.catch((error) =>
-        Effect.logWarning(
-          "Could not read .env file, falling back to environment variables",
-          error,
-        ).pipe(Effect.as(ConfigProvider.layer(ConfigProvider.fromEnv()))),
-      ),
-    );
-  }),
-).pipe(Layer.provide(NodeFileSystem.layer));
+const configProviderLayer = dotEnvConfigProviderLayer().pipe(Layer.provide(NodeFileSystem.layer));
 
 const HttpLive = Layer.unwrap(
   Effect.gen(function* () {

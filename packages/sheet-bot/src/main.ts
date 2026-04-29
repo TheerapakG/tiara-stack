@@ -1,5 +1,6 @@
 import { NodeFileSystem, NodeHttpClient, NodeRuntime } from "@effect/platform-node";
-import { ConfigProvider, Effect, FileSystem, Layer, Logger } from "effect";
+import { Layer, Logger } from "effect";
+import { dotEnvConfigProviderLayer } from "typhoon-core/config";
 import { channelCommandLayer } from "./commands/channel";
 import { checkinCommandLayer } from "./commands/checkin";
 import { kickoutCommandLayer } from "./commands/kickout";
@@ -33,19 +34,7 @@ const botLayer = Layer.mergeAll(
   autoCheckinTaskLayer,
 );
 
-const configProviderLayer = Layer.unwrap(
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    return yield* fs.readFileString(".env").pipe(
-      Effect.map((content) =>
-        ConfigProvider.layerAdd(ConfigProvider.fromDotEnvContents(content)).pipe(
-          Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
-        ),
-      ),
-      Effect.catch(() => Effect.succeed(ConfigProvider.layer(ConfigProvider.fromEnv()))),
-    );
-  }),
-).pipe(Layer.provide(NodeFileSystem.layer));
+const configProviderLayer = dotEnvConfigProviderLayer().pipe(Layer.provide(NodeFileSystem.layer));
 
 Layer.mergeAll(botLayer, httpLayer).pipe(
   Layer.provide(MetricsLive),

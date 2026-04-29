@@ -1,23 +1,12 @@
 import { Atom } from "effect/unstable/reactivity";
 import { NodeFileSystem } from "@effect/platform-node";
 import { createServerFn, createIsomorphicFn } from "@tanstack/react-start";
-import { Layer, ConfigProvider, Effect, FileSystem } from "effect";
+import { Layer, ConfigProvider, Effect } from "effect";
+import { dotEnvConfigProviderLayer } from "typhoon-core/config";
 import { authBaseUrlConfig, appBaseUrlConfig, sheetApisBaseUrlConfig } from "#/lib/config";
 
 // Server-side: Load config directly from .env file
-const serverConfigLayer = Layer.unwrap(
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    return yield* fs.readFileString(".env").pipe(
-      Effect.map((content) =>
-        ConfigProvider.layerAdd(ConfigProvider.fromDotEnvContents(content)).pipe(
-          Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
-        ),
-      ),
-      Effect.catch(() => Effect.succeed(ConfigProvider.layer(ConfigProvider.fromEnv()))),
-    );
-  }),
-).pipe(Layer.provide(NodeFileSystem.layer));
+const serverConfigLayer = dotEnvConfigProviderLayer().pipe(Layer.provide(NodeFileSystem.layer));
 
 // Server function to fetch config from server-side env
 const getConfigServerFn = createServerFn({ method: "GET" }).handler(() =>
