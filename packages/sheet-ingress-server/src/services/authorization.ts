@@ -28,8 +28,11 @@ type SheetAuthUserType = Context.Service.Shape<typeof SheetAuthUser>;
 type SheetAuthGuildUserType = Context.Service.Shape<typeof SheetAuthGuildUser>;
 type GuildPermissionScope = "member" | "monitor" | "manage";
 class ResolvedGuildUserCacheKey extends Data.Class<{
+  readonly accountId: string;
   readonly guildId: string;
+  readonly permissions: PermissionSet;
   readonly token: Redacted.Redacted<string>;
+  readonly userId: string;
 }> {}
 
 export const permissionSetFromIterable = (permissions: Iterable<Permission>): PermissionSet =>
@@ -229,23 +232,22 @@ export class AuthorizationService extends Context.Service<AuthorizationService>(
 
       const resolvedGuildUserCache = yield* Cache.makeWith<
         ResolvedGuildUserCacheKey,
-        SheetAuthGuildUserType,
-        never,
-        SheetAuthUser
+        SheetAuthGuildUserType
       >(
-        Effect.fn("AuthorizationService.resolveCurrentGuildUserCached")(function* ({
-          guildId,
-          token,
-        }) {
-          const user = yield* SheetAuthUser;
-          return yield* resolveSheetAuthGuildUser({ ...user, token }, guildId);
+        Effect.fn("AuthorizationService.resolveCurrentGuildUserCached")(function* (key) {
+          return yield* resolveSheetAuthGuildUser(
+            {
+              accountId: key.accountId,
+              permissions: key.permissions,
+              token: key.token,
+              userId: key.userId,
+            },
+            key.guildId,
+          );
         }),
         {
-          capacity: 1_000,
-          timeToLive: Exit.match({
-            onFailure: () => Duration.seconds(1),
-            onSuccess: () => Duration.seconds(30),
-          }),
+          capacity: 16,
+          timeToLive: () => Duration.infinity,
         },
       );
 
@@ -255,8 +257,11 @@ export class AuthorizationService extends Context.Service<AuthorizationService>(
           return yield* Cache.get(
             resolvedGuildUserCache,
             new ResolvedGuildUserCacheKey({
+              accountId: user.accountId,
               guildId,
+              permissions: user.permissions,
               token: user.token,
+              userId: user.userId,
             }),
           );
         },

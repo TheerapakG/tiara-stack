@@ -905,19 +905,22 @@ const makeApiLayer = () => {
     ),
   );
 
+  const RequestServicesLive = Layer.mergeAll(
+    AuthorizationService.layer,
+    MessageLookup.layer,
+    SheetApisForwardingClient.layer,
+    SheetApisRpcTokens.layer,
+    SheetBotForwardingClient.layer,
+    ServiceTokenAuthorizer.layer,
+  );
+
   return HttpApiBuilder.layer(Api).pipe(
     Layer.provide(ProxyLayers),
+    Layer.provide(SheetAuthTokenAuthorizationLive),
     Layer.merge(HttpApiSwagger.layer(Api)),
     Layer.merge(HttpRouter.add("GET", "/health", HttpServerResponse.empty({ status: 200 }))),
+    HttpRouter.provideRequest(RequestServicesLive),
     Layer.provide(corsMiddlewareLayer),
-    Layer.provide([
-      SheetAuthTokenAuthorizationLive,
-      AuthorizationService.layer,
-      MessageLookup.layer,
-      SheetApisForwardingClient.layer,
-      SheetApisRpcTokens.layer,
-      SheetBotForwardingClient.layer,
-    ]),
   );
 };
 
@@ -930,7 +933,6 @@ const HttpLive = Layer.unwrap(
 
     return HttpRouter.serve(ApiLayer).pipe(
       HttpServer.withLogAddress,
-      Layer.provide(ServiceTokenAuthorizer.layer),
       Layer.provide(NodeHttpServer.layer(createServer, { port })),
     );
   }),
@@ -941,6 +943,6 @@ const MainLive = HttpLive.pipe(
   Layer.provide(Logger.layer([Logger.consoleLogFmt])),
   Layer.provide(NodeHttpClient.layerFetch),
   Layer.provide(configProviderLayer),
-) as Layer.Layer<never, never, never>;
+);
 
 Layer.launch(MainLive).pipe(NodeRuntime.runMain);
