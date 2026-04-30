@@ -7,6 +7,7 @@ import { ParserFieldError } from "../../schemas/sheet/error";
 import { SheetConfigError } from "../../schemas/sheetConfig";
 import { Player, PartialIdPlayer, PartialNamePlayer, Team } from "../../schemas/sheet";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
+import { SheetApisServiceUserFallback } from "../../middlewares/sheetApisServiceUserFallback/tag";
 
 const PlayerError = [
   GoogleSheetsError,
@@ -68,6 +69,7 @@ export class PlayerApi extends HttpApiGroup.make("player")
       error: PlayerError,
     }),
   )
+  .middleware(SheetApisServiceUserFallback)
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Player")
   .annotate(OpenApi.Description, "Player data endpoints") {}

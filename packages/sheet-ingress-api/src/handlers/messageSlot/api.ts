@@ -4,6 +4,7 @@ import { SchemaError, ArgumentError } from "typhoon-core/error";
 import { QueryResultError } from "typhoon-zero/error";
 import { MessageSlot } from "../../schemas/messageSlot";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
+import { SheetApisServiceUserFallback } from "../../middlewares/sheetApisServiceUserFallback/tag";
 
 export class MessageSlotApi extends HttpApiGroup.make("messageSlot")
   .add(
@@ -30,6 +31,7 @@ export class MessageSlotApi extends HttpApiGroup.make("messageSlot")
       error: [SchemaError, QueryResultError],
     }),
   )
+  .middleware(SheetApisServiceUserFallback)
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Message Slot")
   .annotate(OpenApi.Description, "Message slot endpoints") {}

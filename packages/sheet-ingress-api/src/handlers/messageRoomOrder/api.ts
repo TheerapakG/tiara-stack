@@ -8,6 +8,7 @@ import {
   MessageRoomOrderRange,
 } from "../../schemas/messageRoomOrder";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
+import { SheetApisServiceUserFallback } from "../../middlewares/sheetApisServiceUserFallback/tag";
 
 export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
   .add(
@@ -148,6 +149,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
       },
     ),
   )
+  .middleware(SheetApisServiceUserFallback)
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Message Room Order")
   .annotate(OpenApi.Description, "Message room order endpoints") {}

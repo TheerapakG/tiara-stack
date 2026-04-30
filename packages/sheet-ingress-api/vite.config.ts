@@ -42,6 +42,15 @@ export default defineConfig({
       "middlewares/sheetBotRpcAuthorization/tag": fileURLToPath(
         new URL("./src/middlewares/sheetBotRpcAuthorization/tag.ts", import.meta.url),
       ),
+      "middlewares/sheetBotServiceAuthorization/tag": fileURLToPath(
+        new URL("./src/middlewares/sheetBotServiceAuthorization/tag.ts", import.meta.url),
+      ),
+      "middlewares/sheetApisServiceUserFallback/tag": fileURLToPath(
+        new URL("./src/middlewares/sheetApisServiceUserFallback/tag.ts", import.meta.url),
+      ),
+      "middlewares/sheetApisAnonymousUserFallback/tag": fileURLToPath(
+        new URL("./src/middlewares/sheetApisAnonymousUserFallback/tag.ts", import.meta.url),
+      ),
       "sheet-apis": fileURLToPath(new URL("./src/sheet-apis.ts", import.meta.url)),
       "sheet-apis-rpc": fileURLToPath(new URL("./src/sheet-apis-rpc.ts", import.meta.url)),
       ...collectEntries("schemas"),

@@ -38,6 +38,18 @@
       "types": "./dist/middlewares/sheetBotRpcAuthorization/tag.d.mts",
       "default": "./dist/middlewares/sheetBotRpcAuthorization/tag.mjs"
     },
+    "./middlewares/sheetBotServiceAuthorization/tag": {
+      "types": "./dist/middlewares/sheetBotServiceAuthorization/tag.d.mts",
+      "default": "./dist/middlewares/sheetBotServiceAuthorization/tag.mjs"
+    },
+    "./middlewares/sheetApisServiceUserFallback/tag": {
+      "types": "./dist/middlewares/sheetApisServiceUserFallback/tag.d.mts",
+      "default": "./dist/middlewares/sheetApisServiceUserFallback/tag.mjs"
+    },
+    "./middlewares/sheetApisAnonymousUserFallback/tag": {
+      "types": "./dist/middlewares/sheetApisAnonymousUserFallback/tag.d.mts",
+      "default": "./dist/middlewares/sheetApisAnonymousUserFallback/tag.mjs"
+    },
     "./sheet-apis": {
       "types": "./dist/sheet-apis.d.mts",
       "default": "./dist/sheet-apis.mjs"

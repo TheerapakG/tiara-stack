@@ -7,6 +7,7 @@ import { ParserFieldError } from "../../schemas/sheet/error";
 import { SheetConfigError } from "../../schemas/sheetConfig";
 import { Monitor, PartialIdMonitor, PartialNameMonitor } from "../../schemas/sheet";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
+import { SheetApisServiceUserFallback } from "../../middlewares/sheetApisServiceUserFallback/tag";
 
 const MonitorError = [
   GoogleSheetsError,
@@ -54,6 +55,7 @@ export class MonitorApi extends HttpApiGroup.make("monitor")
       error: MonitorError,
     }),
   )
+  .middleware(SheetApisServiceUserFallback)
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Monitor")
   .annotate(OpenApi.Description, "Monitor data endpoints") {}

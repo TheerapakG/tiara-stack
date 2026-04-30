@@ -4,6 +4,7 @@ import { SchemaError, ArgumentError } from "typhoon-core/error";
 import { QueryResultError, MutatorResultError } from "typhoon-zero/error";
 import { GuildChannelConfig, GuildConfig, GuildConfigMonitorRole } from "../../schemas/guildConfig";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
+import { SheetApisServiceUserFallback } from "../../middlewares/sheetApisServiceUserFallback/tag";
 
 const BooleanFromString = Schema.Literals(["true", "false"]).pipe(
   Schema.decodeTo(Schema.Boolean, {
@@ -118,6 +119,7 @@ export class GuildConfigApi extends HttpApiGroup.make("guildConfig")
       error: [SchemaError, QueryResultError, ArgumentError],
     }),
   )
+  .middleware(SheetApisServiceUserFallback)
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Guild Config")
   .annotate(OpenApi.Description, "Guild config endpoints") {}

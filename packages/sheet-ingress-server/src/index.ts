@@ -1,17 +1,6 @@
 import { NodeFileSystem, NodeHttpClient, NodeHttpServer, NodeRuntime } from "@effect/platform-node";
 import { createServer } from "http";
-import {
-  Cache,
-  Context,
-  Duration,
-  Effect,
-  Exit,
-  HashSet,
-  Layer,
-  Logger,
-  Option,
-  Redacted,
-} from "effect";
+import { Effect, Layer, Logger, Option } from "effect";
 import {
   HttpMiddleware,
   HttpRouter,
@@ -44,6 +33,11 @@ import { SheetApisForwardingClient } from "./services/sheetApisForwardingClient"
 import { SheetApisRpcTokens } from "./services/sheetApisRpcTokens";
 import { SheetBotForwardingClient } from "./services/sheetBotForwardingClient";
 import { TelemetryLive } from "./telemetry";
+import {
+  SheetApisAnonymousUserFallbackLive,
+  SheetApisServiceUserFallbackLive,
+  SheetBotServiceAuthorizationLive,
+} from "./middlewares/proxyAuthorization";
 
 function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
   return allowedOrigins.some((allowed) => {
@@ -60,68 +54,6 @@ function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
     return false;
   });
 }
-
-const getBearerAuthorization = (request: HttpServerRequest.HttpServerRequest) => {
-  const authorization = request.headers.authorization;
-
-  if (!authorization?.startsWith("Bearer ")) {
-    return undefined;
-  }
-
-  return authorization.slice("Bearer ".length).trim() === "" ? undefined : authorization;
-};
-
-type ServiceTokenAuthorizerService = {
-  readonly hasServicePermission: (authorization: string) => Effect.Effect<boolean, unknown>;
-};
-
-class ServiceTokenAuthorizer extends Context.Service<
-  ServiceTokenAuthorizer,
-  ServiceTokenAuthorizerService
->()("ServiceTokenAuthorizer") {
-  static layer = Layer.effect(
-    ServiceTokenAuthorizer,
-    Effect.gen(function* () {
-      const sheetAuthUserResolver = yield* SheetAuthUserResolver;
-      const servicePermissionCache = yield* Cache.makeWith(
-        (authorization: string) =>
-          sheetAuthUserResolver
-            .resolveToken(Redacted.make(authorization.slice("Bearer ".length).trim()))
-            .pipe(
-              Effect.map(({ permissions }) => hasPermission(permissions, "service")),
-              Effect.tapError((error) =>
-                Effect.logWarning("Failed to authorize service token for bot proxy route", error),
-              ),
-            ),
-        {
-          capacity: 10_000,
-          timeToLive: Exit.match({
-            onFailure: () => Duration.seconds(1),
-            onSuccess: () => Duration.seconds(30),
-          }),
-        },
-      );
-
-      return {
-        hasServicePermission: (authorization: string) =>
-          Cache.get(servicePermissionCache, authorization),
-      };
-    }),
-  ).pipe(Layer.provide(SheetAuthUserResolver.layer));
-}
-
-const hasServiceTokenFromRequest = (request: HttpServerRequest.HttpServerRequest) =>
-  Effect.gen(function* () {
-    const authorization = getBearerAuthorization(request);
-    if (!authorization) {
-      return false;
-    }
-
-    const serviceTokenAuthorizer = yield* ServiceTokenAuthorizer;
-    return yield* serviceTokenAuthorizer
-      .hasServicePermission(authorization)
-      .pipe(Effect.catch(() => Effect.succeed(false)));
-  });
 
 type SheetBotGroups = (typeof Api)["groups"][keyof (typeof Api)["groups"]];
 type SheetBotGroupName = Extract<HttpApiGroup.Name<SheetBotGroups>, "application" | "cache">;
@@ -140,11 +72,11 @@ type SheetBotProxyHandler<
   HttpApiGroup.Endpoints<SheetBotGroup<GroupName>>,
   EndpointName,
   never,
-  SheetBotForwardingClient | ServiceTokenAuthorizer
+  SheetBotForwardingClient
 >;
 type SheetBotEndpointClient = (args: unknown) => Effect.Effect<unknown, unknown, unknown>;
 
-const proxySheetBot =
+const forwardSheetBot =
   <GroupName extends SheetBotGroupName, EndpointName extends SheetBotEndpointName<GroupName>>(
     group: GroupName,
     endpoint: EndpointName,
@@ -154,11 +86,6 @@ const proxySheetBot =
       const requestArgs = args as {
         readonly request: HttpServerRequest.HttpServerRequest;
       } & Record<string, unknown>;
-      const hasServicePermission = yield* hasServiceTokenFromRequest(requestArgs.request);
-      if (!hasServicePermission) {
-        return yield* Effect.fail(new Unauthorized({ message: "Unauthorized" }));
-      }
-
       const client = yield* SheetBotForwardingClient;
       const groupClient = (
         client as unknown as Record<string, Record<string, SheetBotEndpointClient>>
@@ -265,32 +192,18 @@ type SheetApisProxyHandler<
   SheetApisEndpoint<GroupName>,
   EndpointName,
   SheetApisProxyError<GroupName, EndpointName>,
-  SheetApisForwardingClient | SheetApisRpcTokens | R
+  SheetApisForwardingClient | R
 >;
 type SheetApisEndpointClient = (args: unknown) => Effect.Effect<unknown, unknown, unknown>;
 
-const proxySheetApis =
-  <
-    GroupName extends SheetApisGroupName,
-    EndpointName extends SheetApisEndpointName<GroupName>,
-    R = never,
-  >(
+const forwardSheetApis =
+  <GroupName extends SheetApisGroupName, EndpointName extends SheetApisEndpointName<GroupName>>(
     group: GroupName,
     endpoint: EndpointName,
-    authorize?: (
-      args: SheetApisProxyRequest<GroupName, EndpointName>,
-    ) => Effect.Effect<void, SheetApisProxyError<GroupName, EndpointName>, R>,
-    options?: {
-      readonly unauthenticated?: "anonymous";
-    },
-  ): SheetApisProxyHandler<GroupName, EndpointName, R> =>
+  ): SheetApisProxyHandler<GroupName, EndpointName, never> =>
   (rawArgs) =>
     Effect.gen(function* () {
       const args = rawArgs as SheetApisProxyRequest<GroupName, EndpointName>;
-      if (authorize) {
-        yield* authorize(args);
-      }
-
       const client = yield* SheetApisForwardingClient;
       const groupClient = client[group] as unknown as Record<string, SheetApisEndpointClient>;
       const endpointClient = groupClient?.[endpoint];
@@ -299,24 +212,22 @@ const proxySheetApis =
           new Error(`Unknown sheet-apis proxy target: ${group}.${endpoint}`),
         );
       }
-      const proxied = endpointClient.call(groupClient, clientArgsFrom(args));
-      const maybeUser = yield* Effect.serviceOption(SheetAuthUser);
-      if (Option.isSome(maybeUser)) {
-        return yield* proxied;
-      }
-      if (options?.unauthenticated === "anonymous") {
-        return yield* proxied.pipe(
-          Effect.provideService(SheetAuthUser, {
-            accountId: "anonymous",
-            userId: "anonymous",
-            permissions: HashSet.empty(),
-            token: Redacted.make("anonymous-token-unavailable"),
-          }),
-        );
-      }
-      const tokens = yield* SheetApisRpcTokens;
-      const serviceUser = yield* tokens.getServiceUser();
-      return yield* proxied.pipe(Effect.provideService(SheetAuthUser, serviceUser));
+      return yield* endpointClient.call(groupClient, clientArgsFrom(args));
+    }) as ReturnType<SheetApisProxyHandler<GroupName, EndpointName, never>>;
+
+const authorizedSheetApis =
+  <GroupName extends SheetApisGroupName, EndpointName extends SheetApisEndpointName<GroupName>, R>(
+    group: GroupName,
+    endpoint: EndpointName,
+    authorize: (
+      args: SheetApisProxyRequest<GroupName, EndpointName>,
+    ) => Effect.Effect<void, SheetApisProxyError<GroupName, EndpointName>, R>,
+  ): SheetApisProxyHandler<GroupName, EndpointName, R> =>
+  (rawArgs) =>
+    Effect.gen(function* () {
+      const args = rawArgs as SheetApisProxyRequest<GroupName, EndpointName>;
+      yield* authorize(args);
+      return yield* forwardSheetApis(group, endpoint)(rawArgs as never);
     }) as ReturnType<SheetApisProxyHandler<GroupName, EndpointName, R>>;
 
 const requireService = () =>
@@ -351,6 +262,127 @@ const requireSelfOrMonitor = (guildId: string, accountId: string) =>
   Effect.gen(function* () {
     const authorization = yield* AuthorizationService;
     yield* authorization.requireDiscordAccountIdOrMonitorGuild(guildId, accountId);
+  });
+
+const asSheetApisProxyAuthorization = <
+  GroupName extends SheetApisGroupName,
+  EndpointName extends SheetApisEndpointName<GroupName>,
+  R,
+>(
+  effect: Effect.Effect<void, unknown, R>,
+) => effect as Effect.Effect<void, SheetApisProxyError<GroupName, EndpointName>, R>;
+
+const serviceOnly = <
+  GroupName extends SheetApisGroupName,
+  EndpointName extends SheetApisEndpointName<GroupName>,
+>(
+  group: GroupName,
+  endpoint: EndpointName,
+) =>
+  authorizedSheetApis(group, endpoint, () =>
+    asSheetApisProxyAuthorization<GroupName, EndpointName, AuthorizationService | SheetAuthUser>(
+      requireService(),
+    ),
+  );
+
+const guildQuery = <
+  GroupName extends SheetApisGroupName,
+  EndpointName extends SheetApisEndpointName<GroupName>,
+>(
+  group: GroupName,
+  endpoint: EndpointName,
+  scope: "member" | "monitor" | "manage",
+  selectGuildId: (
+    query: SheetApisProxyRequest<GroupName, EndpointName> extends { readonly query: infer Query }
+      ? Query
+      : never,
+  ) => string,
+) =>
+  authorizedSheetApis(group, endpoint, (args) =>
+    asSheetApisProxyAuthorization<GroupName, EndpointName, AuthorizationService | SheetAuthUser>(
+      requireGuild(
+        scope,
+        selectGuildId(
+          (
+            args as {
+              readonly query: SheetApisProxyRequest<GroupName, EndpointName> extends {
+                readonly query: infer Query;
+              }
+                ? Query
+                : never;
+            }
+          ).query,
+        ),
+      ),
+    ),
+  );
+
+const guildPayload = <
+  GroupName extends SheetApisGroupName,
+  EndpointName extends SheetApisEndpointName<GroupName>,
+>(
+  group: GroupName,
+  endpoint: EndpointName,
+  scope: "member" | "monitor" | "manage",
+  selectGuildId: (
+    payload: SheetApisProxyRequest<GroupName, EndpointName> extends {
+      readonly payload: infer Payload;
+    }
+      ? Payload
+      : never,
+  ) => string,
+) =>
+  authorizedSheetApis(group, endpoint, (args) =>
+    asSheetApisProxyAuthorization<GroupName, EndpointName, AuthorizationService | SheetAuthUser>(
+      requireGuild(
+        scope,
+        selectGuildId(
+          (
+            args as {
+              readonly payload: SheetApisProxyRequest<GroupName, EndpointName> extends {
+                readonly payload: infer Payload;
+              }
+                ? Payload
+                : never;
+            }
+          ).payload,
+        ),
+      ),
+    ),
+  );
+
+const singlePlayerOrMonitor = <
+  GroupName extends SheetApisGroupName,
+  EndpointName extends SheetApisEndpointName<GroupName>,
+>(
+  group: GroupName,
+  endpoint: EndpointName,
+  select: (
+    query: SheetApisProxyRequest<GroupName, EndpointName> extends { readonly query: infer Query }
+      ? Query
+      : never,
+  ) => {
+    readonly guildId: string;
+    readonly ids: ReadonlyArray<string>;
+  },
+) =>
+  authorizedSheetApis(group, endpoint, (args) => {
+    const { guildId, ids } = select(
+      (
+        args as {
+          readonly query: SheetApisProxyRequest<GroupName, EndpointName> extends {
+            readonly query: infer Query;
+          }
+            ? Query
+            : never;
+        }
+      ).query,
+    );
+    return asSheetApisProxyAuthorization<
+      GroupName,
+      EndpointName,
+      AuthorizationService | SheetAuthUser
+    >(ids.length === 1 ? requireSelfOrMonitor(guildId, ids[0]) : requireGuild("monitor", guildId));
   });
 
 const requireMessageSlotRead = (messageId: string) =>
@@ -539,100 +571,92 @@ const makeApiLayer = () => {
   const ProxyLayers = Layer.mergeAll(
     HttpApiBuilder.group(Api, "calc", (handlers) =>
       handlers
-        .handle("calcBot", proxySheetApis("calc", "calcBot", requireService))
-        .handle(
-          "calcSheet",
-          proxySheetApis("calc", "calcSheet", undefined, { unauthenticated: "anonymous" }),
-        ),
+        .handle("calcBot", serviceOnly("calc", "calcBot"))
+        .handle("calcSheet", forwardSheetApis("calc", "calcSheet")),
     ),
     HttpApiBuilder.group(Api, "checkin", (handlers) =>
       handlers.handle(
         "generate",
-        proxySheetApis("checkin", "generate", ({ payload }) =>
-          requireGuild("monitor", payload.guildId),
-        ),
+        guildPayload("checkin", "generate", "monitor", (payload) => payload.guildId),
       ),
     ),
     HttpApiBuilder.group(Api, "discord", (handlers) =>
       handlers
-        .handle("getCurrentUser", proxySheetApis("discord", "getCurrentUser", requireNonService))
+        .handle(
+          "getCurrentUser",
+          authorizedSheetApis("discord", "getCurrentUser", requireNonService),
+        )
         .handle(
           "getCurrentUserGuilds",
-          proxySheetApis("discord", "getCurrentUserGuilds", requireNonService),
+          authorizedSheetApis("discord", "getCurrentUserGuilds", requireNonService),
         ),
     ),
     HttpApiBuilder.group(Api, "guildConfig", (handlers) =>
       handlers
-        .handle(
-          "getAutoCheckinGuilds",
-          proxySheetApis("guildConfig", "getAutoCheckinGuilds", requireService),
-        )
+        .handle("getAutoCheckinGuilds", serviceOnly("guildConfig", "getAutoCheckinGuilds"))
         .handle(
           "getGuildConfig",
-          proxySheetApis("guildConfig", "getGuildConfig", ({ query }) =>
-            requireGuild("manage", query.guildId),
-          ),
+          guildQuery("guildConfig", "getGuildConfig", "manage", (query) => query.guildId),
         )
         .handle(
           "upsertGuildConfig",
-          proxySheetApis("guildConfig", "upsertGuildConfig", ({ payload }) =>
-            requireGuild("manage", payload.guildId),
-          ),
+          guildPayload("guildConfig", "upsertGuildConfig", "manage", (payload) => payload.guildId),
         )
         .handle(
           "getGuildMonitorRoles",
-          proxySheetApis("guildConfig", "getGuildMonitorRoles", ({ query }) =>
-            requireGuild("member", query.guildId),
-          ),
+          guildQuery("guildConfig", "getGuildMonitorRoles", "member", (query) => query.guildId),
         )
         .handle(
           "getGuildChannels",
-          proxySheetApis("guildConfig", "getGuildChannels", ({ query }) =>
-            requireGuild("member", query.guildId),
-          ),
+          guildQuery("guildConfig", "getGuildChannels", "member", (query) => query.guildId),
         )
         .handle(
           "addGuildMonitorRole",
-          proxySheetApis("guildConfig", "addGuildMonitorRole", ({ payload }) =>
-            requireGuild("manage", payload.guildId),
+          guildPayload(
+            "guildConfig",
+            "addGuildMonitorRole",
+            "manage",
+            (payload) => payload.guildId,
           ),
         )
         .handle(
           "removeGuildMonitorRole",
-          proxySheetApis("guildConfig", "removeGuildMonitorRole", ({ payload }) =>
-            requireGuild("manage", payload.guildId),
+          guildPayload(
+            "guildConfig",
+            "removeGuildMonitorRole",
+            "manage",
+            (payload) => payload.guildId,
           ),
         )
         .handle(
           "upsertGuildChannelConfig",
-          proxySheetApis("guildConfig", "upsertGuildChannelConfig", ({ payload }) =>
-            requireGuild("manage", payload.guildId),
+          guildPayload(
+            "guildConfig",
+            "upsertGuildChannelConfig",
+            "manage",
+            (payload) => payload.guildId,
           ),
         )
         .handle(
           "getGuildChannelById",
-          proxySheetApis("guildConfig", "getGuildChannelById", ({ query }) =>
-            requireGuild("member", query.guildId),
-          ),
+          guildQuery("guildConfig", "getGuildChannelById", "member", (query) => query.guildId),
         )
         .handle(
           "getGuildChannelByName",
-          proxySheetApis("guildConfig", "getGuildChannelByName", ({ query }) =>
-            requireGuild("member", query.guildId),
-          ),
+          guildQuery("guildConfig", "getGuildChannelByName", "member", (query) => query.guildId),
         ),
     ),
     HttpApiBuilder.group(Api, "messageCheckin", (handlers) =>
       handlers
         .handle(
           "getMessageCheckinData",
-          proxySheetApis("messageCheckin", "getMessageCheckinData", ({ query }) =>
+          authorizedSheetApis("messageCheckin", "getMessageCheckinData", ({ query }) =>
             requireMessageCheckinRead(query.messageId),
           ),
         )
         .handle(
           "upsertMessageCheckinData",
-          proxySheetApis("messageCheckin", "upsertMessageCheckinData", ({ payload }) =>
+          authorizedSheetApis("messageCheckin", "upsertMessageCheckinData", ({ payload }) =>
             requireMessageCheckinUpsert(
               payload.messageId,
               typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
@@ -644,19 +668,19 @@ const makeApiLayer = () => {
         )
         .handle(
           "addMessageCheckinMembers",
-          proxySheetApis("messageCheckin", "addMessageCheckinMembers", ({ payload }) =>
+          authorizedSheetApis("messageCheckin", "addMessageCheckinMembers", ({ payload }) =>
             requireMessageCheckinMonitor(payload.messageId),
           ),
         )
         .handle(
           "setMessageCheckinMemberCheckinAt",
-          proxySheetApis("messageCheckin", "setMessageCheckinMemberCheckinAt", ({ payload }) =>
+          authorizedSheetApis("messageCheckin", "setMessageCheckinMemberCheckinAt", ({ payload }) =>
             requireMessageCheckinParticipantMutation(payload.messageId, payload.memberId),
           ),
         )
         .handle(
           "removeMessageCheckinMember",
-          proxySheetApis("messageCheckin", "removeMessageCheckinMember", ({ payload }) =>
+          authorizedSheetApis("messageCheckin", "removeMessageCheckinMember", ({ payload }) =>
             requireMessageCheckinParticipantMutation(payload.messageId, payload.memberId),
           ),
         ),
@@ -665,13 +689,13 @@ const makeApiLayer = () => {
       handlers
         .handle(
           "getMessageRoomOrder",
-          proxySheetApis("messageRoomOrder", "getMessageRoomOrder", ({ query }) =>
+          authorizedSheetApis("messageRoomOrder", "getMessageRoomOrder", ({ query }) =>
             requireRoomOrderMonitor(query.messageId),
           ),
         )
         .handle(
           "upsertMessageRoomOrder",
-          proxySheetApis("messageRoomOrder", "upsertMessageRoomOrder", ({ payload }) =>
+          authorizedSheetApis("messageRoomOrder", "upsertMessageRoomOrder", ({ payload }) =>
             requireRoomOrderUpsert(
               payload.messageId,
               typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
@@ -680,7 +704,7 @@ const makeApiLayer = () => {
         )
         .handle(
           "persistMessageRoomOrder",
-          proxySheetApis("messageRoomOrder", "persistMessageRoomOrder", ({ payload }) =>
+          authorizedSheetApis("messageRoomOrder", "persistMessageRoomOrder", ({ payload }) =>
             requireRoomOrderUpsert(
               payload.messageId,
               typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
@@ -689,37 +713,37 @@ const makeApiLayer = () => {
         )
         .handle(
           "decrementMessageRoomOrderRank",
-          proxySheetApis("messageRoomOrder", "decrementMessageRoomOrderRank", ({ payload }) =>
+          authorizedSheetApis("messageRoomOrder", "decrementMessageRoomOrderRank", ({ payload }) =>
             requireRoomOrderMonitor(payload.messageId),
           ),
         )
         .handle(
           "incrementMessageRoomOrderRank",
-          proxySheetApis("messageRoomOrder", "incrementMessageRoomOrderRank", ({ payload }) =>
+          authorizedSheetApis("messageRoomOrder", "incrementMessageRoomOrderRank", ({ payload }) =>
             requireRoomOrderMonitor(payload.messageId),
           ),
         )
         .handle(
           "getMessageRoomOrderEntry",
-          proxySheetApis("messageRoomOrder", "getMessageRoomOrderEntry", ({ query }) =>
+          authorizedSheetApis("messageRoomOrder", "getMessageRoomOrderEntry", ({ query }) =>
             requireRoomOrderMonitor(query.messageId),
           ),
         )
         .handle(
           "getMessageRoomOrderRange",
-          proxySheetApis("messageRoomOrder", "getMessageRoomOrderRange", ({ query }) =>
+          authorizedSheetApis("messageRoomOrder", "getMessageRoomOrderRange", ({ query }) =>
             requireRoomOrderMonitor(query.messageId),
           ),
         )
         .handle(
           "upsertMessageRoomOrderEntry",
-          proxySheetApis("messageRoomOrder", "upsertMessageRoomOrderEntry", ({ payload }) =>
+          authorizedSheetApis("messageRoomOrder", "upsertMessageRoomOrderEntry", ({ payload }) =>
             requireRoomOrderMonitor(payload.messageId),
           ),
         )
         .handle(
           "removeMessageRoomOrderEntry",
-          proxySheetApis("messageRoomOrder", "removeMessageRoomOrderEntry", ({ payload }) =>
+          authorizedSheetApis("messageRoomOrder", "removeMessageRoomOrderEntry", ({ payload }) =>
             requireRoomOrderMonitor(payload.messageId),
           ),
         ),
@@ -728,13 +752,13 @@ const makeApiLayer = () => {
       handlers
         .handle(
           "getMessageSlotData",
-          proxySheetApis("messageSlot", "getMessageSlotData", ({ query }) =>
+          authorizedSheetApis("messageSlot", "getMessageSlotData", ({ query }) =>
             requireMessageSlotRead(query.messageId),
           ),
         )
         .handle(
           "upsertMessageSlotData",
-          proxySheetApis("messageSlot", "upsertMessageSlotData", ({ payload }) =>
+          authorizedSheetApis("messageSlot", "upsertMessageSlotData", ({ payload }) =>
             requireMessageSlotUpsert(
               payload.messageId,
               typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
@@ -746,21 +770,15 @@ const makeApiLayer = () => {
       handlers
         .handle(
           "getMonitorMaps",
-          proxySheetApis("monitor", "getMonitorMaps", ({ query }) =>
-            requireGuild("monitor", query.guildId),
-          ),
+          guildQuery("monitor", "getMonitorMaps", "monitor", (query) => query.guildId),
         )
         .handle(
           "getByIds",
-          proxySheetApis("monitor", "getByIds", ({ query }) =>
-            requireGuild("monitor", query.guildId),
-          ),
+          guildQuery("monitor", "getByIds", "monitor", (query) => query.guildId),
         )
         .handle(
           "getByNames",
-          proxySheetApis("monitor", "getByNames", ({ query }) =>
-            requireGuild("monitor", query.guildId),
-          ),
+          guildQuery("monitor", "getByNames", "monitor", (query) => query.guildId),
         ),
     ),
     HttpApiBuilder.group(Api, "permissions", (handlers) =>
@@ -783,70 +801,59 @@ const makeApiLayer = () => {
       handlers
         .handle(
           "getPlayerMaps",
-          proxySheetApis("player", "getPlayerMaps", ({ query }) =>
-            requireGuild("monitor", query.guildId),
-          ),
+          guildQuery("player", "getPlayerMaps", "monitor", (query) => query.guildId),
         )
         .handle(
           "getByIds",
-          proxySheetApis("player", "getByIds", ({ query }) =>
-            query.ids.length === 1
-              ? requireSelfOrMonitor(query.guildId, query.ids[0])
-              : requireGuild("monitor", query.guildId),
-          ),
+          singlePlayerOrMonitor("player", "getByIds", (query) => ({
+            guildId: query.guildId,
+            ids: query.ids,
+          })),
         )
         .handle(
           "getByNames",
-          proxySheetApis("player", "getByNames", ({ query }) =>
-            requireGuild("monitor", query.guildId),
-          ),
+          guildQuery("player", "getByNames", "monitor", (query) => query.guildId),
         )
         .handle(
           "getTeamsByIds",
-          proxySheetApis("player", "getTeamsByIds", ({ query }) =>
-            query.ids.length === 1
-              ? requireSelfOrMonitor(query.guildId, query.ids[0])
-              : requireGuild("monitor", query.guildId),
-          ),
+          singlePlayerOrMonitor("player", "getTeamsByIds", (query) => ({
+            guildId: query.guildId,
+            ids: query.ids,
+          })),
         )
         .handle(
           "getTeamsByNames",
-          proxySheetApis("player", "getTeamsByNames", ({ query }) =>
-            requireGuild("monitor", query.guildId),
-          ),
+          guildQuery("player", "getTeamsByNames", "monitor", (query) => query.guildId),
         ),
     ),
     HttpApiBuilder.group(Api, "roomOrder", (handlers) =>
       handlers.handle(
         "generate",
-        proxySheetApis("roomOrder", "generate", ({ payload }) =>
-          requireGuild("monitor", payload.guildId),
-        ),
+        guildPayload("roomOrder", "generate", "monitor", (payload) => payload.guildId),
       ),
     ),
     HttpApiBuilder.group(Api, "schedule", (handlers) =>
       handlers
         .handle(
           "getAllPopulatedSchedules",
-          proxySheetApis("schedule", "getAllPopulatedSchedules", ({ query }) =>
-            requireGuild("member", query.guildId),
-          ),
+          guildQuery("schedule", "getAllPopulatedSchedules", "member", (query) => query.guildId),
         )
         .handle(
           "getDayPopulatedSchedules",
-          proxySheetApis("schedule", "getDayPopulatedSchedules", ({ query }) =>
-            requireGuild("member", query.guildId),
-          ),
+          guildQuery("schedule", "getDayPopulatedSchedules", "member", (query) => query.guildId),
         )
         .handle(
           "getChannelPopulatedSchedules",
-          proxySheetApis("schedule", "getChannelPopulatedSchedules", ({ query }) =>
-            requireGuild("member", query.guildId),
+          guildQuery(
+            "schedule",
+            "getChannelPopulatedSchedules",
+            "member",
+            (query) => query.guildId,
           ),
         )
         .handle(
           "getDayPlayerSchedule",
-          proxySheetApis("schedule", "getDayPlayerSchedule", ({ query }) =>
+          authorizedSheetApis("schedule", "getDayPlayerSchedule", ({ query }) =>
             requireDayPlayerSchedule(query.guildId, query.accountId),
           ),
         ),
@@ -854,53 +861,51 @@ const makeApiLayer = () => {
     HttpApiBuilder.group(Api, "screenshot", (handlers) =>
       handlers.handle(
         "getScreenshot",
-        proxySheetApis("screenshot", "getScreenshot", ({ query }) =>
-          requireGuild("monitor", query.guildId),
-        ),
+        guildQuery("screenshot", "getScreenshot", "monitor", (query) => query.guildId),
       ),
     ),
     HttpApiBuilder.group(Api, "sheet", (handlers) =>
       handlers
-        .handle("getPlayers", proxySheetApis("sheet", "getPlayers", requireService))
-        .handle("getMonitors", proxySheetApis("sheet", "getMonitors", requireService))
-        .handle("getTeams", proxySheetApis("sheet", "getTeams", requireService))
-        .handle("getAllSchedules", proxySheetApis("sheet", "getAllSchedules", requireService))
-        .handle("getDaySchedules", proxySheetApis("sheet", "getDaySchedules", requireService))
-        .handle(
-          "getChannelSchedules",
-          proxySheetApis("sheet", "getChannelSchedules", requireService),
-        )
-        .handle("getRangesConfig", proxySheetApis("sheet", "getRangesConfig", requireService))
-        .handle("getTeamConfig", proxySheetApis("sheet", "getTeamConfig", requireService))
-        .handle("getEventConfig", proxySheetApis("sheet", "getEventConfig", requireService))
-        .handle("getScheduleConfig", proxySheetApis("sheet", "getScheduleConfig", requireService))
-        .handle("getRunnerConfig", proxySheetApis("sheet", "getRunnerConfig", requireService)),
+        .handle("getPlayers", serviceOnly("sheet", "getPlayers"))
+        .handle("getMonitors", serviceOnly("sheet", "getMonitors"))
+        .handle("getTeams", serviceOnly("sheet", "getTeams"))
+        .handle("getAllSchedules", serviceOnly("sheet", "getAllSchedules"))
+        .handle("getDaySchedules", serviceOnly("sheet", "getDaySchedules"))
+        .handle("getChannelSchedules", serviceOnly("sheet", "getChannelSchedules"))
+        .handle("getRangesConfig", serviceOnly("sheet", "getRangesConfig"))
+        .handle("getTeamConfig", serviceOnly("sheet", "getTeamConfig"))
+        .handle("getEventConfig", serviceOnly("sheet", "getEventConfig"))
+        .handle("getScheduleConfig", serviceOnly("sheet", "getScheduleConfig"))
+        .handle("getRunnerConfig", serviceOnly("sheet", "getRunnerConfig")),
     ),
     HttpApiBuilder.group(Api, "application", (handlers) =>
-      handlers.handle("getApplication", proxySheetBot("application", "getApplication")),
+      handlers.handle("getApplication", forwardSheetBot("application", "getApplication")),
     ),
     HttpApiBuilder.group(Api, "cache", (handlers) =>
       handlers
-        .handle("getGuild", proxySheetBot("cache", "getGuild"))
-        .handle("getGuildSize", proxySheetBot("cache", "getGuildSize"))
-        .handle("getChannel", proxySheetBot("cache", "getChannel"))
-        .handle("getRole", proxySheetBot("cache", "getRole"))
-        .handle("getMember", proxySheetBot("cache", "getMember"))
-        .handle("getChannelsForParent", proxySheetBot("cache", "getChannelsForParent"))
-        .handle("getRolesForParent", proxySheetBot("cache", "getRolesForParent"))
-        .handle("getMembersForParent", proxySheetBot("cache", "getMembersForParent"))
-        .handle("getChannelsForResource", proxySheetBot("cache", "getChannelsForResource"))
-        .handle("getRolesForResource", proxySheetBot("cache", "getRolesForResource"))
-        .handle("getMembersForResource", proxySheetBot("cache", "getMembersForResource"))
-        .handle("getChannelsSize", proxySheetBot("cache", "getChannelsSize"))
-        .handle("getRolesSize", proxySheetBot("cache", "getRolesSize"))
-        .handle("getMembersSize", proxySheetBot("cache", "getMembersSize"))
-        .handle("getChannelsSizeForParent", proxySheetBot("cache", "getChannelsSizeForParent"))
-        .handle("getRolesSizeForParent", proxySheetBot("cache", "getRolesSizeForParent"))
-        .handle("getMembersSizeForParent", proxySheetBot("cache", "getMembersSizeForParent"))
-        .handle("getChannelsSizeForResource", proxySheetBot("cache", "getChannelsSizeForResource"))
-        .handle("getRolesSizeForResource", proxySheetBot("cache", "getRolesSizeForResource"))
-        .handle("getMembersSizeForResource", proxySheetBot("cache", "getMembersSizeForResource")),
+        .handle("getGuild", forwardSheetBot("cache", "getGuild"))
+        .handle("getGuildSize", forwardSheetBot("cache", "getGuildSize"))
+        .handle("getChannel", forwardSheetBot("cache", "getChannel"))
+        .handle("getRole", forwardSheetBot("cache", "getRole"))
+        .handle("getMember", forwardSheetBot("cache", "getMember"))
+        .handle("getChannelsForParent", forwardSheetBot("cache", "getChannelsForParent"))
+        .handle("getRolesForParent", forwardSheetBot("cache", "getRolesForParent"))
+        .handle("getMembersForParent", forwardSheetBot("cache", "getMembersForParent"))
+        .handle("getChannelsForResource", forwardSheetBot("cache", "getChannelsForResource"))
+        .handle("getRolesForResource", forwardSheetBot("cache", "getRolesForResource"))
+        .handle("getMembersForResource", forwardSheetBot("cache", "getMembersForResource"))
+        .handle("getChannelsSize", forwardSheetBot("cache", "getChannelsSize"))
+        .handle("getRolesSize", forwardSheetBot("cache", "getRolesSize"))
+        .handle("getMembersSize", forwardSheetBot("cache", "getMembersSize"))
+        .handle("getChannelsSizeForParent", forwardSheetBot("cache", "getChannelsSizeForParent"))
+        .handle("getRolesSizeForParent", forwardSheetBot("cache", "getRolesSizeForParent"))
+        .handle("getMembersSizeForParent", forwardSheetBot("cache", "getMembersSizeForParent"))
+        .handle(
+          "getChannelsSizeForResource",
+          forwardSheetBot("cache", "getChannelsSizeForResource"),
+        )
+        .handle("getRolesSizeForResource", forwardSheetBot("cache", "getRolesSizeForResource"))
+        .handle("getMembersSizeForResource", forwardSheetBot("cache", "getMembersSizeForResource")),
     ),
   );
 
@@ -910,11 +915,15 @@ const makeApiLayer = () => {
     SheetApisForwardingClient.layer,
     SheetApisRpcTokens.layer,
     SheetBotForwardingClient.layer,
-    ServiceTokenAuthorizer.layer,
   );
 
   return HttpApiBuilder.layer(Api).pipe(
     Layer.provide(ProxyLayers),
+    Layer.provide(
+      SheetBotServiceAuthorizationLive.pipe(Layer.provide(SheetAuthUserResolver.layer)),
+    ),
+    Layer.provide(SheetApisServiceUserFallbackLive.pipe(Layer.provide(SheetApisRpcTokens.layer))),
+    Layer.provide(SheetApisAnonymousUserFallbackLive),
     Layer.provide(SheetAuthTokenAuthorizationLive),
     Layer.merge(HttpApiSwagger.layer(Api)),
     Layer.merge(HttpRouter.add("GET", "/health", HttpServerResponse.empty({ status: 200 }))),

@@ -3,6 +3,7 @@ import { Schema } from "effect";
 import { SchemaError, ArgumentError } from "typhoon-core/error";
 import { QueryResultError } from "typhoon-zero/error";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
+import { SheetApisServiceUserFallback } from "../../middlewares/sheetApisServiceUserFallback/tag";
 import { RoomOrderGenerateResult } from "../../schemas/roomOrder";
 import { GoogleSheetsError } from "../../schemas/google";
 import { ParserFieldError } from "../../schemas/sheet/error";
@@ -31,6 +32,7 @@ export class RoomOrderApi extends HttpApiGroup.make("roomOrder")
       error: RoomOrderGenerateError,
     }),
   )
+  .middleware(SheetApisServiceUserFallback)
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Room Order")
   .annotate(OpenApi.Description, "Room order generation endpoints") {}

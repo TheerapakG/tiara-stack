@@ -4,6 +4,7 @@ import { SchemaError, ArgumentError } from "typhoon-core/error";
 import { QueryResultError } from "typhoon-zero/error";
 import { MessageCheckin, MessageCheckinMember } from "../../schemas/messageCheckin";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
+import { SheetApisServiceUserFallback } from "../../middlewares/sheetApisServiceUserFallback/tag";
 
 export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
   .add(
@@ -81,6 +82,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
       },
     ),
   )
+  .middleware(SheetApisServiceUserFallback)
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Message Checkin")
   .annotate(OpenApi.Description, "Message check-in endpoints") {}

@@ -8,6 +8,8 @@ import { SheetConfigError } from "../../schemas/sheetConfig";
 import { Room } from "../../schemas/sheet/room";
 import { Team } from "../../schemas/sheet";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
+import { SheetApisAnonymousUserFallback } from "../../middlewares/sheetApisAnonymousUserFallback/tag";
+import { SheetApisServiceUserFallback } from "../../middlewares/sheetApisServiceUserFallback/tag";
 
 const CalcError = [
   GoogleSheetsError,
@@ -43,7 +45,9 @@ export class CalcApi extends HttpApiGroup.make("calc")
         }),
       ),
       error: SchemaError,
-    }).middleware(SheetAuthTokenAuthorization),
+    })
+      .middleware(SheetApisServiceUserFallback)
+      .middleware(SheetAuthTokenAuthorization),
   )
   .add(
     HttpApiEndpoint.post("calcSheet", "/calc/sheet", {
@@ -67,10 +71,10 @@ export class CalcApi extends HttpApiGroup.make("calc")
       }),
       success: Schema.Array(Room),
       error: CalcError,
-    }),
+    }).middleware(SheetApisAnonymousUserFallback),
     // This endpoint needs to be callable from outside the cluster from the Google Sheets,
     // and it does not expose further information than what is derived from the Google Sheet with specified id,
-    // so we are not adding security middleware here for now
+    // so ingress forwards it with anonymous auth context instead of requiring a caller token.
   )
   .annotate(OpenApi.Title, "Calc")
   .annotate(OpenApi.Description, "Calculation endpoints") {}

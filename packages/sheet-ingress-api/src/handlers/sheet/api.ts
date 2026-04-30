@@ -14,6 +14,7 @@ import {
 } from "../../schemas/sheetConfig";
 import { RawPlayer, RawMonitor, Team, ScheduleResponse, ScheduleView } from "../../schemas/sheet";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
+import { SheetApisServiceUserFallback } from "../../middlewares/sheetApisServiceUserFallback/tag";
 
 const SheetError = [
   GoogleSheetsError,
@@ -111,6 +112,7 @@ export class SheetApi extends HttpApiGroup.make("sheet")
       error: SheetError,
     }),
   )
+  .middleware(SheetApisServiceUserFallback)
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Sheet")
   .annotate(OpenApi.Description, "Sheet data endpoints") {}

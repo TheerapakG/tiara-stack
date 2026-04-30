@@ -3,6 +3,7 @@ import { Schema } from "effect";
 import { SchemaError, ArgumentError } from "typhoon-core/error";
 import { QueryResultError } from "typhoon-zero/error";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
+import { SheetApisServiceUserFallback } from "../../middlewares/sheetApisServiceUserFallback/tag";
 import { DiscordUser, DiscordGuild } from "../../schemas/discord";
 
 export class DiscordApi extends HttpApiGroup.make("discord")
@@ -18,6 +19,7 @@ export class DiscordApi extends HttpApiGroup.make("discord")
       error: [SchemaError, QueryResultError, ArgumentError],
     }),
   )
+  .middleware(SheetApisServiceUserFallback)
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Discord")
   .annotate(OpenApi.Description, "Discord API endpoints") {}

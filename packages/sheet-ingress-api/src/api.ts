@@ -1,5 +1,6 @@
 import { HttpApi, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
-import { DiscordApi } from "dfx-discord-utils/discord/api";
+import { ApplicationApi, CacheApi } from "dfx-discord-utils/discord/api";
+import { SheetBotServiceAuthorization } from "./middlewares/sheetBotServiceAuthorization/tag";
 import {
   CalcApi,
   CheckinApi,
@@ -45,13 +46,21 @@ class SheetIngressSheetApisApi extends HttpApi.make("api")
   .add(SheetApisDiscordApi)
   .annotate(OpenApi.Title, "Sheet APIs") {}
 
+class SheetIngressDiscordApiBase extends HttpApi.make("discord")
+  .add(ApplicationApi.middleware(SheetBotServiceAuthorization))
+  .add(CacheApi.middleware(SheetBotServiceAuthorization))
+  .annotate(OpenApi.Title, "Discord API")
+  .annotate(OpenApi.Description, "HTTP API for Discord application metadata and cache lookups") {}
+
 // Effect's fluent HttpApi builder loses the concrete group union after annotate.
 // Keep annotations in this helper so the addHttpApi chain remains the source of truth.
 const ApiBase = withIngressApiAnnotations(
-  HttpApi.make("sheet-ingress").addHttpApi(SheetIngressSheetApisApi).addHttpApi(DiscordApi),
+  HttpApi.make("sheet-ingress")
+    .addHttpApi(SheetIngressSheetApisApi)
+    .addHttpApi(SheetIngressDiscordApiBase),
 );
 
 export class Api extends ApiBase {}
 
 export { SheetApisApi };
-export { DiscordApi as SheetIngressDiscordApi };
+export { SheetIngressDiscordApiBase as SheetIngressDiscordApi };

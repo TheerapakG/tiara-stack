@@ -6,6 +6,7 @@ import { GoogleSheetsError } from "../../schemas/google";
 import { ParserFieldError } from "../../schemas/sheet/error";
 import { SheetConfigError } from "../../schemas/sheetConfig";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
+import { SheetApisServiceUserFallback } from "../../middlewares/sheetApisServiceUserFallback/tag";
 
 const ScreenshotError = [
   GoogleSheetsError,
@@ -28,6 +29,7 @@ export class ScreenshotApi extends HttpApiGroup.make("screenshot")
       error: ScreenshotError,
     }),
   )
+  .middleware(SheetApisServiceUserFallback)
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Screenshot")
   .annotate(OpenApi.Description, "Screenshot endpoints") {}

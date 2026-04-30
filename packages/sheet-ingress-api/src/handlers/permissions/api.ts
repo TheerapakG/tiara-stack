@@ -3,6 +3,7 @@ import { Schema } from "effect";
 import { SchemaError, ArgumentError } from "typhoon-core/error";
 import { QueryResultError } from "typhoon-zero/error";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
+import { SheetApisServiceUserFallback } from "../../middlewares/sheetApisServiceUserFallback/tag";
 import { CurrentUserPermissions } from "../../schemas/permissions";
 
 export class PermissionsApi extends HttpApiGroup.make("permissions")
@@ -15,6 +16,7 @@ export class PermissionsApi extends HttpApiGroup.make("permissions")
       error: [SchemaError, QueryResultError, ArgumentError],
     }),
   )
+  .middleware(SheetApisServiceUserFallback)
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Permissions")
   .annotate(OpenApi.Description, "Permission endpoints") {}

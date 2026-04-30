@@ -11,6 +11,7 @@ import {
   ScheduleView,
 } from "../../schemas/sheet";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
+import { SheetApisServiceUserFallback } from "../../middlewares/sheetApisServiceUserFallback/tag";
 
 const ScheduleError = [
   GoogleSheetsError,
@@ -64,6 +65,7 @@ export class ScheduleApi extends HttpApiGroup.make("schedule")
       error: ScheduleError,
     }),
   )
+  .middleware(SheetApisServiceUserFallback)
   .middleware(SheetAuthTokenAuthorization)
   .annotate(OpenApi.Title, "Schedule")
   .annotate(OpenApi.Description, "Populated schedule data endpoints") {}
