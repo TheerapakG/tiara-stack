@@ -1,5 +1,6 @@
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
+import { Unauthorized } from "typhoon-core/error";
 import {
   ApplicationValueSchema,
   GuildValueSchema,
@@ -11,10 +12,7 @@ import {
   MemberCacheEntriesSchema,
   CacheSizeSchema,
   CacheNotFoundError,
-  Unauthorized,
 } from "./schema";
-
-export { Unauthorized } from "./schema";
 
 // Path parameters
 export const ParentIdParam = Schema.String;

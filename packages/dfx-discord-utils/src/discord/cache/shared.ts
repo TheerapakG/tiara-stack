@@ -1,7 +1,7 @@
 import { Effect, Layer, Context } from "effect";
-import { createStorage, CreateStorageOptions, prefixStorage, type Storage } from "unstorage";
+import { createStorage, prefixStorage, type CreateStorageOptions, type Storage } from "unstorage";
 import { default as memoryDriver } from "unstorage/drivers/memory";
-import { default as redisDriver, RedisOptions } from "unstorage/drivers/redis";
+import { default as redisDriver, type RedisOptions } from "unstorage/drivers/redis";
 
 export class Unstorage extends Context.Service<Unstorage, Storage>()("Unstorage") {
   static layer = (storage: Storage) => Layer.succeed(Unstorage, storage);

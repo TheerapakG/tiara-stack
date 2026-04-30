@@ -16,6 +16,12 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "paths": {
+      "dfx-discord-utils/discord/rpc": ["../dfx-discord-utils/src/discord/rpc.ts"],
+      "sheet-auth/client": ["../sheet-auth/src/client.ts"],
+      "sheet-auth/plugins/kubernetes-oauth": [
+        "../sheet-auth/src/plugins/kubernetes-oauth/index.ts"
+      ],
+      "sheet-ingress-api/*": ["../sheet-ingress-api/src/*"],
       "*": ["./*"],
       "~~/*": ["./*"],
       "@@/*": ["./*"],

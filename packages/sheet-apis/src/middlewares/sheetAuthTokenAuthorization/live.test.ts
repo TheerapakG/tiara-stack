@@ -13,14 +13,35 @@ interface AuthorizedUser {
   readonly token: string;
 }
 
-vi.mock("sheet-auth/plugins/kubernetes-oauth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("sheet-auth/plugins/kubernetes-oauth")>();
+vi.mock("sheet-auth/plugins/kubernetes-oauth/rpc-authorization", async () => {
+  const { Duration, Effect } = await import("effect");
   return {
-    ...actual,
-    verifyKubernetesToken: vi.fn(async () => ({
-      exp: Math.floor(Date.now() / 1000) + 60,
-      sub: "system:serviceaccount:default:sheet-ingress-server",
-    })),
+    getBearerToken: (authorization: string | undefined) => {
+      if (!authorization?.startsWith("Bearer ")) {
+        return undefined;
+      }
+
+      const token = authorization.slice("Bearer ".length).trim();
+      return token.length === 0 ? undefined : token;
+    },
+    makeKubernetesServiceAccountTokenAuthorizer: vi.fn(() =>
+      Effect.succeed({
+        requireAuthorizedBearerToken: vi.fn(() =>
+          Effect.succeed({
+            exp: Math.floor(Date.now() / 1000) + 60,
+            sub: "system:serviceaccount:default:sheet-ingress-server",
+            ttl: Duration.minutes(1),
+          }),
+        ),
+        requireAuthorizedHeaders: vi.fn(() =>
+          Effect.succeed({
+            exp: Math.floor(Date.now() / 1000) + 60,
+            sub: "system:serviceaccount:default:sheet-ingress-server",
+            ttl: Duration.minutes(1),
+          }),
+        ),
+      }),
+    ),
   };
 });
 

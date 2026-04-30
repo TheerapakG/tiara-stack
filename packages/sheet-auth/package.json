@@ -34,12 +34,18 @@
       "types": "./dist/plugins/kubernetes-oauth/client.d.mts",
       "default": "./dist/plugins/kubernetes-oauth/client.mjs"
     },
+    "./plugins/kubernetes-oauth/rpc-authorization": {
+      "types": "./dist/plugins/kubernetes-oauth/rpc-authorization.d.mts",
+      "default": "./dist/plugins/kubernetes-oauth/rpc-authorization.mjs"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
     "format": "vp fmt --check",
     "format:apply": "vp fmt",
     "lint": "vp lint src",
+    "test": "vp test run",
+    "test:watch": "vp test",
     "build": "vp pack && tar -acf dist.tar.zst ./dist",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -67,7 +73,8 @@
     "@typescript/native-preview": "latest",
     "drizzle-kit": "^0.31.4",
     "vite": "catalog:",
-    "vite-plus": "catalog:"
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@better-fetch/fetch": "^1.1.21",

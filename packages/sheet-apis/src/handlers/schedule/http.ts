@@ -3,7 +3,7 @@ import { ScheduleRpcs } from "sheet-ingress-api/sheet-apis-rpc";
 import { withCurrentGuildAuthFromQuery } from "@/handlers/shared/guildAuthorization";
 import { hasGuildPermission, hasPermission } from "@/services/authorization";
 import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthGuildUser";
-import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
+import { Unauthorized } from "typhoon-core/error";
 import {
   AuthorizationService,
   GuildConfigService,

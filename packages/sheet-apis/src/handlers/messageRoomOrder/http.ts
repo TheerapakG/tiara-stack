@@ -4,7 +4,7 @@ import { MessageRoomOrderRpcs } from "sheet-ingress-api/sheet-apis-rpc";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
 import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthGuildUser";
 import { MessageRoomOrder } from "sheet-ingress-api/schemas/messageRoomOrder";
-import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
+import { Unauthorized } from "typhoon-core/error";
 import { AuthorizationService, MessageRoomOrderService } from "@/services";
 
 const missingMessageRoomOrderError = () =>

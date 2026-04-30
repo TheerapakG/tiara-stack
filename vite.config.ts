@@ -5,7 +5,7 @@ export default defineConfig({
     "*": "vp check --fix",
   },
   fmt: {
-    ignorePatterns: ["packages/sheet-web/src/routeTree.gen.ts"],
+    ignorePatterns: ["packages/sheet-web/src/routeTree.gen.ts", "dist", ".output", "node_modules"],
   },
   lint: {
     ignorePatterns: [".output", "dist", "node_modules"],

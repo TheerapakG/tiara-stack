@@ -5,7 +5,7 @@ import { getModernMessageGuildId } from "@/handlers/message/shared";
 import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthGuildUser";
 import { MessageSlot } from "sheet-ingress-api/schemas/messageSlot";
 import { AuthorizationService, MessageSlotService } from "@/services";
-import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
+import { Unauthorized } from "typhoon-core/error";
 
 const missingMessageSlotError = () =>
   makeArgumentError("Cannot get message slot data, the message might not be registered");

@@ -1,5 +1,5 @@
 import { RpcMiddleware } from "effect/unstable/rpc";
-import { Unauthorized } from "dfx-discord-utils/discord/schema";
+import { Unauthorized } from "typhoon-core/error";
 
 export class SheetBotRpcAuthorization extends RpcMiddleware.Service<
   SheetBotRpcAuthorization,

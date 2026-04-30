@@ -5,7 +5,7 @@ import {
   requireMessageSlotReadAccess,
   requireMessageSlotUpsertAccess,
 } from "./http";
-import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
+import { Unauthorized } from "typhoon-core/error";
 import { MessageSlot } from "sheet-ingress-api/schemas/messageSlot";
 import { AuthorizationService, MessageSlotService } from "@/services";
 import { getFailure, liveGuildServices, withUser } from "@/test-utils/guildTestHelpers";

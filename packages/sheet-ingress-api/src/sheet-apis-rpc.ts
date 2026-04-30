@@ -14,7 +14,7 @@ import {
   MessageRoomOrderRange,
 } from "./schemas/messageRoomOrder";
 import { MessageSlot } from "./schemas/messageSlot";
-import { Unauthorized } from "./schemas/middlewares/unauthorized";
+import { Unauthorized } from "typhoon-core/error";
 import { CurrentUserPermissions } from "./schemas/permissions";
 import { RoomOrderGenerateResult } from "./schemas/roomOrder";
 import {

@@ -15,6 +15,9 @@ export default defineConfig({
         "plugins/kubernetes-oauth/client": fileURLToPath(
           new URL("./src/plugins/kubernetes-oauth/client.ts", import.meta.url),
         ),
+        "plugins/kubernetes-oauth/rpc-authorization": fileURLToPath(
+          new URL("./src/plugins/kubernetes-oauth/rpc-authorization.ts", import.meta.url),
+        ),
       },
       sourcemap: true,
       deps: {

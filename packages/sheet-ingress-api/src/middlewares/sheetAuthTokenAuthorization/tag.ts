@@ -1,5 +1,5 @@
 import { HttpApiMiddleware, HttpApiSecurity, OpenApi } from "effect/unstable/httpapi";
-import { Unauthorized } from "../../schemas/middlewares/unauthorized";
+import { Unauthorized } from "typhoon-core/error";
 import { SheetAuthUser } from "../../schemas/middlewares/sheetAuthUser";
 
 export class SheetAuthTokenAuthorization extends HttpApiMiddleware.Service<

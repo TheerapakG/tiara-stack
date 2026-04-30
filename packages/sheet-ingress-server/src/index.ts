@@ -25,10 +25,9 @@ import {
   HttpApiGroup,
   HttpApiSwagger,
 } from "effect/unstable/httpapi";
-import { Unauthorized as SheetBotUnauthorized } from "dfx-discord-utils/discord/schema";
 import { Api } from "sheet-ingress-api/api";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
-import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
+import { Unauthorized } from "typhoon-core/error";
 import { dotEnvConfigProviderLayer } from "typhoon-core/config";
 import { ArgumentError, makeArgumentError } from "typhoon-core/error";
 import { config } from "./config";
@@ -157,7 +156,7 @@ const proxySheetBot =
       } & Record<string, unknown>;
       const hasServicePermission = yield* hasServiceTokenFromRequest(requestArgs.request);
       if (!hasServicePermission) {
-        return yield* Effect.fail(new SheetBotUnauthorized({ message: "Unauthorized" }));
+        return yield* Effect.fail(new Unauthorized({ message: "Unauthorized" }));
       }
 
       const client = yield* SheetBotForwardingClient;

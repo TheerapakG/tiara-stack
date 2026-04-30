@@ -80,6 +80,7 @@
     "@discordjs/builders": "^1.13.1",
     "discord-api-types": "^0.38.38",
     "ts-mixer": "^6.0.4",
+    "typhoon-core": "workspace:*",
     "unstorage": "^1.17.4"
   },
   "devDependencies": {

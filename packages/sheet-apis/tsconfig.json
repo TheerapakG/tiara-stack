@@ -17,6 +17,9 @@
     "noEmit": true,
     "paths": {
       "sheet-apis/api-groups": ["./src/api-groups.ts"],
+      "sheet-auth/plugins/kubernetes-oauth/rpc-authorization": [
+        "../sheet-auth/src/plugins/kubernetes-oauth/rpc-authorization.ts"
+      ],
       "sheet-ingress-api/*": ["../sheet-ingress-api/src/*"],
       "*": ["./*"],
       "~~/*": ["./*"],

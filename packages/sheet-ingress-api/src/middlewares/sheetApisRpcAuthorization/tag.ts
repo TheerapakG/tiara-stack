@@ -1,6 +1,6 @@
 import { RpcMiddleware } from "effect/unstable/rpc";
 import { SheetAuthUser } from "../../schemas/middlewares/sheetAuthUser";
-import { Unauthorized } from "../../schemas/middlewares/unauthorized";
+import { Unauthorized } from "typhoon-core/error";
 
 export class SheetApisRpcAuthorization extends RpcMiddleware.Service<
   SheetApisRpcAuthorization,

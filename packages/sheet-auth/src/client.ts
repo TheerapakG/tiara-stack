@@ -1,7 +1,7 @@
 import { DateTime, Deferred, Effect, Option, Redacted, Schema } from "effect";
 import { createAuthClient } from "better-auth/client";
 import { Account, Session } from "./model";
-import { kubernetesOAuthClient, Permission } from "./plugins/kubernetes-oauth/client";
+import { kubernetesOAuthClient, type Permission } from "./plugins/kubernetes-oauth/client";
 
 // =============================================================================
 // 1. Errors

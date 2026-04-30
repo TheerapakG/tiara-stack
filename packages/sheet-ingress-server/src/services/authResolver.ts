@@ -5,7 +5,7 @@ import {
   type SheetAuthClient as SheetAuthClientValue,
 } from "sheet-auth/client";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
-import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
+import { Unauthorized } from "typhoon-core/error";
 import type { Permission, PermissionSet } from "sheet-ingress-api/schemas/permissions";
 import { SheetBotForwardingClient } from "./sheetBotForwardingClient";
 import { SheetAuthClient } from "./sheetAuthClient";

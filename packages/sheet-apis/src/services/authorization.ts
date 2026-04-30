@@ -7,7 +7,7 @@ import { Effect, HashSet, Layer, Option, Context } from "effect";
 import type { Permission, PermissionSet } from "sheet-ingress-api/schemas/permissions";
 import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthGuildUser";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
-import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
+import { Unauthorized } from "typhoon-core/error";
 import { GuildConfigService } from "./guildConfig";
 import { discordLayer } from "./discord";
 

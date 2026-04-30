@@ -5,7 +5,7 @@ import { getModernMessageGuildId } from "@/handlers/message/shared";
 import { MessageCheckin, MessageCheckinMember } from "sheet-ingress-api/schemas/messageCheckin";
 import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthGuildUser";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
-import { Unauthorized } from "sheet-ingress-api/schemas/middlewares/unauthorized";
+import { Unauthorized } from "typhoon-core/error";
 import { AuthorizationService, MessageCheckinService } from "@/services";
 
 const missingMessageCheckinError = () =>
