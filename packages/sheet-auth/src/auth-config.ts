@@ -21,7 +21,19 @@ interface CreateAuthOptions {
   secondaryStorageDriver: Driver;
 }
 
-export type Auth = BetterAuth<BetterAuthOptions>;
+type AuthPlugins = [
+  ReturnType<typeof bearer>,
+  ReturnType<typeof sessionToken>,
+  ReturnType<typeof jwt>,
+  ReturnType<typeof oauthProvider>,
+  ReturnType<typeof kubernetesOAuth>,
+];
+
+type AuthOptions = BetterAuthOptions & {
+  plugins: AuthPlugins;
+};
+
+export type Auth = BetterAuth<AuthOptions>;
 
 type BaseAuthOptions = Omit<CreateAuthOptions, "postgresUrl" | "secondaryStorageDriver"> & {
   db: ReturnType<typeof drizzle>;
@@ -42,8 +54,8 @@ function createBaseAuth({
   trustedOrigins,
   cookieDomain,
   secondaryStorage,
-}: BaseAuthOptions) {
-  return betterAuth({
+}: BaseAuthOptions): Auth {
+  const options: AuthOptions = {
     baseURL: baseUrl,
     basePath: "/",
     database: drizzleAdapter(db, { provider: "pg", schema }),
@@ -82,10 +94,12 @@ function createBaseAuth({
       },
     },
     trustedOrigins: trustedOrigins ?? [baseUrl],
-  });
+  };
+
+  return betterAuth(options);
 }
 
-export type AuthWithCleanup = ReturnType<typeof createBaseAuth> & CleanupMethods;
+export type AuthWithCleanup = Auth & CleanupMethods;
 
 export function authConfig({
   postgresUrl,
