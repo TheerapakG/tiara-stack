@@ -15,6 +15,7 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "paths": {
+      "vitest": ["./node_modules/vitest"],
       "*": ["./*"],
       "~~/*": ["./*"],
       "@@/*": ["./*"]

@@ -12,9 +12,7 @@ import {
   type ButtonInteraction,
 } from "discord.js";
 import {
-  BATCH_INTERVAL_MS,
   DIFF_TRUNCATION_LINES,
-  SAFE_SPLIT_THRESHOLD,
   DIFF_CONTEXT_LINES,
   STATUS_EMOJI,
   UPDATE_TYPE,
@@ -29,26 +27,22 @@ import {
 } from "../services/session";
 import { getDb, schema } from "../db/index";
 import { randomUUID } from "crypto";
-
-interface BatchEntry {
-  sessionId: string;
-  updateType: string;
-  content: string;
-}
-
-// Raw event data for merging before formatting
-// updateType is determined upfront so merging only happens for same output type
-interface RawBatchEntry {
-  sessionId: string;
-  updateType: "agent_message" | "agent_thought" | "todo" | "tool_call" | "diff";
-  deltas: string[]; // Accumulated deltas for merging
-  // For todo.updated, stores the latest todo list
-  todos?: Array<{ status: string; content: string }>;
-}
+import {
+  DiscordStreamingMessage,
+  findSafeSplitPoint,
+  type DiscordStreamThread,
+  type StreamAtomicEvent,
+  type StreamDelta,
+} from "./streaming";
 
 interface ServerInstance {
   url: string;
   close: () => void;
+}
+
+interface CachedStreamingMessage {
+  streamingMessage: DiscordStreamingMessage;
+  threadId: string;
 }
 
 // Generate a unique button ID using UUID v4
@@ -127,13 +121,11 @@ class VibecordClient {
   private client: OpencodeClient | null = null;
   private server: ServerInstance | null = null;
   private discordClient: Client | null = null;
-  private batch: Map<string, RawBatchEntry[]> = new Map();
-  private batchTimer: ReturnType<typeof setInterval> | null = null;
-  private batchIntervalMs = BATCH_INTERVAL_MS;
-  private isFlushing = false;
+  private streamingMessages: Map<string, CachedStreamingMessage> = new Map();
   private eventStreamAbort: AbortController | null = null;
   private activePrompts: Set<string> = new Set();
   private sessionDirectories: Map<string, string> = new Map();
+  private readonly logger: Pick<Console, "warn"> = console;
 
   setDiscordClient(client: Client): void {
     this.discordClient = client;
@@ -164,7 +156,7 @@ class VibecordClient {
     return null;
   }
 
-  // Tool part formatting (used when we add tool handling to raw batch)
+  // Tool part formatting for completed tool events.
   private formatToolPart(
     part: ToolPart & { state: ToolStateCompleted },
   ): { type: string; content: string } | null {
@@ -269,294 +261,66 @@ class VibecordClient {
     return { lines: result };
   }
 
-  private formatEntryToLines(entry: BatchEntry): string[] {
-    const { updateType, content } = entry;
-
-    switch (updateType) {
-      case UPDATE_TYPE.AGENT_MESSAGE: {
-        // Regular text - split by lines, each line is a separate unit
-        return content.split("\n");
-      }
-      case UPDATE_TYPE.AGENT_THOUGHT: {
-        // Thinking/reasoning - add "-# " prefix to each line
-        return content.split("\n").map((line) => (line.length > 0 ? `-# ${line}` : line));
-      }
-      case UPDATE_TYPE.TOOL_CALL: {
-        // Tool calls are atomic - single line
-        return [`\`tool used ${content}\``];
-      }
-      case UPDATE_TYPE.DIFF: {
-        // Diffs are atomic - keep as single unit (already has code blocks)
-        return [content];
-      }
-      case UPDATE_TYPE.TODO: {
-        // Todo lists are atomic
-        return [`[todo]\n${content}`];
-      }
-      case UPDATE_TYPE.USER_MESSAGE: {
-        // User messages - wrap in bold, split by lines
-        return content.split("\n").map((line) => (line.length > 0 ? `**${line}**` : line));
-      }
-      default: {
-        return content.split("\n");
-      }
-    }
-  }
-
-  private startBatchTimer(): void {
-    if (this.batchTimer) return;
-
-    this.batchTimer = setInterval(() => {
-      void this.flushBatch(false);
-    }, this.batchIntervalMs);
-  }
-
-  private stopBatchTimer(): void {
-    if (this.batchTimer) {
-      clearInterval(this.batchTimer);
-      this.batchTimer = null;
-    }
-  }
-
-  private async flushBatch(forceAll = false): Promise<void> {
-    // Prevent concurrent flushes
-    if (this.isFlushing) return;
-    this.isFlushing = true;
-
-    try {
-      // If there's nothing to flush, return early
-      if (this.batch.size === 0) {
-        this.stopBatchTimer();
-        return;
-      }
-
-      // Take current batch and replace with new empty one
-      const currentBatch = this.batch;
-      this.batch = new Map();
-
-      // Process each session's batch
-      for (const [sessionId, rawEntries] of currentBatch) {
-        const thread = await this.getThreadForSession(sessionId);
-        if (!thread) continue;
-
-        // Split into complete and incomplete entries
-        const { complete, incomplete } = this.splitCompleteAndIncomplete(
-          rawEntries,
-          forceAll || !this.activePrompts.has(sessionId),
+  private getStreamingMessage(sessionId: string, thread: ThreadChannel): DiscordStreamingMessage {
+    const cached = this.streamingMessages.get(sessionId);
+    if (cached) {
+      if (cached.threadId !== thread.id) {
+        this.logger.warn(
+          `[SDK] Streaming thread changed for session ${sessionId}; updating active stream target`,
+          { nextThreadId: thread.id, previousThreadId: cached.threadId },
         );
-
-        // Put incomplete entries back into batch for next flush
-        if (incomplete.length > 0) {
-          const existing = this.batch.get(sessionId);
-          if (existing) {
-            existing.unshift(...incomplete);
-          } else {
-            this.batch.set(sessionId, [...incomplete]);
-          }
-          // Restart timer since we have pending entries
-          this.startBatchTimer();
-        }
-
-        // Format and send complete entries
-        if (complete.length > 0) {
-          const formattedEntries = this.formatRawEntries(complete, sessionId);
-          const concatenatedEntries = this.concatenateEntries(formattedEntries);
-          if (concatenatedEntries.length > 0) {
-            await this.sendEntriesAsLineBasedMessages(
-              concatenatedEntries,
-              thread,
-              DISCORD_MESSAGE_MAX_LENGTH,
-            );
-          }
-        }
+        cached.streamingMessage.updateThread(thread as unknown as DiscordStreamThread);
+        cached.threadId = thread.id;
       }
-    } finally {
-      this.isFlushing = false;
-    }
-  }
-
-  private splitCompleteAndIncomplete(
-    entries: RawBatchEntry[],
-    forceAll: boolean,
-  ): { complete: RawBatchEntry[]; incomplete: RawBatchEntry[] } {
-    if (forceAll || entries.length === 0) {
-      return { complete: entries, incomplete: [] };
+      return cached.streamingMessage;
     }
 
-    // Find the last entry that is "complete" (safe to split after)
-    let lastCompleteIndex = -1;
-    for (let i = entries.length - 1; i >= 0; i--) {
-      const entry = entries[i];
-
-      // Atomic types are always complete
-      if (entry.updateType === UPDATE_TYPE.TODO || entry.updateType === UPDATE_TYPE.DIFF) {
-        lastCompleteIndex = i;
-        break;
-      }
-
-      // Check if this entry is followed by a different type
-      const nextEntry = entries[i + 1];
-      if (nextEntry && nextEntry.updateType !== entry.updateType) {
-        lastCompleteIndex = i;
-        break;
-      }
-
-      // Check if content ends at a safe boundary
-      const content = entry.deltas.join("");
-      if (this.isAtSafeBoundary(content)) {
-        lastCompleteIndex = i;
-        break;
-      }
-    }
-
-    if (lastCompleteIndex === entries.length - 1) {
-      // Last entry is complete
-      return { complete: entries, incomplete: [] };
-    } else if (lastCompleteIndex >= 0) {
-      // Some entries are complete, rest are incomplete
-      return {
-        complete: entries.slice(0, lastCompleteIndex + 1),
-        incomplete: entries.slice(lastCompleteIndex + 1),
-      };
-    } else {
-      // No complete entries
-      return { complete: [], incomplete: entries };
-    }
-  }
-
-  private isAtSafeBoundary(content: string): boolean {
-    // Must end with newline to avoid mid-line cuts
-    if (!content.endsWith("\n")) return false;
-
-    // Check if we're inside a code block (odd number of ```)
-    const codeBlockMatches = content.match(/```/g);
-    const inCodeBlock = codeBlockMatches ? codeBlockMatches.length % 2 !== 0 : false;
-    if (inCodeBlock) return false;
-
-    return true;
-  }
-
-  private formatRawEntries(rawEntries: RawBatchEntry[], sessionId: string): BatchEntry[] {
-    return rawEntries.map((raw) => {
-      if (raw.updateType === UPDATE_TYPE.TODO && raw.todos) {
-        const planContent = raw.todos
-          .map((t) => {
-            const status =
-              t.status === SESSION_STATUS.COMPLETED
-                ? STATUS_EMOJI.COMPLETED
-                : t.status === SESSION_STATUS.IN_PROGRESS
-                  ? STATUS_EMOJI.IN_PROGRESS
-                  : STATUS_EMOJI.PENDING;
-            return `${status} ${t.content}`;
-          })
-          .join("\n");
-        return { sessionId, updateType: UPDATE_TYPE.TODO, content: planContent };
-      }
-      // For message types, just join the deltas
-      const mergedContent = raw.deltas.join("");
-      return { sessionId, updateType: raw.updateType, content: mergedContent };
+    const streamingMessage = new DiscordStreamingMessage({
+      logger: this.logger,
+      thread: thread as unknown as DiscordStreamThread,
     });
+    this.streamingMessages.set(sessionId, {
+      streamingMessage,
+      threadId: thread.id,
+    });
+    return streamingMessage;
   }
 
-  private concatenateEntries(entries: BatchEntry[]): BatchEntry[] {
-    const result: BatchEntry[] = [];
-    let currentRun: BatchEntry[] = [];
+  private async pushStreamDelta(delta: StreamDelta): Promise<void> {
+    const thread = await this.getThreadForSession(delta.sessionId);
+    if (!thread) return;
 
-    const pushCurrentRun = () => {
-      if (currentRun.length === 0) return;
-      if (currentRun.length === 1) {
-        result.push(currentRun[0]);
-      } else {
-        const first = currentRun[0];
-        const shouldNotConcat = first.updateType === UPDATE_TYPE.DIFF;
-        const shouldCommaConcat = first.updateType === UPDATE_TYPE.TOOL_CALL;
-
-        if (shouldNotConcat) {
-          result.push(...currentRun);
-        } else if (shouldCommaConcat) {
-          const concatenated = currentRun.map((e) => e.content).join(", ");
-          result.push({ ...first, content: concatenated });
-        } else {
-          const concatenated = currentRun.map((e) => e.content).join("");
-          result.push({ ...first, content: concatenated });
-        }
-      }
-      currentRun = [];
-    };
-
-    for (const entry of entries) {
-      if (currentRun.length === 0 || entry.updateType === currentRun[0].updateType) {
-        currentRun.push(entry);
-      } else {
-        pushCurrentRun();
-        currentRun.push(entry);
-      }
-    }
-    pushCurrentRun();
-
-    return result;
+    await this.getStreamingMessage(delta.sessionId, thread).pushDelta(delta);
   }
 
-  private async sendEntriesAsLineBasedMessages(
-    entries: BatchEntry[],
-    thread: ThreadChannel,
-    maxLength: number,
-  ): Promise<void> {
-    const textEntries: BatchEntry[] = [];
-    const todoEntries: BatchEntry[] = [];
+  private async flushStreamingMessage(sessionId: string): Promise<void> {
+    const cached = this.streamingMessages.get(sessionId);
+    if (!cached) return;
 
-    // Separate text and todo entries
-    for (const entry of entries) {
-      if (entry.updateType === UPDATE_TYPE.TODO) {
-        todoEntries.push(entry);
-      } else {
-        textEntries.push(entry);
+    await cached.streamingMessage.flushAndReset();
+    this.streamingMessages.delete(sessionId);
+  }
+
+  private async sendAtomicEvent(event: StreamAtomicEvent): Promise<void> {
+    const thread = await this.getThreadForSession(event.sessionId);
+    if (!thread) return;
+
+    await this.flushStreamingMessage(event.sessionId);
+
+    if (event.updateType === UPDATE_TYPE.TODO) {
+      if (event.todos && event.todos.length > 0) {
+        await this.sendEmbed(this.createTodoEmbed(event.todos), thread);
       }
+      return;
     }
 
-    // Send todo entries as embeds
-    for (const todoEntry of todoEntries) {
-      const todos = todoEntry.content
-        .split("\n")
-        .map((line) => {
-          const match = line.match(/^([✓◐○])\s+(.+)$/);
-          if (match) {
-            const status =
-              match[1] === STATUS_EMOJI.COMPLETED
-                ? SESSION_STATUS.COMPLETED
-                : match[1] === STATUS_EMOJI.IN_PROGRESS
-                  ? SESSION_STATUS.IN_PROGRESS
-                  : "pending";
-            return { status, content: match[2] };
-          }
-          return { status: "pending", content: line };
-        })
-        .filter((t) => t.content.length > 0);
-
-      if (todos.length > 0) {
-        const embed = this.createTodoEmbed(todos);
-        await this.sendEmbed(embed, thread);
-      }
+    if (event.updateType === UPDATE_TYPE.TOOL_CALL && event.content) {
+      await this.sendTextContent(`\`tool used ${event.content}\``, thread);
+      return;
     }
 
-    // Process text entries as before
-    if (textEntries.length === 0) return;
-
-    // Format entries (adds -# prefix for thoughts, etc.)
-    const lines: string[] = [];
-    for (const entry of textEntries) {
-      lines.push(...this.formatEntryToLines(entry));
-    }
-
-    // Build formatted content
-    const fullContent = lines.join("\n");
-    if (fullContent.length === 0) return;
-
-    // Split into safe chunks
-    const chunks = this.splitIntoSafeChunks(fullContent, maxLength);
-
-    for (const chunk of chunks) {
-      await this.sendChunk(chunk, thread);
+    if (event.updateType === UPDATE_TYPE.DIFF && event.content) {
+      await this.sendTextContent(event.content, thread);
     }
   }
 
@@ -579,64 +343,17 @@ class VibecordClient {
   }
 
   private findSafeSplitPoint(content: string, maxLength: number): number {
-    // Look for split points in priority order
-    const searchEnd = Math.min(maxLength, content.length);
-    const searchStart = Math.max(0, Math.floor(maxLength * SAFE_SPLIT_THRESHOLD));
-
-    // Priority 1: Code block boundary (```)
-    let inCodeBlock = false;
-    for (let i = 0; i < searchEnd; i++) {
-      if (content.substring(i, i + 3) === "```") {
-        inCodeBlock = !inCodeBlock;
-        if (!inCodeBlock && i >= searchStart && i + 3 <= searchEnd) {
-          // Found end of code block within safe range
-          return i + 3;
-        }
-      }
-    }
-
-    // Priority 2: Paragraph break (double newline)
-    for (let i = searchEnd - 1; i >= searchStart; i--) {
-      if (content.substring(i, i + 2) === "\n\n") {
-        return i + 2;
-      }
-    }
-
-    // Priority 3: Sentence end (. ! ?) followed by space or newline
-    for (let i = searchEnd - 1; i >= searchStart; i--) {
-      const char = content[i];
-      const nextChar = content[i + 1];
-      if (
-        (char === "." || char === "!" || char === "?") &&
-        (nextChar === " " || nextChar === "\n" || i + 1 === content.length)
-      ) {
-        return i + 1;
-      }
-    }
-
-    // Priority 4: Line break
-    for (let i = searchEnd - 1; i >= searchStart; i--) {
-      if (content[i] === "\n") {
-        return i + 1;
-      }
-    }
-
-    // Priority 5: Word boundary (space)
-    for (let i = searchEnd - 1; i >= searchStart; i--) {
-      if (content[i] === " ") {
-        return i + 1;
-      }
-    }
-
-    // Fallback: hard split at maxLength
-    return maxLength;
+    return findSafeSplitPoint(content, maxLength);
   }
 
-  private async sendChunk(content: string, thread: ThreadChannel): Promise<void> {
-    try {
-      await thread.send(content);
-    } catch {
-      // Silently fail - thread may have been deleted
+  private async sendTextContent(content: string, thread: ThreadChannel): Promise<void> {
+    const chunks = this.splitIntoSafeChunks(content, DISCORD_MESSAGE_MAX_LENGTH);
+    for (const chunk of chunks) {
+      try {
+        await thread.send(chunk);
+      } catch {
+        // Silently fail - thread may have been deleted
+      }
     }
   }
 
@@ -688,7 +405,7 @@ class VibecordClient {
       const idleSessionId = event.properties.sessionID;
       this.activePrompts.delete(idleSessionId);
       // Flush immediately to avoid delay in showing final response
-      void this.flushBatch(true);
+      await this.flushStreamingMessage(idleSessionId);
       return;
     }
 
@@ -748,54 +465,49 @@ class VibecordClient {
 
     if (!sessionId) return;
 
-    // Extract raw data for merging, defer formatting
-    const rawEntry = this.extractRawEvent(event, sessionId);
-    if (!rawEntry) return;
-
-    // Try to merge with previous entry of same type
-    const existing = this.batch.get(sessionId);
-    if (existing && existing.length > 0) {
-      const lastEntry = existing[existing.length - 1];
-      if (this.canMergeEntries(lastEntry, rawEntry)) {
-        // Merge deltas
-        lastEntry.deltas.push(...rawEntry.deltas);
-        if (rawEntry.todos) {
-          lastEntry.todos = rawEntry.todos;
-        }
-      } else {
-        existing.push(rawEntry);
-      }
-    } else {
-      this.batch.set(sessionId, [rawEntry]);
+    const streamDelta = this.extractStreamDelta(event, sessionId);
+    if (streamDelta) {
+      await this.pushStreamDelta(streamDelta);
+      return;
     }
 
-    // Start batch timer if not already running
-    this.startBatchTimer();
+    const atomicEvent = this.extractAtomicEvent(event, sessionId);
+    if (atomicEvent) {
+      await this.sendAtomicEvent(atomicEvent);
+    }
   }
 
-  private extractRawEvent(event: Event, sessionId: string): RawBatchEntry | null {
+  private extractStreamDelta(event: Event, sessionId: string): StreamDelta | null {
+    if (event.type !== "message.part.updated") {
+      return null;
+    }
+
+    const part = event.properties.part;
+    if (part.type !== "text" && part.type !== "reasoning") {
+      return null;
+    }
+
+    const delta = (event.properties as { delta?: string }).delta;
+    const content = delta ?? "";
+    if (content === "") {
+      return null;
+    }
+
+    return {
+      sessionId,
+      kind: part.type === "text" ? "text" : "reasoning",
+      text: content,
+      partId:
+        "id" in part && typeof part.id === "string"
+          ? part.id
+          : `${sessionId}:${part.type === "text" ? "text" : "reasoning"}`,
+    };
+  }
+
+  private extractAtomicEvent(event: Event, sessionId: string): StreamAtomicEvent | null {
     switch (event.type) {
       case "message.part.updated": {
         const part = event.properties.part;
-
-        if (part.type === "text" || part.type === "reasoning") {
-          const delta = (event.properties as { delta?: string }).delta;
-          const content = delta ?? "";
-          if (content === "") return null;
-
-          if (part.type === "text") {
-            return {
-              sessionId,
-              updateType: UPDATE_TYPE.AGENT_MESSAGE,
-              deltas: [content],
-            };
-          }
-          return {
-            sessionId,
-            updateType: UPDATE_TYPE.AGENT_THOUGHT,
-            deltas: [content],
-          };
-        }
 
         if (part.type === "tool") {
           if (part.state.status === "completed") {
@@ -804,7 +516,7 @@ class VibecordClient {
               return {
                 sessionId,
                 updateType: formatted.type as "diff" | "tool_call",
-                deltas: [formatted.content],
+                content: formatted.content,
               };
             }
           }
@@ -818,7 +530,6 @@ class VibecordClient {
           return {
             sessionId,
             updateType: UPDATE_TYPE.TODO,
-            deltas: [],
             todos: todos.map((t: { status: string; content: string }) => ({
               status: t.status,
               content: t.content,
@@ -830,12 +541,6 @@ class VibecordClient {
       default:
         return null;
     }
-  }
-
-  private canMergeEntries(a: RawBatchEntry, b: RawBatchEntry): boolean {
-    // Only merge same updateType, and only message types (not todos or tool calls)
-    if (a.updateType !== b.updateType) return false;
-    return a.updateType === UPDATE_TYPE.AGENT_MESSAGE || a.updateType === UPDATE_TYPE.AGENT_THOUGHT;
   }
 
   // Create an embed for displaying todo lists
@@ -1699,10 +1404,12 @@ class VibecordClient {
   }
 
   async disconnect(): Promise<void> {
-    this.stopBatchTimer();
-
-    // Flush all remaining entries (forceAll=true to send everything)
-    await this.flushBatch();
+    await Promise.all(
+      Array.from(this.streamingMessages.values()).map((cached) =>
+        cached.streamingMessage.flushAndReset(),
+      ),
+    );
+    this.streamingMessages.clear();
 
     if (this.eventStreamAbort) {
       this.eventStreamAbort.abort();

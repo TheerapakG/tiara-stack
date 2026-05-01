@@ -18,10 +18,12 @@ export const APPLICATION_COMMAND_OPTION_TYPE = {
   ATTACHMENT: 11,
 } as const;
 
-// Batch Processing Constants
-export const BATCH_INTERVAL_MS = 1000;
+// Output Processing Constants
 export const DIFF_TRUNCATION_LINES = 10;
 export const SAFE_SPLIT_THRESHOLD = 0.7; // Don't go below 70% of max length when searching for split point
+export const DISCORD_STREAM_EDIT_INTERVAL_MS = 500;
+export const DISCORD_STREAM_SEGMENT_MAX_LENGTH = 1900;
+export const STREAM_CHUNKING_MODE = "word";
 
 // Diff Formatting Constants
 export const DIFF_CONTEXT_LINES = 1;
