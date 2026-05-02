@@ -8,7 +8,7 @@ This monorepo contains the following packages:
 
 ### `typhoon-core` (packages/typhoon-core)
 
-Shared utilities library providing schema transformation helpers, standardized error types, and common utilities used across the monorepo.
+Shared utilities library providing schema transformation helpers, standardized error types, config helpers, and common utilities used across the monorepo.
 
 **Dependencies**: `@standard-schema/spec` (peer: `effect`)
 
@@ -24,7 +24,21 @@ Shared Rocicorp Zero integration library providing typed Zero API definitions, E
 
 Backend API server for Google Sheets integration using Effect's HttpApiBuilder, providing HTTP API handlers for sheet operations, calculations, guild configuration, and message management.
 
-**Dependencies**: Effect ecosystem, `@googleapis/sheets`, `@rocicorp/zero`, Playwright, `sheet-db-schema`, `sheet-auth`, `typhoon-core`, `typhoon-zero`, `dfx`, `dfx-discord-utils`
+**Dependencies**: Effect ecosystem, `@googleapis/sheets`, `@rocicorp/zero`, Playwright, `sheet-auth`, `sheet-db-schema`, `sheet-ingress-api`, `dfx-discord-utils`, `typhoon-core`, `typhoon-zero`
+
+### `sheet-ingress-api` (packages/sheet-ingress-api)
+
+Shared Effect HttpApi contract and schema package for sheet ingress routes. It exposes sheet API groups, Discord application/cache API groups, middleware tags, request/response schemas, `SheetApisApi`, and `SheetApisRpcs`.
+
+**Dependencies**: `dfx-discord-utils`, `typhoon-core`, `typhoon-zero` (peer: `effect`)
+
+**Exports**: `.`, `./api`, `./api-groups`, middleware tag exports, `./sheet-apis`, `./sheet-apis-rpc`, `./schemas/*`
+
+### `sheet-ingress-server` (packages/sheet-ingress-server)
+
+Ingress/proxy server that fronts sheet API and sheet bot/Discord routes. It handles authorization, CORS, telemetry, auth resolution, message lookup, and forwarding to `sheet-apis` and sheet bot services.
+
+**Dependencies**: Effect platform/node/opentelemetry stack, `sheet-auth`, `sheet-ingress-api`, `dfx-discord-utils`, `typhoon-core`
 
 ### `sheet-db-server` (packages/sheet-db-server)
 
@@ -36,41 +50,41 @@ Database server providing Zero (real-time sync) HTTP API for the sheet database 
 
 Database schema definitions using Drizzle ORM for PostgreSQL with Zero integration.
 
-**Dependencies**: `@rocicorp/zero`, `drizzle-orm`, `drizzle-zero`, `postgres`, `typhoon-core`, `typhoon-zero`, `effect`
+**Dependencies**: `@rocicorp/zero`, `drizzle-orm`, `drizzle-zero`, `postgres`, `typhoon-core`, `typhoon-zero` (peer: `effect`)
 
 ### `sheet-auth` (packages/sheet-auth)
 
 Authentication service using BetterAuth for Discord OAuth, JWT tokens, and Kubernetes OAuth integration.
 
-**Dependencies**: Effect ecosystem, `better-auth`, `@better-auth/oauth-provider`, `hono`, `@hono/node-server`, `drizzle-orm`, `postgres`, `ioredis`, `unstorage`, `jose`
+**Dependencies**: Effect ecosystem, `better-auth`, `@better-auth/oauth-provider`, `hono`, `@hono/node-server`, `drizzle-orm`, `postgres`, `ioredis`, `unstorage`, `jose`, `typhoon-core`
 
-**Peer Dependencies**: `@better-fetch/fetch`, `@standard-schema/spec`, `nanostores`
+**Peer Dependencies**: `@better-fetch/fetch`, `@effect/opentelemetry`, `@standard-schema/spec`, `effect`, `nanostores`
 
-**Exports**: `.`, `./client`, `./schema`, `./server`, `./plugins/kubernetes-oauth`, `./plugins/kubernetes-oauth/client`
+**Exports**: `.`, `./client`, `./model`, `./schema`, `./server`, `./plugins/kubernetes-oauth`, `./plugins/kubernetes-oauth/client`, `./plugins/kubernetes-oauth/rpc-authorization`
 
 ### `sheet-web` (packages/sheet-web)
 
 Web application for the sheet system built with TanStack Start, providing a dashboard for guild management, scheduling, and calendar views.
 
-**Dependencies**: TanStack Start/React ecosystem, Effect, `better-auth`, `sheet-apis`, `sheet-auth`, `start-atom`, `typhoon-core`, `typhoon-zero`, shadcn/ui components, Recharts
+**Dependencies**: TanStack Start/React ecosystem, Effect, `better-auth`, `sheet-apis` (workspace/type-level API dependency; runtime HTTP calls go through ingress), `sheet-auth`, `sheet-ingress-api`, `start-atom`, `typhoon-core`, `typhoon-zero`, shadcn/ui components, Recharts
 
 ### `sheet-bot` (packages/sheet-bot)
 
-Discord bot application that integrates with sheet-apis to provide Discord commands and interactions.
+Discord bot application that uses the shared ingress API contracts to provide Discord commands and interactions for sheet workflows.
 
-**Dependencies**: Effect ecosystem, `dfx`, `dfx-discord-utils`, `discord-api-types`, `@discordjs/builders`, `ts-mixer`, `handlebars`, `sheet-apis`, `sheet-auth`, `sheet-db-schema`, `typhoon-core`
+**Dependencies**: Effect ecosystem, `dfx`, `dfx-discord-utils`, `discord-api-types`, `@discordjs/builders`, `ts-mixer`, `handlebars`, `sheet-auth`, `sheet-db-schema`, `sheet-ingress-api`, `typhoon-core`
 
 ### `sheet-formulas` (packages/sheet-formulas)
 
 Google Apps Script formulas library for performing calculations and operations on Google Sheets. Deployed as a Google Apps Script project.
 
-**Dependencies**: Effect, `@effect/platform`, `effect-platform-apps-script`, `sheet-apis`, `typhoon-core`
+**Dependencies**: Effect, `core-js`, `effect-platform-apps-script`, `sheet-ingress-api`, `typhoon-core`
 
 ### `vibecord` (packages/vibecord)
 
 Discord bot application for VibeCord, providing workspace and session management with ACP (Agent Client Protocol) integration.
 
-**Dependencies**: `discord.js`, `drizzle-orm`, `@effect/sql-drizzle`, `better-sqlite3`, `@opencode-ai/sdk`, `simple-git`, `diff`, `c12`, `effect`
+**Dependencies**: `discord-api-types`, `dfx`, `dfx-discord-utils`, `drizzle-orm`, `better-sqlite3`, `@opencode-ai/sdk`, `simple-git`, `diff`, `c12`, `remend`, `effect`
 
 **Database Scripts**: `db:generate`, `db:migrate`, `db:push`, `db:studio`
 
@@ -88,15 +102,15 @@ Configuration builder utility library for building type-safe configuration objec
 
 Discord utilities library extending dfx (Discord Effect) with caching, command builders, and interaction helpers.
 
-**Dependencies**: `@discordjs/builders`, `discord-api-types`, `ts-mixer`, `unstorage`
+**Dependencies**: `@discordjs/builders`, `discord-api-types`, `ts-mixer`, `typhoon-core`, `unstorage`
 
-**Peer Dependencies**: `effect`, `@effect/platform`, `@effect/platform-node`, `dfx`
+**Peer Dependencies**: `effect`, `@effect/platform-node`, `dfx`
 
 ### `effect-platform-apps-script` (packages/effect-platform-apps-script)
 
 Effect Platform HTTP client implementation for Google Apps Script environment.
 
-**Peer Dependencies**: `effect`, `@effect/platform`
+**Peer Dependencies**: `effect`
 
 **Dev Dependencies**: `@types/google-apps-script`
 
@@ -104,9 +118,9 @@ Effect Platform HTTP client implementation for Google Apps Script environment.
 
 Integration library connecting TanStack Start with Effect Atom for server-side rendering (SSR) compatible state management.
 
-**Dependencies**: `@effect-atom/atom-react`, `@tanstack/router-core`
+**Dependencies**: `@tanstack/router-core`
 
-**Peer Dependencies**: `effect`, `react`, `@tanstack/react-router`, `@tanstack/react-start`, `@tanstack/router-core`
+**Peer Dependencies**: `@effect/atom-react`, `effect`, `react`, `@tanstack/react-router`, `@tanstack/react-start`, `@tanstack/router-core`
 
 ## Workspace Scripts
 
@@ -186,70 +200,82 @@ We use Graphite for managing stacked pull requests. The following guidelines are
 
 ### Effect.ts
 
-This project utilizes the Effect library for composability and type-safety. The version of the library being used is 3.19.8. Use Effect/Schema for runtime validation except existing code use other validation library, or otherwise stated.
+This project utilizes the Effect library for composability and type-safety. The catalog version of the library being used is 4.0.0-beta.56. Use Effect/Schema for runtime validation except where existing code uses another validation library, or otherwise stated.
 
 ### Arktype
 
 This project utilizes the ArkType library for runtime type validation in some limited case. The version of the library being used is 2.1.19.
 
+### vite-plus
+
+This project uses vite-plus (`vp`) for monorepo build, lint, format, and test tooling. The catalog version is 0.1.15.
+
 ## Package Dependency Graph
 
 ```
 sheet-web
-  ├─ sheet-apis
+  ├─ sheet-apis (workspace/type-level dependency; runtime HTTP calls go through ingress)
   ├─ sheet-auth
   ├─ sheet-ingress-api
   ├─ start-atom
   ├─ typhoon-core
   └─ typhoon-zero
 
+sheet-apis
+  ├─ sheet-auth
+  ├─ sheet-db-schema
+  ├─ sheet-ingress-api
+  ├─ dfx-discord-utils
+  ├─ typhoon-core
+  └─ typhoon-zero
+
+sheet-bot
+  ├─ sheet-auth
+  ├─ sheet-db-schema
+  ├─ sheet-ingress-api
+  ├─ dfx-discord-utils
+  └─ typhoon-core
+
+sheet-formulas
+  ├─ sheet-ingress-api
+  ├─ effect-platform-apps-script
+  └─ typhoon-core
+
 sheet-ingress-server
   ├─ sheet-auth
   ├─ sheet-ingress-api
-  ├─ typhoon-core
-  └─ dfx-discord-utils
+  ├─ dfx-discord-utils
+  └─ typhoon-core
 
 sheet-ingress-api
+  ├─ dfx-discord-utils
   ├─ typhoon-core
-  ├─ typhoon-zero
-  └─ dfx-discord-utils
-
-sheet-bot
-  ├─ sheet-apis
-  ├─ sheet-auth
-  ├─ sheet-db-schema
-  ├─ typhoon-core
-  └─ dfx-discord-utils
-
-sheet-apis
-  ├─ sheet-db-schema
-  ├─ sheet-auth
-  ├─ typhoon-core
-  ├─ typhoon-zero
-  └─ dfx-discord-utils
+  └─ typhoon-zero
+  (peer dependency: effect)
 
 sheet-db-server
   ├─ sheet-db-schema
   ├─ typhoon-core
   └─ typhoon-zero
 
-sheet-formulas
-  ├─ sheet-apis
-  ├─ effect-platform-apps-script
-  └─ typhoon-core
-
 sheet-db-schema
   ├─ typhoon-core
   └─ typhoon-zero
+  (peer dependency: effect)
+
+sheet-auth
+  └─ typhoon-core
 
 dfx-discord-utils
-  (peer dependencies: effect, dfx)
+  └─ typhoon-core
+  (peer dependencies: effect, @effect/platform-node, dfx)
 
 start-atom
-  (peer dependencies: effect, react, @tanstack/react-router)
+  └─ @tanstack/router-core
+  (peer dependencies: @effect/atom-react, effect, react, @tanstack/react-router, @tanstack/react-start, @tanstack/router-core)
 
 effect-platform-apps-script
-  (peer dependencies: effect, @effect/platform)
+  (peer dependency: effect)
 
 bob
   (no workspace dependencies)
@@ -262,5 +288,5 @@ typhoon-zero
   (peer dependency: effect)
 
 vibecord
-  (standalone, no workspace dependencies)
+  └─ dfx-discord-utils
 ```
