@@ -31,14 +31,16 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@effect/sql-drizzle": "^0.48.0",
+    "@effect/platform-node": "catalog:",
     "@opencode-ai/sdk": "^1.1.64",
     "better-sqlite3": "^12.6.2",
     "c12": "^3.3.3",
+    "dfx": "catalog:",
+    "dfx-discord-utils": "workspace:*",
     "diff": "^8.0.3",
-    "discord.js": "^14.18.0",
+    "discord-api-types": "^0.38.38",
     "drizzle-orm": "^0.45.1",
-    "effect": "^3.19.8",
+    "effect": "catalog:",
     "remend": "^1.3.0",
     "simple-git": "^3.30.0"
   },

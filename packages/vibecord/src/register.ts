@@ -1,26 +1,26 @@
-import { REST, Routes } from "discord.js";
-import { Config } from "./config/config";
-import { commands } from "./commands";
-import { Effect, pipe } from "effect";
-import { DISCORD_API_VERSION } from "./constants";
+import { NodeHttpClient, NodeRuntime } from "@effect/platform-node";
+import { DiscordREST, DiscordRESTMemoryLive } from "dfx";
+import { Effect, Layer, pipe } from "effect";
+import { sessionCommandData, workspaceCommandData } from "./commands";
+import { DiscordApplication } from "dfx-discord-utils/discord";
+import { discordApplicationLayer } from "./discord/application";
+import { discordConfigLayer } from "./discord/config";
 
-const program = pipe(
-  Effect.gen(function* () {
-    const config = yield* Config;
+const program = Effect.gen(function* () {
+  const application = yield* DiscordApplication;
+  const rest = yield* DiscordREST;
+  const commands = yield* Effect.all([workspaceCommandData, sessionCommandData]);
 
-    const rest = new REST({ version: DISCORD_API_VERSION }).setToken(config.discordToken);
+  console.log("Started refreshing application (/) commands.");
+  yield* rest.bulkSetApplicationCommands(application.id, commands);
+  console.log("Successfully reloaded application (/) commands.");
+});
 
-    console.log("Started refreshing application (/) commands.");
-
-    yield* Config.use(async (config) => {
-      await rest.put(Routes.applicationCommands(config.discordClientId), {
-        body: commands.map((cmd) => cmd.data.toJSON()),
-      });
-    });
-
-    console.log("Successfully reloaded application (/) commands.");
-  }),
-  Effect.provide(Config.Default),
+pipe(
+  program,
+  Effect.provide(discordApplicationLayer),
+  Effect.provide(DiscordRESTMemoryLive.pipe(Layer.provide(discordConfigLayer))),
+  Effect.provide(NodeHttpClient.layerFetch),
+  Effect.scoped,
+  NodeRuntime.runMain(),
 );
-
-void Effect.runPromise(program);

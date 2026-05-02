@@ -1,16 +1,12 @@
 import { createOpencode, ToolPart, ToolStateCompleted } from "@opencode-ai/sdk/v2";
 import type { OpencodeClient, Event } from "@opencode-ai/sdk/v2";
+import type { Discord } from "dfx";
+import type { DiscordRestService } from "dfx/DiscordREST";
+import type { APIEmbed } from "discord-api-types/v10";
+import { ButtonStyle, ComponentType, MessageFlags } from "discord-api-types/v10";
 import * as Diff from "diff";
 import { eq } from "drizzle-orm";
-import {
-  Client,
-  ThreadChannel,
-  EmbedBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ActionRowBuilder,
-  type ButtonInteraction,
-} from "discord.js";
+import { Effect } from "effect";
 import {
   DIFF_TRUNCATION_LINES,
   DIFF_CONTEXT_LINES,
@@ -38,6 +34,38 @@ import {
 interface ServerInstance {
   url: string;
   close: () => void;
+}
+
+type RestThread = DiscordStreamThread & {
+  readonly id: string;
+};
+
+type DiscordMessageActionRow = Discord.ActionRowComponentForMessageRequest;
+type DiscordMessageButton = Discord.ButtonComponentForMessageRequest;
+type MutableDiscordMessageActionRow = Omit<DiscordMessageActionRow, "components"> & {
+  components: DiscordMessageButton[];
+};
+type RunDiscordEffect = <A, E>(effect: Effect.Effect<A, E, never>) => Promise<A>;
+
+export interface VibecordButtonInteraction {
+  readonly customId: string;
+  readonly userId: string;
+  readonly message: {
+    readonly components: ReadonlyArray<Discord.ActionRowComponentResponse>;
+  };
+  readonly reply: (payload: {
+    readonly content: string;
+    readonly flags?: MessageFlags;
+    readonly ephemeral?: boolean;
+  }) => Promise<void>;
+  readonly update: (payload: {
+    readonly components: ReadonlyArray<DiscordMessageActionRow>;
+  }) => Promise<void>;
+  readonly followUp: (payload: {
+    readonly content: string;
+    readonly flags?: MessageFlags;
+    readonly ephemeral?: boolean;
+  }) => Promise<void>;
 }
 
 interface CachedStreamingMessage {
@@ -120,19 +148,21 @@ async function lookupButtonMapping(buttonId: string): Promise<{
 class VibecordClient {
   private client: OpencodeClient | null = null;
   private server: ServerInstance | null = null;
-  private discordClient: Client | null = null;
+  private discordRest: DiscordRestService | null = null;
+  private runDiscordEffect: RunDiscordEffect | null = null;
   private streamingMessages: Map<string, CachedStreamingMessage> = new Map();
   private eventStreamAbort: AbortController | null = null;
   private activePrompts: Set<string> = new Set();
   private sessionDirectories: Map<string, string> = new Map();
   private readonly logger: Pick<Console, "warn"> = console;
 
-  setDiscordClient(client: Client): void {
-    this.discordClient = client;
+  setDiscordRest(rest: DiscordRestService, runDiscordEffect: RunDiscordEffect): void {
+    this.discordRest = rest;
+    this.runDiscordEffect = runDiscordEffect;
   }
 
-  private async getThreadForSession(sessionId: string): Promise<ThreadChannel | null> {
-    if (!this.discordClient) {
+  private async getThreadForSession(sessionId: string): Promise<RestThread | null> {
+    if (!this.discordRest) {
       return null;
     }
 
@@ -143,17 +173,26 @@ class VibecordClient {
       return null;
     }
 
-    // Fetch the thread from Discord
-    try {
-      const channel = await this.discordClient.channels.fetch(session.threadId);
-      if (channel && "send" in channel) {
-        return channel as ThreadChannel;
-      }
-    } catch {
-      // Silently fail - channel may have been deleted
-    }
+    return this.makeThread(session.threadId);
+  }
 
-    return null;
+  private makeThread(threadId: string): RestThread {
+    return {
+      id: threadId,
+      send: async ({ content }) => {
+        if (!this.discordRest || !this.runDiscordEffect) {
+          throw new Error("Discord REST is not configured");
+        }
+        const rest = this.discordRest;
+        const runDiscordEffect = this.runDiscordEffect;
+        const message = await runDiscordEffect(rest.createMessage(threadId, { content }));
+        return {
+          id: message.id,
+          edit: ({ content }) =>
+            runDiscordEffect(rest.updateMessage(threadId, message.id, { content })),
+        };
+      },
+    };
   }
 
   // Tool part formatting for completed tool events.
@@ -261,7 +300,7 @@ class VibecordClient {
     return { lines: result };
   }
 
-  private getStreamingMessage(sessionId: string, thread: ThreadChannel): DiscordStreamingMessage {
+  private getStreamingMessage(sessionId: string, thread: RestThread): DiscordStreamingMessage {
     const cached = this.streamingMessages.get(sessionId);
     if (cached) {
       if (cached.threadId !== thread.id) {
@@ -269,7 +308,7 @@ class VibecordClient {
           `[SDK] Streaming thread changed for session ${sessionId}; updating active stream target`,
           { nextThreadId: thread.id, previousThreadId: cached.threadId },
         );
-        cached.streamingMessage.updateThread(thread as unknown as DiscordStreamThread);
+        cached.streamingMessage.updateThread(thread);
         cached.threadId = thread.id;
       }
       return cached.streamingMessage;
@@ -277,7 +316,7 @@ class VibecordClient {
 
     const streamingMessage = new DiscordStreamingMessage({
       logger: this.logger,
-      thread: thread as unknown as DiscordStreamThread,
+      thread,
     });
     this.streamingMessages.set(sessionId, {
       streamingMessage,
@@ -346,11 +385,11 @@ class VibecordClient {
     return findSafeSplitPoint(content, maxLength);
   }
 
-  private async sendTextContent(content: string, thread: ThreadChannel): Promise<void> {
+  private async sendTextContent(content: string, thread: RestThread): Promise<void> {
     const chunks = this.splitIntoSafeChunks(content, DISCORD_MESSAGE_MAX_LENGTH);
     for (const chunk of chunks) {
       try {
-        await thread.send(chunk);
+        await thread.send({ content: chunk });
       } catch {
         // Silently fail - thread may have been deleted
       }
@@ -421,7 +460,11 @@ class VibecordClient {
         try {
           // Discord thread names have a 100 character limit
           const truncatedTitle = newTitle.substring(0, DISCORD_THREAD_NAME_MAX_LENGTH);
-          await thread.setName(truncatedTitle);
+          if (this.discordRest && this.runDiscordEffect) {
+            await this.runDiscordEffect(
+              this.discordRest.updateChannel(thread.id, { name: truncatedTitle }),
+            );
+          }
         } catch (err) {
           console.error(`[SDK] Failed to update thread name:`, err);
         }
@@ -544,7 +587,7 @@ class VibecordClient {
   }
 
   // Create an embed for displaying todo lists
-  private createTodoEmbed(todos: Array<{ status: string; content: string }>): EmbedBuilder {
+  private createTodoEmbed(todos: Array<{ status: string; content: string }>): APIEmbed {
     const todoItems = todos.map((todo) => {
       const status =
         todo.status === SESSION_STATUS.COMPLETED
@@ -561,13 +604,15 @@ class VibecordClient {
     if (fullDescription.length > 4096) {
       console.warn(`[SDK] Todo list truncated from ${fullDescription.length} to 4096 characters`);
     }
-    return new EmbedBuilder().setTitle("Todo List").setDescription(description).setColor(0x5865f2);
+    return { title: "Todo List", description, color: 0x5865f2 };
   }
 
   // Send an embed to a thread
-  private async sendEmbed(embed: EmbedBuilder, thread: ThreadChannel): Promise<void> {
+  private async sendEmbed(embed: APIEmbed, thread: RestThread): Promise<void> {
     try {
-      await thread.send({ embeds: [embed] });
+      if (this.discordRest && this.runDiscordEffect) {
+        await this.runDiscordEffect(this.discordRest.createMessage(thread.id, { embeds: [embed] }));
+      }
     } catch {
       // Silently fail - thread may have been deleted
     }
@@ -630,36 +675,46 @@ class VibecordClient {
     allowButtonId: string,
     denyButtonId: string,
     requestId: string,
-  ): { embed: EmbedBuilder; components: ActionRowBuilder<ButtonBuilder>[] } {
+  ): { embed: APIEmbed; components: Array<DiscordMessageActionRow> } {
     const permissionInfo = this.getPermissionDetails(type);
-    const embed = new EmbedBuilder()
-      .setTitle(permissionInfo.title)
-      .setDescription(permissionInfo.description)
-      .addFields(
+    const embed: APIEmbed = {
+      title: permissionInfo.title,
+      description: permissionInfo.description,
+      fields: [
         { name: "Permission Type", value: this.formatPermissionType(type), inline: true },
         {
           name: "Details",
           value: details.length > 1000 ? details.substring(0, 1000) + "..." : details,
           inline: false,
         },
-      )
-      .setColor(0xffa500)
-      .setFooter({ text: requestId })
-      .setTimestamp();
+      ],
+      color: 0xffa500,
+      footer: { text: requestId },
+      timestamp: new Date().toISOString(),
+    };
 
-    const allowButton = new ButtonBuilder()
-      .setCustomId(`p_${allowButtonId}`)
-      .setLabel("Allow")
-      .setStyle(ButtonStyle.Success);
-
-    const denyButton = new ButtonBuilder()
-      .setCustomId(`p_${denyButtonId}`)
-      .setLabel("Deny")
-      .setStyle(ButtonStyle.Danger);
-
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(allowButton, denyButton);
-
-    return { embed, components: [row] };
+    return {
+      embed,
+      components: [
+        {
+          type: ComponentType.ActionRow,
+          components: [
+            {
+              type: ComponentType.Button,
+              custom_id: `p_${allowButtonId}`,
+              label: "Allow",
+              style: ButtonStyle.Success,
+            },
+            {
+              type: ComponentType.Button,
+              custom_id: `p_${denyButtonId}`,
+              label: "Deny",
+              style: ButtonStyle.Danger,
+            },
+          ],
+        },
+      ],
+    };
   }
 
   // Handle permission.asked events
@@ -715,7 +770,14 @@ class VibecordClient {
         denyButtonId,
         requestID,
       );
-      await thread.send({ embeds: [embed], components });
+      if (this.discordRest && this.runDiscordEffect) {
+        await this.runDiscordEffect(
+          this.discordRest.createMessage(thread.id, {
+            embeds: [embed],
+            components,
+          }),
+        );
+      }
 
       console.log(`[SDK] Sent permission request ${requestID} for session ${sessionID}`);
     } catch (err) {
@@ -724,7 +786,7 @@ class VibecordClient {
   }
 
   // Handle button clicks for permissions
-  async handlePermissionButton(interaction: ButtonInteraction): Promise<boolean> {
+  async handlePermissionButton(interaction: VibecordButtonInteraction): Promise<boolean> {
     const customId = interaction.customId;
 
     if (!customId.startsWith("p_")) {
@@ -741,16 +803,16 @@ class VibecordClient {
         console.error(`[SDK] Button mapping not found for: ${buttonId}`);
         await interaction.reply({
           content: "This button has expired. Please try again.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return true;
       }
 
       // Check authorization - only the session owner can click permission buttons
-      if (mapping.userId && mapping.userId !== interaction.user.id) {
+      if (mapping.userId && mapping.userId !== interaction.userId) {
         await interaction.reply({
           content: "You are not authorized to respond to this permission request.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return true;
       }
@@ -768,13 +830,18 @@ class VibecordClient {
       }
 
       // Update the button state
-      const updatedRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder()
-          .setCustomId(customId)
-          .setLabel(allowed ? "Allowed" : "Denied")
-          .setStyle(allowed ? ButtonStyle.Success : ButtonStyle.Danger)
-          .setDisabled(true),
-      );
+      const updatedRow: DiscordMessageActionRow = {
+        type: ComponentType.ActionRow,
+        components: [
+          {
+            type: ComponentType.Button,
+            custom_id: customId,
+            label: allowed ? "Allowed" : "Denied",
+            style: allowed ? ButtonStyle.Success : ButtonStyle.Danger,
+            disabled: true,
+          },
+        ],
+      };
 
       await interaction.update({ components: [updatedRow] });
 
@@ -792,7 +859,7 @@ class VibecordClient {
         console.error(`[SDK] Cannot send permission reply - SDK client not connected`);
         await interaction.followUp({
           content: "Error: Cannot process permission. SDK connection unavailable.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return true;
       }
@@ -803,10 +870,21 @@ class VibecordClient {
       return true;
     } catch (err) {
       console.error(`[SDK] Error handling permission button:`, err);
-      await interaction.reply({
-        content: "Failed to process permission. Please try again.",
-        ephemeral: true,
-      });
+      try {
+        await interaction.reply({
+          content: "Failed to process permission. Please try again.",
+          flags: MessageFlags.Ephemeral,
+        });
+      } catch {
+        try {
+          await interaction.followUp({
+            content: "Failed to process permission. Please try again.",
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch {
+          // Ignore if both fail
+        }
+      }
       return true;
     }
   }
@@ -871,21 +949,25 @@ class VibecordClient {
 
   // Send a question message with buttons
   private async sendQuestionMessage(
-    thread: ThreadChannel,
+    thread: RestThread,
     requestId: string,
     sessionId: string,
     question: string,
     options: Array<{ value: string; label: string }>,
     _allowCustom: boolean,
   ): Promise<void> {
-    const embed = new EmbedBuilder()
-      .setTitle("Question")
-      .setDescription(question || "Please select an option:")
-      .setColor(0x5865f2)
-      .setFooter({ text: requestId || "Question" });
+    const embed: APIEmbed = {
+      title: "Question",
+      description: question || "Please select an option:",
+      color: 0x5865f2,
+      footer: { text: requestId || "Question" },
+    };
 
-    const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-    let currentRow = new ActionRowBuilder<ButtonBuilder>();
+    const rows: Array<DiscordMessageActionRow> = [];
+    let currentRow: MutableDiscordMessageActionRow = {
+      type: ComponentType.ActionRow,
+      components: [],
+    };
     let buttonCount = 0;
 
     // Discord allows max 5 action rows, reserve 1 for cancel button = max 4 option rows (20 buttons)
@@ -920,18 +1002,23 @@ class VibecordClient {
     // Build buttons with label length validation (max 80 chars)
     for (const { id, option } of buttonIds) {
       const label = option.label.length > 80 ? option.label.substring(0, 77) + "..." : option.label;
-      const button = new ButtonBuilder()
-        .setCustomId(`q_${id}`)
-        .setLabel(label)
-        .setStyle(ButtonStyle.Primary);
+      const button: DiscordMessageButton = {
+        type: ComponentType.Button,
+        custom_id: `q_${id}`,
+        label,
+        style: ButtonStyle.Primary,
+      };
 
-      currentRow.addComponents(button);
+      currentRow.components.push(button);
       buttonCount++;
 
       // Discord allows max 5 buttons per row
       if (buttonCount === 5) {
         rows.push(currentRow);
-        currentRow = new ActionRowBuilder<ButtonBuilder>();
+        currentRow = {
+          type: ComponentType.ActionRow,
+          components: [],
+        };
         buttonCount = 0;
       }
     }
@@ -941,19 +1028,28 @@ class VibecordClient {
     }
 
     // Add cancel button with stored mapping (5th row)
-    const cancelRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`qc_${cancelButtonId}`)
-        .setLabel("Cancel")
-        .setStyle(ButtonStyle.Secondary),
-    );
+    const cancelRow: DiscordMessageActionRow = {
+      type: ComponentType.ActionRow,
+      components: [
+        {
+          type: ComponentType.Button,
+          custom_id: `qc_${cancelButtonId}`,
+          label: "Cancel",
+          style: ButtonStyle.Secondary,
+        },
+      ],
+    };
     rows.push(cancelRow);
 
-    await thread.send({ embeds: [embed], components: rows });
+    if (this.discordRest && this.runDiscordEffect) {
+      await this.runDiscordEffect(
+        this.discordRest.createMessage(thread.id, { embeds: [embed], components: rows }),
+      );
+    }
   }
 
   // Handle button clicks for questions
-  async handleQuestionButton(interaction: ButtonInteraction): Promise<boolean> {
+  async handleQuestionButton(interaction: VibecordButtonInteraction): Promise<boolean> {
     const customId = interaction.customId;
 
     // Check if this is a question button (q_<buttonId> or qc_<buttonId>)
@@ -972,7 +1068,7 @@ class VibecordClient {
         console.error(`[SDK] Button mapping not found for: ${buttonId}`);
         await interaction.reply({
           content: "This button has expired. Please try the question again.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return true;
       }
@@ -992,18 +1088,14 @@ class VibecordClient {
     } catch (err) {
       console.error(`[SDK] Error handling question button:`, err);
       const errorMessage = "Failed to process your answer. Please try again.";
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content: errorMessage, ephemeral: true });
-      } else {
-        await interaction.reply({ content: errorMessage, ephemeral: true });
-      }
+      await interaction.reply({ content: errorMessage, flags: MessageFlags.Ephemeral });
       return true;
     }
   }
 
   // Submit question answer
   private async submitQuestionAnswer(
-    interaction: ButtonInteraction,
+    interaction: VibecordButtonInteraction,
     sessionId: string,
     requestId: string,
     optionValue: string,
@@ -1047,7 +1139,7 @@ class VibecordClient {
 
       await interaction.followUp({
         content: `Selected: **${optionValue}**`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
 
       console.log(`[SDK] Question ${requestId} answered with: ${optionValue}`);
@@ -1057,14 +1149,14 @@ class VibecordClient {
       try {
         await interaction.reply({
           content: "Failed to submit your answer. Please try again.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       } catch {
         // If reply fails, try followUp
         try {
           await interaction.followUp({
             content: "Failed to submit your answer. Please try again.",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         } catch {
           // Ignore if both fail
@@ -1075,7 +1167,7 @@ class VibecordClient {
 
   // Cancel question
   private async cancelQuestion(
-    interaction: ButtonInteraction,
+    interaction: VibecordButtonInteraction,
     sessionId: string,
     requestId: string,
   ): Promise<void> {
@@ -1106,7 +1198,7 @@ class VibecordClient {
 
       await interaction.followUp({
         content: "Question cancelled.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
 
       console.log(`[SDK] Question ${requestId} cancelled`);
@@ -1116,14 +1208,14 @@ class VibecordClient {
       try {
         await interaction.reply({
           content: "Failed to cancel the question.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       } catch {
         // If reply fails, try followUp
         try {
           await interaction.followUp({
             content: "Failed to cancel the question.",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         } catch {
           // Ignore if both fail
@@ -1133,31 +1225,35 @@ class VibecordClient {
   }
 
   // Disable all buttons
-  private async disableQuestionButtons(interaction: ButtonInteraction): Promise<void> {
+  private async disableQuestionButtons(interaction: VibecordButtonInteraction): Promise<void> {
     const message = interaction.message;
-    const disabledComponents: ActionRowBuilder<ButtonBuilder>[] = [];
+    const disabledComponents: Array<DiscordMessageActionRow> = [];
 
     for (const row of message.components) {
       // Cast to unknown first, then to the expected type
       const actionRow = row as unknown as {
         components: Array<{
           type: number;
-          customId?: string;
+          custom_id?: string;
           label?: string;
           style?: number;
           disabled?: boolean;
         }>;
       };
-      const newRow = new ActionRowBuilder<ButtonBuilder>();
+      const newRow: MutableDiscordMessageActionRow = {
+        type: ComponentType.ActionRow,
+        components: [],
+      };
       for (const component of actionRow.components) {
-        if (component.type === 2) {
+        if (component.type === ComponentType.Button) {
           // Button component
-          const button = new ButtonBuilder()
-            .setCustomId(component.customId || "")
-            .setLabel(component.label || "")
-            .setStyle(component.style || 1)
-            .setDisabled(true);
-          newRow.addComponents(button);
+          newRow.components.push({
+            type: ComponentType.Button,
+            custom_id: component.custom_id ?? "",
+            label: component.label || "",
+            style: (component.style || ButtonStyle.Primary) as ButtonStyle,
+            disabled: true,
+          } as DiscordMessageButton);
         }
       }
       if (newRow.components.length > 0) {
@@ -1250,8 +1346,7 @@ class VibecordClient {
       }
     }
 
-    // Get current mode from config
-    const currentModeId = config?.agent ? Object.keys(config.agent)[0] : undefined;
+    const currentModeId = config?.default_agent;
 
     return {
       sessionId: session.id,
@@ -1264,6 +1359,18 @@ class VibecordClient {
         availableModes,
       },
     };
+  }
+
+  async deleteSession(sessionId: string, cwd: string): Promise<void> {
+    if (!this.client) {
+      return;
+    }
+
+    await this.client.session.delete({
+      sessionID: sessionId,
+      directory: cwd,
+    });
+    this.sessionDirectories.delete(sessionId);
   }
 
   private async resolveSessionCwd(sessionId: string): Promise<string> {
@@ -1316,17 +1423,16 @@ class VibecordClient {
     });
     const config = configResponse.data;
 
-    // Update the model based on the mode's configured model
+    // Update the default agent and model based on the mode's configured model
     if (config?.agent) {
       const currentAgent = config.agent[modeId];
-      if (currentAgent?.model) {
-        await this.client.config.update({
-          directory: cwd,
-          config: {
-            model: currentAgent.model,
-          },
-        });
-      }
+      await this.client.config.update({
+        directory: cwd,
+        config: {
+          default_agent: modeId,
+          ...(currentAgent?.model ? { model: currentAgent.model } : {}),
+        },
+      });
     }
   }
 
@@ -1379,7 +1485,7 @@ class VibecordClient {
       models,
       modes,
       currentModelId: config?.model,
-      currentModeId: config?.agent ? Object.keys(config.agent)[0] : undefined,
+      currentModeId: config?.default_agent,
     };
   }
 
@@ -1422,6 +1528,8 @@ class VibecordClient {
     }
 
     this.client = null;
+    this.discordRest = null;
+    this.runDiscordEffect = null;
   }
 }
 

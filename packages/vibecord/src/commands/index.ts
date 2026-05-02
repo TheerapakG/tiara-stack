@@ -1,4 +1,2 @@
-import { workspace } from "./workspace";
-import { session } from "./session";
-
-export const commands = [workspace, session];
+export { sessionCommandData, sessionCommandLayer } from "./session";
+export { workspaceCommandData, workspaceCommandLayer } from "./workspace";
