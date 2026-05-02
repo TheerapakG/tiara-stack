@@ -99,10 +99,10 @@ export const sendTentativeRoomOrder = Effect.fn("sendTentativeRoomOrder")(functi
   createdByUserId: string | null;
 }) {
   if (!shouldSendTentativeRoomOrder(fillCount)) {
-    return;
+    return null;
   }
 
-  yield* Effect.gen(function* () {
+  return yield* Effect.gen(function* () {
     const generated = yield* roomOrderService.generate({
       guildId,
       channelId: runningChannelId,
@@ -163,6 +163,11 @@ export const sendTentativeRoomOrder = Effect.fn("sendTentativeRoomOrder")(functi
         ),
       ),
     );
+
+    return {
+      messageId: sentMessage.id,
+      messageChannelId: sentMessage.channel_id,
+    };
   }).pipe(
     Effect.catchCause((cause) =>
       Effect.logError("Failed to send tentative room order").pipe(
@@ -172,6 +177,7 @@ export const sendTentativeRoomOrder = Effect.fn("sendTentativeRoomOrder")(functi
           hour,
         }),
         Effect.andThen(Effect.logError(cause)),
+        Effect.as(null),
       ),
     ),
   );

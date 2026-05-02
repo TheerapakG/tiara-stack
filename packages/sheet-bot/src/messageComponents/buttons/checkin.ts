@@ -36,13 +36,20 @@ const getInteractionMessage = Effect.gen(function* () {
   );
 });
 
-export const checkinButtonData = makeButtonData((b) =>
-  b
-    .setCustomId("interaction:checkin")
-    .setLabel("Check in")
-    .setStyle(ButtonStyle.Primary)
-    .setEmoji({ id: "907705464215711834", name: "Miku_Happy" }),
-);
+export const makeCheckinButtonData = (disabled = false) =>
+  makeButtonData((b) =>
+    b
+      .setCustomId("interaction:checkin")
+      .setLabel("Check in")
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji({ id: "907705464215711834", name: "Miku_Happy" })
+      .setDisabled(disabled),
+  );
+
+export const checkinButtonData = makeCheckinButtonData();
+
+export const checkinActionRow = (disabled = false) =>
+  makeMessageActionRowData((b) => b.setComponents(makeCheckinButtonData(disabled)));
 
 const makeCheckinButtonHandler = Effect.gen(function* () {
   const messageCheckinService = yield* MessageCheckinService;

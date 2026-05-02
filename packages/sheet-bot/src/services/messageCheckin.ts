@@ -47,6 +47,25 @@ export class MessageCheckinService extends Context.Service<MessageCheckinService
             });
           },
         ),
+        persistMessageCheckin: Effect.fn("MessageCheckinService.persistMessageCheckin")(function* (
+          messageId: string,
+          payload: {
+            data: {
+              initialMessage: string;
+              hour: number;
+              channelId: string;
+              roleId: string | null | undefined;
+              guildId: string | null;
+              messageChannelId: string | null;
+              createdByUserId: string | null;
+            };
+            memberIds: ReadonlyArray<string>;
+          },
+        ) {
+          return yield* sheetApisClient.get().messageCheckin.persistMessageCheckin({
+            payload: { messageId, data: payload.data, memberIds: payload.memberIds },
+          });
+        }),
         setMessageCheckinMemberCheckinAt: Effect.fn(
           "MessageCheckinService.setMessageCheckinMemberCheckinAt",
         )(function* (messageId: string, memberId: string, checkinAt: number) {

@@ -15,6 +15,7 @@
     },
     "./zero": {
       "types": "./dist/zero.d.mts",
+      "development": "./src/zero/index.ts",
       "default": "./dist/zero.mjs"
     },
     "./package.json": "./package.json"

@@ -336,6 +336,19 @@ export const messageCheckinLayer = MessageCheckinRpcs.toLayer(
           payload.memberIds,
         );
       }),
+      "messageCheckin.persistMessageCheckin": Effect.fnUntraced(function* ({ payload }) {
+        yield* requireCheckinUpsertAccess(
+          authorizationService,
+          messageCheckinService,
+          payload.messageId,
+          typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
+        );
+
+        return yield* messageCheckinService.persistMessageCheckin(payload.messageId, {
+          data: payload.data,
+          memberIds: payload.memberIds,
+        });
+      }),
       "messageCheckin.setMessageCheckinMemberCheckinAt": Effect.fnUntraced(function* ({ payload }) {
         yield* requireMessageCheckinParticipantMutationAccess(
           authorizationService,

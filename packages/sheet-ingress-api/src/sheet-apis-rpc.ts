@@ -130,6 +130,16 @@ const messageRoomOrderData = Schema.Struct({
   createdByUserId: Schema.NullOr(Schema.String),
 });
 
+const messageCheckinData = Schema.Struct({
+  initialMessage: Schema.String,
+  hour: Schema.Number,
+  channelId: Schema.String,
+  roleId: Schema.optional(Schema.NullOr(Schema.String)),
+  guildId: Schema.NullOr(Schema.String),
+  messageChannelId: Schema.NullOr(Schema.String),
+  createdByUserId: Schema.NullOr(Schema.String),
+});
+
 const messageRoomOrderEntryInput = Schema.Struct({
   rank: Schema.Number,
   position: Schema.Number,
@@ -324,15 +334,7 @@ export const MessageCheckinRpcs = RpcGroup.make(
   protectedRpc("messageCheckin.upsertMessageCheckinData", {
     payload: Payload({
       messageId: Schema.String,
-      data: Schema.Struct({
-        initialMessage: Schema.String,
-        hour: Schema.Number,
-        channelId: Schema.String,
-        roleId: Schema.optional(Schema.NullOr(Schema.String)),
-        guildId: Schema.NullOr(Schema.String),
-        messageChannelId: Schema.NullOr(Schema.String),
-        createdByUserId: Schema.NullOr(Schema.String),
-      }),
+      data: messageCheckinData,
     }),
     success: MessageCheckin,
     error: Schema.Union([SchemaError, QueryResultError]),
@@ -348,6 +350,15 @@ export const MessageCheckinRpcs = RpcGroup.make(
       memberIds: Schema.Array(Schema.String),
     }),
     success: Schema.Array(MessageCheckinMember),
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
+  }),
+  protectedRpc("messageCheckin.persistMessageCheckin", {
+    payload: Payload({
+      messageId: Schema.String,
+      data: messageCheckinData,
+      memberIds: Schema.Array(Schema.String),
+    }),
+    success: MessageCheckin,
     error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
   }),
   protectedRpc("messageCheckin.setMessageCheckinMemberCheckinAt", {

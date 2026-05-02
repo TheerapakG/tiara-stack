@@ -1,10 +1,11 @@
 import { Cache, Context, Duration, Effect, Exit, Layer, Redacted } from "effect";
 import { getDiscordAccessToken } from "sheet-auth/client";
+import { SHEET_AUTH_SESSION_TOKEN_UNAVAILABLE } from "sheet-ingress-api/middlewares/forwardedAuthHeaders";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import { makeArgumentError } from "typhoon-core/error";
 import { SheetAuthClient } from "./sheetAuthClient";
 
-export const SHEET_AUTH_SESSION_TOKEN_UNAVAILABLE = "ingress-forwarded-token-unavailable";
+export { SHEET_AUTH_SESSION_TOKEN_UNAVAILABLE };
 
 const isUnavailableSessionToken = (token: Redacted.Redacted<string>) =>
   Redacted.value(token) === SHEET_AUTH_SESSION_TOKEN_UNAVAILABLE;

@@ -248,6 +248,45 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         );
       },
     }),
+    ZeroApiEndpoint.mutator("persistMessageCheckin", {
+      request: Schema.Struct({
+        messageId: Schema.String,
+        data: Schema.Struct({
+          initialMessage: Schema.String,
+          hour: Schema.Number,
+          channelId: Schema.String,
+          roleId: Schema.optional(Schema.NullOr(Schema.String)),
+          guildId: Schema.NullOr(Schema.String),
+          messageChannelId: Schema.NullOr(Schema.String),
+          createdByUserId: Schema.NullOr(Schema.String),
+        }),
+        memberIds: Schema.Array(Schema.String),
+      }),
+      mutator: async ({ tx, args }) => {
+        await tx.mutate.messageCheckin.upsert({
+          messageId: args.messageId,
+          initialMessage: args.data.initialMessage,
+          hour: args.data.hour,
+          channelId: args.data.channelId,
+          roleId: args.data.roleId,
+          guildId: args.data.guildId,
+          messageChannelId: args.data.messageChannelId,
+          createdByUserId: args.data.createdByUserId,
+          deletedAt: null,
+        });
+
+        await Promise.all(
+          args.memberIds.map((memberId) =>
+            tx.mutate.messageCheckinMember.upsert({
+              messageId: args.messageId,
+              memberId,
+              checkinAt: null,
+              deletedAt: null,
+            }),
+          ),
+        );
+      },
+    }),
     ZeroApiEndpoint.mutator("setMessageCheckinMemberCheckinAt", {
       request: Schema.Struct({
         messageId: Schema.String,

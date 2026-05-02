@@ -6,6 +6,16 @@ import { MessageCheckin, MessageCheckinMember } from "../../schemas/messageCheck
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
 import { SheetApisServiceUserFallback } from "../../middlewares/sheetApisServiceUserFallback/tag";
 
+const MessageCheckinDataPayload = Schema.Struct({
+  initialMessage: Schema.String,
+  hour: Schema.Number,
+  channelId: Schema.String,
+  roleId: Schema.optional(Schema.NullOr(Schema.String)),
+  guildId: Schema.NullOr(Schema.String),
+  messageChannelId: Schema.NullOr(Schema.String),
+  createdByUserId: Schema.NullOr(Schema.String),
+});
+
 export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
   .add(
     HttpApiEndpoint.get("getMessageCheckinData", "/messageCheckin/getMessageCheckinData", {
@@ -20,15 +30,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
     HttpApiEndpoint.post("upsertMessageCheckinData", "/messageCheckin/upsertMessageCheckinData", {
       payload: Schema.Struct({
         messageId: Schema.String,
-        data: Schema.Struct({
-          initialMessage: Schema.String,
-          hour: Schema.Number,
-          channelId: Schema.String,
-          roleId: Schema.optional(Schema.NullOr(Schema.String)),
-          guildId: Schema.NullOr(Schema.String),
-          messageChannelId: Schema.NullOr(Schema.String),
-          createdByUserId: Schema.NullOr(Schema.String),
-        }),
+        data: MessageCheckinDataPayload,
       }),
       success: MessageCheckin,
       error: [SchemaError, QueryResultError],
@@ -50,6 +52,17 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
         memberIds: Schema.Array(Schema.String),
       }),
       success: Schema.Array(MessageCheckinMember),
+      error: [SchemaError, QueryResultError, ArgumentError],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("persistMessageCheckin", "/messageCheckin/persistMessageCheckin", {
+      payload: Schema.Struct({
+        messageId: Schema.String,
+        data: MessageCheckinDataPayload,
+        memberIds: Schema.Array(Schema.String),
+      }),
+      success: MessageCheckin,
       error: [SchemaError, QueryResultError, ArgumentError],
     }),
   )

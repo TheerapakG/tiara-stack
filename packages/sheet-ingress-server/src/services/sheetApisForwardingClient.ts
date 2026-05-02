@@ -45,6 +45,7 @@ export class SheetApisForwardingClient extends Context.Service<SheetApisForwardi
           upsertMessageCheckinData: call(rpcClient["messageCheckin.upsertMessageCheckinData"]),
           getMessageCheckinMembers: call(rpcClient["messageCheckin.getMessageCheckinMembers"]),
           addMessageCheckinMembers: call(rpcClient["messageCheckin.addMessageCheckinMembers"]),
+          persistMessageCheckin: call(rpcClient["messageCheckin.persistMessageCheckin"]),
           setMessageCheckinMemberCheckinAt: call(
             rpcClient["messageCheckin.setMessageCheckinMemberCheckinAt"],
           ),

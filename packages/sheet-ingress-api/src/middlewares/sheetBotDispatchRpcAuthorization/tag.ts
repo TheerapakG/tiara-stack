@@ -1,15 +1,14 @@
 import { RpcMiddleware } from "effect/unstable/rpc";
 import { SheetAuthUser } from "../../schemas/middlewares/sheetAuthUser";
 import { Unauthorized } from "typhoon-core/error";
-export { decodeForwardedSheetAuthUser } from "../forwardedAuthHeaders";
 
-export class SheetApisRpcAuthorization extends RpcMiddleware.Service<
-  SheetApisRpcAuthorization,
+export class SheetBotDispatchRpcAuthorization extends RpcMiddleware.Service<
+  SheetBotDispatchRpcAuthorization,
   {
     provides: SheetAuthUser;
     requires: never;
   }
->()("SheetApisRpcAuthorization", {
-  requiredForClient: true,
+>()("SheetBotDispatchRpcAuthorization", {
   error: Unauthorized,
+  requiredForClient: true,
 }) {}

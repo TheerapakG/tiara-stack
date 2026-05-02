@@ -12,6 +12,7 @@
     "format": "vp fmt --check",
     "format:apply": "vp fmt",
     "lint": "vp lint src",
+    "test": "vp test run",
     "build": "vp pack && tar -acf dist.tar.zst ./dist"
   },
   "dependencies": {
@@ -41,6 +42,7 @@
     "pathe": "^2.0.3",
     "simple-git": "^3.30.0",
     "vite": "catalog:",
-    "vite-plus": "catalog:"
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
   }
 }

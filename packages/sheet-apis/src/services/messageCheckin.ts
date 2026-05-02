@@ -106,6 +106,49 @@ export class MessageCheckinService extends Context.Service<MessageCheckinService
         },
       );
 
+      const persistMessageCheckin = Effect.fn("MessageCheckinService.persistMessageCheckin")(
+        function* (
+          messageId: string,
+          payload: {
+            data: {
+              initialMessage: string;
+              hour: number;
+              channelId: string;
+              roleId?: string | null | undefined;
+              guildId: string | null;
+              messageChannelId: string | null;
+              createdByUserId: string | null;
+            };
+            memberIds: readonly string[];
+          },
+        ) {
+          const mutation = yield* zeroClient.mutate(
+            mutators.messageCheckin.persistMessageCheckin({
+              messageId,
+              data: payload.data,
+              memberIds: payload.memberIds,
+            }),
+          );
+          yield* mutation.server();
+
+          const result = yield* zeroClient.run(
+            queries.messageCheckin.getMessageCheckinData({ messageId }),
+            {
+              type: "complete",
+            },
+          );
+          const messageCheckin = yield* Schema.decodeEffect(
+            Schema.OptionFromNullishOr(DefaultTaggedClass(MessageCheckin)),
+          )(result);
+
+          if (Option.isNone(messageCheckin)) {
+            return yield* Effect.die(makeDBQueryError("Failed to persist message check-in data"));
+          }
+
+          return messageCheckin.value;
+        },
+      );
+
       const setMessageCheckinMemberCheckinAt = Effect.fn(
         "MessageCheckinService.setMessageCheckinMemberCheckinAt",
       )(function* (messageId: string, memberId: string, checkinAt: number) {
@@ -167,6 +210,7 @@ export class MessageCheckinService extends Context.Service<MessageCheckinService
         upsertMessageCheckinData,
         getMessageCheckinMembers,
         addMessageCheckinMembers,
+        persistMessageCheckin,
         setMessageCheckinMemberCheckinAt,
         removeMessageCheckinMember,
       };

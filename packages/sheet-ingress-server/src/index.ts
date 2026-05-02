@@ -673,6 +673,15 @@ const makeApiLayer = () => {
           ),
         )
         .handle(
+          "persistMessageCheckin",
+          authorizedSheetApis("messageCheckin", "persistMessageCheckin", ({ payload }) =>
+            requireMessageCheckinUpsert(
+              payload.messageId,
+              typeof payload.data.guildId === "string" ? payload.data.guildId : undefined,
+            ),
+          ),
+        )
+        .handle(
           "setMessageCheckinMemberCheckinAt",
           authorizedSheetApis("messageCheckin", "setMessageCheckinMemberCheckinAt", ({ payload }) =>
             requireMessageCheckinParticipantMutation(payload.messageId, payload.memberId),

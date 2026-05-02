@@ -119,6 +119,19 @@ export interface SheetZeroClientApi {
       readonly messageId: string;
       readonly memberIds: readonly string[];
     }>;
+    readonly persistMessageCheckin: MutatorResult<{
+      readonly messageId: string;
+      readonly data: {
+        readonly initialMessage: string;
+        readonly hour: number;
+        readonly channelId: string;
+        readonly roleId?: string | null | undefined;
+        readonly guildId: string | null;
+        readonly messageChannelId: string | null;
+        readonly createdByUserId: string | null;
+      };
+      readonly memberIds: readonly string[];
+    }>;
     readonly setMessageCheckinMemberCheckinAt: MutatorResult<{
       readonly messageId: string;
       readonly memberId: string;

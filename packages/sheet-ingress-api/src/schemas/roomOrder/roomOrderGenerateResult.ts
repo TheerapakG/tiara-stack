@@ -6,6 +6,7 @@ export class RoomOrderGenerateResult extends Schema.TaggedClass<RoomOrderGenerat
   "RoomOrderGenerateResult",
   {
     content: Schema.String,
+    runningChannelId: Schema.String,
     range: MessageRoomOrderRange,
     rank: Schema.Number,
     hour: Schema.Number,

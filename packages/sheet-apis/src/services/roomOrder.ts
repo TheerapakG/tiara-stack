@@ -282,6 +282,7 @@ export class RoomOrderService extends Context.Service<RoomOrderService>()("RoomO
             fills.map(toFillParticipant),
             firstRankEntries,
           ),
+          runningChannelId: runningChannel.channelId,
           range: new MessageRoomOrderRange({
             minRank: 0,
             maxRank: roomOrders.length - 1,

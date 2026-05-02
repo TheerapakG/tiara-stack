@@ -30,6 +30,11 @@
       "types": "./dist/middlewares/sheetAuthTokenAuthorization/tag.d.mts",
       "default": "./dist/middlewares/sheetAuthTokenAuthorization/tag.mjs"
     },
+    "./middlewares/forwardedAuthHeaders": {
+      "types": "./dist/middlewares/forwardedAuthHeaders.d.mts",
+      "development": "./src/middlewares/forwardedAuthHeaders.ts",
+      "default": "./dist/middlewares/forwardedAuthHeaders.mjs"
+    },
     "./middlewares/sheetApisRpcAuthorization/tag": {
       "types": "./dist/middlewares/sheetApisRpcAuthorization/tag.d.mts",
       "default": "./dist/middlewares/sheetApisRpcAuthorization/tag.mjs"
@@ -37,6 +42,10 @@
     "./middlewares/sheetBotRpcAuthorization/tag": {
       "types": "./dist/middlewares/sheetBotRpcAuthorization/tag.d.mts",
       "default": "./dist/middlewares/sheetBotRpcAuthorization/tag.mjs"
+    },
+    "./middlewares/sheetBotDispatchRpcAuthorization/tag": {
+      "types": "./dist/middlewares/sheetBotDispatchRpcAuthorization/tag.d.mts",
+      "default": "./dist/middlewares/sheetBotDispatchRpcAuthorization/tag.mjs"
     },
     "./middlewares/sheetBotServiceAuthorization/tag": {
       "types": "./dist/middlewares/sheetBotServiceAuthorization/tag.d.mts",
@@ -57,6 +66,10 @@
     "./sheet-apis-rpc": {
       "types": "./dist/sheet-apis-rpc.d.mts",
       "default": "./dist/sheet-apis-rpc.mjs"
+    },
+    "./sheet-bot-rpc": {
+      "types": "./dist/sheet-bot-rpc.d.mts",
+      "default": "./dist/sheet-bot-rpc.mjs"
     },
     "./schemas/*": {
       "types": "./dist/schemas/*.d.mts",

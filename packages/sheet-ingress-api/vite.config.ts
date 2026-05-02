@@ -36,11 +36,17 @@ export default defineConfig({
       "middlewares/sheetAuthTokenAuthorization/tag": fileURLToPath(
         new URL("./src/middlewares/sheetAuthTokenAuthorization/tag.ts", import.meta.url),
       ),
+      "middlewares/forwardedAuthHeaders": fileURLToPath(
+        new URL("./src/middlewares/forwardedAuthHeaders.ts", import.meta.url),
+      ),
       "middlewares/sheetApisRpcAuthorization/tag": fileURLToPath(
         new URL("./src/middlewares/sheetApisRpcAuthorization/tag.ts", import.meta.url),
       ),
       "middlewares/sheetBotRpcAuthorization/tag": fileURLToPath(
         new URL("./src/middlewares/sheetBotRpcAuthorization/tag.ts", import.meta.url),
+      ),
+      "middlewares/sheetBotDispatchRpcAuthorization/tag": fileURLToPath(
+        new URL("./src/middlewares/sheetBotDispatchRpcAuthorization/tag.ts", import.meta.url),
       ),
       "middlewares/sheetBotServiceAuthorization/tag": fileURLToPath(
         new URL("./src/middlewares/sheetBotServiceAuthorization/tag.ts", import.meta.url),
@@ -53,6 +59,7 @@ export default defineConfig({
       ),
       "sheet-apis": fileURLToPath(new URL("./src/sheet-apis.ts", import.meta.url)),
       "sheet-apis-rpc": fileURLToPath(new URL("./src/sheet-apis-rpc.ts", import.meta.url)),
+      "sheet-bot-rpc": fileURLToPath(new URL("./src/sheet-bot-rpc.ts", import.meta.url)),
       ...collectEntries("schemas"),
     },
     sourcemap: true,

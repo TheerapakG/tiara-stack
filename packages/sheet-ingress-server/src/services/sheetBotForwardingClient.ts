@@ -14,6 +14,11 @@ export class SheetBotForwardingClient extends Context.Service<SheetBotForwarding
         application: {
           getApplication: () => rpcClient["application.getApplication"](undefined),
         },
+        dispatch: {
+          checkin: (args: RpcPayload<"dispatch.checkin">) => rpcClient["dispatch.checkin"](args),
+          roomOrder: (args: RpcPayload<"dispatch.roomOrder">) =>
+            rpcClient["dispatch.roomOrder"](args),
+        },
         cache: {
           getGuild: (args: RpcPayload<"cache.getGuild">) => rpcClient["cache.getGuild"](args),
           getGuildSize: () => rpcClient["cache.getGuildSize"](undefined),

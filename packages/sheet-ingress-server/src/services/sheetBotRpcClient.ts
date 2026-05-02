@@ -1,17 +1,22 @@
 import { HttpClient } from "effect/unstable/http";
 import { RpcClient, RpcSerialization } from "effect/unstable/rpc";
 import { Context, Effect, Layer } from "effect";
-import { DiscordRpcs as SheetBotRpcs } from "dfx-discord-utils/discord/rpc";
+import { SheetBotRpcs } from "sheet-ingress-api/sheet-bot-rpc";
+import { SheetBotDispatchRpcAuthorization } from "sheet-ingress-api/middlewares/sheetBotDispatchRpcAuthorization/tag";
 import { SheetBotRpcAuthorization } from "sheet-ingress-api/middlewares/sheetBotRpcAuthorization/tag";
 import { config } from "@/config";
 import { makeIngressRpcHeadersClientLayer } from "./rpcAuthorizationClient";
 
-const AuthorizedSheetBotRpcs = SheetBotRpcs.middleware(SheetBotRpcAuthorization);
 const sheetBotTokenPath = "/var/run/secrets/tokens/sheet-bot-token";
 
 const sheetBotRpcAuthorizationClientLayer = makeIngressRpcHeadersClientLayer(
   SheetBotRpcAuthorization,
   "SheetBotRpcClient.SheetBotRpcAuthorizationClient",
+  { serviceTokenPath: sheetBotTokenPath },
+);
+const sheetBotDispatchRpcAuthorizationClientLayer = makeIngressRpcHeadersClientLayer(
+  SheetBotDispatchRpcAuthorization,
+  "SheetBotRpcClient.SheetBotDispatchRpcAuthorizationClient",
   { serviceTokenPath: sheetBotTokenPath },
 );
 
@@ -21,9 +26,10 @@ export class SheetBotRpcClient extends Context.Service<SheetBotRpcClient>()("She
     const httpClient = yield* HttpClient.HttpClient;
     const rpcUrl = `${baseUrl.replace(/\/$/, "")}/rpc`;
 
-    return yield* RpcClient.make(AuthorizedSheetBotRpcs).pipe(
+    return yield* RpcClient.make(SheetBotRpcs).pipe(
       Effect.provide(RpcClient.layerProtocolHttp({ url: rpcUrl })),
       Effect.provide(sheetBotRpcAuthorizationClientLayer),
+      Effect.provide(sheetBotDispatchRpcAuthorizationClientLayer),
       Effect.provide(RpcSerialization.layerJson),
       Effect.provideService(HttpClient.HttpClient, httpClient),
     );

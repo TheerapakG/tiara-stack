@@ -53,6 +53,8 @@ describe("SheetBotForwardingClient", () => {
     const client = await run(SheetBotForwardingClient.make);
 
     expect(client.application.getApplication).toEqual(expect.any(Function));
+    expect(client.dispatch.checkin).toEqual(expect.any(Function));
+    expect(client.dispatch.roomOrder).toEqual(expect.any(Function));
     expect(client.cache.getMember).toEqual(expect.any(Function));
   });
 
