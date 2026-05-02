@@ -20,6 +20,7 @@ import {
   SubCommandGroupBuilder,
 } from "./commandBuilder";
 import { DiscordRestService } from "dfx/DiscordREST";
+import { InteractionToken, provideInteractionToken } from "./interaction";
 
 // Re-export types to ensure they're available in generated d.ts files
 export type { HttpClientError, DiscordRESTError };
@@ -517,9 +518,9 @@ export class WrappedCommandHelper<A> {
   private followUp = Effect.fn("WrappedCommandHelper.followUp")(
     { self: this },
     function* (payload: Discord.IncomingWebhookRequestPartial, files: ReadonlyArray<File>) {
-      const interaction = yield* Ix.Interaction;
+      const interactionToken = yield* InteractionToken;
 
-      const request = this.rest.executeWebhook(this.application.id, interaction.token, {
+      const request = this.rest.executeWebhook(this.application.id, interactionToken.token, {
         params: { wait: true },
         payload,
       });
@@ -534,11 +535,11 @@ export class WrappedCommandHelper<A> {
       readonly params?: Discord.UpdateOriginalWebhookMessageParams;
       readonly payload: Discord.IncomingWebhookUpdateRequestPartial;
     }) {
-      const context = yield* Ix.Interaction;
+      const interactionToken = yield* InteractionToken;
 
       return yield* this.rest.updateOriginalWebhookMessage(
         this.application.id,
-        context.token,
+        interactionToken.token,
         response,
       );
     },
@@ -553,10 +554,14 @@ export class WrappedCommandHelper<A> {
         readonly payload: Discord.IncomingWebhookUpdateRequestPartial;
       },
     ) {
-      const context = yield* Ix.Interaction;
+      const interactionToken = yield* InteractionToken;
 
       return yield* this.rest.withFiles(files)(
-        this.rest.updateOriginalWebhookMessage(this.application.id, context.token, response),
+        this.rest.updateOriginalWebhookMessage(
+          this.application.id,
+          interactionToken.token,
+          response,
+        ),
       );
     },
   );
@@ -601,7 +606,11 @@ export const makeForkedCommandHandler = Effect.fnUntraced(function* <
   return Effect.fnUntraced(function* (commandHelper: WrappedCommandHelper<A>) {
     const context = yield* Ix.Interaction;
 
-    yield* pipe(handler(commandHelper), FiberMap.run(fiberMap, context.id));
+    yield* pipe(
+      handler(commandHelper),
+      provideInteractionToken,
+      FiberMap.run(fiberMap, context.id),
+    );
   });
 });
 
@@ -735,11 +744,17 @@ export const makeCommand = Effect.fnUntraced(function* <
 });
 
 export type GlobalCommand<E, R> = GlobalApplicationCommand<
-  Exclude<R, DiscordApplicationCommand | DiscordInteraction | Scope.Scope>,
+  Exclude<
+    Exclude<R, InteractionToken>,
+    DiscordApplicationCommand | DiscordInteraction | Scope.Scope
+  >,
   E
 >;
 export type GuildCommand<E, R> = GuildApplicationCommand<
-  Exclude<R, DiscordApplicationCommand | DiscordInteraction | Scope.Scope>,
+  Exclude<
+    Exclude<R, InteractionToken>,
+    DiscordApplicationCommand | DiscordInteraction | Scope.Scope
+  >,
   E
 >;
 
@@ -752,7 +767,8 @@ export const makeGlobalCommand = <
   handler: (
     commandHelper: CommandHelper<A>,
   ) => Effect.Effect<Discord.CreateInteractionResponseRequest, E, R>,
-): GlobalCommand<E, R> => Ix.global(data, handler);
+): GlobalCommand<E, R> =>
+  Ix.global(data, (commandHelper) => provideInteractionToken(handler(commandHelper)));
 
 export const makeGuildCommand = <
   const A extends Discord.ApplicationCommandCreateRequest,
@@ -763,4 +779,5 @@ export const makeGuildCommand = <
   handler: (
     commandHelper: CommandHelper<A>,
   ) => Effect.Effect<Discord.CreateInteractionResponseRequest, E, R>,
-): GuildCommand<E, R> => Ix.guild(data, handler);
+): GuildCommand<E, R> =>
+  Ix.guild(data, (commandHelper) => provideInteractionToken(handler(commandHelper)));

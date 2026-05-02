@@ -1,6 +1,24 @@
 import { Ix } from "dfx";
 import type * as Discord from "dfx/types";
-import { Effect, Option } from "effect";
+import { Context, Effect, Option } from "effect";
+
+export interface InteractionTokenContext {
+  readonly token: Discord.APIInteraction["token"];
+}
+
+export class InteractionToken extends Context.Service<InteractionToken, InteractionTokenContext>()(
+  "dfx-discord-utils/InteractionToken",
+) {}
+
+export type DiscordInteractionToken = InteractionToken;
+
+export const provideInteractionToken = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E, Exclude<R, InteractionToken> | Ix.Interaction> =>
+  Effect.gen(function* () {
+    const interaction = yield* Ix.Interaction;
+    return yield* Effect.provideService(effect, InteractionToken, { token: interaction.token });
+  });
 
 type InteractionUser = Discord.UserResponse;
 type InteractionMember = NonNullable<Discord.APIInteraction["member"]>;

@@ -12,6 +12,7 @@ import {
   MessageActionRowComponentBuilder,
 } from "./messageComponentBuilder";
 import { DiscordInteraction } from "dfx/Interactions/context";
+import { InteractionToken, provideInteractionToken } from "./interaction";
 
 type AcknowledgementState = "none" | "replied" | "updated" | "deferred-reply" | "deferred-update";
 
@@ -150,8 +151,8 @@ export class MessageComponentHelper {
   private followUp = Effect.fn("MessageComponentHelper.followUp")(
     { self: this },
     function* (payload: Discord.IncomingWebhookRequestPartial, files: ReadonlyArray<File>) {
-      const context = yield* Ix.Interaction;
-      const request = this.rest.executeWebhook(this.application.id, context.token, {
+      const interactionToken = yield* InteractionToken;
+      const request = this.rest.executeWebhook(this.application.id, interactionToken.token, {
         params: { wait: true },
         payload,
       });
@@ -166,11 +167,11 @@ export class MessageComponentHelper {
       readonly params?: Discord.UpdateOriginalWebhookMessageParams;
       readonly payload: Discord.IncomingWebhookUpdateRequestPartial;
     }) {
-      const context = yield* Ix.Interaction;
+      const interactionToken = yield* InteractionToken;
 
       return yield* this.rest.updateOriginalWebhookMessage(
         this.application.id,
-        context.token,
+        interactionToken.token,
         response,
       );
     },
@@ -185,10 +186,14 @@ export class MessageComponentHelper {
         readonly payload: Discord.IncomingWebhookUpdateRequestPartial;
       },
     ) {
-      const context = yield* Ix.Interaction;
+      const interactionToken = yield* InteractionToken;
 
       return yield* this.rest.withFiles(files)(
-        this.rest.updateOriginalWebhookMessage(this.application.id, context.token, response),
+        this.rest.updateOriginalWebhookMessage(
+          this.application.id,
+          interactionToken.token,
+          response,
+        ),
       );
     },
   );
@@ -213,7 +218,7 @@ export const makeForkedMessageComponentHandler = Effect.fnUntraced(function* <E 
   return Effect.fnUntraced(function* (helper: MessageComponentHelper) {
     const context = yield* Ix.Interaction;
 
-    yield* pipe(handler(helper), FiberMap.run(fiberMap, context.id));
+    yield* pipe(handler(helper), provideInteractionToken, FiberMap.run(fiberMap, context.id));
   });
 });
 
@@ -235,7 +240,7 @@ export const makeMessageActionRowData = <
 ) => data(new ActionRowBuilder());
 
 type MessageComponentEnv<R> = Exclude<
-  R,
+  Exclude<R, InteractionToken>,
   DiscordInteraction | DiscordMessageComponent | Scope.Scope
 >;
 
@@ -244,7 +249,7 @@ type BuiltMessageComponent<E, R> = {
   readonly handler: Effect.Effect<
     Discord.CreateInteractionResponseRequest,
     E,
-    DiscordInteraction | R
+    DiscordInteraction | Exclude<R, InteractionToken>
   >;
 };
 
@@ -295,4 +300,4 @@ export const makeMessageComponent = <E = never, R = never>(
   data: { readonly custom_id: string },
   handler: Effect.Effect<Discord.CreateInteractionResponseRequest, E, R>,
 ): DfxMessageComponent<MessageComponentEnv<R>, E> =>
-  Ix.messageComponent(Ix.id(data.custom_id), handler);
+  Ix.messageComponent(Ix.id(data.custom_id), provideInteractionToken(handler));
