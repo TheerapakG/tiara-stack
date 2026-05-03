@@ -7,6 +7,7 @@ type DiscordApiClientRoutes = HttpApiClient.ForApi<typeof DiscordApi>;
 
 type DiscordApiClientService = {
   readonly application: Pick<DiscordApiClientRoutes["application"], "getApplication">;
+  readonly bot: Pick<DiscordApiClientRoutes["bot"], "createInteractionResponse" | "sendMessage">;
   readonly cache: Pick<
     DiscordApiClientRoutes["cache"],
     | "getGuild"

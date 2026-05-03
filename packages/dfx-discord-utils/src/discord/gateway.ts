@@ -25,8 +25,10 @@ export class DiscordApplication extends Context.Service<DiscordApplication>()(
     }),
   },
 ) {
+  static restLayer = Layer.effect(DiscordApplication, this.make);
+
   // Live layer - requires explicit base URL configuration
-  static layer = Layer.effect(DiscordApplication, this.make).pipe(Layer.provide(DiscordLayer));
+  static layer = this.restLayer.pipe(Layer.provide(DiscordLayer));
 }
 
 export const discordGatewayLayer: Layer.Layer<

@@ -1,3 +1,5 @@
+import { DiscordREST } from "dfx";
+import type * as Discord from "dfx/types";
 import { Rpc, RpcGroup } from "effect/unstable/rpc";
 import { Effect, Predicate, Schema } from "effect";
 import { GuildsCache, ChannelsCache, RolesCache, MembersCache } from "./cache";
@@ -8,11 +10,18 @@ import {
   CacheSizeSchema,
   ChannelCacheEntriesSchema,
   ChannelValueSchema,
+  CreateInteractionResponsePayloadSchema,
+  DiscordBotRestError,
+  DiscordBotRestErrorSchema,
+  DiscordInteractionCallbackResponseSchema,
+  DiscordMessageSchema,
   GuildValueSchema,
+  makeDiscordBotRestError,
   MemberCacheEntriesSchema,
   MemberValueSchema,
   RoleCacheEntriesSchema,
   RoleValueSchema,
+  SendMessagePayloadSchema,
 } from "./schema";
 
 const ResourceParams = Schema.Struct({
@@ -33,6 +42,16 @@ const ParentResourceParams = Schema.Struct({
 export class DiscordRpcs extends RpcGroup.make(
   Rpc.make("application.getApplication", {
     success: ApplicationValueSchema,
+  }),
+  Rpc.make("bot.createInteractionResponse", {
+    payload: CreateInteractionResponsePayloadSchema,
+    success: DiscordInteractionCallbackResponseSchema,
+    error: DiscordBotRestErrorSchema,
+  }),
+  Rpc.make("bot.sendMessage", {
+    payload: SendMessagePayloadSchema,
+    success: DiscordMessageSchema,
+    error: DiscordBotRestErrorSchema,
   }),
   Rpc.make("cache.getGuild", {
     payload: ResourceParams,
@@ -160,9 +179,95 @@ const handleSizeError = (
     Effect.orDie,
   );
 
+const statusFromError = (error: unknown): number | undefined => {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "response" in error &&
+    typeof error.response === "object" &&
+    error.response !== null &&
+    "status" in error.response &&
+    typeof error.response.status === "number"
+  ) {
+    return error.response.status;
+  }
+  return undefined;
+};
+
+const messageFromError = (message: string, error: unknown): string => {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "data" in error &&
+    typeof error.data === "object" &&
+    error.data !== null &&
+    "message" in error.data &&
+    typeof error.data.message === "string"
+  ) {
+    return `${message}: ${error.data.message}`;
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return `${message}: ${error.message}`;
+  }
+
+  return message;
+};
+
+const handleBotRestError = <A>(
+  effect: Effect.Effect<A, unknown, never>,
+  message: string,
+): Effect.Effect<A, DiscordBotRestError, never> =>
+  effect.pipe(
+    Effect.mapError((error) =>
+      makeDiscordBotRestError({
+        message: messageFromError(message, error),
+        status: statusFromError(error),
+      }),
+    ),
+  );
+
+const disabledMentions = () => ({ parse: [] });
+
+const withoutMessageMentions = <A extends object>(payload: A): A => ({
+  ...payload,
+  allowed_mentions: disabledMentions(),
+});
+
+const withoutInteractionMessageMentions = <
+  A extends {
+    readonly type: number;
+    readonly data?: object | null;
+  },
+>(
+  payload: A,
+): A => {
+  if (
+    (payload.type === 4 || payload.type === 7) &&
+    typeof payload.data === "object" &&
+    payload.data !== null
+  ) {
+    return {
+      ...payload,
+      data: {
+        ...payload.data,
+        allowed_mentions: disabledMentions(),
+      },
+    };
+  }
+
+  return payload;
+};
+
 export const discordRpcHandlersLayer = DiscordRpcs.toLayer(
   Effect.gen(function* () {
     const application = yield* DiscordApplication;
+    const rest = yield* DiscordREST;
     const guildsCache = yield* GuildsCache;
     const channelsCache = yield* ChannelsCache;
     const rolesCache = yield* RolesCache;
@@ -170,6 +275,28 @@ export const discordRpcHandlersLayer = DiscordRpcs.toLayer(
 
     return DiscordRpcs.of({
       "application.getApplication": () => Effect.succeed({ ownerId: application.owner.id }),
+      "bot.createInteractionResponse": ({ interactionId, interactionToken, payload }) =>
+        handleBotRestError(
+          rest
+            .createInteractionResponse(interactionId, interactionToken, {
+              params: { with_response: true },
+              payload: withoutInteractionMessageMentions(
+                payload,
+              ) as Discord.CreateInteractionResponseRequest,
+            })
+            .pipe(
+              Effect.flatMap(Schema.decodeUnknownEffect(DiscordInteractionCallbackResponseSchema)),
+            ),
+          `Failed to create interaction response for ${interactionId}`,
+        ),
+      "bot.sendMessage": ({ params: { channelId }, payload }) =>
+        handleBotRestError(
+          rest.createMessage(
+            channelId,
+            withoutMessageMentions(payload) as Discord.MessageCreateRequest,
+          ),
+          `Failed to send message to channel ${channelId}`,
+        ),
       "cache.getGuild": ({ params: { resourceId } }) =>
         handleCacheError(
           guildsCache.get(resourceId).pipe(Effect.map((value) => ({ value }))),

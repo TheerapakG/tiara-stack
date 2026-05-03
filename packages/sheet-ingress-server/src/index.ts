@@ -1,13 +1,7 @@
 import { NodeFileSystem, NodeHttpClient, NodeHttpServer, NodeRuntime } from "@effect/platform-node";
 import { createServer } from "http";
 import { Effect, Layer, Logger, Option } from "effect";
-import {
-  HttpMiddleware,
-  HttpRouter,
-  HttpServer,
-  HttpServerRequest,
-  HttpServerResponse,
-} from "effect/unstable/http";
+import { HttpMiddleware, HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http";
 import {
   HttpApiBuilder,
   HttpApiEndpoint,
@@ -32,6 +26,7 @@ import { MessageLookup } from "./services/messageLookup";
 import { SheetApisForwardingClient } from "./services/sheetApisForwardingClient";
 import { SheetApisRpcTokens } from "./services/sheetApisRpcTokens";
 import { SheetBotForwardingClient } from "./services/sheetBotForwardingClient";
+import { clientArgsFrom, forwardSheetBot, forwardSheetBotPayload } from "./services/sheetBotProxy";
 import { TelemetryLive } from "./telemetry";
 import {
   SheetApisAnonymousUserFallbackLive,
@@ -54,49 +49,6 @@ function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
     return false;
   });
 }
-
-type SheetBotGroups = (typeof Api)["groups"][keyof (typeof Api)["groups"]];
-type SheetBotGroupName = Extract<HttpApiGroup.Name<SheetBotGroups>, "application" | "cache">;
-type SheetBotGroup<GroupName extends SheetBotGroupName> = HttpApiGroup.WithName<
-  SheetBotGroups,
-  GroupName
->;
-type SheetBotEndpointName<GroupName extends SheetBotGroupName> = Extract<
-  HttpApiEndpoint.Name<HttpApiGroup.Endpoints<SheetBotGroup<GroupName>>>,
-  string
->;
-type SheetBotProxyHandler<
-  GroupName extends SheetBotGroupName,
-  EndpointName extends SheetBotEndpointName<GroupName>,
-> = HttpApiEndpoint.HandlerWithName<
-  HttpApiGroup.Endpoints<SheetBotGroup<GroupName>>,
-  EndpointName,
-  never,
-  SheetBotForwardingClient
->;
-type SheetBotEndpointClient = (args: unknown) => Effect.Effect<unknown, unknown, unknown>;
-
-const forwardSheetBot =
-  <GroupName extends SheetBotGroupName, EndpointName extends SheetBotEndpointName<GroupName>>(
-    group: GroupName,
-    endpoint: EndpointName,
-  ): SheetBotProxyHandler<GroupName, EndpointName> =>
-  (args) =>
-    Effect.gen(function* () {
-      const requestArgs = args as {
-        readonly request: HttpServerRequest.HttpServerRequest;
-      } & Record<string, unknown>;
-      const client = yield* SheetBotForwardingClient;
-      const groupClient = (
-        client as unknown as Record<string, Record<string, SheetBotEndpointClient>>
-      )[group];
-      const endpointClient = groupClient?.[endpoint];
-      if (typeof endpointClient !== "function") {
-        return yield* Effect.die(new Error(`Unknown sheet-bot proxy target: ${group}.${endpoint}`));
-      }
-
-      return yield* endpointClient(clientArgsFrom(requestArgs));
-    }) as ReturnType<SheetBotProxyHandler<GroupName, EndpointName>>;
 
 const getModernMessageGuildId = <
   T extends {
@@ -136,11 +88,6 @@ const getRequiredModernGuildId = <T extends Parameters<typeof getModernMessageGu
     onSome: Effect.succeed,
     onNone: () => legacyDenied(kind),
   });
-
-const clientArgsFrom = (args: Record<string, unknown>) => {
-  const { request: _request, ...clientArgs } = args;
-  return Object.keys(clientArgs).length === 0 ? undefined : clientArgs;
-};
 
 const corsMiddlewareLayer = Layer.unwrap(
   Effect.gen(function* () {
@@ -889,6 +836,14 @@ const makeApiLayer = () => {
     ),
     HttpApiBuilder.group(Api, "application", (handlers) =>
       handlers.handle("getApplication", forwardSheetBot("application", "getApplication")),
+    ),
+    HttpApiBuilder.group(Api, "bot", (handlers) =>
+      handlers
+        .handle(
+          "createInteractionResponse",
+          forwardSheetBotPayload("bot", "createInteractionResponse"),
+        )
+        .handle("sendMessage", forwardSheetBot("bot", "sendMessage")),
     ),
     HttpApiBuilder.group(Api, "cache", (handlers) =>
       handlers

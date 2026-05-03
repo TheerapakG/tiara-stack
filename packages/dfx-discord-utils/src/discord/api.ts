@@ -12,6 +12,11 @@ import {
   MemberCacheEntriesSchema,
   CacheSizeSchema,
   CacheNotFoundError,
+  CreateInteractionResponsePayloadSchema,
+  DiscordBotRestErrors,
+  DiscordInteractionCallbackResponseSchema,
+  DiscordMessageSchema,
+  SendMessagePayloadSchema,
 } from "./schema";
 
 // Path parameters
@@ -179,8 +184,31 @@ export class CacheApi extends HttpApiGroup.make("cache")
   .annotate(OpenApi.Title, "Cache")
   .annotate(OpenApi.Description, "Discord cache lookup API") {}
 
+export class BotApi extends HttpApiGroup.make("bot")
+  .add(
+    HttpApiEndpoint.post("createInteractionResponse", "/bot/interactions/responses", {
+      payload: CreateInteractionResponsePayloadSchema,
+      success: DiscordInteractionCallbackResponseSchema,
+      error: [...DiscordBotRestErrors, Unauthorized],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("sendMessage", "/bot/channels/:channelId/messages", {
+      params: Schema.Struct({ channelId: ResourceIdParam }),
+      payload: SendMessagePayloadSchema.fields.payload,
+      success: DiscordMessageSchema,
+      error: [...DiscordBotRestErrors, Unauthorized],
+    }),
+  )
+  .annotate(OpenApi.Title, "Bot")
+  .annotate(OpenApi.Description, "Discord bot interaction and message API") {}
+
 export class DiscordApi extends HttpApi.make("discord")
   .add(ApplicationApi)
   .add(CacheApi)
+  .add(BotApi)
   .annotate(OpenApi.Title, "Discord API")
-  .annotate(OpenApi.Description, "HTTP API for Discord application metadata and cache lookups") {}
+  .annotate(
+    OpenApi.Description,
+    "HTTP API for Discord application metadata, cache lookups, and bot actions",
+  ) {}

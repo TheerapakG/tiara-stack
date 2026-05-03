@@ -1,4 +1,5 @@
 export * from "./application";
+export * from "./botApi";
 export * from "./cacheApi";
 export * from "./channel";
 export * from "./emoji";

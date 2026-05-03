@@ -1,5 +1,5 @@
 import { HttpApi, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
-import { ApplicationApi, CacheApi } from "dfx-discord-utils/discord/api";
+import { ApplicationApi, BotApi, CacheApi } from "dfx-discord-utils/discord/api";
 import { SheetBotServiceAuthorization } from "./middlewares/sheetBotServiceAuthorization/tag";
 import {
   CalcApi,
@@ -48,9 +48,13 @@ class SheetIngressSheetApisApi extends HttpApi.make("api")
 
 class SheetIngressDiscordApiBase extends HttpApi.make("discord")
   .add(ApplicationApi.middleware(SheetBotServiceAuthorization))
+  .add(BotApi.middleware(SheetBotServiceAuthorization))
   .add(CacheApi.middleware(SheetBotServiceAuthorization))
   .annotate(OpenApi.Title, "Discord API")
-  .annotate(OpenApi.Description, "HTTP API for Discord application metadata and cache lookups") {}
+  .annotate(
+    OpenApi.Description,
+    "HTTP API for Discord application metadata, bot actions, and cache lookups",
+  ) {}
 
 // Effect's fluent HttpApi builder loses the concrete group union after annotate.
 // Keep annotations in this helper so the addHttpApi chain remains the source of truth.

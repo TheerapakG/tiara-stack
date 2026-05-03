@@ -1,7 +1,11 @@
 import { HttpRouter, HttpServer } from "effect/unstable/http";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import { NodeHttpServer } from "@effect/platform-node";
-import { DiscordApplication, discordRpcHandlersLayer } from "dfx-discord-utils/discord";
+import {
+  DiscordApplication,
+  DiscordLayer,
+  discordRpcHandlersLayer,
+} from "dfx-discord-utils/discord";
 import { SheetBotDispatchRpcs, SheetBotRpcs } from "sheet-ingress-api/sheet-bot-rpc";
 import type { SheetBotDispatchError } from "sheet-ingress-api/sheet-bot-rpc";
 import { Effect, Layer } from "effect";
@@ -58,7 +62,8 @@ const dispatchRpcHandlersLayer = SheetBotDispatchRpcs.toLayer({
 
 const rpcHandlersLayer = Layer.merge(
   discordRpcHandlersLayer.pipe(
-    Layer.provide(DiscordApplication.layer),
+    Layer.provide(DiscordApplication.restLayer),
+    Layer.provide(DiscordLayer),
     Layer.provide([discordConfigLayer, cachesLayer]),
   ),
   dispatchRpcHandlersLayer,

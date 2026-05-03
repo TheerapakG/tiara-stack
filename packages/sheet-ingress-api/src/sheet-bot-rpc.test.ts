@@ -7,6 +7,8 @@ import { DispatchCheckinPayload, DispatchRoomOrderPayload, SheetBotRpcs } from "
 describe("SheetBotRpcs", () => {
   it("keeps existing Discord RPC tags and adds dispatch tags", () => {
     expect(SheetBotRpcs.requests.has("application.getApplication")).toBe(true);
+    expect(SheetBotRpcs.requests.has("bot.createInteractionResponse")).toBe(true);
+    expect(SheetBotRpcs.requests.has("bot.sendMessage")).toBe(true);
     expect(SheetBotRpcs.requests.has("cache.getMember")).toBe(true);
     expect(SheetBotRpcs.requests.has("dispatch.checkin")).toBe(true);
     expect(SheetBotRpcs.requests.has("dispatch.roomOrder")).toBe(true);
