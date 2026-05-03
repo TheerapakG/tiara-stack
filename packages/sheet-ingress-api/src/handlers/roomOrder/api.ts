@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
-import { SchemaError, ArgumentError } from "typhoon-core/error";
+import { SchemaError, ArgumentError, UnknownError } from "typhoon-core/error";
 import { QueryResultError } from "typhoon-zero/error";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
 import { SheetApisServiceUserFallback } from "../../middlewares/sheetApisServiceUserFallback/tag";
@@ -8,6 +8,7 @@ import { RoomOrderGenerateResult } from "../../schemas/roomOrder";
 import { GoogleSheetsError } from "../../schemas/google";
 import { ParserFieldError } from "../../schemas/sheet/error";
 import { SheetConfigError } from "../../schemas/sheetConfig";
+import { RoomOrderDispatchPayload, RoomOrderDispatchResult } from "../../sheet-apis-rpc";
 
 const RoomOrderGenerateError = [
   GoogleSheetsError,
@@ -17,6 +18,8 @@ const RoomOrderGenerateError = [
   QueryResultError,
   ArgumentError,
 ];
+
+const RoomOrderDispatchError = [...RoomOrderGenerateError, UnknownError];
 
 export class RoomOrderApi extends HttpApiGroup.make("roomOrder")
   .add(
@@ -30,6 +33,13 @@ export class RoomOrderApi extends HttpApiGroup.make("roomOrder")
       }),
       success: RoomOrderGenerateResult,
       error: RoomOrderGenerateError,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("dispatch", "/roomOrder/dispatch", {
+      payload: RoomOrderDispatchPayload,
+      success: RoomOrderDispatchResult,
+      error: RoomOrderDispatchError,
     }),
   )
   .middleware(SheetApisServiceUserFallback)

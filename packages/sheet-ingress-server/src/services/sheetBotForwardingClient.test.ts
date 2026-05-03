@@ -55,8 +55,8 @@ describe("SheetBotForwardingClient", () => {
     expect(client.application.getApplication).toEqual(expect.any(Function));
     expect(client.bot.createInteractionResponse).toEqual(expect.any(Function));
     expect(client.bot.sendMessage).toEqual(expect.any(Function));
-    expect(client.dispatch.checkin).toEqual(expect.any(Function));
-    expect(client.dispatch.roomOrder).toEqual(expect.any(Function));
+    expect(client.bot.updateMessage).toEqual(expect.any(Function));
+    expect(client.bot.updateOriginalInteractionResponse).toEqual(expect.any(Function));
     expect(client.cache.getMember).toEqual(expect.any(Function));
   });
 

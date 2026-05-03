@@ -69,6 +69,8 @@ const CheckinGenerateError = Schema.Union([
   ArgumentError,
 ]);
 
+const CheckinDispatchError = Schema.Union([CheckinGenerateError, UnknownError]);
+
 const MonitorError = Schema.Union([
   GoogleSheetsError,
   ParserFieldError,
@@ -93,6 +95,8 @@ const RoomOrderGenerateError = Schema.Union([
   QueryResultError,
   ArgumentError,
 ]);
+
+const RoomOrderDispatchError = Schema.Union([RoomOrderGenerateError, UnknownError]);
 
 const ScheduleError = Schema.Union([
   GoogleSheetsError,
@@ -148,6 +152,52 @@ const messageRoomOrderEntryInput = Schema.Struct({
   tags: Schema.Array(Schema.String),
   effectValue: Schema.Number,
 });
+
+export const CheckinDispatchPayload = Schema.Struct({
+  guildId: Schema.String,
+  channelId: Schema.optional(Schema.String),
+  channelName: Schema.optional(Schema.String),
+  hour: Schema.optional(Schema.Number),
+  template: Schema.optional(Schema.String),
+  interactionToken: Schema.optional(Schema.String),
+});
+
+export type CheckinDispatchPayload = Schema.Schema.Type<typeof CheckinDispatchPayload>;
+
+export const CheckinDispatchResult = Schema.Struct({
+  hour: Schema.Number,
+  runningChannelId: Schema.String,
+  checkinChannelId: Schema.String,
+  checkinMessageId: Schema.NullOr(Schema.String),
+  checkinMessageChannelId: Schema.NullOr(Schema.String),
+  primaryMessageId: Schema.String,
+  primaryMessageChannelId: Schema.String,
+  tentativeRoomOrderMessageId: Schema.NullOr(Schema.String),
+  tentativeRoomOrderMessageChannelId: Schema.NullOr(Schema.String),
+});
+
+export type CheckinDispatchResult = Schema.Schema.Type<typeof CheckinDispatchResult>;
+
+export const RoomOrderDispatchPayload = Schema.Struct({
+  guildId: Schema.String,
+  channelId: Schema.optional(Schema.String),
+  channelName: Schema.optional(Schema.String),
+  hour: Schema.optional(Schema.Number),
+  healNeeded: Schema.optional(Schema.Number),
+  interactionToken: Schema.optional(Schema.String),
+});
+
+export type RoomOrderDispatchPayload = Schema.Schema.Type<typeof RoomOrderDispatchPayload>;
+
+export const RoomOrderDispatchResult = Schema.Struct({
+  messageId: Schema.String,
+  messageChannelId: Schema.String,
+  hour: Schema.Number,
+  runningChannelId: Schema.String,
+  rank: Schema.Number,
+});
+
+export type RoomOrderDispatchResult = Schema.Schema.Type<typeof RoomOrderDispatchResult>;
 
 const protectedRpc = <
   const Tag extends string,
@@ -228,6 +278,13 @@ export const CheckinRpcs = RpcGroup.make(
     }),
     success: CheckinGenerateResult,
     error: CheckinGenerateError,
+  }),
+  protectedRpc("checkin.dispatch", {
+    payload: Schema.Struct({
+      payload: CheckinDispatchPayload,
+    }),
+    success: CheckinDispatchResult,
+    error: CheckinDispatchError,
   }),
 );
 
@@ -559,6 +616,13 @@ export const RoomOrderRpcs = RpcGroup.make(
     }),
     success: RoomOrderGenerateResult,
     error: RoomOrderGenerateError,
+  }),
+  protectedRpc("roomOrder.dispatch", {
+    payload: Schema.Struct({
+      payload: RoomOrderDispatchPayload,
+    }),
+    success: RoomOrderDispatchResult,
+    error: RoomOrderDispatchError,
   }),
 );
 

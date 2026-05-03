@@ -1,12 +1,9 @@
 import { NodeHttpServer } from "@effect/platform-node";
-import { HttpClient, HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http";
-import type { ServeError } from "effect/unstable/http/HttpServerError";
+import { HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import { Layer } from "effect";
-import type { ConfigError } from "effect/Config";
 import { createServer } from "http";
 import { SheetApisRpcs } from "sheet-ingress-api/sheet-apis-rpc";
-import { GoogleSheetsError } from "sheet-ingress-api/schemas/google";
 import { calcLayer } from "./handlers/calc";
 import { checkinLayer } from "./handlers/checkin";
 import { discordLayer } from "./handlers/discord";
@@ -56,11 +53,7 @@ const rpcRoutesLayer = RpcServer.layerHttp({
   Layer.provideMerge(HttpRouter.layer),
 );
 
-export const httpLayer: Layer.Layer<
-  HttpRouter.HttpRouter,
-  ConfigError | GoogleSheetsError | ServeError,
-  HttpClient.HttpClient
-> = HttpRouter.serve(rpcRoutesLayer).pipe(
+export const httpLayer = HttpRouter.serve(rpcRoutesLayer).pipe(
   Layer.provide(discordServiceLayer),
   HttpServer.withLogAddress,
   Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 })),

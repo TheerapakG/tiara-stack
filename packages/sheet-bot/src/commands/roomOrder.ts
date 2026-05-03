@@ -9,8 +9,8 @@ import { Effect, Layer, Option, pipe } from "effect";
 import { discordGatewayLayer } from "../discord/gateway";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
-import { roomOrderActionRow } from "../messageComponents/buttons/roomOrderComponents";
-import { MessageRoomOrderService, RoomOrderService, SheetApisRequestContext } from "../services";
+import { InteractionToken } from "dfx-discord-utils/utils";
+import { SheetApisClient, SheetApisRequestContext } from "../services";
 import { discordApplicationLayer } from "../discord/application";
 
 const getInteractionGuildId = Effect.gen(function* () {
@@ -29,14 +29,8 @@ const getInteractionChannelId = Effect.gen(function* () {
   );
 });
 
-const getInteractionUserId = Effect.gen(function* () {
-  const interactionUser = yield* Interaction.user();
-  return (interactionUser as { id: string }).id;
-});
-
 const makeManualSubCommand = Effect.gen(function* () {
-  const messageRoomOrderService = yield* MessageRoomOrderService;
-  const roomOrderService = yield* RoomOrderService;
+  const sheetApisClient = yield* SheetApisClient;
 
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
@@ -61,51 +55,32 @@ const makeManualSubCommand = Effect.gen(function* () {
         Option.getOrUndefined(serverId) ?? Option.getOrThrow(yield* getInteractionGuildId);
 
       const channelNameOption = command.optionValueOptional("channel_name");
-      const generated = yield* roomOrderService.generate({
-        guildId,
-        ...(Option.isSome(channelNameOption)
-          ? { channelName: channelNameOption.value }
-          : {
-              channelId: Option.getOrThrow(yield* getInteractionChannelId),
-            }),
-        ...pipe(
-          command.optionValueOptional("hour"),
-          Option.match({
-            onSome: (hour) => ({ hour }),
-            onNone: () => ({}),
-          }),
-        ),
-        ...pipe(
-          command.optionValueOptional("heal"),
-          Option.match({
-            onSome: (healNeeded) => ({ healNeeded }),
-            onNone: () => ({}),
-          }),
-        ),
-      });
-
-      const messageResult = yield* command.editReply({
+      const interactionToken = yield* InteractionToken;
+      yield* sheetApisClient.get().roomOrder.dispatch({
         payload: {
-          content: generated.content,
-          components: [roomOrderActionRow(generated.range, generated.rank).toJSON()],
+          guildId,
+          interactionToken: interactionToken.token,
+          ...(Option.isSome(channelNameOption)
+            ? { channelName: channelNameOption.value }
+            : {
+                channelId: Option.getOrThrow(yield* getInteractionChannelId),
+              }),
+          ...pipe(
+            command.optionValueOptional("hour"),
+            Option.match({
+              onSome: (hour) => ({ hour }),
+              onNone: () => ({}),
+            }),
+          ),
+          ...pipe(
+            command.optionValueOptional("heal"),
+            Option.match({
+              onSome: (healNeeded) => ({ healNeeded }),
+              onNone: () => ({}),
+            }),
+          ),
         },
       });
-
-      yield* messageRoomOrderService.upsertMessageRoomOrder(messageResult.id, {
-        previousFills: generated.previousFills,
-        fills: generated.fills,
-        hour: generated.hour,
-        rank: generated.rank,
-        monitor: generated.monitor,
-        guildId,
-        messageChannelId: messageResult.channel_id,
-        createdByUserId: yield* getInteractionUserId,
-      });
-
-      yield* messageRoomOrderService.upsertMessageRoomOrderEntry(
-        messageResult.id,
-        generated.entries,
-      );
     }),
   );
 });
@@ -151,11 +126,6 @@ export const roomOrderCommandLayer = Layer.effectDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(
-      discordGatewayLayer,
-      discordApplicationLayer,
-      RoomOrderService.layer,
-      MessageRoomOrderService.layer,
-    ),
+    Layer.mergeAll(discordGatewayLayer, discordApplicationLayer, SheetApisClient.layer),
   ),
 );

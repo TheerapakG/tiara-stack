@@ -29,6 +29,7 @@ export default defineConfig({
     entry: {
       "api-groups": fileURLToPath(new URL("./src/api-groups.ts", import.meta.url)),
       api: fileURLToPath(new URL("./src/api.ts", import.meta.url)),
+      discordComponents: fileURLToPath(new URL("./src/discordComponents.ts", import.meta.url)),
       "handlers/health/schema": fileURLToPath(
         new URL("./src/handlers/health/schema.ts", import.meta.url),
       ),

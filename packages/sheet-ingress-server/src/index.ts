@@ -522,10 +522,15 @@ const makeApiLayer = () => {
         .handle("calcSheet", forwardSheetApis("calc", "calcSheet")),
     ),
     HttpApiBuilder.group(Api, "checkin", (handlers) =>
-      handlers.handle(
-        "generate",
-        guildPayload("checkin", "generate", "monitor", (payload) => payload.guildId),
-      ),
+      handlers
+        .handle(
+          "generate",
+          guildPayload("checkin", "generate", "monitor", (payload) => payload.guildId),
+        )
+        .handle(
+          "dispatch",
+          guildPayload("checkin", "dispatch", "monitor", (payload) => payload.guildId),
+        ),
     ),
     HttpApiBuilder.group(Api, "discord", (handlers) =>
       handlers
@@ -783,10 +788,15 @@ const makeApiLayer = () => {
         ),
     ),
     HttpApiBuilder.group(Api, "roomOrder", (handlers) =>
-      handlers.handle(
-        "generate",
-        guildPayload("roomOrder", "generate", "monitor", (payload) => payload.guildId),
-      ),
+      handlers
+        .handle(
+          "generate",
+          guildPayload("roomOrder", "generate", "monitor", (payload) => payload.guildId),
+        )
+        .handle(
+          "dispatch",
+          guildPayload("roomOrder", "dispatch", "monitor", (payload) => payload.guildId),
+        ),
     ),
     HttpApiBuilder.group(Api, "schedule", (handlers) =>
       handlers
@@ -843,7 +853,12 @@ const makeApiLayer = () => {
           "createInteractionResponse",
           forwardSheetBotPayload("bot", "createInteractionResponse"),
         )
-        .handle("sendMessage", forwardSheetBot("bot", "sendMessage")),
+        .handle("sendMessage", forwardSheetBot("bot", "sendMessage"))
+        .handle("updateMessage", forwardSheetBot("bot", "updateMessage"))
+        .handle(
+          "updateOriginalInteractionResponse",
+          forwardSheetBot("bot", "updateOriginalInteractionResponse"),
+        ),
     ),
     HttpApiBuilder.group(Api, "cache", (handlers) =>
       handlers

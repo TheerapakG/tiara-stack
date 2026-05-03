@@ -132,6 +132,21 @@ export const SendMessagePayloadSchema = Schema.Struct({
   payload: DiscordMessageRequestSchema,
 });
 
+export const UpdateMessagePayloadSchema = Schema.Struct({
+  params: Schema.Struct({
+    channelId: Schema.String,
+    messageId: Schema.String,
+  }),
+  payload: DiscordMessageRequestSchema,
+});
+
+export const UpdateOriginalInteractionResponsePayloadSchema = Schema.Struct({
+  params: Schema.Struct({
+    interactionToken: Schema.String,
+  }),
+  payload: DiscordMessageRequestSchema,
+});
+
 export const DiscordMessageSchema = Schema.Struct({
   id: Schema.String,
   channel_id: Schema.String,

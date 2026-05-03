@@ -7,6 +7,8 @@ describe("SheetApisRpcs", () => {
     expect(SheetApisRpcs.requests.has("health.live")).toBe(true);
     expect(SheetApisRpcs.requests.has("messageSlot.getMessageSlotData")).toBe(true);
     expect(SheetApisRpcs.requests.has("calc.calcSheet")).toBe(true);
+    expect(SheetApisRpcs.requests.has("checkin.dispatch")).toBe(true);
+    expect(SheetApisRpcs.requests.has("roomOrder.dispatch")).toBe(true);
   });
 
   it("requires authorization middleware on clients", () => {

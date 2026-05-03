@@ -3,6 +3,7 @@ import { userMention } from "@discordjs/formatters";
 import { ButtonStyle, MessageFlags } from "discord-api-types/v10";
 import { Ix } from "dfx/index";
 import { Array, Effect, Layer, Option, pipe } from "effect";
+import { CHECKIN_BUTTON_CUSTOM_ID } from "sheet-ingress-api/discordComponents";
 import { discordGatewayLayer } from "../../discord/gateway";
 import {
   makeButton,
@@ -39,7 +40,7 @@ const getInteractionMessage = Effect.gen(function* () {
 export const makeCheckinButtonData = (disabled = false) =>
   makeButtonData((b) =>
     b
-      .setCustomId("interaction:checkin")
+      .setCustomId(CHECKIN_BUTTON_CUSTOM_ID)
       .setLabel("Check in")
       .setStyle(ButtonStyle.Primary)
       .setEmoji({ id: "907705464215711834", name: "Miku_Happy" })

@@ -1,12 +1,15 @@
 import { Effect } from "effect";
 import type { DiscordRestService } from "dfx/DiscordREST";
 import {
+  formatTentativeRoomOrderContent,
+  hasTentativeRoomOrderPrefix,
+  shouldSendTentativeRoomOrder,
+  stripTentativeRoomOrderPrefix,
+} from "sheet-ingress-api/discordComponents";
+import {
   tentativeRoomOrderActionRow,
   tentativeRoomOrderPinActionRow,
 } from "../messageComponents/buttons/roomOrderComponents";
-
-const MIN_FILL_COUNT = 5;
-const TENTATIVE_PREFIX = "(tentative)";
 
 type TentativeRoomOrderSender = Pick<DiscordRestService, "createMessage" | "updateMessage">;
 
@@ -66,18 +69,11 @@ type TentativeMessageRoomOrderService = {
   ) => Effect.Effect<unknown, unknown, never>;
 };
 
-export const hasTentativeRoomOrderPrefix = (content: string): boolean =>
-  content === TENTATIVE_PREFIX || content.startsWith(`${TENTATIVE_PREFIX}\n`);
-
-export const stripTentativeRoomOrderPrefix = (content: string): string =>
-  hasTentativeRoomOrderPrefix(content)
-    ? content.slice(TENTATIVE_PREFIX.length).replace(/^\n/, "")
-    : content;
-
-export const formatTentativeRoomOrderContent = (content: string): string =>
-  hasTentativeRoomOrderPrefix(content) ? content : [TENTATIVE_PREFIX, content].join("\n");
-
-const shouldSendTentativeRoomOrder = (fillCount: number): boolean => fillCount >= MIN_FILL_COUNT;
+export {
+  formatTentativeRoomOrderContent,
+  hasTentativeRoomOrderPrefix,
+  stripTentativeRoomOrderPrefix,
+};
 
 export const sendTentativeRoomOrder = Effect.fn("sendTentativeRoomOrder")(function* ({
   guildId,

@@ -1,6 +1,5 @@
 export * from "./checkin";
 export * from "./converter";
-export * from "./dispatch";
 export * from "./embed";
 export * from "./format";
 export * from "./guildConfig";

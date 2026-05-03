@@ -18,6 +18,10 @@
       "types": "./dist/api.d.mts",
       "default": "./dist/api.mjs"
     },
+    "./discordComponents": {
+      "types": "./dist/discordComponents.d.mts",
+      "default": "./dist/discordComponents.mjs"
+    },
     "./api-groups": {
       "types": "./dist/api-groups.d.mts",
       "default": "./dist/api-groups.mjs"

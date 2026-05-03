@@ -17,6 +17,8 @@ import {
   DiscordInteractionCallbackResponseSchema,
   DiscordMessageSchema,
   SendMessagePayloadSchema,
+  UpdateMessagePayloadSchema,
+  UpdateOriginalInteractionResponsePayloadSchema,
 } from "./schema";
 
 // Path parameters
@@ -199,6 +201,26 @@ export class BotApi extends HttpApiGroup.make("bot")
       success: DiscordMessageSchema,
       error: [...DiscordBotRestErrors, Unauthorized],
     }),
+  )
+  .add(
+    HttpApiEndpoint.patch("updateMessage", "/bot/channels/:channelId/messages/:messageId", {
+      params: UpdateMessagePayloadSchema.fields.params,
+      payload: UpdateMessagePayloadSchema.fields.payload,
+      success: DiscordMessageSchema,
+      error: [...DiscordBotRestErrors, Unauthorized],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.patch(
+      "updateOriginalInteractionResponse",
+      "/bot/interactions/:interactionToken/original-response",
+      {
+        params: UpdateOriginalInteractionResponsePayloadSchema.fields.params,
+        payload: UpdateOriginalInteractionResponsePayloadSchema.fields.payload,
+        success: DiscordMessageSchema,
+        error: [...DiscordBotRestErrors, Unauthorized],
+      },
+    ),
   )
   .annotate(OpenApi.Title, "Bot")
   .annotate(OpenApi.Description, "Discord bot interaction and message API") {}

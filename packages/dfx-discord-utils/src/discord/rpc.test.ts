@@ -67,14 +67,32 @@ const makeRest = ({
         },
       },
     }),
+  updateMessage = () =>
+    Effect.succeed({
+      id: "message-1",
+      channel_id: "channel-1",
+      content: "updated",
+    }),
+  updateOriginalWebhookMessage = () =>
+    Effect.succeed({
+      id: "message-1",
+      channel_id: "channel-1",
+      content: "updated",
+    }),
 }: {
   readonly createMessage?: (...args: ReadonlyArray<unknown>) => Effect.Effect<unknown, unknown>;
   readonly createInteractionResponse?: (
     ...args: ReadonlyArray<unknown>
   ) => Effect.Effect<unknown, unknown>;
+  readonly updateMessage?: (...args: ReadonlyArray<unknown>) => Effect.Effect<unknown, unknown>;
+  readonly updateOriginalWebhookMessage?: (
+    ...args: ReadonlyArray<unknown>
+  ) => Effect.Effect<unknown, unknown>;
 } = {}) => ({
   createMessage,
   createInteractionResponse,
+  updateMessage,
+  updateOriginalWebhookMessage,
 });
 
 const run = <A, E, R>(
@@ -85,6 +103,7 @@ const run = <A, E, R>(
   const provided = effect.pipe(
     Effect.provide(discordRpcHandlersLayer),
     Effect.provideService(DiscordApplication, {
+      id: "app-1",
       owner: { id: "owner-1" },
     } as never),
     Effect.provideService(GuildsCache, caches.guilds as never),
@@ -328,6 +347,80 @@ describe("DiscordRpcs handlers", () => {
     expect(result).toEqual({ interaction: { id: "interaction-1", type: 2 } });
   });
 
+  it("bot.updateMessage updates a channel message", async () => {
+    const calls: Array<ReadonlyArray<unknown>> = [];
+    const result = await run(
+      Effect.gen(function* () {
+        const client = yield* makeClient;
+        return yield* client("bot.updateMessage", {
+          params: { channelId: "channel-1", messageId: "message-1" },
+          payload: { content: "updated" },
+        });
+      }),
+      makeCaches(),
+      makeRest({
+        updateMessage: (...args) => {
+          calls.push(args);
+          return Effect.succeed({
+            id: "message-1",
+            channel_id: "channel-1",
+            content: "updated",
+          });
+        },
+      }),
+    );
+
+    expect(calls).toEqual([
+      [
+        "channel-1",
+        "message-1",
+        {
+          content: "updated",
+          allowed_mentions: { parse: [] },
+        },
+      ],
+    ]);
+    expect(result).toEqual({ id: "message-1", channel_id: "channel-1", content: "updated" });
+  });
+
+  it("bot.updateOriginalInteractionResponse updates the original webhook message", async () => {
+    const calls: Array<ReadonlyArray<unknown>> = [];
+    const result = await run(
+      Effect.gen(function* () {
+        const client = yield* makeClient;
+        return yield* client("bot.updateOriginalInteractionResponse", {
+          params: { interactionToken: "token-1" },
+          payload: { content: "updated" },
+        });
+      }),
+      makeCaches(),
+      makeRest({
+        updateOriginalWebhookMessage: (...args) => {
+          calls.push(args);
+          return Effect.succeed({
+            id: "message-1",
+            channel_id: "channel-1",
+            content: "updated",
+          });
+        },
+      }),
+    );
+
+    expect(calls).toEqual([
+      [
+        "app-1",
+        "token-1",
+        {
+          payload: {
+            content: "updated",
+            allowed_mentions: { parse: [] },
+          },
+        },
+      ],
+    ]);
+    expect(result).toEqual({ id: "message-1", channel_id: "channel-1", content: "updated" });
+  });
+
   it("bot.createInteractionResponse converts malformed REST responses to a typed error", async () => {
     const result = await run(
       Effect.gen(function* () {
@@ -414,6 +507,20 @@ describe("DiscordRpcs handlers", () => {
             },
           },
         });
+        yield* client("bot.updateMessage", {
+          params: { channelId: "channel-1", messageId: "message-1" },
+          payload: {
+            content: "@everyone",
+            allowed_mentions: { parse: ["everyone"] },
+          },
+        });
+        yield* client("bot.updateOriginalInteractionResponse", {
+          params: { interactionToken: "token-1" },
+          payload: {
+            content: "@everyone",
+            allowed_mentions: { parse: ["everyone"] },
+          },
+        });
       }),
       makeCaches(),
       makeRest({
@@ -424,6 +531,14 @@ describe("DiscordRpcs handlers", () => {
         createInteractionResponse: (...args) => {
           calls.push(args);
           return Effect.succeed({ interaction: { id: "interaction-1", type: 2 } });
+        },
+        updateMessage: (...args) => {
+          calls.push(args);
+          return Effect.succeed({ id: "message-1", channel_id: "channel-1" });
+        },
+        updateOriginalWebhookMessage: (...args) => {
+          calls.push(args);
+          return Effect.succeed({ id: "message-1", channel_id: "channel-1" });
         },
       }),
     );
@@ -447,6 +562,24 @@ describe("DiscordRpcs handlers", () => {
               content: "@everyone",
               allowed_mentions: { parse: [] },
             },
+          },
+        },
+      ],
+      [
+        "channel-1",
+        "message-1",
+        {
+          content: "@everyone",
+          allowed_mentions: { parse: [] },
+        },
+      ],
+      [
+        "app-1",
+        "token-1",
+        {
+          payload: {
+            content: "@everyone",
+            allowed_mentions: { parse: [] },
           },
         },
       ],

@@ -11,7 +11,6 @@ import {
   ChannelCacheEntriesSchema,
   ChannelValueSchema,
   CreateInteractionResponsePayloadSchema,
-  DiscordBotRestError,
   DiscordBotRestErrorSchema,
   DiscordInteractionCallbackResponseSchema,
   DiscordMessageSchema,
@@ -22,7 +21,10 @@ import {
   RoleCacheEntriesSchema,
   RoleValueSchema,
   SendMessagePayloadSchema,
+  UpdateMessagePayloadSchema,
+  UpdateOriginalInteractionResponsePayloadSchema,
 } from "./schema";
+import type { DiscordBotRestError } from "./schema";
 
 const ResourceParams = Schema.Struct({
   params: Schema.Struct({ resourceId: Schema.String }),
@@ -50,6 +52,16 @@ export class DiscordRpcs extends RpcGroup.make(
   }),
   Rpc.make("bot.sendMessage", {
     payload: SendMessagePayloadSchema,
+    success: DiscordMessageSchema,
+    error: DiscordBotRestErrorSchema,
+  }),
+  Rpc.make("bot.updateMessage", {
+    payload: UpdateMessagePayloadSchema,
+    success: DiscordMessageSchema,
+    error: DiscordBotRestErrorSchema,
+  }),
+  Rpc.make("bot.updateOriginalInteractionResponse", {
+    payload: UpdateOriginalInteractionResponsePayloadSchema,
     success: DiscordMessageSchema,
     error: DiscordBotRestErrorSchema,
   }),
@@ -296,6 +308,22 @@ export const discordRpcHandlersLayer = DiscordRpcs.toLayer(
             withoutMessageMentions(payload) as Discord.MessageCreateRequest,
           ),
           `Failed to send message to channel ${channelId}`,
+        ),
+      "bot.updateMessage": ({ params: { channelId, messageId }, payload }) =>
+        handleBotRestError(
+          rest.updateMessage(
+            channelId,
+            messageId,
+            withoutMessageMentions(payload) as Discord.MessageEditRequestPartial,
+          ),
+          `Failed to update message ${messageId} in channel ${channelId}`,
+        ),
+      "bot.updateOriginalInteractionResponse": ({ params: { interactionToken }, payload }) =>
+        handleBotRestError(
+          rest.updateOriginalWebhookMessage(application.id, interactionToken, {
+            payload: withoutMessageMentions(payload) as Discord.IncomingWebhookUpdateRequestPartial,
+          }),
+          "Failed to update original interaction response",
         ),
       "cache.getGuild": ({ params: { resourceId } }) =>
         handleCacheError(

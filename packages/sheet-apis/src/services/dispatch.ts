@@ -1,123 +1,198 @@
-import { Discord, DiscordREST } from "dfx";
-import { MessageFlags } from "discord-api-types/v10";
-import { Context, Effect, HashSet, Layer } from "effect";
-import { DiscordApplication } from "dfx-discord-utils/discord";
-import { makeUnknownError, Unauthorized } from "typhoon-core/error";
+import { Context, Effect, Layer, Schema } from "effect";
+import { DiscordMessageRequestSchema } from "dfx-discord-utils/discord/schema";
+import {
+  formatTentativeRoomOrderContent,
+  shouldSendTentativeRoomOrder,
+} from "sheet-ingress-api/discordComponents";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
-import type { Permission } from "sheet-ingress-api/schemas/permissions";
 import type {
-  DispatchCheckinPayload,
-  DispatchCheckinResult,
-  DispatchRoomOrderPayload,
-  DispatchRoomOrderResult,
-} from "sheet-ingress-api/sheet-bot-rpc";
-import { discordApplicationLayer } from "../discord/application";
-import { discordGatewayLayer } from "../discord/gateway";
-import { checkinActionRow } from "../messageComponents/buttons/checkin";
-import { roomOrderActionRow } from "../messageComponents/buttons/roomOrderComponents";
+  CheckinDispatchPayload,
+  CheckinDispatchResult,
+  RoomOrderDispatchPayload,
+  RoomOrderDispatchResult,
+} from "sheet-ingress-api/sheet-apis-rpc";
 import { CheckinService } from "./checkin";
+import {
+  checkinActionRow,
+  roomOrderActionRow,
+  tentativeRoomOrderActionRow,
+  tentativeRoomOrderPinActionRow,
+} from "./discordComponents";
+import { IngressBotClient } from "./ingressBotClient";
 import { MessageCheckinService } from "./messageCheckin";
 import { MessageRoomOrderService } from "./messageRoomOrder";
 import { RoomOrderService } from "./roomOrder";
-import { sendTentativeRoomOrder } from "./tentativeRoomOrder";
 
-type MessagePayload = Discord.MessageCreateRequest | Discord.IncomingWebhookUpdateRequestPartial;
+const MessageFlags = {
+  Ephemeral: 64,
+} as const;
 
-type DispatchMessageSink = {
-  readonly sendPrimary: (payload: MessagePayload) => Effect.Effect<Discord.APIMessage, unknown>;
-  readonly updatePrimary: (
-    message: Discord.APIMessage,
-    payload: Discord.IncomingWebhookUpdateRequestPartial,
-  ) => Effect.Effect<Discord.APIMessage, unknown>;
+type DiscordMessage = {
+  readonly id: string;
+  readonly channel_id: string;
 };
 
-const mapDiscordError = (message: string) => (cause: unknown) => makeUnknownError(message, cause);
+type MessagePayload = Schema.Schema.Type<typeof DiscordMessageRequestSchema>;
+
+type DispatchMessageSink = {
+  readonly sendPrimary: (
+    payload: MessagePayload,
+  ) => Effect.Effect<DiscordMessage, unknown, unknown>;
+  readonly updatePrimary: (
+    message: DiscordMessage,
+    payload: MessagePayload,
+  ) => Effect.Effect<DiscordMessage, unknown, unknown>;
+};
 
 const logEnableFailure = (message: string) => (error: unknown) =>
   Effect.logWarning(message).pipe(Effect.annotateLogs({ cause: String(error) }));
 
-const hasPermission = (permissions: HashSet.HashSet<Permission>, permission: Permission) =>
-  HashSet.has(permissions, permission);
-
-const requireDispatchMonitorGuild = Effect.fn("DispatchService.requireDispatchMonitorGuild")(
-  function* (guildId: string) {
-    const user = yield* SheetAuthUser;
-    if (
-      hasPermission(user.permissions, "service") ||
-      hasPermission(user.permissions, "app_owner") ||
-      hasPermission(user.permissions, `monitor_guild:${guildId}`)
-    ) {
-      return user;
-    }
-
-    return yield* Effect.fail(
-      new Unauthorized({ message: "User does not have monitor guild permission" }),
-    );
-  },
-);
-
 const makeInteractionMessageSink = (
-  discordRest: Context.Service.Shape<typeof DiscordREST>,
-  application: Context.Service.Shape<typeof DiscordApplication>,
+  botClient: typeof IngressBotClient.Service,
   interactionToken: string,
 ): DispatchMessageSink => ({
-  sendPrimary: (payload) =>
-    discordRest
-      .updateOriginalWebhookMessage(application.id, interactionToken, { payload })
-      .pipe(Effect.mapError(mapDiscordError("Failed to edit deferred interaction response"))),
+  sendPrimary: (payload) => botClient.updateOriginalInteractionResponse(interactionToken, payload),
   updatePrimary: (_message, payload) =>
-    discordRest
-      .updateOriginalWebhookMessage(application.id, interactionToken, { payload })
-      .pipe(Effect.mapError(mapDiscordError("Failed to update deferred interaction response"))),
+    botClient.updateOriginalInteractionResponse(interactionToken, payload),
 });
 
 const makeChannelMessageSink = (
-  discordRest: Context.Service.Shape<typeof DiscordREST>,
+  botClient: typeof IngressBotClient.Service,
   channelId: string,
 ): DispatchMessageSink => ({
-  sendPrimary: (payload) =>
-    discordRest
-      .createMessage(channelId, payload as Discord.MessageCreateRequest)
-      .pipe(Effect.mapError(mapDiscordError("Failed to send primary dispatch message"))),
+  sendPrimary: (payload) => botClient.sendMessage(channelId, payload),
   updatePrimary: (message, payload) =>
-    discordRest
-      .updateMessage(message.channel_id, message.id, payload as Discord.MessageEditRequestPartial)
-      .pipe(Effect.mapError(mapDiscordError("Failed to update primary dispatch message"))),
+    botClient.updateMessage(message.channel_id, message.id, payload),
 });
 
 const makeMessageSink = (
-  discordRest: Context.Service.Shape<typeof DiscordREST>,
-  application: Context.Service.Shape<typeof DiscordApplication>,
+  botClient: typeof IngressBotClient.Service,
   channelId: string,
   interactionToken: string | undefined,
-): DispatchMessageSink => {
-  if (typeof interactionToken === "string") {
-    return makeInteractionMessageSink(discordRest, application, interactionToken);
+): DispatchMessageSink =>
+  typeof interactionToken === "string"
+    ? makeInteractionMessageSink(botClient, interactionToken)
+    : makeChannelMessageSink(botClient, channelId);
+
+const sendTentativeRoomOrder = Effect.fn("DispatchService.sendTentativeRoomOrder")(function* ({
+  guildId,
+  runningChannelId,
+  hour,
+  fillCount,
+  createdByUserId,
+  botClient,
+  roomOrderService,
+  messageRoomOrderService,
+}: {
+  readonly guildId: string;
+  readonly runningChannelId: string;
+  readonly hour: number;
+  readonly fillCount: number;
+  readonly createdByUserId: string | null;
+  readonly botClient: typeof IngressBotClient.Service;
+  readonly roomOrderService: typeof RoomOrderService.Service;
+  readonly messageRoomOrderService: typeof MessageRoomOrderService.Service;
+}) {
+  if (!shouldSendTentativeRoomOrder(fillCount)) {
+    return null;
   }
-  return makeChannelMessageSink(discordRest, channelId);
-};
+
+  return yield* Effect.gen(function* () {
+    const generated = yield* roomOrderService.generate({
+      guildId,
+      channelId: runningChannelId,
+      hour,
+    });
+
+    const sentMessage = yield* botClient.sendMessage(runningChannelId, {
+      content: formatTentativeRoomOrderContent(generated.content),
+      components: [tentativeRoomOrderActionRow(generated.range, generated.rank)],
+    });
+
+    yield* Effect.gen(function* () {
+      yield* messageRoomOrderService.persistMessageRoomOrder(sentMessage.id, {
+        data: {
+          previousFills: generated.previousFills,
+          fills: generated.fills,
+          hour: generated.hour,
+          rank: generated.rank,
+          monitor: generated.monitor,
+          guildId,
+          messageChannelId: sentMessage.channel_id,
+          createdByUserId,
+        },
+        entries: generated.entries,
+      });
+    }).pipe(
+      Effect.catchCause((cause) =>
+        Effect.logError("Failed to persist tentative room order").pipe(
+          Effect.annotateLogs({
+            guildId,
+            runningChannelId,
+            hour,
+            messageId: sentMessage.id,
+          }),
+          Effect.andThen(Effect.logError(cause)),
+          Effect.andThen(
+            botClient
+              .updateMessage(sentMessage.channel_id, sentMessage.id, {
+                components: [tentativeRoomOrderPinActionRow()],
+              })
+              .pipe(
+                Effect.catchCause((updateCause) =>
+                  Effect.logError(
+                    "Failed to persist tentative room order and downgrade buttons",
+                  ).pipe(
+                    Effect.annotateLogs({
+                      guildId,
+                      runningChannelId,
+                      hour,
+                      messageId: sentMessage.id,
+                    }),
+                    Effect.andThen(Effect.logError(cause)),
+                    Effect.andThen(Effect.logError(updateCause)),
+                  ),
+                ),
+              ),
+          ),
+        ),
+      ),
+    );
+
+    return {
+      messageId: sentMessage.id,
+      messageChannelId: sentMessage.channel_id,
+    };
+  }).pipe(
+    Effect.catchCause((cause) =>
+      Effect.logError("Failed to send tentative room order").pipe(
+        Effect.annotateLogs({
+          guildId,
+          runningChannelId,
+          hour,
+        }),
+        Effect.andThen(Effect.logError(cause)),
+        Effect.as(null),
+      ),
+    ),
+  );
+});
 
 export class DispatchService extends Context.Service<DispatchService>()("DispatchService", {
   make: Effect.gen(function* () {
+    const botClient = yield* IngressBotClient;
     const checkinService = yield* CheckinService;
     const messageCheckinService = yield* MessageCheckinService;
     const messageRoomOrderService = yield* MessageRoomOrderService;
     const roomOrderService = yield* RoomOrderService;
-    const discordRest = yield* DiscordREST;
-    const application = yield* DiscordApplication;
 
     return {
-      checkin: Effect.fn("DispatchService.checkin")(function* (payload: DispatchCheckinPayload) {
-        const user = yield* requireDispatchMonitorGuild(payload.guildId);
-        const generated = yield* checkinService.generate({
-          guildId: payload.guildId,
-          channelName: payload.channelName,
-          hour: payload.hour,
-          template: payload.template,
-        });
+      checkin: Effect.fn("DispatchService.checkin")(function* (payload: CheckinDispatchPayload) {
+        const user = yield* SheetAuthUser;
+        const createdByUserId = user.userId;
+        const generated = yield* checkinService.generate(payload);
         const messageSink = makeMessageSink(
-          discordRest,
-          application,
+          botClient,
           generated.runningChannelId,
           payload.interactionToken,
         );
@@ -132,18 +207,16 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
               },
         );
 
-        let checkinMessage: Discord.APIMessage | null = null;
+        let checkinMessage: DiscordMessage | null = null;
         let tentativeRoomOrderMessage: {
           readonly messageId: string;
           readonly messageChannelId: string;
         } | null = null;
 
         if (generated.initialMessage !== null) {
-          checkinMessage = yield* discordRest
-            .createMessage(generated.checkinChannelId, {
-              content: generated.initialMessage,
-            })
-            .pipe(Effect.mapError(mapDiscordError("Failed to send check-in message")));
+          checkinMessage = yield* botClient.sendMessage(generated.checkinChannelId, {
+            content: generated.initialMessage,
+          });
 
           yield* messageCheckinService.persistMessageCheckin(checkinMessage.id, {
             data: {
@@ -153,14 +226,14 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
               roleId: generated.roleId,
               guildId: payload.guildId,
               messageChannelId: generated.checkinChannelId,
-              createdByUserId: user.userId,
+              createdByUserId,
             },
             memberIds: generated.fillIds,
           });
 
-          yield* discordRest
+          yield* botClient
             .updateMessage(checkinMessage.channel_id, checkinMessage.id, {
-              components: [checkinActionRow().toJSON()],
+              components: [checkinActionRow()],
             })
             .pipe(
               Effect.catch(
@@ -175,10 +248,10 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
             runningChannelId: generated.runningChannelId,
             hour: generated.hour,
             fillCount: generated.fillCount,
+            createdByUserId,
+            botClient,
             roomOrderService,
             messageRoomOrderService,
-            sender: discordRest,
-            createdByUserId: user.userId,
           });
         }
 
@@ -213,27 +286,22 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
           primaryMessageChannelId: finalPrimaryMessage.channel_id,
           tentativeRoomOrderMessageId: tentativeRoomOrderMessage?.messageId ?? null,
           tentativeRoomOrderMessageChannelId: tentativeRoomOrderMessage?.messageChannelId ?? null,
-        } satisfies DispatchCheckinResult;
+        } satisfies CheckinDispatchResult;
       }),
       roomOrder: Effect.fn("DispatchService.roomOrder")(function* (
-        payload: DispatchRoomOrderPayload,
+        payload: RoomOrderDispatchPayload,
       ) {
-        const user = yield* requireDispatchMonitorGuild(payload.guildId);
-        const generated = yield* roomOrderService.generate({
-          guildId: payload.guildId,
-          channelName: payload.channelName,
-          hour: payload.hour,
-          healNeeded: payload.healNeeded,
-        });
+        const user = yield* SheetAuthUser;
+        const createdByUserId = user.userId;
+        const generated = yield* roomOrderService.generate(payload);
         const messageSink = makeMessageSink(
-          discordRest,
-          application,
+          botClient,
           generated.runningChannelId,
           payload.interactionToken,
         );
         const message = yield* messageSink.sendPrimary({
           content: generated.content,
-          components: [roomOrderActionRow(generated.range, generated.rank, true).toJSON()],
+          components: [roomOrderActionRow(generated.range, generated.rank, true)],
         });
 
         yield* messageRoomOrderService.persistMessageRoomOrder(message.id, {
@@ -245,14 +313,14 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
             monitor: generated.monitor,
             guildId: payload.guildId,
             messageChannelId: message.channel_id,
-            createdByUserId: user.userId,
+            createdByUserId,
           },
           entries: generated.entries,
         });
 
         const enabledMessage = yield* messageSink
           .updatePrimary(message, {
-            components: [roomOrderActionRow(generated.range, generated.rank).toJSON()],
+            components: [roomOrderActionRow(generated.range, generated.rank)],
           })
           .pipe(
             Effect.catch((error) =>
@@ -268,7 +336,7 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
           hour: generated.hour,
           runningChannelId: generated.runningChannelId,
           rank: generated.rank,
-        } satisfies DispatchRoomOrderResult;
+        } satisfies RoomOrderDispatchResult;
       }),
     };
   }),
@@ -276,8 +344,7 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
   static layer = Layer.effect(DispatchService, this.make).pipe(
     Layer.provide(
       Layer.mergeAll(
-        discordGatewayLayer,
-        discordApplicationLayer,
+        IngressBotClient.layer,
         CheckinService.layer,
         MessageCheckinService.layer,
         MessageRoomOrderService.layer,

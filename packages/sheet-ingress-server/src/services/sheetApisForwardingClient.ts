@@ -23,6 +23,7 @@ export class SheetApisForwardingClient extends Context.Service<SheetApisForwardi
         },
         checkin: {
           generate: call(rpcClient["checkin.generate"]),
+          dispatch: call(rpcClient["checkin.dispatch"]),
         },
         discord: {
           getCurrentUser: callNoInput(rpcClient["discord.getCurrentUser"]),
@@ -91,6 +92,7 @@ export class SheetApisForwardingClient extends Context.Service<SheetApisForwardi
         },
         roomOrder: {
           generate: call(rpcClient["roomOrder.generate"]),
+          dispatch: call(rpcClient["roomOrder.dispatch"]),
         },
         schedule: {
           getAllPopulatedSchedules: call(rpcClient["schedule.getAllPopulatedSchedules"]),

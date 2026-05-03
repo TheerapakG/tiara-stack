@@ -9,16 +9,8 @@ import { Ix } from "dfx/index";
 import { discordGatewayLayer } from "../discord/gateway";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
-import {
-  CheckinService,
-  MessageCheckinService,
-  MessageRoomOrderService,
-  RoomOrderService,
-  sendTentativeRoomOrder,
-  SheetApisRequestContext,
-} from "../services";
-import { checkinButtonData } from "../messageComponents/buttons/checkin";
-import { makeMessageActionRowData } from "dfx-discord-utils/utils";
+import { InteractionToken } from "dfx-discord-utils/utils";
+import { SheetApisClient, SheetApisRequestContext } from "../services";
 import { discordApplicationLayer } from "../discord/application";
 
 const getInteractionGuildId = Effect.gen(function* () {
@@ -37,16 +29,8 @@ const getInteractionChannelId = Effect.gen(function* () {
   );
 });
 
-const getInteractionUserId = Effect.gen(function* () {
-  const interactionUser = yield* Interaction.user();
-  return (interactionUser as { id: string }).id;
-});
-
 const makeManualSubCommand = Effect.gen(function* () {
-  const checkinService = yield* CheckinService;
-  const messageCheckinService = yield* MessageCheckinService;
-  const messageRoomOrderService = yield* MessageRoomOrderService;
-  const roomOrderService = yield* RoomOrderService;
+  const sheetApisClient = yield* SheetApisClient;
 
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
@@ -81,71 +65,31 @@ const makeManualSubCommand = Effect.gen(function* () {
 
       const channelNameOption = command.optionValueOptional("channel_name");
       const interactionChannelId = Option.getOrThrow(yield* getInteractionChannelId);
-      const generated = yield* checkinService.generate({
-        guildId,
-        ...(Option.isSome(channelNameOption)
-          ? { channelName: channelNameOption.value }
-          : {
-              channelId: interactionChannelId,
-            }),
-        ...pipe(
-          command.optionValueOptional("hour"),
-          Option.match({
-            onSome: (hour) => ({ hour }),
-            onNone: () => ({}),
-          }),
-        ),
-        ...pipe(
-          templateOption,
-          Option.match({
-            onSome: (template) => ({ template }),
-            onNone: () => ({}),
-          }),
-        ),
-      });
+      const interactionToken = yield* InteractionToken;
 
-      if (generated.initialMessage !== null) {
-        const createdByUserId = yield* getInteractionUserId;
-        const messageResult = yield* command.rest.createMessage(generated.checkinChannelId, {
-          content: generated.initialMessage,
-          components: [
-            makeMessageActionRowData((b) => b.setComponents(checkinButtonData)).toJSON(),
-          ],
-        });
-
-        yield* messageCheckinService.upsertMessageCheckinData(messageResult.id, {
-          initialMessage: generated.initialMessage,
-          hour: generated.hour,
-          channelId: generated.runningChannelId,
-          roleId: generated.roleId,
-          guildId,
-          messageChannelId: generated.checkinChannelId,
-          createdByUserId,
-        });
-
-        if (generated.fillIds.length > 0) {
-          yield* messageCheckinService.addMessageCheckinMembers(
-            messageResult.id,
-            generated.fillIds,
-          );
-        }
-
-        yield* sendTentativeRoomOrder({
-          guildId,
-          runningChannelId: generated.runningChannelId,
-          hour: generated.hour,
-          fillCount: generated.fillCount,
-          roomOrderService,
-          messageRoomOrderService,
-          sender: command.rest,
-          createdByUserId,
-        });
-      }
-
-      yield* command.editReply({
+      yield* sheetApisClient.get().checkin.dispatch({
         payload: {
-          content: generated.monitorCheckinMessage,
-          flags: MessageFlags.Ephemeral,
+          guildId,
+          interactionToken: interactionToken.token,
+          ...(Option.isSome(channelNameOption)
+            ? { channelName: channelNameOption.value }
+            : {
+                channelId: interactionChannelId,
+              }),
+          ...pipe(
+            command.optionValueOptional("hour"),
+            Option.match({
+              onSome: (hour) => ({ hour }),
+              onNone: () => ({}),
+            }),
+          ),
+          ...pipe(
+            templateOption,
+            Option.match({
+              onSome: (template) => ({ template }),
+              onNone: () => ({}),
+            }),
+          ),
         },
       });
     }),
@@ -193,13 +137,6 @@ export const checkinCommandLayer = Layer.effectDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(
-      discordGatewayLayer,
-      discordApplicationLayer,
-      CheckinService.layer,
-      MessageCheckinService.layer,
-      MessageRoomOrderService.layer,
-      RoomOrderService.layer,
-    ),
+    Layer.mergeAll(discordGatewayLayer, discordApplicationLayer, SheetApisClient.layer),
   ),
 );
