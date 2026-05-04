@@ -11,8 +11,15 @@ import { SheetConfigError } from "../../schemas/sheetConfig";
 import {
   RoomOrderDispatchPayload,
   RoomOrderDispatchResult,
-  RoomOrderHandleButtonPayload,
-  RoomOrderHandleButtonResult,
+  RoomOrderButtonMethods,
+  RoomOrderNextButtonPayload,
+  RoomOrderNextButtonResult,
+  RoomOrderPinTentativeButtonPayload,
+  RoomOrderPinTentativeButtonResult,
+  RoomOrderPreviousButtonPayload,
+  RoomOrderPreviousButtonResult,
+  RoomOrderSendButtonPayload,
+  RoomOrderSendButtonResult,
 } from "../../sheet-apis-rpc";
 
 const RoomOrderGenerateError = [
@@ -57,11 +64,48 @@ export class RoomOrderApi extends HttpApiGroup.make("roomOrder")
     }),
   )
   .add(
-    HttpApiEndpoint.post("handleButton", "/roomOrder/buttons/handle", {
-      payload: RoomOrderHandleButtonPayload,
-      success: RoomOrderHandleButtonResult,
-      error: RoomOrderHandleButtonError,
-    }),
+    HttpApiEndpoint.post(
+      RoomOrderButtonMethods.previous.endpointName,
+      RoomOrderButtonMethods.previous.path,
+      {
+        payload: RoomOrderPreviousButtonPayload,
+        success: RoomOrderPreviousButtonResult,
+        error: RoomOrderHandleButtonError,
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      RoomOrderButtonMethods.next.endpointName,
+      RoomOrderButtonMethods.next.path,
+      {
+        payload: RoomOrderNextButtonPayload,
+        success: RoomOrderNextButtonResult,
+        error: RoomOrderHandleButtonError,
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      RoomOrderButtonMethods.send.endpointName,
+      RoomOrderButtonMethods.send.path,
+      {
+        payload: RoomOrderSendButtonPayload,
+        success: RoomOrderSendButtonResult,
+        error: RoomOrderHandleButtonError,
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      RoomOrderButtonMethods.pinTentative.endpointName,
+      RoomOrderButtonMethods.pinTentative.path,
+      {
+        payload: RoomOrderPinTentativeButtonPayload,
+        success: RoomOrderPinTentativeButtonResult,
+        error: RoomOrderHandleButtonError,
+      },
+    ),
   )
   .middleware(SheetApisServiceUserFallback)
   .middleware(SheetAuthTokenAuthorization)

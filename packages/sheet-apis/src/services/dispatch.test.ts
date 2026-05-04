@@ -982,19 +982,17 @@ describe("DispatchService", () => {
       const calls: Call[] = [];
       const dispatchService = yield* makeDispatchService({ calls });
       const result = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderPreviousButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "previous",
         }),
       );
 
       expect(result).toMatchObject({
         messageId: "room-order-message-1",
         messageChannelId: "running-channel-1",
-        action: "previous",
         status: "updated",
       });
       expect(calls.map((call) => call.name)).toEqual([
@@ -1018,18 +1016,16 @@ describe("DispatchService", () => {
       const calls: Call[] = [];
       const dispatchService = yield* makeDispatchService({ calls });
       const result = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderSendButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "send",
         }),
       );
 
       expect(result).toMatchObject({
         messageChannelId: "running-channel-1",
-        action: "send",
         status: "pinned",
         detail: "sent room order and pinned it!",
       });
@@ -1069,19 +1065,17 @@ describe("DispatchService", () => {
         ),
       });
       const result = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderSendButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "send",
         }),
       );
 
       expect(result).toMatchObject({
         messageId: "sent-message-1",
         messageChannelId: "running-channel-1",
-        action: "send",
         status: "sent",
         detail: "room order was already sent.",
       });
@@ -1105,17 +1099,15 @@ describe("DispatchService", () => {
         ),
       });
       const result = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderSendButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "send",
         }),
       );
 
       expect(result).toMatchObject({
-        action: "send",
         status: "denied",
         detail: "cannot send a tentative room order.",
       });
@@ -1139,19 +1131,17 @@ describe("DispatchService", () => {
         ),
       });
       const result = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderPreviousButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "previous",
         }),
       );
 
       expect(result).toMatchObject({
         messageId: "room-order-message-1",
         messageChannelId: "running-channel-1",
-        action: "previous",
         status: "denied",
         detail: "tentative room order is already pinned.",
       });
@@ -1176,19 +1166,17 @@ describe("DispatchService", () => {
         ),
       });
       const result = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderPreviousButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "previous",
         }),
       );
 
       expect(result).toMatchObject({
         messageId: "room-order-message-1",
         messageChannelId: "running-channel-1",
-        action: "previous",
         status: "updated",
       });
       expect(calls.map((call) => call.name)).toEqual([
@@ -1214,21 +1202,19 @@ describe("DispatchService", () => {
           messageRoomOrder: Option.some(makeMessageRoomOrder(0, { tentative: false })),
         });
         const result = yield* runWithUser(
-          dispatchService.roomOrderButton({
+          dispatchService.roomOrderPreviousButton({
             guildId: "guild-1",
             messageId: "room-order-message-1",
             messageChannelId: "running-channel-1",
             messageContent: "(tentative)\nRoom order content",
             interactionToken: "token-1",
             interactionResponseType: "reply",
-            action: "previous",
           }),
         );
 
         expect(result).toMatchObject({
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
-          action: "previous",
           status: "updated",
         });
         expect(calls.map((call) => call.name)).toEqual([
@@ -1264,20 +1250,18 @@ describe("DispatchService", () => {
         messageRoomOrder: Option.some(makeMessageRoomOrder(0, { tentative: true })),
       });
       const result = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderPreviousButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
           interactionResponseType: "update",
-          action: "previous",
         }),
       );
 
       expect(result).toMatchObject({
         messageId: "room-order-message-1",
         messageChannelId: "running-channel-1",
-        action: "previous",
         status: "updated",
       });
       expect(calls.map((call) => call.name)).toEqual([
@@ -1313,12 +1297,11 @@ describe("DispatchService", () => {
             ),
         });
         const exit = yield* runWithUser(
-          dispatchService.roomOrderButton({
+          dispatchService.roomOrderPreviousButton({
             guildId: "guild-1",
             messageId: "room-order-message-1",
             messageChannelId: "running-channel-1",
             interactionToken: "token-1",
-            action: "previous",
           }),
         ).pipe(Effect.exit);
 
@@ -1351,12 +1334,11 @@ describe("DispatchService", () => {
           }).pipe(Effect.andThen(Effect.fail(new Error("discord update failed")))),
       });
       const exit = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderPreviousButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "previous",
         }),
       ).pipe(Effect.exit);
 
@@ -1393,17 +1375,15 @@ describe("DispatchService", () => {
           }),
       });
       const result = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderPreviousButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "previous",
         }),
       );
 
       expect(result).toMatchObject({
-        action: "previous",
         status: "denied",
         detail: "room order is already being sent.",
       });
@@ -1435,12 +1415,11 @@ describe("DispatchService", () => {
           ),
       });
       const exit = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderPreviousButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "previous",
         }),
       ).pipe(Effect.exit);
 
@@ -1475,17 +1454,15 @@ describe("DispatchService", () => {
           }),
       });
       const result = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderSendButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "send",
         }),
       );
 
       expect(result).toMatchObject({
-        action: "send",
         status: "denied",
         detail: "room order is already being sent.",
       });
@@ -1518,12 +1495,11 @@ describe("DispatchService", () => {
       });
 
       const exit = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderSendButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "send",
         }),
       ).pipe(Effect.exit);
 
@@ -1557,12 +1533,11 @@ describe("DispatchService", () => {
       });
 
       const exit = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderSendButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "send",
         }),
       ).pipe(Effect.exit);
 
@@ -1602,17 +1577,15 @@ describe("DispatchService", () => {
         });
 
         const result = yield* runWithUser(
-          dispatchService.roomOrderButton({
+          dispatchService.roomOrderSendButton({
             guildId: "guild-1",
             messageId: "room-order-message-1",
             messageChannelId: "running-channel-1",
             interactionToken: "token-1",
-            action: "send",
           }),
         );
 
         expect(result).toMatchObject({
-          action: "send",
           status: "partial",
           detail: "sent room order, but failed to track it.",
         });
@@ -1633,19 +1606,17 @@ describe("DispatchService", () => {
       const calls: Call[] = [];
       const dispatchService = yield* makeDispatchService({ calls });
       const result = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderPinTentativeButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "pinTentative",
         }),
       );
 
       expect(result).toMatchObject({
         messageId: "room-order-message-1",
         messageChannelId: "running-channel-1",
-        action: "pinTentative",
         status: "pinned",
         detail: "pinned tentative room order!",
       });
@@ -1685,17 +1656,15 @@ describe("DispatchService", () => {
             }),
         });
         const result = yield* runWithUser(
-          dispatchService.roomOrderButton({
+          dispatchService.roomOrderPinTentativeButton({
             guildId: "guild-1",
             messageId: "room-order-message-1",
             messageChannelId: "running-channel-1",
             interactionToken: "token-1",
-            action: "pinTentative",
           }),
         );
 
         expect(result).toMatchObject({
-          action: "pinTentative",
           status: "partial",
           detail: "pinned tentative room order, but failed to track it.",
         });
@@ -1723,17 +1692,15 @@ describe("DispatchService", () => {
           }).pipe(Effect.andThen(Effect.fail(new Error("complete tentative pin failed") as never))),
       });
       const result = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderPinTentativeButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "pinTentative",
         }),
       );
 
       expect(result).toMatchObject({
-        action: "pinTentative",
         status: "partial",
         detail: "pinned tentative room order, but failed to track it.",
       });
@@ -1773,17 +1740,15 @@ describe("DispatchService", () => {
           }).pipe(Effect.andThen(Effect.fail(new Error("complete tentative pin failed") as never))),
       });
       const result = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderPinTentativeButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "pinTentative",
         }),
       );
 
       expect(result).toMatchObject({
-        action: "pinTentative",
         status: "partial",
         detail: "pinned tentative room order, but failed to track it.",
       });
@@ -1816,17 +1781,15 @@ describe("DispatchService", () => {
           ),
       });
       const result = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderPinTentativeButton({
           guildId: "guild-1",
           messageId: "room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "pinTentative",
         }),
       );
 
       expect(result).toMatchObject({
-        action: "pinTentative",
         status: "partial",
         detail: "pinned tentative room order, but failed to clean up the message.",
       });
@@ -1851,19 +1814,17 @@ describe("DispatchService", () => {
           messageRoomOrder: Option.none(),
         });
         const result = yield* runWithUser(
-          dispatchService.roomOrderButton({
+          dispatchService.roomOrderPinTentativeButton({
             guildId: "guild-1",
             messageId: "fallback-room-order-message-1",
             messageChannelId: "running-channel-1",
             interactionToken: "token-1",
-            action: "pinTentative",
           }),
         );
 
         expect(result).toMatchObject({
           messageId: "fallback-room-order-message-1",
           messageChannelId: "running-channel-1",
-          action: "pinTentative",
           status: "pinned",
           detail: "pinned tentative room order!",
         });
@@ -1889,14 +1850,18 @@ describe("DispatchService", () => {
           calls,
           messageRoomOrder: Option.none(),
         });
+        const payload = {
+          guildId: "guild-1",
+          messageId: "unregistered-room-order-message-1",
+          messageChannelId: "running-channel-1",
+          interactionToken: "token-1",
+        };
         const exit = yield* runWithUser(
-          dispatchService.roomOrderButton({
-            guildId: "guild-1",
-            messageId: "unregistered-room-order-message-1",
-            messageChannelId: "running-channel-1",
-            interactionToken: "token-1",
-            action,
-          }),
+          action === "previous"
+            ? dispatchService.roomOrderPreviousButton(payload)
+            : action === "next"
+              ? dispatchService.roomOrderNextButton(payload)
+              : dispatchService.roomOrderSendButton(payload),
         ).pipe(Effect.exit);
 
         expect(exit._tag).toBe("Failure");
@@ -1933,12 +1898,11 @@ describe("DispatchService", () => {
           ),
         });
         const exit = yield* runWithUser(
-          dispatchService.roomOrderButton({
+          dispatchService.roomOrderPreviousButton({
             guildId: "guild-1",
             messageId: "room-order-message-1",
             messageChannelId: "running-channel-1",
             interactionToken: "token-1",
-            action: "previous",
           }),
         ).pipe(Effect.exit);
 
@@ -1974,19 +1938,17 @@ describe("DispatchService", () => {
         },
       });
       const result = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderPinTentativeButton({
           guildId: "guild-1",
           messageId: "fallback-room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "pinTentative",
         }),
       );
 
       expect(result).toMatchObject({
         messageId: "fallback-room-order-message-1",
         messageChannelId: "running-channel-1",
-        action: "pinTentative",
         status: "failed",
         detail: "tentative room order could not be pinned.",
       });
@@ -2014,12 +1976,11 @@ describe("DispatchService", () => {
         getGuildChannelById: () => Effect.succeed(Option.none()),
       });
       const exit = yield* runWithUser(
-        dispatchService.roomOrderButton({
+        dispatchService.roomOrderPinTentativeButton({
           guildId: "guild-1",
           messageId: "fallback-room-order-message-1",
           messageChannelId: "running-channel-1",
           interactionToken: "token-1",
-          action: "pinTentative",
         }),
       ).pipe(Effect.exit);
 

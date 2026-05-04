@@ -2,8 +2,14 @@ import { Cache, Context, Duration, Effect, Exit, Layer, Option } from "effect";
 import { MessageCheckin, MessageCheckinMember } from "sheet-ingress-api/schemas/messageCheckin";
 import { MessageRoomOrder } from "sheet-ingress-api/schemas/messageRoomOrder";
 import { MessageSlot } from "sheet-ingress-api/schemas/messageSlot";
+import { MESSAGE_ROOM_ORDER_NOT_REGISTERED_ERROR_MESSAGE } from "sheet-ingress-api/sheet-apis-rpc";
+import { ArgumentError } from "typhoon-core/error";
 import { SheetApisForwardingClient } from "./sheetApisForwardingClient";
 import { SheetApisRpcTokens } from "./sheetApisRpcTokens";
+
+const isMissingMessageRoomOrderError = (error: unknown) =>
+  error instanceof ArgumentError &&
+  error.message === MESSAGE_ROOM_ORDER_NOT_REGISTERED_ERROR_MESSAGE;
 
 export class MessageLookup extends Context.Service<MessageLookup>()("MessageLookup", {
   make: Effect.gen(function* () {
@@ -52,7 +58,14 @@ export class MessageLookup extends Context.Service<MessageLookup>()("MessageLook
         sheetApisRpcTokens.withServiceUser(
           sheetApisForwardingClient.messageRoomOrder
             .getMessageRoomOrder({ query: { messageId } })
-            .pipe(Effect.option),
+            .pipe(
+              Effect.map(Option.some),
+              Effect.catch((error) =>
+                isMissingMessageRoomOrderError(error)
+                  ? Effect.succeed(Option.none())
+                  : Effect.fail(error),
+              ),
+            ),
         ),
       cacheOptions,
     );

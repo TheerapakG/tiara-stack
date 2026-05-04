@@ -1,4 +1,5 @@
 import { Context, Effect, Layer } from "effect";
+import { RoomOrderButtonMethods } from "sheet-ingress-api/sheet-apis-rpc";
 import { SheetApisRpcClient } from "./sheetApisRpcClient";
 
 export class SheetApisForwardingClient extends Context.Service<SheetApisForwardingClient>()(
@@ -94,7 +95,18 @@ export class SheetApisForwardingClient extends Context.Service<SheetApisForwardi
         roomOrder: {
           generate: call(rpcClient["roomOrder.generate"]),
           dispatch: call(rpcClient["roomOrder.dispatch"]),
-          handleButton: call(rpcClient["roomOrder.handleButton"]),
+          [RoomOrderButtonMethods.previous.endpointName]: call(
+            rpcClient[RoomOrderButtonMethods.previous.rpcTag],
+          ),
+          [RoomOrderButtonMethods.next.endpointName]: call(
+            rpcClient[RoomOrderButtonMethods.next.rpcTag],
+          ),
+          [RoomOrderButtonMethods.send.endpointName]: call(
+            rpcClient[RoomOrderButtonMethods.send.rpcTag],
+          ),
+          [RoomOrderButtonMethods.pinTentative.endpointName]: call(
+            rpcClient[RoomOrderButtonMethods.pinTentative.rpcTag],
+          ),
         },
         schedule: {
           getAllPopulatedSchedules: call(rpcClient["schedule.getAllPopulatedSchedules"]),

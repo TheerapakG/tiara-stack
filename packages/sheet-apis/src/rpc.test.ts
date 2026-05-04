@@ -10,7 +10,11 @@ describe("SheetApisRpcs", () => {
     expect(SheetApisRpcs.requests.has("checkin.dispatch")).toBe(true);
     expect(SheetApisRpcs.requests.has("checkin.handleButton")).toBe(true);
     expect(SheetApisRpcs.requests.has("roomOrder.dispatch")).toBe(true);
-    expect(SheetApisRpcs.requests.has("roomOrder.handleButton")).toBe(true);
+    expect(SheetApisRpcs.requests.has("roomOrder.previousButton")).toBe(true);
+    expect(SheetApisRpcs.requests.has("roomOrder.nextButton")).toBe(true);
+    expect(SheetApisRpcs.requests.has("roomOrder.sendButton")).toBe(true);
+    expect(SheetApisRpcs.requests.has("roomOrder.pinTentativeButton")).toBe(true);
+    expect(SheetApisRpcs.requests.has("roomOrder.handleButton")).toBe(false);
   });
 
   it("requires authorization middleware on clients", () => {

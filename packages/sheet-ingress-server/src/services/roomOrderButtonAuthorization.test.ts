@@ -1,0 +1,153 @@
+import { describe, expect, it, vi } from "vitest";
+import { Cause, Effect, Exit, Option } from "effect";
+import { MessageRoomOrder } from "sheet-ingress-api/schemas/messageRoomOrder";
+import {
+  MESSAGE_ROOM_ORDER_NOT_REGISTERED_ERROR_MESSAGE,
+  RoomOrderButtonMethods,
+} from "sheet-ingress-api/sheet-apis-rpc";
+import { AuthorizationService } from "./authorization";
+import { MessageLookup } from "./messageLookup";
+import {
+  requireRegisteredRoomOrderButton,
+  requireRoomOrderPinTentativeButton,
+  roomOrderButtonProxyAuthorizers,
+} from "./roomOrderButtonAuthorization";
+
+const makeRoomOrder = (
+  overrides: Partial<ConstructorParameters<typeof MessageRoomOrder>[0]> = {},
+) =>
+  new MessageRoomOrder({
+    messageId: "room-order-message-1",
+    hour: 20,
+    previousFills: [],
+    fills: [],
+    rank: 0,
+    tentative: false,
+    monitor: Option.none(),
+    guildId: Option.some("registered-guild-1"),
+    messageChannelId: Option.some("running-channel-1"),
+    createdByUserId: Option.none(),
+    sendClaimId: Option.none(),
+    sendClaimedAt: Option.none(),
+    sentMessageId: Option.none(),
+    sentMessageChannelId: Option.none(),
+    sentAt: Option.none(),
+    tentativeUpdateClaimId: Option.none(),
+    tentativeUpdateClaimedAt: Option.none(),
+    tentativePinClaimId: Option.none(),
+    tentativePinClaimedAt: Option.none(),
+    tentativePinnedAt: Option.none(),
+    createdAt: Option.none(),
+    updatedAt: Option.none(),
+    deletedAt: Option.none(),
+    ...overrides,
+  });
+
+const runAuthorization = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  {
+    lookupError,
+    roomOrder = Option.none(),
+  }: {
+    readonly lookupError?: unknown;
+    readonly roomOrder?: Option.Option<MessageRoomOrder>;
+  } = {},
+) => {
+  const getMessageRoomOrder = vi.fn(() =>
+    lookupError === undefined ? Effect.succeed(roomOrder) : Effect.fail(lookupError),
+  );
+  const requireMonitorGuild = vi.fn(() => Effect.void);
+
+  const provided = effect.pipe(
+    Effect.provideService(MessageLookup, {
+      getMessageRoomOrder,
+    } as never),
+    Effect.provideService(AuthorizationService, {
+      requireMonitorGuild,
+    } as never),
+  ) as Effect.Effect<A, E, never>;
+
+  return Effect.runPromiseExit(provided).then((exit) => ({
+    exit,
+    getMessageRoomOrder,
+    requireMonitorGuild,
+  }));
+};
+
+describe("room-order button proxy authorization", () => {
+  it("wires split ingress endpoint names to the intended authorization policies", () => {
+    expect(roomOrderButtonProxyAuthorizers[RoomOrderButtonMethods.previous.endpointName]).toBe(
+      requireRegisteredRoomOrderButton,
+    );
+    expect(roomOrderButtonProxyAuthorizers[RoomOrderButtonMethods.next.endpointName]).toBe(
+      requireRegisteredRoomOrderButton,
+    );
+    expect(roomOrderButtonProxyAuthorizers[RoomOrderButtonMethods.send.endpointName]).toBe(
+      requireRegisteredRoomOrderButton,
+    );
+    expect(roomOrderButtonProxyAuthorizers[RoomOrderButtonMethods.pinTentative.endpointName]).toBe(
+      requireRoomOrderPinTentativeButton,
+    );
+  });
+
+  it("requires registered records for previous, next, and send button policy", async () => {
+    const { exit, requireMonitorGuild } = await runAuthorization(
+      requireRegisteredRoomOrderButton({ messageId: "missing-message-1" }),
+    );
+
+    expect(Exit.isFailure(exit)).toBe(true);
+    expect(requireMonitorGuild).not.toHaveBeenCalled();
+    if (Exit.isFailure(exit)) {
+      expect(Cause.pretty(exit.cause)).toContain(MESSAGE_ROOM_ORDER_NOT_REGISTERED_ERROR_MESSAGE);
+    }
+  });
+
+  it("propagates unexpected message lookup failures without rewriting them", async () => {
+    const lookupError = new Error("database unavailable");
+    const { exit } = await runAuthorization(
+      requireRegisteredRoomOrderButton({ messageId: "message-1" }),
+      { lookupError },
+    );
+
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      expect(Cause.pretty(exit.cause)).toContain("database unavailable");
+      expect(Cause.pretty(exit.cause)).not.toContain("Cannot authorize message room order");
+    }
+  });
+
+  it("authorizes registered button actions against the persisted message guild", async () => {
+    const { exit, requireMonitorGuild } = await runAuthorization(
+      requireRegisteredRoomOrderButton({ messageId: "room-order-message-1" }),
+      { roomOrder: Option.some(makeRoomOrder()) },
+    );
+
+    expect(Exit.isSuccess(exit)).toBe(true);
+    expect(requireMonitorGuild).toHaveBeenCalledWith("registered-guild-1");
+  });
+
+  it("allows pinTentative fallback authorization by payload guild when no record exists", async () => {
+    const { exit, requireMonitorGuild } = await runAuthorization(
+      requireRoomOrderPinTentativeButton({
+        guildId: "fallback-guild-1",
+        messageId: "unregistered-room-order-message-1",
+      }),
+    );
+
+    expect(Exit.isSuccess(exit)).toBe(true);
+    expect(requireMonitorGuild).toHaveBeenCalledWith("fallback-guild-1");
+  });
+
+  it("uses the persisted message guild for pinTentative when a record exists", async () => {
+    const { exit, requireMonitorGuild } = await runAuthorization(
+      requireRoomOrderPinTentativeButton({
+        guildId: "payload-guild-1",
+        messageId: "room-order-message-1",
+      }),
+      { roomOrder: Option.some(makeRoomOrder()) },
+    );
+
+    expect(Exit.isSuccess(exit)).toBe(true);
+    expect(requireMonitorGuild).toHaveBeenCalledWith("registered-guild-1");
+  });
+});

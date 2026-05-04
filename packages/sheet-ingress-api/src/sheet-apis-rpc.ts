@@ -118,6 +118,9 @@ const MessageRoomOrderError = Schema.Union([
   UnknownError,
 ]);
 
+export const MESSAGE_ROOM_ORDER_NOT_REGISTERED_ERROR_MESSAGE =
+  "Cannot get message room order, the message might not be registered";
+
 const RoomOrderHandleButtonError = Schema.Union([
   RoomOrderGenerateError,
   MessageRoomOrderError,
@@ -241,9 +244,28 @@ export const RoomOrderDispatchResult = Schema.Struct({
 
 export type RoomOrderDispatchResult = Schema.Schema.Type<typeof RoomOrderDispatchResult>;
 
-export const RoomOrderButtonAction = Schema.Literals(["previous", "next", "send", "pinTentative"]);
-
-export type RoomOrderButtonAction = Schema.Schema.Type<typeof RoomOrderButtonAction>;
+export const RoomOrderButtonMethods = {
+  previous: {
+    endpointName: "previousButton",
+    path: "/roomOrder/buttons/previous",
+    rpcTag: "roomOrder.previousButton",
+  },
+  next: {
+    endpointName: "nextButton",
+    path: "/roomOrder/buttons/next",
+    rpcTag: "roomOrder.nextButton",
+  },
+  send: {
+    endpointName: "sendButton",
+    path: "/roomOrder/buttons/send",
+    rpcTag: "roomOrder.sendButton",
+  },
+  pinTentative: {
+    endpointName: "pinTentativeButton",
+    path: "/roomOrder/buttons/pinTentative",
+    rpcTag: "roomOrder.pinTentativeButton",
+  },
+} as const;
 
 export const RoomOrderButtonInteractionResponseType = Schema.Literals(["reply", "update"]);
 
@@ -251,27 +273,57 @@ export type RoomOrderButtonInteractionResponseType = Schema.Schema.Type<
   typeof RoomOrderButtonInteractionResponseType
 >;
 
-export const RoomOrderHandleButtonPayload = Schema.Struct({
+export const RoomOrderButtonBasePayload = Schema.Struct({
   guildId: Schema.String,
   messageId: Schema.String,
   messageChannelId: Schema.String,
   messageContent: Schema.optional(Schema.NullOr(Schema.String)),
   interactionToken: Schema.String,
   interactionResponseType: Schema.optional(RoomOrderButtonInteractionResponseType),
-  action: RoomOrderButtonAction,
 });
 
-export type RoomOrderHandleButtonPayload = Schema.Schema.Type<typeof RoomOrderHandleButtonPayload>;
+export type RoomOrderButtonBasePayload = Schema.Schema.Type<typeof RoomOrderButtonBasePayload>;
 
-export const RoomOrderHandleButtonResult = Schema.Struct({
+export const RoomOrderPreviousButtonPayload = RoomOrderButtonBasePayload;
+export type RoomOrderPreviousButtonPayload = Schema.Schema.Type<
+  typeof RoomOrderPreviousButtonPayload
+>;
+
+export const RoomOrderNextButtonPayload = RoomOrderButtonBasePayload;
+export type RoomOrderNextButtonPayload = Schema.Schema.Type<typeof RoomOrderNextButtonPayload>;
+
+export const RoomOrderSendButtonPayload = RoomOrderButtonBasePayload;
+export type RoomOrderSendButtonPayload = Schema.Schema.Type<typeof RoomOrderSendButtonPayload>;
+
+export const RoomOrderPinTentativeButtonPayload = RoomOrderButtonBasePayload;
+export type RoomOrderPinTentativeButtonPayload = Schema.Schema.Type<
+  typeof RoomOrderPinTentativeButtonPayload
+>;
+
+export const RoomOrderButtonResult = Schema.Struct({
   messageId: Schema.String,
   messageChannelId: Schema.String,
-  action: RoomOrderButtonAction,
   status: Schema.Literals(["updated", "sent", "pinned", "partial", "denied", "failed"]),
   detail: Schema.NullOr(Schema.String),
 });
 
-export type RoomOrderHandleButtonResult = Schema.Schema.Type<typeof RoomOrderHandleButtonResult>;
+export type RoomOrderButtonResult = Schema.Schema.Type<typeof RoomOrderButtonResult>;
+
+export const RoomOrderPreviousButtonResult = RoomOrderButtonResult;
+export type RoomOrderPreviousButtonResult = Schema.Schema.Type<
+  typeof RoomOrderPreviousButtonResult
+>;
+
+export const RoomOrderNextButtonResult = RoomOrderButtonResult;
+export type RoomOrderNextButtonResult = Schema.Schema.Type<typeof RoomOrderNextButtonResult>;
+
+export const RoomOrderSendButtonResult = RoomOrderButtonResult;
+export type RoomOrderSendButtonResult = Schema.Schema.Type<typeof RoomOrderSendButtonResult>;
+
+export const RoomOrderPinTentativeButtonResult = RoomOrderButtonResult;
+export type RoomOrderPinTentativeButtonResult = Schema.Schema.Type<
+  typeof RoomOrderPinTentativeButtonResult
+>;
 
 const protectedRpc = <
   const Tag extends string,
@@ -713,11 +765,32 @@ export const RoomOrderRpcs = RpcGroup.make(
     success: RoomOrderDispatchResult,
     error: RoomOrderDispatchError,
   }),
-  protectedRpc("roomOrder.handleButton", {
+  protectedRpc(RoomOrderButtonMethods.previous.rpcTag, {
     payload: Schema.Struct({
-      payload: RoomOrderHandleButtonPayload,
+      payload: RoomOrderPreviousButtonPayload,
     }),
-    success: RoomOrderHandleButtonResult,
+    success: RoomOrderPreviousButtonResult,
+    error: RoomOrderHandleButtonError,
+  }),
+  protectedRpc(RoomOrderButtonMethods.next.rpcTag, {
+    payload: Schema.Struct({
+      payload: RoomOrderNextButtonPayload,
+    }),
+    success: RoomOrderNextButtonResult,
+    error: RoomOrderHandleButtonError,
+  }),
+  protectedRpc(RoomOrderButtonMethods.send.rpcTag, {
+    payload: Schema.Struct({
+      payload: RoomOrderSendButtonPayload,
+    }),
+    success: RoomOrderSendButtonResult,
+    error: RoomOrderHandleButtonError,
+  }),
+  protectedRpc(RoomOrderButtonMethods.pinTentative.rpcTag, {
+    payload: Schema.Struct({
+      payload: RoomOrderPinTentativeButtonPayload,
+    }),
+    success: RoomOrderPinTentativeButtonResult,
     error: RoomOrderHandleButtonError,
   }),
 );

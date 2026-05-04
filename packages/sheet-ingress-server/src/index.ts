@@ -10,6 +10,7 @@ import {
 } from "effect/unstable/httpapi";
 import { Api } from "sheet-ingress-api/api";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
+import { RoomOrderButtonMethods } from "sheet-ingress-api/sheet-apis-rpc";
 import { Unauthorized } from "typhoon-core/error";
 import { dotEnvConfigProviderLayer } from "typhoon-core/config";
 import { ArgumentError, makeArgumentError } from "typhoon-core/error";
@@ -23,6 +24,7 @@ import {
 } from "./services/authorization";
 import { SheetAuthUserResolver } from "./services/authResolver";
 import { MessageLookup } from "./services/messageLookup";
+import { roomOrderButtonProxyAuthorizers } from "./services/roomOrderButtonAuthorization";
 import { SheetApisForwardingClient } from "./services/sheetApisForwardingClient";
 import { SheetApisRpcTokens } from "./services/sheetApisRpcTokens";
 import { SheetBotForwardingClient } from "./services/sheetBotForwardingClient";
@@ -364,25 +366,6 @@ const requireRoomOrderMonitor = (messageId: string) =>
     }
     const guildId = yield* getRequiredModernGuildId(record.value, "message room order");
     yield* requireGuild("monitor", guildId);
-  }).pipe(Effect.mapError(authorizationArgumentError("message room order")));
-
-const requireRoomOrderButton = (payload: {
-  readonly action: string;
-  readonly guildId: string;
-  readonly messageId: string;
-}) =>
-  Effect.gen(function* () {
-    const messages = yield* MessageLookup;
-    const record = yield* messages.getMessageRoomOrder(payload.messageId);
-    if (Option.isSome(record)) {
-      const guildId = yield* getRequiredModernGuildId(record.value, "message room order");
-      yield* requireGuild("monitor", guildId);
-      return;
-    }
-    if (payload.action !== "pinTentative") {
-      return yield* Effect.fail(missingMessage("message room order"));
-    }
-    yield* requireGuild("monitor", payload.guildId);
   }).pipe(Effect.mapError(authorizationArgumentError("message room order")));
 
 const requireRoomOrderUpsert = (messageId: string, guildId?: string) =>
@@ -826,9 +809,43 @@ const makeApiLayer = () => {
           guildPayload("roomOrder", "dispatch", "monitor", (payload) => payload.guildId),
         )
         .handle(
-          "handleButton",
-          authorizedSheetApis("roomOrder", "handleButton", ({ payload }) =>
-            requireRoomOrderButton(payload),
+          RoomOrderButtonMethods.previous.endpointName,
+          authorizedSheetApis(
+            "roomOrder",
+            RoomOrderButtonMethods.previous.endpointName,
+            ({ payload }) =>
+              roomOrderButtonProxyAuthorizers[RoomOrderButtonMethods.previous.endpointName](
+                payload,
+              ),
+          ),
+        )
+        .handle(
+          RoomOrderButtonMethods.next.endpointName,
+          authorizedSheetApis(
+            "roomOrder",
+            RoomOrderButtonMethods.next.endpointName,
+            ({ payload }) =>
+              roomOrderButtonProxyAuthorizers[RoomOrderButtonMethods.next.endpointName](payload),
+          ),
+        )
+        .handle(
+          RoomOrderButtonMethods.send.endpointName,
+          authorizedSheetApis(
+            "roomOrder",
+            RoomOrderButtonMethods.send.endpointName,
+            ({ payload }) =>
+              roomOrderButtonProxyAuthorizers[RoomOrderButtonMethods.send.endpointName](payload),
+          ),
+        )
+        .handle(
+          RoomOrderButtonMethods.pinTentative.endpointName,
+          authorizedSheetApis(
+            "roomOrder",
+            RoomOrderButtonMethods.pinTentative.endpointName,
+            ({ payload }) =>
+              roomOrderButtonProxyAuthorizers[RoomOrderButtonMethods.pinTentative.endpointName](
+                payload,
+              ),
           ),
         ),
     ),

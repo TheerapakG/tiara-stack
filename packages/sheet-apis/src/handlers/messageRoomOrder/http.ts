@@ -1,6 +1,9 @@
 import { makeArgumentError } from "typhoon-core/error";
 import { Effect, Layer, Option } from "effect";
-import { MessageRoomOrderRpcs } from "sheet-ingress-api/sheet-apis-rpc";
+import {
+  MESSAGE_ROOM_ORDER_NOT_REGISTERED_ERROR_MESSAGE,
+  MessageRoomOrderRpcs,
+} from "sheet-ingress-api/sheet-apis-rpc";
 import { getModernMessageGuildId } from "@/handlers/message/shared";
 import { SheetAuthGuildUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthGuildUser";
 import { MessageRoomOrder } from "sheet-ingress-api/schemas/messageRoomOrder";
@@ -8,7 +11,7 @@ import { Unauthorized } from "typhoon-core/error";
 import { AuthorizationService, MessageRoomOrderService } from "@/services";
 
 const missingMessageRoomOrderError = () =>
-  makeArgumentError("Cannot get message room order, the message might not be registered");
+  makeArgumentError(MESSAGE_ROOM_ORDER_NOT_REGISTERED_ERROR_MESSAGE);
 
 export const LEGACY_MESSAGE_ROOM_ORDER_ACCESS_ERROR =
   "Legacy message room order records are no longer accessible";

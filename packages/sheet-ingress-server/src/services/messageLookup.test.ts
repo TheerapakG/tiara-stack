@@ -1,10 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import { Effect, Layer, Option } from "effect";
+import { Cause, Effect, Exit, Layer, Option } from "effect";
+import { MESSAGE_ROOM_ORDER_NOT_REGISTERED_ERROR_MESSAGE } from "sheet-ingress-api/sheet-apis-rpc";
+import { makeArgumentError } from "typhoon-core/error";
 import { MessageLookup } from "./messageLookup";
 import { SheetApisForwardingClient } from "./sheetApisForwardingClient";
 import { SheetApisRpcTokens } from "./sheetApisRpcTokens";
 
-const makeSheetApisForwardingClient = () => {
+const makeSheetApisForwardingClient = ({
+  roomOrderError,
+}: {
+  readonly roomOrderError?: unknown;
+} = {}) => {
   const getMessageCheckinData = vi.fn(({ query }: { query: { messageId: string } }) =>
     Effect.succeed({
       messageId: query.messageId,
@@ -24,12 +30,14 @@ const makeSheetApisForwardingClient = () => {
     ]),
   );
   const getMessageRoomOrder = vi.fn(({ query }: { query: { messageId: string } }) =>
-    Effect.succeed({
-      messageId: query.messageId,
-      messageChannelId: "channel-1",
-      roomOrderMessageId: "room-order-message-1",
-      title: "Room order",
-    }),
+    roomOrderError === undefined
+      ? Effect.succeed({
+          messageId: query.messageId,
+          messageChannelId: "channel-1",
+          roomOrderMessageId: "room-order-message-1",
+          title: "Room order",
+        })
+      : Effect.fail(roomOrderError),
   );
   const getMessageSlotData = vi.fn(({ query }: { query: { messageId: string } }) =>
     Effect.succeed({
@@ -124,5 +132,42 @@ describe("MessageLookup", () => {
     expect(result.members[0]?.messageId).toBe("message-1");
     expect(getMessageRoomOrder).toHaveBeenCalledTimes(1);
     expect(getMessageSlotData).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps missing room-order records to none and preserves lookup failures", async () => {
+    const missingClient = makeSheetApisForwardingClient({
+      roomOrderError: makeArgumentError(MESSAGE_ROOM_ORDER_NOT_REGISTERED_ERROR_MESSAGE),
+    });
+
+    const missing = await Effect.runPromise(
+      runLookup(
+        Effect.gen(function* () {
+          const lookup = yield* MessageLookup;
+          return yield* lookup.getMessageRoomOrder("missing-message-1");
+        }),
+        missingClient.client,
+      ),
+    );
+
+    expect(Option.isNone(missing)).toBe(true);
+
+    const failureClient = makeSheetApisForwardingClient({
+      roomOrderError: new Error("database unavailable"),
+    });
+
+    const exit = await Effect.runPromiseExit(
+      runLookup(
+        Effect.gen(function* () {
+          const lookup = yield* MessageLookup;
+          return yield* lookup.getMessageRoomOrder("message-1");
+        }),
+        failureClient.client,
+      ),
+    );
+
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      expect(Cause.pretty(exit.cause)).toContain("database unavailable");
+    }
   });
 });
