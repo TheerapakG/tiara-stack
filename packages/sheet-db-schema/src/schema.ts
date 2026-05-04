@@ -100,6 +100,7 @@ export const messageCheckinMember = pgTable(
     messageId: varchar("message_id").notNull(),
     memberId: varchar("member_id").notNull(),
     checkinAt: timestamp("checkin_at", { mode: "date", withTimezone: true }),
+    checkinClaimId: varchar("checkin_claim_id"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
       .defaultNow()
@@ -116,10 +117,27 @@ export const messageRoomOrder = pgTable("message_room_order", {
   fills: varchar("fills").array().notNull(),
   hour: integer("hour").notNull(),
   rank: integer("rank").notNull(),
+  tentative: boolean("tentative").default(false).notNull(),
   monitor: varchar("monitor"),
   guildId: varchar("guild_id"),
   messageChannelId: varchar("message_channel_id"),
   createdByUserId: varchar("created_by_user_id"),
+  sendClaimId: varchar("send_claim_id"),
+  sendClaimedAt: timestamp("send_claimed_at", { mode: "date", withTimezone: true }),
+  sentMessageId: varchar("sent_message_id"),
+  sentMessageChannelId: varchar("sent_message_channel_id"),
+  sentAt: timestamp("sent_at", { mode: "date", withTimezone: true }),
+  tentativeUpdateClaimId: varchar("tentative_update_claim_id"),
+  tentativeUpdateClaimedAt: timestamp("tentative_update_claimed_at", {
+    mode: "date",
+    withTimezone: true,
+  }),
+  tentativePinClaimId: varchar("tentative_pin_claim_id"),
+  tentativePinClaimedAt: timestamp("tentative_pin_claimed_at", {
+    mode: "date",
+    withTimezone: true,
+  }),
+  tentativePinnedAt: timestamp("tentative_pinned_at", { mode: "date", withTimezone: true }),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
     .defaultNow()

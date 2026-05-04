@@ -52,6 +52,7 @@ type TentativeMessageRoomOrderService = {
         fills: ReadonlyArray<string>;
         hour: number;
         rank: number;
+        tentative: boolean;
         monitor: string | null | undefined;
         guildId: string | null;
         messageChannelId: string | null;
@@ -117,6 +118,7 @@ export const sendTentativeRoomOrder = Effect.fn("sendTentativeRoomOrder")(functi
           fills: generated.fills,
           hour: generated.hour,
           rank: generated.rank,
+          tentative: true,
           monitor: generated.monitor,
           guildId,
           messageChannelId: sentMessage.channel_id,

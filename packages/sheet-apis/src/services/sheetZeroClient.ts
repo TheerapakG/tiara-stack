@@ -136,6 +136,13 @@ export interface SheetZeroClientApi {
       readonly messageId: string;
       readonly memberId: string;
       readonly checkinAt: number;
+      readonly checkinClaimId?: string | undefined;
+    }>;
+    readonly setMessageCheckinMemberCheckinAtIfUnset: MutatorResult<{
+      readonly messageId: string;
+      readonly memberId: string;
+      readonly checkinAt: number;
+      readonly checkinClaimId: string;
     }>;
     readonly removeMessageCheckinMember: MutatorResult<{
       readonly messageId: string;
@@ -153,14 +160,59 @@ export interface SheetZeroClientApi {
     readonly getMessageRoomOrderRange: (args: {
       readonly messageId: string;
     }) => QueryResult<MessageRoomOrderEntry[]>;
-    readonly decrementMessageRoomOrderRank: MutatorResult<{ readonly messageId: string }>;
-    readonly incrementMessageRoomOrderRank: MutatorResult<{ readonly messageId: string }>;
+    readonly decrementMessageRoomOrderRank: MutatorResult<{
+      readonly messageId: string;
+      readonly expectedRank?: number | undefined;
+      readonly tentativeUpdateClaimId?: string | undefined;
+    }>;
+    readonly incrementMessageRoomOrderRank: MutatorResult<{
+      readonly messageId: string;
+      readonly expectedRank?: number | undefined;
+      readonly tentativeUpdateClaimId?: string | undefined;
+    }>;
+    readonly claimMessageRoomOrderSend: MutatorResult<{
+      readonly messageId: string;
+      readonly claimId: string;
+    }>;
+    readonly completeMessageRoomOrderSend: MutatorResult<{
+      readonly messageId: string;
+      readonly claimId: string;
+      readonly sentMessageId: string;
+      readonly sentMessageChannelId: string;
+      readonly sentAt: number;
+    }>;
+    readonly releaseMessageRoomOrderSendClaim: MutatorResult<{
+      readonly messageId: string;
+      readonly claimId: string;
+    }>;
+    readonly claimMessageRoomOrderTentativeUpdate: MutatorResult<{
+      readonly messageId: string;
+      readonly claimId: string;
+    }>;
+    readonly releaseMessageRoomOrderTentativeUpdateClaim: MutatorResult<{
+      readonly messageId: string;
+      readonly claimId: string;
+    }>;
+    readonly claimMessageRoomOrderTentativePin: MutatorResult<{
+      readonly messageId: string;
+      readonly claimId: string;
+    }>;
+    readonly completeMessageRoomOrderTentativePin: MutatorResult<{
+      readonly messageId: string;
+      readonly claimId: string;
+      readonly pinnedAt: number;
+    }>;
+    readonly releaseMessageRoomOrderTentativePinClaim: MutatorResult<{
+      readonly messageId: string;
+      readonly claimId: string;
+    }>;
     readonly upsertMessageRoomOrder: MutatorResult<{
       readonly messageId: string;
       readonly previousFills: readonly string[];
       readonly fills: readonly string[];
       readonly hour: number;
       readonly rank: number;
+      readonly tentative?: boolean | undefined;
       readonly monitor?: string | null | undefined;
       readonly guildId: string | null;
       readonly messageChannelId: string | null;
@@ -173,6 +225,7 @@ export interface SheetZeroClientApi {
         readonly fills: readonly string[];
         readonly hour: number;
         readonly rank: number;
+        readonly tentative?: boolean | undefined;
         readonly monitor?: string | null | undefined;
         readonly guildId: string | null;
         readonly messageChannelId: string | null;

@@ -192,7 +192,10 @@ export const messageRoomOrderLayer = MessageRoomOrderRpcs.toLayer(
 
         yield* requireMessageRoomOrderMonitorPermission(authorizationService, authContext);
 
-        return yield* messageRoomOrderService.decrementMessageRoomOrderRank(payload.messageId);
+        return yield* messageRoomOrderService.decrementMessageRoomOrderRank(payload.messageId, {
+          expectedRank: payload.expectedRank,
+          tentativeUpdateClaimId: payload.tentativeUpdateClaimId,
+        });
       }),
       "messageRoomOrder.incrementMessageRoomOrderRank": Effect.fnUntraced(function* ({ payload }) {
         const record = yield* loadRequiredMessageRoomOrderRecord(
@@ -203,7 +206,10 @@ export const messageRoomOrderLayer = MessageRoomOrderRpcs.toLayer(
 
         yield* requireMessageRoomOrderMonitorPermission(authorizationService, authContext);
 
-        return yield* messageRoomOrderService.incrementMessageRoomOrderRank(payload.messageId);
+        return yield* messageRoomOrderService.incrementMessageRoomOrderRank(payload.messageId, {
+          expectedRank: payload.expectedRank,
+          tentativeUpdateClaimId: payload.tentativeUpdateClaimId,
+        });
       }),
       "messageRoomOrder.getMessageRoomOrderEntry": Effect.fnUntraced(function* ({ query }) {
         const record = yield* loadRequiredMessageRoomOrderRecord(

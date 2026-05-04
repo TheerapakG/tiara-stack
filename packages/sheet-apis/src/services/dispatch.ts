@@ -1,16 +1,23 @@
-import { Context, Effect, Layer, Schema } from "effect";
+import { Cause, Context, DateTime, Duration, Effect, Layer, Option, Schema, pipe } from "effect";
 import { DiscordMessageRequestSchema } from "dfx-discord-utils/discord/schema";
 import {
   formatTentativeRoomOrderContent,
+  hasTentativeRoomOrderPrefix,
   shouldSendTentativeRoomOrder,
 } from "sheet-ingress-api/discordComponents";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
+import type { MessageRoomOrder } from "sheet-ingress-api/schemas/messageRoomOrder";
 import type {
   CheckinDispatchPayload,
   CheckinDispatchResult,
+  CheckinHandleButtonPayload,
+  CheckinHandleButtonResult,
   RoomOrderDispatchPayload,
   RoomOrderDispatchResult,
+  RoomOrderHandleButtonPayload,
+  RoomOrderHandleButtonResult,
 } from "sheet-ingress-api/sheet-apis-rpc";
+import { makeArgumentError } from "typhoon-core/error";
 import { CheckinService } from "./checkin";
 import {
   checkinActionRow,
@@ -18,10 +25,12 @@ import {
   tentativeRoomOrderActionRow,
   tentativeRoomOrderPinActionRow,
 } from "./discordComponents";
+import { GuildConfigService } from "./guildConfig";
 import { IngressBotClient } from "./ingressBotClient";
-import { MessageCheckinService } from "./messageCheckin";
+import { MessageCheckinMemberNotRegisteredError, MessageCheckinService } from "./messageCheckin";
 import { MessageRoomOrderService } from "./messageRoomOrder";
-import { RoomOrderService } from "./roomOrder";
+import { buildRoomOrderContent, RoomOrderService } from "./roomOrder";
+import { SheetService } from "./sheet";
 
 const MessageFlags = {
   Ephemeral: 64,
@@ -33,6 +42,8 @@ type DiscordMessage = {
 };
 
 type MessagePayload = Schema.Schema.Type<typeof DiscordMessageRequestSchema>;
+type GuildConfigServiceApi = Context.Service.Shape<typeof GuildConfigService>;
+type SheetServiceApi = Context.Service.Shape<typeof SheetService>;
 
 type DispatchMessageSink = {
   readonly sendPrimary: (
@@ -73,6 +84,105 @@ const makeMessageSink = (
   typeof interactionToken === "string"
     ? makeInteractionMessageSink(botClient, interactionToken)
     : makeChannelMessageSink(botClient, channelId);
+
+const mentionUser = (userId: string): string => `<@${userId}>`;
+
+const renderCheckedInContent = (
+  initialMessage: string,
+  members: ReadonlyArray<{ readonly memberId: string; readonly checkinAt: Option.Option<unknown> }>,
+) => {
+  const checkedInMentions = members
+    .filter((member) => Option.isSome(member.checkinAt))
+    .map((member) => mentionUser(member.memberId));
+
+  return checkedInMentions.length > 0
+    ? `${initialMessage}\n\nChecked in: ${checkedInMentions.join(" ")}`
+    : initialMessage;
+};
+
+const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigServiceApi) =>
+  guildConfigService.getGuildConfig(guildId).pipe(
+    Effect.flatMap(
+      Option.match({
+        onSome: (guildConfig) =>
+          pipe(
+            guildConfig.sheetId,
+            Option.match({
+              onSome: Effect.succeed,
+              onNone: () =>
+                Effect.fail(
+                  makeArgumentError("Cannot handle room-order button, the guild has no sheet id"),
+                ),
+            }),
+          ),
+        onNone: () =>
+          Effect.fail(
+            makeArgumentError("Cannot handle room-order button, the guild might not be registered"),
+          ),
+      }),
+    ),
+  );
+
+const fillParticipantFromName = (name: string) => ({
+  key: `name:${name}`,
+  label: name,
+  name,
+});
+
+const renderRoomOrderReply = Effect.fn("DispatchService.renderRoomOrderReply")(function* ({
+  guildId,
+  messageId,
+  mode,
+  roomOrder,
+  guildConfigService,
+  sheetService,
+  messageRoomOrderService,
+}: {
+  readonly guildId: string;
+  readonly messageId: string;
+  readonly mode: "normal" | "tentative";
+  readonly roomOrder: MessageRoomOrder;
+  readonly guildConfigService: GuildConfigServiceApi;
+  readonly sheetService: SheetServiceApi;
+  readonly messageRoomOrderService: typeof MessageRoomOrderService.Service;
+}) {
+  const maybeRange = yield* messageRoomOrderService.getMessageRoomOrderRange(messageId);
+  const entries = yield* messageRoomOrderService.getMessageRoomOrderEntry(
+    messageId,
+    roomOrder.rank,
+  );
+  const sheetId = yield* getSheetIdFromGuildId(guildId, guildConfigService);
+  const range = yield* Option.match(maybeRange, {
+    onSome: Effect.succeed,
+    onNone: () => Effect.fail(makeArgumentError("Cannot render room order, no entries found")),
+  });
+  const eventConfig = yield* sheetService.getEventConfig(sheetId);
+  const start = pipe(
+    eventConfig.startTime,
+    DateTime.addDuration(Duration.hours(roomOrder.hour - 1)),
+  );
+  const end = pipe(eventConfig.startTime, DateTime.addDuration(Duration.hours(roomOrder.hour)));
+
+  const content = buildRoomOrderContent(
+    roomOrder.hour,
+    start,
+    end,
+    Option.getOrNull(roomOrder.monitor),
+    roomOrder.previousFills.map(fillParticipantFromName),
+    roomOrder.fills.map(fillParticipantFromName),
+    entries,
+  );
+
+  return mode === "tentative"
+    ? {
+        content: formatTentativeRoomOrderContent(content),
+        components: [tentativeRoomOrderActionRow(range, roomOrder.rank)],
+      }
+    : {
+        content,
+        components: [roomOrderActionRow(range, roomOrder.rank)],
+      };
+});
 
 const sendTentativeRoomOrder = Effect.fn("DispatchService.sendTentativeRoomOrder")(function* ({
   guildId,
@@ -116,6 +226,7 @@ const sendTentativeRoomOrder = Effect.fn("DispatchService.sendTentativeRoomOrder
           fills: generated.fills,
           hour: generated.hour,
           rank: generated.rank,
+          tentative: true,
           monitor: generated.monitor,
           guildId,
           messageChannelId: sentMessage.channel_id,
@@ -182,9 +293,11 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
   make: Effect.gen(function* () {
     const botClient = yield* IngressBotClient;
     const checkinService = yield* CheckinService;
+    const guildConfigService = yield* GuildConfigService;
     const messageCheckinService = yield* MessageCheckinService;
     const messageRoomOrderService = yield* MessageRoomOrderService;
     const roomOrderService = yield* RoomOrderService;
+    const sheetService = yield* SheetService;
 
     return {
       checkin: Effect.fn("DispatchService.checkin")(function* (payload: CheckinDispatchPayload) {
@@ -310,6 +423,7 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
             fills: generated.fills,
             hour: generated.hour,
             rank: generated.rank,
+            tentative: false,
             monitor: generated.monitor,
             guildId: payload.guildId,
             messageChannelId: message.channel_id,
@@ -338,6 +452,788 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
           rank: generated.rank,
         } satisfies RoomOrderDispatchResult;
       }),
+      checkinButton: Effect.fn("DispatchService.checkinButton")(function* (
+        payload: CheckinHandleButtonPayload,
+      ) {
+        const user = yield* SheetAuthUser;
+        const accountId = user.accountId;
+        const checkinAt = Date.now();
+        const checkinClaimId = globalThis.crypto.randomUUID();
+
+        const maybeMessageCheckinData = yield* messageCheckinService.getMessageCheckinData(
+          payload.messageId,
+        );
+        const failCheckinInteraction = (content: string, errorMessage: string) =>
+          botClient
+            .updateOriginalInteractionResponse(payload.interactionToken, {
+              content,
+            })
+            .pipe(Effect.andThen(Effect.fail(makeArgumentError(errorMessage))));
+        const messageCheckinData = yield* Option.match(maybeMessageCheckinData, {
+          onSome: Effect.succeed,
+          onNone: () =>
+            failCheckinInteraction(
+              "This check-in message is not registered.",
+              "Cannot handle check-in button, message is not registered",
+            ),
+        });
+        const messageChannelId = yield* Option.match(messageCheckinData.messageChannelId, {
+          onSome: Effect.succeed,
+          onNone: () =>
+            failCheckinInteraction(
+              "This check-in message channel is not registered.",
+              "Cannot handle check-in button, message channel is not registered",
+            ),
+        });
+        const guildId = yield* Option.match(messageCheckinData.guildId, {
+          onSome: Effect.succeed,
+          onNone: () =>
+            failCheckinInteraction(
+              "This check-in message guild is not registered.",
+              "Cannot handle check-in button, message guild is not registered",
+            ),
+        });
+
+        const checkedInMember = yield* messageCheckinService
+          .setMessageCheckinMemberCheckinAtIfUnset(
+            payload.messageId,
+            accountId,
+            checkinAt,
+            checkinClaimId,
+          )
+          .pipe(
+            Effect.catch((error) =>
+              botClient
+                .updateOriginalInteractionResponse(payload.interactionToken, {
+                  content:
+                    error instanceof MessageCheckinMemberNotRegisteredError
+                      ? "You are not registered for this check-in."
+                      : "We could not check you in. Please try again.",
+                })
+                .pipe(Effect.andThen(Effect.fail(error))),
+            ),
+          );
+        const isFirstCheckin = Option.contains(
+          Option.map(checkedInMember.checkinAt, (value) => Number(DateTime.toEpochMillis(value))),
+          checkinAt,
+        );
+
+        yield* botClient.updateOriginalInteractionResponse(payload.interactionToken, {
+          content: isFirstCheckin
+            ? "You have been checked in!"
+            : "You have already been checked in!",
+        });
+
+        const checkedInMembers = yield* messageCheckinService.getMessageCheckinMembers(
+          payload.messageId,
+        );
+        const content = renderCheckedInContent(messageCheckinData.initialMessage, checkedInMembers);
+
+        yield* botClient
+          .updateMessage(messageChannelId, payload.messageId, {
+            content,
+            components: [checkinActionRow()],
+          })
+          .pipe(
+            Effect.catchCause((cause) =>
+              Effect.logError("Failed to update check-in message after button check-in").pipe(
+                Effect.annotateLogs({
+                  guildId,
+                  messageId: payload.messageId,
+                  messageChannelId,
+                  accountId,
+                }),
+                Effect.andThen(Effect.logError(cause)),
+              ),
+            ),
+          );
+
+        if (isFirstCheckin) {
+          yield* botClient
+            .sendMessage(messageCheckinData.channelId, {
+              content: `${mentionUser(accountId)} has checked in!`,
+            })
+            .pipe(
+              Effect.catchCause((cause) =>
+                Effect.logError("Failed to announce button check-in").pipe(
+                  Effect.annotateLogs({
+                    guildId,
+                    accountId,
+                    channelId: messageCheckinData.channelId,
+                    messageId: payload.messageId,
+                  }),
+                  Effect.andThen(Effect.logError(cause)),
+                ),
+              ),
+            );
+        }
+
+        if (Option.isSome(messageCheckinData.roleId)) {
+          const roleId = messageCheckinData.roleId.value;
+          // Re-apply the role on repeat clicks to repair missed Discord side effects.
+          yield* botClient.addGuildMemberRole(guildId, accountId, roleId).pipe(
+            Effect.catchCause((cause) =>
+              Effect.logError("Failed to add check-in role after button check-in").pipe(
+                Effect.annotateLogs({
+                  guildId,
+                  accountId,
+                  roleId,
+                  messageId: payload.messageId,
+                }),
+                Effect.andThen(Effect.logError(cause)),
+              ),
+            ),
+          );
+        }
+
+        return {
+          messageId: payload.messageId,
+          messageChannelId,
+          checkedInMemberId: accountId,
+        } satisfies CheckinHandleButtonResult;
+      }),
+      roomOrderButton: Effect.fn("DispatchService.roomOrderButton")(function* (
+        payload: RoomOrderHandleButtonPayload,
+        authorizedRoomOrder?: MessageRoomOrder,
+      ) {
+        const maybeInitialRoomOrder =
+          authorizedRoomOrder === undefined
+            ? yield* messageRoomOrderService.getMessageRoomOrder(payload.messageId)
+            : Option.some(authorizedRoomOrder);
+        if (Option.isNone(maybeInitialRoomOrder) && payload.action === "pinTentative") {
+          const fallbackChannel = yield* guildConfigService.getGuildChannelById({
+            guildId: payload.guildId,
+            channelId: payload.messageChannelId,
+            running: true,
+          });
+          if (Option.isNone(fallbackChannel)) {
+            yield* botClient.updateOriginalInteractionResponse(payload.interactionToken, {
+              content: "This channel is not a registered running channel.",
+              components: [],
+            });
+            return yield* Effect.fail(
+              makeArgumentError(
+                "Cannot handle room-order button, message channel is not a registered running channel",
+              ),
+            );
+          }
+
+          const pinned = yield* botClient
+            .createPin(payload.messageChannelId, payload.messageId)
+            .pipe(
+              Effect.as(true),
+              Effect.catchCause((cause) =>
+                Effect.logError("Failed to pin fallback tentative room order").pipe(
+                  Effect.annotateLogs({
+                    guildId: payload.guildId,
+                    channelId: payload.messageChannelId,
+                    messageId: payload.messageId,
+                  }),
+                  Effect.andThen(Effect.logError(cause)),
+                  Effect.as(false),
+                ),
+              ),
+            );
+
+          const cleanedUp = pinned
+            ? yield* botClient
+                .updateMessage(payload.messageChannelId, payload.messageId, {
+                  components: [],
+                })
+                .pipe(
+                  Effect.as(true),
+                  Effect.catchCause((cause) =>
+                    Effect.logError("Failed to clean up fallback tentative room order").pipe(
+                      Effect.annotateLogs({
+                        guildId: payload.guildId,
+                        channelId: payload.messageChannelId,
+                        messageId: payload.messageId,
+                      }),
+                      Effect.andThen(Effect.logError(cause)),
+                      Effect.as(false),
+                    ),
+                  ),
+                )
+            : false;
+
+          const detail = pinned
+            ? cleanedUp
+              ? "pinned tentative room order!"
+              : "pinned tentative room order, but failed to clean up the message."
+            : "tentative room order could not be pinned.";
+          yield* botClient.updateOriginalInteractionResponse(payload.interactionToken, {
+            content: detail,
+            components: [],
+          });
+
+          return {
+            messageId: payload.messageId,
+            messageChannelId: payload.messageChannelId,
+            action: payload.action,
+            status: pinned ? (cleanedUp ? "pinned" : "partial") : "failed",
+            detail,
+          } satisfies RoomOrderHandleButtonResult;
+        }
+        const initialRoomOrder = yield* Option.match(maybeInitialRoomOrder, {
+          onSome: Effect.succeed,
+          onNone: () =>
+            botClient
+              .updateOriginalInteractionResponse(payload.interactionToken, {
+                content: "This room-order message is not registered.",
+                components: [],
+              })
+              .pipe(
+                Effect.andThen(
+                  Effect.fail(
+                    makeArgumentError("Cannot handle room-order button, message is not registered"),
+                  ),
+                ),
+              ),
+        });
+        const failRoomOrderInteraction = (content: string, errorMessage: string) =>
+          botClient
+            .updateOriginalInteractionResponse(payload.interactionToken, {
+              content,
+              components: [],
+            })
+            .pipe(Effect.andThen(Effect.fail(makeArgumentError(errorMessage))));
+        const trustedGuildId = yield* Option.match(initialRoomOrder.guildId, {
+          onSome: Effect.succeed,
+          onNone: () =>
+            failRoomOrderInteraction(
+              "This room-order message guild is not registered.",
+              "Cannot handle room-order button, message guild is not registered",
+            ),
+        });
+        const trustedMessageChannelId = yield* Option.match(initialRoomOrder.messageChannelId, {
+          onSome: Effect.succeed,
+          onNone: () =>
+            failRoomOrderInteraction(
+              "This room-order message channel is not registered.",
+              "Cannot handle room-order button, message channel is not registered",
+            ),
+        });
+        const messageHasTentativePrefix = hasTentativeRoomOrderPrefix(payload.messageContent ?? "");
+        const effectiveInitialRoomOrder =
+          !initialRoomOrder.tentative && messageHasTentativePrefix
+            ? yield* messageRoomOrderService
+                .markMessageRoomOrderTentative(payload.messageId, {
+                  guildId: trustedGuildId,
+                  messageChannelId: trustedMessageChannelId,
+                })
+                .pipe(
+                  Effect.catchCause((cause) =>
+                    Effect.logError("Failed to repair legacy tentative room-order flag").pipe(
+                      Effect.annotateLogs({
+                        guildId: trustedGuildId,
+                        messageId: payload.messageId,
+                        channelId: trustedMessageChannelId,
+                      }),
+                      Effect.andThen(Effect.logError(cause)),
+                      Effect.as(initialRoomOrder),
+                    ),
+                  ),
+                )
+            : initialRoomOrder;
+        const mode = effectiveInitialRoomOrder.tentative ? "tentative" : "normal";
+        const interactionResponseType =
+          payload.interactionResponseType ?? (mode === "tentative" ? "reply" : "update");
+        const renderReply = (
+          roomOrder: MessageRoomOrder,
+          replyMode: "normal" | "tentative" = mode,
+        ) =>
+          renderRoomOrderReply({
+            guildId: trustedGuildId,
+            messageId: payload.messageId,
+            mode: replyMode,
+            roomOrder,
+            guildConfigService,
+            sheetService,
+            messageRoomOrderService,
+          });
+
+        const updateInteraction = (
+          content: string,
+          components: ReadonlyArray<Record<string, unknown>> = [],
+        ) =>
+          botClient.updateOriginalInteractionResponse(payload.interactionToken, {
+            content,
+            components,
+          });
+
+        const getRoomOrderBusyDetail = (roomOrder: MessageRoomOrder) => {
+          if (Option.isSome(roomOrder.sendClaimId)) {
+            return "room order is already being sent.";
+          }
+          if (Option.isSome(roomOrder.tentativeUpdateClaimId)) {
+            return "tentative room order is already being updated.";
+          }
+          if (Option.isSome(roomOrder.tentativePinnedAt)) {
+            return "tentative room order is already pinned.";
+          }
+          return "tentative room order is already being pinned.";
+        };
+
+        if (payload.action === "previous" || payload.action === "next") {
+          const isPrevious = payload.action === "previous";
+          if (mode === "tentative" && Option.isSome(initialRoomOrder.tentativePinnedAt)) {
+            const detail = "tentative room order is already pinned.";
+            yield* updateInteraction(detail);
+            return {
+              messageId: payload.messageId,
+              messageChannelId: trustedMessageChannelId,
+              action: payload.action,
+              status: "denied",
+              detail,
+            } satisfies RoomOrderHandleButtonResult;
+          }
+
+          const updateClaimId = globalThis.crypto.randomUUID();
+          const claimedRoomOrder =
+            yield* messageRoomOrderService.claimMessageRoomOrderTentativeUpdate(
+              payload.messageId,
+              updateClaimId,
+            );
+          if (
+            Option.isSome(claimedRoomOrder.tentativePinnedAt) ||
+            Option.isSome(claimedRoomOrder.tentativePinClaimId) ||
+            !Option.contains(claimedRoomOrder.tentativeUpdateClaimId, updateClaimId)
+          ) {
+            const detail = getRoomOrderBusyDetail(claimedRoomOrder);
+            yield* updateInteraction(detail);
+            return {
+              messageId: payload.messageId,
+              messageChannelId: trustedMessageChannelId,
+              action: payload.action,
+              status: "denied",
+              detail,
+            } satisfies RoomOrderHandleButtonResult;
+          }
+
+          const updatedRank = yield* (
+            isPrevious
+              ? messageRoomOrderService.decrementMessageRoomOrderRank(payload.messageId, {
+                  expectedRank: initialRoomOrder.rank,
+                  tentativeUpdateClaimId: updateClaimId,
+                })
+              : messageRoomOrderService.incrementMessageRoomOrderRank(payload.messageId, {
+                  expectedRank: initialRoomOrder.rank,
+                  tentativeUpdateClaimId: updateClaimId,
+                })
+          ).pipe(
+            Effect.catchCause((cause) =>
+              messageRoomOrderService
+                .releaseMessageRoomOrderTentativeUpdateClaim(payload.messageId, updateClaimId)
+                .pipe(
+                  Effect.catchCause(() => Effect.void),
+                  Effect.andThen(Effect.failCause(cause)),
+                ),
+            ),
+          );
+          const expectedRank = initialRoomOrder.rank + (isPrevious ? -1 : 1);
+          if (updatedRank.rank !== expectedRank) {
+            const detail =
+              Option.isSome(updatedRank.sendClaimId) ||
+              Option.isSome(updatedRank.tentativeUpdateClaimId) ||
+              Option.isSome(updatedRank.tentativePinnedAt) ||
+              Option.isSome(updatedRank.tentativePinClaimId)
+                ? getRoomOrderBusyDetail(updatedRank)
+                : "room order could not be updated.";
+            yield* messageRoomOrderService
+              .releaseMessageRoomOrderTentativeUpdateClaim(payload.messageId, updateClaimId)
+              .pipe(Effect.catchCause(() => Effect.void));
+            yield* updateInteraction(detail);
+            return {
+              messageId: payload.messageId,
+              messageChannelId: trustedMessageChannelId,
+              action: payload.action,
+              status: "denied",
+              detail,
+            } satisfies RoomOrderHandleButtonResult;
+          }
+
+          const rollbackRankUpdate = (cause: Cause.Cause<unknown>) =>
+            (isPrevious
+              ? messageRoomOrderService.incrementMessageRoomOrderRank(payload.messageId, {
+                  expectedRank: updatedRank.rank,
+                  tentativeUpdateClaimId: updateClaimId,
+                })
+              : messageRoomOrderService.decrementMessageRoomOrderRank(payload.messageId, {
+                  expectedRank: updatedRank.rank,
+                  tentativeUpdateClaimId: updateClaimId,
+                })
+            ).pipe(
+              Effect.catchCause(() => Effect.void),
+              Effect.andThen(
+                messageRoomOrderService
+                  .releaseMessageRoomOrderTentativeUpdateClaim(payload.messageId, updateClaimId)
+                  .pipe(Effect.catchCause(() => Effect.void)),
+              ),
+              Effect.andThen(
+                updateInteraction("room order could not be updated.").pipe(
+                  Effect.catchCause(() => Effect.void),
+                ),
+              ),
+              Effect.andThen(Effect.failCause(cause)),
+            );
+
+          if (mode === "tentative") {
+            const reply = yield* renderReply(updatedRank).pipe(
+              Effect.catchCause(rollbackRankUpdate),
+            );
+            yield* botClient
+              .updateMessage(trustedMessageChannelId, payload.messageId, reply)
+              .pipe(Effect.catchCause(rollbackRankUpdate));
+            yield* messageRoomOrderService
+              .releaseMessageRoomOrderTentativeUpdateClaim(payload.messageId, updateClaimId)
+              .pipe(Effect.catchCause(() => Effect.void));
+            if (interactionResponseType === "reply") {
+              yield* updateInteraction("updated tentative room order.");
+            }
+          } else {
+            const reply = yield* renderReply(updatedRank).pipe(
+              Effect.catchCause(rollbackRankUpdate),
+            );
+            if (interactionResponseType === "reply") {
+              yield* botClient
+                .updateMessage(trustedMessageChannelId, payload.messageId, reply)
+                .pipe(Effect.catchCause(rollbackRankUpdate));
+            } else {
+              yield* botClient
+                .updateOriginalInteractionResponse(payload.interactionToken, reply)
+                .pipe(Effect.catchCause(rollbackRankUpdate));
+            }
+            yield* messageRoomOrderService
+              .releaseMessageRoomOrderTentativeUpdateClaim(payload.messageId, updateClaimId)
+              .pipe(Effect.catchCause(() => Effect.void));
+            if (interactionResponseType === "reply") {
+              yield* updateInteraction("updated room order.");
+            }
+          }
+
+          return {
+            messageId: payload.messageId,
+            messageChannelId: trustedMessageChannelId,
+            action: payload.action,
+            status: "updated",
+            detail: null,
+          } satisfies RoomOrderHandleButtonResult;
+        }
+
+        if (payload.action === "send") {
+          if (mode === "tentative") {
+            const detail = "cannot send a tentative room order.";
+            yield* updateInteraction(detail);
+            return {
+              messageId: payload.messageId,
+              messageChannelId: trustedMessageChannelId,
+              action: payload.action,
+              status: "denied",
+              detail,
+            } satisfies RoomOrderHandleButtonResult;
+          }
+          if (
+            Option.isSome(initialRoomOrder.sentMessageId) &&
+            Option.isSome(initialRoomOrder.sentMessageChannelId)
+          ) {
+            const detail = "room order was already sent.";
+            yield* updateInteraction(detail);
+            return {
+              messageId: initialRoomOrder.sentMessageId.value,
+              messageChannelId: initialRoomOrder.sentMessageChannelId.value,
+              action: payload.action,
+              status: "sent",
+              detail,
+            } satisfies RoomOrderHandleButtonResult;
+          }
+          if (Option.isSome(initialRoomOrder.tentativePinnedAt)) {
+            const detail = "tentative room order is already pinned.";
+            yield* updateInteraction(detail);
+            return {
+              messageId: payload.messageId,
+              messageChannelId: trustedMessageChannelId,
+              action: payload.action,
+              status: "denied",
+              detail,
+            } satisfies RoomOrderHandleButtonResult;
+          }
+
+          const claimId = globalThis.crypto.randomUUID();
+          const claimedRoomOrder = yield* messageRoomOrderService.claimMessageRoomOrderSend(
+            payload.messageId,
+            claimId,
+          );
+          if (
+            Option.isSome(claimedRoomOrder.sentMessageId) &&
+            Option.isSome(claimedRoomOrder.sentMessageChannelId)
+          ) {
+            const detail = "room order was already sent.";
+            yield* updateInteraction(detail);
+            return {
+              messageId: claimedRoomOrder.sentMessageId.value,
+              messageChannelId: claimedRoomOrder.sentMessageChannelId.value,
+              action: payload.action,
+              status: "sent",
+              detail,
+            } satisfies RoomOrderHandleButtonResult;
+          }
+          if (!Option.contains(claimedRoomOrder.sendClaimId, claimId)) {
+            const detail = getRoomOrderBusyDetail(claimedRoomOrder);
+            yield* updateInteraction(detail);
+            return {
+              messageId: payload.messageId,
+              messageChannelId: trustedMessageChannelId,
+              action: payload.action,
+              status: "denied",
+              detail,
+            } satisfies RoomOrderHandleButtonResult;
+          }
+
+          const reply = yield* renderReply(claimedRoomOrder, "normal").pipe(
+            Effect.catchCause((cause) =>
+              messageRoomOrderService
+                .releaseMessageRoomOrderSendClaim(payload.messageId, claimId)
+                .pipe(
+                  Effect.catchCause(() => Effect.void),
+                  Effect.andThen(
+                    updateInteraction("room order could not be sent.").pipe(
+                      Effect.catchCause(() => Effect.void),
+                    ),
+                  ),
+                  Effect.andThen(Effect.failCause(cause)),
+                ),
+            ),
+          );
+          const sentMessage = yield* botClient
+            .sendMessage(trustedMessageChannelId, {
+              content: reply.content,
+              nonce: payload.messageId,
+              enforce_nonce: true,
+            })
+            .pipe(
+              Effect.catchCause((cause) =>
+                messageRoomOrderService
+                  .releaseMessageRoomOrderSendClaim(payload.messageId, claimId)
+                  .pipe(
+                    Effect.catchCause(() => Effect.void),
+                    Effect.andThen(
+                      updateInteraction("room order could not be sent.").pipe(
+                        Effect.catchCause(() => Effect.void),
+                      ),
+                    ),
+                    Effect.andThen(Effect.failCause(cause)),
+                  ),
+              ),
+            );
+          const completedRoomOrder = yield* messageRoomOrderService.completeMessageRoomOrderSend(
+            payload.messageId,
+            claimId,
+            {
+              id: sentMessage.id,
+              channelId: sentMessage.channel_id,
+            },
+          );
+          if (
+            !(
+              Option.isNone(completedRoomOrder.sendClaimId) &&
+              Option.contains(completedRoomOrder.sentMessageId, sentMessage.id) &&
+              Option.contains(completedRoomOrder.sentMessageChannelId, sentMessage.channel_id)
+            )
+          ) {
+            const detail = "sent room order, but failed to track it.";
+            yield* updateInteraction(detail);
+            return {
+              messageId: sentMessage.id,
+              messageChannelId: sentMessage.channel_id,
+              action: payload.action,
+              status: "partial",
+              detail,
+            } satisfies RoomOrderHandleButtonResult;
+          }
+          const pinned = yield* botClient.createPin(sentMessage.channel_id, sentMessage.id).pipe(
+            Effect.as(true),
+            Effect.catchCause((cause) =>
+              Effect.logError("Failed to pin sent room order").pipe(
+                Effect.annotateLogs({
+                  guildId: trustedGuildId,
+                  channelId: sentMessage.channel_id,
+                  messageId: sentMessage.id,
+                }),
+                Effect.andThen(Effect.logError(cause)),
+                Effect.as(false),
+              ),
+            ),
+          );
+
+          const detail = pinned
+            ? "sent room order and pinned it!"
+            : "sent room order, but failed to pin it.";
+          yield* updateInteraction(detail);
+
+          return {
+            messageId: sentMessage.id,
+            messageChannelId: sentMessage.channel_id,
+            action: payload.action,
+            status: pinned ? "pinned" : "partial",
+            detail,
+          } satisfies RoomOrderHandleButtonResult;
+        }
+
+        if (payload.action !== "pinTentative") {
+          const exhaustive: never = payload.action;
+          return exhaustive;
+        }
+
+        const pinClaimId = globalThis.crypto.randomUUID();
+        const pinClaimedRoomOrder =
+          yield* messageRoomOrderService.claimMessageRoomOrderTentativePin(
+            payload.messageId,
+            pinClaimId,
+          );
+        if (Option.isSome(pinClaimedRoomOrder.tentativePinnedAt)) {
+          const detail = "tentative room order is already pinned.";
+          yield* updateInteraction(detail);
+          return {
+            messageId: payload.messageId,
+            messageChannelId: trustedMessageChannelId,
+            action: payload.action,
+            status: "denied",
+            detail,
+          } satisfies RoomOrderHandleButtonResult;
+        }
+        if (!Option.contains(pinClaimedRoomOrder.tentativePinClaimId, pinClaimId)) {
+          const detail = getRoomOrderBusyDetail(pinClaimedRoomOrder);
+          yield* updateInteraction(detail);
+          return {
+            messageId: payload.messageId,
+            messageChannelId: trustedMessageChannelId,
+            action: payload.action,
+            status: "denied",
+            detail,
+          } satisfies RoomOrderHandleButtonResult;
+        }
+
+        const pinned = yield* botClient.createPin(trustedMessageChannelId, payload.messageId).pipe(
+          Effect.as(true),
+          Effect.catchCause((cause) =>
+            Effect.logError("Failed to pin tentative room order").pipe(
+              Effect.annotateLogs({
+                guildId: trustedGuildId,
+                channelId: trustedMessageChannelId,
+                messageId: payload.messageId,
+              }),
+              Effect.andThen(Effect.logError(cause)),
+              Effect.as(false),
+            ),
+          ),
+        );
+
+        if (!pinned) {
+          yield* messageRoomOrderService
+            .releaseMessageRoomOrderTentativePinClaim(payload.messageId, pinClaimId)
+            .pipe(Effect.catchCause(() => Effect.void));
+        }
+
+        const maybePinnedRoomOrder = pinned
+          ? yield* messageRoomOrderService
+              .completeMessageRoomOrderTentativePin(payload.messageId, pinClaimId)
+              .pipe(
+                Effect.map(Option.some),
+                Effect.catchCause((cause) =>
+                  Effect.gen(function* () {
+                    const detail = "pinned tentative room order, but failed to track it.";
+                    yield* Effect.logError("Failed to track pinned tentative room order").pipe(
+                      Effect.annotateLogs({
+                        guildId: trustedGuildId,
+                        channelId: trustedMessageChannelId,
+                        messageId: payload.messageId,
+                      }),
+                      Effect.andThen(Effect.logError(cause)),
+                    );
+                    yield* updateInteraction(detail).pipe(Effect.catchCause(() => Effect.void));
+                    yield* messageRoomOrderService
+                      .releaseMessageRoomOrderTentativePinClaim(payload.messageId, pinClaimId)
+                      .pipe(Effect.catchCause(() => Effect.void));
+                    return Option.none();
+                  }),
+                ),
+              )
+          : Option.none();
+        if (pinned && Option.isNone(maybePinnedRoomOrder)) {
+          return {
+            messageId: payload.messageId,
+            messageChannelId: trustedMessageChannelId,
+            action: payload.action,
+            status: "partial",
+            detail: "pinned tentative room order, but failed to track it.",
+          } satisfies RoomOrderHandleButtonResult;
+        }
+        const pinnedRoomOrder = Option.getOrNull(maybePinnedRoomOrder);
+        if (pinnedRoomOrder !== null && Option.isNone(pinnedRoomOrder.tentativePinnedAt)) {
+          const detail = "pinned tentative room order, but failed to track it.";
+          yield* updateInteraction(detail);
+          return {
+            messageId: payload.messageId,
+            messageChannelId: trustedMessageChannelId,
+            action: payload.action,
+            status: "partial",
+            detail,
+          } satisfies RoomOrderHandleButtonResult;
+        }
+
+        const cleanedUp = pinned
+          ? yield* Effect.gen(function* () {
+              const latestReply = yield* renderReply(pinnedRoomOrder ?? initialRoomOrder, "normal");
+
+              return yield* botClient
+                .updateMessage(trustedMessageChannelId, payload.messageId, {
+                  content: latestReply.content,
+                  components: [],
+                })
+                .pipe(
+                  Effect.as(true),
+                  Effect.catchCause((cause) =>
+                    Effect.logError("Failed to clean up pinned tentative room order").pipe(
+                      Effect.annotateLogs({
+                        guildId: trustedGuildId,
+                        channelId: trustedMessageChannelId,
+                        messageId: payload.messageId,
+                      }),
+                      Effect.andThen(Effect.logError(cause)),
+                      Effect.as(false),
+                    ),
+                  ),
+                );
+            }).pipe(
+              Effect.catchCause((cause) =>
+                Effect.logError("Failed to render pinned tentative room order cleanup").pipe(
+                  Effect.annotateLogs({
+                    guildId: trustedGuildId,
+                    channelId: trustedMessageChannelId,
+                    messageId: payload.messageId,
+                  }),
+                  Effect.andThen(Effect.logError(cause)),
+                  Effect.as(false),
+                ),
+              ),
+            )
+          : false;
+
+        const detail = pinned
+          ? cleanedUp
+            ? "pinned tentative room order!"
+            : "pinned tentative room order, but failed to clean up the message."
+          : "tentative room order could not be pinned.";
+        yield* updateInteraction(detail);
+
+        return {
+          messageId: payload.messageId,
+          messageChannelId: trustedMessageChannelId,
+          action: payload.action,
+          status: pinned ? (cleanedUp ? "pinned" : "partial") : "failed",
+          detail,
+        } satisfies RoomOrderHandleButtonResult;
+      }),
     };
   }),
 }) {
@@ -346,9 +1242,11 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
       Layer.mergeAll(
         IngressBotClient.layer,
         CheckinService.layer,
+        GuildConfigService.layer,
         MessageCheckinService.layer,
         MessageRoomOrderService.layer,
         RoomOrderService.layer,
+        SheetService.layer,
       ),
     ),
   );

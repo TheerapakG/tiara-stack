@@ -71,6 +71,19 @@ const CheckinGenerateError = Schema.Union([
 
 const CheckinDispatchError = Schema.Union([CheckinGenerateError, UnknownError]);
 
+const MessageCheckinError = Schema.Union([
+  SchemaError,
+  QueryResultError,
+  ArgumentError,
+  UnknownError,
+]);
+
+const CheckinHandleButtonError = Schema.Union([
+  CheckinGenerateError,
+  MessageCheckinError,
+  UnknownError,
+]);
+
 const MonitorError = Schema.Union([
   GoogleSheetsError,
   ParserFieldError,
@@ -97,6 +110,19 @@ const RoomOrderGenerateError = Schema.Union([
 ]);
 
 const RoomOrderDispatchError = Schema.Union([RoomOrderGenerateError, UnknownError]);
+
+const MessageRoomOrderError = Schema.Union([
+  SchemaError,
+  QueryResultError,
+  ArgumentError,
+  UnknownError,
+]);
+
+const RoomOrderHandleButtonError = Schema.Union([
+  RoomOrderGenerateError,
+  MessageRoomOrderError,
+  UnknownError,
+]);
 
 const ScheduleError = Schema.Union([
   GoogleSheetsError,
@@ -128,6 +154,7 @@ const messageRoomOrderData = Schema.Struct({
   fills: Schema.Array(Schema.String),
   hour: Schema.Number,
   rank: Schema.Number,
+  tentative: Schema.optional(Schema.Boolean),
   monitor: Schema.optional(Schema.NullOr(Schema.String)),
   guildId: Schema.NullOr(Schema.String),
   messageChannelId: Schema.NullOr(Schema.String),
@@ -178,6 +205,21 @@ export const CheckinDispatchResult = Schema.Struct({
 
 export type CheckinDispatchResult = Schema.Schema.Type<typeof CheckinDispatchResult>;
 
+export const CheckinHandleButtonPayload = Schema.Struct({
+  messageId: Schema.String,
+  interactionToken: Schema.String,
+});
+
+export type CheckinHandleButtonPayload = Schema.Schema.Type<typeof CheckinHandleButtonPayload>;
+
+export const CheckinHandleButtonResult = Schema.Struct({
+  messageId: Schema.String,
+  messageChannelId: Schema.String,
+  checkedInMemberId: Schema.String,
+});
+
+export type CheckinHandleButtonResult = Schema.Schema.Type<typeof CheckinHandleButtonResult>;
+
 export const RoomOrderDispatchPayload = Schema.Struct({
   guildId: Schema.String,
   channelId: Schema.optional(Schema.String),
@@ -198,6 +240,38 @@ export const RoomOrderDispatchResult = Schema.Struct({
 });
 
 export type RoomOrderDispatchResult = Schema.Schema.Type<typeof RoomOrderDispatchResult>;
+
+export const RoomOrderButtonAction = Schema.Literals(["previous", "next", "send", "pinTentative"]);
+
+export type RoomOrderButtonAction = Schema.Schema.Type<typeof RoomOrderButtonAction>;
+
+export const RoomOrderButtonInteractionResponseType = Schema.Literals(["reply", "update"]);
+
+export type RoomOrderButtonInteractionResponseType = Schema.Schema.Type<
+  typeof RoomOrderButtonInteractionResponseType
+>;
+
+export const RoomOrderHandleButtonPayload = Schema.Struct({
+  guildId: Schema.String,
+  messageId: Schema.String,
+  messageChannelId: Schema.String,
+  messageContent: Schema.optional(Schema.NullOr(Schema.String)),
+  interactionToken: Schema.String,
+  interactionResponseType: Schema.optional(RoomOrderButtonInteractionResponseType),
+  action: RoomOrderButtonAction,
+});
+
+export type RoomOrderHandleButtonPayload = Schema.Schema.Type<typeof RoomOrderHandleButtonPayload>;
+
+export const RoomOrderHandleButtonResult = Schema.Struct({
+  messageId: Schema.String,
+  messageChannelId: Schema.String,
+  action: RoomOrderButtonAction,
+  status: Schema.Literals(["updated", "sent", "pinned", "partial", "denied", "failed"]),
+  detail: Schema.NullOr(Schema.String),
+});
+
+export type RoomOrderHandleButtonResult = Schema.Schema.Type<typeof RoomOrderHandleButtonResult>;
 
 const protectedRpc = <
   const Tag extends string,
@@ -285,6 +359,13 @@ export const CheckinRpcs = RpcGroup.make(
     }),
     success: CheckinDispatchResult,
     error: CheckinDispatchError,
+  }),
+  protectedRpc("checkin.handleButton", {
+    payload: Schema.Struct({
+      payload: CheckinHandleButtonPayload,
+    }),
+    success: CheckinHandleButtonResult,
+    error: CheckinHandleButtonError,
   }),
 );
 
@@ -461,12 +542,20 @@ export const MessageRoomOrderRpcs = RpcGroup.make(
     error: Schema.Union([SchemaError, QueryResultError]),
   }),
   protectedRpc("messageRoomOrder.decrementMessageRoomOrderRank", {
-    payload: Payload({ messageId: Schema.String }),
+    payload: Payload({
+      messageId: Schema.String,
+      expectedRank: Schema.optional(Schema.Number),
+      tentativeUpdateClaimId: Schema.optional(Schema.String),
+    }),
     success: MessageRoomOrder,
     error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
   }),
   protectedRpc("messageRoomOrder.incrementMessageRoomOrderRank", {
-    payload: Payload({ messageId: Schema.String }),
+    payload: Payload({
+      messageId: Schema.String,
+      expectedRank: Schema.optional(Schema.Number),
+      tentativeUpdateClaimId: Schema.optional(Schema.String),
+    }),
     success: MessageRoomOrder,
     error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
   }),
@@ -623,6 +712,13 @@ export const RoomOrderRpcs = RpcGroup.make(
     }),
     success: RoomOrderDispatchResult,
     error: RoomOrderDispatchError,
+  }),
+  protectedRpc("roomOrder.handleButton", {
+    payload: Schema.Struct({
+      payload: RoomOrderHandleButtonPayload,
+    }),
+    success: RoomOrderHandleButtonResult,
+    error: RoomOrderHandleButtonError,
   }),
 );
 

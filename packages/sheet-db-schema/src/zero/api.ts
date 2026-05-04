@@ -1,5 +1,12 @@
 import { Schema } from "effect";
 import { make, ZeroApiEndpoint, ZeroApiGroup } from "typhoon-zero/zeroApi";
+import {
+  hasActiveSendClaim,
+  hasActiveTentativePinClaim,
+  hasActiveTentativeUpdateClaim,
+  hasStaleUntrackedSendClaim,
+  isActiveSendClaim,
+} from "./claimHelpers";
 import { builder, Schema as ZeroSchema } from "./schema";
 
 declare module "@rocicorp/zero" {
@@ -242,6 +249,7 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
               messageId: args.messageId,
               memberId,
               checkinAt: null,
+              checkinClaimId: null,
               deletedAt: null,
             }),
           ),
@@ -281,6 +289,7 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
               messageId: args.messageId,
               memberId,
               checkinAt: null,
+              checkinClaimId: null,
               deletedAt: null,
             }),
           ),
@@ -292,13 +301,39 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         messageId: Schema.String,
         memberId: Schema.String,
         checkinAt: Schema.Number,
+        checkinClaimId: Schema.optional(Schema.String),
       }),
       mutator: async ({ tx, args }) =>
         await tx.mutate.messageCheckinMember.update({
           messageId: args.messageId,
           memberId: args.memberId,
           checkinAt: args.checkinAt,
+          checkinClaimId: args.checkinClaimId ?? null,
         }),
+    }),
+    ZeroApiEndpoint.mutator("setMessageCheckinMemberCheckinAtIfUnset", {
+      request: Schema.Struct({
+        messageId: Schema.String,
+        memberId: Schema.String,
+        checkinAt: Schema.Number,
+        checkinClaimId: Schema.String,
+      }),
+      mutator: async ({ tx, args }) => {
+        const member = await tx.run(
+          builder.messageCheckinMember
+            .where("messageId", "=", args.messageId)
+            .where("memberId", "=", args.memberId)
+            .where("deletedAt", "IS", null)
+            .one(),
+        );
+        if (!member || member.checkinAt !== null) return;
+        await tx.mutate.messageCheckinMember.update({
+          messageId: args.messageId,
+          memberId: args.memberId,
+          checkinAt: args.checkinAt,
+          checkinClaimId: args.checkinClaimId,
+        });
+      },
     }),
     ZeroApiEndpoint.mutator("removeMessageCheckinMember", {
       request: Schema.Struct({
@@ -343,15 +378,30 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
           .where("deletedAt", "IS", null),
     }),
     ZeroApiEndpoint.mutator("decrementMessageRoomOrderRank", {
-      request: Schema.Struct({ messageId: Schema.String }),
+      request: Schema.Struct({
+        messageId: Schema.String,
+        expectedRank: Schema.optional(Schema.Number),
+        tentativeUpdateClaimId: Schema.optional(Schema.String),
+      }),
       mutator: async ({ tx, args }) => {
+        const now = Date.now();
         const messageRoomOrder = await tx.run(
           builder.messageRoomOrder
             .where("messageId", "=", args.messageId)
             .where("deletedAt", "IS", null)
             .one(),
         );
-        if (!messageRoomOrder) return;
+        if (
+          !messageRoomOrder ||
+          messageRoomOrder.tentativePinnedAt !== null ||
+          (args.expectedRank !== undefined && messageRoomOrder.rank !== args.expectedRank) ||
+          hasActiveSendClaim(messageRoomOrder, now) ||
+          (hasActiveTentativeUpdateClaim(messageRoomOrder, now) &&
+            messageRoomOrder.tentativeUpdateClaimId !== args.tentativeUpdateClaimId) ||
+          hasActiveTentativePinClaim(messageRoomOrder, now)
+        ) {
+          return;
+        }
         await tx.mutate.messageRoomOrder.update({
           messageId: args.messageId,
           rank: messageRoomOrder.rank - 1,
@@ -359,7 +409,76 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
       },
     }),
     ZeroApiEndpoint.mutator("incrementMessageRoomOrderRank", {
-      request: Schema.Struct({ messageId: Schema.String }),
+      request: Schema.Struct({
+        messageId: Schema.String,
+        expectedRank: Schema.optional(Schema.Number),
+        tentativeUpdateClaimId: Schema.optional(Schema.String),
+      }),
+      mutator: async ({ tx, args }) => {
+        const now = Date.now();
+        const messageRoomOrder = await tx.run(
+          builder.messageRoomOrder
+            .where("messageId", "=", args.messageId)
+            .where("deletedAt", "IS", null)
+            .one(),
+        );
+        if (
+          !messageRoomOrder ||
+          messageRoomOrder.tentativePinnedAt !== null ||
+          (args.expectedRank !== undefined && messageRoomOrder.rank !== args.expectedRank) ||
+          hasActiveSendClaim(messageRoomOrder, now) ||
+          (hasActiveTentativeUpdateClaim(messageRoomOrder, now) &&
+            messageRoomOrder.tentativeUpdateClaimId !== args.tentativeUpdateClaimId) ||
+          hasActiveTentativePinClaim(messageRoomOrder, now)
+        ) {
+          return;
+        }
+        await tx.mutate.messageRoomOrder.update({
+          messageId: args.messageId,
+          rank: messageRoomOrder.rank + 1,
+        });
+      },
+    }),
+    ZeroApiEndpoint.mutator("claimMessageRoomOrderSend", {
+      request: Schema.Struct({ messageId: Schema.String, claimId: Schema.String }),
+      mutator: async ({ tx, args }) => {
+        const now = Date.now();
+        const messageRoomOrder = await tx.run(
+          builder.messageRoomOrder
+            .where("messageId", "=", args.messageId)
+            .where("deletedAt", "IS", null)
+            .one(),
+        );
+        if (
+          !messageRoomOrder ||
+          messageRoomOrder.sentMessageId ||
+          messageRoomOrder.tentativePinnedAt !== null ||
+          hasStaleUntrackedSendClaim(messageRoomOrder, now) ||
+          isActiveSendClaim(messageRoomOrder.sendClaimId, messageRoomOrder.sendClaimedAt, now) ||
+          hasActiveTentativeUpdateClaim(messageRoomOrder, now) ||
+          hasActiveTentativePinClaim(messageRoomOrder, now)
+        ) {
+          return;
+        }
+        await tx.mutate.messageRoomOrder.update({
+          messageId: args.messageId,
+          sendClaimId: args.claimId,
+          sendClaimedAt: now,
+          tentativeUpdateClaimId: null,
+          tentativeUpdateClaimedAt: null,
+          tentativePinClaimId: null,
+          tentativePinClaimedAt: null,
+        });
+      },
+    }),
+    ZeroApiEndpoint.mutator("completeMessageRoomOrderSend", {
+      request: Schema.Struct({
+        messageId: Schema.String,
+        claimId: Schema.String,
+        sentMessageId: Schema.String,
+        sentMessageChannelId: Schema.String,
+        sentAt: Schema.Number,
+      }),
       mutator: async ({ tx, args }) => {
         const messageRoomOrder = await tx.run(
           builder.messageRoomOrder
@@ -367,12 +486,186 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
             .where("deletedAt", "IS", null)
             .one(),
         );
-        if (!messageRoomOrder) return;
+        if (!messageRoomOrder || messageRoomOrder.sendClaimId !== args.claimId) {
+          return;
+        }
         await tx.mutate.messageRoomOrder.update({
           messageId: args.messageId,
-          rank: messageRoomOrder.rank + 1,
+          sendClaimId: null,
+          sendClaimedAt: null,
+          sentMessageId: args.sentMessageId,
+          sentMessageChannelId: args.sentMessageChannelId,
+          sentAt: args.sentAt,
         });
       },
+    }),
+    ZeroApiEndpoint.mutator("releaseMessageRoomOrderSendClaim", {
+      request: Schema.Struct({ messageId: Schema.String, claimId: Schema.String }),
+      mutator: async ({ tx, args }) => {
+        const messageRoomOrder = await tx.run(
+          builder.messageRoomOrder
+            .where("messageId", "=", args.messageId)
+            .where("deletedAt", "IS", null)
+            .one(),
+        );
+        if (!messageRoomOrder || messageRoomOrder.sendClaimId !== args.claimId) {
+          return;
+        }
+        await tx.mutate.messageRoomOrder.update({
+          messageId: args.messageId,
+          sendClaimId: null,
+          sendClaimedAt: null,
+        });
+      },
+    }),
+    ZeroApiEndpoint.mutator("claimMessageRoomOrderTentativeUpdate", {
+      request: Schema.Struct({ messageId: Schema.String, claimId: Schema.String }),
+      mutator: async ({ tx, args }) => {
+        const now = Date.now();
+        const messageRoomOrder = await tx.run(
+          builder.messageRoomOrder
+            .where("messageId", "=", args.messageId)
+            .where("deletedAt", "IS", null)
+            .one(),
+        );
+        if (
+          !messageRoomOrder ||
+          messageRoomOrder.tentativePinnedAt !== null ||
+          hasStaleUntrackedSendClaim(messageRoomOrder, now) ||
+          isActiveSendClaim(messageRoomOrder.sendClaimId, messageRoomOrder.sendClaimedAt, now) ||
+          hasActiveTentativePinClaim(messageRoomOrder, now) ||
+          hasActiveTentativeUpdateClaim(messageRoomOrder, now)
+        ) {
+          return;
+        }
+        await tx.mutate.messageRoomOrder.update({
+          messageId: args.messageId,
+          sendClaimId: null,
+          sendClaimedAt: null,
+          tentativeUpdateClaimId: args.claimId,
+          tentativeUpdateClaimedAt: now,
+          tentativePinClaimId: null,
+          tentativePinClaimedAt: null,
+        });
+      },
+    }),
+    ZeroApiEndpoint.mutator("releaseMessageRoomOrderTentativeUpdateClaim", {
+      request: Schema.Struct({ messageId: Schema.String, claimId: Schema.String }),
+      mutator: async ({ tx, args }) => {
+        const messageRoomOrder = await tx.run(
+          builder.messageRoomOrder
+            .where("messageId", "=", args.messageId)
+            .where("deletedAt", "IS", null)
+            .one(),
+        );
+        if (!messageRoomOrder || messageRoomOrder.tentativeUpdateClaimId !== args.claimId) {
+          return;
+        }
+        await tx.mutate.messageRoomOrder.update({
+          messageId: args.messageId,
+          tentativeUpdateClaimId: null,
+          tentativeUpdateClaimedAt: null,
+        });
+      },
+    }),
+    ZeroApiEndpoint.mutator("claimMessageRoomOrderTentativePin", {
+      request: Schema.Struct({
+        messageId: Schema.String,
+        claimId: Schema.String,
+      }),
+      mutator: async ({ tx, args }) => {
+        const now = Date.now();
+        const messageRoomOrder = await tx.run(
+          builder.messageRoomOrder
+            .where("messageId", "=", args.messageId)
+            .where("deletedAt", "IS", null)
+            .one(),
+        );
+        if (
+          !messageRoomOrder ||
+          messageRoomOrder.tentativePinnedAt !== null ||
+          hasStaleUntrackedSendClaim(messageRoomOrder, now) ||
+          isActiveSendClaim(messageRoomOrder.sendClaimId, messageRoomOrder.sendClaimedAt, now) ||
+          hasActiveTentativePinClaim(messageRoomOrder, now) ||
+          hasActiveTentativeUpdateClaim(messageRoomOrder, now)
+        ) {
+          return;
+        }
+        await tx.mutate.messageRoomOrder.update({
+          messageId: args.messageId,
+          sendClaimId: null,
+          sendClaimedAt: null,
+          tentativePinClaimId: args.claimId,
+          tentativePinClaimedAt: now,
+          tentativeUpdateClaimId: null,
+          tentativeUpdateClaimedAt: null,
+        });
+      },
+    }),
+    ZeroApiEndpoint.mutator("completeMessageRoomOrderTentativePin", {
+      request: Schema.Struct({
+        messageId: Schema.String,
+        claimId: Schema.String,
+        pinnedAt: Schema.Number,
+      }),
+      mutator: async ({ tx, args }) => {
+        const messageRoomOrder = await tx.run(
+          builder.messageRoomOrder
+            .where("messageId", "=", args.messageId)
+            .where("deletedAt", "IS", null)
+            .one(),
+        );
+        if (
+          !messageRoomOrder ||
+          messageRoomOrder.tentativePinnedAt !== null ||
+          messageRoomOrder.tentativePinClaimId !== args.claimId
+        ) {
+          return;
+        }
+        await tx.mutate.messageRoomOrder.update({
+          messageId: args.messageId,
+          tentativePinClaimId: null,
+          tentativePinClaimedAt: null,
+          tentativePinnedAt: args.pinnedAt,
+        });
+      },
+    }),
+    ZeroApiEndpoint.mutator("releaseMessageRoomOrderTentativePinClaim", {
+      request: Schema.Struct({ messageId: Schema.String, claimId: Schema.String }),
+      mutator: async ({ tx, args }) => {
+        const messageRoomOrder = await tx.run(
+          builder.messageRoomOrder
+            .where("messageId", "=", args.messageId)
+            .where("deletedAt", "IS", null)
+            .one(),
+        );
+        if (
+          !messageRoomOrder ||
+          messageRoomOrder.tentativePinnedAt !== null ||
+          messageRoomOrder.tentativePinClaimId !== args.claimId
+        ) {
+          return;
+        }
+        await tx.mutate.messageRoomOrder.update({
+          messageId: args.messageId,
+          tentativePinClaimId: null,
+          tentativePinClaimedAt: null,
+        });
+      },
+    }),
+    ZeroApiEndpoint.mutator("markMessageRoomOrderTentative", {
+      request: Schema.Struct({
+        messageId: Schema.String,
+        guildId: Schema.String,
+        messageChannelId: Schema.String,
+      }),
+      mutator: async ({ tx, args }) =>
+        await tx.mutate.messageRoomOrder.update({
+          messageId: args.messageId,
+          tentative: true,
+          guildId: args.guildId,
+          messageChannelId: args.messageChannelId,
+        }),
     }),
     ZeroApiEndpoint.mutator("upsertMessageRoomOrder", {
       request: Schema.Struct({
@@ -381,24 +674,31 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         fills: Schema.Array(Schema.String),
         hour: Schema.Number,
         rank: Schema.Number,
+        tentative: Schema.optional(Schema.Boolean),
         monitor: Schema.optional(Schema.NullOr(Schema.String)),
         guildId: Schema.NullOr(Schema.String),
         messageChannelId: Schema.NullOr(Schema.String),
         createdByUserId: Schema.NullOr(Schema.String),
       }),
-      mutator: async ({ tx, args }) =>
+      mutator: async ({ tx, args }) => {
+        const existingMessageRoomOrder = await tx.run(
+          builder.messageRoomOrder.where("messageId", "=", args.messageId).one(),
+        );
+
         await tx.mutate.messageRoomOrder.upsert({
           messageId: args.messageId,
           previousFills: args.previousFills.slice(),
           fills: args.fills.slice(),
           hour: args.hour,
           rank: args.rank,
+          tentative: args.tentative ?? existingMessageRoomOrder?.tentative ?? false,
           monitor: args.monitor,
           guildId: args.guildId,
           messageChannelId: args.messageChannelId,
           createdByUserId: args.createdByUserId,
           deletedAt: null,
-        }),
+        });
+      },
     }),
     ZeroApiEndpoint.mutator("persistMessageRoomOrder", {
       request: Schema.Struct({
@@ -408,6 +708,7 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
           fills: Schema.Array(Schema.String),
           hour: Schema.Number,
           rank: Schema.Number,
+          tentative: Schema.optional(Schema.Boolean),
           monitor: Schema.optional(Schema.NullOr(Schema.String)),
           guildId: Schema.NullOr(Schema.String),
           messageChannelId: Schema.NullOr(Schema.String),
@@ -431,6 +732,7 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
           fills: args.data.fills.slice(),
           hour: args.data.hour,
           rank: args.data.rank,
+          tentative: args.data.tentative ?? false,
           monitor: args.data.monitor,
           guildId: args.data.guildId,
           messageChannelId: args.data.messageChannelId,

@@ -47,6 +47,7 @@ const makeMessageCheckinMember = (memberId: string) =>
     messageId: "message-1",
     memberId,
     checkinAt: Option.none(),
+    checkinClaimId: Option.none(),
     createdAt: Option.none(),
     updatedAt: Option.none(),
     deletedAt: Option.none(),

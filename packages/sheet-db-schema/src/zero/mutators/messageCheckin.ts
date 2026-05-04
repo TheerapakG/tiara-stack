@@ -1,6 +1,6 @@
 import { defineMutator } from "@rocicorp/zero";
 import { Schema, pipe } from "effect";
-import { Schema as ZeroSchema } from "../schema";
+import { builder, Schema as ZeroSchema } from "../schema";
 
 declare module "@rocicorp/zero" {
   interface DefaultTypes {
@@ -51,6 +51,7 @@ export const messageCheckin = {
             messageId: args.messageId,
             memberId,
             checkinAt: null,
+            checkinClaimId: null,
             deletedAt: null,
           }),
         ),
@@ -93,6 +94,7 @@ export const messageCheckin = {
             messageId: args.messageId,
             memberId,
             checkinAt: null,
+            checkinClaimId: null,
             deletedAt: null,
           }),
         ),
@@ -105,6 +107,7 @@ export const messageCheckin = {
         messageId: Schema.String,
         memberId: Schema.String,
         checkinAt: Schema.Number,
+        checkinClaimId: Schema.optional(Schema.String),
       }),
       Schema.toStandardSchemaV1,
     ),
@@ -113,7 +116,35 @@ export const messageCheckin = {
         messageId: args.messageId,
         memberId: args.memberId,
         checkinAt: args.checkinAt,
+        checkinClaimId: args.checkinClaimId ?? null,
       }),
+  ),
+  setMessageCheckinMemberCheckinAtIfUnset: defineMutator(
+    pipe(
+      Schema.Struct({
+        messageId: Schema.String,
+        memberId: Schema.String,
+        checkinAt: Schema.Number,
+        checkinClaimId: Schema.String,
+      }),
+      Schema.toStandardSchemaV1,
+    ),
+    async ({ tx, args }) => {
+      const member = await tx.run(
+        builder.messageCheckinMember
+          .where("messageId", "=", args.messageId)
+          .where("memberId", "=", args.memberId)
+          .where("deletedAt", "IS", null)
+          .one(),
+      );
+      if (!member || member.checkinAt !== null) return;
+      await tx.mutate.messageCheckinMember.update({
+        messageId: args.messageId,
+        memberId: args.memberId,
+        checkinAt: args.checkinAt,
+        checkinClaimId: args.checkinClaimId,
+      });
+    },
   ),
   removeMessageCheckinMember: defineMutator(
     pipe(

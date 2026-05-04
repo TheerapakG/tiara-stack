@@ -29,6 +29,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
           fills: Schema.Array(Schema.String),
           hour: Schema.Number,
           rank: Schema.Number,
+          tentative: Schema.optional(Schema.Boolean),
           monitor: Schema.optional(Schema.NullOr(Schema.String)),
           guildId: Schema.NullOr(Schema.String),
           messageChannelId: Schema.NullOr(Schema.String),
@@ -48,6 +49,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
           fills: Schema.Array(Schema.String),
           hour: Schema.Number,
           rank: Schema.Number,
+          tentative: Schema.optional(Schema.Boolean),
           monitor: Schema.optional(Schema.NullOr(Schema.String)),
           guildId: Schema.NullOr(Schema.String),
           messageChannelId: Schema.NullOr(Schema.String),
@@ -75,6 +77,8 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
       {
         payload: Schema.Struct({
           messageId: Schema.String,
+          expectedRank: Schema.optional(Schema.Number),
+          tentativeUpdateClaimId: Schema.optional(Schema.String),
         }),
         success: MessageRoomOrder,
         error: [SchemaError, QueryResultError, ArgumentError],
@@ -88,6 +92,8 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
       {
         payload: Schema.Struct({
           messageId: Schema.String,
+          expectedRank: Schema.optional(Schema.Number),
+          tentativeUpdateClaimId: Schema.optional(Schema.String),
         }),
         success: MessageRoomOrder,
         error: [SchemaError, QueryResultError, ArgumentError],

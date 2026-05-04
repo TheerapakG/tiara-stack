@@ -23,6 +23,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
               fills: ReadonlyArray<string>;
               hour: number;
               rank: number;
+              tentative?: boolean | undefined;
               monitor: string | null | undefined;
               guildId: string | null;
               messageChannelId: string | null;
@@ -43,6 +44,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
                 fills: ReadonlyArray<string>;
                 hour: number;
                 rank: number;
+                tentative?: boolean | undefined;
                 monitor: string | null | undefined;
                 guildId: string | null;
                 messageChannelId: string | null;

@@ -24,7 +24,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
             },
           );
 
-          return yield* Schema.decodeEffect(
+          return yield* Schema.decodeUnknownEffect(
             Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder)),
           )(result);
         },
@@ -32,9 +32,15 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
 
       const decrementMessageRoomOrderRank = Effect.fn(
         "MessageRoomOrderService.decrementMessageRoomOrderRank",
-      )(function* (messageId: string) {
+      )(function* (
+        messageId: string,
+        options: {
+          readonly expectedRank?: number | undefined;
+          readonly tentativeUpdateClaimId?: string | undefined;
+        } = {},
+      ) {
         const mutation = yield* zeroClient.mutate(
-          mutators.messageRoomOrder.decrementMessageRoomOrderRank({ messageId }),
+          mutators.messageRoomOrder.decrementMessageRoomOrderRank({ messageId, ...options }),
         );
         yield* mutation.server();
 
@@ -44,7 +50,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
             type: "complete",
           },
         );
-        const roomOrder = yield* Schema.decodeEffect(
+        const roomOrder = yield* Schema.decodeUnknownEffect(
           Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder)),
         )(result);
 
@@ -57,9 +63,15 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
 
       const incrementMessageRoomOrderRank = Effect.fn(
         "MessageRoomOrderService.incrementMessageRoomOrderRank",
-      )(function* (messageId: string) {
+      )(function* (
+        messageId: string,
+        options: {
+          readonly expectedRank?: number | undefined;
+          readonly tentativeUpdateClaimId?: string | undefined;
+        } = {},
+      ) {
         const mutation = yield* zeroClient.mutate(
-          mutators.messageRoomOrder.incrementMessageRoomOrderRank({ messageId }),
+          mutators.messageRoomOrder.incrementMessageRoomOrderRank({ messageId, ...options }),
         );
         yield* mutation.server();
 
@@ -69,7 +81,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
             type: "complete",
           },
         );
-        const roomOrder = yield* Schema.decodeEffect(
+        const roomOrder = yield* Schema.decodeUnknownEffect(
           Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder)),
         )(result);
 
@@ -80,6 +92,184 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
         return roomOrder.value;
       });
 
+      const claimMessageRoomOrderSend = Effect.fn(
+        "MessageRoomOrderService.claimMessageRoomOrderSend",
+      )(function* (messageId: string, claimId: string) {
+        const mutation = yield* zeroClient.mutate(
+          mutators.messageRoomOrder.claimMessageRoomOrderSend({ messageId, claimId }),
+        );
+        yield* mutation.server();
+
+        const result = yield* zeroClient.run(
+          queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
+          {
+            type: "complete",
+          },
+        );
+        const roomOrder = yield* Schema.decodeUnknownEffect(
+          Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder)),
+        )(result);
+
+        if (Option.isNone(roomOrder)) {
+          return yield* Effect.die(makeDBQueryError("Failed to claim room order send"));
+        }
+
+        return roomOrder.value;
+      });
+
+      const completeMessageRoomOrderSend = Effect.fn(
+        "MessageRoomOrderService.completeMessageRoomOrderSend",
+      )(function* (
+        messageId: string,
+        claimId: string,
+        sentMessage: { readonly id: string; readonly channelId: string },
+      ) {
+        const mutation = yield* zeroClient.mutate(
+          mutators.messageRoomOrder.completeMessageRoomOrderSend({
+            messageId,
+            claimId,
+            sentMessageId: sentMessage.id,
+            sentMessageChannelId: sentMessage.channelId,
+            sentAt: Date.now(),
+          }),
+        );
+        yield* mutation.server();
+
+        const result = yield* zeroClient.run(
+          queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
+          {
+            type: "complete",
+          },
+        );
+        const roomOrder = yield* Schema.decodeUnknownEffect(
+          Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder)),
+        )(result);
+
+        if (Option.isNone(roomOrder)) {
+          return yield* Effect.die(makeDBQueryError("Failed to complete room order send"));
+        }
+
+        return roomOrder.value;
+      });
+
+      const releaseMessageRoomOrderSendClaim = Effect.fn(
+        "MessageRoomOrderService.releaseMessageRoomOrderSendClaim",
+      )(function* (messageId: string, claimId: string) {
+        const mutation = yield* zeroClient.mutate(
+          mutators.messageRoomOrder.releaseMessageRoomOrderSendClaim({ messageId, claimId }),
+        );
+        yield* mutation.server();
+      });
+
+      const claimMessageRoomOrderTentativeUpdate = Effect.fn(
+        "MessageRoomOrderService.claimMessageRoomOrderTentativeUpdate",
+      )(function* (messageId: string, claimId: string) {
+        const mutation = yield* zeroClient.mutate(
+          mutators.messageRoomOrder.claimMessageRoomOrderTentativeUpdate({
+            messageId,
+            claimId,
+          }),
+        );
+        yield* mutation.server();
+
+        const result = yield* zeroClient.run(
+          queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
+          {
+            type: "complete",
+          },
+        );
+        const roomOrder = yield* Schema.decodeUnknownEffect(
+          Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder)),
+        )(result);
+
+        if (Option.isNone(roomOrder)) {
+          return yield* Effect.die(makeDBQueryError("Failed to claim tentative room order update"));
+        }
+
+        return roomOrder.value;
+      });
+
+      const releaseMessageRoomOrderTentativeUpdateClaim = Effect.fn(
+        "MessageRoomOrderService.releaseMessageRoomOrderTentativeUpdateClaim",
+      )(function* (messageId: string, claimId: string) {
+        const mutation = yield* zeroClient.mutate(
+          mutators.messageRoomOrder.releaseMessageRoomOrderTentativeUpdateClaim({
+            messageId,
+            claimId,
+          }),
+        );
+        yield* mutation.server();
+      });
+
+      const claimMessageRoomOrderTentativePin = Effect.fn(
+        "MessageRoomOrderService.claimMessageRoomOrderTentativePin",
+      )(function* (messageId: string, claimId: string) {
+        const mutation = yield* zeroClient.mutate(
+          mutators.messageRoomOrder.claimMessageRoomOrderTentativePin({
+            messageId,
+            claimId,
+          }),
+        );
+        yield* mutation.server();
+
+        const result = yield* zeroClient.run(
+          queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
+          {
+            type: "complete",
+          },
+        );
+        const roomOrder = yield* Schema.decodeUnknownEffect(
+          Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder)),
+        )(result);
+
+        if (Option.isNone(roomOrder)) {
+          return yield* Effect.die(makeDBQueryError("Failed to claim tentative room order pin"));
+        }
+
+        return roomOrder.value;
+      });
+
+      const completeMessageRoomOrderTentativePin = Effect.fn(
+        "MessageRoomOrderService.completeMessageRoomOrderTentativePin",
+      )(function* (messageId: string, claimId: string) {
+        const mutation = yield* zeroClient.mutate(
+          mutators.messageRoomOrder.completeMessageRoomOrderTentativePin({
+            messageId,
+            claimId,
+            pinnedAt: Date.now(),
+          }),
+        );
+        yield* mutation.server();
+
+        const result = yield* zeroClient.run(
+          queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
+          {
+            type: "complete",
+          },
+        );
+        const roomOrder = yield* Schema.decodeUnknownEffect(
+          Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder)),
+        )(result);
+
+        if (Option.isNone(roomOrder)) {
+          return yield* Effect.die(makeDBQueryError("Failed to complete tentative room order pin"));
+        }
+
+        return roomOrder.value;
+      });
+
+      const releaseMessageRoomOrderTentativePinClaim = Effect.fn(
+        "MessageRoomOrderService.releaseMessageRoomOrderTentativePinClaim",
+      )(function* (messageId: string, claimId: string) {
+        const mutation = yield* zeroClient.mutate(
+          mutators.messageRoomOrder.releaseMessageRoomOrderTentativePinClaim({
+            messageId,
+            claimId,
+          }),
+        );
+        yield* mutation.server();
+      });
+
       const upsertMessageRoomOrder = Effect.fn("MessageRoomOrderService.upsertMessageRoomOrder")(
         function* (
           messageId: string,
@@ -88,6 +278,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
             fills: readonly string[];
             hour: number;
             rank: number;
+            tentative?: boolean | undefined;
             monitor?: string | null | undefined;
             guildId: string | null;
             messageChannelId: string | null;
@@ -101,6 +292,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
               fills: data.fills,
               hour: data.hour,
               rank: data.rank,
+              tentative: data.tentative,
               monitor: data.monitor,
               guildId: data.guildId,
               messageChannelId: data.messageChannelId,
@@ -115,7 +307,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
               type: "complete",
             },
           );
-          const roomOrder = yield* Schema.decodeEffect(
+          const roomOrder = yield* Schema.decodeUnknownEffect(
             Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder)),
           )(result);
 
@@ -127,6 +319,41 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
         },
       );
 
+      const markMessageRoomOrderTentative = Effect.fn(
+        "MessageRoomOrderService.markMessageRoomOrderTentative",
+      )(function* (
+        messageId: string,
+        data: {
+          readonly guildId: string;
+          readonly messageChannelId: string;
+        },
+      ) {
+        const mutation = yield* zeroClient.mutate(
+          mutators.messageRoomOrder.markMessageRoomOrderTentative({
+            messageId,
+            guildId: data.guildId,
+            messageChannelId: data.messageChannelId,
+          }),
+        );
+        yield* mutation.server();
+
+        const result = yield* zeroClient.run(
+          queries.messageRoomOrder.getMessageRoomOrder({ messageId }),
+          {
+            type: "complete",
+          },
+        );
+        const roomOrder = yield* Schema.decodeUnknownEffect(
+          Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder)),
+        )(result);
+
+        if (Option.isNone(roomOrder)) {
+          return yield* Effect.die(makeDBQueryError("Failed to mark message room order tentative"));
+        }
+
+        return roomOrder.value;
+      });
+
       const persistMessageRoomOrder = Effect.fn("MessageRoomOrderService.persistMessageRoomOrder")(
         function* (
           messageId: string,
@@ -136,6 +363,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
               fills: readonly string[];
               hour: number;
               rank: number;
+              tentative?: boolean | undefined;
               monitor?: string | null | undefined;
               guildId: string | null;
               messageChannelId: string | null;
@@ -166,7 +394,7 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
               type: "complete",
             },
           );
-          const roomOrder = yield* Schema.decodeEffect(
+          const roomOrder = yield* Schema.decodeUnknownEffect(
             Schema.OptionFromNullishOr(DefaultTaggedClass(MessageRoomOrder)),
           )(result);
 
@@ -305,6 +533,15 @@ export class MessageRoomOrderService extends Context.Service<MessageRoomOrderSer
         getMessageRoomOrder,
         decrementMessageRoomOrderRank,
         incrementMessageRoomOrderRank,
+        claimMessageRoomOrderSend,
+        completeMessageRoomOrderSend,
+        releaseMessageRoomOrderSendClaim,
+        claimMessageRoomOrderTentativeUpdate,
+        releaseMessageRoomOrderTentativeUpdateClaim,
+        claimMessageRoomOrderTentativePin,
+        completeMessageRoomOrderTentativePin,
+        releaseMessageRoomOrderTentativePinClaim,
+        markMessageRoomOrderTentative,
         upsertMessageRoomOrder,
         persistMessageRoomOrder,
         getMessageRoomOrderEntry,

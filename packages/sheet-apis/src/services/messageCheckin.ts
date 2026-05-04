@@ -1,9 +1,21 @@
 import { Array, Effect, Layer, Option, Context, Schema } from "effect";
 import { mutators, queries } from "sheet-db-schema/zero";
-import { makeDBQueryError } from "typhoon-core/error";
+import { makeArgumentError, makeDBQueryError } from "typhoon-core/error";
 import { DefaultTaggedClass } from "typhoon-core/schema";
 import { ZeroClient } from "./zeroClient";
 import { MessageCheckin, MessageCheckinMember } from "sheet-ingress-api/schemas/messageCheckin";
+
+export class MessageCheckinMemberNotRegisteredError extends Schema.TaggedErrorClass<MessageCheckinMemberNotRegisteredError>()(
+  "MessageCheckinMemberNotRegisteredError",
+  {
+    message: Schema.String,
+  },
+) {}
+
+const memberNotRegisteredError = () =>
+  new MessageCheckinMemberNotRegisteredError({
+    message: "Member is not registered for this check-in",
+  });
 
 export class MessageCheckinService extends Context.Service<MessageCheckinService>()(
   "MessageCheckinService",
@@ -151,12 +163,18 @@ export class MessageCheckinService extends Context.Service<MessageCheckinService
 
       const setMessageCheckinMemberCheckinAt = Effect.fn(
         "MessageCheckinService.setMessageCheckinMemberCheckinAt",
-      )(function* (messageId: string, memberId: string, checkinAt: number) {
+      )(function* (
+        messageId: string,
+        memberId: string,
+        checkinAt: number,
+        checkinClaimId?: string,
+      ) {
         const mutation = yield* zeroClient.mutate(
           mutators.messageCheckin.setMessageCheckinMemberCheckinAt({
             messageId,
             memberId,
             checkinAt,
+            checkinClaimId,
           }),
         );
         yield* mutation.server();
@@ -173,7 +191,40 @@ export class MessageCheckinService extends Context.Service<MessageCheckinService
         const member = Array.findFirst(members, (item) => item.memberId === memberId);
 
         if (Option.isNone(member)) {
-          return yield* Effect.die(makeDBQueryError("Failed to set check-in timestamp"));
+          return yield* Effect.fail(
+            makeArgumentError("Member is not registered for this check-in"),
+          );
+        }
+
+        return member.value;
+      });
+
+      const setMessageCheckinMemberCheckinAtIfUnset = Effect.fn(
+        "MessageCheckinService.setMessageCheckinMemberCheckinAtIfUnset",
+      )(function* (messageId: string, memberId: string, checkinAt: number, checkinClaimId: string) {
+        const mutation = yield* zeroClient.mutate(
+          mutators.messageCheckin.setMessageCheckinMemberCheckinAtIfUnset({
+            messageId,
+            memberId,
+            checkinAt,
+            checkinClaimId,
+          }),
+        );
+        yield* mutation.server();
+
+        const result = yield* zeroClient.run(
+          queries.messageCheckin.getMessageCheckinMembers({ messageId }),
+          {
+            type: "complete",
+          },
+        );
+        const members = yield* Schema.decodeEffect(
+          Schema.Array(DefaultTaggedClass(MessageCheckinMember)),
+        )(result);
+        const member = Array.findFirst(members, (item) => item.memberId === memberId);
+
+        if (Option.isNone(member)) {
+          return yield* Effect.fail(memberNotRegisteredError());
         }
 
         return member.value;
@@ -212,6 +263,7 @@ export class MessageCheckinService extends Context.Service<MessageCheckinService
         addMessageCheckinMembers,
         persistMessageCheckin,
         setMessageCheckinMemberCheckinAt,
+        setMessageCheckinMemberCheckinAtIfUnset,
         removeMessageCheckinMember,
       };
     }),
