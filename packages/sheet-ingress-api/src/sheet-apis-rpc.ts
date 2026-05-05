@@ -43,6 +43,51 @@ import {
   TeamConfig,
 } from "./schemas/sheetConfig";
 import { HealthResponseSchema } from "./handlers/health/schema";
+import {
+  CheckinDispatchError,
+  CheckinDispatchPayload,
+  CheckinDispatchResult,
+  CheckinHandleButtonError,
+  CheckinHandleButtonPayload,
+  CheckinHandleButtonResult,
+  DispatchRoomOrderButtonMethods,
+  RoomOrderDispatchError,
+  RoomOrderDispatchPayload,
+  RoomOrderDispatchResult,
+  RoomOrderHandleButtonError,
+  RoomOrderNextButtonPayload,
+  RoomOrderNextButtonResult,
+  RoomOrderPinTentativeButtonPayload,
+  RoomOrderPinTentativeButtonResult,
+  RoomOrderPreviousButtonPayload,
+  RoomOrderPreviousButtonResult,
+  RoomOrderSendButtonPayload,
+  RoomOrderSendButtonResult,
+} from "./handlers/dispatch/schema";
+
+export {
+  CheckinDispatchPayload,
+  CheckinDispatchResult,
+  CheckinHandleButtonError,
+  CheckinHandleButtonPayload,
+  CheckinHandleButtonResult,
+  DispatchRoomOrderButtonMethods,
+  RoomOrderButtonBasePayload,
+  RoomOrderButtonInteractionResponseType,
+  RoomOrderButtonResult,
+  RoomOrderDispatchError,
+  RoomOrderDispatchPayload,
+  RoomOrderDispatchResult,
+  RoomOrderHandleButtonError,
+  RoomOrderNextButtonPayload,
+  RoomOrderNextButtonResult,
+  RoomOrderPinTentativeButtonPayload,
+  RoomOrderPinTentativeButtonResult,
+  RoomOrderPreviousButtonPayload,
+  RoomOrderPreviousButtonResult,
+  RoomOrderSendButtonPayload,
+  RoomOrderSendButtonResult,
+} from "./handlers/dispatch/schema";
 
 const Query = <Fields extends Schema.Struct.Fields>(fields: Fields) =>
   Schema.Struct({ query: Schema.Struct(fields) });
@@ -67,21 +112,6 @@ const CheckinGenerateError = Schema.Union([
   SchemaError,
   QueryResultError,
   ArgumentError,
-]);
-
-const CheckinDispatchError = Schema.Union([CheckinGenerateError, UnknownError]);
-
-const MessageCheckinError = Schema.Union([
-  SchemaError,
-  QueryResultError,
-  ArgumentError,
-  UnknownError,
-]);
-
-const CheckinHandleButtonError = Schema.Union([
-  CheckinGenerateError,
-  MessageCheckinError,
-  UnknownError,
 ]);
 
 const MonitorError = Schema.Union([
@@ -109,23 +139,8 @@ const RoomOrderGenerateError = Schema.Union([
   ArgumentError,
 ]);
 
-const RoomOrderDispatchError = Schema.Union([RoomOrderGenerateError, UnknownError]);
-
-const MessageRoomOrderError = Schema.Union([
-  SchemaError,
-  QueryResultError,
-  ArgumentError,
-  UnknownError,
-]);
-
 export const MESSAGE_ROOM_ORDER_NOT_REGISTERED_ERROR_MESSAGE =
   "Cannot get message room order, the message might not be registered";
-
-const RoomOrderHandleButtonError = Schema.Union([
-  RoomOrderGenerateError,
-  MessageRoomOrderError,
-  UnknownError,
-]);
 
 const ScheduleError = Schema.Union([
   GoogleSheetsError,
@@ -182,148 +197,6 @@ const messageRoomOrderEntryInput = Schema.Struct({
   tags: Schema.Array(Schema.String),
   effectValue: Schema.Number,
 });
-
-export const CheckinDispatchPayload = Schema.Struct({
-  guildId: Schema.String,
-  channelId: Schema.optional(Schema.String),
-  channelName: Schema.optional(Schema.String),
-  hour: Schema.optional(Schema.Number),
-  template: Schema.optional(Schema.String),
-  interactionToken: Schema.optional(Schema.String),
-});
-
-export type CheckinDispatchPayload = Schema.Schema.Type<typeof CheckinDispatchPayload>;
-
-export const CheckinDispatchResult = Schema.Struct({
-  hour: Schema.Number,
-  runningChannelId: Schema.String,
-  checkinChannelId: Schema.String,
-  checkinMessageId: Schema.NullOr(Schema.String),
-  checkinMessageChannelId: Schema.NullOr(Schema.String),
-  primaryMessageId: Schema.String,
-  primaryMessageChannelId: Schema.String,
-  tentativeRoomOrderMessageId: Schema.NullOr(Schema.String),
-  tentativeRoomOrderMessageChannelId: Schema.NullOr(Schema.String),
-});
-
-export type CheckinDispatchResult = Schema.Schema.Type<typeof CheckinDispatchResult>;
-
-export const CheckinHandleButtonPayload = Schema.Struct({
-  messageId: Schema.String,
-  interactionToken: Schema.String,
-});
-
-export type CheckinHandleButtonPayload = Schema.Schema.Type<typeof CheckinHandleButtonPayload>;
-
-export const CheckinHandleButtonResult = Schema.Struct({
-  messageId: Schema.String,
-  messageChannelId: Schema.String,
-  checkedInMemberId: Schema.String,
-});
-
-export type CheckinHandleButtonResult = Schema.Schema.Type<typeof CheckinHandleButtonResult>;
-
-export const RoomOrderDispatchPayload = Schema.Struct({
-  guildId: Schema.String,
-  channelId: Schema.optional(Schema.String),
-  channelName: Schema.optional(Schema.String),
-  hour: Schema.optional(Schema.Number),
-  healNeeded: Schema.optional(Schema.Number),
-  interactionToken: Schema.optional(Schema.String),
-});
-
-export type RoomOrderDispatchPayload = Schema.Schema.Type<typeof RoomOrderDispatchPayload>;
-
-export const RoomOrderDispatchResult = Schema.Struct({
-  messageId: Schema.String,
-  messageChannelId: Schema.String,
-  hour: Schema.Number,
-  runningChannelId: Schema.String,
-  rank: Schema.Number,
-});
-
-export type RoomOrderDispatchResult = Schema.Schema.Type<typeof RoomOrderDispatchResult>;
-
-export const RoomOrderButtonMethods = {
-  previous: {
-    endpointName: "previousButton",
-    path: "/roomOrder/buttons/previous",
-    rpcTag: "roomOrder.previousButton",
-  },
-  next: {
-    endpointName: "nextButton",
-    path: "/roomOrder/buttons/next",
-    rpcTag: "roomOrder.nextButton",
-  },
-  send: {
-    endpointName: "sendButton",
-    path: "/roomOrder/buttons/send",
-    rpcTag: "roomOrder.sendButton",
-  },
-  pinTentative: {
-    endpointName: "pinTentativeButton",
-    path: "/roomOrder/buttons/pinTentative",
-    rpcTag: "roomOrder.pinTentativeButton",
-  },
-} as const;
-
-export const RoomOrderButtonInteractionResponseType = Schema.Literals(["reply", "update"]);
-
-export type RoomOrderButtonInteractionResponseType = Schema.Schema.Type<
-  typeof RoomOrderButtonInteractionResponseType
->;
-
-export const RoomOrderButtonBasePayload = Schema.Struct({
-  guildId: Schema.String,
-  messageId: Schema.String,
-  messageChannelId: Schema.String,
-  messageContent: Schema.optional(Schema.NullOr(Schema.String)),
-  interactionToken: Schema.String,
-  interactionResponseType: Schema.optional(RoomOrderButtonInteractionResponseType),
-});
-
-export type RoomOrderButtonBasePayload = Schema.Schema.Type<typeof RoomOrderButtonBasePayload>;
-
-export const RoomOrderPreviousButtonPayload = RoomOrderButtonBasePayload;
-export type RoomOrderPreviousButtonPayload = Schema.Schema.Type<
-  typeof RoomOrderPreviousButtonPayload
->;
-
-export const RoomOrderNextButtonPayload = RoomOrderButtonBasePayload;
-export type RoomOrderNextButtonPayload = Schema.Schema.Type<typeof RoomOrderNextButtonPayload>;
-
-export const RoomOrderSendButtonPayload = RoomOrderButtonBasePayload;
-export type RoomOrderSendButtonPayload = Schema.Schema.Type<typeof RoomOrderSendButtonPayload>;
-
-export const RoomOrderPinTentativeButtonPayload = RoomOrderButtonBasePayload;
-export type RoomOrderPinTentativeButtonPayload = Schema.Schema.Type<
-  typeof RoomOrderPinTentativeButtonPayload
->;
-
-export const RoomOrderButtonResult = Schema.Struct({
-  messageId: Schema.String,
-  messageChannelId: Schema.String,
-  status: Schema.Literals(["updated", "sent", "pinned", "partial", "denied", "failed"]),
-  detail: Schema.NullOr(Schema.String),
-});
-
-export type RoomOrderButtonResult = Schema.Schema.Type<typeof RoomOrderButtonResult>;
-
-export const RoomOrderPreviousButtonResult = RoomOrderButtonResult;
-export type RoomOrderPreviousButtonResult = Schema.Schema.Type<
-  typeof RoomOrderPreviousButtonResult
->;
-
-export const RoomOrderNextButtonResult = RoomOrderButtonResult;
-export type RoomOrderNextButtonResult = Schema.Schema.Type<typeof RoomOrderNextButtonResult>;
-
-export const RoomOrderSendButtonResult = RoomOrderButtonResult;
-export type RoomOrderSendButtonResult = Schema.Schema.Type<typeof RoomOrderSendButtonResult>;
-
-export const RoomOrderPinTentativeButtonResult = RoomOrderButtonResult;
-export type RoomOrderPinTentativeButtonResult = Schema.Schema.Type<
-  typeof RoomOrderPinTentativeButtonResult
->;
 
 const protectedRpc = <
   const Tag extends string,
@@ -405,19 +278,57 @@ export const CheckinRpcs = RpcGroup.make(
     success: CheckinGenerateResult,
     error: CheckinGenerateError,
   }),
-  protectedRpc("checkin.dispatch", {
+);
+
+export const DispatchRpcs = RpcGroup.make(
+  protectedRpc("dispatch.checkin", {
     payload: Schema.Struct({
       payload: CheckinDispatchPayload,
     }),
     success: CheckinDispatchResult,
     error: CheckinDispatchError,
   }),
-  protectedRpc("checkin.handleButton", {
+  protectedRpc("dispatch.checkinButton", {
     payload: Schema.Struct({
       payload: CheckinHandleButtonPayload,
     }),
     success: CheckinHandleButtonResult,
     error: CheckinHandleButtonError,
+  }),
+  protectedRpc("dispatch.roomOrder", {
+    payload: Schema.Struct({
+      payload: RoomOrderDispatchPayload,
+    }),
+    success: RoomOrderDispatchResult,
+    error: RoomOrderDispatchError,
+  }),
+  protectedRpc(DispatchRoomOrderButtonMethods.previous.rpcTag, {
+    payload: Schema.Struct({
+      payload: RoomOrderPreviousButtonPayload,
+    }),
+    success: RoomOrderPreviousButtonResult,
+    error: RoomOrderHandleButtonError,
+  }),
+  protectedRpc(DispatchRoomOrderButtonMethods.next.rpcTag, {
+    payload: Schema.Struct({
+      payload: RoomOrderNextButtonPayload,
+    }),
+    success: RoomOrderNextButtonResult,
+    error: RoomOrderHandleButtonError,
+  }),
+  protectedRpc(DispatchRoomOrderButtonMethods.send.rpcTag, {
+    payload: Schema.Struct({
+      payload: RoomOrderSendButtonPayload,
+    }),
+    success: RoomOrderSendButtonResult,
+    error: RoomOrderHandleButtonError,
+  }),
+  protectedRpc(DispatchRoomOrderButtonMethods.pinTentative.rpcTag, {
+    payload: Schema.Struct({
+      payload: RoomOrderPinTentativeButtonPayload,
+    }),
+    success: RoomOrderPinTentativeButtonResult,
+    error: RoomOrderHandleButtonError,
   }),
 );
 
@@ -758,41 +669,6 @@ export const RoomOrderRpcs = RpcGroup.make(
     success: RoomOrderGenerateResult,
     error: RoomOrderGenerateError,
   }),
-  protectedRpc("roomOrder.dispatch", {
-    payload: Schema.Struct({
-      payload: RoomOrderDispatchPayload,
-    }),
-    success: RoomOrderDispatchResult,
-    error: RoomOrderDispatchError,
-  }),
-  protectedRpc(RoomOrderButtonMethods.previous.rpcTag, {
-    payload: Schema.Struct({
-      payload: RoomOrderPreviousButtonPayload,
-    }),
-    success: RoomOrderPreviousButtonResult,
-    error: RoomOrderHandleButtonError,
-  }),
-  protectedRpc(RoomOrderButtonMethods.next.rpcTag, {
-    payload: Schema.Struct({
-      payload: RoomOrderNextButtonPayload,
-    }),
-    success: RoomOrderNextButtonResult,
-    error: RoomOrderHandleButtonError,
-  }),
-  protectedRpc(RoomOrderButtonMethods.send.rpcTag, {
-    payload: Schema.Struct({
-      payload: RoomOrderSendButtonPayload,
-    }),
-    success: RoomOrderSendButtonResult,
-    error: RoomOrderHandleButtonError,
-  }),
-  protectedRpc(RoomOrderButtonMethods.pinTentative.rpcTag, {
-    payload: Schema.Struct({
-      payload: RoomOrderPinTentativeButtonPayload,
-    }),
-    success: RoomOrderPinTentativeButtonResult,
-    error: RoomOrderHandleButtonError,
-  }),
 );
 
 export const ScheduleRpcs = RpcGroup.make(
@@ -911,6 +787,7 @@ export const SheetRpcs = RpcGroup.make(
 
 export const SheetApisRpcs = CalcRpcs.merge(
   CheckinRpcs,
+  DispatchRpcs,
   DiscordRpcs,
   GuildConfigRpcs,
   HealthRpcs,

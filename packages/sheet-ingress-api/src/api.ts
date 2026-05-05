@@ -4,6 +4,7 @@ import { SheetBotServiceAuthorization } from "./middlewares/sheetBotServiceAutho
 import {
   CalcApi,
   CheckinApi,
+  DispatchApi,
   DiscordApi as SheetApisDiscordApi,
   GuildConfigApi,
   MessageCheckinApi,
@@ -32,6 +33,7 @@ const withIngressApiAnnotations = <Id extends string, Groups extends HttpApiGrou
 class SheetIngressSheetApisApi extends HttpApi.make("api")
   .add(CalcApi)
   .add(CheckinApi)
+  .add(DispatchApi)
   .add(GuildConfigApi)
   .add(MessageCheckinApi)
   .add(MessageRoomOrderApi)

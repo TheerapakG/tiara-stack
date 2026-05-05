@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { Cause, Effect, Exit, Option } from "effect";
 import { MessageRoomOrder } from "sheet-ingress-api/schemas/messageRoomOrder";
 import {
+  DispatchRoomOrderButtonMethods,
   MESSAGE_ROOM_ORDER_NOT_REGISTERED_ERROR_MESSAGE,
-  RoomOrderButtonMethods,
 } from "sheet-ingress-api/sheet-apis-rpc";
 import { AuthorizationService } from "./authorization";
 import { MessageLookup } from "./messageLookup";
@@ -76,18 +76,18 @@ const runAuthorization = <A, E, R>(
 
 describe("room-order button proxy authorization", () => {
   it("wires split ingress endpoint names to the intended authorization policies", () => {
-    expect(roomOrderButtonProxyAuthorizers[RoomOrderButtonMethods.previous.endpointName]).toBe(
+    expect(
+      roomOrderButtonProxyAuthorizers[DispatchRoomOrderButtonMethods.previous.endpointName],
+    ).toBe(requireRegisteredRoomOrderButton);
+    expect(roomOrderButtonProxyAuthorizers[DispatchRoomOrderButtonMethods.next.endpointName]).toBe(
       requireRegisteredRoomOrderButton,
     );
-    expect(roomOrderButtonProxyAuthorizers[RoomOrderButtonMethods.next.endpointName]).toBe(
+    expect(roomOrderButtonProxyAuthorizers[DispatchRoomOrderButtonMethods.send.endpointName]).toBe(
       requireRegisteredRoomOrderButton,
     );
-    expect(roomOrderButtonProxyAuthorizers[RoomOrderButtonMethods.send.endpointName]).toBe(
-      requireRegisteredRoomOrderButton,
-    );
-    expect(roomOrderButtonProxyAuthorizers[RoomOrderButtonMethods.pinTentative.endpointName]).toBe(
-      requireRoomOrderPinTentativeButton,
-    );
+    expect(
+      roomOrderButtonProxyAuthorizers[DispatchRoomOrderButtonMethods.pinTentative.endpointName],
+    ).toBe(requireRoomOrderPinTentativeButton);
   });
 
   it("requires registered records for previous, next, and send button policy", async () => {

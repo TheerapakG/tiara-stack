@@ -56,7 +56,7 @@ const makeManualSubCommand = Effect.gen(function* () {
 
       const channelNameOption = command.optionValueOptional("channel_name");
       const interactionToken = yield* InteractionToken;
-      yield* sheetApisClient.get().roomOrder.dispatch({
+      yield* sheetApisClient.get().dispatch.roomOrder({
         payload: {
           guildId,
           interactionToken: interactionToken.token,

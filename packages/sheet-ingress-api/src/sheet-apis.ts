@@ -2,6 +2,7 @@ import { HttpApi, OpenApi } from "effect/unstable/httpapi";
 import {
   CalcApi,
   CheckinApi,
+  DispatchApi,
   DiscordApi,
   GuildConfigApi,
   HealthApi,
@@ -20,6 +21,7 @@ import {
 export class SheetApisApi extends HttpApi.make("api")
   .add(CalcApi)
   .add(CheckinApi)
+  .add(DispatchApi)
   .add(HealthApi)
   .add(GuildConfigApi)
   .add(MessageCheckinApi)

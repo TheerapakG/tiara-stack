@@ -10,7 +10,7 @@ import {
 } from "effect/unstable/httpapi";
 import { Api } from "sheet-ingress-api/api";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
-import { RoomOrderButtonMethods } from "sheet-ingress-api/sheet-apis-rpc";
+import { DispatchRoomOrderButtonMethods } from "sheet-ingress-api/sheet-apis-rpc";
 import { Unauthorized } from "typhoon-core/error";
 import { dotEnvConfigProviderLayer } from "typhoon-core/config";
 import { ArgumentError, makeArgumentError } from "typhoon-core/error";
@@ -23,6 +23,7 @@ import {
   SheetAuthTokenAuthorizationLive,
 } from "./services/authorization";
 import { SheetAuthUserResolver } from "./services/authResolver";
+import { dispatchProxyTargets } from "./services/dispatchProxyTargets";
 import { MessageLookup } from "./services/messageLookup";
 import { roomOrderButtonProxyAuthorizers } from "./services/roomOrderButtonAuthorization";
 import { SheetApisForwardingClient } from "./services/sheetApisForwardingClient";
@@ -524,22 +525,85 @@ const makeApiLayer = () => {
         .handle("calcSheet", forwardSheetApis("calc", "calcSheet")),
     ),
     HttpApiBuilder.group(Api, "checkin", (handlers) =>
+      handlers.handle(
+        "generate",
+        guildPayload("checkin", "generate", "monitor", (payload) => payload.guildId),
+      ),
+    ),
+    HttpApiBuilder.group(Api, "dispatch", (handlers) =>
       handlers
         .handle(
-          "generate",
-          guildPayload("checkin", "generate", "monitor", (payload) => payload.guildId),
+          "checkin",
+          guildPayload(
+            dispatchProxyTargets.checkin.group,
+            dispatchProxyTargets.checkin.endpoint,
+            "monitor",
+            (payload) => payload.guildId,
+          ),
         )
         .handle(
-          "dispatch",
-          guildPayload("checkin", "dispatch", "monitor", (payload) => payload.guildId),
+          "checkinButton",
+          authorizedSheetApis(
+            dispatchProxyTargets.checkinButton.group,
+            dispatchProxyTargets.checkinButton.endpoint,
+            ({ payload }) =>
+              Effect.gen(function* () {
+                const user = yield* SheetAuthUser;
+                yield* requireMessageCheckinParticipantMutation(payload.messageId, user.accountId);
+              }),
+          ),
         )
         .handle(
-          "handleButton",
-          authorizedSheetApis("checkin", "handleButton", ({ payload }) =>
-            Effect.gen(function* () {
-              const user = yield* SheetAuthUser;
-              yield* requireMessageCheckinParticipantMutation(payload.messageId, user.accountId);
-            }),
+          "roomOrder",
+          guildPayload(
+            dispatchProxyTargets.roomOrder.group,
+            dispatchProxyTargets.roomOrder.endpoint,
+            "monitor",
+            (payload) => payload.guildId,
+          ),
+        )
+        .handle(
+          DispatchRoomOrderButtonMethods.previous.endpointName,
+          authorizedSheetApis(
+            dispatchProxyTargets.roomOrderPreviousButton.group,
+            dispatchProxyTargets.roomOrderPreviousButton.endpoint,
+            ({ payload }) =>
+              roomOrderButtonProxyAuthorizers[DispatchRoomOrderButtonMethods.previous.endpointName](
+                payload,
+              ),
+          ),
+        )
+        .handle(
+          DispatchRoomOrderButtonMethods.next.endpointName,
+          authorizedSheetApis(
+            dispatchProxyTargets.roomOrderNextButton.group,
+            dispatchProxyTargets.roomOrderNextButton.endpoint,
+            ({ payload }) =>
+              roomOrderButtonProxyAuthorizers[DispatchRoomOrderButtonMethods.next.endpointName](
+                payload,
+              ),
+          ),
+        )
+        .handle(
+          DispatchRoomOrderButtonMethods.send.endpointName,
+          authorizedSheetApis(
+            dispatchProxyTargets.roomOrderSendButton.group,
+            dispatchProxyTargets.roomOrderSendButton.endpoint,
+            ({ payload }) =>
+              roomOrderButtonProxyAuthorizers[DispatchRoomOrderButtonMethods.send.endpointName](
+                payload,
+              ),
+          ),
+        )
+        .handle(
+          DispatchRoomOrderButtonMethods.pinTentative.endpointName,
+          authorizedSheetApis(
+            dispatchProxyTargets.roomOrderPinTentativeButton.group,
+            dispatchProxyTargets.roomOrderPinTentativeButton.endpoint,
+            ({ payload }) =>
+              roomOrderButtonProxyAuthorizers[
+                DispatchRoomOrderButtonMethods.pinTentative.endpointName
+              ](payload),
           ),
         ),
     ),
@@ -799,55 +863,10 @@ const makeApiLayer = () => {
         ),
     ),
     HttpApiBuilder.group(Api, "roomOrder", (handlers) =>
-      handlers
-        .handle(
-          "generate",
-          guildPayload("roomOrder", "generate", "monitor", (payload) => payload.guildId),
-        )
-        .handle(
-          "dispatch",
-          guildPayload("roomOrder", "dispatch", "monitor", (payload) => payload.guildId),
-        )
-        .handle(
-          RoomOrderButtonMethods.previous.endpointName,
-          authorizedSheetApis(
-            "roomOrder",
-            RoomOrderButtonMethods.previous.endpointName,
-            ({ payload }) =>
-              roomOrderButtonProxyAuthorizers[RoomOrderButtonMethods.previous.endpointName](
-                payload,
-              ),
-          ),
-        )
-        .handle(
-          RoomOrderButtonMethods.next.endpointName,
-          authorizedSheetApis(
-            "roomOrder",
-            RoomOrderButtonMethods.next.endpointName,
-            ({ payload }) =>
-              roomOrderButtonProxyAuthorizers[RoomOrderButtonMethods.next.endpointName](payload),
-          ),
-        )
-        .handle(
-          RoomOrderButtonMethods.send.endpointName,
-          authorizedSheetApis(
-            "roomOrder",
-            RoomOrderButtonMethods.send.endpointName,
-            ({ payload }) =>
-              roomOrderButtonProxyAuthorizers[RoomOrderButtonMethods.send.endpointName](payload),
-          ),
-        )
-        .handle(
-          RoomOrderButtonMethods.pinTentative.endpointName,
-          authorizedSheetApis(
-            "roomOrder",
-            RoomOrderButtonMethods.pinTentative.endpointName,
-            ({ payload }) =>
-              roomOrderButtonProxyAuthorizers[RoomOrderButtonMethods.pinTentative.endpointName](
-                payload,
-              ),
-          ),
-        ),
+      handlers.handle(
+        "generate",
+        guildPayload("roomOrder", "generate", "monitor", (payload) => payload.guildId),
+      ),
     ),
     HttpApiBuilder.group(Api, "schedule", (handlers) =>
       handlers

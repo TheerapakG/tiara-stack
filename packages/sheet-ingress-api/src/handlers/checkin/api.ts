@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
-import { SchemaError, ArgumentError, UnknownError } from "typhoon-core/error";
+import { SchemaError, ArgumentError } from "typhoon-core/error";
 import { QueryResultError } from "typhoon-zero/error";
 import { GoogleSheetsError } from "../../schemas/google";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
@@ -8,12 +8,6 @@ import { SheetApisServiceUserFallback } from "../../middlewares/sheetApisService
 import { ParserFieldError } from "../../schemas/sheet/error";
 import { SheetConfigError } from "../../schemas/sheetConfig";
 import { CheckinGenerateResult } from "../../schemas/checkin";
-import {
-  CheckinDispatchPayload,
-  CheckinDispatchResult,
-  CheckinHandleButtonPayload,
-  CheckinHandleButtonResult,
-} from "../../sheet-apis-rpc";
 
 const CheckinGenerateError = [
   GoogleSheetsError,
@@ -23,9 +17,6 @@ const CheckinGenerateError = [
   QueryResultError,
   ArgumentError,
 ];
-
-const CheckinDispatchError = [...CheckinGenerateError, UnknownError];
-const CheckinHandleButtonError = [...CheckinGenerateError, UnknownError];
 
 export class CheckinApi extends HttpApiGroup.make("checkin")
   .add(
@@ -39,20 +30,6 @@ export class CheckinApi extends HttpApiGroup.make("checkin")
       }),
       success: CheckinGenerateResult,
       error: CheckinGenerateError,
-    }),
-  )
-  .add(
-    HttpApiEndpoint.post("dispatch", "/checkin/dispatch", {
-      payload: CheckinDispatchPayload,
-      success: CheckinDispatchResult,
-      error: CheckinDispatchError,
-    }),
-  )
-  .add(
-    HttpApiEndpoint.post("handleButton", "/checkin/buttons/handle", {
-      payload: CheckinHandleButtonPayload,
-      success: CheckinHandleButtonResult,
-      error: CheckinHandleButtonError,
     }),
   )
   .middleware(SheetApisServiceUserFallback)

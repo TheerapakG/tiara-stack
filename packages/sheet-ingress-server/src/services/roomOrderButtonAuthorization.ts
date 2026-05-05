@@ -1,7 +1,7 @@
 import { Effect, Option } from "effect";
 import {
   MESSAGE_ROOM_ORDER_NOT_REGISTERED_ERROR_MESSAGE,
-  RoomOrderButtonMethods,
+  DispatchRoomOrderButtonMethods,
 } from "sheet-ingress-api/sheet-apis-rpc";
 import {
   ArgumentError,
@@ -77,8 +77,8 @@ export const requireRoomOrderPinTentativeButton = (payload: RoomOrderButtonPaylo
   }).pipe(Effect.mapError(authorizationError));
 
 export const roomOrderButtonProxyAuthorizers = {
-  [RoomOrderButtonMethods.previous.endpointName]: requireRegisteredRoomOrderButton,
-  [RoomOrderButtonMethods.next.endpointName]: requireRegisteredRoomOrderButton,
-  [RoomOrderButtonMethods.send.endpointName]: requireRegisteredRoomOrderButton,
-  [RoomOrderButtonMethods.pinTentative.endpointName]: requireRoomOrderPinTentativeButton,
+  [DispatchRoomOrderButtonMethods.previous.endpointName]: requireRegisteredRoomOrderButton,
+  [DispatchRoomOrderButtonMethods.next.endpointName]: requireRegisteredRoomOrderButton,
+  [DispatchRoomOrderButtonMethods.send.endpointName]: requireRegisteredRoomOrderButton,
+  [DispatchRoomOrderButtonMethods.pinTentative.endpointName]: requireRoomOrderPinTentativeButton,
 } as const;

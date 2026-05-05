@@ -7,13 +7,20 @@ describe("SheetApisRpcs", () => {
     expect(SheetApisRpcs.requests.has("health.live")).toBe(true);
     expect(SheetApisRpcs.requests.has("messageSlot.getMessageSlotData")).toBe(true);
     expect(SheetApisRpcs.requests.has("calc.calcSheet")).toBe(true);
-    expect(SheetApisRpcs.requests.has("checkin.dispatch")).toBe(true);
-    expect(SheetApisRpcs.requests.has("checkin.handleButton")).toBe(true);
-    expect(SheetApisRpcs.requests.has("roomOrder.dispatch")).toBe(true);
-    expect(SheetApisRpcs.requests.has("roomOrder.previousButton")).toBe(true);
-    expect(SheetApisRpcs.requests.has("roomOrder.nextButton")).toBe(true);
-    expect(SheetApisRpcs.requests.has("roomOrder.sendButton")).toBe(true);
-    expect(SheetApisRpcs.requests.has("roomOrder.pinTentativeButton")).toBe(true);
+    expect(SheetApisRpcs.requests.has("dispatch.checkin")).toBe(true);
+    expect(SheetApisRpcs.requests.has("dispatch.checkinButton")).toBe(true);
+    expect(SheetApisRpcs.requests.has("dispatch.roomOrder")).toBe(true);
+    expect(SheetApisRpcs.requests.has("dispatch.roomOrderPreviousButton")).toBe(true);
+    expect(SheetApisRpcs.requests.has("dispatch.roomOrderNextButton")).toBe(true);
+    expect(SheetApisRpcs.requests.has("dispatch.roomOrderSendButton")).toBe(true);
+    expect(SheetApisRpcs.requests.has("dispatch.roomOrderPinTentativeButton")).toBe(true);
+    expect(SheetApisRpcs.requests.has("checkin.dispatch")).toBe(false);
+    expect(SheetApisRpcs.requests.has("checkin.handleButton")).toBe(false);
+    expect(SheetApisRpcs.requests.has("roomOrder.dispatch")).toBe(false);
+    expect(SheetApisRpcs.requests.has("roomOrder.previousButton")).toBe(false);
+    expect(SheetApisRpcs.requests.has("roomOrder.nextButton")).toBe(false);
+    expect(SheetApisRpcs.requests.has("roomOrder.sendButton")).toBe(false);
+    expect(SheetApisRpcs.requests.has("roomOrder.pinTentativeButton")).toBe(false);
     expect(SheetApisRpcs.requests.has("roomOrder.handleButton")).toBe(false);
   });
 

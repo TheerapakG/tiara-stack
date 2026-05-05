@@ -50,7 +50,7 @@ const makeCheckinButtonHandler = Effect.gen(function* () {
         const message = Option.getOrThrow(yield* getInteractionMessage);
         const interactionToken = yield* InteractionToken;
 
-        yield* sheetApisClient.get().checkin.handleButton({
+        yield* sheetApisClient.get().dispatch.checkinButton({
           payload: {
             messageId: message.id,
             interactionToken: interactionToken.token,

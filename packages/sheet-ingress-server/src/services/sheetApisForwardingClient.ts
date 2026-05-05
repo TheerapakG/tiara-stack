@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from "effect";
-import { RoomOrderButtonMethods } from "sheet-ingress-api/sheet-apis-rpc";
+import { DispatchRoomOrderButtonMethods } from "sheet-ingress-api/sheet-apis-rpc";
 import { SheetApisRpcClient } from "./sheetApisRpcClient";
 
 export class SheetApisForwardingClient extends Context.Service<SheetApisForwardingClient>()(
@@ -24,8 +24,23 @@ export class SheetApisForwardingClient extends Context.Service<SheetApisForwardi
         },
         checkin: {
           generate: call(rpcClient["checkin.generate"]),
-          dispatch: call(rpcClient["checkin.dispatch"]),
-          handleButton: call(rpcClient["checkin.handleButton"]),
+        },
+        dispatch: {
+          checkin: call(rpcClient["dispatch.checkin"]),
+          checkinButton: call(rpcClient["dispatch.checkinButton"]),
+          roomOrder: call(rpcClient["dispatch.roomOrder"]),
+          [DispatchRoomOrderButtonMethods.previous.endpointName]: call(
+            rpcClient[DispatchRoomOrderButtonMethods.previous.rpcTag],
+          ),
+          [DispatchRoomOrderButtonMethods.next.endpointName]: call(
+            rpcClient[DispatchRoomOrderButtonMethods.next.rpcTag],
+          ),
+          [DispatchRoomOrderButtonMethods.send.endpointName]: call(
+            rpcClient[DispatchRoomOrderButtonMethods.send.rpcTag],
+          ),
+          [DispatchRoomOrderButtonMethods.pinTentative.endpointName]: call(
+            rpcClient[DispatchRoomOrderButtonMethods.pinTentative.rpcTag],
+          ),
         },
         discord: {
           getCurrentUser: callNoInput(rpcClient["discord.getCurrentUser"]),
@@ -94,19 +109,6 @@ export class SheetApisForwardingClient extends Context.Service<SheetApisForwardi
         },
         roomOrder: {
           generate: call(rpcClient["roomOrder.generate"]),
-          dispatch: call(rpcClient["roomOrder.dispatch"]),
-          [RoomOrderButtonMethods.previous.endpointName]: call(
-            rpcClient[RoomOrderButtonMethods.previous.rpcTag],
-          ),
-          [RoomOrderButtonMethods.next.endpointName]: call(
-            rpcClient[RoomOrderButtonMethods.next.rpcTag],
-          ),
-          [RoomOrderButtonMethods.send.endpointName]: call(
-            rpcClient[RoomOrderButtonMethods.send.rpcTag],
-          ),
-          [RoomOrderButtonMethods.pinTentative.endpointName]: call(
-            rpcClient[RoomOrderButtonMethods.pinTentative.rpcTag],
-          ),
         },
         schedule: {
           getAllPopulatedSchedules: call(rpcClient["schedule.getAllPopulatedSchedules"]),

@@ -6,6 +6,7 @@ import { createServer } from "http";
 import { SheetApisRpcs } from "sheet-ingress-api/sheet-apis-rpc";
 import { calcLayer } from "./handlers/calc";
 import { checkinLayer } from "./handlers/checkin";
+import { dispatchLayer } from "./handlers/dispatch";
 import { discordLayer } from "./handlers/discord";
 import { guildConfigLayer } from "./handlers/guildConfig";
 import { healthLayer } from "./handlers/health";
@@ -25,6 +26,7 @@ import { discordLayer as discordServiceLayer } from "./services/discord";
 const rpcHandlersLayer = Layer.mergeAll(
   calcLayer,
   checkinLayer,
+  dispatchLayer,
   healthLayer,
   guildConfigLayer,
   messageCheckinLayer,

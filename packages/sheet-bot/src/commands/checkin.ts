@@ -67,7 +67,7 @@ const makeManualSubCommand = Effect.gen(function* () {
       const interactionChannelId = Option.getOrThrow(yield* getInteractionChannelId);
       const interactionToken = yield* InteractionToken;
 
-      yield* sheetApisClient.get().checkin.dispatch({
+      yield* sheetApisClient.get().dispatch.checkin({
         payload: {
           guildId,
           interactionToken: interactionToken.token,

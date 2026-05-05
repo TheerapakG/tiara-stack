@@ -19,7 +19,7 @@ import {
 import { SheetApisClient, SheetApisRequestContext } from "@/services";
 import { discordApplicationLayer } from "../../discord/application";
 import {
-  RoomOrderButtonMethods,
+  DispatchRoomOrderButtonMethods,
   type RoomOrderButtonInteractionResponseType,
 } from "sheet-ingress-api/sheet-apis-rpc";
 
@@ -89,11 +89,11 @@ const makeRoomOrderRankButtonHandler = (action: "previous" | "next") =>
           if (action === "previous") {
             yield* sheetApisClient
               .get()
-              .roomOrder[RoomOrderButtonMethods.previous.endpointName](payload);
+              .dispatch[DispatchRoomOrderButtonMethods.previous.endpointName](payload);
           } else {
             yield* sheetApisClient
               .get()
-              .roomOrder[RoomOrderButtonMethods.next.endpointName](payload);
+              .dispatch[DispatchRoomOrderButtonMethods.next.endpointName](payload);
           }
         }),
       ),
@@ -109,7 +109,9 @@ const makeRoomOrderSendButtonHandler = Effect.gen(function* () {
       Effect.fn("roomOrderSendButton")(function* (helper) {
         yield* helper.deferUpdate({ flags: MessageFlags.Ephemeral });
         const payload = yield* makeRoomOrderButtonPayload();
-        yield* sheetApisClient.get().roomOrder[RoomOrderButtonMethods.send.endpointName](payload);
+        yield* sheetApisClient
+          .get()
+          .dispatch[DispatchRoomOrderButtonMethods.send.endpointName](payload);
       }),
     ),
   );
@@ -126,7 +128,7 @@ const makeTentativeRoomOrderPinButtonHandler = Effect.gen(function* () {
         const payload = yield* makeRoomOrderButtonPayload();
         yield* sheetApisClient
           .get()
-          .roomOrder[RoomOrderButtonMethods.pinTentative.endpointName](payload);
+          .dispatch[DispatchRoomOrderButtonMethods.pinTentative.endpointName](payload);
       }),
     ),
   );
