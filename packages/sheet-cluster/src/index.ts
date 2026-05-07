@@ -7,7 +7,7 @@ import { TracesLive } from "./traces";
 
 const configProviderLayer = dotEnvConfigProviderLayer().pipe(Layer.provide(NodeFileSystem.layer));
 
-const main = httpLayer.pipe(
+httpLayer.pipe(
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
   Layer.provide(Logger.layer([Logger.consoleLogFmt])),
@@ -15,6 +15,5 @@ const main = httpLayer.pipe(
   Layer.provide(configProviderLayer),
   Layer.launch,
   Effect.orDie,
-) as Effect.Effect<never, never, never>;
-
-NodeRuntime.runMain(main);
+  NodeRuntime.runMain(),
+);

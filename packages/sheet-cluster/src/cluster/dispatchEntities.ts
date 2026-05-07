@@ -1,6 +1,9 @@
 import { Clock, Duration, Effect, Fiber, Layer, Schedule, Schema } from "effect";
-import { ClusterSchema, Entity } from "effect/unstable/cluster";
+import type { ConfigError } from "effect/Config";
+import { ClusterSchema, Entity, type Sharding } from "effect/unstable/cluster";
+import type { HttpClient } from "effect/unstable/http";
 import { Rpc, RpcGroup } from "effect/unstable/rpc";
+import type { SqlClient, SqlError } from "effect/unstable/sql";
 import {
   CheckinDispatchError,
   CheckinDispatchPayload,
@@ -665,7 +668,11 @@ const dispatchJobRecoveryLayer = Layer.effectDiscard(
   }),
 );
 
-export const dispatchEntitiesLayer = Layer.mergeAll(
+export const dispatchEntitiesLayer: Layer.Layer<
+  never,
+  ConfigError | SqlError.SqlError,
+  Sharding.Sharding | SqlClient.SqlClient | HttpClient.HttpClient
+> = Layer.mergeAll(
   DispatchCreationEntity.toLayer(
     Effect.gen(function* () {
       const dispatchService = yield* DispatchService;

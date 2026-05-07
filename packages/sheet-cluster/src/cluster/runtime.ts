@@ -47,8 +47,14 @@ const runnerHealthLayer = Layer.unwrap(
   }),
 );
 
-export const clusterLayer = HttpRunner.layerHttpOptions({ path: "/cluster/rpc" }).pipe(
-  Layer.provide(dispatchEntitiesLayer),
+export const clusterClientLayer = HttpRunner.layerHttpClientOnly.pipe(
+  Layer.provide(clusterStorageLayer),
+  Layer.provide(HttpRunner.layerClientProtocolHttp({ path: "/cluster/rpc" })),
+  Layer.provide(shardingConfigLayer),
+  Layer.provide(RpcSerialization.layerJson),
+);
+
+const clusterBaseLayer = HttpRunner.layerHttpOptions({ path: "/cluster/rpc" }).pipe(
   Layer.provide(clusterStorageLayer),
   Layer.provide(runnerHealthLayer),
   Layer.provide(K8sHttpClient.layer),
@@ -56,6 +62,8 @@ export const clusterLayer = HttpRunner.layerHttpOptions({ path: "/cluster/rpc" }
   Layer.provide(shardingConfigLayer),
   Layer.provide(RpcSerialization.layerJson),
 );
+
+export const clusterLayer = dispatchEntitiesLayer.pipe(Layer.provideMerge(clusterBaseLayer));
 
 const clusterHttpServerLayer = Layer.unwrap(
   Effect.gen(function* () {
