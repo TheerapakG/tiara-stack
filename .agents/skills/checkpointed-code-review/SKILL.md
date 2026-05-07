@@ -7,26 +7,42 @@ description: Run a checkpointed multi-agent code review over recent working-dire
 
 Use this skill when the developer asks for a checkpointed code review, a multi-agent review of current changes, or explicitly invokes `$checkpointed-code-review`.
 
-Checkpointing means a hidden Git-ref snapshot mechanism: capture the full working directory into a synthetic commit via a temporary index, store it under a hidden ref, and diff it against the prior checkpoint or `HEAD`, whichever is more recent. A normal checked-out Git repository directory is sufficient; no separate `git worktree` checkout is required.
+Checkpointing is handled by the `tiara-review` CLI package. It captures the full working directory into a synthetic commit via a temporary index, stores it under a hidden ref, chooses an appropriate review base, loads unresolved historical findings from its local SQLite database, runs specialist Codex reviewers, and consolidates the final report. A normal checked-out Git repository directory is sufficient; no separate `git worktree` checkout is required.
 
 ## Main Agent Workflow
 
-1. Spawn one review orchestrator sub-agent.
-2. Tell the orchestrator to first create a checkpoint for the current working directory using `scripts/capture_checkpoint.sh`.
-3. Provide the orchestrator any unresolved prior-review issues from earlier turns that have not been reviewed as fixed.
-4. Wait for the orchestrator's final report.
-5. Return the issues and safety confidence score to the developer.
-6. Do not fix anything unless the developer explicitly asks for fixes.
-7. If the developer explicitly requests a review loop, repeat review/fix/review as instructed; otherwise run one review pass only.
-8. After reporting, tell the developer if checkpoint refs were retained; prune them only when the developer asks.
+1. Run the CLI from the repository root:
 
-If sub-agent spawning is unavailable in the current runtime, state that limitation and perform a best-effort single-agent review using the same six review categories and output contract.
+   ```bash
+   pnpm --filter tiara-review exec tiara-review run --cwd "$PWD"
+   ```
+
+   If the package has not been linked into `pnpm exec` yet, use the built binary after running `pnpm --filter tiara-review build`:
+
+   ```bash
+   node packages/tiara-review/dist/index.mjs run --cwd "$PWD"
+   ```
+
+2. If the developer provides review findings from another agent, PR review, previous tool, or pasted Markdown, pipe that review text through stdin with `--review-stdin`:
+
+   ```bash
+   cat other-review.md | pnpm --filter tiara-review exec tiara-review run --cwd "$PWD" --review-stdin
+   ```
+
+   The CLI uses Codex structured output to parse that Markdown into findings, persists parsed findings in SQLite, and rechecks them in the current and future runs.
+
+3. Return the CLI's consolidated report to the developer, including issues, prior issue rechecks, review notes, and the safety confidence score.
+4. Do not fix anything unless the developer explicitly asks for fixes.
+5. If the developer explicitly requests a review loop, repeat review/fix/review as instructed; otherwise run one review pass only.
+6. After reporting, tell the developer that checkpoint refs are retained under `refs/tiara-review-checkpoints/`; prune them only when the developer asks.
+
+The main agent should not manually spawn reviewer or orchestrator sub-agents for this skill. The CLI owns specialist fan-out, orchestrator consolidation, Codex thread tracking, checkpoint capture, and prior-finding persistence.
 
 ## Checkpoint Helper
 
-Use `scripts/capture_checkpoint.sh` from this skill directory to capture the current working-directory checkpoint.
+Do not call `scripts/capture_checkpoint.sh` for normal reviews. It is retained only as historical fallback material. Use `tiara-review run`, which reimplements the checkpoint capture behavior in TypeScript/Effect.
 
-The helper:
+The CLI:
 
 - Must be run inside a Git working tree: a normal checked-out repository directory is sufficient.
 - Does not require a separate `git worktree` checkout.
@@ -36,30 +52,31 @@ The helper:
 - Creates a tree with `git write-tree`.
 - Creates a synthetic commit with `git commit-tree`, using `HEAD` as parent when `HEAD` exists.
 - Stores it with `git update-ref`.
-- Prints `checkpoint_ref`, `checkpoint_commit`, `head_commit`, `created_at`, and `working_dir_only=true`.
+- Stores run metadata, Codex thread IDs, consolidated findings, prior issue rechecks, and final reports in a local SQLite database.
 - Captures on-disk working-directory state, not staged-only index state such as partial staging or `git rm --cached`.
 
-The helper must not modify the current branch, modify the user's real index, commit to the checked-out branch, restore files, or clean files.
+The CLI must not modify the current branch, modify the user's real index, commit to the checked-out branch, restore files, or clean files.
+
+## Checkpoint Privacy Boundary
+
+The checkpoint captures tracked files plus unignored untracked files, matching `git add -A -- .` behavior in a temporary index. `.gitignore` only excludes untracked files; tracked files are captured even if they are now ignored. Local secrets such as `.env` files, private keys, credential dumps, or scratch files can be included in the synthetic checkpoint and in the diff sent to Codex when they are tracked or unignored. Before running the CLI on sensitive repositories, remove private files from tracking with `git rm --cached` and add matching `.gitignore` rules before leaving them on disk, or move secret files outside the reviewed worktree.
+
+By default, SQLite data is stored at `$XDG_DATA_HOME/tiara-review/reviews.sqlite`, falling back to `~/.local/share/tiara-review/reviews.sqlite`. Use `--db <path>` only when the developer asks for an alternate database.
 
 ## Checkpoint Retention
 
-Checkpoint refs are persistent Git refs under `refs/tiara-review-checkpoints/`. Keep them during the review so later passes can compare against the prior checkpoint. Do not delete checkpoint refs automatically unless the developer asks.
+Checkpoint refs are persistent Git refs under `refs/tiara-review-checkpoints/`. The CLI scopes checkpoint refs by worktree root and uses the SQLite run history to choose completed prior checkpoints for the same repository and branch. Do not delete checkpoint refs automatically unless the developer asks.
 
 When asked to prune stale checkpoints, keep the most recent 20 refs and delete older refs with `git update-ref -d <ref>`. Use `git for-each-ref --sort=-committerdate --format='%(refname)' refs/tiara-review-checkpoints/` to list refs newest first before deleting.
 
-## Orchestrator Responsibilities
+## CLI Review Responsibilities
 
-The orchestrator must:
+The CLI must:
 
 1. Capture the current working-directory checkpoint.
-2. Determine the review base:
-   - The prior checkpoint is the most-recently-created ref under `refs/tiara-review-checkpoints/`, excluding the checkpoint just captured. Determine it with `git for-each-ref --sort=-committerdate --format='%(refname)' refs/tiara-review-checkpoints/` and take the first ref that is not the current checkpoint.
-   - Prefer the prior review checkpoint if it exists and is newer than the latest commit by wall-clock commit time.
-   - Compare the prior checkpoint timestamp with `git show -s --format=%ct <prior-checkpoint-ref>` or its recorded `created_at`; compare `HEAD` with `git log -1 --format=%ct HEAD`.
-   - Otherwise use `HEAD`.
-   - If uncertain, use `HEAD` and state that assumption.
+2. Determine the review base from the latest completed CLI review checkpoint for the same repository and branch, falling back to `HEAD` or an empty tree when needed.
 3. Generate the initial diff between the base and current checkpoint.
-4. Spawn six specialist reviewer sub-agents:
+4. Spawn six specialist Codex reviewer threads:
    - Security
    - Code quality
    - Logic bugs
@@ -71,7 +88,7 @@ The orchestrator must:
    - The current checkpoint ref.
    - The initial diff.
    - Its assigned review aspect.
-   - Relevant unresolved prior issues for that aspect.
+   - Relevant unresolved prior issues for that aspect loaded from SQLite.
 6. Tell reviewers to focus first on the diff between the current checkpoint and the chosen base.
 7. Allow reviewers to incrementally inspect surrounding code and earlier checkpoints/commits only when the diff lacks enough context.
 8. If any specialist reviewer fails to start, errors, or does not respond, record the missing category in Review Notes and lower the safety confidence to reflect incomplete coverage.
@@ -149,7 +166,7 @@ Safety confidence: <0-5>/5
 
 ## Main Agent Output
 
-Present the orchestrator's consolidated findings to the developer:
+Present the CLI's consolidated findings to the developer:
 
 - Itemized findings with severity and issue type.
 - The `0/5` to `5/5` safety confidence score.
@@ -160,13 +177,20 @@ Do not fix issues during the review pass. Do not mutate code. Do not delete chec
 
 ## Prior Review Issues
 
-If the main agent has run this skill before in the conversation, pass unresolved issues to the orchestrator. Include:
+The CLI owns prior finding persistence and injects relevant unresolved findings into future specialist reviewers. The main agent does not need to manually pass prior issues between review runs.
 
-- Original issue text.
-- Severity.
-- Type.
-- Location.
-- Whether it was previously claimed fixed.
-- Relevant checkpoint/base refs from the earlier review, when available.
+If the developer mentions prior issues from outside the CLI database, pass them through `--review-stdin` so the CLI can parse them with Codex structured output, store them as external review findings, and route them to the relevant specialist reviewers. Do not manually route these findings to subagents.
 
-The orchestrator should route each prior issue to the most relevant specialist reviewer and include the recheck result in the final report.
+To import external review Markdown:
+
+```bash
+cat other-review.md | pnpm --filter tiara-review exec tiara-review run --cwd "$PWD" --review-stdin
+```
+
+To reuse a specific database, pass:
+
+```bash
+pnpm --filter tiara-review exec tiara-review run --cwd "$PWD" --db <path>
+```
+
+The final report should include the CLI's `Prior Issues Rechecked` section when available.
