@@ -7,7 +7,7 @@ import {
   hasStaleUntrackedSendClaim,
   isActiveSendClaim,
 } from "./claimHelpers";
-import { builder, Schema as ZeroSchema } from "./schema";
+import { builder, type Schema as ZeroSchema } from "./schema";
 
 declare module "@rocicorp/zero" {
   interface DefaultTypes {

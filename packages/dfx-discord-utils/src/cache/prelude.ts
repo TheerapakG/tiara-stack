@@ -3,10 +3,10 @@ import type { CacheDriver } from "dfx/Cache/driver";
 import { DiscordGateway } from "dfx/DiscordGateway";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
+import { DiscordApiClient } from "../discord/discordApiClient";
+import type { DiscordChannel, DiscordGuild } from "../discord/schema";
 import type { ReverseLookupCacheDriver } from "./driver";
 import { make, makeWithReverseLookup } from "./cache";
-import { DiscordApiClient } from "@/discord/discordApiClient";
-import type { DiscordChannel, DiscordGuild } from "@/discord/schema";
 
 // Member type with pending optional (Discord only includes it when Membership Screening is enabled)
 export type CachedGuildMember = Omit<

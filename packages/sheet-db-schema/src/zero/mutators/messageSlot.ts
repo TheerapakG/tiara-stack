@@ -1,6 +1,6 @@
 import { defineMutator } from "@rocicorp/zero";
 import { Schema, pipe } from "effect";
-import { Schema as ZeroSchema } from "../schema";
+import type { Schema as ZeroSchema } from "../schema";
 
 declare module "@rocicorp/zero" {
   interface DefaultTypes {

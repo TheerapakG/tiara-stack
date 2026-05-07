@@ -3,9 +3,9 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
 import * as Stream from "effect/Stream";
+import { CacheReadonlyError } from "../discord/schema";
 import type { ReverseLookupCacheDriver } from "./driver";
 import type { ReverseLookupCacheOp } from "./prelude";
-import { CacheReadonlyError } from "@/discord/schema";
 
 const retryPolicy = Schedule.exponential("500 millis").pipe(
   Schedule.andThen(Schedule.spaced("10 seconds")),

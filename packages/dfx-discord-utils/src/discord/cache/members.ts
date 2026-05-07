@@ -4,7 +4,7 @@ import {
   membersCacheViewWithReverseLookup,
   membersWithReverseLookup,
   unstorageWithReverseLookupDriver,
-} from "@/cache";
+} from "../../cache";
 import { discordGatewayLayer } from "../gateway";
 import { Unstorage } from "./shared";
 

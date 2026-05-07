@@ -58,6 +58,10 @@
       "types": "./dist/discord/rpc.d.mts",
       "default": "./dist/discord/rpc.mjs"
     },
+    "./discord/discordApiClient": {
+      "types": "./dist/discord/discordApiClient.d.mts",
+      "default": "./dist/discord/discordApiClient.mjs"
+    },
     "./utils": {
       "types": "./dist/utils/index.d.mts",
       "default": "./dist/utils/index.mjs"

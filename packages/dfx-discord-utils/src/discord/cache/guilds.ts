@@ -1,6 +1,6 @@
 import { CachePrelude } from "dfx/gateway";
 import { Effect, Layer, Context } from "effect";
-import { guildsApiCacheView, guildsCacheView, unstorageDriver } from "@/cache";
+import { guildsApiCacheView, guildsCacheView, unstorageDriver } from "../../cache";
 import { discordGatewayLayer } from "../gateway";
 import { Unstorage } from "./shared";
 
