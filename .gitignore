@@ -36,6 +36,7 @@ google-service-account.json
 auth.key
 auth.key.pub
 volume.yaml
+k8s/**/ca-certificate.crt
 
 .nx/cache
 .nx/workspace-data
