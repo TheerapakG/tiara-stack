@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
-import { SchemaError, ArgumentError } from "typhoon-core/error";
+import { SchemaError, ArgumentError, Unauthorized } from "typhoon-core/error";
 import { QueryResultError } from "typhoon-zero/error";
 import { MessageCheckin, MessageCheckinMember } from "../../schemas/messageCheckin";
 import { SheetAuthTokenAuthorization } from "../../middlewares/sheetAuthTokenAuthorization/tag";
@@ -23,7 +23,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
         messageId: Schema.String,
       }),
       success: MessageCheckin,
-      error: [SchemaError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
     }),
   )
   .add(
@@ -33,7 +33,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
         data: MessageCheckinDataPayload,
       }),
       success: MessageCheckin,
-      error: [SchemaError, QueryResultError],
+      error: [SchemaError, QueryResultError, Unauthorized],
     }),
   )
   .add(
@@ -42,7 +42,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
         messageId: Schema.String,
       }),
       success: Schema.Array(MessageCheckinMember),
-      error: [SchemaError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
     }),
   )
   .add(
@@ -52,7 +52,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
         memberIds: Schema.Array(Schema.String),
       }),
       success: Schema.Array(MessageCheckinMember),
-      error: [SchemaError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
     }),
   )
   .add(
@@ -63,7 +63,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
         memberIds: Schema.Array(Schema.String),
       }),
       success: MessageCheckin,
-      error: [SchemaError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
     }),
   )
   .add(
@@ -77,7 +77,23 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
           checkinAt: Schema.Number,
         }),
         success: MessageCheckinMember,
-        error: [SchemaError, QueryResultError, ArgumentError],
+        error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "setMessageCheckinMemberCheckinAtIfUnset",
+      "/messageCheckin/setMessageCheckinMemberCheckinAtIfUnset",
+      {
+        payload: Schema.Struct({
+          messageId: Schema.String,
+          memberId: Schema.String,
+          checkinAt: Schema.Number,
+          checkinClaimId: Schema.String,
+        }),
+        success: MessageCheckinMember,
+        error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
       },
     ),
   )
@@ -91,7 +107,7 @@ export class MessageCheckinApi extends HttpApiGroup.make("messageCheckin")
           memberId: Schema.String,
         }),
         success: MessageCheckinMember,
-        error: [SchemaError, QueryResultError, ArgumentError],
+        error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
       },
     ),
   )

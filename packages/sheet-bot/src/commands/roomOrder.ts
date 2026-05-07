@@ -10,8 +10,9 @@ import { discordGatewayLayer } from "../discord/gateway";
 import { CommandHelper } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import { InteractionToken } from "dfx-discord-utils/utils";
-import { SheetApisClient, SheetApisRequestContext } from "../services";
+import { SheetClusterClient, SheetClusterRequestContext } from "../services";
 import { discordApplicationLayer } from "../discord/application";
+import { interactionDeadlineEpochMs } from "../utils/interactionDeadline";
 
 const getInteractionGuildId = Effect.gen(function* () {
   const interactionGuild = yield* Interaction.guild();
@@ -30,7 +31,7 @@ const getInteractionChannelId = Effect.gen(function* () {
 });
 
 const makeManualSubCommand = Effect.gen(function* () {
-  const sheetApisClient = yield* SheetApisClient;
+  const sheetClusterClient = yield* SheetClusterClient;
 
   return yield* CommandHelper.makeSubCommand(
     (builder) =>
@@ -56,10 +57,13 @@ const makeManualSubCommand = Effect.gen(function* () {
 
       const channelNameOption = command.optionValueOptional("channel_name");
       const interactionToken = yield* InteractionToken;
-      yield* sheetApisClient.get().dispatch.roomOrder({
+      const interaction = yield* Ix.Interaction;
+      yield* sheetClusterClient.get().dispatch.roomOrder({
         payload: {
+          dispatchRequestId: `discord-interaction:${interaction.id}`,
           guildId,
           interactionToken: interactionToken.token,
+          interactionDeadlineEpochMs: interactionDeadlineEpochMs(interaction.id),
           ...(Option.isSome(channelNameOption)
             ? { channelName: channelNameOption.value }
             : {
@@ -103,7 +107,7 @@ const makeRoomOrderCommand = Effect.gen(function* () {
           InteractionContextType.PrivateChannel,
         )
         .addSubcommand(() => manualSubCommand.data),
-    SheetApisRequestContext.asInteractionUser((command) =>
+    SheetClusterRequestContext.asInteractionUser((command) =>
       command.subCommands({
         manual: manualSubCommand.handler,
       }),
@@ -126,6 +130,6 @@ export const roomOrderCommandLayer = Layer.effectDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(discordGatewayLayer, discordApplicationLayer, SheetApisClient.layer),
+    Layer.mergeAll(discordGatewayLayer, discordApplicationLayer, SheetClusterClient.layer),
   ),
 );

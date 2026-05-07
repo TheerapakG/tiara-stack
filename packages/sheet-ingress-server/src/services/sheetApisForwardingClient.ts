@@ -1,5 +1,4 @@
 import { Context, Effect, Layer } from "effect";
-import { DispatchRoomOrderButtonMethods } from "sheet-ingress-api/sheet-apis-rpc";
 import { SheetApisRpcClient } from "./sheetApisRpcClient";
 
 export class SheetApisForwardingClient extends Context.Service<SheetApisForwardingClient>()(
@@ -24,23 +23,6 @@ export class SheetApisForwardingClient extends Context.Service<SheetApisForwardi
         },
         checkin: {
           generate: call(rpcClient["checkin.generate"]),
-        },
-        dispatch: {
-          checkin: call(rpcClient["dispatch.checkin"]),
-          checkinButton: call(rpcClient["dispatch.checkinButton"]),
-          roomOrder: call(rpcClient["dispatch.roomOrder"]),
-          [DispatchRoomOrderButtonMethods.previous.endpointName]: call(
-            rpcClient[DispatchRoomOrderButtonMethods.previous.rpcTag],
-          ),
-          [DispatchRoomOrderButtonMethods.next.endpointName]: call(
-            rpcClient[DispatchRoomOrderButtonMethods.next.rpcTag],
-          ),
-          [DispatchRoomOrderButtonMethods.send.endpointName]: call(
-            rpcClient[DispatchRoomOrderButtonMethods.send.rpcTag],
-          ),
-          [DispatchRoomOrderButtonMethods.pinTentative.endpointName]: call(
-            rpcClient[DispatchRoomOrderButtonMethods.pinTentative.rpcTag],
-          ),
         },
         discord: {
           getCurrentUser: callNoInput(rpcClient["discord.getCurrentUser"]),
@@ -67,6 +49,9 @@ export class SheetApisForwardingClient extends Context.Service<SheetApisForwardi
           setMessageCheckinMemberCheckinAt: call(
             rpcClient["messageCheckin.setMessageCheckinMemberCheckinAt"],
           ),
+          setMessageCheckinMemberCheckinAtIfUnset: call(
+            rpcClient["messageCheckin.setMessageCheckinMemberCheckinAtIfUnset"],
+          ),
           removeMessageCheckinMember: call(rpcClient["messageCheckin.removeMessageCheckinMember"]),
         },
         messageRoomOrder: {
@@ -86,6 +71,31 @@ export class SheetApisForwardingClient extends Context.Service<SheetApisForwardi
           ),
           removeMessageRoomOrderEntry: call(
             rpcClient["messageRoomOrder.removeMessageRoomOrderEntry"],
+          ),
+          claimMessageRoomOrderSend: call(rpcClient["messageRoomOrder.claimMessageRoomOrderSend"]),
+          completeMessageRoomOrderSend: call(
+            rpcClient["messageRoomOrder.completeMessageRoomOrderSend"],
+          ),
+          releaseMessageRoomOrderSendClaim: call(
+            rpcClient["messageRoomOrder.releaseMessageRoomOrderSendClaim"],
+          ),
+          claimMessageRoomOrderTentativeUpdate: call(
+            rpcClient["messageRoomOrder.claimMessageRoomOrderTentativeUpdate"],
+          ),
+          releaseMessageRoomOrderTentativeUpdateClaim: call(
+            rpcClient["messageRoomOrder.releaseMessageRoomOrderTentativeUpdateClaim"],
+          ),
+          claimMessageRoomOrderTentativePin: call(
+            rpcClient["messageRoomOrder.claimMessageRoomOrderTentativePin"],
+          ),
+          completeMessageRoomOrderTentativePin: call(
+            rpcClient["messageRoomOrder.completeMessageRoomOrderTentativePin"],
+          ),
+          releaseMessageRoomOrderTentativePinClaim: call(
+            rpcClient["messageRoomOrder.releaseMessageRoomOrderTentativePinClaim"],
+          ),
+          markMessageRoomOrderTentative: call(
+            rpcClient["messageRoomOrder.markMessageRoomOrderTentative"],
           ),
         },
         messageSlot: {

@@ -90,7 +90,7 @@ describe("room-order button proxy authorization", () => {
     ).toBe(requireRoomOrderPinTentativeButton);
   });
 
-  it("requires registered records for previous, next, and send button policy", async () => {
+  it("requires registered records for room-order button policy", async () => {
     const { exit, requireMonitorGuild } = await runAuthorization(
       requireRegisteredRoomOrderButton({ messageId: "missing-message-1" }),
     );
@@ -126,7 +126,7 @@ describe("room-order button proxy authorization", () => {
     expect(requireMonitorGuild).toHaveBeenCalledWith("registered-guild-1");
   });
 
-  it("allows pinTentative fallback authorization by payload guild when no record exists", async () => {
+  it("allows pinTentative fallback authorization by verified payload guild when no record exists", async () => {
     const { exit, requireMonitorGuild } = await runAuthorization(
       requireRoomOrderPinTentativeButton({
         guildId: "fallback-guild-1",

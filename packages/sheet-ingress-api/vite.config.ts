@@ -60,6 +60,8 @@ export default defineConfig({
       ),
       "sheet-apis": fileURLToPath(new URL("./src/sheet-apis.ts", import.meta.url)),
       "sheet-apis-rpc": fileURLToPath(new URL("./src/sheet-apis-rpc.ts", import.meta.url)),
+      "sheet-cluster": fileURLToPath(new URL("./src/sheet-cluster.ts", import.meta.url)),
+      "sheet-cluster-rpc": fileURLToPath(new URL("./src/sheet-cluster-rpc.ts", import.meta.url)),
       "sheet-bot-rpc": fileURLToPath(new URL("./src/sheet-bot-rpc.ts", import.meta.url)),
       ...collectEntries("schemas"),
     },

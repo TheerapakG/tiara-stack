@@ -3,7 +3,6 @@ export * from "./calc";
 export * from "./checkin";
 export * from "./discord";
 export * from "./discordAccessToken";
-export * from "./dispatch";
 export * from "./google";
 export * from "./guildConfig";
 export * from "./hourWindow";

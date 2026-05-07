@@ -1,4 +1,4 @@
-import { NodeHttpServer } from "@effect/platform-node";
+import { NodeFileSystem, NodeHttpServer } from "@effect/platform-node";
 import { HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import { Layer } from "effect";
@@ -6,7 +6,6 @@ import { createServer } from "http";
 import { SheetApisRpcs } from "sheet-ingress-api/sheet-apis-rpc";
 import { calcLayer } from "./handlers/calc";
 import { checkinLayer } from "./handlers/checkin";
-import { dispatchLayer } from "./handlers/dispatch";
 import { discordLayer } from "./handlers/discord";
 import { guildConfigLayer } from "./handlers/guildConfig";
 import { healthLayer } from "./handlers/health";
@@ -26,7 +25,6 @@ import { discordLayer as discordServiceLayer } from "./services/discord";
 const rpcHandlersLayer = Layer.mergeAll(
   calcLayer,
   checkinLayer,
-  dispatchLayer,
   healthLayer,
   guildConfigLayer,
   messageCheckinLayer,
@@ -57,6 +55,7 @@ const rpcRoutesLayer = RpcServer.layerHttp({
 
 export const httpLayer = HttpRouter.serve(rpcRoutesLayer).pipe(
   Layer.provide(discordServiceLayer),
+  Layer.provide(NodeFileSystem.layer),
   HttpServer.withLogAddress,
   Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 })),
 );

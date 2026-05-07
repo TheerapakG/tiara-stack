@@ -5,6 +5,9 @@ import { GoogleSheetsError } from "../../schemas/google";
 import { ParserFieldError } from "../../schemas/sheet/error";
 import { SheetConfigError } from "../../schemas/sheetConfig";
 
+export const interactionTokenLifetimeMs = 15 * 60 * 1000;
+export const interactionTokenExpirySafetyMarginMs = 30 * 1000;
+
 export const CheckinGenerateErrorSchemas = [
   GoogleSheetsError,
   ParserFieldError,
@@ -39,12 +42,14 @@ export const RoomOrderHandleButtonErrorSchemas = RoomOrderDispatchErrorSchemas;
 export const RoomOrderHandleButtonError = Schema.Union(RoomOrderHandleButtonErrorSchemas);
 
 export const CheckinDispatchPayload = Schema.Struct({
+  dispatchRequestId: Schema.String,
   guildId: Schema.String,
   channelId: Schema.optional(Schema.String),
   channelName: Schema.optional(Schema.String),
   hour: Schema.optional(Schema.Number),
   template: Schema.optional(Schema.String),
   interactionToken: Schema.optional(Schema.String),
+  interactionDeadlineEpochMs: Schema.optional(Schema.Number),
 });
 
 export type CheckinDispatchPayload = Schema.Schema.Type<typeof CheckinDispatchPayload>;
@@ -66,6 +71,7 @@ export type CheckinDispatchResult = Schema.Schema.Type<typeof CheckinDispatchRes
 export const CheckinHandleButtonPayload = Schema.Struct({
   messageId: Schema.String,
   interactionToken: Schema.String,
+  interactionDeadlineEpochMs: Schema.Number,
 });
 
 export type CheckinHandleButtonPayload = Schema.Schema.Type<typeof CheckinHandleButtonPayload>;
@@ -79,12 +85,14 @@ export const CheckinHandleButtonResult = Schema.Struct({
 export type CheckinHandleButtonResult = Schema.Schema.Type<typeof CheckinHandleButtonResult>;
 
 export const RoomOrderDispatchPayload = Schema.Struct({
+  dispatchRequestId: Schema.String,
   guildId: Schema.String,
   channelId: Schema.optional(Schema.String),
   channelName: Schema.optional(Schema.String),
   hour: Schema.optional(Schema.Number),
   healNeeded: Schema.optional(Schema.Number),
   interactionToken: Schema.optional(Schema.String),
+  interactionDeadlineEpochMs: Schema.optional(Schema.Number),
 });
 
 export type RoomOrderDispatchPayload = Schema.Schema.Type<typeof RoomOrderDispatchPayload>;
@@ -122,6 +130,24 @@ export const DispatchRoomOrderButtonMethods = {
   },
 } as const;
 
+export const DispatchAcceptedResult = Schema.Struct({
+  dispatchRequestId: Schema.String,
+  entityType: Schema.Literals(["dispatchCreation", "dispatchMessage"]),
+  entityId: Schema.String,
+  operation: Schema.Literals([
+    "checkin",
+    "roomOrder",
+    "checkinButton",
+    "roomOrderPreviousButton",
+    "roomOrderNextButton",
+    "roomOrderSendButton",
+    "roomOrderPinTentativeButton",
+  ]),
+  status: Schema.Literal("accepted"),
+});
+
+export type DispatchAcceptedResult = Schema.Schema.Type<typeof DispatchAcceptedResult>;
+
 export const RoomOrderButtonInteractionResponseType = Schema.Literals(["reply", "update"]);
 
 export type RoomOrderButtonInteractionResponseType = Schema.Schema.Type<
@@ -134,6 +160,7 @@ export const RoomOrderButtonBasePayload = Schema.Struct({
   messageChannelId: Schema.String,
   messageContent: Schema.optional(Schema.NullOr(Schema.String)),
   interactionToken: Schema.String,
+  interactionDeadlineEpochMs: Schema.Number,
   interactionResponseType: Schema.optional(RoomOrderButtonInteractionResponseType),
 });
 

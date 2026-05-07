@@ -59,6 +59,13 @@ jobs:
           path: packages/sheet-apis/dist.tar.zst
           if-no-files-found: error
 
+      - name: Upload Docker build artifact (sheet-cluster)
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-dist-sheet-cluster
+          path: packages/sheet-cluster/dist.tar.zst
+          if-no-files-found: error
+
       - name: Upload Docker build artifact (sheet-bot)
         uses: actions/upload-artifact@v4
         with:
@@ -96,6 +103,8 @@ jobs:
           - package: sheet-db-server
             cache_mode: max
           - package: sheet-apis
+            cache_mode: min
+          - package: sheet-cluster
             cache_mode: min
           - package: sheet-bot
             cache_mode: max

@@ -28,6 +28,10 @@ spec:
             - containerPort: 9464
               name: sheet-apis-met
           env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -131,6 +135,32 @@ spec:
       targetPort: sheet-apis-met
   selector:
     app: sheet-apis
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sheet-apis-service-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: sheet-apis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: sheet-ingress-server
+      ports:
+        - protocol: TCP
+          port: sheet-apis-svc
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: sheet-apis-met
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor

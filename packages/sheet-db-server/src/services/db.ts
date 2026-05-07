@@ -1,4 +1,4 @@
-import { zeroDrizzle } from "@rocicorp/zero/server/adapters/drizzle";
+import { zeroDrizzle, type DrizzleDatabase } from "@rocicorp/zero/server/adapters/drizzle";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { Cause, Effect, Layer, pipe, Context } from "effect";
 import postgres from "postgres";
@@ -19,7 +19,7 @@ export class DBService extends Context.Service<DBService>()("DBService", {
       catch: (error) => new Cause.UnknownError(error),
     });
     const zql = yield* Effect.try({
-      try: () => zeroDrizzle(zeroSchema, db),
+      try: () => zeroDrizzle(zeroSchema, db as unknown as DrizzleDatabase),
       catch: (error) => new Cause.UnknownError(error),
     });
     yield* Effect.addFinalizer(() =>

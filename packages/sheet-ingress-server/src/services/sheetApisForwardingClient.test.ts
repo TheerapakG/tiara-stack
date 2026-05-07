@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Effect, HashSet, Option, Redacted } from "effect";
 import { Headers } from "effect/unstable/http";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
-import { DispatchRoomOrderButtonMethods } from "sheet-ingress-api/sheet-apis-rpc";
 import { getIngressRpcHeaders } from "./rpcAuthorizationClient";
-import { SheetApisForwardingClient } from "./sheetApisForwardingClient";
-import { SheetApisRpcClient } from "./sheetApisRpcClient";
 import { SheetApisRpcTokens } from "./sheetApisRpcTokens";
 
 const makeSheetApisRpcTokens = () =>
@@ -56,57 +53,5 @@ describe("SheetApisForwardingClient", () => {
     expect(Option.getOrUndefined(Headers.get(headers, "x-sheet-auth-session-token"))).toBe(
       "Bearer sheet-auth-session-token",
     );
-  });
-
-  it("keeps split room-order forwarding methods aligned with shared button metadata", async () => {
-    const rpcClient = {
-      "dispatch.checkin": (args: unknown) => Effect.succeed({ tag: "dispatch.checkin", args }),
-      "dispatch.checkinButton": (args: unknown) =>
-        Effect.succeed({ tag: "dispatch.checkinButton", args }),
-      "dispatch.roomOrder": (args: unknown) => Effect.succeed({ tag: "dispatch.roomOrder", args }),
-      ...Object.fromEntries(
-        Object.values(DispatchRoomOrderButtonMethods).map((method) => [
-          method.rpcTag,
-          (args: unknown) => Effect.succeed({ method, args }),
-        ]),
-      ),
-    };
-
-    const client = await Effect.runPromise(
-      SheetApisForwardingClient.make.pipe(
-        Effect.provideService(SheetApisRpcClient, rpcClient as never),
-      ),
-    );
-
-    await expect(
-      Effect.runPromise(client.dispatch.checkin({ payload: { guildId: "guild-1" } } as never)),
-    ).resolves.toMatchObject({ tag: "dispatch.checkin" });
-    await expect(
-      Effect.runPromise(
-        client.dispatch.checkinButton({
-          payload: { messageId: "message-1", interactionToken: "token-1" },
-        } as never),
-      ),
-    ).resolves.toMatchObject({ tag: "dispatch.checkinButton" });
-    await expect(
-      Effect.runPromise(client.dispatch.roomOrder({ payload: { guildId: "guild-1" } } as never)),
-    ).resolves.toMatchObject({ tag: "dispatch.roomOrder" });
-
-    for (const method of Object.values(DispatchRoomOrderButtonMethods)) {
-      expect(client.dispatch).toHaveProperty(method.endpointName);
-      expect(client.roomOrder).not.toHaveProperty(method.endpointName);
-      await expect(
-        Effect.runPromise(
-          client.dispatch[method.endpointName]({
-            payload: {
-              guildId: "guild-1",
-              messageId: "message-1",
-              messageChannelId: "channel-1",
-              interactionToken: "token-1",
-            },
-          } as never),
-        ),
-      ).resolves.toMatchObject({ method });
-    }
   });
 });

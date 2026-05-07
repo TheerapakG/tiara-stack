@@ -105,7 +105,6 @@ export const messageRoomOrder = {
         !messageRoomOrder ||
         messageRoomOrder.sentMessageId ||
         messageRoomOrder.tentativePinnedAt !== null ||
-        hasStaleUntrackedSendClaim(messageRoomOrder, now) ||
         isActiveSendClaim(messageRoomOrder.sendClaimId, messageRoomOrder.sendClaimedAt, now) ||
         hasActiveTentativeUpdateClaim(messageRoomOrder, now) ||
         hasActiveTentativePinClaim(messageRoomOrder, now)

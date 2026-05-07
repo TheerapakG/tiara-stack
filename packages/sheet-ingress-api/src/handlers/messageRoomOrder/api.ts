@@ -1,6 +1,6 @@
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Schema } from "effect";
-import { SchemaError, ArgumentError } from "typhoon-core/error";
+import { SchemaError, ArgumentError, Unauthorized } from "typhoon-core/error";
 import { QueryResultError } from "typhoon-zero/error";
 import {
   MessageRoomOrder,
@@ -17,7 +17,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
         messageId: Schema.String,
       }),
       success: MessageRoomOrder,
-      error: [SchemaError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
     }),
   )
   .add(
@@ -37,7 +37,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
         }),
       }),
       success: MessageRoomOrder,
-      error: [SchemaError, QueryResultError],
+      error: [SchemaError, QueryResultError, Unauthorized],
     }),
   )
   .add(
@@ -67,7 +67,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
         ),
       }),
       success: MessageRoomOrder,
-      error: [SchemaError, QueryResultError],
+      error: [SchemaError, QueryResultError, Unauthorized],
     }),
   )
   .add(
@@ -81,7 +81,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
           tentativeUpdateClaimId: Schema.optional(Schema.String),
         }),
         success: MessageRoomOrder,
-        error: [SchemaError, QueryResultError, ArgumentError],
+        error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
       },
     ),
   )
@@ -96,7 +96,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
           tentativeUpdateClaimId: Schema.optional(Schema.String),
         }),
         success: MessageRoomOrder,
-        error: [SchemaError, QueryResultError, ArgumentError],
+        error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
       },
     ),
   )
@@ -107,7 +107,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
         rank: Schema.NumberFromString,
       }),
       success: Schema.Array(MessageRoomOrderEntry),
-      error: [SchemaError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
     }),
   )
   .add(
@@ -116,7 +116,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
         messageId: Schema.String,
       }),
       success: MessageRoomOrderRange,
-      error: [SchemaError, QueryResultError, ArgumentError],
+      error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
     }),
   )
   .add(
@@ -138,7 +138,7 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
           ),
         }),
         success: Schema.Array(MessageRoomOrderEntry),
-        error: [SchemaError, QueryResultError, ArgumentError],
+        error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
       },
     ),
   )
@@ -151,7 +151,136 @@ export class MessageRoomOrderApi extends HttpApiGroup.make("messageRoomOrder")
           messageId: Schema.String,
         }),
         success: Schema.Array(MessageRoomOrderEntry),
-        error: [SchemaError, QueryResultError, ArgumentError],
+        error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "claimMessageRoomOrderSend",
+      "/messageRoomOrder/claimMessageRoomOrderSend",
+      {
+        payload: Schema.Struct({
+          messageId: Schema.String,
+          claimId: Schema.String,
+        }),
+        success: MessageRoomOrder,
+        error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "completeMessageRoomOrderSend",
+      "/messageRoomOrder/completeMessageRoomOrderSend",
+      {
+        payload: Schema.Struct({
+          messageId: Schema.String,
+          claimId: Schema.String,
+          sentMessage: Schema.Struct({
+            id: Schema.String,
+            channelId: Schema.String,
+          }),
+        }),
+        success: MessageRoomOrder,
+        error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "releaseMessageRoomOrderSendClaim",
+      "/messageRoomOrder/releaseMessageRoomOrderSendClaim",
+      {
+        payload: Schema.Struct({
+          messageId: Schema.String,
+          claimId: Schema.String,
+        }),
+        success: Schema.Void,
+        error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "claimMessageRoomOrderTentativeUpdate",
+      "/messageRoomOrder/claimMessageRoomOrderTentativeUpdate",
+      {
+        payload: Schema.Struct({
+          messageId: Schema.String,
+          claimId: Schema.String,
+        }),
+        success: MessageRoomOrder,
+        error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "releaseMessageRoomOrderTentativeUpdateClaim",
+      "/messageRoomOrder/releaseMessageRoomOrderTentativeUpdateClaim",
+      {
+        payload: Schema.Struct({
+          messageId: Schema.String,
+          claimId: Schema.String,
+        }),
+        success: Schema.Void,
+        error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "claimMessageRoomOrderTentativePin",
+      "/messageRoomOrder/claimMessageRoomOrderTentativePin",
+      {
+        payload: Schema.Struct({
+          messageId: Schema.String,
+          claimId: Schema.String,
+        }),
+        success: MessageRoomOrder,
+        error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "completeMessageRoomOrderTentativePin",
+      "/messageRoomOrder/completeMessageRoomOrderTentativePin",
+      {
+        payload: Schema.Struct({
+          messageId: Schema.String,
+          claimId: Schema.String,
+        }),
+        success: MessageRoomOrder,
+        error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "releaseMessageRoomOrderTentativePinClaim",
+      "/messageRoomOrder/releaseMessageRoomOrderTentativePinClaim",
+      {
+        payload: Schema.Struct({
+          messageId: Schema.String,
+          claimId: Schema.String,
+        }),
+        success: Schema.Void,
+        error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
+      },
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "markMessageRoomOrderTentative",
+      "/messageRoomOrder/markMessageRoomOrderTentative",
+      {
+        payload: Schema.Struct({
+          messageId: Schema.String,
+        }),
+        success: MessageRoomOrder,
+        error: [SchemaError, QueryResultError, ArgumentError, Unauthorized],
       },
     ),
   )

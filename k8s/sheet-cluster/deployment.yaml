@@ -1,0 +1,233 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sheet-cluster
+  labels:
+    app: sheet-cluster
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sheet-cluster
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  minReadySeconds: 5
+  template:
+    metadata:
+      labels:
+        app: sheet-cluster
+    spec:
+      subdomain: sheet-cluster-runner
+      containers:
+        - name: sheet-cluster
+          image: <IMAGE>
+          ports:
+            - containerPort: 3000
+              name: cluster-svc
+            - containerPort: 34431
+              name: cluster-rpc
+            - containerPort: 9464
+              name: cluster-met
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-cluster-secret
+                  key: otelExporterOtlpEndpoint
+            - name: POSTGRES_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-cluster-secret
+                  key: postgresUrl
+            - name: CLUSTER_RUNNER_HOST
+              value: "$(POD_NAME).sheet-cluster-runner.$(POD_NAMESPACE).svc.cluster.local"
+            - name: CLUSTER_RUNNER_PORT
+              value: "34431"
+            - name: CLUSTER_RUNNER_LISTEN_HOST
+              value: "0.0.0.0"
+            - name: CLUSTER_RUNNER_LISTEN_PORT
+              value: "34431"
+            - name: SHEET_AUTH_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-cluster-secret
+                  key: sheetAuthIssuer
+            - name: SHEET_INGRESS_KUBERNETES_AUDIENCE
+              value: sheet-cluster
+            - name: SHEET_INGRESS_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sheet-cluster-secret
+                  key: sheetIngressBaseUrl
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: cluster-svc
+              scheme: HTTP
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: cluster-svc
+              scheme: HTTP
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /live
+              port: cluster-svc
+              scheme: HTTP
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 12
+          volumeMounts:
+            - name: sheet-cluster-ca-certificate
+              readOnly: true
+              mountPath: "/usr/local/share/ca-certificates/tiarastack"
+            - name: sheet-cluster-tokens
+              readOnly: true
+              mountPath: "/var/run/secrets/tokens"
+      serviceAccountName: sheet-cluster
+      volumes:
+        - name: sheet-cluster-ca-certificate
+          configMap:
+            name: sheet-cluster-ca-certificate
+            items:
+              - key: ca-certificate.crt
+                path: tiarastack.crt
+        - name: sheet-cluster-tokens
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: sheet-auth-token
+                  expirationSeconds: 3600
+                  audience: sheet-auth
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sheet-cluster-service
+  labels:
+    app: sheet-cluster
+spec:
+  ports:
+    - name: cluster-svc
+      protocol: TCP
+      port: 80
+      targetPort: cluster-svc
+    - name: cluster-met
+      protocol: TCP
+      port: 9464
+      targetPort: cluster-met
+  selector:
+    app: sheet-cluster
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sheet-cluster-runner
+  labels:
+    app: sheet-cluster
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: cluster-rpc
+      protocol: TCP
+      port: 34431
+      targetPort: cluster-rpc
+  selector:
+    app: sheet-cluster
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sheet-cluster-service-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: sheet-cluster
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: sheet-ingress-server
+      ports:
+        - protocol: TCP
+          port: cluster-svc
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: cluster-met
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sheet-cluster-cluster-rpc
+spec:
+  podSelector:
+    matchLabels:
+      app: sheet-cluster
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: sheet-cluster
+      ports:
+        - protocol: TCP
+          port: cluster-rpc
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sheet-cluster-runner-health
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sheet-cluster-runner-health
+subjects:
+  - kind: ServiceAccount
+    name: sheet-cluster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: sheet-cluster-runner-health
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: sheet-cluster
+  labels:
+    app: sheet-cluster
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: sheet-cluster
+  endpoints:
+    - port: cluster-met

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Api, SheetApisApi } from "./api";
+import { Api, SheetApisApi, SheetClusterApi } from "./api";
+import { SheetClusterRpcs } from "./sheet-cluster-rpc";
 import { DispatchRoomOrderButtonMethods, SheetApisRpcs } from "./sheet-apis-rpc";
 
 const roomOrderButtonMethods = Object.values(DispatchRoomOrderButtonMethods);
@@ -18,12 +19,16 @@ describe("Api", () => {
     }
   });
 
-  it("splits room-order button RPCs by action", () => {
-    expect(SheetApisRpcs.requests.has("dispatch.checkin")).toBe(true);
-    expect(SheetApisRpcs.requests.has("dispatch.checkinButton")).toBe(true);
-    expect(SheetApisRpcs.requests.has("dispatch.roomOrder")).toBe(true);
+  it("keeps dispatch RPCs on sheet-cluster only", () => {
+    expect(SheetApisRpcs.requests.has("dispatch.checkin")).toBe(false);
+    expect(SheetApisRpcs.requests.has("dispatch.checkinButton")).toBe(false);
+    expect(SheetApisRpcs.requests.has("dispatch.roomOrder")).toBe(false);
+    expect(SheetClusterRpcs.requests.has("dispatch.checkin")).toBe(true);
+    expect(SheetClusterRpcs.requests.has("dispatch.checkinButton")).toBe(true);
+    expect(SheetClusterRpcs.requests.has("dispatch.roomOrder")).toBe(true);
     for (const method of roomOrderButtonMethods) {
-      expect(SheetApisRpcs.requests.has(method.rpcTag)).toBe(true);
+      expect(SheetApisRpcs.requests.has(method.rpcTag)).toBe(false);
+      expect(SheetClusterRpcs.requests.has(method.rpcTag)).toBe(true);
     }
     expect(SheetApisRpcs.requests.has("checkin.dispatch")).toBe(false);
     expect(SheetApisRpcs.requests.has("checkin.handleButton")).toBe(false);
@@ -32,12 +37,13 @@ describe("Api", () => {
   });
 
   it("keeps split room-order button HTTP endpoint paths aligned with RPC names", () => {
-    expect(SheetApisApi.groups).toHaveProperty("dispatch");
+    expect(SheetApisApi.groups).not.toHaveProperty("dispatch");
+    expect(SheetClusterApi.groups).toHaveProperty("dispatch");
     expect(Api.groups).toHaveProperty("dispatch");
 
     for (const method of roomOrderButtonMethods) {
-      expect(SheetApisRpcs.requests.has(method.rpcTag)).toBe(true);
-      expect(SheetApisApi.groups.dispatch.endpoints[method.endpointName]).toMatchObject({
+      expect(SheetClusterRpcs.requests.has(method.rpcTag)).toBe(true);
+      expect(SheetClusterApi.groups.dispatch.endpoints[method.endpointName]).toMatchObject({
         method: "POST",
         name: method.endpointName,
         path: method.path,

@@ -5,7 +5,6 @@ import {
   hasTentativeRoomOrderPrefix,
   shouldSendTentativeRoomOrder,
 } from "sheet-ingress-api/discordComponents";
-import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import type { MessageRoomOrder } from "sheet-ingress-api/schemas/messageRoomOrder";
 import type {
   CheckinDispatchPayload,
@@ -18,19 +17,15 @@ import type {
   RoomOrderDispatchResult,
 } from "sheet-ingress-api/sheet-apis-rpc";
 import { makeArgumentError } from "typhoon-core/error";
-import { CheckinService } from "./checkin";
 import {
   checkinActionRow,
   roomOrderActionRow,
   tentativeRoomOrderActionRow,
   tentativeRoomOrderPinActionRow,
 } from "./discordComponents";
-import { GuildConfigService } from "./guildConfig";
 import { IngressBotClient } from "./ingressBotClient";
-import { MessageCheckinMemberNotRegisteredError, MessageCheckinService } from "./messageCheckin";
-import { MessageRoomOrderService } from "./messageRoomOrder";
-import { buildRoomOrderContent, RoomOrderService } from "./roomOrder";
-import { SheetService } from "./sheet";
+import { buildRoomOrderContent } from "./roomOrderContent";
+import { SheetApisClient } from "./sheetApisClient";
 
 const MessageFlags = {
   Ephemeral: 64,
@@ -42,11 +37,19 @@ type DiscordMessage = {
 };
 
 type MessagePayload = Schema.Schema.Type<typeof DiscordMessageRequestSchema>;
-type GuildConfigServiceApi = Context.Service.Shape<typeof GuildConfigService>;
-type SheetServiceApi = Context.Service.Shape<typeof SheetService>;
+type SheetServiceApi = {
+  readonly getEventConfig: ReturnType<
+    typeof makeSheetApisServices
+  >["sheetService"]["getEventConfig"];
+};
 type RoomOrderButtonAction = "previous" | "next" | "send" | "pinTentative";
 type RoomOrderButtonPayload = RoomOrderButtonBasePayload & {
   readonly action: RoomOrderButtonAction;
+};
+
+export type DispatchRequester = {
+  readonly accountId: string;
+  readonly userId: string;
 };
 
 type DispatchMessageSink = {
@@ -57,6 +60,160 @@ type DispatchMessageSink = {
     message: DiscordMessage,
     payload: MessagePayload,
   ) => Effect.Effect<DiscordMessage, unknown, unknown>;
+};
+
+const optionalArgumentError = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  effect.pipe(
+    Effect.map(Option.some),
+    Effect.catchIf(
+      (error) =>
+        typeof error === "object" &&
+        error !== null &&
+        "_tag" in error &&
+        error._tag === "ArgumentError",
+      () => Effect.succeed(Option.none<A>()),
+    ),
+  );
+
+const makeSheetApisServices = (sheetApisClient: typeof SheetApisClient.Service) => {
+  const sheetApis = sheetApisClient.get();
+
+  const messageRoomOrderService = {
+    getMessageRoomOrder: (messageId: string) =>
+      optionalArgumentError(
+        sheetApis.messageRoomOrder.getMessageRoomOrder({ query: { messageId } }),
+      ),
+    upsertMessageRoomOrder: (
+      messageId: string,
+      data: Parameters<
+        typeof sheetApis.messageRoomOrder.upsertMessageRoomOrder
+      >[0]["payload"]["data"],
+    ) => sheetApis.messageRoomOrder.upsertMessageRoomOrder({ payload: { messageId, data } }),
+    persistMessageRoomOrder: (
+      messageId: string,
+      payload: Omit<
+        Parameters<typeof sheetApis.messageRoomOrder.persistMessageRoomOrder>[0]["payload"],
+        "messageId"
+      >,
+    ) =>
+      sheetApis.messageRoomOrder.persistMessageRoomOrder({
+        payload: { messageId, ...payload },
+      }),
+    decrementMessageRoomOrderRank: (
+      messageId: string,
+      payload: Omit<
+        Parameters<typeof sheetApis.messageRoomOrder.decrementMessageRoomOrderRank>[0]["payload"],
+        "messageId"
+      >,
+    ) =>
+      sheetApis.messageRoomOrder.decrementMessageRoomOrderRank({
+        payload: { messageId, ...payload },
+      }),
+    incrementMessageRoomOrderRank: (
+      messageId: string,
+      payload: Omit<
+        Parameters<typeof sheetApis.messageRoomOrder.incrementMessageRoomOrderRank>[0]["payload"],
+        "messageId"
+      >,
+    ) =>
+      sheetApis.messageRoomOrder.incrementMessageRoomOrderRank({
+        payload: { messageId, ...payload },
+      }),
+    getMessageRoomOrderEntry: (messageId: string, rank: number) =>
+      sheetApis.messageRoomOrder.getMessageRoomOrderEntry({ query: { messageId, rank } }),
+    getMessageRoomOrderRange: (messageId: string) =>
+      optionalArgumentError(
+        sheetApis.messageRoomOrder.getMessageRoomOrderRange({ query: { messageId } }),
+      ),
+    removeMessageRoomOrderEntry: (messageId: string) =>
+      sheetApis.messageRoomOrder.removeMessageRoomOrderEntry({ payload: { messageId } }),
+    claimMessageRoomOrderSend: (messageId: string, claimId: string) =>
+      sheetApis.messageRoomOrder.claimMessageRoomOrderSend({ payload: { messageId, claimId } }),
+    completeMessageRoomOrderSend: (
+      messageId: string,
+      claimId: string,
+      sentMessage: { readonly id: string; readonly channelId: string },
+    ) =>
+      sheetApis.messageRoomOrder.completeMessageRoomOrderSend({
+        payload: { messageId, claimId, sentMessage },
+      }),
+    releaseMessageRoomOrderSendClaim: (messageId: string, claimId: string) =>
+      sheetApis.messageRoomOrder.releaseMessageRoomOrderSendClaim({
+        payload: { messageId, claimId },
+      }),
+    claimMessageRoomOrderTentativeUpdate: (messageId: string, claimId: string) =>
+      sheetApis.messageRoomOrder.claimMessageRoomOrderTentativeUpdate({
+        payload: { messageId, claimId },
+      }),
+    releaseMessageRoomOrderTentativeUpdateClaim: (messageId: string, claimId: string) =>
+      sheetApis.messageRoomOrder.releaseMessageRoomOrderTentativeUpdateClaim({
+        payload: { messageId, claimId },
+      }),
+    claimMessageRoomOrderTentativePin: (messageId: string, claimId: string) =>
+      sheetApis.messageRoomOrder.claimMessageRoomOrderTentativePin({
+        payload: { messageId, claimId },
+      }),
+    completeMessageRoomOrderTentativePin: (messageId: string, claimId: string) =>
+      sheetApis.messageRoomOrder.completeMessageRoomOrderTentativePin({
+        payload: { messageId, claimId },
+      }),
+    releaseMessageRoomOrderTentativePinClaim: (messageId: string, claimId: string) =>
+      sheetApis.messageRoomOrder.releaseMessageRoomOrderTentativePinClaim({
+        payload: { messageId, claimId },
+      }),
+    markMessageRoomOrderTentative: (messageId: string) =>
+      sheetApis.messageRoomOrder.markMessageRoomOrderTentative({
+        payload: { messageId },
+      }),
+  };
+
+  return {
+    checkinService: {
+      generate: (payload: CheckinDispatchPayload) => sheetApis.checkin.generate({ payload }),
+    },
+    guildConfigService: {
+      getGuildConfig: (guildId: string) =>
+        optionalArgumentError(sheetApis.guildConfig.getGuildConfig({ query: { guildId } })),
+      getGuildChannelById: (query: {
+        readonly guildId: string;
+        readonly channelId: string;
+        readonly running?: boolean | undefined;
+      }) => optionalArgumentError(sheetApis.guildConfig.getGuildChannelById({ query })),
+    },
+    messageCheckinService: {
+      getMessageCheckinData: (messageId: string) =>
+        optionalArgumentError(
+          sheetApis.messageCheckin.getMessageCheckinData({ query: { messageId } }),
+        ),
+      getMessageCheckinMembers: (messageId: string) =>
+        sheetApis.messageCheckin.getMessageCheckinMembers({ query: { messageId } }),
+      persistMessageCheckin: (
+        messageId: string,
+        payload: Omit<
+          Parameters<typeof sheetApis.messageCheckin.persistMessageCheckin>[0]["payload"],
+          "messageId"
+        >,
+      ) => sheetApis.messageCheckin.persistMessageCheckin({ payload: { messageId, ...payload } }),
+      setMessageCheckinMemberCheckinAtIfUnset: (
+        messageId: string,
+        memberId: string,
+        checkinAt: number,
+        checkinClaimId: string,
+      ) =>
+        sheetApis.messageCheckin.setMessageCheckinMemberCheckinAtIfUnset({
+          payload: { messageId, memberId, checkinAt, checkinClaimId },
+        }),
+    },
+    messageRoomOrderService,
+    roomOrderService: {
+      generate: (
+        payload: RoomOrderDispatchPayload | { guildId: string; channelId: string; hour: number },
+      ) => sheetApis.roomOrder.generate({ payload }),
+    },
+    sheetService: {
+      getEventConfig: (guildId: string) => sheetApis.sheet.getEventConfig({ query: { guildId } }),
+    },
+  };
 };
 
 const logEnableFailure = (message: string) => (error: unknown) =>
@@ -104,29 +261,6 @@ const renderCheckedInContent = (
     : initialMessage;
 };
 
-const getSheetIdFromGuildId = (guildId: string, guildConfigService: GuildConfigServiceApi) =>
-  guildConfigService.getGuildConfig(guildId).pipe(
-    Effect.flatMap(
-      Option.match({
-        onSome: (guildConfig) =>
-          pipe(
-            guildConfig.sheetId,
-            Option.match({
-              onSome: Effect.succeed,
-              onNone: () =>
-                Effect.fail(
-                  makeArgumentError("Cannot handle room-order button, the guild has no sheet id"),
-                ),
-            }),
-          ),
-        onNone: () =>
-          Effect.fail(
-            makeArgumentError("Cannot handle room-order button, the guild might not be registered"),
-          ),
-      }),
-    ),
-  );
-
 const fillParticipantFromName = (name: string) => ({
   key: `name:${name}`,
   label: name,
@@ -138,7 +272,6 @@ const renderRoomOrderReply = Effect.fn("DispatchService.renderRoomOrderReply")(f
   messageId,
   mode,
   roomOrder,
-  guildConfigService,
   sheetService,
   messageRoomOrderService,
 }: {
@@ -146,21 +279,21 @@ const renderRoomOrderReply = Effect.fn("DispatchService.renderRoomOrderReply")(f
   readonly messageId: string;
   readonly mode: "normal" | "tentative";
   readonly roomOrder: MessageRoomOrder;
-  readonly guildConfigService: GuildConfigServiceApi;
   readonly sheetService: SheetServiceApi;
-  readonly messageRoomOrderService: typeof MessageRoomOrderService.Service;
+  readonly messageRoomOrderService: ReturnType<
+    typeof makeSheetApisServices
+  >["messageRoomOrderService"];
 }) {
   const maybeRange = yield* messageRoomOrderService.getMessageRoomOrderRange(messageId);
   const entries = yield* messageRoomOrderService.getMessageRoomOrderEntry(
     messageId,
     roomOrder.rank,
   );
-  const sheetId = yield* getSheetIdFromGuildId(guildId, guildConfigService);
   const range = yield* Option.match(maybeRange, {
     onSome: Effect.succeed,
     onNone: () => Effect.fail(makeArgumentError("Cannot render room order, no entries found")),
   });
-  const eventConfig = yield* sheetService.getEventConfig(sheetId);
+  const eventConfig = yield* sheetService.getEventConfig(guildId);
   const start = pipe(
     eventConfig.startTime,
     DateTime.addDuration(Duration.hours(roomOrder.hour - 1)),
@@ -204,8 +337,10 @@ const sendTentativeRoomOrder = Effect.fn("DispatchService.sendTentativeRoomOrder
   readonly fillCount: number;
   readonly createdByUserId: string | null;
   readonly botClient: typeof IngressBotClient.Service;
-  readonly roomOrderService: typeof RoomOrderService.Service;
-  readonly messageRoomOrderService: typeof MessageRoomOrderService.Service;
+  readonly roomOrderService: ReturnType<typeof makeSheetApisServices>["roomOrderService"];
+  readonly messageRoomOrderService: ReturnType<
+    typeof makeSheetApisServices
+  >["messageRoomOrderService"];
 }) {
   if (!shouldSendTentativeRoomOrder(fillCount)) {
     return null;
@@ -296,21 +431,73 @@ const sendTentativeRoomOrder = Effect.fn("DispatchService.sendTentativeRoomOrder
 export class DispatchService extends Context.Service<DispatchService>()("DispatchService", {
   make: Effect.gen(function* () {
     const botClient = yield* IngressBotClient;
-    const checkinService = yield* CheckinService;
-    const guildConfigService = yield* GuildConfigService;
-    const messageCheckinService = yield* MessageCheckinService;
-    const messageRoomOrderService = yield* MessageRoomOrderService;
-    const roomOrderService = yield* RoomOrderService;
-    const sheetService = yield* SheetService;
+    const sheetApisClient = yield* SheetApisClient;
+    const {
+      checkinService,
+      guildConfigService,
+      messageCheckinService,
+      messageRoomOrderService,
+      roomOrderService,
+      sheetService,
+    } = makeSheetApisServices(sheetApisClient);
 
     const roomOrderButton = Effect.fn("DispatchService.roomOrderButton")(function* (
       payload: RoomOrderButtonPayload,
-      authorizedRoomOrder?: MessageRoomOrder,
+      authorizedRoomOrder?: MessageRoomOrder | null,
     ) {
+      const failRoomOrderInteraction = (content: string, errorMessage: string) =>
+        botClient
+          .updateOriginalInteractionResponse(payload.interactionToken, {
+            content,
+            components: [],
+          })
+          .pipe(Effect.andThen(Effect.fail(makeArgumentError(errorMessage))));
+      const requireRoomOrderMatch = (roomOrder: MessageRoomOrder) =>
+        Effect.gen(function* () {
+          if (
+            !Option.contains(roomOrder.guildId, payload.guildId) ||
+            !Option.contains(roomOrder.messageChannelId, payload.messageChannelId)
+          ) {
+            return yield* failRoomOrderInteraction(
+              "This room-order message authorization changed.",
+              "Cannot handle room-order button, authorization changed",
+            );
+          }
+        });
+      const requireClaimedRoomOrderMatch = (
+        roomOrder: MessageRoomOrder,
+        releaseClaim: Effect.Effect<unknown, unknown, never>,
+      ) =>
+        requireRoomOrderMatch(roomOrder).pipe(
+          Effect.catchCause((cause) =>
+            releaseClaim.pipe(
+              Effect.catchCause(() => Effect.void),
+              Effect.andThen(Effect.failCause(cause)),
+            ),
+          ),
+        );
+      const requireCurrentRoomOrderMatch = () =>
+        Effect.gen(function* () {
+          const maybeCurrentRoomOrder = yield* messageRoomOrderService.getMessageRoomOrder(
+            payload.messageId,
+          );
+          const currentRoomOrder = yield* Option.match(maybeCurrentRoomOrder, {
+            onSome: Effect.succeed,
+            onNone: () =>
+              failRoomOrderInteraction(
+                "This room-order message is not registered.",
+                "Cannot handle room-order button, message is not registered",
+              ),
+          });
+          yield* requireRoomOrderMatch(currentRoomOrder);
+          return currentRoomOrder;
+        });
       const maybeInitialRoomOrder =
-        authorizedRoomOrder === undefined
-          ? yield* messageRoomOrderService.getMessageRoomOrder(payload.messageId)
-          : Option.some(authorizedRoomOrder);
+        authorizedRoomOrder === null
+          ? Option.none<MessageRoomOrder>()
+          : authorizedRoomOrder === undefined
+            ? yield* messageRoomOrderService.getMessageRoomOrder(payload.messageId)
+            : Option.some(authorizedRoomOrder);
       if (Option.isNone(maybeInitialRoomOrder) && payload.action === "pinTentative") {
         const fallbackChannel = yield* guildConfigService.getGuildChannelById({
           guildId: payload.guildId,
@@ -398,13 +585,7 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
               ),
             ),
       });
-      const failRoomOrderInteraction = (content: string, errorMessage: string) =>
-        botClient
-          .updateOriginalInteractionResponse(payload.interactionToken, {
-            content,
-            components: [],
-          })
-          .pipe(Effect.andThen(Effect.fail(makeArgumentError(errorMessage))));
+      yield* requireRoomOrderMatch(initialRoomOrder);
       const trustedGuildId = yield* Option.match(initialRoomOrder.guildId, {
         onSome: Effect.succeed,
         onNone: () =>
@@ -424,24 +605,19 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
       const messageHasTentativePrefix = hasTentativeRoomOrderPrefix(payload.messageContent ?? "");
       const effectiveInitialRoomOrder =
         !initialRoomOrder.tentative && messageHasTentativePrefix
-          ? yield* messageRoomOrderService
-              .markMessageRoomOrderTentative(payload.messageId, {
-                guildId: trustedGuildId,
-                messageChannelId: trustedMessageChannelId,
-              })
-              .pipe(
-                Effect.catchCause((cause) =>
-                  Effect.logError("Failed to repair legacy tentative room-order flag").pipe(
-                    Effect.annotateLogs({
-                      guildId: trustedGuildId,
-                      messageId: payload.messageId,
-                      channelId: trustedMessageChannelId,
-                    }),
-                    Effect.andThen(Effect.logError(cause)),
-                    Effect.as(initialRoomOrder),
-                  ),
+          ? yield* messageRoomOrderService.markMessageRoomOrderTentative(payload.messageId).pipe(
+              Effect.catchCause((cause) =>
+                Effect.logError("Failed to repair legacy tentative room-order flag").pipe(
+                  Effect.annotateLogs({
+                    guildId: trustedGuildId,
+                    messageId: payload.messageId,
+                    channelId: trustedMessageChannelId,
+                  }),
+                  Effect.andThen(Effect.logError(cause)),
+                  Effect.as(initialRoomOrder),
                 ),
-              )
+              ),
+            )
           : initialRoomOrder;
       const mode = effectiveInitialRoomOrder.tentative ? "tentative" : "normal";
       const interactionResponseType =
@@ -452,7 +628,6 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
           messageId: payload.messageId,
           mode: replyMode,
           roomOrder,
-          guildConfigService,
           sheetService,
           messageRoomOrderService,
         });
@@ -492,12 +667,20 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
           } satisfies RoomOrderButtonResult;
         }
 
+        yield* requireCurrentRoomOrderMatch();
         const updateClaimId = globalThis.crypto.randomUUID();
         const claimedRoomOrder =
           yield* messageRoomOrderService.claimMessageRoomOrderTentativeUpdate(
             payload.messageId,
             updateClaimId,
           );
+        yield* requireClaimedRoomOrderMatch(
+          claimedRoomOrder,
+          messageRoomOrderService.releaseMessageRoomOrderTentativeUpdateClaim(
+            payload.messageId,
+            updateClaimId,
+          ),
+        );
         if (
           Option.isSome(claimedRoomOrder.tentativePinnedAt) ||
           Option.isSome(claimedRoomOrder.tentativePinClaimId) ||
@@ -652,10 +835,15 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
           } satisfies RoomOrderButtonResult;
         }
 
+        yield* requireCurrentRoomOrderMatch();
         const claimId = globalThis.crypto.randomUUID();
         const claimedRoomOrder = yield* messageRoomOrderService.claimMessageRoomOrderSend(
           payload.messageId,
           claimId,
+        );
+        yield* requireClaimedRoomOrderMatch(
+          claimedRoomOrder,
+          messageRoomOrderService.releaseMessageRoomOrderSendClaim(payload.messageId, claimId),
         );
         if (
           Option.isSome(claimedRoomOrder.sentMessageId) &&
@@ -775,9 +963,17 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
       }
 
       const pinClaimId = globalThis.crypto.randomUUID();
+      yield* requireCurrentRoomOrderMatch();
       const pinClaimedRoomOrder = yield* messageRoomOrderService.claimMessageRoomOrderTentativePin(
         payload.messageId,
         pinClaimId,
+      );
+      yield* requireClaimedRoomOrderMatch(
+        pinClaimedRoomOrder,
+        messageRoomOrderService.releaseMessageRoomOrderTentativePinClaim(
+          payload.messageId,
+          pinClaimId,
+        ),
       );
       if (Option.isSome(pinClaimedRoomOrder.tentativePinnedAt)) {
         const detail = "tentative room order is already pinned.";
@@ -920,9 +1116,11 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
     });
 
     return {
-      checkin: Effect.fn("DispatchService.checkin")(function* (payload: CheckinDispatchPayload) {
-        const user = yield* SheetAuthUser;
-        const createdByUserId = user.userId;
+      checkin: Effect.fn("DispatchService.checkin")(function* (
+        payload: CheckinDispatchPayload,
+        requester: DispatchRequester,
+      ) {
+        const createdByUserId = requester.userId;
         const generated = yield* checkinService.generate(payload);
         const messageSink = makeMessageSink(
           botClient,
@@ -1023,9 +1221,9 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
       }),
       roomOrder: Effect.fn("DispatchService.roomOrder")(function* (
         payload: RoomOrderDispatchPayload,
+        requester: DispatchRequester,
       ) {
-        const user = yield* SheetAuthUser;
-        const createdByUserId = user.userId;
+        const createdByUserId = requester.userId;
         const generated = yield* roomOrderService.generate(payload);
         const messageSink = makeMessageSink(
           botClient,
@@ -1074,9 +1272,9 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
       }),
       checkinButton: Effect.fn("DispatchService.checkinButton")(function* (
         payload: CheckinHandleButtonPayload,
+        requester: DispatchRequester,
       ) {
-        const user = yield* SheetAuthUser;
-        const accountId = user.accountId;
+        const accountId = requester.accountId;
         const checkinAt = Date.now();
         const checkinClaimId = globalThis.crypto.randomUUID();
 
@@ -1125,10 +1323,7 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
             Effect.catch((error) =>
               botClient
                 .updateOriginalInteractionResponse(payload.interactionToken, {
-                  content:
-                    error instanceof MessageCheckinMemberNotRegisteredError
-                      ? "You are not registered for this check-in."
-                      : "We could not check you in. Please try again.",
+                  content: "We could not check you in. Please try again.",
                 })
                 .pipe(Effect.andThen(Effect.fail(error))),
             ),
@@ -1232,7 +1427,7 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
       },
       roomOrderPinTentativeButton(
         payload: RoomOrderButtonBasePayload,
-        authorizedRoomOrder?: MessageRoomOrder,
+        authorizedRoomOrder?: MessageRoomOrder | null,
       ) {
         return roomOrderButton({ ...payload, action: "pinTentative" }, authorizedRoomOrder);
       },
@@ -1240,16 +1435,6 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
   }),
 }) {
   static layer = Layer.effect(DispatchService, this.make).pipe(
-    Layer.provide(
-      Layer.mergeAll(
-        IngressBotClient.layer,
-        CheckinService.layer,
-        GuildConfigService.layer,
-        MessageCheckinService.layer,
-        MessageRoomOrderService.layer,
-        RoomOrderService.layer,
-        SheetService.layer,
-      ),
-    ),
+    Layer.provide(Layer.mergeAll(IngressBotClient.layer, SheetApisClient.layer)),
   );
 }

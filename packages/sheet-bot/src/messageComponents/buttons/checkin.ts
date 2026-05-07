@@ -13,7 +13,8 @@ import {
 import { InteractionToken } from "dfx-discord-utils/utils";
 import { Interaction } from "dfx-discord-utils/utils";
 import { discordApplicationLayer } from "../../discord/application";
-import { SheetApisClient, SheetApisRequestContext } from "@/services";
+import { SheetClusterClient, SheetClusterRequestContext } from "@/services";
+import { interactionDeadlineEpochMs } from "@/utils/interactionDeadline";
 
 const getInteractionMessage = Effect.gen(function* () {
   const interactionMessage = yield* Interaction.message();
@@ -39,21 +40,23 @@ export const checkinActionRow = (disabled = false) =>
   makeMessageActionRowData((b) => b.setComponents(makeCheckinButtonData(disabled)));
 
 const makeCheckinButtonHandler = Effect.gen(function* () {
-  const sheetApisClient = yield* SheetApisClient;
+  const sheetClusterClient = yield* SheetClusterClient;
 
   return yield* makeButton(
     checkinButtonData.toJSON(),
-    SheetApisRequestContext.asInteractionUser(
+    SheetClusterRequestContext.asInteractionUser(
       Effect.fn("checkinButton")(function* (helper) {
         yield* helper.deferReply({ flags: MessageFlags.Ephemeral });
 
         const message = Option.getOrThrow(yield* getInteractionMessage);
         const interactionToken = yield* InteractionToken;
+        const interaction = yield* Ix.Interaction;
 
-        yield* sheetApisClient.get().dispatch.checkinButton({
+        yield* sheetClusterClient.get().dispatch.checkinButton({
           payload: {
             messageId: message.id,
             interactionToken: interactionToken.token,
+            interactionDeadlineEpochMs: interactionDeadlineEpochMs(interaction.id),
           },
         });
       }),
@@ -76,6 +79,6 @@ export const checkinButtonLayer = Layer.effectDiscard(
   }),
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(discordGatewayLayer, discordApplicationLayer, SheetApisClient.layer),
+    Layer.mergeAll(discordGatewayLayer, discordApplicationLayer, SheetClusterClient.layer),
   ),
 );

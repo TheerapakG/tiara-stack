@@ -50,7 +50,10 @@ import {
   CheckinHandleButtonError,
   CheckinHandleButtonPayload,
   CheckinHandleButtonResult,
+  DispatchAcceptedResult,
   DispatchRoomOrderButtonMethods,
+  interactionTokenExpirySafetyMarginMs,
+  interactionTokenLifetimeMs,
   RoomOrderDispatchError,
   RoomOrderDispatchPayload,
   RoomOrderDispatchResult,
@@ -66,12 +69,16 @@ import {
 } from "./handlers/dispatch/schema";
 
 export {
+  CheckinDispatchError,
   CheckinDispatchPayload,
   CheckinDispatchResult,
   CheckinHandleButtonError,
   CheckinHandleButtonPayload,
   CheckinHandleButtonResult,
+  DispatchAcceptedResult,
   DispatchRoomOrderButtonMethods,
+  interactionTokenExpirySafetyMarginMs,
+  interactionTokenLifetimeMs,
   RoomOrderButtonBasePayload,
   RoomOrderButtonInteractionResponseType,
   RoomOrderButtonResult,
@@ -285,49 +292,49 @@ export const DispatchRpcs = RpcGroup.make(
     payload: Schema.Struct({
       payload: CheckinDispatchPayload,
     }),
-    success: CheckinDispatchResult,
+    success: DispatchAcceptedResult,
     error: CheckinDispatchError,
   }),
   protectedRpc("dispatch.checkinButton", {
     payload: Schema.Struct({
       payload: CheckinHandleButtonPayload,
     }),
-    success: CheckinHandleButtonResult,
+    success: DispatchAcceptedResult,
     error: CheckinHandleButtonError,
   }),
   protectedRpc("dispatch.roomOrder", {
     payload: Schema.Struct({
       payload: RoomOrderDispatchPayload,
     }),
-    success: RoomOrderDispatchResult,
+    success: DispatchAcceptedResult,
     error: RoomOrderDispatchError,
   }),
   protectedRpc(DispatchRoomOrderButtonMethods.previous.rpcTag, {
     payload: Schema.Struct({
       payload: RoomOrderPreviousButtonPayload,
     }),
-    success: RoomOrderPreviousButtonResult,
+    success: DispatchAcceptedResult,
     error: RoomOrderHandleButtonError,
   }),
   protectedRpc(DispatchRoomOrderButtonMethods.next.rpcTag, {
     payload: Schema.Struct({
       payload: RoomOrderNextButtonPayload,
     }),
-    success: RoomOrderNextButtonResult,
+    success: DispatchAcceptedResult,
     error: RoomOrderHandleButtonError,
   }),
   protectedRpc(DispatchRoomOrderButtonMethods.send.rpcTag, {
     payload: Schema.Struct({
       payload: RoomOrderSendButtonPayload,
     }),
-    success: RoomOrderSendButtonResult,
+    success: DispatchAcceptedResult,
     error: RoomOrderHandleButtonError,
   }),
   protectedRpc(DispatchRoomOrderButtonMethods.pinTentative.rpcTag, {
     payload: Schema.Struct({
       payload: RoomOrderPinTentativeButtonPayload,
     }),
-    success: RoomOrderPinTentativeButtonResult,
+    success: DispatchAcceptedResult,
     error: RoomOrderHandleButtonError,
   }),
 );
@@ -430,7 +437,7 @@ export const MessageCheckinRpcs = RpcGroup.make(
   protectedRpc("messageCheckin.getMessageCheckinData", {
     payload: Query({ messageId: Schema.String }),
     success: MessageCheckin,
-    error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError, Unauthorized]),
   }),
   protectedRpc("messageCheckin.upsertMessageCheckinData", {
     payload: Payload({
@@ -438,12 +445,12 @@ export const MessageCheckinRpcs = RpcGroup.make(
       data: messageCheckinData,
     }),
     success: MessageCheckin,
-    error: Schema.Union([SchemaError, QueryResultError]),
+    error: Schema.Union([SchemaError, QueryResultError, Unauthorized]),
   }),
   protectedRpc("messageCheckin.getMessageCheckinMembers", {
     payload: Query({ messageId: Schema.String }),
     success: Schema.Array(MessageCheckinMember),
-    error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError, Unauthorized]),
   }),
   protectedRpc("messageCheckin.addMessageCheckinMembers", {
     payload: Payload({
@@ -451,7 +458,7 @@ export const MessageCheckinRpcs = RpcGroup.make(
       memberIds: Schema.Array(Schema.String),
     }),
     success: Schema.Array(MessageCheckinMember),
-    error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError, Unauthorized]),
   }),
   protectedRpc("messageCheckin.persistMessageCheckin", {
     payload: Payload({
@@ -460,7 +467,7 @@ export const MessageCheckinRpcs = RpcGroup.make(
       memberIds: Schema.Array(Schema.String),
     }),
     success: MessageCheckin,
-    error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError, Unauthorized]),
   }),
   protectedRpc("messageCheckin.setMessageCheckinMemberCheckinAt", {
     payload: Payload({
@@ -469,7 +476,17 @@ export const MessageCheckinRpcs = RpcGroup.make(
       checkinAt: Schema.Number,
     }),
     success: MessageCheckinMember,
-    error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError, Unauthorized]),
+  }),
+  protectedRpc("messageCheckin.setMessageCheckinMemberCheckinAtIfUnset", {
+    payload: Payload({
+      messageId: Schema.String,
+      memberId: Schema.String,
+      checkinAt: Schema.Number,
+      checkinClaimId: Schema.String,
+    }),
+    success: MessageCheckinMember,
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError, Unauthorized]),
   }),
   protectedRpc("messageCheckin.removeMessageCheckinMember", {
     payload: Payload({
@@ -477,7 +494,7 @@ export const MessageCheckinRpcs = RpcGroup.make(
       memberId: Schema.String,
     }),
     success: MessageCheckinMember,
-    error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError, Unauthorized]),
   }),
 );
 
@@ -546,6 +563,60 @@ export const MessageRoomOrderRpcs = RpcGroup.make(
   protectedRpc("messageRoomOrder.removeMessageRoomOrderEntry", {
     payload: Payload({ messageId: Schema.String }),
     success: Schema.Array(MessageRoomOrderEntry),
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
+  }),
+  protectedRpc("messageRoomOrder.claimMessageRoomOrderSend", {
+    payload: Payload({ messageId: Schema.String, claimId: Schema.String }),
+    success: MessageRoomOrder,
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
+  }),
+  protectedRpc("messageRoomOrder.completeMessageRoomOrderSend", {
+    payload: Payload({
+      messageId: Schema.String,
+      claimId: Schema.String,
+      sentMessage: Schema.Struct({
+        id: Schema.String,
+        channelId: Schema.String,
+      }),
+    }),
+    success: MessageRoomOrder,
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
+  }),
+  protectedRpc("messageRoomOrder.releaseMessageRoomOrderSendClaim", {
+    payload: Payload({ messageId: Schema.String, claimId: Schema.String }),
+    success: Schema.Void,
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
+  }),
+  protectedRpc("messageRoomOrder.claimMessageRoomOrderTentativeUpdate", {
+    payload: Payload({ messageId: Schema.String, claimId: Schema.String }),
+    success: MessageRoomOrder,
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
+  }),
+  protectedRpc("messageRoomOrder.releaseMessageRoomOrderTentativeUpdateClaim", {
+    payload: Payload({ messageId: Schema.String, claimId: Schema.String }),
+    success: Schema.Void,
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
+  }),
+  protectedRpc("messageRoomOrder.claimMessageRoomOrderTentativePin", {
+    payload: Payload({ messageId: Schema.String, claimId: Schema.String }),
+    success: MessageRoomOrder,
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
+  }),
+  protectedRpc("messageRoomOrder.completeMessageRoomOrderTentativePin", {
+    payload: Payload({ messageId: Schema.String, claimId: Schema.String }),
+    success: MessageRoomOrder,
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
+  }),
+  protectedRpc("messageRoomOrder.releaseMessageRoomOrderTentativePinClaim", {
+    payload: Payload({ messageId: Schema.String, claimId: Schema.String }),
+    success: Schema.Void,
+    error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
+  }),
+  protectedRpc("messageRoomOrder.markMessageRoomOrderTentative", {
+    payload: Payload({
+      messageId: Schema.String,
+    }),
+    success: MessageRoomOrder,
     error: Schema.Union([SchemaError, QueryResultError, ArgumentError]),
   }),
 );
@@ -787,7 +858,6 @@ export const SheetRpcs = RpcGroup.make(
 
 export const SheetApisRpcs = CalcRpcs.merge(
   CheckinRpcs,
-  DispatchRpcs,
   DiscordRpcs,
   GuildConfigRpcs,
   HealthRpcs,

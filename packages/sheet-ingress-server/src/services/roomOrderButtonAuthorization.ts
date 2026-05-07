@@ -22,6 +22,10 @@ type RoomOrderButtonPayload = {
   readonly messageId: string;
 };
 
+type RegisteredRoomOrderButtonPayload = {
+  readonly messageId: string;
+};
+
 const getModernMessageGuildId = (record: ModernMessageRecord) =>
   Option.match(record.guildId, {
     onSome: (guildId) =>
@@ -53,7 +57,7 @@ const requireMonitorGuild = (guildId: string) =>
     yield* authorization.requireMonitorGuild(guildId);
   });
 
-export const requireRegisteredRoomOrderButton = (payload: { readonly messageId: string }) =>
+export const requireRegisteredRoomOrderButton = (payload: RegisteredRoomOrderButtonPayload) =>
   Effect.gen(function* () {
     const messages = yield* MessageLookup;
     const record = yield* messages.getMessageRoomOrder(payload.messageId);
@@ -61,7 +65,7 @@ export const requireRegisteredRoomOrderButton = (payload: { readonly messageId: 
       return yield* Effect.fail(missingRoomOrder());
     }
     const guildId = yield* getRequiredModernGuildId(record.value);
-    yield* requireMonitorGuild(guildId);
+    return yield* requireMonitorGuild(guildId);
   }).pipe(Effect.mapError(authorizationError));
 
 export const requireRoomOrderPinTentativeButton = (payload: RoomOrderButtonPayload) =>
@@ -70,10 +74,10 @@ export const requireRoomOrderPinTentativeButton = (payload: RoomOrderButtonPaylo
     const record = yield* messages.getMessageRoomOrder(payload.messageId);
     if (Option.isSome(record)) {
       const guildId = yield* getRequiredModernGuildId(record.value);
-      yield* requireMonitorGuild(guildId);
-      return;
+      return yield* requireMonitorGuild(guildId);
     }
-    yield* requireMonitorGuild(payload.guildId);
+
+    return yield* requireMonitorGuild(payload.guildId);
   }).pipe(Effect.mapError(authorizationError));
 
 export const roomOrderButtonProxyAuthorizers = {

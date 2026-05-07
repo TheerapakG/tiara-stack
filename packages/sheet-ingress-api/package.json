@@ -71,6 +71,14 @@
       "types": "./dist/sheet-apis-rpc.d.mts",
       "default": "./dist/sheet-apis-rpc.mjs"
     },
+    "./sheet-cluster": {
+      "types": "./dist/sheet-cluster.d.mts",
+      "default": "./dist/sheet-cluster.mjs"
+    },
+    "./sheet-cluster-rpc": {
+      "types": "./dist/sheet-cluster-rpc.d.mts",
+      "default": "./dist/sheet-cluster-rpc.mjs"
+    },
     "./sheet-bot-rpc": {
       "types": "./dist/sheet-bot-rpc.d.mts",
       "default": "./dist/sheet-bot-rpc.mjs"

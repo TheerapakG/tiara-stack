@@ -26,6 +26,7 @@ import { SheetAuthUserResolver } from "./services/authResolver";
 import { dispatchProxyTargets } from "./services/dispatchProxyTargets";
 import { MessageLookup } from "./services/messageLookup";
 import { roomOrderButtonProxyAuthorizers } from "./services/roomOrderButtonAuthorization";
+import { SheetClusterForwardingClient } from "./services/sheetClusterForwardingClient";
 import { SheetApisForwardingClient } from "./services/sheetApisForwardingClient";
 import { SheetApisRpcTokens } from "./services/sheetApisRpcTokens";
 import { SheetBotForwardingClient } from "./services/sheetBotForwardingClient";
@@ -111,6 +112,7 @@ const corsMiddlewareLayer = Layer.unwrap(
 
 type SheetIngressGroups = (typeof Api)["groups"][keyof (typeof Api)["groups"]];
 type SheetApisForwardingClientService = typeof SheetApisForwardingClient.Service;
+type SheetClusterForwardingClientService = typeof SheetClusterForwardingClient.Service;
 type SheetApisGroupName = Extract<
   keyof SheetApisForwardingClientService,
   HttpApiGroup.Name<SheetIngressGroups>
@@ -145,6 +147,31 @@ type SheetApisProxyHandler<
   SheetApisForwardingClient | R
 >;
 type SheetApisEndpointClient = (args: unknown) => Effect.Effect<unknown, unknown, unknown>;
+type SheetClusterDispatchEndpointName = Extract<
+  keyof SheetClusterForwardingClientService["dispatch"],
+  string
+>;
+type SheetClusterDispatchRequest<EndpointName extends SheetClusterDispatchEndpointName> =
+  HttpApiEndpoint.Request<
+    HttpApiEndpoint.WithName<
+      HttpApiGroup.Endpoints<HttpApiGroup.WithName<SheetIngressGroups, "dispatch">>,
+      EndpointName
+    >
+  >;
+type SheetClusterDispatchError<EndpointName extends SheetClusterDispatchEndpointName> =
+  HttpApiEndpoint.ErrorsWithName<
+    HttpApiGroup.Endpoints<HttpApiGroup.WithName<SheetIngressGroups, "dispatch">>,
+    EndpointName
+  >;
+type SheetClusterDispatchHandler<
+  EndpointName extends SheetClusterDispatchEndpointName,
+  R,
+> = HttpApiEndpoint.HandlerWithName<
+  HttpApiGroup.Endpoints<HttpApiGroup.WithName<SheetIngressGroups, "dispatch">>,
+  EndpointName,
+  SheetClusterDispatchError<EndpointName>,
+  SheetClusterForwardingClient | R
+>;
 
 const forwardSheetApis =
   <GroupName extends SheetApisGroupName, EndpointName extends SheetApisEndpointName<GroupName>>(
@@ -179,6 +206,32 @@ const authorizedSheetApis =
       yield* authorize(args);
       return yield* forwardSheetApis(group, endpoint)(rawArgs as never);
     }) as ReturnType<SheetApisProxyHandler<GroupName, EndpointName, R>>;
+
+const forwardSheetClusterDispatch =
+  <EndpointName extends SheetClusterDispatchEndpointName>(
+    endpoint: EndpointName,
+  ): SheetClusterDispatchHandler<EndpointName, never> =>
+  (rawArgs) =>
+    Effect.gen(function* () {
+      const args = rawArgs as SheetClusterDispatchRequest<EndpointName>;
+      const client = yield* SheetClusterForwardingClient;
+      const endpointClient = client.dispatch[endpoint];
+      return yield* endpointClient(clientArgsFrom(args) as never);
+    }) as ReturnType<SheetClusterDispatchHandler<EndpointName, never>>;
+
+const authorizedSheetClusterDispatch =
+  <EndpointName extends SheetClusterDispatchEndpointName, R>(
+    endpoint: EndpointName,
+    authorize: (
+      args: SheetClusterDispatchRequest<EndpointName>,
+    ) => Effect.Effect<void, SheetClusterDispatchError<EndpointName>, R>,
+  ): SheetClusterDispatchHandler<EndpointName, R> =>
+  (rawArgs) =>
+    Effect.gen(function* () {
+      const args = rawArgs as SheetClusterDispatchRequest<EndpointName>;
+      yield* authorize(args);
+      return yield* forwardSheetClusterDispatch(endpoint)(rawArgs as never);
+    }) as ReturnType<SheetClusterDispatchHandler<EndpointName, R>>;
 
 const requireService = () =>
   Effect.gen(function* () {
@@ -534,17 +587,13 @@ const makeApiLayer = () => {
       handlers
         .handle(
           "checkin",
-          guildPayload(
-            dispatchProxyTargets.checkin.group,
-            dispatchProxyTargets.checkin.endpoint,
-            "monitor",
-            (payload) => payload.guildId,
+          authorizedSheetClusterDispatch(dispatchProxyTargets.checkin.endpoint, ({ payload }) =>
+            requireGuild("monitor", payload.guildId),
           ),
         )
         .handle(
           "checkinButton",
-          authorizedSheetApis(
-            dispatchProxyTargets.checkinButton.group,
+          authorizedSheetClusterDispatch(
             dispatchProxyTargets.checkinButton.endpoint,
             ({ payload }) =>
               Effect.gen(function* () {
@@ -555,17 +604,13 @@ const makeApiLayer = () => {
         )
         .handle(
           "roomOrder",
-          guildPayload(
-            dispatchProxyTargets.roomOrder.group,
-            dispatchProxyTargets.roomOrder.endpoint,
-            "monitor",
-            (payload) => payload.guildId,
+          authorizedSheetClusterDispatch(dispatchProxyTargets.roomOrder.endpoint, ({ payload }) =>
+            requireGuild("monitor", payload.guildId),
           ),
         )
         .handle(
           DispatchRoomOrderButtonMethods.previous.endpointName,
-          authorizedSheetApis(
-            dispatchProxyTargets.roomOrderPreviousButton.group,
+          authorizedSheetClusterDispatch(
             dispatchProxyTargets.roomOrderPreviousButton.endpoint,
             ({ payload }) =>
               roomOrderButtonProxyAuthorizers[DispatchRoomOrderButtonMethods.previous.endpointName](
@@ -575,8 +620,7 @@ const makeApiLayer = () => {
         )
         .handle(
           DispatchRoomOrderButtonMethods.next.endpointName,
-          authorizedSheetApis(
-            dispatchProxyTargets.roomOrderNextButton.group,
+          authorizedSheetClusterDispatch(
             dispatchProxyTargets.roomOrderNextButton.endpoint,
             ({ payload }) =>
               roomOrderButtonProxyAuthorizers[DispatchRoomOrderButtonMethods.next.endpointName](
@@ -586,8 +630,7 @@ const makeApiLayer = () => {
         )
         .handle(
           DispatchRoomOrderButtonMethods.send.endpointName,
-          authorizedSheetApis(
-            dispatchProxyTargets.roomOrderSendButton.group,
+          authorizedSheetClusterDispatch(
             dispatchProxyTargets.roomOrderSendButton.endpoint,
             ({ payload }) =>
               roomOrderButtonProxyAuthorizers[DispatchRoomOrderButtonMethods.send.endpointName](
@@ -597,8 +640,7 @@ const makeApiLayer = () => {
         )
         .handle(
           DispatchRoomOrderButtonMethods.pinTentative.endpointName,
-          authorizedSheetApis(
-            dispatchProxyTargets.roomOrderPinTentativeButton.group,
+          authorizedSheetClusterDispatch(
             dispatchProxyTargets.roomOrderPinTentativeButton.endpoint,
             ({ payload }) =>
               roomOrderButtonProxyAuthorizers[
@@ -715,6 +757,15 @@ const makeApiLayer = () => {
           ),
         )
         .handle(
+          "setMessageCheckinMemberCheckinAtIfUnset",
+          authorizedSheetApis(
+            "messageCheckin",
+            "setMessageCheckinMemberCheckinAtIfUnset",
+            ({ payload }) =>
+              requireMessageCheckinParticipantMutation(payload.messageId, payload.memberId),
+          ),
+        )
+        .handle(
           "removeMessageCheckinMember",
           authorizedSheetApis("messageCheckin", "removeMessageCheckinMember", ({ payload }) =>
             requireMessageCheckinParticipantMutation(payload.messageId, payload.memberId),
@@ -780,6 +831,72 @@ const makeApiLayer = () => {
         .handle(
           "removeMessageRoomOrderEntry",
           authorizedSheetApis("messageRoomOrder", "removeMessageRoomOrderEntry", ({ payload }) =>
+            requireRoomOrderMonitor(payload.messageId),
+          ),
+        )
+        .handle(
+          "claimMessageRoomOrderSend",
+          authorizedSheetApis("messageRoomOrder", "claimMessageRoomOrderSend", ({ payload }) =>
+            requireRoomOrderMonitor(payload.messageId),
+          ),
+        )
+        .handle(
+          "completeMessageRoomOrderSend",
+          authorizedSheetApis("messageRoomOrder", "completeMessageRoomOrderSend", ({ payload }) =>
+            requireRoomOrderMonitor(payload.messageId),
+          ),
+        )
+        .handle(
+          "releaseMessageRoomOrderSendClaim",
+          authorizedSheetApis(
+            "messageRoomOrder",
+            "releaseMessageRoomOrderSendClaim",
+            ({ payload }) => requireRoomOrderMonitor(payload.messageId),
+          ),
+        )
+        .handle(
+          "claimMessageRoomOrderTentativeUpdate",
+          authorizedSheetApis(
+            "messageRoomOrder",
+            "claimMessageRoomOrderTentativeUpdate",
+            ({ payload }) => requireRoomOrderMonitor(payload.messageId),
+          ),
+        )
+        .handle(
+          "releaseMessageRoomOrderTentativeUpdateClaim",
+          authorizedSheetApis(
+            "messageRoomOrder",
+            "releaseMessageRoomOrderTentativeUpdateClaim",
+            ({ payload }) => requireRoomOrderMonitor(payload.messageId),
+          ),
+        )
+        .handle(
+          "claimMessageRoomOrderTentativePin",
+          authorizedSheetApis(
+            "messageRoomOrder",
+            "claimMessageRoomOrderTentativePin",
+            ({ payload }) => requireRoomOrderMonitor(payload.messageId),
+          ),
+        )
+        .handle(
+          "completeMessageRoomOrderTentativePin",
+          authorizedSheetApis(
+            "messageRoomOrder",
+            "completeMessageRoomOrderTentativePin",
+            ({ payload }) => requireRoomOrderMonitor(payload.messageId),
+          ),
+        )
+        .handle(
+          "releaseMessageRoomOrderTentativePinClaim",
+          authorizedSheetApis(
+            "messageRoomOrder",
+            "releaseMessageRoomOrderTentativePinClaim",
+            ({ payload }) => requireRoomOrderMonitor(payload.messageId),
+          ),
+        )
+        .handle(
+          "markMessageRoomOrderTentative",
+          authorizedSheetApis("messageRoomOrder", "markMessageRoomOrderTentative", ({ payload }) =>
             requireRoomOrderMonitor(payload.messageId),
           ),
         ),
@@ -965,6 +1082,7 @@ const makeApiLayer = () => {
     MessageLookup.layer,
     SheetApisForwardingClient.layer,
     SheetApisRpcTokens.layer,
+    SheetClusterForwardingClient.layer,
     SheetBotForwardingClient.layer,
   );
 
@@ -1004,4 +1122,4 @@ const MainLive = HttpLive.pipe(
   Layer.provide(configProviderLayer),
 );
 
-Layer.launch(MainLive).pipe(NodeRuntime.runMain);
+NodeRuntime.runMain(Effect.orDie(Layer.launch(MainLive)) as Effect.Effect<never, never, never>);
