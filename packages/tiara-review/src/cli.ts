@@ -3,6 +3,10 @@ import * as Console from "effect/Console";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import { Command, Flag } from "effect/unstable/cli";
+import { defaultDbPath } from "./config";
+import { resolveRepoRoot, getCurrentBranch, captureCheckpoint } from "./git/checkpoint";
+import { ensureDependencyGraphVersion, lookupDependencyGraphSymbol } from "./graph/store";
+import { runDependencyGraphMcpServer } from "./graph/mcp";
 import { runCheckpointedReview } from "./review/workflow";
 import type { ReasoningEffort } from "./review/types";
 
@@ -62,6 +66,8 @@ const runCommand = Command.make(
         modelReasoningEffort: config.reasoning as ReasoningEffort,
         timeoutMs: config.timeoutMs._tag === "Some" ? config.timeoutMs.value : undefined,
         externalReviewMarkdown,
+        graphMcpCommand: process.execPath,
+        graphMcpArgsPrefix: process.argv[1] ? [process.argv[1]] : undefined,
       });
       const externalReviewPrefix = result.externalReviewImport
         ? `External review import: ${result.externalReviewImport.importedFindingCount} findings imported; ${result.externalReviewImport.skippedFindingCount} skipped; ${result.externalReviewImport.warnings.length} warnings.\n\n`
@@ -74,9 +80,74 @@ const runCommand = Command.make(
     }),
 ).pipe(Command.withDescription("Run a checkpointed multi-agent Codex code review"));
 
+const graphBuildCommand = Command.make(
+  "build",
+  {
+    cwd: Flag.directory("cwd").pipe(Flag.withDefault(process.cwd())),
+    db: Flag.path("db").pipe(Flag.optional),
+  },
+  (config) =>
+    Effect.gen(function* () {
+      const repoRoot = yield* resolveRepoRoot(config.cwd);
+      const branch = yield* getCurrentBranch(repoRoot);
+      const checkpoint = yield* captureCheckpoint(repoRoot);
+      const version = yield* ensureDependencyGraphVersion({
+        repoRoot,
+        branch,
+        checkpointRef: checkpoint.checkpointRef,
+        checkpointCommit: checkpoint.checkpointCommit,
+        diffHash: "",
+        dbPath: config.db._tag === "Some" ? config.db.value : defaultDbPath(),
+      });
+      yield* Console.log(JSON.stringify(version, null, 2));
+    }),
+).pipe(Command.withDescription("Build the TypeScript dependency graph for the current checkpoint"));
+
+const graphLookupCommand = Command.make(
+  "lookup",
+  {
+    db: Flag.path("db").pipe(Flag.optional),
+    graphVersion: Flag.string("graph-version"),
+    symbol: Flag.string("symbol").pipe(Flag.optional),
+    file: Flag.string("file").pipe(Flag.optional),
+    line: Flag.integer("line").pipe(Flag.optional),
+    column: Flag.integer("column").pipe(Flag.optional),
+  },
+  (config) =>
+    Effect.gen(function* () {
+      const result = yield* lookupDependencyGraphSymbol({
+        dbPath: config.db._tag === "Some" ? config.db.value : defaultDbPath(),
+        versionId: config.graphVersion,
+        name: config.symbol._tag === "Some" ? config.symbol.value : undefined,
+        file: config.file._tag === "Some" ? config.file.value : undefined,
+        line: config.line._tag === "Some" ? config.line.value : undefined,
+        column: config.column._tag === "Some" ? config.column.value : undefined,
+      });
+      yield* Console.log(JSON.stringify(result, null, 2));
+    }),
+).pipe(Command.withDescription("Look up TypeScript symbols in a dependency graph version"));
+
+const graphMcpCommand = Command.make(
+  "mcp",
+  {
+    db: Flag.path("db").pipe(Flag.optional),
+    graphVersion: Flag.string("graph-version"),
+  },
+  (config) =>
+    runDependencyGraphMcpServer({
+      dbPath: config.db._tag === "Some" ? config.db.value : defaultDbPath(),
+      versionId: config.graphVersion,
+    }),
+).pipe(Command.withDescription("Run the dependency graph MCP server over stdio"));
+
+const graphCommand = Command.make("graph").pipe(
+  Command.withDescription("Build and query TypeScript dependency graphs"),
+  Command.withSubcommands([graphBuildCommand, graphLookupCommand, graphMcpCommand]),
+);
+
 export const command = Command.make("tiara-review").pipe(
   Command.withDescription("Checkpointed Codex code review CLI"),
-  Command.withSubcommands([runCommand]),
+  Command.withSubcommands([runCommand, graphCommand]),
 );
 
 export const main = Command.run(command, { version: "0.0.0" }).pipe(

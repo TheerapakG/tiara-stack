@@ -22,17 +22,22 @@
     "format": "vp fmt --check",
     "format:apply": "vp fmt",
     "lint": "vp lint src",
-    "test": "vp test run",
+    "test": "vp test run && node --import tsx scripts/smoke-source-child.mjs && pnpm build && node scripts/smoke-dist-worker.mjs",
+    "test:dist-worker": "node scripts/smoke-dist-worker.mjs",
     "build": "vp pack"
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
     "@effect/sql-sqlite-node": "catalog:",
+    "@modelcontextprotocol/sdk": "^1.24.0",
     "@openai/codex-sdk": "^0.128.0",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "typescript": "^5.9.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",
+    "tsx": "^4.20.6",
     "vite": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:"

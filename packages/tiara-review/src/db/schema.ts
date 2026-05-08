@@ -56,6 +56,74 @@ export const migrations = [
   `CREATE INDEX IF NOT EXISTS findings_run_id_idx ON findings(run_id)`,
   `CREATE INDEX IF NOT EXISTS findings_status_type_idx ON findings(status, type)`,
   `CREATE INDEX IF NOT EXISTS findings_dedupe_key_idx ON findings(dedupe_key)`,
+  `CREATE TABLE IF NOT EXISTS dependency_graph_versions (
+    id text primary key,
+    repo_root text not null,
+    branch text,
+    checkpoint_ref text not null,
+    checkpoint_commit text not null,
+    base_version_id text references dependency_graph_versions(id),
+    diff_hash text not null,
+    mode text not null,
+    status text not null,
+    created_at integer not null,
+    completed_at integer,
+    lease_expires_at integer,
+    error text
+  )`,
+  `CREATE TABLE IF NOT EXISTS dependency_graph_files (
+    file_key text primary key,
+    repo_root text not null,
+    path text not null,
+    content_hash text not null,
+    tsconfig_path text not null
+  )`,
+  `CREATE TABLE IF NOT EXISTS dependency_graph_symbols (
+    symbol_key text primary key,
+    file_key text not null references dependency_graph_files(file_key),
+    name text not null,
+    qualified_name text not null,
+    kind text not null,
+    path text not null,
+    start_line integer not null,
+    start_column integer not null,
+    end_line integer not null,
+    end_column integer not null,
+    exported integer not null,
+    metadata_json text not null
+  )`,
+  `CREATE TABLE IF NOT EXISTS dependency_graph_edges (
+    edge_key text primary key,
+    from_symbol_key text not null,
+    to_symbol_key text not null,
+    kind text not null,
+    source_path text not null,
+    source_start_line integer not null,
+    source_start_column integer not null,
+    metadata_json text not null
+  )`,
+  `CREATE TABLE IF NOT EXISTS dependency_graph_symbol_deltas (
+    version_id text not null references dependency_graph_versions(id),
+    symbol_key text not null references dependency_graph_symbols(symbol_key),
+    op text not null,
+    primary key (version_id, symbol_key)
+  )`,
+  `CREATE TABLE IF NOT EXISTS dependency_graph_edge_deltas (
+    version_id text not null references dependency_graph_versions(id),
+    edge_key text not null references dependency_graph_edges(edge_key),
+    op text not null,
+    primary key (version_id, edge_key)
+  )`,
+  `CREATE INDEX IF NOT EXISTS dependency_graph_versions_repo_branch_idx ON dependency_graph_versions(repo_root, branch, created_at)`,
+  `CREATE INDEX IF NOT EXISTS dependency_graph_versions_checkpoint_idx ON dependency_graph_versions(repo_root, checkpoint_commit)`,
+  `CREATE INDEX IF NOT EXISTS dependency_graph_symbols_name_idx ON dependency_graph_symbols(name, path)`,
+  `CREATE INDEX IF NOT EXISTS dependency_graph_symbols_path_idx ON dependency_graph_symbols(path)`,
+  `CREATE INDEX IF NOT EXISTS dependency_graph_edges_from_idx ON dependency_graph_edges(from_symbol_key, kind)`,
+  `CREATE INDEX IF NOT EXISTS dependency_graph_edges_to_idx ON dependency_graph_edges(to_symbol_key, kind)`,
+  `CREATE INDEX IF NOT EXISTS dependency_graph_symbol_deltas_version_idx ON dependency_graph_symbol_deltas(version_id, op)`,
+  `CREATE INDEX IF NOT EXISTS dependency_graph_edge_deltas_version_idx ON dependency_graph_edge_deltas(version_id, op)`,
+  `CREATE INDEX IF NOT EXISTS dependency_graph_symbol_deltas_symbol_idx ON dependency_graph_symbol_deltas(symbol_key, version_id)`,
+  `CREATE INDEX IF NOT EXISTS dependency_graph_edge_deltas_edge_idx ON dependency_graph_edge_deltas(edge_key, version_id)`,
   `CREATE TABLE IF NOT EXISTS schema_migrations (
     id text primary key,
     applied_at integer not null

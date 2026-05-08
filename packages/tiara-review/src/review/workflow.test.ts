@@ -1,14 +1,28 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { Effect } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { describe, expect, it } from "vitest";
 import type { CodexReviewClient, CodexRunOptions, CodexRunResult } from "../codex/client";
 import { sqliteLayer } from "../db/client";
 import { CodexAgentTimedOut, type AgentAspect } from "./types";
-import { runCheckpointedReviewWithClient } from "./workflow";
+import {
+  looksLikeFilesystemPath,
+  packageRootFallbackFromCompiledDir,
+  runCheckpointedReviewWithClient,
+  tiaraReviewCliBinPath,
+} from "./workflow";
 
 const git = (cwd: string, args: ReadonlyArray<string>) =>
   execFileSync("git", [...args], { cwd, encoding: "utf8" }).trimEnd();
@@ -44,6 +58,7 @@ const latestRunStatus = (dbPath: string) =>
 class MockCodexClient implements CodexReviewClient {
   readonly calls: Array<AgentAspect> = [];
   readonly prompts: Array<{ readonly aspect: AgentAspect; readonly prompt: string }> = [];
+  readonly options: Array<CodexRunOptions> = [];
 
   constructor(
     readonly failAspect?: AgentAspect,
@@ -56,6 +71,7 @@ class MockCodexClient implements CodexReviewClient {
   ): Effect.Effect<CodexRunResult<A>, never> {
     this.calls.push(options.aspect);
     this.prompts.push({ aspect: options.aspect, prompt });
+    this.options.push(options);
     if (this.timeoutAspect === options.aspect) {
       return Effect.fail(
         new CodexAgentTimedOut({
@@ -126,6 +142,33 @@ class MockCodexClient implements CodexReviewClient {
 }
 
 describe("workflow", () => {
+  it("keeps the default graph MCP entrypoint aligned with the package bin", () => {
+    const packageJson = JSON.parse(
+      readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+    ) as { readonly bin?: Record<string, string> };
+    expect(packageJson.bin?.["tiara-review"]?.replace(/^\.\//, "")).toBe(tiaraReviewCliBinPath);
+  });
+
+  it("finds the package root from a bundled dist entrypoint directory", () => {
+    const packageRoot = mkdtempSync(join(tmpdir(), "tiara-review-package."));
+    try {
+      mkdirSync(join(packageRoot, "dist"));
+      writeFileSync(join(packageRoot, "package.json"), JSON.stringify({ name: "tiara-review" }));
+      expect(packageRootFallbackFromCompiledDir(join(packageRoot, "dist"))).toBe(packageRoot);
+    } finally {
+      rmSync(packageRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("distinguishes custom MCP package prefixes from filesystem entrypoints", () => {
+    expect(looksLikeFilesystemPath("tiara-review")).toBe(false);
+    expect(looksLikeFilesystemPath("@scope/tiara-review")).toBe(false);
+    expect(looksLikeFilesystemPath("dist/index.mjs")).toBe(true);
+    expect(looksLikeFilesystemPath("./dist/index.mjs")).toBe(true);
+    expect(looksLikeFilesystemPath("/opt/tiara-review/dist/index.mjs")).toBe(true);
+    expect(looksLikeFilesystemPath("C:\\tiara-review\\dist\\index.mjs")).toBe(true);
+  });
+
   it("runs six specialists before the orchestrator and persists the final report", async () => {
     const repo = makeRepo();
     const dbDir = mkdtempSync(join(tmpdir(), "tiara-review-workflow-db."));
@@ -136,6 +179,8 @@ describe("workflow", () => {
           {
             cwd: repo,
             dbPath: join(dbDir, "reviews.sqlite"),
+            graphMcpCommand: "npx",
+            graphMcpArgsPrefix: ["@scope/tiara-review"],
           },
           client,
         ),
@@ -149,10 +194,268 @@ describe("workflow", () => {
         "test-flakiness",
       ]);
       expect(client.calls[6]).toBe("orchestrator");
+      expect(
+        client.options
+          .filter((options) => options.aspect !== "orchestrator")
+          .every((options) =>
+            options.aspect === "external-review-parser" ? true : Boolean(options.graphVersionId),
+          ),
+      ).toBe(true);
       expect(result.findings).toHaveLength(1);
       expect(result.reportMarkdown).toContain("Checkpointed Review Report");
       expect(result.failedAspects).toEqual([]);
     } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(dbDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not forward graph tools when a custom MCP entrypoint is missing", async () => {
+    const repo = makeRepo();
+    const dbDir = mkdtempSync(join(tmpdir(), "tiara-review-workflow-db."));
+    try {
+      const client = new MockCodexClient();
+      const result = await Effect.runPromise(
+        runCheckpointedReviewWithClient(
+          {
+            cwd: repo,
+            dbPath: join(dbDir, "reviews.sqlite"),
+            graphMcpCommand: process.execPath,
+            graphMcpArgsPrefix: [join(repo, "missing-graph-mcp.js")],
+          },
+          client,
+        ),
+      );
+
+      const specialistOptions = client.options.filter(
+        (options) =>
+          options.aspect !== "orchestrator" && options.aspect !== "external-review-parser",
+      );
+      expect(specialistOptions.every((options) => options.graphVersionId === undefined)).toBe(true);
+      expect(
+        client.prompts.some((prompt) =>
+          prompt.prompt.includes("Dependency graph tools are unavailable"),
+        ),
+      ).toBe(true);
+      expect(result.failedAspects).toEqual([]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(dbDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not forward graph tools when a custom MCP bare entrypoint is missing", async () => {
+    const repo = makeRepo();
+    const dbDir = mkdtempSync(join(tmpdir(), "tiara-review-workflow-db."));
+    try {
+      const client = new MockCodexClient();
+      await Effect.runPromise(
+        runCheckpointedReviewWithClient(
+          {
+            cwd: repo,
+            dbPath: join(dbDir, "reviews.sqlite"),
+            graphMcpCommand: process.execPath,
+            graphMcpArgsPrefix: ["missing-graph-mcp.js"],
+          },
+          client,
+        ),
+      );
+
+      const specialistOptions = client.options.filter(
+        (options) =>
+          options.aspect !== "orchestrator" && options.aspect !== "external-review-parser",
+      );
+      expect(specialistOptions.every((options) => options.graphVersionId === undefined)).toBe(true);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(dbDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not forward graph tools when a custom MCP command has no args prefix", async () => {
+    const repo = makeRepo();
+    const dbDir = mkdtempSync(join(tmpdir(), "tiara-review-workflow-db."));
+    try {
+      const client = new MockCodexClient();
+      await Effect.runPromise(
+        runCheckpointedReviewWithClient(
+          {
+            cwd: repo,
+            dbPath: join(dbDir, "reviews.sqlite"),
+            graphMcpCommand: process.execPath,
+          },
+          client,
+        ),
+      );
+
+      const specialistOptions = client.options.filter(
+        (options) =>
+          options.aspect !== "orchestrator" && options.aspect !== "external-review-parser",
+      );
+      expect(specialistOptions.every((options) => options.graphVersionId === undefined)).toBe(true);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(dbDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not forward graph tools for non-allowlisted no-prefix MCP commands", async () => {
+    const repo = makeRepo();
+    const dbDir = mkdtempSync(join(tmpdir(), "tiara-review-workflow-db."));
+    try {
+      const client = new MockCodexClient();
+      await Effect.runPromise(
+        runCheckpointedReviewWithClient(
+          {
+            cwd: repo,
+            dbPath: join(dbDir, "reviews.sqlite"),
+            graphMcpCommand: "nodejs",
+          },
+          client,
+        ),
+      );
+
+      const specialistOptions = client.options.filter(
+        (options) =>
+          options.aspect !== "orchestrator" && options.aspect !== "external-review-parser",
+      );
+      expect(specialistOptions.every((options) => options.graphVersionId === undefined)).toBe(true);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(dbDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not forward graph tools for no-prefix MCP commands inside the reviewed repo", async () => {
+    const repo = makeRepo();
+    const dbDir = mkdtempSync(join(tmpdir(), "tiara-review-workflow-db."));
+    try {
+      writeFileSync(join(repo, "tiara-review"), "");
+      const client = new MockCodexClient();
+      await Effect.runPromise(
+        runCheckpointedReviewWithClient(
+          {
+            cwd: repo,
+            dbPath: join(dbDir, "reviews.sqlite"),
+            graphMcpCommand: join(repo, "tiara-review"),
+          },
+          client,
+        ),
+      );
+
+      const specialistOptions = client.options.filter(
+        (options) =>
+          options.aspect !== "orchestrator" && options.aspect !== "external-review-parser",
+      );
+      expect(specialistOptions.every((options) => options.graphVersionId === undefined)).toBe(true);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(dbDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not forward graph tools for no-prefix MCP command symlinks inside the reviewed repo", async () => {
+    const repo = makeRepo();
+    const dbDir = mkdtempSync(join(tmpdir(), "tiara-review-workflow-db."));
+    try {
+      const trustedCli = join(dbDir, "tiara-review");
+      writeFileSync(trustedCli, "");
+      chmodSync(trustedCli, 0o755);
+      symlinkSync(trustedCli, join(repo, "tiara-review"));
+      const client = new MockCodexClient();
+      await Effect.runPromise(
+        runCheckpointedReviewWithClient(
+          {
+            cwd: repo,
+            dbPath: join(dbDir, "reviews.sqlite"),
+            graphMcpCommand: join(repo, "tiara-review"),
+          },
+          client,
+        ),
+      );
+
+      const specialistOptions = client.options.filter(
+        (options) =>
+          options.aspect !== "orchestrator" && options.aspect !== "external-review-parser",
+      );
+      expect(specialistOptions.every((options) => options.graphVersionId === undefined)).toBe(true);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(dbDir, { recursive: true, force: true });
+    }
+  });
+
+  it("forwards graph tools for a direct custom MCP CLI command with no args prefix", async () => {
+    const repo = makeRepo();
+    const dbDir = mkdtempSync(join(tmpdir(), "tiara-review-workflow-db."));
+    const previousPath = process.env.PATH;
+    try {
+      const trustedCli = join(dbDir, "tiara-review");
+      writeFileSync(trustedCli, "");
+      chmodSync(trustedCli, 0o755);
+      process.env.PATH = [dbDir, previousPath].filter(Boolean).join(delimiter);
+      const client = new MockCodexClient();
+      await Effect.runPromise(
+        runCheckpointedReviewWithClient(
+          {
+            cwd: repo,
+            dbPath: join(dbDir, "reviews.sqlite"),
+            graphMcpCommand: "tiara-review",
+          },
+          client,
+        ),
+      );
+
+      const specialistOptions = client.options.filter(
+        (options) =>
+          options.aspect !== "orchestrator" && options.aspect !== "external-review-parser",
+      );
+      expect(specialistOptions.every((options) => options.graphVersionId !== undefined)).toBe(true);
+      expect(
+        specialistOptions.every((options) => options.graphMcpCommand === realpathSync(trustedCli)),
+      ).toBe(true);
+    } finally {
+      process.env.PATH = previousPath;
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(dbDir, { recursive: true, force: true });
+    }
+  });
+
+  it("forwards graph tools for no-prefix MCP command symlinks outside the reviewed repo", async () => {
+    const repo = makeRepo();
+    const dbDir = mkdtempSync(join(tmpdir(), "tiara-review-workflow-db."));
+    const previousPath = process.env.PATH;
+    try {
+      const trustedCliTarget = join(dbDir, "tiara-review-target");
+      const trustedCliLink = join(dbDir, "tiara-review");
+      writeFileSync(trustedCliTarget, "");
+      chmodSync(trustedCliTarget, 0o755);
+      symlinkSync(trustedCliTarget, trustedCliLink);
+      process.env.PATH = [dbDir, previousPath].filter(Boolean).join(delimiter);
+      const client = new MockCodexClient();
+      await Effect.runPromise(
+        runCheckpointedReviewWithClient(
+          {
+            cwd: repo,
+            dbPath: join(dbDir, "reviews.sqlite"),
+            graphMcpCommand: "tiara-review",
+          },
+          client,
+        ),
+      );
+
+      const specialistOptions = client.options.filter(
+        (options) =>
+          options.aspect !== "orchestrator" && options.aspect !== "external-review-parser",
+      );
+      expect(specialistOptions.every((options) => options.graphVersionId !== undefined)).toBe(true);
+      expect(
+        specialistOptions.every(
+          (options) => options.graphMcpCommand === realpathSync(trustedCliTarget),
+        ),
+      ).toBe(true);
+    } finally {
+      process.env.PATH = previousPath;
       rmSync(repo, { recursive: true, force: true });
       rmSync(dbDir, { recursive: true, force: true });
     }

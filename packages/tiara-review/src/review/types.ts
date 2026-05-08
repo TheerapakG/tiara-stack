@@ -111,6 +111,8 @@ export type ReviewRunConfig = {
   readonly modelReasoningEffort?: ReasoningEffort;
   readonly timeoutMs?: number;
   readonly externalReviewMarkdown?: string;
+  readonly graphMcpCommand?: string;
+  readonly graphMcpArgsPrefix?: ReadonlyArray<string>;
 };
 
 export type ExternalReviewImportResult = {

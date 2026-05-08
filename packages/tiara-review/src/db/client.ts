@@ -50,6 +50,14 @@ export const migrate = (dbPath: string) =>
         if (!columns.some((column) => column.name === "checkpoint_created_at")) {
           yield* sql.unsafe(`ALTER TABLE review_runs ADD COLUMN checkpoint_created_at integer`);
         }
+        const graphVersionColumns = yield* sql.unsafe<{ readonly name: string }>(
+          `PRAGMA table_info(dependency_graph_versions)`,
+        );
+        if (!graphVersionColumns.some((column) => column.name === "lease_expires_at")) {
+          yield* sql.unsafe(
+            `ALTER TABLE dependency_graph_versions ADD COLUMN lease_expires_at integer`,
+          );
+        }
         const applied = yield* sql.unsafe<{ readonly id: string }>(
           `select id from schema_migrations where id = ? limit 1`,
           [legacyCheckpointTimestampMigrationId],

@@ -2,6 +2,19 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
+import { createRequire } from "node:module";
+import {
+  basename,
+  delimiter,
+  dirname,
+  extname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+} from "node:path";
+import { fileURLToPath } from "node:url";
+import { accessSync, constants, existsSync, realpathSync, statSync } from "node:fs";
 import {
   resolveRepoRoot,
   captureCheckpoint,
@@ -10,6 +23,7 @@ import {
   getCurrentBranch,
 } from "../git/checkpoint";
 import { getDiffInfo } from "../git/diff";
+import { ensureDependencyGraphVersion } from "../graph/store";
 import {
   consolidatedOutputSchema,
   decodeConsolidatedOutput,
@@ -40,6 +54,180 @@ import {
 import { parseExternalReviewWithCodex } from "./external-review";
 
 const now = () => Math.floor(Date.now() / 1000);
+export const tiaraReviewCliBinPath = "dist/index.mjs";
+const tiaraReviewCliBinNameFallback = "tiara-review";
+const require = createRequire(import.meta.url);
+const compiledFileDir = dirname(fileURLToPath(import.meta.url));
+export const packageRootFallbackFromCompiledDir = (compiledDir: string) => {
+  let current = compiledDir;
+  while (true) {
+    if (existsSync(join(current, "package.json"))) {
+      return current;
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      return dirname(compiledDir);
+    }
+    current = parent;
+  }
+};
+const packageRootFallback = () => packageRootFallbackFromCompiledDir(compiledFileDir);
+const packageRoot = () => {
+  try {
+    return dirname(require.resolve("tiara-review/package.json"));
+  } catch {
+    return packageRootFallback();
+  }
+};
+const defaultGraphMcpCommand = () => process.execPath;
+const packageBinMetadata = () => {
+  try {
+    const pkg = require("tiara-review/package.json") as {
+      readonly bin?: string | Record<string, string>;
+    };
+    if (typeof pkg.bin === "string" && pkg.bin.length > 0) {
+      return { name: tiaraReviewCliBinNameFallback, entrypoint: pkg.bin };
+    }
+    if (pkg.bin && typeof pkg.bin === "object") {
+      const binName = pkg.bin[tiaraReviewCliBinNameFallback]
+        ? tiaraReviewCliBinNameFallback
+        : Object.keys(pkg.bin)[0];
+      const binEntry = binName ? pkg.bin[binName] : undefined;
+      if (binName && binEntry && binEntry.length > 0) {
+        return { name: binName, entrypoint: binEntry };
+      }
+    }
+  } catch {
+    // Fall back to the current bundled path when package metadata is unavailable.
+  }
+  return null;
+};
+const resolvedCliBinName = () => packageBinMetadata()?.name ?? tiaraReviewCliBinNameFallback;
+const resolvedCliEntrypoint = () => {
+  const metadata = packageBinMetadata();
+  if (metadata) {
+    return join(packageRoot(), metadata.entrypoint);
+  }
+  return join(packageRoot(), tiaraReviewCliBinPath);
+};
+const defaultGraphMcpEntrypoint = resolvedCliEntrypoint;
+const scopedPackageNamePattern = /^@[^/\\]+\/[^/\\]+$/;
+export const looksLikeFilesystemPath = (path: string) =>
+  !scopedPackageNamePattern.test(path) &&
+  (path.startsWith("/") ||
+    path.startsWith("./") ||
+    path.startsWith("../") ||
+    path.startsWith("file:") ||
+    /^[A-Za-z]:[\\/]/.test(path) ||
+    path.includes("/") ||
+    path.includes("\\"));
+const looksLikeBareEntrypointPath = (path: string) =>
+  !path.startsWith("@") && !path.startsWith("-") && extname(path).length > 0;
+const resolveEntrypointPath = (path: string, repoRoot: string) =>
+  isAbsolute(path) ? path : resolve(repoRoot, path);
+const looksLikeDirectGraphMcpCommand = (command: string) => {
+  const commandName = basename(command).toLowerCase();
+  const binName = resolvedCliBinName().toLowerCase();
+  return (
+    commandName === binName || commandName === `${binName}.cmd` || commandName === `${binName}.ps1`
+  );
+};
+const isInsidePath = (parent: string, child: string) => {
+  const relativePath = relative(resolve(parent), resolve(child));
+  return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath));
+};
+const isExecutableFile = (path: string) => {
+  try {
+    if (!statSync(path).isFile()) {
+      return false;
+    }
+    accessSync(path, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+};
+const pathCandidatesForCommand = (command: string, repoRoot: string) => {
+  if (looksLikeFilesystemPath(command)) {
+    return [isAbsolute(command) ? command : resolve(repoRoot, command)];
+  }
+  const pathEntries = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
+  const extensions =
+    process.platform === "win32" && extname(command).length === 0
+      ? (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean)
+      : [""];
+  return pathEntries.flatMap((entry) =>
+    extensions.map((extension) => resolve(entry, `${command}${extension}`)),
+  );
+};
+const resolveCommandExecutable = (command: string, repoRoot: string) => {
+  for (const candidate of pathCandidatesForCommand(command, repoRoot)) {
+    if (isInsidePath(repoRoot, candidate)) {
+      continue;
+    }
+    if (isExecutableFile(candidate)) {
+      let commandPath: string;
+      try {
+        commandPath = realpathSync(candidate);
+      } catch {
+        continue;
+      }
+      if (!isInsidePath(repoRoot, commandPath)) {
+        return commandPath;
+      }
+    }
+  }
+  return null;
+};
+const resolveDirectGraphMcpCommand = (command: string, repoRoot: string) => {
+  if (!looksLikeDirectGraphMcpCommand(command)) {
+    return null;
+  }
+  const commandPath = resolveCommandExecutable(command, repoRoot);
+  return commandPath;
+};
+const graphMcpLauncher = (config: ReviewRunConfig, repoRoot: string) => {
+  if (config.graphMcpCommand !== undefined || config.graphMcpArgsPrefix !== undefined) {
+    const command = config.graphMcpCommand ?? defaultGraphMcpCommand();
+    const argsPrefix = config.graphMcpArgsPrefix ?? [];
+    const firstArg = argsPrefix[0];
+    const resolvedDirectCommand =
+      argsPrefix.length === 0 ? resolveDirectGraphMcpCommand(command, repoRoot) : null;
+    const missingNoPrefixCommand = argsPrefix.length === 0 && resolvedDirectCommand === null;
+    const entrypointPath =
+      firstArg !== undefined &&
+      (looksLikeFilesystemPath(firstArg) || looksLikeBareEntrypointPath(firstArg))
+        ? resolveEntrypointPath(firstArg, repoRoot)
+        : null;
+    const missingEntrypoint =
+      missingNoPrefixCommand || (entrypointPath !== null && !existsSync(entrypointPath));
+    const available = command.length > 0 && !missingEntrypoint;
+    return {
+      command: resolvedDirectCommand ?? command,
+      argsPrefix,
+      available,
+      unavailableReason:
+        command.length === 0
+          ? "custom graph MCP command is empty"
+          : missingNoPrefixCommand
+            ? `custom graph MCP command is unavailable: ${command}`
+            : `custom graph MCP entrypoint is unavailable: ${entrypointPath ?? firstArg}`,
+    };
+  }
+  const entrypoint = defaultGraphMcpEntrypoint();
+  const available = existsSync(entrypoint);
+  return {
+    command: defaultGraphMcpCommand(),
+    argsPrefix: [entrypoint],
+    available,
+    unavailableReason: `default graph MCP entrypoint is unavailable: ${entrypoint}`,
+  };
+};
+const graphFailureSummary = (cause: Cause.Cause<unknown>) =>
+  String(cause)
+    .replaceAll(/[\r\n\t]+/g, " ")
+    .replaceAll(/[`<>]/g, "")
+    .slice(0, 240);
 
 const agentFailureStatus = (cause: Cause.Cause<unknown>): AgentStatus => {
   const error = Cause.findErrorOption(cause);
@@ -52,6 +240,7 @@ export const runCheckpointedReviewWithClient = (
 ) =>
   Effect.gen(function* () {
     const repoRoot = yield* resolveRepoRoot(config.cwd);
+    const dbPath = config.dbPath ?? defaultDbPath();
     const repository = yield* ReviewRepository;
     const checkpoint = yield* captureCheckpoint(repoRoot);
     const runAfterCheckpoint = Effect.gen(function* () {
@@ -95,6 +284,27 @@ export const runCheckpointedReviewWithClient = (
             }),
           )
           .pipe(Effect.ignore);
+      const dependencyGraphExit = yield* Effect.exit(
+        ensureDependencyGraphVersion({
+          repoRoot,
+          branch,
+          checkpointRef: checkpoint.checkpointRef,
+          checkpointCommit: checkpoint.checkpointCommit,
+          diffHash: diffInfo.diffHash,
+          dbPath,
+        }),
+      );
+      const dependencyGraphVersion = Exit.isSuccess(dependencyGraphExit)
+        ? dependencyGraphExit.value
+        : null;
+      const graphLauncher = graphMcpLauncher(config, repoRoot);
+      const dependencyGraphToolsAvailable =
+        dependencyGraphVersion !== null && graphLauncher.available;
+      const dependencyGraphReviewNotes = Exit.isFailure(dependencyGraphExit)
+        ? [`Dependency graph tools unavailable: ${graphFailureSummary(dependencyGraphExit.cause)}`]
+        : dependencyGraphVersion !== null && !dependencyGraphToolsAvailable
+          ? [`Dependency graph tools unavailable: ${graphLauncher.unavailableReason}`]
+          : [];
       const markAgentFailed = (input: {
         readonly agentId: string;
         readonly status: AgentStatus;
@@ -240,6 +450,7 @@ export const runCheckpointedReviewWithClient = (
               checkpointCommit: checkpoint.checkpointCommit,
               diffText: diffInfo.diffText,
               priorFindings: priorByAspect[aspect],
+              dependencyGraphAvailable: dependencyGraphToolsAvailable,
             });
             const resultExit = yield* Effect.exit(
               client
@@ -250,6 +461,12 @@ export const runCheckpointedReviewWithClient = (
                   modelReasoningEffort: config.modelReasoningEffort ?? "high",
                   timeoutMs: config.timeoutMs,
                   outputSchema: specialistOutputSchema,
+                  graphVersionId: dependencyGraphToolsAvailable
+                    ? dependencyGraphVersion.id
+                    : undefined,
+                  graphDbPath: dbPath,
+                  graphMcpCommand: graphLauncher.command,
+                  graphMcpArgsPrefix: graphLauncher.argsPrefix,
                 })
                 .pipe(
                   Effect.flatMap((result) =>
@@ -335,6 +552,7 @@ export const runCheckpointedReviewWithClient = (
           diffInfo,
           reviewerOutputs: successfulOutputs,
           failedAspects,
+          reviewNotes: dependencyGraphReviewNotes,
         });
         const orchestratorExit = yield* Effect.exit(
           client

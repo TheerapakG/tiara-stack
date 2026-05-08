@@ -20,6 +20,10 @@ export type CodexRunOptions = {
   readonly modelReasoningEffort?: ReasoningEffort;
   readonly timeoutMs?: number;
   readonly outputSchema: unknown;
+  readonly graphVersionId?: string;
+  readonly graphDbPath?: string;
+  readonly graphMcpCommand?: string;
+  readonly graphMcpArgsPrefix?: ReadonlyArray<string>;
 };
 
 export type CodexRunResult<A> = {
@@ -105,15 +109,59 @@ export const runWithAbortTimeout = <A>(input: {
 
 export class SdkCodexReviewClient implements CodexReviewClient {
   private readonly codex: Codex;
+  private readonly graphCodexByConfig = new Map<string, Codex>();
 
   constructor() {
     this.codex = new Codex();
+  }
+
+  private getCodex(options: CodexRunOptions) {
+    if (!options.graphVersionId || !options.graphDbPath || !options.graphMcpCommand) {
+      return this.codex;
+    }
+    const key = JSON.stringify({
+      repoRoot: options.repoRoot,
+      graphDbPath: options.graphDbPath,
+      graphVersionId: options.graphVersionId,
+      graphMcpCommand: options.graphMcpCommand,
+      graphMcpArgsPrefix: options.graphMcpArgsPrefix ?? [],
+    });
+    const cached = this.graphCodexByConfig.get(key);
+    if (cached) {
+      return cached;
+    }
+    const codex = new Codex({
+      config: {
+        mcp_servers: {
+          tiara_review_graph: {
+            command: options.graphMcpCommand,
+            args: [
+              ...(options.graphMcpArgsPrefix ?? []),
+              "graph",
+              "mcp",
+              "--db",
+              options.graphDbPath,
+              "--graph-version",
+              options.graphVersionId,
+            ],
+            cwd: options.repoRoot,
+            enabled_tools: ["resolve_symbol", "symbol_dependencies", "symbol_dependents"],
+            startup_timeout_ms: 10_000,
+            tool_timeout_sec: 30,
+            required: true,
+          },
+        },
+      },
+    });
+    this.graphCodexByConfig.set(key, codex);
+    return codex;
   }
 
   runStructured<A>(prompt: string, options: CodexRunOptions) {
     return Effect.tryPromise({
       try: async () => {
         const abortController = new AbortController();
+        const codex = this.getCodex(options);
         const threadOptions: ThreadOptions = {
           workingDirectory: options.repoRoot,
           sandboxMode: "read-only",
@@ -123,7 +171,7 @@ export class SdkCodexReviewClient implements CodexReviewClient {
           model: options.model,
           modelReasoningEffort: options.modelReasoningEffort as ModelReasoningEffort | undefined,
         };
-        const thread = this.codex.startThread(threadOptions);
+        const thread = codex.startThread(threadOptions);
         const runPromise = thread.run(prompt, {
           outputSchema: options.outputSchema,
           signal: abortController.signal,
