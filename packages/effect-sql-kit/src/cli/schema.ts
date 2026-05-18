@@ -45,6 +45,7 @@ export const MigrationExtensionSchema = Schema.Struct({
   _tag: Schema.Literal("EffectSqlKitMigrationExtension"),
   name: Schema.String,
   generate: FunctionSchema,
+  introspect: Schema.optional(FunctionSchema),
 });
 
 export const EffectSqlKitConfigSchema = Schema.Struct({

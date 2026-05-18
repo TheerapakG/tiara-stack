@@ -1,13 +1,12 @@
 import { NodeServices } from "@effect/platform-node";
 import { Effect, FileSystem, Path, Result, Schema } from "effect";
-import type { EffectSqlSchema, ResolvedConfig } from "../types";
+import type { EffectSqlSchema, JsonValue, ResolvedConfig } from "../types";
 import { diffPg } from "../diff/pg";
 import { diffSqlite } from "../diff/sqlite";
 import type { MigrationStatement } from "../diff/types";
 import { emptySnapshot, snapshotSchema } from "../snapshot";
-import { MigrationExtensionResultSchema } from "../cli/schema";
-import type { JsonValue, MigrationExtension, MigrationExtensionResult } from "../types";
 import { lowerToDrizzleSnapshot } from "../drizzle-lower";
+import { extensionSnapshotsEffect, runMigrationExtensionsEffect } from "./extensions";
 import {
   nextMigrationName,
   readJournalEffect,
@@ -169,101 +168,3 @@ const generateWithDrizzleEffect = ({
     catch: (error) => error,
   }).pipe(Effect.catch(() => Effect.succeed([])));
 };
-
-const isMigrationExtension = (value: unknown): value is MigrationExtension =>
-  typeof value === "object" &&
-  value !== null &&
-  (value as { readonly _tag?: unknown })._tag === "EffectSqlKitMigrationExtension" &&
-  typeof (value as { readonly name?: unknown }).name === "string" &&
-  typeof (value as { readonly generate?: unknown }).generate === "function";
-
-const runMigrationExtensionsEffect = ({
-  config,
-  schema,
-  previous,
-  current,
-  previousExtensions,
-}: {
-  readonly config: ResolvedConfig;
-  readonly schema: EffectSqlSchema;
-  readonly previous: ReturnType<typeof emptySnapshot>;
-  readonly current: ReturnType<typeof snapshotSchema>;
-  readonly previousExtensions: Readonly<Record<string, JsonValue>>;
-}): Effect.Effect<readonly (MigrationExtensionResult & { readonly name: string })[], unknown> =>
-  Effect.gen(function* () {
-    const duplicateNames = duplicateValues(config.extensions.map((extension) => extension.name));
-    if (duplicateNames.length > 0) {
-      return yield* Effect.fail(
-        new Error(
-          `effect-sql-kit: duplicate migration extension name(s): ${duplicateNames.join(", ")}`,
-        ),
-      );
-    }
-
-    return yield* Effect.forEach(config.extensions, (extension) => {
-      if (!isMigrationExtension(extension)) {
-        return Effect.fail(new Error("effect-sql-kit: invalid migration extension"));
-      }
-      return Effect.gen(function* () {
-        const result = yield* Effect.promise(() =>
-          Promise.resolve(
-            extension.generate({
-              config,
-              schema,
-              previous,
-              current,
-              previousExtensions,
-            }),
-          ),
-        );
-        const decoded = yield* Schema.decodeUnknownEffect(MigrationExtensionResultSchema)(
-          result,
-        ).pipe(
-          Effect.mapError(
-            (error) =>
-              new Error(
-                `effect-sql-kit: invalid migration extension result from ${extension.name}: ${String(error)}`,
-              ),
-          ),
-        );
-        return {
-          ...decoded,
-          name: extension.name,
-        } as MigrationExtensionResult & { readonly name: string };
-      });
-    }) as unknown as Effect.Effect<
-      readonly (MigrationExtensionResult & { readonly name: string })[],
-      unknown
-    >;
-  });
-
-const duplicateValues = (values: readonly string[]): readonly string[] => {
-  const seen = new Set<string>();
-  const duplicates = new Set<string>();
-  for (const value of values) {
-    if (seen.has(value)) {
-      duplicates.add(value);
-    }
-    seen.add(value);
-  }
-  return [...duplicates];
-};
-
-const extensionSnapshotsEffect = (
-  extensionResults: readonly (MigrationExtensionResult & { readonly name: string })[],
-): Effect.Effect<Readonly<Record<string, JsonValue>>, Error> =>
-  Effect.gen(function* () {
-    const duplicates = duplicateValues(extensionResults.map((result) => result.name));
-
-    if (duplicates.length > 0) {
-      return yield* Effect.fail(
-        new Error(
-          `effect-sql-kit: duplicate migration extension result name(s): ${duplicates.join(", ")}`,
-        ),
-      );
-    }
-
-    return Object.fromEntries(
-      extensionResults.map((result) => [result.name, result.snapshot]),
-    ) as Readonly<Record<string, JsonValue>>;
-  });

@@ -17,6 +17,8 @@ export type {
 } from "effect-sql-schema";
 
 import type { Dialect, EffectSqlSchema } from "effect-sql-schema";
+import type { Effect } from "effect";
+import type { SqlClient } from "effect/unstable/sql";
 import type { MigrationStatement } from "./diff/types";
 import type { SchemaSnapshot } from "./snapshot";
 
@@ -70,6 +72,13 @@ export type MigrationExtensionContext = {
   readonly previousExtensions: Readonly<Record<string, JsonValue>>;
 };
 
+export type MigrationExtensionIntrospectContext = {
+  readonly config: ResolvedConfig;
+  readonly schema: EffectSqlSchema;
+  readonly previous: SchemaSnapshot;
+  readonly current: SchemaSnapshot;
+};
+
 export type MigrationExtensionResult = {
   readonly statements: readonly MigrationStatement[];
   readonly snapshot: JsonValue;
@@ -81,4 +90,11 @@ export type MigrationExtension = {
   readonly generate: (
     context: MigrationExtensionContext,
   ) => MigrationExtensionResult | Promise<MigrationExtensionResult>;
+  readonly introspect?: (
+    context: MigrationExtensionIntrospectContext,
+  ) =>
+    | JsonValue
+    | undefined
+    | Promise<JsonValue | undefined>
+    | Effect.Effect<JsonValue | undefined, unknown, SqlClient.SqlClient>;
 };

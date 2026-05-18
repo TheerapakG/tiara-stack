@@ -1,4 +1,5 @@
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
+import { SqlClient } from "effect/unstable/sql";
 import type {
   JsonValue,
   MigrationExtension,
@@ -49,6 +50,40 @@ const generate = (
   previousExtensions?: Readonly<Record<string, JsonValue>>,
 ): MigrationExtensionResult =>
   extension.generate(context(previousExtensions)) as MigrationExtensionResult;
+
+type IntrospectableMigrationExtension = MigrationExtension & {
+  readonly introspect: (
+    context: MigrationExtensionContext,
+  ) =>
+    | JsonValue
+    | undefined
+    | Promise<JsonValue | undefined>
+    | Effect.Effect<JsonValue | undefined, unknown, SqlClient.SqlClient>;
+};
+
+const fakeSql = (rows: readonly unknown[]): SqlClient.SqlClient =>
+  ({
+    unsafe: () => Effect.succeed(rows),
+  }) as unknown as SqlClient.SqlClient;
+
+const introspect = (
+  extension: MigrationExtension,
+  rows: readonly unknown[],
+): Promise<JsonValue | undefined> => {
+  const introspectable = extension as IntrospectableMigrationExtension;
+  if (!introspectable.introspect) {
+    throw new Error("expected extension to define introspect");
+  }
+  const result = introspectable.introspect(context());
+  if (!Effect.isEffect(result)) {
+    return Promise.resolve(result);
+  }
+  return Effect.runPromise(
+    result.pipe(Effect.provideService(SqlClient.SqlClient, fakeSql(rows))) as Effect.Effect<
+      JsonValue | undefined
+    >,
+  );
+};
 
 describe("zeroPublication", () => {
   it("creates an initial publication from Zero schema columns", () => {
@@ -272,6 +307,140 @@ describe("zeroPublication", () => {
 
     expect(() => zeroPublication({ schema: schema({ users }) }).generate(context())).toThrow(
       "effect-zero: publication table public.users requires at least one column",
+    );
+  });
+
+  it("introspects undefined when the publication does not exist", async () => {
+    const users = table(model, { name: "users", key: ["id"] });
+    const extension = zeroPublication({ schema: schema({ users }) });
+
+    await expect(introspect(extension, [])).resolves.toBeUndefined();
+  });
+
+  it("introspects existing publication tables and columns deterministically", async () => {
+    const users = table(model, { name: "users", key: ["id"] });
+    const extension = zeroPublication({ schema: schema({ users }) });
+
+    await expect(
+      introspect(extension, [
+        {
+          publication_name: "zero_data",
+          puballtables: false,
+          publication_schemas: [],
+          table_schema: "public",
+          table_name: "users",
+          columns: ["secret", "id", "name"],
+        },
+        {
+          publication_name: "zero_data",
+          puballtables: false,
+          publication_schemas: [],
+          table_schema: "public",
+          table_name: "accounts",
+          columns: ["name", "id"],
+        },
+      ]),
+    ).resolves.toEqual({
+      name: "zero_data",
+      tables: [
+        {
+          schema: "public",
+          name: "accounts",
+          columns: ["id", "name"],
+        },
+        {
+          schema: "public",
+          name: "users",
+          columns: ["id", "name", "secret"],
+        },
+      ],
+    });
+  });
+
+  it("does not emit statements when push introspection matches desired publication", async () => {
+    const users = table(model, { name: "users", key: ["id"] });
+    const extension = zeroPublication({ schema: schema({ users }) });
+    const snapshot = await introspect(extension, [
+      {
+        publication_name: "zero_data",
+        puballtables: false,
+        publication_schemas: [],
+        table_schema: "public",
+        table_name: "users",
+        columns: ["id", "name", "secret"],
+      },
+    ]);
+
+    const result = generate(extension, { [publicationKey]: snapshot! });
+
+    expect(result.statements).toEqual([]);
+  });
+
+  it("creates a publication when push introspection finds no publication", async () => {
+    const users = table(model, { name: "users", key: ["id"] });
+    const extension = zeroPublication({ schema: schema({ users }) });
+    const snapshot = await introspect(extension, []);
+
+    const result = generate(
+      extension,
+      snapshot === undefined ? {} : { [publicationKey]: snapshot },
+    );
+
+    expect(result.statements.map((statement) => statement.sql)).toEqual([
+      'CREATE PUBLICATION "zero_data" FOR TABLE\n  "public"."users" ("id", "name", "secret");',
+    ]);
+  });
+
+  it("rejects malformed publication introspection rows", async () => {
+    const users = table(model, { name: "users", key: ["id"] });
+    const extension = zeroPublication({ schema: schema({ users }) });
+
+    await expect(
+      introspect(extension, [
+        {
+          publication_name: "zero_data",
+          puballtables: false,
+          publication_schemas: [],
+          table_schema: "public",
+          table_name: "users",
+          columns: null,
+        },
+      ]),
+    ).rejects.toThrow("effect-zero: invalid publication introspection row for zero_data");
+  });
+
+  it("rejects all-tables and schema-level publication modes during push introspection", async () => {
+    const users = table(model, { name: "users", key: ["id"] });
+    const extension = zeroPublication({ schema: schema({ users }) });
+
+    await expect(
+      introspect(extension, [
+        {
+          publication_name: "zero_data",
+          puballtables: true,
+          publication_schemas: [],
+          table_schema: null,
+          table_name: null,
+          columns: [],
+        },
+      ]),
+    ).rejects.toThrow(
+      "effect-zero: publication zero_data uses FOR ALL TABLES, which zeroPublication push cannot diff",
+    );
+
+    await expect(
+      introspect(extension, [
+        {
+          publication_name: "zero_data",
+          puballtables: false,
+          publication_schemas: ["public"],
+          table_schema: null,
+          table_name: null,
+          columns: [],
+        },
+      ]),
+    ).rejects.toThrow(
+      "effect-zero: publication zero_data uses schema-level publication entries (public), which zeroPublication push cannot diff",
     );
   });
 });

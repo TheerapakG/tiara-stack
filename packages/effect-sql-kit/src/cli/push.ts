@@ -12,7 +12,12 @@ import { diffSqlite } from "../diff/sqlite";
 import type { MigrationStatement } from "../diff/types";
 import { introspectPg } from "../introspect/pg";
 import { introspectSqlite } from "../introspect/sqlite";
+import {
+  introspectMigrationExtensionsEffect,
+  runMigrationExtensionsEffect,
+} from "../migration/extensions";
 import { snapshotSchema } from "../snapshot";
+import type { EffectSqlSchema } from "../types";
 import { loadConfig, loadConfigEffect, loadSchemaEffect } from "./config";
 import { configFlags, configInputToOverrides, optionalValue, tryPromise } from "./options";
 
@@ -40,9 +45,9 @@ const applyStatements = (statements: readonly MigrationStatement[]) =>
     }
   });
 
-const runWithClient = async (
+const runWithClient = async <A>(
   config: Awaited<ReturnType<typeof loadConfig>>["config"],
-  effect: Effect.Effect<unknown, unknown, SqlClient.SqlClient>,
+  effect: Effect.Effect<A, unknown, SqlClient.SqlClient>,
 ) => {
   const url = config.dbCredentials?.url;
   if (!url) {
@@ -70,10 +75,41 @@ const runWithClient = async (
   );
 };
 
-export const runWithClientEffect = (
+export const runWithClientEffect = <A>(
   config: Awaited<ReturnType<typeof loadConfig>>["config"],
-  effect: Effect.Effect<unknown, unknown, SqlClient.SqlClient>,
+  effect: Effect.Effect<A, unknown, SqlClient.SqlClient>,
 ) => tryPromise(() => runWithClient(config, effect));
+
+export const buildPushStatementsEffect = ({
+  config,
+  schema,
+  live,
+  desired,
+}: {
+  readonly config: Awaited<ReturnType<typeof loadConfig>>["config"];
+  readonly schema: EffectSqlSchema;
+  readonly live: ReturnType<typeof snapshotSchema>;
+  readonly desired: ReturnType<typeof snapshotSchema>;
+}) =>
+  Effect.gen(function* () {
+    const diff =
+      config.dialect === "postgresql" ? diffPg(live, desired) : diffSqlite(live, desired);
+    const previousExtensions = yield* introspectMigrationExtensionsEffect({
+      config,
+      schema,
+      previous: live,
+      current: desired,
+    });
+    const extensionResults = yield* runMigrationExtensionsEffect({
+      config,
+      schema,
+      previous: live,
+      current: desired,
+      previousExtensions,
+    });
+    const extensionStatements = extensionResults.flatMap((result) => result.statements);
+    return [...diff.statements, ...extensionStatements] as readonly MigrationStatement[];
+  });
 
 export const pushCommand = Command.make(
   "push",
@@ -90,23 +126,38 @@ export const pushCommand = Command.make(
         configInputToOverrides(options),
       );
       const sqlSchema = yield* loadSchemaEffect(optionalValue(options.schema), config);
-      const desired = snapshotSchema(sqlSchema);
+      const schemaWithPrefix = {
+        ...sqlSchema,
+        tablePrefix: config.tablePrefix || sqlSchema.tablePrefix,
+      };
+      const desired = snapshotSchema(schemaWithPrefix);
       const excludedTables = [config.migrations.table];
-      const live = (yield* runWithClientEffect(
+      const live = yield* runWithClientEffect(
         config,
-        config.dialect === "postgresql"
+        (config.dialect === "postgresql"
           ? introspectPg(config.migrations.schema, { excludedTables })
-          : introspectSqlite({ excludedTables }),
-      )) as typeof desired;
-      const diff =
-        config.dialect === "postgresql" ? diffPg(live, desired) : diffSqlite(live, desired);
-      const unsupported = diff.statements.filter((statement) => statement.unsupported);
+          : introspectSqlite({ excludedTables })) as Effect.Effect<
+          typeof desired,
+          unknown,
+          SqlClient.SqlClient
+        >,
+      );
+      const allStatements = yield* runWithClientEffect(
+        config,
+        buildPushStatementsEffect({
+          config,
+          schema: schemaWithPrefix,
+          live,
+          desired,
+        }),
+      );
+      const unsupported = allStatements.filter((statement) => statement.unsupported);
       if (unsupported.length > 0) {
         return yield* Effect.fail(
           new Error(unsupported.map((statement) => statement.reason).join("\n")),
         );
       }
-      const statements = diff.statements.filter((statement) => statement.sql.trim().length > 0);
+      const statements = allStatements.filter((statement) => statement.sql.trim().length > 0);
       if (statements.length === 0) {
         yield* Console.log("effect-sql-kit: no changes detected");
         return;
