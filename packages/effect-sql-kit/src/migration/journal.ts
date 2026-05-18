@@ -2,9 +2,10 @@ import { NodeServices } from "@effect/platform-node";
 import { randomUUID } from "node:crypto";
 import { Effect, FileSystem, Path, Result, Schema } from "effect";
 import type { SchemaSnapshot, StoredSnapshot } from "../snapshot";
+import type { JsonValue } from "../types";
 import { snapshotVersion } from "../snapshot";
 import { slugify } from "../util";
-import { DialectSchema } from "../cli/schema";
+import { DialectSchema, JsonValueSchema } from "../cli/schema";
 
 export type JournalEntry = {
   readonly idx: number;
@@ -41,6 +42,7 @@ const StoredSnapshotSchema = Schema.Struct({
   prevId: Schema.String,
   schema: Schema.Unknown,
   drizzle: Schema.optionalKey(Schema.Unknown),
+  extensions: Schema.optionalKey(Schema.Record(Schema.String, JsonValueSchema)),
 });
 
 const parseJsonEffect = (content: string) =>
@@ -160,6 +162,7 @@ export const writeMigrationRecordEffect = ({
   breakpoints,
   prevSnapshotId,
   drizzle,
+  extensions,
 }: {
   readonly out: string;
   readonly journal: Journal;
@@ -170,6 +173,7 @@ export const writeMigrationRecordEffect = ({
   readonly breakpoints: boolean;
   readonly prevSnapshotId?: string;
   readonly drizzle?: unknown;
+  readonly extensions?: Readonly<Record<string, JsonValue>>;
 }) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -184,6 +188,7 @@ export const writeMigrationRecordEffect = ({
       prevId,
       schema: snapshot,
       drizzle,
+      extensions,
     };
     const nextJournal: Journal = {
       ...journal,
@@ -218,6 +223,7 @@ export const writeMigrationRecord = (options: {
   readonly breakpoints: boolean;
   readonly prevSnapshotId?: string;
   readonly drizzle?: unknown;
+  readonly extensions?: Readonly<Record<string, JsonValue>>;
 }): Promise<void> =>
   Effect.runPromise(writeMigrationRecordEffect(options).pipe(Effect.provide(NodeServices.layer)));
 

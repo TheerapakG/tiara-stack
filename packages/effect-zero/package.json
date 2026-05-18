@@ -31,6 +31,7 @@
     "@effect/platform-node": "catalog:",
     "@rocicorp/zero": "^0.25.9",
     "camelcase": "^9.0.0",
+    "effect-sql-kit": "workspace:*",
     "effect-sql-schema": "workspace:*",
     "jsonc-parser": "^3.3.1",
     "ts-morph": "^27.0.2",

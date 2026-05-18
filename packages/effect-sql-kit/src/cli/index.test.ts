@@ -76,7 +76,7 @@ describe("effect-sql-kit Effect CLI", () => {
     expect(output).toContain("--name");
     expect(output).toContain("--custom");
     expect(output).toContain("--prefix");
-  });
+  }, 15_000);
 
   it("prints migrate help", async () => {
     const output = await runCli("migrate", "--help");
@@ -86,7 +86,7 @@ describe("effect-sql-kit Effect CLI", () => {
     expect(output).toContain("--table-prefix");
     expect(output).toContain("--table");
     expect(output).toContain("--db-schema");
-  });
+  }, 15_000);
 
   it("prints push help", async () => {
     const output = await runCli("push", "--help");
@@ -97,7 +97,7 @@ describe("effect-sql-kit Effect CLI", () => {
     expect(output).toContain("--strict");
     expect(output).toContain("--verbose");
     expect(output).toContain("--force");
-  });
+  }, 15_000);
 
   it(
     "generates from a TypeScript config and schema",

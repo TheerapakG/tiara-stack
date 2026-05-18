@@ -2,6 +2,14 @@ import type { EffectSqlColumn, EffectSqlSchema, EffectSqlTable } from "./types";
 
 export const snapshotVersion = 1;
 
+export type JsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | readonly JsonValue[]
+  | { readonly [key: string]: JsonValue };
+
 export type ColumnSnapshot = {
   readonly fieldName: string;
   readonly name: string;
@@ -47,6 +55,7 @@ export type StoredSnapshot = {
   readonly prevId: string;
   readonly schema: SchemaSnapshot;
   readonly drizzle?: unknown;
+  readonly extensions?: Readonly<Record<string, JsonValue>>;
 };
 
 const columnName = (column: EffectSqlColumn): string =>

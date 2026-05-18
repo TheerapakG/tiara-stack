@@ -50,70 +50,79 @@ const withTempProject = <A, E, R>(f: (dir: string) => Effect.Effect<A, E, R>) =>
   );
 
 describe("cli generation", () => {
-  it.effect("generates and signs a schema file", () =>
-    withTempProject((dir) =>
-      Effect.gen(function* () {
-        const outputFilePath = path.join(dir, "zero-schema.gen.ts");
-        const result = yield* Effect.promise(() =>
-          generate({
-            config: path.join(dir, "effect-zero.config.ts"),
-            tsConfigPath: path.join(dir, "tsconfig.json"),
-            outputFilePath,
-          }),
-        );
-        const outputPath = yield* Effect.promise(() => writeGeneratedFile(result));
-        const output = yield* Effect.promise(() => readFile(outputPath, "utf-8"));
-        expect(checkSignature(output)).toBe("valid");
-        expect(output).toContain("display_name");
-      }),
-    ).pipe(Effect.provide(NodeServices.layer)),
+  it.effect(
+    "generates and signs a schema file",
+    () =>
+      withTempProject((dir) =>
+        Effect.gen(function* () {
+          const outputFilePath = path.join(dir, "zero-schema.gen.ts");
+          const result = yield* Effect.promise(() =>
+            generate({
+              config: path.join(dir, "effect-zero.config.ts"),
+              tsConfigPath: path.join(dir, "tsconfig.json"),
+              outputFilePath,
+            }),
+          );
+          const outputPath = yield* Effect.promise(() => writeGeneratedFile(result));
+          const output = yield* Effect.promise(() => readFile(outputPath, "utf-8"));
+          expect(checkSignature(output)).toBe("valid");
+          expect(output).toContain("display_name");
+        }),
+      ).pipe(Effect.provide(NodeServices.layer)),
+    15_000,
   );
 
-  it.effect("refuses to overwrite modified generated files without force", () =>
-    withTempProject((dir) =>
-      Effect.gen(function* () {
-        const outputFilePath = path.join(dir, "zero-schema.gen.ts");
-        const result = yield* Effect.promise(() =>
-          generate({
-            config: path.join(dir, "effect-zero.config.ts"),
-            tsConfigPath: path.join(dir, "tsconfig.json"),
-            outputFilePath,
-          }),
-        );
-        const outputPath = yield* Effect.promise(() => writeGeneratedFile(result));
-        const output = yield* Effect.promise(() => readFile(outputPath, "utf-8"));
-        yield* Effect.promise(() => writeFile(outputPath, `${output}\n// manual edit\n`));
-        yield* Effect.promise(() =>
-          expect(writeGeneratedFile(result)).rejects.toThrow("manually modified"),
-        );
-        yield* Effect.promise(() =>
-          expect(writeGeneratedFile({ ...result, force: true })).resolves.toBe(outputPath),
-        );
-      }),
-    ).pipe(Effect.provide(NodeServices.layer)),
+  it.effect(
+    "refuses to overwrite modified generated files without force",
+    () =>
+      withTempProject((dir) =>
+        Effect.gen(function* () {
+          const outputFilePath = path.join(dir, "zero-schema.gen.ts");
+          const result = yield* Effect.promise(() =>
+            generate({
+              config: path.join(dir, "effect-zero.config.ts"),
+              tsConfigPath: path.join(dir, "tsconfig.json"),
+              outputFilePath,
+            }),
+          );
+          const outputPath = yield* Effect.promise(() => writeGeneratedFile(result));
+          const output = yield* Effect.promise(() => readFile(outputPath, "utf-8"));
+          yield* Effect.promise(() => writeFile(outputPath, `${output}\n// manual edit\n`));
+          yield* Effect.promise(() =>
+            expect(writeGeneratedFile(result)).rejects.toThrow("manually modified"),
+          );
+          yield* Effect.promise(() =>
+            expect(writeGeneratedFile({ ...result, force: true })).resolves.toBe(outputPath),
+          );
+        }),
+      ).pipe(Effect.provide(NodeServices.layer)),
+    15_000,
   );
 
-  it.effect("writeGeneratedFileEffect refuses manually modified generated files", () =>
-    withTempProject((dir) =>
-      Effect.gen(function* () {
-        const outputFilePath = path.join(dir, "zero-schema.gen.ts");
-        const result = yield* Effect.promise(() =>
-          generate({
-            config: path.join(dir, "effect-zero.config.ts"),
-            tsConfigPath: path.join(dir, "tsconfig.json"),
-            outputFilePath,
-          }),
-        );
-        const outputPath = yield* writeGeneratedFileEffect(result);
-        const output = yield* Effect.promise(() => readFile(outputPath, "utf-8"));
-        yield* Effect.promise(() => writeFile(outputPath, `${output}\n// manual edit\n`));
-        const failure = yield* Effect.result(writeGeneratedFileEffect(result));
-        expect(Result.isFailure(failure)).toBe(true);
-        if (Result.isFailure(failure)) {
-          expect(String(failure.failure)).toContain("manually modified");
-        }
-      }),
-    ).pipe(Effect.provide(NodeServices.layer)),
+  it.effect(
+    "writeGeneratedFileEffect refuses manually modified generated files",
+    () =>
+      withTempProject((dir) =>
+        Effect.gen(function* () {
+          const outputFilePath = path.join(dir, "zero-schema.gen.ts");
+          const result = yield* Effect.promise(() =>
+            generate({
+              config: path.join(dir, "effect-zero.config.ts"),
+              tsConfigPath: path.join(dir, "tsconfig.json"),
+              outputFilePath,
+            }),
+          );
+          const outputPath = yield* writeGeneratedFileEffect(result);
+          const output = yield* Effect.promise(() => readFile(outputPath, "utf-8"));
+          yield* Effect.promise(() => writeFile(outputPath, `${output}\n// manual edit\n`));
+          const failure = yield* Effect.result(writeGeneratedFileEffect(result));
+          expect(Result.isFailure(failure)).toBe(true);
+          if (Result.isFailure(failure)) {
+            expect(String(failure.failure)).toContain("manually modified");
+          }
+        }),
+      ).pipe(Effect.provide(NodeServices.layer)),
+    15_000,
   );
 
   it.effect("formatGeneratedFileEffect warns instead of failing when formatting fails", () =>

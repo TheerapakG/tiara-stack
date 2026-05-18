@@ -4,7 +4,12 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Effect, FileSystem, Path, Result } from "effect";
-import { nextMigrationName, readJournalEffect, readLatestSnapshotEffect } from "./journal";
+import {
+  nextMigrationName,
+  readJournalEffect,
+  readLatestSnapshotEffect,
+  writeMigrationRecordEffect,
+} from "./journal";
 
 const withJournal = <A, E, R>(content: string, f: (out: string) => Effect.Effect<A, E, R>) =>
   Effect.acquireUseRelease(
@@ -111,6 +116,43 @@ describe("migration journal effects", () => {
           const journal = yield* readJournalEffect(out, "sqlite");
           const snapshot = yield* readLatestSnapshotEffect(out, journal);
           expect(snapshot?.id).toBe("snapshot-id");
+        }),
+    ).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("persists extension snapshots", () =>
+    withJournal(
+      JSON.stringify({
+        version: 1,
+        dialect: "sqlite",
+        entries: [],
+      }),
+      (out) =>
+        Effect.gen(function* () {
+          const journal = yield* readJournalEffect(out, "sqlite");
+          yield* writeMigrationRecordEffect({
+            out,
+            journal,
+            snapshot: {
+              version: 1,
+              dialect: "sqlite",
+              tables: {},
+            },
+            tag: "0001_initial",
+            prefix: "0001",
+            idx: 1,
+            breakpoints: true,
+            extensions: {
+              test: { value: "stored" },
+            },
+          });
+
+          const nextJournal = yield* readJournalEffect(out, "sqlite");
+          const snapshot = yield* readLatestSnapshotEffect(out, nextJournal);
+
+          expect(snapshot?.extensions).toEqual({
+            test: { value: "stored" },
+          });
         }),
     ).pipe(Effect.provide(NodeServices.layer)),
   );

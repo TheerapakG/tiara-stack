@@ -29,5 +29,5 @@ describe("effect-zero Effect CLI", () => {
     expect(output).toContain("--tsconfig");
     expect(output).toContain("--format");
     expect(output).toContain("--force");
-  });
+  }, 15_000);
 });

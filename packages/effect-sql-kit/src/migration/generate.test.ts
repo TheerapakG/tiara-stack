@@ -33,6 +33,7 @@ describe("generateMigration", () => {
         tablePrefix: "",
         migrations: { table: "effect_sql_migrations", schema: "public" },
         breakpoints: true,
+        extensions: [],
       },
       schema: schema({ users: User }),
       name: "initial",
@@ -60,6 +61,7 @@ describe("generateMigration", () => {
       tablePrefix: "",
       migrations: { table: "effect_sql_migrations", schema: "public" },
       breakpoints: true,
+      extensions: [],
     };
     await generateMigration({ config, schema: schema({ users }), name: "initial" });
     const result = await generateMigration({ config, schema: schema({ users }), name: "again" });
@@ -84,6 +86,7 @@ describe("generateMigration", () => {
         tablePrefix: "app",
         migrations: { table: "app_effect_sql_migrations", schema: "public" },
         breakpoints: true,
+        extensions: [],
       },
       schema: schema({ users }),
       name: "initial",
@@ -91,5 +94,146 @@ describe("generateMigration", () => {
 
     const migration = await readFile(join(out, `${result.tag}.ts`), "utf8");
     expect(migration).toContain('create table "app_users"');
+  });
+
+  it("writes migrations when only extension statements changed", async () => {
+    const out = await temp();
+    const users = pg.table(
+      { fields: { id: Schema.String } },
+      {
+        name: "users",
+        columns: { id: pg.uuid().primaryKey() },
+      },
+    );
+    const config = {
+      dialect: "postgresql" as const,
+      out,
+      tablePrefix: "",
+      migrations: { table: "effect_sql_migrations", schema: "public" },
+      breakpoints: true,
+      extensions: [
+        {
+          _tag: "EffectSqlKitMigrationExtension" as const,
+          name: "test-extension",
+          generate: ({
+            previousExtensions,
+          }: {
+            previousExtensions: Readonly<Record<string, unknown>>;
+          }) => ({
+            statements:
+              previousExtensions["test-extension"] === "done"
+                ? []
+                : [{ sql: 'select "extension-only";' }],
+            snapshot: "done",
+          }),
+        },
+      ],
+    };
+
+    await generateMigration({ config, schema: schema({ users }), name: "initial" });
+    const result = await generateMigration({
+      config,
+      schema: schema({ users }),
+      name: "extension",
+    });
+
+    expect(result.written).toBe(false);
+    const extensionConfig = {
+      ...config,
+      extensions: [
+        {
+          _tag: "EffectSqlKitMigrationExtension" as const,
+          name: "test-extension",
+          generate: () => ({
+            statements: [{ sql: 'select "extension-only";' }],
+            snapshot: "changed",
+          }),
+        },
+      ],
+    };
+    const extensionResult = await generateMigration({
+      config: extensionConfig,
+      schema: schema({ users }),
+      name: "extension",
+    });
+
+    expect(extensionResult.written).toBe(true);
+    expect(extensionResult.statements.map((statement) => statement.sql)).toContain(
+      'select "extension-only";',
+    );
+  });
+
+  it("fails duplicate extension names before invoking extensions", async () => {
+    const out = await temp();
+    const users = pg.table(
+      { fields: { id: Schema.String } },
+      {
+        name: "users",
+        columns: { id: pg.uuid().primaryKey() },
+      },
+    );
+    let called = false;
+    const extension = {
+      _tag: "EffectSqlKitMigrationExtension" as const,
+      name: "duplicate-extension",
+      generate: () => {
+        called = true;
+        return {
+          statements: [{ sql: 'select "extension";' }],
+          snapshot: null,
+        };
+      },
+    };
+
+    await expect(
+      generateMigration({
+        config: {
+          dialect: "postgresql",
+          out,
+          tablePrefix: "",
+          migrations: { table: "effect_sql_migrations", schema: "public" },
+          breakpoints: true,
+          extensions: [extension, extension],
+        },
+        schema: schema({ users }),
+        name: "duplicate",
+      }),
+    ).rejects.toThrow("duplicate migration extension name(s): duplicate-extension");
+    expect(called).toBe(false);
+  });
+
+  it("fails invalid extension results before consuming statements", async () => {
+    const out = await temp();
+    const users = pg.table(
+      { fields: { id: Schema.String } },
+      {
+        name: "users",
+        columns: { id: pg.uuid().primaryKey() },
+      },
+    );
+
+    await expect(
+      generateMigration({
+        config: {
+          dialect: "postgresql",
+          out,
+          tablePrefix: "",
+          migrations: { table: "effect_sql_migrations", schema: "public" },
+          breakpoints: true,
+          extensions: [
+            {
+              _tag: "EffectSqlKitMigrationExtension",
+              name: "invalid-extension",
+              generate: () => ({
+                statements: [{ sql: 123 as never }],
+                snapshot: null,
+              }),
+            },
+          ],
+        },
+        schema: schema({ users }),
+        name: "invalid",
+      }),
+    ).rejects.toThrow("invalid migration extension result from invalid-extension");
   });
 });

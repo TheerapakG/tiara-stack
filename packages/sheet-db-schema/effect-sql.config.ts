@@ -1,6 +1,8 @@
 import { Effect, Schema } from "effect";
 import "dotenv/config";
 import { defineConfig } from "effect-sql-kit";
+import { zeroPublication } from "effect-zero";
+import zeroSchema from "./effect-zero.config";
 
 const env = Schema.decodeUnknownSync(
   Schema.Struct({
@@ -21,4 +23,10 @@ export default defineConfig({
   migrations: {
     schema: "public",
   },
+  extensions: [
+    zeroPublication({
+      name: "zero_data",
+      schema: zeroSchema,
+    }),
+  ],
 });

@@ -37,6 +37,53 @@ describe("CLI config effects", () => {
         const loaded = yield* loadConfigEffect(configPath, { out: "./new" });
         expect(loaded.config.out).toBe("./new");
         expect(loaded.config.dialect).toBe("sqlite");
+        expect(loaded.config.extensions).toEqual([]);
+      }),
+    ).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("preserves configured migration extensions", () =>
+    withTempDir((dir) =>
+      Effect.gen(function* () {
+        yield* linkNodeModules(dir);
+        const configPath = join(dir, "effect-sql.config.ts");
+        yield* Effect.promise(() =>
+          writeFile(
+            configPath,
+            `const extension = {
+  _tag: "EffectSqlKitMigrationExtension",
+  name: "test-extension",
+  generate: () => ({ statements: [], snapshot: null }),
+};
+
+export default { dialect: "sqlite", extensions: [extension] };
+`,
+          ),
+        );
+
+        const loaded = yield* loadConfigEffect(configPath);
+
+        expect(loaded.config.extensions).toHaveLength(1);
+        expect(loaded.config.extensions[0]?.name).toBe("test-extension");
+      }),
+    ).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("rejects malformed migration extensions", () =>
+    withTempDir((dir) =>
+      Effect.gen(function* () {
+        const configPath = join(dir, "effect-sql.config.ts");
+        yield* Effect.promise(() =>
+          writeFile(
+            configPath,
+            `export default { dialect: "sqlite", extensions: [{ name: "missing-generate" }] };
+`,
+          ),
+        );
+
+        const result = yield* Effect.result(loadConfigEffect(configPath));
+
+        expect(Result.isFailure(result)).toBe(true);
       }),
     ).pipe(Effect.provide(NodeServices.layer)),
   );
@@ -152,6 +199,7 @@ export default schema({ users: User });
             schema: "public",
           },
           breakpoints: true,
+          extensions: [],
         });
         expect(loaded.tables.users?._tag).toBe("EffectSqlTable");
       }),
@@ -189,6 +237,7 @@ export const schema = makeSchema({ users: User });
             schema: "public",
           },
           breakpoints: true,
+          extensions: [],
         });
         expect(loaded.tables.users?._tag).toBe("EffectSqlTable");
       }),
@@ -211,6 +260,7 @@ export const schema = makeSchema({ users: User });
               schema: "public",
             },
             breakpoints: true,
+            extensions: [],
           }),
         );
 
@@ -250,6 +300,7 @@ export default schema({ users: User });
             schema: "public",
           },
           breakpoints: true,
+          extensions: [],
         });
 
         expect(loaded.tablePrefix).toBe("app");

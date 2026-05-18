@@ -281,6 +281,9 @@ importers:
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.56
+      effect-sql-kit:
+        specifier: workspace:*
+        version: link:../effect-sql-kit
       effect-sql-schema:
         specifier: workspace:*
         version: link:../effect-sql-schema

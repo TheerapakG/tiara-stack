@@ -96,7 +96,9 @@ export const loadConfigEffect = (
 
     const imported = yield* importFileEffect(resolvedPath);
     const rawConfig = resolveConfigExport(imported);
-    const config = yield* Schema.decodeUnknownEffect(EffectSqlKitConfigSchema)(rawConfig);
+    const config = (yield* Schema.decodeUnknownEffect(EffectSqlKitConfigSchema)(
+      rawConfig,
+    )) as EffectSqlKitConfig;
     return {
       config: yield* resolveConfigEffect(config, overrides),
       configPath: resolvedPath,

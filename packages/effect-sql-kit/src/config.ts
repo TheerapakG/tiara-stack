@@ -62,8 +62,10 @@ export const resolveConfigEffect = (
         schema: merged.migrations?.schema ?? "public",
       },
       breakpoints: merged.breakpoints ?? true,
+      extensions: merged.extensions ?? [],
     };
-    return yield* Schema.decodeUnknownEffect(ResolvedConfigSchema)(resolved);
+    const decoded = yield* Schema.decodeUnknownEffect(ResolvedConfigSchema)(resolved);
+    return decoded as ResolvedConfig;
   });
 
 export const resolveConfig = (
@@ -83,7 +85,7 @@ export const resolveConfig = (
     },
   };
   const tablePrefix = merged.tablePrefix ?? "";
-  return Schema.decodeUnknownSync(ResolvedConfigSchema)({
+  const decoded = Schema.decodeUnknownSync(ResolvedConfigSchema)({
     dialect: merged.dialect,
     schema: merged.schema,
     out: merged.out ?? "./migrations",
@@ -94,5 +96,7 @@ export const resolveConfig = (
       schema: merged.migrations?.schema ?? "public",
     },
     breakpoints: merged.breakpoints ?? true,
+    extensions: merged.extensions ?? [],
   });
+  return decoded as ResolvedConfig;
 };

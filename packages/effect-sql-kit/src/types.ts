@@ -16,7 +16,17 @@ export type {
   TableOptions,
 } from "effect-sql-schema";
 
-import type { Dialect } from "effect-sql-schema";
+import type { Dialect, EffectSqlSchema } from "effect-sql-schema";
+import type { MigrationStatement } from "./diff/types";
+import type { SchemaSnapshot } from "./snapshot";
+
+export type JsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | readonly JsonValue[]
+  | { readonly [key: string]: JsonValue };
 
 export type MigrationConfig = {
   readonly table?: string;
@@ -33,6 +43,7 @@ export type EffectSqlKitConfig = {
   };
   readonly migrations?: MigrationConfig;
   readonly breakpoints?: boolean;
+  readonly extensions?: readonly MigrationExtension[];
 };
 
 export type ResolvedConfig = {
@@ -48,4 +59,26 @@ export type ResolvedConfig = {
     readonly schema: string;
   };
   readonly breakpoints: boolean;
+  readonly extensions: readonly MigrationExtension[];
+};
+
+export type MigrationExtensionContext = {
+  readonly config: ResolvedConfig;
+  readonly schema: EffectSqlSchema;
+  readonly previous: SchemaSnapshot;
+  readonly current: SchemaSnapshot;
+  readonly previousExtensions: Readonly<Record<string, JsonValue>>;
+};
+
+export type MigrationExtensionResult = {
+  readonly statements: readonly MigrationStatement[];
+  readonly snapshot: JsonValue;
+};
+
+export type MigrationExtension = {
+  readonly _tag: "EffectSqlKitMigrationExtension";
+  readonly name: string;
+  readonly generate: (
+    context: MigrationExtensionContext,
+  ) => MigrationExtensionResult | Promise<MigrationExtensionResult>;
 };
