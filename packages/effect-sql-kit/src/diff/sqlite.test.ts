@@ -415,4 +415,64 @@ describe("SQLite push diff", () => {
       `create unique index "tasks_title_idx" on "tasks" ("title")`,
     ]);
   });
+
+  it("creates prefixed indexes on prefixed tables", () => {
+    const next: SchemaSnapshot = {
+      version: 1,
+      dialect: "sqlite",
+      tables: {
+        users: {
+          name: "app_users",
+          columns: {
+            id: { fieldName: "id", name: "id", kind: "text", notNull: true, primaryKey: true },
+            email: {
+              fieldName: "email",
+              name: "email",
+              kind: "text",
+              notNull: true,
+              primaryKey: false,
+            },
+          },
+          primaryKey: ["id"],
+          indexes: [{ name: "app_users_email_idx", unique: false, fields: ["email"] }],
+        },
+      },
+    };
+
+    expect(
+      diffSqlite(emptySnapshot("sqlite"), next).statements.map((statement) => statement.sql),
+    ).toContain(`create index "app_users_email_idx" on "app_users" ("email")`);
+  });
+
+  it("matches live prefixed indexes during push diffs", () => {
+    const live: SchemaSnapshot = {
+      version: 1,
+      dialect: "sqlite",
+      tables: {
+        app_users: {
+          name: "app_users",
+          columns: {
+            id: { fieldName: "id", name: "id", kind: "text", notNull: true, primaryKey: true },
+            email: {
+              fieldName: "email",
+              name: "email",
+              kind: "text",
+              notNull: true,
+              primaryKey: false,
+            },
+          },
+          primaryKey: ["id"],
+          indexes: [{ name: "app_users_email_idx", unique: false, fields: ["email"] }],
+        },
+      },
+    };
+    const desired: SchemaSnapshot = {
+      ...live,
+      tables: {
+        users: live.tables.app_users!,
+      },
+    };
+
+    expect(diffSqlite(live, desired).statements).toEqual([]);
+  });
 });

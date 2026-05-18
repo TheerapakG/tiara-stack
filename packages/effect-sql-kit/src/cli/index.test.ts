@@ -76,6 +76,7 @@ describe("effect-sql-kit Effect CLI", () => {
     expect(output).toContain("--name");
     expect(output).toContain("--custom");
     expect(output).toContain("--prefix");
+    expect(output).toContain("--migration-prefix");
   }, 15_000);
 
   it("prints migrate help", async () => {
@@ -83,7 +84,7 @@ describe("effect-sql-kit Effect CLI", () => {
 
     expect(output).toContain("--out");
     expect(output).toContain("--url");
-    expect(output).toContain("--table-prefix");
+    expect(output).toContain("--prefix");
     expect(output).toContain("--table");
     expect(output).toContain("--db-schema");
   }, 15_000);
@@ -93,7 +94,7 @@ describe("effect-sql-kit Effect CLI", () => {
 
     expect(output).toContain("--schema");
     expect(output).toContain("--url");
-    expect(output).toContain("--table-prefix");
+    expect(output).toContain("--prefix");
     expect(output).toContain("--strict");
     expect(output).toContain("--verbose");
     expect(output).toContain("--force");
@@ -164,7 +165,7 @@ describe("effect-sql-kit Effect CLI", () => {
   );
 
   it(
-    "push is idempotent with table prefixes",
+    "push is idempotent with prefixes",
     async () =>
       withTempDir(async (dir) => {
         const schemaPath = join(dir, "schema.ts");
@@ -179,7 +180,7 @@ describe("effect-sql-kit Effect CLI", () => {
           schemaPath,
           "--url",
           dbPath,
-          "--table-prefix",
+          "--prefix",
           "app",
           "--force",
         );
@@ -191,7 +192,7 @@ describe("effect-sql-kit Effect CLI", () => {
           schemaPath,
           "--url",
           dbPath,
-          "--table-prefix",
+          "--prefix",
           "app",
           "--force",
         );

@@ -514,4 +514,66 @@ describe("Postgres push diff", () => {
       `create unique index "tasks_title_idx" on "new_schema"."tasks" ("title")`,
     ]);
   });
+
+  it("creates prefixed indexes on prefixed tables", () => {
+    const next: SchemaSnapshot = {
+      version: 1,
+      dialect: "postgresql",
+      tables: {
+        users: {
+          name: "app_users",
+          schema: "public",
+          columns: {
+            id: { fieldName: "id", name: "id", kind: "uuid", notNull: true, primaryKey: true },
+            email: {
+              fieldName: "email",
+              name: "email",
+              kind: "text",
+              notNull: true,
+              primaryKey: false,
+            },
+          },
+          primaryKey: ["id"],
+          indexes: [{ name: "app_users_email_idx", unique: false, fields: ["email"] }],
+        },
+      },
+    };
+
+    expect(
+      diffPg(emptySnapshot("postgresql"), next).statements.map((statement) => statement.sql),
+    ).toContain(`create index "app_users_email_idx" on "public"."app_users" ("email")`);
+  });
+
+  it("matches live prefixed indexes during push diffs", () => {
+    const live: SchemaSnapshot = {
+      version: 1,
+      dialect: "postgresql",
+      tables: {
+        app_users: {
+          name: "app_users",
+          schema: "public",
+          columns: {
+            id: { fieldName: "id", name: "id", kind: "uuid", notNull: true, primaryKey: true },
+            email: {
+              fieldName: "email",
+              name: "email",
+              kind: "text",
+              notNull: true,
+              primaryKey: false,
+            },
+          },
+          primaryKey: ["id"],
+          indexes: [{ name: "app_users_email_idx", unique: false, fields: ["email"] }],
+        },
+      },
+    };
+    const desired: SchemaSnapshot = {
+      ...live,
+      tables: {
+        users: live.tables.app_users!,
+      },
+    };
+
+    expect(diffPg(live, desired).statements).toEqual([]);
+  });
 });

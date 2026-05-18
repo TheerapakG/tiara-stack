@@ -128,7 +128,7 @@ export const pushCommand = Command.make(
       const sqlSchema = yield* loadSchemaEffect(optionalValue(options.schema), config);
       const schemaWithPrefix = {
         ...sqlSchema,
-        tablePrefix: config.tablePrefix || sqlSchema.tablePrefix,
+        prefix: config.prefix ?? sqlSchema.prefix,
       };
       const desired = snapshotSchema(schemaWithPrefix);
       const excludedTables = [config.migrations.table];

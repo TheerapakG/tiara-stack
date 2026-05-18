@@ -6,5 +6,5 @@ export const schema = <const Tables extends Record<string, EffectSqlTable>>(
 ): EffectSqlSchema<Tables> => ({
   _tag: "EffectSqlSchema",
   tables,
-  tablePrefix: options?.tablePrefix,
+  prefix: options?.prefix,
 });

@@ -12,7 +12,9 @@ export const generateCommand = Command.make(
     name: Flag.string("name").pipe(Flag.optional),
     custom: Flag.boolean("custom").pipe(Flag.withDefault(false)),
     breakpoints: Flag.boolean("breakpoints").pipe(Flag.optional),
-    prefix: Flag.choice("prefix", ["index", "timestamp"] as const).pipe(Flag.withDefault("index")),
+    migrationPrefix: Flag.choice("migration-prefix", ["index", "timestamp"] as const).pipe(
+      Flag.withDefault("index"),
+    ),
   },
   (options) =>
     Effect.gen(function* () {
@@ -31,7 +33,7 @@ export const generateCommand = Command.make(
         schema: sqlSchema,
         name: optionalValue(options.name),
         custom: options.custom,
-        prefix: options.prefix,
+        prefix: options.migrationPrefix,
       });
 
       yield* Console.log(

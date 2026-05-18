@@ -16,7 +16,7 @@ export default defineConfig({
   dialect: "postgresql",
   schema: "./src/schema.ts",
   out: "./effect-sql-migrations",
-  tablePrefix: "sheet_db",
+  prefix: "sheet_db",
   dbCredentials: {
     url: env.POSTGRES_URL ?? "",
   },

@@ -30,7 +30,7 @@ const normalizeOverrides = (
   };
 };
 
-const prefixedTableName = (prefix: string, tableName: string): string =>
+const prefixedIdentifierName = (prefix: string, tableName: string): string =>
   prefix ? `${prefix.replace(/_+$/, "")}_${tableName}` : tableName;
 
 export const resolveConfigEffect = (
@@ -50,15 +50,15 @@ export const resolveConfigEffect = (
         ...decodedOverrides.migrations,
       },
     };
-    const tablePrefix = merged.tablePrefix ?? "";
+    const prefix = merged.prefix ?? "";
     const resolved = {
       dialect: merged.dialect,
       schema: merged.schema,
       out: merged.out ?? "./migrations",
-      tablePrefix,
+      prefix,
       dbCredentials: merged.dbCredentials,
       migrations: {
-        table: merged.migrations?.table ?? prefixedTableName(tablePrefix, "effect_sql_migrations"),
+        table: merged.migrations?.table ?? prefixedIdentifierName(prefix, "effect_sql_migrations"),
         schema: merged.migrations?.schema ?? "public",
       },
       breakpoints: merged.breakpoints ?? true,
@@ -84,15 +84,15 @@ export const resolveConfig = (
       ...decodedOverrides.migrations,
     },
   };
-  const tablePrefix = merged.tablePrefix ?? "";
+  const prefix = merged.prefix ?? "";
   const decoded = Schema.decodeUnknownSync(ResolvedConfigSchema)({
     dialect: merged.dialect,
     schema: merged.schema,
     out: merged.out ?? "./migrations",
-    tablePrefix,
+    prefix,
     dbCredentials: merged.dbCredentials,
     migrations: {
-      table: merged.migrations?.table ?? prefixedTableName(tablePrefix, "effect_sql_migrations"),
+      table: merged.migrations?.table ?? prefixedIdentifierName(prefix, "effect_sql_migrations"),
       schema: merged.migrations?.schema ?? "public",
     },
     breakpoints: merged.breakpoints ?? true,

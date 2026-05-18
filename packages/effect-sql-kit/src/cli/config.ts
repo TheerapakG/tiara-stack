@@ -132,7 +132,7 @@ export const loadSchemaEffect = (
     }
     return {
       ...decoded,
-      tablePrefix: config.tablePrefix || decoded.tablePrefix,
+      prefix: config.prefix ?? decoded.prefix,
     };
   });
 

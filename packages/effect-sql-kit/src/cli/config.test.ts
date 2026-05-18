@@ -88,36 +88,36 @@ export default { dialect: "sqlite", extensions: [extension] };
     ).pipe(Effect.provide(NodeServices.layer)),
   );
 
-  it.effect("derives migration table from table prefix", () =>
+  it.effect("derives migration table from prefix", () =>
     withTempDir((dir) =>
       Effect.gen(function* () {
         const configPath = join(dir, "effect-sql.config.ts");
         yield* Effect.promise(() =>
-          writeFile(configPath, `export default { dialect: "sqlite", tablePrefix: "app" };\n`),
+          writeFile(configPath, `export default { dialect: "sqlite", prefix: "app" };\n`),
         );
 
         const loaded = yield* loadConfigEffect(configPath);
 
-        expect(loaded.config.tablePrefix).toBe("app");
+        expect(loaded.config.prefix).toBe("app");
         expect(loaded.config.migrations.table).toBe("app_effect_sql_migrations");
       }),
     ).pipe(Effect.provide(NodeServices.layer)),
   );
 
-  it.effect("keeps explicit migration table when table prefix is configured", () =>
+  it.effect("keeps explicit migration table when prefix is configured", () =>
     withTempDir((dir) =>
       Effect.gen(function* () {
         const configPath = join(dir, "effect-sql.config.ts");
         yield* Effect.promise(() =>
           writeFile(
             configPath,
-            `export default { dialect: "sqlite", tablePrefix: "app", migrations: { table: "custom_migrations" } };\n`,
+            `export default { dialect: "sqlite", prefix: "app", migrations: { table: "custom_migrations" } };\n`,
           ),
         );
 
         const loaded = yield* loadConfigEffect(configPath);
 
-        expect(loaded.config.tablePrefix).toBe("app");
+        expect(loaded.config.prefix).toBe("app");
         expect(loaded.config.migrations.table).toBe("custom_migrations");
       }),
     ).pipe(Effect.provide(NodeServices.layer)),
@@ -128,7 +128,7 @@ export default { dialect: "sqlite", extensions: [extension] };
       Effect.gen(function* () {
         const configPath = join(dir, "effect-sql.config.ts");
         yield* Effect.promise(() =>
-          writeFile(configPath, `export default { dialect: "sqlite", tablePrefix: "app_" };\n`),
+          writeFile(configPath, `export default { dialect: "sqlite", prefix: "app_" };\n`),
         );
 
         const loaded = yield* loadConfigEffect(configPath);
@@ -193,7 +193,7 @@ export default schema({ users: User });
         const loaded = yield* loadSchemaEffect(schemaPath, {
           dialect: "sqlite",
           out: "./migrations",
-          tablePrefix: "",
+          prefix: "",
           migrations: {
             table: "effect_sql_migrations",
             schema: "public",
@@ -231,7 +231,7 @@ export const schema = makeSchema({ users: User });
         const loaded = yield* loadSchemaEffect(schemaPath, {
           dialect: "sqlite",
           out: "./migrations",
-          tablePrefix: "",
+          prefix: "",
           migrations: {
             table: "effect_sql_migrations",
             schema: "public",
@@ -254,7 +254,7 @@ export const schema = makeSchema({ users: User });
           loadSchemaEffect(schemaPath, {
             dialect: "sqlite",
             out: "./migrations",
-            tablePrefix: "",
+            prefix: "",
             migrations: {
               table: "effect_sql_migrations",
               schema: "public",
@@ -269,7 +269,7 @@ export const schema = makeSchema({ users: User });
     ).pipe(Effect.provide(NodeServices.layer)),
   );
 
-  it.effect("applies resolved table prefix to loaded schemas", () =>
+  it.effect("applies resolved prefix to loaded schemas", () =>
     withTempDir((dir) =>
       Effect.gen(function* () {
         yield* linkNodeModules(dir);
@@ -294,7 +294,7 @@ export default schema({ users: User });
         const loaded = yield* loadSchemaEffect(schemaPath, {
           dialect: "sqlite",
           out: "./migrations",
-          tablePrefix: "app",
+          prefix: "app",
           migrations: {
             table: "app_effect_sql_migrations",
             schema: "public",
@@ -303,7 +303,7 @@ export default schema({ users: User });
           extensions: [],
         });
 
-        expect(loaded.tablePrefix).toBe("app");
+        expect(loaded.prefix).toBe("app");
       }),
     ).pipe(Effect.provide(NodeServices.layer)),
   );

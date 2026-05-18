@@ -41,13 +41,13 @@ const supportedPgArrayElementKinds = new Set([
   "text",
 ]);
 
-const prefixedTableName = (prefix: string | undefined, tableName: string): string =>
-  prefix ? `${prefix.replace(/_+$/, "")}_${tableName}` : tableName;
+const prefixedIdentifierName = (prefix: string | undefined, name: string): string =>
+  prefix ? `${prefix.replace(/_+$/, "")}_${name}` : name;
 
 const tableDisplayName = (
   table: { readonly sqlName?: string; readonly name: string },
   prefix?: string,
-): string => prefixedTableName(prefix, table.sqlName ?? table.name);
+): string => prefixedIdentifierName(prefix, table.sqlName ?? table.name);
 
 const requireDrizzleField = (
   drizzleTable: Record<string, unknown>,
@@ -115,7 +115,7 @@ export const lowerToDrizzleExports = async (
     ]);
     const exports: Record<string, unknown> = {};
     for (const [key, table] of Object.entries(schema.tables)) {
-      const tableName = tableDisplayName(table, schema.tablePrefix);
+      const tableName = tableDisplayName(table, schema.prefix);
       const columns: Record<string, PgFinalBuilder> = {};
       for (const [fieldName, column] of Object.entries(table.columns)) {
         const name = column.data.name ?? fieldName;
@@ -202,7 +202,9 @@ export const lowerToDrizzleExports = async (
           : []),
         ...table.indexes.map((index) =>
           (
-            (index.unique ? pg.uniqueIndex(index.name) : pg.index(index.name)) as unknown as {
+            (index.unique
+              ? pg.uniqueIndex(prefixedIdentifierName(schema.prefix, index.name))
+              : pg.index(prefixedIdentifierName(schema.prefix, index.name))) as unknown as {
               readonly on: (...columns: unknown[]) => unknown;
             }
           ).on(
@@ -220,7 +222,7 @@ export const lowerToDrizzleExports = async (
   ]);
   const exports: Record<string, unknown> = {};
   for (const [key, table] of Object.entries(schema.tables)) {
-    const tableName = tableDisplayName(table, schema.tablePrefix);
+    const tableName = tableDisplayName(table, schema.prefix);
     const columns: Record<string, unknown> = {};
     for (const [fieldName, column] of Object.entries(table.columns)) {
       const name = column.data.name ?? fieldName;
@@ -273,7 +275,9 @@ export const lowerToDrizzleExports = async (
         : []),
       ...table.indexes.map((index) =>
         (
-          (index.unique ? sqlite.uniqueIndex(index.name) : sqlite.index(index.name)) as unknown as {
+          (index.unique
+            ? sqlite.uniqueIndex(prefixedIdentifierName(schema.prefix, index.name))
+            : sqlite.index(prefixedIdentifierName(schema.prefix, index.name))) as unknown as {
             readonly on: (...columns: unknown[]) => unknown;
           }
         ).on(...requireDrizzleFields(drizzleTable, tableName, `index ${index.name}`, index.fields)),

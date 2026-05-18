@@ -30,7 +30,7 @@ describe("generateMigration", () => {
       config: {
         dialect: "sqlite",
         out,
-        tablePrefix: "",
+        prefix: "",
         migrations: { table: "effect_sql_migrations", schema: "public" },
         breakpoints: true,
         extensions: [],
@@ -58,7 +58,7 @@ describe("generateMigration", () => {
     const config = {
       dialect: "postgresql" as const,
       out,
-      tablePrefix: "",
+      prefix: "",
       migrations: { table: "effect_sql_migrations", schema: "public" },
       breakpoints: true,
       extensions: [],
@@ -69,13 +69,17 @@ describe("generateMigration", () => {
     expect(result.written).toBe(false);
   });
 
-  it("uses config table prefix for generated migration SQL", async () => {
+  it("uses config prefix for generated SQLite migration SQL", async () => {
     const out = await temp();
     const users = sqlite.table(
-      { fields: { id: Schema.String } },
+      { fields: { id: Schema.String, email: Schema.String } },
       {
         name: "users",
-        columns: { id: sqlite.text().primaryKey() },
+        columns: {
+          id: sqlite.text().primaryKey(),
+          email: sqlite.text().notNull(),
+        },
+        indexes: [sqlite.index("users_email_idx").on("email")],
       },
     );
 
@@ -83,7 +87,7 @@ describe("generateMigration", () => {
       config: {
         dialect: "sqlite",
         out,
-        tablePrefix: "app",
+        prefix: "app",
         migrations: { table: "app_effect_sql_migrations", schema: "public" },
         breakpoints: true,
         extensions: [],
@@ -94,6 +98,39 @@ describe("generateMigration", () => {
 
     const migration = await readFile(join(out, `${result.tag}.ts`), "utf8");
     expect(migration).toContain('create table "app_users"');
+    expect(migration).toContain('create index "app_users_email_idx"');
+  });
+
+  it("uses config prefix for generated Postgres migration SQL", async () => {
+    const out = await temp();
+    const users = pg.table(
+      { fields: { id: Schema.String, email: Schema.String } },
+      {
+        name: "users",
+        columns: {
+          id: pg.uuid().primaryKey(),
+          email: pg.text().notNull(),
+        },
+        indexes: [pg.index("users_email_idx").on("email")],
+      },
+    );
+
+    const result = await generateMigration({
+      config: {
+        dialect: "postgresql",
+        out,
+        prefix: "app",
+        migrations: { table: "app_effect_sql_migrations", schema: "public" },
+        breakpoints: true,
+        extensions: [],
+      },
+      schema: schema({ users }),
+      name: "initial",
+    });
+
+    const migration = await readFile(join(out, `${result.tag}.ts`), "utf8");
+    expect(migration).toContain('create table "app_users"');
+    expect(migration).toContain('create index "app_users_email_idx"');
   });
 
   it("writes migrations when only extension statements changed", async () => {
@@ -108,7 +145,7 @@ describe("generateMigration", () => {
     const config = {
       dialect: "postgresql" as const,
       out,
-      tablePrefix: "",
+      prefix: "",
       migrations: { table: "effect_sql_migrations", schema: "public" },
       breakpoints: true,
       extensions: [
@@ -190,7 +227,7 @@ describe("generateMigration", () => {
         config: {
           dialect: "postgresql",
           out,
-          tablePrefix: "",
+          prefix: "",
           migrations: { table: "effect_sql_migrations", schema: "public" },
           breakpoints: true,
           extensions: [extension, extension],
@@ -217,7 +254,7 @@ describe("generateMigration", () => {
         config: {
           dialect: "postgresql",
           out,
-          tablePrefix: "",
+          prefix: "",
           migrations: { table: "effect_sql_migrations", schema: "public" },
           breakpoints: true,
           extensions: [

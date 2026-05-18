@@ -80,6 +80,42 @@ describe("Drizzle lowering", () => {
     expect(table?.primaryKey).toEqual(["userId", "orgId"]);
   });
 
+  it("prefixes Postgres index names in lowered Drizzle snapshots", async () => {
+    const users = pg.table(
+      { fields: { id: Schema.String, email: Schema.String } },
+      {
+        name: "users",
+        columns: {
+          id: pg.uuid().primaryKey(),
+          email: pg.text().notNull(),
+        },
+        indexes: [pg.index("users_email_idx").on("email")],
+      },
+    );
+
+    const lowered = await lowerToDrizzleSnapshot(schema({ users }, { prefix: "app" }));
+
+    expect(JSON.stringify(lowered)).toContain("app_users_email_idx");
+  });
+
+  it("prefixes SQLite index names in lowered Drizzle snapshots", async () => {
+    const users = sqlite.table(
+      { fields: { id: Schema.String, email: Schema.String } },
+      {
+        name: "users",
+        columns: {
+          id: sqlite.text().primaryKey(),
+          email: sqlite.text().notNull(),
+        },
+        indexes: [sqlite.index("users_email_idx").on("email")],
+      },
+    );
+
+    const lowered = await lowerToDrizzleSnapshot(schema({ users }, { prefix: "app" }));
+
+    expect(JSON.stringify(lowered)).toContain("app_users_email_idx");
+  });
+
   it("rejects malformed Postgres array metadata", async () => {
     const users = pg.table(
       { fields: { id: Schema.String, tags: Schema.Array(Schema.String) } },

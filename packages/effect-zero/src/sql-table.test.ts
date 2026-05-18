@@ -129,7 +129,7 @@ describe("effect-sql-schema adapter", () => {
       },
     }) {}
 
-    expect(schema({ users: User }, { tablePrefix: "app" }).tables.users).toMatchObject({
+    expect(schema({ users: User }, { prefix: "app" }).tables.users).toMatchObject({
       name: "users",
       serverName: "app_users",
       key: ["id"],

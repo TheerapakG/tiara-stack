@@ -118,9 +118,46 @@ describe("effect-sql-schema", () => {
       },
     }) {}
 
-    const snapshot = snapshotSchema(schema({ users: User }, { tablePrefix: "app" }));
+    const snapshot = snapshotSchema(schema({ users: User }, { prefix: "app" }));
 
     expect(snapshot.tables.users?.name).toBe("app_users");
+  });
+
+  it("prefixes index names in schema snapshots", () => {
+    class User extends pg.Class<User>("User")({
+      table: "users",
+      fields: {
+        id: pg.uuid().primaryKey(),
+        email: pg.text().notNull(),
+        name: pg.text().notNull(),
+      },
+      indexes: [
+        pg.index("users_email_idx").on("email"),
+        pg.uniqueIndex("users_name_idx").on("name"),
+      ],
+    }) {}
+
+    const snapshot = snapshotSchema(schema({ users: User }, { prefix: "app_" }));
+
+    expect(snapshot.tables.users?.indexes).toEqual([
+      { name: "app_users_email_idx", unique: false, fields: ["email"] },
+      { name: "app_users_name_idx", unique: true, fields: ["name"] },
+    ]);
+  });
+
+  it("prefixes SQLite index names in schema snapshots", () => {
+    class User extends sqlite.Class<User>("User")({
+      table: "users",
+      fields: {
+        id: sqlite.text().primaryKey(),
+        email: sqlite.text().notNull(),
+      },
+      indexes: [sqlite.index("users_email_idx").on("email")],
+    }) {}
+
+    const snapshot = snapshotSchema(schema({ users: User }, { prefix: "app" }));
+
+    expect(snapshot.tables.users?.indexes[0]?.name).toBe("app_users_email_idx");
   });
 
   it("prefixes referenced table names in schema snapshots", () => {
@@ -142,7 +179,7 @@ describe("effect-sql-schema", () => {
       },
     }) {}
 
-    const snapshot = snapshotSchema(schema({ users: User, posts: Post }, { tablePrefix: "app" }));
+    const snapshot = snapshotSchema(schema({ users: User, posts: Post }, { prefix: "app" }));
 
     expect(snapshot.tables.posts?.columns.userId?.references?.table).toBe("app_users");
   });

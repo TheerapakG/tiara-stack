@@ -52,7 +52,7 @@ export const EffectSqlKitConfigSchema = Schema.Struct({
   dialect: DialectSchema,
   schema: Schema.optional(Schema.String),
   out: Schema.optional(Schema.String),
-  tablePrefix: Schema.optional(Schema.String),
+  prefix: Schema.optional(Schema.String),
   dbCredentials: Schema.optional(DbCredentialsSchema),
   migrations: Schema.optional(MigrationsConfigSchema),
   breakpoints: Schema.optional(Schema.Boolean),
@@ -63,7 +63,7 @@ export const EffectSqlKitConfigOverridesSchema = Schema.Struct({
   dialect: Schema.optional(DialectSchema),
   schema: Schema.optional(Schema.String),
   out: Schema.optional(Schema.String),
-  tablePrefix: Schema.optional(Schema.String),
+  prefix: Schema.optional(Schema.String),
   dbCredentials: Schema.optional(DbCredentialsSchema),
   migrations: Schema.optional(MigrationsConfigSchema),
   breakpoints: Schema.optional(Schema.Boolean),
@@ -74,7 +74,7 @@ export const ResolvedConfigSchema = Schema.Struct({
   dialect: DialectSchema,
   schema: Schema.optional(Schema.String),
   out: Schema.String,
-  tablePrefix: Schema.String,
+  prefix: Schema.String,
   dbCredentials: Schema.optional(DbCredentialsSchema),
   migrations: Schema.Struct({
     table: Schema.String,
@@ -87,5 +87,5 @@ export const ResolvedConfigSchema = Schema.Struct({
 export const EffectSqlSchemaExportSchema = Schema.Struct({
   _tag: Schema.Literal("EffectSqlSchema"),
   tables: Schema.Record(Schema.String, Schema.Unknown),
-  tablePrefix: Schema.optional(Schema.String),
+  prefix: Schema.optional(Schema.String),
 });

@@ -23,7 +23,7 @@ const model = {
 const config = (dialect: "postgresql" | "sqlite" = "postgresql"): ResolvedConfig => ({
   dialect,
   out: "./migrations",
-  tablePrefix: "",
+  prefix: "",
   migrations: {
     table: "effect_sql_migrations",
     schema: "public",

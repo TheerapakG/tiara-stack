@@ -24,6 +24,6 @@ export default schema(
     sheetApisDispatchJobs,
   },
   {
-    tablePrefix: "sheet_db",
+    prefix: "sheet_db",
   },
 );

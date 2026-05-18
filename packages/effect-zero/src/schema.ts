@@ -42,7 +42,7 @@ const zeroType = (kind: string): ZeroValueType => {
   }
 };
 
-const prefixedTableName = (prefix: string | undefined, tableName: string): string =>
+const prefixedIdentifierName = (prefix: string | undefined, tableName: string): string =>
   prefix ? `${prefix.replace(/_+$/, "")}_${tableName}` : tableName;
 
 export const isEffectSqlTable = (value: unknown): value is EffectSqlTable =>
@@ -91,19 +91,19 @@ export const fromSqlTable = <const Table extends EffectSqlTable>(
 
 const normalizeTables = <const Tables extends Record<string, SchemaTable>>(
   tables: Tables,
-  tablePrefix?: string,
+  prefix?: string,
 ): NormalizedTables<Tables> => {
   const normalized: Record<string, EffectZeroTable> = {};
   for (const [key, table] of Object.entries(tables)) {
     normalized[key] = isEffectSqlTable(table)
       ? fromSqlTable(table, {
           name: key,
-          serverName: prefixedTableName(tablePrefix, table.sqlName ?? table.name),
+          serverName: prefixedIdentifierName(prefix, table.sqlName ?? table.name),
         })
-      : tablePrefix
+      : prefix
         ? {
             ...table,
-            serverName: prefixedTableName(tablePrefix, table.serverName ?? table.name),
+            serverName: prefixedIdentifierName(prefix, table.serverName ?? table.name),
           }
         : table;
   }
@@ -114,14 +114,14 @@ export const schema = <const Tables extends Record<string, SchemaTable>>(
   tables: Tables,
   options?: {
     readonly relationships?: RelationshipConfig;
-    readonly tablePrefix?: string;
+    readonly prefix?: string;
     readonly enableLegacyQueries?: boolean;
     readonly enableLegacyMutators?: boolean;
   },
 ): EffectZeroSchema<NormalizedTables<Tables>> => ({
-  tables: normalizeTables(tables, options?.tablePrefix),
+  tables: normalizeTables(tables, options?.prefix),
   relationships: options?.relationships ?? {},
-  tablePrefix: options?.tablePrefix,
+  prefix: options?.prefix,
   enableLegacyQueries: options?.enableLegacyQueries,
   enableLegacyMutators: options?.enableLegacyMutators,
 });

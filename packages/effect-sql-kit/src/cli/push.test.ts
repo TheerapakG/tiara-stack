@@ -13,7 +13,7 @@ const sql = {} as SqlClient.SqlClient;
 const config = (extensions: ResolvedConfig["extensions"]): ResolvedConfig => ({
   dialect: "postgresql",
   out: "./migrations",
-  tablePrefix: "",
+  prefix: "",
   migrations: {
     table: "effect_sql_migrations",
     schema: "public",

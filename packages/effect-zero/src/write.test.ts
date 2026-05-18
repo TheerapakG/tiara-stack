@@ -92,7 +92,7 @@ describe("generated schema", () => {
           'import { pg } from "effect-sql-schema";',
           'import { schema } from "effect-zero";',
           'class User extends pg.Class<User>("User")({ table: "users", fields: { id: pg.uuid().primaryKey().defaultRandom(), name: pg.text().notNull() } }) {}',
-          'export default schema({ users: User }, { tablePrefix: "app" });',
+          'export default schema({ users: User }, { prefix: "app" });',
         ].join("\n"),
       );
 
@@ -110,7 +110,7 @@ describe("generated schema", () => {
           users: User,
         },
         {
-          tablePrefix: "app",
+          prefix: "app",
         },
       );
 
