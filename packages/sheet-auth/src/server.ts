@@ -1,4 +1,9 @@
-import { HttpServer, HttpServerRequest, HttpRouter } from "effect/unstable/http";
+import {
+  HttpServer,
+  HttpServerRequest,
+  HttpRouter,
+  HttpServerResponse,
+} from "effect/unstable/http";
 import {
   HttpApi,
   HttpApiBuilder,
@@ -203,6 +208,8 @@ const wellKnownLayer = HttpApiBuilder.group(
 
 const apiLayer = Layer.provide(HttpApiBuilder.layer(Api), [authLayer, wellKnownLayer]).pipe(
   Layer.merge(HttpApiSwagger.layer(Api)),
+  Layer.merge(HttpRouter.add("GET", "/live", HttpServerResponse.empty({ status: 200 }))),
+  Layer.merge(HttpRouter.add("GET", "/ready", HttpServerResponse.empty({ status: 200 }))),
 );
 
 const HttpLive = HttpRouter.serve(apiLayer).pipe(

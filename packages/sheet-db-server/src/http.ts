@@ -1,5 +1,5 @@
 import { HttpApiBuilder, HttpApiSwagger } from "effect/unstable/httpapi";
-import { HttpServer, HttpRouter } from "effect/unstable/http";
+import { HttpServer, HttpRouter, HttpServerResponse } from "effect/unstable/http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 import { createServer } from "http";
@@ -20,6 +20,8 @@ const ZeroHttpLive = makeZeroHttpLive(Api, {
 
 const ApiLayer = Layer.provide(HttpApiBuilder.layer(Api), [ZeroHttpLive]).pipe(
   Layer.merge(HttpApiSwagger.layer(Api)),
+  Layer.merge(HttpRouter.add("GET", "/live", HttpServerResponse.empty({ status: 200 }))),
+  Layer.merge(HttpRouter.add("GET", "/ready", HttpServerResponse.empty({ status: 200 }))),
   Layer.provide(HttpRouter.cors()),
 );
 

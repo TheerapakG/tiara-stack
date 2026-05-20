@@ -79,6 +79,30 @@ spec:
                   key: sheetAuthIssuer
             - name: SHEET_INGRESS_KUBERNETES_AUDIENCE
               value: sheet-bot
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: sheet-bot-svc
+              scheme: HTTP
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: sheet-bot-svc
+              scheme: HTTP
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /live
+              port: sheet-bot-svc
+              scheme: HTTP
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 12
           volumeMounts:
             - name: sheet-bot-tokens
               readOnly: true

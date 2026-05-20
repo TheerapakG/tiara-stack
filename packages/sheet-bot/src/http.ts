@@ -1,4 +1,4 @@
-import { HttpRouter, HttpServer } from "effect/unstable/http";
+import { HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import { NodeHttpServer } from "@effect/platform-node";
 import {
@@ -27,6 +27,8 @@ const rpcRoutesLayer = RpcServer.layerHttp({
   Layer.provide(rpcHandlersLayer),
   Layer.provide(SheetBotRpcAuthorizationLive),
   Layer.provide(RpcSerialization.layerJson),
+  Layer.merge(HttpRouter.add("GET", "/live", HttpServerResponse.empty({ status: 200 }))),
+  Layer.merge(HttpRouter.add("GET", "/ready", HttpServerResponse.empty({ status: 200 }))),
   Layer.provideMerge(HttpRouter.layer),
 );
 

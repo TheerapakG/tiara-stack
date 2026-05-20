@@ -1,7 +1,7 @@
 import { NodeFileSystem, NodeHttpClient, NodeHttpServer, NodeRuntime } from "@effect/platform-node";
 import { createServer } from "http";
 import { Effect, Layer, Logger, Option } from "effect";
-import { HttpMiddleware, HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http";
+import { HttpMiddleware, HttpRouter, HttpServer } from "effect/unstable/http";
 import {
   HttpApiBuilder,
   HttpApiEndpoint,
@@ -19,6 +19,7 @@ import { Unauthorized } from "typhoon-core/error";
 import { dotEnvConfigProviderLayer } from "typhoon-core/config";
 import { ArgumentError, makeArgumentError } from "typhoon-core/error";
 import { config } from "./config";
+import { healthRoutesLayer } from "./health";
 import {
   AuthorizationService,
   hasDiscordAccountPermission,
@@ -1207,7 +1208,7 @@ const makeApiLayer = () => {
     Layer.provide(SheetApisAnonymousUserFallbackLive),
     Layer.provide(SheetAuthTokenAuthorizationLive),
     Layer.merge(HttpApiSwagger.layer(Api)),
-    Layer.merge(HttpRouter.add("GET", "/health", HttpServerResponse.empty({ status: 200 }))),
+    Layer.merge(healthRoutesLayer),
     HttpRouter.provideRequest(RequestServicesLive),
     Layer.provide(corsMiddlewareLayer),
   );

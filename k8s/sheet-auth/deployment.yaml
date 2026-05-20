@@ -79,7 +79,7 @@ spec:
                   key: trustedOrigins
           livenessProbe:
             httpGet:
-              path: /.well-known/oauth-authorization-server
+              path: /live
               port: sheet-auth-svc
               scheme: HTTP
             periodSeconds: 10
@@ -87,7 +87,7 @@ spec:
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /.well-known/oauth-authorization-server
+              path: /ready
               port: sheet-auth-svc
               scheme: HTTP
             periodSeconds: 5
@@ -95,7 +95,7 @@ spec:
             failureThreshold: 3
           startupProbe:
             httpGet:
-              path: /.well-known/oauth-authorization-server
+              path: /live
               port: sheet-auth-svc
               scheme: HTTP
             periodSeconds: 5

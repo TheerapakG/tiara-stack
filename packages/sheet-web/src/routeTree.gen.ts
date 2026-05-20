@@ -9,6 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ReadyRouteImport } from './routes/ready'
+import { Route as LiveRouteImport } from './routes/live'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -22,6 +24,16 @@ import { Route as AuthenticatedDashboardGuildsGuildIdScheduleChannelChannelLayou
 import { Route as AuthenticatedDashboardGuildsGuildIdScheduleChannelChannelLayoutDailyRouteImport } from './routes/_authenticated/dashboard/guilds/$guildId.schedule.$channel/_channelLayout/daily'
 import { Route as AuthenticatedDashboardGuildsGuildIdScheduleChannelChannelLayoutCalendarRouteImport } from './routes/_authenticated/dashboard/guilds/$guildId.schedule.$channel/_channelLayout/calendar'
 
+const ReadyRoute = ReadyRouteImport.update({
+  id: '/ready',
+  path: '/ready',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LiveRoute = LiveRouteImport.update({
+  id: '/live',
+  path: '/live',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
@@ -101,6 +113,8 @@ const AuthenticatedDashboardGuildsGuildIdScheduleChannelChannelLayoutCalendarRou
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/live': typeof LiveRoute
+  '/ready': typeof ReadyRoute
   '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
   '/dashboard/guilds': typeof AuthenticatedDashboardGuildsRouteRouteWithChildren
   '/dashboard/shifts': typeof AuthenticatedDashboardShiftsRoute
@@ -114,6 +128,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/live': typeof LiveRoute
+  '/ready': typeof ReadyRoute
   '/dashboard/shifts': typeof AuthenticatedDashboardShiftsRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/dashboard/guilds': typeof AuthenticatedDashboardGuildsIndexRoute
@@ -126,6 +142,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/live': typeof LiveRoute
+  '/ready': typeof ReadyRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRouteWithChildren
   '/_authenticated/dashboard/guilds': typeof AuthenticatedDashboardGuildsRouteRouteWithChildren
   '/_authenticated/dashboard/shifts': typeof AuthenticatedDashboardShiftsRoute
@@ -141,6 +159,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/live'
+    | '/ready'
     | '/dashboard'
     | '/dashboard/guilds'
     | '/dashboard/shifts'
@@ -154,6 +174,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/live'
+    | '/ready'
     | '/dashboard/shifts'
     | '/dashboard'
     | '/dashboard/guilds'
@@ -165,6 +187,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/live'
+    | '/ready'
     | '/_authenticated/dashboard'
     | '/_authenticated/dashboard/guilds'
     | '/_authenticated/dashboard/shifts'
@@ -180,10 +204,26 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  LiveRoute: typeof LiveRoute
+  ReadyRoute: typeof ReadyRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/ready': {
+      id: '/ready'
+      path: '/ready'
+      fullPath: '/ready'
+      preLoaderRoute: typeof ReadyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/live': {
+      id: '/live'
+      path: '/live'
+      fullPath: '/live'
+      preLoaderRoute: typeof LiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
@@ -359,6 +399,8 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  LiveRoute: LiveRoute,
+  ReadyRoute: ReadyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

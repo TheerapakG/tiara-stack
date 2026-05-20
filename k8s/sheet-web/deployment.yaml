@@ -62,6 +62,30 @@ spec:
                 secretKeyRef:
                   name: sheet-web-secret
                   key: sheetApisBaseUrl
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: sheet-web-svc
+              scheme: HTTP
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: sheet-web-svc
+              scheme: HTTP
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /live
+              port: sheet-web-svc
+              scheme: HTTP
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 12
           volumeMounts:
             - name: sheet-web-ca-certificate
               readOnly: true
