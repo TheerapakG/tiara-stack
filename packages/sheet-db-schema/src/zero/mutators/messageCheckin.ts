@@ -8,6 +8,18 @@ declare module "@rocicorp/zero" {
   }
 }
 
+const withUpsertTimestamps = <const Value extends Record<string, unknown> & { createdAt?: number }>(
+  value: Value,
+  existingCreatedAt?: number,
+) => {
+  const now = Date.now();
+  return {
+    ...value,
+    createdAt: value.createdAt ?? existingCreatedAt ?? now,
+    updatedAt: now,
+  };
+};
+
 export const messageCheckin = {
   upsertMessageCheckinData: defineMutator(
     pipe(
@@ -23,18 +35,28 @@ export const messageCheckin = {
       }),
       Schema.toStandardSchemaV1,
     ),
-    async ({ tx, args }) =>
-      await tx.mutate.messageCheckin.upsert({
-        messageId: args.messageId,
-        initialMessage: args.initialMessage,
-        hour: args.hour,
-        channelId: args.channelId,
-        roleId: args.roleId,
-        guildId: args.guildId,
-        messageChannelId: args.messageChannelId,
-        createdByUserId: args.createdByUserId,
-        deletedAt: null,
-      }),
+    async ({ tx, args }) => {
+      const existingCheckin = await tx.run(
+        builder.messageCheckin.where("messageId", "=", args.messageId).one(),
+      );
+
+      await tx.mutate.messageCheckin.upsert(
+        withUpsertTimestamps(
+          {
+            messageId: args.messageId,
+            initialMessage: args.initialMessage,
+            hour: args.hour,
+            channelId: args.channelId,
+            roleId: args.roleId,
+            guildId: args.guildId,
+            messageChannelId: args.messageChannelId,
+            createdByUserId: args.createdByUserId,
+            deletedAt: null,
+          },
+          existingCheckin?.createdAt,
+        ),
+      );
+    },
   ),
   addMessageCheckinMembers: defineMutator(
     pipe(
@@ -46,15 +68,27 @@ export const messageCheckin = {
     ),
     async ({ tx, args }) => {
       await Promise.all(
-        args.memberIds.map((memberId) =>
-          tx.mutate.messageCheckinMember.upsert({
-            messageId: args.messageId,
-            memberId,
-            checkinAt: null,
-            checkinClaimId: null,
-            deletedAt: null,
-          }),
-        ),
+        args.memberIds.map(async (memberId) => {
+          const existingMember = await tx.run(
+            builder.messageCheckinMember
+              .where("messageId", "=", args.messageId)
+              .where("memberId", "=", memberId)
+              .one(),
+          );
+
+          return tx.mutate.messageCheckinMember.upsert(
+            withUpsertTimestamps(
+              {
+                messageId: args.messageId,
+                memberId,
+                checkinAt: null,
+                checkinClaimId: null,
+                deletedAt: null,
+              },
+              existingMember?.createdAt,
+            ),
+          );
+        }),
       );
     },
   ),
@@ -76,28 +110,49 @@ export const messageCheckin = {
       Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) => {
-      await tx.mutate.messageCheckin.upsert({
-        messageId: args.messageId,
-        initialMessage: args.data.initialMessage,
-        hour: args.data.hour,
-        channelId: args.data.channelId,
-        roleId: args.data.roleId,
-        guildId: args.data.guildId,
-        messageChannelId: args.data.messageChannelId,
-        createdByUserId: args.data.createdByUserId,
-        deletedAt: null,
-      });
+      const existingCheckin = await tx.run(
+        builder.messageCheckin.where("messageId", "=", args.messageId).one(),
+      );
+
+      await tx.mutate.messageCheckin.upsert(
+        withUpsertTimestamps(
+          {
+            messageId: args.messageId,
+            initialMessage: args.data.initialMessage,
+            hour: args.data.hour,
+            channelId: args.data.channelId,
+            roleId: args.data.roleId,
+            guildId: args.data.guildId,
+            messageChannelId: args.data.messageChannelId,
+            createdByUserId: args.data.createdByUserId,
+            deletedAt: null,
+          },
+          existingCheckin?.createdAt,
+        ),
+      );
 
       await Promise.all(
-        args.memberIds.map((memberId) =>
-          tx.mutate.messageCheckinMember.upsert({
-            messageId: args.messageId,
-            memberId,
-            checkinAt: null,
-            checkinClaimId: null,
-            deletedAt: null,
-          }),
-        ),
+        args.memberIds.map(async (memberId) => {
+          const existingMember = await tx.run(
+            builder.messageCheckinMember
+              .where("messageId", "=", args.messageId)
+              .where("memberId", "=", memberId)
+              .one(),
+          );
+
+          return tx.mutate.messageCheckinMember.upsert(
+            withUpsertTimestamps(
+              {
+                messageId: args.messageId,
+                memberId,
+                checkinAt: null,
+                checkinClaimId: null,
+                deletedAt: null,
+              },
+              existingMember?.createdAt,
+            ),
+          );
+        }),
       );
     },
   ),

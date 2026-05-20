@@ -1,11 +1,16 @@
 import { Effect } from "effect";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type * as SqlClient from "effect/unstable/sql/SqlClient";
 import type { Loader, ResolvedMigration } from "effect/unstable/sql/Migrator";
 import { listMigrationModules } from "./journal";
 
 export const fromDirectory = (directory: string): Loader =>
   Effect.promise(async () => {
-    const files = await listMigrationModules(directory);
+    const resolvedDirectory = new URL(
+      `${directory.replace(/\/$/, "")}/`,
+      pathToFileURL(`${process.cwd()}/`),
+    );
+    const files = await listMigrationModules(fileURLToPath(resolvedDirectory));
     return files.flatMap((file): readonly ResolvedMigration[] => {
       const match = file.match(/^(\d+)_(.+)\.(ts|js|mjs)$/);
       if (!match) {
@@ -17,7 +22,7 @@ export const fromDirectory = (directory: string): Loader =>
           Number(id),
           name!,
           Effect.promise(async () => {
-            const mod = await import(`${directory}/${file}`);
+            const mod = await import(new URL(file, resolvedDirectory).href);
             if (!Effect.isEffect(mod.default)) {
               throw new Error(`effect-sql-kit: migration ${file} must default export an Effect`);
             }

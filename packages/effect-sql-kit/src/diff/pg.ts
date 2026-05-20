@@ -108,10 +108,28 @@ const sqlNameForField = (
 };
 
 const primaryKeySqlNames = (table: TableSnapshot): readonly string[] =>
-  table.primaryKey.map((field) => sqlNameForField(table, field, { allowMissing: true }));
+  normalizeFields(table.primaryKey).map((field) =>
+    sqlNameForField(table, field, { allowMissing: true }),
+  );
 
-const indexSqlFields = (table: TableSnapshot, fields: readonly string[]): readonly string[] =>
-  fields.map((field) => sqlNameForField(table, field, { allowMissing: true }));
+const normalizeFields = (fields: readonly string[] | string): readonly string[] => {
+  if (typeof fields !== "string") {
+    return fields;
+  }
+  if (!fields.startsWith("{") || !fields.endsWith("}")) {
+    return [fields];
+  }
+  return fields
+    .slice(1, -1)
+    .split(",")
+    .filter((field) => field.length > 0);
+};
+
+const indexSqlFields = (
+  table: TableSnapshot,
+  fields: readonly string[] | string,
+): readonly string[] =>
+  normalizeFields(fields).map((field) => sqlNameForField(table, field, { allowMissing: true }));
 
 const createIndexStatement = (table: TableSnapshot, index: TableSnapshot["indexes"][number]) => ({
   sql: `create ${index.unique ? "unique " : ""}index ${quoteIdentifier(index.name, "postgresql")} on ${tableName(table)} (${index.fields
@@ -167,7 +185,7 @@ const foreignKeyStatements = (table: TableSnapshot): MigrationStatement[] =>
   });
 
 const columnChanged = (a: ColumnSnapshot, b: ColumnSnapshot): boolean =>
-  !isDeepStrictEqual(normalizeColumnForComparison(a), normalizeColumnForComparison(b));
+  !isDeepStrictEqual(normalizeColumnShapeForComparison(a), normalizeColumnShapeForComparison(b));
 
 const normalizeDefaultSql = (sql?: string): string | undefined => {
   if (!sql) return undefined;
@@ -178,12 +196,35 @@ const normalizeDefaultSql = (sql?: string): string | undefined => {
   return normalized;
 };
 
-const normalizeColumnForComparison = (column: ColumnSnapshot) =>
+const defaultValueFromSql = (sql?: string): ColumnSnapshot["default"] | undefined => {
+  if (sql === "true") return true;
+  if (sql === "false") return false;
+  if (sql === "null") return null;
+  if (sql?.startsWith("'") && sql.endsWith("'")) {
+    return sql.slice(1, -1).replaceAll("''", "'");
+  }
+  if (sql && /^-?\d+(?:\.\d+)?$/.test(sql)) {
+    return Number(sql);
+  }
+  return undefined;
+};
+
+const columnDefaultExpression = (column: ColumnSnapshot): string | undefined => {
+  const defaultSql = normalizeDefaultSql(column.defaultSql);
+  const sqlDefault = defaultValueFromSql(defaultSql);
+  const defaultValue = column.default ?? sqlDefault;
+  return defaultValue !== undefined && defaultSql === literal(defaultValue)
+    ? literal(defaultValue)
+    : (defaultSql ?? (column.default !== undefined ? literal(column.default) : undefined));
+};
+
+const normalizeColumnShapeForComparison = (column: ColumnSnapshot) =>
   Object.fromEntries(
     Object.entries({
       ...column,
       fieldName: undefined,
-      defaultSql: normalizeDefaultSql(column.defaultSql),
+      default: undefined,
+      defaultSql: undefined,
     }).filter(([, value]) => value !== undefined),
   );
 
@@ -235,6 +276,13 @@ export const diffPg = (prev: SchemaSnapshot, next: SchemaSnapshot): DiffResult =
       if (prevColumn.notNull !== column.notNull) {
         statements.push({
           sql: `alter table ${tableName(table)} alter column ${quoteIdentifier(column.name, "postgresql")} ${column.notNull ? "set not null" : "drop not null"}`,
+        });
+      }
+      const previousDefault = columnDefaultExpression(prevColumn);
+      const nextDefault = columnDefaultExpression(column);
+      if (previousDefault !== nextDefault) {
+        statements.push({
+          sql: `alter table ${tableName(table)} alter column ${quoteIdentifier(column.name, "postgresql")} ${nextDefault === undefined ? "drop default" : `set default ${nextDefault}`}`,
         });
       }
       if (columnChanged(prevColumn, column)) {

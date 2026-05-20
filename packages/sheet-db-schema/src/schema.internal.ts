@@ -1,17 +1,13 @@
 import { pg, schema as effectSqlSchema } from "effect-sql-schema";
 import { ReadonlyJSONValue } from "typhoon-zero/schema";
 
-const createdAt = () =>
-  pg.timestamp("created_at", { withTimezone: true }).defaultSql("now()").notNull();
+const createdAt = () => pg.timestamp("created_at", { withTimezone: true }).notNull();
 
-const updatedAt = () =>
-  pg.timestamp("updated_at", { withTimezone: true }).defaultSql("now()").notNull();
+const updatedAt = () => pg.timestamp("updated_at", { withTimezone: true }).notNull();
 
 const deletedAt = () => pg.timestamp("deleted_at", { withTimezone: true });
 
-interface ConfigGuild {}
-
-const ConfigGuild = pg.Class<ConfigGuild>("ConfigGuild")({
+class ConfigGuild extends pg.Class<ConfigGuild>("ConfigGuild")({
   table: "config_guild",
   fields: {
     guildId: pg.varchar("guild_id").primaryKey(),
@@ -22,11 +18,9 @@ const ConfigGuild = pg.Class<ConfigGuild>("ConfigGuild")({
     deletedAt: deletedAt(),
   },
   indexes: [pg.index("config_guild_sheet_id_idx").on("sheetId")],
-});
+}) {}
 
-interface ConfigGuildManagerRole {}
-
-const ConfigGuildManagerRole = pg.Class<ConfigGuildManagerRole>("ConfigGuildManagerRole")({
+class ConfigGuildManagerRole extends pg.Class<ConfigGuildManagerRole>("ConfigGuildManagerRole")({
   table: "config_guild_manager_role",
   fields: {
     guildId: pg.varchar("guild_id").notNull(),
@@ -36,11 +30,9 @@ const ConfigGuildManagerRole = pg.Class<ConfigGuildManagerRole>("ConfigGuildMana
     deletedAt: deletedAt(),
   },
   primaryKey: ["guildId", "roleId"],
-});
+}) {}
 
-interface ConfigGuildChannel {}
-
-const ConfigGuildChannel = pg.Class<ConfigGuildChannel>("ConfigGuildChannel")({
+class ConfigGuildChannel extends pg.Class<ConfigGuildChannel>("ConfigGuildChannel")({
   table: "config_guild_channel",
   fields: {
     guildId: pg.varchar("guild_id").notNull(),
@@ -55,11 +47,9 @@ const ConfigGuildChannel = pg.Class<ConfigGuildChannel>("ConfigGuildChannel")({
   },
   primaryKey: ["guildId", "channelId"],
   indexes: [pg.uniqueIndex("config_guild_channel_guild_id_name_idx").on("guildId", "name")],
-});
+}) {}
 
-interface MessageSlot {}
-
-const MessageSlot = pg.Class<MessageSlot>("MessageSlot")({
+class MessageSlot extends pg.Class<MessageSlot>("MessageSlot")({
   table: "message_slot",
   fields: {
     messageId: pg.varchar("message_id").primaryKey(),
@@ -71,11 +61,9 @@ const MessageSlot = pg.Class<MessageSlot>("MessageSlot")({
     updatedAt: updatedAt(),
     deletedAt: deletedAt(),
   },
-});
+}) {}
 
-interface MessageCheckin {}
-
-const MessageCheckin = pg.Class<MessageCheckin>("MessageCheckin")({
+class MessageCheckin extends pg.Class<MessageCheckin>("MessageCheckin")({
   table: "message_checkin",
   fields: {
     messageId: pg.varchar("message_id").primaryKey(),
@@ -90,11 +78,9 @@ const MessageCheckin = pg.Class<MessageCheckin>("MessageCheckin")({
     updatedAt: updatedAt(),
     deletedAt: deletedAt(),
   },
-});
+}) {}
 
-interface MessageCheckinMember {}
-
-const MessageCheckinMember = pg.Class<MessageCheckinMember>("MessageCheckinMember")({
+class MessageCheckinMember extends pg.Class<MessageCheckinMember>("MessageCheckinMember")({
   table: "message_checkin_member",
   fields: {
     messageId: pg.varchar("message_id").notNull(),
@@ -106,11 +92,9 @@ const MessageCheckinMember = pg.Class<MessageCheckinMember>("MessageCheckinMembe
     deletedAt: deletedAt(),
   },
   primaryKey: ["messageId", "memberId"],
-});
+}) {}
 
-interface MessageRoomOrder {}
-
-const MessageRoomOrder = pg.Class<MessageRoomOrder>("MessageRoomOrder")({
+class MessageRoomOrder extends pg.Class<MessageRoomOrder>("MessageRoomOrder")({
   table: "message_room_order",
   fields: {
     messageId: pg.varchar("message_id").primaryKey(),
@@ -118,7 +102,7 @@ const MessageRoomOrder = pg.Class<MessageRoomOrder>("MessageRoomOrder")({
     fills: pg.varchar("fills").array().notNull(),
     hour: pg.integer("hour").notNull(),
     rank: pg.integer("rank").notNull(),
-    tentative: pg.boolean("tentative").default(false).notNull(),
+    tentative: pg.boolean("tentative").notNull(),
     monitor: pg.varchar("monitor"),
     guildId: pg.varchar("guild_id"),
     messageChannelId: pg.varchar("message_channel_id"),
@@ -137,11 +121,9 @@ const MessageRoomOrder = pg.Class<MessageRoomOrder>("MessageRoomOrder")({
     updatedAt: updatedAt(),
     deletedAt: deletedAt(),
   },
-});
+}) {}
 
-interface MessageRoomOrderEntry {}
-
-const MessageRoomOrderEntry = pg.Class<MessageRoomOrderEntry>("MessageRoomOrderEntry")({
+class MessageRoomOrderEntry extends pg.Class<MessageRoomOrderEntry>("MessageRoomOrderEntry")({
   table: "message_room_order_entry",
   fields: {
     messageId: pg.varchar("message_id").notNull(),
@@ -157,11 +139,9 @@ const MessageRoomOrderEntry = pg.Class<MessageRoomOrderEntry>("MessageRoomOrderE
   },
   primaryKey: ["messageId", "rank", "position"],
   indexes: [pg.index("message_room_order_entry_message_id_rank_idx").on("messageId", "rank")],
-});
+}) {}
 
-interface SheetApisDispatchJobs {}
-
-const SheetApisDispatchJobs = pg.Class<SheetApisDispatchJobs>("SheetApisDispatchJobs")({
+class SheetApisDispatchJobs extends pg.Class<SheetApisDispatchJobs>("SheetApisDispatchJobs")({
   table: "sheet_apis_dispatch_jobs",
   fields: {
     dispatchRequestId: pg.text("dispatch_request_id").primaryKey(),
@@ -178,7 +158,7 @@ const SheetApisDispatchJobs = pg.Class<SheetApisDispatchJobs>("SheetApisDispatch
     deletedAt: deletedAt(),
   },
   indexes: [pg.index("sheet_apis_dispatch_jobs_status_updated_at_idx").on("status", "updatedAt")],
-});
+}) {}
 
 export const configGuild = ConfigGuild;
 export const configGuildManagerRole = ConfigGuildManagerRole;

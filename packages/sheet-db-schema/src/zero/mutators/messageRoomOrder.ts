@@ -8,6 +8,7 @@ import {
   isActiveSendClaim,
 } from "../claimHelpers";
 import { builder, type Schema as ZeroSchema } from "../schema";
+import { withUpdateTimestamp, withUpsertTimestamps } from "../timestamps";
 
 declare module "@rocicorp/zero" {
   interface DefaultTypes {
@@ -45,10 +46,12 @@ export const messageRoomOrder = {
       ) {
         return;
       }
-      await tx.mutate.messageRoomOrder.update({
-        messageId: args.messageId,
-        rank: messageRoomOrder.rank - 1,
-      });
+      await tx.mutate.messageRoomOrder.update(
+        withUpdateTimestamp({
+          messageId: args.messageId,
+          rank: messageRoomOrder.rank - 1,
+        }),
+      );
     },
   ),
   incrementMessageRoomOrderRank: defineMutator(
@@ -79,10 +82,12 @@ export const messageRoomOrder = {
       ) {
         return;
       }
-      await tx.mutate.messageRoomOrder.update({
-        messageId: args.messageId,
-        rank: messageRoomOrder.rank + 1,
-      });
+      await tx.mutate.messageRoomOrder.update(
+        withUpdateTimestamp({
+          messageId: args.messageId,
+          rank: messageRoomOrder.rank + 1,
+        }),
+      );
     },
   ),
   claimMessageRoomOrderSend: defineMutator(
@@ -111,15 +116,17 @@ export const messageRoomOrder = {
       ) {
         return;
       }
-      await tx.mutate.messageRoomOrder.update({
-        messageId: args.messageId,
-        sendClaimId: args.claimId,
-        sendClaimedAt: now,
-        tentativeUpdateClaimId: null,
-        tentativeUpdateClaimedAt: null,
-        tentativePinClaimId: null,
-        tentativePinClaimedAt: null,
-      });
+      await tx.mutate.messageRoomOrder.update(
+        withUpdateTimestamp({
+          messageId: args.messageId,
+          sendClaimId: args.claimId,
+          sendClaimedAt: now,
+          tentativeUpdateClaimId: null,
+          tentativeUpdateClaimedAt: null,
+          tentativePinClaimId: null,
+          tentativePinClaimedAt: null,
+        }),
+      );
     },
   ),
   completeMessageRoomOrderSend: defineMutator(
@@ -143,14 +150,16 @@ export const messageRoomOrder = {
       if (!messageRoomOrder || messageRoomOrder.sendClaimId !== args.claimId) {
         return;
       }
-      await tx.mutate.messageRoomOrder.update({
-        messageId: args.messageId,
-        sendClaimId: null,
-        sendClaimedAt: null,
-        sentMessageId: args.sentMessageId,
-        sentMessageChannelId: args.sentMessageChannelId,
-        sentAt: args.sentAt,
-      });
+      await tx.mutate.messageRoomOrder.update(
+        withUpdateTimestamp({
+          messageId: args.messageId,
+          sendClaimId: null,
+          sendClaimedAt: null,
+          sentMessageId: args.sentMessageId,
+          sentMessageChannelId: args.sentMessageChannelId,
+          sentAt: args.sentAt,
+        }),
+      );
     },
   ),
   releaseMessageRoomOrderSendClaim: defineMutator(
@@ -171,11 +180,13 @@ export const messageRoomOrder = {
       if (!messageRoomOrder || messageRoomOrder.sendClaimId !== args.claimId) {
         return;
       }
-      await tx.mutate.messageRoomOrder.update({
-        messageId: args.messageId,
-        sendClaimId: null,
-        sendClaimedAt: null,
-      });
+      await tx.mutate.messageRoomOrder.update(
+        withUpdateTimestamp({
+          messageId: args.messageId,
+          sendClaimId: null,
+          sendClaimedAt: null,
+        }),
+      );
     },
   ),
   claimMessageRoomOrderTentativeUpdate: defineMutator(
@@ -204,15 +215,17 @@ export const messageRoomOrder = {
       ) {
         return;
       }
-      await tx.mutate.messageRoomOrder.update({
-        messageId: args.messageId,
-        sendClaimId: null,
-        sendClaimedAt: null,
-        tentativeUpdateClaimId: args.claimId,
-        tentativeUpdateClaimedAt: now,
-        tentativePinClaimId: null,
-        tentativePinClaimedAt: null,
-      });
+      await tx.mutate.messageRoomOrder.update(
+        withUpdateTimestamp({
+          messageId: args.messageId,
+          sendClaimId: null,
+          sendClaimedAt: null,
+          tentativeUpdateClaimId: args.claimId,
+          tentativeUpdateClaimedAt: now,
+          tentativePinClaimId: null,
+          tentativePinClaimedAt: null,
+        }),
+      );
     },
   ),
   releaseMessageRoomOrderTentativeUpdateClaim: defineMutator(
@@ -233,11 +246,13 @@ export const messageRoomOrder = {
       if (!messageRoomOrder || messageRoomOrder.tentativeUpdateClaimId !== args.claimId) {
         return;
       }
-      await tx.mutate.messageRoomOrder.update({
-        messageId: args.messageId,
-        tentativeUpdateClaimId: null,
-        tentativeUpdateClaimedAt: null,
-      });
+      await tx.mutate.messageRoomOrder.update(
+        withUpdateTimestamp({
+          messageId: args.messageId,
+          tentativeUpdateClaimId: null,
+          tentativeUpdateClaimedAt: null,
+        }),
+      );
     },
   ),
   claimMessageRoomOrderTentativePin: defineMutator(
@@ -266,15 +281,17 @@ export const messageRoomOrder = {
       ) {
         return;
       }
-      await tx.mutate.messageRoomOrder.update({
-        messageId: args.messageId,
-        sendClaimId: null,
-        sendClaimedAt: null,
-        tentativePinClaimId: args.claimId,
-        tentativePinClaimedAt: now,
-        tentativeUpdateClaimId: null,
-        tentativeUpdateClaimedAt: null,
-      });
+      await tx.mutate.messageRoomOrder.update(
+        withUpdateTimestamp({
+          messageId: args.messageId,
+          sendClaimId: null,
+          sendClaimedAt: null,
+          tentativePinClaimId: args.claimId,
+          tentativePinClaimedAt: now,
+          tentativeUpdateClaimId: null,
+          tentativeUpdateClaimedAt: null,
+        }),
+      );
     },
   ),
   completeMessageRoomOrderTentativePin: defineMutator(
@@ -300,12 +317,14 @@ export const messageRoomOrder = {
       ) {
         return;
       }
-      await tx.mutate.messageRoomOrder.update({
-        messageId: args.messageId,
-        tentativePinClaimId: null,
-        tentativePinClaimedAt: null,
-        tentativePinnedAt: args.pinnedAt,
-      });
+      await tx.mutate.messageRoomOrder.update(
+        withUpdateTimestamp({
+          messageId: args.messageId,
+          tentativePinClaimId: null,
+          tentativePinClaimedAt: null,
+          tentativePinnedAt: args.pinnedAt,
+        }),
+      );
     },
   ),
   releaseMessageRoomOrderTentativePinClaim: defineMutator(
@@ -330,11 +349,13 @@ export const messageRoomOrder = {
       ) {
         return;
       }
-      await tx.mutate.messageRoomOrder.update({
-        messageId: args.messageId,
-        tentativePinClaimId: null,
-        tentativePinClaimedAt: null,
-      });
+      await tx.mutate.messageRoomOrder.update(
+        withUpdateTimestamp({
+          messageId: args.messageId,
+          tentativePinClaimId: null,
+          tentativePinClaimedAt: null,
+        }),
+      );
     },
   ),
   markMessageRoomOrderTentative: defineMutator(
@@ -347,12 +368,14 @@ export const messageRoomOrder = {
       Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) => {
-      await tx.mutate.messageRoomOrder.update({
-        messageId: args.messageId,
-        tentative: true,
-        guildId: args.guildId,
-        messageChannelId: args.messageChannelId,
-      });
+      await tx.mutate.messageRoomOrder.update(
+        withUpdateTimestamp({
+          messageId: args.messageId,
+          tentative: true,
+          guildId: args.guildId,
+          messageChannelId: args.messageChannelId,
+        }),
+      );
     },
   ),
   upsertMessageRoomOrder: defineMutator(
@@ -376,19 +399,24 @@ export const messageRoomOrder = {
         builder.messageRoomOrder.where("messageId", "=", args.messageId).one(),
       );
 
-      await tx.mutate.messageRoomOrder.upsert({
-        messageId: args.messageId,
-        previousFills: args.previousFills.slice(),
-        fills: args.fills.slice(),
-        hour: args.hour,
-        rank: args.rank,
-        tentative: args.tentative ?? existingMessageRoomOrder?.tentative ?? false,
-        monitor: args.monitor,
-        guildId: args.guildId,
-        messageChannelId: args.messageChannelId,
-        createdByUserId: args.createdByUserId,
-        deletedAt: null,
-      });
+      await tx.mutate.messageRoomOrder.upsert(
+        withUpsertTimestamps(
+          {
+            messageId: args.messageId,
+            previousFills: args.previousFills.slice(),
+            fills: args.fills.slice(),
+            hour: args.hour,
+            rank: args.rank,
+            tentative: args.tentative ?? existingMessageRoomOrder?.tentative ?? false,
+            monitor: args.monitor,
+            guildId: args.guildId,
+            messageChannelId: args.messageChannelId,
+            createdByUserId: args.createdByUserId,
+            deletedAt: null,
+          },
+          existingMessageRoomOrder?.createdAt,
+        ),
+      );
     },
   ),
   persistMessageRoomOrder: defineMutator(
@@ -420,33 +448,55 @@ export const messageRoomOrder = {
       Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) => {
-      await tx.mutate.messageRoomOrder.upsert({
-        messageId: args.messageId,
-        previousFills: args.data.previousFills.slice(),
-        fills: args.data.fills.slice(),
-        hour: args.data.hour,
-        rank: args.data.rank,
-        tentative: args.data.tentative ?? false,
-        monitor: args.data.monitor,
-        guildId: args.data.guildId,
-        messageChannelId: args.data.messageChannelId,
-        createdByUserId: args.data.createdByUserId,
-        deletedAt: null,
-      });
+      const existingMessageRoomOrder = await tx.run(
+        builder.messageRoomOrder.where("messageId", "=", args.messageId).one(),
+      );
+
+      await tx.mutate.messageRoomOrder.upsert(
+        withUpsertTimestamps(
+          {
+            messageId: args.messageId,
+            previousFills: args.data.previousFills.slice(),
+            fills: args.data.fills.slice(),
+            hour: args.data.hour,
+            rank: args.data.rank,
+            tentative: args.data.tentative ?? existingMessageRoomOrder?.tentative ?? false,
+            monitor: args.data.monitor,
+            guildId: args.data.guildId,
+            messageChannelId: args.data.messageChannelId,
+            createdByUserId: args.data.createdByUserId,
+            deletedAt: null,
+          },
+          existingMessageRoomOrder?.createdAt,
+        ),
+      );
 
       await Promise.all(
-        args.entries.map((entry) =>
-          tx.mutate.messageRoomOrderEntry.upsert({
-            messageId: args.messageId,
-            rank: entry.rank,
-            position: entry.position,
-            hour: entry.hour,
-            team: entry.team,
-            tags: entry.tags.slice(),
-            effectValue: entry.effectValue,
-            deletedAt: null,
-          }),
-        ),
+        args.entries.map(async (entry) => {
+          const existingEntry = await tx.run(
+            builder.messageRoomOrderEntry
+              .where("messageId", "=", args.messageId)
+              .where("rank", "=", entry.rank)
+              .where("position", "=", entry.position)
+              .one(),
+          );
+
+          return tx.mutate.messageRoomOrderEntry.upsert(
+            withUpsertTimestamps(
+              {
+                messageId: args.messageId,
+                rank: entry.rank,
+                position: entry.position,
+                hour: entry.hour,
+                team: entry.team,
+                tags: entry.tags.slice(),
+                effectValue: entry.effectValue,
+                deletedAt: null,
+              },
+              existingEntry?.createdAt,
+            ),
+          );
+        }),
       );
     },
   ),
@@ -469,18 +519,31 @@ export const messageRoomOrder = {
     ),
     async ({ tx, args }) => {
       await Promise.all(
-        args.entries.map((entry) =>
-          tx.mutate.messageRoomOrderEntry.upsert({
-            messageId: args.messageId,
-            rank: entry.rank,
-            position: entry.position,
-            hour: entry.hour,
-            team: entry.team,
-            tags: entry.tags.slice(),
-            effectValue: entry.effectValue,
-            deletedAt: null,
-          }),
-        ),
+        args.entries.map(async (entry) => {
+          const existingEntry = await tx.run(
+            builder.messageRoomOrderEntry
+              .where("messageId", "=", args.messageId)
+              .where("rank", "=", entry.rank)
+              .where("position", "=", entry.position)
+              .one(),
+          );
+
+          return tx.mutate.messageRoomOrderEntry.upsert(
+            withUpsertTimestamps(
+              {
+                messageId: args.messageId,
+                rank: entry.rank,
+                position: entry.position,
+                hour: entry.hour,
+                team: entry.team,
+                tags: entry.tags.slice(),
+                effectValue: entry.effectValue,
+                deletedAt: null,
+              },
+              existingEntry?.createdAt,
+            ),
+          );
+        }),
       );
     },
   ),
@@ -494,11 +557,13 @@ export const messageRoomOrder = {
       Schema.toStandardSchemaV1,
     ),
     async ({ tx, args }) =>
-      await tx.mutate.messageRoomOrderEntry.update({
-        messageId: args.messageId,
-        rank: args.rank,
-        position: args.position,
-        deletedAt: Date.now() / 1000,
-      }),
+      await tx.mutate.messageRoomOrderEntry.update(
+        withUpdateTimestamp({
+          messageId: args.messageId,
+          rank: args.rank,
+          position: args.position,
+          deletedAt: Date.now(),
+        }),
+      ),
   ),
 };

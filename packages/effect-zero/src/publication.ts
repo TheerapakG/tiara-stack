@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema, SchemaIssue, SchemaTransformation } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import type {
   JsonValue,
@@ -44,13 +44,36 @@ const PublicationSnapshotSchema = Schema.Struct({
   tables: Schema.Array(PublicationTableSnapshotSchema),
 });
 
+const PgTextArraySchema = Schema.Union([
+  Schema.Array(Schema.String),
+  Schema.String.pipe(
+    Schema.decodeTo(
+      Schema.Array(Schema.String),
+      SchemaTransformation.transformOrFail<readonly string[], string>({
+        decode: (value) => {
+          if (!value.startsWith("{") || !value.endsWith("}")) {
+            return Effect.fail(
+              new SchemaIssue.InvalidValue(Option.some(value), {
+                message: "Expected a Postgres text array",
+              }),
+            );
+          }
+          const inner = value.slice(1, -1);
+          return Effect.succeed(inner.length === 0 ? [] : inner.split(","));
+        },
+        encode: (value) => Effect.succeed(`{${value.join(",")}}`),
+      }),
+    ),
+  ),
+]);
+
 const PublicationRowSchema = Schema.Struct({
   publication_name: Schema.String,
   puballtables: Schema.Boolean,
-  publication_schemas: Schema.Array(Schema.String),
+  publication_schemas: PgTextArraySchema,
   table_schema: Schema.NullOr(Schema.String),
   table_name: Schema.NullOr(Schema.String),
-  columns: Schema.Array(Schema.String),
+  columns: PgTextArraySchema,
 });
 
 type PublicationRow = Schema.Schema.Type<typeof PublicationRowSchema>;
@@ -258,7 +281,7 @@ left join pg_namespace ns on ns.oid = c.relnamespace
 left join lateral unnest(pr.prattrs) as attr(attnum) on true
 left join pg_attribute a on a.attrelid = c.oid and a.attnum = attr.attnum
 where p.pubname = $1
-group by p.pubname, ns.nspname, c.relname
+group by p.oid, p.pubname, p.puballtables, ns.nspname, c.relname
 order by ns.nspname, c.relname`,
       [publicationName],
     );
@@ -316,7 +339,6 @@ order by ns.nspname, c.relname`,
 
     return Schema.decodeUnknownSync(PublicationSnapshotSchema)(snapshot) as JsonValue;
   });
-
 export const zeroPublication = (options: ZeroPublicationOptions): MigrationExtensionLike => {
   const resolved = {
     id: options.id ?? defaultPublicationId,

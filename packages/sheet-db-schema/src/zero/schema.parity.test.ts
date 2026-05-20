@@ -29,10 +29,12 @@ const table = (
 });
 
 const auditColumns = [
-  ["createdAt", "number", true, "created_at"],
-  ["updatedAt", "number", true, "updated_at"],
+  ["createdAt", "number", false, "created_at"],
+  ["updatedAt", "number", false, "updated_at"],
   ["deletedAt", "number", true, "deleted_at"],
 ] as const satisfies readonly ColumnSpec[];
+
+const sheetDb = (serverName: string) => `sheet_db_${serverName}`;
 
 const normalizeSchema = (input: typeof schema) => ({
   tables: Object.fromEntries(
@@ -64,7 +66,7 @@ const expectedSchema = {
   tables: {
     configGuild: table(
       "configGuild",
-      "config_guild",
+      sheetDb("config_guild"),
       ["guildId"],
       [
         ["guildId", "string", false, "guild_id"],
@@ -75,7 +77,7 @@ const expectedSchema = {
     ),
     configGuildChannel: table(
       "configGuildChannel",
-      "config_guild_channel",
+      sheetDb("config_guild_channel"),
       ["guildId", "channelId"],
       [
         ["guildId", "string", false, "guild_id"],
@@ -89,7 +91,7 @@ const expectedSchema = {
     ),
     configGuildManagerRole: table(
       "configGuildManagerRole",
-      "config_guild_manager_role",
+      sheetDb("config_guild_manager_role"),
       ["guildId", "roleId"],
       [
         ["guildId", "string", false, "guild_id"],
@@ -99,7 +101,7 @@ const expectedSchema = {
     ),
     messageCheckin: table(
       "messageCheckin",
-      "message_checkin",
+      sheetDb("message_checkin"),
       ["messageId"],
       [
         ["messageId", "string", false, "message_id"],
@@ -115,7 +117,7 @@ const expectedSchema = {
     ),
     messageCheckinMember: table(
       "messageCheckinMember",
-      "message_checkin_member",
+      sheetDb("message_checkin_member"),
       ["messageId", "memberId"],
       [
         ["messageId", "string", false, "message_id"],
@@ -127,7 +129,7 @@ const expectedSchema = {
     ),
     messageRoomOrder: table(
       "messageRoomOrder",
-      "message_room_order",
+      sheetDb("message_room_order"),
       ["messageId"],
       [
         ["messageId", "string", false, "message_id"],
@@ -135,7 +137,7 @@ const expectedSchema = {
         ["fills", "json", false],
         ["hour", "number", false],
         ["rank", "number", false],
-        ["tentative", "boolean", true],
+        ["tentative", "boolean", false],
         ["monitor", "string", true],
         ["guildId", "string", true, "guild_id"],
         ["messageChannelId", "string", true, "message_channel_id"],
@@ -155,7 +157,7 @@ const expectedSchema = {
     ),
     messageRoomOrderEntry: table(
       "messageRoomOrderEntry",
-      "message_room_order_entry",
+      sheetDb("message_room_order_entry"),
       ["messageId", "rank", "position"],
       [
         ["messageId", "string", false, "message_id"],
@@ -170,7 +172,7 @@ const expectedSchema = {
     ),
     messageSlot: table(
       "messageSlot",
-      "message_slot",
+      sheetDb("message_slot"),
       ["messageId"],
       [
         ["messageId", "string", false, "message_id"],
@@ -183,7 +185,7 @@ const expectedSchema = {
     ),
     sheetApisDispatchJobs: table(
       "sheetApisDispatchJobs",
-      "sheet_apis_dispatch_jobs",
+      sheetDb("sheet_apis_dispatch_jobs"),
       ["dispatchRequestId"],
       [
         ["dispatchRequestId", "string", false, "dispatch_request_id"],

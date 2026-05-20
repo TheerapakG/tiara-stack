@@ -8,6 +8,7 @@ import {
   isActiveSendClaim,
 } from "./claimHelpers";
 import { builder, type Schema as ZeroSchema } from "./schema";
+import { withUpdateTimestamp, withUpsertTimestamps } from "./timestamps";
 
 declare module "@rocicorp/zero" {
   interface DefaultTypes {
@@ -141,25 +142,48 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         sheetId: Schema.optional(Schema.NullOr(Schema.String)),
         autoCheckin: Schema.optional(Schema.NullOr(Schema.Boolean)),
       }),
-      mutator: async ({ tx, args }) =>
-        await tx.mutate.configGuild.upsert({
-          guildId: args.guildId,
-          sheetId: args.sheetId,
-          autoCheckin: args.autoCheckin,
-          deletedAt: null,
-        }),
+      mutator: async ({ tx, args }) => {
+        const existingConfigGuild = await tx.run(
+          builder.configGuild.where("guildId", "=", args.guildId).one(),
+        );
+
+        await tx.mutate.configGuild.upsert(
+          withUpsertTimestamps(
+            {
+              guildId: args.guildId,
+              sheetId: args.sheetId,
+              autoCheckin: args.autoCheckin,
+              deletedAt: null,
+            },
+            existingConfigGuild?.createdAt,
+          ),
+        );
+      },
     }),
     ZeroApiEndpoint.mutator("addGuildMonitorRole", {
       request: Schema.Struct({
         guildId: Schema.String,
         roleId: Schema.String,
       }),
-      mutator: async ({ tx, args }) =>
-        await tx.mutate.configGuildManagerRole.upsert({
-          guildId: args.guildId,
-          roleId: args.roleId,
-          deletedAt: null,
-        }),
+      mutator: async ({ tx, args }) => {
+        const existingRole = await tx.run(
+          builder.configGuildManagerRole
+            .where("guildId", "=", args.guildId)
+            .where("roleId", "=", args.roleId)
+            .one(),
+        );
+
+        await tx.mutate.configGuildManagerRole.upsert(
+          withUpsertTimestamps(
+            {
+              guildId: args.guildId,
+              roleId: args.roleId,
+              deletedAt: null,
+            },
+            existingRole?.createdAt,
+          ),
+        );
+      },
     }),
     ZeroApiEndpoint.mutator("removeGuildMonitorRole", {
       request: Schema.Struct({
@@ -167,11 +191,13 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         roleId: Schema.String,
       }),
       mutator: async ({ tx, args }) =>
-        await tx.mutate.configGuildManagerRole.update({
-          guildId: args.guildId,
-          roleId: args.roleId,
-          deletedAt: Date.now() / 1000,
-        }),
+        await tx.mutate.configGuildManagerRole.update(
+          withUpdateTimestamp({
+            guildId: args.guildId,
+            roleId: args.roleId,
+            deletedAt: Date.now(),
+          }),
+        ),
     }),
     ZeroApiEndpoint.mutator("upsertGuildChannelConfig", {
       request: Schema.Struct({
@@ -182,16 +208,29 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         roleId: Schema.optional(Schema.NullOr(Schema.String)),
         checkinChannelId: Schema.optional(Schema.NullOr(Schema.String)),
       }),
-      mutator: async ({ tx, args }) =>
-        await tx.mutate.configGuildChannel.upsert({
-          guildId: args.guildId,
-          channelId: args.channelId,
-          name: args.name,
-          running: args.running,
-          roleId: args.roleId,
-          checkinChannelId: args.checkinChannelId,
-          deletedAt: null,
-        }),
+      mutator: async ({ tx, args }) => {
+        const existingChannel = await tx.run(
+          builder.configGuildChannel
+            .where("guildId", "=", args.guildId)
+            .where("channelId", "=", args.channelId)
+            .one(),
+        );
+
+        await tx.mutate.configGuildChannel.upsert(
+          withUpsertTimestamps(
+            {
+              guildId: args.guildId,
+              channelId: args.channelId,
+              name: args.name,
+              running: args.running,
+              roleId: args.roleId,
+              checkinChannelId: args.checkinChannelId,
+              deletedAt: null,
+            },
+            existingChannel?.createdAt,
+          ),
+        );
+      },
     }),
   );
 
@@ -224,18 +263,28 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         messageChannelId: Schema.NullOr(Schema.String),
         createdByUserId: Schema.NullOr(Schema.String),
       }),
-      mutator: async ({ tx, args }) =>
-        await tx.mutate.messageCheckin.upsert({
-          messageId: args.messageId,
-          initialMessage: args.initialMessage,
-          hour: args.hour,
-          channelId: args.channelId,
-          roleId: args.roleId,
-          guildId: args.guildId,
-          messageChannelId: args.messageChannelId,
-          createdByUserId: args.createdByUserId,
-          deletedAt: null,
-        }),
+      mutator: async ({ tx, args }) => {
+        const existingCheckin = await tx.run(
+          builder.messageCheckin.where("messageId", "=", args.messageId).one(),
+        );
+
+        await tx.mutate.messageCheckin.upsert(
+          withUpsertTimestamps(
+            {
+              messageId: args.messageId,
+              initialMessage: args.initialMessage,
+              hour: args.hour,
+              channelId: args.channelId,
+              roleId: args.roleId,
+              guildId: args.guildId,
+              messageChannelId: args.messageChannelId,
+              createdByUserId: args.createdByUserId,
+              deletedAt: null,
+            },
+            existingCheckin?.createdAt,
+          ),
+        );
+      },
     }),
     ZeroApiEndpoint.mutator("addMessageCheckinMembers", {
       request: Schema.Struct({
@@ -244,15 +293,27 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
       }),
       mutator: async ({ tx, args }) => {
         await Promise.all(
-          args.memberIds.map((memberId) =>
-            tx.mutate.messageCheckinMember.upsert({
-              messageId: args.messageId,
-              memberId,
-              checkinAt: null,
-              checkinClaimId: null,
-              deletedAt: null,
-            }),
-          ),
+          args.memberIds.map(async (memberId) => {
+            const existingMember = await tx.run(
+              builder.messageCheckinMember
+                .where("messageId", "=", args.messageId)
+                .where("memberId", "=", memberId)
+                .one(),
+            );
+
+            return tx.mutate.messageCheckinMember.upsert(
+              withUpsertTimestamps(
+                {
+                  messageId: args.messageId,
+                  memberId,
+                  checkinAt: null,
+                  checkinClaimId: null,
+                  deletedAt: null,
+                },
+                existingMember?.createdAt,
+              ),
+            );
+          }),
         );
       },
     }),
@@ -271,28 +332,49 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         memberIds: Schema.Array(Schema.String),
       }),
       mutator: async ({ tx, args }) => {
-        await tx.mutate.messageCheckin.upsert({
-          messageId: args.messageId,
-          initialMessage: args.data.initialMessage,
-          hour: args.data.hour,
-          channelId: args.data.channelId,
-          roleId: args.data.roleId,
-          guildId: args.data.guildId,
-          messageChannelId: args.data.messageChannelId,
-          createdByUserId: args.data.createdByUserId,
-          deletedAt: null,
-        });
+        const existingCheckin = await tx.run(
+          builder.messageCheckin.where("messageId", "=", args.messageId).one(),
+        );
+
+        await tx.mutate.messageCheckin.upsert(
+          withUpsertTimestamps(
+            {
+              messageId: args.messageId,
+              initialMessage: args.data.initialMessage,
+              hour: args.data.hour,
+              channelId: args.data.channelId,
+              roleId: args.data.roleId,
+              guildId: args.data.guildId,
+              messageChannelId: args.data.messageChannelId,
+              createdByUserId: args.data.createdByUserId,
+              deletedAt: null,
+            },
+            existingCheckin?.createdAt,
+          ),
+        );
 
         await Promise.all(
-          args.memberIds.map((memberId) =>
-            tx.mutate.messageCheckinMember.upsert({
-              messageId: args.messageId,
-              memberId,
-              checkinAt: null,
-              checkinClaimId: null,
-              deletedAt: null,
-            }),
-          ),
+          args.memberIds.map(async (memberId) => {
+            const existingMember = await tx.run(
+              builder.messageCheckinMember
+                .where("messageId", "=", args.messageId)
+                .where("memberId", "=", memberId)
+                .one(),
+            );
+
+            return tx.mutate.messageCheckinMember.upsert(
+              withUpsertTimestamps(
+                {
+                  messageId: args.messageId,
+                  memberId,
+                  checkinAt: null,
+                  checkinClaimId: null,
+                  deletedAt: null,
+                },
+                existingMember?.createdAt,
+              ),
+            );
+          }),
         );
       },
     }),
@@ -304,12 +386,14 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         checkinClaimId: Schema.optional(Schema.String),
       }),
       mutator: async ({ tx, args }) =>
-        await tx.mutate.messageCheckinMember.update({
-          messageId: args.messageId,
-          memberId: args.memberId,
-          checkinAt: args.checkinAt,
-          checkinClaimId: args.checkinClaimId ?? null,
-        }),
+        await tx.mutate.messageCheckinMember.update(
+          withUpdateTimestamp({
+            messageId: args.messageId,
+            memberId: args.memberId,
+            checkinAt: args.checkinAt,
+            checkinClaimId: args.checkinClaimId ?? null,
+          }),
+        ),
     }),
     ZeroApiEndpoint.mutator("setMessageCheckinMemberCheckinAtIfUnset", {
       request: Schema.Struct({
@@ -327,12 +411,14 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
             .one(),
         );
         if (!member || member.checkinAt !== null) return;
-        await tx.mutate.messageCheckinMember.update({
-          messageId: args.messageId,
-          memberId: args.memberId,
-          checkinAt: args.checkinAt,
-          checkinClaimId: args.checkinClaimId,
-        });
+        await tx.mutate.messageCheckinMember.update(
+          withUpdateTimestamp({
+            messageId: args.messageId,
+            memberId: args.memberId,
+            checkinAt: args.checkinAt,
+            checkinClaimId: args.checkinClaimId,
+          }),
+        );
       },
     }),
     ZeroApiEndpoint.mutator("removeMessageCheckinMember", {
@@ -341,11 +427,13 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         memberId: Schema.String,
       }),
       mutator: async ({ tx, args }) =>
-        await tx.mutate.messageCheckinMember.update({
-          messageId: args.messageId,
-          memberId: args.memberId,
-          deletedAt: Date.now() / 1000,
-        }),
+        await tx.mutate.messageCheckinMember.update(
+          withUpdateTimestamp({
+            messageId: args.messageId,
+            memberId: args.memberId,
+            deletedAt: Date.now(),
+          }),
+        ),
     }),
   );
 
@@ -402,10 +490,12 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         ) {
           return;
         }
-        await tx.mutate.messageRoomOrder.update({
-          messageId: args.messageId,
-          rank: messageRoomOrder.rank - 1,
-        });
+        await tx.mutate.messageRoomOrder.update(
+          withUpdateTimestamp({
+            messageId: args.messageId,
+            rank: messageRoomOrder.rank - 1,
+          }),
+        );
       },
     }),
     ZeroApiEndpoint.mutator("incrementMessageRoomOrderRank", {
@@ -433,10 +523,12 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         ) {
           return;
         }
-        await tx.mutate.messageRoomOrder.update({
-          messageId: args.messageId,
-          rank: messageRoomOrder.rank + 1,
-        });
+        await tx.mutate.messageRoomOrder.update(
+          withUpdateTimestamp({
+            messageId: args.messageId,
+            rank: messageRoomOrder.rank + 1,
+          }),
+        );
       },
     }),
     ZeroApiEndpoint.mutator("claimMessageRoomOrderSend", {
@@ -459,15 +551,17 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         ) {
           return;
         }
-        await tx.mutate.messageRoomOrder.update({
-          messageId: args.messageId,
-          sendClaimId: args.claimId,
-          sendClaimedAt: now,
-          tentativeUpdateClaimId: null,
-          tentativeUpdateClaimedAt: null,
-          tentativePinClaimId: null,
-          tentativePinClaimedAt: null,
-        });
+        await tx.mutate.messageRoomOrder.update(
+          withUpdateTimestamp({
+            messageId: args.messageId,
+            sendClaimId: args.claimId,
+            sendClaimedAt: now,
+            tentativeUpdateClaimId: null,
+            tentativeUpdateClaimedAt: null,
+            tentativePinClaimId: null,
+            tentativePinClaimedAt: null,
+          }),
+        );
       },
     }),
     ZeroApiEndpoint.mutator("completeMessageRoomOrderSend", {
@@ -488,14 +582,16 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         if (!messageRoomOrder || messageRoomOrder.sendClaimId !== args.claimId) {
           return;
         }
-        await tx.mutate.messageRoomOrder.update({
-          messageId: args.messageId,
-          sendClaimId: null,
-          sendClaimedAt: null,
-          sentMessageId: args.sentMessageId,
-          sentMessageChannelId: args.sentMessageChannelId,
-          sentAt: args.sentAt,
-        });
+        await tx.mutate.messageRoomOrder.update(
+          withUpdateTimestamp({
+            messageId: args.messageId,
+            sendClaimId: null,
+            sendClaimedAt: null,
+            sentMessageId: args.sentMessageId,
+            sentMessageChannelId: args.sentMessageChannelId,
+            sentAt: args.sentAt,
+          }),
+        );
       },
     }),
     ZeroApiEndpoint.mutator("releaseMessageRoomOrderSendClaim", {
@@ -510,11 +606,13 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         if (!messageRoomOrder || messageRoomOrder.sendClaimId !== args.claimId) {
           return;
         }
-        await tx.mutate.messageRoomOrder.update({
-          messageId: args.messageId,
-          sendClaimId: null,
-          sendClaimedAt: null,
-        });
+        await tx.mutate.messageRoomOrder.update(
+          withUpdateTimestamp({
+            messageId: args.messageId,
+            sendClaimId: null,
+            sendClaimedAt: null,
+          }),
+        );
       },
     }),
     ZeroApiEndpoint.mutator("claimMessageRoomOrderTentativeUpdate", {
@@ -537,15 +635,17 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         ) {
           return;
         }
-        await tx.mutate.messageRoomOrder.update({
-          messageId: args.messageId,
-          sendClaimId: null,
-          sendClaimedAt: null,
-          tentativeUpdateClaimId: args.claimId,
-          tentativeUpdateClaimedAt: now,
-          tentativePinClaimId: null,
-          tentativePinClaimedAt: null,
-        });
+        await tx.mutate.messageRoomOrder.update(
+          withUpdateTimestamp({
+            messageId: args.messageId,
+            sendClaimId: null,
+            sendClaimedAt: null,
+            tentativeUpdateClaimId: args.claimId,
+            tentativeUpdateClaimedAt: now,
+            tentativePinClaimId: null,
+            tentativePinClaimedAt: null,
+          }),
+        );
       },
     }),
     ZeroApiEndpoint.mutator("releaseMessageRoomOrderTentativeUpdateClaim", {
@@ -560,11 +660,13 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         if (!messageRoomOrder || messageRoomOrder.tentativeUpdateClaimId !== args.claimId) {
           return;
         }
-        await tx.mutate.messageRoomOrder.update({
-          messageId: args.messageId,
-          tentativeUpdateClaimId: null,
-          tentativeUpdateClaimedAt: null,
-        });
+        await tx.mutate.messageRoomOrder.update(
+          withUpdateTimestamp({
+            messageId: args.messageId,
+            tentativeUpdateClaimId: null,
+            tentativeUpdateClaimedAt: null,
+          }),
+        );
       },
     }),
     ZeroApiEndpoint.mutator("claimMessageRoomOrderTentativePin", {
@@ -590,15 +692,17 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         ) {
           return;
         }
-        await tx.mutate.messageRoomOrder.update({
-          messageId: args.messageId,
-          sendClaimId: null,
-          sendClaimedAt: null,
-          tentativePinClaimId: args.claimId,
-          tentativePinClaimedAt: now,
-          tentativeUpdateClaimId: null,
-          tentativeUpdateClaimedAt: null,
-        });
+        await tx.mutate.messageRoomOrder.update(
+          withUpdateTimestamp({
+            messageId: args.messageId,
+            sendClaimId: null,
+            sendClaimedAt: null,
+            tentativePinClaimId: args.claimId,
+            tentativePinClaimedAt: now,
+            tentativeUpdateClaimId: null,
+            tentativeUpdateClaimedAt: null,
+          }),
+        );
       },
     }),
     ZeroApiEndpoint.mutator("completeMessageRoomOrderTentativePin", {
@@ -621,12 +725,14 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         ) {
           return;
         }
-        await tx.mutate.messageRoomOrder.update({
-          messageId: args.messageId,
-          tentativePinClaimId: null,
-          tentativePinClaimedAt: null,
-          tentativePinnedAt: args.pinnedAt,
-        });
+        await tx.mutate.messageRoomOrder.update(
+          withUpdateTimestamp({
+            messageId: args.messageId,
+            tentativePinClaimId: null,
+            tentativePinClaimedAt: null,
+            tentativePinnedAt: args.pinnedAt,
+          }),
+        );
       },
     }),
     ZeroApiEndpoint.mutator("releaseMessageRoomOrderTentativePinClaim", {
@@ -645,11 +751,13 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         ) {
           return;
         }
-        await tx.mutate.messageRoomOrder.update({
-          messageId: args.messageId,
-          tentativePinClaimId: null,
-          tentativePinClaimedAt: null,
-        });
+        await tx.mutate.messageRoomOrder.update(
+          withUpdateTimestamp({
+            messageId: args.messageId,
+            tentativePinClaimId: null,
+            tentativePinClaimedAt: null,
+          }),
+        );
       },
     }),
     ZeroApiEndpoint.mutator("markMessageRoomOrderTentative", {
@@ -659,12 +767,14 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         messageChannelId: Schema.String,
       }),
       mutator: async ({ tx, args }) =>
-        await tx.mutate.messageRoomOrder.update({
-          messageId: args.messageId,
-          tentative: true,
-          guildId: args.guildId,
-          messageChannelId: args.messageChannelId,
-        }),
+        await tx.mutate.messageRoomOrder.update(
+          withUpdateTimestamp({
+            messageId: args.messageId,
+            tentative: true,
+            guildId: args.guildId,
+            messageChannelId: args.messageChannelId,
+          }),
+        ),
     }),
     ZeroApiEndpoint.mutator("upsertMessageRoomOrder", {
       request: Schema.Struct({
@@ -684,19 +794,24 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
           builder.messageRoomOrder.where("messageId", "=", args.messageId).one(),
         );
 
-        await tx.mutate.messageRoomOrder.upsert({
-          messageId: args.messageId,
-          previousFills: args.previousFills.slice(),
-          fills: args.fills.slice(),
-          hour: args.hour,
-          rank: args.rank,
-          tentative: args.tentative ?? existingMessageRoomOrder?.tentative ?? false,
-          monitor: args.monitor,
-          guildId: args.guildId,
-          messageChannelId: args.messageChannelId,
-          createdByUserId: args.createdByUserId,
-          deletedAt: null,
-        });
+        await tx.mutate.messageRoomOrder.upsert(
+          withUpsertTimestamps(
+            {
+              messageId: args.messageId,
+              previousFills: args.previousFills.slice(),
+              fills: args.fills.slice(),
+              hour: args.hour,
+              rank: args.rank,
+              tentative: args.tentative ?? existingMessageRoomOrder?.tentative ?? false,
+              monitor: args.monitor,
+              guildId: args.guildId,
+              messageChannelId: args.messageChannelId,
+              createdByUserId: args.createdByUserId,
+              deletedAt: null,
+            },
+            existingMessageRoomOrder?.createdAt,
+          ),
+        );
       },
     }),
     ZeroApiEndpoint.mutator("persistMessageRoomOrder", {
@@ -725,33 +840,55 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         ),
       }),
       mutator: async ({ tx, args }) => {
-        await tx.mutate.messageRoomOrder.upsert({
-          messageId: args.messageId,
-          previousFills: args.data.previousFills.slice(),
-          fills: args.data.fills.slice(),
-          hour: args.data.hour,
-          rank: args.data.rank,
-          tentative: args.data.tentative ?? false,
-          monitor: args.data.monitor,
-          guildId: args.data.guildId,
-          messageChannelId: args.data.messageChannelId,
-          createdByUserId: args.data.createdByUserId,
-          deletedAt: null,
-        });
+        const existingMessageRoomOrder = await tx.run(
+          builder.messageRoomOrder.where("messageId", "=", args.messageId).one(),
+        );
+
+        await tx.mutate.messageRoomOrder.upsert(
+          withUpsertTimestamps(
+            {
+              messageId: args.messageId,
+              previousFills: args.data.previousFills.slice(),
+              fills: args.data.fills.slice(),
+              hour: args.data.hour,
+              rank: args.data.rank,
+              tentative: args.data.tentative ?? existingMessageRoomOrder?.tentative ?? false,
+              monitor: args.data.monitor,
+              guildId: args.data.guildId,
+              messageChannelId: args.data.messageChannelId,
+              createdByUserId: args.data.createdByUserId,
+              deletedAt: null,
+            },
+            existingMessageRoomOrder?.createdAt,
+          ),
+        );
 
         await Promise.all(
-          args.entries.map((entry) =>
-            tx.mutate.messageRoomOrderEntry.upsert({
-              messageId: args.messageId,
-              rank: entry.rank,
-              position: entry.position,
-              hour: entry.hour,
-              team: entry.team,
-              tags: entry.tags.slice(),
-              effectValue: entry.effectValue,
-              deletedAt: null,
-            }),
-          ),
+          args.entries.map(async (entry) => {
+            const existingEntry = await tx.run(
+              builder.messageRoomOrderEntry
+                .where("messageId", "=", args.messageId)
+                .where("rank", "=", entry.rank)
+                .where("position", "=", entry.position)
+                .one(),
+            );
+
+            return tx.mutate.messageRoomOrderEntry.upsert(
+              withUpsertTimestamps(
+                {
+                  messageId: args.messageId,
+                  rank: entry.rank,
+                  position: entry.position,
+                  hour: entry.hour,
+                  team: entry.team,
+                  tags: entry.tags.slice(),
+                  effectValue: entry.effectValue,
+                  deletedAt: null,
+                },
+                existingEntry?.createdAt,
+              ),
+            );
+          }),
         );
       },
     }),
@@ -771,18 +908,31 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
       }),
       mutator: async ({ tx, args }) => {
         await Promise.all(
-          args.entries.map((entry) =>
-            tx.mutate.messageRoomOrderEntry.upsert({
-              messageId: args.messageId,
-              rank: entry.rank,
-              position: entry.position,
-              hour: entry.hour,
-              team: entry.team,
-              tags: entry.tags.slice(),
-              effectValue: entry.effectValue,
-              deletedAt: null,
-            }),
-          ),
+          args.entries.map(async (entry) => {
+            const existingEntry = await tx.run(
+              builder.messageRoomOrderEntry
+                .where("messageId", "=", args.messageId)
+                .where("rank", "=", entry.rank)
+                .where("position", "=", entry.position)
+                .one(),
+            );
+
+            return tx.mutate.messageRoomOrderEntry.upsert(
+              withUpsertTimestamps(
+                {
+                  messageId: args.messageId,
+                  rank: entry.rank,
+                  position: entry.position,
+                  hour: entry.hour,
+                  team: entry.team,
+                  tags: entry.tags.slice(),
+                  effectValue: entry.effectValue,
+                  deletedAt: null,
+                },
+                existingEntry?.createdAt,
+              ),
+            );
+          }),
         );
       },
     }),
@@ -793,12 +943,14 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         position: Schema.Number,
       }),
       mutator: async ({ tx, args }) =>
-        await tx.mutate.messageRoomOrderEntry.update({
-          messageId: args.messageId,
-          rank: args.rank,
-          position: args.position,
-          deletedAt: Date.now() / 1000,
-        }),
+        await tx.mutate.messageRoomOrderEntry.update(
+          withUpdateTimestamp({
+            messageId: args.messageId,
+            rank: args.rank,
+            position: args.position,
+            deletedAt: Date.now(),
+          }),
+        ),
     }),
   );
 
@@ -817,15 +969,25 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
         messageChannelId: Schema.NullOr(Schema.String),
         createdByUserId: Schema.NullOr(Schema.String),
       }),
-      mutator: async ({ tx, args }) =>
-        await tx.mutate.messageSlot.upsert({
-          messageId: args.messageId,
-          day: args.day,
-          guildId: args.guildId,
-          messageChannelId: args.messageChannelId,
-          createdByUserId: args.createdByUserId,
-          deletedAt: null,
-        }),
+      mutator: async ({ tx, args }) => {
+        const existingSlot = await tx.run(
+          builder.messageSlot.where("messageId", "=", args.messageId).one(),
+        );
+
+        await tx.mutate.messageSlot.upsert(
+          withUpsertTimestamps(
+            {
+              messageId: args.messageId,
+              day: args.day,
+              guildId: args.guildId,
+              messageChannelId: args.messageChannelId,
+              createdByUserId: args.createdByUserId,
+              deletedAt: null,
+            },
+            existingSlot?.createdAt,
+          ),
+        );
+      },
     }),
   );
 

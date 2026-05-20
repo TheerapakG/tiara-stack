@@ -1,12 +1,24 @@
 import { defineMutator } from "@rocicorp/zero";
 import { Schema, pipe } from "effect";
-import type { Schema as ZeroSchema } from "../schema";
+import { builder, type Schema as ZeroSchema } from "../schema";
 
 declare module "@rocicorp/zero" {
   interface DefaultTypes {
     schema: ZeroSchema;
   }
 }
+
+const withUpsertTimestamps = <const Value extends Record<string, unknown> & { createdAt?: number }>(
+  value: Value,
+  existingCreatedAt?: number,
+) => {
+  const now = Date.now();
+  return {
+    ...value,
+    createdAt: value.createdAt ?? existingCreatedAt ?? now,
+    updatedAt: now,
+  };
+};
 
 export const guildConfig = {
   upsertGuildConfig: defineMutator(
@@ -18,13 +30,23 @@ export const guildConfig = {
       }),
       Schema.toStandardSchemaV1,
     ),
-    async ({ tx, args }) =>
-      await tx.mutate.configGuild.upsert({
-        guildId: args.guildId,
-        sheetId: args.sheetId,
-        autoCheckin: args.autoCheckin,
-        deletedAt: null,
-      }),
+    async ({ tx, args }) => {
+      const existingConfigGuild = await tx.run(
+        builder.configGuild.where("guildId", "=", args.guildId).one(),
+      );
+
+      await tx.mutate.configGuild.upsert(
+        withUpsertTimestamps(
+          {
+            guildId: args.guildId,
+            sheetId: args.sheetId,
+            autoCheckin: args.autoCheckin,
+            deletedAt: null,
+          },
+          existingConfigGuild?.createdAt,
+        ),
+      );
+    },
   ),
   addGuildMonitorRole: defineMutator(
     pipe(
@@ -34,12 +56,25 @@ export const guildConfig = {
       }),
       Schema.toStandardSchemaV1,
     ),
-    async ({ tx, args }) =>
-      await tx.mutate.configGuildManagerRole.upsert({
-        guildId: args.guildId,
-        roleId: args.roleId,
-        deletedAt: null,
-      }),
+    async ({ tx, args }) => {
+      const existingRole = await tx.run(
+        builder.configGuildManagerRole
+          .where("guildId", "=", args.guildId)
+          .where("roleId", "=", args.roleId)
+          .one(),
+      );
+
+      await tx.mutate.configGuildManagerRole.upsert(
+        withUpsertTimestamps(
+          {
+            guildId: args.guildId,
+            roleId: args.roleId,
+            deletedAt: null,
+          },
+          existingRole?.createdAt,
+        ),
+      );
+    },
   ),
   removeGuildMonitorRole: defineMutator(
     pipe(
@@ -68,15 +103,28 @@ export const guildConfig = {
       }),
       Schema.toStandardSchemaV1,
     ),
-    async ({ tx, args }) =>
-      await tx.mutate.configGuildChannel.upsert({
-        guildId: args.guildId,
-        channelId: args.channelId,
-        name: args.name,
-        running: args.running,
-        roleId: args.roleId,
-        checkinChannelId: args.checkinChannelId,
-        deletedAt: null,
-      }),
+    async ({ tx, args }) => {
+      const existingChannel = await tx.run(
+        builder.configGuildChannel
+          .where("guildId", "=", args.guildId)
+          .where("channelId", "=", args.channelId)
+          .one(),
+      );
+
+      await tx.mutate.configGuildChannel.upsert(
+        withUpsertTimestamps(
+          {
+            guildId: args.guildId,
+            channelId: args.channelId,
+            name: args.name,
+            running: args.running,
+            roleId: args.roleId,
+            checkinChannelId: args.checkinChannelId,
+            deletedAt: null,
+          },
+          existingChannel?.createdAt,
+        ),
+      );
+    },
   ),
 };
