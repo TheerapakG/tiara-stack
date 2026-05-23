@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { removeUndefinedFields } from "./http";
+import { hasZeroHandlerFn, removeUndefinedFields } from "./http";
 
 describe("Zero server HTTP helpers", () => {
   it("removes undefined object fields and normalizes undefined array entries to null", () => {
@@ -20,5 +20,14 @@ describe("Zero server HTTP helpers", () => {
       },
       array: ["value", null, { keep: true }],
     });
+  });
+
+  it("accepts Zero handler definitions stored as functions with fn metadata", () => {
+    const query = Object.assign(() => undefined, {
+      fn: () => undefined,
+    });
+
+    expect(typeof query).toBe("function");
+    expect(hasZeroHandlerFn(query)).toBe(true);
   });
 });

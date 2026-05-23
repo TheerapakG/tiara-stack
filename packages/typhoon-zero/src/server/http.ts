@@ -8,7 +8,7 @@ import {
   type Schema as ZeroSchema,
 } from "@rocicorp/zero";
 import { handleMutateRequest, handleQueryRequest, type Database } from "@rocicorp/zero/server";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import { HttpApiBuilder, type HttpApi, type HttpApiGroup } from "effect/unstable/httpapi";
 import { ZeroHttpApi } from "./api";
 
@@ -56,6 +56,26 @@ interface ZeroMutatorHandler<Context, Tx> {
   }) => Promise<void>;
 }
 
+type ZeroHandlerWithFn = {
+  readonly fn: unknown;
+};
+
+const ZeroHandlerWithFnSchema = Schema.declare(
+  (handler): handler is ZeroHandlerWithFn =>
+    (typeof handler === "object" || typeof handler === "function") &&
+    handler !== null &&
+    typeof Reflect.get(handler, "fn") === "function",
+);
+
+export const hasZeroHandlerFn = (handler: unknown): handler is ZeroHandlerWithFn => {
+  try {
+    Schema.decodeUnknownSync(ZeroHandlerWithFnSchema)(handler);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const mustGetPath = (registry: object, name: string): unknown => {
   let current: unknown = registry;
   for (const part of name.split(".")) {
@@ -72,11 +92,7 @@ const mustGetQueryHandler = <Context>(
   name: string,
 ): ZeroQueryHandler<Context> => {
   const query = mustGetPath(registry, name);
-  if (
-    typeof query !== "object" ||
-    query === null ||
-    typeof Reflect.get(query, "fn") !== "function"
-  ) {
+  if (!hasZeroHandlerFn(query)) {
     throw new Error(`Zero query handler not found: ${name}`);
   }
   return query as ZeroQueryHandler<Context>;
@@ -87,11 +103,7 @@ const mustGetMutatorHandler = <Context, Tx>(
   name: string,
 ): ZeroMutatorHandler<Context, Tx> => {
   const mutator = mustGetPath(registry, name);
-  if (
-    typeof mutator !== "object" ||
-    mutator === null ||
-    typeof Reflect.get(mutator, "fn") !== "function"
-  ) {
+  if (!hasZeroHandlerFn(mutator)) {
     throw new Error(`Zero mutator handler not found: ${name}`);
   }
   return mutator as ZeroMutatorHandler<Context, Tx>;
