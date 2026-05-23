@@ -11,6 +11,9 @@ RUN tar -axf ./dist.tar.zst && rm ./dist.tar.zst
 
 FROM node:22-slim
 
+ENV NODE_OPTIONS=--use-openssl-ca
+ENV NODE_EXTRA_CA_CERTS=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates \
   && rm -rf /var/lib/apt/lists/*
