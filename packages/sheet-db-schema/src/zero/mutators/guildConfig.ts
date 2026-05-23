@@ -1,6 +1,7 @@
 import { defineMutator } from "@rocicorp/zero";
 import { Schema, pipe } from "effect";
 import { builder, type Schema as ZeroSchema } from "../schema";
+import { preserveOmitted } from "../timestamps";
 
 declare module "@rocicorp/zero" {
   interface DefaultTypes {
@@ -39,8 +40,8 @@ export const guildConfig = {
         withUpsertTimestamps(
           {
             guildId: args.guildId,
-            sheetId: args.sheetId,
-            autoCheckin: args.autoCheckin,
+            sheetId: preserveOmitted(args.sheetId, existingConfigGuild?.sheetId),
+            autoCheckin: preserveOmitted(args.autoCheckin, existingConfigGuild?.autoCheckin),
             deletedAt: null,
           },
           existingConfigGuild?.createdAt,
@@ -116,10 +117,13 @@ export const guildConfig = {
           {
             guildId: args.guildId,
             channelId: args.channelId,
-            name: args.name,
-            running: args.running,
-            roleId: args.roleId,
-            checkinChannelId: args.checkinChannelId,
+            name: preserveOmitted(args.name, existingChannel?.name),
+            running: preserveOmitted(args.running, existingChannel?.running),
+            roleId: preserveOmitted(args.roleId, existingChannel?.roleId),
+            checkinChannelId: preserveOmitted(
+              args.checkinChannelId,
+              existingChannel?.checkinChannelId,
+            ),
             deletedAt: null,
           },
           existingChannel?.createdAt,

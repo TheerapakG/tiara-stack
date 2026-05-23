@@ -8,7 +8,7 @@ import {
   isActiveSendClaim,
 } from "./claimHelpers";
 import { builder, type Schema as ZeroSchema } from "./schema";
-import { withUpdateTimestamp, withUpsertTimestamps } from "./timestamps";
+import { preserveOmitted, withUpdateTimestamp, withUpsertTimestamps } from "./timestamps";
 
 declare module "@rocicorp/zero" {
   interface DefaultTypes {
@@ -151,8 +151,8 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
           withUpsertTimestamps(
             {
               guildId: args.guildId,
-              sheetId: args.sheetId,
-              autoCheckin: args.autoCheckin,
+              sheetId: preserveOmitted(args.sheetId, existingConfigGuild?.sheetId),
+              autoCheckin: preserveOmitted(args.autoCheckin, existingConfigGuild?.autoCheckin),
               deletedAt: null,
             },
             existingConfigGuild?.createdAt,
@@ -221,10 +221,13 @@ const makeSheetZeroApiWithSuccess = <const SuccessSchemas extends SheetZeroApiSu
             {
               guildId: args.guildId,
               channelId: args.channelId,
-              name: args.name,
-              running: args.running,
-              roleId: args.roleId,
-              checkinChannelId: args.checkinChannelId,
+              name: preserveOmitted(args.name, existingChannel?.name),
+              running: preserveOmitted(args.running, existingChannel?.running),
+              roleId: preserveOmitted(args.roleId, existingChannel?.roleId),
+              checkinChannelId: preserveOmitted(
+                args.checkinChannelId,
+                existingChannel?.checkinChannelId,
+              ),
               deletedAt: null,
             },
             existingChannel?.createdAt,

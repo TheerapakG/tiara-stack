@@ -29,6 +29,12 @@ const resolveGuildId = Effect.fn("resolveGuildId")(function* (serverId: Option.O
 
 const isUnauthorized = Predicate.isTagged("Unauthorized");
 
+const isAutoCheckinEnabled = (autoCheckin: Option.Option<boolean>) =>
+  pipe(
+    autoCheckin,
+    Option.getOrElse(() => false),
+  );
+
 const makeListConfigSubCommand = Effect.gen(function* () {
   const embedService = yield* EmbedService;
   const guildConfigService = yield* GuildConfigService;
@@ -71,7 +77,9 @@ const makeListConfigSubCommand = Effect.gen(function* () {
                 .setDescription(
                   [
                     `Sheet id: ${sheetId}`,
-                    `Auto check-in: ${guildConfig.autoCheckin ? "Enabled" : "Disabled"}`,
+                    `Auto check-in: ${
+                      isAutoCheckinEnabled(guildConfig.autoCheckin) ? "Enabled" : "Disabled"
+                    }`,
                     `Monitor roles: ${
                       monitorRoles.length > 0
                         ? monitorRoles
@@ -332,7 +340,7 @@ const makeSetAutoCheckinSubCommand = Effect.gen(function* () {
               (yield* embedService.makeBaseEmbedBuilder())
                 .setTitle("Success!")
                 .setDescription(
-                  `Auto check-in for ${escapeMarkdown(guild.name)} is now ${guildConfig.autoCheckin ? "enabled" : "disabled"}.`,
+                  `Auto check-in for ${escapeMarkdown(guild.name)} is now ${isAutoCheckinEnabled(guildConfig.autoCheckin) ? "enabled" : "disabled"}.`,
                 )
                 .toJSON(),
             ],

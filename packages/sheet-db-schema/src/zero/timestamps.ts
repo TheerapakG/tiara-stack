@@ -16,3 +16,8 @@ export const withUpdateTimestamp = <const Value extends Record<string, unknown>>
   ...value,
   updatedAt: Date.now(),
 });
+
+export const preserveOmitted = <Value>(
+  value: Value | null | undefined,
+  existingValue: Value | null | undefined,
+) => (typeof value === "undefined" ? existingValue : value);
