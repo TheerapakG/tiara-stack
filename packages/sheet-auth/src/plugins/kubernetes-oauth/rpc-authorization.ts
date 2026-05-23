@@ -1,9 +1,47 @@
 import { Cache, Clock, Duration, Effect, Exit, Option } from "effect";
 import { Headers } from "effect/unstable/http";
+import { decodeJwt, decodeProtectedHeader } from "jose";
 import { Unauthorized } from "typhoon-core/error";
 import { verifyKubernetesToken } from "./index";
 
 const defaultHeaderName = "x-sheet-ingress-auth";
+
+const getString = (value: unknown) => (typeof value === "string" ? value : undefined);
+const getNumber = (value: unknown) => (typeof value === "number" ? value : undefined);
+
+const getKubernetesTokenDiagnostics = (
+  token: string,
+  expectedAudience: string,
+  expectedSubject: string,
+) => {
+  const tokenParts = token.split(".").length;
+  const header = (() => {
+    try {
+      return decodeProtectedHeader(token);
+    } catch {
+      return undefined;
+    }
+  })();
+  const payload = (() => {
+    try {
+      return decodeJwt(token);
+    } catch {
+      return undefined;
+    }
+  })();
+
+  return {
+    expectedAudience,
+    expectedSubject,
+    tokenParts,
+    headerAlg: getString(header?.alg),
+    headerKid: getString(header?.kid),
+    payloadAud: payload?.aud,
+    payloadExp: getNumber(payload?.exp),
+    payloadIss: getString(payload?.iss),
+    payloadSub: getString(payload?.sub),
+  };
+};
 
 export interface KubernetesServiceAccountTokenAuthorizerOptions<E = Unauthorized> {
   readonly audience: string;
@@ -113,9 +151,19 @@ export const makeKubernetesServiceAccountTokenAuthorizer = <E = Unauthorized>(
       (token: string) =>
         Effect.tryPromise({
           try: () => verifyToken(token, audience),
-          catch: (cause) =>
+          catch: (cause) => cause,
+        }).pipe(
+          Effect.tapError((cause) =>
+            Effect.logWarning("Failed to verify ingress Kubernetes token", {
+              cause,
+              token: getKubernetesTokenDiagnostics(token, audience, expectedSubject),
+            }),
+          ),
+          Effect.mapError((cause) =>
             makeUnauthorized({ message: "Invalid ingress Kubernetes token", cause }),
-        }).pipe(Effect.flatMap(toCachedVerifiedToken)),
+          ),
+          Effect.flatMap(toCachedVerifiedToken),
+        ),
       {
         capacity: cacheCapacity,
         timeToLive: Exit.match({
