@@ -80,6 +80,64 @@ const parseQueryErrorResultDetails = (error: ErroredQuery) =>
     ),
   );
 
+const makeUnknownQueryError = (): ErroredQuery => ({
+  error: "app",
+  id: "unknown",
+  name: "unknown",
+  message: "Zero query failed without error details",
+});
+
+const runQuery = <S extends ZeroSchema, MD extends CustomMutatorDefs | undefined, C, TReturn>(
+  zero: Zero<S, MD, C>,
+  query: QueryOrQueryRequest<any, any, any, S, TReturn, C>,
+  runOptions?: RunOptions,
+) =>
+  Effect.suspend(() => {
+    const view = zero.materialize(query, { ttl: runOptions?.ttl });
+
+    if (runOptions?.type !== "complete") {
+      const data = view.data as HumanReadable<TReturn>;
+      view.destroy();
+      return Effect.succeed(data);
+    }
+
+    return Effect.callback<HumanReadable<TReturn>, ErroredQuery>((resume) => {
+      let removeListener: (() => void) | undefined;
+      let done = false;
+
+      const cleanup = () => {
+        removeListener?.();
+        view.destroy();
+      };
+
+      const complete = (effect: Effect.Effect<HumanReadable<TReturn>, ErroredQuery>) => {
+        if (done) {
+          return;
+        }
+        done = true;
+        cleanup();
+        resume(effect);
+      };
+
+      removeListener = view.addListener((data, resultType, error) => {
+        if (resultType === "complete") {
+          complete(Effect.succeed(data as HumanReadable<TReturn>));
+        } else if (resultType === "error") {
+          complete(Effect.fail(error ?? makeUnknownQueryError()));
+        }
+      });
+
+      if (done) {
+        removeListener();
+      }
+
+      return Effect.sync(() => {
+        done = true;
+        cleanup();
+      });
+    });
+  });
+
 const parseMutatorResultDetails = (result: MutatorResultDetails) =>
   pipe(
     Match.value(result),
@@ -110,10 +168,7 @@ export const ZeroClient = <S extends ZeroSchema, MD extends CustomMutatorDefs | 
           query: QueryOrQueryRequest<any, any, any, S, TReturn, C>,
           runOptions?: RunOptions,
         ) {
-          return yield* Effect.tryPromise({
-            try: () => zero.run(query, runOptions),
-            catch: (error) => error as ErroredQuery,
-          }).pipe(
+          return yield* runQuery(zero, query, runOptions).pipe(
             Effect.catch((error) =>
               parseQueryErrorResultDetails(error).pipe(Effect.flatMap(Effect.fail)),
             ),
