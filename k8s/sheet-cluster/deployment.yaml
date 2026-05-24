@@ -19,7 +19,6 @@ spec:
       labels:
         app: sheet-cluster
     spec:
-      subdomain: sheet-cluster-runner
       containers:
         - name: sheet-cluster
           image: <IMAGE>
@@ -31,10 +30,6 @@ spec:
             - containerPort: 9464
               name: cluster-met
           env:
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -50,7 +45,9 @@ spec:
                   name: sheet-cluster-secret
                   key: postgresUrl
             - name: CLUSTER_RUNNER_HOST
-              value: "$(POD_NAME).sheet-cluster-runner.$(POD_NAMESPACE).svc.cluster.local"
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
             - name: CLUSTER_RUNNER_PORT
               value: "34431"
             - name: CLUSTER_RUNNER_LISTEN_HOST
