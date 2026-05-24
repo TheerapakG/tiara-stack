@@ -4,17 +4,11 @@ import { DiscordGateway } from "dfx/DiscordGateway";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import { DiscordApiClient } from "../discord/discordApiClient";
-import type { DiscordChannel, DiscordGuild } from "../discord/schema";
+import type { DiscordChannel, DiscordGuild, DiscordMember } from "../discord/schema";
 import type { ReverseLookupCacheDriver } from "./driver";
 import { make, makeWithReverseLookup } from "./cache";
 
-// Member type with pending optional (Discord only includes it when Membership Screening is enabled)
-export type CachedGuildMember = Omit<
-  Discord.GuildMemberResponse,
-  "deaf" | "flags" | "joined_at" | "mute" | "pending"
-> & {
-  pending?: boolean;
-};
+export type CachedGuildMember = DiscordMember;
 
 // Guild type with relaxed fields (allows unknown future values)
 export type CachedGuild = Omit<
@@ -260,16 +254,7 @@ export const membersWithReverseLookup = Effect.fn("cache.membersWithReverseLooku
   RM,
   EM,
   E,
->(
-  makeDriver: Effect.Effect<
-    ReverseLookupCacheDriver<
-      E,
-      Omit<Discord.GuildMemberResponse, "deaf" | "flags" | "joined_at" | "mute">
-    >,
-    EM,
-    RM
-  >,
-) {
+>(makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, CachedGuildMember>, EM, RM>) {
   const driver = yield* makeDriver;
   const gateway = yield* DiscordGateway;
   const rest = yield* DiscordREST;
@@ -281,8 +266,7 @@ export const membersWithReverseLookup = Effect.fn("cache.membersWithReverseLooku
         new Cache.CacheMissError({ cacheName: "MembersReverseLookupCache/id", id: _.user.id }),
       ),
     ops: opsWithReverseLookup({
-      id: (m: Omit<Discord.GuildMemberResponse, "deaf" | "flags" | "joined_at" | "mute">) =>
-        m.user.id,
+      id: (m: CachedGuildMember) => m.user.id,
       fromParent: Stream.map(gateway.fromDispatch("GUILD_CREATE"), (g) => [g.id, g.members]),
       create: Stream.map(gateway.fromDispatch("GUILD_MEMBER_ADD"), (r) => [r.guild_id, r]),
       update: Stream.map(gateway.fromDispatch("GUILD_MEMBER_UPDATE"), (r) => [r.guild_id, r]),
@@ -370,14 +354,7 @@ export const rolesCacheViewWithReverseLookup = <RM, EM, E>(
 ) => cacheViewWithReverseLookup((r) => r.id, makeDriver);
 
 export const membersCacheViewWithReverseLookup = <RM, EM, E>(
-  makeDriver: Effect.Effect<
-    ReverseLookupCacheDriver<
-      E,
-      Omit<Discord.GuildMemberResponse, "deaf" | "flags" | "joined_at" | "mute">
-    >,
-    EM,
-    RM
-  >,
+  makeDriver: Effect.Effect<ReverseLookupCacheDriver<E, CachedGuildMember>, EM, RM>,
 ) => cacheViewWithReverseLookup((m) => m.user.id, makeDriver);
 
 // Generic cache view prelude (no gateway subscriptions, read-only view, dies on miss)

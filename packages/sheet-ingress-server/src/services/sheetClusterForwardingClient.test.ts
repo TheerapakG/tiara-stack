@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Effect, HashSet, Option, Redacted } from "effect";
 import { Headers } from "effect/unstable/http";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
@@ -61,19 +61,20 @@ describe("SheetClusterForwardingClient", () => {
   });
 
   it("keeps split room-order forwarding methods aligned with shared button metadata", async () => {
+    const makeDiscard = () => vi.fn(() => Effect.void);
     const rpcClient = {
-      [DispatchWorkflowOperations.checkin.discardRpcTag]: () => Effect.void,
-      [DispatchWorkflowOperations.checkinButton.discardRpcTag]: () => Effect.void,
-      [DispatchWorkflowOperations.roomOrder.discardRpcTag]: () => Effect.void,
-      [DispatchWorkflowOperations.slotOpenButton.discardRpcTag]: () => Effect.void,
-      ...Object.fromEntries(
-        [
-          DispatchWorkflowOperations.roomOrderPreviousButton,
-          DispatchWorkflowOperations.roomOrderNextButton,
-          DispatchWorkflowOperations.roomOrderSendButton,
-          DispatchWorkflowOperations.roomOrderPinTentativeButton,
-        ].map((operation) => [operation.discardRpcTag, () => Effect.void]),
-      ),
+      [DispatchWorkflowOperations.checkin.discardRpcTag]: makeDiscard(),
+      [DispatchWorkflowOperations.checkinButton.discardRpcTag]: makeDiscard(),
+      [DispatchWorkflowOperations.roomOrder.discardRpcTag]: makeDiscard(),
+      [DispatchWorkflowOperations.kickout.discardRpcTag]: makeDiscard(),
+      [DispatchWorkflowOperations.slotButton.discardRpcTag]: makeDiscard(),
+      [DispatchWorkflowOperations.slotList.discardRpcTag]: makeDiscard(),
+      [DispatchWorkflowOperations.serviceStatus.discardRpcTag]: makeDiscard(),
+      [DispatchWorkflowOperations.slotOpenButton.discardRpcTag]: makeDiscard(),
+      [DispatchWorkflowOperations.roomOrderPreviousButton.discardRpcTag]: makeDiscard(),
+      [DispatchWorkflowOperations.roomOrderNextButton.discardRpcTag]: makeDiscard(),
+      [DispatchWorkflowOperations.roomOrderSendButton.discardRpcTag]: makeDiscard(),
+      [DispatchWorkflowOperations.roomOrderPinTentativeButton.discardRpcTag]: makeDiscard(),
     };
 
     const client = await Effect.runPromise(
@@ -81,6 +82,12 @@ describe("SheetClusterForwardingClient", () => {
         Effect.provideService(SheetClusterRpcClient, rpcClient as never),
       ),
     );
+    const expectDiscarded = <O extends { readonly discardRpcTag: keyof typeof rpcClient }>(
+      operation: O,
+      payload: unknown,
+    ) => {
+      expect(rpcClient[operation.discardRpcTag]).toHaveBeenCalledWith(payload, { discard: true });
+    };
 
     const requester = { accountId: "account-1", userId: "user-1" };
     const authorizedRoomOrder = new MessageRoomOrder({
@@ -122,6 +129,7 @@ describe("SheetClusterForwardingClient", () => {
       ),
       operation: "checkin",
     });
+    expectDiscarded(DispatchWorkflowOperations.checkin, checkinPayload);
     await expect(
       Effect.runPromise(
         client.dispatch.checkinButton({
@@ -134,6 +142,14 @@ describe("SheetClusterForwardingClient", () => {
         } as never) as Effect.Effect<unknown, unknown, never>,
       ),
     ).resolves.toMatchObject({ operation: "checkinButton" });
+    expectDiscarded(DispatchWorkflowOperations.checkinButton, {
+      requester,
+      payload: {
+        messageId: "message-1",
+        interactionToken: "token-1",
+        interactionDeadlineEpochMs: expect.any(Number),
+      },
+    });
     await expect(
       Effect.runPromise(
         client.dispatch.roomOrder({
@@ -142,6 +158,74 @@ describe("SheetClusterForwardingClient", () => {
         } as never) as Effect.Effect<unknown, unknown, never>,
       ),
     ).resolves.toMatchObject({ operation: "roomOrder" });
+    expectDiscarded(DispatchWorkflowOperations.roomOrder, {
+      requester,
+      payload: { dispatchRequestId: "dispatch-room-order", guildId: "guild-1" },
+    });
+    await expect(
+      Effect.runPromise(
+        client.dispatch.kickout({
+          requester,
+          payload: { dispatchRequestId: "dispatch-kickout", guildId: "guild-1" },
+        } as never) as Effect.Effect<unknown, unknown, never>,
+      ),
+    ).resolves.toMatchObject({ operation: "kickout" });
+    expectDiscarded(DispatchWorkflowOperations.kickout, {
+      requester,
+      payload: { dispatchRequestId: "dispatch-kickout", guildId: "guild-1" },
+    });
+    await expect(
+      Effect.runPromise(
+        client.dispatch.slotButton({
+          requester,
+          payload: {
+            dispatchRequestId: "dispatch-slot-button",
+            guildId: "guild-1",
+            channelId: "channel-1",
+            day: 1,
+            interactionToken: "token-1",
+            interactionDeadlineEpochMs: Date.now() + 60_000,
+          },
+        } as never) as Effect.Effect<unknown, unknown, never>,
+      ),
+    ).resolves.toMatchObject({ operation: "slotButton" });
+    expectDiscarded(DispatchWorkflowOperations.slotButton, {
+      requester,
+      payload: {
+        dispatchRequestId: "dispatch-slot-button",
+        guildId: "guild-1",
+        channelId: "channel-1",
+        day: 1,
+        interactionToken: "token-1",
+        interactionDeadlineEpochMs: expect.any(Number),
+      },
+    });
+    await expect(
+      Effect.runPromise(
+        client.dispatch.slotList({
+          requester,
+          payload: {
+            dispatchRequestId: "dispatch-slot-list",
+            guildId: "guild-1",
+            day: 1,
+            messageType: "ephemeral",
+            interactionToken: "token-1",
+            interactionDeadlineEpochMs: Date.now() + 60_000,
+          },
+        } as never) as Effect.Effect<unknown, unknown, never>,
+      ),
+    ).resolves.toMatchObject({ operation: "slotList" });
+    expectDiscarded(DispatchWorkflowOperations.slotList, {
+      requester,
+      payload: {
+        dispatchRequestId: "dispatch-slot-list",
+        guildId: "guild-1",
+        day: 1,
+        messageType: "ephemeral",
+        interactionToken: "token-1",
+        interactionDeadlineEpochMs: expect.any(Number),
+      },
+    });
     await expect(
       Effect.runPromise(
         client.dispatch.slotOpenButton({
@@ -154,6 +238,34 @@ describe("SheetClusterForwardingClient", () => {
         } as never) as Effect.Effect<unknown, unknown, never>,
       ),
     ).resolves.toMatchObject({ operation: "slotOpenButton" });
+    expectDiscarded(DispatchWorkflowOperations.slotOpenButton, {
+      requester,
+      payload: {
+        messageId: "message-1",
+        interactionToken: "token-1",
+        interactionDeadlineEpochMs: expect.any(Number),
+      },
+    });
+    await expect(
+      Effect.runPromise(
+        client.dispatch.serviceStatus({
+          requester,
+          payload: {
+            dispatchRequestId: "dispatch-service-status",
+            interactionToken: "token-1",
+            interactionDeadlineEpochMs: Date.now() + 60_000,
+          },
+        } as never) as Effect.Effect<unknown, unknown, never>,
+      ),
+    ).resolves.toMatchObject({ operation: "serviceStatus" });
+    expectDiscarded(DispatchWorkflowOperations.serviceStatus, {
+      requester,
+      payload: {
+        dispatchRequestId: "dispatch-service-status",
+        interactionToken: "token-1",
+        interactionDeadlineEpochMs: expect.any(Number),
+      },
+    });
 
     for (const method of Object.values(DispatchRoomOrderButtonMethods)) {
       const operation = [
@@ -191,6 +303,9 @@ describe("SheetClusterForwardingClient", () => {
         operation: operation?.operation,
         status: "accepted",
       });
+      if (operation !== undefined) {
+        expectDiscarded(operation, payload);
+      }
     }
   });
 });

@@ -35,46 +35,65 @@ export class SheetClusterForwardingClient extends Context.Service<SheetClusterFo
       return {
         dispatch: {
           checkin: accept(DispatchWorkflowOperations.checkin, (args) =>
-            rpcClient[DispatchWorkflowOperations.checkin.discardRpcTag](args),
+            rpcClient[DispatchWorkflowOperations.checkin.discardRpcTag](args, { discard: true }),
           ),
           checkinButton: accept(DispatchWorkflowOperations.checkinButton, (args) =>
-            rpcClient[DispatchWorkflowOperations.checkinButton.discardRpcTag](args),
+            rpcClient[DispatchWorkflowOperations.checkinButton.discardRpcTag](args, {
+              discard: true,
+            }),
           ),
           roomOrder: accept(DispatchWorkflowOperations.roomOrder, (args) =>
-            rpcClient[DispatchWorkflowOperations.roomOrder.discardRpcTag](args),
+            rpcClient[DispatchWorkflowOperations.roomOrder.discardRpcTag](args, { discard: true }),
           ),
           kickout: accept(DispatchWorkflowOperations.kickout, (args) =>
-            rpcClient[DispatchWorkflowOperations.kickout.discardRpcTag](args),
+            rpcClient[DispatchWorkflowOperations.kickout.discardRpcTag](args, { discard: true }),
           ),
           slotButton: accept(DispatchWorkflowOperations.slotButton, (args) =>
-            rpcClient[DispatchWorkflowOperations.slotButton.discardRpcTag](args),
+            rpcClient[DispatchWorkflowOperations.slotButton.discardRpcTag](args, {
+              discard: true,
+            }),
           ),
           slotList: accept(DispatchWorkflowOperations.slotList, (args) =>
-            rpcClient[DispatchWorkflowOperations.slotList.discardRpcTag](args),
+            rpcClient[DispatchWorkflowOperations.slotList.discardRpcTag](args, { discard: true }),
           ),
           slotOpenButton: accept(DispatchWorkflowOperations.slotOpenButton, (args) =>
-            rpcClient[DispatchWorkflowOperations.slotOpenButton.discardRpcTag](args),
+            rpcClient[DispatchWorkflowOperations.slotOpenButton.discardRpcTag](args, {
+              discard: true,
+            }),
           ),
           serviceStatus: accept(DispatchWorkflowOperations.serviceStatus, (args) =>
-            rpcClient[DispatchWorkflowOperations.serviceStatus.discardRpcTag](args),
+            rpcClient[DispatchWorkflowOperations.serviceStatus.discardRpcTag](args, {
+              discard: true,
+            }),
           ),
           [DispatchWorkflowOperations.roomOrderPreviousButton.endpointName]: accept(
             DispatchWorkflowOperations.roomOrderPreviousButton,
             (args) =>
-              rpcClient[DispatchWorkflowOperations.roomOrderPreviousButton.discardRpcTag](args),
+              rpcClient[DispatchWorkflowOperations.roomOrderPreviousButton.discardRpcTag](args, {
+                discard: true,
+              }),
           ),
           [DispatchWorkflowOperations.roomOrderNextButton.endpointName]: accept(
             DispatchWorkflowOperations.roomOrderNextButton,
-            (args) => rpcClient[DispatchWorkflowOperations.roomOrderNextButton.discardRpcTag](args),
+            (args) =>
+              rpcClient[DispatchWorkflowOperations.roomOrderNextButton.discardRpcTag](args, {
+                discard: true,
+              }),
           ),
           [DispatchWorkflowOperations.roomOrderSendButton.endpointName]: accept(
             DispatchWorkflowOperations.roomOrderSendButton,
-            (args) => rpcClient[DispatchWorkflowOperations.roomOrderSendButton.discardRpcTag](args),
+            (args) =>
+              rpcClient[DispatchWorkflowOperations.roomOrderSendButton.discardRpcTag](args, {
+                discard: true,
+              }),
           ),
           [DispatchWorkflowOperations.roomOrderPinTentativeButton.endpointName]: accept(
             DispatchWorkflowOperations.roomOrderPinTentativeButton,
             (args) =>
-              rpcClient[DispatchWorkflowOperations.roomOrderPinTentativeButton.discardRpcTag](args),
+              rpcClient[DispatchWorkflowOperations.roomOrderPinTentativeButton.discardRpcTag](
+                args,
+                { discard: true },
+              ),
           ),
         },
       };

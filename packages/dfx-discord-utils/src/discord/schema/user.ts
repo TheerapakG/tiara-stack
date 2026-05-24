@@ -28,18 +28,18 @@ export const DiscordUserPrimaryGuild = Schema.Struct({
 export const DiscordUser = Schema.Struct({
   id: Schema.String,
   username: Schema.String,
-  avatar: Schema.NullOr(Schema.String),
+  avatar: Schema.optional(Schema.NullOr(Schema.String)),
   discriminator: Schema.String,
-  public_flags: Schema.Number,
-  flags: Schema.Number,
+  public_flags: Schema.optional(Schema.Number),
+  flags: Schema.optional(Schema.Number),
   bot: Schema.optional(Schema.Boolean),
   system: Schema.optional(Schema.Boolean),
   banner: Schema.optional(Schema.NullOr(Schema.String)),
   accent_color: Schema.optional(Schema.NullOr(Schema.Number)),
-  global_name: Schema.NullOr(Schema.String),
+  global_name: Schema.optional(Schema.NullOr(Schema.String)),
   avatar_decoration_data: Schema.optional(Schema.NullOr(DiscordAvatarDecorationData)),
   collectibles: Schema.optional(Schema.NullOr(DiscordUserCollectibles)),
-  primary_guild: Schema.NullOr(DiscordUserPrimaryGuild),
+  primary_guild: Schema.optional(Schema.NullOr(DiscordUserPrimaryGuild)),
 });
 
 export type DiscordUser = typeof DiscordUser.Type;
