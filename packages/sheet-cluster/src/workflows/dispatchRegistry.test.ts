@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer, Option, Schema } from "effect";
 import type { HttpApiClient } from "effect/unstable/httpapi";
+import { vi } from "vitest";
 import { MessageCheckinMember } from "sheet-ingress-api/schemas/messageCheckin";
 import { MessageSlot } from "sheet-ingress-api/schemas/messageSlot";
 import {
@@ -14,6 +15,8 @@ import type {
   KickoutDispatchPayload,
   KickoutDispatchResult,
   RoomOrderPinTentativeButtonPayload,
+  ServiceStatusDispatchPayload,
+  ServiceStatusDispatchResult,
   SlotButtonDispatchPayload,
   SlotButtonDispatchResult,
   SlotListDispatchPayload,
@@ -62,6 +65,12 @@ const slotListPayload: SlotListDispatchPayload = {
 
 const slotOpenButtonPayload: SlotOpenButtonPayload = {
   messageId: "slot-message-1",
+  interactionToken: "interaction-token",
+  interactionDeadlineEpochMs: 4_102_444_800_000,
+};
+
+const serviceStatusPayload: ServiceStatusDispatchPayload = {
+  dispatchRequestId: "dispatch-service-status",
   interactionToken: "interaction-token",
   interactionDeadlineEpochMs: 4_102_444_800_000,
 };
@@ -115,6 +124,7 @@ const makeDispatchServiceMock = (overrides: Partial<DispatchServiceMock>): Dispa
   slotButton: unexpectedDispatchServiceCall("slotButton"),
   slotList: unexpectedDispatchServiceCall("slotList"),
   slotOpenButton: unexpectedDispatchServiceCall("slotOpenButton"),
+  serviceStatus: unexpectedDispatchServiceCall("serviceStatus"),
   checkinButton: unexpectedDispatchServiceCall("checkinButton"),
   roomOrderPreviousButton: unexpectedDispatchServiceCall("roomOrderPreviousButton"),
   roomOrderNextButton: unexpectedDispatchServiceCall("roomOrderNextButton"),
@@ -219,6 +229,7 @@ describe("dispatch workflow registry", () => {
       "slotButton",
       "slotList",
       "slotOpenButton",
+      "serviceStatus",
       "checkinButton",
       "roomOrderPreviousButton",
       "roomOrderNextButton",
@@ -380,6 +391,42 @@ describe("dispatch workflow registry", () => {
                   day: 2,
                 } satisfies SlotOpenButtonResult;
               }),
+          }),
+        ),
+      ),
+    );
+  });
+
+  it("routes service status workflow execution to DispatchService", async () => {
+    const serviceStatus = vi.fn((payload: ServiceStatusDispatchPayload) =>
+      Effect.sync(() => {
+        expect(payload).toBe(serviceStatusPayload);
+        return {
+          overallStatus: "ok",
+          okCount: 7,
+          downCount: 0,
+        } satisfies ServiceStatusDispatchResult;
+      }),
+    ) as DispatchServiceMock["serviceStatus"];
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const result = yield* dispatchWorkflowRegistry.serviceStatus.execute({
+          requester,
+          payload: serviceStatusPayload,
+        });
+
+        expect(result).toEqual({
+          overallStatus: "ok",
+          okCount: 7,
+          downCount: 0,
+        });
+        expect(serviceStatus).toHaveBeenCalledWith(serviceStatusPayload);
+      }).pipe(
+        Effect.provideService(
+          DispatchService,
+          makeDispatchServiceMock({
+            serviceStatus,
           }),
         ),
       ),

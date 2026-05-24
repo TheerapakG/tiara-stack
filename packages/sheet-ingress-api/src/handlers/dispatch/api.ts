@@ -16,11 +16,13 @@ import {
   RoomOrderPinTentativeButtonPayload,
   RoomOrderPreviousButtonPayload,
   RoomOrderSendButtonPayload,
+  ServiceStatusDispatchPayload,
   SlotButtonDispatchPayload,
   SlotDispatchErrorSchemas,
   SlotListDispatchPayload,
   SlotOpenButtonPayload,
 } from "./schema";
+import { UnknownError } from "typhoon-core/error";
 
 export class DispatchApi extends HttpApiGroup.make("dispatch")
   .add(
@@ -70,6 +72,13 @@ export class DispatchApi extends HttpApiGroup.make("dispatch")
       payload: SlotOpenButtonPayload,
       success: DispatchAcceptedResult,
       error: SlotDispatchErrorSchemas,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("serviceStatus", "/dispatch/status/services", {
+      payload: ServiceStatusDispatchPayload,
+      success: DispatchAcceptedResult,
+      error: UnknownError,
     }),
   )
   .add(

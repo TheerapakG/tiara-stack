@@ -9,6 +9,7 @@ import { scheduleCommandLayer } from "./commands/schedule";
 import { screenshotCommandLayer } from "./commands/screenshot";
 import { serverCommandLayer } from "./commands/server";
 import { slotCommandLayer } from "./commands/slot";
+import { statusCommandLayer } from "./commands/status";
 import { teamCommandLayer } from "./commands/team";
 import { httpLayer } from "./http";
 import { checkinButtonLayer } from "./messageComponents/buttons/checkin";
@@ -26,6 +27,7 @@ const botLayer = Layer.mergeAll(
   scheduleCommandLayer,
   serverCommandLayer,
   slotCommandLayer,
+  statusCommandLayer,
   teamCommandLayer,
   checkinButtonLayer,
   roomOrderButtonLayer,

@@ -20,6 +20,7 @@ import { roomOrderLayer } from "./handlers/roomOrder";
 import { scheduleLayer } from "./handlers/schedule";
 import { screenshotLayer } from "./handlers/screenshot";
 import { sheetLayer } from "./handlers/sheet";
+import { statusLayer } from "./handlers/status";
 import { discordLayer as discordServiceLayer } from "./services/discord";
 
 const rpcHandlersLayer = Layer.mergeAll(
@@ -38,6 +39,7 @@ const rpcHandlersLayer = Layer.mergeAll(
   screenshotLayer,
   scheduleLayer,
   discordLayer,
+  statusLayer,
 );
 
 const rpcRoutesLayer = RpcServer.layerHttp({

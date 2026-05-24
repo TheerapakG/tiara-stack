@@ -3,6 +3,7 @@ import { Cause, DateTime, Effect, Exit, Option } from "effect";
 import { TestClock } from "effect/testing";
 import type {
   KickoutDispatchPayload,
+  ServiceStatusDispatchPayload,
   SlotButtonDispatchPayload,
   SlotOpenButtonPayload,
 } from "sheet-ingress-api/handlers/dispatch/schema";
@@ -26,6 +27,12 @@ const slotButtonPayload: SlotButtonDispatchPayload = {
 
 const slotOpenButtonPayload: SlotOpenButtonPayload = {
   messageId: "message-1",
+  interactionToken: "interaction-token",
+  interactionDeadlineEpochMs: 1_700_000_000_000,
+};
+
+const serviceStatusPayload: ServiceStatusDispatchPayload = {
+  dispatchRequestId: "dispatch-service-status",
   interactionToken: "interaction-token",
   interactionDeadlineEpochMs: 1_700_000_000_000,
 };
@@ -122,6 +129,18 @@ const runSlotOpenButton = (
   Effect.gen(function* () {
     const service = yield* DispatchService.make;
     return yield* service.slotOpenButton(slotOpenButtonPayload, messageSlot);
+  }).pipe(
+    Effect.provideService(IngressBotClient, botClient),
+    Effect.provideService(SheetApisClient, sheetApisClient),
+  );
+
+const runServiceStatus = (
+  botClient: typeof IngressBotClient.Service,
+  sheetApisClient: typeof SheetApisClient.Service,
+) =>
+  Effect.gen(function* () {
+    const service = yield* DispatchService.make;
+    return yield* service.serviceStatus(serviceStatusPayload);
   }).pipe(
     Effect.provideService(IngressBotClient, botClient),
     Effect.provideService(SheetApisClient, sheetApisClient),
@@ -249,6 +268,83 @@ describe("DispatchService", () => {
             {
               title: "Day 2 Filled Slots",
               description: "All Open :3",
+            },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it("updates the interaction with a service status embed", async () => {
+    const updateCalls: Array<unknown> = [];
+    const checkedAt = DateTime.makeUnsafe("2026-05-23T12:00:00.000Z");
+    const botClient = {
+      updateOriginalInteractionResponse: (interactionToken: string, payload: unknown) => {
+        updateCalls.push({ interactionToken, payload });
+        return Effect.succeed({ id: "interaction-message-1", channel_id: "channel-1" });
+      },
+    } as never;
+    const sheetApisClient = makeSheetApisClient({
+      status: {
+        getServices: () =>
+          Effect.succeed({
+            overallStatus: "degraded" as const,
+            checkedAt,
+            services: [
+              {
+                name: "sheet-apis",
+                url: "http://sheet-apis-service:3000/ready",
+                status: "ok" as const,
+                httpStatus: 200,
+                latencyMs: 24,
+                checkedAt,
+                error: null,
+              },
+              {
+                name: "sheet-web",
+                url: "http://sheet-web-service:3000/ready",
+                status: "down" as const,
+                httpStatus: 503,
+                latencyMs: 18,
+                checkedAt,
+                error: "HTTP 503",
+              },
+            ],
+          }),
+      },
+    });
+
+    const result = await Effect.runPromise(runServiceStatus(botClient, sheetApisClient));
+
+    expect(result).toEqual({
+      overallStatus: "degraded",
+      okCount: 1,
+      downCount: 1,
+    });
+    expect(updateCalls).toEqual([
+      {
+        interactionToken: "interaction-token",
+        payload: {
+          embeds: [
+            {
+              title: "Service Status",
+              description: "Some services are not ready.",
+              color: 0xfee75c,
+              fields: [
+                {
+                  name: "sheet-apis",
+                  value: "OK - 200 - 24ms",
+                  inline: true,
+                },
+                {
+                  name: "sheet-web",
+                  value: "DOWN - 503 - 18ms",
+                  inline: true,
+                },
+              ],
+              footer: {
+                text: "Checked at 2026-05-23T12:00:00.000Z",
+              },
             },
           ],
         },

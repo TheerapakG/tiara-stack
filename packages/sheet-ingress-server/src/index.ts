@@ -719,6 +719,7 @@ const makeApiLayer = () => {
             requireMessageSlotRead(payload.messageId),
           ),
         )
+        .handle("serviceStatus", authorizedSheetClusterDispatch("serviceStatus", requireNonService))
         .handle(
           DispatchRoomOrderButtonMethods.previous.endpointName,
           authorizedSheetClusterDispatch(
@@ -770,6 +771,12 @@ const makeApiLayer = () => {
           "getCurrentUserGuilds",
           authorizedSheetApis("discord", "getCurrentUserGuilds", requireNonService),
         ),
+    ),
+    HttpApiBuilder.group(Api, "status", (handlers) =>
+      handlers.handle(
+        "getServices",
+        authorizedSheetApis("status", "getServices", requireNonService),
+      ),
     ),
     HttpApiBuilder.group(Api, "guildConfig", (handlers) =>
       handlers

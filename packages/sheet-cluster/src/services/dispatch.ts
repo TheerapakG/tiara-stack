@@ -31,6 +31,8 @@ import type {
   RoomOrderButtonResult,
   RoomOrderDispatchPayload,
   RoomOrderDispatchResult,
+  ServiceStatusDispatchPayload,
+  ServiceStatusDispatchResult,
   SlotButtonDispatchPayload,
   SlotButtonDispatchResult,
   SlotListDispatchPayload,
@@ -39,6 +41,7 @@ import type {
   SlotOpenButtonResult,
 } from "sheet-ingress-api/sheet-apis-rpc";
 import * as Sheet from "sheet-ingress-api/schemas/sheet";
+import type { ServiceStatus } from "sheet-ingress-api/sheet-apis-rpc";
 import { makeArgumentError } from "typhoon-core/error";
 import {
   checkinActionRow,
@@ -258,6 +261,9 @@ const makeSheetApisServices = (sheetApisClient: typeof SheetApisClient.Service) 
     sheetService: {
       getEventConfig: (guildId: string) => sheetApis.sheet.getEventConfig({ query: { guildId } }),
     },
+    statusService: {
+      getServicesStatus: () => sheetApis.status.getServices({}),
+    },
   };
 };
 
@@ -300,7 +306,12 @@ const time = (epochSeconds: number): string => `<t:${Math.floor(epochSeconds)}:t
 const makeEmbed = (embed: {
   readonly title?: string;
   readonly description?: string | null;
-  readonly fields?: ReadonlyArray<{ readonly name: string; readonly value: string }>;
+  readonly fields?: ReadonlyArray<{
+    readonly name: string;
+    readonly value: string;
+    readonly inline?: boolean;
+  }>;
+  readonly footer?: { readonly text: string };
   readonly color?: number;
 }) => embed;
 
@@ -311,6 +322,20 @@ const makeWebScheduleEmbed = () =>
   });
 
 const formatDateTime = (dateTime: DateTime.DateTime) => DateTime.toEpochMillis(dateTime) / 1000;
+
+const formatServiceStatusFieldValue = (service: ServiceStatus) => {
+  if (service.status === "ok") {
+    const latency = service.latencyMs === null ? "unknown latency" : `${service.latencyMs}ms`;
+    return `OK - ${service.httpStatus ?? "unknown"} - ${latency}`;
+  }
+
+  if (service.httpStatus !== null) {
+    const latency = service.latencyMs === null ? "unknown latency" : `${service.latencyMs}ms`;
+    return `DOWN - ${service.httpStatus} - ${latency}`;
+  }
+
+  return `DOWN - ${service.error ?? "request failed"}`;
+};
 
 const hourWindowFor = (eventConfig: { readonly startTime: DateTime.DateTime }, hour: number) => ({
   start: pipe(eventConfig.startTime, DateTime.addDuration(Duration.hours(hour - 1))),
@@ -584,6 +609,7 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
       roomOrderService,
       scheduleService,
       sheetService,
+      statusService,
     } = makeSheetApisServices(sheetApisClient);
 
     const roomOrderButton = Effect.fn("DispatchService.roomOrderButton")(function* (
@@ -1679,6 +1705,53 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
           day: payload.day,
           messageType: payload.messageType,
         } satisfies SlotListDispatchResult;
+      }),
+      serviceStatus: Effect.fn("DispatchService.serviceStatus")(function* (
+        payload: ServiceStatusDispatchPayload,
+      ) {
+        return yield* Effect.gen(function* () {
+          const status = yield* statusService.getServicesStatus();
+          const okCount = status.services.filter((service) => service.status === "ok").length;
+          const downCount = status.services.length - okCount;
+
+          yield* botClient.updateOriginalInteractionResponse(payload.interactionToken, {
+            embeds: [
+              makeEmbed({
+                title: "Service Status",
+                description:
+                  status.overallStatus === "ok"
+                    ? "All services are ready."
+                    : "Some services are not ready.",
+                color: status.overallStatus === "ok" ? 0x57f287 : 0xfee75c,
+                fields: status.services.map((service) => ({
+                  name: service.name,
+                  value: formatServiceStatusFieldValue(service),
+                  inline: true,
+                })),
+                footer: {
+                  text: `Checked at ${DateTime.formatIso(status.checkedAt)}`,
+                },
+              }),
+            ],
+          });
+
+          return {
+            overallStatus: status.overallStatus,
+            okCount,
+            downCount,
+          } satisfies ServiceStatusDispatchResult;
+        }).pipe(
+          Effect.catch((error) =>
+            botClient
+              .updateOriginalInteractionResponse(payload.interactionToken, {
+                content: "Failed to check service status. Please try again.",
+              })
+              .pipe(
+                Effect.catch(() => Effect.void),
+                Effect.andThen(Effect.fail(error)),
+              ),
+          ),
+        );
       }),
       slotOpenButton: Effect.fn("DispatchService.slotOpenButton")(function* (
         payload: SlotOpenButtonPayload,

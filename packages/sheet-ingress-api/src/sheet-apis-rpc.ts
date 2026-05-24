@@ -43,6 +43,7 @@ import {
   TeamConfig,
 } from "./schemas/sheetConfig";
 import { HealthResponseSchema } from "./handlers/health/schema";
+import { ServicesStatusResponse } from "./handlers/status/schema";
 import {
   CheckinDispatchError,
   CheckinDispatchPayload,
@@ -69,6 +70,8 @@ import {
   RoomOrderPreviousButtonResult,
   RoomOrderSendButtonPayload,
   RoomOrderSendButtonResult,
+  ServiceStatusDispatchPayload,
+  ServiceStatusDispatchResult,
   SlotButtonDispatchPayload,
   SlotButtonDispatchResult,
   SlotDispatchError,
@@ -107,6 +110,8 @@ export {
   RoomOrderPreviousButtonResult,
   RoomOrderSendButtonPayload,
   RoomOrderSendButtonResult,
+  ServiceStatusDispatchPayload,
+  ServiceStatusDispatchResult,
   SlotButtonDispatchPayload,
   SlotButtonDispatchResult,
   SlotDispatchError,
@@ -115,6 +120,7 @@ export {
   SlotOpenButtonPayload,
   SlotOpenButtonResult,
 } from "./handlers/dispatch/schema";
+export { ServiceStatus, ServicesStatusResponse } from "./handlers/status/schema";
 
 const Query = <Fields extends Schema.Struct.Fields>(fields: Fields) =>
   Schema.Struct({ query: Schema.Struct(fields) });
@@ -451,6 +457,13 @@ export const GuildConfigRpcs = RpcGroup.make(
 export const HealthRpcs = RpcGroup.make(
   Rpc.make("health.live", { success: HealthResponseSchema }),
   Rpc.make("health.ready", { success: HealthResponseSchema }),
+);
+
+export const StatusRpcs = RpcGroup.make(
+  protectedRpc("status.getServices", {
+    success: ServicesStatusResponse,
+    error: UnknownError,
+  }),
 );
 
 export const MessageCheckinRpcs = RpcGroup.make(
@@ -891,4 +904,5 @@ export const SheetApisRpcs = CalcRpcs.merge(
   ScheduleRpcs,
   ScreenshotRpcs,
   SheetRpcs,
+  StatusRpcs,
 );

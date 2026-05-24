@@ -1,0 +1,64 @@
+import { describe, expect, it } from "@effect/vitest";
+import { HttpClient, HttpClientResponse } from "effect/unstable/http";
+import { Effect } from "effect";
+import { ServiceStatusService } from "./serviceStatus";
+
+const runStatusCheck = (handler: HttpClient.HttpClient["execute"]) =>
+  Effect.gen(function* () {
+    const service = yield* ServiceStatusService;
+    return yield* service.getServicesStatus();
+  }).pipe(
+    Effect.provide(ServiceStatusService.layer),
+    Effect.provideService(HttpClient.HttpClient, HttpClient.make(handler)),
+  );
+
+const response = (request: Parameters<HttpClient.HttpClient["execute"]>[0], status: number) =>
+  HttpClientResponse.fromWeb(request, new Response(null, { status }));
+
+describe("ServiceStatusService", () => {
+  it.effect("reports ok when every service returns 2xx", () =>
+    Effect.gen(function* () {
+      const result = yield* runStatusCheck((request) => Effect.succeed(response(request, 200)));
+
+      expect(result.overallStatus).toBe("ok");
+      expect(result.services).toHaveLength(7);
+      expect(result.services.every((service) => service.status === "ok")).toBe(true);
+      expect(result.services.every((service) => service.httpStatus === 200)).toBe(true);
+    }),
+  );
+
+  it.effect("reports degraded when a service returns non-2xx", () =>
+    Effect.gen(function* () {
+      const result = yield* runStatusCheck((request) =>
+        Effect.succeed(response(request, request.url.includes("sheet-bot-service") ? 503 : 200)),
+      );
+
+      const sheetBot = result.services.find((service) => service.name === "sheet-bot");
+      expect(result.overallStatus).toBe("degraded");
+      expect(sheetBot).toMatchObject({
+        status: "down",
+        httpStatus: 503,
+        error: "HTTP 503",
+      });
+    }),
+  );
+
+  it.effect("reports degraded when a service request fails", () =>
+    Effect.gen(function* () {
+      const result = yield* runStatusCheck((request) =>
+        request.url.includes("sheet-web-service")
+          ? Effect.fail(new Error("connection refused") as never)
+          : Effect.succeed(response(request, 200)),
+      );
+
+      const sheetWeb = result.services.find((service) => service.name === "sheet-web");
+      expect(result.overallStatus).toBe("degraded");
+      expect(sheetWeb).toMatchObject({
+        status: "down",
+        httpStatus: null,
+        latencyMs: null,
+        error: "connection refused",
+      });
+    }),
+  );
+});

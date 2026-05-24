@@ -6,4 +6,5 @@ export * from "./screenshot";
 export * from "./schedule";
 export * from "./server";
 export * from "./slot";
+export * from "./status";
 export * from "./team";

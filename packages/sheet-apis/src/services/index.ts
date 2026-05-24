@@ -13,6 +13,7 @@ export * from "./messageSlot";
 export * from "./monitor";
 export * from "./roomOrder";
 export * from "./player";
+export * from "./serviceStatus";
 export * from "./screenshot";
 export * from "./schedule";
 export * from "./sheet";

@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import { Workflow, WorkflowProxy } from "effect/unstable/workflow";
+import { UnknownError } from "typhoon-core/error";
 import { SheetApisRpcAuthorization } from "./middlewares/sheetApisRpcAuthorization/tag";
 import { MessageRoomOrder } from "./schemas/messageRoomOrder";
 import {
@@ -26,6 +27,8 @@ import {
   RoomOrderPreviousButtonResult,
   RoomOrderSendButtonPayload,
   RoomOrderSendButtonResult,
+  ServiceStatusDispatchPayload,
+  ServiceStatusDispatchResult,
   SlotButtonDispatchPayload,
   SlotButtonDispatchResult,
   SlotDispatchError,
@@ -87,6 +90,7 @@ const workflowName = {
   slotButton: "dispatch.slotButton",
   slotList: "dispatch.slotList",
   slotOpenButton: "dispatch.slotOpenButton",
+  serviceStatus: "dispatch.serviceStatus",
   checkinButton: "dispatch.checkinButton",
   roomOrderPreviousButton: "dispatch.roomOrderPreviousButton",
   roomOrderNextButton: "dispatch.roomOrderNextButton",
@@ -143,6 +147,14 @@ export const DispatchSlotOpenButtonWorkflow = Workflow.make({
     `button:slotOpenButton:${payload.messageId}:${payload.interactionToken}`,
 });
 
+export const DispatchServiceStatusWorkflow = Workflow.make({
+  name: workflowName.serviceStatus,
+  payload: dispatchPayload(ServiceStatusDispatchPayload),
+  success: ServiceStatusDispatchResult,
+  error: UnknownError,
+  idempotencyKey: ({ payload }) => payload.dispatchRequestId,
+});
+
 export const DispatchCheckinButtonWorkflow = Workflow.make({
   name: workflowName.checkinButton,
   payload: dispatchPayload(CheckinHandleButtonPayload),
@@ -195,6 +207,7 @@ export const DispatchWorkflows = [
   DispatchSlotButtonWorkflow,
   DispatchSlotListWorkflow,
   DispatchSlotOpenButtonWorkflow,
+  DispatchServiceStatusWorkflow,
   DispatchCheckinButtonWorkflow,
   DispatchRoomOrderPreviousButtonWorkflow,
   DispatchRoomOrderNextButtonWorkflow,
@@ -247,6 +260,13 @@ export const DispatchWorkflowOperations = {
     workflow: DispatchSlotOpenButtonWorkflow,
     rpcTag: DispatchSlotOpenButtonWorkflow.name,
     discardRpcTag: `${DispatchSlotOpenButtonWorkflow.name}Discard`,
+  },
+  serviceStatus: {
+    operation: "serviceStatus",
+    endpointName: "serviceStatus",
+    workflow: DispatchServiceStatusWorkflow,
+    rpcTag: DispatchServiceStatusWorkflow.name,
+    discardRpcTag: `${DispatchServiceStatusWorkflow.name}Discard`,
   },
   checkinButton: {
     operation: "checkinButton",

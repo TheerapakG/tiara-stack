@@ -17,6 +17,7 @@ import {
   ScheduleApi,
   ScreenshotApi,
   SheetApi,
+  StatusApi,
 } from "./api-groups";
 import { SheetApisApi } from "./sheet-apis";
 import { SheetClusterApi } from "./sheet-cluster";
@@ -47,6 +48,7 @@ class SheetIngressSheetApisApi extends HttpApi.make("api")
   .add(ScreenshotApi)
   .add(ScheduleApi)
   .add(SheetApisDiscordApi)
+  .add(StatusApi)
   .annotate(OpenApi.Title, "Sheet APIs") {}
 
 class SheetIngressDiscordApiBase extends HttpApi.make("discord")

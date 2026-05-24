@@ -55,6 +55,9 @@ export class SheetClusterForwardingClient extends Context.Service<SheetClusterFo
           slotOpenButton: accept(DispatchWorkflowOperations.slotOpenButton, (args) =>
             rpcClient[DispatchWorkflowOperations.slotOpenButton.discardRpcTag](args),
           ),
+          serviceStatus: accept(DispatchWorkflowOperations.serviceStatus, (args) =>
+            rpcClient[DispatchWorkflowOperations.serviceStatus.discardRpcTag](args),
+          ),
           [DispatchWorkflowOperations.roomOrderPreviousButton.endpointName]: accept(
             DispatchWorkflowOperations.roomOrderPreviousButton,
             (args) =>

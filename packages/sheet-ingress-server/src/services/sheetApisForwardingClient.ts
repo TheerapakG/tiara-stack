@@ -142,6 +142,9 @@ export class SheetApisForwardingClient extends Context.Service<SheetApisForwardi
           getScheduleConfig: call(rpcClient["sheet.getScheduleConfig"]),
           getRunnerConfig: call(rpcClient["sheet.getRunnerConfig"]),
         },
+        status: {
+          getServices: callNoInput(rpcClient["status.getServices"]),
+        },
       };
     }),
   },

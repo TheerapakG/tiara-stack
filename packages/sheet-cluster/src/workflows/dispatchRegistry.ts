@@ -9,6 +9,7 @@ import {
   DispatchRoomOrderPreviousButtonWorkflow,
   DispatchRoomOrderSendButtonWorkflow,
   DispatchRoomOrderWorkflow,
+  DispatchServiceStatusWorkflow,
   DispatchSlotButtonWorkflow,
   DispatchSlotListWorkflow,
   DispatchSlotOpenButtonWorkflow,
@@ -273,6 +274,18 @@ export const dispatchWorkflowRegistry = {
         return yield* service.slotOpenButton(request.payload, messageSlot);
       }),
   },
+  serviceStatus: {
+    operation: "serviceStatus",
+    workflow: DispatchServiceStatusWorkflow,
+    getInteractionToken: (request: typeof DispatchServiceStatusWorkflow.payloadSchema.Type) =>
+      request.payload.interactionToken,
+    authorize: () => Effect.void,
+    execute: (request: typeof DispatchServiceStatusWorkflow.payloadSchema.Type) =>
+      Effect.gen(function* () {
+        const service = yield* DispatchService;
+        return yield* service.serviceStatus(request.payload);
+      }),
+  },
   checkinButton: {
     operation: "checkinButton",
     workflow: DispatchCheckinButtonWorkflow,
@@ -383,6 +396,11 @@ export const dispatchWorkflowLayer = Layer.mergeAll(
   DispatchSlotOpenButtonWorkflow.toLayer(
     makeWorkflowHandler({
       ...dispatchWorkflowRegistry.slotOpenButton,
+    }),
+  ),
+  DispatchServiceStatusWorkflow.toLayer(
+    makeWorkflowHandler({
+      ...dispatchWorkflowRegistry.serviceStatus,
     }),
   ),
   DispatchCheckinButtonWorkflow.toLayer(

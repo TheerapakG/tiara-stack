@@ -23,6 +23,8 @@ describe("SheetClusterRpcs", () => {
     expect(SheetClusterRpcs.requests.has("dispatch.slotListDiscard")).toBe(true);
     expect(SheetClusterRpcs.requests.has("dispatch.slotOpenButton")).toBe(true);
     expect(SheetClusterRpcs.requests.has("dispatch.slotOpenButtonDiscard")).toBe(true);
+    expect(SheetClusterRpcs.requests.has("dispatch.serviceStatus")).toBe(true);
+    expect(SheetClusterRpcs.requests.has("dispatch.serviceStatusDiscard")).toBe(true);
 
     for (const method of Object.values(DispatchRoomOrderButtonMethods)) {
       expect(SheetClusterRpcs.requests.has(method.rpcTag)).toBe(true);

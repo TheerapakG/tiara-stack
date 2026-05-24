@@ -41,6 +41,9 @@ describe("Api", () => {
     expect(SheetClusterRpcs.requests.has("dispatch.slotListDiscard")).toBe(true);
     expect(SheetClusterRpcs.requests.has("dispatch.slotOpenButton")).toBe(true);
     expect(SheetClusterRpcs.requests.has("dispatch.slotOpenButtonDiscard")).toBe(true);
+    expect(SheetClusterRpcs.requests.has("dispatch.serviceStatus")).toBe(true);
+    expect(SheetClusterRpcs.requests.has("dispatch.serviceStatusDiscard")).toBe(true);
+    expect(SheetApisRpcs.requests.has("status.getServices")).toBe(true);
     for (const method of roomOrderButtonMethods) {
       expect(SheetApisRpcs.requests.has(method.rpcTag)).toBe(false);
       expect(SheetClusterRpcs.requests.has(method.rpcTag)).toBe(true);
@@ -76,10 +79,20 @@ describe("Api", () => {
       name: "slotOpenButton",
       path: "/dispatch/slot/buttons/open",
     });
+    expect(SheetClusterApi.groups.dispatch.endpoints.serviceStatus).toMatchObject({
+      method: "POST",
+      name: "serviceStatus",
+      path: "/dispatch/status/services",
+    });
     expect(Api.groups.dispatch.endpoints.slotOpenButton).toMatchObject({
       method: "POST",
       name: "slotOpenButton",
       path: "/dispatch/slot/buttons/open",
+    });
+    expect(Api.groups.dispatch.endpoints.serviceStatus).toMatchObject({
+      method: "POST",
+      name: "serviceStatus",
+      path: "/dispatch/status/services",
     });
 
     expect(SheetApisApi.groups.checkin.endpoints).not.toHaveProperty("dispatch");

@@ -210,6 +210,22 @@ export const SlotOpenButtonResult = Schema.Struct({
 
 export type SlotOpenButtonResult = Schema.Schema.Type<typeof SlotOpenButtonResult>;
 
+export const ServiceStatusDispatchPayload = Schema.Struct({
+  dispatchRequestId: Schema.String,
+  interactionToken: Schema.String,
+  interactionDeadlineEpochMs: Schema.Number,
+});
+
+export type ServiceStatusDispatchPayload = Schema.Schema.Type<typeof ServiceStatusDispatchPayload>;
+
+export const ServiceStatusDispatchResult = Schema.Struct({
+  overallStatus: Schema.Literals(["ok", "degraded"]),
+  okCount: Schema.Number,
+  downCount: Schema.Number,
+});
+
+export type ServiceStatusDispatchResult = Schema.Schema.Type<typeof ServiceStatusDispatchResult>;
+
 export const DispatchRoomOrderButtonMethods = {
   previous: {
     endpointName: "roomOrderPreviousButton",
@@ -242,6 +258,7 @@ export const DispatchAcceptedResult = Schema.Struct({
     "slotButton",
     "slotList",
     "slotOpenButton",
+    "serviceStatus",
     "checkinButton",
     "roomOrderPreviousButton",
     "roomOrderNextButton",
