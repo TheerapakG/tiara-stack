@@ -155,7 +155,9 @@ jobs:
 
       - name: Update deployment file
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
-        run: sed -i 's|<IMAGE>|registry.digitalocean.com/${{ secrets.REGISTRY_NAME }}/${{ matrix.package }}:${{ steps.vars.outputs.tag }}|' $GITHUB_WORKSPACE/k8s/${{ matrix.package }}/deployment.yaml
+        run: |
+          sed -i 's|<IMAGE>|registry.digitalocean.com/${{ secrets.REGISTRY_NAME }}/${{ matrix.package }}:${{ steps.vars.outputs.tag }}|' $GITHUB_WORKSPACE/k8s/${{ matrix.package }}/deployment.yaml
+          sed -i 's|<IMAGE_PULL_SECRET>|${{ secrets.REGISTRY_NAME }}|' $GITHUB_WORKSPACE/k8s/${{ matrix.package }}/deployment.yaml
 
       - name: Save DigitalOcean kubeconfig with short-lived credentials
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'

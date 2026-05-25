@@ -6,6 +6,14 @@ type ClusterReadinessRow = {
   readonly ready: boolean;
 };
 
+type ClusterRunnerReadinessSnapshotRow = {
+  readonly address: string;
+  readonly hasRecentHealthyRunner: boolean;
+  readonly heldLockCount: number;
+  readonly totalRunnerCount: number;
+  readonly totalLockCount: number;
+};
+
 const configuredRunnerAddress = Effect.gen(function* () {
   const host = yield* config.clusterRunnerHost;
   const port = yield* config.clusterRunnerPort;
@@ -37,3 +45,33 @@ export const isClusterRunnerReady = Effect.gen(function* () {
   ),
   Effect.withSpan("sheet-cluster.runner.ready"),
 );
+
+export const getClusterRunnerReadinessSnapshot = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  const address = yield* configuredRunnerAddress;
+  const [row] = yield* sql<ClusterRunnerReadinessSnapshotRow>`
+    SELECT
+      ${address} AS address,
+      EXISTS (
+        SELECT 1
+        FROM "sheet_apis_cluster_runners"
+        WHERE "sheet_apis_cluster_runners".address = ${address}
+          AND "sheet_apis_cluster_runners".healthy = TRUE
+          AND "sheet_apis_cluster_runners".last_heartbeat > NOW() - INTERVAL '35 seconds'
+      ) AS "hasRecentHealthyRunner",
+      (
+        SELECT COUNT(*)::int
+        FROM "sheet_apis_cluster_locks"
+        WHERE "sheet_apis_cluster_locks".address = ${address}
+      ) AS "heldLockCount",
+      (
+        SELECT COUNT(*)::int
+        FROM "sheet_apis_cluster_runners"
+      ) AS "totalRunnerCount",
+      (
+        SELECT COUNT(*)::int
+        FROM "sheet_apis_cluster_locks"
+      ) AS "totalLockCount"
+  `;
+  return row;
+}).pipe(Effect.withSpan("sheet-cluster.runner.readinessSnapshot"));
