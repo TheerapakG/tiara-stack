@@ -2,6 +2,7 @@ import { NodeFileSystem, NodeHttpClient, NodeRuntime } from "@effect/platform-no
 import { Effect, Layer, Logger } from "effect";
 import { dotEnvConfigProviderLayer } from "typhoon-core/config";
 import {
+  clusterHttpLayer,
   clusterStorageLayer,
   clusterWorkflowEngineClientLayer,
   shardingConfigLayer,
@@ -13,8 +14,11 @@ import { TracesLive } from "./traces";
 
 const configProviderLayer = dotEnvConfigProviderLayer().pipe(Layer.provide(NodeFileSystem.layer));
 
-const mainLayer = Layer.mergeAll(httpLayer, autoCheckinTaskLayer).pipe(
+const clientWorkflowLayers = Layer.mergeAll(httpLayer, autoCheckinTaskLayer).pipe(
   Layer.provide(clusterWorkflowEngineClientLayer),
+);
+
+const mainLayer = Layer.mergeAll(clientWorkflowLayers, clusterHttpLayer).pipe(
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
   Layer.provide(Logger.layer([Logger.consoleLogFmt])),
@@ -22,6 +26,7 @@ const mainLayer = Layer.mergeAll(httpLayer, autoCheckinTaskLayer).pipe(
   Layer.provide(clusterStorageLayer),
   Layer.provide(shardingConfigLayer),
   Layer.provide(configProviderLayer),
+  Layer.provide(NodeFileSystem.layer),
 );
 
 mainLayer.pipe(Layer.launch, Effect.orDie, NodeRuntime.runMain);

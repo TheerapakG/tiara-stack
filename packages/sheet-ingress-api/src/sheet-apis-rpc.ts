@@ -456,7 +456,7 @@ export const GuildConfigRpcs = RpcGroup.make(
 
 export const HealthRpcs = RpcGroup.make(
   Rpc.make("health.live", { success: HealthResponseSchema }),
-  Rpc.make("health.ready", { success: HealthResponseSchema }),
+  Rpc.make("health.ready", { success: HealthResponseSchema, error: UnknownError }),
 );
 
 export const StatusRpcs = RpcGroup.make(
