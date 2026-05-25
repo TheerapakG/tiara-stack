@@ -134,6 +134,12 @@ const sendTentativeRoomOrder = Effect.fn("AutoCheckinService.sendTentativeRoomOr
     typeof makeSheetApisServices
   >["messageRoomOrderService"];
 }) {
+  yield* Effect.annotateCurrentSpan({
+    guildId,
+    channelId: runningChannelId,
+    hour,
+    fillCount,
+  });
   if (!shouldSendTentativeRoomOrder(fillCount)) {
     return null;
   }
@@ -226,7 +232,15 @@ export class AutoCheckinWorkflowClient extends Context.Service<AutoCheckinWorkfl
     make: Effect.succeed({
       enqueueChannel: Effect.fn("AutoCheckinWorkflowClient.enqueueChannel")(
         (payload: AutoCheckinChannelPayload) =>
-          AutoCheckinChannelWorkflow.execute(payload, { discard: true }),
+          AutoCheckinChannelWorkflow.execute(payload, { discard: true }).pipe(
+            Effect.withSpan("AutoCheckinWorkflowClient.enqueueChannel", {
+              attributes: {
+                guildId: payload.guildId,
+                channelName: payload.channelName,
+                hour: payload.hour,
+              },
+            }),
+          ),
       ),
     }).pipe(
       Effect.andThen((service) =>
@@ -266,6 +280,7 @@ export class AutoCheckinService extends Context.Service<AutoCheckinService>()(
       const enqueueGuild = Effect.fn("AutoCheckinService.enqueueGuild")(function* (
         guildId: string,
       ) {
+        yield* Effect.annotateCurrentSpan({ guildId, autoCheckinConcurrency });
         const eventConfig = yield* sheetService.getEventConfig(guildId);
         const targetDateTime = yield* DateTime.now.pipe(
           Effect.map(DateTime.addDuration("20 minutes")),
@@ -298,12 +313,15 @@ export class AutoCheckinService extends Context.Service<AutoCheckinService>()(
           { concurrency: autoCheckinConcurrency },
         );
 
-        return results.reduce((sum, count) => sum + count, 0);
+        const enqueuedCount = results.reduce((sum, count) => sum + count, 0);
+        yield* Effect.annotateCurrentSpan({ enqueuedChannelCount: enqueuedCount, hour });
+        return enqueuedCount;
       });
 
       return {
         enqueueGuild,
         enqueueDueChannels: Effect.fn("AutoCheckinService.enqueueDueChannels")(function* () {
+          yield* Effect.annotateCurrentSpan({ autoCheckinConcurrency });
           const guildConfigs = yield* guildConfigService.getAutoCheckinGuilds();
           const counts = yield* Effect.forEach(
             guildConfigs,
@@ -320,11 +338,21 @@ export class AutoCheckinService extends Context.Service<AutoCheckinService>()(
             { concurrency: autoCheckinConcurrency },
           );
 
-          return counts.reduce((sum, count) => sum + count, 0);
+          const enqueuedCount = counts.reduce((sum, count) => sum + count, 0);
+          yield* Effect.annotateCurrentSpan({
+            guildCount: guildConfigs.length,
+            enqueuedChannelCount: enqueuedCount,
+          });
+          return enqueuedCount;
         }),
         processChannel: Effect.fn("AutoCheckinService.processChannel")(function* (
           payload: AutoCheckinChannelPayload,
         ) {
+          yield* Effect.annotateCurrentSpan({
+            guildId: payload.guildId,
+            channelName: payload.channelName,
+            hour: payload.hour,
+          });
           if (payload.channelName.length === 0) {
             return yield* Effect.fail(makeArgumentError("Cannot auto check-in an unnamed channel"));
           }

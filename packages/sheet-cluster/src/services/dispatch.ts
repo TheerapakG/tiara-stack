@@ -452,6 +452,7 @@ const renderRoomOrderReply = Effect.fn("DispatchService.renderRoomOrderReply")(f
     typeof makeSheetApisServices
   >["messageRoomOrderService"];
 }) {
+  yield* Effect.annotateCurrentSpan({ guildId, messageId, mode, hour: roomOrder.hour });
   const maybeRange = yield* messageRoomOrderService.getMessageRoomOrderRange(messageId);
   const entries = yield* messageRoomOrderService.getMessageRoomOrderEntry(
     messageId,
@@ -510,6 +511,12 @@ const sendTentativeRoomOrder = Effect.fn("DispatchService.sendTentativeRoomOrder
     typeof makeSheetApisServices
   >["messageRoomOrderService"];
 }) {
+  yield* Effect.annotateCurrentSpan({
+    guildId,
+    channelId: runningChannelId,
+    hour,
+    fillCount,
+  });
   if (!shouldSendTentativeRoomOrder(fillCount)) {
     return null;
   }
@@ -616,6 +623,12 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
       payload: RoomOrderButtonPayload,
       authorizedRoomOrder?: MessageRoomOrder | null,
     ) {
+      yield* Effect.annotateCurrentSpan({
+        guildId: payload.guildId,
+        channelId: payload.messageChannelId,
+        messageId: payload.messageId,
+        action: payload.action,
+      });
       const failRoomOrderInteraction = (content: string, errorMessage: string) =>
         botClient
           .updateOriginalInteractionResponse(payload.interactionToken, {
@@ -1331,6 +1344,13 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
         payload: CheckinDispatchPayload,
         requester: DispatchRequester,
       ) {
+        yield* Effect.annotateCurrentSpan({
+          guildId: payload.guildId,
+          channelName: payload.channelName,
+          hour: payload.hour,
+          "requester.accountId": requester.accountId,
+          "requester.userId": requester.userId,
+        });
         const createdByUserId = requester.userId;
         const generated = yield* checkinService.generate(payload);
         const messageSink = makeMessageSink(
@@ -1434,6 +1454,13 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
         payload: RoomOrderDispatchPayload,
         requester: DispatchRequester,
       ) {
+        yield* Effect.annotateCurrentSpan({
+          guildId: payload.guildId,
+          channelId: payload.channelId,
+          hour: payload.hour,
+          "requester.accountId": requester.accountId,
+          "requester.userId": requester.userId,
+        });
         const createdByUserId = requester.userId;
         const generated = yield* roomOrderService.generate(payload);
         const messageSink = makeMessageSink(
@@ -1483,8 +1510,16 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
       }),
       kickout: Effect.fn("DispatchService.kickout")(function* (
         payload: KickoutDispatchPayload,
-        _requester: DispatchRequester,
+        requester: DispatchRequester,
       ) {
+        yield* Effect.annotateCurrentSpan({
+          guildId: payload.guildId,
+          channelId: payload.channelId,
+          channelName: payload.channelName,
+          hour: payload.hour,
+          "requester.accountId": requester.accountId,
+          "requester.userId": requester.userId,
+        });
         const updateInteraction = (content: string) =>
           typeof payload.interactionToken === "string"
             ? botClient.updateOriginalInteractionResponse(payload.interactionToken, {
@@ -1649,6 +1684,13 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
         payload: SlotButtonDispatchPayload,
         requester: DispatchRequester,
       ) {
+        yield* Effect.annotateCurrentSpan({
+          guildId: payload.guildId,
+          channelId: payload.channelId,
+          day: payload.day,
+          "requester.accountId": requester.accountId,
+          "requester.userId": requester.userId,
+        });
         const message = yield* botClient.sendMessage(payload.channelId, {
           content: `Press the button below to get the current open slots for day ${payload.day}`,
           components: [slotActionRow()],
@@ -1679,7 +1721,8 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
             Effect.catchCause((cause) =>
               Effect.logError("Failed to update slot button interaction response").pipe(
                 Effect.annotateLogs({
-                  interactionToken: payload.interactionToken,
+                  guildId: payload.guildId,
+                  channelId: payload.channelId,
                   messageId: message.id,
                 }),
                 Effect.andThen(Effect.logError(cause)),
@@ -1694,6 +1737,11 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
         } satisfies SlotButtonDispatchResult;
       }),
       slotList: Effect.fn("DispatchService.slotList")(function* (payload: SlotListDispatchPayload) {
+        yield* Effect.annotateCurrentSpan({
+          guildId: payload.guildId,
+          day: payload.day,
+          messageType: payload.messageType,
+        });
         const slotEmbeds = yield* makeSlotEmbeds(payload.guildId, payload.day);
 
         yield* botClient.updateOriginalInteractionResponse(payload.interactionToken, {
@@ -1709,6 +1757,7 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
       serviceStatus: Effect.fn("DispatchService.serviceStatus")(function* (
         payload: ServiceStatusDispatchPayload,
       ) {
+        yield* Effect.annotateCurrentSpan({ operation: "serviceStatus" });
         return yield* Effect.gen(function* () {
           const status = yield* statusService.getServicesStatus();
           const okCount = status.services.filter((service) => service.status === "ok").length;
@@ -1757,6 +1806,10 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
         payload: SlotOpenButtonPayload,
         messageSlot: MessageSlot,
       ) {
+        yield* Effect.annotateCurrentSpan({
+          messageId: payload.messageId,
+          day: messageSlot.day,
+        });
         const guildId = Option.getOrUndefined(messageSlot.guildId);
         const messageChannelId = Option.getOrUndefined(messageSlot.messageChannelId);
         if (guildId === undefined) {
@@ -1793,6 +1846,11 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
         payload: CheckinHandleButtonPayload,
         requester: DispatchRequester,
       ) {
+        yield* Effect.annotateCurrentSpan({
+          messageId: payload.messageId,
+          "requester.accountId": requester.accountId,
+          "requester.userId": requester.userId,
+        });
         const accountId = requester.accountId;
         const checkinAt = Date.now();
         const checkinClaimId = globalThis.crypto.randomUUID();

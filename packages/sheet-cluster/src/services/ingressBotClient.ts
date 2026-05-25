@@ -104,6 +104,7 @@ export class IngressBotClient extends Context.Service<IngressBotClient>()("Ingre
       Effect.catch((error) =>
         Effect.logWarning("Failed to read sheet-auth Kubernetes token", error),
       ),
+      Effect.withSpan("IngressBotClient.refreshK8sToken", { attributes: { baseUrl } }),
     );
 
     yield* refreshK8sToken;
@@ -134,10 +135,16 @@ export class IngressBotClient extends Context.Service<IngressBotClient>()("Ingre
             )
           : Duration.minutes(1);
 
-        return {
+        const entry = {
           token: session?.token,
           timeToLive,
         };
+        yield* Effect.annotateCurrentSpan({
+          serviceUserId,
+          tokenAvailable: entry.token !== undefined,
+          timeToLiveMillis: Duration.toMillis(entry.timeToLive),
+        });
+        return entry;
       }),
       {
         capacity: 1,
@@ -148,25 +155,28 @@ export class IngressBotClient extends Context.Service<IngressBotClient>()("Ingre
       },
     );
 
-    const httpClient = HttpClient.mapRequestEffect(
-      baseHttpClient,
-      Effect.fnUntraced(function* (request) {
+    const httpClient = HttpClient.mapRequestEffect(baseHttpClient, (request) =>
+      Effect.gen(function* () {
         const { token } = yield* Cache.get(tokenCache, DISCORD_SERVICE_USER_ID_SENTINEL);
 
+        yield* Effect.annotateCurrentSpan({ tokenAvailable: token !== undefined });
         return token ? HttpClientRequest.bearerToken(request, Redacted.value(token)) : request;
-      }),
+      }).pipe(Effect.withSpan("IngressBotClient.mapAuthRequest")),
     ) as unknown as HttpClient.HttpClient;
 
     const client = (yield* HttpApiClient.makeWith(SheetIngressDiscordApi as never, {
       baseUrl,
       httpClient,
-    })) as DiscordClient;
+    }).pipe(
+      Effect.withSpan("IngressBotClient.makeWith", { attributes: { baseUrl } }),
+    )) as DiscordClient;
 
     return {
       sendMessage: Effect.fn("IngressBotClient.sendMessage")(function* (
         channelId: string,
         payload: MessagePayload,
       ) {
+        yield* Effect.annotateCurrentSpan({ channelId });
         return yield* client.bot.sendMessage({
           params: { channelId },
           payload,
@@ -177,6 +187,7 @@ export class IngressBotClient extends Context.Service<IngressBotClient>()("Ingre
         messageId: string,
         payload: MessagePayload,
       ) {
+        yield* Effect.annotateCurrentSpan({ channelId, messageId });
         return yield* client.bot.updateMessage({
           params: { channelId, messageId },
           payload,
@@ -185,6 +196,7 @@ export class IngressBotClient extends Context.Service<IngressBotClient>()("Ingre
       updateOriginalInteractionResponse: Effect.fn(
         "IngressBotClient.updateOriginalInteractionResponse",
       )(function* (interactionToken: string, payload: MessagePayload) {
+        yield* Effect.annotateCurrentSpan({ hasInteractionToken: interactionToken.length > 0 });
         return yield* client.bot.updateOriginalInteractionResponse({
           params: { interactionToken },
           payload,
@@ -194,6 +206,7 @@ export class IngressBotClient extends Context.Service<IngressBotClient>()("Ingre
         channelId: string,
         messageId: string,
       ) {
+        yield* Effect.annotateCurrentSpan({ channelId, messageId });
         return yield* client.bot.createPin({
           params: { channelId, messageId },
         });
@@ -202,6 +215,7 @@ export class IngressBotClient extends Context.Service<IngressBotClient>()("Ingre
         channelId: string,
         messageId: string,
       ) {
+        yield* Effect.annotateCurrentSpan({ channelId, messageId });
         return yield* client.bot.deleteMessage({
           params: { channelId, messageId },
         });
@@ -211,6 +225,7 @@ export class IngressBotClient extends Context.Service<IngressBotClient>()("Ingre
         userId: string,
         roleId: string,
       ) {
+        yield* Effect.annotateCurrentSpan({ guildId, userId, roleId });
         return yield* client.bot.addGuildMemberRole({
           params: { guildId, userId, roleId },
         });
@@ -220,6 +235,7 @@ export class IngressBotClient extends Context.Service<IngressBotClient>()("Ingre
         userId: string,
         roleId: string,
       ) {
+        yield* Effect.annotateCurrentSpan({ guildId, userId, roleId });
         return yield* client.bot.removeGuildMemberRole({
           params: { guildId, userId, roleId },
         });
@@ -227,6 +243,7 @@ export class IngressBotClient extends Context.Service<IngressBotClient>()("Ingre
       getMembersForParent: Effect.fn("IngressBotClient.getMembersForParent")(function* (
         guildId: string,
       ) {
+        yield* Effect.annotateCurrentSpan({ parentId: guildId });
         return yield* client.cache.getMembersForParent({
           params: { parentId: guildId },
         });

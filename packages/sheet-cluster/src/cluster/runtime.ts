@@ -36,30 +36,32 @@ export const shardingConfigLayer = Layer.unwrap(
       simulateRemoteSerialization: false,
     });
   }),
-);
+).pipe(Layer.withSpan("sheet-cluster.shardingConfig"));
 
 export const clusterStorageLayer = Layer.mergeAll(
   SqlMessageStorage.layerWith({ prefix: "sheet_apis_cluster" }),
   SqlRunnerStorage.layerWith({ prefix: "sheet_apis_cluster" }),
-).pipe(Layer.provide(postgresSqlLayer));
+).pipe(Layer.provide(postgresSqlLayer), Layer.withSpan("sheet-cluster.clusterStorage"));
 
 const runnerHealthLayer = Layer.unwrap(
   Effect.gen(function* () {
     const namespace = yield* config.podNamespace;
     return RunnerHealth.layerK8s({ namespace, labelSelector: "app=sheet-cluster" });
   }),
-);
+).pipe(Layer.withSpan("sheet-cluster.runnerHealth"));
 
 export const clusterClientLayer = HttpRunner.layerHttpClientOnly.pipe(
   Layer.provide(clusterStorageLayer),
   Layer.provide(HttpRunner.layerClientProtocolHttp({ path: "/cluster/rpc" })),
   Layer.provide(shardingConfigLayer),
   Layer.provide(RpcSerialization.layerJson),
+  Layer.withSpan("sheet-cluster.clusterClient"),
 );
 
 export const clusterWorkflowEngineClientLayer = ClusterWorkflowEngine.layer.pipe(
   Layer.provide(clusterStorageLayer),
   Layer.provide(clusterClientLayer),
+  Layer.withSpan("sheet-cluster.workflowEngineClient"),
 );
 
 const clusterBaseLayer = HttpRunner.layerHttpOptions({ path: "/cluster/rpc" }).pipe(
@@ -87,4 +89,4 @@ const clusterHttpServerLayer = Layer.unwrap(
 
 export const clusterHttpLayer = HttpRouter.serve(
   clusterLayer.pipe(Layer.provideMerge(HttpRouter.layer)),
-).pipe(Layer.provide(clusterHttpServerLayer));
+).pipe(Layer.provide(clusterHttpServerLayer), Layer.withSpan("sheet-cluster.clusterHttp"));

@@ -1,4 +1,4 @@
-import { Effect, Layer, Option } from "effect";
+import { Effect, Layer, Option, Schema } from "effect";
 import { Activity } from "effect/unstable/workflow";
 import {
   DispatchCheckinButtonWorkflow,
@@ -79,6 +79,32 @@ type DispatchWorkflowHandlerOptions<
     request: DispatchWorkflowPayload<TWorkflow>,
     authorization: TAuthorization,
   ) => Effect.Effect<DispatchWorkflowSuccess<TWorkflow>, unknown, RExecute>;
+};
+
+const WorkflowAttributesPayload = Schema.Struct({
+  dispatchRequestId: Schema.optional(Schema.String),
+});
+
+const workflowAttributes = (
+  operation: DispatchWorkflowOperation,
+  executionId: string,
+  request: { readonly payload: unknown; readonly requester: DispatchRequester },
+) => {
+  const dispatchRequestId = Option.match(
+    Schema.decodeUnknownOption(WorkflowAttributesPayload)(request.payload),
+    {
+      onNone: () => undefined,
+      onSome: (payload) => payload.dispatchRequestId,
+    },
+  );
+
+  return {
+    operation,
+    executionId,
+    dispatchRequestId,
+    "requester.accountId": request.requester.accountId,
+    "requester.userId": request.requester.userId,
+  };
 };
 
 const requireCheckinButtonAccess = (messageId: string, requester: DispatchRequester) =>
@@ -174,15 +200,26 @@ const makeWorkflowHandler =
   ): DispatchWorkflowHandler<TWorkflow, RAuthorize | RExecute | IngressBotClient> =>
   (request, executionId) =>
     Effect.gen(function* () {
+      const attributes = workflowAttributes(options.operation, executionId, request);
       const effect = options.authorize(request).pipe(
-        Effect.flatMap((authorization) => options.execute(request, authorization)),
+        Effect.withSpan("DispatchWorkflow.authorize", { attributes }),
+        Effect.flatMap((authorization) =>
+          options
+            .execute(request, authorization)
+            .pipe(Effect.withSpan("DispatchWorkflow.execute", { attributes })),
+        ),
         Effect.mapError(
           (error): DispatchWorkflowError<TWorkflow> =>
             normalizeDispatchError(`Failed to dispatch ${options.operation}`)(
               error,
             ) as DispatchWorkflowError<TWorkflow>,
         ),
-        Effect.tapError(() => notifyInteractionFailure(options.getInteractionToken(request))),
+        Effect.tapError(() =>
+          notifyInteractionFailure(options.getInteractionToken(request)).pipe(
+            Effect.withSpan("DispatchWorkflow.notifyInteractionFailure", { attributes }),
+          ),
+        ),
+        Effect.annotateLogs(attributes),
       );
 
       return yield* Activity.make({

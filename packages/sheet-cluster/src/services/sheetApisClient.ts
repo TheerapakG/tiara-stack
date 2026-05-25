@@ -40,6 +40,7 @@ export class SheetApisClient extends Context.Service<SheetApisClient>()("SheetAp
       Effect.flatMap((token) => Ref.set(k8sTokenRef, token)),
       Effect.retry({ schedule: Schedule.exponential("1 second"), times: 3 }),
       Effect.catch(() => Effect.void),
+      Effect.withSpan("SheetApisClient.refreshK8sToken"),
       Effect.repeat(Schedule.spaced("5 minutes")),
       Effect.forkScoped,
     );
@@ -60,10 +61,15 @@ export class SheetApisClient extends Context.Service<SheetApisClient>()("SheetAp
             )
           : Duration.minutes(1);
 
-        return {
+        const entry = {
           token: session?.token,
           timeToLive,
         };
+        yield* Effect.annotateCurrentSpan({
+          tokenAvailable: entry.token !== undefined,
+          timeToLiveMillis: Duration.toMillis(entry.timeToLive),
+        });
+        return entry;
       }),
       {
         capacity: 1,
@@ -74,9 +80,8 @@ export class SheetApisClient extends Context.Service<SheetApisClient>()("SheetAp
       },
     );
 
-    const httpClientWithToken = HttpClient.mapRequestEffect(
-      httpClient,
-      Effect.fnUntraced(function* (request) {
+    const httpClientWithToken = HttpClient.mapRequestEffect(httpClient, (request) =>
+      Effect.gen(function* () {
         const { token } = yield* pipe(
           Cache.get(tokenCache, DISCORD_SERVICE_USER_ID_SENTINEL),
           Effect.catch((err) =>
@@ -89,14 +94,15 @@ export class SheetApisClient extends Context.Service<SheetApisClient>()("SheetAp
           ),
         );
 
+        yield* Effect.annotateCurrentSpan({ tokenAvailable: token !== undefined });
         return token ? HttpClientRequest.bearerToken(request, Redacted.value(token)) : request;
-      }),
+      }).pipe(Effect.withSpan("SheetApisClient.mapAuthRequest")),
     ) as unknown as HttpClient.HttpClient;
 
     const client = yield* HttpApiClient.makeWith(SheetApisApi, {
       httpClient: httpClientWithToken,
       baseUrl,
-    });
+    }).pipe(Effect.withSpan("SheetApisClient.makeWith", { attributes: { baseUrl } }));
 
     return {
       get: () => client,
