@@ -86,7 +86,7 @@ describe("SheetClusterForwardingClient", () => {
       operation: O,
       payload: unknown,
     ) => {
-      expect(rpcClient[operation.discardRpcTag]).toHaveBeenCalledWith(payload, { discard: true });
+      expect(rpcClient[operation.discardRpcTag]).toHaveBeenCalledWith(payload);
     };
 
     const requester = { accountId: "account-1", userId: "user-1" };
