@@ -17,9 +17,12 @@ const configProviderLayer = dotEnvConfigProviderLayer().pipe(Layer.provide(NodeF
 
 const clientWorkflowLayers = Layer.mergeAll(httpLayer, autoCheckinTaskLayer).pipe(
   Layer.provide(clusterWorkflowEngineClientLayer),
+  Layer.provide(shardingConfigLayer),
 );
 
-const mainLayer = Layer.mergeAll(clientWorkflowLayers, clusterHttpLayer).pipe(
+const clusterServerLayer = clusterHttpLayer.pipe(Layer.provide(shardingConfigLayer));
+
+const mainLayer = Layer.mergeAll(clientWorkflowLayers, clusterServerLayer).pipe(
   Layer.provide(MetricsLive),
   Layer.provide(TracesLive),
   Layer.provide(Logger.layer([Logger.consoleLogFmt])),
