@@ -58,8 +58,9 @@ const runnerHealthLayer = Layer.unwrap(
   }),
 ).pipe(Layer.withSpan("sheet-cluster.runnerHealth"));
 
-export const clusterClientLayer = HttpRunner.layerHttpClientOnly.pipe(
+export const clusterClientLayer = HttpRunner.layerClient.pipe(
   Layer.provide(clusterStorageLayer),
+  Layer.provide(RunnerHealth.layerNoop),
   Layer.provide(HttpRunner.layerClientProtocolHttp({ path: "/cluster/rpc" })),
   Layer.provide(shardingConfigLayer),
   Layer.provide(RpcSerialization.layerJson),
