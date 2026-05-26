@@ -6,19 +6,18 @@ import {
   K8sHttpClient,
   RunnerAddress,
   RunnerHealth,
-  RunnerServer,
   Sharding,
   ShardingConfig,
   SqlMessageStorage,
   SqlRunnerStorage,
 } from "effect/unstable/cluster";
 import { HttpRouter } from "effect/unstable/http";
-import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
+import { RpcSerialization } from "effect/unstable/rpc";
 import { createServer } from "node:http";
 import { config } from "@/config";
 import { AutoCheckinService } from "@/services";
 import { autoCheckinWorkflowLayer } from "@/workflows/autoCheckin";
-import { postgresSqlLayer } from "@/services";
+import { getClusterRunnerReadinessSnapshot, postgresSqlLayer } from "@/services";
 import { dispatchWorkflowLayer } from "@/workflows/dispatch";
 
 const shardGroups = ["dispatch", "autoCheckin"] as const;
@@ -50,7 +49,7 @@ export const shardingConfigLayer = Layer.unwrap(
 export const clusterStorageLayer = Layer.mergeAll(
   SqlMessageStorage.layerWith({ prefix: "sheet_apis_cluster" }),
   SqlRunnerStorage.layerWith({ prefix: "sheet_apis_cluster" }),
-).pipe(Layer.provide(postgresSqlLayer), Layer.withSpan("sheet-cluster.clusterStorage"));
+).pipe(Layer.withSpan("sheet-cluster.clusterStorage"));
 
 const runnerHealthLayer = Layer.unwrap(
   Effect.gen(function* () {
@@ -73,7 +72,7 @@ export const clusterWorkflowEngineClientLayer = ClusterWorkflowEngine.layer.pipe
   Layer.withSpan("sheet-cluster.workflowEngineClient"),
 );
 
-const clusterRunnerLayer = HttpRunner.layerClient.pipe(
+const clusterRunnerLayer = HttpRunner.layerHttpOptions({ path: "/cluster/rpc" }).pipe(
   Layer.provide(clusterStorageLayer),
   Layer.provide(runnerHealthLayer),
   Layer.provide(K8sHttpClient.layer),
@@ -82,10 +81,31 @@ const clusterRunnerLayer = HttpRunner.layerClient.pipe(
   Layer.provide(RpcSerialization.layerJson),
 );
 
+const runnerReadinessProbeTimeout = Duration.seconds(15);
+
 const clusterStartupLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     yield* Sharding.Sharding;
     yield* Effect.logInfo("Started sheet-cluster sharding runtime");
+    yield* getClusterRunnerReadinessSnapshot.pipe(
+      Effect.delay(Duration.seconds(5)),
+      Effect.flatMap((snapshot) => {
+        const ready = snapshot.hasRecentHealthyRunner && snapshot.heldLockCount > 0;
+        const log = ready ? Effect.logInfo : Effect.logWarning;
+        return log("Checked sheet-cluster runner registration", snapshot);
+      }),
+      Effect.timeoutOrElse({
+        duration: runnerReadinessProbeTimeout,
+        orElse: () =>
+          Effect.logWarning("sheet-cluster runner readiness probe timed out", {
+            timeoutMillis: Duration.toMillis(runnerReadinessProbeTimeout),
+          }),
+      }),
+      Effect.catchCause((cause) =>
+        Effect.logWarning("Failed to inspect sheet-cluster runner registration", cause),
+      ),
+      Effect.forkScoped,
+    );
     yield* Effect.never.pipe(Effect.forkScoped);
   }),
 );
@@ -98,6 +118,7 @@ export const clusterLayer = Layer.mergeAll(
   Layer.provide(AutoCheckinService.layer),
   Layer.provide(ClusterWorkflowEngine.layer),
   Layer.provideMerge(clusterRunnerLayer),
+  Layer.provide(postgresSqlLayer),
 );
 
 const clusterHttpServerLayer = Layer.unwrap(
@@ -108,14 +129,6 @@ const clusterHttpServerLayer = Layer.unwrap(
   }),
 );
 
-const clusterRpcRoutesLayer = RunnerServer.layer.pipe(
-  Layer.provide(RpcServer.layerProtocolHttp({ path: "/cluster/rpc" })),
-  Layer.provide(RpcSerialization.layerJson),
-);
-
 export const clusterHttpLayer = HttpRouter.serve(
-  clusterRpcRoutesLayer.pipe(
-    Layer.provideMerge(clusterLayer),
-    Layer.provideMerge(HttpRouter.layer),
-  ),
+  clusterLayer.pipe(Layer.provideMerge(HttpRouter.layer)),
 ).pipe(Layer.provide(clusterHttpServerLayer), Layer.withSpan("sheet-cluster.clusterHttp"));

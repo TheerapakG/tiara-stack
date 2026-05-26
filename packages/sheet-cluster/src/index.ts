@@ -9,6 +9,7 @@ import {
 } from "./cluster";
 import { httpLayer } from "./http";
 import { MetricsLive } from "./metrics";
+import { postgresSqlLayer } from "./services";
 import { autoCheckinTaskLayer } from "./tasks";
 import { TracesLive } from "./traces";
 
@@ -24,6 +25,7 @@ const mainLayer = Layer.mergeAll(clientWorkflowLayers, clusterHttpLayer).pipe(
   Layer.provide(Logger.layer([Logger.consoleLogFmt])),
   Layer.provide(NodeHttpClient.layerFetch),
   Layer.provide(clusterStorageLayer),
+  Layer.provide(postgresSqlLayer),
   Layer.provide(shardingConfigLayer),
   Layer.provide(configProviderLayer),
   Layer.provide(NodeFileSystem.layer),
