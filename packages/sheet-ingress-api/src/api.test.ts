@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Schema } from "effect";
 import { Api, SheetApisApi, SheetClusterApi } from "./api";
 import { SheetClusterRpcs } from "./sheet-cluster-rpc";
 import { DispatchRoomOrderButtonMethods, SheetApisRpcs } from "./sheet-apis-rpc";
@@ -103,5 +104,15 @@ describe("Api", () => {
     expect(Api.groups.checkin.endpoints).not.toHaveProperty("handleButton");
     expect(Api.groups.roomOrder.endpoints).not.toHaveProperty("dispatch");
     expect(Api.groups.roomOrder.endpoints).not.toHaveProperty("handleButton");
+  });
+
+  it("declares workflow discard RPCs as returning execution ids", () => {
+    const discardRpc = SheetClusterRpcs.requests.get("dispatch.serviceStatusDiscard");
+
+    expect(discardRpc).toBeDefined();
+    expect(Schema.decodeUnknownSync(discardRpc!.successSchema)("execution-id")).toBe(
+      "execution-id",
+    );
+    expect(() => Schema.decodeUnknownSync(discardRpc!.successSchema)(undefined)).toThrow();
   });
 });
