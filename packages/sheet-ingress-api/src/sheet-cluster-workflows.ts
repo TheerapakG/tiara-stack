@@ -1,6 +1,6 @@
 import { Schema } from "effect";
-import { Rpc, RpcGroup } from "effect/unstable/rpc";
-import { Workflow } from "effect/unstable/workflow";
+import { Rpc } from "effect/unstable/rpc";
+import { Workflow, WorkflowProxy } from "effect/unstable/workflow";
 import { UnknownError } from "typhoon-core/error";
 import { SheetApisRpcAuthorization } from "./middlewares/sheetApisRpcAuthorization/tag";
 import { MessageRoomOrder } from "./schemas/messageRoomOrder";
@@ -216,26 +216,14 @@ export const DispatchWorkflows = [
   DispatchRoomOrderPinTentativeButtonWorkflow,
 ] as const;
 
-const DispatchWorkflowResumePayload = Schema.Struct({
-  executionId: Schema.String,
-});
-
 const makeDispatchWorkflowRpcs = (workflows: typeof DispatchWorkflows) =>
-  RpcGroup.make(
-    ...workflows.flatMap((workflow) => [
-      Rpc.make(workflow.name, {
-        payload: workflow.payloadSchema,
-        success: workflow.successSchema,
-        error: workflow.errorSchema,
-      }).annotateMerge(workflow.annotations),
+  WorkflowProxy.toRpcGroup(workflows).add(
+    ...workflows.map((workflow) =>
       Rpc.make(`${workflow.name}Discard`, {
         payload: workflow.payloadSchema,
         success: DispatchWorkflowExecutionId,
       }).annotateMerge(workflow.annotations),
-      Rpc.make(`${workflow.name}Resume`, {
-        payload: DispatchWorkflowResumePayload,
-      }).annotateMerge(workflow.annotations),
-    ]),
+    ),
   );
 
 export const DispatchWorkflowRpcs =
