@@ -38,10 +38,6 @@ export const isClusterRunnerReady = Effect.gen(function* () {
       WHERE "sheet_apis_cluster_runners".address = ${address}
         AND "sheet_apis_cluster_runners".healthy = TRUE
         AND "sheet_apis_cluster_runners".last_heartbeat > NOW() - INTERVAL '35 seconds'
-    ) AND EXISTS (
-      SELECT 1
-      FROM "sheet_apis_cluster_locks"
-      WHERE "sheet_apis_cluster_locks".address = ${address}
     ) AS ready
   `;
   return row?.ready === true;
