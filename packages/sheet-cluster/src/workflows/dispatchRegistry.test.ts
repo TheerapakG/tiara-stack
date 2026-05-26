@@ -1,11 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer, Option, Schema } from "effect";
+import { Context, Effect, Layer, Option, Schema } from "effect";
+import { ClusterSchema } from "effect/unstable/cluster";
 import type { HttpApiClient } from "effect/unstable/httpapi";
 import { vi } from "vitest";
 import { MessageCheckinMember } from "sheet-ingress-api/schemas/messageCheckin";
 import { MessageSlot } from "sheet-ingress-api/schemas/messageSlot";
 import {
-  DispatchWorkflows,
+  DispatchWorkflows as SheetIngressDispatchWorkflows,
   type DispatchRequester,
 } from "sheet-ingress-api/sheet-cluster-workflows";
 import type {
@@ -27,6 +28,7 @@ import type {
 import { Unauthorized } from "typhoon-core/error";
 import { DispatchService, SheetApisClient } from "@/services";
 import { dispatchWorkflowNames, dispatchWorkflowRegistry } from "./dispatchRegistry";
+import { DispatchWorkflows } from "./dispatchWorkflows";
 
 const requester: DispatchRequester = {
   accountId: "account-1",
@@ -221,7 +223,9 @@ const makeSheetApisClientMock = (overrides: {
 
 describe("dispatch workflow registry", () => {
   it("has metadata for every dispatch workflow", () => {
-    expect(dispatchWorkflowNames).toEqual(DispatchWorkflows.map((workflow) => workflow.name));
+    expect(dispatchWorkflowNames).toEqual(
+      SheetIngressDispatchWorkflows.map((workflow) => workflow.name),
+    );
     expect(Object.keys(dispatchWorkflowRegistry)).toEqual([
       "checkin",
       "roomOrder",
@@ -236,6 +240,13 @@ describe("dispatch workflow registry", () => {
       "roomOrderSendButton",
       "roomOrderPinTentativeButton",
     ]);
+  });
+
+  it("assigns dispatch workflows to the configured dispatch shard group", () => {
+    for (const workflow of DispatchWorkflows) {
+      const shardGroup = Context.get(workflow.annotations, ClusterSchema.ShardGroup);
+      expect(shardGroup(undefined as never)).toBe("dispatch");
+    }
   });
 
   it("routes check-in workflow execution to DispatchService", async () => {
