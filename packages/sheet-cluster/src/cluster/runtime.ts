@@ -28,23 +28,40 @@ const configuredRunnerAddress = Effect.gen(function* () {
   return RunnerAddress.make(runnerHost, runnerPort);
 });
 
+const shardingConfig = ({
+  runnerAddress,
+  runnerListenAddress,
+}: {
+  readonly runnerAddress: Option.Option<RunnerAddress.RunnerAddress>;
+  readonly runnerListenAddress: Option.Option<RunnerAddress.RunnerAddress>;
+}) =>
+  ShardingConfig.layer({
+    runnerAddress,
+    runnerListenAddress,
+    shardGroups,
+    shardsPerGroup: 300,
+    entityMailboxCapacity: 4096,
+    entityMaxIdleTime: Duration.minutes(5),
+    simulateRemoteSerialization: false,
+  });
+
 export const shardingConfigLayer = Layer.unwrap(
   Effect.gen(function* () {
     const runnerAddress = yield* configuredRunnerAddress;
     const runnerListenHost = yield* config.clusterRunnerListenHost;
     const runnerListenPort = yield* config.clusterRunnerListenPort;
 
-    return ShardingConfig.layer({
+    return shardingConfig({
       runnerAddress: Option.some(runnerAddress),
       runnerListenAddress: Option.some(RunnerAddress.make(runnerListenHost, runnerListenPort)),
-      shardGroups,
-      shardsPerGroup: 300,
-      entityMailboxCapacity: 4096,
-      entityMaxIdleTime: Duration.minutes(5),
-      simulateRemoteSerialization: false,
     });
   }),
 ).pipe(Layer.withSpan("sheet-cluster.shardingConfig"));
+
+const clusterClientShardingConfigLayer = shardingConfig({
+  runnerAddress: Option.none(),
+  runnerListenAddress: Option.none(),
+}).pipe(Layer.withSpan("sheet-cluster.clusterClientShardingConfig"));
 
 export const clusterStorageLayer = Layer.mergeAll(
   SqlMessageStorage.layerWith({ prefix: "sheet_apis_cluster" }),
@@ -62,7 +79,7 @@ export const clusterClientLayer = HttpRunner.layerClient.pipe(
   Layer.provide(clusterStorageLayer),
   Layer.provide(RunnerHealth.layerNoop),
   Layer.provide(HttpRunner.layerClientProtocolHttp({ path: "/cluster/rpc" })),
-  Layer.provide(shardingConfigLayer),
+  Layer.provide(clusterClientShardingConfigLayer),
   Layer.provide(RpcSerialization.layerJson),
   Layer.withSpan("sheet-cluster.clusterClient"),
 );
