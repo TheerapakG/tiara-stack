@@ -61,20 +61,46 @@ describe("SheetClusterForwardingClient", () => {
   });
 
   it("keeps split room-order forwarding methods aligned with shared button metadata", async () => {
-    const makeDiscard = () => vi.fn(() => Effect.void);
+    const makeDiscard = (operation: {
+      readonly workflow: { executionId: (payload: never) => Effect.Effect<string> };
+    }) => vi.fn((payload) => operation.workflow.executionId(payload as never));
     const rpcClient = {
-      [DispatchWorkflowOperations.checkin.discardRpcTag]: makeDiscard(),
-      [DispatchWorkflowOperations.checkinButton.discardRpcTag]: makeDiscard(),
-      [DispatchWorkflowOperations.roomOrder.discardRpcTag]: makeDiscard(),
-      [DispatchWorkflowOperations.kickout.discardRpcTag]: makeDiscard(),
-      [DispatchWorkflowOperations.slotButton.discardRpcTag]: makeDiscard(),
-      [DispatchWorkflowOperations.slotList.discardRpcTag]: makeDiscard(),
-      [DispatchWorkflowOperations.serviceStatus.discardRpcTag]: makeDiscard(),
-      [DispatchWorkflowOperations.slotOpenButton.discardRpcTag]: makeDiscard(),
-      [DispatchWorkflowOperations.roomOrderPreviousButton.discardRpcTag]: makeDiscard(),
-      [DispatchWorkflowOperations.roomOrderNextButton.discardRpcTag]: makeDiscard(),
-      [DispatchWorkflowOperations.roomOrderSendButton.discardRpcTag]: makeDiscard(),
-      [DispatchWorkflowOperations.roomOrderPinTentativeButton.discardRpcTag]: makeDiscard(),
+      [DispatchWorkflowOperations.checkin.discardRpcTag]: makeDiscard(
+        DispatchWorkflowOperations.checkin,
+      ),
+      [DispatchWorkflowOperations.checkinButton.discardRpcTag]: makeDiscard(
+        DispatchWorkflowOperations.checkinButton,
+      ),
+      [DispatchWorkflowOperations.roomOrder.discardRpcTag]: makeDiscard(
+        DispatchWorkflowOperations.roomOrder,
+      ),
+      [DispatchWorkflowOperations.kickout.discardRpcTag]: makeDiscard(
+        DispatchWorkflowOperations.kickout,
+      ),
+      [DispatchWorkflowOperations.slotButton.discardRpcTag]: makeDiscard(
+        DispatchWorkflowOperations.slotButton,
+      ),
+      [DispatchWorkflowOperations.slotList.discardRpcTag]: makeDiscard(
+        DispatchWorkflowOperations.slotList,
+      ),
+      [DispatchWorkflowOperations.serviceStatus.discardRpcTag]: makeDiscard(
+        DispatchWorkflowOperations.serviceStatus,
+      ),
+      [DispatchWorkflowOperations.slotOpenButton.discardRpcTag]: makeDiscard(
+        DispatchWorkflowOperations.slotOpenButton,
+      ),
+      [DispatchWorkflowOperations.roomOrderPreviousButton.discardRpcTag]: makeDiscard(
+        DispatchWorkflowOperations.roomOrderPreviousButton,
+      ),
+      [DispatchWorkflowOperations.roomOrderNextButton.discardRpcTag]: makeDiscard(
+        DispatchWorkflowOperations.roomOrderNextButton,
+      ),
+      [DispatchWorkflowOperations.roomOrderSendButton.discardRpcTag]: makeDiscard(
+        DispatchWorkflowOperations.roomOrderSendButton,
+      ),
+      [DispatchWorkflowOperations.roomOrderPinTentativeButton.discardRpcTag]: makeDiscard(
+        DispatchWorkflowOperations.roomOrderPinTentativeButton,
+      ),
     };
 
     const client = await Effect.runPromise(

@@ -16,15 +16,11 @@ export class SheetClusterForwardingClient extends Context.Service<SheetClusterFo
           operation: TOperation,
           fn: (
             args: TOperation["workflow"]["payloadSchema"]["~type.make.in"],
-          ) => Effect.Effect<void, E, R>,
+          ) => Effect.Effect<string, E, R>,
         ) =>
         (args: TOperation["workflow"]["payloadSchema"]["~type.make.in"]) =>
           Effect.gen(function* () {
-            const executionIdFor = operation.workflow.executionId as (
-              payload: TOperation["workflow"]["payloadSchema"]["~type.make.in"],
-            ) => Effect.Effect<string>;
-            const executionId = yield* executionIdFor(args);
-            yield* fn(args);
+            const executionId = yield* fn(args);
             return {
               executionId,
               operation: operation.operation,
