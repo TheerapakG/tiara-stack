@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { ClusterSchema } from "effect/unstable/cluster";
 import { Workflow } from "effect/unstable/workflow";
 
 export const AutoCheckinChannelPayload = Schema.Struct({
@@ -29,4 +30,4 @@ export const AutoCheckinChannelWorkflow = Workflow.make({
   error: Schema.Unknown,
   idempotencyKey: ({ guildId, channelName, hour, eventStartEpochMs }) =>
     `auto-checkin:${guildId}:${eventStartEpochMs}:${hour}:${channelName}`,
-});
+}).annotate(ClusterSchema.ShardGroup, () => "autoCheckin");

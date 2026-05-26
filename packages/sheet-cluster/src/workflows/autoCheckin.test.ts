@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Context, Effect } from "effect";
+import { ClusterSchema } from "effect/unstable/cluster";
 import { WorkflowEngine } from "effect/unstable/workflow";
 import { AutoCheckinService } from "@/services";
 import { autoCheckinWorkflowLayer } from "./autoCheckin";
@@ -27,6 +28,14 @@ const result: AutoCheckinChannelResult = {
 };
 
 describe("auto check-in workflow", () => {
+  it("assigns the workflow to the configured autoCheckin shard group", () => {
+    const shardGroup = Context.get(
+      AutoCheckinChannelWorkflow.annotations,
+      ClusterSchema.ShardGroup,
+    );
+    expect(shardGroup(undefined as never)).toBe("autoCheckin");
+  });
+
   it("routes channel processing to AutoCheckinService", async () => {
     const service = {
       enqueueDueChannels: () => Effect.die("Unexpected enqueueDueChannels call"),
