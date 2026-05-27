@@ -71,6 +71,14 @@ type DiscordClient = {
       };
     }) => Effect.Effect<unknown, unknown>;
   };
+  readonly ingressBot: {
+    readonly updateOriginalInteractionResponse: (args: {
+      readonly payload: {
+        readonly interactionToken: string;
+        readonly payload: MessagePayload;
+      };
+    }) => Effect.Effect<DiscordMessage, unknown>;
+  };
   readonly cache: {
     readonly getMembersForParent: (args: {
       readonly params: { readonly parentId: string };
@@ -197,9 +205,8 @@ export class IngressBotClient extends Context.Service<IngressBotClient>()("Ingre
         "IngressBotClient.updateOriginalInteractionResponse",
       )(function* (interactionToken: string, payload: MessagePayload) {
         yield* Effect.annotateCurrentSpan({ hasInteractionToken: interactionToken.length > 0 });
-        return yield* client.bot.updateOriginalInteractionResponse({
-          params: { interactionToken },
-          payload,
+        return yield* client.ingressBot.updateOriginalInteractionResponse({
+          payload: { interactionToken, payload },
         });
       }),
       createPin: Effect.fn("IngressBotClient.createPin")(function* (

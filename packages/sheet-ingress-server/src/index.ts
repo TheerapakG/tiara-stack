@@ -775,7 +775,7 @@ const makeApiLayer = () => {
     HttpApiBuilder.group(Api, "status", (handlers) =>
       handlers.handle(
         "getServices",
-        authorizedSheetApis("status", "getServices", requireNonService),
+        authorizedSheetApis("status", "getServices", () => Effect.void),
       ),
     ),
     HttpApiBuilder.group(Api, "guildConfig", (handlers) =>
@@ -1168,6 +1168,17 @@ const makeApiLayer = () => {
         .handle("deleteMessage", forwardSheetBot("bot", "deleteMessage"))
         .handle("addGuildMemberRole", forwardSheetBot("bot", "addGuildMemberRole"))
         .handle("removeGuildMemberRole", forwardSheetBot("bot", "removeGuildMemberRole")),
+    ),
+    HttpApiBuilder.group(Api, "ingressBot", (handlers) =>
+      handlers.handle("updateOriginalInteractionResponse", ({ payload }) =>
+        forwardSheetBot(
+          "bot",
+          "updateOriginalInteractionResponse",
+        )({
+          params: { interactionToken: payload.interactionToken },
+          payload: payload.payload,
+        } as never),
+      ),
     ),
     HttpApiBuilder.group(Api, "cache", (handlers) =>
       handlers

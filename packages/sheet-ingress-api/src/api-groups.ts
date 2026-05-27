@@ -4,6 +4,7 @@ export { DispatchApi } from "./handlers/dispatch/api";
 export { DiscordApi } from "./handlers/discord/api";
 export { GuildConfigApi } from "./handlers/guildConfig/api";
 export { HealthApi } from "./handlers/health/api";
+export { IngressBotApi } from "./handlers/ingressBot/api";
 export { MessageCheckinApi } from "./handlers/messageCheckin/api";
 export { MessageRoomOrderApi } from "./handlers/messageRoomOrder/api";
 export { MessageSlotApi } from "./handlers/messageSlot/api";

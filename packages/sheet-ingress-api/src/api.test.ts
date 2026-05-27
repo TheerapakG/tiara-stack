@@ -115,4 +115,12 @@ describe("Api", () => {
     );
     expect(() => Schema.decodeUnknownSync(discardRpc!.successSchema)(undefined)).toThrow();
   });
+
+  it("keeps long interaction tokens out of ingress bot paths", () => {
+    expect(Api.groups.ingressBot.endpoints.updateOriginalInteractionResponse).toMatchObject({
+      method: "PATCH",
+      name: "updateOriginalInteractionResponse",
+      path: "/bot/interactions/original-response",
+    });
+  });
 });

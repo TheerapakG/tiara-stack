@@ -126,11 +126,12 @@ export class IngressBotClient extends Context.Service<IngressBotClient>()("Ingre
         "IngressBotClient.updateOriginalInteractionResponse",
       )(function* (
         interactionToken: string,
-        payload: Parameters<typeof client.bot.updateOriginalInteractionResponse>[0]["payload"],
+        payload: Parameters<
+          typeof client.ingressBot.updateOriginalInteractionResponse
+        >[0]["payload"]["payload"],
       ) {
-        return yield* client.bot.updateOriginalInteractionResponse({
-          params: { interactionToken },
-          payload,
+        return yield* client.ingressBot.updateOriginalInteractionResponse({
+          payload: { interactionToken, payload },
         });
       }),
       createPin: Effect.fn("IngressBotClient.createPin")(function* (

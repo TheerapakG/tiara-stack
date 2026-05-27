@@ -7,6 +7,7 @@ import {
   DispatchApi,
   DiscordApi as SheetApisDiscordApi,
   GuildConfigApi,
+  IngressBotApi,
   MessageCheckinApi,
   MessageRoomOrderApi,
   MessageSlotApi,
@@ -55,6 +56,7 @@ class SheetIngressDiscordApiBase extends HttpApi.make("discord")
   .add(ApplicationApi.middleware(SheetBotServiceAuthorization))
   .add(BotApi.middleware(SheetBotServiceAuthorization))
   .add(CacheApi.middleware(SheetBotServiceAuthorization))
+  .add(IngressBotApi.middleware(SheetBotServiceAuthorization))
   .annotate(OpenApi.Title, "Discord API")
   .annotate(
     OpenApi.Description,
