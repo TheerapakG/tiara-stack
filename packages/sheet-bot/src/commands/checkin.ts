@@ -13,6 +13,7 @@ import { InteractionToken } from "dfx-discord-utils/utils";
 import { SheetClusterClient, SheetClusterRequestContext } from "../services";
 import { discordApplicationLayer } from "../discord/application";
 import { interactionDeadlineEpochMs } from "../utils/interactionDeadline";
+import { runSheetClusterDispatch } from "../utils/sheetClusterDispatch";
 
 const getInteractionGuildId = Effect.gen(function* () {
   const interactionGuild = yield* Interaction.guild();
@@ -70,33 +71,39 @@ const makeManualSubCommand = Effect.gen(function* () {
       const interactionToken = yield* InteractionToken;
       const interaction = yield* Ix.Interaction;
 
-      yield* sheetClusterClient.get().dispatch.checkin({
-        payload: {
-          dispatchRequestId: `discord-interaction:${interaction.id}`,
-          guildId,
-          interactionToken: interactionToken.token,
-          interactionDeadlineEpochMs: interactionDeadlineEpochMs(interaction.id),
-          ...(Option.isSome(channelNameOption)
-            ? { channelName: channelNameOption.value }
-            : {
-                channelId: interactionChannelId,
-              }),
-          ...pipe(
-            command.optionValueOptional("hour"),
-            Option.match({
-              onSome: (hour) => ({ hour }),
-              onNone: () => ({}),
-            }),
-          ),
-          ...pipe(
-            templateOption,
-            Option.match({
-              onSome: (template) => ({ template }),
-              onNone: () => ({}),
-            }),
-          ),
-        },
-      });
+      yield* runSheetClusterDispatch(
+        response,
+        "the check-in",
+        SheetClusterRequestContext.asInteractionUser(() =>
+          sheetClusterClient.get().dispatch.checkin({
+            payload: {
+              dispatchRequestId: `discord-interaction:${interaction.id}`,
+              guildId,
+              interactionToken: interactionToken.token,
+              interactionDeadlineEpochMs: interactionDeadlineEpochMs(interaction.id),
+              ...(Option.isSome(channelNameOption)
+                ? { channelName: channelNameOption.value }
+                : {
+                    channelId: interactionChannelId,
+                  }),
+              ...pipe(
+                command.optionValueOptional("hour"),
+                Option.match({
+                  onSome: (hour) => ({ hour }),
+                  onNone: () => ({}),
+                }),
+              ),
+              ...pipe(
+                templateOption,
+                Option.match({
+                  onSome: (template) => ({ template }),
+                  onNone: () => ({}),
+                }),
+              ),
+            },
+          }),
+        )(),
+      );
     }),
   );
 });
@@ -119,11 +126,10 @@ const makeCheckinCommand = Effect.gen(function* () {
           InteractionContextType.PrivateChannel,
         )
         .addSubcommand(() => manualSubCommand.data),
-    SheetClusterRequestContext.asInteractionUser((command) =>
+    (command) =>
       command.subCommands({
         manual: manualSubCommand.handler,
       }),
-    ),
   );
 });
 

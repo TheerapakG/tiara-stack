@@ -12,6 +12,7 @@ import { discordGatewayLayer } from "../discord/gateway";
 import { SheetClusterClient, SheetClusterRequestContext } from "../services";
 import { discordApplicationLayer } from "../discord/application";
 import { interactionDeadlineEpochMs } from "../utils/interactionDeadline";
+import { runSheetClusterDispatch } from "../utils/sheetClusterDispatch";
 
 const getInteractionGuildId = Effect.gen(function* () {
   const interactionGuild = yield* Interaction.guild();
@@ -72,16 +73,22 @@ const makeListSubCommand = Effect.gen(function* () {
 
       const interactionToken = yield* InteractionToken;
       const interaction = yield* Ix.Interaction;
-      yield* sheetClusterClient.get().dispatch.slotList({
-        payload: {
-          dispatchRequestId: `discord-interaction:${interaction.id}`,
-          guildId,
-          day,
-          messageType,
-          interactionToken: interactionToken.token,
-          interactionDeadlineEpochMs: interactionDeadlineEpochMs(interaction.id),
-        },
-      });
+      yield* runSheetClusterDispatch(
+        response,
+        "the slot list",
+        SheetClusterRequestContext.asInteractionUser(() =>
+          sheetClusterClient.get().dispatch.slotList({
+            payload: {
+              dispatchRequestId: `discord-interaction:${interaction.id}`,
+              guildId,
+              day,
+              messageType,
+              interactionToken: interactionToken.token,
+              interactionDeadlineEpochMs: interactionDeadlineEpochMs(interaction.id),
+            },
+          }),
+        )(),
+      );
     }),
   );
 });
@@ -118,16 +125,22 @@ const makeButtonSubCommand = Effect.gen(function* () {
       );
       const interactionToken = yield* InteractionToken;
       const interaction = yield* Ix.Interaction;
-      yield* sheetClusterClient.get().dispatch.slotButton({
-        payload: {
-          dispatchRequestId: `discord-interaction:${interaction.id}`,
-          guildId,
-          channelId,
-          day,
-          interactionToken: interactionToken.token,
-          interactionDeadlineEpochMs: interactionDeadlineEpochMs(interaction.id),
-        },
-      });
+      yield* runSheetClusterDispatch(
+        response,
+        "the slot button",
+        SheetClusterRequestContext.asInteractionUser(() =>
+          sheetClusterClient.get().dispatch.slotButton({
+            payload: {
+              dispatchRequestId: `discord-interaction:${interaction.id}`,
+              guildId,
+              channelId,
+              day,
+              interactionToken: interactionToken.token,
+              interactionDeadlineEpochMs: interactionDeadlineEpochMs(interaction.id),
+            },
+          }),
+        )(),
+      );
     }),
   );
 });
@@ -152,12 +165,11 @@ const makeSlotCommand = Effect.gen(function* () {
         )
         .addSubcommand(() => listSubCommand.data)
         .addSubcommand(() => buttonSubCommand.data),
-    SheetClusterRequestContext.asInteractionUser((command) =>
+    (command) =>
       command.subCommands({
         list: listSubCommand.handler,
         button: buttonSubCommand.handler,
       }),
-    ),
   );
 });
 

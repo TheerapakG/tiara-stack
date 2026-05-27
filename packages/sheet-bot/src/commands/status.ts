@@ -8,6 +8,7 @@ import { discordApplicationLayer } from "../discord/application";
 import { discordGatewayLayer } from "../discord/gateway";
 import { SheetClusterClient, SheetClusterRequestContext } from "../services";
 import { interactionDeadlineEpochMs } from "../utils/interactionDeadline";
+import { runSheetClusterDispatch } from "../utils/sheetClusterDispatch";
 
 const makeStatusCommand = Effect.gen(function* () {
   const sheetClusterClient = yield* SheetClusterClient;
@@ -26,22 +27,28 @@ const makeStatusCommand = Effect.gen(function* () {
           InteractionContextType.Guild,
           InteractionContextType.PrivateChannel,
         ),
-    SheetClusterRequestContext.asInteractionUser(
-      Effect.fn("status")(function* () {
-        const response = yield* InteractionResponse;
-        yield* response.deferReply();
+    Effect.fn("status")(function* () {
+      const response = yield* InteractionResponse;
+      yield* response.deferReply();
 
-        const interactionToken = yield* InteractionToken;
-        const interaction = yield* Ix.Interaction;
-        yield* sheetClusterClient.get().dispatch.serviceStatus({
-          payload: {
-            dispatchRequestId: `discord-interaction:${interaction.id}`,
-            interactionToken: interactionToken.token,
-            interactionDeadlineEpochMs: interactionDeadlineEpochMs(interaction.id),
-          },
-        });
-      }),
-    ),
+      yield* runSheetClusterDispatch(
+        response,
+        "the service status check",
+        SheetClusterRequestContext.asInteractionUser(
+          Effect.fn("status.dispatch")(function* () {
+            const interactionToken = yield* InteractionToken;
+            const interaction = yield* Ix.Interaction;
+            return yield* sheetClusterClient.get().dispatch.serviceStatus({
+              payload: {
+                dispatchRequestId: `discord-interaction:${interaction.id}`,
+                interactionToken: interactionToken.token,
+                interactionDeadlineEpochMs: interactionDeadlineEpochMs(interaction.id),
+              },
+            });
+          }),
+        )(),
+      );
+    }),
   );
 });
 

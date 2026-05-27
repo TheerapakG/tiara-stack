@@ -13,6 +13,7 @@ import { InteractionToken } from "dfx-discord-utils/utils";
 import { SheetClusterClient, SheetClusterRequestContext } from "../services";
 import { discordApplicationLayer } from "../discord/application";
 import { interactionDeadlineEpochMs } from "../utils/interactionDeadline";
+import { runSheetClusterDispatch } from "../utils/sheetClusterDispatch";
 
 const getInteractionGuildId = Effect.gen(function* () {
   const interactionGuild = yield* Interaction.guild();
@@ -57,35 +58,44 @@ const makeManualSubCommand = Effect.gen(function* () {
         Option.getOrUndefined(serverId) ?? Option.getOrThrow(yield* getInteractionGuildId);
 
       const channelNameOption = command.optionValueOptional("channel_name");
+      const interactionChannelId = Option.isSome(channelNameOption)
+        ? undefined
+        : Option.getOrThrow(yield* getInteractionChannelId);
       const interactionToken = yield* InteractionToken;
       const interaction = yield* Ix.Interaction;
-      yield* sheetClusterClient.get().dispatch.roomOrder({
-        payload: {
-          dispatchRequestId: `discord-interaction:${interaction.id}`,
-          guildId,
-          interactionToken: interactionToken.token,
-          interactionDeadlineEpochMs: interactionDeadlineEpochMs(interaction.id),
-          ...(Option.isSome(channelNameOption)
-            ? { channelName: channelNameOption.value }
-            : {
-                channelId: Option.getOrThrow(yield* getInteractionChannelId),
-              }),
-          ...pipe(
-            command.optionValueOptional("hour"),
-            Option.match({
-              onSome: (hour) => ({ hour }),
-              onNone: () => ({}),
-            }),
-          ),
-          ...pipe(
-            command.optionValueOptional("heal"),
-            Option.match({
-              onSome: (healNeeded) => ({ healNeeded }),
-              onNone: () => ({}),
-            }),
-          ),
-        },
-      });
+      yield* runSheetClusterDispatch(
+        response,
+        "the room order",
+        SheetClusterRequestContext.asInteractionUser(() =>
+          sheetClusterClient.get().dispatch.roomOrder({
+            payload: {
+              dispatchRequestId: `discord-interaction:${interaction.id}`,
+              guildId,
+              interactionToken: interactionToken.token,
+              interactionDeadlineEpochMs: interactionDeadlineEpochMs(interaction.id),
+              ...(Option.isSome(channelNameOption)
+                ? { channelName: channelNameOption.value }
+                : {
+                    channelId: interactionChannelId,
+                  }),
+              ...pipe(
+                command.optionValueOptional("hour"),
+                Option.match({
+                  onSome: (hour) => ({ hour }),
+                  onNone: () => ({}),
+                }),
+              ),
+              ...pipe(
+                command.optionValueOptional("heal"),
+                Option.match({
+                  onSome: (healNeeded) => ({ healNeeded }),
+                  onNone: () => ({}),
+                }),
+              ),
+            },
+          }),
+        )(),
+      );
     }),
   );
 });
@@ -108,11 +118,10 @@ const makeRoomOrderCommand = Effect.gen(function* () {
           InteractionContextType.PrivateChannel,
         )
         .addSubcommand(() => manualSubCommand.data),
-    SheetClusterRequestContext.asInteractionUser((command) =>
+    (command) =>
       command.subCommands({
         manual: manualSubCommand.handler,
       }),
-    ),
   );
 });
 
