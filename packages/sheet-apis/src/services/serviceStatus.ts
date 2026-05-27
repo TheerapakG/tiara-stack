@@ -17,7 +17,7 @@ const formatError = (error: unknown) =>
     ? error.message
     : typeof error === "string"
       ? error
-      : JSON.stringify(error);
+      : (JSON.stringify(error) ?? String(error));
 
 export class ServiceStatusService extends Context.Service<ServiceStatusService>()(
   "ServiceStatusService",

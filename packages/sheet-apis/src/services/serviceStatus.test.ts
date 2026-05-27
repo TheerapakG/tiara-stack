@@ -61,4 +61,25 @@ describe("ServiceStatusService", () => {
       });
     }),
   );
+
+  it.effect(
+    "reports degraded with a string error when a service request fails without a cause",
+    () =>
+      Effect.gen(function* () {
+        const result = yield* runStatusCheck((request) =>
+          request.url.includes("sheet-web-service")
+            ? Effect.fail(undefined as never)
+            : Effect.succeed(response(request, 200)),
+        );
+
+        const sheetWeb = result.services.find((service) => service.name === "sheet-web");
+        expect(result.overallStatus).toBe("degraded");
+        expect(sheetWeb).toMatchObject({
+          status: "down",
+          httpStatus: null,
+          latencyMs: null,
+          error: "undefined",
+        });
+      }),
+  );
 });
