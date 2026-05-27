@@ -11,14 +11,16 @@ import { httpLayer } from "./http";
 import { MetricsLive } from "./metrics";
 import { postgresSqlLayer } from "./services";
 import { autoCheckinTaskLayer } from "./tasks";
+import { smokeWorkflowTaskLayer } from "./tasks/smokeWorkflow";
 import { TracesLive } from "./traces";
 
 const configProviderLayer = dotEnvConfigProviderLayer().pipe(Layer.provide(NodeFileSystem.layer));
 
-const clientWorkflowLayers = Layer.mergeAll(httpLayer, autoCheckinTaskLayer).pipe(
-  Layer.provide(clusterWorkflowEngineClientLayer),
-  Layer.provide(shardingConfigLayer),
-);
+const clientWorkflowLayers = Layer.mergeAll(
+  httpLayer,
+  autoCheckinTaskLayer,
+  smokeWorkflowTaskLayer,
+).pipe(Layer.provide(clusterWorkflowEngineClientLayer), Layer.provide(shardingConfigLayer));
 
 const clusterServerLayer = clusterHttpLayer.pipe(Layer.provide(shardingConfigLayer));
 

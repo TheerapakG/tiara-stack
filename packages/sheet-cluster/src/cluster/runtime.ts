@@ -6,13 +6,12 @@ import {
   K8sHttpClient,
   RunnerAddress,
   RunnerHealth,
-  RunnerServer,
   Sharding,
   ShardingConfig,
   SqlMessageStorage,
   SqlRunnerStorage,
 } from "effect/unstable/cluster";
-import { FetchHttpClient, HttpRouter } from "effect/unstable/http";
+import { HttpRouter } from "effect/unstable/http";
 import { RpcSerialization } from "effect/unstable/rpc";
 import { createServer } from "node:http";
 import { config } from "@/config";
@@ -20,6 +19,7 @@ import { AutoCheckinService } from "@/services";
 import { autoCheckinWorkflowLayer } from "@/workflows/autoCheckin";
 import { getClusterRunnerReadinessSnapshot, postgresSqlLayer } from "@/services";
 import { dispatchWorkflowLayer } from "@/workflows/dispatch";
+import { smokeWorkflowLayer } from "@/workflows/smoke";
 
 const shardGroups = ["dispatch", "autoCheckin"] as const;
 
@@ -60,10 +60,10 @@ const runnerHealthLayer = Layer.unwrap(
   }),
 ).pipe(Layer.withSpan("sheet-cluster.runnerHealth"));
 
-export const clusterClientLayer = RunnerServer.layerClientOnly.pipe(
+export const clusterClientLayer = HttpRunner.layerClient.pipe(
   Layer.provide(clusterStorageLayer),
+  Layer.provide(RunnerHealth.layerNoop),
   Layer.provide(HttpRunner.layerClientProtocolHttp({ path: "/cluster/rpc" })),
-  Layer.provide(FetchHttpClient.layer),
   Layer.provide(shardingConfigLayer),
   Layer.provide(RpcSerialization.layerJson),
   Layer.withSpan("sheet-cluster.clusterClient"),
@@ -116,6 +116,7 @@ const clusterStartupLayer = Layer.effectDiscard(
 export const clusterLayer = Layer.mergeAll(
   dispatchWorkflowLayer,
   autoCheckinWorkflowLayer,
+  smokeWorkflowLayer,
   clusterStartupLayer,
 ).pipe(
   Layer.provide(AutoCheckinService.layer),

@@ -23,4 +23,7 @@ export const config = {
   autoCheckinConcurrency: Config.schema(positiveInt, "AUTO_CHECKIN_CONCURRENCY").pipe(
     Config.withDefault(50),
   ),
+  clusterSmokeWorkflowEnabled: Config.boolean("CLUSTER_SMOKE_WORKFLOW_ENABLED").pipe(
+    Config.withDefault(false),
+  ),
 };
