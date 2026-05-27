@@ -42,7 +42,8 @@ import type {
 } from "sheet-ingress-api/sheet-apis-rpc";
 import * as Sheet from "sheet-ingress-api/schemas/sheet";
 import type { ServiceStatus } from "sheet-ingress-api/sheet-apis-rpc";
-import { makeArgumentError } from "typhoon-core/error";
+import { makeArgumentError, makeUnknownError } from "typhoon-core/error";
+import { markInteractionFailureHandled } from "@/handlers/shared/interactionFailure";
 import {
   checkinActionRow,
   roomOrderActionRow,
@@ -635,7 +636,11 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
             content,
             components: [],
           })
-          .pipe(Effect.andThen(Effect.fail(makeArgumentError(errorMessage))));
+          .pipe(
+            Effect.andThen(
+              Effect.fail(markInteractionFailureHandled(makeArgumentError(errorMessage))),
+            ),
+          );
       const requireRoomOrderMatch = (roomOrder: MessageRoomOrder) =>
         Effect.gen(function* () {
           if (
@@ -694,8 +699,10 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
             components: [],
           });
           return yield* Effect.fail(
-            makeArgumentError(
-              "Cannot handle room-order button, message channel is not a registered running channel",
+            markInteractionFailureHandled(
+              makeArgumentError(
+                "Cannot handle room-order button, message channel is not a registered running channel",
+              ),
             ),
           );
         }
@@ -764,7 +771,9 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
             .pipe(
               Effect.andThen(
                 Effect.fail(
-                  makeArgumentError("Cannot handle room-order button, message is not registered"),
+                  markInteractionFailureHandled(
+                    makeArgumentError("Cannot handle room-order button, message is not registered"),
+                  ),
                 ),
               ),
             ),
@@ -943,7 +952,13 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
                 Effect.catchCause(() => Effect.void),
               ),
             ),
-            Effect.andThen(Effect.failCause(cause)),
+            Effect.andThen(
+              Effect.fail(
+                markInteractionFailureHandled(
+                  makeUnknownError("Failed to update room-order button interaction", cause),
+                ),
+              ),
+            ),
           );
 
         if (mode === "tentative") {
@@ -1064,7 +1079,13 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
                     Effect.catchCause(() => Effect.void),
                   ),
                 ),
-                Effect.andThen(Effect.failCause(cause)),
+                Effect.andThen(
+                  Effect.fail(
+                    markInteractionFailureHandled(
+                      makeUnknownError("Failed to send room-order button interaction", cause),
+                    ),
+                  ),
+                ),
               ),
           ),
         );
@@ -1085,7 +1106,13 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
                       Effect.catchCause(() => Effect.void),
                     ),
                   ),
-                  Effect.andThen(Effect.failCause(cause)),
+                  Effect.andThen(
+                    Effect.fail(
+                      markInteractionFailureHandled(
+                        makeUnknownError("Failed to send room-order button interaction", cause),
+                      ),
+                    ),
+                  ),
                 ),
             ),
           );
@@ -1570,7 +1597,11 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
           onNone: () =>
             updateInteraction("Cannot kick out, running channel not found").pipe(
               Effect.andThen(
-                Effect.fail(makeArgumentError("Cannot kick out, running channel not found")),
+                Effect.fail(
+                  markInteractionFailureHandled(
+                    makeArgumentError("Cannot kick out, running channel not found"),
+                  ),
+                ),
               ),
             ),
         });
@@ -1579,7 +1610,11 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
           onNone: () =>
             updateInteraction("Cannot kick out, channel has no name").pipe(
               Effect.andThen(
-                Effect.fail(makeArgumentError("Cannot kick out, channel has no name")),
+                Effect.fail(
+                  markInteractionFailureHandled(
+                    makeArgumentError("Cannot kick out, channel has no name"),
+                  ),
+                ),
               ),
             ),
         });
@@ -1797,7 +1832,7 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
               })
               .pipe(
                 Effect.catch(() => Effect.void),
-                Effect.andThen(Effect.fail(error)),
+                Effect.andThen(Effect.fail(markInteractionFailureHandled(error))),
               ),
           ),
         );
@@ -1817,7 +1852,9 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
             content: "This slot message is not registered to a server.",
           });
           return yield* Effect.fail(
-            makeArgumentError("Cannot handle slot button, message guild is not registered"),
+            markInteractionFailureHandled(
+              makeArgumentError("Cannot handle slot button, message guild is not registered"),
+            ),
           );
         }
 
@@ -1826,7 +1863,9 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
             content: "This slot message channel is not registered.",
           });
           return yield* Effect.fail(
-            makeArgumentError("Cannot handle slot button, message channel is not registered"),
+            markInteractionFailureHandled(
+              makeArgumentError("Cannot handle slot button, message channel is not registered"),
+            ),
           );
         }
 
@@ -1863,7 +1902,11 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
             .updateOriginalInteractionResponse(payload.interactionToken, {
               content,
             })
-            .pipe(Effect.andThen(Effect.fail(makeArgumentError(errorMessage))));
+            .pipe(
+              Effect.andThen(
+                Effect.fail(markInteractionFailureHandled(makeArgumentError(errorMessage))),
+              ),
+            );
         const messageCheckinData = yield* Option.match(maybeMessageCheckinData, {
           onSome: Effect.succeed,
           onNone: () =>
@@ -1902,7 +1945,7 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
                 .updateOriginalInteractionResponse(payload.interactionToken, {
                   content: "We could not check you in. Please try again.",
                 })
-                .pipe(Effect.andThen(Effect.fail(error))),
+                .pipe(Effect.andThen(Effect.fail(markInteractionFailureHandled(error)))),
             ),
           );
         const isFirstCheckin = Option.contains(

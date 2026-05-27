@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import { ClusterSchema } from "effect/unstable/cluster";
 import type { HttpApiClient } from "effect/unstable/httpapi";
+import { WorkflowEngine } from "effect/unstable/workflow";
 import { vi } from "vitest";
 import { MessageCheckinMember } from "sheet-ingress-api/schemas/messageCheckin";
 import { MessageSlot } from "sheet-ingress-api/schemas/messageSlot";
@@ -26,9 +27,14 @@ import type {
   SlotOpenButtonResult,
 } from "sheet-ingress-api/sheet-apis-rpc";
 import { Unauthorized } from "typhoon-core/error";
-import { DispatchService, SheetApisClient } from "@/services";
-import { dispatchWorkflowNames, dispatchWorkflowRegistry } from "./dispatchRegistry";
-import { DispatchWorkflows } from "./dispatchWorkflows";
+import { markInteractionFailureHandled } from "@/handlers/shared/interactionFailure";
+import { DispatchService, IngressBotClient, SheetApisClient } from "@/services";
+import {
+  dispatchWorkflowNames,
+  dispatchWorkflowRegistry,
+  makeWorkflowHandler,
+} from "./dispatchRegistry";
+import { DispatchServiceStatusWorkflow, DispatchWorkflows } from "./dispatchWorkflows";
 
 const requester: DispatchRequester = {
   accountId: "account-1",
@@ -442,6 +448,78 @@ describe("dispatch workflow registry", () => {
         ),
       ),
     );
+  });
+
+  it("does not overwrite handled interaction failure replies with the generic dispatch failure", async () => {
+    const updateOriginalInteractionResponse = vi.fn(() => Effect.void);
+    const serviceStatus = vi.fn(() =>
+      Effect.fail(markInteractionFailureHandled(new Error("status failed"))),
+    );
+
+    const exit = await Effect.runPromise(
+      Effect.exit(
+        DispatchServiceStatusWorkflow.execute({
+          requester,
+          payload: serviceStatusPayload,
+        }),
+      ).pipe(
+        Effect.provide(
+          DispatchServiceStatusWorkflow.toLayer(
+            makeWorkflowHandler({ ...dispatchWorkflowRegistry.serviceStatus }),
+          ),
+        ),
+        Effect.provideService(
+          DispatchService,
+          makeDispatchServiceMock({
+            serviceStatus: serviceStatus as unknown as DispatchServiceMock["serviceStatus"],
+          }),
+        ),
+        Effect.provideService(IngressBotClient, {
+          updateOriginalInteractionResponse,
+        } as never),
+        Effect.provide(WorkflowEngine.layerMemory),
+      ),
+    );
+
+    expect(exit._tag).toBe("Failure");
+    expect(serviceStatus).toHaveBeenCalledWith(serviceStatusPayload);
+    expect(updateOriginalInteractionResponse).not.toHaveBeenCalled();
+  });
+
+  it("keeps the generic dispatch failure for unhandled interaction failures", async () => {
+    const updateOriginalInteractionResponse = vi.fn(() => Effect.void);
+    const serviceStatus = vi.fn(() => Effect.fail(new Error("status failed")));
+
+    const exit = await Effect.runPromise(
+      Effect.exit(
+        DispatchServiceStatusWorkflow.execute({
+          requester,
+          payload: serviceStatusPayload,
+        }),
+      ).pipe(
+        Effect.provide(
+          DispatchServiceStatusWorkflow.toLayer(
+            makeWorkflowHandler({ ...dispatchWorkflowRegistry.serviceStatus }),
+          ),
+        ),
+        Effect.provideService(
+          DispatchService,
+          makeDispatchServiceMock({
+            serviceStatus: serviceStatus as unknown as DispatchServiceMock["serviceStatus"],
+          }),
+        ),
+        Effect.provideService(IngressBotClient, {
+          updateOriginalInteractionResponse,
+        } as never),
+        Effect.provide(WorkflowEngine.layerMemory),
+      ),
+    );
+
+    expect(exit._tag).toBe("Failure");
+    expect(serviceStatus).toHaveBeenCalledWith(serviceStatusPayload);
+    expect(updateOriginalInteractionResponse).toHaveBeenCalledWith("interaction-token", {
+      content: "Dispatch failed. Please try again.",
+    });
   });
 
   it("authorizes slot open buttons from modern message slot records", async () => {

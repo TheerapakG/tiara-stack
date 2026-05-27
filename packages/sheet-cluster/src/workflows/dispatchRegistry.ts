@@ -13,6 +13,10 @@ import { MessageRoomOrder } from "sheet-ingress-api/schemas/messageRoomOrder";
 import type { MessageSlot } from "sheet-ingress-api/schemas/messageSlot";
 import { Unauthorized } from "typhoon-core/error";
 import { normalizeDispatchError } from "@/handlers/shared/dispatchError";
+import {
+  isInteractionFailureHandled,
+  unwrapInteractionFailure,
+} from "@/handlers/shared/interactionFailure";
 import { DispatchService, IngressBotClient, SheetApisClient } from "@/services";
 import {
   DispatchCheckinButtonWorkflow,
@@ -196,7 +200,7 @@ const requireSlotOpenButtonAccess = (messageId: string) =>
     return messageSlot;
   });
 
-const makeWorkflowHandler =
+export const makeWorkflowHandler =
   <TWorkflow extends DispatchWorkflow, TAuthorization, RAuthorize, RExecute>(
     options: DispatchWorkflowHandlerOptions<TWorkflow, TAuthorization, RAuthorize, RExecute>,
   ): DispatchWorkflowHandler<TWorkflow, RAuthorize | RExecute | IngressBotClient> =>
@@ -210,16 +214,18 @@ const makeWorkflowHandler =
             .execute(request, authorization)
             .pipe(Effect.withSpan("DispatchWorkflow.execute", { attributes })),
         ),
+        Effect.tapError((error) =>
+          isInteractionFailureHandled(error)
+            ? Effect.void
+            : notifyInteractionFailure(options.getInteractionToken(request)).pipe(
+                Effect.withSpan("DispatchWorkflow.notifyInteractionFailure", { attributes }),
+              ),
+        ),
         Effect.mapError(
           (error): DispatchWorkflowError<TWorkflow> =>
             normalizeDispatchError(`Failed to dispatch ${options.operation}`)(
-              error,
+              unwrapInteractionFailure(error),
             ) as DispatchWorkflowError<TWorkflow>,
-        ),
-        Effect.tapError(() =>
-          notifyInteractionFailure(options.getInteractionToken(request)).pipe(
-            Effect.withSpan("DispatchWorkflow.notifyInteractionFailure", { attributes }),
-          ),
         ),
         Effect.annotateLogs(attributes),
       );
