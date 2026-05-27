@@ -9,13 +9,12 @@ export interface DiscordConfigOptions {
 export const discordConfigLayer = (options: DiscordConfigOptions) =>
   Layer.unwrap(
     Effect.gen(function* () {
+      const token = yield* options.token;
       const intents = options.intents ? yield* options.intents : 0;
-      return DiscordConfig.layerConfig({
-        token: options.token,
+      return DiscordConfig.layer({
+        token,
         gateway: {
-          intents: Config.succeed(
-            Intents.fromList([...Intents.toList(intents), "Guilds", "GuildMembers"]),
-          ),
+          intents: Intents.fromList([...Intents.toList(intents), "Guilds", "GuildMembers"]),
         },
       });
     }),
