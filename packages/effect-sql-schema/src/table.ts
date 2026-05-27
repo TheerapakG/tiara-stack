@@ -166,7 +166,8 @@ export const defineClass =
       fields[fieldName] = modelField(namedColumn);
     }
 
-    const klass = Model.Class<Self>(identifier)(fields as never);
+    const makeClass = Model.Class<Self>(identifier);
+    const klass = makeClass(fields as Parameters<typeof makeClass>[0]);
     const tableMetadata = finalizeTable(dialect, klass as unknown as EffectSqlModel, {
       name: table.name,
       schema: table.schema,

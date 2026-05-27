@@ -94,7 +94,7 @@ export function theeCalc(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
         {
           settingSheet: Option.fromNullishOr(
             SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SETTING_SHEET_NAME),
-          ).asEffect(),
+          ).pipe(Effect.fromOption),
         },
         { concurrency: "unbounded" },
       ),
@@ -124,9 +124,13 @@ export function theeCalc(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
               Effect.flatMap((config) =>
                 pipe(
                   Effect.Do,
-                  Effect.bind("cc", () => HashMap.get(config, "cc").asEffect()),
-                  Effect.bind("considerEnc", () => HashMap.get(config, "consider_enc").asEffect()),
-                  Effect.bind("healNeeded", () => HashMap.get(config, "heal_needed").asEffect()),
+                  Effect.bind("cc", () => HashMap.get(config, "cc").pipe(Effect.fromOption)),
+                  Effect.bind("considerEnc", () =>
+                    HashMap.get(config, "consider_enc").pipe(Effect.fromOption),
+                  ),
+                  Effect.bind("healNeeded", () =>
+                    HashMap.get(config, "heal_needed").pipe(Effect.fromOption),
+                  ),
                 ),
               ),
               Effect.flatMap(Schema.decodeUnknownEffect(calcConfigValidator)),
@@ -220,6 +224,7 @@ export function theeCalc(calcSheet: GoogleAppsScript.Spreadsheet.Sheet) {
       ),
       Effect.asVoid,
       Effect.provide(AppsScriptHttpClientLayer),
+      Effect.orDie,
     ),
   );
 }
@@ -331,6 +336,7 @@ export function TZSHORTSTAMPS(start: CellValue, tzs: CellValue[][], hours: CellV
           ),
         ),
       ),
+      Effect.orDie,
     ),
   );
 }
@@ -433,6 +439,7 @@ export function TZLONGSTAMPS(start: CellValue, tzs: CellValue[][], hours: CellVa
           ),
         ),
       ),
+      Effect.orDie,
     ),
   );
 }
@@ -460,7 +467,7 @@ export function tzLongStamps({
         {
           settingSheet: Option.fromNullishOr(
             SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SETTING_SHEET_NAME),
-          ).asEffect(),
+          ).pipe(Effect.fromOption),
         },
         { concurrency: "unbounded" },
       ),
@@ -575,6 +582,7 @@ export function tzLongStamps({
             .setValues(result),
         ),
       ),
+      Effect.orDie,
     ),
   );
 }

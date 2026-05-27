@@ -11,17 +11,17 @@ allowBuilds:
 
 catalog:
   {
-    "@effect/atom-react": npm:@effect/atom-react@4.0.0-beta.56,
-    "@effect/ai-openai": npm:@effect/ai-openai@4.0.0-beta.56,
-    "@effect/ai-openrouter": npm:@effect/ai-openrouter@4.0.0-beta.56,
-    "@effect/vitest": npm:@effect/vitest@4.0.0-beta.56,
-    "@effect/platform-node": npm:@effect/platform-node@4.0.0-beta.56,
-    "@effect/opentelemetry": npm:@effect/opentelemetry@4.0.0-beta.56,
-    "@effect/sql-sqlite-node": npm:@effect/sql-sqlite-node@4.0.0-beta.56,
-    "@effect/sql-pg": npm:@effect/sql-pg@4.0.0-beta.56,
+    "@effect/atom-react": npm:@effect/atom-react@4.0.0-beta.67,
+    "@effect/ai-openai": npm:@effect/ai-openai@4.0.0-beta.67,
+    "@effect/ai-openrouter": npm:@effect/ai-openrouter@4.0.0-beta.67,
+    "@effect/vitest": npm:@effect/vitest@4.0.0-beta.67,
+    "@effect/platform-node": npm:@effect/platform-node@4.0.0-beta.67,
+    "@effect/opentelemetry": npm:@effect/opentelemetry@4.0.0-beta.67,
+    "@effect/sql-sqlite-node": npm:@effect/sql-sqlite-node@4.0.0-beta.67,
+    "@effect/sql-pg": npm:@effect/sql-pg@4.0.0-beta.67,
     "@types/node": ^24.7.2,
     dfx: npm:dfx@1.0.13,
-    effect: npm:effect@4.0.0-beta.56,
+    effect: npm:effect@4.0.0-beta.67,
     vite: npm:@voidzero-dev/vite-plus-core@0.1.15,
     vitest: npm:@voidzero-dev/vite-plus-test@0.1.15,
     vite-plus: 0.1.15,
@@ -32,6 +32,10 @@ overrides:
   better-auth: 1.4.18
   vite: "catalog:"
   vitest: "catalog:"
+packageExtensions:
+  "@effect/vitest@4.0.0-beta.67":
+    dependencies:
+      "@vitest/runner": 4.1.2
 patchedDependencies:
   better-auth@1.4.18: patches/better-auth@1.4.18.patch
 peerDependencyRules:

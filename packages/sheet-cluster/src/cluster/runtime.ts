@@ -6,12 +6,13 @@ import {
   K8sHttpClient,
   RunnerAddress,
   RunnerHealth,
+  RunnerServer,
   Sharding,
   ShardingConfig,
   SqlMessageStorage,
   SqlRunnerStorage,
 } from "effect/unstable/cluster";
-import { HttpRouter } from "effect/unstable/http";
+import { FetchHttpClient, HttpRouter } from "effect/unstable/http";
 import { RpcSerialization } from "effect/unstable/rpc";
 import { createServer } from "node:http";
 import { config } from "@/config";
@@ -37,7 +38,8 @@ export const shardingConfigLayer = Layer.unwrap(
     return ShardingConfig.layer({
       runnerAddress: Option.some(runnerAddress),
       runnerListenAddress: Option.some(RunnerAddress.make(runnerListenHost, runnerListenPort)),
-      shardGroups,
+      assignedShardGroups: shardGroups,
+      availableShardGroups: shardGroups,
       shardsPerGroup: 300,
       entityMailboxCapacity: 4096,
       entityMaxIdleTime: Duration.minutes(5),
@@ -58,10 +60,10 @@ const runnerHealthLayer = Layer.unwrap(
   }),
 ).pipe(Layer.withSpan("sheet-cluster.runnerHealth"));
 
-export const clusterClientLayer = HttpRunner.layerClient.pipe(
+export const clusterClientLayer = RunnerServer.layerClientOnly.pipe(
   Layer.provide(clusterStorageLayer),
-  Layer.provide(RunnerHealth.layerNoop),
   Layer.provide(HttpRunner.layerClientProtocolHttp({ path: "/cluster/rpc" })),
+  Layer.provide(FetchHttpClient.layer),
   Layer.provide(shardingConfigLayer),
   Layer.provide(RpcSerialization.layerJson),
   Layer.withSpan("sheet-cluster.clusterClient"),
