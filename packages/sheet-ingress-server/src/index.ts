@@ -17,7 +17,7 @@ import {
 } from "sheet-ingress-api/sheet-apis-rpc";
 import { Unauthorized } from "typhoon-core/error";
 import { dotEnvConfigProviderLayer } from "typhoon-core/config";
-import { ArgumentError, makeArgumentError } from "typhoon-core/error";
+import { ArgumentError, makeArgumentError, makeUnknownError } from "typhoon-core/error";
 import { config } from "./config";
 import { healthRoutesLayer } from "./health";
 import {
@@ -210,6 +210,22 @@ const authorizedSheetApis =
       yield* authorize(args);
       return yield* forwardSheetApis(group, endpoint)(rawArgs as never);
     }) as ReturnType<SheetApisProxyHandler<GroupName, EndpointName, R>>;
+
+const statusGetServices: SheetApisProxyHandler<"status", "getServices", never> = (rawArgs) =>
+  authorizedSheetApis(
+    "status",
+    "getServices",
+    () => Effect.void,
+  )(rawArgs).pipe(
+    Effect.mapError((error) =>
+      typeof error === "object" &&
+      error !== null &&
+      "_tag" in error &&
+      error._tag === "UnknownError"
+        ? error
+        : makeUnknownError("Failed to get service status", error),
+    ),
+  ) as ReturnType<SheetApisProxyHandler<"status", "getServices", never>>;
 
 const forwardSheetClusterDispatch =
   <EndpointName extends SheetClusterDispatchEndpointName>(
@@ -773,10 +789,7 @@ const makeApiLayer = () => {
         ),
     ),
     HttpApiBuilder.group(Api, "status", (handlers) =>
-      handlers.handle(
-        "getServices",
-        authorizedSheetApis("status", "getServices", () => Effect.void),
-      ),
+      handlers.handle("getServices", statusGetServices),
     ),
     HttpApiBuilder.group(Api, "guildConfig", (handlers) =>
       handlers
