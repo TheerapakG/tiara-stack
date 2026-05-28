@@ -29,6 +29,23 @@ type TokenCacheEntry = {
   readonly timeToLive: Duration.Duration;
 };
 
+export const readKubernetesTokenFile = Effect.fn("SheetApisRpcTokens.readKubernetesTokenFile")(
+  function* (tokenPath: string, tokenName: string) {
+    const fs = yield* FileSystem.FileSystem;
+
+    return yield* pipe(
+      fs.readFileString(tokenPath, "utf-8"),
+      Effect.map((token) => token.trim()),
+      Effect.flatMap((token) =>
+        token.length > 0
+          ? Effect.succeed(token)
+          : Effect.fail(new Error(`${tokenName} Kubernetes token file is empty`)),
+      ),
+      Effect.retry({ schedule: Schedule.exponential("1 second"), times: 3 }),
+    );
+  },
+);
+
 export class SheetApisRpcTokens extends Context.Service<SheetApisRpcTokens>()(
   "SheetApisRpcTokens",
   {
@@ -37,17 +54,13 @@ export class SheetApisRpcTokens extends Context.Service<SheetApisRpcTokens>()(
       const sheetAuthClient = yield* SheetAuthClient;
       const k8sTokenRef = yield* Ref.make("");
 
-      const refreshToken = (tokenPath: string, tokenName: string, tokenRef: Ref.Ref<string>) =>
-        pipe(
-          fs.readFileString(tokenPath, "utf-8"),
-          Effect.map((token) => token.trim()),
-          Effect.flatMap((token) =>
-            token.length > 0
-              ? Ref.set(tokenRef, token)
-              : Effect.fail(new Error(`${tokenName} Kubernetes token file is empty`)),
-          ),
-          Effect.retry({ schedule: Schedule.exponential("1 second"), times: 3 }),
+      const readToken = (tokenPath: string, tokenName: string) =>
+        readKubernetesTokenFile(tokenPath, tokenName).pipe(
+          Effect.provideService(FileSystem.FileSystem, fs),
         );
+
+      const refreshToken = (tokenPath: string, tokenName: string, tokenRef: Ref.Ref<string>) =>
+        readToken(tokenPath, tokenName).pipe(Effect.flatMap((token) => Ref.set(tokenRef, token)));
 
       const refreshK8sToken = refreshToken(sheetAuthTokenPath, "sheet-auth", k8sTokenRef);
 
@@ -62,35 +75,6 @@ export class SheetApisRpcTokens extends Context.Service<SheetApisRpcTokens>()(
         ),
         Effect.repeat(Schedule.spaced("5 minutes")),
         Effect.forkScoped,
-      );
-
-      const serviceTokenRefs = yield* Cache.makeWith(
-        Effect.fn("SheetApisRpcTokens.lookupServiceTokenRef")(function* (tokenPath) {
-          const tokenRef = yield* Ref.make("");
-          const refreshServiceToken = refreshToken(tokenPath, tokenPath, tokenRef);
-
-          yield* refreshServiceToken.pipe(
-            Effect.tapError((error) =>
-              Effect.logError(`Failed to initialize Kubernetes token at ${tokenPath}`, error),
-            ),
-          );
-          yield* refreshServiceToken.pipe(
-            Effect.catch((error) =>
-              Effect.logWarning(`Failed to refresh Kubernetes token at ${tokenPath}`, error),
-            ),
-            Effect.repeat(Schedule.spaced("5 minutes")),
-            Effect.forkScoped,
-          );
-
-          return tokenRef;
-        }),
-        {
-          capacity: 16,
-          timeToLive: Exit.match({
-            onFailure: () => Duration.seconds(30),
-            onSuccess: () => Duration.infinity,
-          }),
-        },
       );
 
       const serviceUserTokenCache = yield* Cache.makeWith<string, TokenCacheEntry>(
@@ -155,8 +139,7 @@ export class SheetApisRpcTokens extends Context.Service<SheetApisRpcTokens>()(
         getServiceToken: Effect.fn("SheetApisRpcTokens.getServiceToken")(function* (
           tokenPath: string,
         ) {
-          const tokenRef = yield* Cache.get(serviceTokenRefs, tokenPath);
-          return yield* Ref.get(tokenRef);
+          return yield* readToken(tokenPath, tokenPath);
         }),
         getServiceUser,
         withServiceUser: Effect.fn("SheetApisRpcTokens.withServiceUser")(function* <A, E, R>(
