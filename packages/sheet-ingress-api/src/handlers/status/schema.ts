@@ -10,7 +10,9 @@ export const ServiceStatus = Schema.Struct({
   httpStatus: Schema.NullOr(Schema.Number),
   latencyMs: Schema.NullOr(Schema.Number),
   checkedAt: Schema.DateTimeUtcFromMillis,
-  error: Schema.NullOr(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
+  error: Schema.optional(Schema.NullOr(Schema.String)).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
 });
 
 export type ServiceStatus = Schema.Schema.Type<typeof ServiceStatus>;

@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { DateTime, Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { ServicesStatusResponse } from "./schema";
 
@@ -21,5 +21,29 @@ describe("ServicesStatusResponse", () => {
 
     expect(decoded.services).toHaveLength(1);
     expect(decoded.services[0]!.error).toBe(null);
+  });
+
+  it("encodes undefined service errors without failing", () => {
+    const checkedAt = Effect.runSync(DateTime.now);
+    const response: typeof ServicesStatusResponse.Type = {
+      overallStatus: "ok",
+      checkedAt,
+      services: [
+        {
+          name: "sheet-apis",
+          url: "http://sheet-apis-service:3000/ready",
+          status: "ok",
+          httpStatus: 200,
+          latencyMs: 3,
+          checkedAt,
+          error: undefined,
+        },
+      ],
+    };
+
+    const encoded = Schema.encodeUnknownSync(ServicesStatusResponse)(response);
+
+    expect(encoded.services).toHaveLength(1);
+    expect(encoded.services[0]!.error).toBeUndefined();
   });
 });
