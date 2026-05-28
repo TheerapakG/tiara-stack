@@ -3,13 +3,13 @@ import { Context, DateTime, Duration, Effect, Layer } from "effect";
 import type { ServicesStatusResponse } from "sheet-ingress-api/sheet-apis-rpc";
 
 const serviceStatusTargets = [
-  { name: "sheet-apis", url: "http://sheet-apis-service:3000/ready" },
-  { name: "sheet-auth", url: "http://sheet-auth-service:3000/ready" },
-  { name: "sheet-bot", url: "http://sheet-bot-service:3000/ready" },
-  { name: "sheet-cluster", url: "http://sheet-cluster-service:3000/ready" },
-  { name: "sheet-db-server", url: "http://sheet-db-server-service:3000/ready" },
-  { name: "sheet-ingress-server", url: "http://sheet-ingress-server-service:3000/ready" },
-  { name: "sheet-web", url: "http://sheet-web-service:3000/ready" },
+  { name: "sheet-apis", url: "http://sheet-apis-service/ready" },
+  { name: "sheet-auth", url: "http://sheet-auth-service/ready" },
+  { name: "sheet-bot", url: "http://sheet-bot-service/ready" },
+  { name: "sheet-cluster", url: "http://sheet-cluster-service/ready" },
+  { name: "sheet-db-server", url: "http://sheet-db-server-service/ready" },
+  { name: "sheet-ingress-server", url: "http://sheet-ingress-server-service/ready" },
+  { name: "sheet-web", url: "http://sheet-web-service/ready" },
 ] as const;
 
 const formatError = (error: unknown) =>

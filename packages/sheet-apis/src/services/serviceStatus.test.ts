@@ -27,6 +27,26 @@ describe("ServiceStatusService", () => {
     }),
   );
 
+  it.effect("checks Kubernetes service ports instead of container ports", () =>
+    Effect.gen(function* () {
+      const urls: Array<string> = [];
+      yield* runStatusCheck((request) => {
+        urls.push(request.url);
+        return Effect.succeed(response(request, 200));
+      });
+
+      expect(urls).toEqual([
+        "http://sheet-apis-service/ready",
+        "http://sheet-auth-service/ready",
+        "http://sheet-bot-service/ready",
+        "http://sheet-cluster-service/ready",
+        "http://sheet-db-server-service/ready",
+        "http://sheet-ingress-server-service/ready",
+        "http://sheet-web-service/ready",
+      ]);
+    }),
+  );
+
   it.effect("reports degraded when a service returns non-2xx", () =>
     Effect.gen(function* () {
       const result = yield* runStatusCheck((request) =>
