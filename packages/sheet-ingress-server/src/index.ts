@@ -12,6 +12,7 @@ import { Api } from "sheet-ingress-api/api";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import {
   DispatchRoomOrderButtonMethods,
+  type ServicesStatusResponse,
   interactionTokenExpirySafetyMarginMs,
   interactionTokenLifetimeMs,
 } from "sheet-ingress-api/sheet-apis-rpc";
@@ -35,6 +36,7 @@ import { SheetApisForwardingClient } from "./services/sheetApisForwardingClient"
 import { SheetApisRpcTokens } from "./services/sheetApisRpcTokens";
 import { SheetBotForwardingClient } from "./services/sheetBotForwardingClient";
 import { clientArgsFrom, forwardSheetBot, forwardSheetBotPayload } from "./services/sheetBotProxy";
+import { normalizeServicesStatusResponse } from "./services/statusResponse";
 import { TelemetryLive } from "./telemetry";
 import {
   SheetApisAnonymousUserFallbackLive,
@@ -217,6 +219,7 @@ const statusGetServices: SheetApisProxyHandler<"status", "getServices", never> =
     "getServices",
     () => Effect.void,
   )(rawArgs).pipe(
+    Effect.map((response) => normalizeServicesStatusResponse(response as ServicesStatusResponse)),
     Effect.mapError((error) =>
       typeof error === "object" &&
       error !== null &&
