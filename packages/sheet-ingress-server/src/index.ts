@@ -12,13 +12,12 @@ import { Api } from "sheet-ingress-api/api";
 import { SheetAuthUser } from "sheet-ingress-api/schemas/middlewares/sheetAuthUser";
 import {
   DispatchRoomOrderButtonMethods,
-  type ServicesStatusResponse,
   interactionTokenExpirySafetyMarginMs,
   interactionTokenLifetimeMs,
 } from "sheet-ingress-api/sheet-apis-rpc";
 import { Unauthorized } from "typhoon-core/error";
 import { dotEnvConfigProviderLayer } from "typhoon-core/config";
-import { ArgumentError, makeArgumentError, makeUnknownError } from "typhoon-core/error";
+import { ArgumentError, makeArgumentError } from "typhoon-core/error";
 import { config } from "./config";
 import { healthRoutesLayer } from "./health";
 import {
@@ -36,6 +35,7 @@ import { SheetApisForwardingClient } from "./services/sheetApisForwardingClient"
 import { SheetApisRpcTokens } from "./services/sheetApisRpcTokens";
 import { SheetBotForwardingClient } from "./services/sheetBotForwardingClient";
 import { clientArgsFrom, forwardSheetBot, forwardSheetBotPayload } from "./services/sheetBotProxy";
+import { ServiceStatusService } from "./services/serviceStatus";
 import { normalizeServicesStatusResponse } from "./services/statusResponse";
 import { TelemetryLive } from "./telemetry";
 import {
@@ -213,22 +213,17 @@ const authorizedSheetApis =
       return yield* forwardSheetApis(group, endpoint)(rawArgs as never);
     }) as ReturnType<SheetApisProxyHandler<GroupName, EndpointName, R>>;
 
-const statusGetServices: SheetApisProxyHandler<"status", "getServices", never> = (rawArgs) =>
-  authorizedSheetApis(
-    "status",
-    "getServices",
-    () => Effect.void,
-  )(rawArgs).pipe(
-    Effect.map((response) => normalizeServicesStatusResponse(response as ServicesStatusResponse)),
-    Effect.mapError((error) =>
-      typeof error === "object" &&
-      error !== null &&
-      "_tag" in error &&
-      error._tag === "UnknownError"
-        ? error
-        : makeUnknownError("Failed to get service status", error),
-    ),
-  ) as ReturnType<SheetApisProxyHandler<"status", "getServices", never>>;
+const statusGetServices: SheetApisProxyHandler<
+  "status",
+  "getServices",
+  ServiceStatusService
+> = () =>
+  Effect.gen(function* () {
+    const serviceStatusService = yield* ServiceStatusService;
+    return yield* serviceStatusService.getServicesStatus();
+  }).pipe(Effect.map((response) => normalizeServicesStatusResponse(response))) as ReturnType<
+    SheetApisProxyHandler<"status", "getServices", ServiceStatusService>
+  >;
 
 const forwardSheetClusterDispatch =
   <EndpointName extends SheetClusterDispatchEndpointName>(
@@ -1231,6 +1226,7 @@ const makeApiLayer = () => {
     SheetApisRpcTokens.layer,
     SheetClusterForwardingClient.layer,
     SheetBotForwardingClient.layer,
+    ServiceStatusService.layer,
   );
 
   return HttpApiBuilder.layer(Api).pipe(
