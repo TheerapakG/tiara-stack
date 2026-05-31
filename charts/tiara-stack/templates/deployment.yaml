@@ -2,7 +2,6 @@
 {{- range $svc := include "tiara-stack.serviceSpecs" . | fromYamlArray }}
 {{- $serviceValues := (index ($root.Values.services | default dict) $svc.key) | default dict -}}
 {{- $secretRef := $serviceValues.secretRef | default dict -}}
-{{- $needsRuntimeCertUpdate := or (eq $svc.key "sheetApis") (eq $svc.key "sheetCluster") -}}
 {{- if $serviceValues.enabled }}
 ---
 apiVersion: apps/v1
@@ -33,14 +32,9 @@ spec:
         app: {{ $svc.name }}
     spec:
       securityContext:
-        {{- if $needsRuntimeCertUpdate }}
-        runAsUser: 0
-        runAsGroup: 0
-        {{- else }}
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
-        {{- end }}
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
@@ -61,7 +55,7 @@ spec:
             {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: {{ if $needsRuntimeCertUpdate }}false{{ else }}true{{ end }}
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
