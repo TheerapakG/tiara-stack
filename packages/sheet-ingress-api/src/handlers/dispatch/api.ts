@@ -7,6 +7,8 @@ import {
   CheckinHandleButtonErrorSchemas,
   CheckinHandleButtonPayload,
   DispatchRoomOrderButtonMethods,
+  GuildWelcomeDispatchErrorSchemas,
+  GuildWelcomeDispatchPayload,
   KickoutDispatchErrorSchemas,
   KickoutDispatchPayload,
   RoomOrderDispatchErrorSchemas,
@@ -79,6 +81,13 @@ export class DispatchApi extends HttpApiGroup.make("dispatch")
       payload: ServiceStatusDispatchPayload,
       success: DispatchAcceptedResult,
       error: UnknownError,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("guildWelcome", "/dispatch/guild/welcome", {
+      payload: GuildWelcomeDispatchPayload,
+      success: DispatchAcceptedResult,
+      error: GuildWelcomeDispatchErrorSchemas,
     }),
   )
   .add(

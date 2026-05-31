@@ -28,6 +28,7 @@ describe("Api", () => {
     expect(SheetApisRpcs.requests.has("dispatch.slotButton")).toBe(false);
     expect(SheetApisRpcs.requests.has("dispatch.slotList")).toBe(false);
     expect(SheetApisRpcs.requests.has("dispatch.slotOpenButton")).toBe(false);
+    expect(SheetApisRpcs.requests.has("dispatch.guildWelcome")).toBe(false);
     expect(SheetClusterRpcs.requests.has("dispatch.checkin")).toBe(true);
     expect(SheetClusterRpcs.requests.has("dispatch.checkinDiscard")).toBe(true);
     expect(SheetClusterRpcs.requests.has("dispatch.checkinButton")).toBe(true);
@@ -44,6 +45,8 @@ describe("Api", () => {
     expect(SheetClusterRpcs.requests.has("dispatch.slotOpenButtonDiscard")).toBe(true);
     expect(SheetClusterRpcs.requests.has("dispatch.serviceStatus")).toBe(true);
     expect(SheetClusterRpcs.requests.has("dispatch.serviceStatusDiscard")).toBe(true);
+    expect(SheetClusterRpcs.requests.has("dispatch.guildWelcome")).toBe(true);
+    expect(SheetClusterRpcs.requests.has("dispatch.guildWelcomeDiscard")).toBe(true);
     expect(SheetApisRpcs.requests.has("status.getServices")).toBe(true);
     for (const method of roomOrderButtonMethods) {
       expect(SheetApisRpcs.requests.has(method.rpcTag)).toBe(false);
@@ -85,6 +88,11 @@ describe("Api", () => {
       name: "serviceStatus",
       path: "/dispatch/status/services",
     });
+    expect(SheetClusterApi.groups.dispatch.endpoints.guildWelcome).toMatchObject({
+      method: "POST",
+      name: "guildWelcome",
+      path: "/dispatch/guild/welcome",
+    });
     expect(Api.groups.dispatch.endpoints.slotOpenButton).toMatchObject({
       method: "POST",
       name: "slotOpenButton",
@@ -94,6 +102,11 @@ describe("Api", () => {
       method: "POST",
       name: "serviceStatus",
       path: "/dispatch/status/services",
+    });
+    expect(Api.groups.dispatch.endpoints.guildWelcome).toMatchObject({
+      method: "POST",
+      name: "guildWelcome",
+      path: "/dispatch/guild/welcome",
     });
 
     expect(SheetApisApi.groups.checkin.endpoints).not.toHaveProperty("dispatch");

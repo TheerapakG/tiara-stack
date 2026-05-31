@@ -2,6 +2,7 @@ import { ClusterSchema } from "effect/unstable/cluster";
 import {
   DispatchCheckinButtonWorkflow as BaseDispatchCheckinButtonWorkflow,
   DispatchCheckinWorkflow as BaseDispatchCheckinWorkflow,
+  DispatchGuildWelcomeWorkflow as BaseDispatchGuildWelcomeWorkflow,
   DispatchKickoutWorkflow as BaseDispatchKickoutWorkflow,
   DispatchRoomOrderNextButtonWorkflow as BaseDispatchRoomOrderNextButtonWorkflow,
   DispatchRoomOrderPinTentativeButtonWorkflow as BaseDispatchRoomOrderPinTentativeButtonWorkflow,
@@ -51,6 +52,11 @@ export const DispatchServiceStatusWorkflow = BaseDispatchServiceStatusWorkflow.a
   dispatchShardGroup,
 );
 
+export const DispatchGuildWelcomeWorkflow = BaseDispatchGuildWelcomeWorkflow.annotate(
+  ClusterSchema.ShardGroup,
+  dispatchShardGroup,
+);
+
 export const DispatchCheckinButtonWorkflow = BaseDispatchCheckinButtonWorkflow.annotate(
   ClusterSchema.ShardGroup,
   dispatchShardGroup,
@@ -86,6 +92,7 @@ export const DispatchWorkflows = [
   DispatchSlotListWorkflow,
   DispatchSlotOpenButtonWorkflow,
   DispatchServiceStatusWorkflow,
+  DispatchGuildWelcomeWorkflow,
   DispatchCheckinButtonWorkflow,
   DispatchRoomOrderPreviousButtonWorkflow,
   DispatchRoomOrderNextButtonWorkflow,

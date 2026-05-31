@@ -14,6 +14,8 @@ import type {
   CheckinDispatchPayload,
   CheckinHandleButtonPayload,
   CheckinDispatchResult,
+  GuildWelcomeDispatchPayload,
+  GuildWelcomeDispatchResult,
   KickoutDispatchPayload,
   KickoutDispatchResult,
   RoomOrderPinTentativeButtonPayload,
@@ -83,6 +85,14 @@ const serviceStatusPayload: ServiceStatusDispatchPayload = {
   interactionDeadlineEpochMs: 4_102_444_800_000,
 };
 
+const guildWelcomePayload: GuildWelcomeDispatchPayload = {
+  dispatchRequestId: "discord-guild-create:guild-1:2026-05-31T00:00:00.000Z",
+  guildId: "guild-1",
+  guildName: "Guild One",
+  joinedAt: "2026-05-31T00:00:00.000Z",
+  systemChannelId: "system-channel",
+};
+
 const interactionDeadlineEpochMs = 4_102_444_800_000;
 
 const checkinButtonPayload: CheckinHandleButtonPayload = {
@@ -133,6 +143,7 @@ const makeDispatchServiceMock = (overrides: Partial<DispatchServiceMock>): Dispa
   slotList: unexpectedDispatchServiceCall("slotList"),
   slotOpenButton: unexpectedDispatchServiceCall("slotOpenButton"),
   serviceStatus: unexpectedDispatchServiceCall("serviceStatus"),
+  guildWelcome: unexpectedDispatchServiceCall("guildWelcome"),
   checkinButton: unexpectedDispatchServiceCall("checkinButton"),
   roomOrderPreviousButton: unexpectedDispatchServiceCall("roomOrderPreviousButton"),
   roomOrderNextButton: unexpectedDispatchServiceCall("roomOrderNextButton"),
@@ -240,6 +251,7 @@ describe("dispatch workflow registry", () => {
       "slotList",
       "slotOpenButton",
       "serviceStatus",
+      "guildWelcome",
       "checkinButton",
       "roomOrderPreviousButton",
       "roomOrderNextButton",
@@ -444,6 +456,42 @@ describe("dispatch workflow registry", () => {
           DispatchService,
           makeDispatchServiceMock({
             serviceStatus,
+          }),
+        ),
+      ),
+    );
+  });
+
+  it("routes guild welcome workflow execution to DispatchService", async () => {
+    const guildWelcome = vi.fn((payload: GuildWelcomeDispatchPayload) =>
+      Effect.sync(() => {
+        expect(payload).toBe(guildWelcomePayload);
+        return {
+          guildId: "guild-1",
+          channelId: "channel-1",
+          messageId: "message-1",
+        } satisfies GuildWelcomeDispatchResult;
+      }),
+    ) as DispatchServiceMock["guildWelcome"];
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const result = yield* dispatchWorkflowRegistry.guildWelcome.execute({
+          requester,
+          payload: guildWelcomePayload,
+        });
+
+        expect(result).toEqual({
+          guildId: "guild-1",
+          channelId: "channel-1",
+          messageId: "message-1",
+        });
+        expect(guildWelcome).toHaveBeenCalledWith(guildWelcomePayload);
+      }).pipe(
+        Effect.provideService(
+          DispatchService,
+          makeDispatchServiceMock({
+            guildWelcome,
           }),
         ),
       ),
@@ -666,8 +714,21 @@ describe("dispatch workflow registry", () => {
         },
       }),
     );
+    const guildWelcomeLeft = await Effect.runPromise(
+      dispatchWorkflowRegistry.guildWelcome.workflow.executionId({
+        requester,
+        payload: guildWelcomePayload,
+      }),
+    );
+    const guildWelcomeRight = await Effect.runPromise(
+      dispatchWorkflowRegistry.guildWelcome.workflow.executionId({
+        requester: { accountId: "account-2", userId: "user-2" },
+        payload: guildWelcomePayload,
+      }),
+    );
 
     expect(left).toBe(right);
     expect(left).not.toBe(different);
+    expect(guildWelcomeLeft).toBe(guildWelcomeRight);
   });
 });

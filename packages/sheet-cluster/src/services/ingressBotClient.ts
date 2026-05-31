@@ -80,6 +80,22 @@ type DiscordClient = {
     }) => Effect.Effect<DiscordMessage, unknown>;
   };
   readonly cache: {
+    readonly getChannelsForParent: (args: {
+      readonly params: { readonly parentId: string };
+    }) => Effect.Effect<
+      ReadonlyArray<{
+        readonly parentId: string;
+        readonly resourceId: string;
+        readonly value: {
+          readonly id: string;
+          readonly type: number;
+          readonly guild_id?: string;
+          readonly name?: string;
+          readonly position?: number;
+        };
+      }>,
+      unknown
+    >;
     readonly getMembersForParent: (args: {
       readonly params: { readonly parentId: string };
     }) => Effect.Effect<
@@ -252,6 +268,14 @@ export class IngressBotClient extends Context.Service<IngressBotClient>()("Ingre
       ) {
         yield* Effect.annotateCurrentSpan({ parentId: guildId });
         return yield* client.cache.getMembersForParent({
+          params: { parentId: guildId },
+        });
+      }),
+      getChannelsForParent: Effect.fn("IngressBotClient.getChannelsForParent")(function* (
+        guildId: string,
+      ) {
+        yield* Effect.annotateCurrentSpan({ parentId: guildId });
+        return yield* client.cache.getChannelsForParent({
           params: { parentId: guildId },
         });
       }),

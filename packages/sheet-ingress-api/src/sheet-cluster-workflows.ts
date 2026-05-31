@@ -13,6 +13,9 @@ import {
   CheckinHandleButtonResult,
   DispatchAcceptedResult,
   DispatchRoomOrderButtonMethods,
+  GuildWelcomeDispatchError,
+  GuildWelcomeDispatchPayload,
+  GuildWelcomeDispatchResult,
   KickoutDispatchError,
   KickoutDispatchPayload,
   KickoutDispatchResult,
@@ -92,6 +95,7 @@ const workflowName = {
   slotList: "dispatch.slotList",
   slotOpenButton: "dispatch.slotOpenButton",
   serviceStatus: "dispatch.serviceStatus",
+  guildWelcome: "dispatch.guildWelcome",
   checkinButton: "dispatch.checkinButton",
   roomOrderPreviousButton: "dispatch.roomOrderPreviousButton",
   roomOrderNextButton: "dispatch.roomOrderNextButton",
@@ -156,6 +160,14 @@ export const DispatchServiceStatusWorkflow = Workflow.make({
   idempotencyKey: ({ payload }) => payload.dispatchRequestId,
 });
 
+export const DispatchGuildWelcomeWorkflow = Workflow.make({
+  name: workflowName.guildWelcome,
+  payload: dispatchPayload(GuildWelcomeDispatchPayload),
+  success: GuildWelcomeDispatchResult,
+  error: GuildWelcomeDispatchError,
+  idempotencyKey: ({ payload }) => payload.dispatchRequestId,
+});
+
 export const DispatchCheckinButtonWorkflow = Workflow.make({
   name: workflowName.checkinButton,
   payload: dispatchPayload(CheckinHandleButtonPayload),
@@ -209,6 +221,7 @@ export const DispatchWorkflows = [
   DispatchSlotListWorkflow,
   DispatchSlotOpenButtonWorkflow,
   DispatchServiceStatusWorkflow,
+  DispatchGuildWelcomeWorkflow,
   DispatchCheckinButtonWorkflow,
   DispatchRoomOrderPreviousButtonWorkflow,
   DispatchRoomOrderNextButtonWorkflow,
@@ -278,6 +291,13 @@ export const DispatchWorkflowOperations = {
     workflow: DispatchServiceStatusWorkflow,
     rpcTag: DispatchServiceStatusWorkflow.name,
     discardRpcTag: `${DispatchServiceStatusWorkflow.name}Discard`,
+  },
+  guildWelcome: {
+    operation: "guildWelcome",
+    endpointName: "guildWelcome",
+    workflow: DispatchGuildWelcomeWorkflow,
+    rpcTag: DispatchGuildWelcomeWorkflow.name,
+    discardRpcTag: `${DispatchGuildWelcomeWorkflow.name}Discard`,
   },
   checkinButton: {
     operation: "checkinButton",

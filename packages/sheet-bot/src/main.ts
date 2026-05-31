@@ -11,6 +11,7 @@ import { serverCommandLayer } from "./commands/server";
 import { slotCommandLayer } from "./commands/slot";
 import { statusCommandLayer } from "./commands/status";
 import { teamCommandLayer } from "./commands/team";
+import { guildWelcomeEventLayer } from "./events/guildWelcome";
 import { httpLayer } from "./http";
 import { checkinButtonLayer } from "./messageComponents/buttons/checkin";
 import { roomOrderButtonLayer } from "./messageComponents/buttons/roomOrder";
@@ -29,6 +30,7 @@ const botLayer = Layer.mergeAll(
   slotCommandLayer,
   statusCommandLayer,
   teamCommandLayer,
+  guildWelcomeEventLayer,
   checkinButtonLayer,
   roomOrderButtonLayer,
   slotButtonLayer,

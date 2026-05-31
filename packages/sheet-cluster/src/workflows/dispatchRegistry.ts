@@ -21,6 +21,7 @@ import { DispatchService, IngressBotClient, SheetApisClient } from "@/services";
 import {
   DispatchCheckinButtonWorkflow,
   DispatchCheckinWorkflow,
+  DispatchGuildWelcomeWorkflow,
   DispatchKickoutWorkflow,
   DispatchRoomOrderNextButtonWorkflow,
   DispatchRoomOrderPinTentativeButtonWorkflow,
@@ -331,6 +332,17 @@ export const dispatchWorkflowRegistry = {
         return yield* service.serviceStatus(request.payload);
       }),
   },
+  guildWelcome: {
+    operation: "guildWelcome",
+    workflow: DispatchGuildWelcomeWorkflow,
+    getInteractionToken: () => undefined,
+    authorize: () => Effect.void,
+    execute: (request: typeof DispatchGuildWelcomeWorkflow.payloadSchema.Type) =>
+      Effect.gen(function* () {
+        const service = yield* DispatchService;
+        return yield* service.guildWelcome(request.payload);
+      }),
+  },
   checkinButton: {
     operation: "checkinButton",
     workflow: DispatchCheckinButtonWorkflow,
@@ -446,6 +458,11 @@ export const dispatchWorkflowLayer = Layer.mergeAll(
   DispatchServiceStatusWorkflow.toLayer(
     makeWorkflowHandler({
       ...dispatchWorkflowRegistry.serviceStatus,
+    }),
+  ),
+  DispatchGuildWelcomeWorkflow.toLayer(
+    makeWorkflowHandler({
+      ...dispatchWorkflowRegistry.guildWelcome,
     }),
   ),
   DispatchCheckinButtonWorkflow.toLayer(

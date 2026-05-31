@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Cause, DateTime, Effect, Exit, Option } from "effect";
 import { TestClock } from "effect/testing";
 import type {
+  GuildWelcomeDispatchPayload,
   KickoutDispatchPayload,
   ServiceStatusDispatchPayload,
   SlotButtonDispatchPayload,
@@ -15,6 +16,14 @@ import {
 } from "sheet-ingress-api/schemas/sheet";
 import { EventConfig } from "sheet-ingress-api/schemas/sheetConfig";
 import { DispatchService, IngressBotClient, SheetApisClient } from "@/services";
+
+const guildWelcomePayload: GuildWelcomeDispatchPayload = {
+  dispatchRequestId: "discord-guild-create:guild-1:2026-05-31T00:00:00.000Z",
+  guildId: "guild-1",
+  guildName: "Guild One",
+  joinedAt: "2026-05-31T00:00:00.000Z",
+  systemChannelId: "system-channel",
+};
 
 const slotButtonPayload: SlotButtonDispatchPayload = {
   dispatchRequestId: "dispatch-slot-button",
@@ -146,7 +155,143 @@ const runServiceStatus = (
     Effect.provideService(SheetApisClient, sheetApisClient),
   );
 
+const runGuildWelcome = (
+  botClient: typeof IngressBotClient.Service,
+  sheetApisClient: typeof SheetApisClient.Service,
+) =>
+  Effect.gen(function* () {
+    const service = yield* DispatchService.make;
+    return yield* service.guildWelcome(guildWelcomePayload);
+  }).pipe(
+    Effect.provideService(IngressBotClient, botClient),
+    Effect.provideService(SheetApisClient, sheetApisClient),
+  );
+
+const makeChannelEntry = (overrides: {
+  readonly id: string;
+  readonly type?: number;
+  readonly name?: string;
+  readonly position?: number;
+}) => ({
+  parentId: "guild-1",
+  resourceId: overrides.id,
+  value: {
+    id: overrides.id,
+    guild_id: "guild-1",
+    type: overrides.type ?? 0,
+    name: overrides.name ?? overrides.id,
+    position: overrides.position ?? 0,
+  },
+});
+
 describe("DispatchService", () => {
+  it("sends the guild welcome embed to the system channel first", async () => {
+    const sendCalls: Array<{ readonly channelId: string; readonly payload: unknown }> = [];
+    const botClient = {
+      getChannelsForParent: () =>
+        Effect.succeed([
+          makeChannelEntry({ id: "general", name: "general", position: 1 }),
+          makeChannelEntry({ id: "system-channel", name: "welcome", position: 2 }),
+        ]),
+      sendMessage: (channelId: string, payload: unknown) => {
+        sendCalls.push({ channelId, payload });
+        return Effect.succeed({ id: "welcome-message", channel_id: channelId });
+      },
+    } as never;
+
+    const result = await Effect.runPromise(runGuildWelcome(botClient, makeSheetApisClient({})));
+
+    expect(result).toEqual({
+      guildId: "guild-1",
+      channelId: "system-channel",
+      messageId: "welcome-message",
+    });
+    expect(sendCalls).toHaveLength(1);
+    expect(sendCalls[0]?.channelId).toBe("system-channel");
+    expect(sendCalls[0]?.payload).toEqual({
+      embeds: [
+        {
+          title: "Thanks for adding Tiara",
+          description:
+            "I help manage and monitor Project SEKAI tiering runs: schedules, check-ins, slots, room order, and run status from your team's Google Sheet.",
+          color: 0x5865f2,
+          fields: [
+            {
+              name: "Google Sheet adapter required",
+              value:
+                "This bot needs a compatible Google Sheet adapter before it can do useful work. For now, message <@394295776655966219> (Theerie) to get one.",
+            },
+            {
+              name: "Run your own bot",
+              value:
+                "If you would rather not give the hosted bot your sheet ID, you can run your own bot from https://github.com/tiara-stack/tiara-stack with the Docker Compose file or Helm chart.",
+            },
+            {
+              name: "Self-hosting requirements",
+              value:
+                "You will need a Discord application and bot token, a Google Cloud service account with Sheets access, Postgres, Redis, and either Docker Compose or a Kubernetes cluster. Optional pieces include Infisical for secret sync and an OTLP endpoint for traces/metrics.",
+            },
+          ],
+          footer: {
+            text: "happy mana/moniing~",
+          },
+        },
+      ],
+    });
+  });
+
+  it("falls back to general and then sorted sendable channels for guild welcome", async () => {
+    const sendCalls: Array<string> = [];
+    const botClient = {
+      getChannelsForParent: () =>
+        Effect.succeed([
+          makeChannelEntry({ id: "voice", type: 2, name: "voice", position: 0 }),
+          makeChannelEntry({ id: "late", name: "late", position: 20 }),
+          makeChannelEntry({ id: "general", name: "General", position: 50 }),
+          makeChannelEntry({ id: "early", name: "early", position: 10 }),
+        ]),
+      sendMessage: (channelId: string) => {
+        sendCalls.push(channelId);
+        return channelId === "general"
+          ? Effect.fail(new Error("cannot send general"))
+          : Effect.succeed({ id: `message-${channelId}`, channel_id: channelId });
+      },
+    } as never;
+
+    const result = await Effect.runPromise(runGuildWelcome(botClient, makeSheetApisClient({})));
+
+    expect(result).toEqual({
+      guildId: "guild-1",
+      channelId: "early",
+      messageId: "message-early",
+    });
+    expect(sendCalls).toEqual(["general", "early"]);
+  });
+
+  it("fails guild welcome when no channel can receive the message", async () => {
+    const botClient = {
+      getChannelsForParent: () =>
+        Effect.succeed([makeChannelEntry({ id: "voice", type: 2, name: "voice", position: 0 })]),
+      sendMessage: () => Effect.die("sendMessage should not be called"),
+    } as never;
+
+    const exit = await Effect.runPromiseExit(runGuildWelcome(botClient, makeSheetApisClient({})));
+
+    expect(Exit.isFailure(exit)).toBe(true);
+    expect(
+      Exit.isFailure(exit) &&
+        exit.cause.reasons
+          .filter(Cause.isFailReason)
+          .some(
+            (reason) =>
+              typeof reason.error === "object" &&
+              reason.error !== null &&
+              "_tag" in reason.error &&
+              reason.error._tag === "ArgumentError",
+          ),
+    ).toBe(true);
+  });
+
   it("persists slot button metadata with the requester Discord user id", async () => {
     const upsertCalls: Array<unknown> = [];
     const botClient = {

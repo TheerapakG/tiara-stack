@@ -25,6 +25,8 @@ import type {
   CheckinDispatchResult,
   CheckinHandleButtonPayload,
   CheckinHandleButtonResult,
+  GuildWelcomeDispatchPayload,
+  GuildWelcomeDispatchResult,
   KickoutDispatchPayload,
   KickoutDispatchResult,
   RoomOrderButtonBasePayload,
@@ -62,6 +64,18 @@ const MessageFlags = {
 type DiscordMessage = {
   readonly id: string;
   readonly channel_id: string;
+};
+
+type DiscordChannelCacheEntry = {
+  readonly parentId: string;
+  readonly resourceId: string;
+  readonly value: {
+    readonly id: string;
+    readonly type: number;
+    readonly guild_id?: string;
+    readonly name?: string;
+    readonly position?: number;
+  };
 };
 
 type MessagePayload = Schema.Schema.Type<typeof DiscordMessageRequestSchema>;
@@ -321,6 +335,75 @@ const makeWebScheduleEmbed = () =>
     description: "📅 **Preview**: View your schedule online at <https://schedule.theerapakg.moe/>",
     color: 0x5865f2,
   });
+
+const welcomeEmbed = () =>
+  makeEmbed({
+    title: "Thanks for adding Tiara",
+    description:
+      "I help manage and monitor Project SEKAI tiering runs: schedules, check-ins, slots, room order, and run status from your team's Google Sheet.",
+    color: 0x5865f2,
+    fields: [
+      {
+        name: "Google Sheet adapter required",
+        value:
+          "This bot needs a compatible Google Sheet adapter before it can do useful work. For now, message <@394295776655966219> (Theerie) to get one.",
+      },
+      {
+        name: "Run your own bot",
+        value:
+          "If you would rather not give the hosted bot your sheet ID, you can run your own bot from https://github.com/tiara-stack/tiara-stack with the Docker Compose file or Helm chart.",
+      },
+      {
+        name: "Self-hosting requirements",
+        value:
+          "You will need a Discord application and bot token, a Google Cloud service account with Sheets access, Postgres, Redis, and either Docker Compose or a Kubernetes cluster. Optional pieces include Infisical for secret sync and an OTLP endpoint for traces/metrics.",
+      },
+    ],
+    footer: {
+      text: "happy mana/moniing~",
+    },
+  });
+
+const sendableGuildChannelTypes = new Set([0, 5]);
+
+const isSendableGuildChannel = (channel: DiscordChannelCacheEntry) =>
+  sendableGuildChannelTypes.has(channel.value.type);
+
+const channelPosition = (channel: DiscordChannelCacheEntry) =>
+  typeof channel.value.position === "number" ? channel.value.position : Number.MAX_SAFE_INTEGER;
+
+export const guildWelcomeChannelCandidates = (
+  channels: ReadonlyArray<DiscordChannelCacheEntry>,
+  systemChannelId: string | undefined,
+) => {
+  const sendableChannels = channels.filter(isSendableGuildChannel);
+  const byId = new Map(sendableChannels.map((channel) => [channel.resourceId, channel]));
+  const candidates: Array<DiscordChannelCacheEntry> = [];
+  const seen = new Set<string>();
+  const addCandidate = (channel: DiscordChannelCacheEntry | undefined) => {
+    if (channel !== undefined && !seen.has(channel.resourceId)) {
+      seen.add(channel.resourceId);
+      candidates.push(channel);
+    }
+  };
+
+  if (systemChannelId !== undefined) {
+    addCandidate(byId.get(systemChannelId));
+  }
+
+  addCandidate(sendableChannels.find((channel) => channel.value.name?.toLowerCase() === "general"));
+
+  for (const channel of [...sendableChannels].sort((left, right) => {
+    const positionDifference = channelPosition(left) - channelPosition(right);
+    return positionDifference === 0
+      ? left.resourceId.localeCompare(right.resourceId)
+      : positionDifference;
+  })) {
+    addCandidate(channel);
+  }
+
+  return candidates;
+};
 
 const formatDateTime = (dateTime: DateTime.DateTime) => DateTime.toEpochMillis(dateTime) / 1000;
 
@@ -1835,6 +1918,50 @@ export class DispatchService extends Context.Service<DispatchService>()("Dispatc
                 Effect.andThen(Effect.fail(markInteractionFailureHandled(error))),
               ),
           ),
+        );
+      }),
+      guildWelcome: Effect.fn("DispatchService.guildWelcome")(function* (
+        payload: GuildWelcomeDispatchPayload,
+      ) {
+        yield* Effect.annotateCurrentSpan({
+          guildId: payload.guildId,
+          guildName: payload.guildName,
+          systemChannelId: payload.systemChannelId,
+        });
+
+        const channels = yield* botClient.getChannelsForParent(payload.guildId);
+        const candidates = guildWelcomeChannelCandidates(channels, payload.systemChannelId);
+        const messagePayload = {
+          embeds: [welcomeEmbed()],
+        } satisfies MessagePayload;
+
+        for (const channel of candidates) {
+          const sentMessage = yield* botClient.sendMessage(channel.resourceId, messagePayload).pipe(
+            Effect.map(Option.some),
+            Effect.catchCause((cause) =>
+              Effect.logWarning("Failed to send guild welcome message").pipe(
+                Effect.annotateLogs({
+                  guildId: payload.guildId,
+                  channelId: channel.resourceId,
+                  channelName: channel.value.name,
+                }),
+                Effect.andThen(Effect.logDebug(cause)),
+                Effect.as(Option.none<DiscordMessage>()),
+              ),
+            ),
+          );
+
+          if (Option.isSome(sentMessage)) {
+            return {
+              guildId: payload.guildId,
+              channelId: sentMessage.value.channel_id,
+              messageId: sentMessage.value.id,
+            } satisfies GuildWelcomeDispatchResult;
+          }
+        }
+
+        return yield* Effect.fail(
+          makeArgumentError(`Cannot send guild welcome message for guild ${payload.guildId}`),
         );
       }),
       slotOpenButton: Effect.fn("DispatchService.slotOpenButton")(function* (

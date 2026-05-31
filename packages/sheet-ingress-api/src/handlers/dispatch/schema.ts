@@ -63,6 +63,9 @@ export const SlotDispatchErrorSchemas = [
 ] as const;
 export const SlotDispatchError = Schema.Union(SlotDispatchErrorSchemas);
 
+export const GuildWelcomeDispatchErrorSchemas = [ArgumentError, UnknownError] as const;
+export const GuildWelcomeDispatchError = Schema.Union(GuildWelcomeDispatchErrorSchemas);
+
 export const CheckinDispatchPayload = Schema.Struct({
   dispatchRequestId: Schema.String,
   guildId: Schema.String,
@@ -217,6 +220,24 @@ export const ServiceStatusDispatchPayload = Schema.Struct({
 });
 
 export type ServiceStatusDispatchPayload = Schema.Schema.Type<typeof ServiceStatusDispatchPayload>;
+
+export const GuildWelcomeDispatchPayload = Schema.Struct({
+  dispatchRequestId: Schema.String,
+  guildId: Schema.String,
+  guildName: Schema.String,
+  joinedAt: Schema.String,
+  systemChannelId: Schema.optional(Schema.String),
+});
+
+export type GuildWelcomeDispatchPayload = Schema.Schema.Type<typeof GuildWelcomeDispatchPayload>;
+
+export const GuildWelcomeDispatchResult = Schema.Struct({
+  guildId: Schema.String,
+  channelId: Schema.String,
+  messageId: Schema.String,
+});
+
+export type GuildWelcomeDispatchResult = Schema.Schema.Type<typeof GuildWelcomeDispatchResult>;
 
 export const ServiceStatusDispatchResult = Schema.Struct({
   overallStatus: Schema.Literals(["ok", "degraded"]),
